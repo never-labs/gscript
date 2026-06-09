@@ -1430,6 +1430,20 @@ func TestBucketFloorNumericValues(t *testing.T) {
 	if got, want := rangeBucketed.Values(), []any{int64(-4), int64(-2), int64(-2), int64(0), int64(0), int64(2), int64(2)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("range bucket values = %#v, want %#v", got, want)
 	}
+	if sum, ok, err := TryTypedNumericSum(rangeBucketed); err != nil || !ok || sum != int64(-4) {
+		t.Fatalf("range bucket typed sum = %v,%v,%v; want -4,true,nil", sum, ok, err)
+	}
+
+	tilBucketed, err := BucketFloor(NewI64Range(0, 1, 8192), int64(60))
+	if err != nil {
+		t.Fatalf("BucketFloor til range returned error: %v", err)
+	}
+	if _, ok := tilBucketed.(i64BucketArray); !ok {
+		t.Fatalf("BucketFloor til range returned %T, want i64BucketArray", tilBucketed)
+	}
+	if sum, ok, err := TryTypedNumericSum(tilBucketed); err != nil || !ok || sum != int64(33309120) {
+		t.Fatalf("til bucket typed sum = %v,%v,%v; want 33309120,true,nil", sum, ok, err)
+	}
 
 	floatBucketed, err := BucketFloor(NewF64([]float64{-1.25, -1.0, -0.75, 0, 0.74, 0.75}), 0.5)
 	if err != nil {

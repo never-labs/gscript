@@ -500,6 +500,26 @@ type i64ProductArray struct {
 	right i64RangeArray
 }
 
+type i64BucketArray struct {
+	source Array
+	width  int64
+	len    int
+}
+
+type f64BucketArray struct {
+	source Array
+	width  float64
+	kind   Kind
+	len    int
+}
+
+type i64XrankArray struct {
+	source      Array
+	bucketCount int64
+	domainSize  int64
+	len         int
+}
+
 type nullableArray struct {
 	kind Kind
 	data []any
@@ -791,6 +811,174 @@ func (a i64RangeArray) gatherRange(indexes []int) (Array, bool) {
 		step:  int64(indexStep) * a.step,
 		len:   len(indexes),
 	}, true
+}
+
+func (a i64BucketArray) Kind() Kind { return KindI64 }
+
+func (a i64BucketArray) Len() int { return a.len }
+
+func (a i64BucketArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64BucketArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data i64 bucket row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64BucketArray) Gather(indexes []int) Array {
+	if gathered, ok := gatherI64BucketRange(a, indexes); ok {
+		return gathered
+	}
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data i64 bucket gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64BucketArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	value, ok, err := integerArrayAt(a.source, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return floorInt64(value, a.width), true, nil
+}
+
+func (a f64BucketArray) Kind() Kind { return a.kind }
+
+func (a f64BucketArray) Len() int { return a.len }
+
+func (a f64BucketArray) At(row int) (any, bool) {
+	value, ok, err := a.f64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	if a.kind == KindF32 {
+		return float32(value), true
+	}
+	return value, true
+}
+
+func (a f64BucketArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.f64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data f64 bucket row %d out of range", row))
+		}
+		if a.kind == KindF32 {
+			out[row] = float32(value)
+		} else {
+			out[row] = value
+		}
+	}
+	return out
+}
+
+func (a f64BucketArray) Gather(indexes []int) Array {
+	out := make([]float64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.f64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data f64 bucket gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	if a.kind == KindF32 {
+		values := make([]float32, len(out))
+		for i, value := range out {
+			values[i] = float32(value)
+		}
+		return columnArray[float32]{kind: KindF32, data: values}
+	}
+	return newF64Trusted(out)
+}
+
+func (a f64BucketArray) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	value, ok, err := typedKernels.NumericAt(a.source, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return math.Floor(value/a.width) * a.width, true, nil
+}
+
+func (a i64XrankArray) Kind() Kind { return KindI64 }
+
+func (a i64XrankArray) Len() int { return a.len }
+
+func (a i64XrankArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64XrankArray) Values() []any {
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data xrank row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64XrankArray) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data xrank gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64XrankArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	if a.bucketCount <= 0 || a.domainSize <= 0 {
+		return 0, false, fmt.Errorf("xrank domain is invalid")
+	}
+	value, ok, err := integerArrayAt(a.source, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	if value < 0 || value >= a.domainSize {
+		return 0, false, nil
+	}
+	bucket := (value * a.bucketCount) / a.domainSize
+	if bucket >= a.bucketCount {
+		bucket = a.bucketCount - 1
+	}
+	return bucket, true, nil
 }
 
 func (a i64SegmentArray) Kind() Kind { return KindI64 }
@@ -3588,13 +3776,43 @@ func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
 		if err != nil {
 			return nil, true, err
 		}
-		return bucketFloorI64Slice(a.data, width), true, nil
+		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
 	case i64RangeArray:
 		width, err := bucketInt64Interval(KindI64, interval)
 		if err != nil {
 			return nil, true, err
 		}
-		return bucketFloorI64Range(a, width), true, nil
+		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
+	case i64SegmentArray:
+		width, err := bucketInt64Interval(KindI64, interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
+	case i64ScalarDyadicArray:
+		width, err := bucketInt64Interval(KindI64, interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
+	case f64RangeArray:
+		width, err := bucketFloat64Interval(interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return f64BucketArray{source: a, width: width, kind: KindF64, len: a.Len()}, true, nil
+	case columnArray[float32]:
+		width, err := bucketFloat64Interval(interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return f64BucketArray{source: a, width: width, kind: KindF32, len: a.Len()}, true, nil
+	case columnArray[float64]:
+		width, err := bucketFloat64Interval(interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return f64BucketArray{source: a, width: width, kind: KindF64, len: a.Len()}, true, nil
 	default:
 		return nil, false, nil
 	}

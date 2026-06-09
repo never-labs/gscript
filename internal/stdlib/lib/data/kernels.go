@@ -1890,6 +1890,12 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 	case i64RangeArray:
 		sum := i64RangeSum(a)
 		return float64(sum), int64(a.len), true, nil
+	case i64BucketArray:
+		sum, handled, err := i64BucketSum(a)
+		return float64(sum), int64(a.Len()), handled, err
+	case i64XrankArray:
+		sum, handled, err := i64XrankSum(a)
+		return float64(sum), int64(a.Len()), handled, err
 	case i64SparseAmendArray:
 		sum, handled, err := i64SparseAmendSum(a)
 		return float64(sum), int64(a.Len()), handled, err
@@ -1899,6 +1905,9 @@ func (typedKernelRegistry) NumericSum(array Array) (float64, int64, bool, error)
 		return float64(a.total()), int64(a.len), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), int64(a.len), true, nil
+	case f64BucketArray:
+		sum, handled, err := f64BucketSum(a)
+		return sum, int64(a.Len()), handled, err
 	case f64FillArray:
 		return a.sum(), int64(a.Len()), true, nil
 	case fbyF64BroadcastArray:
@@ -2082,6 +2091,69 @@ func TryTypedBinSum(domain Array, query any) (any, bool, error) {
 		return nil, true, err
 	}
 	return index, true, nil
+}
+
+// TryTypedXrank returns q xrank buckets for typed integer arrays without
+// materializing []any values or sorting when the source shape is already
+// describable as a compact integer bucket domain.
+func TryTypedXrank(bucketCount int64, array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, true, fmt.Errorf("xrank array must be non-nil")
+	}
+	if bucketCount <= 0 || int64(int(bucketCount)) != bucketCount {
+		return nil, true, fmt.Errorf("xrank expects a positive integer bucket count")
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedXrank(bucketCount, a.array)
+	case columnArray[int8]:
+		return xrankSignedSlice(a.data, bucketCount), true, nil
+	case columnArray[int16]:
+		return xrankSignedSlice(a.data, bucketCount), true, nil
+	case columnArray[int32]:
+		return xrankSignedSlice(a.data, bucketCount), true, nil
+	case columnArray[int64]:
+		return xrankSignedSlice(a.data, bucketCount), true, nil
+	case i64ScalarDyadicArray:
+		if a.op == OpMod && !a.scalarLeft && a.scalar > 0 {
+			return i64XrankArray{source: a, bucketCount: bucketCount, domainSize: a.scalar, len: a.Len()}, true, nil
+		}
+	case i64RangeArray:
+		if a.step == 1 && a.start == 0 {
+			return i64XrankArray{source: a, bucketCount: bucketCount, domainSize: int64(a.len), len: a.Len()}, true, nil
+		}
+	}
+	return nil, false, nil
+}
+
+func xrankSignedSlice[T signedScalar](values []T, bucketCount int64) Array {
+	out := make([]int64, len(values))
+	if len(values) == 0 {
+		return newI64Trusted(out)
+	}
+	indexes := make([]int, len(values))
+	for i := range indexes {
+		indexes[i] = i
+	}
+	sort.SliceStable(indexes, func(i, j int) bool {
+		return values[indexes[i]] < values[indexes[j]]
+	})
+	rank := 0
+	for rank < len(indexes) {
+		next := rank + 1
+		for next < len(indexes) && values[indexes[next]] == values[indexes[rank]] {
+			next++
+		}
+		bucket := int64(rank) * bucketCount / int64(len(indexes))
+		if bucket >= bucketCount {
+			bucket = bucketCount - 1
+		}
+		for _, index := range indexes[rank:next] {
+			out[index] = bucket
+		}
+		rank = next
+	}
+	return newI64Trusted(out)
 }
 
 // TryTypedNumericSumByI64Indexes reduces array rows selected by a typed i64
@@ -3011,6 +3083,10 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case i64RangeArray:
 		return i64RangeSum(a), true, nil
+	case i64BucketArray:
+		return i64BucketSum(a)
+	case i64XrankArray:
+		return i64XrankSum(a)
 	case i64ScalarDyadicArray:
 		return i64ScalarDyadicSum(a)
 	case i64ScalarDyadicRunningSumArray:
@@ -3025,6 +3101,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return a.total(), true, nil
 	case f64RangeArray:
 		return f64RangeSum(a), true, nil
+	case f64BucketArray:
+		return f64BucketSum(a)
 	case f64FillArray:
 		return a.sum(), true, nil
 	case fbyF64BroadcastArray:
@@ -5691,6 +5769,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericI64RangeAt(a, row)
 	case f64RangeArray:
 		return numericF64RangeAt(a, row)
+	case f64BucketArray:
+		return a.f64At(row)
 	case i64RunningSumArray:
 		value, ok := a.i64At(row)
 		if !ok {
@@ -5705,6 +5785,18 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return value, true, nil
 	case i64SegmentArray:
 		return numericI64SegmentAt(a, row)
+	case i64BucketArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
+	case i64XrankArray:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
 	case i64PeriodicIndexArray:
 		value, ok := a.i64At(row)
 		if !ok {
@@ -5808,7 +5900,7 @@ func isNumericArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
-		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray:
+		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, i64BucketArray, i64XrankArray, f64BucketArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -6183,7 +6275,7 @@ func isIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -6218,7 +6310,7 @@ func isDenseIntegerArray(array Array) bool {
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray:
+		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray:
 		return true
 	default:
 		return false
@@ -6244,6 +6336,10 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 	case attributedArray:
 		return integerArrayAt(a.array, row)
 	case i64SparseAmendArray:
+		return a.i64At(row)
+	case i64BucketArray:
+		return a.i64At(row)
+	case i64XrankArray:
 		return a.i64At(row)
 	case tiledArray:
 		if row < 0 || row >= a.len || a.source.Len() == 0 {
@@ -7896,6 +7992,117 @@ func i64RangeSum(values i64RangeArray) int64 {
 		return (n / 2) * endpoints
 	}
 	return n * (endpoints / 2)
+}
+
+func i64BucketSum(values i64BucketArray) (int64, bool, error) {
+	if values.width <= 0 {
+		return 0, true, fmt.Errorf("bucket floor interval must be positive")
+	}
+	switch source := values.source.(type) {
+	case attributedArray:
+		return i64BucketSum(i64BucketArray{source: source.array, width: values.width, len: values.len})
+	case i64RangeArray:
+		if source.step == 1 && source.start >= 0 && values.len == source.len {
+			return i64BucketRangeStepOneSum(source.start, values.len, values.width), true, nil
+		}
+	}
+	var total int64
+	for row := 0; row < values.len; row++ {
+		value, ok, err := values.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		total += value
+	}
+	return total, true, nil
+}
+
+func i64BucketRangeStepOneSum(start int64, length int, width int64) int64 {
+	if length <= 0 {
+		return 0
+	}
+	end := start + int64(length)
+	return width * (floorQuotientPrefixSum(end, width) - floorQuotientPrefixSum(start, width))
+}
+
+func floorQuotientPrefixSum(n, width int64) int64 {
+	if n <= 0 {
+		return 0
+	}
+	full := n / width
+	rem := n % width
+	return width*full*(full-1)/2 + rem*full
+}
+
+func f64BucketSum(values f64BucketArray) (float64, bool, error) {
+	if values.width <= 0 || math.IsNaN(values.width) || math.IsInf(values.width, 0) {
+		return 0, true, fmt.Errorf("bucket floor interval must be finite and positive")
+	}
+	var total float64
+	for row := 0; row < values.len; row++ {
+		value, ok, err := values.f64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		total += value
+	}
+	return total, true, nil
+}
+
+func i64XrankSum(values i64XrankArray) (int64, bool, error) {
+	if values.bucketCount <= 0 || values.domainSize <= 0 {
+		return 0, true, fmt.Errorf("xrank domain is invalid")
+	}
+	switch source := values.source.(type) {
+	case attributedArray:
+		return i64XrankSum(i64XrankArray{source: source.array, bucketCount: values.bucketCount, domainSize: values.domainSize, len: values.len})
+	case i64RangeArray:
+		if source.start == 0 && source.step == 1 && int64(source.len) == values.domainSize && values.len == source.len {
+			return i64XrankDomainPrefixSum(values.domainSize, values.bucketCount, int64(values.len)), true, nil
+		}
+	case i64ScalarDyadicArray:
+		if source.op == OpMod && !source.scalarLeft && source.scalar == values.domainSize && source.scalar > 0 {
+			period := i64XrankDomainPrefixSum(values.domainSize, values.bucketCount, values.domainSize)
+			full := int64(values.len) / values.domainSize
+			rem := int64(values.len) % values.domainSize
+			return period*full + i64XrankDomainPrefixSum(values.domainSize, values.bucketCount, rem), true, nil
+		}
+	}
+	var total int64
+	for row := 0; row < values.len; row++ {
+		value, ok, err := values.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		total += value
+	}
+	return total, true, nil
+}
+
+func i64XrankDomainPrefixSum(domainSize, bucketCount, length int64) int64 {
+	if domainSize <= 0 || bucketCount <= 0 || length <= 0 {
+		return 0
+	}
+	if length > domainSize {
+		length = domainSize
+	}
+	var total int64
+	for value := int64(0); value < length; value++ {
+		bucket := (value * bucketCount) / domainSize
+		if bucket >= bucketCount {
+			bucket = bucketCount - 1
+		}
+		total += bucket
+	}
+	return total
+}
+
+func gatherI64BucketRange(values i64BucketArray, indexes []int) (Array, bool) {
+	if len(indexes) == 0 {
+		return i64BucketArray{source: values.source.Gather(nil), width: values.width, len: 0}, true
+	}
+	gathered := values.source.Gather(indexes)
+	return i64BucketArray{source: gathered, width: values.width, len: gathered.Len()}, true
 }
 
 func f64RangeSum(values f64RangeArray) float64 {

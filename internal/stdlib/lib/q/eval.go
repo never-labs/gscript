@@ -12128,6 +12128,15 @@ func xrank(bucketCount any, v any) (any, error) {
 		}
 		return int64(0), nil
 	}
+	if out, handled, err := data.TryTypedXrank(n64, array); err != nil || handled {
+		recordRuntimeKernelProbe("ArrayXrank", "xrank/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	} else {
+		recordRuntimeKernelProbeReason("ArrayXrank", "xrank/"+string(array.Kind()), handled, err, RuntimeFallbackUnsupportedType)
+	}
 	values := array.Values()
 	out := make([]any, len(values))
 	indexes := make([]int, 0, len(values))

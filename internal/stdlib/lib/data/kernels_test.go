@@ -2454,6 +2454,43 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 			t.Fatalf("%s sum = %v,%v; want %d,true", tt.name, sum, ok, tt.want)
 		}
 	}
+	xrank, ok, err := TryTypedXrank(4, NewI64Range(0, 1, 9))
+	if err != nil {
+		t.Fatalf("TryTypedXrank til returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedXrank til did not match")
+	}
+	if got, want := xrank.Values(), []any{int64(0), int64(0), int64(0), int64(1), int64(1), int64(2), int64(2), int64(3), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedXrank til values = %v, want %v", got, want)
+	}
+	xrank, ok, err = TryTypedXrank(2, NewI64([]int64{40, 10, 30, 20}))
+	if err != nil {
+		t.Fatalf("TryTypedXrank slice returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedXrank slice did not match")
+	}
+	if got, want := xrank.Values(), []any{int64(1), int64(0), int64(1), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedXrank slice values = %v, want %v", got, want)
+	}
+	modRankInput, ok, err := TryTypedIntegerDyadic(OpMod, NewI64Range(0, 1, 8192), int64(100))
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDyadic xrank mod returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDyadic xrank mod did not match")
+	}
+	xrank, ok, err = TryTypedXrank(10, modRankInput.(Array))
+	if err != nil {
+		t.Fatalf("TryTypedXrank modulo returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedXrank modulo did not match")
+	}
+	if sum, ok, err := TryTypedNumericSum(xrank); err != nil || !ok || sum != int64(36828) {
+		t.Fatalf("TryTypedXrank modulo sum = %v,%v,%v; want 36828,true,nil", sum, ok, err)
+	}
 	count, indexSum, ok, err := TryTypedModuloCompareIndexStatsI64(NewI64Range(0, 1, 12), int64(4), OpEQ, int64(2))
 	if err != nil || !ok || count != 3 || indexSum != 18 {
 		t.Fatalf("TryTypedModuloCompareIndexStatsI64 eq = %d,%d,%v,%v; want 3,18,true,nil", count, indexSum, ok, err)
