@@ -2591,6 +2591,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumIntegerValue(a.data), true, nil
 	case i64RangeArray:
 		return i64RangeSum(a), true, nil
+	case i64ScalarDyadicArray:
+		return i64ScalarDyadicSum(a)
 	case i64SparseAmendArray:
 		return i64SparseAmendSum(a)
 	case i64FillArray:
@@ -4566,7 +4568,9 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
-		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray, i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray:
+		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
+		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
+		i64ScalarDyadicArray:
 		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
@@ -4866,6 +4870,11 @@ func applyI64RangeScalar(op Op, values i64RangeArray, scalar int64, scalarLeft b
 		return i64RangeArray{start: values.start - scalar, step: values.step, len: values.len}, true
 	case OpMul:
 		return i64RangeArray{start: values.start * scalar, step: values.step * scalar, len: values.len}, true
+	case OpMod:
+		if scalarLeft || scalar == 0 {
+			return nil, false
+		}
+		return i64ScalarDyadicArray{source: values, op: op, scalar: scalar, len: values.len}, true
 	default:
 		return nil, false
 	}
@@ -7349,6 +7358,11 @@ func i64ScalarDyadicRangeSum(array i64ScalarDyadicArray, start, length int) (any
 	if length == 0 {
 		return NullValue, true, nil
 	}
+	if start == 0 && length == array.len {
+		if out, handled := i64ScalarDyadicWholeRangeSum(array); handled {
+			return out, true, nil
+		}
+	}
 	sourceRows := i64RangeArray{start: int64(start), step: 1, len: length}
 	sourceSumValue, handled, err := typedIntegerSumContiguousRange(array.source, sourceRows)
 	if err != nil || !handled {
@@ -7375,6 +7389,62 @@ func i64ScalarDyadicRangeSum(array i64ScalarDyadicArray, start, length int) (any
 	default:
 		return nil, false, nil
 	}
+}
+
+func i64ScalarDyadicSum(array i64ScalarDyadicArray) (any, bool, error) {
+	if array.len == 0 {
+		return int64(0), true, nil
+	}
+	if out, handled := i64ScalarDyadicWholeRangeSum(array); handled {
+		return out, true, nil
+	}
+	return i64ScalarDyadicRangeSum(array, 0, array.len)
+}
+
+func i64ScalarDyadicWholeRangeSum(array i64ScalarDyadicArray) (int64, bool) {
+	if array.op != OpMod || array.scalarLeft || array.scalar <= 0 {
+		return 0, false
+	}
+	rangeSource, ok := array.source.(i64RangeArray)
+	if !ok || rangeSource.step != 1 {
+		return 0, false
+	}
+	return i64RangePositiveModSum(rangeSource.start, array.len, array.scalar), true
+}
+
+func i64RangePositiveModSum(start int64, length int, modulus int64) int64 {
+	if length <= 0 {
+		return 0
+	}
+	period := modulus
+	if period <= 0 {
+		return 0
+	}
+	periodSum := period * (period - 1) / 2
+	first := qPositiveMod(start, modulus)
+	n := int64(length)
+	if first == 0 {
+		full := n / period
+		rem := n % period
+		return full*periodSum + rem*(rem-1)/2
+	}
+	firstRun := period - first
+	if n <= firstRun {
+		return n * (2*first + n - 1) / 2
+	}
+	sum := firstRun * (first + period - 1) / 2
+	remaining := n - firstRun
+	full := remaining / period
+	rem := remaining % period
+	return sum + full*periodSum + rem*(rem-1)/2
+}
+
+func qPositiveMod(value, modulus int64) int64 {
+	out := value % modulus
+	if out < 0 {
+		out += modulus
+	}
+	return out
 }
 
 func (a notMask) Kind() Kind { return KindBool }

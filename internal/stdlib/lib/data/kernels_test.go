@@ -2275,6 +2275,31 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := negativeMod.(Array).Values(), []any{int64(1), int64(0), int64(1), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedIntegerDyadic negative mod values = %v, want %v", got, want)
 	}
+	for _, tt := range []struct {
+		name    string
+		source  Array
+		modulus int64
+		want    int64
+	}{
+		{name: "til", source: NewI64Range(0, 1, 40), modulus: 17, want: 287},
+		{name: "offset", source: NewI64Range(5, 1, 20), modulus: 7, want: 59},
+		{name: "negative start", source: NewI64Range(-5, 1, 12), modulus: 4, want: 18},
+	} {
+		mod, ok, err := TryTypedIntegerDyadic(OpMod, tt.source, tt.modulus)
+		if err != nil {
+			t.Fatalf("%s mod returned error: %v", tt.name, err)
+		}
+		if !ok {
+			t.Fatalf("%s mod did not match", tt.name)
+		}
+		sum, ok, err := TryTypedNumericSum(mod.(Array))
+		if err != nil {
+			t.Fatalf("%s sum returned error: %v", tt.name, err)
+		}
+		if !ok || sum != tt.want {
+			t.Fatalf("%s sum = %v,%v; want %d,true", tt.name, sum, ok, tt.want)
+		}
+	}
 	attributedNot, ok, err := TryTypedNot(WithArrayAttribute(NewI64([]int64{0, 1}), ArrayAttributeSorted))
 	if err != nil {
 		t.Fatalf("TryTypedNot attributed returned error: %v", err)
