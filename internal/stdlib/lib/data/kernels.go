@@ -1819,23 +1819,9 @@ func TryTypedQNumericDyadicFloatSum(op string, left, right any) (any, bool, erro
 	if err != nil {
 		return nil, true, err
 	}
-	var sum float64
-	for row := 0; row < length; row++ {
-		leftValue, leftOK, err := leftProducer.f64At(row)
-		if err != nil {
-			return nil, true, err
-		}
-		if !leftOK {
-			continue
-		}
-		rightValue, rightOK, err := rightProducer.f64At(row)
-		if err != nil {
-			return nil, true, err
-		}
-		if !rightOK {
-			continue
-		}
-		sum += apply(leftValue, rightValue)
+	sum, err := f64ProducerSum(f64DyadicProducer{left: leftProducer, right: rightProducer, apply: apply, len: length})
+	if err != nil {
+		return nil, true, err
 	}
 	return sum, true, nil
 }
@@ -2153,6 +2139,480 @@ func (p f64DyadicProducer) f64AtCached(row int, cache *f64DyadicEvalCache) (floa
 		return 0, rightOK, err
 	}
 	return cache.apply(p.apply, leftValue, rightValue), true, nil
+}
+
+func f64ProducerSum(producer f64NumericProducer) (float64, error) {
+	switch p := producer.(type) {
+	case f64NullProducer:
+		return 0, nil
+	case f64ScalarProducer:
+		return p.value * float64(p.len), nil
+	case f64BroadcastProducer:
+		value, ok, err := p.source.f64At(0)
+		if err != nil || !ok {
+			return 0, err
+		}
+		return value * float64(p.len), nil
+	case f64I8ColumnProducer:
+		return f64ProducerSumSigned(p.data), nil
+	case f64I16ColumnProducer:
+		return f64ProducerSumSigned(p.data), nil
+	case f64I32ColumnProducer:
+		return f64ProducerSumSigned(p.data), nil
+	case f64I64ColumnProducer:
+		return f64ProducerSumSigned(p.data), nil
+	case f64F32ColumnProducer:
+		return f64ProducerSumFloat(p.data), nil
+	case f64F64ColumnProducer:
+		return f64ProducerSumFloat(p.data), nil
+	case f64I64RangeProducer:
+		return float64(i64RangeSum(p.values)), nil
+	case f64F64RangeProducer:
+		return f64RangeSum(p.values), nil
+	case f64I64ScalarDyadicProducer:
+		sum, ok, err := i64ScalarDyadicSum(p.values)
+		if err != nil || !ok {
+			return 0, err
+		}
+		total, ok := sum.(int64)
+		if !ok {
+			return 0, fmt.Errorf("typed numeric producer sum is %T, want int64", sum)
+		}
+		return float64(total), nil
+	case f64DyadicProducer:
+		return f64DyadicProducerSumFloat(p)
+	}
+	var total float64
+	for row := 0; row < producer.Len(); row++ {
+		value, ok, err := producer.f64At(row)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			total += value
+		}
+	}
+	return total, nil
+}
+
+func f64ProducerRatiosSum(producer f64NumericProducer) (float64, error) {
+	switch p := producer.(type) {
+	case f64NullProducer:
+		return 0, nil
+	case f64ScalarProducer:
+		if p.len <= 0 {
+			return 0, nil
+		}
+		if p.len == 1 {
+			return p.value, nil
+		}
+		if p.value == 0 {
+			return math.NaN(), nil
+		}
+		return p.value + float64(p.len-1), nil
+	case f64BroadcastProducer:
+		value, ok, err := p.source.f64At(0)
+		if err != nil || !ok {
+			return 0, err
+		}
+		if p.len <= 0 {
+			return 0, nil
+		}
+		if p.len == 1 {
+			return value, nil
+		}
+		if value == 0 {
+			return math.NaN(), nil
+		}
+		return value + float64(p.len-1), nil
+	case f64I8ColumnProducer:
+		return f64ProducerRatiosSumSigned(p.data), nil
+	case f64I16ColumnProducer:
+		return f64ProducerRatiosSumSigned(p.data), nil
+	case f64I32ColumnProducer:
+		return f64ProducerRatiosSumSigned(p.data), nil
+	case f64I64ColumnProducer:
+		return f64ProducerRatiosSumSigned(p.data), nil
+	case f64F32ColumnProducer:
+		return f64ProducerRatiosSumFloat(p.data), nil
+	case f64F64ColumnProducer:
+		return f64ProducerRatiosSumFloat(p.data), nil
+	case f64I64RangeProducer:
+		return f64ProducerRatiosSumI64Range(p.values), nil
+	case f64F64RangeProducer:
+		return f64ProducerRatiosSumF64Range(p.values), nil
+	case f64I64ScalarDyadicProducer:
+		return f64ProducerRatiosSumI64ScalarDyadic(p.values)
+	case f64DyadicProducer:
+		return f64DyadicRatiosSumFloat(p)
+	}
+	var total float64
+	var previous float64
+	var hasPrevious bool
+	for row := 0; row < producer.Len(); row++ {
+		current, ok, err := producer.f64At(row)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			hasPrevious = false
+			continue
+		}
+		if !hasPrevious {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+		hasPrevious = true
+	}
+	return total, nil
+}
+
+func f64ProducerSumSigned[T signedScalar](values []T) float64 {
+	var total float64
+	for _, value := range values {
+		total += float64(value)
+	}
+	return total
+}
+
+func f64ProducerSumFloat[T floatScalar](values []T) float64 {
+	var total float64
+	for _, value := range values {
+		total += float64(value)
+	}
+	return total
+}
+
+func f64ProducerRatiosSumSigned[T signedScalar](values []T) float64 {
+	var total float64
+	var previous float64
+	for i, value := range values {
+		current := float64(value)
+		if i == 0 {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+	}
+	return total
+}
+
+func f64ProducerRatiosSumFloat[T floatScalar](values []T) float64 {
+	var total float64
+	var previous float64
+	for i, value := range values {
+		current := float64(value)
+		if i == 0 {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+	}
+	return total
+}
+
+func f64ProducerRatiosSumI64Range(values i64RangeArray) float64 {
+	var total float64
+	var previous float64
+	for row := 0; row < values.len; row++ {
+		current := float64(values.start + int64(row)*values.step)
+		if row == 0 {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+	}
+	return total
+}
+
+func f64ProducerRatiosSumF64Range(values f64RangeArray) float64 {
+	var total float64
+	var previous float64
+	for row := 0; row < values.len; row++ {
+		current := values.start + float64(row)*values.step
+		if row == 0 {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+	}
+	return total
+}
+
+func f64ProducerRatiosSumI64ScalarDyadic(values i64ScalarDyadicArray) (float64, error) {
+	var total float64
+	var previous float64
+	for row := 0; row < values.len; row++ {
+		current, ok, err := values.i64At(row)
+		if err != nil || !ok {
+			return 0, err
+		}
+		f := float64(current)
+		if row == 0 {
+			total += f
+		} else {
+			total += f / previous
+		}
+		previous = f
+	}
+	return total, nil
+}
+
+func f64DyadicProducerSumFloat(producer f64DyadicProducer) (float64, error) {
+	if left, ok := producer.left.(f64ScalarProducer); ok {
+		return f64DyadicScalarProducerSum(left.value, producer.right, true, producer.apply)
+	}
+	if right, ok := producer.right.(f64ScalarProducer); ok {
+		return f64DyadicScalarProducerSum(right.value, producer.left, false, producer.apply)
+	}
+	var total float64
+	var cache f64DyadicEvalCache
+	for row := 0; row < producer.len; row++ {
+		value, ok, err := producer.f64AtCached(row, &cache)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			total += value
+		}
+	}
+	return total, nil
+}
+
+func f64DyadicScalarProducerSum(scalar float64, producer f64NumericProducer, scalarLeft bool, apply f64DyadicFunc) (float64, error) {
+	switch p := producer.(type) {
+	case f64NullProducer:
+		return 0, nil
+	case f64ScalarProducer:
+		return applyScalarDyadicFloat(scalar, p.value, scalarLeft, apply) * float64(p.len), nil
+	case f64BroadcastProducer:
+		value, ok, err := p.source.f64At(0)
+		if err != nil || !ok {
+			return 0, err
+		}
+		return applyScalarDyadicFloat(scalar, value, scalarLeft, apply) * float64(p.len), nil
+	case f64I8ColumnProducer:
+		return f64DyadicScalarSumSigned(scalar, p.data, scalarLeft, apply), nil
+	case f64I16ColumnProducer:
+		return f64DyadicScalarSumSigned(scalar, p.data, scalarLeft, apply), nil
+	case f64I32ColumnProducer:
+		return f64DyadicScalarSumSigned(scalar, p.data, scalarLeft, apply), nil
+	case f64I64ColumnProducer:
+		return f64DyadicScalarSumSigned(scalar, p.data, scalarLeft, apply), nil
+	case f64F32ColumnProducer:
+		return f64DyadicScalarSumFloat(scalar, p.data, scalarLeft, apply), nil
+	case f64F64ColumnProducer:
+		return f64DyadicScalarSumFloat(scalar, p.data, scalarLeft, apply), nil
+	case f64I64RangeProducer:
+		var total float64
+		for row := 0; row < p.values.len; row++ {
+			total += applyScalarDyadicFloat(scalar, float64(p.values.start+int64(row)*p.values.step), scalarLeft, apply)
+		}
+		return total, nil
+	case f64F64RangeProducer:
+		var total float64
+		for row := 0; row < p.values.len; row++ {
+			total += applyScalarDyadicFloat(scalar, p.values.start+float64(row)*p.values.step, scalarLeft, apply)
+		}
+		return total, nil
+	case f64I64ScalarDyadicProducer:
+		if total, ok, err := f64DyadicScalarI64ScalarDyadicRangeSum(scalar, p.values, scalarLeft, apply); ok || err != nil {
+			return total, err
+		}
+		var total float64
+		for row := 0; row < p.values.len; row++ {
+			value, ok, err := p.values.i64At(row)
+			if err != nil || !ok {
+				return 0, err
+			}
+			total += applyScalarDyadicFloat(scalar, float64(value), scalarLeft, apply)
+		}
+		return total, nil
+	}
+	var total float64
+	for row := 0; row < producer.Len(); row++ {
+		value, ok, err := producer.f64At(row)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			total += applyScalarDyadicFloat(scalar, value, scalarLeft, apply)
+		}
+	}
+	return total, nil
+}
+
+func f64DyadicScalarSumSigned[T signedScalar](scalar float64, values []T, scalarLeft bool, apply f64DyadicFunc) float64 {
+	var total float64
+	for _, value := range values {
+		total += applyScalarDyadicFloat(scalar, float64(value), scalarLeft, apply)
+	}
+	return total
+}
+
+func f64DyadicScalarSumFloat[T floatScalar](scalar float64, values []T, scalarLeft bool, apply f64DyadicFunc) float64 {
+	var total float64
+	for _, value := range values {
+		total += applyScalarDyadicFloat(scalar, float64(value), scalarLeft, apply)
+	}
+	return total
+}
+
+func applyScalarDyadicFloat(scalar, value float64, scalarLeft bool, apply f64DyadicFunc) float64 {
+	if scalarLeft {
+		return apply(scalar, value)
+	}
+	return apply(value, scalar)
+}
+
+func f64DyadicRatiosSumFloat(producer f64DyadicProducer) (float64, error) {
+	if left, ok := producer.left.(f64ScalarProducer); ok {
+		return f64DyadicScalarProducerRatiosSum(left.value, producer.right, true, producer.apply)
+	}
+	if right, ok := producer.right.(f64ScalarProducer); ok {
+		return f64DyadicScalarProducerRatiosSum(right.value, producer.left, false, producer.apply)
+	}
+	var total float64
+	var previous float64
+	var hasPrevious bool
+	var cache f64DyadicEvalCache
+	for row := 0; row < producer.len; row++ {
+		current, ok, err := producer.f64AtCached(row, &cache)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			hasPrevious = false
+			continue
+		}
+		if !hasPrevious {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+		hasPrevious = true
+	}
+	return total, nil
+}
+
+func f64DyadicScalarProducerRatiosSum(scalar float64, producer f64NumericProducer, scalarLeft bool, apply f64DyadicFunc) (float64, error) {
+	switch p := producer.(type) {
+	case f64NullProducer:
+		return 0, nil
+	case f64ScalarProducer:
+		if p.len <= 0 {
+			return 0, nil
+		}
+		value := applyScalarDyadicFloat(scalar, p.value, scalarLeft, apply)
+		return value + float64(p.len-1), nil
+	case f64BroadcastProducer:
+		value, ok, err := p.source.f64At(0)
+		if err != nil || !ok {
+			return 0, err
+		}
+		if p.len <= 0 {
+			return 0, nil
+		}
+		current := applyScalarDyadicFloat(scalar, value, scalarLeft, apply)
+		return current + float64(p.len-1), nil
+	case f64I64ScalarDyadicProducer:
+		if total, ok, err := f64DyadicScalarI64ScalarDyadicRangeRatiosSum(scalar, p.values, scalarLeft, apply); ok || err != nil {
+			return total, err
+		}
+	}
+	var total float64
+	var previous float64
+	var hasPrevious bool
+	var cache f64DyadicEvalCache
+	for row := 0; row < producer.Len(); row++ {
+		value, ok, err := producer.f64At(row)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			hasPrevious = false
+			continue
+		}
+		current := applyScalarDyadicFloatCached(scalar, value, scalarLeft, apply, &cache)
+		if !hasPrevious {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+		hasPrevious = true
+	}
+	return total, nil
+}
+
+func f64DyadicScalarI64ScalarDyadicRangeSum(scalar float64, values i64ScalarDyadicArray, scalarLeft bool, apply f64DyadicFunc) (float64, bool, error) {
+	source, ok := values.source.(i64RangeArray)
+	if !ok || source.len != values.len {
+		return 0, false, nil
+	}
+	var total float64
+	var cache f64DyadicEvalCache
+	for row := 0; row < values.len; row++ {
+		value, err := f64I64ScalarDyadicRangeValue(source, values, row)
+		if err != nil {
+			return 0, true, err
+		}
+		total += applyScalarDyadicFloatCached(scalar, value, scalarLeft, apply, &cache)
+	}
+	return total, true, nil
+}
+
+func f64DyadicScalarI64ScalarDyadicRangeRatiosSum(scalar float64, values i64ScalarDyadicArray, scalarLeft bool, apply f64DyadicFunc) (float64, bool, error) {
+	source, ok := values.source.(i64RangeArray)
+	if !ok || source.len != values.len {
+		return 0, false, nil
+	}
+	var total float64
+	var previous float64
+	var cache f64DyadicEvalCache
+	for row := 0; row < values.len; row++ {
+		value, err := f64I64ScalarDyadicRangeValue(source, values, row)
+		if err != nil {
+			return 0, true, err
+		}
+		current := applyScalarDyadicFloatCached(scalar, value, scalarLeft, apply, &cache)
+		if row == 0 {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+	}
+	return total, true, nil
+}
+
+func f64I64ScalarDyadicRangeValue(source i64RangeArray, values i64ScalarDyadicArray, row int) (float64, error) {
+	if row < 0 || row >= values.len || row >= source.len {
+		return 0, fmt.Errorf("array row %d out of range", row)
+	}
+	sourceValue := source.start + int64(row)*source.step
+	value, ok, err := applyI64ScalarDyadicValue(values.op, sourceValue, values.scalar, values.scalarLeft)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, fmt.Errorf("unsupported i64 scalar dyadic op %s", values.op)
+	}
+	return float64(value), nil
+}
+
+func applyScalarDyadicFloatCached(scalar, value float64, scalarLeft bool, apply f64DyadicFunc, cache *f64DyadicEvalCache) float64 {
+	if scalarLeft {
+		return cache.apply(apply, scalar, value)
+	}
+	return cache.apply(apply, value, scalar)
 }
 
 func (c *f64DyadicEvalCache) apply(apply f64DyadicFunc, left, right float64) float64 {
@@ -4682,28 +5142,9 @@ func TryTypedRatiosSum(array Array) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	if dyadic, ok := producer.(f64DyadicProducer); ok {
-		return f64DyadicRatiosSum(dyadic)
-	}
-	var total float64
-	var previous float64
-	var hasPrevious bool
-	for row := 0; row < array.Len(); row++ {
-		current, ok, err := producer.f64At(row)
-		if err != nil {
-			return nil, true, err
-		}
-		if !ok {
-			hasPrevious = false
-			continue
-		}
-		if !hasPrevious {
-			total += current
-		} else {
-			total += current / previous
-		}
-		previous = current
-		hasPrevious = true
+	total, err := f64ProducerRatiosSum(producer)
+	if err != nil {
+		return nil, true, err
 	}
 	return total, true, nil
 }
@@ -10974,45 +11415,9 @@ func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	return f64DyadicProducerSum(producer)
-}
-
-func f64DyadicProducerSum(producer f64DyadicProducer) (any, bool, error) {
-	var total float64
-	var cache f64DyadicEvalCache
-	for row := 0; row < producer.len; row++ {
-		value, ok, err := producer.f64AtCached(row, &cache)
-		if err != nil {
-			return nil, true, err
-		}
-		if ok {
-			total += value
-		}
-	}
-	return total, true, nil
-}
-
-func f64DyadicRatiosSum(producer f64DyadicProducer) (any, bool, error) {
-	var total float64
-	var previous float64
-	var hasPrevious bool
-	var cache f64DyadicEvalCache
-	for row := 0; row < producer.len; row++ {
-		current, ok, err := producer.f64AtCached(row, &cache)
-		if err != nil {
-			return nil, true, err
-		}
-		if !ok {
-			hasPrevious = false
-			continue
-		}
-		if !hasPrevious {
-			total += current
-		} else {
-			total += current / previous
-		}
-		previous = current
-		hasPrevious = true
+	total, err := f64ProducerSum(producer)
+	if err != nil {
+		return nil, true, err
 	}
 	return total, true, nil
 }

@@ -3235,6 +3235,71 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 
 }
 
+func TestF64NumericProducerDirectReductions(t *testing.T) {
+	columnProducer, err := newF64NumericProducer(NewF64([]float64{2, 4, 8, 16}), 4)
+	if err != nil {
+		t.Fatalf("newF64NumericProducer column returned error: %v", err)
+	}
+	columnSum, err := f64ProducerSum(columnProducer)
+	if err != nil {
+		t.Fatalf("f64ProducerSum column returned error: %v", err)
+	}
+	if columnSum != 30 {
+		t.Fatalf("f64ProducerSum column = %v, want 30", columnSum)
+	}
+	columnRatios, err := f64ProducerRatiosSum(columnProducer)
+	if err != nil {
+		t.Fatalf("f64ProducerRatiosSum column returned error: %v", err)
+	}
+	if columnRatios != 8 {
+		t.Fatalf("f64ProducerRatiosSum column = %v, want 8", columnRatios)
+	}
+	zeroRatios, err := f64ProducerRatiosSum(f64ScalarProducer{value: 0, len: 3})
+	if err != nil {
+		t.Fatalf("f64ProducerRatiosSum zero scalar returned error: %v", err)
+	}
+	if !math.IsNaN(zeroRatios) {
+		t.Fatalf("f64ProducerRatiosSum zero scalar = %v, want NaN", zeroRatios)
+	}
+
+	scaled, ok := applyI64RangeScalar(OpMod, i64RangeArray{start: 0, step: 1, len: 8}, 4, false)
+	if !ok {
+		t.Fatal("applyI64RangeScalar mod did not return typed array")
+	}
+	lazy, handled, err := TryTypedQNumericDyadicFloat(NumericDyadicXExp, int64(2), scaled)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedQNumericDyadicFloat lazy = %#v,%v,%v; want handled nil error", lazy, handled, err)
+	}
+	if _, ok := lazy.(f64NumericDyadicArray); !ok {
+		t.Fatalf("TryTypedQNumericDyadicFloat lazy = %T, want f64NumericDyadicArray", lazy)
+	}
+	if got, want := lazy.Values(), []any{1.0, 2.0, 4.0, 8.0, 1.0, 2.0, 4.0, 8.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("lazy dyadic values = %v, want %v", got, want)
+	}
+
+	sumValue, handled, err := typedKernels.NumericSumValue(lazy)
+	if err != nil || !handled {
+		t.Fatalf("NumericSumValue lazy = %#v,%v,%v; want handled nil error", sumValue, handled, err)
+	}
+	if sumValue != 30.0 {
+		t.Fatalf("NumericSumValue lazy = %v, want 30", sumValue)
+	}
+	directSum, handled, err := TryTypedQNumericDyadicFloatSum(NumericDyadicXExp, int64(2), scaled)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum lazy = %#v,%v,%v; want handled nil error", directSum, handled, err)
+	}
+	if directSum != 30.0 {
+		t.Fatalf("TryTypedQNumericDyadicFloatSum lazy = %v, want 30", directSum)
+	}
+	ratiosSum, handled, err := TryTypedRatiosSum(lazy)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedRatiosSum lazy = %#v,%v,%v; want handled nil error", ratiosSum, handled, err)
+	}
+	if got, want := ratiosSum.(float64), 1.0+2.0+2.0+2.0+0.125+2.0+2.0+2.0; math.Abs(got-want) > 1e-12 {
+		t.Fatalf("TryTypedRatiosSum lazy = %v, want %v", got, want)
+	}
+}
+
 func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
 	scalarRight, ok, err := typedKernels.Dyadic(OpAdd, NewI32([]int32{1, 2, 3}), int64(10))
 	if err != nil {
