@@ -217,6 +217,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if qPipelineApplyScalarIndexCandidate(src) {
 		return true
 	}
+	if qPipelineApplyPathIndexCandidate(src) {
+		return true
+	}
 	return false
 }
 
@@ -233,6 +236,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if plan, ok := buildQPipelineApplyScalarIndexPlan(src); ok {
+		return qPipelinePlanWithBindingPlans(withSource(plan))
+	}
+	if plan, ok := buildQPipelineApplyPathIndexPlan(src); ok {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if strings.HasPrefix(src, "+/") {
@@ -371,6 +377,11 @@ func qPipelineApplyScalarIndexCandidate(src string) bool {
 	return ok
 }
 
+func qPipelineApplyPathIndexCandidate(src string) bool {
+	_, ok := buildQPipelineApplyPathIndexPlan(src)
+	return ok
+}
+
 func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
 	apply, ok := buildScalarApplyIndexPlan(src)
 	if !ok {
@@ -389,6 +400,24 @@ func buildQPipelineApplyScalarIndexPlan(src string) (qPipelinePlan, bool) {
 		compareOp: op,
 		valueExpr: apply.target,
 		indexExpr: fmt.Sprintf("%d", apply.index),
+	}, true
+}
+
+func buildQPipelineApplyPathIndexPlan(src string) (qPipelinePlan, bool) {
+	apply, ok := buildScalarApplyIndexPlan(src)
+	if !ok || apply.mode != qApplyIndexDot || apply.scalar || len(apply.indexes) < 2 {
+		return qPipelinePlan{}, false
+	}
+	indexExpr := make([]string, 0, len(apply.indexes))
+	for _, index := range apply.indexes {
+		indexExpr = append(indexExpr, fmt.Sprintf("%d", index))
+	}
+	return qPipelinePlan{
+		kind:      qPipelineApplyScalarIndex,
+		shape:     "apply-index/path-dot",
+		compareOp: "dot",
+		valueExpr: apply.target,
+		indexExpr: strings.Join(indexExpr, " "),
 	}, true
 }
 
@@ -1146,12 +1175,24 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan qPipelinePlan) (any, bool
 	if err != nil {
 		return nil, true, err
 	}
-	if !scalar || len(indexes) != 1 {
-		return nil, false, nil
-	}
 	mode := qApplyIndexAt
 	if plan.compareOp == "dot" {
 		mode = qApplyIndexDot
+	}
+	if !scalar || len(indexes) != 1 {
+		indexPlan := qScalarApplyIndexPlan{
+			mode:    mode,
+			target:  plan.valueExpr,
+			indexes: indexes,
+			scalar:  scalar,
+		}
+		if len(indexes) > 0 {
+			indexPlan.index = indexes[0]
+		}
+		if out, handled, err := scalarApplyIndexPlanValue(indexPlan, target); err != nil || handled {
+			return out, handled, err
+		}
+		return nil, false, nil
 	}
 	if out, handled, err := scalarIndexValue(mode, target, indexes[0]); err != nil || handled {
 		return out, handled, err
