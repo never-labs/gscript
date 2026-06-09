@@ -73,6 +73,7 @@ var opNativeReplayMayExitPolicies = [...]bool{
 	OpMatrixSetF:                 true,
 	OpMatrixFlat:                 true,
 	OpMatrixStride:               true,
+	OpQEvalPipelinePlan:          true,
 	OpAddInt:                     true,
 	OpSubInt:                     true,
 	OpMulInt:                     true,
