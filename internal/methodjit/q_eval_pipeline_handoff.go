@@ -53,3 +53,31 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		Detail:        descriptor.Detail,
 	}, true
 }
+
+type qRuntimeEvalPipelineBackend struct {
+	static qEvalPipelineStaticBackend
+}
+
+func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPipelineBackend {
+	return qRuntimeEvalPipelineBackend{
+		static: newQEvalPipelineStaticBackend(qEvalPipelineTypedRuntimeBackend, refs),
+	}
+}
+
+func (b qRuntimeEvalPipelineBackend) BackendName() string {
+	return b.static.BackendName()
+}
+
+func (b qRuntimeEvalPipelineBackend) LookupQEvalPipelinePlan(ref QEvalPipelinePlanRef) (QEvalPipelinePlan, bool) {
+	return b.static.LookupQEvalPipelinePlan(ref)
+}
+
+func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlan(ref QEvalPipelinePlanRef) (any, bool, error) {
+	if ref.Backend != qEvalPipelineTypedRuntimeBackend {
+		return nil, false, nil
+	}
+	if _, ok := b.LookupQEvalPipelinePlan(ref); !ok {
+		return nil, false, nil
+	}
+	return stdq.ExecuteEvalPipeline(ref.Source)
+}

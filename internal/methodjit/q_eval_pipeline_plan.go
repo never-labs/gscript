@@ -1,6 +1,10 @@
 package methodjit
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/never-labs/leia/internal/runtime"
+)
 
 // QEvalPipelineBackend is the stable handoff point between MethodJIT q.eval
 // hot-path recognition and the q typed pipeline backend. The current slice only
@@ -10,6 +14,12 @@ import "fmt"
 type QEvalPipelineBackend interface {
 	BackendName() string
 	LookupQEvalPipelinePlan(ref QEvalPipelinePlanRef) (QEvalPipelinePlan, bool)
+}
+
+// QEvalPipelineExecutor is the execution-side extension for backends that can
+// run a plan ref through the q typed runtime without re-entering generic q.eval.
+type QEvalPipelineExecutor interface {
+	ExecuteQEvalPipelinePlan(ref QEvalPipelinePlanRef) (any, bool, error)
 }
 
 // QEvalPipelinePlan is intentionally metadata-only in MethodJIT. Ownership of
@@ -111,4 +121,75 @@ func formatQEvalPipelinePlanRefs(refs []QEvalPipelinePlanRef) string {
 		out += fmt.Sprintf("  [%d] id=%d kernel=%s shape=%s pipeline_shape=%s backend=%s\n", i, ref.ID, ref.Kernel, ref.Shape, ref.PipelineShape, ref.Backend)
 	}
 	return out
+}
+
+func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value, bool, error) {
+	if cf == nil {
+		return runtime.NilValue(), false, nil
+	}
+	ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, id)
+	if !ok {
+		return runtime.NilValue(), false, nil
+	}
+	backend := newQRuntimeEvalPipelineBackend(cf.QEvalPipelinePlans)
+	return executeQEvalPipelinePlanValue(backend, ref)
+}
+
+func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipelinePlanRef) (runtime.Value, bool, error) {
+	if backend == nil || !ref.Valid() {
+		return runtime.NilValue(), false, nil
+	}
+	if _, ok := backend.LookupQEvalPipelinePlan(ref); !ok {
+		return runtime.NilValue(), false, nil
+	}
+	executor, ok := backend.(QEvalPipelineExecutor)
+	if !ok {
+		return runtime.NilValue(), false, nil
+	}
+	out, handled, err := executor.ExecuteQEvalPipelinePlan(ref)
+	if err != nil || !handled {
+		return runtime.NilValue(), handled, err
+	}
+	value, err := qEvalPipelineRuntimeValue(out)
+	if err != nil {
+		return runtime.NilValue(), false, err
+	}
+	return value, true, nil
+}
+
+func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
+	switch x := v.(type) {
+	case nil:
+		return runtime.NilValue(), nil
+	case bool:
+		return runtime.BoolValue(x), nil
+	case int:
+		return runtime.IntValue(int64(x)), nil
+	case int8:
+		return runtime.IntValue(int64(x)), nil
+	case int16:
+		return runtime.IntValue(int64(x)), nil
+	case int32:
+		return runtime.IntValue(int64(x)), nil
+	case int64:
+		return runtime.IntValue(x), nil
+	case uint:
+		return runtime.IntValue(int64(x)), nil
+	case uint8:
+		return runtime.IntValue(int64(x)), nil
+	case uint16:
+		return runtime.IntValue(int64(x)), nil
+	case uint32:
+		return runtime.IntValue(int64(x)), nil
+	case uint64:
+		return runtime.IntValue(int64(x)), nil
+	case float32:
+		return runtime.FloatValue(float64(x)), nil
+	case float64:
+		return runtime.FloatValue(x), nil
+	case string:
+		return runtime.StringValue(x), nil
+	default:
+		return runtime.NilValue(), fmt.Errorf("methodjit: q eval pipeline result type %T is not runtime-value supported", v)
+	}
 }

@@ -5863,6 +5863,25 @@ func TestQEvalPipelinePlannerUsesQRuntimeDescriptor(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineRuntimeBackendExecutesTypedPlanRef(t *testing.T) {
+	ref := QEvalPipelinePlanRef{
+		ID:            0,
+		Kernel:        "QScriptPipelinePlan",
+		Shape:         "script-pipeline/where-index-reduce/sum/assignments",
+		PipelineShape: "script_pipeline",
+		Source:        "x:til 64;y:x+1;idx:where x>10;+/y[idx]",
+		Backend:       qEvalPipelineTypedRuntimeBackend,
+	}
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+	if err != nil {
+		t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+	}
+	if !handled || !value.IsInt() || value.Int() != 2014 {
+		t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int 2014 handled", value, handled)
+	}
+}
+
 func TestQEvalPipelinePlanRefsCopyToCompiledFunction(t *testing.T) {
 	fn := &Function{
 		QEvalPipelinePlans: []QEvalPipelinePlanRef{{
@@ -5881,6 +5900,25 @@ func TestQEvalPipelinePlanRefsCopyToCompiledFunction(t *testing.T) {
 	}
 	if got := formatQEvalPipelinePlanRefs(cf.QEvalPipelinePlans); !strings.Contains(got, "QEvalVectorReduce") || !strings.Contains(got, "q_pipeline_typed_runtime") {
 		t.Fatalf("formatQEvalPipelinePlanRefs = %q, want kernel/backend", got)
+	}
+}
+
+func TestCompiledFunctionExecutesQEvalPipelinePlanValue(t *testing.T) {
+	ref := QEvalPipelinePlanRef{
+		ID:            0,
+		Kernel:        "QScriptPipelinePlan",
+		Shape:         "script-pipeline/where-index-reduce/sum/assignments",
+		PipelineShape: "script_pipeline",
+		Source:        "x:til 64;y:x+1;idx:where x>10;+/y[idx]",
+		Backend:       qEvalPipelineTypedRuntimeBackend,
+	}
+	cf := &CompiledFunction{QEvalPipelinePlans: []QEvalPipelinePlanRef{ref}}
+	value, handled, err := cf.ExecuteQEvalPipelinePlanValue(0)
+	if err != nil {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue: %v", err)
+	}
+	if !handled || !value.IsInt() || value.Int() != 2014 {
+		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 2014 handled", value, handled)
 	}
 }
 

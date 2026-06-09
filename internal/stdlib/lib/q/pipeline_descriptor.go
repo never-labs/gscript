@@ -58,7 +58,13 @@ func DescribeEvalPipeline(source string) (EvalPipelineDescriptor, bool) {
 // back through the full q evaluator. The returned handled flag is false when no
 // pipeline shape is available.
 func ExecuteEvalPipeline(source string) (any, bool, error) {
-	state := NewEvalState(nil)
+	return ExecuteEvalPipelineWithEnv(source, nil)
+}
+
+// ExecuteEvalPipelineWithEnv is the environment-bearing variant used by future
+// q.session and JIT entry points that need existing q bindings.
+func ExecuteEvalPipelineWithEnv(source string, env map[string]any) (any, bool, error) {
+	state := NewEvalState(env)
 	return state.executeEvalPipeline(strings.TrimSpace(source))
 }
 
