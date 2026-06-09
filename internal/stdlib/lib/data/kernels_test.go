@@ -2680,6 +2680,35 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnaryDyadicSum ceiling range%%scalar = %v, %v; want 9, true", value, ok)
 	}
 
+	minSum, ok, err := TryTypedDyadicMinMaxSum(NewI64Range(0, 1, 8), NewI64Range(7, -1, 8), false)
+	if err != nil {
+		t.Fatalf("TryTypedDyadicMinMaxSum range min returned error: %v", err)
+	}
+	if !ok || minSum != int64(12) {
+		t.Fatalf("TryTypedDyadicMinMaxSum range min = %v,%v; want 12,true", minSum, ok)
+	}
+	maxSum, ok, err := TryTypedDyadicMinMaxSum(NewI64Range(0, 1, 8), NewI64Range(7, -1, 8), true)
+	if err != nil {
+		t.Fatalf("TryTypedDyadicMinMaxSum range max returned error: %v", err)
+	}
+	if !ok || maxSum != int64(44) {
+		t.Fatalf("TryTypedDyadicMinMaxSum range max = %v,%v; want 44,true", maxSum, ok)
+	}
+	scalarMin, ok, err := TryTypedDyadicMinMaxSum(NewI64([]int64{10, 20, 30, 40}), int64(25), false)
+	if err != nil {
+		t.Fatalf("TryTypedDyadicMinMaxSum array-scalar min returned error: %v", err)
+	}
+	if !ok || scalarMin != int64(80) {
+		t.Fatalf("TryTypedDyadicMinMaxSum array-scalar min = %v,%v; want 80,true", scalarMin, ok)
+	}
+	floatMax, ok, err := TryTypedDyadicMinMaxSum(NewF64([]float64{1.5, 4.5, 2.5}), NewF64([]float64{2, 3, 4}), true)
+	if err != nil {
+		t.Fatalf("TryTypedDyadicMinMaxSum float max returned error: %v", err)
+	}
+	if !ok || math.Abs(floatMax.(float64)-10.5) > 1e-12 {
+		t.Fatalf("TryTypedDyadicMinMaxSum float max = %v,%v; want 10.5,true", floatMax, ok)
+	}
+
 	sum, ok, err := typedKernels.NumericBinary(OpAdd, NewI32([]int32{1, 2, 3}), NewF64([]float64{0.5, 1.5, 2.5}))
 	if err != nil {
 		t.Fatalf("NumericBinary returned error: %v", err)

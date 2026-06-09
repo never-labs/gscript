@@ -517,6 +517,35 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 		t.Fatalf("ExecuteEvalPipelineDescriptor generic sum = %#v,%v,%v; want 12,true,nil", got, handled, err)
 	}
 
+	descriptor, ok = DescribeEvalPipeline("+/x min y")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize dyadic min sum pipeline")
+	}
+	if descriptor.Shape != "vector-reduce/sum-dyadic-min" ||
+		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ShapeFamily != "vector" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "dyadic-min" ||
+		descriptor.LeftExpr != "x" ||
+		descriptor.RightExpr != "y" ||
+		descriptor.CompareOp != "min" {
+		t.Fatalf("dyadic min sum descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptorWithEnv(EvalPipelineDescriptor{
+		Source:    "+/x min y",
+		Kind:      descriptor.Kind,
+		Kernel:    descriptor.Kernel,
+		Shape:     descriptor.Shape,
+		LeftExpr:  descriptor.LeftExpr,
+		RightExpr: descriptor.RightExpr,
+		CompareOp: descriptor.CompareOp,
+	}, map[string]any{
+		"x": data.NewI64Range(0, 1, 8),
+		"y": data.NewI64Range(7, -1, 8),
+	}); err != nil || !handled || got != int64(12) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor dyadic min sum = %#v,%v,%v; want 12,true,nil", got, handled, err)
+	}
+
 	descriptor, ok = DescribeEvalPipeline("count 8#til 4")
 	if !ok {
 		t.Fatalf("DescribeEvalPipeline did not recognize generic vector count pipeline")
@@ -2996,6 +3025,36 @@ func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 	if counts["ArrayDyadicArithmetic"] != 2 {
 		t.Fatalf("ArrayDyadicArithmetic hits = %d, want 2; stats=%#v", counts["ArrayDyadicArithmetic"], RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalDyadicMinMaxReduceUsesTypedPipeline(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:til 8;y:reverse x;(+/x min y)+(+/x max y)", int64(56))
+	assertEvalValue(t, "x:10 20 30 40;(+/x min 25)+(+/25 max x)", int64(200))
+
+	seenPlan := map[string]bool{}
+	seenKernel := map[string]bool{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected dyadic min/max reduce fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "QPipelinePlan" && stat.Outcome == "hit" && stat.ReasonCode == "typed_pipeline" {
+			seenPlan[stat.Shape] = true
+		}
+		if stat.Kernel == "ArrayDyadicMinMaxSum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seenKernel[stat.Shape] = true
+		}
+	}
+	for _, shape := range []string{"vector-reduce/sum-dyadic-min", "vector-reduce/sum-dyadic-max"} {
+		if !seenPlan[shape] {
+			t.Fatalf("missing dyadic min/max reduce pipeline %s: %#v", shape, RuntimeKernelExecutionStats())
+		}
+	}
+	if !seenKernel["vector-reduce/sum-dyadic-min/i64/i64"] || !seenKernel["vector-reduce/sum-dyadic-max/i64/i64"] {
+		t.Fatalf("missing dyadic min/max reduce typed kernels: %#v", RuntimeKernelExecutionStats())
 	}
 }
 

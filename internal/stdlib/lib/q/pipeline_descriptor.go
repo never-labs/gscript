@@ -367,6 +367,12 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.kind = qPipelineSumBin
 	case "vector-reduce/sum-expr":
 		plan.kind = qPipelineSumVectorExpr
+	case "vector-reduce/sum-dyadic-min":
+		plan.kind = qPipelineSumDyadicMinMax
+		plan.compareOp = "min"
+	case "vector-reduce/sum-dyadic-max":
+		plan.kind = qPipelineSumDyadicMinMax
+		plan.compareOp = "max"
 	case "vector-count/expr":
 		plan.kind = qPipelineCountVectorExpr
 	case "vector-reduce/sum-msum", "vector-reduce/sum-mavg", "vector-reduce/sum-mcount", "vector-reduce/sum-mmin", "vector-reduce/sum-mmax":

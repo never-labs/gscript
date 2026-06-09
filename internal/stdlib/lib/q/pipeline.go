@@ -23,6 +23,7 @@ const (
 	qPipelineSumDeltas
 	qPipelineSumBin
 	qPipelineSumVectorExpr
+	qPipelineSumDyadicMinMax
 	qPipelineCountVectorExpr
 	qPipelineCountDistinct
 	qPipelineCountWhereIn
@@ -237,6 +238,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineSumMovingWindowPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
+		if plan, ok := buildQPipelineSumDyadicMinMaxPlan(right); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if qPipelineVectorTransformExprCandidate(right) {
 			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
 			plan.reductionInput = right
@@ -252,6 +256,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if plan, ok := buildQPipelineSumMovingWindowPlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
+		if plan, ok := buildQPipelineSumDyadicMinMaxPlan(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
@@ -322,6 +329,27 @@ func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
 			return qPipelinePlan{}, false
 		}
 		plan := qPipelineShapePlan(qPipelineSumMovingWindow, word)
+		plan.compareOp = word
+		plan.leftExpr = left
+		plan.rightExpr = right
+		return plan, true
+	}
+	return qPipelinePlan{}, false
+}
+
+func buildQPipelineSumDyadicMinMaxPlan(src string) (qPipelinePlan, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	for _, word := range []string{"min", "max"} {
+		left, right, ok := splitTopLevelWord(src, word)
+		if !ok {
+			continue
+		}
+		left = strings.TrimSpace(left)
+		right = strings.TrimSpace(right)
+		if left == "" || right == "" {
+			return qPipelinePlan{}, false
+		}
+		plan := qPipelineShapePlan(qPipelineSumDyadicMinMax, word)
 		plan.compareOp = word
 		plan.leftExpr = left
 		plan.rightExpr = right
@@ -634,6 +662,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineSumBin(plan)
 	case qPipelineSumVectorExpr:
 		out, handled, err = s.evalQPipelineSumVectorExpr(plan)
+	case qPipelineSumDyadicMinMax:
+		out, handled, err = s.evalQPipelineSumDyadicMinMax(plan)
 	case qPipelineCountVectorExpr:
 		out, handled, err = s.evalQPipelineCountVectorExpr(plan)
 	case qPipelineCountDistinct:
@@ -1468,6 +1498,21 @@ func evalQPipelineSumMovingWindowBound(plan qPipelinePlan, bound qPipelineBoundP
 
 func errMovingWindowWidth(name string) error {
 	return fmt.Errorf("%s width must be a positive integer", name)
+}
+
+func (s *EvalState) evalQPipelineSumDyadicMinMax(plan qPipelinePlan) (any, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	wantMax := plan.compareOp == "max"
+	shape := "vector-reduce/sum-dyadic-" + plan.compareOp + "/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	out, handled, err := data.TryTypedDyadicMinMaxSum(left, right, wantMax)
+	return qTypedRuntimeResult("ArrayDyadicMinMaxSum", shape, out, handled, err)
 }
 
 func (s *EvalState) evalQPipelineCountRunningScan(plan qPipelinePlan) (any, bool, error) {

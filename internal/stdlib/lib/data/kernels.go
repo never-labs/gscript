@@ -1738,6 +1738,187 @@ func TryTypedQNumericUnaryDyadicSum(unaryOp string, dyadicOp Op, left, right any
 	return qNumericUnaryDyadicSum(unaryOp, dyadicOp, left, right, length)
 }
 
+// TryTypedDyadicMinMaxSum reduces min/max applied pairwise to numeric operands
+// without materializing the intermediate dyadic vector.
+func TryTypedDyadicMinMaxSum(left, right any, wantMax bool) (any, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	length := 0
+	switch {
+	case leftIsArray && rightIsArray:
+		switch {
+		case leftArray.Len() == rightArray.Len():
+			length = leftArray.Len()
+		case leftArray.Len() == 1:
+			length = rightArray.Len()
+		case rightArray.Len() == 1:
+			length = leftArray.Len()
+		default:
+			return nil, true, fmt.Errorf("typed dyadic min/max sum length mismatch: %d != %d", leftArray.Len(), rightArray.Len())
+		}
+	case leftIsArray:
+		length = leftArray.Len()
+	case rightIsArray:
+		length = rightArray.Len()
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return nil, false, nil
+	}
+	if typedIntegerOperand(left) && typedIntegerOperand(right) {
+		if sum, ok := i64RangeDyadicMinMaxSum(left, right, length, wantMax); ok {
+			return sum, true, nil
+		}
+		var sum int64
+		for row := 0; row < length; row++ {
+			lv, ok, err := integerMinMaxOperandAt(left, row, length)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				continue
+			}
+			rv, ok, err := integerMinMaxOperandAt(right, row, length)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				continue
+			}
+			if wantMax {
+				if rv > lv {
+					lv = rv
+				}
+			} else if rv < lv {
+				lv = rv
+			}
+			sum += lv
+		}
+		return sum, true, nil
+	}
+	var sum float64
+	for row := 0; row < length; row++ {
+		lv, ok, err := numericMinMaxOperandAt(left, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			continue
+		}
+		rv, ok, err := numericMinMaxOperandAt(right, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			continue
+		}
+		if wantMax {
+			if rv > lv {
+				lv = rv
+			}
+		} else if rv < lv {
+			lv = rv
+		}
+		sum += lv
+	}
+	return sum, true, nil
+}
+
+func i64RangeDyadicMinMaxSum(left, right any, length int, wantMax bool) (int64, bool) {
+	leftRange, leftOK := i64RangeOperand(left, length)
+	rightRange, rightOK := i64RangeOperand(right, length)
+	if !leftOK || !rightOK {
+		return 0, false
+	}
+	return i64RangeRangeMinMaxSum(leftRange, rightRange, wantMax), true
+}
+
+func i64RangeOperand(value any, length int) (i64RangeArray, bool) {
+	if rangeValue, ok := asI64RangeArray(value); ok {
+		if rangeValue.len == length {
+			return rangeValue, true
+		}
+		if rangeValue.len == 1 && length != 1 {
+			return i64RangeArray{start: rangeValue.start, len: length}, true
+		}
+		return i64RangeArray{}, false
+	}
+	if scalar, ok := integerScalarValue(value); ok {
+		return i64RangeArray{start: scalar, len: length}, true
+	}
+	return i64RangeArray{}, false
+}
+
+func i64RangeRangeMinMaxSum(left, right i64RangeArray, wantMax bool) int64 {
+	n := left.len
+	if n <= 0 {
+		return 0
+	}
+	firstDiff := left.start - right.start
+	stepDiff := left.step - right.step
+	leftTotal := i64RangeSegmentSum(left, 0, n)
+	rightTotal := i64RangeSegmentSum(right, 0, n)
+	leftWins := func(diff int64) bool {
+		if wantMax {
+			return diff >= 0
+		}
+		return diff <= 0
+	}
+	if stepDiff == 0 {
+		if leftWins(firstDiff) {
+			return leftTotal
+		}
+		return rightTotal
+	}
+	lastDiff := firstDiff + int64(n-1)*stepDiff
+	firstWins := leftWins(firstDiff)
+	lastWins := leftWins(lastDiff)
+	if firstWins && lastWins {
+		return leftTotal
+	}
+	if !firstWins && !lastWins {
+		return rightTotal
+	}
+	cut := sort.Search(n, func(i int) bool {
+		diff := firstDiff + int64(i)*stepDiff
+		return leftWins(diff) == lastWins
+	})
+	if lastWins {
+		return i64RangeSegmentSum(right, 0, cut) + i64RangeSegmentSum(left, cut, n-cut)
+	}
+	return i64RangeSegmentSum(left, 0, cut) + i64RangeSegmentSum(right, cut, n-cut)
+}
+
+func i64RangeSegmentSum(array i64RangeArray, start int, length int) int64 {
+	if length <= 0 {
+		return 0
+	}
+	first := array.start + int64(start)*array.step
+	last := first + int64(length-1)*array.step
+	n := int64(length)
+	endpoints := first + last
+	if n%2 == 0 {
+		return (n / 2) * endpoints
+	}
+	return n * (endpoints / 2)
+}
+
+func integerMinMaxOperandAt(value any, row int, length int) (int64, bool, error) {
+	if array, ok := value.(Array); ok && array.Len() == 1 && length != 1 {
+		row = 0
+	}
+	return integerOperandAt(value, row)
+}
+
+func numericMinMaxOperandAt(value any, row int, length int) (float64, bool, error) {
+	if array, ok := value.(Array); ok && array.Len() == 1 && length != 1 {
+		row = 0
+	}
+	return numericOperandAt(value, row)
+}
+
 func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	if array == nil {
 		return nil, true, fmt.Errorf("typed cast array is nil")

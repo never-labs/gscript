@@ -60,6 +60,17 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     "expr",
 			PipelineShape: "vector_reduce",
 		}, true
+	case qPipelineSumDyadicMinMax:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/sum-dyadic-" + variant,
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     "dyadic-" + variant,
+			PipelineShape: "vector_reduce",
+		}, true
 	case qPipelineCountVectorExpr:
 		return qPipelineShapeSpec{
 			ID:            "vector-count/expr",
