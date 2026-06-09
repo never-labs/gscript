@@ -3656,6 +3656,53 @@ func TestEvalCut(t *testing.T) {
 	assertEvalErrorContains(t, "-1 2_10 20 30", "non-negative")
 }
 
+func TestEvalListStringAndBoolGaps(t *testing.T) {
+	assertEvalValue(t, "1b", true)
+	assertEvalValue(t, "0b", false)
+	assertEvalArray(t, "101b", data.KindBool, []any{true, false, true})
+	assertEvalArray(t, "0 1b", data.KindBool, []any{false, true})
+	assertEvalValue(t, "count where 101001b", int64(3))
+
+	got, err := Eval("cut[0 2 4;10 20 30 40 50]")
+	if err != nil {
+		t.Fatalf("Eval(cut function) returned error: %v", err)
+	}
+	segments, ok := got.(data.Array)
+	if !ok || segments.Len() != 3 {
+		t.Fatalf("cut function = %#v, want 3 segments", got)
+	}
+	assertNestedArray(t, segments, 0, data.KindI64, []any{int64(10), int64(20)})
+	assertNestedArray(t, segments, 1, data.KindI64, []any{int64(30), int64(40)})
+	assertNestedArray(t, segments, 2, data.KindI64, []any{int64(50)})
+
+	assertEvalArray(t, "1 3 sublist 10 20 30 40 50", data.KindI64, []any{int64(20), int64(30), int64(40)})
+	assertEvalArray(t, "sublist[1 3;10 20 30 40 50]", data.KindI64, []any{int64(20), int64(30), int64(40)})
+	assertEvalValue(t, `1 2 sublist "åßcd"`, "ßc")
+
+	crossed, err := Eval("1 2 cross `a`b")
+	if err != nil {
+		t.Fatalf("Eval(cross) returned error: %v", err)
+	}
+	crossArray, ok := crossed.(data.Array)
+	if !ok || crossArray.Len() != 4 {
+		t.Fatalf("cross = %#v, want 4 pairs", crossed)
+	}
+	assertNestedArray(t, crossArray, 0, data.KindAny, []any{int64(1), data.Symbol("a")})
+	assertNestedArray(t, crossArray, 3, data.KindAny, []any{int64(2), data.Symbol("b")})
+
+	assertEvalValue(t, `trim "  AAPL  "`, "AAPL")
+	assertEvalValue(t, `ltrim "  AAPL  "`, "AAPL  ")
+	assertEvalValue(t, `rtrim "  AAPL  "`, "  AAPL")
+	assertEvalArray(t, `trim " a " " b"`, data.KindString, []any{"a", "b"})
+
+	assertEvalArray(t, `"banana" ss "an"`, data.KindI64, []any{int64(1), int64(3)})
+	assertEvalValue(t, `ssr["banana";"an";"ON"]`, "bONONa")
+	assertEvalValue(t, `"a-b-c" ssr ("-";"+")`, "a+b+c")
+	assertEvalValue(t, `"," sv "AAPL" "MSFT" "NVDA"`, "AAPL,MSFT,NVDA")
+	assertEvalArray(t, `"," vs "AAPL,MSFT,NVDA"`, data.KindString, []any{"AAPL", "MSFT", "NVDA"})
+	assertEvalArray(t, `"" vs "åß"`, data.KindString, []any{"å", "ß"})
+}
+
 func TestEvalEnlistAndRaze(t *testing.T) {
 	enlisted, err := Eval("enlist 42")
 	if err != nil {

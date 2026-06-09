@@ -1990,6 +1990,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return value, nil
 	}
+	if value, ok, err := parseQBoolLiteral(src); ok || err != nil {
+		return value, err
+	}
 	if strings.HasPrefix(src, "set ") {
 		return s.evalSetPrefix(strings.TrimSpace(src[len("set "):]))
 	}
@@ -2004,6 +2007,9 @@ func (s *EvalState) eval(src string) (any, error) {
 	}
 	if strings.HasPrefix(src, "@[") {
 		return s.evalAmend(src)
+	}
+	if value, ok, err := s.evalListStringFunctionCall(src); ok || err != nil {
+		return value, err
 	}
 	if value, ok, err := s.evalApplyIndexForm(src); ok || err != nil {
 		return value, err
@@ -2260,6 +2266,10 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"string ", stringValue},
 		{"lower ", lowerValue},
 		{"upper ", upperValue},
+		{"trim ", qTrimValue},
+		{"ltrim ", qLTrimValue},
+		{"rtrim ", qRTrimValue},
+		{"ssr ", qSSRValue},
 		{"count ", count},
 		{"first ", first},
 		{"last ", last},
@@ -2402,6 +2412,13 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"xasc", xasc},
 		{"xdesc", xdesc},
 		{"rotate", rotateValue},
+		{"cut", qCutValue},
+		{"sublist", qSublistValue},
+		{"cross", qCrossValue},
+		{"ss", qSSValue},
+		{"ssr", qSSRWithSourceValue},
+		{"sv", qSVValue},
+		{"vs", qVSValue},
 		{"plus", dyadicVerbFunc('+')},
 		{"minus", dyadicVerbFunc('-')},
 		{"times", dyadicVerbFunc('*')},
@@ -6036,6 +6053,20 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return xdesc, true
 	case "rotate":
 		return rotateValue, true
+	case "cut":
+		return qCutValue, true
+	case "sublist":
+		return qSublistValue, true
+	case "cross":
+		return qCrossValue, true
+	case "ss":
+		return qSSValue, true
+	case "ssr":
+		return qSSRWithSourceValue, true
+	case "sv":
+		return qSVValue, true
+	case "vs":
+		return qVSValue, true
 	case "mmu":
 		return matrixMultiplyValue, true
 	case "xexp":
@@ -6075,6 +6106,14 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return lowerValue, true
 	case "upper":
 		return upperValue, true
+	case "trim":
+		return qTrimValue, true
+	case "ltrim":
+		return qLTrimValue, true
+	case "rtrim":
+		return qRTrimValue, true
+	case "ssr":
+		return qSSRValue, true
 	case "distinct":
 		return distinct, true
 	case "first":
@@ -7381,6 +7420,9 @@ func parseAtomOrVector(src string) (any, error) {
 			return v, nil
 		}
 	}
+	if value, ok, err := parseQBoolLiteral(src); ok || err != nil {
+		return value, err
+	}
 	fields := strings.Fields(src)
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("empty q expression")
@@ -7536,6 +7578,12 @@ func looksLikeTemporalVector(src string) bool {
 }
 
 func looksLikeLiteralVector(src string) bool {
+	if value, ok, err := parseQBoolLiteral(src); ok && err == nil {
+		if _, isArray := value.(data.Array); isArray {
+			return true
+		}
+		return false
+	}
 	fields := strings.Fields(src)
 	if len(fields) <= 1 {
 		return false
