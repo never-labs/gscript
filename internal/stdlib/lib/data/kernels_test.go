@@ -2405,6 +2405,10 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if err != nil || !ok || count != 8 || indexSum != 34 {
 		t.Fatalf("TryTypedModuloCompareIndexStatsI64 ne = %d,%d,%v,%v; want 8,34,true,nil", count, indexSum, ok, err)
 	}
+	count, indexSum, ok, err = TryTypedModuloCompareIndexStatsI64(NewI64Range(5, 1, 12), int64(4), OpEQ, int64(1))
+	if err != nil || !ok || count != 3 || indexSum != 12 {
+		t.Fatalf("TryTypedModuloCompareIndexStatsI64 offset eq = %d,%d,%v,%v; want 3,12,true,nil", count, indexSum, ok, err)
+	}
 	indexes, ok, err := TryTypedModuloCompareIndexesI64(NewI64Range(0, 1, 10), int64(3), OpEQ, int64(0))
 	if err != nil || !ok {
 		t.Fatalf("TryTypedModuloCompareIndexesI64 = %v,%v; want handled nil", ok, err)
@@ -2415,6 +2419,10 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	valueSum, ok, err := TryTypedNumericSumWhereModuloCompare(NewI64Range(1, 2, 10), NewI64Range(0, 1, 10), int64(3), OpEQ, int64(0))
 	if err != nil || !ok || valueSum != int64(40) {
 		t.Fatalf("TryTypedNumericSumWhereModuloCompare = %v,%v,%v; want 40,true,nil", valueSum, ok, err)
+	}
+	periodicSum, ok, err := TryTypedNumericSumWhereModuloCompare(NewI64Range(1, 2, 12), NewI64Range(0, 1, 12), int64(5), OpNE, int64(3))
+	if err != nil || !ok || periodicSum != int64(120) {
+		t.Fatalf("TryTypedNumericSumWhereModuloCompare ne = %v,%v,%v; want 120,true,nil", periodicSum, ok, err)
 	}
 	attributedNot, ok, err := TryTypedNot(WithArrayAttribute(NewI64([]int64{0, 1}), ArrayAttributeSorted))
 	if err != nil {

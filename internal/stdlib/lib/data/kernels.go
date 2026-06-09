@@ -2071,6 +2071,13 @@ func TryTypedModuloCompareIndexStatsI64(array Array, modulus any, op Op, target 
 	if array == nil {
 		return 0, 0, true, fmt.Errorf("modulo compare array is nil")
 	}
+	if plan, ok := i64ModuloComparePlanForArray(array, modulusI64, op, targetI64); ok {
+		count, ok := plan.trueCount()
+		if !ok {
+			return 0, 0, false, nil
+		}
+		return count, plan.indexSum(), true, nil
+	}
 	if !isDenseIntegerArray(array) {
 		return 0, 0, false, nil
 	}
@@ -2096,6 +2103,9 @@ func TryTypedModuloCompareIndexesI64(array Array, modulus any, op Op, target any
 	}
 	if array == nil {
 		return nil, true, fmt.Errorf("modulo compare array is nil")
+	}
+	if plan, ok := i64ModuloComparePlanForArray(array, modulusI64, op, targetI64); ok {
+		return i64ModuloComparePlanIndexArray(plan), true, nil
 	}
 	if !isDenseIntegerArray(array) {
 		return nil, false, nil
@@ -2128,6 +2138,10 @@ func TryTypedNumericSumWhereModuloCompare(values, modSource Array, modulus any, 
 	}
 	if !isDenseIntegerArray(modSource) || !isNumericArray(values) {
 		return nil, false, nil
+	}
+	if plan, ok := i64ModuloComparePlanForArray(modSource, modulusI64, op, targetI64); ok {
+		indexes := i64ModuloComparePlanIndexArray(plan)
+		return TryTypedNumericSumByI64Indexes(values, indexes)
 	}
 	if isDenseIntegerArray(values) {
 		var total int64
@@ -2238,39 +2252,105 @@ func typedIntegerSumByI64IndexView(array, indexes Array) (any, bool, error) {
 	case attributedArray:
 		return typedIntegerSumByI64IndexView(array, idx.array)
 	case i64RangeArray:
-		return typedIntegerSumContiguousRange(array, idx)
+		return typedIntegerSumRange(array, idx)
+	case i64PeriodicIndexArray:
+		return typedIntegerSumPeriodicIndex(array, idx)
 	default:
 		return nil, false, nil
 	}
 }
 
 func typedIntegerSumContiguousRange(array Array, rows i64RangeArray) (any, bool, error) {
-	if rows.len == 0 {
-		return NullValue, true, nil
-	}
 	if rows.step != 1 {
 		return nil, false, nil
+	}
+	return typedIntegerSumRange(array, rows)
+}
+
+func typedIntegerSumRange(array Array, rows i64RangeArray) (any, bool, error) {
+	if rows.len == 0 {
+		return NullValue, true, nil
 	}
 	start, err := checkedI64Index(rows.start)
 	if err != nil {
 		return nil, true, err
 	}
-	last, err := checkedI64Index(rows.start + int64(rows.len-1))
+	last, err := checkedI64Index(rows.start + int64(rows.len-1)*rows.step)
 	if err != nil {
 		return nil, true, err
 	}
-	if start < 0 || last >= array.Len() {
-		return nil, true, fmt.Errorf("index %d out of bounds for length %d", last, array.Len())
+	low, high := start, last
+	if low > high {
+		low, high = high, low
+	}
+	if low < 0 || high >= array.Len() {
+		return nil, true, fmt.Errorf("index range %d..%d out of bounds for length %d", start, last, array.Len())
 	}
 	switch a := array.(type) {
 	case attributedArray:
-		return typedIntegerSumContiguousRange(a.array, rows)
+		return typedIntegerSumRange(a.array, rows)
 	case i64RangeArray:
-		return i64RangeSum(i64RangeArray{start: a.start + int64(start)*a.step, step: a.step, len: rows.len}), true, nil
+		return i64RangeSum(i64RangeArray{start: a.start + int64(start)*a.step, step: a.step * rows.step, len: rows.len}), true, nil
 	case i64ScalarDyadicArray:
-		return i64ScalarDyadicRangeSum(a, start, rows.len)
+		if rows.step == 1 {
+			return i64ScalarDyadicRangeSum(a, start, rows.len)
+		}
+		sourceSumValue, handled, err := typedIntegerSumRange(a.source, rows)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		sourceSum, ok := sourceSumValue.(int64)
+		if !ok {
+			return nil, false, nil
+		}
+		return i64ScalarDyadicApplySum(a, sourceSum, rows.len)
 	case tiledArray:
 		return nil, false, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func typedIntegerSumPeriodicIndex(array Array, indexes i64PeriodicIndexArray) (any, bool, error) {
+	if indexes.len == 0 {
+		return NullValue, true, nil
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return typedIntegerSumPeriodicIndex(a.array, indexes)
+	case i64RangeArray:
+		sourceSum := i64PeriodicIndexSum(indexes)
+		return a.start*int64(indexes.len) + a.step*sourceSum, true, nil
+	case i64ScalarDyadicArray:
+		sourceSumValue, handled, err := typedIntegerSumPeriodicIndex(a.source, indexes)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		sourceSum, ok := sourceSumValue.(int64)
+		if !ok {
+			return nil, false, nil
+		}
+		return i64ScalarDyadicApplySum(a, sourceSum, indexes.len)
+	default:
+		return nil, false, nil
+	}
+}
+
+func i64ScalarDyadicApplySum(array i64ScalarDyadicArray, sourceSum int64, length int) (any, bool, error) {
+	n := int64(length)
+	switch array.op {
+	case OpAdd:
+		if array.scalarLeft {
+			return array.scalar*n + sourceSum, true, nil
+		}
+		return sourceSum + array.scalar*n, true, nil
+	case OpSub:
+		if array.scalarLeft {
+			return array.scalar*n - sourceSum, true, nil
+		}
+		return sourceSum - array.scalar*n, true, nil
+	case OpMul:
+		return sourceSum * array.scalar, true, nil
 	default:
 		return nil, false, nil
 	}
@@ -8556,6 +8636,33 @@ func (p i64ModuloComparePlan) trueCount() (int64, bool) {
 		return 0, false
 	}
 	return p.countResidueInterval(low, high), true
+}
+
+func (p i64ModuloComparePlan) indexSum() int64 {
+	if p.length <= 0 {
+		return 0
+	}
+	switch p.op {
+	case OpEQ:
+		return p.indexSumEqualResidue(p.scalar)
+	case OpNE:
+		return i64RangeSum(i64RangeArray{start: 0, step: 1, len: p.length}) - p.indexSumEqualResidue(p.scalar)
+	default:
+		indexes := i64ModuloComparePlanIndexArray(p)
+		return i64IndexArraySum(indexes)
+	}
+}
+
+func (p i64ModuloComparePlan) indexSumEqualResidue(target int64) int64 {
+	if target < 0 || target >= p.modulus || p.length <= 0 {
+		return 0
+	}
+	first := qPositiveMod(target-p.startResidue, p.modulus)
+	if first >= int64(p.length) {
+		return 0
+	}
+	count := int((int64(p.length)-first-1)/p.modulus) + 1
+	return i64RangeSum(i64RangeArray{start: first, step: p.modulus, len: count})
 }
 
 func (p i64ModuloComparePlan) countEqualResidue(target int64) int64 {
