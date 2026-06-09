@@ -547,6 +547,8 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.includeCount = true
 	case strings.Contains(shape, "callable-dot/sum-plus-right"):
 		out.kind = qScriptPipelineCallableDotSumRight
+	case strings.Contains(shape, "callable-over/scan-sum-count"):
+		out.kind = qScriptPipelineCallableOverScanSum
 	case strings.Contains(shape, "apply-index/scalar-at"):
 		out.kind = qScriptPipelineApplyScalarAt
 		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{

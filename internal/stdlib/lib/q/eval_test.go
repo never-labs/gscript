@@ -1027,6 +1027,48 @@ func TestQScriptPipelinePlannerDescribesCallableDotSumPlusCount(t *testing.T) {
 	assertEvalValue(t, src, int64(38))
 }
 
+func TestQScriptPipelinePlannerDescribesCallableOverScanSum(t *testing.T) {
+	src := "x:1+til 8;s:+\\x;({x+y}/[10;x])+last s+count s"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineCallableOverScanSum {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineCallableOverScanSum)
+	}
+	if d.valueExpr != "x" || d.valueBinding != "1+til 8" || d.scalarExpr != "10" {
+		t.Fatalf("callable-over descriptor = value %q binding %q scalar %q", d.valueExpr, d.valueBinding, d.scalarExpr)
+	}
+	if got, want := d.shape(), "script-pipeline/callable-over/scan-sum-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize callable-over scan pipeline", src)
+	}
+	if descriptor.ValueExpr != "x" || descriptor.ValueBinding != "1+til 8" || descriptor.ScalarExpr != "10" {
+		t.Fatalf("descriptor = %#v, want value x binding 1+til 8 scalar 10", descriptor)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(90) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor callable-over scan = %#v,%v,%v; want 90,true,nil", out, handled, err)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(EvalPipelineBackendPlan{
+		Backend:    EvalPipelineTypedRuntimeBackend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	})
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan failed for callable-over scan descriptor")
+	}
+	out, handled, err = NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if err != nil || !handled || out != int64(90) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan callable-over scan = %#v,%v,%v; want 90,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(90))
+}
+
 func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
