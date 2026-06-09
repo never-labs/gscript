@@ -92,10 +92,13 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 }
 
 func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
+	if plan := buildQScriptPrefixBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
 		if err != nil || !ok {
-			return buildQScriptPrefixBindingPlan(src)
+			return qScriptBindingPlan{}
 		}
 		expr = parsed
 	}
@@ -103,11 +106,23 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if plan.kind != qScriptBindingInvalid {
 		return plan
 	}
-	return buildQScriptPrefixBindingPlan(src)
+	return qScriptBindingPlan{}
 }
 
 func buildQScriptPrefixBindingPlan(src string) qScriptBindingPlan {
 	src = strings.TrimSpace(src)
+	if strings.HasPrefix(src, "til ") && wordBoundary(src, 0, len("til")) {
+		arg := strings.TrimSpace(src[len("til "):])
+		expr, ok, err := parseValueExpr(arg)
+		if err != nil || !ok {
+			return qScriptBindingPlan{}
+		}
+		argPlan := buildQScriptBindingPlan(expr)
+		if argPlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "til", left: &argPlan}
+	}
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
 		arg := strings.TrimSpace(src[len("where "):])
 		expr, ok, err := parseValueExpr(arg)
@@ -221,7 +236,7 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 	}
 	if plan.op == "and" || plan.op == "or" {
 		if out, handled, err := data.TryTypedBoolLogical(plan.op, left, right); err != nil || handled {
-			recordRuntimeKernelProbe("ArrayBoolLogical", "logical/"+plan.op, handled, err)
+			recordRuntimeKernelProbe("ArrayBoolLogical", qScriptBoolLogicalShape(plan.op), handled, err)
 			if err != nil {
 				return nil, true, err
 			}
@@ -269,4 +284,15 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan) (any, boo
 	}
 	out, err := evalValueBinary(plan.op, left, right)
 	return out, true, err
+}
+
+func qScriptBoolLogicalShape(op string) string {
+	switch op {
+	case "and":
+		return "logical/and"
+	case "or":
+		return "logical/or"
+	default:
+		return "logical/" + op
+	}
 }

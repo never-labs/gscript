@@ -226,6 +226,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "where_gather_reduce"
 	case strings.HasPrefix(shape, "script-pipeline/"):
 		return "script_pipeline"
+	case strings.HasPrefix(shape, "logical/"):
+		return "mask_combine"
 	case strings.HasPrefix(shape, "where-reduce/"), strings.HasPrefix(shape, "where-index-reduce/"):
 		return "mask_reduce"
 	case shape == "compare-to-index-sum", shape == "compare-to-index-count":
@@ -8380,12 +8382,46 @@ func qDataComparisonOp(op byte) (data.Op, bool) {
 func qRuntimeKernelVectorDyadicShape(op byte, left, right any, la, ra data.Array) string {
 	leftKind := qRuntimeKernelOperandKind(left, la)
 	rightKind := qRuntimeKernelOperandKind(right, ra)
+	if leftKind == data.KindI64 && rightKind == data.KindI64 {
+		switch op {
+		case '+':
+			return "vector-dyadic/+/i64/i64"
+		case '-':
+			return "vector-dyadic/-/i64/i64"
+		case '*':
+			return "vector-dyadic/*/i64/i64"
+		case '%':
+			return "vector-dyadic/%/i64/i64"
+		case '<':
+			return "vector-dyadic/</i64/i64"
+		case '>':
+			return "vector-dyadic/>/i64/i64"
+		case '=':
+			return "vector-dyadic/=/i64/i64"
+		}
+	}
 	return "vector-dyadic/" + string(op) + "/" + string(leftKind) + "/" + string(rightKind)
 }
 
 func qRuntimeKernelCompositeVectorDyadicShape(op string, left, right any, la, ra data.Array) string {
 	leftKind := qRuntimeKernelOperandKind(left, la)
 	rightKind := qRuntimeKernelOperandKind(right, ra)
+	if leftKind == data.KindI64 && rightKind == data.KindI64 {
+		switch op {
+		case "<":
+			return "vector-dyadic/</i64/i64"
+		case "<=":
+			return "vector-dyadic/<=/i64/i64"
+		case ">":
+			return "vector-dyadic/>/i64/i64"
+		case ">=":
+			return "vector-dyadic/>=/i64/i64"
+		case "=":
+			return "vector-dyadic/=/i64/i64"
+		case "<>":
+			return "vector-dyadic/<>/i64/i64"
+		}
+	}
 	return "vector-dyadic/" + op + "/" + string(leftKind) + "/" + string(rightKind)
 }
 

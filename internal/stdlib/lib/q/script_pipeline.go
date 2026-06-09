@@ -1,6 +1,10 @@
 package q
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
+)
 
 type qScriptPipelineKind string
 
@@ -13,14 +17,18 @@ const (
 
 type qScriptPipelineDescriptor struct {
 	kind              qScriptPipelineKind
+	shapeText         string
 	assignments       []qScriptPipelineAssignment
 	terminal          string
 	valueExpr         string
 	valueBinding      string
+	valuePlan         qScriptBindingPlan
 	indexExpr         string
 	indexBinding      string
+	indexPlan         qScriptBindingPlan
 	maskExpr          string
 	maskBinding       string
+	maskPlan          qScriptBindingPlan
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
 }
@@ -33,6 +41,9 @@ type qScriptPipelineAssignment struct {
 }
 
 func (d qScriptPipelineDescriptor) shape() string {
+	if d.shapeText != "" {
+		return d.shapeText
+	}
 	if d.kind == qScriptPipelineUnsupported {
 		return "script-pipeline/unsupported"
 	}
@@ -75,6 +86,10 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.assignments = assignments
 	descriptor.terminal = terminal.src
 	descriptor.terminalPlan = buildQPipelinePlan(terminal.src)
+	descriptor.valuePlan = buildQScriptBindingPlanForRHS(descriptor.valueExpr, nil)
+	descriptor.indexPlan = buildQScriptBindingPlanForRHS(descriptor.indexExpr, nil)
+	descriptor.maskPlan = buildQScriptBindingPlanForRHS(descriptor.maskExpr, nil)
+	descriptor.shapeText = descriptor.shape()
 	return &descriptor, true
 }
 
@@ -166,7 +181,7 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		}
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
-	out, handled, err := s.evalQPipelinePlan(terminal)
+	out, handled, err := s.evalQScriptTerminalPipeline(descriptor, terminal)
 	switch {
 	case err != nil:
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
@@ -176,4 +191,95 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
 	return out, handled, err
+}
+
+func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal qPipelinePlan) (any, bool, error) {
+	switch terminal.kind {
+	case qPipelineSumWhereIndex:
+		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		mask, handled, err := s.evalQScriptBindingPlan(&descriptor.maskPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if handled {
+			if maskArray, ok := mask.(data.Array); ok {
+				out, handled, err := qPipelineWhereReduceSumWithPlanStats(terminal, array, maskArray)
+				if err != nil || handled {
+					return out, handled, err
+				}
+			}
+		}
+		index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		indexes, ok := index.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return qPipelineGatherReduceSumWithPlanStats(terminal, array, indexes)
+	case qPipelineSumGatherIndexes:
+		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		indexes, ok := index.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return qPipelineGatherReduceSumWithPlanStats(terminal, array, indexes)
+	case qPipelineSumWhereMask:
+		value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		array, ok := value.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		mask, handled, err := s.evalQScriptBindingPlan(&descriptor.maskPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return s.evalQPipelinePlan(terminal)
+		}
+		maskArray, ok := mask.(data.Array)
+		if !ok {
+			return nil, false, nil
+		}
+		return qPipelineWhereReduceSumWithPlanStats(terminal, array, maskArray)
+	default:
+		return s.evalQPipelinePlan(terminal)
+	}
 }
