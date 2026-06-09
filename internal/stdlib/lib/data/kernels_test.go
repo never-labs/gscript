@@ -188,6 +188,39 @@ func TestTryTypedWithinIndexesAndStatsTiledTime(t *testing.T) {
 	}
 }
 
+func TestTryTypedWithinIndexStatsBucketViews(t *testing.T) {
+	intBuckets, err := BucketFloor(NewI64Range(0, 1, 20), int64(5))
+	if err != nil {
+		t.Fatalf("BucketFloor int range returned error: %v", err)
+	}
+	count, sum, handled, err := TryTypedWithinIndexStatsI64(intBuckets, int64(5), int64(10), true)
+	if err != nil {
+		t.Fatalf("TryTypedWithinIndexStatsI64 int buckets returned error: %v", err)
+	}
+	if !handled || count != 10 || sum != 95 {
+		t.Fatalf("int bucket within stats count=%d sum=%d handled=%v, want 10,95,true", count, sum, handled)
+	}
+	count, handled, err = TryTypedWithinCount(intBuckets, int64(5), int64(10), true)
+	if err != nil {
+		t.Fatalf("TryTypedWithinCount int buckets returned error: %v", err)
+	}
+	if !handled || count != 10 {
+		t.Fatalf("int bucket within count=%d handled=%v, want 10,true", count, handled)
+	}
+
+	floatBuckets, err := BucketFloor(NewF64([]float64{0.1, 0.5, 0.9, 1.0, 1.49, 1.5}), 0.5)
+	if err != nil {
+		t.Fatalf("BucketFloor float array returned error: %v", err)
+	}
+	count, sum, handled, err = TryTypedWithinIndexStatsI64(floatBuckets, 0.5, 1.0, true)
+	if err != nil {
+		t.Fatalf("TryTypedWithinIndexStatsI64 float buckets returned error: %v", err)
+	}
+	if !handled || count != 4 || sum != 10 {
+		t.Fatalf("float bucket within stats count=%d sum=%d handled=%v, want 4,10,true", count, sum, handled)
+	}
+}
+
 func TestTryTypedCastIntegerArrays(t *testing.T) {
 	shorts, handled, err := TryTypedCast(KindI16, NewI64Range(0, 2, 4))
 	if err != nil {

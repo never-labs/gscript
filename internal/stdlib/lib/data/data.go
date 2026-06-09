@@ -2554,6 +2554,10 @@ func TryTypedWithinIndexStatsI64(array Array, low, high any, highClosed bool) (c
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedWithinIndexStatsI64(a.array, low, high, highClosed)
+	case i64BucketArray:
+		return withinI64BucketIndexStats(a, low, high, highClosed)
+	case f64BucketArray:
+		return withinF64BucketIndexStats(a, low, high, highClosed)
 	case tiledArray:
 		residues, handled, err := typedWithinTiledResidues(a, low, high, highClosed)
 		if err != nil || !handled {
@@ -2568,6 +2572,94 @@ func TryTypedWithinIndexStatsI64(array Array, low, high any, highClosed bool) (c
 		}
 		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
 	}
+}
+
+func withinI64BucketIndexStats(array i64BucketArray, low, high any, highClosed bool) (count, sum int64, handled bool, err error) {
+	lowI, lowOK := coerceInt64Exact(low)
+	highI, highOK := coerceInt64Exact(high)
+	if !lowOK || !highOK {
+		return 0, 0, false, nil
+	}
+	if highI < lowI || (!highClosed && highI == lowI) {
+		return 0, 0, true, nil
+	}
+	if count, sum, ok := withinI64BucketRangeStepOneIndexStats(array, lowI, highI, highClosed); ok {
+		return count, sum, true, nil
+	}
+	for row := 0; row < array.len; row++ {
+		value, ok, err := array.i64At(row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !ok {
+			continue
+		}
+		if value < lowI || value > highI || (!highClosed && value == highI) {
+			continue
+		}
+		count++
+		sum += int64(row)
+	}
+	return count, sum, true, nil
+}
+
+func withinI64BucketRangeStepOneIndexStats(array i64BucketArray, low, high int64, highClosed bool) (count, sum int64, ok bool) {
+	source, ok := array.source.(i64RangeArray)
+	if !ok || source.step != 1 || source.len != array.len || array.width <= 0 {
+		return 0, 0, false
+	}
+	kLow := ceilDivInt64(low, array.width)
+	var kHigh int64
+	if highClosed {
+		kHigh = floorDivInt64(high, array.width)
+	} else {
+		if high == math.MinInt64 {
+			return 0, 0, true
+		}
+		kHigh = floorDivInt64(high-1, array.width)
+	}
+	if kHigh < kLow {
+		return 0, 0, true
+	}
+	valueLow := kLow * array.width
+	valueHigh := (kHigh+1)*array.width - 1
+	indexes := i64RangeIntervalIndexArray(source, valueLow, valueHigh)
+	return int64(indexes.Len()), i64IndexArraySum(indexes), true
+}
+
+func ceilDivInt64(value, width int64) int64 {
+	quotient := value / width
+	remainder := value % width
+	if remainder != 0 && value > 0 {
+		quotient++
+	}
+	return quotient
+}
+
+func withinF64BucketIndexStats(array f64BucketArray, low, high any, highClosed bool) (count, sum int64, handled bool, err error) {
+	lowF, lowOK := numeric(low)
+	highF, highOK := numeric(high)
+	if !lowOK || !highOK {
+		return 0, 0, false, nil
+	}
+	if math.IsNaN(lowF) || math.IsNaN(highF) || highF < lowF || (!highClosed && highF == lowF) {
+		return 0, 0, true, nil
+	}
+	for row := 0; row < array.len; row++ {
+		value, ok, err := array.f64At(row)
+		if err != nil {
+			return 0, 0, true, err
+		}
+		if !ok {
+			continue
+		}
+		if value < lowF || value > highF || (!highClosed && value == highF) {
+			continue
+		}
+		count++
+		sum += int64(row)
+	}
+	return count, sum, true, nil
 }
 
 // TryTypedWithinCount returns the number of rows selected by a typed within
