@@ -79,6 +79,45 @@ func TransposeMatrix(matrix Matrix) (Array, error) {
 	return transposedMatrixArray{source: matrix, rows: shape[1], cols: shape[0]}, nil
 }
 
+// MatrixFromRows recognizes a rectangular list-of-lists as a Matrix. Existing
+// Matrix values pass through unchanged; non-matrix arrays return ok=false.
+func MatrixFromRows(value Array) (Matrix, bool, error) {
+	if matrix, ok := value.(Matrix); ok {
+		return matrix, true, nil
+	}
+	if value == nil || value.Len() == 0 {
+		return nil, false, nil
+	}
+	rows := value.Len()
+	cols := 0
+	flat := make([]any, 0)
+	for row := 0; row < rows; row++ {
+		item, ok := value.At(row)
+		if !ok {
+			return nil, true, fmt.Errorf("matrix row %d out of range", row)
+		}
+		rowArray, ok := item.(Array)
+		if !ok {
+			return nil, false, nil
+		}
+		if row == 0 {
+			cols = rowArray.Len()
+		} else if rowArray.Len() != cols {
+			return nil, true, fmt.Errorf("matrix row %d length %d does not match %d", row, rowArray.Len(), cols)
+		}
+		flat = append(flat, rowArray.Values()...)
+	}
+	reshaped, err := ReshapeArray([]int{rows, cols}, InferArray(flat))
+	if err != nil {
+		return nil, true, err
+	}
+	matrix, ok := reshaped.(Matrix)
+	if !ok {
+		return nil, true, fmt.Errorf("matrix reshape did not produce matrix")
+	}
+	return matrix, true, nil
+}
+
 // MatrixMultiplyNumeric multiplies two numeric two-dimensional matrices. The
 // f64 result keeps the semantic layer simple while leaving a single replacement
 // point for future typed BLAS-style kernels.

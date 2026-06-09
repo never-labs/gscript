@@ -9240,37 +9240,7 @@ func qMatrixValue(value any) (data.Matrix, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	rows := outer.Len()
-	if rows == 0 {
-		return nil, false, nil
-	}
-	var cols int
-	flat := make([]any, 0)
-	for row := 0; row < rows; row++ {
-		item, ok := outer.At(row)
-		if !ok {
-			return nil, true, fmt.Errorf("matrix row %d out of range", row)
-		}
-		rowArray, ok := item.(data.Array)
-		if !ok {
-			return nil, false, nil
-		}
-		if row == 0 {
-			cols = rowArray.Len()
-		} else if rowArray.Len() != cols {
-			return nil, true, fmt.Errorf("matrix row %d length %d does not match %d", row, rowArray.Len(), cols)
-		}
-		flat = append(flat, rowArray.Values()...)
-	}
-	reshaped, err := data.ReshapeArray([]int{rows, cols}, inferQArray(flat))
-	if err != nil {
-		return nil, true, err
-	}
-	matrix, ok := reshaped.(data.Matrix)
-	if !ok {
-		return nil, true, fmt.Errorf("matrix reshape did not produce matrix")
-	}
-	return matrix, true, nil
+	return data.MatrixFromRows(outer)
 }
 
 func flipRowCount(v any) (rows int, cols int, err error) {

@@ -7085,6 +7085,27 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 		t.Fatalf("transpose cell 2,1 = %#v ok %v, want 6", got, ok)
 	}
 
+	fromRows, ok, err := MatrixFromRows(NewAny([]any{
+		NewI64([]int64{1, 2}),
+		NewI64([]int64{3, 4}),
+		NewI64([]int64{5, 6}),
+	}))
+	if err != nil || !ok {
+		t.Fatalf("MatrixFromRows returned %#v,%v,%v; want matrix,true,nil", fromRows, ok, err)
+	}
+	if got, want := fromRows.Shape(), []int{3, 2}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("MatrixFromRows shape = %#v, want %#v", got, want)
+	}
+	if got, ok := fromRows.Cell(2, 1); !ok || got != int64(6) {
+		t.Fatalf("MatrixFromRows cell 2,1 = %#v ok %v, want 6", got, ok)
+	}
+	if _, ok, err := MatrixFromRows(NewAny([]any{
+		NewI64([]int64{1, 2}),
+		NewI64([]int64{3}),
+	})); err == nil || !ok {
+		t.Fatalf("MatrixFromRows ragged rows = ok %v err %v; want ok true and error", ok, err)
+	}
+
 	right, err := ReshapeArray([]int{3, 2}, NewI64([]int64{10, 20, 30, 40, 50, 60}))
 	if err != nil {
 		t.Fatalf("right reshape returned error: %v", err)

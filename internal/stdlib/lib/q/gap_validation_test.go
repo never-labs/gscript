@@ -31,12 +31,31 @@ func TestQGapValidationReshapeMatrixAndFlip(t *testing.T) {
 		data.NewI64([]int64{1, 2, 3}),
 		data.NewI64([]int64{4, 5, 6}),
 	})
+	assertEvalArray(t, "2 3#1 2 3 4", data.KindAny, []any{
+		data.NewI64([]int64{1, 2, 3}),
+		data.NewI64([]int64{4, 1, 2}),
+	})
 	assertEvalValue(t, "(2 3#1 2 3 4 5 6) . (1;2)", int64(6))
 	assertEvalArray(t, "flip (1 2 3;4 5 6)", data.KindAny, []any{
 		data.NewI64([]int64{1, 4}),
 		data.NewI64([]int64{2, 5}),
 		data.NewI64([]int64{3, 6}),
 	})
+	assertEvalArray(t, "flip ((1 2);(3 4);(5 6))", data.KindAny, []any{
+		data.NewI64([]int64{1, 3, 5}),
+		data.NewI64([]int64{2, 4, 6}),
+	})
+	tableValue, err := Eval("flip `sym`px!(`AAPL`MSFT;100 101)")
+	if err != nil {
+		t.Fatalf("Eval(dictionary flip) returned error: %v", err)
+	}
+	table, ok := tableValue.(data.Frame)
+	if !ok {
+		t.Fatalf("dictionary flip = %T, want data.Frame", tableValue)
+	}
+	if got := table.Len(); got != 2 {
+		t.Fatalf("dictionary flip rows = %d, want 2", got)
+	}
 	assertEvalArray(t, "mmu[(2 2#1 2 3 4);(2 2#5 6 7 8)]", data.KindAny, []any{
 		data.NewF64([]float64{19, 22}),
 		data.NewF64([]float64{43, 50}),
