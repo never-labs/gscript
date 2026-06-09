@@ -2664,6 +2664,15 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 				{Transform: SequenceTransformSublist, Args: [2]int{15}, ArgCount: 1},
 			},
 		},
+		{
+			name:   "cycle_rotate_drop_take_sum_count",
+			source: NewI64Range(0, 1, 8192),
+			steps: []SequenceTransformStep{
+				{Transform: SequenceTransformRotate, Args: [2]int{997}, ArgCount: 1},
+				{Transform: SequenceTransformDrop, Args: [2]int{1024}, ArgCount: 1},
+				{Transform: SequenceTransformSublist, Args: [2]int{9000}, ArgCount: 1},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wantArray := tc.source
@@ -2681,6 +2690,20 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 					wantArray, handled, err = TryTypedRotate(wantArray, step.Args[0])
 					if err != nil || !handled {
 						t.Fatalf("TryTypedRotate oracle = %T,%v,%v", wantArray, handled, err)
+					}
+				case SequenceTransformDrop:
+					if step.ArgCount != 1 {
+						t.Fatalf("bad drop arg count %d", step.ArgCount)
+					}
+					n := step.Args[0]
+					if n < 0 {
+						n = -n
+						wantArray, err = Slice(wantArray, 0, wantArray.Len()-n)
+					} else {
+						wantArray, err = Slice(wantArray, n, wantArray.Len()-n)
+					}
+					if err != nil {
+						t.Fatalf("drop oracle: %v", err)
 					}
 				case SequenceTransformSublist:
 					switch step.ArgCount {

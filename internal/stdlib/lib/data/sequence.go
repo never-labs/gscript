@@ -352,6 +352,12 @@ func sequenceTransformChainI64RangeSumFirstLast(steps []SequenceTransformStep, l
 		total := int64(finalLen)*values.start + values.step*rowSum
 		return total + (values.start + values.step*firstRow) + (values.start + values.step*lastRow), true
 	}
+	if rowSum, plan, ok := sequenceTransformChainI64RangePeriodicRowSum(steps, lengths, values.len, finalLen); ok {
+		firstRow := plan.sourceRow(0)
+		lastRow := plan.sourceRow(int64(finalLen - 1))
+		total := int64(finalLen)*values.start + values.step*rowSum
+		return total + (values.start + values.step*firstRow) + (values.start + values.step*lastRow), true
+	}
 	var total int64
 	for row := 0; row < finalLen; row++ {
 		sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
@@ -386,6 +392,8 @@ func sequenceTransformChainI64RangeSumCount(steps []SequenceTransformStep, lengt
 		rowSum = int64(finalLen) * (2*firstRow + int64(finalLen-1)*stride) / 2
 	} else if sum, ok := sequenceAffineModuloRowSum(offset, stride, finalLen, baseLen); ok {
 		rowSum = sum
+	} else if periodicRowSum, _, ok := sequenceTransformChainI64RangePeriodicRowSum(steps, lengths, values.len, finalLen); ok {
+		rowSum = periodicRowSum
 	} else {
 		for row := 0; row < finalLen; row++ {
 			sourceRow, ok, err := sequenceTransformSourceRow(row, steps, lengths)
@@ -501,6 +509,213 @@ func sequenceTransformChainAffineRows(steps []SequenceTransformStep, lengths [9]
 		}
 	}
 	return offset, stride, true
+}
+
+type sequenceTransformPeriodicRowPlan struct {
+	offset      int64
+	stride      int64
+	cycleOffset int64
+	cycleStride int64
+	cycleMod    int64
+	finalMod    int64
+}
+
+func (p sequenceTransformPeriodicRowPlan) sourceRow(row int64) int64 {
+	cycle := positiveModInt64(p.cycleOffset+p.cycleStride*row, p.cycleMod)
+	source := p.offset + p.stride*cycle
+	if p.finalMod > 0 {
+		source = positiveModInt64(source, p.finalMod)
+	}
+	return source
+}
+
+func sequenceTransformChainI64RangePeriodicRowSum(steps []SequenceTransformStep, lengths [9]int, baseLen int, finalLen int) (int64, sequenceTransformPeriodicRowPlan, bool) {
+	plan, ok := sequenceTransformChainPeriodicRowPlan(steps, lengths, baseLen)
+	if !ok || finalLen <= 0 {
+		return 0, sequenceTransformPeriodicRowPlan{}, false
+	}
+	rowSum, ok := sequenceTransformPeriodicRowSum(plan, int64(finalLen))
+	return rowSum, plan, ok
+}
+
+func sequenceTransformChainPeriodicRowPlan(steps []SequenceTransformStep, lengths [9]int, baseLen int) (sequenceTransformPeriodicRowPlan, bool) {
+	if baseLen <= 0 {
+		return sequenceTransformPeriodicRowPlan{}, false
+	}
+	offset := int64(0)
+	stride := int64(1)
+	plan := sequenceTransformPeriodicRowPlan{stride: 1, cycleStride: 1}
+	hasCycle := false
+	for i := len(steps) - 1; i >= 0; i-- {
+		step := steps[i]
+		prevLen := lengths[i]
+		if prevLen <= 0 {
+			return sequenceTransformPeriodicRowPlan{}, false
+		}
+		addConst := func(n int64) bool {
+			if hasCycle {
+				plan.offset += n
+			} else {
+				offset += n
+			}
+			return true
+		}
+		reverseRows := func() bool {
+			if hasCycle {
+				if plan.finalMod > 0 {
+					return false
+				}
+				plan.offset = int64(prevLen-1) - plan.offset
+				plan.stride = -plan.stride
+			} else {
+				offset = int64(prevLen-1) - offset
+				stride = -stride
+			}
+			return true
+		}
+		wrapRows := func(add int64) bool {
+			if hasCycle {
+				if plan.finalMod > 0 {
+					return false
+				}
+				plan.offset += add
+				plan.finalMod = int64(prevLen)
+				return true
+			}
+			plan.offset = 0
+			plan.stride = 1
+			plan.cycleOffset = offset + add
+			plan.cycleStride = stride
+			plan.cycleMod = int64(prevLen)
+			hasCycle = true
+			return true
+		}
+		switch step.Transform {
+		case SequenceTransformReverse:
+			if !reverseRows() {
+				return sequenceTransformPeriodicRowPlan{}, false
+			}
+		case SequenceTransformRotate:
+			shift := step.Args[0] % prevLen
+			if shift < 0 {
+				shift += prevLen
+			}
+			if !wrapRows(int64(shift)) {
+				return sequenceTransformPeriodicRowPlan{}, false
+			}
+		case SequenceTransformDrop:
+			if step.ArgCount != 1 {
+				return sequenceTransformPeriodicRowPlan{}, false
+			}
+			if step.Args[0] > 0 && !addConst(int64(step.Args[0])) {
+				return sequenceTransformPeriodicRowPlan{}, false
+			}
+		case SequenceTransformSublist:
+			switch step.ArgCount {
+			case 1:
+				start := 0
+				if step.Args[0] < 0 {
+					count := -step.Args[0]
+					start = prevLen - count%prevLen
+					if start == prevLen {
+						start = 0
+					}
+				}
+				if !wrapRows(int64(start)) {
+					return sequenceTransformPeriodicRowPlan{}, false
+				}
+			case 2:
+				start, _ := boundedStartCount(prevLen, step.Args[0], step.Args[1])
+				if !addConst(int64(start)) {
+					return sequenceTransformPeriodicRowPlan{}, false
+				}
+			default:
+				return sequenceTransformPeriodicRowPlan{}, false
+			}
+		default:
+			return sequenceTransformPeriodicRowPlan{}, false
+		}
+	}
+	if !hasCycle || plan.cycleMod <= 0 || (plan.cycleStride != 1 && plan.cycleStride != -1) || (plan.stride != 1 && plan.stride != -1) {
+		return sequenceTransformPeriodicRowPlan{}, false
+	}
+	return plan, true
+}
+
+func sequenceTransformPeriodicRowSum(plan sequenceTransformPeriodicRowPlan, length int64) (int64, bool) {
+	if length <= 0 || plan.cycleMod <= 0 {
+		return 0, false
+	}
+	cycles := length / plan.cycleMod
+	remainder := length % plan.cycleMod
+	innerFull := plan.cycleMod * (plan.cycleMod - 1) / 2
+	var fullSum int64
+	if plan.finalMod > 0 {
+		var ok bool
+		fullSum, ok = sequencePositiveModStrideUnitSum(plan.offset, plan.stride, plan.cycleMod, plan.finalMod)
+		if !ok {
+			return 0, false
+		}
+	} else {
+		fullSum = plan.cycleMod*plan.offset + plan.stride*innerFull
+	}
+	total := cycles * fullSum
+	if remainder == 0 {
+		return total, true
+	}
+	if plan.finalMod == 0 {
+		innerRemainder, ok := sequencePositiveModStrideUnitSum(plan.cycleOffset, plan.cycleStride, remainder, plan.cycleMod)
+		if !ok {
+			return 0, false
+		}
+		return total + remainder*plan.offset + plan.stride*innerRemainder, true
+	}
+	for row := int64(0); row < remainder; row++ {
+		total += plan.sourceRow(row)
+	}
+	return total, true
+}
+
+func sequencePositiveModStrideUnitSum(offset, stride, length, modulus int64) (int64, bool) {
+	if length < 0 || modulus <= 0 || (stride != 1 && stride != -1) {
+		return 0, false
+	}
+	if length == 0 {
+		return 0, true
+	}
+	start := positiveModInt64(offset, modulus)
+	if stride == 1 {
+		return sequencePositiveModAscendingSum(start, length, modulus), true
+	}
+	return sequencePositiveModDescendingSum(start, length, modulus), true
+}
+
+func sequencePositiveModAscendingSum(start, length, modulus int64) int64 {
+	first := modulus - start
+	if first > length {
+		first = length
+	}
+	total := first * (2*start + first - 1) / 2
+	remaining := length - first
+	full := modulus * (modulus - 1) / 2
+	total += (remaining / modulus) * full
+	rem := remaining % modulus
+	total += rem * (rem - 1) / 2
+	return total
+}
+
+func sequencePositiveModDescendingSum(start, length, modulus int64) int64 {
+	first := start + 1
+	if first > length {
+		first = length
+	}
+	total := first * (2*start - first + 1) / 2
+	remaining := length - first
+	full := modulus * (modulus - 1) / 2
+	total += (remaining / modulus) * full
+	rem := remaining % modulus
+	total += rem * (2*(modulus-1) - rem + 1) / 2
+	return total
 }
 
 func sequenceAffineRowsNoWrap(offset, stride int64, length int, modulus int64) bool {
