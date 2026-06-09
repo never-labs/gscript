@@ -1790,6 +1790,21 @@ func TestEvalScriptExecutableSingleStatementPreservesEnvironmentSemantics(t *tes
 	}
 }
 
+func TestEvalScriptExecutablePipelineBackendWarmPath(t *testing.T) {
+	state := NewEvalState(nil)
+	src := "x:1+til 8;s:+\\x;({x+y}/[10;x])+last s+count s"
+	if got, err := state.Eval(src); err != nil || got != int64(90) {
+		t.Fatalf("first executable pipeline Eval returned %#v, %v; want 90,nil", got, err)
+	}
+	plan := state.scriptCache[src]
+	if plan.executable == nil || plan.executable.kind != qScriptExecutablePipelineBackend || !plan.executable.pipeline.Valid() {
+		t.Fatalf("cached executable = %#v, want valid pipeline backend", plan.executable)
+	}
+	if got, err := state.Eval(src); err != nil || got != int64(90) {
+		t.Fatalf("warm executable pipeline Eval returned %#v, %v; want 90,nil", got, err)
+	}
+}
+
 func TestEvalGlobalScriptPlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	ClearEvalPlanCaches()
 	t.Cleanup(ClearEvalPlanCaches)

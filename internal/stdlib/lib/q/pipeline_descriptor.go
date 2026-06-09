@@ -606,6 +606,9 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		return qScriptPipelineDescriptor{}, false
 	}
 	out.valuePlan = buildQScriptBindingPlanForRHS(out.valueExpr, nil)
+	if out.kind == qScriptPipelineCallableOverScanSum && strings.TrimSpace(out.valueBinding) != "" {
+		out.valuePlan = buildQScriptWarmBindingPlan(out.valueBinding, parseCachedValueExpr(out.valueBinding))
+	}
 	out.indexPlan = buildQScriptBindingPlanForRHS(out.indexExpr, nil)
 	out.maskPlan = buildQScriptBindingPlanForRHS(out.maskExpr, nil)
 	out.rowValuePlan = buildQScriptBindingPlanForRHS(out.rowValueExpr, nil)

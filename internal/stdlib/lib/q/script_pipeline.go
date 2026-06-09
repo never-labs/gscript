@@ -124,6 +124,9 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.terminal = terminal.src
 	descriptor.terminalPlan = buildQPipelinePlan(terminal.src)
 	descriptor.valuePlan = buildQScriptBindingPlanForRHS(descriptor.valueExpr, nil)
+	if descriptor.kind == qScriptPipelineCallableOverScanSum && strings.TrimSpace(descriptor.valueBinding) != "" {
+		descriptor.valuePlan = buildQScriptWarmBindingPlan(descriptor.valueBinding, parseCachedValueExpr(descriptor.valueBinding))
+	}
 	descriptor.indexPlan = buildQScriptBindingPlanForRHS(descriptor.indexExpr, nil)
 	descriptor.maskPlan = buildQScriptBindingPlanForRHS(descriptor.maskExpr, nil)
 	descriptor.rowValuePlan = buildQScriptBindingPlanForRHS(descriptor.rowValueExpr, nil)

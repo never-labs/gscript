@@ -893,11 +893,13 @@ type qScriptExecutableKind uint8
 const (
 	qScriptExecutableInvalid qScriptExecutableKind = iota
 	qScriptExecutableSingleStatement
+	qScriptExecutablePipelineBackend
 )
 
 type qScriptExecutablePlan struct {
 	kind      qScriptExecutableKind
 	statement qScriptStatement
+	pipeline  EvalPipelineExecutablePlan
 }
 
 func (s *EvalState) qScriptPlan(src string) qScriptPlan {
@@ -1050,6 +1052,16 @@ func buildQScriptPlan(src string) qScriptPlan {
 }
 
 func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
+	if plan.scriptPipeline != nil {
+		return &qScriptExecutablePlan{
+			kind: qScriptExecutablePipelineBackend,
+			pipeline: EvalPipelineExecutablePlan{
+				backend: EvalPipelineTypedRuntimeBackend,
+				kind:    "script",
+				script:  cloneQScriptPipelineDescriptor(plan.scriptPipeline),
+			},
+		}
+	}
 	if plan.deferScanCandidates || len(plan.statements) != 1 {
 		return nil
 	}
@@ -1072,6 +1084,8 @@ func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any,
 		stmt := plan.statement
 		out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
 		return out, true, err
+	case qScriptExecutablePipelineBackend:
+		return s.ExecuteEvalPipelineExecutablePlan(plan.pipeline)
 	default:
 		return nil, false, nil
 	}
@@ -1098,7 +1112,15 @@ func cloneQScriptExecutablePlan(in *qScriptExecutablePlan) *qScriptExecutablePla
 	}
 	out := *in
 	out.statement = cloneQScriptStatement(in.statement)
+	out.pipeline = cloneEvalPipelineExecutablePlan(in.pipeline)
 	return &out
+}
+
+func cloneEvalPipelineExecutablePlan(in EvalPipelineExecutablePlan) EvalPipelineExecutablePlan {
+	out := in
+	out.expression = cloneQPipelinePlan(in.expression)
+	out.script = cloneQScriptPipelineDescriptor(in.script)
+	return out
 }
 
 func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
