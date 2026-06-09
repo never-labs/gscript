@@ -153,6 +153,8 @@ type qRuntimeEvalPipelineBackend struct {
 	static             qEvalPipelineStaticBackend
 	descriptorByID     map[int]stdq.EvalPipelineDescriptor
 	backendPlanByID    map[int]stdq.EvalPipelineBackendPlan
+	executablePlanByID map[int]stdq.EvalPipelineExecutablePlan
+	executeExecutable  func(stdq.EvalPipelineExecutablePlan) (any, bool, error)
 	executeBackendPlan func(stdq.EvalPipelineBackendPlan) (any, bool, error)
 	executeDescriptor  func(stdq.EvalPipelineDescriptor) (any, bool, error)
 	executeSource      func(string) (any, bool, error)
@@ -176,13 +178,18 @@ type qEvalPipelinePlanHelper struct {
 func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPipelineBackend {
 	descriptorByID := make(map[int]stdq.EvalPipelineDescriptor, len(refs))
 	backendPlanByID := make(map[int]stdq.EvalPipelineBackendPlan, len(refs))
+	executablePlanByID := make(map[int]stdq.EvalPipelineExecutablePlan, len(refs))
 	for _, ref := range refs {
 		if descriptor, ok := qEvalPipelineDescriptorFromRef(ref); ok {
 			descriptorByID[ref.ID] = descriptor
-			backendPlanByID[ref.ID] = stdq.EvalPipelineBackendPlan{
+			plan := stdq.EvalPipelineBackendPlan{
 				Backend:    qEvalPipelineTypedRuntimeBackend,
 				Detail:     "kind=" + descriptor.Kind,
 				Descriptor: descriptor,
+			}
+			backendPlanByID[ref.ID] = plan
+			if executable, ok := stdq.CompileEvalPipelineBackendPlan(plan); ok {
+				executablePlanByID[ref.ID] = executable
 			}
 		}
 	}
@@ -190,6 +197,7 @@ func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPip
 		static:             newQEvalPipelineStaticBackend(qEvalPipelineTypedRuntimeBackend, refs),
 		descriptorByID:     descriptorByID,
 		backendPlanByID:    backendPlanByID,
+		executablePlanByID: executablePlanByID,
 		executeBackendPlan: stdq.ExecuteEvalPipelineBackendPlan,
 		executeDescriptor:  stdq.ExecuteEvalPipelineDescriptor,
 		executeSource:      stdq.ExecuteEvalPipeline,
@@ -370,6 +378,9 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlan(ref QEvalPipelineP
 	if _, ok := b.LookupQEvalPipelinePlan(ref); !ok {
 		return nil, false, nil
 	}
+	if executable, ok := b.lookupExecutablePlan(ref); ok && b.canUseExecutablePlan() {
+		return b.executeEvalPipelineExecutablePlan(executable)
+	}
 	if backendPlan, ok := b.lookupBackendPlan(ref); ok {
 		return b.executeEvalPipelineBackendPlan(backendPlan)
 	}
@@ -377,6 +388,30 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlan(ref QEvalPipelineP
 		return b.executeEvalPipelineDescriptor(descriptor)
 	}
 	return b.executeEvalPipelineSource(ref.Source)
+}
+
+func (b qRuntimeEvalPipelineBackend) lookupExecutablePlan(ref QEvalPipelinePlanRef) (stdq.EvalPipelineExecutablePlan, bool) {
+	if b.executablePlanByID == nil {
+		return stdq.EvalPipelineExecutablePlan{}, false
+	}
+	plan, ok := b.executablePlanByID[ref.ID]
+	return plan, ok && plan.Valid()
+}
+
+func (b qRuntimeEvalPipelineBackend) canUseExecutablePlan() bool {
+	if b.executeExecutable != nil {
+		return true
+	}
+	if b.executeBackendPlan != nil && !sameQEvalPipelineBackendPlanExecutor(b.executeBackendPlan, stdq.ExecuteEvalPipelineBackendPlan) {
+		return false
+	}
+	if b.executeDescriptor != nil && !sameQEvalPipelineDescriptorExecutor(b.executeDescriptor, stdq.ExecuteEvalPipelineDescriptor) {
+		return false
+	}
+	if b.executeSource != nil && !sameQEvalPipelineSourceExecutor(b.executeSource, stdq.ExecuteEvalPipeline) {
+		return false
+	}
+	return true
 }
 
 func (b qRuntimeEvalPipelineBackend) lookupBackendPlan(ref QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool) {
@@ -411,6 +446,13 @@ func (b qRuntimeEvalPipelineBackend) executeEvalPipelineBackendPlan(plan stdq.Ev
 		return b.executeBackendPlan(plan)
 	}
 	return stdq.ExecuteEvalPipelineBackendPlan(plan)
+}
+
+func (b qRuntimeEvalPipelineBackend) executeEvalPipelineExecutablePlan(plan stdq.EvalPipelineExecutablePlan) (any, bool, error) {
+	if b.executeExecutable != nil {
+		return b.executeExecutable(plan)
+	}
+	return stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(plan)
 }
 
 func (b qRuntimeEvalPipelineBackend) executeEvalPipelineDescriptor(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
