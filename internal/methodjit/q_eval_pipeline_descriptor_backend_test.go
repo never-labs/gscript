@@ -19,6 +19,8 @@ func TestQEvalPipelineRuntimeBackendPrefersBackendPlanOverSourcePlanner(t *testi
 		{name: "bin_reduce_sum", src: "+/til 8192 bin til 8192", want: 33550336},
 		{name: "modulo_where_count", src: "count where (til 8192 mod 4)=1", want: 2048},
 		{name: "script_modulo_gather_reduce", src: "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]", want: 8388608},
+		{name: "sequence_count_cross", src: "count (til 16) cross til 16", want: 256},
+		{name: "sequence_count_trim_take", src: `count trim 10000#" AAPL "`, want: 9999},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)

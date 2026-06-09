@@ -53,16 +53,47 @@ func TrimStringValue(value any) (any, error) {
 	return TransformStringValue("trim", value, strings.TrimSpace)
 }
 
+// TrimmedStringCount returns count TrimStringValue(value) without allocating
+// the transformed value. Array transforms preserve row count; scalar
+// string/symbol transforms count runes in the trimmed text.
+func TrimmedStringCount(value any) (int64, error) {
+	return transformStringCount("trim", value, strings.TrimSpace)
+}
+
+func RepeatedTrimmedStringCount(n int, value any) (int64, error) {
+	return repeatedTransformStringCount("trim", n, value, true, true)
+}
+
 func LTrimStringValue(value any) (any, error) {
 	return TransformStringValue("ltrim", value, func(s string) string {
 		return strings.TrimLeftFunc(s, unicode.IsSpace)
 	})
 }
 
+func LTrimmedStringCount(value any) (int64, error) {
+	return transformStringCount("ltrim", value, func(s string) string {
+		return strings.TrimLeftFunc(s, unicode.IsSpace)
+	})
+}
+
+func RepeatedLTrimmedStringCount(n int, value any) (int64, error) {
+	return repeatedTransformStringCount("ltrim", n, value, true, false)
+}
+
 func RTrimStringValue(value any) (any, error) {
 	return TransformStringValue("rtrim", value, func(s string) string {
 		return strings.TrimRightFunc(s, unicode.IsSpace)
 	})
+}
+
+func RTrimmedStringCount(value any) (int64, error) {
+	return transformStringCount("rtrim", value, func(s string) string {
+		return strings.TrimRightFunc(s, unicode.IsSpace)
+	})
+}
+
+func RepeatedRTrimmedStringCount(n int, value any) (int64, error) {
+	return repeatedTransformStringCount("rtrim", n, value, false, true)
 }
 
 func StringSearch(haystack, needle string) Array {
@@ -106,4 +137,59 @@ func StringSplit(sep, text string) Array {
 		return NewString(parts)
 	}
 	return NewString(strings.Split(text, sep))
+}
+
+func transformStringCount(name string, value any, fn func(string) string) (int64, error) {
+	if array, ok := value.(Array); ok {
+		return int64(array.Len()), nil
+	}
+	if IsNull(value) {
+		return 0, nil
+	}
+	text, err := StringScalar(name, value)
+	if err != nil {
+		return 0, err
+	}
+	return int64(len([]rune(fn(text)))), nil
+}
+
+func repeatedTransformStringCount(name string, n int, value any, trimStart, trimEnd bool) (int64, error) {
+	if n == 0 {
+		return 0, nil
+	}
+	text, err := StringScalar(name, value)
+	if err != nil {
+		return 0, err
+	}
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return 0, nil
+	}
+	count := n
+	if count < 0 {
+		count = -count
+	}
+	start := 0
+	if n < 0 {
+		start = len(runes) - count%len(runes)
+		if start == len(runes) {
+			start = 0
+		}
+	}
+	left := 0
+	if trimStart {
+		for left < count && unicode.IsSpace(runes[(start+left)%len(runes)]) {
+			left++
+		}
+	}
+	right := count - 1
+	if trimEnd {
+		for right >= left && unicode.IsSpace(runes[(start+right)%len(runes)]) {
+			right--
+		}
+	}
+	if right < left {
+		return 0, nil
+	}
+	return int64(right - left + 1), nil
 }

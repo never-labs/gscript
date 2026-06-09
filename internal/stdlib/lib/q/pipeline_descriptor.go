@@ -381,6 +381,10 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.kind = qPipelineCountRunningScan
 	case "vector-last/sums", "vector-last/prds", "vector-last/mins", "vector-last/maxs", "vector-last/avgs":
 		plan.kind = qPipelineLastRunningScan
+	case "sequence-count/trim", "sequence-count/ltrim", "sequence-count/rtrim",
+		"sequence-count/cross", "sequence-count/cut", "sequence-count/sublist":
+		plan.kind = qPipelineCountSequencePrimitive
+		plan.compareOp = strings.TrimPrefix(shape, "sequence-count/")
 	default:
 		return qPipelinePlan{}, false
 	}

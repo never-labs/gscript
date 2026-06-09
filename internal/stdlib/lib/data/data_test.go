@@ -63,6 +63,14 @@ func TestSequenceCutArrayStringAndFrame(t *testing.T) {
 	if gotLen := frameSegments[1].(Frame).Len(); gotLen != 1 {
 		t.Fatalf("Cut frame segment 1 length = %d, want 1", gotLen)
 	}
+
+	count, err := CutCount([]int{0, 2}, frame)
+	if err != nil || count != 2 {
+		t.Fatalf("CutCount frame = %d,%v; want 2,nil", count, err)
+	}
+	if _, err := CutCount([]int{0}, 42); err == nil {
+		t.Fatalf("CutCount scalar succeeded")
+	}
 }
 
 func TestSequenceSublistArrayStringAndFrame(t *testing.T) {
@@ -115,6 +123,22 @@ func TestSequenceSublistArrayStringAndFrame(t *testing.T) {
 	if _, err := Sublist(-1, 1, NewI64([]int64{1})); err == nil {
 		t.Fatalf("Sublist negative start succeeded")
 	}
+
+	count, err := SublistCount(1, 8, NewI64Range(10, 10, 4))
+	if err != nil || count != 3 {
+		t.Fatalf("SublistCount range = %d,%v; want 3,nil", count, err)
+	}
+	count, err = SublistCount(1, 8, "åßcd")
+	if err != nil || count != 3 {
+		t.Fatalf("SublistCount string = %d,%v; want 3,nil", count, err)
+	}
+	count, err = SublistCount(1, 8, frame)
+	if err != nil || count != 2 {
+		t.Fatalf("SublistCount frame = %d,%v; want 2,nil", count, err)
+	}
+	if _, err := SublistCount(-1, 1, NewI64([]int64{1})); err == nil {
+		t.Fatalf("SublistCount negative start succeeded")
+	}
 }
 
 func TestSequenceCrossAndItems(t *testing.T) {
@@ -132,6 +156,21 @@ func TestSequenceCrossAndItems(t *testing.T) {
 	}
 	if values := SequenceItems(Symbol("x")); !reflect.DeepEqual(values, []any{Symbol("x")}) {
 		t.Fatalf("SequenceItems scalar = %#v", values)
+	}
+	if got := CrossCount(NewSymbols([]string{"a", "b"}), NewI64([]int64{1, 2, 3})); got != 6 {
+		t.Fatalf("CrossCount array array = %d, want 6", got)
+	}
+	if got := CrossCount("abc", NewI64([]int64{1, 2})); got != 2 {
+		t.Fatalf("CrossCount scalar string array = %d, want 2", got)
+	}
+	if got := SequenceCount("åßc"); got != 3 {
+		t.Fatalf("SequenceCount string = %d, want 3", got)
+	}
+	if got := SequenceCount(NewI64([]int64{1, 2})); got != 2 {
+		t.Fatalf("SequenceCount array = %d, want 2", got)
+	}
+	if got := SequenceCount(Symbol("x")); got != 1 {
+		t.Fatalf("SequenceCount scalar = %d, want 1", got)
 	}
 }
 
@@ -160,6 +199,25 @@ func TestReusableStringHelpers(t *testing.T) {
 	}
 	if values := StringSplit("", "åß").Values(); !reflect.DeepEqual(values, []any{"å", "ß"}) {
 		t.Fatalf("StringSplit runes = %#v", values)
+	}
+
+	if got, err := TrimmedStringCount("  åß \t"); err != nil || got != 2 {
+		t.Fatalf("TrimmedStringCount scalar = %d,%v; want 2,nil", got, err)
+	}
+	if got, err := LTrimmedStringCount(Symbol("  åß  ")); err != nil || got != 4 {
+		t.Fatalf("LTrimmedStringCount symbol = %d,%v; want 4,nil", got, err)
+	}
+	if got, err := RTrimmedStringCount("  åß  "); err != nil || got != 4 {
+		t.Fatalf("RTrimmedStringCount scalar = %d,%v; want 4,nil", got, err)
+	}
+	if got, err := TrimmedStringCount(NewString([]string{" A ", "B"})); err != nil || got != 2 {
+		t.Fatalf("TrimmedStringCount array = %d,%v; want 2,nil", got, err)
+	}
+	if got, err := TrimmedStringCount(NullValue); err != nil || got != 0 {
+		t.Fatalf("TrimmedStringCount null = %d,%v; want 0,nil", got, err)
+	}
+	if _, err := TrimmedStringCount(42); err == nil {
+		t.Fatalf("TrimmedStringCount numeric succeeded")
 	}
 }
 

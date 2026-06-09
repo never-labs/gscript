@@ -120,6 +120,17 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Transform:     variant,
 			PipelineShape: "vector_scan",
 		}, true
+	case qPipelineCountSequencePrimitive:
+		if variant == "" {
+			return qPipelineShapeSpec{}, false
+		}
+		return qPipelineShapeSpec{
+			ID:            "sequence-count/" + variant,
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "count",
+			Transform:     variant,
+			PipelineShape: "sequence_count",
+		}, true
 	default:
 		return qPipelineShapeSpec{}, false
 	}

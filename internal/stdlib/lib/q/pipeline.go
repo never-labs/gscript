@@ -30,6 +30,7 @@ const (
 	qPipelineSumMovingWindow
 	qPipelineCountRunningScan
 	qPipelineLastRunningScan
+	qPipelineCountSequencePrimitive
 )
 
 type qPipelinePlan struct {
@@ -285,6 +286,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if scan, arg, ok := qPipelineRunningScanInput(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountRunningScan, shape: "vector-count/" + scan, compareOp: scan, reductionInput: arg}))
 		}
+		if plan, ok := buildQPipelineCountSequencePlan(inputExpr); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if strings.HasPrefix(inputExpr, "where ") && wordBoundary(inputExpr, 0, len("where")) {
 			return qPipelinePlan{}
 		}
@@ -314,6 +318,74 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		}
 	}
 	return qPipelinePlan{}
+}
+
+func buildQPipelineCountSequencePlan(src string) (qPipelinePlan, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if src == "" {
+		return qPipelinePlan{}, false
+	}
+	for _, transform := range []string{"trim", "ltrim", "rtrim"} {
+		prefix := transform + " "
+		if strings.HasPrefix(src, prefix) && wordBoundary(src, 0, len(transform)) {
+			arg := strings.TrimSpace(src[len(prefix):])
+			if arg == "" {
+				return qPipelinePlan{}, false
+			}
+			return qPipelinePlan{
+				kind:           qPipelineCountSequencePrimitive,
+				shape:          "sequence-count/" + transform,
+				compareOp:      transform,
+				reductionInput: arg,
+			}, true
+		}
+	}
+	if left, right, ok := splitTopLevelWord(src, "cross"); ok {
+		return qPipelinePlan{
+			kind:      qPipelineCountSequencePrimitive,
+			shape:     "sequence-count/cross",
+			compareOp: "cross",
+			leftExpr:  strings.TrimSpace(left),
+			rightExpr: strings.TrimSpace(right),
+		}, true
+	}
+	if left, right, ok := splitTopLevelWord(src, "cut"); ok {
+		return qPipelinePlan{
+			kind:      qPipelineCountSequencePrimitive,
+			shape:     "sequence-count/cut",
+			compareOp: "cut",
+			leftExpr:  strings.TrimSpace(left),
+			rightExpr: strings.TrimSpace(right),
+		}, true
+	}
+	if args, ok := qFunctionCallArgs(src); ok && strings.TrimSpace(src[:strings.Index(src, "[")]) == "cut" && len(args) == 2 {
+		return qPipelinePlan{
+			kind:      qPipelineCountSequencePrimitive,
+			shape:     "sequence-count/cut",
+			compareOp: "cut",
+			leftExpr:  strings.TrimSpace(args[0]),
+			rightExpr: strings.TrimSpace(args[1]),
+		}, true
+	}
+	if left, right, ok := splitTopLevelWord(src, "sublist"); ok {
+		return qPipelinePlan{
+			kind:      qPipelineCountSequencePrimitive,
+			shape:     "sequence-count/sublist",
+			compareOp: "sublist",
+			leftExpr:  strings.TrimSpace(left),
+			rightExpr: strings.TrimSpace(right),
+		}, true
+	}
+	if args, ok := qFunctionCallArgs(src); ok && strings.TrimSpace(src[:strings.Index(src, "[")]) == "sublist" && len(args) == 2 {
+		return qPipelinePlan{
+			kind:      qPipelineCountSequencePrimitive,
+			shape:     "sequence-count/sublist",
+			compareOp: "sublist",
+			leftExpr:  strings.TrimSpace(args[0]),
+			rightExpr: strings.TrimSpace(args[1]),
+		}, true
+	}
+	return qPipelinePlan{}, false
 }
 
 func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
@@ -676,6 +748,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineCountRunningScan(plan)
 	case qPipelineLastRunningScan:
 		out, handled, err = s.evalQPipelineLastRunningScan(plan)
+	case qPipelineCountSequencePrimitive:
+		out, handled, err = s.evalQPipelineCountSequencePrimitive(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
@@ -1647,6 +1721,77 @@ func evalQPipelineCountVectorExprBound(bound qPipelineBoundPlan, array data.Arra
 	}
 	recordQTypedRuntimeKernel("ArrayCountExpr", shape, true, nil)
 	return int64(array.Len()), true, nil
+}
+
+func (s *EvalState) evalQPipelineCountSequencePrimitive(plan qPipelinePlan) (any, bool, error) {
+	switch plan.compareOp {
+	case "trim", "ltrim", "rtrim":
+		out, handled, err := s.tryEvalCountStringTransform(plan.compareOp + " " + plan.reductionInput)
+		return out, handled, err
+	case "cross":
+		left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		out := data.CrossCount(left, right)
+		shape := "cross-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+		recordRuntimeKernelProbe("SequenceCrossCount", shape, true, nil)
+		return out, true, nil
+	case "cut":
+		left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		indexes, err := qIntegerIndexes("cut", left)
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := data.CutCount(indexes, right)
+		shape := "cut-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+		recordRuntimeKernelProbe("SequenceCutCount", shape, err == nil, err)
+		if err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
+	case "sublist":
+		left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		args, err := qIntegerIndexes("sublist", left)
+		if err != nil {
+			return nil, true, err
+		}
+		right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+		if err != nil {
+			return nil, true, err
+		}
+		var out int64
+		switch len(args) {
+		case 1:
+			out = qTakeCount(args[0], right)
+		case 2:
+			out, err = data.SublistCount(args[0], args[1], right)
+		default:
+			err = fmt.Errorf("sublist expects count or start count")
+		}
+		shape := "sublist-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+		recordRuntimeKernelProbe("SequenceSublistCount", shape, err == nil, err)
+		if err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func (s *EvalState) evalQPipelineCountDistinct(plan qPipelinePlan) (any, bool, error) {

@@ -11,6 +11,22 @@ func SequenceItems(value any) []any {
 	return []any{value}
 }
 
+// SequenceCount returns the logical element count for reusable sequence-like
+// values. Scalars count as one item, while strings count runes because they are
+// list-like character sequences in q/Leia frontends.
+func SequenceCount(value any) int64 {
+	switch x := value.(type) {
+	case Array:
+		return int64(x.Len())
+	case Frame:
+		return int64(x.Len())
+	case string:
+		return int64(len([]rune(x)))
+	default:
+		return 1
+	}
+}
+
 // Cross returns the Cartesian product of two scalar-or-array values. The
 // product rows are two-item arrays so callers can preserve tuple-like shape.
 func Cross(left, right any) Array {
@@ -23,6 +39,13 @@ func Cross(left, right any) Array {
 		}
 	}
 	return NewAny(out)
+}
+
+// CrossCount returns the row count of Cross without materializing tuple rows.
+// It mirrors SequenceItems scalar extension: non-array values, including
+// strings, are a single cross item.
+func CrossCount(left, right any) int64 {
+	return sequenceItemsCount(left) * sequenceItemsCount(right)
 }
 
 // Cut splits an array, string, or frame at monotonically interpreted segment
@@ -79,6 +102,17 @@ func Cut(indexes []int, value any) (any, error) {
 	}
 }
 
+// CutCount returns the number of segments produced by Cut without
+// materializing the segments.
+func CutCount(indexes []int, value any) (int64, error) {
+	switch value.(type) {
+	case Array, string, Frame:
+		return int64(len(indexes)), nil
+	default:
+		return 0, fmt.Errorf("cut expects an array, string, or frame")
+	}
+}
+
 // Sublist returns a contiguous slice using q's start/count convention. It is a
 // reusable runtime primitive for q and Leia frontends that need list slicing
 // without materializing an intermediate drop result.
@@ -99,6 +133,27 @@ func Sublist(start, count int, value any) (any, error) {
 		return GatherFrame(x, SegmentIndexes(x.Len(), start, start+count))
 	default:
 		return nil, fmt.Errorf("sublist expects an array, string, or frame")
+	}
+}
+
+// SublistCount returns the row/rune count of Sublist without materializing the
+// contiguous slice.
+func SublistCount(start, count int, value any) (int64, error) {
+	if start < 0 || count < 0 {
+		return 0, fmt.Errorf("sublist expects non-negative start and count")
+	}
+	switch x := value.(type) {
+	case Array:
+		_, count = boundedStartCount(x.Len(), start, count)
+		return int64(count), nil
+	case string:
+		_, count = boundedStartCount(len([]rune(x)), start, count)
+		return int64(count), nil
+	case Frame:
+		_, count = boundedStartCount(x.Len(), start, count)
+		return int64(count), nil
+	default:
+		return 0, fmt.Errorf("sublist expects an array, string, or frame")
 	}
 }
 
@@ -130,4 +185,11 @@ func boundedStartCount(length, start, count int) (int, int) {
 		count = length - start
 	}
 	return start, count
+}
+
+func sequenceItemsCount(value any) int64 {
+	if array, ok := value.(Array); ok {
+		return int64(array.Len())
+	}
+	return 1
 }

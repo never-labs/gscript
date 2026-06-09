@@ -2226,6 +2226,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalCountSequencePrimitive(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountLengthPreservingTransform(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -5030,6 +5033,185 @@ func (s *EvalState) tryEvalCountReverse(src string) (any, bool, error) {
 		return nil, true, err
 	}
 	recordRuntimeKernelProbe("ArrayCountReverse", "count-reverse/"+string(qRuntimeKernelOperandKind(value, nil)), true, nil)
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountSequencePrimitive(src string) (any, bool, error) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if out, handled, err := s.tryEvalCountStringTransform(src); err != nil || handled {
+		return out, handled, err
+	}
+	if out, handled, err := s.tryEvalCountCross(src); err != nil || handled {
+		return out, handled, err
+	}
+	if out, handled, err := s.tryEvalCountCut(src); err != nil || handled {
+		return out, handled, err
+	}
+	if out, handled, err := s.tryEvalCountSublist(src); err != nil || handled {
+		return out, handled, err
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalCountStringTransform(src string) (any, bool, error) {
+	for _, transform := range []struct {
+		word     string
+		kernel   string
+		fn       func(any) (int64, error)
+		takeFn   func(int, any) (int64, error)
+		takeName string
+	}{
+		{"trim ", "StringTrimCount", data.TrimmedStringCount, data.RepeatedTrimmedStringCount, "StringRepeatedTrimCount"},
+		{"ltrim ", "StringLeftTrimCount", data.LTrimmedStringCount, data.RepeatedLTrimmedStringCount, "StringRepeatedLeftTrimCount"},
+		{"rtrim ", "StringRightTrimCount", data.RTrimmedStringCount, data.RepeatedRTrimmedStringCount, "StringRepeatedRightTrimCount"},
+	} {
+		if !strings.HasPrefix(src, transform.word) || !wordBoundary(src, 0, len(strings.TrimSpace(transform.word))) {
+			continue
+		}
+		arg := strings.TrimSpace(src[len(transform.word):])
+		if out, handled, err := s.tryEvalCountRepeatedStringTransform(arg, transform.takeName, transform.takeFn); err != nil || handled {
+			return out, handled, err
+		}
+		value, err := s.eval(arg)
+		if err != nil {
+			return nil, true, err
+		}
+		shape := "string-count/" + strings.TrimSpace(transform.word) + "/" + string(qRuntimeKernelOperandKind(value, nil))
+		out, err := transform.fn(value)
+		recordRuntimeKernelProbe(transform.kernel, shape, err == nil, err)
+		if err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
+	}
+	return nil, false, nil
+}
+
+func (s *EvalState) tryEvalCountRepeatedStringTransform(src, kernel string, fn func(int, any) (int64, error)) (any, bool, error) {
+	hash := findTopLevel(src, "#")
+	if hash < 0 {
+		return nil, false, nil
+	}
+	left, err := s.eval(strings.TrimSpace(src[:hash]))
+	if err != nil {
+		return nil, true, err
+	}
+	n, ok := integerValue(left)
+	if !ok || int64(int(n)) != n {
+		return nil, false, nil
+	}
+	right, err := s.eval(strings.TrimSpace(src[hash+1:]))
+	if err != nil {
+		return nil, true, err
+	}
+	switch right.(type) {
+	case string, data.Symbol:
+	default:
+		return nil, false, nil
+	}
+	shape := "string-count/take/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	out, err := fn(int(n), right)
+	recordRuntimeKernelProbe(kernel, shape, err == nil, err)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountCross(src string) (any, bool, error) {
+	leftExpr, rightExpr, ok := splitTopLevelWord(src, "cross")
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	out := data.CrossCount(left, right)
+	shape := "cross-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	recordRuntimeKernelProbe("SequenceCrossCount", shape, true, nil)
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountCut(src string) (any, bool, error) {
+	var leftExpr, rightExpr string
+	if args, ok := qFunctionCallArgs(src); ok && strings.TrimSpace(src[:strings.Index(src, "[")]) == "cut" {
+		if len(args) != 2 {
+			return nil, true, fmt.Errorf("cut expects 2 arguments")
+		}
+		leftExpr, rightExpr = args[0], args[1]
+	} else {
+		var ok bool
+		leftExpr, rightExpr, ok = splitTopLevelWord(src, "cut")
+		if !ok {
+			return nil, false, nil
+		}
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	indexes, err := qIntegerIndexes("cut", left)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := data.CutCount(indexes, right)
+	shape := "cut-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	recordRuntimeKernelProbe("SequenceCutCount", shape, err == nil, err)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) tryEvalCountSublist(src string) (any, bool, error) {
+	var leftExpr, rightExpr string
+	if args, ok := qFunctionCallArgs(src); ok && strings.TrimSpace(src[:strings.Index(src, "[")]) == "sublist" {
+		if len(args) != 2 {
+			return nil, true, fmt.Errorf("sublist expects 2 arguments")
+		}
+		leftExpr, rightExpr = args[0], args[1]
+	} else {
+		var ok bool
+		leftExpr, rightExpr, ok = splitTopLevelWord(src, "sublist")
+		if !ok {
+			return nil, false, nil
+		}
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	args, err := qIntegerIndexes("sublist", left)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	var out int64
+	switch len(args) {
+	case 1:
+		out = qTakeCount(args[0], right)
+	case 2:
+		out, err = data.SublistCount(args[0], args[1], right)
+	default:
+		err = fmt.Errorf("sublist expects count or start count")
+	}
+	shape := "sublist-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
+	recordRuntimeKernelProbe("SequenceSublistCount", shape, err == nil, err)
+	if err != nil {
+		return nil, true, err
+	}
 	return out, true, nil
 }
 
@@ -10054,7 +10236,7 @@ func count(v any) (any, error) {
 	case EvalDict:
 		return int64(len(x.Keys)), nil
 	case string:
-		return int64(len(x)), nil
+		return int64(len([]rune(x))), nil
 	default:
 		return int64(1), nil
 	}
@@ -13077,6 +13259,34 @@ func qTakeIndexes(length, n int) []int {
 		indexes[i] = (start + i) % length
 	}
 	return indexes
+}
+
+func qTakeCount(n int, v any) int64 {
+	if n == 0 {
+		return 0
+	}
+	switch x := v.(type) {
+	case data.Array:
+		if x.Len() == 0 {
+			return 0
+		}
+	case data.Frame:
+		if x.Len() == 0 {
+			return 0
+		}
+	case data.KeyedFrame:
+		if data.KeyedFrameLen(x) == 0 {
+			return 0
+		}
+	case string:
+		if len([]rune(x)) == 0 {
+			return 0
+		}
+	}
+	if n < 0 {
+		n = -n
+	}
+	return int64(n)
 }
 
 func takeString(n int, v string) string {

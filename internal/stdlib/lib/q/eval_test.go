@@ -220,6 +220,60 @@ func TestQPipelinePlanRecognizesGenericVectorReduceAndCount(t *testing.T) {
 	assertEvalValue(t, "count 8#til 4", int64(8))
 }
 
+func TestQPipelinePlanRecognizesSequenceStringCounts(t *testing.T) {
+	tests := []struct {
+		expr      string
+		shape     string
+		transform string
+		want      any
+		kernel    string
+	}{
+		{expr: "count 100 sublist til 1000", shape: "sequence-count/sublist", transform: "sublist", want: int64(100), kernel: "SequenceSublistCount"},
+		{expr: "count 0 100 200 cut til 1000", shape: "sequence-count/cut", transform: "cut", want: int64(3), kernel: "SequenceCutCount"},
+		{expr: "count (til 16) cross til 16", shape: "sequence-count/cross", transform: "cross", want: int64(256), kernel: "SequenceCrossCount"},
+		{expr: `count trim 1000#" AAPL "`, shape: "sequence-count/trim", transform: "trim", want: int64(999), kernel: "StringRepeatedTrimCount"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.shape, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			assertEvalValue(t, tt.expr, tt.want)
+			descriptor, ok := DescribeEvalPipeline(tt.expr)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize sequence count", tt.expr)
+			}
+			if descriptor.Shape != tt.shape ||
+				descriptor.PipelineShape != "sequence_count" ||
+				descriptor.ShapeReducer != "count" ||
+				descriptor.ShapeTransform != tt.transform {
+				t.Fatalf("descriptor = %#v, want shape=%q transform=%q", descriptor, tt.shape, tt.transform)
+			}
+			out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+			if err != nil || !handled || !reflect.DeepEqual(out, tt.want) {
+				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want %#v,true,nil", out, handled, err, tt.want)
+			}
+
+			seenPipeline := false
+			seenKernel := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected pipeline fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == "QPipelinePlan" && stat.Shape == tt.shape && stat.Outcome == "hit" {
+					seenPipeline = true
+				}
+				if stat.Kernel == tt.kernel && stat.Outcome == "hit" {
+					seenKernel = true
+				}
+			}
+			if !seenPipeline || !seenKernel {
+				t.Fatalf("missing sequence pipeline/kernel stats: pipeline=%v kernel=%v all=%#v", seenPipeline, seenKernel, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -266,6 +320,15 @@ func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
 			reducer:   "count",
 			transform: "expr",
 			pipeline:  "vector_scan",
+		},
+		{
+			name:      "sequence primitive count",
+			source:    "count (til 16) cross til 16",
+			shape:     "sequence-count/cross",
+			family:    qPipelineShapeFamilyVector,
+			reducer:   "count",
+			transform: "cross",
+			pipeline:  "sequence_count",
 		},
 		{
 			name:      "deltas reduce",
@@ -3694,6 +3757,8 @@ func TestEvalListStringAndBoolGaps(t *testing.T) {
 	assertEvalValue(t, `ltrim "  AAPL  "`, "AAPL  ")
 	assertEvalValue(t, `rtrim "  AAPL  "`, "  AAPL")
 	assertEvalArray(t, `trim " a " " b"`, data.KindString, []any{"a", "b"})
+	assertEvalValue(t, `count "åß"`, int64(2))
+	assertEvalValue(t, `count trim " åß "`, int64(2))
 
 	assertEvalArray(t, `"banana" ss "an"`, data.KindI64, []any{int64(1), int64(3)})
 	assertEvalValue(t, `ssr["banana";"an";"ON"]`, "bONONa")
