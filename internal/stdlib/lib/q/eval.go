@@ -2723,10 +2723,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return dictLookup(left, right)
 	}
-	for _, op := range []struct {
-		word string
-		fn   func(any, any) (any, error)
-	}{
+	dyadicWords := []qDyadicWordOp{
 		{"bin", bin},
 		{"binr", binr},
 		{"xbar", xbar},
@@ -2783,39 +2780,34 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"in", membership},
 		{"and", logicalAnd},
 		{"or", logicalOr},
-	} {
-		if leftExpr, rightExpr, ok := splitTopLevelWord(src, op.word); ok {
-			left, err := s.eval(leftExpr)
-			if err != nil {
-				return nil, err
-			}
-			right, err := s.eval(rightExpr)
-			if err != nil {
-				return nil, err
-			}
-			return op.fn(left, right)
-		}
 	}
-	for _, op := range []struct {
-		word string
-		fn   func(any, any) (any, error)
-	}{
+	if op, leftExpr, rightExpr, ok := splitTopLevelDyadicWord(src, dyadicWords); ok {
+		left, err := s.eval(leftExpr)
+		if err != nil {
+			return nil, err
+		}
+		right, err := s.eval(rightExpr)
+		if err != nil {
+			return nil, err
+		}
+		return op.fn(left, right)
+	}
+	setWords := []qDyadicWordOp{
 		{"intersect", inter},
 		{"except", except},
 		{"union", union},
 		{"inter", inter},
-	} {
-		if leftExpr, rightExpr, ok := splitTopLevelWord(src, op.word); ok {
-			left, err := s.eval(leftExpr)
-			if err != nil {
-				return nil, err
-			}
-			right, err := s.eval(rightExpr)
-			if err != nil {
-				return nil, err
-			}
-			return op.fn(left, right)
+	}
+	if op, leftExpr, rightExpr, ok := splitTopLevelDyadicWord(src, setWords); ok {
+		left, err := s.eval(leftExpr)
+		if err != nil {
+			return nil, err
 		}
+		right, err := s.eval(rightExpr)
+		if err != nil {
+			return nil, err
+		}
+		return op.fn(left, right)
 	}
 	if hash := findTopLevel(src, "#"); hash >= 0 {
 		if marker, ok := parseAttributeMarker(strings.TrimSpace(src[:hash])); ok {
@@ -3982,7 +3974,48 @@ func qSymbolLiteralEnd(src string, start int) int {
 	return pos
 }
 
+type qDyadicWordOp struct {
+	word string
+	fn   func(any, any) (any, error)
+}
+
 func splitTopLevelWord(src, word string) (string, string, bool) {
+	pos := findTopLevelWord(src, word)
+	if pos < 0 {
+		return "", "", false
+	}
+	left := strings.TrimSpace(src[:pos])
+	right := strings.TrimSpace(src[pos+len(word):])
+	return left, right, left != "" && right != ""
+}
+
+func splitTopLevelDyadicWord(src string, ops []qDyadicWordOp) (qDyadicWordOp, string, string, bool) {
+	var zero qDyadicWordOp
+	best := -1
+	bestIndex := -1
+	for i, op := range ops {
+		pos := findTopLevelWord(src, op.word)
+		if pos < 0 {
+			continue
+		}
+		if best < 0 || pos < best || pos == best && len(op.word) > len(ops[bestIndex].word) {
+			best = pos
+			bestIndex = i
+		}
+	}
+	if bestIndex < 0 {
+		return zero, "", "", false
+	}
+	op := ops[bestIndex]
+	left := strings.TrimSpace(src[:best])
+	right := strings.TrimSpace(src[best+len(op.word):])
+	if left == "" || right == "" {
+		return zero, "", "", false
+	}
+	return op, left, right, true
+}
+
+func findTopLevelWord(src, word string) int {
 	parenDepth := 0
 	bracketDepth := 0
 	braceDepth := 0
@@ -4018,13 +4051,11 @@ func splitTopLevelWord(src, word string) (string, string, bool) {
 			braceDepth--
 		default:
 			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 && strings.HasPrefix(src[i:], word) && wordBoundary(src, i, len(word)) {
-				left := strings.TrimSpace(src[:i])
-				right := strings.TrimSpace(src[i+len(word):])
-				return left, right, left != "" && right != ""
+				return i
 			}
 		}
 	}
-	return "", "", false
+	return -1
 }
 
 func wordBoundary(src string, start, length int) bool {

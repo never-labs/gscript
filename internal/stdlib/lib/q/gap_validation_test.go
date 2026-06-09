@@ -108,3 +108,16 @@ func TestQGapValidationStringAndListVerbCompositions(t *testing.T) {
 	assertEvalArray(t, "reverse sublist[1 3;10 20 30 40 50]", data.KindI64, []any{int64(40), int64(30), int64(20)})
 	assertEvalValue(t, "count (1 2 cross `a`b)[where 1010b]", int64(2))
 }
+
+func TestQGapValidationDyadicWordChainsUseQRightAssociativity(t *testing.T) {
+	assertEvalValue(t, `count "," vs "," sv "AAPL" "MSFT" "NVDA"`, int64(3))
+	assertEvalArray(t, `"," vs "," sv "AAPL" "MSFT" "NVDA"`, data.KindString, []any{"AAPL", "MSFT", "NVDA"})
+	assertEvalValue(t, `";" sv "," vs "AAPL,MSFT,NVDA"`, "AAPL;MSFT;NVDA")
+	assertEvalValue(t, `"a-b-c" ssr "," vs "-,+"`, "a+b+c")
+	assertEvalValue(t, `"banana" ssr "," vs "na,NA"`, "baNANA")
+
+	assertEvalArray(t, "1 2 3 union 3 4 except 2 4", data.KindI64, []any{int64(1), int64(2), int64(3)})
+	assertEvalArray(t, "1 2 3 inter 2 3 4 union 4 5", data.KindI64, []any{int64(2), int64(3)})
+	assertEvalValue(t, "10 plus 2 times 3", int64(16))
+	assertEvalValue(t, "100 minus 20 div 5", int64(96))
+}
