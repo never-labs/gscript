@@ -1584,6 +1584,20 @@ func TestEvalListAndStringIndexing(t *testing.T) {
 	assertEvalValue(t, "(`a`b!10 20)[`b]", int64(20))
 }
 
+func TestEvalApplyIndexOperators(t *testing.T) {
+	assertEvalValue(t, "x:10 20 30;x@1", int64(20))
+	assertEvalArray(t, "x:10 20 30;x@2 0", data.KindI64, []any{int64(30), int64(10)})
+	assertEvalValue(t, `s:"abcd";s@2`, "c")
+	assertEvalValue(t, "d:`a`b!10 20;d@`b", int64(20))
+	assertEvalValue(t, "sum@1 2 3", int64(6))
+	assertEvalValue(t, "{x+y} . (4;5)", int64(9))
+	assertEvalValue(t, "x:10 20 30;x . 1", int64(20))
+	assertEvalValue(t, "x:(10 20;30 40);x . (0;1)", int64(20))
+	assertEvalValue(t, ".[{x+y};(2;3)]", int64(5))
+	assertEvalValue(t, ".[sum;enlist 1 2 3]", int64(6))
+	assertEvalDict(t, ".[(`a`b!10 20);`b;:;25]", []data.Symbol{"a", "b"}, []any{int64(10), int64(25)})
+}
+
 func TestEvalDictionaryAmendAndUpsert(t *testing.T) {
 	assertEvalDict(t, "@[(`a`b!10 20);`b;:;25]", []data.Symbol{"a", "b"}, []any{int64(10), int64(25)})
 	assertEvalDict(t, "@[(`a`b!10 20);`c;:;30]", []data.Symbol{"a", "b", "c"}, []any{int64(10), int64(20), int64(30)})

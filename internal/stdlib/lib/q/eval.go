@@ -1997,8 +1997,8 @@ func (s *EvalState) eval(src string) (any, error) {
 	if strings.HasPrefix(src, "@[") {
 		return s.evalAmend(src)
 	}
-	if strings.HasPrefix(src, ".[") {
-		return s.evalDotAmend(src)
+	if value, ok, err := s.evalApplyIndexForm(src); ok || err != nil {
+		return value, err
 	}
 	if callableExpr, rightExpr, ok := splitTopLevelWord(src, "each"); ok {
 		callable, err := s.eval(callableExpr)
