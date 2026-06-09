@@ -742,6 +742,21 @@ type qScriptStatement struct {
 	rhs         string
 	valueExpr   Expr
 	bindingPlan qScriptBindingPlan
+	fastPlan    qEvalFastPlan
+}
+
+type qEvalFastPlanKind uint8
+
+const (
+	qEvalFastInvalid qEvalFastPlanKind = iota
+	qEvalFastPipeline
+	qEvalFastScalarApplyIndex
+)
+
+type qEvalFastPlan struct {
+	kind        qEvalFastPlanKind
+	pipeline    qPipelinePlan
+	scalarIndex qScalarApplyIndexPlan
 }
 
 func (s *EvalState) qScriptPlan(src string) qScriptPlan {
@@ -790,7 +805,17 @@ func qGlobalScriptPlanCacheProbe(src string) (qScriptPlan, bool) {
 	if !ok {
 		return qScriptPlan{}, false
 	}
+	qRecordScriptPlanFastPipelineCacheHits(plan)
 	return cloneQScriptPlan(plan), true
+}
+
+func qRecordScriptPlanFastPipelineCacheHits(plan qScriptPlan) {
+	for _, stmt := range plan.statements {
+		if stmt.fastPlan.kind != qEvalFastPipeline || stmt.fastPlan.pipeline.source == "" {
+			continue
+		}
+		qGlobalPipelinePlanCacheProbe(stmt.fastPlan.pipeline.source)
+	}
 }
 
 func qGlobalScriptPlanCacheStore(src string, plan qScriptPlan) {
@@ -855,6 +880,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 			stmt.rhs = name + op + rhs
 			stmt.valueExpr = parseCachedValueExpr(stmt.rhs)
 			stmt.bindingPlan = buildQScriptWarmBindingPlan(stmt.rhs, stmt.valueExpr)
+			stmt.fastPlan = buildQEvalFastPlan(stmt.rhs)
 			if _, _, ok := parseDeferredScan(stmt.rhs); ok {
 				deferScanCandidates = true
 			}
@@ -863,11 +889,13 @@ func buildQScriptPlan(src string) qScriptPlan {
 			stmt.rhs = rhs
 			stmt.valueExpr = parseCachedValueExpr(rhs)
 			stmt.bindingPlan = buildQScriptWarmBindingPlan(rhs, stmt.valueExpr)
+			stmt.fastPlan = buildQEvalFastPlan(rhs)
 			if _, _, ok := parseDeferredScan(rhs); ok {
 				deferScanCandidates = true
 			}
 		} else {
 			stmt.valueExpr = parseCachedValueExpr(part)
+			stmt.fastPlan = buildQEvalFastPlan(part)
 		}
 		statements = append(statements, stmt)
 	}
@@ -891,7 +919,14 @@ func cloneQScriptPlan(plan qScriptPlan) qScriptPlan {
 
 func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
 	stmt.bindingPlan = cloneQScriptBindingPlan(stmt.bindingPlan)
+	stmt.fastPlan = cloneQEvalFastPlan(stmt.fastPlan)
 	return stmt
+}
+
+func cloneQEvalFastPlan(in qEvalFastPlan) qEvalFastPlan {
+	out := in
+	out.pipeline = cloneQPipelinePlan(in.pipeline)
+	return out
 }
 
 func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipelineDescriptor {
@@ -1165,7 +1200,7 @@ func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
 		}
 	}
 	if !handled {
-		v, err = s.evalCachedOrString(target, stmt.valueExpr, &stmt.bindingPlan)
+		v, err = s.evalCachedOrString(target, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
 	}
 	if err != nil {
 		return nil, err
@@ -1363,7 +1398,52 @@ func numericReductionStatsValue(stats data.NumericStats, op string) any {
 	}
 }
 
-func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScriptBindingPlan) (any, error) {
+func buildQEvalFastPlan(src string) qEvalFastPlan {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qEvalFastPlan{}
+	}
+	if scalar, ok := buildScalarApplyIndexPlan(src); ok {
+		return qEvalFastPlan{kind: qEvalFastScalarApplyIndex, scalarIndex: scalar}
+	}
+	if qPipelinePlanCandidate(src) {
+		if qPipelinePlanGlobalCacheable(src) {
+			if pipeline, ok := qGlobalPipelinePlanCacheProbe(src); ok {
+				return qEvalFastPlan{kind: qEvalFastPipeline, pipeline: pipeline}
+			}
+		}
+		if pipeline := buildQPipelinePlan(src); pipeline.kind != qPipelineInvalid {
+			if qPipelinePlanGlobalCacheable(src) {
+				qGlobalPipelinePlanCacheStore(src, pipeline)
+			}
+			return qEvalFastPlan{kind: qEvalFastPipeline, pipeline: pipeline}
+		}
+	}
+	return qEvalFastPlan{}
+}
+
+func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
+	if plan == nil {
+		return nil, false, nil
+	}
+	switch plan.kind {
+	case qEvalFastPipeline:
+		if plan.pipeline.kind == qPipelineInvalid {
+			return nil, false, nil
+		}
+		return s.evalQPipelinePlan(plan.pipeline)
+	case qEvalFastScalarApplyIndex:
+		target, ok := s.lookupName(plan.scalarIndex.target)
+		if !ok || isCallable(target) {
+			return nil, false, nil
+		}
+		return scalarIndexValue(plan.scalarIndex.mode, target, plan.scalarIndex.index)
+	default:
+		return nil, false, nil
+	}
+}
+
+func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
 	if bindingPlan != nil && bindingPlan.kind != qScriptBindingInvalid {
 		value, handled, err := s.evalQScriptBindingPlan(bindingPlan)
 		if err != nil {
@@ -1372,6 +1452,9 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 		if handled {
 			return value, nil
 		}
+	}
+	if out, handled, err := s.evalQFastPlan(fastPlan); err != nil || handled {
+		return out, err
 	}
 	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
 		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
@@ -4732,12 +4815,16 @@ func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 	}
 	var acc any
 	for i, term := range terms {
-		value, err := s.eval(term)
+		value, err := s.evalScalarAddChainTerm(term)
 		if err != nil {
 			return nil, true, err
 		}
 		if i == 0 {
 			acc = value
+			continue
+		}
+		if out, ok := addScalarNumericFast(acc, value); ok {
+			acc = out
 			continue
 		}
 		acc, err = applyDyadic('+', acc, value)
@@ -4746,6 +4833,74 @@ func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 		}
 	}
 	return acc, true, nil
+}
+
+func (s *EvalState) evalScalarAddChainTerm(src string) (any, error) {
+	src = strings.TrimSpace(stripEnclosingParens(src))
+	if src == "" {
+		return nil, fmt.Errorf("empty q expression")
+	}
+	if qScalarAddChainTermMayBeNumber(src) {
+		if value, _, err := parseNumberOrBool(src); err == nil {
+			return value, nil
+		}
+	}
+	if qScalarAddChainTermMayBeScalarIndex(src) {
+		if scalar, ok := buildScalarApplyIndexPlan(src); ok {
+			target, found := s.lookupName(scalar.target)
+			if found && !isCallable(target) {
+				if value, handled, err := scalarIndexValue(scalar.mode, target, scalar.index); err != nil || handled {
+					return value, err
+				}
+			}
+		}
+	}
+	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
+		arg := strings.TrimSpace(src[len("count "):])
+		if value, ok := s.lookupName(arg); ok {
+			return count(value)
+		}
+	}
+	return s.eval(src)
+}
+
+func qScalarAddChainTermMayBeNumber(src string) bool {
+	if src == "" {
+		return false
+	}
+	ch := src[0]
+	if ch >= '0' && ch <= '9' {
+		return true
+	}
+	if ch == '.' {
+		return len(src) > 1 && src[1] >= '0' && src[1] <= '9'
+	}
+	if ch != '-' && ch != '+' {
+		return false
+	}
+	if len(src) < 2 {
+		return false
+	}
+	next := src[1]
+	return next == '.' || (next >= '0' && next <= '9')
+}
+
+func qScalarAddChainTermMayBeScalarIndex(src string) bool {
+	return strings.Contains(src, "@") || strings.Contains(src, " . ")
+}
+
+func addScalarNumericFast(left, right any) (any, bool) {
+	if li, ok := integerValue(left); ok {
+		if ri, ok := integerValue(right); ok {
+			return li + ri, true
+		}
+	}
+	lf, lok := numeric(left)
+	rf, rok := numeric(right)
+	if lok && rok {
+		return lf + rf, true
+	}
+	return nil, false
 }
 
 func splitTopLevelPlusChain(src string) []string {
@@ -4822,6 +4977,9 @@ func isScalarAddChainTerm(src string) bool {
 		}
 	}
 	if strings.HasPrefix(src, "+/") {
+		return true
+	}
+	if _, ok := buildScalarApplyIndexPlan(src); ok {
 		return true
 	}
 	for _, word := range []string{"sum", "prd", "avg", "min", "max", "first", "last", "count"} {
