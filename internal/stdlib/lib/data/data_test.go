@@ -184,6 +184,63 @@ func TestTryTypedCompareIndexStatsI64(t *testing.T) {
 	if handled {
 		t.Fatal("TryTypedCompareIndexStatsI64 non-contiguous NE handled, want fallback")
 	}
+
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(NewDate([]Date{
+		DateFromDays(20610),
+		DateFromDays(20611),
+		DateFromDays(20612),
+		DateFromDays(20610),
+	}), OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 date did not handle typed compare")
+	}
+	if count != 2 || sum != 3 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 date = count %d sum %d; want 2, 3", count, sum)
+	}
+
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(NewSymbols([]string{"AAPL", "MSFT", "NVDA"}), OpLT, "NVDA")
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 symbol returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 symbol did not handle typed compare")
+	}
+	if count != 2 || sum != 1 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 symbol = count %d sum %d; want 2, 1", count, sum)
+	}
+
+	tiledDates, err := TakeRepeat(NewDate([]Date{
+		DateFromDays(20610),
+		DateFromDays(20611),
+		DateFromDays(20612),
+	}), 9)
+	if err != nil {
+		t.Fatalf("TakeRepeat date returned error: %v", err)
+	}
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(tiledDates, OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 tiled date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 tiled date did not handle typed compare")
+	}
+	if count != 6 || sum != 27 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 tiled date = count %d sum %d; want 6, 27", count, sum)
+	}
+
+	tiledIndexes, handled, err := TryTypedCompareIndexesI64(tiledDates, OpGE, DateFromDays(20611))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 tiled date returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 tiled date did not handle typed compare")
+	}
+	if got, want := tiledIndexes.Values(), []any{int64(1), int64(2), int64(4), int64(5), int64(7), int64(8)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedCompareIndexesI64 tiled date = %#v, want %#v", got, want)
+	}
 }
 
 func TestNewI64RangeArraySemantics(t *testing.T) {

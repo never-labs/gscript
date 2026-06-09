@@ -378,6 +378,53 @@ func TestTypedBinScalarAndVectorBoundaries(t *testing.T) {
 	}
 }
 
+func TestTypedBinTemporalAndSymbolVectors(t *testing.T) {
+	dateDomain := WithArrayAttribute(NewDate([]Date{
+		DateFromDays(20610),
+		DateFromDays(20611),
+		DateFromDays(20611),
+		DateFromDays(20613),
+	}), ArrayAttributeSorted)
+	dateQueries := NewDate([]Date{
+		DateFromDays(20609),
+		DateFromDays(20610),
+		DateFromDays(20611),
+		DateFromDays(20612),
+		DateFromDays(20614),
+	})
+	dateIndexes, ok, err := typedKernels.Bin(dateDomain, dateQueries)
+	if err != nil {
+		t.Fatalf("date Bin vector returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("date Bin vector did not match typed kernel")
+	}
+	if got, want := dateIndexes.(Array).Values(), []any{int64(-1), int64(0), int64(2), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("date Bin vector values = %v, want %v", got, want)
+	}
+
+	timeDomain := WithArrayAttribute(NewTime([]Time{Time(34200000), Time(34260000), Time(34320000)}), ArrayAttributeSorted)
+	timeIndex, ok, err := typedKernels.Bin(timeDomain, Time(34290000))
+	if err != nil {
+		t.Fatalf("time Bin scalar returned error: %v", err)
+	}
+	if !ok || timeIndex != int64(1) {
+		t.Fatalf("time Bin scalar = %v, %v; want 1, true", timeIndex, ok)
+	}
+
+	symbolDomain := WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "MSFT", "NVDA"}), ArrayAttributeSorted)
+	symbolIndexes, ok, err := typedKernels.Bin(symbolDomain, NewSymbols([]string{"A", "AAPL", "MSFT", "TSLA"}))
+	if err != nil {
+		t.Fatalf("symbol Bin vector returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("symbol Bin vector did not match typed kernel")
+	}
+	if got, want := symbolIndexes.(Array).Values(), []any{int64(-1), int64(0), int64(2), int64(3)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("symbol Bin vector values = %v, want %v", got, want)
+	}
+}
+
 func TestQueryKernelSupportReasonForTimeSeriesVectorTransforms(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("ts", []any{TimestampFromUnixNanos(1_000), TimestampFromUnixNanos(2_000)}),

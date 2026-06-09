@@ -2305,6 +2305,64 @@ func TestEvalFrameRuntimePrimitivesRecordStats(t *testing.T) {
 	}
 }
 
+func TestEvalBinRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:10*til 8;probe:til 80;y:x bin probe;+/y", int64(280))
+	assertEvalValue(t, "d:2026.06.06 2026.06.07 2026.06.07 2026.06.09;probe:2026.06.05 2026.06.06 2026.06.07 2026.06.08;y:d bin probe;+/y", int64(3))
+	assertEvalValue(t, "s:`AAPL`MSFT`MSFT`NVDA;probe:`A`AAPL`MSFT`TSLA;y:s bin probe;+/y", int64(4))
+
+	seenI64 := false
+	seenDate := false
+	seenSymbol := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "ArrayBin" || stat.Route != "typed_data_kernel" || stat.PipelineShape != "search_index" || stat.Outcome != "hit" || stat.ReasonCode != "typed_kernel" || stat.Count == 0 {
+			continue
+		}
+		switch stat.Shape {
+		case "bin/i64/i64":
+			seenI64 = true
+		case "bin/date/date":
+			seenDate = true
+		case "bin/symbol/symbol":
+			seenSymbol = true
+		}
+	}
+	if !seenI64 || !seenDate || !seenSymbol {
+		t.Fatalf("missing bin typed runtime stats: i64=%v date=%v symbol=%v stats=%#v", seenI64, seenDate, seenSymbol, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalTemporalCompareRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "dates:9#2026.06.06 2026.06.07 2026.06.08;count where dates>=2026.06.07", int64(6))
+	assertEvalValue(t, "times:8#09:30 09:31 09:32 09:33;count where times within 09:31 09:32", int64(4))
+
+	seenCompareStats := false
+	seenPipeline := false
+	seenDateFallback := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if strings.Contains(stat.Shape, "/date/date") && (stat.Outcome == "fallback" || stat.Outcome == "error") {
+			seenDateFallback = true
+		}
+		if stat.Outcome != "hit" || stat.ReasonCode != "typed_kernel" || stat.Count == 0 {
+			if stat.Kernel == "QPipelinePlan" && stat.Shape == "compare-to-index-count" && stat.PipelineShape == "mask_reduce" && stat.Outcome == "hit" && stat.ReasonCode == "typed_pipeline" && stat.Count > 0 {
+				seenPipeline = true
+			}
+			continue
+		}
+		if stat.Kernel == "ArrayWhereCompareStats" && stat.Shape == "compare-to-index-count-stats/>=/date/date" && stat.PipelineShape == "compare_index_stats" {
+			seenCompareStats = true
+		}
+	}
+	if !seenCompareStats || !seenPipeline || seenDateFallback {
+		t.Fatalf("missing temporal compare typed runtime stats: stats=%v pipeline=%v dateFallback=%v allStats=%#v", seenCompareStats, seenPipeline, seenDateFallback, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

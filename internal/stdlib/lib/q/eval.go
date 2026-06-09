@@ -243,7 +243,7 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "mask_combine"
 	case strings.HasPrefix(shape, "where-reduce/"), strings.HasPrefix(shape, "where-index-reduce/"):
 		return "mask_reduce"
-	case shape == "compare-to-index-sum", shape == "compare-to-index-count":
+	case shape == "compare-to-index-sum", shape == "compare-to-index-count", strings.HasPrefix(shape, "compare-to-index-sum/"), strings.HasPrefix(shape, "compare-to-index-count/"):
 		return "mask_reduce"
 	case strings.HasPrefix(shape, "compare-to-index-count-sum-stats/"), strings.HasPrefix(shape, "compare-to-index-count-stats/"), strings.HasPrefix(shape, "compare-to-index-sum-stats/"):
 		return "compare_index_stats"
@@ -267,6 +267,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "group_aggregate"
 	case strings.HasPrefix(shape, "like-count/"), strings.HasPrefix(shape, "in-count/"):
 		return "predicate_count"
+	case strings.HasPrefix(shape, "bin/"):
+		return "search_index"
 	case strings.HasPrefix(shape, "last-scan/"), strings.HasPrefix(shape, "vector-last/"):
 		return "terminal_scan"
 	case strings.HasPrefix(shape, "amend-indexes/"):
@@ -10663,6 +10665,7 @@ func membership(left, right any) (any, error) {
 func bin(left, right any) (any, error) {
 	if domainArray, ok := left.(data.Array); ok {
 		result, ok, err := data.Bin(domainArray, right)
+		recordRuntimeKernelProbe("ArrayBin", qBinShape(domainArray, right), ok, err)
 		if err != nil {
 			return nil, err
 		}
@@ -10689,6 +10692,10 @@ func bin(left, right any) (any, error) {
 		return data.NewI64(out), nil
 	}
 	return binScalar(domain, right)
+}
+
+func qBinShape(domain data.Array, query any) string {
+	return "bin/" + string(domain.Kind()) + "/" + string(qRuntimeKernelOperandKind(query, nil))
 }
 
 func binScalar(domain []any, query any) (int64, error) {

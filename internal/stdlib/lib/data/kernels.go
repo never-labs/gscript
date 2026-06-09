@@ -3844,6 +3844,9 @@ func (typedKernelRegistry) Bin(domain Array, query any) (any, bool, error) {
 	if domain == nil {
 		return nil, false, fmt.Errorf("bin domain is nil")
 	}
+	if out, ok, err := binTyped(domain, query); ok || err != nil {
+		return out, ok, err
+	}
 	if queryArray, ok := query.(Array); ok {
 		out := make([]int64, queryArray.Len())
 		for i := 0; i < queryArray.Len(); i++ {
@@ -3864,6 +3867,360 @@ func (typedKernelRegistry) Bin(domain Array, query any) (any, bool, error) {
 		return nil, true, err
 	}
 	return index, true, nil
+}
+
+func binTyped(domain Array, query any) (any, bool, error) {
+	switch d := domain.(type) {
+	case attributedArray:
+		return binTyped(d.array, query)
+	case columnArray[int8]:
+		return binSigned[int8](d.data, query)
+	case columnArray[int16]:
+		return binSigned[int16](d.data, query)
+	case columnArray[int32]:
+		return binSigned[int32](d.data, query)
+	case columnArray[int64]:
+		if queryArray, ok := query.(i64RangeArray); ok {
+			return binI64Range(d.data, queryArray), true, nil
+		}
+		return binI64(d.data, query)
+	case i64RangeArray:
+		return binI64RangeDomain(d, query)
+	case columnArray[uint8]:
+		return binUnsigned[uint8](d.data, query)
+	case columnArray[uint16]:
+		return binUnsigned[uint16](d.data, query)
+	case columnArray[uint32]:
+		return binUnsigned[uint32](d.data, query)
+	case columnArray[uint64]:
+		return binUnsigned[uint64](d.data, query)
+	case columnArray[float32]:
+		return binFloat[float32](d.data, query)
+	case columnArray[float64]:
+		return binF64(d.data, query)
+	case columnArray[string]:
+		return binString(d.data, query)
+	case columnArray[Symbol]:
+		return binSymbol(d.data, query)
+	case columnArray[Month]:
+		return binSigned[Month](d.data, query)
+	case columnArray[Date]:
+		return binSigned[Date](d.data, query)
+	case columnArray[DateTime]:
+		return binSigned[DateTime](d.data, query)
+	case columnArray[Timespan]:
+		return binSigned[Timespan](d.data, query)
+	case columnArray[Minute]:
+		return binSigned[Minute](d.data, query)
+	case columnArray[Second]:
+		return binSigned[Second](d.data, query)
+	case columnArray[Time]:
+		return binSigned[Time](d.data, query)
+	case columnArray[Timestamp]:
+		return binSigned[Timestamp](d.data, query)
+	default:
+		return nil, false, nil
+	}
+}
+
+func binSigned[T signedScalar](domain []T, query any) (any, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := signedArrayData[T](queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		return NewI64(binSignedSlice(domain, values)), true, nil
+	}
+	value, ok := query.(T)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binI64(domain []int64, query any) (any, bool, error) {
+	if queryArray, ok := query.(i64RangeArray); ok {
+		return binI64Range(domain, queryArray), true, nil
+	}
+	if queryArray, ok := query.(Array); ok {
+		values, ok := signedArrayData[int64](queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		return NewI64(binSignedSlice(domain, values)), true, nil
+	}
+	value, ok := coerceInt64Exact(query)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binI64Range(domain []int64, query i64RangeArray) Array {
+	out := make([]int64, query.Len())
+	for i := range out {
+		value := query.start + int64(i)*query.step
+		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return NewI64(out)
+}
+
+func binI64RangeDomain(domain i64RangeArray, query any) (any, bool, error) {
+	if domain.step <= 0 {
+		return nil, false, nil
+	}
+	if queryArray, ok := query.(i64RangeArray); ok {
+		out := make([]int64, queryArray.Len())
+		for i := range out {
+			out[i] = binAscendingI64RangeScalar(domain, queryArray.start+int64(i)*queryArray.step)
+		}
+		return NewI64(out), true, nil
+	}
+	if queryArray, ok := query.(Array); ok {
+		values, ok := signedArrayData[int64](queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		out := make([]int64, len(values))
+		for i, value := range values {
+			out[i] = binAscendingI64RangeScalar(domain, value)
+		}
+		return NewI64(out), true, nil
+	}
+	value, ok := coerceInt64Exact(query)
+	if !ok {
+		return nil, false, nil
+	}
+	return binAscendingI64RangeScalar(domain, value), true, nil
+}
+
+func binAscendingI64RangeScalar(domain i64RangeArray, query int64) int64 {
+	if domain.len == 0 || query < domain.start {
+		return -1
+	}
+	last := domain.start + int64(domain.len-1)*domain.step
+	if query >= last {
+		return int64(domain.len - 1)
+	}
+	return (query - domain.start) / domain.step
+}
+
+func binUnsigned[T unsignedScalar](domain []T, query any) (any, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := unsignedArrayData[T](queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		return NewI64(binUnsignedSlice(domain, values)), true, nil
+	}
+	value, ok := query.(T)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binFloat[T floatScalar](domain []T, query any) (any, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := floatArrayData[T](queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		return NewI64(binFloatSlice(domain, values)), true, nil
+	}
+	value, ok := query.(T)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 || math.IsNaN(float64(value)) {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binF64(domain []float64, query any) (any, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := floatArrayData[float64](queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		return NewI64(binFloatSlice(domain, values)), true, nil
+	}
+	value, ok := numeric(query)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 || math.IsNaN(value) {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binString(domain []string, query any) (any, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := stringArrayData(queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		out := make([]int64, len(values))
+		for i, value := range values {
+			out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+		}
+		return NewI64(out), true, nil
+	}
+	value, ok := coerceComparableString(query)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binSymbol(domain []Symbol, query any) (any, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := symbolArrayData(queryArray)
+		if !ok {
+			return nil, false, nil
+		}
+		out := make([]int64, len(values))
+		for i, value := range values {
+			out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+		}
+		return NewI64(out), true, nil
+	}
+	value, ok := coerceComparableSymbol(query)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(domain) == 0 {
+		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binSignedSlice[T signedScalar](domain, query []T) []int64 {
+	out := make([]int64, len(query))
+	for i, value := range query {
+		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return out
+}
+
+func binUnsignedSlice[T unsignedScalar](domain, query []T) []int64 {
+	out := make([]int64, len(query))
+	for i, value := range query {
+		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return out
+}
+
+func binFloatSlice[T floatScalar](domain, query []T) []int64 {
+	out := make([]int64, len(query))
+	for i, value := range query {
+		if math.IsNaN(float64(value)) {
+			out[i] = -1
+			continue
+		}
+		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return out
+}
+
+func signedArrayData[T signedScalar](array Array) ([]T, bool) {
+	for {
+		attributed, ok := array.(attributedArray)
+		if !ok {
+			break
+		}
+		array = attributed.array
+	}
+	if typed, ok := array.(columnArray[T]); ok {
+		return typed.data, true
+	}
+	return nil, false
+}
+
+func unsignedArrayData[T unsignedScalar](array Array) ([]T, bool) {
+	for {
+		attributed, ok := array.(attributedArray)
+		if !ok {
+			break
+		}
+		array = attributed.array
+	}
+	if typed, ok := array.(columnArray[T]); ok {
+		return typed.data, true
+	}
+	return nil, false
+}
+
+func floatArrayData[T floatScalar](array Array) ([]T, bool) {
+	for {
+		attributed, ok := array.(attributedArray)
+		if !ok {
+			break
+		}
+		array = attributed.array
+	}
+	if typed, ok := array.(columnArray[T]); ok {
+		return typed.data, true
+	}
+	return nil, false
+}
+
+func stringArrayData(array Array) ([]string, bool) {
+	for {
+		attributed, ok := array.(attributedArray)
+		if !ok {
+			break
+		}
+		array = attributed.array
+	}
+	switch typed := array.(type) {
+	case columnArray[string]:
+		return typed.data, true
+	case columnArray[Symbol]:
+		out := make([]string, len(typed.data))
+		for i, value := range typed.data {
+			out[i] = string(value)
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+func symbolArrayData(array Array) ([]Symbol, bool) {
+	for {
+		attributed, ok := array.(attributedArray)
+		if !ok {
+			break
+		}
+		array = attributed.array
+	}
+	switch typed := array.(type) {
+	case columnArray[Symbol]:
+		return typed.data, true
+	case columnArray[string]:
+		out := make([]Symbol, len(typed.data))
+		for i, value := range typed.data {
+			out[i] = Symbol(value)
+		}
+		return out, true
+	default:
+		return nil, false
+	}
 }
 
 func kdbBinScalar(domain Array, query any) (int64, error) {

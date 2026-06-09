@@ -1739,6 +1739,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok := typedCompareIndexRangeI64(array, op, value); ok {
 		return out, true, nil
 	}
+	if out, ok, err := typedCompareTiledIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	indexes, ok := typedKernels.CompareIndexes(array, op, value, nil)
 	if !ok {
 		return nil, false, nil
@@ -1769,9 +1772,296 @@ func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int
 			return 0, 0, false, nil
 		}
 		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	case tiledArray:
+		return compareTiledIndexStats(a, op, value)
+	default:
+		return typedCompareIndexStatsI64(a, op, value)
+	}
+}
+
+func typedCompareTiledIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	tiled, ok := array.(tiledArray)
+	if !ok {
+		if attributed, ok := array.(attributedArray); ok {
+			return typedCompareTiledIndexesI64(attributed.array, op, value)
+		}
+		return nil, false, nil
+	}
+	if !typedCompareTiledCanHandle(tiled.source, op, value) {
+		return nil, false, nil
+	}
+	if tiled.source.Len() == 0 || tiled.len == 0 {
+		return i64RangeArray{len: 0}, true, nil
+	}
+	out := make([]int64, 0)
+	for row := 0; row < tiled.len; row++ {
+		sourceRow := (tiled.start + row) % tiled.source.Len()
+		sourceValue, ok := tiled.source.At(sourceRow)
+		if !ok {
+			return nil, true, fmt.Errorf("tiled compare source row %d out of range", sourceRow)
+		}
+		if compareTiledValue(sourceValue, op, value) {
+			out = append(out, int64(row))
+		}
+	}
+	return newI64Trusted(out), true, nil
+}
+
+func compareTiledIndexStats(array tiledArray, op Op, value any) (count, sum int64, handled bool, err error) {
+	if !typedCompareTiledCanHandle(array.source, op, value) {
+		return 0, 0, false, nil
+	}
+	if array.source.Len() == 0 || array.len == 0 {
+		return 0, 0, true, nil
+	}
+	for row := 0; row < array.len; row++ {
+		sourceRow := (array.start + row) % array.source.Len()
+		sourceValue, ok := array.source.At(sourceRow)
+		if !ok {
+			return 0, 0, true, fmt.Errorf("tiled compare source row %d out of range", sourceRow)
+		}
+		if compareTiledValue(sourceValue, op, value) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func typedCompareTiledCanHandle(source Array, op Op, value any) bool {
+	switch s := source.(type) {
+	case attributedArray:
+		return typedCompareTiledCanHandle(s.array, op, value)
+	case columnArray[bool]:
+		_, ok := value.(bool)
+		return ok
+	case columnArray[int8]:
+		_, ok := value.(int8)
+		return ok
+	case columnArray[int16]:
+		_, ok := value.(int16)
+		return ok
+	case columnArray[int32]:
+		_, ok := value.(int32)
+		return ok
+	case columnArray[int64], i64RangeArray:
+		_, ok := coerceInt64Exact(value)
+		return ok
+	case columnArray[uint8]:
+		_, ok := value.(uint8)
+		return ok
+	case columnArray[uint16]:
+		_, ok := value.(uint16)
+		return ok
+	case columnArray[uint32]:
+		_, ok := value.(uint32)
+		return ok
+	case columnArray[uint64]:
+		_, ok := value.(uint64)
+		return ok
+	case columnArray[float32]:
+		_, ok := value.(float32)
+		return ok
+	case columnArray[float64]:
+		_, ok := numeric(value)
+		return ok
+	case columnArray[string]:
+		_, ok := coerceComparableString(value)
+		return ok
+	case columnArray[Symbol]:
+		_, ok := coerceComparableSymbol(value)
+		return ok
+	case columnArray[Month]:
+		_, ok := value.(Month)
+		return ok
+	case columnArray[Date]:
+		_, ok := value.(Date)
+		return ok
+	case columnArray[DateTime]:
+		_, ok := value.(DateTime)
+		return ok
+	case columnArray[Timespan]:
+		_, ok := value.(Timespan)
+		return ok
+	case columnArray[Minute]:
+		_, ok := value.(Minute)
+		return ok
+	case columnArray[Second]:
+		_, ok := value.(Second)
+		return ok
+	case columnArray[Time]:
+		_, ok := value.(Time)
+		return ok
+	case columnArray[Timestamp]:
+		_, ok := value.(Timestamp)
+		return ok
+	default:
+		return false
+	}
+}
+
+func compareTiledValue(left any, op Op, right any) bool {
+	if IsNull(left) || IsNull(right) {
+		eq := IsNull(left) && IsNull(right)
+		switch op {
+		case OpEQ:
+			return eq
+		case OpNE:
+			return !eq
+		default:
+			return false
+		}
+	}
+	cmp := compare(left, right)
+	return boolCompare(op, cmp == 0, cmp)
+}
+
+func typedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int64, handled bool, err error) {
+	switch a := array.(type) {
+	case columnArray[bool]:
+		v, ok := value.(bool)
+		return compareBoolIndexStats(a.data, v, ok, op)
+	case columnArray[int8]:
+		v, ok := value.(int8)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[int16]:
+		v, ok := value.(int16)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[int32]:
+		v, ok := value.(int32)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[int64]:
+		v, ok := coerceInt64Exact(value)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[uint8]:
+		v, ok := value.(uint8)
+		return compareUnsignedIndexStats(a.data, v, ok, op)
+	case columnArray[uint16]:
+		v, ok := value.(uint16)
+		return compareUnsignedIndexStats(a.data, v, ok, op)
+	case columnArray[uint32]:
+		v, ok := value.(uint32)
+		return compareUnsignedIndexStats(a.data, v, ok, op)
+	case columnArray[uint64]:
+		v, ok := value.(uint64)
+		return compareUnsignedIndexStats(a.data, v, ok, op)
+	case columnArray[float32]:
+		v, ok := value.(float32)
+		return compareFloatIndexStats(a.data, v, ok, op)
+	case columnArray[float64]:
+		v, ok := numeric(value)
+		return compareFloatIndexStats(a.data, v, ok, op)
+	case columnArray[string]:
+		v, ok := coerceComparableString(value)
+		return compareStringIndexStats(a.data, v, ok, op)
+	case columnArray[Symbol]:
+		v, ok := coerceComparableSymbol(value)
+		return compareSymbolIndexStats(a.data, v, ok, op)
+	case columnArray[Month]:
+		v, ok := value.(Month)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[Date]:
+		v, ok := value.(Date)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[DateTime]:
+		v, ok := value.(DateTime)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[Timespan]:
+		v, ok := value.(Timespan)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[Minute]:
+		v, ok := value.(Minute)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[Second]:
+		v, ok := value.(Second)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[Time]:
+		v, ok := value.(Time)
+		return compareSignedIndexStats(a.data, v, ok, op)
+	case columnArray[Timestamp]:
+		v, ok := value.(Timestamp)
+		return compareSignedIndexStats(a.data, v, ok, op)
 	default:
 		return 0, 0, false, nil
 	}
+}
+
+func compareBoolIndexStats(values []bool, target bool, ok bool, op Op) (count, sum int64, handled bool, err error) {
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row, value := range values {
+		if boolCompare(op, value == target, compareBool(value, target)) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func compareSignedIndexStats[T signedScalar](values []T, target T, ok bool, op Op) (count, sum int64, handled bool, err error) {
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row, value := range values {
+		if boolCompare(op, value == target, compareInt64(int64(value), int64(target))) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func compareUnsignedIndexStats[T unsignedScalar](values []T, target T, ok bool, op Op) (count, sum int64, handled bool, err error) {
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row, value := range values {
+		if boolCompare(op, value == target, compareUint64(uint64(value), uint64(target))) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func compareFloatIndexStats[T floatScalar](values []T, target T, ok bool, op Op) (count, sum int64, handled bool, err error) {
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row, value := range values {
+		if boolCompare(op, value == target, compareFloat64(float64(value), float64(target))) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func compareStringIndexStats(values []string, target string, ok bool, op Op) (count, sum int64, handled bool, err error) {
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row, value := range values {
+		if boolCompare(op, value == target, compareString(value, target)) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
+}
+
+func compareSymbolIndexStats(values []Symbol, target Symbol, ok bool, op Op) (count, sum int64, handled bool, err error) {
+	if !ok {
+		return 0, 0, false, nil
+	}
+	for row, value := range values {
+		if boolCompare(op, value == target, compareString(string(value), string(target))) {
+			count++
+			sum += int64(row)
+		}
+	}
+	return count, sum, true, nil
 }
 
 func i64IndexArraySum(array Array) int64 {
