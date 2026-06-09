@@ -24,6 +24,10 @@ var _ runtime.Value
 var _ *vm.FuncProto
 
 func (cf *CompiledFunction) Execute(args []runtime.Value) ([]runtime.Value, error) {
+	if results, handled, err := cf.tryExecuteQEvalPipelineDirectReturn(args); handled {
+		return results, err
+	}
+
 	// Allocate VM registers (NaN-boxed values).
 	nregs := cf.numRegs
 	if nregs < len(args)+1 {

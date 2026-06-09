@@ -75,6 +75,15 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionCounter(id int, rout
 			counter.opError.Add(1)
 			return true
 		}
+	case "typed_runtime_direct_entry":
+		if outcome == "success" {
+			counter.directSuccess.Add(1)
+			return true
+		}
+		if outcome == "error" {
+			counter.directError.Add(1)
+			return true
+		}
 	}
 	return false
 }
@@ -322,6 +331,8 @@ func (cf *CompiledFunction) appendQEvalPipelinePlanExecutionStats(out map[qKerne
 		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_native_exit", "error", counter.nativeError.Load())
 		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_op_exit", "success", counter.opSuccess.Load())
 		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_op_exit", "error", counter.opError.Load())
+		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_direct_entry", "success", counter.directSuccess.Load())
+		appendQEvalPipelinePlanCounter(out, shape, "typed_runtime_direct_entry", "error", counter.directError.Load())
 	}
 }
 

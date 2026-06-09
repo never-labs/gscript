@@ -71,6 +71,8 @@ type qEvalPipelinePlanExecutionCounters struct {
 	nativeError   atomic.Uint64
 	opSuccess     atomic.Uint64
 	opError       atomic.Uint64
+	directSuccess atomic.Uint64
+	directError   atomic.Uint64
 }
 
 func (p qEvalPipelineStaticPlan) Ref() QEvalPipelinePlanRef {
@@ -181,6 +183,19 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 		backend = newQRuntimeEvalPipelineBackend(cf.QEvalPipelinePlans)
 	}
 	return executeQEvalPipelinePlanValue(backend, ref)
+}
+
+func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturn(args []runtime.Value) ([]runtime.Value, bool, error) {
+	if cf == nil || len(args) != 0 || !cf.QEvalPipelineDirectReturn || cf.QEvalPipelineDirectReturnID < 0 || exitResumeCheckEnabled() {
+		return nil, false, nil
+	}
+	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(cf.QEvalPipelineDirectReturnID)
+	if err != nil || !handled {
+		cf.recordQEvalPipelinePlanExecutionWithRoute(cf.QEvalPipelineDirectReturnID, "typed_runtime_direct_entry", "error")
+		return nil, true, err
+	}
+	cf.recordQEvalPipelinePlanExecutionWithRoute(cf.QEvalPipelineDirectReturnID, "typed_runtime_direct_entry", "success")
+	return []runtime.Value{out}, true, nil
 }
 
 func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs []runtime.Value, base int, route string) error {
@@ -307,6 +322,25 @@ func qEvalPipelineTerminalReturnTable(fn *Function) []bool {
 		}
 	}
 	return table
+}
+
+func qEvalPipelineDirectReturnPlanID(fn *Function) int {
+	if fn == nil || len(fn.QEvalPipelinePlans) == 0 || fn.Entry == nil || len(fn.Entry.Instrs) != 2 {
+		return -1
+	}
+	plan := fn.Entry.Instrs[0]
+	ret := fn.Entry.Instrs[1]
+	if plan == nil || ret == nil || plan.Op != OpQEvalPipelinePlan || ret.Op != OpReturn || len(ret.Args) != 1 || ret.Args[0] == nil {
+		return -1
+	}
+	if ret.Args[0].ID != plan.ID {
+		return -1
+	}
+	id := int(plan.Aux)
+	if _, ok := qEvalPipelinePlanRefByID(fn.QEvalPipelinePlans, id); !ok {
+		return -1
+	}
+	return id
 }
 
 func newQEvalPipelinePlanExecutionCounters(refs []QEvalPipelinePlanRef) []qEvalPipelinePlanExecutionCounters {

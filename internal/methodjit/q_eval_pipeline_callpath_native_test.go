@@ -97,6 +97,24 @@ func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
 	})
 }
 
+func TestQEvalPipelinePlanDirectReturnExecutesTypedPlanRef(t *testing.T) {
+	t.Setenv(exitResumeCheckEnv, "")
+	cf := compileQEvalPipelineNativeExitBenchmark(t, "count where (til 64 mod 4)=1")
+	defer cf.Code.Free()
+	if !cf.QEvalPipelineDirectReturn || cf.QEvalPipelineDirectReturnID != 0 {
+		t.Fatalf("compiled direct q eval return = %v/%d, want true/0", cf.QEvalPipelineDirectReturn, cf.QEvalPipelineDirectReturnID)
+	}
+
+	result, err := cf.Execute(nil)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if len(result) != 1 || !result[0].IsInt() || result[0].Int() != 16 {
+		t.Fatalf("Execute result = %v, want int 16", result)
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), cf.QEvalPipelinePlans[0].Shape, "typed_runtime_direct_entry", "success", 1)
+}
+
 func TestQEvalPipelineTerminalReturnTable(t *testing.T) {
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "+/til 16")
 	fn := &Function{QEvalPipelinePlans: []QEvalPipelinePlanRef{ref}}

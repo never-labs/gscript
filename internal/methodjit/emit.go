@@ -642,6 +642,13 @@ type CompiledFunction struct {
 	// the hot path while preserving the older backend fallback.
 	QEvalPipelinePlanHelpers []qEvalPipelinePlanHelper
 
+	// QEvalPipelineDirectReturn is set when the compiled function body is a
+	// terminal q.eval backend plan followed immediately by return. Standalone
+	// execution can call the typed backend directly instead of entering native
+	// code only to bounce through ExitQEvalPipelinePlan.
+	QEvalPipelineDirectReturn   bool
+	QEvalPipelineDirectReturnID int
+
 	// QEvalPipelineResumeOffsets keeps q.eval pipeline native-exit resume
 	// offsets indexed by OpQEvalPipelinePlan instruction ID. This avoids a
 	// generic map lookup on the fixed q pipeline helper path.

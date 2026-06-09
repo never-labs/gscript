@@ -481,6 +481,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	qEvalPipelineResumeOffsets := qEvalPipelineResumeOffsetTable(fn, resumeAddrs)
 	qEvalPipelineNumericResumeOffsets := qEvalPipelineResumeOffsetTable(fn, numericResumeAddrs)
 	qEvalPipelineTerminalReturns := qEvalPipelineTerminalReturnTable(fn)
+	qEvalPipelineDirectReturnID := qEvalPipelineDirectReturnPlanID(fn)
 	return &CompiledFunction{
 		Code:                              cb,
 		Proto:                             fn.Proto,
@@ -516,6 +517,8 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		QEvalPipelinePlans:                fn.QEvalPipelinePlans,
 		QEvalPipelineBackend:              qEvalPipelineBackend,
 		QEvalPipelinePlanHelpers:          newQEvalPipelinePlanHelpers(fn.QEvalPipelinePlans, qEvalPipelineBackend),
+		QEvalPipelineDirectReturn:         qEvalPipelineDirectReturnID >= 0,
+		QEvalPipelineDirectReturnID:       qEvalPipelineDirectReturnID,
 		QEvalPipelineResumeOffsets:        qEvalPipelineResumeOffsets,
 		QEvalPipelineNumericResumeOffsets: qEvalPipelineNumericResumeOffsets,
 		QEvalPipelineTerminalReturns:      qEvalPipelineTerminalReturns,
