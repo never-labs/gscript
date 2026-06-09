@@ -4369,31 +4369,24 @@ func TryTypedRatiosSum(array Array) (any, bool, error) {
 		return nil, false, nil
 	}
 	var total float64
-	var previous any
+	var previous float64
+	var hasPrevious bool
 	for row := 0; row < array.Len(); row++ {
-		item, ok := array.At(row)
-		if !ok {
-			return nil, true, fmt.Errorf("ratios row %d out of range", row)
+		current, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return nil, true, err
 		}
-		if IsNull(item) {
-			previous = item
+		if !ok {
+			hasPrevious = false
 			continue
 		}
-		current, ok := numeric(item)
-		if !ok {
-			return nil, false, nil
-		}
-		if row == 0 || IsNull(previous) {
+		if !hasPrevious {
 			total += current
-			previous = item
-			continue
+		} else {
+			total += current / previous
 		}
-		prev, ok := numeric(previous)
-		if !ok {
-			return nil, false, nil
-		}
-		total += current / prev
-		previous = item
+		previous = current
+		hasPrevious = true
 	}
 	return total, true, nil
 }
