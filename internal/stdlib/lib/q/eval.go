@@ -140,6 +140,7 @@ func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
 }
 
 func recordRuntimeExecution(source, kernel, shape, route, outcome, reasonCode string) {
+	reasonCode = normalizeRuntimeKernelReasonCode(outcome, reasonCode)
 	key := runtimeKernelExecutionKey{
 		source:     normalizeRuntimeStatField(source, "q_eval_runtime"),
 		kernel:     normalizeRuntimeStatField(kernel, "unknown"),
@@ -152,6 +153,17 @@ func recordRuntimeExecution(source, kernel, shape, route, outcome, reasonCode st
 		key.reasonCode = key.outcome
 	}
 	runtimeKernelCounterFor(key).count.Add(1)
+}
+
+func normalizeRuntimeKernelReasonCode(outcome, reasonCode string) string {
+	switch outcome {
+	case "fallback":
+		return RuntimeFallbackReasonCode(reasonCode)
+	case "error":
+		return RuntimeFallbackRuntimeError
+	default:
+		return reasonCode
+	}
 }
 
 func recordRuntimeFramePrimitive(kernel, shape string, err error) {
@@ -171,6 +183,10 @@ func normalizeRuntimeStatField(value, fallback string) string {
 }
 
 func recordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
+	recordRuntimeKernelProbeReason(kernel, shape, handled, err, RuntimeFallbackUnsupportedShape)
+}
+
+func recordRuntimeKernelProbeReason(kernel, shape string, handled bool, err error, fallbackReason string) {
 	if kernel == "" {
 		kernel = "unknown"
 	}
@@ -185,7 +201,12 @@ func recordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
 	case handled:
 		counters.hit.count.Add(1)
 	default:
-		counters.fallback.count.Add(1)
+		reasonCode := RuntimeFallbackReasonCode(fallbackReason)
+		if reasonCode == RuntimeFallbackUnsupportedShape {
+			counters.fallback.count.Add(1)
+			return
+		}
+		recordRuntimeKernelExecution(kernel, shape, "fallback", reasonCode)
 	}
 }
 
@@ -292,7 +313,7 @@ func runtimeKernelProbeCountersFor(kernel, shape string) *runtimeKernelProbeCoun
 			shape:      shape,
 			route:      "typed_data_kernel",
 			outcome:    "fallback",
-			reasonCode: "unsupported_shape",
+			reasonCode: RuntimeFallbackUnsupportedShape,
 		}),
 		err: registerRuntimeKernelCounterLocked(runtimeKernelExecutionKey{
 			source:     "q_eval_vector_runtime",
@@ -300,7 +321,7 @@ func runtimeKernelProbeCountersFor(kernel, shape string) *runtimeKernelProbeCoun
 			shape:      shape,
 			route:      "typed_data_kernel",
 			outcome:    "error",
-			reasonCode: "runtime_error",
+			reasonCode: RuntimeFallbackRuntimeError,
 		}),
 	}
 	runtimeKernelProbeStats[key] = counters
@@ -8402,7 +8423,7 @@ func applyCompositeDyadic(op string, left, right any) (any, error) {
 			shape := qRuntimeKernelCompositeVectorDyadicShape(op, left, right, la, ra)
 			if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
 				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
-				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", "unsupported_shape")
+				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
 			} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
 				recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
 				if err != nil {
@@ -8522,7 +8543,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		}
 		if !canUse || !qVectorDyadicCanUseTypedArithmetic(typedLeft, typedRight) {
 			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "attempt", "attempt")
-			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "fallback", "unsupported_shape")
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "fallback", RuntimeFallbackUnsupportedType)
 		} else if out, handled, err := qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight); err != nil || handled {
 			recordRuntimeKernelProbe("ArrayDyadicArithmetic", shape, handled, err)
 			if err != nil {
@@ -8539,7 +8560,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 		if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
-			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", "unsupported_shape")
+			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
 		} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
 			recordRuntimeKernelProbe("ArrayDyadicCompare", shape, handled, err)
 			if err != nil {
@@ -9275,7 +9296,7 @@ func sum(v any) (any, error) {
 		}
 		return out, nil
 	} else {
-		recordRuntimeKernelProbe("ArraySum", "vector-reduce/sum/"+string(array.Kind()), handled, err)
+		recordRuntimeKernelProbeReason("ArraySum", "vector-reduce/sum/"+string(array.Kind()), handled, err, RuntimeFallbackUnsupportedType)
 	}
 	totalI := int64(0)
 	totalF := float64(0)
@@ -9325,7 +9346,7 @@ func avg(v any) (any, error) {
 		}
 		return out, nil
 	} else {
-		recordRuntimeKernelProbe("ArrayAvg", "vector-reduce/avg/"+string(array.Kind()), handled, err)
+		recordRuntimeKernelProbeReason("ArrayAvg", "vector-reduce/avg/"+string(array.Kind()), handled, err, RuntimeFallbackUnsupportedType)
 	}
 	total := float64(0)
 	count := 0

@@ -18,6 +18,14 @@ const (
 	KernelFallbackJoinPlan            = "kernel_join_plan"
 )
 
+const (
+	RuntimeFallbackUnsupportedShape = "unsupported_shape"
+	RuntimeFallbackUnsupportedType  = "unsupported_type"
+	RuntimeFallbackRuntimeError     = "runtime_error"
+	RuntimeFallbackPlannerUnhandled = "planner_unhandled"
+	RuntimeFallbackSemanticGuard    = "semantic_guard"
+)
+
 // KernelFallbackReasonCode converts kernel fallback text into a stable bucket
 // suitable for explain output and fallback_stats aggregation.
 func KernelFallbackReasonCode(reason string) string {
@@ -51,5 +59,36 @@ func KernelFallbackReasonCode(reason string) string {
 		return KernelFallbackWhereExpression
 	default:
 		return KernelFallbackUnsupported
+	}
+}
+
+// RuntimeFallbackReasonCode converts q.eval typed-runtime fallback text into a
+// stable bucket suitable for RuntimeKernelExecutionStats aggregation.
+func RuntimeFallbackReasonCode(reason string) string {
+	reason = strings.ToLower(strings.Join(strings.Fields(reason), " "))
+	switch reason {
+	case "", RuntimeFallbackUnsupportedShape, "unsupported_runtime_shape", "runtime_unsupported_shape":
+		return RuntimeFallbackUnsupportedShape
+	case RuntimeFallbackUnsupportedType, "type", "type_mismatch", "unsupported_kind", "unsupported_value_type":
+		return RuntimeFallbackUnsupportedType
+	case RuntimeFallbackRuntimeError, "error":
+		return RuntimeFallbackRuntimeError
+	case RuntimeFallbackPlannerUnhandled, "planner", "planner_unhandled_shape", "unsupported_plan":
+		return RuntimeFallbackPlannerUnhandled
+	case RuntimeFallbackSemanticGuard, "semantic", "semantic_path", "semantic_fallback":
+		return RuntimeFallbackSemanticGuard
+	default:
+		switch {
+		case strings.Contains(reason, "type") || strings.Contains(reason, "kind"):
+			return RuntimeFallbackUnsupportedType
+		case strings.Contains(reason, "runtime error") || strings.Contains(reason, "error"):
+			return RuntimeFallbackRuntimeError
+		case strings.Contains(reason, "planner") || strings.Contains(reason, "plan"):
+			return RuntimeFallbackPlannerUnhandled
+		case strings.Contains(reason, "semantic") || strings.Contains(reason, "guard"):
+			return RuntimeFallbackSemanticGuard
+		default:
+			return RuntimeFallbackUnsupportedShape
+		}
 	}
 }

@@ -164,7 +164,7 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "attempt", "attempt")
 	terminal := descriptor.terminalPlan
 	if terminal.kind == qPipelineInvalid {
-		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
+		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
 	}
 	s.rememberQPipelinePlan(descriptor.terminal, terminal)

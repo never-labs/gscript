@@ -95,3 +95,25 @@ func TestKernelFallbackReasonCodeNormalizesWhitespaceAndCase(t *testing.T) {
 		t.Fatalf("KernelFallbackReasonCode normalized = %q, want %q", got, KernelFallbackSelectExpression)
 	}
 }
+
+func TestRuntimeFallbackReasonCodeBucketsStableRuntimeReasons(t *testing.T) {
+	tests := []struct {
+		name   string
+		reason string
+		want   string
+	}{
+		{name: "empty", reason: "", want: RuntimeFallbackUnsupportedShape},
+		{name: "legacy runtime shape", reason: "unsupported_runtime_shape", want: RuntimeFallbackUnsupportedShape},
+		{name: "type mismatch", reason: "typed helper kind mismatch", want: RuntimeFallbackUnsupportedType},
+		{name: "runtime error", reason: "runtime error: divide by zero", want: RuntimeFallbackRuntimeError},
+		{name: "planner", reason: "unsupported plan for terminal", want: RuntimeFallbackPlannerUnhandled},
+		{name: "semantic guard", reason: "semantic guard: symbol cast", want: RuntimeFallbackSemanticGuard},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RuntimeFallbackReasonCode(tt.reason); got != tt.want {
+				t.Fatalf("RuntimeFallbackReasonCode(%q) = %q, want %q", tt.reason, got, tt.want)
+			}
+		})
+	}
+}

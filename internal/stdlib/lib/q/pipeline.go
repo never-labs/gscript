@@ -399,6 +399,7 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 	case qPipelineCountVectorExpr:
 		out, handled, err = s.evalQPipelineCountVectorExpr(plan)
 	default:
+		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
 	}
 	switch {

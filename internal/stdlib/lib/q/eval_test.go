@@ -82,8 +82,40 @@ func TestRuntimeKernelExecutionStatsReportHitAndFallbackOutcomes(t *testing.T) {
 	if counts["ArraySum/hit/typed_kernel"] != 1 {
 		t.Fatalf("ArraySum hits = %d, want 1; stats=%#v", counts["ArraySum/hit/typed_kernel"], stats)
 	}
-	if counts["ArraySum/fallback/unsupported_shape"] != 1 {
-		t.Fatalf("ArraySum fallbacks = %d, want 1; stats=%#v", counts["ArraySum/fallback/unsupported_shape"], stats)
+	if counts["ArraySum/fallback/unsupported_type"] != 1 {
+		t.Fatalf("ArraySum fallbacks = %d, want 1; stats=%#v", counts["ArraySum/fallback/unsupported_type"], stats)
+	}
+}
+
+func TestRuntimeKernelExecutionStatsAggregateStableFallbackReasons(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	recordRuntimeKernelExecution("TestKernel", "shape", "fallback", "unsupported runtime shape")
+	recordRuntimeKernelExecution("TestKernel", "shape", "fallback", "unsupported kind")
+	recordRuntimeKernelExecution("TestKernel", "shape", "fallback", "unsupported plan")
+	recordRuntimeKernelExecution("TestKernel", "shape", "fallback", "semantic guard")
+	recordRuntimeKernelExecution("TestKernel", "shape", "error", "typed helper failed")
+	recordRuntimeKernelProbeReason("TestProbe", "shape", false, nil, "type mismatch")
+
+	counts := map[string]uint64{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		key := stat.Kernel + "/" + stat.Outcome + "/" + stat.ReasonCode
+		counts[key] += stat.Count
+	}
+	want := map[string]uint64{
+		"TestKernel/fallback/unsupported_shape": 1,
+		"TestKernel/fallback/unsupported_type":  1,
+		"TestKernel/fallback/planner_unhandled": 1,
+		"TestKernel/fallback/semantic_guard":    1,
+		"TestKernel/error/runtime_error":        1,
+		"TestProbe/attempt/attempt":             1,
+		"TestProbe/fallback/unsupported_type":   1,
+	}
+	for key, expected := range want {
+		if counts[key] != expected {
+			t.Fatalf("runtime stats %s = %d, want %d; stats=%#v", key, counts[key], expected, RuntimeKernelExecutionStats())
+		}
 	}
 }
 
