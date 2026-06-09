@@ -20,6 +20,97 @@ func TestNewFrameRejectsUnequalColumnLengths(t *testing.T) {
 	}
 }
 
+func TestSequenceCutArrayStringAndFrame(t *testing.T) {
+	array := NewI64([]int64{10, 20, 30, 40, 50})
+	got, err := Cut([]int{0, 2, 4}, array)
+	if err != nil {
+		t.Fatalf("Cut array returned error: %v", err)
+	}
+	segments := got.(Array).Values()
+	if len(segments) != 3 {
+		t.Fatalf("Cut array segments = %d, want 3", len(segments))
+	}
+	if values := segments[0].(Array).Values(); !reflect.DeepEqual(values, []any{int64(10), int64(20)}) {
+		t.Fatalf("Cut array segment 0 = %#v", values)
+	}
+	if values := segments[2].(Array).Values(); !reflect.DeepEqual(values, []any{int64(50)}) {
+		t.Fatalf("Cut array segment 2 = %#v", values)
+	}
+
+	text, err := Cut([]int{0, 2}, "abcdef")
+	if err != nil {
+		t.Fatalf("Cut string returned error: %v", err)
+	}
+	if values := text.(Array).Values(); !reflect.DeepEqual(values, []any{"ab", "cdef"}) {
+		t.Fatalf("Cut string = %#v", values)
+	}
+
+	frame, err := NewFrame(NewColumn("qty", []any{10, 20, 30}))
+	if err != nil {
+		t.Fatalf("NewFrame returned error: %v", err)
+	}
+	frameCut, err := Cut([]int{0, 2}, frame)
+	if err != nil {
+		t.Fatalf("Cut frame returned error: %v", err)
+	}
+	frameSegments := frameCut.(Array).Values()
+	if len(frameSegments) != 2 {
+		t.Fatalf("Cut frame segments = %d, want 2", len(frameSegments))
+	}
+	if gotLen := frameSegments[0].(Frame).Len(); gotLen != 2 {
+		t.Fatalf("Cut frame segment 0 length = %d, want 2", gotLen)
+	}
+	if gotLen := frameSegments[1].(Frame).Len(); gotLen != 1 {
+		t.Fatalf("Cut frame segment 1 length = %d, want 1", gotLen)
+	}
+}
+
+func TestSequenceCrossAndItems(t *testing.T) {
+	got := Cross(NewSymbols([]string{"a", "b"}), NewI64([]int64{1, 2, 3}))
+	if got.Len() != 6 {
+		t.Fatalf("Cross length = %d, want 6", got.Len())
+	}
+	first, _ := got.At(0)
+	if values := first.(Array).Values(); !reflect.DeepEqual(values, []any{Symbol("a"), int64(1)}) {
+		t.Fatalf("Cross first = %#v", values)
+	}
+	last, _ := got.At(5)
+	if values := last.(Array).Values(); !reflect.DeepEqual(values, []any{Symbol("b"), int64(3)}) {
+		t.Fatalf("Cross last = %#v", values)
+	}
+	if values := SequenceItems(Symbol("x")); !reflect.DeepEqual(values, []any{Symbol("x")}) {
+		t.Fatalf("SequenceItems scalar = %#v", values)
+	}
+}
+
+func TestReusableStringHelpers(t *testing.T) {
+	if got, err := TrimStringValue("  abc \t"); err != nil || got != "abc" {
+		t.Fatalf("TrimStringValue = %#v,%v; want abc,nil", got, err)
+	}
+	if got, err := LTrimStringValue(Symbol("  abc")); err != nil || got != "abc" {
+		t.Fatalf("LTrimStringValue = %#v,%v; want abc,nil", got, err)
+	}
+	if got, err := RTrimStringValue("abc  "); err != nil || got != "abc" {
+		t.Fatalf("RTrimStringValue = %#v,%v; want abc,nil", got, err)
+	}
+	if values := StringSearch("banana", "an").Values(); !reflect.DeepEqual(values, []any{int64(1), int64(3)}) {
+		t.Fatalf("StringSearch = %#v, want 1 3", values)
+	}
+	if got := StringReplaceAll("banana", "an", "ON"); got != "bONONa" {
+		t.Fatalf("StringReplaceAll = %q, want bONONa", got)
+	}
+	joined, err := StringJoin(",", []any{"AAPL", Symbol("MSFT")})
+	if err != nil || joined != "AAPL,MSFT" {
+		t.Fatalf("StringJoin = %q,%v; want AAPL,MSFT,nil", joined, err)
+	}
+	if values := StringSplit(",", "AAPL,MSFT").Values(); !reflect.DeepEqual(values, []any{"AAPL", "MSFT"}) {
+		t.Fatalf("StringSplit comma = %#v", values)
+	}
+	if values := StringSplit("", "åß").Values(); !reflect.DeepEqual(values, []any{"å", "ß"}) {
+		t.Fatalf("StringSplit runes = %#v", values)
+	}
+}
+
 func TestTryTypedWhereMaskI64(t *testing.T) {
 	got, handled, err := TryTypedWhereMaskI64(NewBool([]bool{true, false, true, true, false}))
 	if err != nil {

@@ -3,7 +3,6 @@ package q
 import (
 	"fmt"
 	"strings"
-	"unicode"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
@@ -59,7 +58,7 @@ func qCutValue(left, right any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cut(indexes, right)
+	return data.Cut(indexes, right)
 }
 
 func qSublistValue(left, right any) (any, error) {
@@ -105,38 +104,23 @@ func qIntegerIndexes(name string, value any) ([]int, error) {
 }
 
 func qCrossValue(left, right any) (any, error) {
-	leftValues := qListItems(left)
-	rightValues := qListItems(right)
-	out := make([]any, 0, len(leftValues)*len(rightValues))
-	for _, l := range leftValues {
-		for _, r := range rightValues {
-			out = append(out, data.NewAny([]any{l, r}))
-		}
-	}
-	return data.NewAny(out), nil
+	return data.Cross(left, right), nil
 }
 
 func qListItems(value any) []any {
-	if array, ok := value.(data.Array); ok {
-		return array.Values()
-	}
-	return []any{value}
+	return data.SequenceItems(value)
 }
 
 func qTrimValue(value any) (any, error) {
-	return mapStringValue("trim", value, strings.TrimSpace)
+	return data.TrimStringValue(value)
 }
 
 func qLTrimValue(value any) (any, error) {
-	return mapStringValue("ltrim", value, func(s string) string {
-		return strings.TrimLeftFunc(s, unicode.IsSpace)
-	})
+	return data.LTrimStringValue(value)
 }
 
 func qRTrimValue(value any) (any, error) {
-	return mapStringValue("rtrim", value, func(s string) string {
-		return strings.TrimRightFunc(s, unicode.IsSpace)
-	})
+	return data.RTrimStringValue(value)
 }
 
 func qSSValue(left, right any) (any, error) {
@@ -148,19 +132,7 @@ func qSSValue(left, right any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if needle == "" {
-		return data.NewI64(nil), nil
-	}
-	var indexes []int64
-	for offset := 0; offset <= len(haystack); {
-		i := strings.Index(haystack[offset:], needle)
-		if i < 0 {
-			break
-		}
-		indexes = append(indexes, int64(len([]rune(haystack[:offset+i]))))
-		offset += i + len(needle)
-	}
-	return data.NewI64(indexes), nil
+	return data.StringSearch(haystack, needle), nil
 }
 
 func qSSRValue(args any) (any, error) {
@@ -180,7 +152,7 @@ func qSSRValue(args any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return strings.ReplaceAll(source, old, repl), nil
+	return data.StringReplaceAll(source, old, repl), nil
 }
 
 func qSSRWithSourceValue(left, right any) (any, error) {
@@ -197,14 +169,7 @@ func qSVValue(left, right any) (any, error) {
 		return nil, err
 	}
 	items := qListItems(right)
-	parts := make([]string, len(items))
-	for i, item := range items {
-		parts[i], err = qStringOperand("sv", item)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return strings.Join(parts, sep), nil
+	return data.StringJoin(sep, items)
 }
 
 func qVSValue(left, right any) (any, error) {
@@ -216,25 +181,11 @@ func qVSValue(left, right any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if sep == "" {
-		parts := make([]string, 0, len([]rune(text)))
-		for _, r := range text {
-			parts = append(parts, string(r))
-		}
-		return data.NewString(parts), nil
-	}
-	return data.NewString(strings.Split(text, sep)), nil
+	return data.StringSplit(sep, text), nil
 }
 
 func qStringOperand(name string, value any) (string, error) {
-	switch x := value.(type) {
-	case string:
-		return x, nil
-	case data.Symbol:
-		return string(x), nil
-	default:
-		return "", fmt.Errorf("%s expects string or symbol values", name)
-	}
+	return data.StringScalar(name, value)
 }
 
 func qArgsN(name string, args any, n int) ([]any, error) {

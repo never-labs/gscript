@@ -10219,38 +10219,8 @@ func mapStringValue(name string, v any, fn func(string) string) (any, error) {
 				return typed, err
 			}
 		}
-		out := make([]string, array.Len())
-		for i := 0; i < array.Len(); i++ {
-			item, ok := array.At(i)
-			if !ok {
-				return nil, fmt.Errorf("%s row %d out of range", name, i)
-			}
-			if data.IsNull(item) {
-				out[i] = ""
-				continue
-			}
-			switch x := item.(type) {
-			case string:
-				out[i] = fn(x)
-			case data.Symbol:
-				out[i] = fn(string(x))
-			default:
-				return nil, fmt.Errorf("%s expects string or symbol values", name)
-			}
-		}
-		return data.NewString(out), nil
 	}
-	if data.IsNull(v) {
-		return "", nil
-	}
-	switch x := v.(type) {
-	case string:
-		return fn(x), nil
-	case data.Symbol:
-		return fn(string(x)), nil
-	default:
-		return nil, fmt.Errorf("%s expects string or symbol values", name)
-	}
+	return data.TransformStringValue(name, v, fn)
 }
 
 func sum(v any) (any, error) {
@@ -13198,82 +13168,10 @@ func cutOrDrop(left any, right any) (any, error) {
 			}
 			indexes[i] = int(n)
 		}
-		return cut(indexes, right)
+		return data.Cut(indexes, right)
 	default:
 		return nil, fmt.Errorf("_ left operand must be an integer or integer vector")
 	}
-}
-
-func cut(indexes []int, v any) (any, error) {
-	switch x := v.(type) {
-	case data.Array:
-		segments := make([]any, len(indexes))
-		for i, start := range indexes {
-			end := x.Len()
-			if i+1 < len(indexes) {
-				end = indexes[i+1]
-			}
-			gather := segmentIndexes(x.Len(), start, end)
-			part, err := data.Gather(x, gather)
-			if err != nil {
-				return nil, err
-			}
-			segments[i] = part
-		}
-		return data.NewAny(segments), nil
-	case string:
-		runes := []rune(x)
-		segments := make([]any, len(indexes))
-		for i, start := range indexes {
-			end := len(runes)
-			if i+1 < len(indexes) {
-				end = indexes[i+1]
-			}
-			gather := segmentIndexes(len(runes), start, end)
-			out := make([]rune, len(gather))
-			for j, index := range gather {
-				out[j] = runes[index]
-			}
-			segments[i] = string(out)
-		}
-		return data.NewAny(segments), nil
-	case data.Frame:
-		segments := make([]any, len(indexes))
-		for i, start := range indexes {
-			end := x.Len()
-			if i+1 < len(indexes) {
-				end = indexes[i+1]
-			}
-			part, err := qGatherFrameRuntime("cut", x, segmentIndexes(x.Len(), start, end))
-			if err != nil {
-				return nil, err
-			}
-			segments[i] = part
-		}
-		return data.NewAny(segments), nil
-	default:
-		return nil, fmt.Errorf("_ cut expects a vector, string, or frame")
-	}
-}
-
-func segmentIndexes(length, start, end int) []int {
-	if start < 0 {
-		start = 0
-	}
-	if start > length {
-		start = length
-	}
-	if end < start {
-		end = start
-	}
-	if end > length {
-		end = length
-	}
-	indexes := make([]int, end-start)
-	for i := range indexes {
-		indexes[i] = start + i
-	}
-	return indexes
 }
 
 func dropArray(array data.Array, n int) (data.Array, error) {
