@@ -2396,6 +2396,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalSumDeltas(right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalSortIndexSum(right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalTypedDyadicFloatSum(right); err != nil || handled {
 			return out, err
 		}
@@ -4848,6 +4851,43 @@ func (s *EvalState) sequenceTransformExpr(src string) (string, []int, string, bo
 		return "", nil, "", true, err
 	}
 	return data.SequenceTransformSublist, indexes, rightExpr, true, nil
+}
+
+func (s *EvalState) tryEvalSortIndexSum(src string) (any, bool, error) {
+	descending := false
+	arg := ""
+	switch {
+	case strings.HasPrefix(src, "iasc "):
+		arg = strings.TrimSpace(src[len("iasc "):])
+	case strings.HasPrefix(src, "idesc "):
+		descending = true
+		arg = strings.TrimSpace(src[len("idesc "):])
+	default:
+		return nil, false, nil
+	}
+	if arg == "" {
+		return nil, false, nil
+	}
+	value, err := s.eval(arg)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return int64(0), true, nil
+	}
+	shape := "sort-index-sum/" + string(array.Kind())
+	if descending {
+		shape += "/desc"
+	} else {
+		shape += "/asc"
+	}
+	out, handled, err := data.TryTypedSortIndexSumI64(array, descending)
+	out, handled, err = qTypedRuntimeResult("ArraySortIndexSum", shape, out, handled, err)
+	if err != nil || handled {
+		return out, true, err
+	}
+	return nil, false, nil
 }
 
 func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
