@@ -5962,15 +5962,28 @@ func qClearCaches() {
 
 	stdq.ClearEvalPlanCaches()
 	stdq.ClearRuntimeKernelExecutionStats()
+	data.ClearRuntimeKernelExecutionStats()
 }
 
 func qEvalRuntimeKernelExecutionStats() []QRuntimeKernelExecutionStat {
 	stats := stdq.RuntimeKernelExecutionStats()
-	if len(stats) == 0 {
+	dataStats := data.RuntimeKernelExecutionStats()
+	if len(stats) == 0 && len(dataStats) == 0 {
 		return nil
 	}
-	out := make([]QRuntimeKernelExecutionStat, 0, len(stats))
+	out := make([]QRuntimeKernelExecutionStat, 0, len(stats)+len(dataStats))
 	for _, stat := range stats {
+		out = append(out, QRuntimeKernelExecutionStat{
+			Source:     stat.Source,
+			Kernel:     stat.Kernel,
+			Shape:      stat.Shape,
+			Route:      stat.Route,
+			Outcome:    stat.Outcome,
+			ReasonCode: stat.ReasonCode,
+			Count:      stat.Count,
+		})
+	}
+	for _, stat := range dataStats {
 		out = append(out, QRuntimeKernelExecutionStat{
 			Source:     stat.Source,
 			Kernel:     stat.Kernel,

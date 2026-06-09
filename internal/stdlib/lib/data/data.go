@@ -3857,7 +3857,10 @@ func BucketFloor(array Array, interval any) (Array, error) {
 		return nil, fmt.Errorf("bucket floor array is nil")
 	}
 	if bucketed, ok, err := bucketFloorTyped(array, interval); ok || err != nil {
+		recordDataRuntimeKernelProbe("DataBucketFloor", bucketFloorRuntimeShape(array), ok, err)
 		return bucketed, err
+	} else {
+		recordDataRuntimeKernelProbe("DataBucketFloor", bucketFloorRuntimeShape(array), false, nil)
 	}
 	values := make([]any, array.Len())
 	switch array.Kind() {
@@ -3925,6 +3928,14 @@ func BucketFloor(array Array, interval any) (Array, error) {
 		return nil, fmt.Errorf("bucket floor kind %s is not supported", array.Kind())
 	}
 	return arrayWithKind(array.Kind(), values)
+}
+
+func bucketFloorRuntimeShape(array Array) string {
+	kind := KindAny
+	if array != nil {
+		kind = array.Kind()
+	}
+	return "bucket-floor/xbar/" + string(kind)
 }
 
 func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
@@ -6430,7 +6441,9 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 	switch e.Func {
 	case "null":
 		mask := make([]bool, values.Len())
-		if !typedKernels.NullMask(values, mask) {
+		handled := typedKernels.NullMask(values, mask)
+		recordDataRuntimeKernelProbe("DataVectorTransformNull", vectorTransformRuntimeShape(e.Func, values), handled, nil)
+		if !handled {
 			for i := 0; i < values.Len(); i++ {
 				v, ok := values.At(i)
 				if !ok {
@@ -6442,6 +6455,7 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 		return NewBool(mask), nil
 	case "rank":
 		out, handled, err := TryTypedRankI64(values)
+		recordDataRuntimeKernelProbe("DataVectorTransformRank", vectorTransformRuntimeShape(e.Func, values), handled, err)
 		if err != nil {
 			return nil, err
 		}
@@ -6451,6 +6465,7 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 		return rankArray(values)
 	case "abs", "neg", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling":
 		out, ok, err := typedKernels.NumericUnary(e.Func, values)
+		recordDataRuntimeKernelProbe("DataVectorTransformNumericUnary", vectorTransformRuntimeShape(e.Func, values), ok, err)
 		if err != nil {
 			return nil, err
 		}
@@ -6491,6 +6506,14 @@ func (e VectorTransformExpr) EvalRows(frame Frame, indexes []int) (Array, error)
 	default:
 		return nil, fmt.Errorf("unsupported vector transform %q", e.Func)
 	}
+}
+
+func vectorTransformRuntimeShape(verb string, values Array) string {
+	kind := KindAny
+	if values != nil {
+		kind = values.Kind()
+	}
+	return "vector-transform/" + verb + "/" + string(kind)
 }
 
 func rankArray(values Array) (Array, error) {

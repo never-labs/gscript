@@ -3,6 +3,7 @@ package bind
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -3425,6 +3426,55 @@ after := q.cache_stats()
 	afterRow := qTestCacheStatsRowTable(t, interp.GetGlobal("after").Table(), "q_runtime_kernel_execution")
 	if got := afterRow.RawGetString("executions"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("q_runtime_kernel_execution after clear executions = %v, want 0", got)
+	}
+}
+
+func TestQSQLNumericVectorTransformRuntimeKernelStats(t *testing.T) {
+	qClearCaches()
+	defer qClearCaches()
+
+	interp := runtime.NewCore()
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
+	installTestModule(interp, "data", runtime.TableValue(BuildData()))
+	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
+	execOnInterp(t, interp, `
+trades := data.frame({
+    px: data.f64({2.0, 4.0, 8.0, 16.0}),
+    qty: array.i64({4, 1, 3, 2}),
+    ts: array.i64({0, 9, 10, 19}),
+})
+projection := q.sql(trades, "select sqrt_px:sqrt px,log_px:log px,r:rank qty from trades")
+buckets := q.sql(trades, "select total:sum qty by bucket:10 xbar ts from trades order by bucket asc")
+stats := q.cache_stats()
+`)
+	projection := interp.GetGlobal("projection").Table()
+	if projection == nil || projection.Length() != 4 {
+		t.Fatalf("projection len = %v, want 4", projection)
+	}
+	if got := projection.RawGetInt(1).Table().RawGetString("sqrt_px"); !got.IsFloat() || got.Float() != math.Sqrt(2) {
+		t.Fatalf("projection[1].sqrt_px = %v, want sqrt(2)", got)
+	}
+	buckets := interp.GetGlobal("buckets").Table()
+	if buckets == nil || buckets.Length() != 2 {
+		t.Fatalf("buckets len = %v, want 2", buckets)
+	}
+
+	row := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_execution")
+	stats := row.RawGetString("stats").Table()
+	if stats == nil {
+		t.Fatal("q_runtime_kernel_execution stats table is nil")
+	}
+	for _, tc := range []struct {
+		kernel string
+		shape  string
+	}{
+		{"DataVectorTransformNumericUnary", "vector-transform/sqrt/f64"},
+		{"DataVectorTransformNumericUnary", "vector-transform/log/f64"},
+		{"DataVectorTransformRank", "vector-transform/rank/i64"},
+		{"DataBucketFloor", "bucket-floor/xbar/i64"},
+	} {
+		assertQSQLDataRuntimeKernelStat(t, stats, tc.kernel, tc.shape, "attempt", 1)
+		assertQSQLDataRuntimeKernelStat(t, stats, tc.kernel, tc.shape, "hit", 1)
 	}
 }
 
@@ -6851,6 +6901,36 @@ func assertQEvalRuntimeKernelStat(t *testing.T, tbl *Table, kernel, shape, outco
 		}
 		if got := row.RawGetString("count"); !got.IsInt() || got.Int() != count {
 			t.Fatalf("runtime kernel %s count = %v, want %d", kernel, got, count)
+		}
+		return
+	}
+	t.Fatalf("runtime kernel stat %s/%s/%s not found in %+v", kernel, shape, outcome, tbl)
+}
+
+func assertQSQLDataRuntimeKernelStat(t *testing.T, tbl *Table, kernel, shape, outcome string, minCount int64) {
+	t.Helper()
+	for i := 1; i <= tbl.Length(); i++ {
+		row := tbl.RawGetInt(int64(i)).Table()
+		if row == nil {
+			t.Fatalf("runtime kernel stats row %d is nil", i)
+		}
+		if got := row.RawGetString("source"); !got.IsString() || got.Str() != "data_query_runtime" {
+			continue
+		}
+		if got := row.RawGetString("kernel"); !got.IsString() || got.Str() != kernel {
+			continue
+		}
+		if got := row.RawGetString("shape"); !got.IsString() || got.Str() != shape {
+			continue
+		}
+		if got := row.RawGetString("route"); !got.IsString() || got.Str() != "typed_data_kernel" {
+			t.Fatalf("runtime kernel %s route = %v, want typed_data_kernel", kernel, got)
+		}
+		if got := row.RawGetString("outcome"); !got.IsString() || got.Str() != outcome {
+			continue
+		}
+		if got := row.RawGetString("count"); !got.IsInt() || got.Int() < minCount {
+			t.Fatalf("runtime kernel %s count = %v, want at least %d", kernel, got, minCount)
 		}
 		return
 	}

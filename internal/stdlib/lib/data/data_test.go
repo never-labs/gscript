@@ -7,6 +7,23 @@ import (
 	"testing"
 )
 
+func assertDataRuntimeKernelStat(t *testing.T, stats []RuntimeKernelExecutionStat, kernel, shape, outcome string, count uint64) {
+	t.Helper()
+	for _, stat := range stats {
+		if stat.Source != "data_query_runtime" || stat.Kernel != kernel || stat.Shape != shape || stat.Outcome != outcome {
+			continue
+		}
+		if stat.Route != "typed_data_kernel" {
+			t.Fatalf("runtime kernel %s route = %q, want typed_data_kernel; stats=%#v", kernel, stat.Route, stats)
+		}
+		if stat.Count != count {
+			t.Fatalf("runtime kernel %s/%s/%s count = %d, want %d; stats=%#v", kernel, shape, outcome, stat.Count, count, stats)
+		}
+		return
+	}
+	t.Fatalf("runtime kernel stat %s/%s/%s not found in %#v", kernel, shape, outcome, stats)
+}
+
 func TestNewFrameRejectsUnequalColumnLengths(t *testing.T) {
 	_, err := NewFrame(
 		NewColumn("a", []any{1, 2}),
@@ -2429,6 +2446,48 @@ func TestQueryVectorTransformProjection(t *testing.T) {
 	assertColumnValues(t, got, "signum", []any{1.0, 1.0, 0.0, 1.0})
 	assertColumnValues(t, got, "floor", []any{NullValue, 3.0, NullValue, 5.0})
 	assertColumnValues(t, got, "ceiling", []any{NullValue, 3.0, NullValue, 5.0})
+}
+
+func TestQueryVectorTransformProjectionRuntimeKernelStats(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	frame := mustFrame(t,
+		NewColumn("px", []any{2.0, 4.0, 8.0, 16.0}),
+		NewColumn("qty", []any{4, 1, 3, 2}),
+		NewColumn("ts", []any{int64(0), int64(9), int64(10), int64(19)}),
+	)
+	_, err := Exec(frame, QueryPlan{
+		Source: frame,
+		Select: []SelectItem{
+			{Name: "sqrt_px", Expr: VectorTransformExpr{Func: "sqrt", Expr: ColumnRef{Name: "px"}}},
+			{Name: "log_px", Expr: VectorTransformExpr{Func: "log", Expr: ColumnRef{Name: "px"}}},
+			{Name: "sin_px", Expr: VectorTransformExpr{Func: "sin", Expr: ColumnRef{Name: "px"}}},
+			{Name: "cos_px", Expr: VectorTransformExpr{Func: "cos", Expr: ColumnRef{Name: "px"}}},
+			{Name: "r", Expr: VectorTransformExpr{Func: "rank", Expr: ColumnRef{Name: "qty"}}},
+			{Name: "bucket", Expr: BucketFloorExpr{Interval: int64(10), Expr: ColumnRef{Name: "ts"}}},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+
+	stats := RuntimeKernelExecutionStats()
+	for _, tc := range []struct {
+		kernel string
+		shape  string
+	}{
+		{"DataVectorTransformNumericUnary", "vector-transform/sqrt/f64"},
+		{"DataVectorTransformNumericUnary", "vector-transform/log/f64"},
+		{"DataVectorTransformNumericUnary", "vector-transform/sin/f64"},
+		{"DataVectorTransformNumericUnary", "vector-transform/cos/f64"},
+		{"DataVectorTransformRank", "vector-transform/rank/i64"},
+		{"DataBucketFloor", "bucket-floor/xbar/i64"},
+	} {
+		assertDataRuntimeKernelStat(t, stats, tc.kernel, tc.shape, "attempt", 1)
+		assertDataRuntimeKernelStat(t, stats, tc.kernel, tc.shape, "hit", 1)
+	}
 }
 
 func TestQueryVectorTransformProjectionUsesFilteredAndOrderedRows(t *testing.T) {
