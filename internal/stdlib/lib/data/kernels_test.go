@@ -2394,6 +2394,13 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if _, lazy := typedXexp.(f64NumericDyadicArray); !lazy {
 		t.Fatalf("TryTypedQNumericDyadicFloat xexp returned %T, want lazy f64NumericDyadicArray", typedXexp)
 	}
+	lazyProducer, err := newF64NumericProducer(typedXexp, typedXexp.Len())
+	if err != nil {
+		t.Fatalf("newF64NumericProducer lazy xexp returned error: %v", err)
+	}
+	if _, ok := lazyProducer.(f64DyadicProducer); !ok {
+		t.Fatalf("newF64NumericProducer lazy xexp = %T, want f64DyadicProducer", lazyProducer)
+	}
 	if got, want := typedXexp.Values(), []any{8.0, 9.0}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedQNumericDyadicFloat xexp values = %v, want %v", got, want)
 	}
@@ -2428,6 +2435,14 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	}
 	if got, want := broadcastSum.(float64), 14.0; got != want {
 		t.Fatalf("TryTypedQNumericDyadicFloatSum xexp singleton-array = %v, want %v", got, want)
+	}
+
+	lazyRatiosSum, ok, err := TryTypedRatiosSum(typedXexp)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedRatiosSum lazy xexp = %#v,%v,%v; want handled nil error", lazyRatiosSum, ok, err)
+	}
+	if got, want := lazyRatiosSum.(float64), 8.0+9.0/8.0; got != want {
+		t.Fatalf("TryTypedRatiosSum lazy xexp = %v, want %v", got, want)
 	}
 	gotExp := exponent.Values()
 	if len(gotExp) != 2 || gotExp[0].(float64) != 1 || math.Abs(gotExp[1].(float64)-math.E) > 1e-12 {
