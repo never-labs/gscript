@@ -221,11 +221,24 @@ func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, err
 }
 
 func qScalarApplyIndexShape(mode qApplyIndexMode, kind string) string {
-	op := "at"
 	if mode == qApplyIndexDot {
-		op = "dot"
+		switch kind {
+		case string(data.KindI64):
+			return "scalar-index/dot/i64"
+		case string(data.KindString):
+			return "scalar-index/dot/string"
+		default:
+			return "scalar-index/dot/" + kind
+		}
 	}
-	return "scalar-index/" + op + "/" + kind
+	switch kind {
+	case string(data.KindI64):
+		return "scalar-index/at/i64"
+	case string(data.KindString):
+		return "scalar-index/at/string"
+	default:
+		return "scalar-index/at/" + kind
+	}
 }
 
 func dotIndexValue(target any, path any) (any, error) {
