@@ -477,6 +477,70 @@ func TestNewI64RangeArraySemantics(t *testing.T) {
 	}
 }
 
+func TestI64SegmentCompareKernels(t *testing.T) {
+	rotated, handled, err := TryTypedRotate(NewI64Range(0, 1, 16), 11)
+	if err != nil {
+		t.Fatalf("TryTypedRotate returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedRotate did not handle i64 range")
+	}
+	if _, ok := rotated.(i64SegmentArray); !ok {
+		t.Fatalf("TryTypedRotate returned %T, want i64SegmentArray", rotated)
+	}
+
+	indexes, handled, err := TryTypedCompareIndexesI64(rotated, OpLT, int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 segment returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 segment did not handle")
+	}
+	if got, want := indexes.Values(), []any{int64(5), int64(6), int64(7), int64(8)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("segment compare indexes = %#v, want %#v", got, want)
+	}
+
+	count, sum, handled, err := TryTypedCompareIndexStatsI64(rotated, OpLT, int64(4))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 segment returned error: %v", err)
+	}
+	if !handled || count != 4 || sum != 26 {
+		t.Fatalf("segment compare stats = count %d sum %d handled %v; want 4, 26, true", count, sum, handled)
+	}
+
+	ge, handled, err := TryTypedDyadic(OpGE, rotated, int64(3))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedDyadic segment ge handled=%v err=%v", handled, err)
+	}
+	lt, handled, err := TryTypedDyadic(OpLT, rotated, int64(7))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedDyadic segment lt handled=%v err=%v", handled, err)
+	}
+	mask, handled, err := TryTypedBoolLogical("and", ge, lt)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedBoolLogical segment handled=%v err=%v", handled, err)
+	}
+	trueCount, handled, err := TryTypedTrueCount(mask)
+	if err != nil || !handled || trueCount != 4 {
+		t.Fatalf("TryTypedTrueCount segment mask = %d,%v,%v; want 4,true,nil", trueCount, handled, err)
+	}
+	where, handled, err := TryTypedWhereMaskI64(mask)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWhereMaskI64 segment mask handled=%v err=%v", handled, err)
+	}
+	if got, want := where.Values(), []any{int64(8), int64(9), int64(10), int64(11)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("segment logical where = %#v, want %#v", got, want)
+	}
+
+	gathered, handled, err := TryGatherByI64IndexArray(rotated, where)
+	if err != nil || !handled {
+		t.Fatalf("TryGatherByI64IndexArray segment handled=%v err=%v", handled, err)
+	}
+	if got, want := gathered.Values(), []any{int64(3), int64(4), int64(5), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("segment logical gather = %#v, want %#v", got, want)
+	}
+}
+
 func TestNewFramePreservesColumnOrderAndKinds(t *testing.T) {
 	frame, err := NewFrame(
 		NewColumn("z", []any{int64(3)}),

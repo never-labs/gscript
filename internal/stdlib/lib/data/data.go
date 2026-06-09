@@ -1459,6 +1459,8 @@ func Slice(array Array, start, count int) (Array, error) {
 		return tiledArray{source: a.source, start: (a.start + start) % a.source.Len(), len: count}, nil
 	case i64RangeArray:
 		return i64RangeArray{start: a.start + int64(start)*a.step, step: a.step, len: count}, nil
+	case i64SegmentArray:
+		return sliceI64SegmentArray(a, start, count), nil
 	case f64RangeArray:
 		return f64RangeArray{start: a.start + float64(start)*a.step, step: a.step, len: count}, nil
 	case columnArray[bool]:
@@ -1553,6 +1555,36 @@ func Reverse(array Array) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+func sliceI64SegmentArray(array i64SegmentArray, start, count int) Array {
+	if count <= 0 {
+		return i64RangeArray{len: 0}
+	}
+	out := make([]i64RangeArray, 0, len(array.segments))
+	offset := start
+	remaining := count
+	for _, segment := range array.segments {
+		if offset >= segment.len {
+			offset -= segment.len
+			continue
+		}
+		take := segment.len - offset
+		if take > remaining {
+			take = remaining
+		}
+		out = append(out, i64RangeArray{
+			start: segment.start + int64(offset)*segment.step,
+			step:  segment.step,
+			len:   take,
+		})
+		remaining -= take
+		if remaining == 0 {
+			break
+		}
+		offset = 0
+	}
+	return newI64SegmentArray(out...)
 }
 
 func TakeRepeat(array Array, n int) (Array, error) {
@@ -1709,6 +1741,8 @@ func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
 		return typedWhereMaskIndexArray(a.array)
 	case i64RangeCompareMask:
 		return i64RangeCompareMaskIndexArray(a)
+	case i64SegmentCompareMask:
+		return i64SegmentCompareMaskIndexArray(a)
 	case i64ScalarDyadicCompareMask:
 		return i64ScalarDyadicCompareMaskIndexArray(a)
 	case boolLogicalMask:
@@ -1727,18 +1761,32 @@ func boolLogicalMaskIndexArray(mask boolLogicalMask) (Array, bool, error) {
 	}
 	left, leftOK := mask.left.(i64RangeCompareMask)
 	right, rightOK := mask.right.(i64RangeCompareMask)
-	if !leftOK || !rightOK || !sameI64Range(left.values, right.values) || left.values.step != 1 {
+	if leftOK && rightOK && sameI64Range(left.values, right.values) && left.values.step == 1 {
+		leftLow, leftHigh, ok := compareMaskValueInterval(left)
+		if !ok {
+			return nil, false, nil
+		}
+		rightLow, rightHigh, ok := compareMaskValueInterval(right)
+		if !ok {
+			return nil, false, nil
+		}
+		return i64RangeIntervalIndexArray(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh)), true, nil
+	}
+	leftSegment, leftSegmentOK := mask.left.(i64SegmentCompareMask)
+	rightSegment, rightSegmentOK := mask.right.(i64SegmentCompareMask)
+	if !leftSegmentOK || !rightSegmentOK || !sameI64Segment(leftSegment.values, rightSegment.values) {
 		return nil, false, nil
 	}
-	leftLow, leftHigh, ok := compareMaskValueInterval(left)
+	leftLow, leftHigh, ok := compareSegmentMaskValueInterval(leftSegment)
 	if !ok {
 		return nil, false, nil
 	}
-	rightLow, rightHigh, ok := compareMaskValueInterval(right)
+	rightLow, rightHigh, ok := compareSegmentMaskValueInterval(rightSegment)
 	if !ok {
 		return nil, false, nil
 	}
-	return i64RangeIntervalIndexArray(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh)), true, nil
+	out, ok := i64SegmentIntervalIndexArray(leftSegment.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh))
+	return out, ok, nil
 }
 
 func i64RangeCompareMaskIndexArray(mask i64RangeCompareMask) (Array, bool, error) {
@@ -1750,6 +1798,15 @@ func i64RangeCompareMaskIndexArray(mask i64RangeCompareMask) (Array, bool, error
 		return nil, false, nil
 	}
 	return i64RangeIntervalIndexArray(mask.values, low, high), true, nil
+}
+
+func i64SegmentCompareMaskIndexArray(mask i64SegmentCompareMask) (Array, bool, error) {
+	low, high, ok := compareSegmentMaskValueInterval(mask)
+	if !ok {
+		return nil, false, nil
+	}
+	out, ok := i64SegmentIntervalIndexArray(mask.values, low, high)
+	return out, ok, nil
 }
 
 func i64ScalarDyadicCompareMaskIndexArray(mask i64ScalarDyadicCompareMask) (Array, bool, error) {
@@ -2039,6 +2096,12 @@ func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int
 			return 0, 0, false, nil
 		}
 		return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+	case i64SegmentArray:
+		target, ok := coerceInt64Exact(value)
+		if !ok {
+			return 0, 0, false, nil
+		}
+		return compareI64SegmentIndexStats(a, op, target)
 	case tiledArray:
 		return compareTiledIndexStats(a, op, value)
 	case i64ScalarDyadicArray:
@@ -2619,6 +2682,32 @@ func tryGatherRangeByI64IndexArray(array Array, indexes Array) (Array, bool, err
 		default:
 			return nil, false, nil
 		}
+	case i64SegmentArray:
+		switch idx := indexes.(type) {
+		case attributedArray:
+			return tryGatherRangeByI64IndexArray(array, idx.array)
+		case i64RangeArray:
+			if err := validateI64IndexRange(idx, a.len); err != nil {
+				return nil, true, err
+			}
+			return gatherI64SegmentByI64Range(a, idx), true, nil
+		case i64SegmentArray:
+			out := make([]i64RangeArray, 0, len(idx.segments))
+			for _, segment := range idx.segments {
+				if err := validateI64IndexRange(segment, a.len); err != nil {
+					return nil, true, err
+				}
+				gathered := gatherI64SegmentByI64Range(a, segment)
+				if gatheredSegment, ok := gathered.(i64SegmentArray); ok {
+					out = append(out, gatheredSegment.segments...)
+				} else if gatheredRange, ok := gathered.(i64RangeArray); ok && gatheredRange.len > 0 {
+					out = append(out, gatheredRange)
+				}
+			}
+			return newI64SegmentArray(out...), true, nil
+		default:
+			return nil, false, nil
+		}
 	default:
 		if idx, ok := unwrapI64RangeIndex(indexes); ok && idx.step == 1 {
 			if err := validateI64IndexRange(idx, array.Len()); err != nil {
@@ -2633,6 +2722,44 @@ func tryGatherRangeByI64IndexArray(array Array, indexes Array) (Array, bool, err
 		}
 		return nil, false, nil
 	}
+}
+
+func gatherI64SegmentByI64Range(array i64SegmentArray, indexes i64RangeArray) Array {
+	switch indexes.len {
+	case 0:
+		return i64RangeArray{len: 0}
+	case 1:
+		value, _ := array.i64At(int(indexes.start))
+		return i64RangeArray{start: value, step: 1, len: 1}
+	}
+	first, _ := array.i64At(int(indexes.start))
+	secondIndex := indexes.start + indexes.step
+	second, _ := array.i64At(int(secondIndex))
+	step := second - first
+	prev := second
+	for i := 2; i < indexes.len; i++ {
+		row := indexes.start + int64(i)*indexes.step
+		current, _ := array.i64At(int(row))
+		if current-prev != step {
+			if indexes.step == 1 {
+				start, _ := checkedI64Index(indexes.start)
+				return sliceI64SegmentArray(array, start, indexes.len)
+			}
+			values := make([]int64, indexes.len)
+			values[0] = first
+			values[1] = second
+			for j := 2; j < i; j++ {
+				values[j], _ = array.i64At(int(indexes.start + int64(j)*indexes.step))
+			}
+			values[i] = current
+			for j := i + 1; j < indexes.len; j++ {
+				values[j], _ = array.i64At(int(indexes.start + int64(j)*indexes.step))
+			}
+			return newI64Trusted(values)
+		}
+		prev = current
+	}
+	return i64RangeArray{start: first, step: step, len: indexes.len}
 }
 
 func unwrapI64RangeIndex(indexes Array) (i64RangeArray, bool) {
@@ -2821,6 +2948,12 @@ func typedCompareIndexRangeI64(array Array, op Op, value any) (Array, bool) {
 			return nil, false
 		}
 		return compareI64RangeIndexArray(a, op, target)
+	case i64SegmentArray:
+		target, ok := coerceInt64Exact(value)
+		if !ok {
+			return nil, false
+		}
+		return compareI64SegmentIndexArray(a, op, target)
 	default:
 		return nil, false
 	}
@@ -2909,6 +3042,98 @@ func compareI64RangeIndexArray(values i64RangeArray, op Op, target int64) (Array
 		return compareAscendingI64RangeIndexes(values, op, target)
 	}
 	return compareDescendingI64RangeIndexes(values, op, target)
+}
+
+func compareI64SegmentIndexArray(values i64SegmentArray, op Op, target int64) (Array, bool) {
+	if values.len == 0 {
+		return i64RangeArray{len: 0}, true
+	}
+	out := make([]i64RangeArray, 0, len(values.segments))
+	offset := int64(0)
+	for _, segment := range values.segments {
+		indexes, ok := compareI64RangeIndexArray(segment, op, target)
+		if !ok {
+			return nil, false
+		}
+		if translated, ok := translateI64IndexArray(indexes, offset); ok {
+			out = append(out, translated...)
+		} else {
+			return nil, false
+		}
+		offset += int64(segment.len)
+	}
+	return newI64SegmentArray(out...), true
+}
+
+func compareI64SegmentIndexStats(values i64SegmentArray, op Op, target int64) (count, sum int64, handled bool, err error) {
+	indexes, ok := compareI64SegmentIndexArray(values, op, target)
+	if !ok {
+		return 0, 0, false, nil
+	}
+	return int64(indexes.Len()), i64IndexArraySum(indexes), true, nil
+}
+
+func i64SegmentIntervalIndexArray(values i64SegmentArray, low, high int64) (Array, bool) {
+	if values.len == 0 || high < low {
+		return i64RangeArray{len: 0}, true
+	}
+	out := make([]i64RangeArray, 0, len(values.segments))
+	offset := int64(0)
+	for _, segment := range values.segments {
+		rows, ok := i64RangeIntervalRowsForAnyStep(segment, low, high)
+		if !ok {
+			return nil, false
+		}
+		if rows.len > 0 {
+			rows.start += offset
+			out = append(out, rows)
+		}
+		offset += int64(segment.len)
+	}
+	return newI64SegmentArray(out...), true
+}
+
+func i64RangeIntervalRowsForAnyStep(values i64RangeArray, low, high int64) (i64RangeArray, bool) {
+	ge, ok := compareI64RangeIndexArray(values, OpGE, low)
+	if !ok {
+		return i64RangeArray{}, false
+	}
+	le, ok := compareI64RangeIndexArray(values, OpLE, high)
+	if !ok {
+		return i64RangeArray{}, false
+	}
+	left, leftOK := ge.(i64RangeArray)
+	right, rightOK := le.(i64RangeArray)
+	if !leftOK || !rightOK || left.step != 1 || right.step != 1 {
+		return i64RangeArray{}, false
+	}
+	start := maxInt64Value(left.start, right.start)
+	end := minInt64Value(left.start+int64(left.len)-1, right.start+int64(right.len)-1)
+	if left.len == 0 || right.len == 0 || end < start {
+		return i64RangeArray{len: 0}, true
+	}
+	return i64RangeArray{start: start, step: 1, len: int(end-start) + 1}, true
+}
+
+func translateI64IndexArray(indexes Array, offset int64) ([]i64RangeArray, bool) {
+	switch idx := indexes.(type) {
+	case i64RangeArray:
+		if idx.len == 0 {
+			return nil, true
+		}
+		return []i64RangeArray{{start: idx.start + offset, step: idx.step, len: idx.len}}, true
+	case i64SegmentArray:
+		out := make([]i64RangeArray, 0, len(idx.segments))
+		for _, segment := range idx.segments {
+			if segment.len <= 0 {
+				continue
+			}
+			out = append(out, i64RangeArray{start: segment.start + offset, step: segment.step, len: segment.len})
+		}
+		return out, true
+	default:
+		return nil, false
+	}
 }
 
 func compareI64RangeIndexArraySlow(values i64RangeArray, op Op, target int64) (Array, bool) {

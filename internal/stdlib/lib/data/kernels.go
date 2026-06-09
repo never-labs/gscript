@@ -95,6 +95,9 @@ func (typedKernelRegistry) CompareMask(array Array, op Op, value any, out []bool
 	case i64RangeArray:
 		v, ok := coerceInt64Exact(value)
 		return compareI64RangeMask(a, v, ok, op, out)
+	case i64SegmentArray:
+		v, ok := coerceInt64Exact(value)
+		return compareI64SegmentMask(a, v, ok, op, out)
 	case columnArray[uint8]:
 		v, ok := value.(uint8)
 		return compareUnsignedSlice(a.data, v, ok, op, out)
@@ -866,6 +869,8 @@ func TryTypedTrueCount(mask Array) (int64, bool, error) {
 	case attributedArray:
 		return TryTypedTrueCount(a.array)
 	case i64RangeCompareMask:
+		return a.trueCount(), true, nil
+	case i64SegmentCompareMask:
 		return a.trueCount(), true, nil
 	case i64ScalarDyadicCompareMask:
 		return a.trueCount()
@@ -6068,6 +6073,17 @@ func asI64RangeArray(value any) (i64RangeArray, bool) {
 	}
 }
 
+func asI64SegmentArray(value any) (i64SegmentArray, bool) {
+	switch a := value.(type) {
+	case attributedArray:
+		return asI64SegmentArray(a.array)
+	case i64SegmentArray:
+		return a, true
+	default:
+		return i64SegmentArray{}, false
+	}
+}
+
 func applyI64RangeScalar(op Op, values i64RangeArray, scalar int64, scalarLeft bool) (Array, bool) {
 	switch op {
 	case OpAdd:
@@ -6312,6 +6328,9 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 	if out, ok := compareI64RangeScalarDyadic(op, left, right, length); ok {
 		return out, true, nil
 	}
+	if out, ok := compareI64SegmentScalarDyadic(op, left, right, length); ok {
+		return out, true, nil
+	}
 	if out, ok := compareI64ScalarDyadicScalarDyadic(op, left, right, length); ok {
 		return out, true, nil
 	}
@@ -6480,6 +6499,72 @@ func (a i64RangeCompareMask) valueAt(row int) bool {
 }
 
 func (a i64RangeCompareMask) trueCount() int64 {
+	indexes, ok := compareI64RangeIndexArray(a.values, effectiveRangeCompareOp(a.op, a.scalarLeft), a.scalar)
+	if ok {
+		return int64(indexes.Len())
+	}
+	var count int64
+	for row := 0; row < a.values.len; row++ {
+		if a.valueAt(row) {
+			count++
+		}
+	}
+	return count
+}
+
+type i64SegmentCompareMask struct {
+	values     i64SegmentArray
+	op         Op
+	scalar     int64
+	scalarLeft bool
+}
+
+func (a i64SegmentCompareMask) Kind() Kind { return KindBool }
+
+func (a i64SegmentCompareMask) Len() int { return a.values.len }
+
+func (a i64SegmentCompareMask) At(row int) (any, bool) {
+	if row < 0 || row >= a.values.len {
+		return nil, false
+	}
+	return a.valueAt(row), true
+}
+
+func (a i64SegmentCompareMask) Values() []any {
+	out := make([]any, a.values.len)
+	for row := range out {
+		out[row] = a.valueAt(row)
+	}
+	return out
+}
+
+func (a i64SegmentCompareMask) Gather(indexes []int) Array {
+	out := make([]bool, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.values.len {
+			panic(fmt.Sprintf("data segment compare gather index %d out of range", row))
+		}
+		out[i] = a.valueAt(row)
+	}
+	return newBoolTrusted(out)
+}
+
+func (a i64SegmentCompareMask) valueAt(row int) bool {
+	value, ok := a.values.i64At(row)
+	if !ok {
+		return false
+	}
+	if a.scalarLeft {
+		return boolCompare(a.op, a.scalar == value, compareInt64(a.scalar, value))
+	}
+	return boolCompare(a.op, value == a.scalar, compareInt64(value, a.scalar))
+}
+
+func (a i64SegmentCompareMask) trueCount() int64 {
+	selected, _, handled, _ := compareI64SegmentIndexStats(a.values, effectiveRangeCompareOp(a.op, a.scalarLeft), a.scalar)
+	if handled {
+		return selected
+	}
 	var count int64
 	for row := 0; row < a.values.len; row++ {
 		if a.valueAt(row) {
@@ -6528,6 +6613,45 @@ func compareI64RangeScalarDyadic(op Op, left, right any, length int) (Array, boo
 		return i64RangeCompareMask{values: rightRange, op: op, scalar: leftScalar, scalarLeft: true}, true
 	default:
 		return nil, false
+	}
+}
+
+func compareI64SegmentScalarDyadic(op Op, left, right any, length int) (Array, bool) {
+	leftSegment, leftSegmentOK := asI64SegmentArray(left)
+	rightSegment, rightSegmentOK := asI64SegmentArray(right)
+	leftScalar, leftScalarOK := integerScalarValue(left)
+	rightScalar, rightScalarOK := integerScalarValue(right)
+	switch {
+	case leftSegmentOK && rightScalarOK:
+		if leftSegment.len != length {
+			return nil, false
+		}
+		return i64SegmentCompareMask{values: leftSegment, op: op, scalar: rightScalar}, true
+	case leftScalarOK && rightSegmentOK:
+		if rightSegment.len != length {
+			return nil, false
+		}
+		return i64SegmentCompareMask{values: rightSegment, op: op, scalar: leftScalar, scalarLeft: true}, true
+	default:
+		return nil, false
+	}
+}
+
+func effectiveRangeCompareOp(op Op, scalarLeft bool) Op {
+	if !scalarLeft {
+		return op
+	}
+	switch op {
+	case OpLT:
+		return OpGT
+	case OpLE:
+		return OpGE
+	case OpGT:
+		return OpLT
+	case OpGE:
+		return OpLE
+	default:
+		return op
 	}
 }
 
@@ -8247,6 +8371,21 @@ func compareI64RangeMask(values i64RangeArray, target int64, ok bool, op Op, out
 	return true
 }
 
+func compareI64SegmentMask(values i64SegmentArray, target int64, ok bool, op Op, out []bool) bool {
+	if !ok || len(out) < values.len {
+		return false
+	}
+	row := 0
+	for _, segment := range values.segments {
+		for i := 0; i < segment.len; i++ {
+			v := segment.start + int64(i)*segment.step
+			out[row] = boolCompare(op, v == target, compareInt64(v, target))
+			row++
+		}
+	}
+	return true
+}
+
 func compareBoolIndexes(values []bool, target bool, ok bool, op Op, out []int) ([]int, bool) {
 	if !ok {
 		return nil, false
@@ -9223,25 +9362,53 @@ func (a boolLogicalMask) rangeCompareTrueCount() (int64, bool) {
 	}
 	left, leftOK := a.left.(i64RangeCompareMask)
 	right, rightOK := a.right.(i64RangeCompareMask)
-	if !leftOK || !rightOK || !sameI64Range(left.values, right.values) || left.values.step != 1 {
+	if leftOK && rightOK && sameI64Range(left.values, right.values) && left.values.step == 1 {
+		leftLow, leftHigh, ok := compareMaskValueInterval(left)
+		if !ok {
+			return 0, false
+		}
+		rightLow, rightHigh, ok := compareMaskValueInterval(right)
+		if !ok {
+			return 0, false
+		}
+		intersect := i64RangeIntervalCount(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh))
+		if a.op == "and" {
+			return intersect, true
+		}
+		if a.op == "or" {
+			leftCount := i64RangeIntervalCount(left.values, leftLow, leftHigh)
+			rightCount := i64RangeIntervalCount(right.values, rightLow, rightHigh)
+			return leftCount + rightCount - intersect, true
+		}
 		return 0, false
 	}
-	leftLow, leftHigh, ok := compareMaskValueInterval(left)
+	leftSegment, leftSegmentOK := a.left.(i64SegmentCompareMask)
+	rightSegment, rightSegmentOK := a.right.(i64SegmentCompareMask)
+	if !leftSegmentOK || !rightSegmentOK || !sameI64Segment(leftSegment.values, rightSegment.values) {
+		return 0, false
+	}
+	leftLow, leftHigh, ok := compareSegmentMaskValueInterval(leftSegment)
 	if !ok {
 		return 0, false
 	}
-	rightLow, rightHigh, ok := compareMaskValueInterval(right)
+	rightLow, rightHigh, ok := compareSegmentMaskValueInterval(rightSegment)
 	if !ok {
 		return 0, false
 	}
-	intersect := i64RangeIntervalCount(left.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh))
+	intersect, ok := i64SegmentIntervalIndexArray(leftSegment.values, maxInt64Value(leftLow, rightLow), minInt64Value(leftHigh, rightHigh))
+	if !ok {
+		return 0, false
+	}
 	if a.op == "and" {
-		return intersect, true
+		return int64(intersect.Len()), true
 	}
 	if a.op == "or" {
-		leftCount := i64RangeIntervalCount(left.values, leftLow, leftHigh)
-		rightCount := i64RangeIntervalCount(right.values, rightLow, rightHigh)
-		return leftCount + rightCount - intersect, true
+		leftIndexes, leftOK := i64SegmentIntervalIndexArray(leftSegment.values, leftLow, leftHigh)
+		rightIndexes, rightOK := i64SegmentIntervalIndexArray(rightSegment.values, rightLow, rightHigh)
+		if !leftOK || !rightOK {
+			return 0, false
+		}
+		return int64(leftIndexes.Len() + rightIndexes.Len() - intersect.Len()), true
 	}
 	return 0, false
 }
@@ -9336,39 +9503,46 @@ func sameI64Range(left, right i64RangeArray) bool {
 	return left.start == right.start && left.step == right.step && left.len == right.len
 }
 
-func compareMaskValueInterval(mask i64RangeCompareMask) (int64, int64, bool) {
-	op := mask.op
-	if mask.scalarLeft {
-		switch op {
-		case OpLT:
-			op = OpGT
-		case OpLE:
-			op = OpGE
-		case OpGT:
-			op = OpLT
-		case OpGE:
-			op = OpLE
+func sameI64Segment(left, right i64SegmentArray) bool {
+	if left.len != right.len || len(left.segments) != len(right.segments) {
+		return false
+	}
+	for i := range left.segments {
+		if !sameI64Range(left.segments[i], right.segments[i]) {
+			return false
 		}
 	}
+	return true
+}
+
+func compareMaskValueInterval(mask i64RangeCompareMask) (int64, int64, bool) {
+	return compareValueInterval(effectiveRangeCompareOp(mask.op, mask.scalarLeft), mask.scalar)
+}
+
+func compareSegmentMaskValueInterval(mask i64SegmentCompareMask) (int64, int64, bool) {
+	return compareValueInterval(effectiveRangeCompareOp(mask.op, mask.scalarLeft), mask.scalar)
+}
+
+func compareValueInterval(op Op, scalar int64) (int64, int64, bool) {
 	minInt := -int64(^uint64(0)>>1) - 1
 	maxInt := int64(^uint64(0) >> 1)
 	switch op {
 	case OpEQ:
-		return mask.scalar, mask.scalar, true
+		return scalar, scalar, true
 	case OpGT:
-		if mask.scalar == maxInt {
+		if scalar == maxInt {
 			return 1, 0, true
 		}
-		return mask.scalar + 1, maxInt, true
+		return scalar + 1, maxInt, true
 	case OpGE:
-		return mask.scalar, maxInt, true
+		return scalar, maxInt, true
 	case OpLT:
-		if mask.scalar == minInt {
+		if scalar == minInt {
 			return 1, 0, true
 		}
-		return minInt, mask.scalar - 1, true
+		return minInt, scalar - 1, true
 	case OpLE:
-		return minInt, mask.scalar, true
+		return minInt, scalar, true
 	default:
 		return 0, 0, false
 	}
@@ -9453,6 +9627,11 @@ func boolArrayAt(array Array, row int) (bool, bool, error) {
 	case attributedArray:
 		return boolArrayAt(a.array, row)
 	case i64RangeCompareMask:
+		if row < 0 || row >= a.Len() {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		return a.valueAt(row), true, nil
+	case i64SegmentCompareMask:
 		if row < 0 || row >= a.Len() {
 			return false, true, fmt.Errorf("logical row %d out of range", row)
 		}
