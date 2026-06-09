@@ -142,6 +142,9 @@ func buildQScriptReshapeBindingPlan(src string) qScriptBindingPlan {
 	if !ok {
 		return qScriptBindingPlan{}
 	}
+	if strings.HasPrefix(strings.TrimSpace(leftExpr), "`") {
+		return qScriptBindingPlan{}
+	}
 	left := buildQScriptBindingPlanForRHS(leftExpr, nil)
 	if left.kind == qScriptBindingInvalid {
 		return qScriptBindingPlan{}
