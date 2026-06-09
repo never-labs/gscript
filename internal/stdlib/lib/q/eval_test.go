@@ -476,6 +476,64 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanRecognizesCastEnvelope(t *testing.T) {
+	src := "(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")"
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize cast envelope", src)
+	}
+	if descriptor.Shape != "cast-envelope/sum" ||
+		descriptor.PipelineShape != "cast" ||
+		descriptor.ShapeFamily != "cast" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "typed-cast" {
+		t.Fatalf("descriptor = %#v, want cast sum descriptor", descriptor)
+	}
+	if len(descriptor.CastTerms) != 5 {
+		t.Fatalf("descriptor cast terms = %#v, want 5 terms", descriptor.CastTerms)
+	}
+	if !descriptor.CastTerms[3].Count || !descriptor.CastTerms[4].Count || !descriptor.CastTerms[4].StringCast {
+		t.Fatalf("descriptor cast term flags = %#v", descriptor.CastTerms)
+	}
+
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(67) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want 67,true,nil", out, handled, err)
+	}
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) did not recognize cast envelope", src)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan(%#v) failed", backend)
+	}
+	out, handled, err = NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if err != nil || !handled || out != int64(67) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v; want 67,true,nil", out, handled, err)
+	}
+
+	seenPipeline := false
+	var seenCast uint64
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected cast pipeline fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "QPipelinePlan" && stat.Shape == "cast-envelope/sum" && stat.Outcome == "hit" {
+			seenPipeline = true
+		}
+		if stat.Kernel == "QCastPrimitive" && stat.Outcome == "hit" {
+			seenCast += stat.Count
+		}
+	}
+	if !seenPipeline || seenCast < 10 {
+		t.Fatalf("missing cast runtime stats: pipeline=%v castHits=%d all=%#v", seenPipeline, seenCast, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalAdverbArithmeticUsesTypedRuntime(t *testing.T) {
 	tests := []struct {
 		expr string

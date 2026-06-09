@@ -119,6 +119,62 @@ func tryTypedQCast(target qCastTarget, array data.Array) (data.Array, bool, erro
 	return data.TryTypedCast(target.kind, array)
 }
 
+func evalQTypedCastPrimitive(target qCastTarget, value any) (any, bool, error) {
+	shape := "q-cast/" + string(target.kind) + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "QCastPrimitive",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return qTypedCastPrimitiveValue(target, value)
+		},
+	})
+}
+
+func qTypedCastPrimitiveValue(target qCastTarget, value any) (any, bool, error) {
+	if array, ok := value.(data.Array); ok {
+		if target.kind == data.KindString {
+			out, handled, err := data.TryTypedStringCast(array)
+			if err != nil || handled {
+				return out, handled, err
+			}
+		}
+		if out, handled, err := data.TryTypedCast(target.kind, array); err != nil || handled {
+			return out, handled, err
+		}
+		if target.kind != data.KindSymbol && target.kind != data.KindString {
+			return nil, false, nil
+		}
+		values := make([]any, array.Len())
+		for i := 0; i < array.Len(); i++ {
+			item, ok := array.At(i)
+			if !ok {
+				return nil, true, fmt.Errorf("q cast %s row %d out of range", target.sourceText, i+1)
+			}
+			converted, err := castScalarValue(target.kind, item)
+			if err != nil {
+				return nil, true, err
+			}
+			values[i] = converted
+		}
+		column, err := data.NewColumnWithKind("_", target.kind, values)
+		if err != nil {
+			return nil, true, err
+		}
+		return column.Data, true, nil
+	}
+	switch target.kind {
+	case data.KindSymbol, data.KindString, data.KindBool,
+		data.KindI8, data.KindI16, data.KindI32, data.KindI64,
+		data.KindU8, data.KindU16, data.KindU32, data.KindU64,
+		data.KindF32, data.KindF64:
+		out, err := castScalarValue(target.kind, value)
+		return out, true, err
+	default:
+		return nil, false, nil
+	}
+}
+
 func castScalarValue(kind data.Kind, value any) (any, error) {
 	if data.IsNull(value) {
 		return data.NullForKind(kind), nil

@@ -2,6 +2,7 @@ package q
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -37,6 +38,7 @@ const (
 	qPipelineUnaryPrimitive
 	qPipelineDyadicPrimitive
 	qPipelineApplyScalarIndex
+	qPipelineCastEnvelopeSum
 )
 
 type qPipelinePlan struct {
@@ -66,6 +68,16 @@ type qPipelinePlan struct {
 	reductionInput string
 	reductionPlan  qScriptBindingPlan
 	moduloMaskPlan *qPipelinePlan
+	castTerms      []qPipelineCastTermPlan
+}
+
+type qPipelineCastTermPlan struct {
+	domainExpr string
+	valueExpr  string
+	valuePlan  qScriptBindingPlan
+	target     qCastTarget
+	stringCast bool
+	count      bool
 }
 
 type qPipelineOperandRole string
@@ -237,6 +249,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if qPipelineApplyPathIndexCandidate(src) {
 		return true
 	}
+	if qPipelineCastEnvelopeCandidate(src) {
+		return true
+	}
 	return false
 }
 
@@ -256,6 +271,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if plan, ok := buildQPipelineApplyPathIndexPlan(src); ok {
+		return qPipelinePlanWithBindingPlans(withSource(plan))
+	}
+	if plan, ok := buildQPipelineCastEnvelopePlan(src); ok {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if strings.HasPrefix(src, "+/") {
@@ -905,6 +923,12 @@ func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
 		plan.reductionPlan = buildQPipelineBindingPlan(plan.reductionInput)
 		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandReduction, expr: plan.reductionInput, plan: plan.reductionPlan})
 	}
+	for i := range plan.castTerms {
+		if plan.castTerms[i].valueExpr == "" {
+			continue
+		}
+		plan.castTerms[i].valuePlan = buildQPipelineBindingPlan(plan.castTerms[i].valueExpr)
+	}
 	return plan
 }
 
@@ -915,6 +939,98 @@ func buildQPipelineBindingPlan(src string) qScriptBindingPlan {
 		}
 	}
 	return buildQScriptBindingPlanForRHS(src, nil)
+}
+
+func qPipelineCastEnvelopeCandidate(src string) bool {
+	_, ok := buildQPipelineCastEnvelopePlan(src)
+	return ok
+}
+
+func buildQPipelineCastEnvelopePlan(src string) (qPipelinePlan, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) == 0 {
+		return qPipelinePlan{}, false
+	}
+	castTerms := make([]qPipelineCastTermPlan, 0, len(terms))
+	countTerms := 0
+	for _, term := range terms {
+		parsed, ok := qPipelineCastEnvelopeTerm(term)
+		if !ok {
+			return qPipelinePlan{}, false
+		}
+		if parsed.count {
+			countTerms++
+		}
+		castTerms = append(castTerms, parsed)
+	}
+	if len(castTerms) == 1 && countTerms == 0 {
+		return qPipelinePlan{}, false
+	}
+	plan := qPipelineShapePlan(qPipelineCastEnvelopeSum, "")
+	plan.castTerms = castTerms
+	return plan, true
+}
+
+func qPipelineCastEnvelopeTerm(src string) (qPipelineCastTermPlan, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if src == "" {
+		return qPipelineCastTermPlan{}, false
+	}
+	term := qPipelineCastTermPlan{}
+	if strings.HasPrefix(src, "count ") && wordBoundary(src, 0, len("count")) {
+		term.count = true
+		src = stripEnclosingParens(strings.TrimSpace(src[len("count "):]))
+	}
+	if strings.HasPrefix(src, "string ") && wordBoundary(src, 0, len("string")) {
+		term.stringCast = true
+		src = stripEnclosingParens(strings.TrimSpace(src[len("string "):]))
+	}
+	dollar := findTopLevel(src, "$")
+	if dollar < 0 {
+		return qPipelineCastTermPlan{}, false
+	}
+	domainExpr := strings.TrimSpace(src[:dollar])
+	valueExpr := strings.TrimSpace(src[dollar+1:])
+	if valueExpr == "" {
+		return qPipelineCastTermPlan{}, false
+	}
+	target, ok := qStaticCastTargetFromExpr(domainExpr)
+	if !ok {
+		return qPipelineCastTermPlan{}, false
+	}
+	term.domainExpr = domainExpr
+	term.valueExpr = valueExpr
+	term.target = target
+	return term, true
+}
+
+func qStaticCastTargetFromExpr(src string) (qCastTarget, bool) {
+	src = strings.TrimSpace(src)
+	switch src {
+	case "", "`":
+		return qSymbolCastTarget(), true
+	}
+	if isBareQCastName(src) {
+		if kind, ok := qCastKindFromSymbol(data.Symbol(src)); ok {
+			return qCastTarget{kind: kind, sourceText: src}, true
+		}
+	}
+	if strings.HasPrefix(src, "`") && !strings.ContainsAny(src[1:], " \t\r\n;()[]{}") {
+		name := strings.TrimPrefix(src, "`")
+		if kind, ok := qCastKindFromSymbol(data.Symbol(name)); ok {
+			return qCastTarget{kind: kind, sourceText: src}, true
+		}
+	}
+	if len(src) >= 2 && src[0] == '"' && src[len(src)-1] == '"' {
+		text, err := strconv.Unquote(src)
+		if err != nil {
+			return qCastTarget{}, false
+		}
+		if kind, ok := qCastKindFromTypeText(text); ok {
+			return qCastTarget{kind: kind, sourceText: src}, true
+		}
+	}
+	return qCastTarget{}, false
 }
 
 func qPipelineVectorTransformExprCandidate(src string) bool {
@@ -1164,6 +1280,8 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineRuntimePrimitive(*plan)
 	case qPipelineApplyScalarIndex:
 		out, handled, err = s.evalQPipelineApplyScalarIndex(plan)
+	case qPipelineCastEnvelopeSum:
+		out, handled, err = s.evalQPipelineCastEnvelopeSum(plan)
 	default:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
@@ -1177,6 +1295,48 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
 	return out, handled, err
+}
+
+func (s *EvalState) evalQPipelineCastEnvelopeSum(plan *qPipelinePlan) (any, bool, error) {
+	if len(plan.castTerms) == 0 {
+		return nil, false, nil
+	}
+	var total int64
+	for i := range plan.castTerms {
+		term := &plan.castTerms[i]
+		value, err := s.evalQPipelinePlannedExpr(term.valueExpr, &term.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+		casted, handled, err := evalQTypedCastPrimitive(term.target, value)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		if term.stringCast {
+			casted, err = stringValue(casted)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		if term.count {
+			counted, err := count(casted)
+			if err != nil {
+				return nil, true, err
+			}
+			n, ok := integerValue(counted)
+			if !ok {
+				return nil, false, nil
+			}
+			total += n
+			continue
+		}
+		n, ok := integerValue(casted)
+		if !ok {
+			return nil, false, nil
+		}
+		total += n
+	}
+	return total, true, nil
 }
 
 func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, bool, error) {

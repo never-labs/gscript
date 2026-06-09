@@ -10,6 +10,7 @@ const (
 	qPipelineShapeFamilyStats   qPipelineShapeFamily = "stats"
 	qPipelineShapeFamilyWindow  qPipelineShapeFamily = "window"
 	qPipelineShapeFamilyApply   qPipelineShapeFamily = "apply"
+	qPipelineShapeFamilyCast    qPipelineShapeFamily = "cast"
 )
 
 type qPipelineShapeSpec struct {
@@ -193,6 +194,14 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Selector:      "scalar",
 			Transform:     variant,
 			PipelineShape: "apply_index",
+		}, true
+	case qPipelineCastEnvelopeSum:
+		return qPipelineShapeSpec{
+			ID:            "cast-envelope/sum",
+			Family:        qPipelineShapeFamilyCast,
+			Reducer:       "sum",
+			Transform:     "typed-cast",
+			PipelineShape: "cast",
 		}, true
 	default:
 		return qPipelineShapeSpec{}, false

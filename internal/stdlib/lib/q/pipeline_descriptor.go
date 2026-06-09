@@ -21,6 +21,14 @@ type EvalPipelineIntegerDivModTerm struct {
 	ScalarExpr string
 }
 
+type EvalPipelineCastTerm struct {
+	DomainExpr string
+	ValueExpr  string
+	TargetKind string
+	StringCast bool
+	Count      bool
+}
+
 // EvalPipelineDescriptor is the read-only handoff shape exposed to MethodJIT
 // and diagnostics. It describes the q runtime pipeline plan that would be used
 // for a source string without binding environment values or caching results.
@@ -52,6 +60,7 @@ type EvalPipelineDescriptor struct {
 	ScalarExpr   string
 	ScalarLeft   bool
 	IntegerTerms []EvalPipelineIntegerDivModTerm
+	CastTerms    []EvalPipelineCastTerm
 	IncludeCount bool
 
 	SequenceValueExpr      string
@@ -359,7 +368,7 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 
 func evalExpressionPipelineDescriptor(source string, plan qPipelinePlan) EvalPipelineDescriptor {
 	shapeSpec := qPipelinePlanShapeSpec(plan)
-	return EvalPipelineDescriptor{
+	out := EvalPipelineDescriptor{
 		Source:         source,
 		Kind:           "expression",
 		Kernel:         "QPipelinePlan",
@@ -381,6 +390,19 @@ func evalExpressionPipelineDescriptor(source string, plan qPipelinePlan) EvalPip
 		ModTargetExpr:  strings.TrimSpace(plan.modTargetExpr),
 		ReductionInput: strings.TrimSpace(plan.reductionInput),
 	}
+	if len(plan.castTerms) > 0 {
+		out.CastTerms = make([]EvalPipelineCastTerm, 0, len(plan.castTerms))
+		for _, term := range plan.castTerms {
+			out.CastTerms = append(out.CastTerms, EvalPipelineCastTerm{
+				DomainExpr: strings.TrimSpace(term.domainExpr),
+				ValueExpr:  strings.TrimSpace(term.valueExpr),
+				TargetKind: string(term.target.kind),
+				StringCast: term.stringCast,
+				Count:      term.count,
+			})
+		}
+	}
+	return out
 }
 
 func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipelinePlan, bool) {
@@ -475,6 +497,25 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 	case "apply-index/path-dot":
 		plan.kind = qPipelineApplyScalarIndex
 		plan.compareOp = "dot"
+	case "cast-envelope/sum":
+		plan.kind = qPipelineCastEnvelopeSum
+		plan.castTerms = make([]qPipelineCastTermPlan, 0, len(descriptor.CastTerms))
+		for _, term := range descriptor.CastTerms {
+			if strings.TrimSpace(term.ValueExpr) == "" || strings.TrimSpace(term.TargetKind) == "" {
+				return qPipelinePlan{}, false
+			}
+			target := qCastTarget{kind: data.Kind(term.TargetKind), sourceText: strings.TrimSpace(term.DomainExpr)}
+			if target.sourceText == "" {
+				target.sourceText = string(target.kind)
+			}
+			plan.castTerms = append(plan.castTerms, qPipelineCastTermPlan{
+				domainExpr: strings.TrimSpace(term.DomainExpr),
+				valueExpr:  strings.TrimSpace(term.ValueExpr),
+				target:     target,
+				stringCast: term.StringCast,
+				count:      term.Count,
+			})
+		}
 	default:
 		switch {
 		case strings.HasPrefix(shape, "runtime-unary/"):

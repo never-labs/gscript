@@ -515,6 +515,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "reverse_count"
 	case strings.HasPrefix(shape, "string-cast/"), strings.HasPrefix(shape, "string-case/"):
 		return "string_map"
+	case strings.HasPrefix(shape, "q-cast/"), strings.HasPrefix(shape, "cast-envelope/"):
+		return "cast"
 	case strings.HasPrefix(shape, "vector-unary/"):
 		return "vector_map"
 	case strings.HasPrefix(shape, "frame-gather/"):
@@ -570,6 +572,8 @@ func qRuntimeKernelQPipelinePlanShape(shape string) string {
 		return "search_index_reduce"
 	case "apply-index/scalar-at", "apply-index/scalar-dot", "apply-index/path-dot":
 		return "apply_index"
+	case "cast-envelope/sum":
+		return "cast"
 	default:
 		switch {
 		case strings.HasPrefix(shape, "runtime-unary/"):
@@ -1177,6 +1181,13 @@ func cloneQPipelinePlan(in qPipelinePlan) qPipelinePlan {
 		for i := range in.operands {
 			out.operands[i] = in.operands[i]
 			out.operands[i].plan = cloneQScriptBindingPlan(in.operands[i].plan)
+		}
+	}
+	if len(in.castTerms) > 0 {
+		out.castTerms = make([]qPipelineCastTermPlan, len(in.castTerms))
+		for i := range in.castTerms {
+			out.castTerms[i] = in.castTerms[i]
+			out.castTerms[i].valuePlan = cloneQScriptBindingPlan(in.castTerms[i].valuePlan)
 		}
 	}
 	out.valuePlan = cloneQScriptBindingPlan(in.valuePlan)
