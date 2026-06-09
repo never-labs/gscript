@@ -161,6 +161,7 @@ var qEvalRequiredPipelineCategories = []string{
 	"group_fby",
 	"sort_gather",
 	"ordinary_list_adverb",
+	"vector_numeric",
 }
 
 func buildQEvalVectorCases() []qEvalVectorCase {
@@ -3189,6 +3190,10 @@ func qEvalVectorPipelineCategories(tc qEvalVectorCase) []string {
 		hasTag("cut") || hasTag("enlist") || hasTag("raze") || hasShapePrefix("adverb:") || hasMatrixPrefix("list:") ||
 		strings.Contains(name, "adverb") || strings.Contains(name, "list") || strings.Contains(name, "deltas") {
 		add("ordinary_list_adverb")
+	}
+	if hasShapePrefix("verb:") || hasMatrixPrefix("numeric:") || strings.Contains(name, "numeric") || strings.Contains(name, "dyadic") ||
+		strings.Contains(name, "minmax") || strings.Contains(name, "signum") || strings.Contains(name, "reciprocal") {
+		add("vector_numeric")
 	}
 	out := make([]string, 0, len(seen))
 	for category := range seen {
