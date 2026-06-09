@@ -3602,6 +3602,28 @@ func TestTryTypedFbySum(t *testing.T) {
 	}
 }
 
+func TestTryTypedFbySumTotalAndGroupCount(t *testing.T) {
+	groups := takeRepeatMust(t, NewSymbols([]string{"a", "b"}), 5)
+	out, ok, err := TryTypedFbySum(NewI64Range(0, 1, 5), groups)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySum tiled handled=%v err=%v; want true,nil", ok, err)
+	}
+	if _, ok := out.(fbyI64TiledBroadcastArray); !ok {
+		t.Fatalf("TryTypedFbySum tiled returned %T, want fbyI64TiledBroadcastArray", out)
+	}
+	total, ok, err := TryTypedFbySumTotal(NewI64Range(0, 1, 5), groups)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedFbySumTotal handled=%v err=%v; want true,nil", ok, err)
+	}
+	if total != int64(26) {
+		t.Fatalf("TryTypedFbySumTotal = %#v, want 26", total)
+	}
+	count, ok, err := TryTypedGroupCount(NewI64([]int64{1, 2, 1, 3, 2}))
+	if err != nil || !ok || count != 3 {
+		t.Fatalf("TryTypedGroupCount = %d,%v,%v; want 3,true,nil", count, ok, err)
+	}
+}
+
 func TestTryTypedBoolLogical(t *testing.T) {
 	out, ok, err := TryTypedBoolLogical("and", NewBool([]bool{true, false, true}), NewBool([]bool{true, true, false}))
 	if err != nil || !ok {

@@ -2969,6 +2969,26 @@ func TestEvalFbyAggregateVectors(t *testing.T) {
 	assertEvalArray(t, "last 0N 20 0N 40 fby `a`a`b`b", data.KindI64, []any{int64(20), int64(20), int64(40), int64(40)})
 }
 
+func TestEvalGroupFbyTerminalTypedKernels(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+	assertEvalValue(t, "v:til 8;g:8#`a`b;s:sum v fby g;+/s", int64(112))
+	assertEvalValue(t, "count group (til 16) mod 4", int64(4))
+	seenFbySum := false
+	seenGroupCount := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayFbySum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenFbySum = true
+		}
+		if stat.Kernel == "ArrayGroupCount" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenGroupCount = true
+		}
+	}
+	if !seenFbySum || !seenGroupCount {
+		t.Fatalf("missing group/fby typed stats: fby=%v group=%v stats=%#v", seenFbySum, seenGroupCount, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalSetVerbsAndWhere(t *testing.T) {
 	assertEvalArray(t, "?1 2 1 3 2", data.KindI64, []any{int64(1), int64(2), int64(3)})
 	assertEvalArray(t, "?`AAPL`MSFT`AAPL", data.KindSymbol, []any{

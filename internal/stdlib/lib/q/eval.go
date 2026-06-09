@@ -1942,13 +1942,13 @@ func (s *EvalState) eval(src string) (any, error) {
 	if strings.HasPrefix(src, "hopen ") {
 		return s.evalHopen(strings.TrimSpace(src[len("hopen "):]))
 	}
-	if leftExpr, rightExpr, ok := splitTopLevelWord(src, "fby"); ok {
-		return s.evalFby(leftExpr, rightExpr)
-	}
 	if strings.HasPrefix(src, "+/") {
 		right := strings.TrimSpace(src[2:])
 		if right == "" {
 			return qAdverbFunction{verb: "+", adverb: "/"}, nil
+		}
+		if out, handled, err := s.tryEvalSumFby(right); err != nil || handled {
+			return out, err
 		}
 		if out, handled, err := s.tryEvalSumWhereGatherReduce(right); err != nil || handled {
 			return out, err
@@ -1970,6 +1970,9 @@ func (s *EvalState) eval(src string) (any, error) {
 			return nil, err
 		}
 		return sum(v)
+	}
+	if leftExpr, rightExpr, ok := splitTopLevelWord(src, "fby"); ok {
+		return s.evalFby(leftExpr, rightExpr)
 	}
 	if strings.HasPrefix(src, "+\\") {
 		if strings.TrimSpace(src[2:]) == "" {
@@ -2014,6 +2017,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		return s.evalDrop(strings.TrimSpace(src[len("drop "):]))
 	}
 	if strings.HasPrefix(src, "count ") {
+		if out, handled, err := s.tryEvalCountGroup(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountDistinct(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
@@ -4325,6 +4331,9 @@ func isDyadicOp(b byte) bool {
 
 func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	if expr.left == "" && expr.adverb == "/" && expr.verb == "+" {
+		if out, handled, err := s.tryEvalSumFby(expr.right); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalSumDeltas(expr.right); err != nil || handled {
 			return out, err
 		}
@@ -4574,6 +4583,46 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 	return nil, false, nil
 }
 
+func (s *EvalState) tryEvalSumFby(src string) (any, bool, error) {
+	leftExpr, groupExpr, ok := splitTopLevelWord(stripEnclosingParens(strings.TrimSpace(src)), "fby")
+	if !ok {
+		return nil, false, nil
+	}
+	agg, valueExpr, err := parseFbyAggregate(leftExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	if agg != "sum" {
+		return nil, false, nil
+	}
+	values, err := s.eval(valueExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	valueArray, ok := values.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	groups, err := s.eval(groupExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	groupArray, ok := groups.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	if valueArray.Len() != groupArray.Len() {
+		return nil, true, fmt.Errorf("fby value length %d does not match group length %d", valueArray.Len(), groupArray.Len())
+	}
+	out, handled, err := data.TryTypedFbySumTotal(valueArray, groupArray)
+	shape := "fby-sum-total/" + string(valueArray.Kind()) + "/" + string(groupArray.Kind())
+	recordRuntimeKernelProbe("ArrayFbySumTotal", shape, handled, err)
+	if err != nil || handled {
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
 func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 	terms := splitTopLevelPlusChain(src)
 	if len(terms) < 2 {
@@ -4797,6 +4846,26 @@ func (s *EvalState) tryEvalCountDistinct(src string) (any, bool, error) {
 	}
 	value, err := countDistinct(out)
 	return value, true, err
+}
+
+func (s *EvalState) tryEvalCountGroup(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "group ") {
+		return nil, false, nil
+	}
+	value, err := s.eval(strings.TrimSpace(src[len("group "):]))
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled, err := data.TryTypedGroupCount(array)
+	recordRuntimeKernelProbe("ArrayGroupCount", "group-count/"+string(array.Kind()), handled, err)
+	if err != nil || handled {
+		return out, true, err
+	}
+	return nil, false, nil
 }
 
 func (s *EvalState) tryEvalCountWhereCompare(src string) (any, bool, error) {
@@ -10908,6 +10977,12 @@ func group(v any) (any, error) {
 		}
 		if index, ok := data.ArrayIndexFor(array, data.ArrayAttributeUnique); ok {
 			return qGroupFromArrayIndex(index), nil
+		}
+		if index, err := data.BuildArrayIndex(array, data.ArrayAttributeGrouped); err == nil {
+			recordRuntimeKernelProbe("ArrayGroup", "group-index/"+string(array.Kind()), true, nil)
+			return qGroupFromArrayIndex(index), nil
+		} else {
+			recordRuntimeKernelProbe("ArrayGroup", "group-index/"+string(array.Kind()), false, err)
 		}
 	}
 	values, err := setItems(v)
