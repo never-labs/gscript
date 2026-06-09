@@ -8630,6 +8630,10 @@ type projectionGroup struct {
 }
 
 func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems []SelectItem) (Frame, error) {
+	if !selectItemsNeedGroupedRows(plan.Select) {
+		indexArray := queryIndexesArray(indexes, frame.Len())
+		return execProjectByI64IndexArray(frame, indexArray, plan.Select)
+	}
 	byInputs, err := bindGroupInputs(frame, byItems)
 	if err != nil {
 		return Frame{}, err
@@ -8713,6 +8717,53 @@ func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems [
 		cols = append(cols, NewColumn(item.Name, values))
 	}
 	return NewFrame(cols...)
+}
+
+func selectItemsNeedGroupedRows(items []SelectItem) bool {
+	for _, item := range items {
+		if exprNeedsGroupedRows(item.Expr) {
+			return true
+		}
+	}
+	return false
+}
+
+func exprNeedsGroupedRows(expr Expr) bool {
+	switch e := expr.(type) {
+	case nil, ColumnRef, Literal:
+		return false
+	case vectorProjector:
+		return true
+	case Binary:
+		return exprNeedsGroupedRows(e.Left) || exprNeedsGroupedRows(e.Right)
+	case Conditional:
+		return exprNeedsGroupedRows(e.Cond) || exprNeedsGroupedRows(e.Then) || exprNeedsGroupedRows(e.Else)
+	case Logical:
+		return exprNeedsGroupedRows(e.Left) || exprNeedsGroupedRows(e.Right)
+	case Not:
+		return exprNeedsGroupedRows(e.Expr)
+	case In:
+		return exprNeedsGroupedRows(e.Expr)
+	case Within:
+		return exprNeedsGroupedRows(e.Expr)
+	case BucketFloorExpr:
+		return exprNeedsGroupedRows(e.Expr)
+	case ListAggregateExpr:
+		return exprNeedsGroupedRows(e.Expr)
+	default:
+		return false
+	}
+}
+
+func queryIndexesArray(indexes []int, frameLen int) Array {
+	if indexesCoverAllRows(indexes, frameLen) {
+		return i64RangeArray{start: 0, step: 1, len: frameLen}
+	}
+	values := make([]int64, len(indexes))
+	for i, row := range indexes {
+		values[i] = int64(row)
+	}
+	return NewI64(values)
 }
 
 func groupIndexForSingleColumn(frame Frame, byInputs []groupInput) (ArrayIndex, bool, error) {

@@ -4667,7 +4667,7 @@ func TestQExplainReportsQueryKernelVisibility(t *testing.T) {
 		t.Fatalf("kernel_shape before = %v, want stable filtered ordered projection shape", kernelShape)
 	}
 	kernelPipelineShape := beforeTable.RawGetString("kernel_pipeline_shape")
-	wantKernelPipelineShape := "scan=frame|where=compare_mask:column_literal|filter=index|project=typed_binary:1|order=post_project:1|limit=bounded"
+	wantKernelPipelineShape := "scan=frame|where=compare_mask(compare_mask:column_literal)|filter=index|project=typed_expr(typed_binary:1)|order=post_project:1|limit=bounded"
 	if !kernelPipelineShape.IsString() || kernelPipelineShape.Str() != wantKernelPipelineShape {
 		t.Fatalf("kernel_pipeline_shape before = %v, want %q", kernelPipelineShape, wantKernelPipelineShape)
 	}

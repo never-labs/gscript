@@ -1795,8 +1795,13 @@ func TestQueryKernelSupportReasonClassifiesHotExpressionPaths(t *testing.T) {
 	if got, want := QueryKernelPlanPipelineShape(changedLiteral), QueryKernelPlanPipelineShape(base); got != want {
 		t.Fatalf("QueryKernelPlanPipelineShape changed with literal value: got %q, want %q", got, want)
 	}
-	if got, want := QueryKernelPlanPipelineShape(base), "scan=frame|where=compare_mask:column_literal|filter=index|project=typed_binary:1"; got != want {
+	if got, want := QueryKernelPlanPipelineShape(base), "scan=frame|where=compare_mask(compare_mask:column_literal)|filter=index|project=typed_expr(typed_binary:1)"; got != want {
 		t.Fatalf("QueryKernelPlanPipelineShape = %q, want %q", got, want)
+	}
+	descriptor := QueryKernelPlanPipelineDescriptor(base)
+	if descriptor.WhereFamily != "compare_mask" || descriptor.WhereOps != "compare_mask:column_literal" ||
+		descriptor.ProjectionFamily != "typed_expr" || descriptor.ProjectionOps != "typed_binary:1" {
+		t.Fatalf("QueryKernelPlanPipelineDescriptor = %+v, want compare-mask typed-expression projection", descriptor)
 	}
 }
 
@@ -1871,12 +1876,17 @@ func TestQueryKernelPlanShapeClassifiesCompositePaths(t *testing.T) {
 	if got := kernel.Shape(); got != want {
 		t.Fatalf("compiled kernel shape = %q, want %q", got, want)
 	}
-	wantPipeline := "scan=frame|group=column_load:1|project=where_select:1|order=post_project:1|distinct=rows|limit=bounded"
+	wantPipeline := "scan=frame|group=key_columns(column_load:1)|project=where_select(where_select:1)|order=post_project:1|distinct=rows|limit=bounded"
 	if got := QueryKernelPlanPipelineShape(plan); got != wantPipeline {
 		t.Fatalf("QueryKernelPlanPipelineShape = %q, want %q", got, wantPipeline)
 	}
 	if got := kernel.PipelineShape(); got != wantPipeline {
 		t.Fatalf("compiled kernel pipeline shape = %q, want %q", got, wantPipeline)
+	}
+	descriptor := QueryKernelPlanPipelineDescriptor(plan)
+	if descriptor.GroupFamily != "key_columns" || descriptor.GroupOps != "column_load:1" ||
+		descriptor.ProjectionFamily != "where_select" || descriptor.ProjectionOps != "where_select:1" {
+		t.Fatalf("QueryKernelPlanPipelineDescriptor = %+v, want key-column where-select shape", descriptor)
 	}
 	var nilKernel *QueryKernel
 	if got := nilKernel.Shape(); got != "" {

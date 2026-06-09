@@ -3547,6 +3547,39 @@ func TestQueryKernelGroupedProjectionWithoutAggregates(t *testing.T) {
 	assertColumnValues(t, got, "notional", []any{2460.0, 2400.0, 2020.0})
 }
 
+func TestQueryKernelGroupedProjectionWithoutAggregatesSkipsGroupBuildForRowLocalExpressions(t *testing.T) {
+	sym := &countingMetadataArray{array: NewSymbols([]string{"AAPL", "AAPL", "MSFT", "MSFT", "NVDA"})}
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: sym},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{100, 101, 80, 82, 120})},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+		By:     []Symbol{"sym"},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}}},
+		},
+		LimitN: -1,
+	}
+
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil || !ok {
+		t.Fatalf("CompileQueryKernel grouped projection = %v,%v", ok, err)
+	}
+	got, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("QueryKernel Exec returned error: %v", err)
+	}
+	if sym.ats != 0 {
+		t.Fatalf("grouped projection key column At called %d times; want typed projection handoff without group build", sym.ats)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("MSFT"), Symbol("NVDA")})
+	assertColumnValues(t, got, "notional", []any{2020.0, 2400.0, 2460.0, 4800.0})
+}
+
 func TestQueryDistinctRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),
@@ -6901,6 +6934,61 @@ func BenchmarkQueryKernelTypedFilterProjection(b *testing.B) {
 		Select: []SelectItem{
 			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
 			{Name: "qty", Expr: ColumnRef{Name: "qty"}},
+			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "price"}}},
+		},
+		LimitN: -1,
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil {
+		b.Fatalf("CompileQueryKernel returned error: %v", err)
+	}
+	if !ok {
+		b.Fatal("CompileQueryKernel returned ok=false")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, err := kernel.Exec(frame)
+		if err != nil {
+			b.Fatalf("kernel Exec returned error: %v", err)
+		}
+		if out.Len() != rows/2 {
+			b.Fatalf("kernel output len = %d, want %d", out.Len(), rows/2)
+		}
+	}
+}
+
+func BenchmarkQueryKernelGroupedProjectionNoAggregateTypedHandoff(b *testing.B) {
+	const rows = 10000
+	syms := make([]string, rows)
+	qty := make([]int64, rows)
+	price := make([]float64, rows)
+	for i := 0; i < rows; i++ {
+		switch i % 4 {
+		case 0:
+			syms[i] = "AAPL"
+		case 1:
+			syms[i] = "MSFT"
+		case 2:
+			syms[i] = "NVDA"
+		default:
+			syms[i] = "TSLA"
+		}
+		qty[i] = int64(i % 100)
+		price[i] = float64(i) * 0.25
+	}
+	frame := mustFrame(b,
+		Column{Name: "sym", Data: NewSymbols(syms)},
+		Column{Name: "qty", Data: NewI64(qty)},
+		Column{Name: "price", Data: NewF64(price)},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(50)}},
+		By:     []Symbol{"sym"},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
 			{Name: "notional", Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "price"}}},
 		},
 		LimitN: -1,

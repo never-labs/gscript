@@ -264,7 +264,7 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *t
 func TestQSQLKernelPipelineShapeHandoffFeedsMethodJITDescriptorStats(t *testing.T) {
 	ref := QSQLKernelPipelineRef{
 		Shape:         "where=1|select=2|by=0|order=1|limit=bounded",
-		PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=typed_binary:1|order=post_project:1|limit=bounded",
+		PipelineShape: "scan=frame|where=compare_mask(compare_mask:column_literal)|filter=index|project=typed_expr(typed_binary:1)|order=post_project:1|limit=bounded",
 		SchemaHash:    "qsql-schema-a",
 	}
 	descriptor := QSQLKernelRuntimeDescriptor(ref)

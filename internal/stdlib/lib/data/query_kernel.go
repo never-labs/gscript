@@ -24,6 +24,65 @@ type QueryKernel struct {
 	pipelineShape string
 }
 
+// QueryKernelPipelineDescriptor is the schema-stable lowering contract between
+// qSQL planning and typed runtime/JIT backends. Family fields intentionally use
+// low-cardinality names; Ops fields preserve coarse operator counts for runtime
+// selection without baking in source text, column names, or literal values.
+type QueryKernelPipelineDescriptor struct {
+	Scan             string
+	WhereFamily      string
+	WhereOps         string
+	FilterFamily     string
+	GroupFamily      string
+	GroupOps         string
+	AggregateFamily  string
+	AggregateOps     string
+	ProjectionFamily string
+	ProjectionOps    string
+	OrderFamily      string
+	DistinctFamily   string
+	LimitFamily      string
+}
+
+// String returns the compact pipeline shape used by existing cache/explain
+// surfaces. It is derived from the structured descriptor so future backends can
+// consume either the typed fields or the stable string.
+func (d QueryKernelPipelineDescriptor) String() string {
+	stages := []string{"scan=frame"}
+	if d.WhereFamily != "" {
+		stages = append(stages, "where="+joinPipelineFamilyOps(d.WhereFamily, d.WhereOps))
+		if d.FilterFamily != "" {
+			stages = append(stages, "filter="+d.FilterFamily)
+		}
+	}
+	if d.GroupFamily != "" {
+		stages = append(stages, "group="+joinPipelineFamilyOps(d.GroupFamily, d.GroupOps))
+	}
+	if d.AggregateFamily != "" {
+		stages = append(stages, "aggregate="+joinPipelineFamilyOps(d.AggregateFamily, d.AggregateOps))
+	}
+	if d.ProjectionFamily != "" {
+		stages = append(stages, "project="+joinPipelineFamilyOps(d.ProjectionFamily, d.ProjectionOps))
+	}
+	if d.OrderFamily != "" {
+		stages = append(stages, "order="+d.OrderFamily)
+	}
+	if d.DistinctFamily != "" {
+		stages = append(stages, "distinct="+d.DistinctFamily)
+	}
+	if d.LimitFamily != "" {
+		stages = append(stages, "limit="+d.LimitFamily)
+	}
+	return strings.Join(stages, "|")
+}
+
+func joinPipelineFamilyOps(family, ops string) string {
+	if ops == "" || ops == family {
+		return family
+	}
+	return family + "(" + ops + ")"
+}
+
 // SchemaStableCacheKeyParts is the decoded representation of cache keys built
 // by FrameSchemaCacheKey, QueryAlignedPlanCacheKey, QueryAlignedMutationCacheKey
 // and QueryKernelCacheKey.
@@ -1009,29 +1068,40 @@ func QueryKernelPlanShape(plan QueryPlan) string {
 // column names and literal values so it is reusable across schema-stable qSQL
 // cache entries and can be consumed by typed runtime/JIT backends.
 func QueryKernelPlanPipelineShape(plan QueryPlan) string {
-	stages := []string{"scan=frame"}
+	return QueryKernelPlanPipelineDescriptor(plan).String()
+}
+
+// QueryKernelPlanPipelineDescriptor returns the structured low-cardinality
+// columnar pipeline shape used by qSQL runtime/JIT handoff.
+func QueryKernelPlanPipelineDescriptor(plan QueryPlan) QueryKernelPipelineDescriptor {
+	descriptor := QueryKernelPipelineDescriptor{Scan: "frame"}
 	if where := queryKernelWherePipelineShape(plan.Where); where != "" {
-		stages = append(stages, "where="+where, "filter=index")
+		descriptor.WhereFamily = queryKernelWherePipelineFamily(plan.Where)
+		descriptor.WhereOps = where
+		descriptor.FilterFamily = "index"
 	}
 	if by := queryKernelGroupPipelineShape(plan); by != "" {
-		stages = append(stages, "group="+by)
+		descriptor.GroupFamily = queryKernelGroupPipelineFamily(plan)
+		descriptor.GroupOps = by
 	}
 	if aggregate := queryKernelAggregatePipelineShape(plan); aggregate != "" {
-		stages = append(stages, "aggregate="+aggregate)
+		descriptor.AggregateFamily = queryKernelAggregatePipelineFamily(plan)
+		descriptor.AggregateOps = aggregate
 	}
 	if projection := queryKernelProjectionPipelineShape(plan); projection != "" {
-		stages = append(stages, "project="+projection)
+		descriptor.ProjectionFamily = queryKernelProjectionPipelineFamily(plan)
+		descriptor.ProjectionOps = projection
 	}
 	if len(plan.OrderBy) > 0 {
-		stages = append(stages, "order="+queryKernelOrderShape(plan))
+		descriptor.OrderFamily = queryKernelOrderShape(plan)
 	}
 	if plan.Distinct {
-		stages = append(stages, "distinct=rows")
+		descriptor.DistinctFamily = "rows"
 	}
 	if plan.LimitN >= 0 {
-		stages = append(stages, "limit=bounded")
+		descriptor.LimitFamily = "bounded"
 	}
-	return strings.Join(stages, "|")
+	return descriptor
 }
 
 func queryKernelPlanPath(plan QueryPlan) string {
@@ -1216,6 +1286,24 @@ func queryKernelWherePipelineShape(expr Expr) string {
 	}
 }
 
+func queryKernelWherePipelineFamily(expr Expr) string {
+	switch e := expr.(type) {
+	case nil:
+		return ""
+	case Binary:
+		if isComparisonOp(e.Op) {
+			return "compare_mask"
+		}
+		return "bool_mask"
+	case Within, In:
+		return "compare_mask"
+	case Logical, Not, Conditional, ColumnRef, Literal:
+		return "bool_mask"
+	default:
+		return "bool_mask"
+	}
+}
+
 func queryKernelByReasonDetail(plan QueryPlan) string {
 	if len(plan.ByExprs) == 0 {
 		return ""
@@ -1265,6 +1353,19 @@ func queryKernelGroupPipelineShape(plan QueryPlan) string {
 		return ""
 	}
 	return strings.Join(parts, ",")
+}
+
+func queryKernelGroupPipelineFamily(plan QueryPlan) string {
+	switch queryKernelByShape(plan) {
+	case "":
+		return ""
+	case "columns":
+		return "key_columns"
+	case "bucketed", "columns_bucketed":
+		return "key_bucket"
+	default:
+		return "key_expr"
+	}
 }
 
 func queryKernelAggregateReasonDetail(plan QueryPlan) string {
@@ -1336,6 +1437,36 @@ func queryKernelAggregatePipelineShape(plan QueryPlan) string {
 		}
 	}
 	return strings.Join(appendPipelineOpCounts(nil, ops), ",")
+}
+
+func queryKernelAggregatePipelineFamily(plan QueryPlan) string {
+	if len(plan.Aggregates) == 0 {
+		return ""
+	}
+	hasWeighted := false
+	hasComputed := false
+	for _, agg := range plan.Aggregates {
+		if agg.Weight != nil {
+			hasWeighted = true
+		}
+		if agg.Func != "count" {
+			switch agg.Expr.(type) {
+			case ColumnRef:
+			case Binary:
+				hasComputed = true
+			default:
+				hasComputed = true
+			}
+		}
+	}
+	switch {
+	case hasWeighted:
+		return "weighted_reduce"
+	case hasComputed:
+		return "computed_reduce"
+	default:
+		return "column_reduce"
+	}
 }
 
 func queryKernelProjectionReasonDetail(plan QueryPlan) string {
@@ -1455,6 +1586,29 @@ func queryKernelProjectionPipelineShape(plan QueryPlan) string {
 		ops[queryKernelExprPipelineOp(item.Expr)]++
 	}
 	return strings.Join(appendPipelineOpCounts(nil, ops), ",")
+}
+
+func queryKernelProjectionPipelineFamily(plan QueryPlan) string {
+	switch queryKernelProjectionShape(plan) {
+	case "":
+		return "column_load"
+	case "columns":
+		return "column_load"
+	case "typed_binary":
+		return "typed_expr"
+	case "boolean":
+		return "mask_expr"
+	case "conditional":
+		return "where_select"
+	case "bucket":
+		return "bucket"
+	case "list_aggregate":
+		return "list_reduce"
+	case "vector_transform":
+		return "vector_transform"
+	default:
+		return "computed_expr"
+	}
 }
 
 func queryKernelExprPipelineOp(expr Expr) string {
