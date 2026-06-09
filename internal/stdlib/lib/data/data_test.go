@@ -1735,6 +1735,27 @@ func TestQueryFilteredSingleColumnGroupBuildsTypedIndex(t *testing.T) {
 	assertColumnValues(t, got, "last_venue", []any{"XASE", "BATS", "ARCX"})
 }
 
+func TestQueryTypedFilterProjectRangePreservesColumnarSemantics(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "id", Data: NewI64([]int64{0, 1, 2, 3, 4, 5})},
+		Column{Name: "sym", Data: NewSymbols([]string{"a", "b", "c", "d", "e", "f"})},
+		Column{Name: "px", Data: NewF64([]float64{10, 11, 12, 13, 14, 15})},
+	)
+	got, err := Exec(frame, QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "id"}, Right: Literal{Value: int64(2)}},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "px", Expr: ColumnRef{Name: "px"}},
+		},
+		LimitN: -1,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	assertColumnValues(t, got, "sym", []any{Symbol("c"), Symbol("d"), Symbol("e"), Symbol("f")})
+	assertColumnValues(t, got, "px", []any{12.0, 13.0, 14.0, 15.0})
+}
+
 func TestQueryFoundationNumericComparisonAndOrder(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("qty", []any{int32(3), nil, int32(1), int32(3)}),
@@ -6317,6 +6338,48 @@ func BenchmarkQueryKernelTypedFilterProjection(b *testing.B) {
 		}
 		if out.Len() != rows/2 {
 			b.Fatalf("kernel output len = %d, want %d", out.Len(), rows/2)
+		}
+	}
+}
+
+func BenchmarkExecTypedRangeFilterProjection(b *testing.B) {
+	const rows = 100000
+	ids := make([]int64, rows)
+	syms := make([]string, rows)
+	price := make([]float64, rows)
+	for i := 0; i < rows; i++ {
+		ids[i] = int64(i)
+		if i%2 == 0 {
+			syms[i] = "AAPL"
+		} else {
+			syms[i] = "MSFT"
+		}
+		price[i] = float64(i) * 0.25
+	}
+	frame := mustFrame(b,
+		Column{Name: "id", Data: NewI64(ids)},
+		Column{Name: "sym", Data: NewSymbols(syms)},
+		Column{Name: "price", Data: NewF64(price)},
+	)
+	plan := QueryPlan{
+		Source: frame,
+		Where:  Binary{Op: OpGE, Left: ColumnRef{Name: "id"}, Right: Literal{Value: int64(rows / 2)}},
+		Select: []SelectItem{
+			{Name: "sym", Expr: ColumnRef{Name: "sym"}},
+			{Name: "price", Expr: ColumnRef{Name: "price"}},
+		},
+		LimitN: -1,
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		out, err := Exec(frame, plan)
+		if err != nil {
+			b.Fatalf("Exec returned error: %v", err)
+		}
+		if out.Len() != rows/2 {
+			b.Fatalf("Exec output len = %d, want %d", out.Len(), rows/2)
 		}
 	}
 }

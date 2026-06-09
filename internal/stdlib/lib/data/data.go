@@ -2000,6 +2000,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok := typedCompareIndexRangeI64(array, op, value); ok {
 		return out, true, nil
 	}
+	if out, ok, err := typedCompareContiguousIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	if out, ok, err := typedCompareScalarDyadicIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
@@ -2512,7 +2515,29 @@ func tryGatherRangeByI64IndexArray(array Array, indexes Array) (Array, bool, err
 			return nil, false, nil
 		}
 	default:
+		if idx, ok := unwrapI64RangeIndex(indexes); ok && idx.step == 1 {
+			if err := validateI64IndexRange(idx, array.Len()); err != nil {
+				return nil, true, err
+			}
+			start, err := checkedI64Index(idx.start)
+			if err != nil {
+				return nil, true, err
+			}
+			out, err := Slice(array, start, idx.len)
+			return out, true, err
+		}
 		return nil, false, nil
+	}
+}
+
+func unwrapI64RangeIndex(indexes Array) (i64RangeArray, bool) {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return unwrapI64RangeIndex(idx.array)
+	case i64RangeArray:
+		return idx, true
+	default:
+		return i64RangeArray{}, false
 	}
 }
 
@@ -2694,6 +2719,71 @@ func typedCompareIndexRangeI64(array Array, op Op, value any) (Array, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func typedCompareContiguousIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		return typedCompareContiguousIndexesI64(a.array, op, value)
+	case columnArray[int64]:
+		target, ok := coerceInt64Exact(value)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Month]:
+		target, ok := value.(Month)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Date]:
+		target, ok := value.(Date)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[DateTime]:
+		target, ok := value.(DateTime)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Timespan]:
+		target, ok := value.(Timespan)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Minute]:
+		target, ok := value.(Minute)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Second]:
+		target, ok := value.(Second)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Time]:
+		target, ok := value.(Time)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	case columnArray[Timestamp]:
+		target, ok := value.(Timestamp)
+		return compareContiguousSignedIndexesI64(a.data, target, ok, op)
+	default:
+		return nil, false, nil
+	}
+}
+
+func compareContiguousSignedIndexesI64[T signedScalar](values []T, target T, ok bool, op Op) (Array, bool, error) {
+	if !ok {
+		return nil, false, nil
+	}
+	start := -1
+	end := -1
+	closed := false
+	for row, value := range values {
+		keep := boolCompare(op, int64(value) == int64(target), compareInt64(int64(value), int64(target)))
+		if keep {
+			if closed {
+				return nil, false, nil
+			}
+			if start < 0 {
+				start = row
+			}
+			end = row
+			continue
+		}
+		if start >= 0 {
+			closed = true
+		}
+	}
+	if start < 0 {
+		return i64RangeArray{len: 0}, true, nil
+	}
+	return i64RangeArray{start: int64(start), step: 1, len: end - start + 1}, true, nil
 }
 
 func compareI64RangeIndexArray(values i64RangeArray, op Op, target int64) (Array, bool) {
@@ -6320,6 +6410,9 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 		}
 		return out, nil
 	}
+	if out, ok, err := execTypedFilterProject(frame, plan); ok || err != nil {
+		return out, err
+	}
 	indexes, err := filterIndexes(frame, plan.Where)
 	if err != nil {
 		return Frame{}, err
@@ -6369,6 +6462,19 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 		return out.Gather(allIndexes(plan.LimitN))
 	}
 	return out, nil
+}
+
+func execTypedFilterProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
+		len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+		return Frame{}, false, nil
+	}
+	indexes, ok, err := typedFilterIndexArray(frame, plan.Where)
+	if err != nil || !ok {
+		return Frame{}, ok, err
+	}
+	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
+	return out, true, err
 }
 
 func canLimitBeforeProjection(plan QueryPlan) bool {
@@ -6464,6 +6570,33 @@ func filterIndexes(frame Frame, where Expr) ([]int, error) {
 		}
 	}
 	return indexes, nil
+}
+
+func typedFilterIndexArray(frame Frame, where Expr) (Array, bool, error) {
+	switch expr := where.(type) {
+	case nil:
+		return i64RangeArray{start: 0, step: 1, len: frame.Len()}, true, nil
+	case Binary:
+		if !isComparisonOp(expr.Op) {
+			return nil, false, nil
+		}
+		ref, op, literal, ok := binaryColumnLiteral(expr)
+		if !ok {
+			return nil, false, nil
+		}
+		col, ok := frame.Column(ref.Name)
+		if !ok {
+			return nil, true, fmt.Errorf("unknown column %q", ref.Name)
+		}
+		normalized := normalizeScalar(col.Kind(), literal.Value)
+		indexes, handled, err := TryTypedCompareIndexesI64(col, op, normalized)
+		if err != nil || handled {
+			return indexes, handled, err
+		}
+		return nil, false, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
@@ -6971,6 +7104,131 @@ func evalProjectionExprRows(frame Frame, indexes []int, expr Expr) (Array, error
 		values[i] = v
 	}
 	return InferArray(values), nil
+}
+
+func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) (Frame, error) {
+	if indexes == nil {
+		return Frame{}, fmt.Errorf("project index vector is nil")
+	}
+	if indexes.Kind() != KindI64 {
+		return Frame{}, fmt.Errorf("project index vector kind is %s, want %s", indexes.Kind(), KindI64)
+	}
+	if len(items) == 0 {
+		items = make([]SelectItem, 0, len(frame.schema.names))
+		for _, name := range frame.schema.names {
+			items = append(items, SelectItem{Name: name, Expr: ColumnRef{Name: name}})
+		}
+	}
+	allRows := i64IndexArrayCoversAllRows(indexes, frame.Len())
+	var rows []int
+	rowsReady := false
+	indexRows := func() ([]int, error) {
+		if rowsReady {
+			return rows, nil
+		}
+		out, handled, err := TryTypedI64Indexes(indexes)
+		if err != nil {
+			return nil, err
+		}
+		if !handled {
+			return nil, fmt.Errorf("project index vector is not a supported typed i64 index")
+		}
+		rows, rowsReady = out, true
+		return rows, nil
+	}
+	cols := make([]Column, 0, len(items))
+	for _, item := range items {
+		if item.Name == "" {
+			return Frame{}, fmt.Errorf("select item name must not be empty")
+		}
+		if ref, ok := item.Expr.(ColumnRef); ok {
+			col, ok := frame.Column(ref.Name)
+			if !ok {
+				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
+			}
+			if allRows {
+				cols = append(cols, Column{Name: item.Name, Data: col})
+				continue
+			}
+			out, handled, err := TryGatherByI64IndexArray(col, indexes)
+			if err != nil {
+				return Frame{}, err
+			}
+			if handled {
+				cols = append(cols, Column{Name: item.Name, Data: out})
+				continue
+			}
+			rs, err := indexRows()
+			if err != nil {
+				return Frame{}, err
+			}
+			cols = append(cols, Column{Name: item.Name, Data: col.Gather(rs)})
+			continue
+		}
+		if projector, ok := item.Expr.(vectorProjector); ok {
+			rs, err := indexRows()
+			if err != nil {
+				return Frame{}, err
+			}
+			array, err := projector.EvalRows(frame, rs)
+			if err != nil {
+				return Frame{}, err
+			}
+			if array.Len() != len(rs) {
+				return Frame{}, fmt.Errorf("select item %q returned %d rows, want %d", item.Name, array.Len(), len(rs))
+			}
+			cols = append(cols, Column{Name: item.Name, Data: array})
+			continue
+		}
+		if array, ok, err := evalExprArray(frame, item.Expr); ok || err != nil {
+			if err != nil {
+				return Frame{}, err
+			}
+			if allRows {
+				cols = append(cols, Column{Name: item.Name, Data: array})
+				continue
+			}
+			out, handled, err := TryGatherByI64IndexArray(array, indexes)
+			if err != nil {
+				return Frame{}, err
+			}
+			if handled {
+				cols = append(cols, Column{Name: item.Name, Data: out})
+				continue
+			}
+			rs, err := indexRows()
+			if err != nil {
+				return Frame{}, err
+			}
+			cols = append(cols, Column{Name: item.Name, Data: array.Gather(rs)})
+			continue
+		}
+		rs, err := indexRows()
+		if err != nil {
+			return Frame{}, err
+		}
+		values := make([]any, len(rs))
+		for i, row := range rs {
+			v, err := item.Expr.EvalRow(frame, row)
+			if err != nil {
+				return Frame{}, err
+			}
+			values[i] = v
+		}
+		cols = append(cols, NewColumn(item.Name, values))
+	}
+	return newFrameTrusted(cols...)
+}
+
+func i64IndexArrayCoversAllRows(indexes Array, rows int) bool {
+	switch idx := indexes.(type) {
+	case attributedArray:
+		return i64IndexArrayCoversAllRows(idx.array, rows)
+	case i64RangeArray:
+		return idx.start == 0 && idx.step == 1 && idx.len == rows
+	default:
+		return false
+	}
 }
 
 func execProject(frame Frame, indexes []int, items []SelectItem) (Frame, error) {
