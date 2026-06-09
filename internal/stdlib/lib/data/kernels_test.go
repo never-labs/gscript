@@ -2401,6 +2401,9 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if _, ok := lazyProducer.(f64DyadicProducer); !ok {
 		t.Fatalf("newF64NumericProducer lazy xexp = %T, want f64DyadicProducer", lazyProducer)
 	}
+	if lazyArray, ok := typedXexp.(f64NumericDyadicArray); !ok || lazyArray.bound.producer.apply == nil {
+		t.Fatalf("TryTypedQNumericDyadicFloat xexp bound = %#v,%v; want pre-bound producer", lazyArray.bound, ok)
+	}
 	if got, want := typedXexp.Values(), []any{8.0, 9.0}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedQNumericDyadicFloat xexp values = %v, want %v", got, want)
 	}
@@ -3236,6 +3239,42 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 }
 
 func TestF64NumericProducerDirectReductions(t *testing.T) {
+	bound, handled, err := BindNumericDyadicFloat(NumericDyadicXExp, int64(2), NewI64([]int64{0, 1, 2, 3}))
+	if err != nil || !handled {
+		t.Fatalf("BindNumericDyadicFloat xexp = %#v,%v,%v; want handled nil error", bound, handled, err)
+	}
+	if bound.Len() != 4 {
+		t.Fatalf("BindNumericDyadicFloat Len = %d, want 4", bound.Len())
+	}
+	boundSum, err := bound.Sum()
+	if err != nil {
+		t.Fatalf("NumericDyadicFloatBound.Sum returned error: %v", err)
+	}
+	if boundSum != 15 {
+		t.Fatalf("NumericDyadicFloatBound.Sum = %v, want 15", boundSum)
+	}
+	boundRatios, err := bound.RatiosSum()
+	if err != nil {
+		t.Fatalf("NumericDyadicFloatBound.RatiosSum returned error: %v", err)
+	}
+	if boundRatios != 7 {
+		t.Fatalf("NumericDyadicFloatBound.RatiosSum = %v, want 7", boundRatios)
+	}
+	if got, want := bound.Array().Values(), []any{1.0, 2.0, 4.0, 8.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("NumericDyadicFloatBound.Array values = %v, want %v", got, want)
+	}
+	nested, handled, err := BindNumericDyadicFloat(NumericDyadicXLog, int64(2), bound.Array())
+	if err != nil || !handled {
+		t.Fatalf("BindNumericDyadicFloat nested xlog = %#v,%v,%v; want handled nil error", nested, handled, err)
+	}
+	nestedSum, err := nested.Sum()
+	if err != nil {
+		t.Fatalf("nested NumericDyadicFloatBound.Sum returned error: %v", err)
+	}
+	if nestedSum != 6 {
+		t.Fatalf("nested NumericDyadicFloatBound.Sum = %v, want 6", nestedSum)
+	}
+
 	columnProducer, err := newF64NumericProducer(NewF64([]float64{2, 4, 8, 16}), 4)
 	if err != nil {
 		t.Fatalf("newF64NumericProducer column returned error: %v", err)

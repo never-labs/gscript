@@ -1776,54 +1776,85 @@ func ApplyNumericDyadicFloat(op string, left, right any) (any, bool, error) {
 }
 
 func TryTypedQNumericDyadicFloat(op string, left, right any) (Array, bool, error) {
-	leftArray, leftIsArray := left.(Array)
-	rightArray, rightIsArray := right.(Array)
-	if !leftIsArray && !rightIsArray {
-		return nil, false, nil
+	bound, handled, err := BindNumericDyadicFloat(op, left, right)
+	if err != nil || !handled {
+		return nil, handled, err
 	}
-	if !typedNumericOperand(left) || !typedNumericOperand(right) {
-		return nil, false, nil
-	}
-	length, err := numericDyadicLength(op, leftArray, rightArray)
-	if err != nil {
-		return nil, true, err
-	}
-	if _, ok := numericDyadicFloatFunc(op); !ok {
-		return nil, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
-	}
-	return f64NumericDyadicArray{op: op, left: left, right: right, len: length}, true, nil
+	return bound.Array(), true, nil
 }
 
 func TryTypedQNumericDyadicFloatSum(op string, left, right any) (any, bool, error) {
-	leftArray, leftIsArray := left.(Array)
-	rightArray, rightIsArray := right.(Array)
-	if !leftIsArray && !rightIsArray {
-		return nil, false, nil
+	bound, handled, err := BindNumericDyadicFloat(op, left, right)
+	if err != nil || !handled {
+		return nil, handled, err
 	}
-	if !typedNumericOperand(left) || !typedNumericOperand(right) {
-		return nil, false, nil
-	}
-	length, err := numericDyadicLength(op, leftArray, rightArray)
-	if err != nil {
-		return nil, true, err
-	}
-	apply, ok := numericDyadicFloatFunc(op)
-	if !ok {
-		return nil, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
-	}
-	leftProducer, err := newF64NumericProducer(left, length)
-	if err != nil {
-		return nil, true, err
-	}
-	rightProducer, err := newF64NumericProducer(right, length)
-	if err != nil {
-		return nil, true, err
-	}
-	sum, err := f64ProducerSum(f64DyadicProducer{left: leftProducer, right: rightProducer, apply: apply, len: length})
+	sum, err := bound.Sum()
 	if err != nil {
 		return nil, true, err
 	}
 	return sum, true, nil
+}
+
+// NumericDyadicFloatBound is an opaque pre-bound typed runtime operand for
+// dyadic float kernels such as xexp/xlog. It is immutable and reusable by q
+// warm paths and future JIT backends.
+type NumericDyadicFloatBound struct {
+	op       string
+	producer f64DyadicProducer
+}
+
+// BindNumericDyadicFloat pre-binds numeric operands for a dyadic float kernel.
+// At least one operand must be array-like; scalar/scalar calls stay on the
+// regular scalar evaluator.
+func BindNumericDyadicFloat(op string, left, right any) (NumericDyadicFloatBound, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return NumericDyadicFloatBound{}, false, nil
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return NumericDyadicFloatBound{}, false, nil
+	}
+	length, err := numericDyadicLength(op, leftArray, rightArray)
+	if err != nil {
+		return NumericDyadicFloatBound{}, true, err
+	}
+	apply, ok := numericDyadicFloatFunc(op)
+	if !ok {
+		return NumericDyadicFloatBound{}, true, fmt.Errorf("unsupported numeric dyadic float kernel %q", op)
+	}
+	leftProducer, err := newF64NumericProducer(left, length)
+	if err != nil {
+		return NumericDyadicFloatBound{}, true, err
+	}
+	rightProducer, err := newF64NumericProducer(right, length)
+	if err != nil {
+		return NumericDyadicFloatBound{}, true, err
+	}
+	return NumericDyadicFloatBound{
+		op:       op,
+		producer: f64DyadicProducer{left: leftProducer, right: rightProducer, apply: apply, len: length},
+	}, true, nil
+}
+
+func (b NumericDyadicFloatBound) Len() int {
+	return b.producer.len
+}
+
+func (b NumericDyadicFloatBound) Sum() (float64, error) {
+	return f64ProducerSum(b.producer)
+}
+
+func (b NumericDyadicFloatBound) RatiosSum() (float64, error) {
+	return f64ProducerRatiosSum(b.producer)
+}
+
+func (b NumericDyadicFloatBound) Array() Array {
+	return f64NumericDyadicArray{
+		op:    b.op,
+		len:   b.producer.len,
+		bound: b,
+	}
 }
 
 func numericDyadicFloatOperandAt(value any, array Array, isArray bool, row, length int) (float64, bool, error) {
@@ -2091,6 +2122,9 @@ func (p f64I64ScalarDyadicProducer) f64At(row int) (float64, bool, error) {
 }
 
 func newF64NumericDyadicProducer(array f64NumericDyadicArray) (f64DyadicProducer, error) {
+	if array.bound.producer.apply != nil && array.bound.producer.len == array.len {
+		return array.bound.producer, nil
+	}
 	apply, ok := numericDyadicFloatFunc(array.op)
 	if !ok {
 		return f64DyadicProducer{}, fmt.Errorf("unsupported numeric dyadic float kernel %q", array.op)
@@ -2434,6 +2468,8 @@ func f64DyadicScalarProducerSum(scalar float64, producer f64NumericProducer, sca
 			total += applyScalarDyadicFloat(scalar, float64(value), scalarLeft, apply)
 		}
 		return total, nil
+	case f64DyadicProducer:
+		return f64DyadicScalarNestedProducerSum(scalar, p, scalarLeft, apply)
 	}
 	var total float64
 	for row := 0; row < producer.Len(); row++ {
@@ -2462,6 +2498,22 @@ func f64DyadicScalarSumFloat[T floatScalar](scalar float64, values []T, scalarLe
 		total += applyScalarDyadicFloat(scalar, float64(value), scalarLeft, apply)
 	}
 	return total
+}
+
+func f64DyadicScalarNestedProducerSum(scalar float64, producer f64DyadicProducer, scalarLeft bool, apply f64DyadicFunc) (float64, error) {
+	var total float64
+	var innerCache f64DyadicEvalCache
+	var outerCache f64DyadicEvalCache
+	for row := 0; row < producer.len; row++ {
+		value, ok, err := producer.f64AtCached(row, &innerCache)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			total += applyScalarDyadicFloatCached(scalar, value, scalarLeft, apply, &outerCache)
+		}
+	}
+	return total, nil
 }
 
 func applyScalarDyadicFloat(scalar, value float64, scalarLeft bool, apply f64DyadicFunc) float64 {
@@ -2526,6 +2578,8 @@ func f64DyadicScalarProducerRatiosSum(scalar float64, producer f64NumericProduce
 		if total, ok, err := f64DyadicScalarI64ScalarDyadicRangeRatiosSum(scalar, p.values, scalarLeft, apply); ok || err != nil {
 			return total, err
 		}
+	case f64DyadicProducer:
+		return f64DyadicScalarNestedProducerRatiosSum(scalar, p, scalarLeft, apply)
 	}
 	var total float64
 	var previous float64
@@ -2541,6 +2595,33 @@ func f64DyadicScalarProducerRatiosSum(scalar float64, producer f64NumericProduce
 			continue
 		}
 		current := applyScalarDyadicFloatCached(scalar, value, scalarLeft, apply, &cache)
+		if !hasPrevious {
+			total += current
+		} else {
+			total += current / previous
+		}
+		previous = current
+		hasPrevious = true
+	}
+	return total, nil
+}
+
+func f64DyadicScalarNestedProducerRatiosSum(scalar float64, producer f64DyadicProducer, scalarLeft bool, apply f64DyadicFunc) (float64, error) {
+	var total float64
+	var previous float64
+	var hasPrevious bool
+	var innerCache f64DyadicEvalCache
+	var outerCache f64DyadicEvalCache
+	for row := 0; row < producer.len; row++ {
+		value, ok, err := producer.f64AtCached(row, &innerCache)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			hasPrevious = false
+			continue
+		}
+		current := applyScalarDyadicFloatCached(scalar, value, scalarLeft, apply, &outerCache)
 		if !hasPrevious {
 			total += current
 		} else {
@@ -11323,6 +11404,7 @@ type f64NumericDyadicArray struct {
 	left  any
 	right any
 	len   int
+	bound NumericDyadicFloatBound
 }
 
 type i64ScalarDyadicRunningSumArray struct {
@@ -11390,6 +11472,9 @@ func (a f64NumericDyadicArray) Gather(indexes []int) Array {
 }
 
 func (a f64NumericDyadicArray) f64At(row int) (float64, bool, error) {
+	if a.bound.producer.apply != nil && a.bound.producer.len == a.len {
+		return a.bound.producer.f64At(row)
+	}
 	if row < 0 || row >= a.len {
 		return 0, false, fmt.Errorf("array row %d out of range", row)
 	}
