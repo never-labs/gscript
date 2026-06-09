@@ -3385,6 +3385,53 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSum nested scalar dyadic mod = %v,%v,%v; want 33,true,nil", value, ok, err)
 	}
 
+	floatMod, ok, err := TryTypedDyadic(OpMod, NewF64([]float64{5.5, -1.5, 7.25}), int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedDyadic float mod = %T,%v,%v; want handled", floatMod, ok, err)
+	}
+	if got, want := floatMod.(Array).Values(), []any{1.5, 0.5, 1.25}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic float mod values = %v, want %v", got, want)
+	}
+	rotatedFloat, ok, err := TryTypedRotate(NewF64([]float64{0.5, 1.5, 2.5, 3.5}), 1)
+	if err != nil {
+		t.Fatalf("TryTypedRotate float returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedRotate float was not handled")
+	}
+	tiledFloatMod, ok, err := TryTypedDyadic(OpMod, rotatedFloat, int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedDyadic tiled float mod = %T,%v,%v; want handled", tiledFloatMod, ok, err)
+	}
+	if got, want := tiledFloatMod.(Array).Values(), []any{1.5, 0.5, 1.5, 0.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic tiled float mod values = %v, want %v", got, want)
+	}
+	indexedFloatMod, ok, err := TryTypedDyadic(OpMod, NewF64([]float64{0.5, 1.5, 2.5, 3.5}).Gather([]int{3, 1, 0}), int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedDyadic indexed float mod = %T,%v,%v; want handled", indexedFloatMod, ok, err)
+	}
+	if got, want := indexedFloatMod.(Array).Values(), []any{1.5, 1.5, 0.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic indexed float mod values = %v, want %v", got, want)
+	}
+	nullableFloatMod, ok, err := TryTypedDyadic(OpMod, NewColumn("x", []any{5.5, NullValue, -1.5}).Data, int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedDyadic nullable float mod = %T,%v,%v; want handled", nullableFloatMod, ok, err)
+	}
+	if got, want := nullableFloatMod.(Array).Values(), []any{1.5, NullValue, 0.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic nullable float mod values = %v, want %v", got, want)
+	}
+	filledFloat, ok, err := TryTypedScalarFill(0.5, NewColumn("x", []any{5.5, NullValue, -1.5}).Data)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedScalarFill float = %T,%v,%v; want handled", filledFloat, ok, err)
+	}
+	filledFloatMod, ok, err := TryTypedDyadic(OpMod, filledFloat, int64(2))
+	if err != nil || !ok {
+		t.Fatalf("TryTypedDyadic filled float mod = %T,%v,%v; want handled", filledFloatMod, ok, err)
+	}
+	if got, want := filledFloatMod.(Array).Values(), []any{1.5, 0.5, 0.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedDyadic filled float mod values = %v, want %v", got, want)
+	}
+
 	value, ok, err = TryTypedNumericSumByI64Indexes(NewI64Range(0, 1, 8), NewI64([]int64{2, 4, 6}))
 	if err != nil {
 		t.Fatalf("TryTypedNumericSumByI64Indexes returned error: %v", err)

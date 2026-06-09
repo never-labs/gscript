@@ -2607,6 +2607,11 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 		}
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}
+	if qScriptPipelineHasAssignment(descriptor, descriptor.valueExpr) {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.valueExpr); err != nil {
+			return nil, true, err
+		}
+	}
 	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
 	if err != nil {
 		return nil, true, err
@@ -2626,6 +2631,11 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 	}
 	if out, handled, err := s.evalQScriptGatherSumCountWhereIndexPipeline(descriptor, array); err != nil || handled {
 		return out, handled, err
+	}
+	if qScriptPipelineHasAssignment(descriptor, descriptor.indexExpr) {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.indexExpr); err != nil {
+			return nil, true, err
+		}
 	}
 	index, handled, err := s.evalQScriptBindingPlan(&descriptor.indexPlan)
 	if err != nil {
@@ -2655,6 +2665,22 @@ func (s *EvalState) evalQScriptGatherSumCountPipeline(descriptor *qScriptPipelin
 		return nil, false, nil
 	}
 	return out, true, nil
+}
+
+func qScriptPipelineHasAssignment(descriptor *qScriptPipelineDescriptor, name string) bool {
+	if descriptor == nil {
+		return false
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	for _, assignment := range descriptor.assignments {
+		if strings.TrimSpace(assignment.name) == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *EvalState) evalQScriptIndexExprSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
@@ -3114,9 +3140,6 @@ func qScriptPipelineModuloMaskPlan(maskExpr string) *qPipelinePlan {
 func (s *EvalState) evalQScriptPipelineDeferredAssignment(descriptor *qScriptPipelineDescriptor, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil
-	}
-	if _, ok := s.lookupName(name); ok {
 		return nil
 	}
 	for _, assignment := range descriptor.assignments {

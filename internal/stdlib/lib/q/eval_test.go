@@ -2543,6 +2543,16 @@ func TestEvalStatePipelinePlanCachePreservesEnvironmentSemantics(t *testing.T) {
 	}
 }
 
+func TestEvalScriptPipelineAssignmentsOverrideSessionBindings(t *testing.T) {
+	state := NewEvalState(nil)
+	if got, err := state.Eval("x:(til 8)*0.5;y:0.5^x;idx:where x<4;y mod 2"); err != nil {
+		t.Fatalf("seed Eval returned %#v, %v; want nil error", got, err)
+	}
+	if got, err := state.Eval("x:til 8;y:(x*2)+7;idx:where (y mod 5)>1;(+/y[idx])+count idx"); err != nil || got != int64(70) {
+		t.Fatalf("pipeline Eval returned %#v, %v; want 70,nil", got, err)
+	}
+}
+
 func TestEvalIPCLoopbackHandle(t *testing.T) {
 	state := NewEvalState(map[string]any{"x": int64(100)})
 	assertStateEvalValue(t, state, `h:hopen "loopback";h["1+2"]`, int64(3))
@@ -3639,6 +3649,7 @@ func TestEvalDyadicNumericOps(t *testing.T) {
 	assertEvalArray(t, "2*1.5 2.5", data.KindF64, []any{3.0, 5.0})
 	assertEvalArray(t, "1 2 3%2", data.KindF64, []any{0.5, 1.0, 1.5})
 	assertEvalArray(t, "10 11 12 mod 5", data.KindI64, []any{int64(0), int64(1), int64(2)})
+	assertEvalArray(t, "5.5 -1.5 7.25 mod 2", data.KindF64, []any{1.5, 0.5, 1.25})
 	assertEvalArray(t, "10 11 12 div 5", data.KindI64, []any{int64(2), int64(2), int64(2)})
 	assertEvalArray(t, "100 101.5 99.5>100", data.KindBool, []any{false, true, false})
 }
@@ -4339,6 +4350,25 @@ func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 	if counts["ArrayDyadicArithmetic"] != 2 {
 		t.Fatalf("ArrayDyadicArithmetic hits = %d, want 2; stats=%#v", counts["ArrayDyadicArithmetic"], RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalFloatModuloRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:(til 8)*0.5;y:x mod 2;+/y", 6.0)
+	seenFloatMod := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayDyadicArithmetic" && stat.Shape == "vector-dyadic/r/f64/i64" && stat.Outcome == "hit" {
+			seenFloatMod = true
+		}
+		if stat.Kernel == "ArrayDyadicArithmetic" && stat.Shape == "vector-dyadic/r/f64/i64" && stat.Outcome == "fallback" {
+			t.Fatalf("float mod fell back: %#v", RuntimeKernelExecutionStats())
+		}
+	}
+	if !seenFloatMod {
+		t.Fatalf("missing typed float mod hit: %#v", RuntimeKernelExecutionStats())
 	}
 }
 

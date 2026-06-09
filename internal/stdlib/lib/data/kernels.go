@@ -3439,6 +3439,11 @@ func applyNumericDyadicFloatNumbers(op string, left, right float64) (float64, er
 		return left * right, nil
 	case string(OpDiv):
 		return left / right, nil
+	case string(OpMod):
+		if right == 0 {
+			return math.NaN(), nil
+		}
+		return left - right*math.Floor(left/right), nil
 	case NumericDyadicXExp:
 		return math.Pow(left, right), nil
 	case NumericDyadicXLog:
@@ -3468,6 +3473,13 @@ func numericDyadicFloatFunc(op string) (f64DyadicFunc, bool) {
 		return func(left, right float64) float64 { return left * right }, true
 	case string(OpDiv):
 		return func(left, right float64) float64 { return left / right }, true
+	case string(OpMod):
+		return func(left, right float64) float64 {
+			if right == 0 {
+				return math.NaN()
+			}
+			return left - right*math.Floor(left/right)
+		}, true
 	case NumericDyadicXExp:
 		return numericDyadicFloatFuncForXExp, true
 	case NumericDyadicXLog:
@@ -9274,6 +9286,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return a.f64At(row)
 	case f64BucketArray:
 		return a.f64At(row)
+	case f64FillArray:
+		return a.valueAt(row)
 	case i64RunningSumArray:
 		value, ok := a.i64At(row)
 		if !ok {
@@ -9406,7 +9420,7 @@ func isNumericArray(array Array) bool {
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
 		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
-		i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray,
+		i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray, fbyF64BroadcastArray, fbyF64TiledBroadcastArray:
 		return true
 	case nullableArray:
@@ -11626,6 +11640,11 @@ func applyNumericBinaryFloat(op Op, left, right float64) (float64, error) {
 		return left * right, nil
 	case OpDiv:
 		return left / right, nil
+	case OpMod:
+		if right == 0 {
+			return math.NaN(), nil
+		}
+		return left - right*math.Floor(left/right), nil
 	default:
 		return 0, fmt.Errorf("unsupported numeric binary kernel %s", op)
 	}

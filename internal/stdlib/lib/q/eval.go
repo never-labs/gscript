@@ -11438,9 +11438,6 @@ func qDataArithmeticOp(op byte) (data.Op, bool) {
 }
 
 func qTryTypedArithmeticDyadic(op data.Op, left, right any) (any, bool, error) {
-	if op == data.OpMod && (!qTypedIntegerOperandOK(left) || !qTypedIntegerOperandOK(right)) {
-		return nil, false, nil
-	}
 	if op != data.OpDiv && qTypedIntegerOperandOK(left) && qTypedIntegerOperandOK(right) {
 		return data.TryTypedIntegerDyadic(op, left, right)
 	}
