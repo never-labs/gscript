@@ -33,6 +33,7 @@ const (
 type qPipelinePlan struct {
 	kind           qPipelineKind
 	shape          string
+	shapeSpec      qPipelineShapeSpec
 	valueExpr      string
 	valuePlan      qScriptBindingPlan
 	indexExpr      string
@@ -183,7 +184,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(plan)
 		}
 		if qPipelineVectorTransformExprCandidate(right) {
-			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumVectorExpr, shape: "vector-reduce/sum-expr", reductionInput: right})
+			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
+			plan.reductionInput = right
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		return qPipelinePlan{}
 	}
@@ -196,7 +199,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(plan)
 		}
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
-			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineSumVectorExpr, shape: "vector-reduce/sum-expr", reductionInput: inputExpr})
+			plan := qPipelineShapePlan(qPipelineSumVectorExpr, "")
+			plan.reductionInput = inputExpr
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		return qPipelinePlan{}
 	}
@@ -224,7 +229,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlan{}
 		}
 		if qPipelineVectorTransformExprCandidate(inputExpr) {
-			return qPipelinePlanWithBindingPlans(qPipelinePlan{kind: qPipelineCountVectorExpr, shape: "vector-count/expr", reductionInput: inputExpr})
+			plan := qPipelineShapePlan(qPipelineCountVectorExpr, "")
+			plan.reductionInput = inputExpr
+			return qPipelinePlanWithBindingPlans(plan)
 		}
 		return qPipelinePlan{}
 	}
@@ -248,13 +255,11 @@ func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
 		if left == "" || right == "" {
 			return qPipelinePlan{}, false
 		}
-		return qPipelinePlan{
-			kind:      qPipelineSumMovingWindow,
-			shape:     "vector-reduce/sum-" + word,
-			compareOp: word,
-			leftExpr:  left,
-			rightExpr: right,
-		}, true
+		plan := qPipelineShapePlan(qPipelineSumMovingWindow, word)
+		plan.compareOp = word
+		plan.leftExpr = left
+		plan.rightExpr = right
+		return plan, true
 	}
 	return qPipelinePlan{}, false
 }
@@ -285,6 +290,12 @@ func qPipelineRunningScanInput(src string) (scan, arg string, ok bool) {
 }
 
 func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
+	if !plan.shapeSpec.valid() {
+		if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.compareOp); ok && (plan.shape == "" || plan.shape == spec.ID) {
+			plan.shapeSpec = spec
+			plan.shape = spec.ID
+		}
+	}
 	if plan.valueExpr != "" {
 		plan.valuePlan = buildQPipelineBindingPlan(plan.valueExpr)
 	}
@@ -360,26 +371,22 @@ func qPipelineVectorTransformExprCandidate(src string) bool {
 
 func buildQPipelineSumGatherPlan(src string) (qPipelinePlan, bool) {
 	if valueExpr, maskExpr, ok := splitTopLevelWord(src, "where"); ok {
-		return qPipelinePlan{
-			kind:      qPipelineSumWhereMask,
-			shape:     "where-reduce/sum",
-			valueExpr: strings.TrimSpace(valueExpr),
-			maskExpr:  strings.TrimSpace(maskExpr),
-		}, true
+		plan := qPipelineShapePlan(qPipelineSumWhereMask, "")
+		plan.valueExpr = strings.TrimSpace(valueExpr)
+		plan.maskExpr = strings.TrimSpace(maskExpr)
+		return plan, true
 	}
 	collectionExpr, indexExpr, ok := findPostfixIndex(src)
 	if !ok {
 		return qPipelinePlan{}, false
 	}
-	plan := qPipelinePlan{
-		kind:      qPipelineSumGatherIndexes,
-		shape:     "gather-reduce/sum",
-		valueExpr: strings.TrimSpace(collectionExpr),
-		indexExpr: strings.TrimSpace(indexExpr),
-	}
+	plan := qPipelineShapePlan(qPipelineSumGatherIndexes, "")
+	plan.valueExpr = strings.TrimSpace(collectionExpr)
+	plan.indexExpr = strings.TrimSpace(indexExpr)
 	if maskExpr, ok := directWhereMaskExpr(indexExpr); ok {
-		plan.kind = qPipelineSumWhereIndex
-		plan.shape = "where-index-reduce/sum"
+		plan = qPipelineShapePlan(qPipelineSumWhereIndex, "")
+		plan.valueExpr = strings.TrimSpace(collectionExpr)
+		plan.indexExpr = strings.TrimSpace(indexExpr)
 		plan.maskExpr = strings.TrimSpace(maskExpr)
 	}
 	return plan, true
@@ -520,7 +527,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 	if plan.kind == qPipelineInvalid {
 		return nil, false, nil
 	}
-	recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "attempt", "attempt")
+	shape := plan.stableShape()
+	recordRuntimeKernelExecution("QPipelinePlan", shape, "attempt", "attempt")
 	var (
 		out     any
 		handled bool
@@ -562,16 +570,16 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 	case qPipelineCountRunningScan:
 		out, handled, err = s.evalQPipelineCountRunningScan(plan)
 	default:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "fallback", RuntimeFallbackPlannerUnhandled)
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", RuntimeFallbackPlannerUnhandled)
 		return nil, false, nil
 	}
 	switch {
 	case err != nil:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "error", "runtime_error")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", "runtime_error")
 	case handled:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "hit", "typed_pipeline")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "hit", "typed_pipeline")
 	default:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "fallback", "unsupported_runtime_shape")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
 	return out, handled, err
 }
@@ -734,14 +742,14 @@ func qPipelineGatherReduceSum(array, indexes data.Array) (any, bool, error) {
 }
 
 func qPipelineGatherReduceSumWithPlanStats(plan qPipelinePlan, array, indexes data.Array) (any, bool, error) {
-	recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "attempt", "attempt")
+	recordRuntimeKernelExecution("QPipelinePlan", plan.stableShape(), "attempt", "attempt")
 	out, handled, err := qPipelineGatherReduceSum(array, indexes)
 	recordQPipelinePlanOutcome(plan, handled, err)
 	return out, handled, err
 }
 
 func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.Array) (any, bool, error) {
-	recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "attempt", "attempt")
+	recordRuntimeKernelExecution("QPipelinePlan", plan.stableShape(), "attempt", "attempt")
 	shape := ""
 	if array.Kind() == data.KindI64 && mask.Kind() == data.KindBool {
 		shape = "where-reduce/i64/bool"
@@ -755,13 +763,14 @@ func qPipelineWhereReduceSumWithPlanStats(plan qPipelinePlan, array, mask data.A
 }
 
 func recordQPipelinePlanOutcome(plan qPipelinePlan, handled bool, err error) {
+	shape := plan.stableShape()
 	switch {
 	case err != nil:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "error", "runtime_error")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", "runtime_error")
 	case handled:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "hit", "typed_pipeline")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "hit", "typed_pipeline")
 	default:
-		recordRuntimeKernelExecution("QPipelinePlan", plan.shape, "fallback", "unsupported_runtime_shape")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 	}
 }
 

@@ -14,11 +14,15 @@ type EvalPipelineAssignment struct {
 // and diagnostics. It describes the q runtime pipeline plan that would be used
 // for a source string without binding environment values or caching results.
 type EvalPipelineDescriptor struct {
-	Source        string
-	Kind          string
-	Kernel        string
-	Shape         string
-	PipelineShape string
+	Source         string
+	Kind           string
+	Kernel         string
+	Shape          string
+	PipelineShape  string
+	ShapeFamily    string
+	ShapeReducer   string
+	ShapeSelector  string
+	ShapeTransform string
 
 	Terminal    string
 	Assignments []EvalPipelineAssignment
@@ -145,12 +149,17 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 }
 
 func evalExpressionPipelineDescriptor(source string, plan qPipelinePlan) EvalPipelineDescriptor {
+	shapeSpec := qPipelinePlanShapeSpec(plan)
 	return EvalPipelineDescriptor{
 		Source:         source,
 		Kind:           "expression",
 		Kernel:         "QPipelinePlan",
-		Shape:          plan.shape,
-		PipelineShape:  qRuntimeKernelPipelineShape("QPipelinePlan", plan.shape),
+		Shape:          plan.stableShape(),
+		PipelineShape:  plan.stablePipelineShape(),
+		ShapeFamily:    string(shapeSpec.Family),
+		ShapeReducer:   shapeSpec.Reducer,
+		ShapeSelector:  shapeSpec.Selector,
+		ShapeTransform: shapeSpec.Transform,
 		ValueExpr:      strings.TrimSpace(plan.valueExpr),
 		IndexExpr:      strings.TrimSpace(plan.indexExpr),
 		MaskExpr:       strings.TrimSpace(plan.maskExpr),

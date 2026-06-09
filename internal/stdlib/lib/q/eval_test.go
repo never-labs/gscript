@@ -220,6 +220,75 @@ func TestQPipelinePlanRecognizesGenericVectorReduceAndCount(t *testing.T) {
 	assertEvalValue(t, "count 8#til 4", int64(8))
 }
 
+func TestQPipelineShapeRegistryStabilizesExpressionPlans(t *testing.T) {
+	tests := []struct {
+		name      string
+		source    string
+		shape     string
+		family    qPipelineShapeFamily
+		reducer   string
+		selector  string
+		transform string
+		pipeline  string
+	}{
+		{
+			name:     "where mask reduce",
+			source:   "+/y where x>8",
+			shape:    "where-reduce/sum",
+			family:   qPipelineShapeFamilyWhere,
+			reducer:  "sum",
+			selector: "mask",
+			pipeline: "mask_reduce",
+		},
+		{
+			name:     "gather reduce",
+			source:   "+/y[idx]",
+			shape:    "gather-reduce/sum",
+			family:   qPipelineShapeFamilyGather,
+			reducer:  "sum",
+			selector: "index",
+			pipeline: "gather_reduce",
+		},
+		{
+			name:      "vector transform reduce",
+			source:    "sum reverse 8#til 4",
+			shape:     "vector-reduce/sum-expr",
+			family:    qPipelineShapeFamilyVector,
+			reducer:   "sum",
+			transform: "expr",
+			pipeline:  "vector_reduce",
+		},
+		{
+			name:      "vector transform count",
+			source:    "count 8#til 4",
+			shape:     "vector-count/expr",
+			family:    qPipelineShapeFamilyVector,
+			reducer:   "count",
+			transform: "expr",
+			pipeline:  "vector_scan",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := buildQPipelinePlan(tt.source)
+			if plan.kind == qPipelineInvalid {
+				t.Fatalf("plan was not recognized")
+			}
+			spec := qPipelinePlanShapeSpec(plan)
+			if got := spec.stableID(); got != tt.shape {
+				t.Fatalf("stable shape = %q, want %q", got, tt.shape)
+			}
+			if spec.Family != tt.family || spec.Reducer != tt.reducer || spec.Selector != tt.selector || spec.Transform != tt.transform || spec.PipelineShape != tt.pipeline {
+				t.Fatalf("shape spec = %#v, want family=%q reducer=%q selector=%q transform=%q pipeline=%q",
+					spec, tt.family, tt.reducer, tt.selector, tt.transform, tt.pipeline)
+			}
+			if plan.stableShape() != tt.shape || plan.stablePipelineShape() != tt.pipeline {
+				t.Fatalf("plan stable shape = %q/%q, want %q/%q", plan.stableShape(), plan.stablePipelineShape(), tt.shape, tt.pipeline)
+			}
+		})
+	}
+}
+
 func TestQScriptPipelineCachesBoundModuloMaskPlan(t *testing.T) {
 	plan := buildQScriptPlan("x:til 12;y:x*2;idx:where (x mod 3)=0;+/y[idx]")
 	if plan.scriptPipeline == nil {
@@ -371,6 +440,9 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	}
 	if descriptor.Shape != "vector-reduce/sum-expr" ||
 		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ShapeFamily != "vector" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "expr" ||
 		descriptor.ReductionInput != "reverse 8#til 4" {
 		t.Fatalf("generic sum descriptor = %#v", descriptor)
 	}
@@ -384,6 +456,9 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	}
 	if descriptor.Shape != "vector-count/expr" ||
 		descriptor.PipelineShape != "vector_scan" ||
+		descriptor.ShapeFamily != "vector" ||
+		descriptor.ShapeReducer != "count" ||
+		descriptor.ShapeTransform != "expr" ||
 		descriptor.ReductionInput != "8#til 4" {
 		t.Fatalf("generic count descriptor = %#v", descriptor)
 	}
@@ -397,6 +472,9 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 	}
 	if descriptor.Shape != "vector-reduce/sum-msum" ||
 		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ShapeFamily != "vector" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "msum" ||
 		descriptor.LeftExpr != "3" ||
 		descriptor.RightExpr != "1+til 5" ||
 		descriptor.CompareOp != "msum" {
