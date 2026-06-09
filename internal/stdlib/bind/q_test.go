@@ -3483,36 +3483,52 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	restore := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
 		return []QRuntimeKernelExecutionStat{
 			{
-				Source:  "methodjit_q_frame_runtime",
-				Kernel:  "QFrameSelectColumn",
-				Shape:   "compare/filter/project/column",
-				Route:   "typed_runtime_op_exit",
-				Outcome: "success",
-				Count:   2,
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "success",
+				Count:         2,
 			},
 			{
-				Source:  "methodjit_q_frame_runtime",
-				Kernel:  "QFrameSelectColumn",
-				Shape:   "compare/filter/project/column",
-				Route:   "typed_runtime_op_exit",
-				Outcome: "success",
-				Count:   3,
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "success",
+				ReasonCode:    "typed_kernel",
+				Count:         3,
 			},
 			{
-				Source:  "methodjit_q_frame_runtime",
-				Kernel:  "QFrameSelectColumn",
-				Shape:   "compare/filter/project/column",
-				Route:   "typed_runtime_op_exit",
-				Outcome: "error",
-				Count:   1,
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "error",
+				ReasonCode:    "runtime_error",
+				Count:         1,
 			},
 			{
-				Source:  "methodjit_q_vector_runtime",
-				Kernel:  "QVectorWhereReduce",
-				Shape:   "compare/vector-where/vector-reduce",
-				Route:   "typed_runtime_op_exit",
-				Outcome: "success",
-				Count:   4,
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "fallback",
+				ReasonCode:    "missing_kernel",
+				Count:         2,
+			},
+			{
+				Source:        "methodjit_q_vector_runtime",
+				Kernel:        "QVectorWhereReduce",
+				Shape:         "compare/vector-where/vector-reduce",
+				PipelineShape: "mask_reduce",
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "success",
+				Count:         4,
 			},
 			{
 				Source: "",
@@ -3529,8 +3545,8 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := rows["qsql_kernel"]; got["entries"] != 0 || got["hits"] != 0 || got["misses"] != 0 || got["evictions"] != 0 {
 		t.Fatalf("qsql_kernel stats = %#v, want semantic cache untouched by runtime execution stats", got)
 	}
-	if got := rows["q_runtime_kernel_execution"]; got["entries"] != 3 || got["hits"] != 9 || got["misses"] != 0 || got["evictions"] != 0 || got["limit"] != 0 {
-		t.Fatalf("q_runtime_kernel_execution stats = %#v, want three non-cache execution rows", got)
+	if got := rows["q_runtime_kernel_execution"]; got["entries"] != 4 || got["hits"] != 9 || got["misses"] != 0 || got["evictions"] != 0 || got["limit"] != 0 {
+		t.Fatalf("q_runtime_kernel_execution stats = %#v, want four non-cache execution rows", got)
 	}
 
 	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
@@ -3540,8 +3556,8 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := row.RawGetString("cache_backed"); !got.IsBool() || got.Bool() {
 		t.Fatalf("q_runtime_kernel_execution cache_backed = %v, want false", got)
 	}
-	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 10 {
-		t.Fatalf("q_runtime_kernel_execution executions = %v, want 10", got)
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 12 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 12", got)
 	}
 	if got := row.RawGetString("successes"); !got.IsInt() || got.Int() != 9 {
 		t.Fatalf("q_runtime_kernel_execution successes = %v, want 9", got)
@@ -3549,10 +3565,13 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := row.RawGetString("errors"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_execution errors = %v, want 1", got)
 	}
+	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution fallbacks = %v, want 2", got)
+	}
 
 	stats := row.RawGetString("stats").Table()
-	if stats == nil || stats.Length() != 3 {
-		t.Fatalf("q_runtime_kernel_execution stats table = %v, want three rows", stats)
+	if stats == nil || stats.Length() != 4 {
+		t.Fatalf("q_runtime_kernel_execution stats table = %v, want four rows", stats)
 	}
 	first := stats.RawGetInt(1).Table()
 	if first == nil {
@@ -3572,10 +3591,16 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := first.RawGetString("count"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_execution stats[1].count = %v, want 1", got)
 	}
+	if got := first.RawGetString("pipeline_shape"); !got.IsString() || got.Str() != "scan=frame|where=compare_mask:column_literal|filter=index|project=column" {
+		t.Fatalf("q_runtime_kernel_execution stats[1].pipeline_shape = %v", got)
+	}
+	if got := first.RawGetString("reason_code"); !got.IsString() || got.Str() != "runtime_error" {
+		t.Fatalf("q_runtime_kernel_execution stats[1].reason_code = %v, want runtime_error", got)
+	}
 
 	shapes := row.RawGetString("shapes").Table()
-	if shapes == nil || shapes.Length() != 3 {
-		t.Fatalf("q_runtime_kernel_execution shapes table = %v, want three rows", shapes)
+	if shapes == nil || shapes.Length() != 4 {
+		t.Fatalf("q_runtime_kernel_execution shapes table = %v, want four rows", shapes)
 	}
 	top := shapes.RawGetInt(1).Table()
 	if top == nil {
@@ -3594,8 +3619,8 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 		t.Fatalf("q_runtime_kernel_execution shapes[1].count = %v, want 5", got)
 	}
 	kernels := row.RawGetString("kernels").Table()
-	if kernels == nil || kernels.Length() != 3 {
-		t.Fatalf("q_runtime_kernel_execution kernels table = %v, want three rows", kernels)
+	if kernels == nil || kernels.Length() != 4 {
+		t.Fatalf("q_runtime_kernel_execution kernels table = %v, want four rows", kernels)
 	}
 	kernel := kernels.RawGetInt(1).Table()
 	if kernel == nil {
@@ -3614,8 +3639,8 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 		t.Fatalf("q_runtime_kernel_execution kernels[1].count = %v, want 5", got)
 	}
 	routes := row.RawGetString("routes").Table()
-	if routes == nil || routes.Length() != 3 {
-		t.Fatalf("q_runtime_kernel_execution routes table = %v, want three rows", routes)
+	if routes == nil || routes.Length() != 4 {
+		t.Fatalf("q_runtime_kernel_execution routes table = %v, want four rows", routes)
 	}
 	route := routes.RawGetInt(1).Table()
 	if route == nil {
@@ -3633,6 +3658,82 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	}
 	if got := route.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_execution routes[1].count = %v, want 5", got)
+	}
+	reasons := row.RawGetString("fallback_reasons").Table()
+	if reasons == nil || reasons.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reasons = %v, want fallback and error rows", reasons)
+	}
+	reason := qTestNestedRowByFields(t, row, "fallback_reasons", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"outcome":     "fallback",
+		"reason_code": "missing_kernel",
+	})
+	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reasons missing_kernel count = %v, want 2", got)
+	}
+	reasonShapes := row.RawGetString("fallback_reason_shapes").Table()
+	if reasonShapes == nil || reasonShapes.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reason_shapes = %v, want fallback and error rows", reasonShapes)
+	}
+	reasonShape := qTestNestedRowByFields(t, row, "fallback_reason_shapes", map[string]string{
+		"source":         "methodjit_q_frame_runtime",
+		"kernel":         "QFrameSelectColumn",
+		"shape":          "compare/filter/project/column",
+		"pipeline_shape": "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+		"route":          "typed_runtime_op_exit",
+		"outcome":        "fallback",
+		"reason_code":    "missing_kernel",
+	})
+	if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reason_shapes missing_kernel count = %v, want 2", got)
+	}
+}
+
+func TestQRuntimeKernelExecutionStatsExposeEvalFallbackReasons(t *testing.T) {
+	qClearCaches()
+	stdq.ClearRuntimeKernelExecutionStats()
+	t.Cleanup(func() {
+		qClearCaches()
+		stdq.ClearRuntimeKernelExecutionStats()
+	})
+
+	if _, err := stdq.Eval("+/1 2 3"); err != nil {
+		t.Fatalf("q eval typed sum: %v", err)
+	}
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution fallbacks after typed hot path = %v, want 0", got)
+	}
+	if reasons := row.RawGetString("fallback_reasons").Table(); reasons == nil || reasons.Length() != 0 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reasons after typed hot path = %v, want empty", reasons)
+	}
+
+	if _, err := stdq.Eval("+/`a`b"); err == nil {
+		t.Fatal("q eval symbolic sum succeeded, want typed runtime fallback then semantic error")
+	}
+	row = qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_execution fallbacks after unsupported typed sum = %v, want 1", got)
+	}
+	reason := qTestNestedRowByFields(t, row, "fallback_reasons", map[string]string{
+		"source":      "q_eval_vector_runtime",
+		"outcome":     "fallback",
+		"reason_code": "unsupported_type",
+	})
+	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_execution unsupported_type reason count = %v, want 1", got)
+	}
+	reasonShape := qTestNestedRowByFields(t, row, "fallback_reason_shapes", map[string]string{
+		"source":         "q_eval_vector_runtime",
+		"kernel":         "ArraySum",
+		"shape":          "vector-reduce/sum/symbol",
+		"pipeline_shape": "vector_reduce",
+		"route":          "typed_data_kernel",
+		"outcome":        "fallback",
+		"reason_code":    "unsupported_type",
+	})
+	if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_execution unsupported_type reason shape count = %v, want 1", got)
 	}
 }
 

@@ -44,12 +44,14 @@ func TestQRuntimeKernelExecutionStatsProviderAggregatesMethodJITDiagnoseRoutesAn
 		return report.QKernelExecutionStats
 	}, func(stat QKernelExecutionStat) qbind.QRuntimeKernelExecutionStat {
 		return qbind.QRuntimeKernelExecutionStat{
-			Source:  stat.Source,
-			Kernel:  stat.Kernel,
-			Shape:   stat.Shape,
-			Route:   stat.Route,
-			Outcome: stat.Outcome,
-			Count:   stat.Count,
+			Source:        stat.Source,
+			Kernel:        stat.Kernel,
+			Shape:         stat.Shape,
+			PipelineShape: stat.PipelineShape,
+			Route:         stat.Route,
+			Outcome:       stat.Outcome,
+			ReasonCode:    stat.ReasonCode,
+			Count:         stat.Count,
 		}
 	})
 	defer restore()

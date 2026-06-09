@@ -121,12 +121,14 @@ type QKernelDescriptorJSONRow struct {
 // uses the same stable source/kernel/shape/route keys as QKernelDescriptor so
 // runtime observations can be joined with lowering-time descriptors.
 type QKernelExecutionStat struct {
-	Source  string
-	Kernel  string
-	Shape   string
-	Route   string
-	Outcome string
-	Count   uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonCode    string
+	Count         uint64
 }
 
 // QKernelDescriptorCacheStat records schema-stable descriptor cache behavior
@@ -147,12 +149,14 @@ type QKernelDescriptorCacheStat struct {
 // QKernelExecutionStatJSONRow is the stable external row shape for raw q
 // typed-runtime execution observations.
 type QKernelExecutionStatJSONRow struct {
-	Source  string `json:"source"`
-	Kernel  string `json:"kernel"`
-	Shape   string `json:"shape"`
-	Route   string `json:"route"`
-	Outcome string `json:"outcome"`
-	Count   uint64 `json:"count"`
+	Source        string `json:"source"`
+	Kernel        string `json:"kernel"`
+	Shape         string `json:"shape"`
+	PipelineShape string `json:"pipeline_shape,omitempty"`
+	Route         string `json:"route"`
+	Outcome       string `json:"outcome"`
+	ReasonCode    string `json:"reason_code,omitempty"`
+	Count         uint64 `json:"count"`
 }
 
 // QKernelExecutionRouteSummary aggregates q typed-runtime execution outcomes
@@ -706,12 +710,14 @@ func QKernelExecutionStatJSONRows(rows []QKernelExecutionStat) []QKernelExecutio
 	out := make([]QKernelExecutionStatJSONRow, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, QKernelExecutionStatJSONRow{
-			Source:  row.Source,
-			Kernel:  row.Kernel,
-			Shape:   row.Shape,
-			Route:   row.Route,
-			Outcome: row.Outcome,
-			Count:   row.Count,
+			Source:        row.Source,
+			Kernel:        row.Kernel,
+			Shape:         row.Shape,
+			PipelineShape: row.PipelineShape,
+			Route:         row.Route,
+			Outcome:       row.Outcome,
+			ReasonCode:    row.ReasonCode,
+			Count:         row.Count,
 		})
 	}
 	return out

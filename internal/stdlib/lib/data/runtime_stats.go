@@ -2,6 +2,7 @@ package data
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -10,13 +11,14 @@ import (
 // It is intentionally independent from q/bind so qSQL and Leia-native callers
 // can share the same data runtime visibility.
 type RuntimeKernelExecutionStat struct {
-	Source     string
-	Kernel     string
-	Shape      string
-	Route      string
-	Outcome    string
-	ReasonCode string
-	Count      uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonCode    string
+	Count         uint64
 }
 
 type runtimeKernelExecutionKey struct {
@@ -110,13 +112,14 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 		}
 		key := counter.key
 		out = append(out, RuntimeKernelExecutionStat{
-			Source:     key.source,
-			Kernel:     key.kernel,
-			Shape:      key.shape,
-			Route:      key.route,
-			Outcome:    key.outcome,
-			ReasonCode: key.reasonCode,
-			Count:      count,
+			Source:        key.source,
+			Kernel:        key.kernel,
+			Shape:         key.shape,
+			PipelineShape: RuntimeKernelPipelineShape(key.kernel, key.shape),
+			Route:         key.route,
+			Outcome:       key.outcome,
+			ReasonCode:    key.reasonCode,
+			Count:         count,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -138,6 +141,21 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 		return out[i].ReasonCode < out[j].ReasonCode
 	})
 	return out
+}
+
+// RuntimeKernelPipelineShape maps concrete data-runtime probe shapes onto the
+// lower-cardinality pipeline families used by q.cache_stats consumers.
+func RuntimeKernelPipelineShape(kernel, shape string) string {
+	switch {
+	case strings.HasPrefix(shape, "bucket-floor/"):
+		return "bucket_transform"
+	case strings.HasPrefix(shape, "vector-transform/"):
+		return "vector_transform"
+	case strings.HasPrefix(shape, "query/"):
+		return "query_kernel"
+	default:
+		return "unknown"
+	}
 }
 
 // ClearRuntimeKernelExecutionStats resets data-runtime typed kernel counters.

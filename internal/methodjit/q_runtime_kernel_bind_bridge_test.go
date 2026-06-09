@@ -9,21 +9,25 @@ import (
 func TestQKernelExecutionStatsMapToBindRuntimeStats(t *testing.T) {
 	stats := stdbind.QRuntimeKernelExecutionStatsFrom([]QKernelExecutionStat{
 		{
-			Source:  "methodjit_q_frame_runtime",
-			Kernel:  "QFrameSelectColumn",
-			Shape:   "compare/filter/project/column",
-			Route:   "typed_runtime_op_exit",
-			Outcome: "success",
-			Count:   7,
+			Source:        "methodjit_q_frame_runtime",
+			Kernel:        "QFrameSelectColumn",
+			Shape:         "compare/filter/project/column",
+			PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+			Route:         "typed_runtime_op_exit",
+			Outcome:       "success",
+			ReasonCode:    "typed_kernel",
+			Count:         7,
 		},
 	}, func(stat QKernelExecutionStat) stdbind.QRuntimeKernelExecutionStat {
 		return stdbind.QRuntimeKernelExecutionStat{
-			Source:  stat.Source,
-			Kernel:  stat.Kernel,
-			Shape:   stat.Shape,
-			Route:   stat.Route,
-			Outcome: stat.Outcome,
-			Count:   stat.Count,
+			Source:        stat.Source,
+			Kernel:        stat.Kernel,
+			Shape:         stat.Shape,
+			PipelineShape: stat.PipelineShape,
+			Route:         stat.Route,
+			Outcome:       stat.Outcome,
+			ReasonCode:    stat.ReasonCode,
+			Count:         stat.Count,
 		}
 	})
 	if len(stats) != 1 {
@@ -31,8 +35,10 @@ func TestQKernelExecutionStatsMapToBindRuntimeStats(t *testing.T) {
 	}
 	got := stats[0]
 	if got.Source != "methodjit_q_frame_runtime" || got.Kernel != "QFrameSelectColumn" ||
-		got.Shape != "compare/filter/project/column" || got.Route != "typed_runtime_op_exit" ||
-		got.Outcome != "success" || got.Count != 7 {
+		got.Shape != "compare/filter/project/column" ||
+		got.PipelineShape != "scan=frame|where=compare_mask:column_literal|filter=index|project=column" ||
+		got.Route != "typed_runtime_op_exit" || got.Outcome != "success" ||
+		got.ReasonCode != "typed_kernel" || got.Count != 7 {
 		t.Fatalf("mapped stat = %#v, want MethodJIT q execution stat fields preserved", got)
 	}
 }

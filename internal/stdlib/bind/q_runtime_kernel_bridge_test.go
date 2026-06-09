@@ -3,12 +3,14 @@ package bind
 import "testing"
 
 type qRuntimeKernelExecutionExternalStatForTest struct {
-	Source  string
-	Kernel  string
-	Shape   string
-	Route   string
-	Outcome string
-	Count   uint64
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	Route         string
+	Outcome       string
+	ReasonCode    string
+	Count         uint64
 }
 
 type qRuntimeKernelDescriptorCacheExternalStatForTest struct {
@@ -39,12 +41,14 @@ type qRuntimeKernelLoweringExternalStatForTest struct {
 
 func qRuntimeKernelExecutionExternalStatToBindForTest(stat qRuntimeKernelExecutionExternalStatForTest) QRuntimeKernelExecutionStat {
 	return QRuntimeKernelExecutionStat{
-		Source:  stat.Source,
-		Kernel:  stat.Kernel,
-		Shape:   stat.Shape,
-		Route:   stat.Route,
-		Outcome: stat.Outcome,
-		Count:   stat.Count,
+		Source:        stat.Source,
+		Kernel:        stat.Kernel,
+		Shape:         stat.Shape,
+		PipelineShape: stat.PipelineShape,
+		Route:         stat.Route,
+		Outcome:       stat.Outcome,
+		ReasonCode:    stat.ReasonCode,
+		Count:         stat.Count,
 	}
 }
 
@@ -81,12 +85,14 @@ func qRuntimeKernelLoweringExternalStatToBindForTest(stat qRuntimeKernelLowering
 func TestQRuntimeKernelExecutionStatsFromMapsExternalRows(t *testing.T) {
 	stats := QRuntimeKernelExecutionStatsFrom([]qRuntimeKernelExecutionExternalStatForTest{
 		{
-			Source:  "methodjit_q_frame_runtime",
-			Kernel:  "QFrameSelectColumn",
-			Shape:   "compare/filter/project/column",
-			Route:   "typed_runtime_op_exit",
-			Outcome: "success",
-			Count:   7,
+			Source:        "methodjit_q_frame_runtime",
+			Kernel:        "QFrameSelectColumn",
+			Shape:         "compare/filter/project/column",
+			PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column",
+			Route:         "typed_runtime_op_exit",
+			Outcome:       "success",
+			ReasonCode:    "typed_kernel",
+			Count:         7,
 		},
 	}, qRuntimeKernelExecutionExternalStatToBindForTest)
 	if len(stats) != 1 {
@@ -94,8 +100,10 @@ func TestQRuntimeKernelExecutionStatsFromMapsExternalRows(t *testing.T) {
 	}
 	got := stats[0]
 	if got.Source != "methodjit_q_frame_runtime" || got.Kernel != "QFrameSelectColumn" ||
-		got.Shape != "compare/filter/project/column" || got.Route != "typed_runtime_op_exit" ||
-		got.Outcome != "success" || got.Count != 7 {
+		got.Shape != "compare/filter/project/column" ||
+		got.PipelineShape != "scan=frame|where=compare_mask:column_literal|filter=index|project=column" ||
+		got.Route != "typed_runtime_op_exit" || got.Outcome != "success" ||
+		got.ReasonCode != "typed_kernel" || got.Count != 7 {
 		t.Fatalf("mapped stat = %#v, want field-preserving conversion", got)
 	}
 	if got := QRuntimeKernelExecutionStatsFrom([]qRuntimeKernelExecutionExternalStatForTest{{Count: 1}}, nil); got != nil {

@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/internal/vm"
@@ -162,11 +163,13 @@ func (cf *CompiledFunction) recordQKernelExecutionWithPipelineShape(source, kern
 		schemaHash = "unknown"
 	}
 	key := qKernelExecutionKey{
-		source:  source,
-		kernel:  kernel,
-		shape:   shape,
-		route:   route,
-		outcome: outcome,
+		source:        source,
+		kernel:        kernel,
+		shape:         shape,
+		pipelineShape: pipelineShape,
+		route:         route,
+		outcome:       outcome,
+		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
 	}
 	cf.qKernelStatsMu.Lock()
 	if cf.qKernelStats == nil {
@@ -314,20 +317,28 @@ func (cf *CompiledFunction) QKernelExecutionStats() []QKernelExecutionStat {
 		if keys[i].shape != keys[j].shape {
 			return keys[i].shape < keys[j].shape
 		}
+		if keys[i].pipelineShape != keys[j].pipelineShape {
+			return keys[i].pipelineShape < keys[j].pipelineShape
+		}
 		if keys[i].route != keys[j].route {
 			return keys[i].route < keys[j].route
 		}
-		return keys[i].outcome < keys[j].outcome
+		if keys[i].outcome != keys[j].outcome {
+			return keys[i].outcome < keys[j].outcome
+		}
+		return keys[i].reasonCode < keys[j].reasonCode
 	})
 	out := make([]QKernelExecutionStat, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, QKernelExecutionStat{
-			Source:  key.source,
-			Kernel:  key.kernel,
-			Shape:   key.shape,
-			Route:   key.route,
-			Outcome: key.outcome,
-			Count:   merged[key],
+			Source:        key.source,
+			Kernel:        key.kernel,
+			Shape:         key.shape,
+			PipelineShape: key.pipelineShape,
+			Route:         key.route,
+			Outcome:       key.outcome,
+			ReasonCode:    key.reasonCode,
+			Count:         merged[key],
 		})
 	}
 	return out
@@ -354,12 +365,65 @@ func appendQEvalPipelinePlanCounter(out map[qKernelExecutionKey]uint64, shape, r
 		return
 	}
 	out[qKernelExecutionKey{
-		source:  "methodjit_q_eval_runtime",
-		kernel:  "QEvalPipelinePlan",
-		shape:   shape,
-		route:   route,
-		outcome: outcome,
+		source:        "methodjit_q_eval_runtime",
+		kernel:        "QEvalPipelinePlan",
+		shape:         shape,
+		pipelineShape: qKernelExecutionPipelineShape("QPipelinePlan", shape),
+		route:         route,
+		outcome:       outcome,
+		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
 	}] += count
+}
+
+func qKernelExecutionPipelineShape(kernel, shape string) string {
+	switch {
+	case kernel == "QPipelinePlan":
+		switch {
+		case shape == "numeric-stats/bundle":
+			return "numeric_stats"
+		case shape == "callable-dot/sum-plus-count":
+			return "apply_reduce"
+		case shape == "apply-index/sum-count":
+			return "apply_reduce"
+		case shape == "sequence-transform/sum":
+			return "sequence_reduce"
+		case shape == "where-gather-reduce":
+			return "where_gather_reduce"
+		case shape == "modulo-compare/sum-count":
+			return "modulo_compare_reduce"
+		case shape == "dyadic-float/sum":
+			return "numeric_math"
+		case shape == "dyadic-minmax/sum":
+			return "numeric_math"
+		case strings.HasPrefix(shape, "script-pipeline/"):
+			return "script_pipeline"
+		case strings.HasPrefix(shape, "vector-reduce/"):
+			return "vector_reduce"
+		case strings.HasPrefix(shape, "vector-scan/"):
+			return "vector_scan"
+		}
+	case strings.HasPrefix(shape, "compare/vector-where/vector-reduce"):
+		return "mask_reduce"
+	case strings.HasPrefix(shape, "gather/vector-reduce"):
+		return "gather_reduce"
+	}
+	return "unknown"
+}
+
+func qKernelExecutionReasonCode(outcome, reasonCode string) string {
+	if reasonCode != "" {
+		return reasonCode
+	}
+	switch outcome {
+	case "success":
+		return "typed_kernel"
+	case "error":
+		return "runtime_error"
+	case "fallback":
+		return "unspecified"
+	default:
+		return outcome
+	}
 }
 
 func qFrameSelectColumnExecutionShape(specs []QFrameSelectColumnSpec, specIdx int) string {
