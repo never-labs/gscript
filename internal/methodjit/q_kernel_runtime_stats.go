@@ -31,6 +31,19 @@ func (cf *CompiledFunction) recordQRuntimePrimitiveExecution(op Op, outcome stri
 	cf.recordQKernelExecution(source, kernel, shape, route, outcome)
 }
 
+func (cf *CompiledFunction) recordQEvalPipelinePlanExecution(id int, outcome string) {
+	if cf == nil {
+		return
+	}
+	cf.recordQKernelExecution(
+		"methodjit_q_eval_runtime",
+		"QEvalPipelinePlan",
+		qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id),
+		"typed_runtime_op_exit",
+		outcome,
+	)
+}
+
 func qVectorRuntimeKernelShapesByID(fn *Function) map[int]string {
 	kernels := DetectQVectorRuntimeKernels(fn)
 	if len(kernels) == 0 {

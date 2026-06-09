@@ -673,18 +673,14 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			return fmt.Errorf("QEvalPipelinePlan op-exit missing compiled function")
 		}
 		out, handled, err := cf.ExecuteQEvalPipelinePlanValue(int(aux))
-		shape := "q-eval/pipeline-plan"
-		if ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, int(aux)); ok && ref.Shape != "" {
-			shape = ref.Shape
-		}
 		if err != nil || !handled {
-			cf.recordQKernelExecution("methodjit_q_eval_runtime", "QEvalPipelinePlan", shape, "typed_runtime_op_exit", "error")
+			cf.recordQEvalPipelinePlanExecution(int(aux), "error")
 			if err != nil {
 				return err
 			}
 			return fmt.Errorf("QEvalPipelinePlan op-exit plan %d was not handled", aux)
 		}
-		cf.recordQKernelExecution("methodjit_q_eval_runtime", "QEvalPipelinePlan", shape, "typed_runtime_op_exit", "success")
+		cf.recordQEvalPipelinePlanExecution(int(aux), "success")
 		regs[absSlot] = out
 
 	case OpVectorScan:

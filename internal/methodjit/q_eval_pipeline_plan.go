@@ -157,6 +157,13 @@ func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipeli
 	return value, true, nil
 }
 
+func qEvalPipelinePlanExecutionShape(refs []QEvalPipelinePlanRef, id int) string {
+	if ref, ok := qEvalPipelinePlanRefByID(refs, id); ok && ref.Shape != "" {
+		return ref.Shape
+	}
+	return "q-eval/pipeline-plan"
+}
+
 func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
 	switch x := v.(type) {
 	case nil:
