@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -103,9 +104,35 @@ type runtimeKernelExecutionKey struct {
 	reasonCode string
 }
 
+type runtimeKernelExecutionCounter struct {
+	key   runtimeKernelExecutionKey
+	count atomic.Uint64
+}
+
+type runtimeKernelProbeKey struct {
+	kernel string
+	shape  string
+}
+
+type runtimeKernelProbeCounters struct {
+	key      runtimeKernelProbeKey
+	attempt  *runtimeKernelExecutionCounter
+	hit      *runtimeKernelExecutionCounter
+	fallback *runtimeKernelExecutionCounter
+	err      *runtimeKernelExecutionCounter
+}
+
+const runtimeKernelCounterCacheSize = 64
+
 var (
-	runtimeKernelStatsMu sync.Mutex
-	runtimeKernelStats   map[runtimeKernelExecutionKey]uint64
+	runtimeKernelStatsMu      sync.RWMutex
+	runtimeKernelStats        map[runtimeKernelExecutionKey]*runtimeKernelExecutionCounter
+	runtimeKernelProbeStats   map[runtimeKernelProbeKey]*runtimeKernelProbeCounters
+	runtimeKernelStatCounters []*runtimeKernelExecutionCounter
+	runtimeKernelLastCounter  atomic.Pointer[runtimeKernelExecutionCounter]
+	runtimeKernelLastProbe    atomic.Pointer[runtimeKernelProbeCounters]
+	runtimeKernelCounterCache [runtimeKernelCounterCacheSize]atomic.Pointer[runtimeKernelExecutionCounter]
+	runtimeKernelProbeCache   [runtimeKernelCounterCacheSize]atomic.Pointer[runtimeKernelProbeCounters]
 )
 
 func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
@@ -124,12 +151,7 @@ func recordRuntimeExecution(source, kernel, shape, route, outcome, reasonCode st
 	if key.reasonCode == "" {
 		key.reasonCode = key.outcome
 	}
-	runtimeKernelStatsMu.Lock()
-	if runtimeKernelStats == nil {
-		runtimeKernelStats = make(map[runtimeKernelExecutionKey]uint64)
-	}
-	runtimeKernelStats[key]++
-	runtimeKernelStatsMu.Unlock()
+	runtimeKernelCounterFor(key).count.Add(1)
 }
 
 func recordRuntimeFramePrimitive(kernel, shape string, err error) {
@@ -155,51 +177,32 @@ func recordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
 	if shape == "" {
 		shape = "unknown"
 	}
-	outcome := "fallback"
-	reasonCode := "unsupported_shape"
+	counters := runtimeKernelProbeCountersFor(kernel, shape)
+	counters.attempt.count.Add(1)
 	switch {
 	case err != nil:
-		outcome = "error"
-		reasonCode = "runtime_error"
+		counters.err.count.Add(1)
 	case handled:
-		outcome = "hit"
-		reasonCode = "typed_kernel"
+		counters.hit.count.Add(1)
+	default:
+		counters.fallback.count.Add(1)
 	}
-	attemptKey := runtimeKernelExecutionKey{
-		source:     "q_eval_vector_runtime",
-		kernel:     kernel,
-		shape:      shape,
-		route:      "typed_data_kernel",
-		outcome:    "attempt",
-		reasonCode: "attempt",
-	}
-	outcomeKey := runtimeKernelExecutionKey{
-		source:     "q_eval_vector_runtime",
-		kernel:     kernel,
-		shape:      shape,
-		route:      "typed_data_kernel",
-		outcome:    outcome,
-		reasonCode: reasonCode,
-	}
-	runtimeKernelStatsMu.Lock()
-	if runtimeKernelStats == nil {
-		runtimeKernelStats = make(map[runtimeKernelExecutionKey]uint64)
-	}
-	runtimeKernelStats[attemptKey]++
-	runtimeKernelStats[outcomeKey]++
-	runtimeKernelStatsMu.Unlock()
 }
 
 // RuntimeKernelExecutionStats returns a stable snapshot of q.eval typed
 // primitive executions for q.cache_stats.
 func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
-	runtimeKernelStatsMu.Lock()
-	defer runtimeKernelStatsMu.Unlock()
-	if len(runtimeKernelStats) == 0 {
+	counters := runtimeKernelCountersSnapshot()
+	if len(counters) == 0 {
 		return nil
 	}
-	out := make([]RuntimeKernelExecutionStat, 0, len(runtimeKernelStats))
-	for key, count := range runtimeKernelStats {
+	out := make([]RuntimeKernelExecutionStat, 0, len(counters))
+	for _, counter := range counters {
+		count := counter.count.Load()
+		if count == 0 {
+			continue
+		}
+		key := counter.key
 		out = append(out, RuntimeKernelExecutionStat{
 			Source:        key.source,
 			Kernel:        key.kernel,
@@ -210,6 +213,9 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 			ReasonCode:    key.reasonCode,
 			Count:         count,
 		})
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
@@ -231,6 +237,155 @@ func RuntimeKernelExecutionStats() []RuntimeKernelExecutionStat {
 		return a.ReasonCode < b.ReasonCode
 	})
 	return out
+}
+
+func runtimeKernelProbeCountersFor(kernel, shape string) *runtimeKernelProbeCounters {
+	key := runtimeKernelProbeKey{kernel: kernel, shape: shape}
+	if counters := runtimeKernelLastProbe.Load(); counters != nil && counters.key == key {
+		return counters
+	}
+	cacheSlot := runtimeKernelProbeCacheIndex(key)
+	if counters := runtimeKernelProbeCache[cacheSlot].Load(); counters != nil && counters.key == key {
+		runtimeKernelLastProbe.Store(counters)
+		return counters
+	}
+	runtimeKernelStatsMu.RLock()
+	counters := runtimeKernelProbeStats[key]
+	runtimeKernelStatsMu.RUnlock()
+	if counters != nil {
+		runtimeKernelLastProbe.Store(counters)
+		runtimeKernelProbeCache[cacheSlot].Store(counters)
+		return counters
+	}
+
+	runtimeKernelStatsMu.Lock()
+	defer runtimeKernelStatsMu.Unlock()
+	if runtimeKernelProbeStats == nil {
+		runtimeKernelProbeStats = make(map[runtimeKernelProbeKey]*runtimeKernelProbeCounters)
+	}
+	if counters = runtimeKernelProbeStats[key]; counters != nil {
+		runtimeKernelLastProbe.Store(counters)
+		runtimeKernelProbeCache[cacheSlot].Store(counters)
+		return counters
+	}
+	counters = &runtimeKernelProbeCounters{
+		key: key,
+		attempt: registerRuntimeKernelCounterLocked(runtimeKernelExecutionKey{
+			source:     "q_eval_vector_runtime",
+			kernel:     kernel,
+			shape:      shape,
+			route:      "typed_data_kernel",
+			outcome:    "attempt",
+			reasonCode: "attempt",
+		}),
+		hit: registerRuntimeKernelCounterLocked(runtimeKernelExecutionKey{
+			source:     "q_eval_vector_runtime",
+			kernel:     kernel,
+			shape:      shape,
+			route:      "typed_data_kernel",
+			outcome:    "hit",
+			reasonCode: "typed_kernel",
+		}),
+		fallback: registerRuntimeKernelCounterLocked(runtimeKernelExecutionKey{
+			source:     "q_eval_vector_runtime",
+			kernel:     kernel,
+			shape:      shape,
+			route:      "typed_data_kernel",
+			outcome:    "fallback",
+			reasonCode: "unsupported_shape",
+		}),
+		err: registerRuntimeKernelCounterLocked(runtimeKernelExecutionKey{
+			source:     "q_eval_vector_runtime",
+			kernel:     kernel,
+			shape:      shape,
+			route:      "typed_data_kernel",
+			outcome:    "error",
+			reasonCode: "runtime_error",
+		}),
+	}
+	runtimeKernelProbeStats[key] = counters
+	runtimeKernelLastProbe.Store(counters)
+	runtimeKernelProbeCache[cacheSlot].Store(counters)
+	return counters
+}
+
+func runtimeKernelCounterFor(key runtimeKernelExecutionKey) *runtimeKernelExecutionCounter {
+	if counter := runtimeKernelLastCounter.Load(); counter != nil && counter.key == key {
+		return counter
+	}
+	cacheSlot := runtimeKernelCounterCacheIndex(key)
+	if counter := runtimeKernelCounterCache[cacheSlot].Load(); counter != nil && counter.key == key {
+		runtimeKernelLastCounter.Store(counter)
+		return counter
+	}
+	runtimeKernelStatsMu.RLock()
+	counter := runtimeKernelStats[key]
+	runtimeKernelStatsMu.RUnlock()
+	if counter != nil {
+		runtimeKernelLastCounter.Store(counter)
+		runtimeKernelCounterCache[cacheSlot].Store(counter)
+		return counter
+	}
+
+	runtimeKernelStatsMu.Lock()
+	defer runtimeKernelStatsMu.Unlock()
+	if runtimeKernelStats == nil {
+		runtimeKernelStats = make(map[runtimeKernelExecutionKey]*runtimeKernelExecutionCounter)
+	}
+	counter = registerRuntimeKernelCounterLocked(key)
+	runtimeKernelLastCounter.Store(counter)
+	runtimeKernelCounterCache[cacheSlot].Store(counter)
+	return counter
+}
+
+func registerRuntimeKernelCounterLocked(key runtimeKernelExecutionKey) *runtimeKernelExecutionCounter {
+	if runtimeKernelStats == nil {
+		runtimeKernelStats = make(map[runtimeKernelExecutionKey]*runtimeKernelExecutionCounter)
+	}
+	if counter := runtimeKernelStats[key]; counter != nil {
+		return counter
+	}
+	counter := &runtimeKernelExecutionCounter{key: key}
+	runtimeKernelStats[key] = counter
+	runtimeKernelStatCounters = append(runtimeKernelStatCounters, counter)
+	return counter
+}
+
+func runtimeKernelCountersSnapshot() []*runtimeKernelExecutionCounter {
+	runtimeKernelStatsMu.RLock()
+	defer runtimeKernelStatsMu.RUnlock()
+	if len(runtimeKernelStatCounters) == 0 {
+		return nil
+	}
+	return append([]*runtimeKernelExecutionCounter(nil), runtimeKernelStatCounters...)
+}
+
+func runtimeKernelCounterCacheIndex(key runtimeKernelExecutionKey) uintptr {
+	hash := runtimeKernelStringHash(key.kernel)
+	hash = hash*33 + runtimeKernelStringHash(key.shape)
+	hash = hash*33 + runtimeKernelStringHash(key.outcome)
+	hash = hash*33 + runtimeKernelStringHash(key.reasonCode)
+	hash = hash*33 + runtimeKernelStringHash(key.source)
+	hash = hash*33 + runtimeKernelStringHash(key.route)
+	return hash & (runtimeKernelCounterCacheSize - 1)
+}
+
+func runtimeKernelProbeCacheIndex(key runtimeKernelProbeKey) uintptr {
+	hash := runtimeKernelStringHash(key.kernel)
+	hash = hash*33 + runtimeKernelStringHash(key.shape)
+	return hash & (runtimeKernelCounterCacheSize - 1)
+}
+
+func runtimeKernelStringHash(value string) uintptr {
+	if value == "" {
+		return 0
+	}
+	last := len(value) - 1
+	hash := uintptr(len(value))*131 + uintptr(value[0])*17 + uintptr(value[last])
+	if len(value) > 2 {
+		hash += uintptr(value[len(value)/2]) * 31
+	}
+	return hash
 }
 
 func qRuntimeKernelPipelineShape(kernel, shape string) string {
@@ -319,9 +474,9 @@ func qGatherFrameRuntime(op string, frame data.Frame, indexes []int) (data.Frame
 
 // ClearRuntimeKernelExecutionStats resets q.eval runtime-kernel counters.
 func ClearRuntimeKernelExecutionStats() {
-	runtimeKernelStatsMu.Lock()
-	runtimeKernelStats = nil
-	runtimeKernelStatsMu.Unlock()
+	for _, counter := range runtimeKernelCountersSnapshot() {
+		counter.count.Store(0)
+	}
 }
 
 type projectionArg struct {
