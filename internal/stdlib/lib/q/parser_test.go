@@ -2168,6 +2168,35 @@ func TestLoweredQSQLExecutesAgainstDataFrame(t *testing.T) {
 	assertColumnValue(t, out, "fills", 0, int64(2))
 }
 
+func TestLoweredQSQLReportedRankAndXbarFormsExecute(t *testing.T) {
+	frame := mustFrame(t,
+		data.NewColumn("px", []any{30, 10, 20, 10, 40}),
+	)
+
+	ranked, err := Lower(mustParse(t, "select r:rank px from t"))
+	if err != nil {
+		t.Fatalf("Lower rank projection returned error: %v", err)
+	}
+	ranked.Plan.Source = frame
+	rankedOut, err := ranked.Plan.Exec()
+	if err != nil {
+		t.Fatalf("rank projection Exec returned error: %v", err)
+	}
+	assertQColumnValues(t, rankedOut, "r", []any{int64(3), int64(0), int64(2), int64(1), int64(4)})
+
+	bucketed, err := Lower(mustParse(t, "select c:count i by g:2 xbar px from t"))
+	if err != nil {
+		t.Fatalf("Lower xbar by clause returned error: %v", err)
+	}
+	bucketed.Plan.Source = frame
+	bucketedOut, err := bucketed.Plan.Exec()
+	if err != nil {
+		t.Fatalf("xbar by clause Exec returned error: %v", err)
+	}
+	assertQColumnValues(t, bucketedOut, "g", []any{int64(30), int64(10), int64(20), int64(40)})
+	assertQColumnValues(t, bucketedOut, "c", []any{int64(1), int64(2), int64(1), int64(1)})
+}
+
 func TestLowerQSQLConditionalSelectAndUpdate(t *testing.T) {
 	frame := mustFrame(t,
 		data.NewColumn("side", []any{data.Symbol("buy"), data.Symbol("sell"), data.Symbol("buy")}),
