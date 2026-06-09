@@ -109,11 +109,15 @@ var (
 )
 
 func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
+	recordRuntimeExecution("q_eval_vector_runtime", kernel, shape, "typed_data_kernel", outcome, reasonCode)
+}
+
+func recordRuntimeExecution(source, kernel, shape, route, outcome, reasonCode string) {
 	key := runtimeKernelExecutionKey{
-		source:     "q_eval_vector_runtime",
+		source:     normalizeRuntimeStatField(source, "q_eval_runtime"),
 		kernel:     normalizeRuntimeStatField(kernel, "unknown"),
 		shape:      normalizeRuntimeStatField(shape, "unknown"),
-		route:      "typed_data_kernel",
+		route:      normalizeRuntimeStatField(route, "runtime_primitive"),
 		outcome:    normalizeRuntimeStatField(outcome, "unknown"),
 		reasonCode: normalizeRuntimeStatField(reasonCode, outcome),
 	}
@@ -126,6 +130,15 @@ func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
 	}
 	runtimeKernelStats[key]++
 	runtimeKernelStatsMu.Unlock()
+}
+
+func recordRuntimeFramePrimitive(kernel, shape string, err error) {
+	recordRuntimeExecution("q_eval_frame_runtime", kernel, shape, "frame_runtime_primitive", "attempt", "attempt")
+	if err != nil {
+		recordRuntimeExecution("q_eval_frame_runtime", kernel, shape, "frame_runtime_primitive", "error", "runtime_error")
+		return
+	}
+	recordRuntimeExecution("q_eval_frame_runtime", kernel, shape, "frame_runtime_primitive", "hit", "frame_runtime")
 }
 
 func normalizeRuntimeStatField(value, fallback string) string {
@@ -262,11 +275,42 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "null_mask"
 	case strings.HasPrefix(shape, "count-reverse/"):
 		return "reverse_count"
+	case strings.HasPrefix(shape, "string-cast/"), strings.HasPrefix(shape, "string-case/"):
+		return "string_map"
+	case strings.HasPrefix(shape, "vector-unary/"):
+		return "vector_map"
+	case strings.HasPrefix(shape, "frame-gather/"):
+		return "frame_gather"
 	case kernel != "":
 		return "kernel/" + kernel
 	default:
 		return "unknown"
 	}
+}
+
+func qFrameGatherShape(op string, frame data.Frame, indexes []int) string {
+	return "frame-gather/" + op + "/" + qRuntimeCardinalityShape(len(indexes)) + "/cols-" + strconv.Itoa(len(frame.Schema().Names()))
+}
+
+func qRuntimeCardinalityShape(n int) string {
+	switch {
+	case n == 0:
+		return "rows-0"
+	case n == 1:
+		return "rows-1"
+	case n <= 16:
+		return "rows-small"
+	case n <= 1024:
+		return "rows-medium"
+	default:
+		return "rows-large"
+	}
+}
+
+func qGatherFrameRuntime(op string, frame data.Frame, indexes []int) (data.Frame, error) {
+	out, err := data.GatherFrame(frame, indexes)
+	recordRuntimeFramePrimitive("FrameGather", qFrameGatherShape(op, frame, indexes), err)
+	return out, err
 }
 
 // ClearRuntimeKernelExecutionStats resets q.eval runtime-kernel counters.
@@ -9898,7 +9942,7 @@ func sortFrameByColumns(frame data.Frame, names []data.Symbol, descending bool) 
 	if cmpErr != nil {
 		return data.Frame{}, cmpErr
 	}
-	return frame.Gather(indexes)
+	return qGatherFrameRuntime("sort", frame, indexes)
 }
 
 func qColumnNameList(v any) ([]data.Symbol, error) {
@@ -11228,9 +11272,9 @@ func take(n int, v any) (any, error) {
 	case data.Frame:
 		indexes := qTakeIndexes(x.Len(), n)
 		if len(indexes) == 0 && n != 0 && x.Len() == 0 {
-			return x.Gather(nil)
+			return qGatherFrameRuntime("take", x, nil)
 		}
-		return data.GatherFrame(x, indexes)
+		return qGatherFrameRuntime("take", x, indexes)
 	case data.KeyedFrame:
 		return takeKeyedFrame(x, n)
 	case string:
@@ -11658,7 +11702,7 @@ func rotateValue(left any, right any) (any, error) {
 		}
 		return data.Gather(x, rotateIndexes(x.Len(), n))
 	case data.Frame:
-		return data.GatherFrame(x, rotateIndexes(x.Len(), n))
+		return qGatherFrameRuntime("rotate", x, rotateIndexes(x.Len(), n))
 	case string:
 		runes := []rune(x)
 		indexes := rotateIndexes(len(runes), n)
@@ -11749,7 +11793,7 @@ func cut(indexes []int, v any) (any, error) {
 			if i+1 < len(indexes) {
 				end = indexes[i+1]
 			}
-			part, err := data.GatherFrame(x, segmentIndexes(x.Len(), start, end))
+			part, err := qGatherFrameRuntime("cut", x, segmentIndexes(x.Len(), start, end))
 			if err != nil {
 				return nil, err
 			}
@@ -11802,7 +11846,7 @@ func dropArray(array data.Array, n int) (data.Array, error) {
 
 func dropFrame(frame data.Frame, n int) (data.Frame, error) {
 	indexes := dropIndexes(frame.Len(), n)
-	return data.GatherFrame(frame, indexes)
+	return qGatherFrameRuntime("drop", frame, indexes)
 }
 
 func takeKeyedFrame(frame data.KeyedFrame, n int) (data.KeyedFrame, error) {
@@ -11874,7 +11918,7 @@ func takeFrameTail(frame data.Frame, n int) (data.Frame, error) {
 	for i := range indexes {
 		indexes[i] = start + i
 	}
-	return data.GatherFrame(frame, indexes)
+	return qGatherFrameRuntime("take-tail", frame, indexes)
 }
 
 func vectorValues(v any) ([]any, error) {

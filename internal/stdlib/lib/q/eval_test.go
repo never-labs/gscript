@@ -2268,6 +2268,43 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestEvalFrameRuntimePrimitivesRecordStats(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "count take 2 flip `sym`price!(`AAPL`MSFT`NVDA;100 101 102)", int64(2))
+	assertEvalValue(t, "count drop 1 flip `sym`price!(`AAPL`MSFT`NVDA;100 101 102)", int64(2))
+	assertEvalValue(t, "count 1 rotate flip `sym`price!(`AAPL`MSFT`NVDA;100 101 102)", int64(3))
+	assertEvalValue(t, "count `price xasc flip `sym`price!(`MSFT`AAPL`NVDA;80 101 210)", int64(3))
+
+	seen := map[string]bool{}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "FrameGather" ||
+			stat.Route != "frame_runtime_primitive" ||
+			stat.PipelineShape != "frame_gather" ||
+			stat.Outcome != "hit" ||
+			stat.ReasonCode != "frame_runtime" ||
+			stat.Count == 0 {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(stat.Shape, "frame-gather/take/"):
+			seen["take"] = true
+		case strings.HasPrefix(stat.Shape, "frame-gather/drop/"):
+			seen["drop"] = true
+		case strings.HasPrefix(stat.Shape, "frame-gather/rotate/"):
+			seen["rotate"] = true
+		case strings.HasPrefix(stat.Shape, "frame-gather/sort/"):
+			seen["sort"] = true
+		}
+	}
+	for _, op := range []string{"take", "drop", "rotate", "sort"} {
+		if !seen[op] {
+			t.Fatalf("missing frame runtime primitive stat for %s: %#v", op, RuntimeKernelExecutionStats())
+		}
+	}
+}
+
 func TestEvalVectorArithmeticRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
