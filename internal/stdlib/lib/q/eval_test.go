@@ -119,6 +119,14 @@ func TestQScriptPipelinePlannerDescribesAssignmentTerminalWhereIndexReduce(t *te
 	if got, want := len(d.assignments), 5; got != want {
 		t.Fatalf("assignment count = %d, want %d", got, want)
 	}
+	for _, assignment := range d.assignments {
+		if assignment.binding.kind == qScriptBindingInvalid {
+			t.Fatalf("assignment %q binding plan is invalid", assignment.name)
+		}
+	}
+	if d.terminalPlan.kind != qPipelineSumGatherIndexes {
+		t.Fatalf("terminal plan kind = %v, want qPipelineSumGatherIndexes", d.terminalPlan.kind)
+	}
 	if d.valueExpr != "y" || d.valueBinding != "(x*3)+7" {
 		t.Fatalf("value descriptor = expr %q binding %q, want y/(x*3)+7", d.valueExpr, d.valueBinding)
 	}

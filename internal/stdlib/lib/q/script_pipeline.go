@@ -22,12 +22,14 @@ type qScriptPipelineDescriptor struct {
 	maskExpr          string
 	maskBinding       string
 	terminalUsesWhere bool
+	terminalPlan      qPipelinePlan
 }
 
 type qScriptPipelineAssignment struct {
 	name      string
 	rhs       string
 	valueExpr Expr
+	binding   qScriptBindingPlan
 }
 
 func (d qScriptPipelineDescriptor) shape() string {
@@ -63,7 +65,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 		if _, _, ok := parseDeferredScan(stmt.rhs); ok {
 			return nil, false
 		}
-		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr})
+		assignments = append(assignments, qScriptPipelineAssignment{name: stmt.assign, rhs: stmt.rhs, valueExpr: stmt.valueExpr, binding: buildQScriptBindingPlanForRHS(stmt.rhs, stmt.valueExpr)})
 		bindings[stmt.assign] = stmt.rhs
 	}
 	descriptor, ok := describeQScriptPipelineTerminal(terminal.src, bindings)
@@ -72,6 +74,7 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	}
 	descriptor.assignments = assignments
 	descriptor.terminal = terminal.src
+	descriptor.terminalPlan = buildQPipelinePlan(terminal.src)
 	return &descriptor, true
 }
 
@@ -142,16 +145,24 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 	}
 	shape := descriptor.shape()
 	recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "attempt", "attempt")
-	terminal := s.qPipelinePlan(descriptor.terminal)
+	terminal := descriptor.terminalPlan
 	if terminal.kind == qPipelineInvalid {
 		recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "fallback", "unsupported_runtime_shape")
 		return nil, false, nil
 	}
+	s.rememberQPipelinePlan(descriptor.terminal, terminal)
 	for _, assignment := range descriptor.assignments {
-		value, err := s.evalCachedOrString(assignment.rhs, assignment.valueExpr)
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
 		if err != nil {
 			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
 			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr)
+			if err != nil {
+				recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+				return nil, true, err
+			}
 		}
 		s.env[s.resolveAssignmentName(assignment.name)] = value
 	}

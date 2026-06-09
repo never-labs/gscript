@@ -52,6 +52,24 @@ func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
 	return plan
 }
 
+func (s *EvalState) rememberQPipelinePlan(src string, plan qPipelinePlan) {
+	src = strings.TrimSpace(src)
+	if src == "" || plan.kind == qPipelineInvalid {
+		return
+	}
+	if s.pipelineCache != nil {
+		if _, ok := s.pipelineCache[src]; ok {
+			return
+		}
+	}
+	if s.pipelineCache == nil {
+		s.pipelineCache = make(map[string]qPipelinePlan, 32)
+	} else if len(s.pipelineCache) >= 512 {
+		s.pipelineCache = make(map[string]qPipelinePlan, 32)
+	}
+	s.pipelineCache[src] = plan
+}
+
 func qPipelinePlanCandidate(src string) bool {
 	if strings.HasPrefix(src, "+/") {
 		return true
