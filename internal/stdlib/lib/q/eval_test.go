@@ -2746,6 +2746,11 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 		data.NewF64([]float64{220, 280}),
 		data.NewF64([]float64{490, 640}),
 	})
+	assertEvalArray(t, "inv 2 2#1 0 0 1", data.KindAny, []any{
+		data.NewF64([]float64{1, 0}),
+		data.NewF64([]float64{0, 1}),
+	})
+	assertEvalErrorContains(t, "inv 2 2#1 2 2 4", "non-singular")
 	assertEvalArray(t, "take 3 `AAPL", data.KindSymbol, []any{data.Symbol("AAPL"), data.Symbol("AAPL"), data.Symbol("AAPL")})
 	assertEvalValue(t, `take 5 "ab"`, "ababa")
 	assertEvalValue(t, `take -5 "ab"`, "babab")

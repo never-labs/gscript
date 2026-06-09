@@ -6899,4 +6899,23 @@ func TestMatrixReshapeTransposeAndMultiply(t *testing.T) {
 	if got, ok := pm.Cell(1, 1); !ok || got != 640.0 {
 		t.Fatalf("product cell 1,1 = %#v ok %v, want 640", got, ok)
 	}
+
+	inverse, err := MatrixInverseNumeric(matrixArray{
+		shape: []int{2, 2},
+		data:  NewF64([]float64{4, 7, 2, 6}),
+	})
+	if err != nil {
+		t.Fatalf("MatrixInverseNumeric returned error: %v", err)
+	}
+	im := inverse.(Matrix)
+	want := []float64{0.6, -0.7, -0.2, 0.4}
+	for i, expected := range want {
+		got, ok := im.Cell(i/2, i%2)
+		if !ok {
+			t.Fatalf("inverse cell %d missing", i)
+		}
+		if math.Abs(got.(float64)-expected) > 1e-12 {
+			t.Fatalf("inverse cell %d = %v, want %v", i, got, expected)
+		}
+	}
 }

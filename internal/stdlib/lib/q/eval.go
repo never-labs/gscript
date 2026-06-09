@@ -851,7 +851,15 @@ func buildQScriptPlan(src string) qScriptPlan {
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		stmt := qScriptStatement{src: part}
-		if name, rhs, ok := splitTopLevelAssignment(part); ok {
+		if name, op, rhs, ok := splitTopLevelAugmentedAssignment(part); ok {
+			stmt.assign = name
+			stmt.rhs = name + op + rhs
+			stmt.valueExpr = parseCachedValueExpr(stmt.rhs)
+			stmt.bindingPlan = buildQScriptWarmBindingPlan(stmt.rhs, stmt.valueExpr)
+			if _, _, ok := parseDeferredScan(stmt.rhs); ok {
+				deferScanCandidates = true
+			}
+		} else if name, rhs, ok := splitTopLevelAssignment(part); ok {
 			stmt.assign = name
 			stmt.rhs = rhs
 			stmt.valueExpr = parseCachedValueExpr(rhs)
@@ -2286,6 +2294,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"signum ", signumValue},
 		{"floor ", floorValue},
 		{"ceiling ", ceilingValue},
+		{"inv ", matrixInverseValue},
 		{"sums ", sums},
 		{"prds ", prds},
 		{"mins ", mins},
@@ -3445,6 +3454,27 @@ func splitTopLevelAssignment(src string) (string, string, bool) {
 	}
 	rhs := strings.TrimSpace(src[colon+1:])
 	return name, rhs, rhs != ""
+}
+
+func splitTopLevelAugmentedAssignment(src string) (string, string, string, bool) {
+	colon := findTopLevel(src, ":")
+	if colon <= 0 {
+		return "", "", "", false
+	}
+	left := strings.TrimSpace(src[:colon])
+	if len(left) < 2 {
+		return "", "", "", false
+	}
+	op := left[len(left)-1:]
+	if !strings.Contains("+-*%^&|", op) {
+		return "", "", "", false
+	}
+	name := strings.TrimSpace(left[:len(left)-1])
+	if !isQAssignmentName(name) {
+		return "", "", "", false
+	}
+	rhs := strings.TrimSpace(src[colon+1:])
+	return name, op, rhs, rhs != ""
 }
 
 func expandScriptVars(src string, vars map[string]any) string {
@@ -6119,6 +6149,8 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return floorValue, true
 	case "ceiling":
 		return ceilingValue, true
+	case "inv":
+		return matrixInverseValue, true
 	case "sum":
 		return sum, true
 	case "sums":
@@ -8876,6 +8908,17 @@ func matrixMultiplyValue(left, right any) (any, error) {
 		return nil, fmt.Errorf("mmu right operand must be a matrix")
 	}
 	return data.MatrixMultiplyNumeric(leftMatrix, rightMatrix)
+}
+
+func matrixInverseValue(value any) (any, error) {
+	matrix, ok, err := qMatrixValue(value)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("inv operand must be a matrix")
+	}
+	return data.MatrixInverseNumeric(matrix)
 }
 
 func qReshapeShape(value any) ([]int, error) {

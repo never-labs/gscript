@@ -1,6 +1,9 @@
 package data
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Matrix is the runtime representation for rectangular list-of-lists values.
 // It deliberately remains an Array: q sees a matrix as a list of rows, while
@@ -115,6 +118,81 @@ func MatrixMultiplyNumeric(left, right Matrix) (Array, error) {
 		}
 	}
 	return matrixArray{shape: []int{leftShape[0], rightShape[1]}, data: NewF64(out)}, nil
+}
+
+// MatrixInverseNumeric inverts a numeric square matrix with Gauss-Jordan
+// elimination. It is intentionally centralized here so future typed kernels can
+// replace the implementation without changing q eval semantics.
+func MatrixInverseNumeric(matrix Matrix) (Array, error) {
+	if matrix == nil {
+		return nil, fmt.Errorf("matrix inverse expects a matrix")
+	}
+	shape := matrix.Shape()
+	if len(shape) != 2 {
+		return nil, fmt.Errorf("matrix inverse expects a two-dimensional matrix")
+	}
+	n := shape[0]
+	if n != shape[1] {
+		return nil, fmt.Errorf("matrix inverse expects a square matrix, got %dx%d", shape[0], shape[1])
+	}
+	if n == 0 {
+		return matrixArray{shape: []int{0, 0}, data: NewF64(nil)}, nil
+	}
+	aug := make([]float64, n*2*n)
+	for row := 0; row < n; row++ {
+		for col := 0; col < n; col++ {
+			value, ok := matrix.Cell(row, col)
+			if !ok {
+				return nil, fmt.Errorf("matrix inverse cell %d,%d out of range", row, col)
+			}
+			num, ok := numeric(value)
+			if !ok {
+				return nil, fmt.Errorf("matrix inverse expects numeric cells")
+			}
+			aug[row*2*n+col] = num
+		}
+		aug[row*2*n+n+row] = 1
+	}
+	for col := 0; col < n; col++ {
+		pivotRow := col
+		pivotAbs := math.Abs(aug[pivotRow*2*n+col])
+		for row := col + 1; row < n; row++ {
+			candidate := math.Abs(aug[row*2*n+col])
+			if candidate > pivotAbs {
+				pivotAbs = candidate
+				pivotRow = row
+			}
+		}
+		if pivotAbs == 0 {
+			return nil, fmt.Errorf("matrix inverse expects a non-singular matrix")
+		}
+		if pivotRow != col {
+			for j := 0; j < 2*n; j++ {
+				aug[col*2*n+j], aug[pivotRow*2*n+j] = aug[pivotRow*2*n+j], aug[col*2*n+j]
+			}
+		}
+		pivot := aug[col*2*n+col]
+		for j := 0; j < 2*n; j++ {
+			aug[col*2*n+j] /= pivot
+		}
+		for row := 0; row < n; row++ {
+			if row == col {
+				continue
+			}
+			factor := aug[row*2*n+col]
+			if factor == 0 {
+				continue
+			}
+			for j := 0; j < 2*n; j++ {
+				aug[row*2*n+j] -= factor * aug[col*2*n+j]
+			}
+		}
+	}
+	out := make([]float64, n*n)
+	for row := 0; row < n; row++ {
+		copy(out[row*n:(row+1)*n], aug[row*2*n+n:row*2*n+2*n])
+	}
+	return matrixArray{shape: []int{n, n}, data: NewF64(out)}, nil
 }
 
 func (m matrixArray) Kind() Kind { return KindAny }
