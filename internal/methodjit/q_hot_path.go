@@ -174,39 +174,42 @@ type QKernelExecutionRouteSummaryJSONRow struct {
 }
 
 type qEvalHotPlan struct {
-	Kernel         string
-	Shape          string
-	PipelineShape  string
-	ShapeFamily    string
-	ShapeReducer   string
-	ShapeSelector  string
-	ShapeTransform string
-	Backend        string
-	Detail         string
-	Kind           string
-	Terminal       string
-	AssignmentText string
-	ValueExpr      string
-	ValueBinding   string
-	IndexExpr      string
-	IndexBinding   string
-	MaskExpr       string
-	MaskBinding    string
-	RowValueExpr   string
-	RowIndexExpr   string
-	ColIndexExpr   string
-	CallableExpr   string
-	DyadicOp       string
-	ScalarExpr     string
-	ScalarLeft     bool
-	LeftExpr       string
-	RightExpr      string
-	CompareOp      string
-	ComparePrefix  string
-	ModExpr        string
-	ModulusExpr    string
-	ModTargetExpr  string
-	ReductionInput string
+	Kernel                 string
+	Shape                  string
+	PipelineShape          string
+	ShapeFamily            string
+	ShapeReducer           string
+	ShapeSelector          string
+	ShapeTransform         string
+	Backend                string
+	Detail                 string
+	Kind                   string
+	Terminal               string
+	AssignmentText         string
+	ValueExpr              string
+	ValueBinding           string
+	IndexExpr              string
+	IndexBinding           string
+	MaskExpr               string
+	MaskBinding            string
+	RowValueExpr           string
+	RowIndexExpr           string
+	ColIndexExpr           string
+	CallableExpr           string
+	DyadicOp               string
+	ScalarExpr             string
+	ScalarLeft             bool
+	SequenceValueExpr      string
+	SequenceTransformChain string
+	SequenceTransformNames string
+	LeftExpr               string
+	RightExpr              string
+	CompareOp              string
+	ComparePrefix          string
+	ModExpr                string
+	ModulusExpr            string
+	ModTargetExpr          string
+	ReductionInput         string
 }
 
 // QKernelShapeSummary is a source-stable row for joining MethodJIT q kernel

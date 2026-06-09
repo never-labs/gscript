@@ -5938,6 +5938,20 @@ func TestQEvalPipelinePlannerCopiesFusedDescriptorFields(t *testing.T) {
 		t.Fatalf("dyadic descriptor = %+v, want fused dyadic-float fields", dyadic)
 	}
 
+	chain, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("x:til 16;y:reverse x;z:5 rotate y;w:2 10 sublist z;(+/w)+first w+last w")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize sequence transform chain script pipeline")
+	}
+	if chain.Kind != "script" ||
+		chain.Shape != "script-pipeline/sequence-edge-reduce/sum-first-last-transform-chain/assignments" ||
+		chain.ValueExpr != "w" ||
+		chain.SequenceValueExpr != "x" ||
+		chain.SequenceTransformChain != "reverse|rotate:5|sublist:2,10" ||
+		chain.SequenceTransformNames != "y\x1fz\x1fw" ||
+		chain.ShapeTransform != "reverse.rotate.sublist" {
+		t.Fatalf("sequence chain descriptor = %+v, want stable transform-chain fields", chain)
+	}
+
 	matrix, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("m:2 4#til 8;row:m . 1;(+/row)+count row")
 	if !ok {
 		t.Fatalf("DescribeQEvalPipeline did not recognize matrix row script pipeline")
@@ -6002,6 +6016,7 @@ func TestQEvalPipelineRuntimeBackendExecutesDescriptorPlanRef(t *testing.T) {
 		{name: "bin_reduce_sum", src: "+/til 8 bin til 8", want: 28},
 		{name: "modulo_where_count", src: "count where (til 64 mod 4)=1", want: 16},
 		{name: "script_modulo_gather_reduce", src: "x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]", want: 512},
+		{name: "script_sequence_transform_chain_edge", src: "x:til 16;y:reverse x;z:5 rotate y;w:2 10 sublist z;(+/w)+first w+last w", want: 74},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline(tc.src)
@@ -6009,28 +6024,31 @@ func TestQEvalPipelineRuntimeBackendExecutesDescriptorPlanRef(t *testing.T) {
 				t.Fatalf("DescribeQEvalPipeline(%q) did not recognize pipeline", tc.src)
 			}
 			plan := qEvalHotPlan{
-				Kernel:         descriptor.Kernel,
-				Shape:          descriptor.Shape,
-				PipelineShape:  descriptor.PipelineShape,
-				Backend:        descriptor.Backend,
-				Detail:         descriptor.Detail,
-				Kind:           descriptor.Kind,
-				Terminal:       descriptor.Terminal,
-				AssignmentText: descriptor.AssignmentText,
-				ValueExpr:      descriptor.ValueExpr,
-				ValueBinding:   descriptor.ValueBinding,
-				IndexExpr:      descriptor.IndexExpr,
-				IndexBinding:   descriptor.IndexBinding,
-				MaskExpr:       descriptor.MaskExpr,
-				MaskBinding:    descriptor.MaskBinding,
-				LeftExpr:       descriptor.LeftExpr,
-				RightExpr:      descriptor.RightExpr,
-				CompareOp:      descriptor.CompareOp,
-				ComparePrefix:  descriptor.ComparePrefix,
-				ModExpr:        descriptor.ModExpr,
-				ModulusExpr:    descriptor.ModulusExpr,
-				ModTargetExpr:  descriptor.ModTargetExpr,
-				ReductionInput: descriptor.ReductionInput,
+				Kernel:                 descriptor.Kernel,
+				Shape:                  descriptor.Shape,
+				PipelineShape:          descriptor.PipelineShape,
+				Backend:                descriptor.Backend,
+				Detail:                 descriptor.Detail,
+				Kind:                   descriptor.Kind,
+				Terminal:               descriptor.Terminal,
+				AssignmentText:         descriptor.AssignmentText,
+				ValueExpr:              descriptor.ValueExpr,
+				ValueBinding:           descriptor.ValueBinding,
+				IndexExpr:              descriptor.IndexExpr,
+				IndexBinding:           descriptor.IndexBinding,
+				MaskExpr:               descriptor.MaskExpr,
+				MaskBinding:            descriptor.MaskBinding,
+				SequenceValueExpr:      descriptor.SequenceValueExpr,
+				SequenceTransformChain: descriptor.SequenceTransformChain,
+				SequenceTransformNames: descriptor.SequenceTransformNames,
+				LeftExpr:               descriptor.LeftExpr,
+				RightExpr:              descriptor.RightExpr,
+				CompareOp:              descriptor.CompareOp,
+				ComparePrefix:          descriptor.ComparePrefix,
+				ModExpr:                descriptor.ModExpr,
+				ModulusExpr:            descriptor.ModulusExpr,
+				ModTargetExpr:          descriptor.ModTargetExpr,
+				ReductionInput:         descriptor.ReductionInput,
 			}
 			fn := &Function{}
 			ref := fn.addQEvalPipelinePlan("not a q pipeline", plan)

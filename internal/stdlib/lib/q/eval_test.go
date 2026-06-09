@@ -699,12 +699,24 @@ func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
 	if d.valueExpr != "y" || d.valueBinding != "128 sublist reverse r" {
 		t.Fatalf("value descriptor = expr %q binding %q, want y/128 sublist reverse r", d.valueExpr, d.valueBinding)
 	}
-	if got, want := d.shape(), "script-pipeline/sequence-edge-reduce/sum-first-last/assignments"; got != want {
+	if d.sequenceValueExpr != "x" ||
+		qScriptPipelineSequenceTransformName(d.sequenceSteps) != "rotate.reverse.sublist" ||
+		encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps) != "rotate:17|reverse|sublist:128" ||
+		encodeQScriptPipelineNames(d.sequenceBindings) != "r\x1fy" {
+		t.Fatalf("sequence chain descriptor = base %q steps %#v names %#v", d.sequenceValueExpr, d.sequenceSteps, d.sequenceBindings)
+	}
+	if got, want := d.shape(), "script-pipeline/sequence-edge-reduce/sum-first-last-transform-chain/assignments"; got != want {
 		t.Fatalf("shape = %q, want %q", got, want)
 	}
 	descriptor, ok := DescribeEvalPipeline(src)
 	if !ok {
 		t.Fatalf("DescribeEvalPipeline(%q) did not recognize sequence edge pipeline", src)
+	}
+	if descriptor.SequenceValueExpr != "x" ||
+		descriptor.SequenceTransformChain != "rotate:17|reverse|sublist:128" ||
+		descriptor.SequenceTransformNames != "r\x1fy" ||
+		descriptor.ShapeTransform != "rotate.reverse.sublist" {
+		t.Fatalf("eval descriptor sequence chain = %#v", descriptor)
 	}
 	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
 	if err != nil || !handled || out != int64(108513) {
@@ -4676,10 +4688,10 @@ func TestEvalSequenceCompositeReducerAddChainStats(t *testing.T) {
 		if stat.Outcome == "fallback" || stat.Outcome == "error" {
 			t.Fatalf("unexpected sequence composite fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
 		}
-		if stat.Kernel == "QScriptPipelinePlan" && stat.Shape == "script-pipeline/sequence-edge-reduce/sum-first-last/assignments" && stat.Outcome == "hit" {
+		if stat.Kernel == "QScriptPipelinePlan" && stat.Shape == "script-pipeline/sequence-edge-reduce/sum-first-last-transform-chain/assignments" && stat.Outcome == "hit" {
 			seenPipeline = true
 		}
-		if stat.Kernel == "SequenceEdgeReduce" && stat.Shape == "vector-reduce/sum-first-last/i64" && stat.Outcome == "hit" {
+		if stat.Kernel == "SequenceTransformChainEdgeReduce" && stat.Shape == "vector-transform-chain/sum-first-last/rotate.reverse.sublist/i64" && stat.Outcome == "hit" {
 			seenComposite = true
 		}
 		if stat.Kernel == "ArraySum" && stat.Shape == "vector-reduce/sum/i64" && stat.Outcome == "hit" {
