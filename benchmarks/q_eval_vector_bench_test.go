@@ -1343,6 +1343,7 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 	cases = appendQEvalExpressionCombinationCases(cases)
 	cases = appendQEvalOrdinaryExpressionCoverageCases(cases)
 	cases = appendQEvalTaskDListMathMatrixApplyIndexCases(cases)
+	cases = appendQEvalTaskDSemanticEnvelopeCases(cases)
 	cases = appendQEvalSupportedExpressionBreadthCases(cases)
 	return appendQEvalSemanticCoverageCases(cases)
 }
@@ -3215,6 +3216,200 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 				}
 				qEvalVectorAnyBenchSink = values
 				return values[100] + values[200] + values[300] + int64(len(values))
+			},
+		},
+	}
+	return append(cases, taskD...)
+}
+
+func appendQEvalTaskDSemanticEnvelopeCases(cases []qEvalVectorCase) []qEvalVectorCase {
+	taskD := []qEvalVectorCase{
+		{
+			name:   "TaskDMathScalarVectorMixedEnvelope",
+			tags:   []string{"math-transcendental", "numeric-monad", "numeric-vector", "sum"},
+			matrix: []string{"math:transcendental-vector:hot", "numeric-arithmetic:float-vector:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(+/sqrt x)+log %d", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				for i := 1; i <= rows; i++ {
+					total += math.Sqrt(float64(i))
+				}
+				total += math.Log(float64(rows))
+				qEvalVectorFloatBenchSink = total
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDMathTrigWhereEnvelope",
+			tags:   []string{"math-transcendental", "numeric-monad", "where", "sum"},
+			matrix: []string{"math:transcendental-vector:hot", "compare:int-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:(til %d) mod 12;(+/sin x)+count where x<6", rows)
+			},
+			goFn: func(rows int) int64 {
+				var total float64
+				var count int64
+				for i := 0; i < rows; i++ {
+					x := i % 12
+					total += math.Sin(float64(x))
+					if x < 6 {
+						count++
+					}
+				}
+				qEvalVectorFloatBenchSink = total
+				return int64(total) + count
+			},
+		},
+		{
+			name:   "TaskDAggregateStatsEnvelope",
+			tags:   []string{"sum", "avg-var-dev-med", "min-max", "weighted-aggregate"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector", "aggregate:wavg-xprev:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(+/x)+(avg x)+(med x)+(var x)+(dev x)+(wavg[x;x])", rows)
+			},
+			goFn: func(rows int) int64 {
+				var sum, sumSquares float64
+				for i := 1; i <= rows; i++ {
+					x := float64(i)
+					sum += x
+					sumSquares += x * x
+				}
+				avg := sum / float64(rows)
+				med := float64(rows+1) / 2
+				variance := sumSquares/float64(rows) - avg*avg
+				dev := math.Sqrt(variance)
+				wavg := sumSquares / sum
+				total := sum + avg + med + variance + dev + wavg
+				qEvalVectorFloatBenchSink = total
+				return int64(total)
+			},
+		},
+		{
+			name:   "TaskDWindowScanEnvelope",
+			tags:   []string{"sums", "adverb-each-prior", "moving-window", "sum"},
+			matrix: []string{"aggregate:running-prd-min-max-avg:vector", "membership:in-differ-ratios:vector"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:1+til %d;(+/sums x)+(+/deltas x)+(+/ratios x)+(+/32 msum x)+(+/32 mavg x)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var running, sumsTotal, deltasTotal, msumTotal int64
+				var ratiosTotal, mavgTotal float64
+				var prev int64
+				for i := 1; i <= rows; i++ {
+					x := int64(i)
+					running += x
+					sumsTotal += running
+					if i == 1 {
+						deltasTotal += x
+					} else {
+						deltasTotal++
+						ratiosTotal += float64(x) / float64(prev)
+					}
+					prev = x
+					start := i - 31
+					if start < 1 {
+						start = 1
+					}
+					var window int64
+					for j := start; j <= i; j++ {
+						window += int64(j)
+					}
+					msumTotal += window
+					mavgTotal += float64(window) / float64(i-start+1)
+				}
+				qEvalVectorFloatBenchSink = ratiosTotal + mavgTotal
+				return sumsTotal + deltasTotal + int64(ratiosTotal) + 1 + msumTotal + int64(mavgTotal)
+			},
+		},
+		{
+			name:   "TaskDApplyAtGatherWindowEnvelope",
+			tags:   []string{"apply-index", "where", "projection", "sum"},
+			matrix: []string{"apply-index:list-dict-callable:hot", "compare:int-vector:where"},
+			shapes: []string{"index:gather-after-where:row-scaled"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("x:til %d;idx:where (x mod 64)<4;y:x@idx;(+/y)+(x@(%d-1))+count y", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var total, count int64
+				for i := 0; i < rows; i++ {
+					if i%64 < 4 {
+						total += int64(i)
+						count++
+					}
+				}
+				return total + int64(rows-1) + count
+			},
+		},
+		{
+			name:   "TaskDListDotDictLookupEnvelope",
+			tags:   []string{"apply-index", "dict", "projection", "sum"},
+			matrix: []string{"apply-index:list-dict-callable:hot", "dict:lookup-amend-upsert:symbol-key"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("d:`px`qty!(til %d;1+til %d);px:d`px;qty:d`qty;(+/px)+(+/qty)+(px . 10)", rows, rows)
+			},
+			goFn: func(rows int) int64 {
+				var px, qty int64
+				for i := 0; i < rows; i++ {
+					px += int64(i)
+					qty += int64(i + 1)
+				}
+				return px + qty + 10
+			},
+		},
+		{
+			name:   "TaskDReshapeFlipProbeEnvelope",
+			tags:   []string{"matrix-reshape", "apply-index", "sum"},
+			matrix: []string{"matrix:reshape-flip:vector", "apply-index:list-dict-callable:hot"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("m:4 %d#til %d;t:flip m;(m . 1 3)+count t", rows/4, rows)
+			},
+			goFn: func(rows int) int64 {
+				cols := rows / 4
+				cell := qEvalVectorGoBaselineMatrixCellProbe(2, cols, 3, qEvalVectorGoBaselineInput) - 2
+				return cell + int64(cols)
+			},
+		},
+		{
+			name:   "TaskDStringLowerUpperLikeEnvelope",
+			tags:   []string{"string", "match-like", "symbol", "where"},
+			matrix: []string{"compare:string-vector:where", "compare:symbol-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("s:%d#`aapl`MSFT`amd`NVDA;u:upper string s;l:lower string s;(count where u like \"A*\")+(count where l like \"m*\")+(count u)+(count l)", rows)
+			},
+			goFn: func(rows int) int64 {
+				var aHits, mHits int64
+				values := []string{"aapl", "MSFT", "amd", "NVDA"}
+				for i := 0; i < rows; i++ {
+					upper := strings.ToUpper(values[i%len(values)])
+					lower := strings.ToLower(values[i%len(values)])
+					if strings.HasPrefix(upper, "A") {
+						aHits++
+					}
+					if strings.HasPrefix(lower, "m") {
+						mHits++
+					}
+				}
+				return aHits + mHits + int64(rows*2)
+			},
+		},
+		{
+			name:   "TaskDSymbolGroupSortEnvelope",
+			tags:   []string{"symbol", "group", "table-sort", "sum"},
+			matrix: []string{"sort:symbol-vector:index-rank", "compare:symbol-vector:where"},
+			expr: func(rows int) string {
+				return fmt.Sprintf("s:%d#`MSFT`AAPL`NVDA`AAPL`AMD;(+/iasc s)+(+/rank s)+(count group s)", rows)
+			},
+			goFn: func(rows int) int64 {
+				values := []string{"MSFT", "AAPL", "NVDA", "AAPL", "AMD"}
+				repeated := make([]string, rows)
+				for i := 0; i < rows; i++ {
+					repeated[i] = values[i%len(values)]
+				}
+				iasc := sortedIndexStringForQEvalVectorGoBaseline(repeated, true)
+				rank := rankStringForQEvalVectorGoBaseline(repeated)
+				return sumIntSliceForQEvalVectorGoBaseline(iasc) + sumIntSliceForQEvalVectorGoBaseline(rank) + 4
 			},
 		},
 	}
