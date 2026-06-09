@@ -440,7 +440,7 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 			if err != nil || !handled {
 				t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v", out, handled, err)
 			}
-			if !reflect.DeepEqual(out, tt.want) {
+			if !qEvalPipelineTestValueEqual(out, tt.want) {
 				t.Fatalf("ExecuteEvalPipelineDescriptor output = %#v, want %#v", out, tt.want)
 			}
 
