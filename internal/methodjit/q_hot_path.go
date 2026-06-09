@@ -199,6 +199,7 @@ type qEvalHotPlan struct {
 	DyadicOp               string
 	ScalarExpr             string
 	ScalarLeft             bool
+	IncludeCount           bool
 	SequenceValueExpr      string
 	SequenceTransformChain string
 	SequenceTransformNames string

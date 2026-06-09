@@ -541,6 +541,9 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineMatrixRowSumCount
 	case strings.Contains(shape, "matrix-cell-reduce/cell-plus-count"):
 		out.kind = qScriptPipelineMatrixCellPlusCount
+	case strings.Contains(shape, "callable-dot/sum-plus-count-right"):
+		out.kind = qScriptPipelineCallableDotSumCount
+		out.includeCount = true
 	case strings.Contains(shape, "callable-dot/sum-plus-right"):
 		out.kind = qScriptPipelineCallableDotSumRight
 	case strings.Contains(shape, "apply-index/scalar-at"):

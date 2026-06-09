@@ -41,6 +41,7 @@ type QEvalPipelineDescriptor struct {
 	DyadicOp               string
 	ScalarExpr             string
 	ScalarLeft             bool
+	IncludeCount           bool
 	SequenceValueExpr      string
 	SequenceTransformChain string
 	SequenceTransformNames string
@@ -101,6 +102,7 @@ func (p qEvalPipelineBackendPlan) methodDescriptor() QEvalPipelineDescriptor {
 		DyadicOp:               descriptor.DyadicOp,
 		ScalarExpr:             descriptor.ScalarExpr,
 		ScalarLeft:             descriptor.ScalarLeft,
+		IncludeCount:           descriptor.IncludeCount,
 		SequenceValueExpr:      descriptor.SequenceValueExpr,
 		SequenceTransformChain: descriptor.SequenceTransformChain,
 		SequenceTransformNames: descriptor.SequenceTransformNames,
@@ -165,6 +167,7 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		DyadicOp:               descriptor.DyadicOp,
 		ScalarExpr:             descriptor.ScalarExpr,
 		ScalarLeft:             descriptor.ScalarLeft,
+		IncludeCount:           descriptor.IncludeCount,
 		SequenceValueExpr:      descriptor.SequenceValueExpr,
 		SequenceTransformChain: descriptor.SequenceTransformChain,
 		SequenceTransformNames: descriptor.SequenceTransformNames,

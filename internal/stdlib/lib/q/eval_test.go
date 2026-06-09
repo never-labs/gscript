@@ -935,6 +935,36 @@ func TestQScriptPipelinePlannerDescribesCallableDotSumPlusRight(t *testing.T) {
 	assertEvalValue(t, src, int64(38))
 }
 
+func TestQScriptPipelinePlannerDescribesCallableDotSumPlusCount(t *testing.T) {
+	src := "f:{(+/x)+count y};.[f;(til 8;10#1)]"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineCallableDotSumCount {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineCallableDotSumCount)
+	}
+	if d.callableExpr != "f" || d.valueExpr != "til 8" || d.indexExpr != "10#1" || !d.includeCount {
+		t.Fatalf("callable descriptor = callable %q value %q index %q includeCount=%v", d.callableExpr, d.valueExpr, d.indexExpr, d.includeCount)
+	}
+	if got, want := d.shape(), "script-pipeline/callable-dot/sum-plus-count-right/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize callable dot count pipeline", src)
+	}
+	if descriptor.CallableExpr != "f" || descriptor.ValueExpr != "til 8" || descriptor.IndexExpr != "10#1" || !descriptor.IncludeCount {
+		t.Fatalf("descriptor = %#v, want callable f value til 8 index 10#1 includeCount", descriptor)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(38) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor callable dot count = %#v,%v,%v; want 38,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(38))
+}
+
 func TestQScriptPipelinePlannerRecordsRuntimeStats(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

@@ -5986,6 +5986,19 @@ func TestQEvalPipelinePlannerCopiesFusedDescriptorFields(t *testing.T) {
 		callable.IndexExpr != "10" {
 		t.Fatalf("callable descriptor = %+v, want callable-dot fields", callable)
 	}
+
+	callableCount, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline("f:{(+/x)+count y};.[f;(til 8;10#1)]")
+	if !ok {
+		t.Fatalf("DescribeQEvalPipeline did not recognize callable-dot count script pipeline")
+	}
+	if callableCount.Kind != "script" ||
+		callableCount.Shape != "script-pipeline/callable-dot/sum-plus-count-right/assignments" ||
+		callableCount.CallableExpr != "f" ||
+		callableCount.ValueExpr != "til 8" ||
+		callableCount.IndexExpr != "10#1" ||
+		!callableCount.IncludeCount {
+		t.Fatalf("callable count descriptor = %+v, want callable-dot count fields", callableCount)
+	}
 }
 
 func TestQEvalPipelineRuntimeBackendExecutesTypedPlanRef(t *testing.T) {

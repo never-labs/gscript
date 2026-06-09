@@ -31,6 +31,8 @@ func TestQApplyIndexCoreSemantics(t *testing.T) {
 		assertEvalValue(t, ".[{[a;b] a + b};(2;3)]", int64(5))
 		assertEvalValue(t, ".[{42};()]", int64(42))
 		assertEvalValue(t, "f:{(+/x)+y};.[f;(til 8;10)]", int64(38))
+		assertEvalValue(t, "f:{(+/x)+count y};.[f;(til 8;10#1)]", int64(38))
+		assertEvalValue(t, "f:{count y+(+/x)};.[f;(til 8;10#1)]", int64(38))
 		assertEvalValue(t, "f:{[xs;n]sum xs+n};.[f;(til 8;10)]", int64(38))
 		assertEvalValue(t, "f:{y+(+/x)};.[f;(til 8;10)]", int64(38))
 		assertEvalValue(t, "a:10;f:{x+a};a:20;.[f;(1)]", int64(11))
@@ -69,6 +71,29 @@ func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 	if !seenRowSumCount && (!seenRowIndex || !seenRowSum) {
 		t.Fatalf("missing matrix row typed runtime stats: rowIndex=%v rowSum=%v rowSumCount=%v stats=%#v", seenRowIndex, seenRowSum, seenRowSumCount, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestQDotApplyCallableSumPlusCountRecordsTypedRuntimeKernel(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "f:{(+/x)+count y};.[f;(til 8;10#1)]", int64(38))
+
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "CallableDotSumPlusCount" && (stat.Outcome == "fallback" || stat.Outcome == "error") {
+			t.Fatalf("unexpected callable dot fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "CallableDotSumPlusCount" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" {
+			seen = true
+			if stat.PipelineShape != "apply_index" {
+				t.Fatalf("callable dot pipeline shape = %q, want apply_index; stat=%#v", stat.PipelineShape, stat)
+			}
+		}
+	}
+	if !seen {
+		t.Fatalf("missing CallableDotSumPlusCount hit: %#v", RuntimeKernelExecutionStats())
 	}
 }
 

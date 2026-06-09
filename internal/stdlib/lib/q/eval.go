@@ -37,6 +37,7 @@ const (
 	qLambdaFastInvalid qLambdaFastKind = iota
 	qLambdaFastDyadic
 	qLambdaFastSumPlusRight
+	qLambdaFastSumPlusCountRight
 )
 
 type qLambdaFastPlan struct {
@@ -476,7 +477,7 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "gather"
 	case strings.HasPrefix(shape, "matrix-row/"):
 		return "matrix_row_index"
-	case strings.HasPrefix(shape, "scalar-index/"), strings.HasPrefix(shape, "apply-index/"):
+	case strings.HasPrefix(shape, "scalar-index/"), strings.HasPrefix(shape, "apply-index/"), strings.HasPrefix(shape, "callable-dot/"):
 		return "apply_index"
 	case strings.HasPrefix(shape, "and/"), strings.HasPrefix(shape, "or/"):
 		return "mask_combine"
@@ -7497,6 +7498,8 @@ func (s *EvalState) applyLambda2(fn qLambda, left, right any) (any, error) {
 				return nil, err
 			}
 			return applyDyadic('+', sumValue, right)
+		case qLambdaFastSumPlusCountRight:
+			return qLambdaFastSumPlusCountRightValue(left, right)
 		}
 	}
 	return s.applyLambda(fn, []any{left, right})
@@ -7513,6 +7516,9 @@ func qLambdaFastPlanFor(src string) (qLambdaFastPlan, bool) {
 	}
 	if qLambdaFastSumPlusParam(body, params[0], params[1]) {
 		return qLambdaFastPlan{kind: qLambdaFastSumPlusRight}, true
+	}
+	if qLambdaFastSumPlusCountParam(body, params[0], params[1]) {
+		return qLambdaFastPlan{kind: qLambdaFastSumPlusCountRight}, true
 	}
 	return qLambdaFastPlan{}, false
 }
@@ -7558,6 +7564,17 @@ func qLambdaFastSumPlusParam(body, sumParam, rightParam string) bool {
 		(qLambdaFastSumTerm(right, sumParam) && left == rightParam)
 }
 
+func qLambdaFastSumPlusCountParam(body, sumParam, rightParam string) bool {
+	left, right, ok := splitTopLevelOperator(body, "+")
+	if !ok {
+		return false
+	}
+	left = stripEnclosingParens(left)
+	right = stripEnclosingParens(right)
+	return (qLambdaFastSumTerm(left, sumParam) && qLambdaFastCountTerm(right, rightParam)) ||
+		(qLambdaFastSumTerm(right, sumParam) && qLambdaFastCountTerm(left, rightParam))
+}
+
 func qLambdaFastSumTerm(src, param string) bool {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	if strings.HasPrefix(src, "+/") {
@@ -7567,6 +7584,49 @@ func qLambdaFastSumTerm(src, param string) bool {
 		return stripEnclosingParens(strings.TrimSpace(src[len("sum"):])) == param
 	}
 	return false
+}
+
+func qLambdaFastCountTerm(src, param string) bool {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "#") {
+		return stripEnclosingParens(strings.TrimSpace(src[len("#"):])) == param
+	}
+	if strings.HasPrefix(src, "count") && wordBoundary(src, 0, len("count")) {
+		return stripEnclosingParens(strings.TrimSpace(src[len("count"):])) == param
+	}
+	return false
+}
+
+func qLambdaFastSumPlusCountRightValue(left, right any) (any, error) {
+	leftArray, ok := left.(data.Array)
+	if !ok {
+		sumValue, err := sum(left)
+		if err != nil {
+			return nil, err
+		}
+		countValue, err := count(right)
+		if err != nil {
+			return nil, err
+		}
+		return applyDyadic('+', sumValue, countValue)
+	}
+	countValue, err := count(right)
+	if err != nil {
+		return nil, err
+	}
+	shape := "callable-dot/sum-plus-count/" + string(leftArray.Kind()) + "/" + string(qRuntimeKernelOperandKind(countValue, nil))
+	sumValue, handled, err := data.TryTypedNumericSum(leftArray)
+	sumValue, handled, err = qTypedRuntimeResultReason("CallableDotSumPlusCount", shape, RuntimeFallbackUnsupportedType, sumValue, handled, err)
+	if err != nil {
+		return nil, err
+	}
+	if !handled {
+		sumValue, err = sum(left)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return applyDyadic('+', sumValue, countValue)
 }
 
 func lambdaSignature(src string) ([]string, string, error) {

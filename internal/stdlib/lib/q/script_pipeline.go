@@ -21,6 +21,7 @@ const (
 	qScriptPipelineMatrixRowSumCount    qScriptPipelineKind = "matrix-row-reduce/sum-count"
 	qScriptPipelineMatrixCellPlusCount  qScriptPipelineKind = "matrix-cell-reduce/cell-plus-count"
 	qScriptPipelineCallableDotSumRight  qScriptPipelineKind = "callable-dot/sum-plus-right"
+	qScriptPipelineCallableDotSumCount  qScriptPipelineKind = "callable-dot/sum-plus-count-right"
 	qScriptPipelineApplyScalarAt        qScriptPipelineKind = "apply-index/scalar-at"
 	qScriptPipelineApplyScalarDot       qScriptPipelineKind = "apply-index/scalar-dot"
 	qScriptPipelineApplyPathDot         qScriptPipelineKind = "apply-index/path-dot"
@@ -387,7 +388,7 @@ func qScriptPipelineCallableDotSumPlusRight(src string, bindings map[string]stri
 	}
 	body := strings.TrimSpace(binding[1 : len(binding)-1])
 	fastPlan, ok := qLambdaFastPlanFor(body)
-	if !ok || fastPlan.kind != qLambdaFastSumPlusRight {
+	if !ok || (fastPlan.kind != qLambdaFastSumPlusRight && fastPlan.kind != qLambdaFastSumPlusCountRight) {
 		return qScriptPipelineDescriptor{}, false
 	}
 	leftExpr := strings.TrimSpace(plan.argExprs[0])
@@ -395,14 +396,19 @@ func qScriptPipelineCallableDotSumPlusRight(src string, bindings map[string]stri
 	if leftExpr == "" || rightExpr == "" {
 		return qScriptPipelineDescriptor{}, false
 	}
+	kind := qScriptPipelineCallableDotSumRight
+	if fastPlan.kind == qLambdaFastSumPlusCountRight {
+		kind = qScriptPipelineCallableDotSumCount
+	}
 	return qScriptPipelineDescriptor{
-		kind:            qScriptPipelineCallableDotSumRight,
+		kind:            kind,
 		callableExpr:    callableExpr,
 		callableBinding: binding,
 		valueExpr:       leftExpr,
 		valueBinding:    qScriptPipelineBinding(leftExpr, bindings),
 		indexExpr:       rightExpr,
 		indexBinding:    qScriptPipelineBinding(rightExpr, bindings),
+		includeCount:    fastPlan.kind == qLambdaFastSumPlusCountRight,
 	}, true
 }
 
@@ -902,7 +908,7 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
-	if descriptor.kind == qScriptPipelineCallableDotSumRight {
+	if descriptor.kind == qScriptPipelineCallableDotSumRight || descriptor.kind == qScriptPipelineCallableDotSumCount {
 		out, handled, err := s.evalQScriptCallableDotSumPlusRightPipeline(descriptor)
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
@@ -1273,6 +1279,10 @@ func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScri
 	}
 	if !handled {
 		return nil, false, nil
+	}
+	if descriptor.includeCount {
+		out, err := qLambdaFastSumPlusCountRightValue(left, right)
+		return out, true, err
 	}
 	sumValue, err := sum(left)
 	if err != nil {
