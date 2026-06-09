@@ -54,6 +54,10 @@ type EvalPipelineDescriptor struct {
 	IntegerTerms []EvalPipelineIntegerDivModTerm
 	IncludeCount bool
 
+	SequenceValueExpr      string
+	SequenceTransformChain string
+	SequenceTransformNames string
+
 	LeftExpr       string
 	RightExpr      string
 	CompareOp      string
@@ -290,26 +294,29 @@ func (s *EvalState) executeEvalPipelineDescriptor(descriptor EvalPipelineDescrip
 
 func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) EvalPipelineDescriptor {
 	out := EvalPipelineDescriptor{
-		Source:        source,
-		Kind:          "script",
-		Kernel:        "QScriptPipelinePlan",
-		Shape:         d.shape(),
-		PipelineShape: qRuntimeKernelPipelineShape("QScriptPipelinePlan", d.shape()),
-		Terminal:      d.terminal,
-		ValueExpr:     strings.TrimSpace(d.valueExpr),
-		ValueBinding:  strings.TrimSpace(d.valueBinding),
-		IndexExpr:     strings.TrimSpace(d.indexExpr),
-		IndexBinding:  strings.TrimSpace(d.indexBinding),
-		MaskExpr:      strings.TrimSpace(d.maskExpr),
-		MaskBinding:   strings.TrimSpace(d.maskBinding),
-		RowValueExpr:  strings.TrimSpace(d.rowValueExpr),
-		RowIndexExpr:  strings.TrimSpace(d.rowIndexExpr),
-		ColIndexExpr:  strings.TrimSpace(d.colIndexExpr),
-		CallableExpr:  strings.TrimSpace(d.callableExpr),
-		DyadicOp:      strings.TrimSpace(d.dyadicOp),
-		ScalarExpr:    strings.TrimSpace(d.scalarExpr),
-		ScalarLeft:    d.scalarLeft,
-		IncludeCount:  d.includeCount,
+		Source:                 source,
+		Kind:                   "script",
+		Kernel:                 "QScriptPipelinePlan",
+		Shape:                  d.shape(),
+		PipelineShape:          qRuntimeKernelPipelineShape("QScriptPipelinePlan", d.shape()),
+		Terminal:               d.terminal,
+		ValueExpr:              strings.TrimSpace(d.valueExpr),
+		ValueBinding:           strings.TrimSpace(d.valueBinding),
+		IndexExpr:              strings.TrimSpace(d.indexExpr),
+		IndexBinding:           strings.TrimSpace(d.indexBinding),
+		MaskExpr:               strings.TrimSpace(d.maskExpr),
+		MaskBinding:            strings.TrimSpace(d.maskBinding),
+		RowValueExpr:           strings.TrimSpace(d.rowValueExpr),
+		RowIndexExpr:           strings.TrimSpace(d.rowIndexExpr),
+		ColIndexExpr:           strings.TrimSpace(d.colIndexExpr),
+		CallableExpr:           strings.TrimSpace(d.callableExpr),
+		DyadicOp:               strings.TrimSpace(d.dyadicOp),
+		ScalarExpr:             strings.TrimSpace(d.scalarExpr),
+		ScalarLeft:             d.scalarLeft,
+		SequenceValueExpr:      strings.TrimSpace(d.sequenceValueExpr),
+		SequenceTransformChain: encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps),
+		SequenceTransformNames: encodeQScriptPipelineNames(d.sequenceBindings),
+		IncludeCount:           d.includeCount,
 	}
 	if len(d.integerTerms) > 0 {
 		out.IntegerTerms = make([]EvalPipelineIntegerDivModTerm, 0, len(d.integerTerms))
@@ -318,6 +325,13 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 				Op:         string(term.op),
 				ScalarExpr: strings.TrimSpace(term.scalarExpr),
 			})
+		}
+	}
+	if out.ShapeFamily == "" && d.kind == qScriptPipelineSequenceEdgeSum {
+		out.ShapeFamily = "sequence_edge"
+		out.ShapeReducer = "sum_first_last"
+		if len(d.sequenceSteps) > 0 {
+			out.ShapeTransform = qScriptPipelineSequenceTransformName(d.sequenceSteps)
 		}
 	}
 	if len(d.assignments) > 0 {
@@ -478,22 +492,29 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		return qScriptPipelineDescriptor{}, false
 	}
 	out := qScriptPipelineDescriptor{
-		shapeText:    shape,
-		terminal:     strings.TrimSpace(descriptor.Terminal),
-		valueExpr:    strings.TrimSpace(descriptor.ValueExpr),
-		valueBinding: strings.TrimSpace(descriptor.ValueBinding),
-		indexExpr:    strings.TrimSpace(descriptor.IndexExpr),
-		indexBinding: strings.TrimSpace(descriptor.IndexBinding),
-		maskExpr:     strings.TrimSpace(descriptor.MaskExpr),
-		maskBinding:  strings.TrimSpace(descriptor.MaskBinding),
-		rowValueExpr: strings.TrimSpace(descriptor.RowValueExpr),
-		rowIndexExpr: strings.TrimSpace(descriptor.RowIndexExpr),
-		colIndexExpr: strings.TrimSpace(descriptor.ColIndexExpr),
-		callableExpr: strings.TrimSpace(descriptor.CallableExpr),
-		dyadicOp:     strings.TrimSpace(descriptor.DyadicOp),
-		scalarExpr:   strings.TrimSpace(descriptor.ScalarExpr),
-		scalarLeft:   descriptor.ScalarLeft,
-		includeCount: descriptor.IncludeCount,
+		shapeText:         shape,
+		terminal:          strings.TrimSpace(descriptor.Terminal),
+		valueExpr:         strings.TrimSpace(descriptor.ValueExpr),
+		valueBinding:      strings.TrimSpace(descriptor.ValueBinding),
+		indexExpr:         strings.TrimSpace(descriptor.IndexExpr),
+		indexBinding:      strings.TrimSpace(descriptor.IndexBinding),
+		maskExpr:          strings.TrimSpace(descriptor.MaskExpr),
+		maskBinding:       strings.TrimSpace(descriptor.MaskBinding),
+		rowValueExpr:      strings.TrimSpace(descriptor.RowValueExpr),
+		rowIndexExpr:      strings.TrimSpace(descriptor.RowIndexExpr),
+		colIndexExpr:      strings.TrimSpace(descriptor.ColIndexExpr),
+		callableExpr:      strings.TrimSpace(descriptor.CallableExpr),
+		dyadicOp:          strings.TrimSpace(descriptor.DyadicOp),
+		scalarExpr:        strings.TrimSpace(descriptor.ScalarExpr),
+		scalarLeft:        descriptor.ScalarLeft,
+		sequenceValueExpr: strings.TrimSpace(descriptor.SequenceValueExpr),
+		sequenceBindings:  decodeQScriptPipelineNames(descriptor.SequenceTransformNames),
+		includeCount:      descriptor.IncludeCount,
+	}
+	if steps, ok := decodeQScriptPipelineSequenceTransformSteps(descriptor.SequenceTransformChain); ok {
+		out.sequenceSteps = steps
+	} else {
+		return qScriptPipelineDescriptor{}, false
 	}
 	switch {
 	case strings.Contains(shape, "sequence-edge-reduce/sum-first-last"):

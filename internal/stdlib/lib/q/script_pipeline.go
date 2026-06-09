@@ -1,6 +1,7 @@
 package q
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
@@ -52,6 +53,9 @@ type qScriptPipelineDescriptor struct {
 	scalarLeft        bool
 	integerTerms      []qScriptPipelineIntegerDivModTerm
 	includeCount      bool
+	sequenceValueExpr string
+	sequenceSteps     []data.SequenceTransformStep
+	sequenceBindings  []string
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
 	moduloMaskPlan    *qPipelinePlan
@@ -70,6 +74,12 @@ func (d qScriptPipelineDescriptor) shape() string {
 	}
 	if d.kind == qScriptPipelineUnsupported {
 		return "script-pipeline/unsupported"
+	}
+	if d.kind == qScriptPipelineSequenceEdgeSum && len(d.sequenceSteps) > 0 {
+		if len(d.assignments) == 0 {
+			return "script-pipeline/" + string(d.kind) + "-transform-chain/direct"
+		}
+		return "script-pipeline/" + string(d.kind) + "-transform-chain/assignments"
 	}
 	if len(d.assignments) == 0 {
 		return "script-pipeline/" + string(d.kind) + "/direct"
@@ -147,6 +157,17 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		}, true
 	}
 	if valueExpr, ok := qScriptPipelineSequenceEdgeReduceValue(src); ok {
+		baseExpr, steps, chainBindings, chainOK := qScriptPipelineSequenceTransformChain(valueExpr, bindings)
+		if chainOK && len(steps) > 0 {
+			return qScriptPipelineDescriptor{
+				kind:              qScriptPipelineSequenceEdgeSum,
+				valueExpr:         valueExpr,
+				valueBinding:      qScriptPipelineBinding(valueExpr, bindings),
+				sequenceValueExpr: baseExpr,
+				sequenceSteps:     steps,
+				sequenceBindings:  chainBindings,
+			}, true
+		}
 		return qScriptPipelineDescriptor{
 			kind:         qScriptPipelineSequenceEdgeSum,
 			valueExpr:    valueExpr,
@@ -212,6 +233,118 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		d.maskBinding = qScriptPipelineBinding(maskExpr, bindings)
 	}
 	return d, true
+}
+
+func qScriptPipelineSequenceTransformChain(valueExpr string, bindings map[string]string) (string, []data.SequenceTransformStep, []string, bool) {
+	valueExpr = strings.TrimSpace(valueExpr)
+	if valueExpr == "" || len(bindings) == 0 {
+		return "", nil, nil, false
+	}
+	seen := make(map[string]bool, len(bindings))
+	return qScriptPipelineSequenceTransformChainFromExpr(valueExpr, bindings, seen)
+}
+
+func qScriptPipelineSequenceTransformChainFromExpr(expr string, bindings map[string]string, seen map[string]bool) (string, []data.SequenceTransformStep, []string, bool) {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return "", nil, nil, false
+	}
+	if qScriptPipelineSimpleName(expr) {
+		rhs, ok := bindings[expr]
+		if !ok {
+			return expr, nil, nil, true
+		}
+		if seen[expr] {
+			return "", nil, nil, false
+		}
+		seen[expr] = true
+		if step, inner, ok := qScriptPipelineSequenceTransformStep(rhs); ok {
+			base, steps, names, ok := qScriptPipelineSequenceTransformChainFromExpr(inner, bindings, seen)
+			if !ok {
+				return "", nil, nil, false
+			}
+			steps = append(steps, step)
+			names = append(names, expr)
+			return base, steps, names, true
+		}
+		return expr, nil, nil, true
+	}
+	if step, inner, ok := qScriptPipelineSequenceTransformStep(expr); ok {
+		base, steps, names, ok := qScriptPipelineSequenceTransformChainFromExpr(inner, bindings, seen)
+		if !ok {
+			return "", nil, nil, false
+		}
+		steps = append(steps, step)
+		return base, steps, names, true
+	}
+	return expr, nil, nil, true
+}
+
+func qScriptPipelineSequenceTransformStep(src string) (data.SequenceTransformStep, string, bool) {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return data.SequenceTransformStep{}, "", false
+	}
+	if strings.HasPrefix(src, "reverse ") && wordBoundary(src, 0, len("reverse")) {
+		valueExpr := strings.TrimSpace(src[len("reverse "):])
+		if valueExpr == "" {
+			return data.SequenceTransformStep{}, "", false
+		}
+		return data.SequenceTransformStep{Transform: data.SequenceTransformReverse}, valueExpr, true
+	}
+	if left, right, ok := splitTopLevelWord(src, "rotate"); ok {
+		n, ok := qScriptPipelineStaticInt(left)
+		if !ok || strings.TrimSpace(right) == "" {
+			return data.SequenceTransformStep{}, "", false
+		}
+		return data.SequenceTransformStep{Transform: data.SequenceTransformRotate, Args: [2]int{n}, ArgCount: 1}, strings.TrimSpace(right), true
+	}
+	if left, right, ok := splitTopLevelWord(src, "sublist"); ok {
+		args, ok := qScriptPipelineStaticIntArgs(left)
+		if !ok || len(args) == 0 || len(args) > 2 || strings.TrimSpace(right) == "" {
+			return data.SequenceTransformStep{}, "", false
+		}
+		step := data.SequenceTransformStep{Transform: data.SequenceTransformSublist, ArgCount: len(args)}
+		copy(step.Args[:], args)
+		return step, strings.TrimSpace(right), true
+	}
+	return data.SequenceTransformStep{}, "", false
+}
+
+func qScriptPipelineStaticInt(src string) (int, bool) {
+	value, ok := qScriptPipelineStaticValue(src)
+	if !ok {
+		return 0, false
+	}
+	n, ok := integerValue(value)
+	if !ok || int64(int(n)) != n {
+		return 0, false
+	}
+	return int(n), true
+}
+
+func qScriptPipelineStaticIntArgs(src string) ([]int, bool) {
+	value, ok := qScriptPipelineStaticValue(src)
+	if !ok {
+		return nil, false
+	}
+	indexes, err := qIntegerIndexes("sequence transform", value)
+	if err != nil || len(indexes) == 0 || len(indexes) > 2 {
+		return nil, false
+	}
+	return indexes, true
+}
+
+func qScriptPipelineStaticValue(src string) (any, bool) {
+	plan := buildQScriptBindingPlanForRHS(src, nil)
+	if plan.kind == qScriptBindingInvalid || !qScriptBindingPlanCacheable(&plan) {
+		return nil, false
+	}
+	value, handled, err := NewEvalState(nil).evalQScriptBindingPlan(&plan)
+	if err != nil || !handled {
+		return nil, false
+	}
+	return value, true
 }
 
 func qScriptPipelineCallableDotSumPlusRight(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
@@ -1037,6 +1170,9 @@ func (s *EvalState) evalQScriptCallableDotSumPlusRightPipeline(descriptor *qScri
 }
 
 func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	if len(descriptor.sequenceSteps) > 0 && strings.TrimSpace(descriptor.sequenceValueExpr) != "" {
+		return s.evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor)
+	}
 	for _, assignment := range descriptor.assignments {
 		if strings.TrimSpace(descriptor.valueExpr) == assignment.name {
 			continue
@@ -1077,6 +1213,185 @@ func (s *EvalState) evalQScriptSequenceEdgeSumPipeline(descriptor *qScriptPipeli
 	out, handled, err := data.TryTypedNumericSumFirstLast(array)
 	out, handled, err = qTypedRuntimeResultReason("SequenceEdgeReduce", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
+}
+
+func (s *EvalState) evalQScriptSequenceTransformChainEdgeSumPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	skip := qScriptPipelineNameSet(descriptor.sequenceBindings)
+	for _, assignment := range descriptor.assignments {
+		if skip[assignment.name] {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	basePlan := buildQScriptBindingPlanForRHS(descriptor.sequenceValueExpr, nil)
+	value, handled, err := s.evalQScriptBindingPlan(&basePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	shape := "vector-transform-chain/sum-first-last/" + qScriptPipelineSequenceTransformName(descriptor.sequenceSteps) + "/" + string(qRuntimeKernelOperandKind(value, nil))
+	out, handled, err := data.TryTypedSequenceTransformChainNumericSumFirstLast(descriptor.sequenceSteps, value)
+	out, handled, err = qTypedRuntimeResultReason("SequenceTransformChainEdgeReduce", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	return out, handled, err
+}
+
+func qScriptPipelineNameSet(names []string) map[string]bool {
+	out := make(map[string]bool, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			out[name] = true
+		}
+	}
+	return out
+}
+
+func qScriptPipelineSequenceTransformName(steps []data.SequenceTransformStep) string {
+	if len(steps) == 0 {
+		return "none"
+	}
+	parts := make([]string, 0, len(steps))
+	for _, step := range steps {
+		switch step.Transform {
+		case data.SequenceTransformReverse:
+			parts = append(parts, "reverse")
+		case data.SequenceTransformRotate:
+			parts = append(parts, "rotate")
+		case data.SequenceTransformSublist:
+			parts = append(parts, "sublist")
+		default:
+			parts = append(parts, step.Transform)
+		}
+	}
+	return strings.Join(parts, ".")
+}
+
+func encodeQScriptPipelineSequenceTransformSteps(steps []data.SequenceTransformStep) string {
+	if len(steps) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(steps))
+	for _, step := range steps {
+		part := strings.TrimSpace(step.Transform)
+		switch step.ArgCount {
+		case 0:
+		case 1:
+			part += ":" + strconv.Itoa(step.Args[0])
+		case 2:
+			part += ":" + strconv.Itoa(step.Args[0]) + "," + strconv.Itoa(step.Args[1])
+		default:
+			return ""
+		}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, "|")
+}
+
+func decodeQScriptPipelineSequenceTransformSteps(text string) ([]data.SequenceTransformStep, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil, true
+	}
+	parts := strings.Split(text, "|")
+	steps := make([]data.SequenceTransformStep, 0, len(parts))
+	for _, part := range parts {
+		name, argText, _ := strings.Cut(strings.TrimSpace(part), ":")
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil, false
+		}
+		step := data.SequenceTransformStep{Transform: name}
+		if argText != "" {
+			args, ok := parseQScriptPipelineSequenceTransformArgs(argText)
+			if !ok {
+				return nil, false
+			}
+			step.ArgCount = len(args)
+			copy(step.Args[:], args)
+		}
+		switch step.Transform {
+		case data.SequenceTransformReverse:
+			if step.ArgCount != 0 {
+				return nil, false
+			}
+		case data.SequenceTransformRotate:
+			if step.ArgCount != 1 {
+				return nil, false
+			}
+		case data.SequenceTransformSublist:
+			if step.ArgCount != 1 && step.ArgCount != 2 {
+				return nil, false
+			}
+		default:
+			return nil, false
+		}
+		steps = append(steps, step)
+	}
+	return steps, true
+}
+
+func parseQScriptPipelineSequenceTransformArgs(text string) ([]int, bool) {
+	if text == "" {
+		return nil, true
+	}
+	parts := strings.Split(text, ",")
+	if len(parts) == 0 || len(parts) > 2 {
+		return nil, false
+	}
+	args := make([]int, len(parts))
+	for i, part := range parts {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil {
+			return nil, false
+		}
+		args[i] = n
+	}
+	return args, true
+}
+
+func encodeQScriptPipelineNames(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\x1f')
+		}
+		b.WriteString(name)
+	}
+	return b.String()
+}
+
+func decodeQScriptPipelineNames(text string) []string {
+	if text == "" {
+		return nil
+	}
+	parts := strings.Split(text, "\x1f")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func (s *EvalState) evalQScriptTerminalPipeline(descriptor *qScriptPipelineDescriptor, terminal qPipelinePlan) (any, bool, error) {
