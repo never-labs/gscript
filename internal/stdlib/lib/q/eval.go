@@ -5082,6 +5082,19 @@ func (s *EvalState) tryEvalWhereCompareIndexStats(src, shapePrefix string) (coun
 	if err != nil {
 		return 0, 0, true, err
 	}
+	if op == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return 0, 0, ok, err
+		}
+		shape := shapePrefix + "-stats/within/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		count, sum, handled, err = data.TryTypedWithinIndexStatsI64(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithinStats", shape, handled, err)
+		if err != nil || !handled {
+			return 0, 0, handled, err
+		}
+		return count, sum, true, nil
+	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
 	if !ok {
 		return 0, 0, false, nil
@@ -5112,6 +5125,19 @@ func (s *EvalState) tryEvalWhereCompareCount(src, shapePrefix string) (count int
 	if err != nil {
 		return 0, true, err
 	}
+	if op == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		shape := shapePrefix + "/within/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		count, handled, err = data.TryTypedWithinCount(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithinCount", shape, handled, err)
+		if err != nil || !handled {
+			return 0, handled, err
+		}
+		return count, true, nil
+	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
 	if !ok {
 		return 0, false, nil
@@ -5141,6 +5167,22 @@ func (s *EvalState) tryEvalWhereCompareIndexes(src, shapePrefix string) (data.Ar
 	right, err := s.eval(rightExpr)
 	if err != nil {
 		return nil, true, err
+	}
+	if op == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return nil, false, nil
+		}
+		return out, true, nil
 	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
 	if !ok {
@@ -11035,6 +11077,22 @@ func (s *EvalState) evalWhereCompare(src string) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
+	if op == "within" {
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			return nil, false, nil
+		}
+		return out, true, nil
+	}
 	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
 	if !ok {
 		return nil, false, nil
@@ -11110,7 +11168,10 @@ func qWithinOperands(left, right any) (data.Array, any, any, bool, error) {
 		return nil, nil, nil, false, nil
 	}
 	bounds, err := vectorValues(right)
-	if err != nil || len(bounds) != 2 {
+	if err != nil {
+		return nil, nil, nil, true, fmt.Errorf("within expects a two-item bounds vector")
+	}
+	if len(bounds) != 2 {
 		return nil, nil, nil, true, fmt.Errorf("within expects a two-item bounds vector")
 	}
 	return array, bounds[0], bounds[1], true, nil

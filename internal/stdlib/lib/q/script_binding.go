@@ -359,6 +359,26 @@ func (s *EvalState) evalQScriptBindingPlan(plan *qScriptBindingPlan) (any, bool,
 }
 
 func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan) (any, bool, error) {
+	if plan.op == "where" && plan.left != nil && plan.left.kind == qScriptBindingBinary && plan.left.op == "within" {
+		left, handled, err := s.evalQScriptBindingPlan(plan.left.left)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		right, handled, err := s.evalQScriptBindingPlan(plan.left.right)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		array, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return nil, ok, err
+		}
+		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
+		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
+		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
+		if err != nil || handled {
+			return out, true, err
+		}
+	}
 	arg, handled, err := s.evalQScriptBindingPlan(plan.left)
 	if err != nil || !handled {
 		return nil, handled, err

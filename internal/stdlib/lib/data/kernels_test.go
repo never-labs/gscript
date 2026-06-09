@@ -154,6 +154,40 @@ func TestTypedWithinMaskOpenClosedAndNullBounds(t *testing.T) {
 	}
 }
 
+func TestTryTypedWithinIndexesAndStatsTiledTime(t *testing.T) {
+	times, err := TakeRepeat(NewTime([]Time{1, 2, 3, 4}), 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat time returned error: %v", err)
+	}
+	indexes, handled, err := TryTypedWithinIndexesI64(times, Time(2), Time(3), true)
+	if err != nil {
+		t.Fatalf("TryTypedWithinIndexesI64 returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedWithinIndexesI64 did not handle tiled time")
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(2), int64(5), int64(6), int64(9)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("within indexes = %v, want %v", got, want)
+	}
+	count, sum, handled, err := TryTypedWithinIndexStatsI64(times, Time(2), Time(3), true)
+	if err != nil {
+		t.Fatalf("TryTypedWithinIndexStatsI64 returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedWithinIndexStatsI64 did not handle tiled time")
+	}
+	if count != 5 || sum != 23 {
+		t.Fatalf("within stats count=%d sum=%d, want count=5 sum=23", count, sum)
+	}
+	count, handled, err = TryTypedWithinCount(times, Time(2), Time(3), true)
+	if err != nil {
+		t.Fatalf("TryTypedWithinCount returned error: %v", err)
+	}
+	if !handled || count != 5 {
+		t.Fatalf("within count handled=%v count=%d, want handled=true count=5", handled, count)
+	}
+}
+
 func TestTryTypedCastIntegerArrays(t *testing.T) {
 	shorts, handled, err := TryTypedCast(KindI16, NewI64Range(0, 2, 4))
 	if err != nil {
