@@ -26,6 +26,7 @@ const (
 	ExitNativeCallExit     ExitKind = 8  // native call exit: callee hit exit-resume during BLR call
 	ExitOSR                ExitKind = 9  // OSR: Tier 1 loop counter expired, request Tier 2 compilation
 	ExitCoroutineYieldFast ExitKind = 10 // coroutine yield fast path
+	ExitQEvalPipelinePlan  ExitKind = 11 // q.eval pipeline plan exit: call typed q runtime backend and resume
 )
 
 // exitKindInfo describes one exit kind in the centralized table.
@@ -48,6 +49,7 @@ var allExitKinds = []exitKindInfo{
 	{ExitNativeCallExit, "ExitNativeCallExit"},
 	{ExitOSR, "ExitOSR"},
 	{ExitCoroutineYieldFast, "ExitCoroutineYieldFast"},
+	{ExitQEvalPipelinePlan, "ExitQEvalPipelinePlan"},
 }
 
 // exitKindNames is the lookup map derived from allExitKinds.

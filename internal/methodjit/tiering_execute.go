@@ -471,6 +471,40 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			codePtr = tier2ExitResumeCodePtr(cf, ctx, resumeOff)
 			continue
 
+		case ExitQEvalPipelinePlan:
+			site := cf.exitResumeCheckSite(ctx)
+			before, err := exitCheck.checkBefore(ctx, site, regs, base, protoNameForCheck(proto))
+			if err != nil {
+				return nil, err
+			}
+			if tm.perfStatsEnabled {
+				start := time.Now()
+				err = cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_native_exit")
+				tm.perfStats.record(perfTier2OpExit, time.Since(start))
+			} else {
+				err = cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_native_exit")
+			}
+			if err != nil {
+				return nil, fmt.Errorf("tier2: q eval pipeline exit: %w", err)
+			}
+			resyncRegs()
+			if err := exitCheck.checkAfter(site, before, regs, base, protoNameForCheck(proto)); err != nil {
+				return nil, err
+			}
+			opID := int(ctx.OpExitID)
+			resumeOff, ok := cf.resumeOffset(opID, ctx.ResumeNumericPass != 0)
+			if !ok {
+				return nil, fmt.Errorf("tier2: no resume for q eval pipeline %d", opID)
+			}
+			if tm.perfStatsEnabled {
+				start := time.Now()
+				codePtr = tier2ExitResumeCodePtr(cf, ctx, resumeOff)
+				tm.perfStats.record(perfTier2ExitResume, time.Since(start))
+				continue
+			}
+			codePtr = tier2ExitResumeCodePtr(cf, ctx, resumeOff)
+			continue
+
 		default:
 			return nil, fmt.Errorf("tier2: unknown exit code %d", ctx.ExitCode)
 		}

@@ -60,7 +60,7 @@ func (c *tier2ExitProfileCollector) record(proto *vm.FuncProto, cf *CompiledFunc
 		return Tier2ExitProfileSite{}, false
 	}
 	switch ctx.ExitCode {
-	case ExitDeopt, ExitCallExit, ExitGlobalExit, ExitTableExit, ExitOpExit:
+	case ExitDeopt, ExitCallExit, ExitGlobalExit, ExitTableExit, ExitOpExit, ExitQEvalPipelinePlan:
 	default:
 		return Tier2ExitProfileSite{}, false
 	}

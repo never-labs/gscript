@@ -97,7 +97,7 @@ func (tm *TieringManager) recordTier2Exit(proto *vm.FuncProto, cf *CompiledFunct
 		return
 	}
 	switch ctx.ExitCode {
-	case ExitDeopt, ExitCallExit, ExitGlobalExit, ExitTableExit, ExitOpExit:
+	case ExitDeopt, ExitCallExit, ExitGlobalExit, ExitTableExit, ExitOpExit, ExitQEvalPipelinePlan:
 	default:
 		return
 	}
@@ -367,6 +367,8 @@ func exitStatsOpID(ctx *ExecContext) int {
 		return int(ctx.TableExitID)
 	case ExitOpExit:
 		return int(ctx.OpExitID)
+	case ExitQEvalPipelinePlan:
+		return int(ctx.OpExitID)
 	default:
 		return 0
 	}
@@ -381,6 +383,8 @@ func exitStatsFallbackOp(ctx *ExecContext) int64 {
 		return ctx.TableOp
 	case ExitOpExit:
 		return ctx.OpExitOp
+	case ExitQEvalPipelinePlan:
+		return int64(OpQEvalPipelinePlan)
 	default:
 		return 0
 	}

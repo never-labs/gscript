@@ -172,6 +172,28 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 	return executeQEvalPipelinePlanValue(backend, ref)
 }
 
+func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs []runtime.Value, base int, route string) error {
+	if cf == nil || ctx == nil {
+		return fmt.Errorf("QEvalPipelinePlan exit missing compiled function")
+	}
+	absSlot := base + int(ctx.OpExitSlot)
+	if absSlot < 0 || absSlot >= len(regs) {
+		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
+	}
+	planID := int(ctx.OpExitAux)
+	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(planID)
+	if err != nil || !handled {
+		cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "error")
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
+	}
+	cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "success")
+	regs[absSlot] = out
+	return nil
+}
+
 func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipelinePlanRef) (runtime.Value, bool, error) {
 	if backend == nil || !ref.Valid() {
 		return runtime.NilValue(), false, nil

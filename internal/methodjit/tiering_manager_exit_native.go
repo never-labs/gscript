@@ -277,6 +277,18 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 			return runtime.NilValue(), fmt.Errorf("callee op-exit: no resume for %d", ctx.OpExitID)
 		}
 		codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
+	case ExitQEvalPipelinePlan:
+		handlerMark := tm.tier2PerfStart()
+		err := cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_native_exit")
+		tm.tier2PerfStop(perfTier2OpExit, handlerMark)
+		if err != nil {
+			return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)
+		}
+		resumeOff, ok := cf.resumeOffset(int(ctx.OpExitID), ctx.NativeCalleeResumePass != 0)
+		if !ok {
+			return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: no resume for %d", ctx.OpExitID)
+		}
+		codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
 	case ExitCallExit:
 		if err := tm.executeCallExit(ctx, regs, base, proto, cf); err != nil {
 			if vm.IsCoroutineYield(err) {
@@ -377,6 +389,23 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 			resumeOff, ok := cf.resumeOffset(int(ctx.OpExitID), ctx.ResumeNumericPass != 0)
 			if !ok {
 				return runtime.NilValue(), fmt.Errorf("callee op-exit: no resume for %d", ctx.OpExitID)
+			}
+			codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
+			ctx.ExitCode = 0
+			ctx.ResumeNumericPass = 0
+			tm.tier2PerfStop(perfTier2ExitResume, resumeMark)
+		case ExitQEvalPipelinePlan:
+			handlerMark := tm.tier2PerfStart()
+			err := cf.executeQEvalPipelinePlanExit(ctx, currentRegs, base, "typed_runtime_native_exit")
+			tm.tier2PerfStop(perfTier2OpExit, handlerMark)
+			if err != nil {
+				return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)
+			}
+			currentRegs = tm.callVM.Regs()
+			resumeMark := tm.tier2PerfStart()
+			resumeOff, ok := cf.resumeOffset(int(ctx.OpExitID), ctx.ResumeNumericPass != 0)
+			if !ok {
+				return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: no resume for %d", ctx.OpExitID)
 			}
 			codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
 			ctx.ExitCode = 0

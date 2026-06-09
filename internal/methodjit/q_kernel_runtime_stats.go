@@ -32,6 +32,10 @@ func (cf *CompiledFunction) recordQRuntimePrimitiveExecution(op Op, outcome stri
 }
 
 func (cf *CompiledFunction) recordQEvalPipelinePlanExecution(id int, outcome string) {
+	cf.recordQEvalPipelinePlanExecutionWithRoute(id, "typed_runtime_op_exit", outcome)
+}
+
+func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRoute(id int, route, outcome string) {
 	if cf == nil {
 		return
 	}
@@ -39,7 +43,7 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecution(id int, outcome str
 		"methodjit_q_eval_runtime",
 		"QEvalPipelinePlan",
 		qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id),
-		"typed_runtime_op_exit",
+		route,
 		outcome,
 	)
 }

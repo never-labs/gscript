@@ -206,6 +206,28 @@ func (cf *CompiledFunction) Execute(args []runtime.Value) ([]runtime.Value, erro
 			ctx.ResumeNumericPass = 0
 			continue
 
+		case ExitQEvalPipelinePlan:
+			site := cf.exitResumeCheckSite(&ctx)
+			before, err := exitCheck.checkBefore(&ctx, site, regs, 0, protoNameForCheck(cf.Proto))
+			if err != nil {
+				return nil, err
+			}
+			if err := cf.executeQEvalPipelinePlanExit(&ctx, regs, 0, "typed_runtime_native_exit"); err != nil {
+				return nil, fmt.Errorf("methodjit: q eval pipeline exit error: %w", err)
+			}
+			if err := exitCheck.checkAfter(site, before, regs, 0, protoNameForCheck(cf.Proto)); err != nil {
+				return nil, err
+			}
+			opID := int(ctx.OpExitID)
+			resumeOff, ok := cf.resumeOffset(opID, ctx.ResumeNumericPass != 0)
+			if !ok {
+				return nil, fmt.Errorf("methodjit: no resume address for q eval pipeline ID %d", opID)
+			}
+			codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
+			ctx.ExitCode = 0
+			ctx.ResumeNumericPass = 0
+			continue
+
 		default:
 			return nil, fmt.Errorf("methodjit: unknown exit code %d", ctx.ExitCode)
 		}
@@ -1294,16 +1316,9 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if slot >= len(regs) {
 			return fmt.Errorf("QEvalPipelinePlan op-exit out of register range")
 		}
-		out, handled, err := cf.ExecuteQEvalPipelinePlanValue(int(aux))
-		if err != nil || !handled {
-			cf.recordQEvalPipelinePlanExecution(int(aux), "error")
-			if err != nil {
-				return err
-			}
-			return fmt.Errorf("QEvalPipelinePlan op-exit plan %d was not handled", aux)
-		}
-		cf.recordQEvalPipelinePlanExecution(int(aux), "success")
-		regs[slot] = out
+		ctx.OpExitSlot = int64(slot)
+		ctx.OpExitAux = int64(aux)
+		return cf.executeQEvalPipelinePlanExit(ctx, regs, 0, "typed_runtime_op_exit")
 
 	case OpVectorScan:
 		if arg1 >= len(regs) || slot >= len(regs) {

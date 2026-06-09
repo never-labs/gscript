@@ -236,7 +236,7 @@ func tier2ContinuationKindForExitName(exitName string) (Tier2ContinuationKind, b
 		return Tier2ContinuationGlobal, true
 	case "ExitTableExit":
 		return Tier2ContinuationTable, true
-	case "ExitOpExit":
+	case "ExitOpExit", "ExitQEvalPipelinePlan":
 		return Tier2ContinuationOp, true
 	default:
 		return 0, false
@@ -259,7 +259,7 @@ func tier2ContinuationKeyForRuntimeExit(cf *CompiledFunction, ctx *ExecContext) 
 	case ExitTableExit:
 		instrID = int(ctx.TableExitID)
 		kind = Tier2ContinuationTable
-	case ExitOpExit:
+	case ExitOpExit, ExitQEvalPipelinePlan:
 		instrID = int(ctx.OpExitID)
 		kind = Tier2ContinuationOp
 	default:

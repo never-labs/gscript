@@ -44,6 +44,7 @@ func TestExitKindNumericValues(t *testing.T) {
 		{ExitNativeCallExit, 8, "ExitNativeCallExit"},
 		{ExitOSR, 9, "ExitOSR"},
 		{ExitCoroutineYieldFast, 10, "ExitCoroutineYieldFast"},
+		{ExitQEvalPipelinePlan, 11, "ExitQEvalPipelinePlan"},
 	}
 	for _, c := range cases {
 		if int64(c.kind) != c.want {
@@ -73,13 +74,14 @@ func TestExitKindNumericValues(t *testing.T) {
 func TestExitKindDispatchExhaustive(t *testing.T) {
 	// Kinds handled by the Tier 2 Go-side exit loop (tiering_execute.go).
 	tier2Handled := map[ExitKind]bool{
-		ExitNormal:         true,
-		ExitDeopt:          true,
-		ExitCallExit:       true,
-		ExitNativeCallExit: true,
-		ExitGlobalExit:     true,
-		ExitTableExit:      true,
-		ExitOpExit:         true,
+		ExitNormal:            true,
+		ExitDeopt:             true,
+		ExitCallExit:          true,
+		ExitNativeCallExit:    true,
+		ExitGlobalExit:        true,
+		ExitTableExit:         true,
+		ExitOpExit:            true,
+		ExitQEvalPipelinePlan: true,
 	}
 	// Kinds handled by the Tier 1 Go-side exit loop (tier1_manager.go).
 	tier1Handled := map[ExitKind]bool{
