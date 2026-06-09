@@ -107,7 +107,7 @@ func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
 	}
 }
 
-func TestQEvalPipelineHelperReusableEvalStateRequiresSourceBackedDefaultRuntime(t *testing.T) {
+func TestQEvalPipelineHelperReusableEvalStateRequiresDefaultExecutableRuntime(t *testing.T) {
 	sourceRef := qEvalPipelineSourceBackedTestRef(t, "count where (til 64 mod 4)=1")
 	sourceBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{sourceRef})
 	sourceHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{sourceRef}, sourceBackend)
@@ -118,8 +118,8 @@ func TestQEvalPipelineHelperReusableEvalStateRequiresSourceBackedDefaultRuntime(
 	descriptorRef := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
 	descriptorBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{descriptorRef})
 	descriptorHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{descriptorRef}, descriptorBackend)
-	if len(descriptorHelpers) != 1 || descriptorHelpers[0].evalState != nil {
-		t.Fatalf("descriptor-only helper evalState = %+v, want nil", descriptorHelpers)
+	if len(descriptorHelpers) != 1 || descriptorHelpers[0].evalState == nil || !descriptorHelpers[0].hasExecutablePlan {
+		t.Fatalf("descriptor-only helper evalState/executable = %+v, want reusable executable eval state", descriptorHelpers)
 	}
 
 	customBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{sourceRef})

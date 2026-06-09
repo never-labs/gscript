@@ -56,6 +56,16 @@ type EvalPipelineBackendPlan struct {
 	Descriptor EvalPipelineDescriptor
 }
 
+// EvalPipelineExecutablePlan is an opaque, predecoded q runtime pipeline plan.
+// It lets MethodJIT keep q planning behind the q package boundary while still
+// avoiding descriptor-to-plan rebuilding on every hot-path execution.
+type EvalPipelineExecutablePlan struct {
+	backend    string
+	kind       string
+	expression qPipelinePlan
+	script     *qScriptPipelineDescriptor
+}
+
 func (p EvalPipelineBackendPlan) Valid() bool {
 	return p.Backend != "" && p.Descriptor.Kind != "" && p.Descriptor.Kernel != "" && p.Descriptor.Shape != ""
 }
@@ -78,6 +88,10 @@ func (p EvalPipelineBackendPlan) PipelineShape() string {
 
 func (p EvalPipelineBackendPlan) Source() string {
 	return p.Descriptor.Source
+}
+
+func (p EvalPipelineExecutablePlan) Valid() bool {
+	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != ""
 }
 
 // DescribeEvalPipeline returns the stable descriptor for a q source string
@@ -153,6 +167,75 @@ func ExecuteEvalPipelineBackendPlanWithEnv(plan EvalPipelineBackendPlan, env map
 	}
 	state := NewEvalState(env)
 	return state.executeEvalPipelineDescriptor(plan.Descriptor)
+}
+
+// CompileEvalPipelineBackendPlan predecodes a stable backend plan into an
+// executable q runtime plan. The returned value is intentionally opaque so
+// callers can cache it without depending on q AST/runtime internals.
+func CompileEvalPipelineBackendPlan(plan EvalPipelineBackendPlan) (EvalPipelineExecutablePlan, bool) {
+	if !plan.Valid() || plan.Backend != EvalPipelineTypedRuntimeBackend {
+		return EvalPipelineExecutablePlan{}, false
+	}
+	switch plan.Descriptor.Kind {
+	case "expression":
+		expression, ok := qPipelinePlanFromEvalDescriptor(plan.Descriptor)
+		if !ok {
+			return EvalPipelineExecutablePlan{}, false
+		}
+		return EvalPipelineExecutablePlan{
+			backend:    plan.Backend,
+			kind:       plan.Descriptor.Kind,
+			expression: expression,
+		}, true
+	case "script":
+		script, ok := qScriptPipelineDescriptorFromEvalDescriptor(plan.Descriptor)
+		if !ok {
+			return EvalPipelineExecutablePlan{}, false
+		}
+		return EvalPipelineExecutablePlan{
+			backend: plan.Backend,
+			kind:    plan.Descriptor.Kind,
+			script:  &script,
+		}, true
+	default:
+		return EvalPipelineExecutablePlan{}, false
+	}
+}
+
+// ExecuteEvalPipelineDescriptor executes a predecoded pipeline descriptor using
+// this EvalState's caches and environment. It is intended for callers such as
+// MethodJIT that already hold a stable plan and want to avoid re-entering
+// source parsing on every execution.
+func (s *EvalState) ExecuteEvalPipelineDescriptor(descriptor EvalPipelineDescriptor) (any, bool, error) {
+	if s == nil {
+		return nil, false, nil
+	}
+	return s.executeEvalPipelineDescriptor(descriptor)
+}
+
+// ExecuteEvalPipelineBackendPlan executes a typed-runtime backend plan using
+// this EvalState's caches and environment.
+func (s *EvalState) ExecuteEvalPipelineBackendPlan(plan EvalPipelineBackendPlan) (any, bool, error) {
+	if s == nil || !plan.Valid() || plan.Backend != EvalPipelineTypedRuntimeBackend {
+		return nil, false, nil
+	}
+	return s.executeEvalPipelineDescriptor(plan.Descriptor)
+}
+
+// ExecuteEvalPipelineExecutablePlan executes an opaque predecoded plan using
+// this EvalState's caches and environment.
+func (s *EvalState) ExecuteEvalPipelineExecutablePlan(plan EvalPipelineExecutablePlan) (any, bool, error) {
+	if s == nil || !plan.Valid() {
+		return nil, false, nil
+	}
+	switch plan.kind {
+	case "expression":
+		return s.evalQPipelinePlan(plan.expression)
+	case "script":
+		return s.tryEvalQScriptPipeline(plan.script)
+	default:
+		return nil, false, nil
+	}
 }
 
 func (s *EvalState) executeEvalPipeline(source string) (any, bool, error) {
