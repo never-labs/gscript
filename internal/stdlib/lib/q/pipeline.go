@@ -17,6 +17,7 @@ const (
 	qPipelineCountWhereCompare
 	qPipelineWhereCompareIndexes
 	qPipelineSumDeltas
+	qPipelineSumBin
 )
 
 type qPipelinePlan struct {
@@ -105,6 +106,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineSumGatherPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(plan)
 		}
+		if plan, ok := buildQPipelineSumBinPlan(right); ok {
+			return qPipelinePlanWithBindingPlans(plan)
+		}
 		if plan, ok := buildQPipelineWhereComparePlan(right, qPipelineSumWhereCompare, "compare-to-index-sum"); ok {
 			return qPipelinePlanWithBindingPlans(plan)
 		}
@@ -182,6 +186,19 @@ func buildQPipelineSumGatherPlan(src string) (qPipelinePlan, bool) {
 	return plan, true
 }
 
+func buildQPipelineSumBinPlan(src string) (qPipelinePlan, bool) {
+	leftExpr, rightExpr, ok := splitTopLevelWord(src, "bin")
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	return qPipelinePlan{
+		kind:      qPipelineSumBin,
+		shape:     "bin-reduce/sum",
+		leftExpr:  strings.TrimSpace(leftExpr),
+		rightExpr: strings.TrimSpace(rightExpr),
+	}, true
+}
+
 func buildQPipelineWhereComparePlan(src string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
 	src = strings.TrimSpace(src)
 	if !strings.HasPrefix(src, "where ") || !wordBoundary(src, 0, len("where")) {
@@ -242,6 +259,8 @@ func (s *EvalState) evalQPipelinePlan(plan qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineWhereCompareIndexes(plan)
 	case qPipelineSumDeltas:
 		out, handled, err = s.evalQPipelineSumDeltas(plan)
+	case qPipelineSumBin:
+		out, handled, err = s.evalQPipelineSumBin(plan)
 	default:
 		return nil, false, nil
 	}
@@ -472,6 +491,25 @@ func (s *EvalState) evalQPipelineSumDeltas(plan qPipelinePlan) (any, bool, error
 		recordRuntimeKernelProbe("ArrayDeltasSum", shape, handled, err)
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) evalQPipelineSumBin(plan qPipelinePlan) (any, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	domain, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	query, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	out, handled, err := data.TryTypedBinSum(domain, query)
+	shape := "bin-reduce/sum/" + string(domain.Kind()) + "/" + string(qRuntimeKernelOperandKind(query, nil))
+	recordRuntimeKernelProbe("ArrayBinReduceSum", shape, handled, err)
+	return out, handled, err
 }
 
 func (s *EvalState) evalQPipelinePlannedExpr(src string, plan *qScriptBindingPlan) (any, error) {

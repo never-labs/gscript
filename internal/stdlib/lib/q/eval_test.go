@@ -2334,6 +2334,47 @@ func TestEvalBinRecordsTypedRuntimeKernel(t *testing.T) {
 	}
 }
 
+func TestEvalBinReduceUsesTypedPipelineKernel(t *testing.T) {
+	state := NewEvalState(nil)
+	if plan := state.qPipelinePlan("+/x bin probe"); plan.kind != qPipelineSumBin {
+		t.Fatalf("pipeline plan kind = %v, want qPipelineSumBin", plan.kind)
+	}
+
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "x:10*til 8;probe:til 80;+/x bin probe", int64(280))
+	assertEvalValue(t, "d:2026.06.06 2026.06.07 2026.06.07 2026.06.09;probe:2026.06.05 2026.06.06 2026.06.07 2026.06.08;+/d bin probe", int64(3))
+	assertEvalValue(t, "s:`AAPL`MSFT`MSFT`NVDA;probe:`A`AAPL`MSFT`TSLA;+/s bin probe", int64(4))
+
+	seenReduce := map[string]bool{}
+	seenPipelineHit := false
+	seenMaterializedBin := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayBin" && stat.Outcome == "hit" {
+			seenMaterializedBin = true
+		}
+		if stat.Kernel == "QPipelinePlan" && stat.Shape == "bin-reduce/sum" && stat.PipelineShape == "search_index_reduce" && stat.Outcome == "hit" && stat.ReasonCode == "typed_pipeline" {
+			seenPipelineHit = true
+		}
+		if stat.Kernel != "ArrayBinReduceSum" || stat.Route != "typed_data_kernel" || stat.PipelineShape != "search_index_reduce" || stat.Outcome != "hit" || stat.ReasonCode != "typed_kernel" {
+			continue
+		}
+		seenReduce[stat.Shape] = true
+	}
+	if seenMaterializedBin {
+		t.Fatalf("bin reduce expression materialized ArrayBin path: %#v", RuntimeKernelExecutionStats())
+	}
+	for _, shape := range []string{"bin-reduce/sum/i64/i64", "bin-reduce/sum/date/date", "bin-reduce/sum/symbol/symbol"} {
+		if !seenReduce[shape] {
+			t.Fatalf("missing bin reduce stat %s: %#v", shape, RuntimeKernelExecutionStats())
+		}
+	}
+	if !seenPipelineHit {
+		t.Fatalf("missing bin reduce pipeline hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalTemporalCompareRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

@@ -267,6 +267,8 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "group_aggregate"
 	case strings.HasPrefix(shape, "like-count/"), strings.HasPrefix(shape, "in-count/"):
 		return "predicate_count"
+	case strings.HasPrefix(shape, "bin-reduce/"):
+		return "search_index_reduce"
 	case strings.HasPrefix(shape, "bin/"):
 		return "search_index"
 	case strings.HasPrefix(shape, "last-scan/"), strings.HasPrefix(shape, "vector-last/"):

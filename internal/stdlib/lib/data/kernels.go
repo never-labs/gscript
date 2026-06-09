@@ -1956,6 +1956,37 @@ func TryTypedNumericSum(array Array) (any, bool, error) {
 	return typedKernels.NumericSumValue(array)
 }
 
+// TryTypedBinSum reduces q's `domain bin query` result directly. It preserves
+// the scalar result shape of sum while avoiding the intermediate i64 bin vector.
+func TryTypedBinSum(domain Array, query any) (any, bool, error) {
+	if domain == nil {
+		return nil, true, fmt.Errorf("bin sum domain must be non-nil")
+	}
+	if sum, handled, err := binSumTyped(domain, query); err != nil || handled {
+		return sum, handled, err
+	}
+	if queryArray, ok := query.(Array); ok {
+		var total int64
+		for row := 0; row < queryArray.Len(); row++ {
+			value, ok := queryArray.At(row)
+			if !ok {
+				return nil, true, fmt.Errorf("bin query row %d out of range", row)
+			}
+			index, err := kdbBinScalar(domain, value)
+			if err != nil {
+				return nil, true, err
+			}
+			total += index
+		}
+		return total, true, nil
+	}
+	index, err := kdbBinScalar(domain, query)
+	if err != nil {
+		return nil, true, err
+	}
+	return index, true, nil
+}
+
 // TryTypedNumericSumByI64Indexes reduces array rows selected by a typed i64
 // index vector without materializing the gathered vector.
 func TryTypedNumericSumByI64Indexes(array, indexes Array) (any, bool, error) {
@@ -3925,6 +3956,62 @@ func binTyped(domain Array, query any) (any, bool, error) {
 	}
 }
 
+func binSumTyped(domain Array, query any) (int64, bool, error) {
+	switch d := domain.(type) {
+	case attributedArray:
+		return binSumTyped(d.array, query)
+	case columnArray[int8]:
+		return binSignedSum[int8](d.data, query)
+	case columnArray[int16]:
+		return binSignedSum[int16](d.data, query)
+	case columnArray[int32]:
+		return binSignedSum[int32](d.data, query)
+	case columnArray[int64]:
+		return binI64Sum(d.data, query)
+	case i64RangeArray:
+		return binI64RangeDomainSum(d, query)
+	case i64ScalarDyadicArray:
+		if domain, ok := i64ScalarDyadicAffineRange(d); ok {
+			return binI64RangeDomainSum(domain, query)
+		}
+		return 0, false, nil
+	case columnArray[uint8]:
+		return binUnsignedSum[uint8](d.data, query)
+	case columnArray[uint16]:
+		return binUnsignedSum[uint16](d.data, query)
+	case columnArray[uint32]:
+		return binUnsignedSum[uint32](d.data, query)
+	case columnArray[uint64]:
+		return binUnsignedSum[uint64](d.data, query)
+	case columnArray[float32]:
+		return binFloatSum[float32](d.data, query)
+	case columnArray[float64]:
+		return binF64Sum(d.data, query)
+	case columnArray[string]:
+		return binStringSum(d.data, query)
+	case columnArray[Symbol]:
+		return binSymbolSum(d.data, query)
+	case columnArray[Month]:
+		return binSignedSum[Month](d.data, query)
+	case columnArray[Date]:
+		return binSignedSum[Date](d.data, query)
+	case columnArray[DateTime]:
+		return binSignedSum[DateTime](d.data, query)
+	case columnArray[Timespan]:
+		return binSignedSum[Timespan](d.data, query)
+	case columnArray[Minute]:
+		return binSignedSum[Minute](d.data, query)
+	case columnArray[Second]:
+		return binSignedSum[Second](d.data, query)
+	case columnArray[Time]:
+		return binSignedSum[Time](d.data, query)
+	case columnArray[Timestamp]:
+		return binSignedSum[Timestamp](d.data, query)
+	default:
+		return 0, false, nil
+	}
+}
+
 func binSigned[T signedScalar](domain []T, query any) (any, bool, error) {
 	if queryArray, ok := query.(Array); ok {
 		values, ok := signedArrayData[T](queryArray)
@@ -3939,6 +4026,24 @@ func binSigned[T signedScalar](domain []T, query any) (any, bool, error) {
 	}
 	if len(domain) == 0 {
 		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binSignedSum[T signedScalar](domain []T, query any) (int64, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := signedArrayData[T](queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		return binSignedSliceSum(domain, values), true, nil
+	}
+	value, ok := query.(T)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 {
+		return -1, true, nil
 	}
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
@@ -3964,6 +4069,27 @@ func binI64(domain []int64, query any) (any, bool, error) {
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
 
+func binI64Sum(domain []int64, query any) (int64, bool, error) {
+	if queryArray, ok := query.(i64RangeArray); ok {
+		return binI64RangeSum(domain, queryArray), true, nil
+	}
+	if queryArray, ok := query.(Array); ok {
+		values, ok := signedArrayData[int64](queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		return binSignedSliceSum(domain, values), true, nil
+	}
+	value, ok := coerceInt64Exact(query)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 {
+		return -1, true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
 func binI64Range(domain []int64, query i64RangeArray) Array {
 	out := make([]int64, query.Len())
 	for i := range out {
@@ -3971,6 +4097,15 @@ func binI64Range(domain []int64, query i64RangeArray) Array {
 		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
 	}
 	return NewI64(out)
+}
+
+func binI64RangeSum(domain []int64, query i64RangeArray) int64 {
+	var total int64
+	for i := 0; i < query.Len(); i++ {
+		value := query.start + int64(i)*query.step
+		total += int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return total
 }
 
 func binI64RangeDomain(domain i64RangeArray, query any) (any, bool, error) {
@@ -4002,6 +4137,118 @@ func binI64RangeDomain(domain i64RangeArray, query any) (any, bool, error) {
 	return binAscendingI64RangeScalar(domain, value), true, nil
 }
 
+func binI64RangeDomainSum(domain i64RangeArray, query any) (int64, bool, error) {
+	if domain.step <= 0 {
+		return 0, false, nil
+	}
+	if queryArray, ok := query.(i64RangeArray); ok {
+		if sum, ok := binAscendingI64RangeQuerySum(domain, queryArray); ok {
+			return sum, true, nil
+		}
+		var total int64
+		for i := 0; i < queryArray.Len(); i++ {
+			total += binAscendingI64RangeScalar(domain, queryArray.start+int64(i)*queryArray.step)
+		}
+		return total, true, nil
+	}
+	if queryArray, ok := query.(Array); ok {
+		values, ok := signedArrayData[int64](queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		var total int64
+		for _, value := range values {
+			total += binAscendingI64RangeScalar(domain, value)
+		}
+		return total, true, nil
+	}
+	value, ok := coerceInt64Exact(query)
+	if !ok {
+		return 0, false, nil
+	}
+	return binAscendingI64RangeScalar(domain, value), true, nil
+}
+
+func i64ScalarDyadicAffineRange(array i64ScalarDyadicArray) (i64RangeArray, bool) {
+	source, ok := array.source.(i64RangeArray)
+	if !ok {
+		return i64RangeArray{}, false
+	}
+	start := source.start
+	step := source.step
+	switch array.op {
+	case OpAdd:
+		start += array.scalar
+	case OpSub:
+		if array.scalarLeft {
+			start = array.scalar - start
+			step = -step
+		} else {
+			start -= array.scalar
+		}
+	case OpMul:
+		start *= array.scalar
+		step *= array.scalar
+	default:
+		return i64RangeArray{}, false
+	}
+	if step <= 0 {
+		return i64RangeArray{}, false
+	}
+	return i64RangeArray{start: start, step: step, len: array.len}, true
+}
+
+func binAscendingI64RangeQuerySum(domain, query i64RangeArray) (int64, bool) {
+	if domain.step <= 0 || query.step <= 0 {
+		return 0, false
+	}
+	n := query.len
+	if n == 0 {
+		return 0, true
+	}
+	if domain.len == 0 {
+		return -int64(n), true
+	}
+	last := domain.start + int64(domain.len-1)*domain.step
+	lowEnd := lowerBoundI64RangeIndex(query, domain.start)
+	highStart := lowerBoundI64RangeIndex(query, last)
+	if lowEnd > n {
+		lowEnd = n
+	}
+	if highStart < lowEnd {
+		highStart = lowEnd
+	}
+	if highStart > n {
+		highStart = n
+	}
+	total := -int64(lowEnd)
+	middleN := highStart - lowEnd
+	if middleN > 0 {
+		first := query.start + int64(lowEnd)*query.step - domain.start
+		total += floorSumNonNegative(int64(middleN), domain.step, query.step, first)
+	}
+	total += int64(n-highStart) * int64(domain.len-1)
+	return total, true
+}
+
+func lowerBoundI64RangeIndex(array i64RangeArray, target int64) int {
+	if array.len <= 0 {
+		return 0
+	}
+	if target <= array.start {
+		return 0
+	}
+	diff := target - array.start
+	index := diff / array.step
+	if diff%array.step != 0 {
+		index++
+	}
+	if index > int64(array.len) {
+		return array.len
+	}
+	return int(index)
+}
+
 func binAscendingI64RangeScalar(domain i64RangeArray, query int64) int64 {
 	if domain.len == 0 || query < domain.start {
 		return -1
@@ -4031,6 +4278,24 @@ func binUnsigned[T unsignedScalar](domain []T, query any) (any, bool, error) {
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
 
+func binUnsignedSum[T unsignedScalar](domain []T, query any) (int64, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := unsignedArrayData[T](queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		return binUnsignedSliceSum(domain, values), true, nil
+	}
+	value, ok := query.(T)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 {
+		return -1, true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
 func binFloat[T floatScalar](domain []T, query any) (any, bool, error) {
 	if queryArray, ok := query.(Array); ok {
 		values, ok := floatArrayData[T](queryArray)
@@ -4049,6 +4314,24 @@ func binFloat[T floatScalar](domain []T, query any) (any, bool, error) {
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
 
+func binFloatSum[T floatScalar](domain []T, query any) (int64, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := floatArrayData[T](queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		return binFloatSliceSum(domain, values), true, nil
+	}
+	value, ok := query.(T)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 || math.IsNaN(float64(value)) {
+		return -1, true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
 func binF64(domain []float64, query any) (any, bool, error) {
 	if queryArray, ok := query.(Array); ok {
 		values, ok := floatArrayData[float64](queryArray)
@@ -4063,6 +4346,24 @@ func binF64(domain []float64, query any) (any, bool, error) {
 	}
 	if len(domain) == 0 || math.IsNaN(value) {
 		return int64(-1), true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
+func binF64Sum(domain []float64, query any) (int64, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := floatArrayData[float64](queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		return binFloatSliceSum(domain, values), true, nil
+	}
+	value, ok := numeric(query)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 || math.IsNaN(value) {
+		return -1, true, nil
 	}
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
@@ -4089,6 +4390,28 @@ func binString(domain []string, query any) (any, bool, error) {
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
 
+func binStringSum(domain []string, query any) (int64, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := stringArrayData(queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		var total int64
+		for _, value := range values {
+			total += int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+		}
+		return total, true, nil
+	}
+	value, ok := coerceComparableString(query)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 {
+		return -1, true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
 func binSymbol(domain []Symbol, query any) (any, bool, error) {
 	if queryArray, ok := query.(Array); ok {
 		values, ok := symbolArrayData(queryArray)
@@ -4111,6 +4434,28 @@ func binSymbol(domain []Symbol, query any) (any, bool, error) {
 	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
 }
 
+func binSymbolSum(domain []Symbol, query any) (int64, bool, error) {
+	if queryArray, ok := query.(Array); ok {
+		values, ok := symbolArrayData(queryArray)
+		if !ok {
+			return 0, false, nil
+		}
+		var total int64
+		for _, value := range values {
+			total += int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+		}
+		return total, true, nil
+	}
+	value, ok := coerceComparableSymbol(query)
+	if !ok {
+		return 0, false, nil
+	}
+	if len(domain) == 0 {
+		return -1, true, nil
+	}
+	return int64(sort.Search(len(domain), func(i int) bool { return domain[i] > value }) - 1), true, nil
+}
+
 func binSignedSlice[T signedScalar](domain, query []T) []int64 {
 	out := make([]int64, len(query))
 	for i, value := range query {
@@ -4119,12 +4464,28 @@ func binSignedSlice[T signedScalar](domain, query []T) []int64 {
 	return out
 }
 
+func binSignedSliceSum[T signedScalar](domain, query []T) int64 {
+	var total int64
+	for _, value := range query {
+		total += int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return total
+}
+
 func binUnsignedSlice[T unsignedScalar](domain, query []T) []int64 {
 	out := make([]int64, len(query))
 	for i, value := range query {
 		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
 	}
 	return out
+}
+
+func binUnsignedSliceSum[T unsignedScalar](domain, query []T) int64 {
+	var total int64
+	for _, value := range query {
+		total += int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return total
 }
 
 func binFloatSlice[T floatScalar](domain, query []T) []int64 {
@@ -4137,6 +4498,18 @@ func binFloatSlice[T floatScalar](domain, query []T) []int64 {
 		out[i] = int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
 	}
 	return out
+}
+
+func binFloatSliceSum[T floatScalar](domain, query []T) int64 {
+	var total int64
+	for _, value := range query {
+		if math.IsNaN(float64(value)) {
+			total--
+			continue
+		}
+		total += int64(sort.Search(len(domain), func(row int) bool { return domain[row] > value }) - 1)
+	}
+	return total
 }
 
 func signedArrayData[T signedScalar](array Array) ([]T, bool) {

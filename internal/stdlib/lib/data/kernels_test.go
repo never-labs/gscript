@@ -425,6 +425,56 @@ func TestTypedBinTemporalAndSymbolVectors(t *testing.T) {
 	}
 }
 
+func TestTryTypedBinSumAvoidsMaterializedResult(t *testing.T) {
+	rangeDomain := NewI64Range(0, 10, 8)
+	sum, ok, err := TryTypedBinSum(rangeDomain, NewI64Range(0, 1, 80))
+	if err != nil {
+		t.Fatalf("TryTypedBinSum range returned error: %v", err)
+	}
+	if !ok || sum != int64(280) {
+		t.Fatalf("TryTypedBinSum range = %v, %v; want 280, true", sum, ok)
+	}
+
+	intDomain := WithArrayAttribute(NewI64([]int64{10, 20, 20, 40}), ArrayAttributeSorted)
+	sum, ok, err = TryTypedBinSum(intDomain, NewColumn("q", []any{int64(5), int64(10), nil, int64(30), int64(50)}).Data)
+	if err != nil {
+		t.Fatalf("TryTypedBinSum nullable query returned error: %v", err)
+	}
+	if !ok || sum != int64(3) {
+		t.Fatalf("TryTypedBinSum nullable query = %v, %v; want 3, true", sum, ok)
+	}
+
+	dateDomain := WithArrayAttribute(NewDate([]Date{
+		DateFromDays(20610),
+		DateFromDays(20611),
+		DateFromDays(20611),
+		DateFromDays(20613),
+	}), ArrayAttributeSorted)
+	dateQueries := NewDate([]Date{
+		DateFromDays(20609),
+		DateFromDays(20610),
+		DateFromDays(20611),
+		DateFromDays(20612),
+		DateFromDays(20614),
+	})
+	sum, ok, err = TryTypedBinSum(dateDomain, dateQueries)
+	if err != nil {
+		t.Fatalf("TryTypedBinSum date returned error: %v", err)
+	}
+	if !ok || sum != int64(6) {
+		t.Fatalf("TryTypedBinSum date = %v, %v; want 6, true", sum, ok)
+	}
+
+	symbolDomain := WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "MSFT", "NVDA"}), ArrayAttributeSorted)
+	sum, ok, err = TryTypedBinSum(symbolDomain, NewSymbols([]string{"A", "AAPL", "MSFT", "TSLA"}))
+	if err != nil {
+		t.Fatalf("TryTypedBinSum symbol returned error: %v", err)
+	}
+	if !ok || sum != int64(4) {
+		t.Fatalf("TryTypedBinSum symbol = %v, %v; want 4, true", sum, ok)
+	}
+}
+
 func TestQueryKernelSupportReasonForTimeSeriesVectorTransforms(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("ts", []any{TimestampFromUnixNanos(1_000), TimestampFromUnixNanos(2_000)}),
