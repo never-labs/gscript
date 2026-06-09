@@ -155,6 +155,14 @@ var qEvalRequiredSemanticShapes = []string{
 	"null:fill-arithmetic-where:row-scaled",
 }
 
+var qEvalRequiredPipelineCategories = []string{
+	"xbar_within",
+	"where_project_reduce",
+	"group_fby",
+	"sort_gather",
+	"ordinary_list_adverb",
+}
+
 func buildQEvalVectorCases() []qEvalVectorCase {
 	cases := make([]qEvalVectorCase, 0, 128)
 
@@ -2792,6 +2800,7 @@ func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	covered := make(map[string][]string)
 	matrixCovered := make(map[string][]string)
 	shapeCovered := make(map[string][]string)
+	categoryCovered := make(map[string][]string)
 	for _, tc := range qEvalVectorCases {
 		for _, tag := range tc.tags {
 			covered[tag] = append(covered[tag], tc.name)
@@ -2801,6 +2810,9 @@ func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 		}
 		for _, shape := range tc.shapes {
 			shapeCovered[shape] = append(shapeCovered[shape], tc.name)
+		}
+		for _, category := range qEvalVectorPipelineCategories(tc) {
+			categoryCovered[category] = append(categoryCovered[category], tc.name)
 		}
 	}
 	var missing []string
@@ -2829,6 +2841,29 @@ func TestQEvalVectorBenchmarkCoverageTags(t *testing.T) {
 	}
 	if len(missingShapes) > 0 {
 		t.Fatalf("q.eval performance coverage missing semantic shapes: %s", strings.Join(missingShapes, ", "))
+	}
+	var missingCategories []string
+	for _, category := range qEvalRequiredPipelineCategories {
+		if len(categoryCovered[category]) == 0 {
+			missingCategories = append(missingCategories, category)
+		}
+	}
+	if len(missingCategories) > 0 {
+		t.Fatalf("q.eval performance coverage missing pipeline categories: %s", strings.Join(missingCategories, ", "))
+	}
+}
+
+func TestQEvalVectorRuntimeFallbackReport(t *testing.T) {
+	eval := qSessionEvalVectorEval(t)
+	report := qEvalVectorRuntimeFallbackReport(t, eval, qEvalVectorRows)
+	if report.caseCount != len(qEvalVectorCases) {
+		t.Fatalf("fallback report case count = %d, want %d", report.caseCount, len(qEvalVectorCases))
+	}
+	if len(report.categories) < len(qEvalRequiredPipelineCategories) {
+		t.Fatalf("fallback report categories = %d, want at least %d", len(report.categories), len(qEvalRequiredPipelineCategories))
+	}
+	for _, line := range report.LogLines(10) {
+		t.Log(line)
 	}
 }
 
@@ -2863,6 +2898,7 @@ func BenchmarkQSessionEvalVectorWarmExecution(b *testing.B) {
 			}
 			b.StopTimer()
 			qEvalVectorReportRuntimeKernelStats(b)
+			qEvalVectorReportPipelineCategories(b, tc)
 		})
 	}
 }
@@ -2974,6 +3010,192 @@ func qEvalVectorReportRuntimeKernelStats(b *testing.B) {
 		b.ReportMetric(float64(len(pipelineShapes)), "typed_pipeline_shapes")
 		b.ReportMetric(float64(len(fallbackPipelineShapes)), "typed_pipeline_fallback_shapes")
 	}
+}
+
+func qEvalVectorReportPipelineCategories(b *testing.B, tc qEvalVectorCase) {
+	b.Helper()
+	for _, category := range qEvalVectorPipelineCategories(tc) {
+		b.ReportMetric(1, "q_pipeline_category_"+category)
+	}
+}
+
+type qEvalVectorRuntimeFallbackSummary struct {
+	caseCount  int
+	categories map[string]struct{}
+	rows       map[qEvalVectorRuntimeFallbackKey]uint64
+}
+
+type qEvalVectorRuntimeFallbackKey struct {
+	category      string
+	pipelineShape string
+	kernel        string
+	reason        string
+	outcome       string
+}
+
+type qEvalVectorRuntimeFallbackRow struct {
+	key   qEvalVectorRuntimeFallbackKey
+	count uint64
+}
+
+func qEvalVectorRuntimeFallbackReportForCases(tb testing.TB, eval *bind.GoFunction, rows int, cases []qEvalVectorCase) qEvalVectorRuntimeFallbackSummary {
+	tb.Helper()
+	report := qEvalVectorRuntimeFallbackSummary{
+		categories: make(map[string]struct{}),
+		rows:       make(map[qEvalVectorRuntimeFallbackKey]uint64),
+	}
+	for _, tc := range cases {
+		categories := qEvalVectorPipelineCategories(tc)
+		if len(categories) == 0 {
+			categories = []string{"uncategorized"}
+		}
+		for _, category := range categories {
+			report.categories[category] = struct{}{}
+		}
+		stdq.ClearRuntimeKernelExecutionStats()
+		qEvalVectorBenchSink = qEvalVectorRun(tb, eval, tc.expr(rows))
+		report.caseCount++
+		for _, stat := range stdq.RuntimeKernelExecutionStats() {
+			if stat.Outcome != "fallback" && stat.Outcome != "error" {
+				continue
+			}
+			for _, category := range categories {
+				key := qEvalVectorRuntimeFallbackKey{
+					category:      category,
+					pipelineShape: qEvalRuntimeStatField(stat.PipelineShape),
+					kernel:        qEvalRuntimeStatField(stat.Kernel),
+					reason:        qEvalRuntimeStatField(stat.ReasonCode),
+					outcome:       qEvalRuntimeStatField(stat.Outcome),
+				}
+				report.rows[key] += stat.Count
+			}
+		}
+	}
+	stdq.ClearRuntimeKernelExecutionStats()
+	return report
+}
+
+func qEvalVectorRuntimeFallbackReport(tb testing.TB, eval *bind.GoFunction, rows int) qEvalVectorRuntimeFallbackSummary {
+	tb.Helper()
+	return qEvalVectorRuntimeFallbackReportForCases(tb, eval, rows, qEvalVectorCases)
+}
+
+func (r qEvalVectorRuntimeFallbackSummary) Rows() []qEvalVectorRuntimeFallbackRow {
+	rows := make([]qEvalVectorRuntimeFallbackRow, 0, len(r.rows))
+	for key, count := range r.rows {
+		rows = append(rows, qEvalVectorRuntimeFallbackRow{key: key, count: count})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.count != b.count {
+			return a.count > b.count
+		}
+		if a.key.category != b.key.category {
+			return a.key.category < b.key.category
+		}
+		if a.key.pipelineShape != b.key.pipelineShape {
+			return a.key.pipelineShape < b.key.pipelineShape
+		}
+		if a.key.kernel != b.key.kernel {
+			return a.key.kernel < b.key.kernel
+		}
+		if a.key.reason != b.key.reason {
+			return a.key.reason < b.key.reason
+		}
+		return a.key.outcome < b.key.outcome
+	})
+	return rows
+}
+
+func (r qEvalVectorRuntimeFallbackSummary) LogLines(limit int) []string {
+	rows := r.Rows()
+	if limit > 0 && len(rows) > limit {
+		rows = rows[:limit]
+	}
+	lines := make([]string, 0, len(rows)+1)
+	lines = append(lines, fmt.Sprintf("q_pipeline_fallback_report cases=%d categories=%d rows=%d", r.caseCount, len(r.categories), len(r.rows)))
+	if len(rows) == 0 {
+		lines = append(lines, "q_pipeline_fallback_report rank=none category=none pipeline_shape=none kernel=none reason=none outcome=none count=0")
+		return lines
+	}
+	for i, row := range rows {
+		lines = append(lines, fmt.Sprintf(
+			"q_pipeline_fallback_report rank=%d category=%s pipeline_shape=%s kernel=%s reason=%s outcome=%s count=%d",
+			i+1,
+			row.key.category,
+			row.key.pipelineShape,
+			row.key.kernel,
+			row.key.reason,
+			row.key.outcome,
+			row.count,
+		))
+	}
+	return lines
+}
+
+func qEvalRuntimeStatField(value string) string {
+	if value == "" {
+		return "unknown"
+	}
+	return strings.ReplaceAll(value, " ", "_")
+}
+
+func qEvalVectorPipelineCategories(tc qEvalVectorCase) []string {
+	seen := make(map[string]struct{}, 4)
+	add := func(category string) {
+		seen[category] = struct{}{}
+	}
+	hasTag := func(tag string) bool {
+		for _, item := range tc.tags {
+			if item == tag {
+				return true
+			}
+		}
+		return false
+	}
+	hasShapePrefix := func(prefix string) bool {
+		for _, item := range tc.shapes {
+			if strings.HasPrefix(item, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	hasMatrixPrefix := func(prefix string) bool {
+		for _, item := range tc.matrix {
+			if strings.HasPrefix(item, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	name := strings.ToLower(tc.name)
+	if strings.Contains(name, "xbarwithin") || (hasTag("xbar") && (hasTag("bin-within-xrank") || strings.Contains(name, "within"))) {
+		add("xbar_within")
+	}
+	if strings.Contains(name, "where") && (strings.Contains(name, "project") || strings.Contains(name, "gather") || strings.Contains(name, "sum") || strings.Contains(name, "count")) {
+		add("where_project_reduce")
+	}
+	if hasShapePrefix("where:") || hasShapePrefix("index:gather-after-where") || hasTag("where") {
+		add("where_project_reduce")
+	}
+	if hasTag("fby") || hasTag("group") || hasShapePrefix("group:") || hasMatrixPrefix("table:xkey-xgroup") {
+		add("group_fby")
+	}
+	if hasTag("table-sort") || hasShapePrefix("sort:") || hasMatrixPrefix("sort:") || strings.Contains(name, "sort") || strings.Contains(name, "gather") {
+		add("sort_gather")
+	}
+	if hasTag("adverb-over-scan") || hasTag("adverb-each") || hasTag("adverb-each-prior") || hasTag("adverb-each-left-right") ||
+		hasTag("cut") || hasTag("enlist") || hasTag("raze") || hasShapePrefix("adverb:") || hasMatrixPrefix("list:") ||
+		strings.Contains(name, "adverb") || strings.Contains(name, "list") || strings.Contains(name, "deltas") {
+		add("ordinary_list_adverb")
+	}
+	out := make([]string, 0, len(seen))
+	for category := range seen {
+		out = append(out, category)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func qEvalVectorInt64(tb testing.TB, v bind.Value) int64 {

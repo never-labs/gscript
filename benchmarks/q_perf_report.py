@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BENCH_RE = re.compile(r"^(Benchmark[^\s]+)\s+(\d+)\s+([0-9.]+)\s+ns/op(?:\s+(.*))?$")
 BENCH_NO_NS_RE = re.compile(r"^(Benchmark[^\s]+)\s+(\d+)\s+(.*)$")
 BENCH_CPU_SUFFIX_RE = re.compile(r"-\d+$")
+Q_PIPELINE_FALLBACK_RE = re.compile(r"q_pipeline_fallback_report\s+(.*)$")
 MIN_TRUSTED_GO_BASELINE_NS = 100.0
 
 QSQL_BENCH = (
@@ -105,6 +106,28 @@ class RuntimeMetricRow:
     typed_kernel_errors_op: float | None
     typed_pipeline_shapes: float | None
     typed_pipeline_fallback_shapes: float | None
+
+
+@dataclass
+class PipelineFallbackTopRow:
+    category: str
+    pipeline_shape: str
+    kernel: str
+    reason: str
+    outcome: str
+    count: int
+
+
+@dataclass
+class PipelineCategoryMetricRow:
+    category: str
+    benchmark_count: int
+    avg_ns_op: float | None
+    avg_bytes_op: float | None
+    avg_allocs_op: float | None
+    avg_typed_hit_pct: float | None
+    total_fallbacks_op: float
+    total_fallback_shapes: float
 
 
 @dataclass
@@ -244,6 +267,52 @@ def parse_metric_pairs(text: str) -> dict[str, float]:
     return metrics
 
 
+def parse_key_value_tokens(text: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for token in text.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        out[key] = value
+    return out
+
+
+def parse_q_pipeline_fallback_reports(output: str) -> list[PipelineFallbackTopRow]:
+    rows: dict[tuple[str, str, str, str, str], int] = {}
+    for line in output.splitlines():
+        match = Q_PIPELINE_FALLBACK_RE.search(line)
+        if not match:
+            continue
+        fields = parse_key_value_tokens(match.group(1))
+        if fields.get("rank") in ("none", None):
+            continue
+        try:
+            count = int(fields.get("count", "0"))
+        except ValueError:
+            continue
+        key = (
+            fields.get("category") or "unknown",
+            fields.get("pipeline_shape") or "unknown",
+            fields.get("kernel") or "unknown",
+            fields.get("reason") or "unknown",
+            fields.get("outcome") or "unknown",
+        )
+        rows[key] = rows.get(key, 0) + count
+    out = [
+        PipelineFallbackTopRow(
+            category=category,
+            pipeline_shape=pipeline_shape,
+            kernel=kernel,
+            reason=reason,
+            outcome=outcome,
+            count=count,
+        )
+        for (category, pipeline_shape, kernel, reason, outcome), count in rows.items()
+    ]
+    out.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
+    return out
+
+
 def ratio(rows: dict[str, BenchRow], numerator: str, denominator: str) -> float | None:
     left = rows.get(numerator)
     right = rows.get(denominator)
@@ -348,6 +417,38 @@ def build_fallback_shape_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
         or (row.typed_kernel_fallbacks_op or 0) > 0
         or (row.fallbacks_op or 0) > 0
     ]
+
+
+def average(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def build_pipeline_category_metric_rows(rows: dict[str, BenchRow]) -> list[PipelineCategoryMetricRow]:
+    grouped: dict[str, list[BenchRow]] = {}
+    for row in rows.values():
+        if not row.name.startswith("BenchmarkQSessionEvalVectorWarmExecution/"):
+            continue
+        for metric in row.metrics:
+            if metric.startswith("q_pipeline_category_") and row.metrics.get(metric, 0) > 0:
+                category = metric.removeprefix("q_pipeline_category_")
+                grouped.setdefault(category, []).append(row)
+    out: list[PipelineCategoryMetricRow] = []
+    for category, items in sorted(grouped.items()):
+        out.append(
+            PipelineCategoryMetricRow(
+                category=category,
+                benchmark_count=len(items),
+                avg_ns_op=average([item.ns_op for item in items]),
+                avg_bytes_op=average([item.metrics["B/op"] for item in items if "B/op" in item.metrics]),
+                avg_allocs_op=average([item.metrics["allocs/op"] for item in items if "allocs/op" in item.metrics]),
+                avg_typed_hit_pct=average([item.metrics["typed_kernel_hit_pct"] for item in items if "typed_kernel_hit_pct" in item.metrics]),
+                total_fallbacks_op=sum(item.metrics.get("typed_kernel_fallbacks/op", item.metrics.get("fallbacks/op", 0.0)) for item in items),
+                total_fallback_shapes=sum(item.metrics.get("typed_pipeline_fallback_shapes", 0.0) for item in items),
+            )
+        )
+    return out
 
 
 def qeval_cases(rows: dict[str, BenchRow], prefix: str) -> set[str]:
@@ -640,15 +741,18 @@ def markdown_report(
     commands: list[CommandResult],
     current_vs_old: list[CurrentVsOldRow] | None = None,
     gate_checks: list[GateCheck] | None = None,
+    pipeline_fallback_top: list[PipelineFallbackTopRow] | None = None,
 ) -> str:
     current_vs_old = current_vs_old or []
     gate_checks = gate_checks or []
+    pipeline_fallback_top = pipeline_fallback_top or []
     coverage = build_coverage(rows, current_vs_old)
     qsql_coverage = build_qsql_benchmark_coverage(rows)
     qeval_compute = build_qeval_compute_coverage(rows)
     ratios = build_ratios(rows)
     runtime_metrics = build_runtime_metric_rows(rows)
     fallback_shapes = build_fallback_shape_rows(rows)
+    category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
         "",
@@ -817,6 +921,47 @@ def markdown_report(
     lines.extend(
         [
             "",
+            "## Pipeline Category Metrics",
+            "",
+            "| Category | Benchmarks | avg ns/op | avg B/op | avg allocs/op | avg typed hit pct | total fallbacks/op | total fallback shapes |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    if category_metrics:
+        for item in category_metrics:
+            lines.append(
+                f"| {item.category} | {item.benchmark_count} | "
+                f"{format_metric(item.avg_ns_op, 0)} | "
+                f"{format_metric(item.avg_bytes_op, 0)} | "
+                f"{format_metric(item.avg_allocs_op, 1)} | "
+                f"{format_metric(item.avg_typed_hit_pct, 1)} | "
+                f"{item.total_fallbacks_op:.3f} | "
+                f"{item.total_fallback_shapes:.0f} |"
+            )
+    else:
+        lines.append("| missing | 0 | missing | missing | missing | missing | 0 | 0 |")
+    lines.extend(
+        [
+            "",
+            "## Pipeline Fallback Top-N",
+            "",
+            "Rows come from `go test ./benchmarks -run TestQEvalVectorRuntimeFallbackReport -v` output.",
+            "",
+            "| Category | Pipeline shape | Kernel | Reason | Outcome | Count |",
+            "|---|---|---|---|---|---:|",
+        ]
+    )
+    if pipeline_fallback_top:
+        for item in pipeline_fallback_top:
+            lines.append(
+                f"| {item.category} | {item.pipeline_shape} | {item.kernel} | "
+                f"{item.reason} | {item.outcome} | {item.count} |"
+            )
+    else:
+        lines.append("| missing | missing | missing | missing | missing | 0 |")
+    lines.extend(
+        [
+            "",
             "## Raw Benchmarks",
             "",
             "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_fallbacks/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes |",
@@ -862,17 +1007,20 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-typed-fallbacks-op", type=float, default=0.0)
     parser.add_argument("--max-pipeline-fallback-shapes", type=float, default=0.0)
     parser.add_argument("--max-allocs-op", type=float, default=64.0)
+    parser.add_argument("--fallback-top-n", type=int, default=20)
     args = parser.parse_args(argv)
 
     commands: list[CommandResult] = []
     rows: dict[str, BenchRow] = {}
     current_vs_old: list[CurrentVsOldRow] = []
+    pipeline_fallback_rows: list[PipelineFallbackTopRow] = []
 
     if args.from_output:
         for path in args.from_output:
             output = path.read_text()
             parsed = parse_go_benchmarks(output)
             rows.update(parsed)
+            pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(output))
             commands.append(
                 CommandResult(
                     label=f"from-output:{path}",
@@ -891,6 +1039,7 @@ def main(argv: list[str]) -> int:
         qsql.parsed_benchmark_count = len(qsql_rows)
         commands.append(qsql)
         rows.update(qsql_rows)
+        pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qsql.output))
 
         qeval = run_command(
             "qeval-native",
@@ -900,6 +1049,7 @@ def main(argv: list[str]) -> int:
         qeval.parsed_benchmark_count = len(qeval_rows)
         commands.append(qeval)
         rows.update(qeval_rows)
+        pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qeval.output))
 
     for path in args.timing_json:
         current_vs_old.extend(parse_timing_compare_json(path))
@@ -912,12 +1062,17 @@ def main(argv: list[str]) -> int:
         max_allocs_op=args.max_allocs_op,
     )
     gate_checks = build_gate_checks(rows, policy) if args.check else []
+    pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
+    if args.fallback_top_n >= 0:
+        pipeline_fallback_rows = pipeline_fallback_rows[: args.fallback_top_n]
     payload = {
         "commands": [asdict(command) for command in commands],
         "benchmarks": {name: asdict(row) for name, row in sorted(rows.items())},
         "coverage": build_coverage(rows, current_vs_old),
         "current_vs_old": [asdict(row) for row in current_vs_old],
         "runtime_metrics": [asdict(row) for row in build_runtime_metric_rows(rows)],
+        "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
+        "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "ratios": [asdict(row) for row in build_ratios(rows)],
@@ -929,7 +1084,7 @@ def main(argv: list[str]) -> int:
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.markdown.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    args.markdown.write_text(markdown_report(rows, commands, current_vs_old, gate_checks))
+    args.markdown.write_text(markdown_report(rows, commands, current_vs_old, gate_checks, pipeline_fallback_rows))
 
     for command in commands:
         if command.exit_code != 0:
