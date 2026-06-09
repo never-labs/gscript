@@ -882,10 +882,10 @@ const (
 )
 
 type qEvalFastPlan struct {
-	kind           qEvalFastPlanKind
-	pipeline       qPipelinePlan
-	scalarIndex    qScalarApplyIndexPlan
-	sortRankSource string
+	kind          qEvalFastPlanKind
+	pipeline      qPipelinePlan
+	scalarIndex   qScalarApplyIndexPlan
+	sortRankTerms []qSortRankReducerTermPlan
 }
 
 type qScriptExecutableKind uint8
@@ -1595,8 +1595,8 @@ func buildQEvalFastPlan(src string) qEvalFastPlan {
 	if scalar, ok := buildScalarApplyIndexPlan(src); ok {
 		return qEvalFastPlan{kind: qEvalFastScalarApplyIndex, scalarIndex: scalar}
 	}
-	if qSortRankReducerBundleCandidate(src) {
-		return qEvalFastPlan{kind: qEvalFastSortRankReducerBundle, sortRankSource: src}
+	if sortRankTerms := buildQSortRankReducerBundlePlan(src); len(sortRankTerms) > 0 {
+		return qEvalFastPlan{kind: qEvalFastSortRankReducerBundle, sortRankTerms: sortRankTerms}
 	}
 	if qPipelinePlanCandidate(src) {
 		if qPipelinePlanGlobalCacheable(src) {
@@ -1631,7 +1631,7 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 		}
 		return scalarApplyIndexPlanValue(plan.scalarIndex, target)
 	case qEvalFastSortRankReducerBundle:
-		return s.tryEvalSortRankReducerBundle(plan.sortRankSource)
+		return s.evalSortRankReducerBundlePlan(plan.sortRankTerms)
 	default:
 		return nil, false, nil
 	}
@@ -5005,14 +5005,40 @@ func (s *EvalState) tryEvalSortedEdge(src string) (any, bool, error) {
 	return nil, false, nil
 }
 
+type qSortRankReducerTermKind uint8
+
+const (
+	qSortRankReducerTermInvalid qSortRankReducerTermKind = iota
+	qSortRankReducerTermSortIndexSum
+	qSortRankReducerTermRankSum
+	qSortRankReducerTermSortedEdge
+)
+
+type qSortRankReducerTermPlan struct {
+	kind        qSortRankReducerTermKind
+	arg         string
+	argExpr     Expr
+	argValue    any
+	hasArgValue bool
+	descending  bool
+	last        bool
+}
+
 func (s *EvalState) tryEvalSortRankReducerBundle(src string) (any, bool, error) {
-	terms := qSortRankReducerPlusTerms(src)
+	terms := buildQSortRankReducerBundlePlan(src)
 	if len(terms) < 2 {
 		return nil, false, nil
 	}
-	var out any = int64(0)
+	return s.evalSortRankReducerBundlePlan(terms)
+}
+
+func (s *EvalState) evalSortRankReducerBundlePlan(terms []qSortRankReducerTermPlan) (any, bool, error) {
+	if len(terms) < 2 {
+		return nil, false, nil
+	}
+	var total int64
 	for _, term := range terms {
-		value, handled, err := s.evalSortRankReducerTerm(term)
+		value, handled, err := s.evalSortRankReducerTermPlan(term)
 		if err != nil {
 			recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(terms)), false, err, RuntimeFallbackUnsupportedType)
 			return nil, true, err
@@ -5020,29 +5046,99 @@ func (s *EvalState) tryEvalSortRankReducerBundle(src string) (any, bool, error) 
 		if !handled {
 			return nil, false, nil
 		}
-		out, err = applyDyadic('+', out, value)
-		if err != nil {
+		n, ok := integerValue(value)
+		if !ok {
+			err := fmt.Errorf("sort/rank reducer term returned non-integer %T", value)
 			recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(terms)), false, err, RuntimeFallbackUnsupportedType)
 			return nil, true, err
 		}
+		total += n
 	}
 	recordRuntimeKernelProbeReason("SortRankReducerBundle", "sort-rank-reducer-bundle/"+strconv.Itoa(len(terms)), true, nil, RuntimeFallbackUnsupportedType)
-	return out, true, nil
+	return total, true, nil
 }
 
-func (s *EvalState) evalSortRankReducerTerm(src string) (any, bool, error) {
-	src = stripEnclosingParens(strings.TrimSpace(src))
-	if strings.HasPrefix(src, "+/") {
-		body := strings.TrimSpace(src[len("+/"):])
-		if out, handled, err := s.tryEvalSortIndexSum(body); err != nil || handled {
-			return out, handled, err
-		}
-		if out, handled, err := s.tryEvalRankSum(body); err != nil || handled {
-			return out, handled, err
-		}
+func (s *EvalState) evalSortRankReducerTermPlan(term qSortRankReducerTermPlan) (any, bool, error) {
+	switch term.kind {
+	case qSortRankReducerTermSortIndexSum:
+		return s.evalSortIndexSumPlan(term.arg, term.argExpr, term.argValue, term.hasArgValue, term.descending)
+	case qSortRankReducerTermRankSum:
+		return s.evalRankSumPlan(term.arg, term.argExpr, term.argValue, term.hasArgValue)
+	case qSortRankReducerTermSortedEdge:
+		return s.evalSortedEdgePlan(term.arg, term.argExpr, term.argValue, term.hasArgValue, term.descending, term.last)
+	default:
 		return nil, false, nil
 	}
-	return s.tryEvalSortedEdge(src)
+}
+
+func (s *EvalState) evalSortIndexSumPlan(arg string, expr Expr, staticValue any, hasStaticValue bool, descending bool) (any, bool, error) {
+	value, err := s.evalSortRankReducerArgValue(arg, expr, staticValue, hasStaticValue)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return int64(0), true, nil
+	}
+	order := "asc"
+	if descending {
+		order = "desc"
+	}
+	shape := "sort-index-sum/" + string(array.Kind()) + "/" + order
+	out, handled, err := data.TryTypedSortIndexSumI64(array, descending)
+	return qTypedRuntimeResult("ArraySortIndexSum", shape, out, handled, err)
+}
+
+func (s *EvalState) evalRankSumPlan(arg string, expr Expr, staticValue any, hasStaticValue bool) (any, bool, error) {
+	value, err := s.evalSortRankReducerArgValue(arg, expr, staticValue, hasStaticValue)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return int64(0), true, nil
+	}
+	shape := "rank-sum/" + string(array.Kind())
+	out, handled, err := data.TryTypedRankSumI64(array)
+	return qTypedRuntimeResultReason("ArrayRankSum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalSortedEdgePlan(arg string, expr Expr, staticValue any, hasStaticValue bool, descending bool, last bool) (any, bool, error) {
+	value, err := s.evalSortRankReducerArgValue(arg, expr, staticValue, hasStaticValue)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	order := "asc"
+	if descending {
+		order = "desc"
+	}
+	edge := "first"
+	if last {
+		edge = "last"
+	}
+	shape := "sort-edge/" + string(array.Kind()) + "/" + order + "/" + edge
+	out, handled, err := data.TryTypedSortedEdge(array, descending, last)
+	return qTypedRuntimeResultReason("ArraySortedEdge", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+}
+
+func (s *EvalState) evalSortRankReducerArgValue(arg string, expr Expr, staticValue any, hasStaticValue bool) (any, error) {
+	if hasStaticValue {
+		return staticValue, nil
+	}
+	if expr != nil {
+		value, err := s.evalValueExpr(expr)
+		if err == nil {
+			return value, nil
+		}
+		if !isUnsupportedEvalValueExpr(err) {
+			return nil, err
+		}
+	}
+	return s.eval(arg)
 }
 
 func qSortRankReducerPlusTerms(src string) []string {
@@ -5102,34 +5198,114 @@ func qSortRankReducerPlusTerms(src string) []string {
 }
 
 func qSortRankReducerBundleCandidate(src string) bool {
+	return len(buildQSortRankReducerBundlePlan(src)) > 0
+}
+
+func buildQSortRankReducerBundlePlan(src string) []qSortRankReducerTermPlan {
 	terms := qSortRankReducerPlusTerms(src)
 	if len(terms) < 2 {
-		return false
+		return nil
 	}
+	out := make([]qSortRankReducerTermPlan, 0, len(terms))
 	for _, term := range terms {
-		if !qSortRankReducerTermCandidate(term) {
-			return false
+		plan, ok := qSortRankReducerTermPlanFor(term)
+		if !ok {
+			return nil
 		}
+		out = append(out, plan)
 	}
-	return true
+	return out
 }
 
 func qSortRankReducerTermCandidate(src string) bool {
+	_, ok := qSortRankReducerTermPlanFor(src)
+	return ok
+}
+
+func qSortRankReducerTermPlanFor(src string) (qSortRankReducerTermPlan, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	if strings.HasPrefix(src, "+/") {
 		body := strings.TrimSpace(src[len("+/"):])
-		return strings.HasPrefix(body, "iasc ") ||
-			strings.HasPrefix(body, "idesc ") ||
-			strings.HasPrefix(body, "rank ")
+		switch {
+		case strings.HasPrefix(body, "iasc ") && wordBoundary(body, 0, len("iasc")):
+			arg := strings.TrimSpace(body[len("iasc "):])
+			expr, value, hasValue := qSortRankReducerArgPlan(arg)
+			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortIndexSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue}, true
+		case strings.HasPrefix(body, "idesc ") && wordBoundary(body, 0, len("idesc")):
+			arg := strings.TrimSpace(body[len("idesc "):])
+			expr, value, hasValue := qSortRankReducerArgPlan(arg)
+			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortIndexSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, descending: true}, true
+		case strings.HasPrefix(body, "rank ") && wordBoundary(body, 0, len("rank")):
+			arg := strings.TrimSpace(body[len("rank "):])
+			expr, value, hasValue := qSortRankReducerArgPlan(arg)
+			return qSortRankReducerTermPlan{kind: qSortRankReducerTermRankSum, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue}, true
+		default:
+			return qSortRankReducerTermPlan{}, false
+		}
 	}
 	for _, edge := range []string{"first ", "last "} {
 		if !strings.HasPrefix(src, edge) {
 			continue
 		}
+		last := strings.HasPrefix(edge, "last")
 		body := strings.TrimSpace(src[len(edge):])
-		return strings.HasPrefix(body, "asc ") || strings.HasPrefix(body, "desc ")
+		switch {
+		case strings.HasPrefix(body, "asc ") && wordBoundary(body, 0, len("asc")):
+			arg := strings.TrimSpace(body[len("asc "):])
+			expr, value, hasValue := qSortRankReducerArgPlan(arg)
+			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortedEdge, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, last: last}, true
+		case strings.HasPrefix(body, "desc ") && wordBoundary(body, 0, len("desc")):
+			arg := strings.TrimSpace(body[len("desc "):])
+			expr, value, hasValue := qSortRankReducerArgPlan(arg)
+			return qSortRankReducerTermPlan{kind: qSortRankReducerTermSortedEdge, arg: arg, argExpr: expr, argValue: value, hasArgValue: hasValue, descending: true, last: last}, true
+		default:
+			return qSortRankReducerTermPlan{}, false
+		}
 	}
-	return false
+	return qSortRankReducerTermPlan{}, false
+}
+
+func qSortRankReducerArgPlan(arg string) (Expr, any, bool) {
+	expr, ok, err := parseValueExpr(arg)
+	if err != nil || !ok {
+		return nil, nil, false
+	}
+	value, ok := staticQValueExpr(expr)
+	return expr, value, ok
+}
+
+func staticQValueExpr(expr Expr) (any, bool) {
+	switch x := expr.(type) {
+	case Number:
+		value, _, err := parseNumberOrBool(x.Text)
+		return value, err == nil
+	case String:
+		return x.Value, true
+	case Symbol:
+		return data.Symbol(x.Name), true
+	case Bool:
+		return x.Value, true
+	case Null:
+		return data.NullValue, true
+	case Temporal:
+		value, err := parseQTemporal(x.Kind, x.Text)
+		return value, err == nil
+	case TypedNull:
+		return data.NullForKind(data.Kind(x.Kind)), true
+	case Vector:
+		values := make([]any, len(x.Items))
+		for i, item := range x.Items {
+			value, ok := staticQValueExpr(item)
+			if !ok {
+				return nil, false
+			}
+			values[i] = value
+		}
+		value, err := evalValueVector(values)
+		return value, err == nil
+	default:
+		return nil, false
+	}
 }
 
 func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {

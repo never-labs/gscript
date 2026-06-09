@@ -4570,6 +4570,20 @@ func TestQSortRankReducerPlusTerms(t *testing.T) {
 	}
 }
 
+func TestQSortRankReducerPlanHoistsOnlyStaticArgs(t *testing.T) {
+	terms := buildQSortRankReducerBundlePlan("(+/iasc 3 1 2 1)+(+/rank x)")
+	if len(terms) != 2 {
+		t.Fatalf("plan terms = %#v, want 2", terms)
+	}
+	if !terms[0].hasArgValue {
+		t.Fatalf("literal sort/rank arg was not hoisted: %#v", terms[0])
+	}
+	if terms[1].hasArgValue {
+		t.Fatalf("dynamic sort/rank arg was hoisted: %#v", terms[1])
+	}
+	assertEvalValue(t, "x:4 1 3;(+/iasc 3 1 2 1)+(+/rank x)", int64(9))
+}
+
 func TestEvalConditionalSpecialForms(t *testing.T) {
 	assertEvalValue(t, "$[1;2;3]", int64(2))
 	assertEvalValue(t, "$[0;2;3]", int64(3))
