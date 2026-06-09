@@ -14,6 +14,7 @@ const (
 	qScriptPipelineGatherReduceSum     qScriptPipelineKind = "gather-reduce/sum"
 	qScriptPipelineSequenceEdgeSum     qScriptPipelineKind = "sequence-edge-reduce/sum-first-last"
 	qScriptPipelineSumPlusDyadicFloat  qScriptPipelineKind = "multi-reduce/sum-plus-dyadic-float-sum"
+	qScriptPipelineIntegerDivModReduce qScriptPipelineKind = "multi-reduce/integer-divmod-sum-count"
 	qScriptPipelineMatrixRowSumCount   qScriptPipelineKind = "matrix-row-reduce/sum-count"
 	qScriptPipelineMatrixCellPlusCount qScriptPipelineKind = "matrix-cell-reduce/cell-plus-count"
 	qScriptPipelineCallableDotSumRight qScriptPipelineKind = "callable-dot/sum-plus-right"
@@ -49,6 +50,8 @@ type qScriptPipelineDescriptor struct {
 	scalarExpr        string
 	scalarPlan        qScriptBindingPlan
 	scalarLeft        bool
+	integerTerms      []qScriptPipelineIntegerDivModTerm
+	includeCount      bool
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
 	moduloMaskPlan    *qPipelinePlan
@@ -151,6 +154,9 @@ func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qS
 		}, true
 	}
 	if descriptor, ok := qScriptPipelineSumPlusDyadicFloatDescriptor(src, bindings); ok {
+		return descriptor, true
+	}
+	if descriptor, ok := qScriptPipelineIntegerDivModDescriptor(src, bindings); ok {
 		return descriptor, true
 	}
 	if descriptor, ok := qScriptPipelineMatrixCellPlusCountDescriptor(src, bindings); ok {
@@ -364,6 +370,86 @@ func qScriptPipelineDyadicFloatReducerTermFor(src string) (qScriptPipelineDyadic
 	return qScriptPipelineDyadicFloatReducerTerm{}, false
 }
 
+type qScriptPipelineIntegerDivModTerm struct {
+	op         data.Op
+	valueExpr  string
+	scalarExpr string
+}
+
+func qScriptPipelineIntegerDivModDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
+	terms := qScriptPipelinePlusTerms(src)
+	if len(terms) < 2 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	var valueExpr string
+	var includeCount bool
+	reducers := make([]qScriptPipelineIntegerDivModTerm, 0, len(terms))
+	for _, term := range terms {
+		if expr, ok := qScriptPipelineCountTerm(term); ok {
+			if includeCount {
+				return qScriptPipelineDescriptor{}, false
+			}
+			if valueExpr == "" {
+				valueExpr = expr
+			} else if valueExpr != expr {
+				return qScriptPipelineDescriptor{}, false
+			}
+			includeCount = true
+			continue
+		}
+		parsed, ok := qScriptPipelineIntegerDivModReducerTermFor(term)
+		if !ok {
+			return qScriptPipelineDescriptor{}, false
+		}
+		if valueExpr == "" {
+			valueExpr = parsed.valueExpr
+		} else if valueExpr != parsed.valueExpr {
+			return qScriptPipelineDescriptor{}, false
+		}
+		reducers = append(reducers, parsed)
+	}
+	if valueExpr == "" || len(reducers) == 0 {
+		return qScriptPipelineDescriptor{}, false
+	}
+	return qScriptPipelineDescriptor{
+		kind:         qScriptPipelineIntegerDivModReduce,
+		valueExpr:    valueExpr,
+		valueBinding: qScriptPipelineBinding(valueExpr, bindings),
+		integerTerms: reducers,
+		includeCount: includeCount,
+	}, true
+}
+
+func qScriptPipelineIntegerDivModReducerTermFor(src string) (qScriptPipelineIntegerDivModTerm, bool) {
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	if strings.HasPrefix(src, "+/") {
+		src = strings.TrimSpace(src[len("+/"):])
+	} else if strings.HasPrefix(src, "sum") && wordBoundary(src, 0, len("sum")) {
+		src = strings.TrimSpace(src[len("sum"):])
+	} else {
+		return qScriptPipelineIntegerDivModTerm{}, false
+	}
+	for _, spec := range []struct {
+		word string
+		op   data.Op
+	}{
+		{"div", data.OpDiv},
+		{"mod", data.OpMod},
+	} {
+		left, right, ok := splitTopLevelWord(src, spec.word)
+		if !ok {
+			continue
+		}
+		left = strings.TrimSpace(left)
+		right = strings.TrimSpace(right)
+		if !qScriptPipelineSimpleName(left) || right == "" {
+			return qScriptPipelineIntegerDivModTerm{}, false
+		}
+		return qScriptPipelineIntegerDivModTerm{op: spec.op, valueExpr: left, scalarExpr: right}, true
+	}
+	return qScriptPipelineIntegerDivModTerm{}, false
+}
+
 func qScriptPipelineMatrixCellPlusCountDescriptor(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {
 	terms := qScriptPipelinePlusTerms(src)
 	if len(terms) != 2 {
@@ -555,6 +641,11 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		recordQScriptPipelineResult(shape, handled, err)
 		return out, handled, err
 	}
+	if descriptor.kind == qScriptPipelineIntegerDivModReduce {
+		out, handled, err := s.evalQScriptIntegerDivModReducePipeline(descriptor)
+		recordQScriptPipelineResult(shape, handled, err)
+		return out, handled, err
+	}
 	if descriptor.kind == qScriptPipelineMatrixRowSumCount {
 		out, handled, err := s.evalQScriptMatrixRowSumCountPipeline(descriptor)
 		recordQScriptPipelineResult(shape, handled, err)
@@ -653,6 +744,61 @@ func (s *EvalState) evalQScriptSumPlusDyadicFloatPipeline(descriptor *qScriptPip
 	shape := "vector-reduce/sum-plus-dyadic-float-" + descriptor.dyadicOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
 	out, handled, err := data.TryTypedNumericSumPlusScalarDyadicFloatSum(array, descriptor.dyadicOp, scalar, descriptor.scalarLeft)
 	out, handled, err = qTypedRuntimeResultReason("ArrayNumericSumPlusDyadicFloatSum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+	return out, handled, err
+}
+
+func (s *EvalState) evalQScriptIntegerDivModReducePipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
+	for _, assignment := range descriptor.assignments {
+		if strings.TrimSpace(descriptor.valueExpr) == assignment.name {
+			continue
+		}
+		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
+		if err != nil {
+			return nil, true, err
+		}
+		if !handled {
+			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		s.env[s.resolveAssignmentName(assignment.name)] = value
+	}
+	value, handled, err := s.evalQScriptBindingPlan(&descriptor.valuePlan)
+	if err != nil {
+		return nil, true, err
+	}
+	if !handled {
+		if err := s.evalQScriptPipelineDeferredAssignment(descriptor, descriptor.valueExpr); err != nil {
+			return nil, true, err
+		}
+		value, handled, err = s.evalQScriptBindingPlan(&descriptor.valuePlan)
+		if err != nil {
+			return nil, true, err
+		}
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	terms := make([]data.IntegerDivModReducerTerm, 0, len(descriptor.integerTerms))
+	for _, term := range descriptor.integerTerms {
+		divisorValue, err := s.eval(strings.TrimSpace(term.scalarExpr))
+		if err != nil {
+			return nil, true, err
+		}
+		divisor, ok := integerValue(divisorValue)
+		if !ok {
+			return nil, false, nil
+		}
+		terms = append(terms, data.IntegerDivModReducerTerm{Op: term.op, Divisor: divisor})
+	}
+	shape := "vector-reduce/integer-divmod-sum-count/" + string(array.Kind())
+	out, handled, err := data.TryTypedIntegerDivModSumCount(array, terms, descriptor.includeCount)
+	out, handled, err = qTypedRuntimeResultReason("ArrayIntegerDivModSumCount", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 	return out, handled, err
 }
 

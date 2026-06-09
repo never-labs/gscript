@@ -3199,6 +3199,64 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedNumericSums lazy dyadic values = %v, want %v", got, want)
 	}
 
+	divModSum, ok, err := TryTypedIntegerDivModSumCount(
+		NewI64Range(1, 1, 1024),
+		[]IntegerDivModReducerTerm{{Op: OpDiv, Divisor: 3}, {Op: OpMod, Divisor: 3}},
+		true,
+	)
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDivModSumCount range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDivModSumCount range was not handled")
+	}
+	var wantDivMod int64 = 1024
+	for i := int64(1); i <= 1024; i++ {
+		wantDivMod += floorDivInt64(i, 3) + qModInt64(i, 3)
+	}
+	if divModSum != wantDivMod {
+		t.Fatalf("TryTypedIntegerDivModSumCount range = %d, want %d", divModSum, wantDivMod)
+	}
+
+	steppedDivModSum, ok, err := TryTypedIntegerDivModSumCount(
+		NewI64Range(-11, 4, 17),
+		[]IntegerDivModReducerTerm{{Op: OpDiv, Divisor: 5}, {Op: OpMod, Divisor: 5}},
+		true,
+	)
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDivModSumCount stepped range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDivModSumCount stepped range was not handled")
+	}
+	var wantStepped int64 = 17
+	for row := 0; row < 17; row++ {
+		value := int64(-11 + 4*row)
+		wantStepped += floorDivInt64(value, 5) + qModInt64(value, 5)
+	}
+	if steppedDivModSum != wantStepped {
+		t.Fatalf("TryTypedIntegerDivModSumCount stepped range = %d, want %d", steppedDivModSum, wantStepped)
+	}
+
+	arrayDivModSum, ok, err := TryTypedIntegerDivModSumCount(
+		NewI64([]int64{-8, -1, 0, 7, 13}),
+		[]IntegerDivModReducerTerm{{Op: OpDiv, Divisor: 4}, {Op: OpMod, Divisor: 4}},
+		true,
+	)
+	if err != nil {
+		t.Fatalf("TryTypedIntegerDivModSumCount array returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedIntegerDivModSumCount array was not handled")
+	}
+	var wantArray int64 = 5
+	for _, value := range []int64{-8, -1, 0, 7, 13} {
+		wantArray += floorDivInt64(value, 4) + qModInt64(value, 4)
+	}
+	if arrayDivModSum != wantArray {
+		t.Fatalf("TryTypedIntegerDivModSumCount array = %d, want %d", arrayDivModSum, wantArray)
+	}
+
 	total, count, ok, err = typedKernels.NumericSumRows(NewI64Range(10, 2, 5), []int{4, 0, 2})
 	if err != nil {
 		t.Fatalf("range NumericSumRows returned error: %v", err)

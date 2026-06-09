@@ -8532,6 +8532,97 @@ func qModInt64(left, right int64) int64 {
 	return left - right*int64(math.Floor(float64(left)/float64(right)))
 }
 
+// IntegerDivModReducerTerm describes a fused integer reducer over one input
+// array. OpDiv means q integer div (floor division), not floating division.
+type IntegerDivModReducerTerm struct {
+	Op      Op
+	Divisor int64
+}
+
+// TryTypedIntegerDivModSumCount fuses terms like sum(x div n), sum(x mod n),
+// and count x over the same integer input without materializing intermediate
+// vectors. It is intentionally shape-based: callers provide normalized reducer
+// terms, and the data layer chooses formulas for ranges or a single scan for
+// other integer arrays.
+func TryTypedIntegerDivModSumCount(array Array, terms []IntegerDivModReducerTerm, includeCount bool) (int64, bool, error) {
+	if array == nil || len(terms) == 0 && !includeCount {
+		return 0, false, nil
+	}
+	for _, term := range terms {
+		if term.Op != OpDiv && term.Op != OpMod {
+			return 0, false, nil
+		}
+		if term.Divisor == 0 {
+			return 0, true, fmt.Errorf("divide by zero")
+		}
+	}
+	length := array.Len()
+	if rangeValues, ok := asI64RangeArray(array); ok && rangeValues.len == length {
+		total, ok := i64RangeIntegerDivModSumCount(rangeValues, terms, includeCount)
+		if ok {
+			return total, true, nil
+		}
+	}
+	total := int64(0)
+	if includeCount {
+		total += int64(length)
+	}
+	for row := 0; row < length; row++ {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			continue
+		}
+		for _, term := range terms {
+			switch term.Op {
+			case OpDiv:
+				total += floorDivInt64(value, term.Divisor)
+			case OpMod:
+				total += qModInt64(value, term.Divisor)
+			}
+		}
+	}
+	return total, true, nil
+}
+
+func i64RangeIntegerDivModSumCount(values i64RangeArray, terms []IntegerDivModReducerTerm, includeCount bool) (int64, bool) {
+	total := int64(0)
+	if includeCount {
+		total += int64(values.len)
+	}
+	for _, term := range terms {
+		switch term.Op {
+		case OpDiv:
+			if term.Divisor <= 0 {
+				return 0, false
+			}
+			sum, ok := floorSumArithmetic(values.len, values.start, values.step, term.Divisor)
+			if !ok {
+				return 0, false
+			}
+			total += sum
+		case OpMod:
+			if term.Divisor <= 0 {
+				return 0, false
+			}
+			if values.step == 1 {
+				total += i64RangePositiveModSum(values.start, values.len, term.Divisor)
+				continue
+			}
+			sumFloor, ok := floorSumArithmetic(values.len, values.start, values.step, term.Divisor)
+			if !ok {
+				return 0, false
+			}
+			total += i64RangeSum(values) - term.Divisor*sumFloor
+		default:
+			return 0, false
+		}
+	}
+	return total, true
+}
+
 func applyI64ScalarDyadicValue(op Op, value, scalar int64, scalarLeft bool) (int64, bool, error) {
 	switch op {
 	case OpAdd:

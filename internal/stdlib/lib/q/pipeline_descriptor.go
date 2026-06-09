@@ -16,6 +16,11 @@ type EvalPipelineAssignment struct {
 	RHS  string
 }
 
+type EvalPipelineIntegerDivModTerm struct {
+	Op         string
+	ScalarExpr string
+}
+
 // EvalPipelineDescriptor is the read-only handoff shape exposed to MethodJIT
 // and diagnostics. It describes the q runtime pipeline plan that would be used
 // for a source string without binding environment values or caching results.
@@ -46,6 +51,8 @@ type EvalPipelineDescriptor struct {
 	DyadicOp     string
 	ScalarExpr   string
 	ScalarLeft   bool
+	IntegerTerms []EvalPipelineIntegerDivModTerm
+	IncludeCount bool
 
 	LeftExpr       string
 	RightExpr      string
@@ -302,6 +309,16 @@ func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) E
 		DyadicOp:      strings.TrimSpace(d.dyadicOp),
 		ScalarExpr:    strings.TrimSpace(d.scalarExpr),
 		ScalarLeft:    d.scalarLeft,
+		IncludeCount:  d.includeCount,
+	}
+	if len(d.integerTerms) > 0 {
+		out.IntegerTerms = make([]EvalPipelineIntegerDivModTerm, 0, len(d.integerTerms))
+		for _, term := range d.integerTerms {
+			out.IntegerTerms = append(out.IntegerTerms, EvalPipelineIntegerDivModTerm{
+				Op:         string(term.op),
+				ScalarExpr: strings.TrimSpace(term.scalarExpr),
+			})
+		}
 	}
 	if len(d.assignments) > 0 {
 		out.Assignments = make([]EvalPipelineAssignment, 0, len(d.assignments))
@@ -476,12 +493,15 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		dyadicOp:     strings.TrimSpace(descriptor.DyadicOp),
 		scalarExpr:   strings.TrimSpace(descriptor.ScalarExpr),
 		scalarLeft:   descriptor.ScalarLeft,
+		includeCount: descriptor.IncludeCount,
 	}
 	switch {
 	case strings.Contains(shape, "sequence-edge-reduce/sum-first-last"):
 		out.kind = qScriptPipelineSequenceEdgeSum
 	case strings.Contains(shape, "multi-reduce/sum-plus-dyadic-float-sum"):
 		out.kind = qScriptPipelineSumPlusDyadicFloat
+	case strings.Contains(shape, "multi-reduce/integer-divmod-sum-count"):
+		out.kind = qScriptPipelineIntegerDivModReduce
 	case strings.Contains(shape, "matrix-row-reduce/sum-count"):
 		out.kind = qScriptPipelineMatrixRowSumCount
 	case strings.Contains(shape, "matrix-cell-reduce/cell-plus-count"):
@@ -552,6 +572,24 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 	out.colIndexPlan = buildQScriptBindingPlanForRHS(out.colIndexExpr, nil)
 	out.scalarPlan = buildQScriptBindingPlanForRHS(out.scalarExpr, nil)
 	out.moduloMaskPlan = qScriptPipelineModuloMaskPlan(out.maskExpr)
+	if len(descriptor.IntegerTerms) > 0 {
+		out.integerTerms = make([]qScriptPipelineIntegerDivModTerm, 0, len(descriptor.IntegerTerms))
+		for _, term := range descriptor.IntegerTerms {
+			op := data.Op(strings.TrimSpace(term.Op))
+			if op != data.OpDiv && op != data.OpMod {
+				return qScriptPipelineDescriptor{}, false
+			}
+			scalarExpr := strings.TrimSpace(term.ScalarExpr)
+			if scalarExpr == "" {
+				return qScriptPipelineDescriptor{}, false
+			}
+			out.integerTerms = append(out.integerTerms, qScriptPipelineIntegerDivModTerm{
+				op:         op,
+				valueExpr:  out.valueExpr,
+				scalarExpr: scalarExpr,
+			})
+		}
+	}
 	if len(descriptor.Assignments) > 0 {
 		out.assignments = make([]qScriptPipelineAssignment, 0, len(descriptor.Assignments))
 		for _, assignment := range descriptor.Assignments {

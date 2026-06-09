@@ -740,6 +740,36 @@ func TestQScriptPipelinePlannerDescribesSumPlusDyadicFloat(t *testing.T) {
 	assertEvalValue(t, src, 42.0)
 }
 
+func TestQScriptPipelinePlannerDescribesIntegerDivModReduce(t *testing.T) {
+	src := "x:til 1024;y:x+1;(+/y div 3)+(+/y mod 3)+count y"
+	plan := buildQScriptPlan(src)
+	if plan.scriptPipeline == nil {
+		t.Fatalf("script pipeline descriptor missing")
+	}
+	d := plan.scriptPipeline
+	if d.kind != qScriptPipelineIntegerDivModReduce {
+		t.Fatalf("pipeline kind = %q, want %q", d.kind, qScriptPipelineIntegerDivModReduce)
+	}
+	if d.valueExpr != "y" || d.valueBinding != "x+1" {
+		t.Fatalf("value descriptor = expr %q binding %q, want y/x+1", d.valueExpr, d.valueBinding)
+	}
+	if !d.includeCount || len(d.integerTerms) != 2 {
+		t.Fatalf("integer terms = includeCount %v len %d, want true/2", d.includeCount, len(d.integerTerms))
+	}
+	if got, want := d.shape(), "script-pipeline/multi-reduce/integer-divmod-sum-count/assignments"; got != want {
+		t.Fatalf("shape = %q, want %q", got, want)
+	}
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize integer div/mod pipeline", src)
+	}
+	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
+	if err != nil || !handled || out != int64(176640) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor integer div/mod = %#v,%v,%v; want 176640,true,nil", out, handled, err)
+	}
+	assertEvalValue(t, src, int64(176640))
+}
+
 func TestQScriptPipelinePlannerDescribesMatrixRowSumCount(t *testing.T) {
 	src := "m:2 4#til 8;row:m . 1;(+/row)+count row"
 	plan := buildQScriptPlan(src)
