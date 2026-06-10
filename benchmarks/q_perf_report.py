@@ -143,6 +143,22 @@ class RuntimeObservabilityRow:
 
 
 @dataclass
+class RuntimeHealthRow:
+    scope: str
+    benchmark_count: int
+    avg_allocs_op: float | None
+    max_allocs_op: float | None
+    typed_fallbacks_op: float
+    typed_errors_op: float
+    pipeline_fallback_shapes: float
+    jit_direct_return_op: float
+    jit_native_exit_op: float
+    jit_op_exit_op: float
+    jit_slow_route_pct: float | None
+    note: str = ""
+
+
+@dataclass
 class PipelineFallbackTopRow:
     category: str
     pipeline_shape: str
@@ -583,6 +599,48 @@ def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[Runti
     return out
 
 
+def build_runtime_health_summary(rows: dict[str, BenchRow]) -> list[RuntimeHealthRow]:
+    runtime_rows = build_runtime_metric_rows(rows)
+    health_rows = [
+        row
+        for row in runtime_rows
+        if row.typed_kernel_attempts_op is not None
+        or row.typed_pipeline_shapes is not None
+        or row.jit_typed_direct_return_op is not None
+        or row.jit_typed_native_exit_op is not None
+        or row.jit_typed_op_exit_op is not None
+        or row.jit_typed_kernel_success_op is not None
+        or row.jit_typed_kernel_errors_op is not None
+    ]
+    if not health_rows:
+        return []
+    direct = sum(row.jit_typed_direct_return_op or 0.0 for row in health_rows)
+    native = sum(row.jit_typed_native_exit_op or 0.0 for row in health_rows)
+    op_exit = sum(row.jit_typed_op_exit_op or 0.0 for row in health_rows)
+    route_total = direct + native + op_exit
+    alloc_values = [row.allocs_op for row in health_rows if row.allocs_op is not None]
+    return [
+        RuntimeHealthRow(
+            scope="q_runtime_hotpath",
+            benchmark_count=len(health_rows),
+            avg_allocs_op=average(alloc_values),
+            max_allocs_op=max(alloc_values) if alloc_values else None,
+            typed_fallbacks_op=sum(row.typed_kernel_fallbacks_op or 0.0 for row in health_rows),
+            typed_errors_op=sum(row.typed_kernel_errors_op or 0.0 for row in health_rows)
+            + sum(row.jit_typed_kernel_errors_op or 0.0 for row in health_rows),
+            pipeline_fallback_shapes=sum(row.typed_pipeline_fallback_shapes or 0.0 for row in health_rows),
+            jit_direct_return_op=direct,
+            jit_native_exit_op=native,
+            jit_op_exit_op=op_exit,
+            jit_slow_route_pct=(100 * (native + op_exit) / route_total) if route_total > 0 else None,
+            note=(
+                "combined health of typed primitive fallback, pipeline fallback, "
+                "JIT route split, and allocation pressure"
+            ),
+        )
+    ]
+
+
 def average(values: list[float]) -> float | None:
     if not values:
         return None
@@ -895,8 +953,71 @@ def observability_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> 
     return checks
 
 
+def runtime_health_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    for item in build_runtime_health_summary(rows):
+        checks.append(
+            GateCheck(
+                signal="runtime_health_typed_fallbacks_op",
+                benchmark=item.scope,
+                value=item.typed_fallbacks_op,
+                threshold=f"<= {policy.max_typed_fallbacks_op:g}",
+                status="pass" if item.typed_fallbacks_op <= policy.max_typed_fallbacks_op else "fail",
+                note=item.note,
+            )
+        )
+        checks.append(
+            GateCheck(
+                signal="runtime_health_typed_errors_op",
+                benchmark=item.scope,
+                value=item.typed_errors_op,
+                threshold=f"<= {policy.max_jit_typed_errors_op:g}",
+                status="pass" if item.typed_errors_op <= policy.max_jit_typed_errors_op else "fail",
+                note=item.note,
+            )
+        )
+        checks.append(
+            GateCheck(
+                signal="runtime_health_pipeline_fallback_shapes",
+                benchmark=item.scope,
+                value=item.pipeline_fallback_shapes,
+                threshold=f"<= {policy.max_pipeline_fallback_shapes:g}",
+                status="pass" if item.pipeline_fallback_shapes <= policy.max_pipeline_fallback_shapes else "fail",
+                note=item.note,
+            )
+        )
+        if item.max_allocs_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="runtime_health_max_allocs_op",
+                    benchmark=item.scope,
+                    value=item.max_allocs_op,
+                    threshold=f"<= {policy.max_allocs_op:g}",
+                    status="pass" if item.max_allocs_op <= policy.max_allocs_op else "fail",
+                    note=item.note,
+                )
+            )
+        if item.jit_slow_route_pct is not None:
+            checks.append(
+                GateCheck(
+                    signal="runtime_health_jit_slow_route_pct",
+                    benchmark=item.scope,
+                    value=item.jit_slow_route_pct,
+                    threshold=f"<= {policy.max_jit_backend_slow_route_pct:g}",
+                    status="pass" if item.jit_slow_route_pct <= policy.max_jit_backend_slow_route_pct else "fail",
+                    note=item.note,
+                )
+            )
+    return checks
+
+
 def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
-    return ratio_gate_checks(rows, policy) + runtime_gate_checks(rows, policy) + observability_gate_checks(rows, policy)
+    return (
+        ratio_gate_checks(rows, policy)
+        + runtime_gate_checks(rows, policy)
+        + observability_gate_checks(rows, policy)
+        + runtime_health_gate_checks(rows, policy)
+    )
 
 
 def gate_failed(checks: list[GateCheck]) -> bool:
@@ -989,6 +1110,7 @@ def markdown_report(
     fallback_shapes = build_fallback_shape_rows(rows)
     jit_routes = build_jit_route_summary(rows)
     observability = build_runtime_observability_summary(rows)
+    health = build_runtime_health_summary(rows)
     category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -1188,6 +1310,32 @@ def markdown_report(
     lines.extend(
         [
             "",
+            "## Runtime Health Summary",
+            "",
+            "| Scope | Benchmarks | avg allocs/op | max allocs/op | typed fallbacks/op | typed errors/op | pipeline fallback shapes | direct return/op | native exit/op | op exit/op | JIT slow route pct | Note |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    if health:
+        for item in health:
+            lines.append(
+                f"| {item.scope} | {item.benchmark_count} | "
+                f"{format_metric(item.avg_allocs_op, 1)} | "
+                f"{format_metric(item.max_allocs_op, 1)} | "
+                f"{item.typed_fallbacks_op:.3f} | "
+                f"{item.typed_errors_op:.3f} | "
+                f"{item.pipeline_fallback_shapes:.0f} | "
+                f"{item.jit_direct_return_op:.3f} | "
+                f"{item.jit_native_exit_op:.3f} | "
+                f"{item.jit_op_exit_op:.3f} | "
+                f"{format_metric(item.jit_slow_route_pct, 1)} | "
+                f"{item.note} |"
+            )
+    else:
+        lines.append("| missing | 0 | missing | missing | 0 | 0 | 0 | 0 | 0 | 0 | missing | no typed runtime or JIT route metrics parsed |")
+    lines.extend(
+        [
+            "",
             "## Fallback Shape Summary",
             "",
             "| Benchmark | fallbacks/op | typed_kernel_fallbacks/op | typed_pipeline_fallback_shapes |",
@@ -1373,6 +1521,7 @@ def main(argv: list[str]) -> int:
         "runtime_metrics": [asdict(row) for row in build_runtime_metric_rows(rows)],
         "jit_route_summary": [asdict(row) for row in build_jit_route_summary(rows)],
         "runtime_observability_summary": [asdict(row) for row in build_runtime_observability_summary(rows)],
+        "runtime_health_summary": [asdict(row) for row in build_runtime_health_summary(rows)],
         "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
         "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),

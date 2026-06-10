@@ -146,6 +146,24 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["jit_backend"].errors_op, 1)
         self.assertEqual(summary["jit_backend"].slow_route_pct, 60)
 
+    def test_runtime_health_summary_combines_jit_fallback_and_alloc_pressure(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
+        summary = report.build_runtime_health_summary(rows)
+
+        self.assertEqual(len(summary), 1)
+        health = summary[0]
+        self.assertEqual(health.scope, "q_runtime_hotpath")
+        self.assertEqual(health.benchmark_count, 4)
+        self.assertEqual(health.avg_allocs_op, 108 / 4)
+        self.assertEqual(health.max_allocs_op, 90)
+        self.assertEqual(health.typed_fallbacks_op, 0.2)
+        self.assertEqual(health.typed_errors_op, 1)
+        self.assertEqual(health.pipeline_fallback_shapes, 1)
+        self.assertEqual(health.jit_direct_return_op, 2)
+        self.assertEqual(health.jit_native_exit_op, 2)
+        self.assertEqual(health.jit_op_exit_op, 1)
+        self.assertEqual(health.jit_slow_route_pct, 60)
+
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
         policy = report.GatePolicy(
@@ -182,6 +200,24 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn(("jit_typed_errors_op", "BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute"), failed)
         self.assertIn(("jit_backend_errors_op", "jit_backend"), failed)
         self.assertIn(("jit_backend_slow_route_pct", "jit_backend"), failed)
+        self.assertIn(("runtime_health_typed_errors_op", "q_runtime_hotpath"), failed)
+        self.assertIn(("runtime_health_jit_slow_route_pct", "q_runtime_hotpath"), failed)
+
+    def test_gate_checks_cover_runtime_health_fallback_and_alloc_pressure(self):
+        rows = report.parse_go_benchmarks(SAMPLE_WITH_FALLBACK)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("runtime_health_typed_fallbacks_op", "q_runtime_hotpath"), failed)
+        self.assertIn(("runtime_health_pipeline_fallback_shapes", "q_runtime_hotpath"), failed)
+        self.assertIn(("runtime_health_max_allocs_op", "q_runtime_hotpath"), failed)
 
     def test_fallback_shape_summary_filters_only_rows_with_fallback_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
@@ -244,6 +280,8 @@ class QPerfReportTest(unittest.TestCase):
             self.assertEqual(payload["jit_route_summary"][0]["route"], "direct_return")
             self.assertIn("runtime_observability_summary", payload)
             self.assertEqual(payload["runtime_observability_summary"][0]["layer"], "qsql_kernel")
+            self.assertIn("runtime_health_summary", payload)
+            self.assertEqual(payload["runtime_health_summary"][0]["scope"], "q_runtime_hotpath")
             self.assertIn("pipeline_category_metrics", payload)
             self.assertIn("pipeline_fallback_top", payload)
             self.assertIn("fallback_shape_summary", payload)
@@ -254,6 +292,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("Gate Summary", markdown)
             self.assertIn("JIT Typed Runtime Routes", markdown)
             self.assertIn("Runtime Observability Summary", markdown)
+            self.assertIn("Runtime Health Summary", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
 
