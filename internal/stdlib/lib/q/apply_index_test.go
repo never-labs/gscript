@@ -220,10 +220,13 @@ func TestQApplyIndexScalarFastPathRecordsRuntimeStats(t *testing.T) {
 		t.Fatalf("m@1 = %#v, want row array len 4", got)
 	}
 
-	var scalarHits, matrixHits uint64
+	var scalarHits, typedArrayScalarHits, matrixHits uint64
 	for _, stat := range RuntimeKernelExecutionStats() {
 		if (stat.Kernel == "ArrayScalarIndex" || stat.Kernel == "StringScalarIndex") && stat.Outcome == "hit" {
 			scalarHits += stat.Count
+			if stat.Kernel == "ArrayScalarIndex" && stat.ReasonCode == "typed_kernel" {
+				typedArrayScalarHits += stat.Count
+			}
 			if stat.PipelineShape != "apply_index" {
 				t.Fatalf("scalar index pipeline shape = %q, want apply_index; stat=%#v", stat.PipelineShape, stat)
 			}
@@ -237,5 +240,8 @@ func TestQApplyIndexScalarFastPathRecordsRuntimeStats(t *testing.T) {
 	}
 	if scalarHits != 3 || matrixHits != 1 {
 		t.Fatalf("scalar hits=%d matrix hits=%d; stats=%#v", scalarHits, matrixHits, RuntimeKernelExecutionStats())
+	}
+	if typedArrayScalarHits != 2 {
+		t.Fatalf("typed array scalar hits=%d; stats=%#v", typedArrayScalarHits, RuntimeKernelExecutionStats())
 	}
 }
