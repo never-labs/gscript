@@ -202,6 +202,31 @@ add_performance_smoke() {
     add_run "Performance Smoke" "$cmd"
 }
 
+add_q_performance_gate() {
+    if ! have_cmd go; then
+        add_skip "Q Performance Gate" "missing go"
+        return
+    fi
+    if ! have_cmd python3; then
+        add_skip "Q Performance Gate" "missing python3"
+        return
+    fi
+    if [ ! -f benchmarks/q_performance_suite.sh ]; then
+        add_skip "Q Performance Gate" "missing benchmarks/q_performance_suite.sh"
+        return
+    fi
+    if [ ! -f benchmarks/q_perf_report.py ]; then
+        add_skip "Q Performance Gate" "missing benchmarks/q_perf_report.py"
+        return
+    fi
+    # Go-bench q suite (timing_compare leg skipped; the generic Performance
+    # Gate already covers current-vs-HEAD timing) teed into the q ratio /
+    # runtime-counter report check. Full mode only, like the other long
+    # performance stages; --quick keeps it out of the plan.
+    add_run "Q Performance Gate" \
+        "q_perf_out=\$(mktemp \"\${TMPDIR:-/tmp}/leia-q-perf-gate.XXXXXX\") && trap 'rm -f \"\$q_perf_out\"' EXIT && set -o pipefail && LEIA_SKIP_TIMING_COMPARE=1 bash benchmarks/q_performance_suite.sh | tee \"\$q_perf_out\" && python3 benchmarks/q_perf_report.py --from-output \"\$q_perf_out\" --check"
+}
+
 add_documentation_references() {
     if [ ! -f scripts/docs_check.sh ]; then
         add_skip "Documentation References" "missing scripts/docs_check.sh"
@@ -406,6 +431,7 @@ build_full_plan() {
     add_documentation_references
     add_editor_assets
     add_performance_gate
+    add_q_performance_gate
     add_release_smoke
     add_cli_experience_gate
     if [ "$RELEASE_PROFILE" -eq 1 ]; then

@@ -70,6 +70,19 @@
 // amortized over few iterations and inflates ns/op; use >=100x for stable
 // per-op numbers.
 //
+// Coverage and wall-time design: the benchmark enumerates ALL of
+// qEvalVectorCases (full table, no hand-maintained subset; see
+// qEvalJITScriptExcludedCases for the shrink-only exclusion map). Each case
+// still gets a fresh leia VM + Exec + warmup, preserving per-case tiering
+// isolation; this was kept after measuring the per-case fixed cost (VM
+// construction + Exec + 8x run(4) warmup + settle calls) at ~40-65ms on
+// Apple M4 Max, so the full-table BenchmarkQEvalJITScriptWarm family
+// (483 cases at the time of measurement) completes in ~32s wall at
+// -benchtime=100x — far inside the ~10 minute budget. A shared-VM design
+// was considered and rejected as unnecessary complexity at this fixed cost.
+// Every case is checksum-verified during warmup against
+// tc.goFn(qEvalVectorRows).
+//
 // The q source is embedded into the script as a constant string literal (%q):
 // Leia string literals use Go-compatible escaping, and a constant source
 // keeps this layer comparable with a future constant-source JIT fast path.
@@ -78,6 +91,7 @@ package benchmarks
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -91,74 +105,30 @@ import (
 	bytecodevm "github.com/never-labs/leia/internal/vm"
 )
 
-// qEvalJITScriptCaseNames is the deterministic benchmark subset: one or more
-// representatives per q.eval pipeline category plus the worst families from
-// the q breadth perf audit (benchmarks/q_breadth_perf_audit.md). Names must
-// match qEvalVectorCases entries exactly; TestQEvalJITScriptCaseNamesExist
-// fails with the missing names if the case table drifts.
-var qEvalJITScriptCaseNames = []string{
-	// Audit worst families: apply bracket gather.
-	"BreadthApplyBracketGatherSmall",
-	"BreadthApplyBracketGatherMedium",
-	"BreadthApplyBracketGatherWide",
-	// Audit worst families: arithmetic div/mod envelope.
-	"BreadthArithmeticDivModEnvelopeMod3Bias1",
-	"BreadthArithmeticDivModEnvelopeMod7Bias4",
-	// Audit worst families: list drop/take/sublist.
-	"BreadthListDropTakeSublistShort",
-	"BreadthListDropTakeSublistLong",
-	// Audit worst families: list cut/raze checksum.
-	"BreadthListCutRazeChecksumShort",
-	"BreadthListCutRazeChecksumLong",
-	// Audit worst families: float floor/ceiling/reciprocal.
-	"BreadthFloatFloorCeilingReciprocalMod3Bias1",
-	"BreadthFloatFloorCeilingReciprocalMod7Bias4",
-	// Audit worst families: symbol distinct/group/sort.
-	"BreadthSymbolDistinctGroupSortSymbolsA",
-	"BreadthSymbolDistinctGroupSortVenuesX",
-	// vector_numeric spread.
-	"VectorAffineSumSmall",
-	"VectorAffineSumWide",
-	"VectorSquareSumMarketPrice",
-	"VectorMinMaxDyadicEnvelope",
-	"NumericMonadExpReciprocalSignumNot",
-	// where_project_reduce / gather spread.
-	"WhereIndexSumGE128",
-	"WhereValueGatherReduceSelectivityPct50",
-	"WhereGatherProjectionSum",
-	"WhereModuloGatherProjectionSum",
-	// Moving-window spread.
-	"MovingSumAvgRowScaled",
-	"MovingStdDevEma32Envelope",
-	"MovingMinMax32Envelope",
-	// Adverb spread.
-	"AdverbInitialOverScanProducts",
-	"EachPriorMinusRowScaled",
-	"DeepAdverbEachPairwiseArithmetic",
-	// apply_index spread.
-	"BreadthApplyAtGatherSmall",
-	"TaskDApplyAtScalarAndVector",
-	"TaskDApplyDotScalarProbe",
-	// xbar_within representative.
-	"DeepXbarWithinCountTen",
-	// group_fby representatives.
-	"FbyGroupedAggregateRowScaled",
-	"GroupModuloBucketCount",
-	// sort_gather representative.
-	"SortIndexGatherRowScaled",
-	// ordinary_list_adverb representative.
-	"TaskDListSublistRotateReverse",
-	// math_transcendental representative.
-	"TaskDMathSqrtLogVectorSum",
-	// matrix_reshape representative.
-	"BreadthMatrixReshapeRowSumTwoByN",
-	// Running aggregate / scan / distinct / typed / symbol / temporal spread.
-	"RunningMinMaxTailEnvelope",
-	"SumsTailChecksum",
-	"DistinctModuloCount",
-	"TemporalDateCompareMaskCount",
-	"TypedNullFillSum",
-	"SymbolEqualityMaskCount",
+// qEvalJITScriptExcludedCases lists qEvalVectorCases entries that cannot run
+// under the script harness, keyed by case name with a justification. The
+// benchmark families enumerate the FULL qEvalVectorCases table minus this
+// map, so the case list never needs hand maintenance. Shrink-only: new
+// entries require a concrete harness incompatibility (not a slow case), and
+// TestQEvalJITScriptCaseNamesExist fails if an entry stops matching the case
+// table (stale exclusion) so the map cannot silently grow or rot.
+var qEvalJITScriptExcludedCases = map[string]string{
+	"SafeSystemAndLoopbackIPC": "expr counts session variables via \\v; this harness re-evaluates inside ONE " +
+		"persistent q session (see header), so the h/v assignments persist across loop iterations and the " +
+		"checksum diverges from the fresh-eval Go baseline (observed run()=6, want 5)",
+}
+
+// qEvalJITScriptCases returns the benchmark enumeration: every entry of
+// qEvalVectorCases except justified exclusions, in table order.
+func qEvalJITScriptCases() []qEvalVectorCase {
+	out := make([]qEvalVectorCase, 0, len(qEvalVectorCases))
+	for _, tc := range qEvalVectorCases {
+		if _, excluded := qEvalJITScriptExcludedCases[tc.name]; excluded {
+			continue
+		}
+		out = append(out, tc)
+	}
+	return out
 }
 
 const qEvalJITScriptWarmupCalls = 8
@@ -270,12 +240,9 @@ func qEvalJITScriptWarmup(tb testing.TB, vm *leia.VM, want int64) {
 }
 
 func qEvalJITScriptBenchmark(b *testing.B, useJIT bool) {
-	for _, name := range qEvalJITScriptCaseNames {
-		tc, ok := qEvalJITScriptCaseByName(name)
-		if !ok {
-			b.Fatalf("q.eval JIT script subset case %q is missing from qEvalVectorCases; update qEvalJITScriptCaseNames", name)
-		}
-		b.Run(name, func(b *testing.B) {
+	for _, tc := range qEvalJITScriptCases() {
+		tc := tc
+		b.Run(tc.name, func(b *testing.B) {
 			src := tc.expr(qEvalVectorRows)
 			want := tc.goFn(qEvalVectorRows)
 			vm := qEvalJITScriptVM(b, useJIT, qEvalJITScriptSource(src))
@@ -313,38 +280,51 @@ func BenchmarkQEvalVMScriptWarm(b *testing.B) {
 	qEvalJITScriptBenchmark(b, false)
 }
 
-// TestQEvalJITScriptCaseNamesExist pins the benchmark subset to the current
-// qEvalVectorCases table. Concurrent edits to the case table must not silently
-// orphan subset entries.
+// TestQEvalJITScriptCaseNamesExist pins the benchmark enumeration to the
+// current qEvalVectorCases table: full coverage minus justified exclusions.
+// Stale exclusion entries (names no longer in the case table) and empty
+// justifications fail, so the shrink-only exclusion map cannot rot, and the
+// enumerated set must keep covering every q.eval pipeline category.
 func TestQEvalJITScriptCaseNamesExist(t *testing.T) {
 	known := make(map[string]bool, len(qEvalVectorCases))
 	for _, tc := range qEvalVectorCases {
 		known[tc.name] = true
 	}
-	seen := make(map[string]bool, len(qEvalJITScriptCaseNames))
-	var missing, duplicated []string
-	for _, name := range qEvalJITScriptCaseNames {
-		if seen[name] {
-			duplicated = append(duplicated, name)
-		}
-		seen[name] = true
+	var stale, unjustified []string
+	for name, reason := range qEvalJITScriptExcludedCases {
 		if !known[name] {
-			missing = append(missing, name)
+			stale = append(stale, name)
+		}
+		if strings.TrimSpace(reason) == "" {
+			unjustified = append(unjustified, name)
 		}
 	}
-	if len(duplicated) > 0 {
-		t.Fatalf("qEvalJITScriptCaseNames contains duplicate entries: %s", strings.Join(duplicated, ", "))
+	sort.Strings(stale)
+	sort.Strings(unjustified)
+	if len(stale) > 0 {
+		t.Fatalf("qEvalJITScriptExcludedCases refers to q.eval vector cases that do not exist: %s.\n"+
+			"The case table in q_eval_vector_bench_test.go changed; remove or rename the stale "+
+			"exclusions in q_eval_jit_script_bench_test.go.", strings.Join(stale, ", "))
 	}
-	if len(missing) > 0 {
-		t.Fatalf("qEvalJITScriptCaseNames refers to q.eval vector cases that do not exist: %s.\n"+
-			"The case table in q_eval_vector_bench_test.go changed; update qEvalJITScriptCaseNames "+
-			"in q_eval_jit_script_bench_test.go to current case names.", strings.Join(missing, ", "))
+	if len(unjustified) > 0 {
+		t.Fatalf("qEvalJITScriptExcludedCases entries lack a justification: %s", strings.Join(unjustified, ", "))
 	}
 
-	// The subset must keep covering every q.eval pipeline category.
+	enumerated := qEvalJITScriptCases()
+	if want := len(qEvalVectorCases) - len(qEvalJITScriptExcludedCases); len(enumerated) != want {
+		t.Fatalf("qEvalJITScriptCases() enumerated %d cases, want %d (table %d - exclusions %d)",
+			len(enumerated), want, len(qEvalVectorCases), len(qEvalJITScriptExcludedCases))
+	}
+	// Full-coverage floor mirrors TestQEvalVectorBenchmarkExpressions: the
+	// script harness must keep measuring (essentially) the whole table.
+	if len(enumerated) < 480 {
+		t.Fatalf("q.eval JIT script benchmark coverage too small: got %d cases, want at least 480", len(enumerated))
+	}
+
+	// The enumeration must keep covering every q.eval pipeline category
+	// (exclusions must not silently drop a whole category).
 	covered := map[string]bool{}
-	for _, name := range qEvalJITScriptCaseNames {
-		tc, _ := qEvalJITScriptCaseByName(name)
+	for _, tc := range enumerated {
 		for _, category := range qEvalVectorPipelineCategories(tc) {
 			covered[category] = true
 		}
@@ -366,7 +346,7 @@ func TestQEvalJITScriptCaseNamesExist(t *testing.T) {
 		}
 	}
 	if len(missingCategories) > 0 {
-		t.Fatalf("qEvalJITScriptCaseNames no longer covers pipeline categories: %s", strings.Join(missingCategories, ", "))
+		t.Fatalf("qEvalJITScriptCases() no longer covers pipeline categories: %s", strings.Join(missingCategories, ", "))
 	}
 }
 
