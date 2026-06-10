@@ -307,6 +307,10 @@ func TryExportStringCopy(array Array, dst []string) (bool, error) {
 			dst[i] = string(value)
 		}
 		return true, nil
+	case encodedArray:
+		return exportEncodedStringCopy(a.domain, a.codes, dst)
+	case EncodedArrayInfo:
+		return exportEncodedStringCopy(a.EncodedDomain(), a.EncodedCodes(), dst)
 	case nullableArray:
 		return exportNullableStringCopy(a, dst)
 	case shiftedArray:
@@ -397,6 +401,10 @@ func stringArrayAt(array Array, row int) (string, bool) {
 			return "", false
 		}
 		return string(a.data[row]), true
+	case encodedArray:
+		return encodedStringAt(a.domain, a.codes, row)
+	case EncodedArrayInfo:
+		return encodedStringAt(a.EncodedDomain(), a.EncodedCodes(), row)
 	case nullableArray:
 		if row < 0 || row >= len(a.data) || IsNull(a.data[row]) {
 			return "", false
@@ -421,5 +429,50 @@ func stringArrayAt(array Array, row int) (string, bool) {
 		}
 		out, ok := value.(string)
 		return out, ok
+	}
+}
+
+func exportEncodedStringCopy(domain []any, codes []int32, dst []string) (bool, error) {
+	if len(dst) != len(codes) {
+		return true, fmt.Errorf("encoded string export destination length %d does not match array length %d", len(dst), len(codes))
+	}
+	for row, code := range codes {
+		value, ok, err := encodedStringCode(domain, code)
+		if err != nil {
+			return true, fmt.Errorf("encoded string export row %d: %w", row, err)
+		}
+		if !ok {
+			return false, nil
+		}
+		dst[row] = value
+	}
+	return true, nil
+}
+
+func encodedStringAt(domain []any, codes []int32, row int) (string, bool) {
+	if row < 0 || row >= len(codes) {
+		return "", false
+	}
+	value, ok, err := encodedStringCode(domain, codes[row])
+	if err != nil {
+		return "", false
+	}
+	return value, ok
+}
+
+func encodedStringCode(domain []any, code int32) (string, bool, error) {
+	if code < 0 {
+		return "", false, nil
+	}
+	if int(code) >= len(domain) {
+		return "", false, fmt.Errorf("code %d outside domain length %d", code, len(domain))
+	}
+	switch value := domain[code].(type) {
+	case string:
+		return value, true, nil
+	case Symbol:
+		return string(value), true, nil
+	default:
+		return "", false, nil
 	}
 }

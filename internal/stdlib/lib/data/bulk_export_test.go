@@ -124,6 +124,9 @@ func TestTryExportTypedCopyFloatBoolString(t *testing.T) {
 		{"indexed string", indexedArray{source: NewString([]string{"AAPL", "MSFT", "NVDA"}), indexes: NewI64([]int64{2, 0}), len: 2}, []string{"NVDA", "AAPL"}},
 		{"symbol column", NewSymbols([]string{"AAPL", "MSFT"}), []string{"AAPL", "MSFT"}},
 		{"indexed symbol", indexedArray{source: NewSymbols([]string{"AAPL", "MSFT", "NVDA"}), indexes: NewI64([]int64{2, 0}), len: 2}, []string{"NVDA", "AAPL"}},
+		{"encoded string", mustEncodedArray(t, KindString, []any{"AAPL", "MSFT", "NVDA"}, []int32{0, 2, 1, 0}), []string{"AAPL", "NVDA", "MSFT", "AAPL"}},
+		{"encoded symbol", NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL", "NVDA"}), []string{"AAPL", "MSFT", "AAPL", "NVDA"}},
+		{"indexed encoded symbol", indexedArray{source: NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "NVDA"}), indexes: NewI64([]int64{2, 0, 1}), len: 3}, []string{"NVDA", "AAPL", "MSFT"}},
 		{"nullable string", nullableArray{kind: KindString, data: []any{"bid", "ask"}}, []string{"bid", "ask"}},
 		{"nullable symbol", nullableArray{kind: KindSymbol, data: []any{Symbol("bid"), Symbol("ask")}}, []string{"bid", "ask"}},
 	} {
@@ -162,4 +165,22 @@ func TestTryExportTypedCopyRejectsUnsupportedAndBadDestination(t *testing.T) {
 	if err == nil || !handled {
 		t.Fatalf("TryExportI64Copy short dst = %v, %v; want handled error", handled, err)
 	}
+
+	encodedWithNull := mustEncodedArray(t, KindString, []any{"AAPL"}, []int32{0, -1})
+	handled, err = TryExportStringCopy(encodedWithNull, make([]string, encodedWithNull.Len()))
+	if err != nil {
+		t.Fatalf("TryExportStringCopy encoded null returned error: %v", err)
+	}
+	if handled {
+		t.Fatal("TryExportStringCopy handled encoded null; want generic fallback")
+	}
+}
+
+func mustEncodedArray(t *testing.T, kind Kind, domain []any, codes []int32) Array {
+	t.Helper()
+	array, err := NewEncoded(kind, domain, codes)
+	if err != nil {
+		t.Fatalf("NewEncoded returned error: %v", err)
+	}
+	return array
 }

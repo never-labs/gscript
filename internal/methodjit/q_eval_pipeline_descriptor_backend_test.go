@@ -69,6 +69,22 @@ func TestQEvalPipelineRuntimeValueUsesBulkTypedArrayExport(t *testing.T) {
 				assertDenseArrayStrings(t, dense, []string{"AAPL", "MSFT"})
 			},
 		},
+		{
+			name:  "encoded_string",
+			array: mustQEvalPipelineEncodedArray(t, data.KindString, []any{"AAPL", "MSFT", "NVDA"}, []int32{0, 2, 1, 0}),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				assertDenseArrayStrings(t, dense, []string{"AAPL", "NVDA", "MSFT", "AAPL"})
+			},
+		},
+		{
+			name:  "encoded_symbol",
+			array: data.NewEncodedSymbols([]data.Symbol{"AAPL", "MSFT", "AAPL", "NVDA"}),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				assertDenseArrayStrings(t, dense, []string{"AAPL", "MSFT", "AAPL", "NVDA"})
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			value, route, err := qEvalPipelineArrayRuntimeValueWithRoute(tc.array)
@@ -87,32 +103,52 @@ func TestQEvalPipelineRuntimeValueUsesBulkTypedArrayExport(t *testing.T) {
 }
 
 func TestQEvalPipelineRuntimeValueBulkExportsSymbolArrays(t *testing.T) {
-	value, handled, err := qEvalPipelineTypedArrayRuntimeValue(data.NewSymbols([]string{"AAPL", "MSFT"}))
-	if err != nil {
-		t.Fatalf("qEvalPipelineTypedArrayRuntimeValue: %v", err)
+	for _, tc := range []struct {
+		name  string
+		array data.Array
+		want  []string
+	}{
+		{"symbol column", data.NewSymbols([]string{"AAPL", "MSFT"}), []string{"AAPL", "MSFT"}},
+		{"encoded symbol", data.NewEncodedSymbols([]data.Symbol{"AAPL", "MSFT", "AAPL"}), []string{"AAPL", "MSFT", "AAPL"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			value, handled, err := qEvalPipelineTypedArrayRuntimeValue(tc.array)
+			if err != nil {
+				t.Fatalf("qEvalPipelineTypedArrayRuntimeValue: %v", err)
+			}
+			if !handled {
+				t.Fatal("qEvalPipelineTypedArrayRuntimeValue did not handle symbol array")
+			}
+			if !value.IsDenseArray() {
+				t.Fatalf("symbol array bridge returned %v, want DenseArray", value)
+			}
+			assertDenseArrayStrings(t, value.DenseArray(), tc.want)
+		})
 	}
-	if !handled {
-		t.Fatal("qEvalPipelineTypedArrayRuntimeValue did not handle symbol array")
-	}
-	if !value.IsDenseArray() {
-		t.Fatalf("symbol array bridge returned %v, want DenseArray", value)
-	}
-	assertDenseArrayStrings(t, value.DenseArray(), []string{"AAPL", "MSFT"})
 }
 
 func TestQEvalPipelineRuntimeValueKeepsUnsupportedArrayFallback(t *testing.T) {
-	encoded := data.NewEncodedSymbols([]data.Symbol{"AAPL", "MSFT", "AAPL"})
-	value, route, err := qEvalPipelineArrayRuntimeValueWithRoute(encoded)
+	array := data.NewAny([]any{int64(7), "AAPL", true})
+	value, route, err := qEvalPipelineArrayRuntimeValueWithRoute(array)
 	if err != nil {
 		t.Fatalf("qEvalPipelineArrayRuntimeValueWithRoute: %v", err)
 	}
 	if route != qEvalPipelineArrayBridgeRouteFallback {
-		t.Fatalf("encoded symbol array bridge route = %q, want fallback", route)
+		t.Fatalf("mixed array bridge route = %q, want fallback", route)
 	}
-	if !value.IsDenseArray() {
-		t.Fatalf("encoded symbol array bridge returned %v, want DenseArray from fallback", value)
+	if !value.IsTable() {
+		t.Fatalf("mixed array bridge returned %v, want Table from fallback", value)
 	}
-	assertDenseArrayStrings(t, value.DenseArray(), []string{"AAPL", "MSFT", "AAPL"})
+	table := value.Table()
+	if got := table.RawGetInt(1); !got.IsInt() || got.Int() != 7 {
+		t.Fatalf("fallback table row 1 = %v, want int 7", got)
+	}
+	if got := table.RawGetInt(2); !got.IsString() || got.Str() != "AAPL" {
+		t.Fatalf("fallback table row 2 = %v, want string AAPL", got)
+	}
+	if got := table.RawGetInt(3); !got.IsBool() || !got.Bool() {
+		t.Fatalf("fallback table row 3 = %v, want true", got)
+	}
 }
 
 func assertDenseArrayStrings(t *testing.T, dense *runtime.DenseArray, want []string) {
@@ -636,7 +672,8 @@ func BenchmarkQEvalPipelineArrayRuntimeBridge(b *testing.B) {
 		{name: "BulkF64Column", array: data.NewF64(makeF64BenchmarkColumn(rows)), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
 		{name: "BulkBoolColumn", array: data.NewBool(makeBoolBenchmarkColumn(rows)), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
 		{name: "BulkStringColumn", array: data.NewString(makeStringBenchmarkColumn(rows)), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
-		{name: "FallbackEncodedSymbol", array: makeEncodedSymbolBenchmarkColumn(rows), wantRoute: qEvalPipelineArrayBridgeRouteFallback},
+		{name: "BulkEncodedSymbol", array: makeEncodedSymbolBenchmarkColumn(rows), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
+		{name: "FallbackMixedAny", array: makeMixedAnyBenchmarkColumn(rows), wantRoute: qEvalPipelineArrayBridgeRouteFallback},
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
@@ -700,6 +737,31 @@ func makeEncodedSymbolBenchmarkColumn(n int) data.Array {
 		values[i] = data.Symbol(value)
 	}
 	return data.NewEncodedSymbols(values)
+}
+
+func makeMixedAnyBenchmarkColumn(n int) data.Array {
+	seed := []string{"AAPL", "MSFT", "NVDA", "TSLA", "META", "AMZN", "GOOG", "ORCL"}
+	values := make([]any, n)
+	for i := range values {
+		switch i % 3 {
+		case 0:
+			values[i] = int64(i)
+		case 1:
+			values[i] = seed[i%len(seed)]
+		default:
+			values[i] = i%2 == 0
+		}
+	}
+	return data.NewAny(values)
+}
+
+func mustQEvalPipelineEncodedArray(t *testing.T, kind data.Kind, domain []any, codes []int32) data.Array {
+	t.Helper()
+	array, err := data.NewEncoded(kind, domain, codes)
+	if err != nil {
+		t.Fatalf("NewEncoded returned error: %v", err)
+	}
+	return array
 }
 
 func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
