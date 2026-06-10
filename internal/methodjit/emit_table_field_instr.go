@@ -49,6 +49,8 @@ func (ec *emitContext) emitTableInstr(instr *Instr) bool {
 		ec.emitOpExit(instr)
 	case OpQEvalPipelinePlan:
 		ec.emitQEvalPipelinePlanNativeExit(instr)
+	case OpQEvalSessionEval:
+		ec.emitOpExit(instr)
 	case OpVectorWhere, OpQVectorWhereReduce:
 		ec.emitVectorWhereExit(instr)
 	case OpSetList:

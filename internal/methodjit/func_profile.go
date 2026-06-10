@@ -410,6 +410,12 @@ func shouldStayTier0MetamethodRuntimeLoop(proto *vm.FuncProto, profile FuncProfi
 	if !hasFieldDispatchCallInLoop(proto) {
 		return false
 	}
+	// Constant-source q session eval loops look like field-dispatch call loops
+	// at the bytecode level, but Tier 2 lowers the call away
+	// (QEvalSessionEvalLoweringPass); keep them on the tiering path.
+	if protoLoopCallsAreLowerableQSessionEval(proto) {
+		return false
+	}
 	inLoop := staticLoopPCs(proto)
 	for pc, inst := range proto.Code {
 		if !inLoop[pc] {

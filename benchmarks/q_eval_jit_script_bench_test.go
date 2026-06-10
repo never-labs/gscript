@@ -20,39 +20,45 @@
 //     result of any EvalSourceCacheable constant source. Every benchmark
 //     expression in qEvalVectorCases is cacheable, so iterations after the
 //     first are ~500ns map hits.
-//  2. Tier 2 loop hoisting: when methodjit lowers a constant q.eval source to
-//     OpQEvalPipelinePlan, the op has no arguments and is treated as pure, so
-//     the optimizer legitimately hoists it out of the loop. Empirically
-//     (forced Tier 2, 64 loop iterations): ExitQEvalPipelinePlan == 1 and
-//     zero stdq kernel attempts recorded inside the loop.
+//  2. Tier 2 short-circuit: methodjit lowers a constant q.eval source to
+//     OpQEvalPipelinePlan even when classification only produced a heuristic
+//     (non-executable) plan; the first in-loop exit then fails ("plan was not
+//     handled") and the call falls back to the interpreter, where bind's
+//     result cache serves every iteration. Empirically (forced Tier 2, 64
+//     loop iterations): ExitQEvalPipelinePlan == 1 and ~zero stdq kernel
+//     attempts recorded inside the loop.
 //
 // Both effects were confirmed empirically: with the bare-q.eval harness,
 // stdq.RuntimeKernelExecutionStats() recorded 0 kernel attempts across 1000
 // loop iterations and ns/op was flat (~0.9-1.3us) across a 64x row-count
 // range. That harness measures memoization, not work.
 //
-// The benchmarks therefore run the loop body through a q session:
-// qSessionEval := q.session().eval; qSessionEval(<constant source>). Session
-// eval has no result cache (bind q.session.eval calls EvalState.Eval
-// directly) and re-executes the typed q runtime kernels every iteration —
-// verified: typed-kernel attempts scale exactly with iteration count (3-5
-// attempts/op depending on expression) and ns/op scales with row count.
-// Trade-offs, documented for q_perf_report.py consumers:
-//   - methodjit does not lower the session eval call to the q-eval
-//     pipeline-plan op (qCallIsQEvalEntrypoint only recognizes the literal
-//     q.eval global entrypoint); each iteration is a generic host call into
-//     the q evaluator.
-//   - Tier 2 currently declines the run loop entirely ("LoopDepth<2
-//     candidate has performance-blocked op Call inside loop"), so under
-//     WithJIT the loop executes at Tier 1 baseline JIT. This is the honest
-//     current end-to-end number; closing that gap (per-iteration q work
-//     under Tier 2) is exactly the optimization headroom this layer tracks.
+// The benchmarks therefore run the loop body through a q session created
+// inside run: qs := q.session(); ... qs.eval(<constant source>). Session
+// eval has no result cache (bind q.session.eval calls EvalSession.Eval,
+// which caches parse/plan artifacts only) and re-executes the typed q
+// runtime kernels every iteration — verified: typed-kernel attempts scale
+// exactly with iteration count (3-5 attempts/op depending on expression)
+// and ns/op scales with row count.
+//
+// JIT routing (the layer this file measures): methodjit recognizes the
+// constant-source session eval shape `<local from q.session()>.eval(<const
+// string>)` and lowers it during the Tier 2 pipeline to OpQEvalSessionEval
+// (internal/methodjit/q_eval_session_eval.go), a result-producing op-exit
+// that invokes the same session eval host function per iteration — state,
+// plan caching, and error semantics identical to the generic call, with no
+// result memoization (the op has call side effects and is never hoisted).
+// Because the loop's only generic Call disappears in lowering, tier policy
+// keeps these loops Tier 2-eligible (bytecode-level loop-call heuristics
+// are bypassed via protoLoopCallsAreLowerableQSessionEval), and the
+// CallBoundaryLoop gate passes. Under WithJIT the loop runs as Tier 2
+// native code with one session eval op-exit per iteration.
 //
 // TestQEvalJITScriptRouting pins all of the above: per-iteration kernel
-// attempts scale with N on the session route, Tier 2 declines the session
-// loop today (logs loudly if that changes), and the direct-q.eval route is
-// pinned as memoized/hoisted so a future per-iteration-capable JIT route
-// will be noticed.
+// attempts scale with N on the session route, Tier 2 accepts the session
+// loop and performs one session eval op-exit per iteration, and the
+// direct-q.eval route is pinned as memoized/short-circuited so a future
+// per-iteration-capable direct route will be noticed.
 //
 // Harness choice: the hot loop lives in the Leia script (func run(n) { ... })
 // and each benchmark performs a single amortized vm.Call("run", b.N) after
@@ -157,6 +163,12 @@ var qEvalJITScriptCaseNames = []string{
 
 const qEvalJITScriptWarmupCalls = 8
 
+// qEvalJITScriptSettleCalls is the number of untimed full-size run(b.N) calls
+// after warmup. The first full-size call entry-deopts on the warmup-observed
+// parameter range guard and queues a relaxed Tier 2 recompile; a few more
+// calls let the recompile land and re-enter native code before timing starts.
+const qEvalJITScriptSettleCalls = 5
+
 func qEvalJITScriptCaseByName(name string) (qEvalVectorCase, bool) {
 	for _, tc := range qEvalVectorCases {
 		if tc.name == name {
@@ -169,14 +181,21 @@ func qEvalJITScriptCaseByName(name string) (qEvalVectorCase, bool) {
 // qEvalJITScriptSource builds the hot-loop Leia script for one q expression.
 // The loop evaluates through a q session so every iteration performs real
 // columnar work (see file header: bare q.eval(const) is memoized at the bind
-// layer and loop-hoisted by Tier 2).
+// layer and short-circuited under Tier 2).
+//
+// The session is created inside run (not at module level) so the loop call
+// matches the methodjit-recognized shape `<local from q.session()>.eval(<const
+// string>)` (QEvalSessionEvalLoweringPass): Tier 2 lowers the loop body call
+// to the OpQEvalSessionEval op-exit, which invokes the same session eval host
+// function per iteration. Session creation is outside the loop, amortized
+// over n iterations.
 func qEvalJITScriptSource(qSrc string) string {
 	return fmt.Sprintf(`
-qSessionEval := q.session().eval
 func run(n) {
+    qs := q.session()
     acc := 0
     for i := 1; i <= n; i++ {
-        r := qSessionEval(%q)
+        r := qs.eval(%q)
         acc = r
     }
     return acc
@@ -261,6 +280,17 @@ func qEvalJITScriptBenchmark(b *testing.B, useJIT bool) {
 			want := tc.goFn(qEvalVectorRows)
 			vm := qEvalJITScriptVM(b, useJIT, qEvalJITScriptSource(src))
 			qEvalJITScriptWarmup(b, vm, want)
+			// Full-size settle calls: warmup ran run(4), so Tier 2 parameter
+			// range guards observed n=4 only. The first full-size calls entry-
+			// deopt, relax the guard, and recompile (possibly more than once);
+			// running them untimed keeps the timed call on the steady-state
+			// tier (the state a real warm service reaches). Harmless for the
+			// VM-only configuration.
+			for i := 0; i < qEvalJITScriptSettleCalls; i++ {
+				if _, err := vm.Call("run", b.N); err != nil {
+					b.Fatalf("settle vm.Call(run, %d): %v", b.N, err)
+				}
+			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			out, err := vm.Call("run", b.N)
@@ -456,10 +486,12 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 	t.Logf("session route: %d typed kernel attempts over %d iterations (%.2f/op)",
 		attempts, iters, float64(attempts)/iters)
 
-	// (2) JIT tiering reality for the session route: Tier 2 currently declines
-	// a single-depth loop dominated by a generic host call ("performance-
-	// blocked op Call inside loop"), so run executes under Tier 1 baseline
-	// JIT. Pin that, and notice if Tier 2 ever starts accepting it.
+	// (2) JIT tiering for the session route: Tier 2 must accept the loop. The
+	// constant-source session eval call is lowered to OpQEvalSessionEval
+	// (QEvalSessionEvalLoweringPass), so the loop no longer contains a
+	// performance-blocked generic Call. Pin that the lowered route does REAL
+	// per-iteration work in Tier 2 native code: ExitOpExit occurrences (the
+	// session eval op-exit) must scale with the iteration count.
 	{
 		proto := qEvalJITScriptCompileTop(t, qEvalJITScriptSource(src))
 		globals := vmtest.NewInterpreterGlobals()
@@ -488,16 +520,39 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 			}
 		}
 		if err := tm.CompileTier2(runProto); err != nil {
-			t.Logf("Tier 2 declines the session-route loop as expected today: %v", err)
-			if tm.Tier1Count() == 0 {
-				v.Close()
-				t.Fatalf("session-route run was not even Tier 1 compiled after %d warm calls; JIT did not engage", qEvalJITScriptWarmupCalls)
-			}
-			t.Logf("session-route loop runs under Tier 1 baseline JIT (tier1 compiled functions: %d)", tm.Tier1Count())
-		} else {
-			t.Logf("NOTE: Tier 2 now accepts the session-route loop; "+
-				"BenchmarkQEvalJITScriptWarm is measuring Tier 2 from now on (tier2 compiled: %d)", tm.Tier2Count())
+			v.Close()
+			t.Fatalf("Tier 2 must accept the session-route loop (QEvalSessionEval lowering): %v", err)
 		}
+		// Settle calls: warmup observed n=4 only, so the first full-size call
+		// can entry-deopt on a parameter range guard and recompile relaxed.
+		for i := 0; i < 2; i++ {
+			if _, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(iters)}); err != nil {
+				v.Close()
+				t.Fatalf("settle CallValue(run, %d): %v", iters, err)
+			}
+		}
+		before := tm.ExitStats().ByExitCode["ExitOpExit"]
+		results, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(iters)})
+		if err != nil {
+			v.Close()
+			t.Fatalf("CallValue(run, %d): %v", iters, err)
+		}
+		if len(results) != 1 || !results[0].IsInt() || results[0].Int() != want {
+			v.Close()
+			t.Fatalf("Tier 2 session-route run(%d) = %v, want Go baseline %d", iters, results, want)
+		}
+		if runProto.EnteredTier2 == 0 {
+			v.Close()
+			t.Fatalf("session-route run never entered Tier 2 native code (EnteredTier2=%d)", runProto.EnteredTier2)
+		}
+		opExits := tm.ExitStats().ByExitCode["ExitOpExit"] - before
+		if opExits < minAttempts {
+			v.Close()
+			t.Fatalf("session eval op-exits = %d for %d Tier 2 iterations (< %d); "+
+				"the lowered route is not executing per iteration", opExits, iters, minAttempts)
+		}
+		t.Logf("Tier 2 session route: %d session eval op-exits over %d iterations (tier2 compiled: %d)",
+			opExits, iters, tm.Tier2Count())
 		v.Close()
 	}
 

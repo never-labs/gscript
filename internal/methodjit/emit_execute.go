@@ -1336,6 +1336,21 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		ctx.OpExitAux = int64(aux)
 		return cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteOpExit)
 
+	case OpQEvalSessionEval:
+		if arg1 >= len(regs) || slot >= len(regs) {
+			return fmt.Errorf("QEvalSessionEval op-exit out of register range")
+		}
+		var constants []runtime.Value
+		if cf.Proto != nil {
+			constants = cf.Proto.Constants
+		}
+		out, err := executeQEvalSessionEvalValue(constants, aux, regs[arg1])
+		cf.recordQEvalSessionEvalExecution(err)
+		if err != nil {
+			return err
+		}
+		regs[slot] = out
+
 	case OpVectorScan:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

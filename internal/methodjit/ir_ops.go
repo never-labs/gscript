@@ -246,6 +246,14 @@ const (
 	// Function.QEvalPipelinePlans index. Interpreter/runtime paths execute the
 	// referenced plan through the q pipeline backend.
 	OpQEvalPipelinePlan
+	// q session constant-source eval primitive. Args = [session table], Aux =
+	// constant pool index of the q source string. Execution invokes the
+	// receiver session's own eval host function (q.session.eval), so session
+	// state, plan caching, and error semantics stay identical to the generic
+	// call path while skipping per-iteration call ABI + field dispatch. The op
+	// has call side effects: it is never hoisted, CSE'd, or eliminated, so a
+	// loop evaluates the source once per iteration (no result memoization).
+	OpQEvalSessionEval
 	OpGetField // Args[0].field; Aux = constant pool index for field name
 	// OpGetFieldNumToFloat fuses Args[0].field with numeric widening.
 	// It preserves NumToFloat semantics: int and float fields become raw
