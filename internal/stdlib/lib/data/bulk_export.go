@@ -15,6 +15,25 @@ func TryExportI64Copy(array Array, dst []int64) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportI64Copy(a.array, dst)
+	case indexedArray:
+		for row := range dst {
+			index, ok, err := i64IndexArrayAt(a.indexes, row)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return true, fmt.Errorf("indexed i64 export row %d out of range", row)
+			}
+			value, ok, err := integerArrayAt(a.source, index)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[row] = value
+		}
+		return true, nil
 	case columnArray[int64]:
 		copy(dst, a.data)
 		return true, nil
@@ -74,6 +93,49 @@ func TryExportI64Copy(array Array, dst []int64) (bool, error) {
 			dst[i] = v
 		}
 		return true, nil
+	case i64BucketArray:
+		for i := range dst {
+			v, ok, err := a.i64At(i)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[i] = v
+		}
+		return true, nil
+	case i64XrankArray:
+		for i := range dst {
+			v, ok, err := a.i64At(i)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[i] = v
+		}
+		return true, nil
+	case i64FillArray:
+		for i := range dst {
+			v, ok, err := a.valueAt(i)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[i] = v
+		}
+		return true, nil
+	case nullableArray:
+		return exportNullableI64Copy(a, dst)
+	case shiftedArray:
+		if a.offset != 0 {
+			return false, nil
+		}
+		return TryExportI64Copy(a.source, dst)
 	}
 	return false, nil
 }
@@ -90,6 +152,25 @@ func TryExportF64Copy(array Array, dst []float64) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportF64Copy(a.array, dst)
+	case indexedArray:
+		for row := range dst {
+			index, ok, err := i64IndexArrayAt(a.indexes, row)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return true, fmt.Errorf("indexed f64 export row %d out of range", row)
+			}
+			value, ok, err := numericAt(a.source, index)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[row] = value
+		}
+		return true, nil
 	case columnArray[float64]:
 		copy(dst, a.data)
 		return true, nil
@@ -112,6 +193,37 @@ func TryExportF64Copy(array Array, dst []float64) (bool, error) {
 			dst[i] = v
 		}
 		return true, nil
+	case f64BucketArray:
+		for i := range dst {
+			v, ok, err := a.f64At(i)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[i] = v
+		}
+		return true, nil
+	case f64FillArray:
+		for i := range dst {
+			v, ok, err := a.valueAt(i)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[i] = v
+		}
+		return true, nil
+	case nullableArray:
+		return exportNullableF64Copy(a, dst)
+	case shiftedArray:
+		if a.offset != 0 {
+			return false, nil
+		}
+		return TryExportF64Copy(a.source, dst)
 	}
 	return false, nil
 }
@@ -127,9 +239,35 @@ func TryExportBoolCopy(array Array, dst []bool) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportBoolCopy(a.array, dst)
+	case indexedArray:
+		for row := range dst {
+			index, ok, err := i64IndexArrayAt(a.indexes, row)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return true, fmt.Errorf("indexed bool export row %d out of range", row)
+			}
+			value, ok, err := boolArrayAt(a.source, index)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return false, nil
+			}
+			dst[row] = value
+		}
+		return true, nil
 	case columnArray[bool]:
 		copy(dst, a.data)
 		return true, nil
+	case nullableArray:
+		return exportNullableBoolCopy(a, dst)
+	case shiftedArray:
+		if a.offset != 0 {
+			return false, nil
+		}
+		return TryExportBoolCopy(a.source, dst)
 	}
 	return false, nil
 }
@@ -145,9 +283,124 @@ func TryExportStringCopy(array Array, dst []string) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportStringCopy(a.array, dst)
+	case indexedArray:
+		for row := range dst {
+			index, ok, err := i64IndexArrayAt(a.indexes, row)
+			if err != nil {
+				return true, err
+			}
+			if !ok {
+				return true, fmt.Errorf("indexed string export row %d out of range", row)
+			}
+			value, ok := stringArrayAt(a.source, index)
+			if !ok {
+				return false, nil
+			}
+			dst[row] = value
+		}
+		return true, nil
 	case columnArray[string]:
 		copy(dst, a.data)
 		return true, nil
+	case nullableArray:
+		return exportNullableStringCopy(a, dst)
+	case shiftedArray:
+		if a.offset != 0 {
+			return false, nil
+		}
+		return TryExportStringCopy(a.source, dst)
 	}
 	return false, nil
+}
+
+func exportNullableI64Copy(array nullableArray, dst []int64) (bool, error) {
+	for i, value := range array.data {
+		if IsNull(value) {
+			return false, nil
+		}
+		n, ok := integerScalarValue(value)
+		if !ok {
+			return false, nil
+		}
+		dst[i] = n
+	}
+	return true, nil
+}
+
+func exportNullableF64Copy(array nullableArray, dst []float64) (bool, error) {
+	for i, value := range array.data {
+		if IsNull(value) {
+			return false, nil
+		}
+		n, ok := numeric(value)
+		if !ok {
+			return false, nil
+		}
+		dst[i] = n
+	}
+	return true, nil
+}
+
+func exportNullableBoolCopy(array nullableArray, dst []bool) (bool, error) {
+	for i, value := range array.data {
+		if IsNull(value) {
+			return false, nil
+		}
+		v, ok := value.(bool)
+		if !ok {
+			return false, nil
+		}
+		dst[i] = v
+	}
+	return true, nil
+}
+
+func exportNullableStringCopy(array nullableArray, dst []string) (bool, error) {
+	for i, value := range array.data {
+		if IsNull(value) {
+			return false, nil
+		}
+		v, ok := value.(string)
+		if !ok {
+			return false, nil
+		}
+		dst[i] = v
+	}
+	return true, nil
+}
+
+func stringArrayAt(array Array, row int) (string, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return stringArrayAt(a.array, row)
+	case indexedArray:
+		index, ok, err := i64IndexArrayAt(a.indexes, row)
+		if err != nil || !ok {
+			return "", false
+		}
+		return stringArrayAt(a.source, index)
+	case columnArray[string]:
+		if row < 0 || row >= len(a.data) {
+			return "", false
+		}
+		return a.data[row], true
+	case nullableArray:
+		if row < 0 || row >= len(a.data) || IsNull(a.data[row]) {
+			return "", false
+		}
+		value, ok := a.data[row].(string)
+		return value, ok
+	case shiftedArray:
+		if a.offset != 0 {
+			return "", false
+		}
+		return stringArrayAt(a.source, row)
+	default:
+		value, ok := array.At(row)
+		if !ok || IsNull(value) {
+			return "", false
+		}
+		out, ok := value.(string)
+		return out, ok
+	}
 }
