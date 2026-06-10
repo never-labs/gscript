@@ -2132,6 +2132,22 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	if out, handled, err := typedWhereMaskIndexArray(mask); handled || err != nil {
 		return out, handled, err
 	}
+	if values, owned, ok := tryBulkBoolValues(mask); ok {
+		count := 0
+		for _, keep := range values {
+			if keep {
+				count++
+			}
+		}
+		out := make([]int64, 0, count)
+		for row, keep := range values {
+			if keep {
+				out = append(out, int64(row))
+			}
+		}
+		bulkBoolRelease(values, owned)
+		return newI64Trusted(out), true, nil
+	}
 	indexes, handled, err := typedWhereMaskIndexes(mask)
 	if err != nil {
 		return nil, true, err
@@ -2494,6 +2510,22 @@ func typedWhereMaskIndexes(mask Array) ([]int, bool, error) {
 		if mask.Kind() != KindBool {
 			return nil, false, nil
 		}
+		if values, owned, ok := tryBulkBoolValues(mask); ok {
+			count := 0
+			for _, keep := range values {
+				if keep {
+					count++
+				}
+			}
+			out := make([]int, 0, count)
+			for row, keep := range values {
+				if keep {
+					out = append(out, row)
+				}
+			}
+			bulkBoolRelease(values, owned)
+			return out, true, nil
+		}
 		capacity := mask.Len()
 		if count, handled, err := TryTypedTrueCount(mask); err != nil {
 			return nil, true, err
@@ -2601,7 +2633,13 @@ func TryTypedCompareCount(array Array, op Op, value any) (count int64, handled b
 		return compareTiledCount(a, op, value)
 	default:
 		count, _, handled, err := TryTypedCompareIndexStatsI64(a, op, value)
-		return count, handled, err
+		if handled || err != nil {
+			return count, handled, err
+		}
+		if count, ok := compareCountBulk(a, op, value); ok {
+			return count, true, nil
+		}
+		return 0, false, nil
 	}
 }
 

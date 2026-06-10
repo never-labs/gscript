@@ -188,6 +188,22 @@ func (typedKernelRegistry) CompareMask(array Array, op Op, value any, out []bool
 		v, ok := value.(Timestamp)
 		return compareSignedSlice(a.data, v, ok, op, out)
 	default:
+		if values, valuesOwned, ok := tryBulkI64Values(array); ok {
+			v, exact := coerceInt64Exact(value)
+			if exact {
+				fillCompareI64Mask(values, op, v, out)
+			}
+			bulkI64Release(values, valuesOwned)
+			if exact {
+				return true
+			}
+		}
+		if values, valuesOwned, ok := tryBulkF64Values(array); ok {
+			v, numericOK := numeric(value)
+			handled := compareFloatSlice(values, v, numericOK, op, out)
+			bulkF64Release(values, valuesOwned)
+			return handled
+		}
 		return false
 	}
 }
@@ -360,6 +376,22 @@ func (typedKernelRegistry) WithinMask(array Array, low, high any, highClosed boo
 		hi, hok := high.(Timestamp)
 		return withinSignedSlice(a.data, lo, hi, lok && hok, highClosed, out)
 	default:
+		if values, valuesOwned, ok := tryBulkI64Values(array); ok {
+			lo, lok := coerceInt64Exact(low)
+			hi, hok := coerceInt64Exact(high)
+			handled := withinSignedSlice(values, lo, hi, lok && hok, highClosed, out)
+			bulkI64Release(values, valuesOwned)
+			if handled {
+				return true
+			}
+		}
+		if values, valuesOwned, ok := tryBulkF64Values(array); ok {
+			lo, lok := numeric(low)
+			hi, hok := numeric(high)
+			handled := withinFloatSlice(values, lo, hi, lok && hok, highClosed, out)
+			bulkF64Release(values, valuesOwned)
+			return handled
+		}
 		return false
 	}
 }
@@ -1320,6 +1352,16 @@ func TryTypedInIndexesI64(array Array, values []any) (Array, bool, error) {
 	default:
 		indexes, ok := typedKernels.InIndexes(a, values, nil)
 		if !ok {
+			if rows, rowsOwned, bulkOK := tryBulkI64Values(a); bulkOK {
+				set, setOK := int64Membership(normalizeMembershipValues(KindI64, values))
+				if !setOK {
+					bulkI64Release(rows, rowsOwned)
+					return nil, false, nil
+				}
+				mask := bulkI64MembershipMask(rows, set)
+				bulkI64Release(rows, rowsOwned)
+				return boolMaskIndexArray(mask), true, nil
+			}
 			return nil, false, nil
 		}
 		return intIndexesToI64Array(indexes), true, nil
@@ -1539,6 +1581,16 @@ func typedInMask(array Array, values []any) (Array, bool, error) {
 		set, ok := exactMembership[Timestamp](values)
 		return membershipSignedMask(a.data, set, ok), ok, nil
 	default:
+		if rows, rowsOwned, ok := tryBulkI64Values(array); ok {
+			set, setOK := int64Membership(normalizeMembershipValues(KindI64, values))
+			if !setOK {
+				bulkI64Release(rows, rowsOwned)
+				return nil, false, nil
+			}
+			mask := bulkI64MembershipMask(rows, set)
+			bulkI64Release(rows, rowsOwned)
+			return newBoolTrusted(mask), true, nil
+		}
 		return nil, false, nil
 	}
 }
@@ -10296,6 +10348,9 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		return out, true, nil
 	}
 	if out, ok := compareI64ScalarDyadicScalarDyadic(op, left, right, length); ok {
+		return out, true, nil
+	}
+	if out, ok := compareDyadicBulk(op, left, right, length); ok {
 		return out, true, nil
 	}
 	out := make([]bool, length)

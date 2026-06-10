@@ -13660,6 +13660,16 @@ func boolValue(v any) (bool, error) {
 }
 
 func findValue(left, right any) (any, error) {
+	if domainArray, ok := left.(data.Array); ok {
+		if queryArray, ok := right.(data.Array); ok {
+			out, handled := data.TryTypedFindI64(domainArray, queryArray)
+			shape := "find/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
+			recordRuntimeKernelProbe("ArrayFind", shape, handled, nil)
+			if handled {
+				return out, nil
+			}
+		}
+	}
 	domain, err := findDomainValues(left)
 	if err != nil {
 		return nil, err
