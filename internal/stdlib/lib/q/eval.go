@@ -517,6 +517,10 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 		return "string_map"
 	case strings.HasPrefix(shape, "q-cast/"), strings.HasPrefix(shape, "cast-envelope/"):
 		return "cast"
+	case strings.HasPrefix(shape, "runtime-unary/"):
+		return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-unary/"))
+	case strings.HasPrefix(shape, "runtime-dyadic/"):
+		return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-dyadic/"))
 	case strings.HasPrefix(shape, "vector-unary/"):
 		return "vector_map"
 	case strings.HasPrefix(shape, "frame-gather/"):

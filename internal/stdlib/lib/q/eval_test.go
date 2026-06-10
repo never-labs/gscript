@@ -139,6 +139,30 @@ func TestRuntimeKernelExecutionStatsMapPipelineShapes(t *testing.T) {
 	}
 }
 
+func TestRuntimeNumericUnaryUsesRuntimePrimitiveShape(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalArray(t, "sqrt 4 9 16", data.KindF64, []any{2.0, 3.0, 4.0})
+
+	seenTypedUnary := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if strings.HasPrefix(stat.Shape, "vector-unary/") {
+			t.Fatalf("numeric unary used legacy vector-unary shape: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayNumericUnary" &&
+			stat.Shape == "runtime-unary/sqrt" &&
+			stat.PipelineShape == "numeric_math" &&
+			stat.Outcome == "hit" &&
+			stat.ReasonCode == "typed_kernel" {
+			seenTypedUnary = true
+		}
+	}
+	if !seenTypedUnary {
+		t.Fatalf("missing unified ArrayNumericUnary runtime primitive hit: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalFunctionalAmendAddUsesTypedIndexedAccumulation(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
