@@ -40,7 +40,7 @@ func xlogValue(left, right any) (any, error) {
 
 func qDataNumericUnary(name string, value any) (any, error) {
 	if array, ok := value.(data.Array); ok {
-		shape := "vector-unary/" + name + "/" + string(array.Kind())
+		shape := qRuntimeUnaryPrimitiveShape(name)
 		typed, handled, err := data.TryTypedQNumericUnary(name, array)
 		typed, handled, err = qTypedRuntimeResult("ArrayNumericUnary", shape, typed, handled, err)
 		if err != nil || handled {
@@ -59,6 +59,13 @@ func qDataNumericUnary(name string, value any) (any, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("%s expects a numeric value or vector", name)
+}
+
+func qRuntimeUnaryPrimitiveShape(name string) string {
+	if name == "" {
+		name = "unknown"
+	}
+	return "runtime-unary/" + name
 }
 
 func qDataNumericUnaryArrayFallback(name string, array data.Array) (any, error) {
