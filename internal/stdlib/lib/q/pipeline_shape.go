@@ -1,5 +1,11 @@
 package q
 
+import (
+	"strings"
+
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
+)
+
 type qPipelineShapeFamily string
 
 const (
@@ -20,6 +26,68 @@ type qPipelineShapeSpec struct {
 	Selector      string
 	Transform     string
 	PipelineShape string
+}
+
+type qPipelineShapeVariantField uint8
+
+const (
+	qPipelineShapeVariantNone qPipelineShapeVariantField = iota
+	qPipelineShapeVariantCompareOp
+	qPipelineShapeVariantUnaryOp
+)
+
+type qPipelineShapeRegistryEntry struct {
+	ID            string
+	Prefix        string
+	Kind          qPipelineKind
+	Variant       string
+	VariantField  qPipelineShapeVariantField
+	ComparePrefix string
+}
+
+var qPipelineDescriptorShapeRegistry = []qPipelineShapeRegistryEntry{
+	{ID: "vector-reduce/sum-deltas", Kind: qPipelineSumDeltas},
+	{ID: "vector-reduce/sum-expr", Kind: qPipelineSumVectorExpr},
+	{ID: "vector-reduce/sum-dyadic-min", Kind: qPipelineSumDyadicMinMax, Variant: "min", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-dyadic-max", Kind: qPipelineSumDyadicMinMax, Variant: "max", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-dyadic-float-xexp", Kind: qPipelineSumDyadicFloatMath, Variant: data.NumericDyadicXExp, VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-dyadic-float-xlog", Kind: qPipelineSumDyadicFloatMath, Variant: data.NumericDyadicXLog, VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-reverse", Kind: qPipelineSumSequenceTransform, Variant: data.SequenceTransformReverse, VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-rotate", Kind: qPipelineSumSequenceTransform, Variant: data.SequenceTransformRotate, VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-sublist", Kind: qPipelineSumSequenceTransform, Variant: data.SequenceTransformSublist, VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-ratios", Kind: qPipelineSumSequenceTransform, Variant: data.SequenceTransformRatios, VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-raze", Kind: qPipelineSumRaze},
+	{ID: "vector-count/expr", Kind: qPipelineCountVectorExpr},
+	{ID: "vector-reduce/sum-msum", Kind: qPipelineSumMovingWindow, Variant: "msum", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-mavg", Kind: qPipelineSumMovingWindow, Variant: "mavg", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-mcount", Kind: qPipelineSumMovingWindow, Variant: "mcount", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-mmin", Kind: qPipelineSumMovingWindow, Variant: "mmin", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-mmax", Kind: qPipelineSumMovingWindow, Variant: "mmax", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-count/sums", Kind: qPipelineCountRunningScan, Variant: "sums", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-count/prds", Kind: qPipelineCountRunningScan, Variant: "prds", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-count/mins", Kind: qPipelineCountRunningScan, Variant: "mins", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-count/maxs", Kind: qPipelineCountRunningScan, Variant: "maxs", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-count/avgs", Kind: qPipelineCountRunningScan, Variant: "avgs", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-last/sums", Kind: qPipelineLastRunningScan, Variant: "sums", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-last/prds", Kind: qPipelineLastRunningScan, Variant: "prds", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-last/mins", Kind: qPipelineLastRunningScan, Variant: "mins", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-last/maxs", Kind: qPipelineLastRunningScan, Variant: "maxs", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-last/avgs", Kind: qPipelineLastRunningScan, Variant: "avgs", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/trim", Kind: qPipelineCountSequencePrimitive, Variant: "trim", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/ltrim", Kind: qPipelineCountSequencePrimitive, Variant: "ltrim", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/rtrim", Kind: qPipelineCountSequencePrimitive, Variant: "rtrim", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/cross", Kind: qPipelineCountSequencePrimitive, Variant: "cross", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/cut", Kind: qPipelineCountSequencePrimitive, Variant: "cut", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/sublist", Kind: qPipelineCountSequencePrimitive, Variant: "sublist", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/raze", Kind: qPipelineCountSequencePrimitive, Variant: "raze", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "sequence-count/value", Kind: qPipelineCountSequencePrimitive, Variant: "value", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "apply-index/scalar-at", Kind: qPipelineApplyScalarIndex, Variant: "at", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "apply-index/gather-at", Kind: qPipelineApplyGatherIndex, Variant: "at", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "apply-index/scalar-dot", Kind: qPipelineApplyScalarIndex, Variant: "dot", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "apply-index/path-dot", Kind: qPipelineApplyScalarIndex, Variant: "dot", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "cast-envelope/sum", Kind: qPipelineCastEnvelopeSum},
+	{Prefix: "vector-reduce/sum-unary-", Kind: qPipelineSumUnaryPrimitive, VariantField: qPipelineShapeVariantUnaryOp},
+	{Prefix: "numeric-unary-compare-to-index/", Kind: qPipelineWhereUnaryCompareIndexes, VariantField: qPipelineShapeVariantUnaryOp, ComparePrefix: "numeric-unary-compare-to-index"},
 }
 
 func (s qPipelineShapeSpec) valid() bool {
@@ -236,6 +304,42 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 	default:
 		return qPipelineShapeSpec{}, false
 	}
+}
+
+func qPipelineApplyDescriptorShapeRegistry(plan *qPipelinePlan, shape string) bool {
+	for _, entry := range qPipelineDescriptorShapeRegistry {
+		var variant string
+		switch {
+		case entry.ID != "" && shape == entry.ID:
+			variant = entry.Variant
+		case entry.Prefix != "" && strings.HasPrefix(shape, entry.Prefix):
+			variant = strings.TrimPrefix(shape, entry.Prefix)
+		default:
+			continue
+		}
+		if entry.Kind == qPipelineInvalid {
+			return false
+		}
+		plan.kind = entry.Kind
+		switch entry.VariantField {
+		case qPipelineShapeVariantCompareOp:
+			if variant != "" {
+				plan.compareOp = variant
+			}
+		case qPipelineShapeVariantUnaryOp:
+			if plan.unaryOp == "" {
+				plan.unaryOp = variant
+			}
+		}
+		if entry.ComparePrefix != "" && plan.comparePrefix == "" {
+			plan.comparePrefix = entry.ComparePrefix
+		}
+		if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.shapeVariant()); ok && spec.ID == shape {
+			plan.shapeSpec = spec
+		}
+		return true
+	}
+	return false
 }
 
 func qPipelineRuntimePrimitiveShapeSpec(prefix, verb string) qPipelineShapeSpec {

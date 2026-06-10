@@ -473,6 +473,15 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		modTargetExpr:  strings.TrimSpace(descriptor.ModTargetExpr),
 		reductionInput: strings.TrimSpace(descriptor.ReductionInput),
 	}
+	if qPipelineApplyDescriptorShapeRegistry(&plan, shape) {
+		if plan.kind == qPipelineCastEnvelopeSum && !qPipelineRestoreDescriptorCastTerms(&plan, descriptor.CastTerms) {
+			return qPipelinePlan{}, false
+		}
+		if plan.comparePrefix == "" {
+			plan.comparePrefix = shape
+		}
+		return qPipelinePlanWithBindingPlans(plan), true
+	}
 	switch shape {
 	case "where-reduce/sum":
 		plan.kind = qPipelineSumWhereMask
@@ -492,97 +501,10 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.kind = qPipelineCountWhereModuloCompare
 	case "compare-to-index-mod":
 		plan.kind = qPipelineWhereModuloCompareIndexes
-	case "vector-reduce/sum-deltas":
-		plan.kind = qPipelineSumDeltas
 	case "bin-reduce/sum":
 		plan.kind = qPipelineSumBin
-	case "vector-reduce/sum-expr":
-		plan.kind = qPipelineSumVectorExpr
-	case "vector-reduce/sum-dyadic-min":
-		plan.kind = qPipelineSumDyadicMinMax
-		plan.compareOp = "min"
-	case "vector-reduce/sum-dyadic-max":
-		plan.kind = qPipelineSumDyadicMinMax
-		plan.compareOp = "max"
-	case "vector-reduce/sum-dyadic-float-xexp":
-		plan.kind = qPipelineSumDyadicFloatMath
-		plan.compareOp = data.NumericDyadicXExp
-	case "vector-reduce/sum-dyadic-float-xlog":
-		plan.kind = qPipelineSumDyadicFloatMath
-		plan.compareOp = data.NumericDyadicXLog
-	case "vector-reduce/sum-reverse":
-		plan.kind = qPipelineSumSequenceTransform
-		plan.compareOp = data.SequenceTransformReverse
-	case "vector-reduce/sum-rotate":
-		plan.kind = qPipelineSumSequenceTransform
-		plan.compareOp = data.SequenceTransformRotate
-	case "vector-reduce/sum-sublist":
-		plan.kind = qPipelineSumSequenceTransform
-		plan.compareOp = data.SequenceTransformSublist
-	case "vector-reduce/sum-ratios":
-		plan.kind = qPipelineSumSequenceTransform
-		plan.compareOp = data.SequenceTransformRatios
-	case "vector-reduce/sum-raze":
-		plan.kind = qPipelineSumRaze
-	case "vector-count/expr":
-		plan.kind = qPipelineCountVectorExpr
-	case "vector-reduce/sum-msum", "vector-reduce/sum-mavg", "vector-reduce/sum-mcount", "vector-reduce/sum-mmin", "vector-reduce/sum-mmax":
-		plan.kind = qPipelineSumMovingWindow
-	case "vector-count/sums", "vector-count/prds", "vector-count/mins", "vector-count/maxs", "vector-count/avgs":
-		plan.kind = qPipelineCountRunningScan
-	case "vector-last/sums", "vector-last/prds", "vector-last/mins", "vector-last/maxs", "vector-last/avgs":
-		plan.kind = qPipelineLastRunningScan
-	case "sequence-count/trim", "sequence-count/ltrim", "sequence-count/rtrim",
-		"sequence-count/cross", "sequence-count/cut", "sequence-count/sublist",
-		"sequence-count/raze", "sequence-count/value":
-		plan.kind = qPipelineCountSequencePrimitive
-		plan.compareOp = strings.TrimPrefix(shape, "sequence-count/")
-	case "apply-index/scalar-at":
-		plan.kind = qPipelineApplyScalarIndex
-		plan.compareOp = "at"
-	case "apply-index/gather-at":
-		plan.kind = qPipelineApplyGatherIndex
-		plan.compareOp = "at"
-	case "apply-index/scalar-dot":
-		plan.kind = qPipelineApplyScalarIndex
-		plan.compareOp = "dot"
-	case "apply-index/path-dot":
-		plan.kind = qPipelineApplyScalarIndex
-		plan.compareOp = "dot"
-	case "cast-envelope/sum":
-		plan.kind = qPipelineCastEnvelopeSum
-		plan.castTerms = make([]qPipelineCastTermPlan, 0, len(descriptor.CastTerms))
-		for _, term := range descriptor.CastTerms {
-			if strings.TrimSpace(term.ValueExpr) == "" || strings.TrimSpace(term.TargetKind) == "" {
-				return qPipelinePlan{}, false
-			}
-			target := qCastTarget{kind: data.Kind(term.TargetKind), sourceText: strings.TrimSpace(term.DomainExpr)}
-			if target.sourceText == "" {
-				target.sourceText = string(target.kind)
-			}
-			plan.castTerms = append(plan.castTerms, qPipelineCastTermPlan{
-				domainExpr: strings.TrimSpace(term.DomainExpr),
-				valueExpr:  strings.TrimSpace(term.ValueExpr),
-				target:     target,
-				stringCast: term.StringCast,
-				count:      term.Count,
-			})
-		}
 	default:
 		switch {
-		case strings.HasPrefix(shape, "vector-reduce/sum-unary-"):
-			plan.kind = qPipelineSumUnaryPrimitive
-			if plan.unaryOp == "" {
-				plan.unaryOp = strings.TrimPrefix(shape, "vector-reduce/sum-unary-")
-			}
-		case strings.HasPrefix(shape, "numeric-unary-compare-to-index/"):
-			plan.kind = qPipelineWhereUnaryCompareIndexes
-			if plan.unaryOp == "" {
-				plan.unaryOp = strings.TrimPrefix(shape, "numeric-unary-compare-to-index/")
-			}
-			if plan.comparePrefix == "" {
-				plan.comparePrefix = "numeric-unary-compare-to-index"
-			}
 		case strings.HasPrefix(shape, "runtime-unary/"):
 			plan.kind = qPipelineUnaryPrimitive
 			if plan.compareOp == "" {
@@ -601,6 +523,27 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		plan.comparePrefix = shape
 	}
 	return qPipelinePlanWithBindingPlans(plan), true
+}
+
+func qPipelineRestoreDescriptorCastTerms(plan *qPipelinePlan, terms []EvalPipelineCastTerm) bool {
+	plan.castTerms = make([]qPipelineCastTermPlan, 0, len(terms))
+	for _, term := range terms {
+		if strings.TrimSpace(term.ValueExpr) == "" || strings.TrimSpace(term.TargetKind) == "" {
+			return false
+		}
+		target := qCastTarget{kind: data.Kind(term.TargetKind), sourceText: strings.TrimSpace(term.DomainExpr)}
+		if target.sourceText == "" {
+			target.sourceText = string(target.kind)
+		}
+		plan.castTerms = append(plan.castTerms, qPipelineCastTermPlan{
+			domainExpr: strings.TrimSpace(term.DomainExpr),
+			valueExpr:  strings.TrimSpace(term.ValueExpr),
+			target:     target,
+			stringCast: term.StringCast,
+			count:      term.Count,
+		})
+	}
+	return true
 }
 
 func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qScriptPipelineDescriptor, bool) {
