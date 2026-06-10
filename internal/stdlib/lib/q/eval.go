@@ -4771,6 +4771,9 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 		case "'":
 			return applyEachUnary(expr.verb, right)
 		case "':":
+			if op, _, ok := lookupDyadicVerb(expr.verb); ok {
+				return applyEachPrior(op, nil, right)
+			}
 			fn, ok := lookupDyadicVerbFunc(expr.verb)
 			if !ok {
 				return nil, fmt.Errorf("%s cannot be used with each-prior", expr.verb)
@@ -4817,6 +4820,9 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 		}
 		return applyEachDyadicFunc(fn, left, right)
 	case "':":
+		if hasDyadicOp {
+			return applyEachPrior(op, left, right)
+		}
 		return applyEachPriorFunc(fn, left, right)
 	case "\\:":
 		if hasDyadicOp {
@@ -8109,6 +8115,9 @@ func applyAdverbFunction(fn qAdverbFunction, args []any) (any, error) {
 			}
 			return applyScan(op, nil, args[0])
 		case "':":
+			if hasDyadicOp {
+				return applyEachPrior(op, nil, args[0])
+			}
 			return applyEachPriorFunc(dyad, nil, args[0])
 		case "'":
 			return nil, fmt.Errorf("adverb function each expected 2 arguments, got 1")
@@ -8135,6 +8144,9 @@ func applyAdverbFunction(fn qAdverbFunction, args []any) (any, error) {
 			}
 			return applyScan(op, args[0], args[1])
 		case "':":
+			if hasDyadicOp {
+				return applyEachPrior(op, args[0], args[1])
+			}
 			return applyEachPriorFunc(dyad, args[0], args[1])
 		case "\\:":
 			if hasDyadicOp {
@@ -8645,6 +8657,11 @@ func (s *EvalState) applyEachDyadicCallable(fn any, left any, right any) (any, e
 	if lok && rok && la.Len() != ra.Len() {
 		return nil, fmt.Errorf("callable each length mismatch")
 	}
+	if op, ok := callableFastDyadicOp(fn); ok {
+		if out, handled, err := tryApplyTypedAdverbDyadic(op, "'", left, right); handled || err != nil {
+			return out, err
+		}
+	}
 	n := 0
 	switch {
 	case lok:
@@ -8739,6 +8756,11 @@ func (s *EvalState) applyOverCallable(fn any, initial any, v any) (any, error) {
 		}
 		return applyDyadic('+', initial, reduced)
 	}
+	if op, ok := callableFastDyadicOp(fn); ok {
+		if out, handled, err := tryApplyTypedOverScan(op, initial, v, false); handled || err != nil {
+			return out, err
+		}
+	}
 	items, err := vectorValues(v)
 	if err != nil {
 		if initial != nil {
@@ -8781,6 +8803,11 @@ func (s *EvalState) applyScanCallable(fn any, initial any, v any) (any, error) {
 			return scan, nil
 		}
 		return applyDyadic('+', scan, initial)
+	}
+	if op, ok := callableFastDyadicOp(fn); ok {
+		if out, handled, err := tryApplyTypedOverScan(op, initial, v, true); handled || err != nil {
+			return out, err
+		}
 	}
 	items, err := vectorValues(v)
 	if err != nil {
@@ -8827,6 +8854,11 @@ func isCallableAdd(fn any) bool {
 }
 
 func (s *EvalState) applyEachPriorCallable(fn any, initial any, v any) (any, error) {
+	if op, ok := callableFastDyadicOp(fn); ok {
+		if out, handled, err := tryApplyTypedEachPrior(op, initial, v); handled || err != nil {
+			return out, err
+		}
+	}
 	items, err := vectorValues(v)
 	if err != nil {
 		if initial != nil {
@@ -8989,6 +9021,9 @@ func applyEachDyadicFunc(fn func(any, any) (any, error), left, right any) (any, 
 }
 
 func applyEachPrior(op byte, initial any, v any) (any, error) {
+	if out, handled, err := tryApplyTypedEachPrior(op, initial, v); handled || err != nil {
+		return out, err
+	}
 	return applyEachPriorFunc(dyadicVerbFunc(op), initial, v)
 }
 
@@ -9089,6 +9124,9 @@ func applyOver(op byte, initial any, v any) (any, error) {
 	if op == '+' && initial == nil {
 		return sum(v)
 	}
+	if out, handled, err := tryApplyTypedOverScan(op, initial, v, false); handled || err != nil {
+		return out, err
+	}
 	items, err := vectorValues(v)
 	if err != nil {
 		if initial != nil {
@@ -9121,6 +9159,9 @@ func applyOver(op byte, initial any, v any) (any, error) {
 func applyScan(op byte, initial any, v any) (any, error) {
 	if op == '+' && initial == nil {
 		return sums(v)
+	}
+	if out, handled, err := tryApplyTypedOverScan(op, initial, v, true); handled || err != nil {
+		return out, err
 	}
 	items, err := vectorValues(v)
 	if err != nil {
