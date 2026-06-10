@@ -981,3 +981,319 @@ func TryTypedFindI64(domain, query Array) (Array, bool) {
 	bulkI64Release(queryValues, queryOwned)
 	return newI64Trusted(out), true
 }
+
+// TryTypedSetOpIndexes returns left-side row indexes for the q set verbs
+// inter/intersect (op "inter") and except (op "except") without boxing rows
+// or running O(n*m) DeepEqual membership probes. "inter" keeps the first
+// occurrence of each left value present in the right-hand value set (q dedup
+// semantics); "except" keeps every left row absent from it. Membership uses
+// strict typed equality, matching DeepEqual semantics for int64, float64
+// (NaN never equals NaN on either path), Symbol, and string rows.
+func TryTypedSetOpIndexes(op string, array Array, values []any) ([]int, bool) {
+	intersect := op == "inter"
+	if !intersect && op != "except" {
+		return nil, false
+	}
+	if attributed, ok := array.(attributedArray); ok {
+		array = attributed.array
+	}
+	switch a := array.(type) {
+	case columnArray[Symbol]:
+		set, ok := exactMembership[Symbol](values)
+		if !ok {
+			return nil, false
+		}
+		return setOpIndexesComparable(a.data, set, intersect), true
+	case columnArray[string]:
+		set, ok := exactMembership[string](values)
+		if !ok {
+			return nil, false
+		}
+		return setOpIndexesComparable(a.data, set, intersect), true
+	case columnArray[float64]:
+		set, ok := exactMembership[float64](values)
+		if !ok {
+			return nil, false
+		}
+		return setOpIndexesComparable(a.data, set, intersect), true
+	}
+	if array.Kind() != KindI64 {
+		return nil, false
+	}
+	rows, owned, ok := tryBulkI64Values(array)
+	if !ok {
+		return nil, false
+	}
+	set, ok := exactMembership[int64](values)
+	if !ok {
+		bulkI64Release(rows, owned)
+		return nil, false
+	}
+	out := setOpIndexesComparable(rows, set, intersect)
+	bulkI64Release(rows, owned)
+	return out, true
+}
+
+func setOpIndexesComparable[T comparable](rows []T, set map[T]struct{}, intersect bool) []int {
+	// Sentinel-sized sets: a linear probe over a flattened key slice beats a
+	// hash probe per row.
+	if len(set) <= 16 {
+		keys := make([]T, 0, len(set))
+		for key := range set {
+			keys = append(keys, key)
+		}
+		return setOpIndexesSmall(rows, keys, intersect)
+	}
+	if intersect {
+		out := make([]int, 0, len(set))
+		var seen map[T]struct{}
+		for i, value := range rows {
+			if _, member := set[value]; !member {
+				continue
+			}
+			if seen == nil {
+				seen = make(map[T]struct{}, len(set))
+			} else if _, dup := seen[value]; dup {
+				continue
+			}
+			seen[value] = struct{}{}
+			out = append(out, i)
+		}
+		return out
+	}
+	out := make([]int, 0, len(rows))
+	for i, value := range rows {
+		if _, member := set[value]; !member {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func setOpIndexesSmall[T comparable](rows []T, keys []T, intersect bool) []int {
+	member := func(value T) bool {
+		for _, key := range keys {
+			if key == value {
+				return true
+			}
+		}
+		return false
+	}
+	if intersect {
+		out := make([]int, 0, len(keys))
+		var seen []T
+		for i, value := range rows {
+			if !member(value) {
+				continue
+			}
+			dup := false
+			for _, existing := range seen {
+				if existing == value {
+					dup = true
+					break
+				}
+			}
+			if dup {
+				continue
+			}
+			seen = append(seen, value)
+			out = append(out, i)
+			if len(out) == len(keys) {
+				break
+			}
+		}
+		return out
+	}
+	out := make([]int, 0, len(rows))
+	for i, value := range rows {
+		if !member(value) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+// TryTypedDistinctIndexes returns first-occurrence row indexes for typed
+// arrays so distinct can gather without per-row boxing or O(n^2) DeepEqual
+// scans. Strict typed equality matches the boxed fallback for non-null rows.
+func TryTypedDistinctIndexes(array Array) ([]int, bool) {
+	if attributed, ok := array.(attributedArray); ok {
+		array = attributed.array
+	}
+	switch a := array.(type) {
+	case columnArray[Symbol]:
+		return distinctIndexesComparable(a.data), true
+	case columnArray[string]:
+		return distinctIndexesComparable(a.data), true
+	case columnArray[float64]:
+		return distinctIndexesComparable(a.data), true
+	}
+	if array.Kind() != KindI64 {
+		return nil, false
+	}
+	rows, owned, ok := tryBulkI64Values(array)
+	if !ok {
+		return nil, false
+	}
+	out := distinctIndexesComparable(rows)
+	bulkI64Release(rows, owned)
+	return out, true
+}
+
+func distinctIndexesComparable[T comparable](rows []T) []int {
+	out := make([]int, 0, min(len(rows), 16))
+	seen := make(map[T]struct{}, min(len(rows), 64))
+	for i, value := range rows {
+		if _, dup := seen[value]; dup {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, i)
+	}
+	return out
+}
+
+// TryTypedUnion returns the q union of two same-kind typed arrays: left
+// values deduplicated in first-occurrence order followed by unseen right
+// values, with one map instead of O((n+m)^2) boxed DeepEqual scans.
+func TryTypedUnion(left, right Array) (Array, bool) {
+	if attributed, ok := left.(attributedArray); ok {
+		left = attributed.array
+	}
+	if attributed, ok := right.(attributedArray); ok {
+		right = attributed.array
+	}
+	switch l := left.(type) {
+	case columnArray[Symbol]:
+		r, ok := right.(columnArray[Symbol])
+		if !ok {
+			return nil, false
+		}
+		return columnArray[Symbol]{kind: KindSymbol, data: unionComparable(l.data, r.data)}, true
+	case columnArray[string]:
+		r, ok := right.(columnArray[string])
+		if !ok {
+			return nil, false
+		}
+		return columnArray[string]{kind: KindString, data: unionComparable(l.data, r.data)}, true
+	case columnArray[float64]:
+		r, ok := right.(columnArray[float64])
+		if !ok {
+			return nil, false
+		}
+		return columnArray[float64]{kind: KindF64, data: unionComparable(l.data, r.data)}, true
+	}
+	if left.Kind() != KindI64 || right.Kind() != KindI64 {
+		return nil, false
+	}
+	leftRows, leftOwned, ok := tryBulkI64Values(left)
+	if !ok {
+		return nil, false
+	}
+	rightRows, rightOwned, ok := tryBulkI64Values(right)
+	if !ok {
+		bulkI64Release(leftRows, leftOwned)
+		return nil, false
+	}
+	out := unionComparable(leftRows, rightRows)
+	bulkI64Release(leftRows, leftOwned)
+	bulkI64Release(rightRows, rightOwned)
+	return newI64Trusted(out), true
+}
+
+func unionComparable[T comparable](left, right []T) []T {
+	out := make([]T, 0, len(left)+len(right))
+	seen := make(map[T]struct{}, len(left)+len(right))
+	for _, value := range left {
+		if _, dup := seen[value]; dup {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	for _, value := range right {
+		if _, dup := seen[value]; dup {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+// MaterializeArray returns a dense representation of array. Dense carriers
+// (typed columns, boxed nullable columns, encoded vectors) return unchanged
+// with zero copies; lazy carriers (ranges, scalar-dyadic chains, tiled
+// cycles) flatten through the bulk kernels so downstream row-loop consumers
+// (sorts, group scans, frame columns) never pay a carrier-tree walk per row.
+func MaterializeArray(array Array) Array {
+	switch a := array.(type) {
+	case attributedArray:
+		return attributedArray{array: MaterializeArray(a.array), metadata: a.metadata}
+	case columnArray[bool], columnArray[int8], columnArray[int16], columnArray[int32],
+		columnArray[int64], columnArray[uint8], columnArray[uint16], columnArray[uint32],
+		columnArray[uint64], columnArray[float32], columnArray[float64],
+		columnArray[string], columnArray[Symbol], columnArray[Month], columnArray[Date],
+		columnArray[DateTime], columnArray[Timespan], columnArray[Minute],
+		columnArray[Second], columnArray[Time], columnArray[Timestamp],
+		nullableArray, encodedArray:
+		return array
+	case tiledArray:
+		if out, ok := tileExpandTyped(a); ok {
+			return out
+		}
+	}
+	// External metadata-carrying wrappers (q attribute vectors) keep their
+	// own Gather semantics so attributes survive materialization.
+	if _, ok := array.(arrayMetadataProvider); ok {
+		return array.Gather(allIndexes(array.Len()))
+	}
+	if values, owned, ok := tryBulkI64Values(array); ok {
+		if !owned {
+			values = append([]int64(nil), values...)
+		}
+		return newI64Trusted(values)
+	}
+	if array.Kind() == KindF64 {
+		if values, owned, ok := tryBulkF64Values(array); ok {
+			if !owned {
+				values = append([]float64(nil), values...)
+			}
+			return newF64Trusted(values)
+		}
+	}
+	return array.Gather(allIndexes(array.Len()))
+}
+
+// tileExpandTyped expands cyclic takes (n#`a`b`c) of typed sources into a
+// dense column with one modulo loop, skipping the mapped index slice and the
+// per-row dispatch a generic gather would pay.
+func tileExpandTyped(a tiledArray) (Array, bool) {
+	if a.len <= 0 || a.source.Len() == 0 {
+		return nil, false
+	}
+	source := MaterializeArray(a.source)
+	if attributed, ok := source.(attributedArray); ok {
+		source = attributed.array
+	}
+	switch sc := source.(type) {
+	case columnArray[Symbol]:
+		return columnArray[Symbol]{kind: sc.kind, data: tileExpandSlice(sc.data, a.start, a.len)}, true
+	case columnArray[string]:
+		return columnArray[string]{kind: sc.kind, data: tileExpandSlice(sc.data, a.start, a.len)}, true
+	case columnArray[bool]:
+		return columnArray[bool]{kind: sc.kind, data: tileExpandSlice(sc.data, a.start, a.len)}, true
+	case columnArray[float64]:
+		return columnArray[float64]{kind: sc.kind, data: tileExpandSlice(sc.data, a.start, a.len)}, true
+	default:
+		return nil, false
+	}
+}
+
+func tileExpandSlice[T any](source []T, start, n int) []T {
+	out := make([]T, n)
+	for i := range out {
+		out[i] = source[(start+i)%len(source)]
+	}
+	return out
+}

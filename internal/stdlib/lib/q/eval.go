@@ -646,7 +646,8 @@ type EvalState struct {
 	oneShot              bool
 	scriptCache          map[string]qScriptPlan
 	valueExprCache       map[string]Expr
-	pipelineCache        map[string]qPipelinePlan
+	pipelineCache        map[string]*qPipelinePlan
+	constValueCache      map[string]any
 	applyIndexCache      map[string]qScalarApplyIndexPlan
 	dotApplyCache        map[string]qDotApplyPlan
 	deferScanAssignments map[string]bool
@@ -731,6 +732,79 @@ func EvalSourceCacheable(src string) bool {
 	return true
 }
 
+// qEvalConstantWords lists identifier tokens that keep an expression
+// session-constant beyond the unary/dyadic verb registries: adverb words,
+// dyadic word forms, and literal keywords. Nondeterministic words (rand,
+// roll, deal) and workspace-reading words stay out so they are treated as
+// names and disqualify constant memoization.
+var qEvalConstantWords = map[string]struct{}{
+	"each": {}, "over": {}, "scan": {}, "prior": {}, "fby": {},
+	"til": {}, "where": {}, "mod": {}, "div": {}, "and": {}, "or": {},
+	"in": {}, "within": {}, "like": {}, "xbar": {}, "xrank": {},
+	"cut": {}, "sublist": {}, "rotate": {}, "cross": {}, "vs": {}, "sv": {},
+	"union": {}, "inter": {}, "intersect": {}, "except": {},
+	"msum": {}, "mavg": {}, "mcount": {}, "mmin": {}, "mmax": {}, "mdev": {},
+	"ema": {}, "xprev": {}, "xcols": {}, "xkey": {}, "xgroup": {},
+	"xasc": {}, "xdesc": {}, "bin": {}, "binr": {}, "fill": {},
+	"true": {}, "false": {}, "left": {}, "right": {},
+}
+
+// qEvalConstantStatementSource reports whether src is a closed q expression:
+// every bare identifier resolves to a deterministic builtin verb, so the
+// expression denotes the same value on every session-warm call and its
+// result may be memoized. Assignments, lambdas, amend forms, temporal
+// colon literals, and random (`?`) forms are rejected conservatively.
+func qEvalConstantStatementSource(src string) bool {
+	if !EvalSourceCacheable(src) {
+		return false
+	}
+	scan := qEvalCacheScanText(src)
+	for i := 0; i < len(scan); i++ {
+		ch := scan[i]
+		switch ch {
+		case '{', '}', ':', '?', '@', '.':
+			return false
+		case '`':
+			// Skip symbol atoms: their identifier text is data, not a name.
+			j := i + 1
+			for j < len(scan) && isQIdentByte(scan[j]) {
+				j++
+			}
+			i = j - 1
+			continue
+		}
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			start := i
+			j := i
+			for j < len(scan) && isQIdentByte(scan[j]) {
+				j++
+			}
+			word := scan[start:j]
+			i = j - 1
+			// Numeric type suffixes (10f, 0N, 0w) ride directly on a digit.
+			if start > 0 && scan[start-1] >= '0' && scan[start-1] <= '9' {
+				continue
+			}
+			if _, ok := qEvalConstantWords[word]; ok {
+				continue
+			}
+			if _, ok := lookupUnaryVerb(word); ok {
+				continue
+			}
+			if _, ok := lookupDyadicVerbFunc(word); ok {
+				continue
+			}
+			return false
+		}
+	}
+	return true
+}
+
+func isQIdentByte(ch byte) bool {
+	return ch == '_' || (ch >= '0' && ch <= '9') ||
+		(ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+}
+
 func qEvalCacheScanText(src string) string {
 	var out strings.Builder
 	out.Grow(len(src))
@@ -801,11 +875,11 @@ func (s *EvalState) evalScriptPlan(plan qScriptPlan) (any, error) {
 		s.deferScanAssignments = previousDeferredScans
 	}()
 	if len(plan.statements) == 1 {
-		return s.evalScriptStatement(plan.statements[0])
+		return s.evalScriptStatement(&plan.statements[0])
 	}
 	var last any
 	for i := 0; i < len(plan.statements); i++ {
-		stmt := plan.statements[i]
+		stmt := &plan.statements[i]
 		if stmt.src == "" {
 			continue
 		}
@@ -852,6 +926,15 @@ const (
 	qEvalFastPipeline
 	qEvalFastScalarApplyIndex
 	qEvalFastSortRankReducerBundle
+	qEvalFastNamePostfixSymbol
+)
+
+type qEvalConstState uint8
+
+const (
+	qEvalConstUnknown qEvalConstState = iota
+	qEvalConstValue
+	qEvalConstNot
 )
 
 type qEvalFastPlan struct {
@@ -859,6 +942,9 @@ type qEvalFastPlan struct {
 	pipeline      qPipelinePlan
 	scalarIndex   qScalarApplyIndexPlan
 	sortRankTerms []qSortRankReducerTermPlan
+	postfixName   string
+	postfixSymbol data.Symbol
+	constState    qEvalConstState
 }
 
 type qScriptExecutableKind uint8
@@ -1366,7 +1452,7 @@ func cachedValueExprContainsTemporal(expr Expr) bool {
 	return false
 }
 
-func (s *EvalState) evalScriptStatement(stmt qScriptStatement) (any, error) {
+func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 	target := stmt.src
 	if stmt.assign != "" {
 		target = stmt.rhs
@@ -1593,6 +1679,9 @@ func buildQEvalFastPlan(src string) qEvalFastPlan {
 	if scalar, ok := buildScalarApplyIndexPlan(src); ok {
 		return qEvalFastPlan{kind: qEvalFastScalarApplyIndex, scalarIndex: scalar}
 	}
+	if name, sym, ok := buildNamePostfixSymbolPlan(src); ok {
+		return qEvalFastPlan{kind: qEvalFastNamePostfixSymbol, postfixName: name, postfixSymbol: sym}
+	}
 	if sortRankTerms := buildQSortRankReducerBundlePlan(src); len(sortRankTerms) > 0 {
 		return qEvalFastPlan{kind: qEvalFastSortRankReducerBundle, sortRankTerms: sortRankTerms}
 	}
@@ -1630,12 +1719,84 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 		return scalarApplyIndexPlanValue(plan.scalarIndex, target)
 	case qEvalFastSortRankReducerBundle:
 		return s.evalSortRankReducerBundlePlan(plan.sortRankTerms)
+	case qEvalFastNamePostfixSymbol:
+		collection, ok := s.lookupName(plan.postfixName)
+		if !ok || isCallable(collection) {
+			return nil, false, nil
+		}
+		out, err := indexValue(collection, plan.postfixSymbol)
+		return out, true, err
 	default:
 		return nil, false, nil
 	}
 }
 
+// buildNamePostfixSymbolPlan recognizes `name`sym` column/key reads (t`px,
+// d`a): a bare non-verb identifier indexed by one symbol literal. Execution
+// is a name lookup plus indexValue, skipping the per-call string walk.
+func buildNamePostfixSymbolPlan(src string) (string, data.Symbol, bool) {
+	collectionExpr, symbolExpr, ok := findPostfixSymbolLookup(src)
+	if !ok {
+		return "", "", false
+	}
+	name := strings.TrimSpace(collectionExpr)
+	if !isQAssignmentName(name) {
+		return "", "", false
+	}
+	if _, ok := qEvalConstantWords[name]; ok {
+		return "", "", false
+	}
+	if _, ok := lookupUnaryVerb(name); ok {
+		return "", "", false
+	}
+	if _, ok := lookupDyadicVerbFunc(name); ok {
+		return "", "", false
+	}
+	syms, err := parseSymbolList(strings.TrimSpace(symbolExpr))
+	if err != nil || len(syms) != 1 {
+		return "", "", false
+	}
+	return name, syms[0], true
+}
+
 func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
+	// Constant statement memoization: closed expressions (no free names, no
+	// nondeterministic forms) evaluate to the same value on every call, so
+	// the session-warm steady state is a single map probe. Values memoize
+	// per EvalState only — plans are shared through the global script-plan
+	// cache and fresh sessions must still execute (and record) kernels.
+	// Amend forms rebuild arrays copy-on-write, matching the binding-plan
+	// literal cache contract.
+	if fastPlan != nil {
+		switch fastPlan.constState {
+		case qEvalConstValue:
+			if value, ok := s.constValueCache[src]; ok {
+				return value, nil
+			}
+		case qEvalConstUnknown:
+			if qEvalConstantStatementSource(src) {
+				fastPlan.constState = qEvalConstValue
+			} else {
+				fastPlan.constState = qEvalConstNot
+			}
+		}
+		if fastPlan.constState == qEvalConstValue {
+			value, err := s.evalCachedOrStringUncached(src, expr, bindingPlan, fastPlan)
+			if err == nil && !s.oneShot {
+				if s.constValueCache == nil {
+					s.constValueCache = make(map[string]any, 8)
+				} else if len(s.constValueCache) >= 256 {
+					s.constValueCache = make(map[string]any, 8)
+				}
+				s.constValueCache[src] = value
+			}
+			return value, err
+		}
+	}
+	return s.evalCachedOrStringUncached(src, expr, bindingPlan, fastPlan)
+}
+
+func (s *EvalState) evalCachedOrStringUncached(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
 	if out, handled, err := s.evalApplyIndexForm(src); err != nil || handled {
 		return out, err
 	}
@@ -1651,8 +1812,8 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 	if out, handled, err := s.evalQFastPlan(fastPlan); err != nil || handled {
 		return out, err
 	}
-	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
-		if out, handled, err := s.evalQPipelinePlan(&plan); err != nil || handled {
+	if plan := s.qPipelinePlanRef(src); plan.kind != qPipelineInvalid {
+		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
 			return out, err
 		}
 	}
@@ -2234,8 +2395,8 @@ func (s *EvalState) eval(src string) (any, error) {
 	if out, handled, err := s.tryEvalSortRankReducerBundle(src); err != nil || handled {
 		return out, err
 	}
-	if plan := s.qPipelinePlan(src); plan.kind != qPipelineInvalid {
-		if out, handled, err := s.evalQPipelinePlan(&plan); err != nil || handled {
+	if plan := s.qPipelinePlanRef(src); plan.kind != qPipelineInvalid {
+		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
 			return out, err
 		}
 	}
@@ -2710,66 +2871,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return dictLookup(left, right)
 	}
-	dyadicWords := []qDyadicWordOp{
-		{"bin", bin},
-		{"binr", binr},
-		{"xbar", xbar},
-		{"xrank", xrank},
-		{"msum", msum},
-		{"mavg", mavg},
-		{"mcount", mcount},
-		{"mmin", mmin},
-		{"mmax", mmax},
-		{"mdev", mdevValue},
-		{"ema", emaValue},
-		{"xprev", xprev},
-		{"xrank", xrank},
-		{"mmu", matrixMultiplyValue},
-		{"xcols", xcols},
-		{"xkey", xkey},
-		{"xgroup", xgroup},
-		{"xasc", xasc},
-		{"xdesc", xdesc},
-		{"rotate", rotateValue},
-		{"cut", qCutValue},
-		{"sublist", qSublistValue},
-		{"cross", qCrossValue},
-		{"ss", qSSValue},
-		{"ssr", qSSRWithSourceValue},
-		{"sv", qSVValue},
-		{"vs", qVSValue},
-		{"plus", dyadicVerbFunc('+')},
-		{"minus", dyadicVerbFunc('-')},
-		{"times", dyadicVerbFunc('*')},
-		{"divide", dyadicVerbFunc('%')},
-		{"div", dyadicVerbFunc('d')},
-		{"mod", modValue},
-		{"xexp", xexpValue},
-		{"xlog", xlogValue},
-		{"fill", dyadicVerbFunc('^')},
-		{"match", func(left, right any) (any, error) { return matchValue(left, right), nil }},
-		{"like", likeValue},
-		{"equal", dyadicVerbFunc('=')},
-		{"equals", dyadicVerbFunc('=')},
-		{"less", dyadicVerbFunc('<')},
-		{"more", dyadicVerbFunc('>')},
-		{"greater", dyadicVerbFunc('>')},
-		{"min", dyadicVerbFunc('m')},
-		{"max", dyadicVerbFunc('M')},
-		{"wavg", wavg},
-		{"wsum", wsumValue},
-		{"cov", covValue},
-		{"scov", scovValue},
-		{"cor", corValue},
-		{"left", dyadicVerbFunc('L')},
-		{"right", dyadicVerbFunc('R')},
-		{"within", within},
-		{"where", whereFilterValue},
-		{"in", membership},
-		{"and", logicalAnd},
-		{"or", logicalOr},
-	}
-	if op, leftExpr, rightExpr, ok := splitTopLevelDyadicWord(src, dyadicWords); ok {
+	if op, leftExpr, rightExpr, ok := splitTopLevelDyadicWordMap(src, qDyadicWordOps); ok {
 		left, err := s.eval(leftExpr)
 		if err != nil {
 			return nil, err
@@ -2780,13 +2882,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return op.fn(left, right)
 	}
-	setWords := []qDyadicWordOp{
-		{"intersect", inter},
-		{"except", except},
-		{"union", union},
-		{"inter", inter},
-	}
-	if op, leftExpr, rightExpr, ok := splitTopLevelDyadicWord(src, setWords); ok {
+	if op, leftExpr, rightExpr, ok := splitTopLevelDyadicWordMap(src, qSetWordOps); ok {
 		left, err := s.eval(leftExpr)
 		if err != nil {
 			return nil, err
@@ -3975,6 +4071,149 @@ func splitTopLevelWord(src, word string) (string, string, bool) {
 	left := strings.TrimSpace(src[:pos])
 	right := strings.TrimSpace(src[pos+len(word):])
 	return left, right, left != "" && right != ""
+}
+
+// qDyadicWordOps and qSetWordOps are the word-form dyadic verb registries the
+// string evaluator splits on. Built once: the per-call probe used to rebuild
+// these tables and run one full source scan per word; the map variant scans
+// the source once and looks each top-level identifier token up directly.
+var qDyadicWordOps = map[string]qDyadicWordOp{}
+var qSetWordOps = map[string]qDyadicWordOp{}
+
+func init() {
+	for _, op := range []qDyadicWordOp{
+		{"bin", bin},
+		{"binr", binr},
+		{"xbar", xbar},
+		{"xrank", xrank},
+		{"msum", msum},
+		{"mavg", mavg},
+		{"mcount", mcount},
+		{"mmin", mmin},
+		{"mmax", mmax},
+		{"mdev", mdevValue},
+		{"ema", emaValue},
+		{"xprev", xprev},
+		{"mmu", matrixMultiplyValue},
+		{"xcols", xcols},
+		{"xkey", xkey},
+		{"xgroup", xgroup},
+		{"xasc", xasc},
+		{"xdesc", xdesc},
+		{"rotate", rotateValue},
+		{"cut", qCutValue},
+		{"sublist", qSublistValue},
+		{"cross", qCrossValue},
+		{"ss", qSSValue},
+		{"ssr", qSSRWithSourceValue},
+		{"sv", qSVValue},
+		{"vs", qVSValue},
+		{"plus", dyadicVerbFunc('+')},
+		{"minus", dyadicVerbFunc('-')},
+		{"times", dyadicVerbFunc('*')},
+		{"divide", dyadicVerbFunc('%')},
+		{"div", dyadicVerbFunc('d')},
+		{"mod", modValue},
+		{"xexp", xexpValue},
+		{"xlog", xlogValue},
+		{"fill", dyadicVerbFunc('^')},
+		{"match", func(left, right any) (any, error) { return matchValue(left, right), nil }},
+		{"like", likeValue},
+		{"equal", dyadicVerbFunc('=')},
+		{"equals", dyadicVerbFunc('=')},
+		{"less", dyadicVerbFunc('<')},
+		{"more", dyadicVerbFunc('>')},
+		{"greater", dyadicVerbFunc('>')},
+		{"min", dyadicVerbFunc('m')},
+		{"max", dyadicVerbFunc('M')},
+		{"wavg", wavg},
+		{"wsum", wsumValue},
+		{"cov", covValue},
+		{"scov", scovValue},
+		{"cor", corValue},
+		{"left", dyadicVerbFunc('L')},
+		{"right", dyadicVerbFunc('R')},
+		{"within", within},
+		{"where", whereFilterValue},
+		{"in", membership},
+		{"and", logicalAnd},
+		{"or", logicalOr},
+	} {
+		qDyadicWordOps[op.word] = op
+	}
+	for _, op := range []qDyadicWordOp{
+		{"intersect", inter},
+		{"except", except},
+		{"union", union},
+		{"inter", inter},
+	} {
+		qSetWordOps[op.word] = op
+	}
+}
+
+// splitTopLevelDyadicWordMap finds the leftmost top-level identifier token
+// present in ops and splits src around it. Equivalent to probing
+// findTopLevelWord once per registered word, but with a single scan.
+func splitTopLevelDyadicWordMap(src string, ops map[string]qDyadicWordOp) (qDyadicWordOp, string, string, bool) {
+	var zero qDyadicWordOp
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	inString := false
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '`':
+			i = qSymbolLiteralEnd(src, i) - 1
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+		case '[':
+			bracketDepth++
+		case ']':
+			bracketDepth--
+		case '{':
+			braceDepth++
+		case '}':
+			braceDepth--
+		default:
+			if !isQIdentRest(ch) {
+				continue
+			}
+			j := i + 1
+			for j < len(src) && isQIdentRest(src[j]) {
+				j++
+			}
+			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 {
+				if op, ok := ops[src[i:j]]; ok {
+					// Leftmost registered word decides the split; an empty
+					// side rejects the whole form, matching the per-word
+					// probe variant below.
+					left := strings.TrimSpace(src[:i])
+					right := strings.TrimSpace(src[j:])
+					if left == "" || right == "" {
+						return zero, "", "", false
+					}
+					return op, left, right, true
+				}
+			}
+			i = j - 1
+		}
+	}
+	return zero, "", "", false
 }
 
 func splitTopLevelDyadicWord(src string, ops []qDyadicWordOp) (qDyadicWordOp, string, string, bool) {
@@ -10746,9 +10985,12 @@ func flip(v any) (any, error) {
 			}
 			array = data.InferArray(repeated)
 		}
-		cols = append(cols, data.Column{Name: name, Data: array})
+		cols = append(cols, data.Column{Name: name, Data: data.MaterializeArray(array)})
 	}
-	return data.NewFrame(cols...)
+	// q-side arrays are immutable value carriers: adopt the densely
+	// materialized columns directly instead of routing every column through
+	// NewFrame's defensive per-row boxed clone gather.
+	return data.NewFrameAdoptingColumns(cols...)
 }
 
 func reshapeValue(shapeValue, value any) (any, error) {
@@ -13904,6 +14146,9 @@ func except(left, right any) (any, error) {
 		}
 		return data.NewAny([]any{left}), nil
 	}
+	if indexes, handled := trySetOpIndexes("except", leftArray, right); handled {
+		return data.Gather(leftArray, indexes)
+	}
 	indexes := make([]int, 0, leftArray.Len())
 	for i := 0; i < leftArray.Len(); i++ {
 		value, ok := leftArray.At(i)
@@ -13925,6 +14170,9 @@ func inter(left, right any) (any, error) {
 		}
 		return data.NewAny(nil), nil
 	}
+	if indexes, handled := trySetOpIndexes("inter", leftArray, right); handled {
+		return data.Gather(leftArray, indexes)
+	}
 	indexes := make([]int, 0, leftArray.Len())
 	var seen []any
 	for i := 0; i < leftArray.Len(); i++ {
@@ -13941,7 +14189,27 @@ func inter(left, right any) (any, error) {
 	return data.Gather(leftArray, indexes)
 }
 
+// trySetOpIndexes routes inter/except left-row selection through the typed
+// set-op kernel, replacing per-row boxed DeepEqual membership scans.
+func trySetOpIndexes(op string, leftArray data.Array, right any) ([]int, bool) {
+	items, err := setItems(right)
+	if err != nil {
+		return nil, false
+	}
+	indexes, handled := data.TryTypedSetOpIndexes(op, leftArray, items)
+	recordRuntimeKernelProbe("ArraySetOpIndexes", op+"/"+string(leftArray.Kind()), handled, nil)
+	return indexes, handled
+}
+
 func union(left, right any) (any, error) {
+	if leftArray, ok := left.(data.Array); ok {
+		if rightArray, ok := right.(data.Array); ok {
+			if out, handled := data.TryTypedUnion(leftArray, rightArray); handled {
+				recordRuntimeKernelProbe("ArrayUnion", "union/"+string(leftArray.Kind()), handled, nil)
+				return out, nil
+			}
+		}
+	}
 	leftItems, err := setItems(left)
 	if err != nil {
 		return nil, err
@@ -14156,6 +14424,10 @@ func distinct(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil
+	}
+	if indexes, handled := data.TryTypedDistinctIndexes(array); handled {
+		recordRuntimeKernelProbe("ArrayDistinctIndexes", "distinct/"+string(array.Kind()), handled, nil)
+		return array.Gather(indexes), nil
 	}
 	values := array.Values()
 	indexes := make([]int, 0, len(values))
