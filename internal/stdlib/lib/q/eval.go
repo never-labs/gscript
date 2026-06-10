@@ -1128,6 +1128,7 @@ func cloneEvalPipelineExecutablePlan(in EvalPipelineExecutablePlan) EvalPipeline
 	out := in
 	out.expression = cloneQPipelinePlan(in.expression)
 	out.script = cloneQScriptPipelineDescriptor(in.script)
+	out.runner = evalPipelineExecutableRunner(out.kind, out.expression, out.script)
 	return out
 }
 
