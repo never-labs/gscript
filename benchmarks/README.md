@@ -230,7 +230,14 @@ python3 benchmarks/q_perf_report.py \
   --max-jit-typed-errors-op=0 \
   --max-jit-backend-slow-route-pct=0 \
   --min-runtime-direct-bridge-share-pct=95 \
-  --max-runtime-allocs-per-direct-call=32
+  --max-runtime-allocs-per-direct-call=32 \
+  --min-runtime-typed-primitive-benchmarks=1 \
+  --min-runtime-jit-backend-benchmarks=1 \
+  --min-runtime-array-bridge-benchmarks=1 \
+  --min-runtime-bridge-benchmark-count=3 \
+  --min-q-array-bridge-rows-op=1 \
+  --max-q-array-bridge-avg-allocs-op=64 \
+  --max-q-array-bridge-max-allocs-op=64
 ```
 
 For quick iteration on saved `go test -bench` output, skip rerunning benchmarks:
@@ -254,6 +261,12 @@ depending on a specific optimizer implementation:
 | `direct call share` | direct calls divided by direct plus slow calls | gate with `--min-runtime-direct-bridge-share-pct` |
 | `allocs/direct call` | average `allocs/op` divided by direct calls/op | gate with `--max-runtime-allocs-per-direct-call` |
 
+The default `--check` policy also requires benchmark rows for all three backend
+layers: ordinary q typed primitive counters, JIT backend route counters, and
+MethodJIT array bridge counters. This prevents a partial benchmark output from
+looking healthy merely because one layer was not run. For intentionally partial
+local checks, set the corresponding `--min-runtime-*-benchmarks=0` flag.
+
 The `Runtime Array Bridge Summary` section is the focused MethodJIT q array
 bridge gate. It consumes the `q_array_bridge_*` benchmark counters directly, so
 bulk export regressions are visible without inferring them from the broader
@@ -265,6 +278,7 @@ runtime bridge aggregate:
 | `fallbacks/op` | arrays converted through row-wise fallback | gate with `--max-q-array-bridge-fallbacks-op` |
 | `bulk hit pct` | bulk hits divided by bulk hits plus fallback/error routes | gate with `--min-q-array-bridge-bulk-hit-pct` |
 | `rows/op` | array rows observed by the bridge benchmarks | sanity check that route counters cover meaningful data volume |
+| `avg/max allocs/op` | allocation pressure of the bridge rows | gate with `--max-q-array-bridge-avg-allocs-op` and `--max-q-array-bridge-max-allocs-op` |
 
 Use this stricter gate after bulk export, direct return, executable backend, or
 typed kernel changes:
@@ -277,6 +291,9 @@ python3 benchmarks/q_perf_report.py \
   --max-runtime-allocs-per-direct-call=32 \
   --min-q-array-bridge-bulk-hit-pct=95 \
   --max-q-array-bridge-fallbacks-op=0 \
+  --min-q-array-bridge-rows-op=1 \
+  --max-q-array-bridge-avg-allocs-op=64 \
+  --max-q-array-bridge-max-allocs-op=64 \
   --max-jit-backend-slow-route-pct=0 \
   --max-jit-typed-errors-op=0
 ```
@@ -290,7 +307,10 @@ families first, then feed it to the report:
     -bench 'BenchmarkQSQL(Bind|DataRuntime|NativeGo)' \
     -benchmem -benchtime=100x
   go test ./benchmarks -run '^$' \
-    -bench 'Benchmark(QEvalVector|QSessionEvalVector|QEvalPipelineNativeExitCallpath)' \
+    -bench 'Benchmark(QEvalVector|QSessionEvalVector)' \
+    -benchmem -benchtime=100x
+  go test ./internal/methodjit -run '^$' \
+    -bench 'BenchmarkQEvalPipeline(NativeExitCallpath|ArrayRuntimeBridge)' \
     -benchmem -benchtime=100x
 } | tee /tmp/qbench.txt
 
