@@ -190,16 +190,27 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 }
 
 func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturn(args []runtime.Value) ([]runtime.Value, bool, error) {
-	if cf == nil || len(args) != 0 || !cf.QEvalPipelineDirectReturn || cf.QEvalPipelineDirectReturnID < 0 || exitResumeCheckEnabled() {
+	if len(args) != 0 {
 		return nil, false, nil
+	}
+	out, handled, err := cf.tryExecuteQEvalPipelineDirectReturnValue()
+	if !handled {
+		return nil, false, nil
+	}
+	return []runtime.Value{out}, true, err
+}
+
+func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturnValue() (runtime.Value, bool, error) {
+	if cf == nil || !cf.QEvalPipelineDirectReturn || cf.QEvalPipelineDirectReturnID < 0 || exitResumeCheckEnabled() {
+		return runtime.NilValue(), false, nil
 	}
 	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(cf.QEvalPipelineDirectReturnID)
 	if err != nil || !handled {
 		cf.recordQEvalPipelinePlanExecutionWithRoute(cf.QEvalPipelineDirectReturnID, "typed_runtime_direct_entry", "error")
-		return nil, true, err
+		return runtime.NilValue(), true, err
 	}
 	cf.recordQEvalPipelinePlanExecutionWithRoute(cf.QEvalPipelineDirectReturnID, "typed_runtime_direct_entry", "success")
-	return []runtime.Value{out}, true, nil
+	return out, true, nil
 }
 
 func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs []runtime.Value, base int, route string) error {

@@ -20,6 +20,14 @@ func (tm *TieringManager) executeTier2(cf *CompiledFunction, regs []runtime.Valu
 }
 
 func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
+	if proto != nil && proto.NumParams == 0 {
+		if out, handled, err := cf.tryExecuteQEvalPipelineDirectReturnValue(); handled {
+			if err != nil {
+				return nil, err
+			}
+			return runtime.ReuseValueSlice1(retBuf, out), nil
+		}
+	}
 	if results, handled, err := tm.executeCompiledSpecialization(cf, regs, base, proto, retBuf); handled {
 		return results, err
 	}

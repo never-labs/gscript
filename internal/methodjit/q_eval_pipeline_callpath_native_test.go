@@ -116,6 +116,42 @@ func TestQEvalPipelinePlanDirectReturnExecutesTypedPlanRef(t *testing.T) {
 	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(cf.QEvalPipelinePlans[0]), "typed_runtime_direct_entry", "success", 1)
 }
 
+func TestQEvalPipelineTieringEntryUsesDirectReturn(t *testing.T) {
+	t.Setenv(exitResumeCheckEnv, "")
+	cf := compileQEvalPipelineNativeExitBenchmark(t, "count where (til 64 mod 4)=1")
+	defer cf.Code.Free()
+	if !cf.QEvalPipelineDirectReturn || cf.QEvalPipelineDirectReturnID != 0 {
+		t.Fatalf("compiled direct q eval return = %v/%d, want true/0", cf.QEvalPipelineDirectReturn, cf.QEvalPipelineDirectReturnID)
+	}
+
+	tm := NewTieringManager()
+	regs := runtime.MakeNilSlice(cf.numRegs + 1)
+	var storage [1]runtime.Value
+	result, err := tm.executeTier2WithResultBuffer(cf, regs, 0, cf.Proto, storage[:0])
+	if err != nil {
+		t.Fatalf("executeTier2WithResultBuffer: %v", err)
+	}
+	if len(result) != 1 || &result[0] != &storage[0] {
+		t.Fatalf("executeTier2WithResultBuffer result buffer = %p len %d, want storage %p len 1", result, len(result), &storage[0])
+	}
+	if !result[0].IsInt() || result[0].Int() != 16 {
+		t.Fatalf("executeTier2WithResultBuffer result = %v, want int 16", result)
+	}
+	stats := cf.QKernelExecutionStats()
+	shape := qEvalPipelinePlanRefShape(cf.QEvalPipelinePlans[0])
+	assertQEvalPipelineExecutionStat(t, stats, shape, "typed_runtime_direct_entry", "success", 1)
+	for _, stat := range stats {
+		if stat.Source == "methodjit_q_eval_runtime" &&
+			stat.Kernel == "QEvalPipelinePlan" &&
+			stat.Shape == shape &&
+			stat.Route == "typed_runtime_native_exit" &&
+			stat.Outcome == "success" &&
+			stat.Count != 0 {
+			t.Fatalf("native q eval pipeline exits = %d, want 0; stats=%+v", stat.Count, stats)
+		}
+	}
+}
+
 func TestQEvalPipelineTerminalReturnTable(t *testing.T) {
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "+/til 16")
 	fn := &Function{QEvalPipelinePlans: []QEvalPipelinePlanRef{ref}}
