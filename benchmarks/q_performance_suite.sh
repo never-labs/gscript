@@ -22,3 +22,12 @@ go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
   -benchmem \
   -benchtime="${LEIA_GO_BENCHTIME}" \
   -count="${LEIA_GO_BENCHCOUNT}"
+
+# JIT/VM script-binding warm benches feeding the jit_script/vm_script Go-ratio
+# families in q_perf_report.py. Tolerant while these benches land: `-bench`
+# with zero matches still exits 0 and simply contributes no rows.
+go test ./benchmarks -run '^$' \
+  -bench 'BenchmarkQEval(JIT|VM)ScriptWarm' \
+  -benchmem \
+  -benchtime="${LEIA_GO_BENCHTIME}" \
+  -count="${LEIA_GO_BENCHCOUNT}"

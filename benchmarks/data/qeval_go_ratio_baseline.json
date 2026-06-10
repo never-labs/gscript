@@ -1,0 +1,1941 @@
+{
+  "captured": "2026-06-11",
+  "cases": {
+    "AdverbDeltasSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5262
+    },
+    "AdverbInitialOverScanProducts": {
+      "jit_go_ratio": 4.8747,
+      "warm_go_ratio": 4.1792
+    },
+    "AdverbMatrix": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "AdverbSumScanAndNamedSums": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.6783
+    },
+    "AvgsTailChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5833
+    },
+    "BinAscendingProbeSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.6925
+    },
+    "BooleanLogicalAndCompositeCompare": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "BooleanWhereLiteralCountEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 33.6165
+    },
+    "BreadthAggregateAvgMedRange": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 20.4765
+    },
+    "BreadthAggregateProductOnesAndWavg": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.5009
+    },
+    "BreadthApplyAtGatherMedium": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5811
+    },
+    "BreadthApplyAtGatherSmall": {
+      "jit_go_ratio": 2.7442,
+      "warm_go_ratio": 1.4093
+    },
+    "BreadthApplyAtGatherTiny": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.2333
+    },
+    "BreadthApplyAtGatherWide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5931
+    },
+    "BreadthApplyBracketGatherMedium": {
+      "jit_go_ratio": 2.5303,
+      "warm_go_ratio": 0.3336
+    },
+    "BreadthApplyBracketGatherSmall": {
+      "jit_go_ratio": 2.4856,
+      "warm_go_ratio": 0.3389
+    },
+    "BreadthApplyBracketGatherTiny": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2902
+    },
+    "BreadthApplyBracketGatherWide": {
+      "jit_go_ratio": 2.2405,
+      "warm_go_ratio": 0.3541
+    },
+    "BreadthArithmeticAbsNegSignumMod11Bias6": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.0469
+    },
+    "BreadthArithmeticAbsNegSignumMod3Bias1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.8735
+    },
+    "BreadthArithmeticAbsNegSignumMod5Bias2": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.0833
+    },
+    "BreadthArithmeticAbsNegSignumMod7Bias4": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.8923
+    },
+    "BreadthArithmeticDivModEnvelopeMod11Bias6": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3692
+    },
+    "BreadthArithmeticDivModEnvelopeMod3Bias1": {
+      "jit_go_ratio": 0.8162,
+      "warm_go_ratio": 0.3431
+    },
+    "BreadthArithmeticDivModEnvelopeMod5Bias2": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3528
+    },
+    "BreadthArithmeticDivModEnvelopeMod7Bias4": {
+      "jit_go_ratio": 0.7484,
+      "warm_go_ratio": 0.3566
+    },
+    "BreadthCallableDotApplyMedium": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2023
+    },
+    "BreadthCallableDotApplySmall": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2134
+    },
+    "BreadthCallableDotApplyTiny": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1953
+    },
+    "BreadthCallableDotApplyWide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1941
+    },
+    "BreadthFloatFloorCeilingReciprocalMod11Bias6": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 9.2221
+    },
+    "BreadthFloatFloorCeilingReciprocalMod3Bias1": {
+      "jit_go_ratio": 10.1057,
+      "warm_go_ratio": 9.3126
+    },
+    "BreadthFloatFloorCeilingReciprocalMod5Bias2": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 9.2814
+    },
+    "BreadthFloatFloorCeilingReciprocalMod7Bias4": {
+      "jit_go_ratio": 9.968,
+      "warm_go_ratio": 9.2328
+    },
+    "BreadthListCutRazeChecksumCycle": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.5314
+    },
+    "BreadthListCutRazeChecksumLong": {
+      "jit_go_ratio": 11.3788,
+      "warm_go_ratio": 9.6534
+    },
+    "BreadthListCutRazeChecksumMid": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 8.4223
+    },
+    "BreadthListCutRazeChecksumShort": {
+      "jit_go_ratio": 8.6183,
+      "warm_go_ratio": 7.1556
+    },
+    "BreadthListDropTakeSublistCycle": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0795
+    },
+    "BreadthListDropTakeSublistLong": {
+      "jit_go_ratio": 0.946,
+      "warm_go_ratio": 0.1294
+    },
+    "BreadthListDropTakeSublistMid": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1614
+    },
+    "BreadthListDropTakeSublistShort": {
+      "jit_go_ratio": 1.1504,
+      "warm_go_ratio": 0.1425
+    },
+    "BreadthListFirstLastReverseRotateCycle": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0867
+    },
+    "BreadthListFirstLastReverseRotateLong": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0806
+    },
+    "BreadthListFirstLastReverseRotateMid": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0812
+    },
+    "BreadthListFirstLastReverseRotateShort": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0804
+    },
+    "BreadthMatrixReshapeCellProbeEightByN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1898
+    },
+    "BreadthMatrixReshapeCellProbeFourByN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2029
+    },
+    "BreadthMatrixReshapeCellProbeTwoByN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2041
+    },
+    "BreadthMatrixReshapeRowSumEightByN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.2267
+    },
+    "BreadthMatrixReshapeRowSumFourByN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.7041
+    },
+    "BreadthMatrixReshapeRowSumTwoByN": {
+      "jit_go_ratio": 3.1598,
+      "warm_go_ratio": 0.3684
+    },
+    "BreadthMovingWindowEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3954
+    },
+    "BreadthRunningMinMaxAvgEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.8184
+    },
+    "BreadthStringUpperLowerLikeSymbolsA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.9773
+    },
+    "BreadthStringUpperLowerLikeSymbolsN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.3621
+    },
+    "BreadthStringUpperLowerLikeVenuesX": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.3071
+    },
+    "BreadthSymbolDistinctGroupSortSymbolsA": {
+      "jit_go_ratio": 0.1209,
+      "warm_go_ratio": 0.1048
+    },
+    "BreadthSymbolDistinctGroupSortSymbolsN": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.055
+    },
+    "BreadthSymbolDistinctGroupSortVenuesX": {
+      "jit_go_ratio": 0.1094,
+      "warm_go_ratio": 0.0903
+    },
+    "ComboDepth3DeltasAbsSqrtFloorSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 50.4707
+    },
+    "ComboDepth3FillsMsumNullPipeline": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 41851.1235
+    },
+    "ComboDepth3RotateDeltasAbsSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 51.9761
+    },
+    "ComboDepth3SumsModXbarReduce": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 30.7626
+    },
+    "ComboDictTableFbyNotionalSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 98.5238
+    },
+    "ComboDictTableXascHeadGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.3783
+    },
+    "ComboDictTableXgroupUngroupSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 26.2062
+    },
+    "ComboEachIndexedMatrixRowsSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "ComboMixedFloatIntNotionalFloor": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 57.0466
+    },
+    "ComboMixedFloatXbarBucketEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 74.1797
+    },
+    "ComboMixedTypedSuffixPromotionSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 60.6874
+    },
+    "ComboNestedEachPriorOverAbs": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 57.8035
+    },
+    "ComboNestedOverEachCutSegments": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.5939
+    },
+    "ComboNestedScanEachRazeSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 21.3047
+    },
+    "ComboNullFillsWhereGatherReduce": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 28191.7943
+    },
+    "ComboNullMaskArithWithinEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 49.4151
+    },
+    "ComboOverGatherModuloSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 26.1019
+    },
+    "ComboScanGatherLastEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 28.0903
+    },
+    "ComboWhereModCompareMembershipSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 191.4326
+    },
+    "ComboWherePriceBandSizeWithin": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 126.215
+    },
+    "ComboWhereSymbolInOrNotCompare": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 47.5124
+    },
+    "CompositionCountDistinctAndReverse": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.8574
+    },
+    "CutEnlistRazeChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "DeepAdverbEachLeftRightChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.5622
+    },
+    "DeepAdverbEachPairwiseArithmetic": {
+      "jit_go_ratio": 2.2323,
+      "warm_go_ratio": 1.4037
+    },
+    "DeepBinBucketProbeSumFine": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4452
+    },
+    "DeepBinBucketProbeSumKilo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4388
+    },
+    "DeepBinBucketProbeSumMinute": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4423
+    },
+    "DeepBinBucketProbeSumTen": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4158
+    },
+    "DeepDeltasFillsChecksumInts": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 17.2384
+    },
+    "DeepDeltasFillsChecksumLongs": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 17.4457
+    },
+    "DeepNullFillWhereSumInts": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5014
+    },
+    "DeepNullFillWhereSumLongs": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4841
+    },
+    "DeepNumericAffineModuloWhereA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 17.2401
+    },
+    "DeepNumericAffineModuloWhereB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 21.4907
+    },
+    "DeepNumericAffineModuloWhereC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 19.8717
+    },
+    "DeepNumericAffineModuloWhereD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 19.5021
+    },
+    "DeepNumericFloorCeilingEnvelopeA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 11.7913
+    },
+    "DeepNumericFloorCeilingEnvelopeB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 11.8397
+    },
+    "DeepNumericFloorCeilingEnvelopeC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 11.726
+    },
+    "DeepNumericFloorCeilingEnvelopeD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 11.7746
+    },
+    "DeepNumericSignumNotMaskA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 37.654
+    },
+    "DeepNumericSignumNotMaskB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 36.6197
+    },
+    "DeepNumericSignumNotMaskC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 36.2843
+    },
+    "DeepNumericSignumNotMaskD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 36.1221
+    },
+    "DeepOverScanProjectionChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1993
+    },
+    "DeepReverseWhereWindowCountCycle": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 43.4934
+    },
+    "DeepReverseWhereWindowCountMedium": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 43.3936
+    },
+    "DeepReverseWhereWindowCountSmall": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 43.879
+    },
+    "DeepReverseWhereWindowCountWide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 43.9237
+    },
+    "DeepRotateModuloGatherSumCycle": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.7172
+    },
+    "DeepRotateModuloGatherSumMedium": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.9699
+    },
+    "DeepRotateModuloGatherSumSmall": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.8063
+    },
+    "DeepRotateModuloGatherSumWide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.8076
+    },
+    "DeepSetUnionInterExceptSymbols": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "DeepSortRankGatherChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 17.5259
+    },
+    "DeepStringUpperLikeCountSide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.531
+    },
+    "DeepStringUpperLikeCountTech": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5618
+    },
+    "DeepStringUpperLikeCountVenue": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.0324
+    },
+    "DeepSymbolDistinctAfterRotateSide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2054
+    },
+    "DeepSymbolDistinctAfterRotateTech": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2197
+    },
+    "DeepSymbolDistinctAfterRotateVenue": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2192
+    },
+    "DeepSymbolMembershipProjectionSide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.2708
+    },
+    "DeepSymbolMembershipProjectionTech": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.566
+    },
+    "DeepSymbolMembershipProjectionVenue": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.3491
+    },
+    "DeepTakeDropRotateSumCycle": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0409
+    },
+    "DeepTakeDropRotateSumMedium": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0678
+    },
+    "DeepTakeDropRotateSumSmall": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0682
+    },
+    "DeepTakeDropRotateSumWide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.064
+    },
+    "DeepTemporalReverseCountDateWindow": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 18.405
+    },
+    "DeepTemporalReverseCountMonthWindow": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 20.0619
+    },
+    "DeepTemporalReverseCountTimeGE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 26.4623
+    },
+    "DeepTemporalWhereProjectionDateWindow": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3425
+    },
+    "DeepTemporalWhereProjectionMonthWindow": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2593
+    },
+    "DeepTemporalWhereProjectionTimeGE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.267
+    },
+    "DeepXbarWithinCountFine": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.1663
+    },
+    "DeepXbarWithinCountKilo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4859
+    },
+    "DeepXbarWithinCountMinute": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2155
+    },
+    "DeepXbarWithinCountTen": {
+      "jit_go_ratio": 3.4766,
+      "warm_go_ratio": 2.2239
+    },
+    "DeepXrankModuloSumFine": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.038
+    },
+    "DeepXrankModuloSumKilo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5864
+    },
+    "DeepXrankModuloSumMinute": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0582
+    },
+    "DeepXrankModuloSumTen": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0415
+    },
+    "DictAmendUpsertAndLookup": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "DictEachCountDistinct": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 254.8804
+    },
+    "DictKeysValueAttrFillMatch": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "DirectDropPrefixSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.6545
+    },
+    "DirectReverseSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.605
+    },
+    "DirectRotateSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3583
+    },
+    "DirectTakeCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1885
+    },
+    "DirectTakeCycleSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3102
+    },
+    "DistinctModuloCount": {
+      "jit_go_ratio": 2.2619,
+      "warm_go_ratio": 1.5631
+    },
+    "DropPrefix1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4566
+    },
+    "DropPrefix1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.7004
+    },
+    "DropPrefix256": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5693
+    },
+    "DropPrefix4096": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.9668
+    },
+    "DropPrefix64": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4787
+    },
+    "DropPrefix8": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5018
+    },
+    "EachPriorMinusRowScaled": {
+      "jit_go_ratio": 54.4438,
+      "warm_go_ratio": 55.8833
+    },
+    "EnumSymbolStringMatchLike": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "FbyCountTerminalProjection": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.7902
+    },
+    "FbyGroupedAggregateRowScaled": {
+      "jit_go_ratio": 6.9915,
+      "warm_go_ratio": 5.7158
+    },
+    "FillsNullPatternSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 20.1255
+    },
+    "FindModuloPatternSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 157.5183
+    },
+    "FloatCastCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.78
+    },
+    "FloatVectorArithmetic": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.6086
+    },
+    "FloatXbarCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.0261
+    },
+    "FunctionalAmendWhereVector": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 45.6778
+    },
+    "GroupModuloBucketCount": {
+      "jit_go_ratio": 2.9696,
+      "warm_go_ratio": 2.1535
+    },
+    "KeyedTableGroupUngroupFby": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "KeyedTableTemporalStringMetaCombo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "ListCrossCountEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.9626
+    },
+    "ListCutCountEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4905
+    },
+    "ListReductionsInt": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.7938
+    },
+    "ListStringBooleanCoverageEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.436
+    },
+    "ListSublistCountEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4234
+    },
+    "LogicalMaskFilterRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.3642
+    },
+    "MembershipDifferRatiosTruthMatrix": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "MembershipSymbolFilterRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.8208
+    },
+    "MinMaxAvgVarDevMed": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.1284
+    },
+    "ModuloBandWhereIndexSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4681
+    },
+    "ModuloEqMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5785
+    },
+    "ModuloNeMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3549
+    },
+    "MovingCount32Sum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5578
+    },
+    "MovingMinMax32Envelope": {
+      "jit_go_ratio": 1.7369,
+      "warm_go_ratio": 0.9954
+    },
+    "MovingStdDevEma32Envelope": {
+      "jit_go_ratio": 1.0056,
+      "warm_go_ratio": 0.9104
+    },
+    "MovingSumAvgRowScaled": {
+      "jit_go_ratio": 0.1599,
+      "warm_go_ratio": 0.0819
+    },
+    "MovingWindowAggregates": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.3281
+    },
+    "NestedDictProjectionAmendCombo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "NumericMonadExpReciprocalSignumNot": {
+      "jit_go_ratio": 14.4488,
+      "warm_go_ratio": 14.1407
+    },
+    "NumericMonadsAndWordDyadics": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 18.5021
+    },
+    "OrdinaryArithmeticMapReduceDenseA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.0905
+    },
+    "OrdinaryArithmeticMapReduceDenseB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.1192
+    },
+    "OrdinaryArithmeticMapReduceDenseC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.1102
+    },
+    "OrdinaryArithmeticMapReduceDenseD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2163
+    },
+    "OrdinaryArithmeticMapReduceDenseE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.0367
+    },
+    "OrdinaryArithmeticMapReduceDenseF": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.1463
+    },
+    "OrdinaryArithmeticScanTailDenseA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.1094
+    },
+    "OrdinaryArithmeticScanTailDenseB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.1003
+    },
+    "OrdinaryArithmeticScanTailDenseC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.2283
+    },
+    "OrdinaryArithmeticScanTailDenseD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.3145
+    },
+    "OrdinaryArithmeticScanTailDenseE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.213
+    },
+    "OrdinaryArithmeticScanTailDenseF": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.2907
+    },
+    "OrdinaryArithmeticWhereProjectDenseA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4558
+    },
+    "OrdinaryArithmeticWhereProjectDenseB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4607
+    },
+    "OrdinaryArithmeticWhereProjectDenseC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4879
+    },
+    "OrdinaryArithmeticWhereProjectDenseD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4835
+    },
+    "OrdinaryArithmeticWhereProjectDenseE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4509
+    },
+    "OrdinaryArithmeticWhereProjectDenseF": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4657
+    },
+    "OrdinaryDropThenTake1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2863
+    },
+    "OrdinaryDropThenTake127": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2787
+    },
+    "OrdinaryDropThenTake16": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3333
+    },
+    "OrdinaryDropThenTake2049": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.239
+    },
+    "OrdinaryDropThenTake256": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2847
+    },
+    "OrdinaryDropThenTake3": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3017
+    },
+    "OrdinaryDropThenTake31": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3274
+    },
+    "OrdinaryDropThenTake513": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2915
+    },
+    "OrdinaryDropThenTake64": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3146
+    },
+    "OrdinaryDropThenTake7": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3008
+    },
+    "OrdinaryModuloBandCountBandA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.5602
+    },
+    "OrdinaryModuloBandCountBandB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.5669
+    },
+    "OrdinaryModuloBandCountBandC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.7382
+    },
+    "OrdinaryModuloBandCountBandD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.9309
+    },
+    "OrdinaryModuloBandCountBandE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.8399
+    },
+    "OrdinaryModuloBandCountBandF": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.7801
+    },
+    "OrdinaryModuloBandGatherSumBandA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.9581
+    },
+    "OrdinaryModuloBandGatherSumBandB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.8518
+    },
+    "OrdinaryModuloBandGatherSumBandC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.0598
+    },
+    "OrdinaryModuloBandGatherSumBandD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.0349
+    },
+    "OrdinaryModuloBandGatherSumBandE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2066
+    },
+    "OrdinaryModuloBandGatherSumBandF": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.123
+    },
+    "OrdinaryNullFillSumFloatNulls": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.7239
+    },
+    "OrdinaryNullFillSumIntNulls": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.6453
+    },
+    "OrdinaryNullFillSumShortCast": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.1519
+    },
+    "OrdinaryNullFillsCountFloatNulls": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1935
+    },
+    "OrdinaryNullFillsCountIntNulls": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1807
+    },
+    "OrdinaryNullFillsCountShortCast": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2202
+    },
+    "OrdinaryRotateFilter1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.545
+    },
+    "OrdinaryRotateFilter127": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.7517
+    },
+    "OrdinaryRotateFilter16": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.6663
+    },
+    "OrdinaryRotateFilter2049": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.5561
+    },
+    "OrdinaryRotateFilter256": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.5781
+    },
+    "OrdinaryRotateFilter3": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.563
+    },
+    "OrdinaryRotateFilter31": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.4791
+    },
+    "OrdinaryRotateFilter513": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.5515
+    },
+    "OrdinaryRotateFilter64": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.4613
+    },
+    "OrdinaryRotateFilter7": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.5899
+    },
+    "OrdinarySymbolEqualityWhereSidesBuy": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.9361
+    },
+    "OrdinarySymbolEqualityWhereSidesSell": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.918
+    },
+    "OrdinarySymbolEqualityWhereTechAAPL": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.9536
+    },
+    "OrdinarySymbolEqualityWhereTechMSFT": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.2156
+    },
+    "OrdinarySymbolEqualityWhereVenuesBATS": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1408
+    },
+    "OrdinarySymbolEqualityWhereVenuesXNYS": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.9697
+    },
+    "OrdinarySymbolFilterProjectionSidesBuy": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.9391
+    },
+    "OrdinarySymbolFilterProjectionSidesSell": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.0105
+    },
+    "OrdinarySymbolFilterProjectionTechAAPL": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.0281
+    },
+    "OrdinarySymbolFilterProjectionTechMSFT": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1526
+    },
+    "OrdinarySymbolFilterProjectionVenuesBATS": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.134
+    },
+    "OrdinarySymbolFilterProjectionVenuesXNYS": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1082
+    },
+    "OrdinaryTakeReverseHead1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.098
+    },
+    "OrdinaryTakeReverseHead127": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1028
+    },
+    "OrdinaryTakeReverseHead16": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1179
+    },
+    "OrdinaryTakeReverseHead2049": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0803
+    },
+    "OrdinaryTakeReverseHead256": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1009
+    },
+    "OrdinaryTakeReverseHead3": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0863
+    },
+    "OrdinaryTakeReverseHead31": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1135
+    },
+    "OrdinaryTakeReverseHead513": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1006
+    },
+    "OrdinaryTakeReverseHead64": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1
+    },
+    "OrdinaryTakeReverseHead7": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.107
+    },
+    "OrdinaryTemporalCompareCountDateEQ": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2873
+    },
+    "OrdinaryTemporalCompareCountDateGE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2949
+    },
+    "OrdinaryTemporalCompareCountMonthSuffixGE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3024
+    },
+    "OrdinaryTemporalCompareCountTimeWithin": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.245
+    },
+    "OrdinaryTemporalFilterProjectionDateEQ": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3403
+    },
+    "OrdinaryTemporalFilterProjectionDateGE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1502
+    },
+    "OrdinaryTemporalFilterProjectionMonthSuffixGE": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1547
+    },
+    "OrdinaryTemporalFilterProjectionTimeWithin": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2902
+    },
+    "PrevNextDeltasCountsRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.627
+    },
+    "ProductOnesRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.5391
+    },
+    "ProjectionEachDictNumericTableCombo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "ReverseFirstLastChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1814
+    },
+    "ReverseWhereGatherHeadSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 11.2831
+    },
+    "RotateSumNeg1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1018
+    },
+    "RotateSumNeg1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1058
+    },
+    "RotateSumNeg257": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1099
+    },
+    "RotateSumPos1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0958
+    },
+    "RotateSumPos1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1111
+    },
+    "RotateSumPos257": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0976
+    },
+    "RotateWhereHeadCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.467
+    },
+    "RunningAggregateCountTerminalProjection": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3917
+    },
+    "RunningAggregateProductMatrix": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.9541
+    },
+    "RunningMinMaxTailEnvelope": {
+      "jit_go_ratio": 1.7706,
+      "warm_go_ratio": 1.0366
+    },
+    "SafeSystemAndLoopbackIPC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "SampleStatsCorrelationEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 14.133
+    },
+    "ScanPlusTailChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2243
+    },
+    "SearchBinrWavgXprevMatrix": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "SetBinWithinXrank": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "SortIndexGatherRowScaled": {
+      "jit_go_ratio": 0.4294,
+      "warm_go_ratio": 0.3059
+    },
+    "SortRankTypeMatrix": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.6132
+    },
+    "StringTrimCountEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.8446
+    },
+    "StringUpperSymbolCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1408
+    },
+    "SumsTailChecksum": {
+      "jit_go_ratio": 3.16,
+      "warm_go_ratio": 1.2829
+    },
+    "SymbolDistinctCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0133
+    },
+    "SymbolEqualityMaskCount": {
+      "jit_go_ratio": 5.2711,
+      "warm_go_ratio": 4.2757
+    },
+    "SymbolNotEqualMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.7605
+    },
+    "SymbolRotateDistinctCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0129
+    },
+    "SymbolSetVerbs": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "SymbolStringLikeRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 12.0417
+    },
+    "TableLiteralCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.3383
+    },
+    "TableMetadataReorderSort": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TakeCycleBeyondLengthSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.7406
+    },
+    "TakeHead1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.7773
+    },
+    "TakeHead1024": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.49
+    },
+    "TakeHead128": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4356
+    },
+    "TakeHead4096": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.7058
+    },
+    "TakeHead64": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.7627
+    },
+    "TakeHead8": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.9986
+    },
+    "TaskDAggregateStatsEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 60.471
+    },
+    "TaskDApplyAtGatherWindowEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 23.5615
+    },
+    "TaskDApplyAtRepeatedScalarProbe": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.9037
+    },
+    "TaskDApplyAtScalarAndVector": {
+      "jit_go_ratio": 2.3666,
+      "warm_go_ratio": 1.4809
+    },
+    "TaskDApplyDotFunctionGatherArgs": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.7736
+    },
+    "TaskDApplyDotScalarProbe": {
+      "jit_go_ratio": 1.664,
+      "warm_go_ratio": 0.9398
+    },
+    "TaskDApplyFunctionDotArgs": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1921
+    },
+    "TaskDBooleanVectorLiteralWhereProjection": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 12.6198
+    },
+    "TaskDCastSymbolNumericEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TaskDColumnarComputedProjectionBucket": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 31.5484
+    },
+    "TaskDColumnarNullAwareGroupNotional": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 27.3148
+    },
+    "TaskDColumnarSelectWhereByNotional": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 42.7397
+    },
+    "TaskDColumnarSymbolBucketPipeline": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 18.0205
+    },
+    "TaskDColumnarWhereWindowNotional": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 21.7455
+    },
+    "TaskDCrossApplyIndexChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5443
+    },
+    "TaskDListCutRazeVariableBins": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 9.8025
+    },
+    "TaskDListDotDictLookupEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.8206
+    },
+    "TaskDListRatiosCountAndSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4016
+    },
+    "TaskDListRatiosDirectSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2616
+    },
+    "TaskDListRazeNestedRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.2481
+    },
+    "TaskDListReverseDirectSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.6911
+    },
+    "TaskDListRotateDirectSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3057
+    },
+    "TaskDListSublistDirectSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.2035
+    },
+    "TaskDListSublistRotateReverse": {
+      "jit_go_ratio": 0.2869,
+      "warm_go_ratio": 0.0374
+    },
+    "TaskDMathInverseTrigVectorEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 16.3475
+    },
+    "TaskDMathScalarVectorMixedEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 9.2041
+    },
+    "TaskDMathSqrtLogVectorSum": {
+      "jit_go_ratio": 3.4419,
+      "warm_go_ratio": 3.1973
+    },
+    "TaskDMathTrigVectorEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.7022
+    },
+    "TaskDMathTrigWhereEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.6605
+    },
+    "TaskDMathXexpXlogVectorEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.6036
+    },
+    "TaskDMatrixDotCellIndex": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1699
+    },
+    "TaskDMatrixDotRowIndexSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4243
+    },
+    "TaskDMatrixFlipColumnRowChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.8126
+    },
+    "TaskDMatrixFlipRazeSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.2266
+    },
+    "TaskDMatrixMmuInvEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 37.6437
+    },
+    "TaskDMatrixReshapeRazeSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.5968
+    },
+    "TaskDReshapeCycleFillFlipChecksum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.8983
+    },
+    "TaskDReshapeFlipProbeEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1055
+    },
+    "TaskDStringLowerUpperLikeEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2397
+    },
+    "TaskDStringSearchReplaceJoinRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.2496
+    },
+    "TaskDSymbolGroupSortEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.0249
+    },
+    "TaskDWindowScanEnvelope": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3169
+    },
+    "TemporalDateCompareMaskCount": {
+      "jit_go_ratio": 1.5384,
+      "warm_go_ratio": 0.5688
+    },
+    "TemporalStringSymbolProjectionCombo": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TemporalTimeCompareMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.7739
+    },
+    "TemporalTypedXbarAndSort": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TemporalXbarCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TimestampXbarCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TypeMatrixCastBoolMaskGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 45.3751
+    },
+    "TypeMatrixCastFloatLetterHalfSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 24.2326
+    },
+    "TypeMatrixCastIntLetterModSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 25.5628
+    },
+    "TypeMatrixCastRealLetterQuarterSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 32.9105
+    },
+    "TypeMatrixCastRealLongRoundTripSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 48.5238
+    },
+    "TypeMatrixCastShortIntLongChainSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 33.069
+    },
+    "TypeMatrixCastShortLetterRoundTripSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 22.4634
+    },
+    "TypeMatrixFloatCompareEqNotEqCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 168.3645
+    },
+    "TypeMatrixFloatCompareGtGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 25.1051
+    },
+    "TypeMatrixFloatModSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.1395
+    },
+    "TypeMatrixFloatNullDivideHalfSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.0748
+    },
+    "TypeMatrixFloatWithinGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 118.1928
+    },
+    "TypeMatrixIntDenseSubScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 27.681
+    },
+    "TypeMatrixIntDivModComboSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 51.0346
+    },
+    "TypeMatrixIntNullCompareLtGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 18.6973
+    },
+    "TypeMatrixIntNullMulScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 20.5627
+    },
+    "TypeMatrixLongNullDivSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 27.7086
+    },
+    "TypeMatrixLongNullModSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 14.9379
+    },
+    "TypeMatrixLongNullNotEqualEqualNullCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 27.8608
+    },
+    "TypeMatrixLongNullVectorAddVectorSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 28.8876
+    },
+    "TypeMatrixLongNullWithinGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 12.9542
+    },
+    "TypeMatrixLongPercentDivideSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.4495
+    },
+    "TypeMatrixPromoteIntMulOverflowSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 21.9391
+    },
+    "TypeMatrixPromoteIntPlusFloatScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.6752
+    },
+    "TypeMatrixPromoteRealPlusIntScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 36.2681
+    },
+    "TypeMatrixPromoteShortMulOverflowSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 23.7725
+    },
+    "TypeMatrixPromoteShortPlusIntVectorSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 23.3499
+    },
+    "TypeMatrixPromoteShortPlusLongScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 23.3664
+    },
+    "TypeMatrixRealCompareGeGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 51.6028
+    },
+    "TypeMatrixRealDenseMulQuarterSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 35.0142
+    },
+    "TypeMatrixRealNullAddScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.6322
+    },
+    "TypeMatrixRealNullCompareGtGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 27.9901
+    },
+    "TypeMatrixShortDenseAddScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 24.8634
+    },
+    "TypeMatrixShortNullAddScalarSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 18.152
+    },
+    "TypeMatrixShortNullCompareGtGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 24.6752
+    },
+    "TypeMatrixShortNullVectorMulVectorSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 13.8181
+    },
+    "TypeMatrixWhereFloatIntMixedPredicateGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 156.4395
+    },
+    "TypeMatrixWhereFourClauseMembershipGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 504.2507
+    },
+    "TypeMatrixWhereModCompareMembershipGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 298.9674
+    },
+    "TypeMatrixWhereNegatedModWithinGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 178.0992
+    },
+    "TypeMatrixWhereNullGuardCompoundGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 82.3428
+    },
+    "TypeMatrixWhereSymbolMembershipNumericGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 131.3434
+    },
+    "TypeMatrixWhereWithinModNotEqGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 179.5571
+    },
+    "TypeMatrixWhereXbarWithinMembershipGatherSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 143.3512
+    },
+    "TypedIntCastRoundTripSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 44.9908
+    },
+    "TypedNullFillSum": {
+      "jit_go_ratio": 3.1563,
+      "warm_go_ratio": 2.1159
+    },
+    "TypedNullFillWhereRowScaled": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.7427
+    },
+    "TypedPrevNextDeltasFills": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": null
+    },
+    "TypedSuffixNullAndCasts": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 23.8975
+    },
+    "VectorAffineSumLargeScale": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4394
+    },
+    "VectorAffineSumMarketPrice": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4216
+    },
+    "VectorAffineSumOddScale": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4573
+    },
+    "VectorAffineSumSignedOffset": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4127
+    },
+    "VectorAffineSumSmall": {
+      "jit_go_ratio": 2.892,
+      "warm_go_ratio": 1.5988
+    },
+    "VectorAffineSumWide": {
+      "jit_go_ratio": 3.0326,
+      "warm_go_ratio": 1.42
+    },
+    "VectorMinMaxDyadicEnvelope": {
+      "jit_go_ratio": 2.1055,
+      "warm_go_ratio": 1.1162
+    },
+    "VectorMixedArithmeticTwoStageA": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.3745
+    },
+    "VectorMixedArithmeticTwoStageB": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.3703
+    },
+    "VectorMixedArithmeticTwoStageC": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.3834
+    },
+    "VectorMixedArithmeticTwoStageD": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.405
+    },
+    "VectorModuloBucketSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.554
+    },
+    "VectorSquareSumLargeScale": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.244
+    },
+    "VectorSquareSumMarketPrice": {
+      "jit_go_ratio": 4.1207,
+      "warm_go_ratio": 2.3269
+    },
+    "VectorSquareSumOddScale": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2267
+    },
+    "VectorSquareSumSignedOffset": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4259
+    },
+    "VectorSquareSumSmall": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4203
+    },
+    "VectorSquareSumWide": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.3427
+    },
+    "VerbFormAmpLogicalMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 61.1456
+    },
+    "VerbFormCondBranchReduce": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.1708
+    },
+    "VerbFormDoAccumulateVectorSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3727
+    },
+    "VerbFormFillPriorShiftSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 10.5305
+    },
+    "VerbFormIfGuardedReduce": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.8988
+    },
+    "VerbFormIntersectSentinelSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 81.8641
+    },
+    "VerbFormLtrimRtrimMatchCond": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 7.3303
+    },
+    "VerbFormPipeLogicalMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 36.1859
+    },
+    "VerbFormWhileRowBoundSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.4431
+    },
+    "VerbFormWordAliasDivideMinus": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.6874
+    },
+    "VerbFormWordAliasEqualEqualsCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 4.4604
+    },
+    "VerbFormWordAliasLeftRightGather": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 13.5829
+    },
+    "VerbFormWordAliasLessGreaterMore": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 6.8045
+    },
+    "VerbFormXdescColumnProbe": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.1546
+    },
+    "WhereCompareCountSumDirect": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 5.3269
+    },
+    "WhereGatherProjectionSum": {
+      "jit_go_ratio": 18.6204,
+      "warm_go_ratio": 14.0378
+    },
+    "WhereIndexCountGE0": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.411
+    },
+    "WhereIndexCountGE1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2428
+    },
+    "WhereIndexCountGE1000": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.3111
+    },
+    "WhereIndexCountGE128": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4069
+    },
+    "WhereIndexCountGE17": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2397
+    },
+    "WhereIndexCountGE2048": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.3116
+    },
+    "WhereIndexCountGE4096": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.3827
+    },
+    "WhereIndexCountGE7000": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.336
+    },
+    "WhereIndexCountGE8191": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4381
+    },
+    "WhereIndexCountGE999": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.2593
+    },
+    "WhereIndexSumGE0": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1041
+    },
+    "WhereIndexSumGE1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.0911
+    },
+    "WhereIndexSumGE1000": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1061
+    },
+    "WhereIndexSumGE128": {
+      "jit_go_ratio": 1.8258,
+      "warm_go_ratio": 1.1253
+    },
+    "WhereIndexSumGE17": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.0827
+    },
+    "WhereIndexSumGE2048": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1011
+    },
+    "WhereIndexSumGE4096": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1863
+    },
+    "WhereIndexSumGE7000": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.1561
+    },
+    "WhereIndexSumGE8191": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.139
+    },
+    "WhereIndexSumGE999": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 1.0912
+    },
+    "WhereModuloGatherProjectionSum": {
+      "jit_go_ratio": 0.9146,
+      "warm_go_ratio": 0.2062
+    },
+    "WhereModuloOrMaskCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 7.5771
+    },
+    "WhereValueGatherReduceSelectivityPct0": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.9081
+    },
+    "WhereValueGatherReduceSelectivityPct1": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.5563
+    },
+    "WhereValueGatherReduceSelectivityPct100": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3066
+    },
+    "WhereValueGatherReduceSelectivityPct50": {
+      "jit_go_ratio": 1.3957,
+      "warm_go_ratio": 0.3985
+    },
+    "WhereValueGatherReduceSelectivityPct99": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 0.3001
+    },
+    "XbarIntWidth10": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.249
+    },
+    "XbarIntWidth1000": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.6064
+    },
+    "XbarIntWidth2": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.4514
+    },
+    "XbarIntWidth3": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.338
+    },
+    "XbarIntWidth5": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.3813
+    },
+    "XbarIntWidth60": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 2.5972
+    },
+    "XbarStaticMixedSignCount": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 8.2005
+    },
+    "XrankModuloBucketsSum": {
+      "jit_go_ratio": null,
+      "warm_go_ratio": 3.8903
+    }
+  },
+  "exceptions": {},
+  "family_targets": {},
+  "max_untrusted_go_baselines": 24,
+  "schema_version": 1
+}

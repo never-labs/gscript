@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
+from datetime import date
 from pathlib import Path
 
 
@@ -19,6 +21,16 @@ BENCH_NO_NS_RE = re.compile(r"^(Benchmark[^\s]+)\s+(\d+)\s+(.*)$")
 BENCH_CPU_SUFFIX_RE = re.compile(r"-\d+$")
 Q_PIPELINE_FALLBACK_RE = re.compile(r"q_pipeline_fallback_report\s+(.*)$")
 MIN_TRUSTED_GO_BASELINE_NS = 100.0
+
+# Ratchet baseline for "Leia beats Go" progress: per-case trusted ratios are
+# captured with --update-ratio-baseline and gated as no-regression under --check.
+DEFAULT_RATIO_BASELINE_PATH = Path("benchmarks/data/qeval_go_ratio_baseline.json")
+RATIO_BASELINE_REGRESSION_TOLERANCE = 1.15
+RATIO_BASELINE_FAMILIES = (
+    ("warm_go_ratio", "BenchmarkQSessionEvalVectorWarmExecution"),
+    ("jit_go_ratio", "BenchmarkQEvalJITScriptWarm"),
+)
+MIN_FAMILY_GEOMEAN_TRUSTED_COVERAGE = 0.5
 
 QSQL_BENCH = (
     "BenchmarkQSQL("
@@ -218,6 +230,7 @@ class GatePolicy:
     max_typed_fallbacks_op: float
     max_pipeline_fallback_shapes: float
     max_allocs_op: float
+    max_leia_jit_go_ratio: float = 5.0
     max_jit_typed_errors_op: float = 0.0
     max_jit_backend_slow_route_pct: float = 0.0
     min_runtime_direct_bridge_share_pct: float = 95.0
@@ -957,21 +970,92 @@ def build_ratios(rows: dict[str, BenchRow]) -> list[RatioRow]:
                 ),
             ]
         )
+    jit_script_cases = sorted(
+        name.removeprefix("BenchmarkQEvalJITScriptWarm/")
+        for name in rows
+        if name.startswith("BenchmarkQEvalJITScriptWarm/")
+    )
+    for case in jit_script_cases:
+        numerator = f"BenchmarkQEvalJITScriptWarm/{case}"
+        go = f"BenchmarkQEvalVectorGoBaseline/{case}"
+        jit_ratio, jit_note = trusted_qeval_go_ratio(rows, numerator, go)
+        ratios.append(
+            RatioRow(
+                f"q.eval {case} JIT script warm vs Go",
+                numerator,
+                go,
+                jit_ratio,
+                jit_note if jit_ratio is None else "JIT-compiled q script warm execution vs hand-written Go",
+            )
+        )
+    vm_script_cases = sorted(
+        name.removeprefix("BenchmarkQEvalVMScriptWarm/")
+        for name in rows
+        if name.startswith("BenchmarkQEvalVMScriptWarm/")
+    )
+    for case in vm_script_cases:
+        numerator = f"BenchmarkQEvalVMScriptWarm/{case}"
+        go = f"BenchmarkQEvalVectorGoBaseline/{case}"
+        vm_ratio, vm_note = trusted_qeval_go_ratio(rows, numerator, go)
+        ratios.append(
+            RatioRow(
+                f"q.eval {case} VM script warm vs Go",
+                numerator,
+                go,
+                vm_ratio,
+                vm_note if vm_ratio is None else "VM script warm execution vs hand-written Go; attribution only, not gated",
+            )
+        )
     return ratios
 
 
-def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+def qeval_case_from_benchmark(name: str) -> str | None:
+    for prefix in (
+        "BenchmarkQSessionEvalVectorWarmExecution/",
+        "BenchmarkQEvalJITScriptWarm/",
+    ):
+        if name.startswith(prefix):
+            return name.removeprefix(prefix)
+    return None
+
+
+def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_baseline: dict | None = None) -> list[GateCheck]:
     checks: list[GateCheck] = []
+    exceptions = (ratio_baseline or {}).get("exceptions") or {}
     for item in build_ratios(rows):
         if "Go" not in item.denominator:
+            continue
+        if item.numerator.startswith("BenchmarkQEvalVMScriptWarm/"):
+            # VM script ratios are reported for attribution only; never hard-cap gated.
+            continue
+        if item.numerator.startswith("BenchmarkQEvalJITScriptWarm/"):
+            signal = "leia_jit_go_ratio"
+            cap = policy.max_leia_jit_go_ratio
+        else:
+            signal = "leia_go_ratio"
+            cap = policy.max_leia_go_ratio
+        case = qeval_case_from_benchmark(item.numerator)
+        if case is not None and case in exceptions:
+            exception = exceptions.get(case) or {}
+            reason = exception.get("reason") or "listed in baseline exceptions"
+            checks.append(
+                GateCheck(
+                    signal=signal,
+                    benchmark=item.numerator,
+                    value=item.ratio,
+                    threshold=f"<= {cap:g}",
+                    status="skip",
+                    note=f"exempt from hard cap via baseline exception: {reason} (no-regression gate still applies)",
+                )
+            )
             continue
         if item.ratio is None:
             checks.append(
                 GateCheck(
-                    signal="leia_go_ratio",
+                    signal=signal,
                     benchmark=item.numerator,
                     value=None,
-                    threshold=f"<= {policy.max_leia_go_ratio:g}",
+                    threshold=f"<= {cap:g}",
                     status="skip",
                     note=item.note or "missing or untrusted denominator",
                 )
@@ -979,14 +1063,233 @@ def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[Gat
             continue
         checks.append(
             GateCheck(
-                signal="leia_go_ratio",
+                signal=signal,
                 benchmark=item.numerator,
                 value=item.ratio,
-                threshold=f"<= {policy.max_leia_go_ratio:g}",
-                status="pass" if item.ratio <= policy.max_leia_go_ratio else "fail",
+                threshold=f"<= {cap:g}",
+                status="pass" if item.ratio <= cap else "fail",
                 note=item.note,
             )
         )
+    return checks
+
+
+def load_ratio_baseline(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
+def count_untrusted_go_baselines(rows: dict[str, BenchRow]) -> int:
+    return sum(
+        1
+        for name, row in rows.items()
+        if name.startswith("BenchmarkQEvalVectorGoBaseline/") and row.ns_op < MIN_TRUSTED_GO_BASELINE_NS
+    )
+
+
+def collect_ratio_baseline_cases(rows: dict[str, BenchRow]) -> dict[str, dict[str, float | None]]:
+    go = qeval_cases(rows, "BenchmarkQEvalVectorGoBaseline")
+    session = qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
+    jit = qeval_cases(rows, "BenchmarkQEvalJITScriptWarm")
+    cases: dict[str, dict[str, float | None]] = {}
+    for case in sorted(go & (session | jit)):
+        denominator = f"BenchmarkQEvalVectorGoBaseline/{case}"
+        warm_ratio, _ = trusted_qeval_go_ratio(rows, f"BenchmarkQSessionEvalVectorWarmExecution/{case}", denominator)
+        jit_ratio, _ = trusted_qeval_go_ratio(rows, f"BenchmarkQEvalJITScriptWarm/{case}", denominator)
+        cases[case] = {
+            "warm_go_ratio": round(warm_ratio, 4) if warm_ratio is not None else None,
+            "jit_go_ratio": round(jit_ratio, 4) if jit_ratio is not None else None,
+        }
+    return cases
+
+
+def build_ratio_baseline_payload(rows: dict[str, BenchRow], existing: dict | None = None) -> dict:
+    existing = existing or {}
+    return {
+        "schema_version": 1,
+        "captured": date.today().isoformat(),
+        "max_untrusted_go_baselines": count_untrusted_go_baselines(rows),
+        "cases": collect_ratio_baseline_cases(rows),
+        "family_targets": existing.get("family_targets") or {},
+        "exceptions": existing.get("exceptions") or {},
+    }
+
+
+def write_ratio_baseline(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def geomean(values: list[float]) -> float:
+    return math.exp(sum(math.log(value) for value in values) / len(values))
+
+
+def family_geomean_gate_checks(rows: dict[str, BenchRow], ratio_baseline: dict) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    family_targets = ratio_baseline.get("family_targets") or {}
+    if not family_targets:
+        checks.append(
+            GateCheck(
+                signal="family_geomean_jit_go_ratio",
+                benchmark="family_targets",
+                value=None,
+                threshold="none configured",
+                status="skip",
+                note="family_targets is empty in the ratio baseline; populated in a later phase",
+            )
+        )
+        return checks
+    for family, spec in sorted(family_targets.items()):
+        spec = spec or {}
+        cases = spec.get("cases") or []
+        threshold = spec.get("max_geomean_jit_go_ratio")
+        if not cases or threshold is None:
+            checks.append(
+                GateCheck(
+                    signal="family_geomean_jit_go_ratio",
+                    benchmark=family,
+                    value=None,
+                    threshold="invalid target",
+                    status="skip",
+                    note="family target needs a non-empty cases list and max_geomean_jit_go_ratio",
+                )
+            )
+            continue
+        trusted: list[float] = []
+        for case in cases:
+            value, _ = trusted_qeval_go_ratio(
+                rows,
+                f"BenchmarkQEvalJITScriptWarm/{case}",
+                f"BenchmarkQEvalVectorGoBaseline/{case}",
+            )
+            if value is not None and value > 0:
+                trusted.append(value)
+        coverage = len(trusted) / len(cases)
+        if coverage < MIN_FAMILY_GEOMEAN_TRUSTED_COVERAGE:
+            checks.append(
+                GateCheck(
+                    signal="family_geomean_jit_go_ratio",
+                    benchmark=family,
+                    value=None,
+                    threshold=f"<= {threshold:g}",
+                    status="skip",
+                    note=(
+                        f"only {len(trusted)}/{len(cases)} cases have a trusted jit_go_ratio "
+                        "(below 50% coverage); family skipped"
+                    ),
+                )
+            )
+            continue
+        value = geomean(trusted)
+        checks.append(
+            GateCheck(
+                signal="family_geomean_jit_go_ratio",
+                benchmark=family,
+                value=value,
+                threshold=f"<= {threshold:g}",
+                status="pass" if value <= threshold else "fail",
+                note=f"geomean over {len(trusted)}/{len(cases)} trusted jit_go_ratio cases",
+            )
+        )
+    return checks
+
+
+def ratio_baseline_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_baseline: dict | None) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    if ratio_baseline is None:
+        checks.append(
+            GateCheck(
+                signal="ratio_baseline",
+                benchmark="qeval_go_ratio_baseline",
+                value=None,
+                threshold="baseline file present",
+                status="skip",
+                note="ratio baseline file missing; capture it with --update-ratio-baseline",
+            )
+        )
+        return checks
+    baseline_cases = ratio_baseline.get("cases") or {}
+    tolerance = RATIO_BASELINE_REGRESSION_TOLERANCE
+    for key, prefix in RATIO_BASELINE_FAMILIES:
+        for case in sorted(qeval_cases(rows, prefix)):
+            numerator = f"{prefix}/{case}"
+            denominator = f"BenchmarkQEvalVectorGoBaseline/{case}"
+            current, _ = trusted_qeval_go_ratio(rows, numerator, denominator)
+            if current is None:
+                continue
+            entry = baseline_cases.get(case) or {}
+            baseline_value = entry.get(key)
+            if baseline_value is None:
+                checks.append(
+                    GateCheck(
+                        signal="leia_go_ratio_regression",
+                        benchmark=numerator,
+                        value=current,
+                        threshold="no baseline entry",
+                        status="pass",
+                        note="case not in ratio baseline yet; it will be captured at the next --update-ratio-baseline",
+                    )
+                )
+                continue
+            limit = baseline_value * tolerance
+            checks.append(
+                GateCheck(
+                    signal="leia_go_ratio_regression",
+                    benchmark=numerator,
+                    value=current,
+                    threshold=f"<= {limit:.4f}",
+                    status="pass" if current <= limit else "fail",
+                    note=f"baseline {key} {baseline_value:g} * tolerance {tolerance:g}",
+                )
+            )
+    max_untrusted = ratio_baseline.get("max_untrusted_go_baselines")
+    if max_untrusted is not None:
+        untrusted = count_untrusted_go_baselines(rows)
+        checks.append(
+            GateCheck(
+                signal="untrusted_go_baseline_count",
+                benchmark="BenchmarkQEvalVectorGoBaseline",
+                value=float(untrusted),
+                threshold=f"<= {max_untrusted:g}",
+                status="pass" if untrusted <= max_untrusted else "fail",
+                note=(
+                    f"Go baselines below {MIN_TRUSTED_GO_BASELINE_NS:g} ns/op are correctness-only; "
+                    "ratchet the cap down with --update-ratio-baseline"
+                ),
+            )
+        )
+    exceptions = ratio_baseline.get("exceptions") or {}
+    checks.append(
+        GateCheck(
+            signal="ratio_baseline_exception_count",
+            benchmark="qeval_go_ratio_baseline",
+            value=float(len(exceptions)),
+            threshold="report-only",
+            status="pass",
+            note="hard-cap exceptions; shrink-only is enforced by PR review of the baseline JSON",
+        )
+    )
+    known_cases = (
+        qeval_cases(rows, "BenchmarkQEvalVectorGoBaseline")
+        | qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
+        | qeval_cases(rows, "BenchmarkQEvalJITScriptWarm")
+    )
+    if known_cases:
+        for case in sorted(exceptions):
+            if case in known_cases:
+                continue
+            checks.append(
+                GateCheck(
+                    signal="ratio_baseline_stale_exception",
+                    benchmark=case,
+                    value=None,
+                    threshold="exception case must exist in bench rows",
+                    status="fail",
+                    note="remove the stale case from exceptions in the ratio baseline JSON",
+                )
+            )
+    checks.extend(family_geomean_gate_checks(rows, ratio_baseline))
     return checks
 
 
@@ -1328,9 +1631,10 @@ def runtime_metric_contract_gate_checks(rows: dict[str, BenchRow], policy: GateP
     return checks
 
 
-def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_baseline: dict | None = None) -> list[GateCheck]:
     return (
-        ratio_gate_checks(rows, policy)
+        ratio_gate_checks(rows, policy, ratio_baseline)
+        + ratio_baseline_gate_checks(rows, policy, ratio_baseline)
         + runtime_gate_checks(rows, policy)
         + observability_gate_checks(rows, policy)
         + runtime_health_gate_checks(rows, policy)
@@ -1806,6 +2110,18 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--timing-json", type=Path, action="append", default=[], help="Include current-vs-old rows from timing_compare.py JSON output.")
     parser.add_argument("--check", action="store_true", help="Fail if q benchmark ratios or runtime metrics miss the configured thresholds.")
     parser.add_argument("--max-leia-go-ratio", type=float, default=5.0)
+    parser.add_argument("--max-leia-jit-go-ratio", type=float, default=5.0, help="Hard cap for BenchmarkQEvalJITScriptWarm vs BenchmarkQEvalVectorGoBaseline ratios.")
+    parser.add_argument(
+        "--ratio-baseline",
+        type=Path,
+        default=DEFAULT_RATIO_BASELINE_PATH,
+        help="Ratchet baseline JSON with per-case trusted Leia-vs-Go ratios, exceptions, and family targets.",
+    )
+    parser.add_argument(
+        "--update-ratio-baseline",
+        action="store_true",
+        help="Recompute all trusted Leia-vs-Go ratios from the bench input and rewrite the ratio baseline JSON.",
+    )
     parser.add_argument("--min-typed-hit-pct", type=float, default=95.0)
     parser.add_argument("--max-typed-fallbacks-op", type=float, default=0.0)
     parser.add_argument("--max-pipeline-fallback-shapes", type=float, default=0.0)
@@ -1880,8 +2196,20 @@ def main(argv: list[str]) -> int:
     for path in args.timing_json:
         current_vs_old.extend(parse_timing_compare_json(path))
 
+    ratio_baseline = load_ratio_baseline(args.ratio_baseline)
+    if args.update_ratio_baseline:
+        if not any(name.startswith("BenchmarkQEvalVectorGoBaseline/") for name in rows):
+            print(
+                "--update-ratio-baseline requires BenchmarkQEvalVectorGoBaseline rows in the bench input",
+                file=sys.stderr,
+            )
+            return 1
+        write_ratio_baseline(args.ratio_baseline, build_ratio_baseline_payload(rows, ratio_baseline))
+        print(f"wrote {args.ratio_baseline}")
+
     policy = GatePolicy(
         max_leia_go_ratio=args.max_leia_go_ratio,
+        max_leia_jit_go_ratio=args.max_leia_jit_go_ratio,
         min_typed_hit_pct=args.min_typed_hit_pct,
         max_typed_fallbacks_op=args.max_typed_fallbacks_op,
         max_pipeline_fallback_shapes=args.max_pipeline_fallback_shapes,
@@ -1900,7 +2228,7 @@ def main(argv: list[str]) -> int:
         max_q_array_bridge_avg_allocs_op=args.max_q_array_bridge_avg_allocs_op,
         max_q_array_bridge_max_allocs_op=args.max_q_array_bridge_max_allocs_op,
     )
-    gate_checks = build_gate_checks(rows, policy) if args.check else []
+    gate_checks = build_gate_checks(rows, policy, ratio_baseline) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
     if args.fallback_top_n >= 0:
         pipeline_fallback_rows = pipeline_fallback_rows[: args.fallback_top_n]

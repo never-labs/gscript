@@ -44,6 +44,30 @@ BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  
 BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  131184 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
 """
 
+SAMPLE_JIT_SCRIPT = """
+BenchmarkQEvalJITScriptWarm/MaskWhere-16    100  1500 ns/op  128 B/op  4 allocs/op
+BenchmarkQEvalVMScriptWarm/MaskWhere-16     100  4000 ns/op  256 B/op  9 allocs/op
+"""
+
+SAMPLE_UNTRUSTED_GO_BASELINE = """
+BenchmarkQSessionEvalVectorWarmExecution/TinyConst-16    100  50 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalVectorGoBaseline/TinyConst-16              100  5 ns/op  0 B/op  0 allocs/op
+"""
+
+
+def make_ratio_baseline(**overrides):
+    baseline = {
+        "schema_version": 1,
+        "captured": "2026-06-10",
+        "max_untrusted_go_baselines": 64,
+        "cases": {},
+        "family_targets": {},
+        "exceptions": {},
+    }
+    baseline.update(overrides)
+    return baseline
+
+
 FALLBACK_REPORT_LOG = """
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report cases=2 categories=2 rows=1
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report rank=1 category=xbar_within pipeline_shape=bin kernel=ArrayBin reason=unsupported_type outcome=fallback count=3
@@ -395,6 +419,304 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn(("runtime_health_typed_fallbacks_op", "q_runtime_hotpath"), failed)
         self.assertIn(("runtime_health_pipeline_fallback_shapes", "q_runtime_hotpath"), failed)
         self.assertIn(("runtime_health_max_allocs_op", "q_runtime_hotpath"), failed)
+
+    def test_build_ratios_includes_jit_and_vm_script_families(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)
+        ratios = {row.scenario: row for row in report.build_ratios(rows)}
+
+        jit = ratios["q.eval MaskWhere JIT script warm vs Go"]
+        self.assertEqual(jit.ratio, 1.5)
+        self.assertEqual(jit.numerator, "BenchmarkQEvalJITScriptWarm/MaskWhere")
+        self.assertEqual(jit.denominator, "BenchmarkQEvalVectorGoBaseline/MaskWhere")
+        vm = ratios["q.eval MaskWhere VM script warm vs Go"]
+        self.assertEqual(vm.ratio, 4.0)
+        self.assertIn("attribution only", vm.note)
+
+    def test_build_ratios_tolerates_absent_script_warm_families(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        scenarios = [row.scenario for row in report.build_ratios(rows)]
+
+        self.assertFalse(any("script warm vs Go" in scenario for scenario in scenarios))
+
+    def test_gate_checks_gate_jit_script_family_but_never_vm(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            max_leia_jit_go_ratio=1.2,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("leia_jit_go_ratio", "BenchmarkQEvalJITScriptWarm/MaskWhere"), failed)
+        ratio_signals = {"leia_go_ratio", "leia_jit_go_ratio", "leia_go_ratio_regression"}
+        self.assertFalse(
+            any(
+                check.benchmark.startswith("BenchmarkQEvalVMScriptWarm/")
+                for check in checks
+                if check.signal in ratio_signals
+            )
+        )
+
+    def test_ratio_baseline_no_regression_pass_and_fail(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)
+        baseline = make_ratio_baseline(cases={"MaskWhere": {"warm_go_ratio": 2.0, "jit_go_ratio": 1.0}})
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy, baseline)
+        regression = {check.benchmark: check for check in checks if check.signal == "leia_go_ratio_regression"}
+
+        warm = regression["BenchmarkQSessionEvalVectorWarmExecution/MaskWhere"]
+        self.assertEqual(warm.status, "pass")  # 2.0 <= 2.0 * 1.15
+        jit = regression["BenchmarkQEvalJITScriptWarm/MaskWhere"]
+        self.assertEqual(jit.status, "fail")  # 1.5 > 1.0 * 1.15
+        self.assertEqual(jit.value, 1.5)
+
+    def test_ratio_baseline_missing_case_passes_with_capture_note(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        baseline = make_ratio_baseline()
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy, baseline)
+        regression = {check.benchmark: check for check in checks if check.signal == "leia_go_ratio_regression"}
+
+        warm = regression["BenchmarkQSessionEvalVectorWarmExecution/MaskWhere"]
+        self.assertEqual(warm.status, "pass")
+        self.assertIn("--update-ratio-baseline", warm.note)
+
+    def test_ratio_baseline_exceptions_exempt_hard_cap_but_not_regression(self):
+        rows = report.parse_go_benchmarks(SAMPLE_WITH_FALLBACK)
+        baseline = make_ratio_baseline(
+            cases={"FallbackShape": {"warm_go_ratio": 5.0, "jit_go_ratio": None}},
+            exceptions={"FallbackShape": {"reason": "known kernel gap", "ref": "ISSUE-1"}},
+        )
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy, baseline)
+
+        hard_cap = [
+            check
+            for check in checks
+            if check.signal == "leia_go_ratio"
+            and check.benchmark == "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"
+        ]
+        self.assertEqual(len(hard_cap), 1)
+        self.assertEqual(hard_cap[0].status, "skip")
+        self.assertIn("known kernel gap", hard_cap[0].note)
+        regression = [
+            check
+            for check in checks
+            if check.signal == "leia_go_ratio_regression"
+            and check.benchmark == "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"
+        ]
+        self.assertEqual(len(regression), 1)
+        self.assertEqual(regression[0].status, "fail")  # 9.0 > 5.0 * 1.15
+        counts = [check for check in checks if check.signal == "ratio_baseline_exception_count"]
+        self.assertEqual(len(counts), 1)
+        self.assertEqual(counts[0].value, 1)
+        self.assertEqual(counts[0].status, "pass")
+
+    def test_ratio_baseline_stale_exception_fails(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        baseline = make_ratio_baseline(exceptions={"RemovedCase": {"reason": "gone", "ref": ""}})
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy, baseline)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("ratio_baseline_stale_exception", "RemovedCase"), failed)
+
+    def test_untrusted_go_baseline_count_gate(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_UNTRUSTED_GO_BASELINE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+
+        strict = report.build_gate_checks(rows, policy, make_ratio_baseline(max_untrusted_go_baselines=0))
+        by_signal = {check.signal: check for check in strict if check.signal == "untrusted_go_baseline_count"}
+        self.assertEqual(by_signal["untrusted_go_baseline_count"].status, "fail")
+        self.assertEqual(by_signal["untrusted_go_baseline_count"].value, 1)
+
+        relaxed = report.build_gate_checks(rows, policy, make_ratio_baseline(max_untrusted_go_baselines=1))
+        by_signal = {check.signal: check for check in relaxed if check.signal == "untrusted_go_baseline_count"}
+        self.assertEqual(by_signal["untrusted_go_baseline_count"].status, "pass")
+
+    def test_family_geomean_gating_skip_and_fail(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+
+        empty = report.build_gate_checks(rows, policy, make_ratio_baseline(family_targets={}))
+        empty_checks = [check for check in empty if check.signal == "family_geomean_jit_go_ratio"]
+        self.assertEqual(len(empty_checks), 1)
+        self.assertEqual(empty_checks[0].status, "skip")
+        self.assertIn("later phase", empty_checks[0].note)
+
+        failing = report.build_gate_checks(
+            rows,
+            policy,
+            make_ratio_baseline(
+                family_targets={"core": {"cases": ["MaskWhere"], "max_geomean_jit_go_ratio": 1.2}}
+            ),
+        )
+        failing_checks = {check.benchmark: check for check in failing if check.signal == "family_geomean_jit_go_ratio"}
+        self.assertEqual(failing_checks["core"].status, "fail")
+        self.assertAlmostEqual(failing_checks["core"].value, 1.5)
+
+        sparse = report.build_gate_checks(
+            rows,
+            policy,
+            make_ratio_baseline(
+                family_targets={
+                    "sparse": {
+                        "cases": ["MaskWhere", "MissingA", "MissingB"],
+                        "max_geomean_jit_go_ratio": 1.2,
+                    }
+                }
+            ),
+        )
+        sparse_checks = {check.benchmark: check for check in sparse if check.signal == "family_geomean_jit_go_ratio"}
+        self.assertEqual(sparse_checks["sparse"].status, "skip")
+        self.assertIn("1/3", sparse_checks["sparse"].note)
+
+    def test_ratio_baseline_gate_skips_when_baseline_file_missing(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+        )
+        checks = report.build_gate_checks(rows, policy, None)
+        baseline_checks = [check for check in checks if check.signal == "ratio_baseline"]
+
+        self.assertEqual(len(baseline_checks), 1)
+        self.assertEqual(baseline_checks[0].status, "skip")
+        self.assertFalse(any(check.signal == "leia_go_ratio_regression" for check in checks))
+
+    def test_update_ratio_baseline_round_trip(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE + SAMPLE_JIT_SCRIPT + SAMPLE_UNTRUSTED_GO_BASELINE)
+            baseline_path = td_path / "qeval_go_ratio_baseline.json"
+            baseline_path.write_text(
+                json.dumps(
+                    make_ratio_baseline(
+                        exceptions={"MaskWhere": {"reason": "kept", "ref": "ISSUE-2"}},
+                        family_targets={"core": {"cases": ["MaskWhere"], "max_geomean_jit_go_ratio": 2.0}},
+                    )
+                )
+            )
+            argv = [
+                "--from-output", str(out),
+                "--json", str(td_path / "report.json"),
+                "--markdown", str(td_path / "report.md"),
+                "--ratio-baseline", str(baseline_path),
+                "--update-ratio-baseline",
+            ]
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main(argv)
+
+            self.assertEqual(code, 0)
+            first_text = baseline_path.read_text()
+            payload = json.loads(first_text)
+            self.assertEqual(payload["schema_version"], 1)
+            self.assertEqual(payload["max_untrusted_go_baselines"], 1)
+            self.assertEqual(payload["cases"]["MaskWhere"], {"warm_go_ratio": 2.0, "jit_go_ratio": 1.5})
+            self.assertEqual(payload["cases"]["TinyConst"], {"warm_go_ratio": None, "jit_go_ratio": None})
+            self.assertEqual(payload["exceptions"], {"MaskWhere": {"reason": "kept", "ref": "ISSUE-2"}})
+            self.assertEqual(payload["family_targets"], {"core": {"cases": ["MaskWhere"], "max_geomean_jit_go_ratio": 2.0}})
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main(argv)
+
+            self.assertEqual(code, 0)
+            self.assertEqual(baseline_path.read_text(), first_text)
+
+    def test_update_ratio_baseline_requires_qeval_bench_input(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text("BenchmarkQSQLNativeGoSelectWhereProject-16  100  2000 ns/op  100 B/op  1 allocs/op\n")
+            baseline_path = td_path / "qeval_go_ratio_baseline.json"
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--json", str(td_path / "report.json"),
+                    "--markdown", str(td_path / "report.md"),
+                    "--ratio-baseline", str(baseline_path),
+                    "--update-ratio-baseline",
+                ])
+
+            self.assertEqual(code, 1)
+            self.assertFalse(baseline_path.exists())
+
+    def test_main_check_uses_ratio_baseline_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE + SAMPLE_JIT_SCRIPT)
+            baseline_path = td_path / "qeval_go_ratio_baseline.json"
+            baseline_path.write_text(
+                json.dumps(make_ratio_baseline(cases={"MaskWhere": {"warm_go_ratio": 2.0, "jit_go_ratio": 1.0}}))
+            )
+            json_path = td_path / "report.json"
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--json", str(json_path),
+                    "--markdown", str(td_path / "report.md"),
+                    "--ratio-baseline", str(baseline_path),
+                    "--check",
+                ])
+
+            self.assertEqual(code, 2)
+            payload = json.loads(json_path.read_text())
+            regression_rows = [
+                row
+                for row in payload["gate"]
+                if row["signal"] == "leia_go_ratio_regression"
+                and row["benchmark"] == "BenchmarkQEvalJITScriptWarm/MaskWhere"
+            ]
+            self.assertEqual(len(regression_rows), 1)
+            self.assertEqual(regression_rows[0]["status"], "fail")
 
     def test_fallback_shape_summary_filters_only_rows_with_fallback_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)

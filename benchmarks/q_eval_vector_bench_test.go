@@ -28,6 +28,65 @@ func buildQEvalVectorGoBaselineInput(rows int) []int64 {
 }
 
 //go:noinline
+func qEvalVectorGoBaselineMaterializeTil(rows int) []int64 {
+	values := make([]int64, rows)
+	copy(values, qEvalVectorGoBaselineInput[:rows])
+	qEvalVectorAnyBenchSink = values
+	return values
+}
+
+//go:noinline
+func qEvalVectorGoBaselineMaterializeReverse(rows int) []int64 {
+	values := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		values[i] = qEvalVectorGoBaselineInput[rows-1-i]
+	}
+	qEvalVectorAnyBenchSink = values
+	return values
+}
+
+//go:noinline
+func qEvalVectorGoBaselineMaterializeRotate(rows, shift int) []int64 {
+	shift %= rows
+	if shift < 0 {
+		shift += rows
+	}
+	values := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		values[i] = qEvalVectorGoBaselineInput[(shift+i)%rows]
+	}
+	qEvalVectorAnyBenchSink = values
+	return values
+}
+
+//go:noinline
+func qEvalVectorGoBaselineMaterializeDrop(rows, drop int) []int64 {
+	values := make([]int64, rows-drop)
+	copy(values, qEvalVectorGoBaselineInput[drop:rows])
+	qEvalVectorAnyBenchSink = values
+	return values
+}
+
+//go:noinline
+func qEvalVectorGoBaselineXrankModuloCount(rows int, mod int64) int64 {
+	x := make([]int64, rows)
+	for i := 0; i < rows; i++ {
+		x[i] = qEvalVectorGoBaselineInput[i] % mod
+	}
+	idx := make([]int, rows)
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool { return x[idx[i]] < x[idx[j]] })
+	buckets := make([]int64, rows)
+	for rank, original := range idx {
+		buckets[original] = int64(10 * rank / rows)
+	}
+	qEvalVectorAnyBenchSink = buckets
+	return int64(len(buckets))
+}
+
+//go:noinline
 func qEvalVectorGoBaselineSumsTailChecksum(rows int, values []int64) int64 {
 	var sum int64
 	for i := 0; i < rows; i++ {
@@ -156,7 +215,10 @@ func qEvalVectorGoBaselineApplyAtGather(rows, width int, values []int64) int64 {
 	if rows <= 0 || width*3 >= rows || rows > len(values) {
 		return 0
 	}
-	return values[width] + values[width*2] + values[width*3] + int64(rows)
+	x := make([]int64, rows)
+	copy(x, values[:rows])
+	qEvalVectorAnyBenchSink = x
+	return x[width] + x[width*2] + x[width*3] + int64(rows)
 }
 
 //go:noinline
@@ -176,11 +238,15 @@ func qEvalVectorGoBaselineCallableDotApply(rows, width int, values []int64) int6
 
 //go:noinline
 func qEvalVectorGoBaselineMatrixCellProbe(matrixRows, cols, cellIndex int, values []int64) int64 {
+	total := matrixRows * cols
 	offset := (matrixRows-1)*cols + cellIndex
-	if offset < 0 || offset >= len(values) {
+	if offset < 0 || total > len(values) || offset >= total {
 		return 0
 	}
-	return values[offset] + int64(matrixRows)
+	cells := make([]int64, total)
+	copy(cells, values[:total])
+	qEvalVectorAnyBenchSink = cells
+	return cells[offset] + int64(matrixRows)
 }
 
 func qEvalVectorMatrixMmuSide(rows int) int {
@@ -362,10 +428,16 @@ func sumIntSliceForQEvalVectorGoBaseline(values []int64) int64 {
 
 //go:noinline
 func qEvalVectorGoBaselineTakeCount(rows int, values []int64) int64 {
-	if rows < 0 || rows > len(values) {
+	if rows <= 0 || rows > len(values) {
 		return 0
 	}
-	return int64(rows + qEvalVectorGoBaselineTakeExtra)
+	n := rows + qEvalVectorGoBaselineTakeExtra
+	taken := make([]int64, n)
+	for i := 0; i < n; i++ {
+		taken[i] = values[i%rows]
+	}
+	qEvalVectorAnyBenchSink = taken
+	return int64(len(taken))
 }
 
 //go:noinline
@@ -812,9 +884,6 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 			},
 			goFn: func(rows int) int64 {
 				selected := p.selectRows(rows)
-				if selected == 0 {
-					return 0
-				}
 				var sum int64
 				for i := 0; i < rows; i++ {
 					if i >= 0 && i < selected {
@@ -836,9 +905,10 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("x:til %d;a:%d#x;+/a", rows, n)
 			},
 			goFn: func(rows int) int64 {
+				x := qEvalVectorGoBaselineMaterializeTil(rows)
 				var sum int64
 				for i := 0; i < n; i++ {
-					sum += int64(i % rows)
+					sum += x[i%rows]
 				}
 				return sum
 			},
@@ -1354,7 +1424,16 @@ func buildQEvalVectorCases() []qEvalVectorCase {
 				return fmt.Sprintf("v:til %d;g:%d#`a`b`c`d;count (sum v fby g)", rows, rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows)
+				var groupSums [4]int64
+				for i := 0; i < rows; i++ {
+					groupSums[i%4] += qEvalVectorGoBaselineInput[i]
+				}
+				perRow := make([]int64, rows)
+				for i := 0; i < rows; i++ {
+					perRow[i] = groupSums[i%4]
+				}
+				qEvalVectorAnyBenchSink = perRow
+				return int64(len(perRow))
 			},
 		},
 		qEvalVectorCase{
@@ -1643,8 +1722,11 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 			},
 			goFn: func(rows int) int64 {
 				var sum int64
-				for value := 0; value < 128 && value < rows; value++ {
-					sum += int64(value)
+				for i := rows - 1; i >= 0; i-- {
+					value := qEvalVectorGoBaselineInput[i]
+					if value < 128 {
+						sum += value
+					}
 				}
 				return sum
 			},
@@ -1885,7 +1967,13 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("syms:%d#`aapl`msft`nvda;count upper string syms", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows)
+				pattern := []string{"aapl", "msft", "nvda"}
+				names := make([]string, rows)
+				for i := 0; i < rows; i++ {
+					names[i] = strings.ToUpper(pattern[i%len(pattern)])
+				}
+				qEvalVectorAnyBenchSink = names
+				return int64(len(names))
 			},
 		},
 		{
@@ -1929,7 +2017,11 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;+/`long$`int$x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows-1) * int64(rows) / 2
+				var sum int64
+				for i := 0; i < rows; i++ {
+					sum += int64(int32(qEvalVectorGoBaselineInput[i]))
+				}
+				return sum
 			},
 		},
 		{
@@ -1940,7 +2032,12 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:(til %d)*0.5;count `float$x", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows)
+				floats := make([]float64, rows)
+				for i := 0; i < rows; i++ {
+					floats[i] = float64(qEvalVectorGoBaselineInput[i]) * 0.5
+				}
+				qEvalVectorAnyBenchSink = floats
+				return int64(len(floats))
 			},
 		},
 		{
@@ -1973,7 +2070,23 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;(count prev x)+(count next x)+(count deltas x)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows * 3)
+				prev := make([]int64, rows)
+				next := make([]int64, rows)
+				deltas := make([]int64, rows)
+				for i := 0; i < rows; i++ {
+					value := qEvalVectorGoBaselineInput[i]
+					if i == 0 {
+						deltas[i] = value
+					} else {
+						prev[i] = qEvalVectorGoBaselineInput[i-1]
+						deltas[i] = value - qEvalVectorGoBaselineInput[i-1]
+					}
+					if i+1 < rows {
+						next[i] = qEvalVectorGoBaselineInput[i+1]
+					}
+				}
+				qEvalVectorAnyBenchSink = [][]int64{prev, next, deltas}
+				return int64(len(prev) + len(next) + len(deltas))
 			},
 		},
 		{
@@ -2005,10 +2118,17 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;+/ -':x", rows)
 			},
 			goFn: func(rows int) int64 {
-				if rows <= 0 {
-					return 0
+				var sum, prev int64
+				for i := 0; i < rows; i++ {
+					value := qEvalVectorGoBaselineInput[i]
+					if i == 0 {
+						sum += value
+					} else {
+						sum += value - prev
+					}
+					prev = value
 				}
-				return int64(rows - 1)
+				return sum
 			},
 		},
 		{
@@ -2019,10 +2139,16 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;count distinct x mod 257", rows)
 			},
 			goFn: func(rows int) int64 {
-				if rows < 257 {
-					return int64(rows)
+				var seen [257]bool
+				var count int64
+				for i := 0; i < rows; i++ {
+					m := qEvalVectorGoBaselineInput[i] % 257
+					if !seen[m] {
+						seen[m] = true
+						count++
+					}
 				}
-				return 257
+				return count
 			},
 		},
 		{
@@ -2033,10 +2159,16 @@ func appendQEvalExpressionCombinationCases(cases []qEvalVectorCase) []qEvalVecto
 				return fmt.Sprintf("x:til %d;count group x mod 64", rows)
 			},
 			goFn: func(rows int) int64 {
-				if rows < 64 {
-					return int64(rows)
+				var seen [64]bool
+				var buckets int64
+				for i := 0; i < rows; i++ {
+					m := qEvalVectorGoBaselineInput[i] % 64
+					if !seen[m] {
+						seen[m] = true
+						buckets++
+					}
 				}
-				return 64
+				return buckets
 			},
 		},
 		{
@@ -2168,9 +2300,10 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("x:til %d;a:%d#reverse x;(+/a)+first a+last a", rows, n)
 				},
 				goFn: func(rows int) int64 {
+					reversed := qEvalVectorGoBaselineMaterializeReverse(rows)
 					var sum, first, last int64
 					for i := 0; i < n; i++ {
-						value := int64(rows - 1 - (i % rows))
+						value := reversed[i%rows]
 						if i == 0 {
 							first = value
 						}
@@ -2200,10 +2333,10 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 					if take == 0 {
 						take = 1
 					}
-					length := rows - drop
+					y := qEvalVectorGoBaselineMaterializeDrop(rows, drop)
 					var sum int64
 					for i := 0; i < take; i++ {
-						sum += int64(drop + (i % length))
+						sum += y[i%len(y)]
 					}
 					return sum + int64(take)
 				},
@@ -2407,12 +2540,13 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 	}
 
 	for _, p := range []struct {
-		name    string
-		values  string
-		fill    int64
-		sum     func(rows int) int64
-		nulls   func(rows int) int64
-		castTag string
+		name      string
+		values    string
+		fill      int64
+		sum       func(rows int) int64
+		nulls     func(rows int) int64
+		castTag   string
+		nullSlots map[int]bool
 	}{
 		{"IntNulls", "0N 1 2 0N", 9, func(rows int) int64 {
 			var sum int64
@@ -2424,14 +2558,14 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 				}
 			}
 			return sum
-		}, func(rows int) int64 { return qPatternCount(rows, 4, map[int]bool{0: true, 3: true}) }, "typed-null"},
+		}, func(rows int) int64 { return qPatternCount(rows, 4, map[int]bool{0: true, 3: true}) }, "typed-null", map[int]bool{0: true, 3: true}},
 		{"ShortCast", "1 2 3 4", 0, func(rows int) int64 {
 			var sum int64
 			for i := 0; i < rows; i++ {
 				sum += int64(i%4 + 1)
 			}
 			return sum
-		}, func(rows int) int64 { return 0 }, "cast"},
+		}, func(rows int) int64 { return 0 }, "cast", map[int]bool{}},
 		{"FloatNulls", "0Nf 1.5 2.5 0Nf", 7, func(rows int) int64 {
 			var sum float64
 			for i := 0; i < rows; i++ {
@@ -2445,7 +2579,7 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 				}
 			}
 			return int64(sum)
-		}, func(rows int) int64 { return qPatternCount(rows, 4, map[int]bool{0: true, 3: true}) }, "typed-null"},
+		}, func(rows int) int64 { return qPatternCount(rows, 4, map[int]bool{0: true, 3: true}) }, "typed-null", map[int]bool{0: true, 3: true}},
 	} {
 		p := p
 		cases = append(cases,
@@ -2468,7 +2602,16 @@ func appendQEvalOrdinaryExpressionCoverageCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("x:%d#%s;count fills x", rows, p.values)
 				},
 				goFn: func(rows int) int64 {
-					return int64(rows)
+					filled := make([]int64, rows)
+					var last int64
+					for i := 0; i < rows; i++ {
+						if !p.nullSlots[i%4] {
+							last = int64(i % 4)
+						}
+						filled[i] = last
+					}
+					qEvalVectorAnyBenchSink = filled
+					return int64(len(filled))
 				},
 			},
 		)
@@ -2573,11 +2716,11 @@ func appendQEvalDeepExpressionCombinationCases(cases []qEvalVectorCase) []qEvalV
 					return fmt.Sprintf("x:til %d;r:%d rotate x;y:%d#drop %d r;(+/y)+first y+last y", rows, p.shift, p.take, p.drop)
 				},
 				goFn: func(rows int) int64 {
-					shift := p.shift % rows
-					rotatedLen := rows - p.drop
+					rotated := qEvalVectorGoBaselineMaterializeRotate(rows, p.shift)
+					dropped := rotated[p.drop:]
 					var sum, first, last int64
 					for i := 0; i < p.take; i++ {
-						value := int64((shift + p.drop + (i % rotatedLen)) % rows)
+						value := dropped[i%len(dropped)]
 						if i == 0 {
 							first = value
 						}
@@ -2689,7 +2832,7 @@ func appendQEvalDeepExpressionCombinationCases(cases []qEvalVectorCase) []qEvalV
 					return fmt.Sprintf("x:(til %d) mod %d;count 10 xrank x", rows, p.width*10)
 				},
 				goFn: func(rows int) int64 {
-					return int64(rows)
+					return qEvalVectorGoBaselineXrankModuloCount(rows, p.width*10)
 				},
 			},
 		)
@@ -2747,12 +2890,11 @@ func appendQEvalDeepExpressionCombinationCases(cases []qEvalVectorCase) []qEvalV
 					return fmt.Sprintf("syms:%d#%s;count distinct 17 rotate syms", rows, p.pattern)
 				},
 				goFn: func(rows int) int64 {
-					seen := make(map[int]struct{}, p.width)
-					for i := 0; i < p.width; i++ {
-						seen[i] = struct{}{}
-					}
-					if p.name == "Side" {
-						return 3
+					symbols := strings.Split(strings.TrimPrefix(p.pattern, "`"), "`")
+					seen := make(map[string]struct{}, p.width)
+					shift := 17 % rows
+					for i := 0; i < rows; i++ {
+						seen[symbols[(shift+i)%rows%p.width]] = struct{}{}
 					}
 					return int64(len(seen))
 				},
@@ -3070,10 +3212,15 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 				return fmt.Sprintf("x:til %d;r:17 rotate x;y:128 sublist reverse r;(+/y)+first y+last y", rows)
 			},
 			goFn: func(rows int) int64 {
-				shift := 17 % rows
+				rotated := qEvalVectorGoBaselineMaterializeRotate(rows, 17)
+				reversed := make([]int64, rows)
+				for i := 0; i < rows; i++ {
+					reversed[i] = rotated[rows-1-i]
+				}
+				qEvalVectorAnyBenchSink = reversed
 				var total, first, last int64
 				for i := 0; i < 128; i++ {
-					value := int64((shift + rows - 1 - i) % rows)
+					value := reversed[i]
 					if i == 0 {
 						first = value
 					}
@@ -3583,8 +3730,14 @@ func appendQEvalTaskDSemanticEnvelopeCases(cases []qEvalVectorCase) []qEvalVecto
 			},
 			goFn: func(rows int) int64 {
 				cols := rows / 4
-				cell := qEvalVectorGoBaselineMatrixCellProbe(2, cols, 3, qEvalVectorGoBaselineInput) - 2
-				return cell + int64(cols)
+				flipped := make([]int64, rows)
+				for c := 0; c < cols; c++ {
+					for r := 0; r < 4; r++ {
+						flipped[c*4+r] = qEvalVectorGoBaselineInput[r*cols+c]
+					}
+				}
+				qEvalVectorAnyBenchSink = flipped
+				return flipped[3*4+1] + int64(cols)
 			},
 		},
 		{
@@ -3975,11 +4128,11 @@ func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("x:til %d;y:%d#drop %d x;z:%d sublist y;(+/z)+count z", rows, p.take, p.drop, p.take/2)
 				},
 				goFn: func(rows int) int64 {
-					length := rows - p.drop
+					dropped := qEvalVectorGoBaselineMaterializeDrop(rows, p.drop)
 					sub := p.take / 2
 					var sum int64
 					for i := 0; i < sub; i++ {
-						sum += int64(p.drop + (i % length))
+						sum += dropped[i%len(dropped)]
 					}
 					return sum + int64(sub)
 				},
@@ -4038,10 +4191,11 @@ func appendQEvalSupportedExpressionBreadthCases(cases []qEvalVectorCase) []qEval
 					return fmt.Sprintf("x:til %d;idx:%d*til %d;(+/x[idx])+count idx", rows, p.width, rows/p.width)
 				},
 				goFn: func(rows int) int64 {
+					x := qEvalVectorGoBaselineMaterializeTil(rows)
 					n := rows / p.width
 					var sum int64
 					for i := 0; i < n; i++ {
-						sum += int64(p.width * i)
+						sum += x[p.width*i]
 					}
 					return sum + int64(n)
 				},
@@ -4345,7 +4499,34 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return fmt.Sprintf("x:1+til %d;(count sums x)+(count prds x)+(count mins x)+(count maxs x)+(count avgs x)", rows)
 			},
 			goFn: func(rows int) int64 {
-				return int64(rows * 5)
+				sums := make([]int64, rows)
+				prds := make([]float64, rows)
+				mins := make([]int64, rows)
+				maxs := make([]int64, rows)
+				avgs := make([]float64, rows)
+				var running int64
+				product := 1.0
+				minValue := int64(math.MaxInt64)
+				maxValue := int64(math.MinInt64)
+				for i := 0; i < rows; i++ {
+					value := qEvalVectorGoBaselineInput[i] + 1
+					running += value
+					sums[i] = running
+					product *= float64(value)
+					prds[i] = product
+					if value < minValue {
+						minValue = value
+					}
+					if value > maxValue {
+						maxValue = value
+					}
+					mins[i] = minValue
+					maxs[i] = maxValue
+					avgs[i] = float64(running) / float64(i+1)
+				}
+				qEvalVectorAnyBenchSink = [][]int64{sums, mins, maxs}
+				qEvalVectorFloatBenchSink = prds[rows-1] + avgs[rows-1]
+				return int64(len(sums) + len(prds) + len(mins) + len(maxs) + len(avgs))
 			},
 		},
 		{
@@ -4602,12 +4783,16 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 	}
-	return append(cases, coverage...)
+	cases = append(cases, coverage...)
+	cases = append(cases, qEvalVectorVerbFormBacklogCases()...)
+	cases = append(cases, qEvalVectorComboCases()...)
+	cases = append(cases, qEvalVectorTypeNullMatrixCases()...)
+	return cases
 }
 
 func TestQEvalVectorBenchmarkExpressions(t *testing.T) {
-	if len(qEvalVectorCases) < 220 {
-		t.Fatalf("q.eval benchmark coverage too small: got %d cases, want at least 220", len(qEvalVectorCases))
+	if len(qEvalVectorCases) < 480 {
+		t.Fatalf("q.eval benchmark coverage too small: got %d cases, want at least 480", len(qEvalVectorCases))
 	}
 	eval := qEvalVectorEval(t)
 	for _, tc := range qEvalVectorCases {
@@ -4792,6 +4977,150 @@ func TestQEvalVectorTargetGoBaselinesDoRealWork(t *testing.T) {
 		}
 		sort.Strings(missing)
 		t.Fatalf("missing target q.eval Go baseline cases: %s", strings.Join(missing, ", "))
+	}
+}
+
+// qEvalRowInvariantBaselineAllowlist lists the only cases whose Go baseline is
+// allowed to return the same value for qEvalVectorRows and qEvalVectorRows/2.
+// Every entry needs a justification: either the q expression itself does
+// constant-size literal work, or the result is legitimately row-invariant even
+// though the baseline work scales with rows. Do not add entries to hide a
+// constant-folded baseline; fix the baseline instead.
+var qEvalRowInvariantBaselineAllowlist = map[string]string{
+	// Literal-envelope cases: the q expression operates on small literal
+	// vectors/dicts/tables, so constant work and a constant result are correct.
+	"TemporalXbarCount":                   "q expr buckets a 4-element literal time vector; constant work on both sides",
+	"TimestampXbarCount":                  "q expr buckets a 3-element literal timestamp vector; constant work on both sides",
+	"DictEachCountDistinct":               "q expr scans a literal 3-key dict of tiny vectors; constant work on both sides",
+	"BooleanWhereLiteralCountEnvelope":    "q expr scans the 6-bit literal mask 101001b; constant work on both sides",
+	"CutEnlistRazeChecksum":               "q expr cuts/razes literal 5-element lists; constant work on both sides",
+	"MembershipDifferRatiosTruthMatrix":   "q expr probes literal 3-5 element vectors; constant work on both sides",
+	"AdverbMatrix":                        "q expr exercises adverbs over literal 3-4 element vectors; constant work on both sides",
+	"SetBinWithinXrank":                   "q expr runs set/bin/within/xrank over literal 3-5 element vectors; constant work on both sides",
+	"SearchBinrWavgXprevMatrix":           "q expr runs binr/find/wavg/xprev over literal vectors; constant work on both sides",
+	"SymbolSetVerbs":                      "q expr runs set verbs over literal 2-3 symbol vectors; constant work on both sides",
+	"TypedPrevNextDeltasFills":            "q expr runs prev/next/deltas/fills over literal 3-element vectors; constant work on both sides",
+	"SortRankTypeMatrix":                  "q expr sorts/ranks literal 3-5 element vectors; constant work on both sides",
+	"DictAmendUpsertAndLookup":            "q expr amends a literal 2-key dict; constant work on both sides",
+	"DictKeysValueAttrFillMatch":          "q expr probes literal 2-3 element dicts and vectors; constant work on both sides",
+	"EnumSymbolStringMatchLike":           "q expr enumerates literal 2-3 symbol vectors; constant work on both sides",
+	"TemporalTypedXbarAndSort":            "q expr buckets/compares literal 2-3 element temporal vectors; constant work on both sides",
+	"TableMetadataReorderSort":            "q expr reorders literal 2-row tables; constant work on both sides",
+	"KeyedTableGroupUngroupFby":           "q expr keys/groups literal 2-3 row tables; constant work on both sides",
+	"SafeSystemAndLoopbackIPC":            "q expr measures loopback IPC plus a literal call; constant work on both sides",
+	"ProjectionEachDictNumericTableCombo": "q expr combines literal 3-element dicts and tables; constant work on both sides",
+	"TemporalStringSymbolProjectionCombo": "q expr combines literal 4-element symbol/temporal vectors; constant work on both sides",
+	"NestedDictProjectionAmendCombo":      "q expr amends literal 3-element dicts; constant work on both sides",
+	"KeyedTableTemporalStringMetaCombo":   "q expr keys/sorts literal 3-row tables; constant work on both sides",
+	"BooleanLogicalAndCompositeCompare":   "q expr compares literal 3-element vectors; constant work on both sides",
+	"DeepSetUnionInterExceptSymbols":      "q expr runs set verbs over literal 2-4 symbol vectors; constant work on both sides",
+	"TaskDCastSymbolNumericEnvelope":      "q expr casts scalar literals; constant work on both sides",
+
+	// Row-invariant results with row-scaled baseline work.
+	"SampleStatsCorrelationEnvelope":        "result counts 6 statistics; baseline computes full sample stats over rows",
+	"ListSublistCountEnvelope":              "100 sublist always counts 100; baseline materializes the rows-long source vector",
+	"ListCutCountEnvelope":                  "0 100 200 cut always yields 3 bins; baseline materializes and cuts the rows-long vector",
+	"SymbolDistinctCount":                   "distinct of a 6-symbol cycle is 6 at any benchmarked size; seen-set scan scales with rows",
+	"SymbolRotateDistinctCount":             "distinct of a rotated 5-symbol cycle is 4 at any benchmarked size; seen-set scan scales with rows",
+	"ProductOnesRowScaled":                  "prd rows#1 is always 1; baseline multiplies across all rows",
+	"FunctionalAmendWhereVector":            "amend targets a fixed 128-index prefix; result 256 at any benchmarked size; mask scan scales with rows",
+	"RotateWhereHeadCount":                  "a permutation always has exactly 10 values below 10; full mask scan scales with rows",
+	"WhereValueGatherReduceSelectivityPct0": "0% selectivity gathers nothing; result 0; mask scan scales with rows",
+	"ReverseWhereGatherHeadSum":             "values below 128 sum identically in any permutation; reverse scan scales with rows",
+	"DistinctModuloCount":                   "x mod 257 covers all 257 residues at benchmarked sizes; distinct scan scales with rows",
+	"GroupModuloBucketCount":                "x mod 64 covers all 64 buckets at benchmarked sizes; group scan scales with rows",
+	"DeepStringUpperLikeCountSide":          "side symbols never match A*; result 0; pattern scan scales with rows",
+	"DeepAdverbEachLeftRightChecksum":       "the each-left and each-right sums cancel to 0 for any rows; per-row adverb work scales",
+	"TaskDListSublistDirectSum":             "128 1024 sublist is a fixed window; summing the 1024-element window is the honest work",
+	"DeepSymbolDistinctAfterRotateTech":     "rotation preserves the 5-symbol distinct set; seen-set scan scales with rows",
+	"DeepSymbolDistinctAfterRotateVenue":    "rotation preserves the 5-symbol distinct set; seen-set scan scales with rows",
+	"DeepSymbolDistinctAfterRotateSide":     "rotation preserves the 3-symbol distinct set; seen-set scan scales with rows",
+	"TakeHead1":                             "take-prefix sum is independent of rows; baseline materializes til rows before taking",
+	"TakeHead8":                             "take-prefix sum is independent of rows; baseline materializes til rows before taking",
+	"TakeHead64":                            "take-prefix sum is independent of rows; baseline materializes til rows before taking",
+	"TakeHead128":                           "take-prefix sum is independent of rows; baseline materializes til rows before taking",
+	"TakeHead1024":                          "take-prefix sum is independent of rows; baseline materializes til rows before taking",
+	"TakeHead4096":                          "take-prefix sum is independent of rows; baseline materializes til rows before taking",
+	"OrdinaryDropThenTake3":                 "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake7":                 "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake16":                "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake31":                "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake64":                "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake127":               "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake256":               "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake513":               "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryDropThenTake1024":              "drop+take window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"OrdinaryRotateFilter3":                 "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter7":                 "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter16":                "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter31":                "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter64":                "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter127":               "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter256":               "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter513":               "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter1024":              "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"OrdinaryRotateFilter2049":              "a 128-wide band of a permutation always counts 128; full mask scan scales with rows",
+	"DeepReverseWhereWindowCountSmall":      "fixed-width band over a permutation counts the band width; full scan scales with rows",
+	"DeepReverseWhereWindowCountMedium":     "fixed-width band over a permutation counts the band width; full scan scales with rows",
+	"DeepReverseWhereWindowCountWide":       "fixed-width band over a permutation counts the band width; full scan scales with rows",
+	"DeepReverseWhereWindowCountCycle":      "fixed-width band over a permutation counts the band width; full scan scales with rows",
+	"DeepXbarWithinCountFine":               "xbar band is fully inside/outside both benchmarked row counts; full bucket scan scales with rows",
+	"DeepXbarWithinCountTen":                "xbar band is fully inside/outside both benchmarked row counts; full bucket scan scales with rows",
+	"DeepXbarWithinCountMinute":             "xbar band is fully inside/outside both benchmarked row counts; full bucket scan scales with rows",
+	"DeepXbarWithinCountKilo":               "xbar band is fully inside/outside both benchmarked row counts; full bucket scan scales with rows",
+	"DeepTakeDropRotateSumSmall":            "take window clears wraparound; values independent of rows; rotate materialization scales with rows",
+	"DeepTakeDropRotateSumMedium":           "take window clears wraparound; values independent of rows; rotate materialization scales with rows",
+	"DeepTakeDropRotateSumWide":             "take window clears wraparound; values independent of rows; rotate materialization scales with rows",
+	"BreadthListDropTakeSublistShort":       "sublist window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"BreadthListDropTakeSublistMid":         "sublist window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"BreadthListDropTakeSublistLong":        "sublist window clears wraparound at benchmarked sizes; baseline materializes the dropped vector",
+	"BreadthMatrixReshapeRowSumTwoByN":      "matrix is fixed at 8192 cells regardless of rows; row sum work matches the fixed shape",
+	"BreadthMatrixReshapeRowSumFourByN":     "matrix is fixed at 8192 cells regardless of rows; row sum work matches the fixed shape",
+	"BreadthMatrixReshapeRowSumEightByN":    "matrix is fixed at 8192 cells regardless of rows; row sum work matches the fixed shape",
+	"BreadthMatrixReshapeCellProbeTwoByN":   "matrix is fixed at 8192 cells regardless of rows; baseline materializes the reshaped backing",
+	"BreadthMatrixReshapeCellProbeFourByN":  "matrix is fixed at 8192 cells regardless of rows; baseline materializes the reshaped backing",
+	"BreadthMatrixReshapeCellProbeEightByN": "matrix is fixed at 8192 cells regardless of rows; baseline materializes the reshaped backing",
+}
+
+// qEvalRowInvariantBaselineAllowlistMax pins the allowlist size: it may only
+// shrink. Fix new baselines to scale with rows instead of growing this list.
+const qEvalRowInvariantBaselineAllowlistMax = 89
+
+func TestQEvalVectorAllGoBaselinesDoRealWork(t *testing.T) {
+	if len(qEvalRowInvariantBaselineAllowlist) > qEvalRowInvariantBaselineAllowlistMax {
+		t.Fatalf("row-invariant baseline allowlist has %d entries, max %d; fix new baselines to scale with rows instead of allowlisting them",
+			len(qEvalRowInvariantBaselineAllowlist), qEvalRowInvariantBaselineAllowlistMax)
+	}
+	caseNames := make(map[string]struct{}, len(qEvalVectorCases))
+	for _, tc := range qEvalVectorCases {
+		caseNames[tc.name] = struct{}{}
+	}
+	staleNames := make([]string, 0)
+	for name, justification := range qEvalRowInvariantBaselineAllowlist {
+		if justification == "" {
+			t.Errorf("allowlist entry %q has no justification", name)
+		}
+		if _, ok := caseNames[name]; !ok {
+			staleNames = append(staleNames, name)
+		}
+	}
+	if len(staleNames) > 0 {
+		sort.Strings(staleNames)
+		t.Fatalf("stale row-invariant baseline allowlist entries (no matching case): %s", strings.Join(staleNames, ", "))
+	}
+	for _, tc := range qEvalVectorCases {
+		if _, ok := qEvalRowInvariantBaselineAllowlist[tc.name]; ok {
+			continue
+		}
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			full := tc.goFn(qEvalVectorRows)
+			half := tc.goFn(qEvalVectorRows / 2)
+			if full == half {
+				t.Fatalf("Go baseline result %d is identical for %d and %d rows; make the baseline row-scaled or allowlist it with a justification",
+					full, qEvalVectorRows, qEvalVectorRows/2)
+			}
+		})
 	}
 }
 
