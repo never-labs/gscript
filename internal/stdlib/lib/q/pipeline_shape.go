@@ -46,6 +46,16 @@ type qPipelineShapeRegistryEntry struct {
 }
 
 var qPipelineDescriptorShapeRegistry = []qPipelineShapeRegistryEntry{
+	{ID: "where-reduce/sum", Kind: qPipelineSumWhereMask},
+	{ID: "where-index-reduce/sum", Kind: qPipelineSumWhereIndex},
+	{ID: "gather-reduce/sum", Kind: qPipelineSumGatherIndexes},
+	{ID: "compare-to-index-sum", Kind: qPipelineSumWhereCompare},
+	{ID: "compare-to-index-count", Kind: qPipelineCountWhereCompare},
+	{ID: "compare-to-index", Kind: qPipelineWhereCompareIndexes},
+	{ID: "compare-to-index-sum-mod", Kind: qPipelineSumWhereModuloCompare},
+	{ID: "compare-to-index-count-mod", Kind: qPipelineCountWhereModuloCompare},
+	{ID: "compare-to-index-mod", Kind: qPipelineWhereModuloCompareIndexes},
+	{ID: "bin-reduce/sum", Kind: qPipelineSumBin},
 	{ID: "vector-reduce/sum-deltas", Kind: qPipelineSumDeltas},
 	{ID: "vector-reduce/sum-expr", Kind: qPipelineSumVectorExpr},
 	{ID: "vector-reduce/sum-dyadic-min", Kind: qPipelineSumDyadicMinMax, Variant: "min", VariantField: qPipelineShapeVariantCompareOp},
@@ -86,6 +96,8 @@ var qPipelineDescriptorShapeRegistry = []qPipelineShapeRegistryEntry{
 	{ID: "apply-index/scalar-dot", Kind: qPipelineApplyScalarIndex, Variant: "dot", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "apply-index/path-dot", Kind: qPipelineApplyScalarIndex, Variant: "dot", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "cast-envelope/sum", Kind: qPipelineCastEnvelopeSum},
+	{Prefix: "runtime-unary/", Kind: qPipelineUnaryPrimitive, VariantField: qPipelineShapeVariantCompareOp},
+	{Prefix: "runtime-dyadic/", Kind: qPipelineDyadicPrimitive, VariantField: qPipelineShapeVariantCompareOp},
 	{Prefix: "vector-reduce/sum-unary-", Kind: qPipelineSumUnaryPrimitive, VariantField: qPipelineShapeVariantUnaryOp},
 	{Prefix: "numeric-unary-compare-to-index/", Kind: qPipelineWhereUnaryCompareIndexes, VariantField: qPipelineShapeVariantUnaryOp, ComparePrefix: "numeric-unary-compare-to-index"},
 }

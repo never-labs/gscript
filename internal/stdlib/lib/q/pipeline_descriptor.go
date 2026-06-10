@@ -524,47 +524,7 @@ func qPipelinePlanFromEvalDescriptor(descriptor EvalPipelineDescriptor) (qPipeli
 		}
 		return qPipelinePlanWithBindingPlans(plan), true
 	}
-	switch shape {
-	case "where-reduce/sum":
-		plan.kind = qPipelineSumWhereMask
-	case "where-index-reduce/sum":
-		plan.kind = qPipelineSumWhereIndex
-	case "gather-reduce/sum":
-		plan.kind = qPipelineSumGatherIndexes
-	case "compare-to-index-sum":
-		plan.kind = qPipelineSumWhereCompare
-	case "compare-to-index-count":
-		plan.kind = qPipelineCountWhereCompare
-	case "compare-to-index":
-		plan.kind = qPipelineWhereCompareIndexes
-	case "compare-to-index-sum-mod":
-		plan.kind = qPipelineSumWhereModuloCompare
-	case "compare-to-index-count-mod":
-		plan.kind = qPipelineCountWhereModuloCompare
-	case "compare-to-index-mod":
-		plan.kind = qPipelineWhereModuloCompareIndexes
-	case "bin-reduce/sum":
-		plan.kind = qPipelineSumBin
-	default:
-		switch {
-		case strings.HasPrefix(shape, "runtime-unary/"):
-			plan.kind = qPipelineUnaryPrimitive
-			if plan.compareOp == "" {
-				plan.compareOp = strings.TrimPrefix(shape, "runtime-unary/")
-			}
-		case strings.HasPrefix(shape, "runtime-dyadic/"):
-			plan.kind = qPipelineDyadicPrimitive
-			if plan.compareOp == "" {
-				plan.compareOp = strings.TrimPrefix(shape, "runtime-dyadic/")
-			}
-		default:
-			return qPipelinePlan{}, false
-		}
-	}
-	if plan.comparePrefix == "" {
-		plan.comparePrefix = shape
-	}
-	return qPipelinePlanWithBindingPlans(plan), true
+	return qPipelinePlan{}, false
 }
 
 func qPipelineRestoreDescriptorCastTerms(plan *qPipelinePlan, terms []EvalPipelineCastTerm) bool {
