@@ -674,7 +674,7 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		ctx.OpExitSlot = int64(absSlot - base)
 		ctx.OpExitAux = int64(aux)
-		return cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_op_exit")
+		return cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteOpExit)
 
 	case OpVectorScan:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {

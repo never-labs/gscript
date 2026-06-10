@@ -223,7 +223,7 @@ func (cf *CompiledFunction) Execute(args []runtime.Value) ([]runtime.Value, erro
 			}
 			planID := int(ctx.OpExitAux)
 			absSlot := int(ctx.OpExitSlot)
-			if err := cf.executeQEvalPipelinePlanSlot(planID, absSlot, regs, "typed_runtime_native_exit"); err != nil {
+			if err := cf.executeQEvalPipelinePlanSlot(planID, absSlot, regs, qEvalPipelineExecutionRouteNativeExit); err != nil {
 				return nil, fmt.Errorf("methodjit: q eval pipeline exit error: %w", err)
 			}
 			if exitCheck != nil {
@@ -1334,7 +1334,7 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		}
 		ctx.OpExitSlot = int64(slot)
 		ctx.OpExitAux = int64(aux)
-		return cf.executeQEvalPipelinePlanExit(ctx, regs, 0, "typed_runtime_op_exit")
+		return cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteOpExit)
 
 	case OpVectorScan:
 		if arg1 >= len(regs) || slot >= len(regs) {

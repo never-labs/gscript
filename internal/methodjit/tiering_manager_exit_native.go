@@ -279,7 +279,7 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 		codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
 	case ExitQEvalPipelinePlan:
 		handlerMark := tm.tier2PerfStart()
-		err := cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_native_exit")
+		err := cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteNativeExit)
 		tm.tier2PerfStop(perfTier2OpExit, handlerMark)
 		if err != nil {
 			return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)
@@ -399,7 +399,7 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 			tm.tier2PerfStop(perfTier2ExitResume, resumeMark)
 		case ExitQEvalPipelinePlan:
 			handlerMark := tm.tier2PerfStart()
-			err := cf.executeQEvalPipelinePlanExit(ctx, currentRegs, base, "typed_runtime_native_exit")
+			err := cf.executeQEvalPipelinePlanExit(ctx, currentRegs, base, qEvalPipelineExecutionRouteNativeExit)
 			tm.tier2PerfStop(perfTier2OpExit, handlerMark)
 			if err != nil {
 				return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)

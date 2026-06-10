@@ -494,6 +494,55 @@ func TestCompiledFunctionHelperExecutesCallableDotCountExecutablePlan(t *testing
 	}
 }
 
+func TestQEvalPipelineExecutionAdapterSharesTypedBackendForDirectAndSlotRoutes(t *testing.T) {
+	t.Setenv(exitResumeCheckEnv, "")
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	executableCalls := 0
+	backend.executeExecutable = func(plan stdq.EvalPipelineExecutablePlan) (any, bool, error) {
+		if !plan.Valid() {
+			t.Fatalf("executeExecutable plan = %+v, want valid executable plan", plan)
+		}
+		executableCalls++
+		return int64(77), true, nil
+	}
+	backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
+		return nil, false, errors.New("backend-plan fallback should not execute when adapter has typed executable helper")
+	}
+	backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+		return nil, false, errors.New("descriptor fallback should not execute when adapter has typed executable helper")
+	}
+	backend.executeSource = func(source string) (any, bool, error) {
+		return nil, false, errors.New("source fallback should not execute when adapter has typed executable helper")
+	}
+	cf := &CompiledFunction{
+		QEvalPipelinePlans:          []QEvalPipelinePlanRef{ref},
+		QEvalPipelinePlanHelpers:    newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
+		QEvalPipelinePlanStats:      newQEvalPipelinePlanExecutionCounters([]QEvalPipelinePlanRef{ref}),
+		QEvalPipelineDirectReturn:   true,
+		QEvalPipelineDirectReturnID: ref.ID,
+	}
+
+	out, handled, err := cf.tryExecuteQEvalPipelineDirectReturnValue()
+	if err != nil || !handled || !out.IsInt() || out.Int() != 77 {
+		t.Fatalf("direct adapter execution = %v,%v,%v; want int 77,true,nil", out, handled, err)
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	if err := cf.executeQEvalPipelinePlanSlot(ref.ID, 0, regs, qEvalPipelineExecutionRouteNativeExit); err != nil {
+		t.Fatalf("slot adapter execution: %v", err)
+	}
+	if !regs[0].IsInt() || regs[0].Int() != 77 {
+		t.Fatalf("slot adapter result = %v, want int 77", regs[0])
+	}
+	if executableCalls != 2 {
+		t.Fatalf("typed executable calls = %d, want direct and slot routes to share backend helper", executableCalls)
+	}
+	stats := cf.QKernelExecutionStats()
+	shape := qEvalPipelinePlanRefShape(ref)
+	assertQEvalPipelineExecutionStat(t, stats, shape, "typed_runtime_direct_entry", "success", 1)
+	assertQEvalPipelineExecutionStat(t, stats, shape, "typed_runtime_native_exit", "success", 1)
+}
+
 func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
