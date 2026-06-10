@@ -194,6 +194,26 @@ func (p EvalPipelineExecutablePlan) Valid() bool {
 	return ok
 }
 
+// Backend returns the runtime backend that owns this executable plan. It is the
+// public metadata surface for JIT/session caches; the executable payload remains
+// opaque and runner-owned.
+func (p EvalPipelineExecutablePlan) Backend() string {
+	metadata, ok := p.metadata()
+	if !ok {
+		return ""
+	}
+	return metadata.backend
+}
+
+// Kind returns the executable pipeline kind, for example expression or script.
+func (p EvalPipelineExecutablePlan) Kind() string {
+	metadata, ok := p.metadata()
+	if !ok {
+		return ""
+	}
+	return metadata.kind
+}
+
 func (p EvalPipelineExecutablePlan) executableRunner() (qEvalPipelineExecutable, bool) {
 	if _, ok := p.metadata(); !ok {
 		return nil, false

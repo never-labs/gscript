@@ -641,12 +641,8 @@ func TestEvalPipelineExecutablePlanMetadataComesFromRunner(t *testing.T) {
 	if !ok {
 		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
 	}
-	metadata, ok := executable.metadata()
-	if !ok {
-		t.Fatalf("executable metadata is invalid")
-	}
-	if metadata.backend != EvalPipelineTypedRuntimeBackend || metadata.kind != evalPipelineKindExpression {
-		t.Fatalf("executable metadata = %#v, want typed runtime expression", metadata)
+	if executable.Backend() != EvalPipelineTypedRuntimeBackend || executable.Kind() != evalPipelineKindExpression {
+		t.Fatalf("executable metadata = backend %q kind %q, want typed runtime expression", executable.Backend(), executable.Kind())
 	}
 	invalidRunner := evalPipelineExecutablePlanForRunner(qEvalPipelineExpressionExecutable{})
 	if invalidRunner.Valid() {
