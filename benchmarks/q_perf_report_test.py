@@ -54,6 +54,26 @@ BenchmarkQSessionEvalVectorWarmExecution/TinyConst-16    100  50 ns/op  0 B/op  
 BenchmarkQEvalVectorGoBaseline/TinyConst-16              100  5 ns/op  0 B/op  0 allocs/op
 """
 
+SAMPLE_MILESTONE_PRESSURE = """
+BenchmarkQSessionEvalVectorWarmExecution/FallbackShape-16    100  9000 ns/op  2048 B/op  90 allocs/op  80.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  0.8 typed_kernel_hits/op  0.2 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  1 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/FallbackShape-16              100  1000 ns/op  0 B/op  0 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/HealthyA-16         100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  20 typed_kernel_attempts/op  20 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/HealthyA-16                   100  1000 ns/op  0 B/op  0 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/HealthyB-16         100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  20 typed_kernel_attempts/op  20 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/HealthyB-16                   100  1000 ns/op  0 B/op  0 allocs/op
+"""
+
+MILESTONE_CAPS = {
+    "max_leia_go_ratio": 10.0,
+    "max_leia_jit_go_ratio": 12.0,
+    "min_typed_hit_pct": 75.0,
+    "max_typed_fallbacks_op": 1.0,
+    "max_pipeline_fallback_shapes": 2.0,
+    "max_allocs_op": 128.0,
+    "min_runtime_jit_backend_benchmarks": 0,
+    "min_runtime_array_bridge_benchmarks": 0,
+}
+
 
 def make_ratio_baseline(**overrides):
     baseline = {
@@ -717,6 +737,122 @@ class QPerfReportTest(unittest.TestCase):
             ]
             self.assertEqual(len(regression_rows), 1)
             self.assertEqual(regression_rows[0]["status"], "fail")
+
+    def run_milestone_check(self, td_path, baseline, extra_args=()):
+        out = td_path / "bench.txt"
+        out.write_text(SAMPLE_MILESTONE_PRESSURE)
+        baseline_path = td_path / "qeval_go_ratio_baseline.json"
+        baseline_path.write_text(json.dumps(baseline))
+        json_path = td_path / "report.json"
+
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            code = report.main([
+                "--from-output", str(out),
+                "--json", str(json_path),
+                "--markdown", str(td_path / "report.md"),
+                "--ratio-baseline", str(baseline_path),
+                "--check",
+                *extra_args,
+            ])
+        return code, json.loads(json_path.read_text())
+
+    def test_milestone_caps_relax_default_thresholds_when_flags_omitted(self):
+        with tempfile.TemporaryDirectory() as td:
+            code, payload = self.run_milestone_check(
+                Path(td), make_ratio_baseline(milestone_caps=dict(MILESTONE_CAPS))
+            )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["gate_policy"]["max_leia_go_ratio"], 10.0)
+            self.assertEqual(payload["gate_policy"]["max_leia_jit_go_ratio"], 12.0)
+            self.assertEqual(payload["gate_policy"]["min_typed_hit_pct"], 75.0)
+            self.assertEqual(payload["gate_policy"]["max_typed_fallbacks_op"], 1.0)
+            self.assertEqual(payload["gate_policy"]["max_pipeline_fallback_shapes"], 2.0)
+            self.assertEqual(payload["gate_policy"]["max_allocs_op"], 128.0)
+            self.assertEqual(payload["gate_policy"]["min_runtime_jit_backend_benchmarks"], 0)
+            self.assertEqual(payload["gate_policy"]["min_runtime_array_bridge_benchmarks"], 0)
+            self.assertFalse(any(row["status"] == "fail" for row in payload["gate"]))
+
+    def test_explicit_cli_flag_wins_over_milestone_caps(self):
+        with tempfile.TemporaryDirectory() as td:
+            # --max-allocs-op 64 equals the argparse default, but an explicit
+            # flag must still beat milestone_caps.max_allocs_op = 128.
+            code, payload = self.run_milestone_check(
+                Path(td),
+                make_ratio_baseline(milestone_caps=dict(MILESTONE_CAPS)),
+                extra_args=("--max-allocs-op", "64"),
+            )
+
+            self.assertEqual(code, 2)
+            self.assertEqual(payload["gate_policy"]["max_allocs_op"], 64.0)
+            # other milestone caps still apply
+            self.assertEqual(payload["gate_policy"]["min_typed_hit_pct"], 75.0)
+            alloc_fails = [
+                row
+                for row in payload["gate"]
+                if row["signal"] == "allocs_op" and row["status"] == "fail"
+            ]
+            self.assertEqual(
+                [row["benchmark"] for row in alloc_fails],
+                ["BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"],
+            )
+
+    def test_missing_milestone_caps_keeps_default_thresholds(self):
+        with tempfile.TemporaryDirectory() as td:
+            code, payload = self.run_milestone_check(Path(td), make_ratio_baseline())
+
+            self.assertEqual(code, 2)
+            self.assertEqual(payload["gate_policy"]["max_leia_go_ratio"], 5.0)
+            self.assertEqual(payload["gate_policy"]["max_allocs_op"], 64.0)
+            self.assertEqual(payload["gate_policy"]["min_typed_hit_pct"], 95.0)
+            failed_signals = {row["signal"] for row in payload["gate"] if row["status"] == "fail"}
+            self.assertIn("leia_go_ratio", failed_signals)
+            self.assertIn("allocs_op", failed_signals)
+            self.assertIn("typed_hit_pct", failed_signals)
+
+    def test_update_ratio_baseline_preserves_milestone_caps(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE + SAMPLE_JIT_SCRIPT)
+            baseline_path = td_path / "qeval_go_ratio_baseline.json"
+            baseline_path.write_text(
+                json.dumps(make_ratio_baseline(milestone_caps=dict(MILESTONE_CAPS)))
+            )
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--json", str(td_path / "report.json"),
+                    "--markdown", str(td_path / "report.md"),
+                    "--ratio-baseline", str(baseline_path),
+                    "--update-ratio-baseline",
+                ])
+
+            self.assertEqual(code, 0)
+            payload = json.loads(baseline_path.read_text())
+            self.assertEqual(payload["milestone_caps"], MILESTONE_CAPS)
+            self.assertEqual(payload["cases"]["MaskWhere"], {"warm_go_ratio": 2.0, "jit_go_ratio": 1.5})
+
+    def test_update_ratio_baseline_writes_empty_milestone_caps_when_absent(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE)
+            baseline_path = td_path / "qeval_go_ratio_baseline.json"
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--json", str(td_path / "report.json"),
+                    "--markdown", str(td_path / "report.md"),
+                    "--ratio-baseline", str(baseline_path),
+                    "--update-ratio-baseline",
+                ])
+
+            self.assertEqual(code, 0)
+            payload = json.loads(baseline_path.read_text())
+            self.assertEqual(payload["milestone_caps"], {})
 
     def test_fallback_shape_summary_filters_only_rows_with_fallback_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)

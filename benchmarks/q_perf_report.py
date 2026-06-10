@@ -32,6 +32,26 @@ RATIO_BASELINE_FAMILIES = (
 )
 MIN_FAMILY_GEOMEAN_TRUSTED_COVERAGE = 0.5
 
+# Hard-cap thresholds that may be sourced from `milestone_caps` in the ratio
+# baseline JSON. When the matching CLI flag is left at its argparse default,
+# the milestone value overrides the default; an explicitly provided CLI flag
+# always wins. Caps are tightened over time via PR-reviewed edits to the JSON;
+# the per-case no-regression ratchet remains the primary guard.
+MILESTONE_CAP_KEYS = (
+    "max_leia_go_ratio",
+    "max_leia_jit_go_ratio",
+    "min_typed_hit_pct",
+    "max_typed_fallbacks_op",
+    "max_pipeline_fallback_shapes",
+    "max_allocs_op",
+    "min_runtime_jit_backend_benchmarks",
+    "min_runtime_array_bridge_benchmarks",
+)
+MILESTONE_CAP_HELP = (
+    "When this flag is omitted, milestone_caps.%s in the ratio baseline JSON "
+    "overrides the default; an explicit flag always wins."
+)
+
 QSQL_BENCH = (
     "BenchmarkQSQL("
     "BindRunSQLWarmCacheSelectWhereProject|"
@@ -1113,7 +1133,42 @@ def build_ratio_baseline_payload(rows: dict[str, BenchRow], existing: dict | Non
         "cases": collect_ratio_baseline_cases(rows),
         "family_targets": existing.get("family_targets") or {},
         "exceptions": existing.get("exceptions") or {},
+        "milestone_caps": existing.get("milestone_caps") or {},
     }
+
+
+def flag_in_argv(argv: list[str], key: str) -> bool:
+    flag = "--" + key.replace("_", "-")
+    return any(token == flag or token.startswith(flag + "=") for token in argv)
+
+
+def apply_milestone_caps(
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+    ratio_baseline: dict | None,
+    argv: list[str] | None = None,
+) -> list[str]:
+    """Override default-valued threshold flags with milestone_caps from the ratio baseline.
+
+    A flag that is explicitly provided on the command line (or whose parsed
+    value differs from the argparse default) always wins over milestone_caps.
+    A missing or empty milestone_caps object leaves every flag untouched.
+    """
+    caps = (ratio_baseline or {}).get("milestone_caps") or {}
+    applied: list[str] = []
+    for key in MILESTONE_CAP_KEYS:
+        cap_value = caps.get(key)
+        if cap_value is None:
+            continue
+        if argv is not None and flag_in_argv(argv, key):
+            continue
+        default = parser.get_default(key)
+        if getattr(args, key) != default:
+            continue
+        cap_type = type(default)
+        setattr(args, key, cap_type(cap_value))
+        applied.append(key)
+    return applied
 
 
 def write_ratio_baseline(path: Path, payload: dict) -> None:
@@ -2109,8 +2164,21 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--from-output", type=Path, action="append", default=[], help="Parse existing go test output instead of running commands.")
     parser.add_argument("--timing-json", type=Path, action="append", default=[], help="Include current-vs-old rows from timing_compare.py JSON output.")
     parser.add_argument("--check", action="store_true", help="Fail if q benchmark ratios or runtime metrics miss the configured thresholds.")
-    parser.add_argument("--max-leia-go-ratio", type=float, default=5.0)
-    parser.add_argument("--max-leia-jit-go-ratio", type=float, default=5.0, help="Hard cap for BenchmarkQEvalJITScriptWarm vs BenchmarkQEvalVectorGoBaseline ratios.")
+    parser.add_argument(
+        "--max-leia-go-ratio",
+        type=float,
+        default=5.0,
+        help="Hard cap for warm session-execution vs Go baseline ratios. " + MILESTONE_CAP_HELP % "max_leia_go_ratio",
+    )
+    parser.add_argument(
+        "--max-leia-jit-go-ratio",
+        type=float,
+        default=5.0,
+        help=(
+            "Hard cap for BenchmarkQEvalJITScriptWarm vs BenchmarkQEvalVectorGoBaseline ratios. "
+            + MILESTONE_CAP_HELP % "max_leia_jit_go_ratio"
+        ),
+    )
     parser.add_argument(
         "--ratio-baseline",
         type=Path,
@@ -2122,10 +2190,30 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Recompute all trusted Leia-vs-Go ratios from the bench input and rewrite the ratio baseline JSON.",
     )
-    parser.add_argument("--min-typed-hit-pct", type=float, default=95.0)
-    parser.add_argument("--max-typed-fallbacks-op", type=float, default=0.0)
-    parser.add_argument("--max-pipeline-fallback-shapes", type=float, default=0.0)
-    parser.add_argument("--max-allocs-op", type=float, default=64.0)
+    parser.add_argument(
+        "--min-typed-hit-pct",
+        type=float,
+        default=95.0,
+        help="Minimum typed kernel hit percentage. " + MILESTONE_CAP_HELP % "min_typed_hit_pct",
+    )
+    parser.add_argument(
+        "--max-typed-fallbacks-op",
+        type=float,
+        default=0.0,
+        help="Hard cap for typed kernel fallbacks per op. " + MILESTONE_CAP_HELP % "max_typed_fallbacks_op",
+    )
+    parser.add_argument(
+        "--max-pipeline-fallback-shapes",
+        type=float,
+        default=0.0,
+        help="Hard cap for typed pipeline fallback shapes. " + MILESTONE_CAP_HELP % "max_pipeline_fallback_shapes",
+    )
+    parser.add_argument(
+        "--max-allocs-op",
+        type=float,
+        default=64.0,
+        help="Hard cap for allocs/op on q runtime benchmarks. " + MILESTONE_CAP_HELP % "max_allocs_op",
+    )
     parser.add_argument("--max-jit-typed-errors-op", type=float, default=0.0)
     parser.add_argument("--max-jit-backend-slow-route-pct", type=float, default=0.0)
     parser.add_argument("--min-runtime-direct-bridge-share-pct", type=float, default=95.0)
@@ -2133,8 +2221,24 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--min-q-array-bridge-bulk-hit-pct", type=float, default=95.0)
     parser.add_argument("--max-q-array-bridge-fallbacks-op", type=float, default=0.0)
     parser.add_argument("--min-runtime-typed-primitive-benchmarks", type=int, default=1)
-    parser.add_argument("--min-runtime-jit-backend-benchmarks", type=int, default=1)
-    parser.add_argument("--min-runtime-array-bridge-benchmarks", type=int, default=1)
+    parser.add_argument(
+        "--min-runtime-jit-backend-benchmarks",
+        type=int,
+        default=1,
+        help=(
+            "Minimum benchmarks emitting JIT backend route counters. "
+            + MILESTONE_CAP_HELP % "min_runtime_jit_backend_benchmarks"
+        ),
+    )
+    parser.add_argument(
+        "--min-runtime-array-bridge-benchmarks",
+        type=int,
+        default=1,
+        help=(
+            "Minimum benchmarks emitting q array bridge counters. "
+            + MILESTONE_CAP_HELP % "min_runtime_array_bridge_benchmarks"
+        ),
+    )
     parser.add_argument("--min-runtime-bridge-benchmark-count", type=int, default=3)
     parser.add_argument("--min-q-array-bridge-rows-op", type=float, default=1.0)
     parser.add_argument("--max-q-array-bridge-avg-allocs-op", type=float, default=64.0)
@@ -2207,6 +2311,7 @@ def main(argv: list[str]) -> int:
         write_ratio_baseline(args.ratio_baseline, build_ratio_baseline_payload(rows, ratio_baseline))
         print(f"wrote {args.ratio_baseline}")
 
+    apply_milestone_caps(args, parser, ratio_baseline, argv)
     policy = GatePolicy(
         max_leia_go_ratio=args.max_leia_go_ratio,
         max_leia_jit_go_ratio=args.max_leia_jit_go_ratio,

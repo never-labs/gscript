@@ -1937,5 +1937,15 @@
   "exceptions": {},
   "family_targets": {},
   "max_untrusted_go_baselines": 24,
+  "milestone_caps": {
+    "max_allocs_op": 1800000.0,
+    "max_leia_go_ratio": 320.0,
+    "max_leia_jit_go_ratio": 56.0,
+    "max_pipeline_fallback_shapes": 20.0,
+    "max_typed_fallbacks_op": 50.0,
+    "min_runtime_array_bridge_benchmarks": 0,
+    "min_runtime_jit_backend_benchmarks": 0,
+    "min_typed_hit_pct": 8.0
+  },
   "schema_version": 1
 }
