@@ -1204,15 +1204,24 @@ func (a *DenseArray) filterKnownCount(mask *DenseArray, count int) (*DenseArray,
 
 func (a *DenseArray) Gather(indices *DenseArray) (*DenseArray, error) {
 	if a == nil || indices == nil {
+		recordRuntimePrimitiveError(RuntimePrimitiveDenseArrayGather)
 		return nil, ErrDenseArrayOperand
 	}
 	if indices.dtype != DenseArrayI64 {
+		recordRuntimePrimitiveError(RuntimePrimitiveDenseArrayGather)
 		return nil, fmt.Errorf("dense array gather indices must be i64")
 	}
 	if err := denseArrayValidateGatherIndices(indices, a.Len()); err != nil {
+		recordRuntimePrimitiveError(RuntimePrimitiveDenseArrayGather)
 		return nil, err
 	}
-	return a.gatherValidatedI64(indices.i64)
+	out, err := a.gatherValidatedI64(indices.i64)
+	if err != nil {
+		recordRuntimePrimitiveError(RuntimePrimitiveDenseArrayGather)
+		return nil, err
+	}
+	recordRuntimePrimitiveHit(RuntimePrimitiveDenseArrayGather)
+	return out, nil
 }
 
 func (a *DenseArray) gatherValidatedI64(indices []int64) (*DenseArray, error) {

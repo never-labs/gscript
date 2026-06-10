@@ -43,6 +43,7 @@ type RuntimePathStats struct {
 	stringConcatBuilder  atomic.Uint64
 
 	runtimeSpecializationHit sync.Map
+	runtimePrimitiveStats    sync.Map
 
 	// nativeCallByBuiltin attributes native_call fast/fallback events to a
 	// specific *GoFunction. Keys are *GoFunction; values are
@@ -66,6 +67,7 @@ type RuntimePathStatsSnapshot struct {
 	StringFormat          RuntimePathStringStats                `json:"string_format"`
 	StringConcat          RuntimePathStringConcatStats          `json:"string_concat"`
 	RuntimeSpecialization RuntimePathRuntimeSpecializationStats `json:"runtime_specialization"`
+	RuntimePrimitive      RuntimePathRuntimePrimitiveStats      `json:"runtime_primitive"`
 }
 
 type RuntimePathNativeCallStats struct {
@@ -124,6 +126,22 @@ type RuntimePathRuntimeSpecializationStats struct {
 	PerSpecialization []RuntimePathRuntimeSpecializationEntry `json:"per_specialization,omitempty"`
 }
 
+type RuntimePathRuntimePrimitiveStats struct {
+	Hit          uint64                             `json:"hit"`
+	Error        uint64                             `json:"error"`
+	PerPrimitive []RuntimePathRuntimePrimitiveEntry `json:"per_primitive,omitempty"`
+}
+
+// RuntimePathRuntimePrimitiveEntry attributes typed VM primitive executions.
+type RuntimePathRuntimePrimitiveEntry struct {
+	ID     string `json:"id"`
+	Family string `json:"family"`
+	Op     string `json:"op"`
+	Shape  string `json:"shape"`
+	Hit    uint64 `json:"hit"`
+	Error  uint64 `json:"error"`
+}
+
 // RuntimePathRuntimeSpecializationEntry attributes guarded runtime-specialization hits.
 // Route is a stable VM-level category such as whole_call_value or
 // whole_call_no_result; Name is the structural recognizer name.
@@ -140,6 +158,18 @@ type runtimeSpecializationStatsKey struct {
 
 type runtimeSpecializationCounters struct {
 	count atomic.Uint64
+}
+
+type runtimePrimitiveStatsKey struct {
+	id     RuntimePrimitiveID
+	family string
+	op     string
+	shape  string
+}
+
+type runtimePrimitiveCounters struct {
+	hit   atomic.Uint64
+	error atomic.Uint64
 }
 
 var runtimePathStats atomic.Pointer[RuntimePathStats]
@@ -201,6 +231,7 @@ func (s *RuntimePathStats) Snapshot() RuntimePathStatsSnapshot {
 			Builder: s.stringConcatBuilder.Load(),
 		},
 		RuntimeSpecialization: s.snapshotRuntimeSpecializations(),
+		RuntimePrimitive:      s.snapshotRuntimePrimitives(),
 	}
 }
 
@@ -249,6 +280,15 @@ func (s *RuntimePathStats) WriteText(w io.Writer) {
 		fmt.Fprintln(w, "    per_specialization:")
 		for _, e := range snap.RuntimeSpecialization.PerSpecialization {
 			fmt.Fprintf(w, "      %s/%s: count=%d\n", e.Route, e.Name, e.Count)
+		}
+	}
+	fmt.Fprintln(w, "  runtime_primitive:")
+	fmt.Fprintf(w, "    hit: %d\n", snap.RuntimePrimitive.Hit)
+	fmt.Fprintf(w, "    error: %d\n", snap.RuntimePrimitive.Error)
+	if len(snap.RuntimePrimitive.PerPrimitive) > 0 {
+		fmt.Fprintln(w, "    per_primitive:")
+		for _, e := range snap.RuntimePrimitive.PerPrimitive {
+			fmt.Fprintf(w, "      %s: family=%s op=%s shape=%s hit=%d error=%d\n", e.ID, e.Family, e.Op, e.Shape, e.Hit, e.Error)
 		}
 	}
 }
@@ -512,6 +552,50 @@ func (s *RuntimePathStats) loadOrCreateRuntimeSpecialization(route, name string)
 	return c
 }
 
+// RecordRuntimePathPrimitiveHit attributes a typed VM primitive hit. It is
+// diagnostic-only; disabled stats pay one atomic pointer load and nil check.
+func RecordRuntimePathPrimitiveHit(desc RuntimePrimitiveDescriptor) {
+	s := runtimePathStats.Load()
+	if s == nil || desc.ID == "" {
+		return
+	}
+	s.loadOrCreateRuntimePrimitive(desc).hit.Add(1)
+}
+
+func RecordRuntimePathPrimitiveError(desc RuntimePrimitiveDescriptor) {
+	s := runtimePathStats.Load()
+	if s == nil || desc.ID == "" {
+		return
+	}
+	s.loadOrCreateRuntimePrimitive(desc).error.Add(1)
+}
+
+func (s *RuntimePathStats) loadOrCreateRuntimePrimitive(desc RuntimePrimitiveDescriptor) *runtimePrimitiveCounters {
+	key := runtimePrimitiveStatsKey{
+		id:     desc.ID,
+		family: desc.Family,
+		op:     desc.Op,
+		shape:  desc.Shape,
+	}
+	if key.family == "" {
+		key.family = "unknown"
+	}
+	if key.op == "" {
+		key.op = "unknown"
+	}
+	if key.shape == "" {
+		key.shape = "unknown"
+	}
+	if v, ok := s.runtimePrimitiveStats.Load(key); ok {
+		return v.(*runtimePrimitiveCounters)
+	}
+	c := &runtimePrimitiveCounters{}
+	if actual, loaded := s.runtimePrimitiveStats.LoadOrStore(key, c); loaded {
+		return actual.(*runtimePrimitiveCounters)
+	}
+	return c
+}
+
 func (s *RuntimePathStats) snapshotRuntimeSpecializations() RuntimePathRuntimeSpecializationStats {
 	var out []RuntimePathRuntimeSpecializationEntry
 	var total uint64
@@ -540,4 +624,39 @@ func (s *RuntimePathStats) snapshotRuntimeSpecializations() RuntimePathRuntimeSp
 		return out[i].Name < out[j].Name
 	})
 	return RuntimePathRuntimeSpecializationStats{Total: total, PerSpecialization: out}
+}
+
+func (s *RuntimePathStats) snapshotRuntimePrimitives() RuntimePathRuntimePrimitiveStats {
+	var out []RuntimePathRuntimePrimitiveEntry
+	var hits, errors uint64
+	s.runtimePrimitiveStats.Range(func(k, v any) bool {
+		key, _ := k.(runtimePrimitiveStatsKey)
+		c, _ := v.(*runtimePrimitiveCounters)
+		if key.id == "" || c == nil {
+			return true
+		}
+		hit := c.hit.Load()
+		errs := c.error.Load()
+		hits += hit
+		errors += errs
+		out = append(out, RuntimePathRuntimePrimitiveEntry{
+			ID:     string(key.id),
+			Family: key.family,
+			Op:     key.op,
+			Shape:  key.shape,
+			Hit:    hit,
+			Error:  errs,
+		})
+		return true
+	})
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Error != out[j].Error {
+			return out[i].Error > out[j].Error
+		}
+		if out[i].Hit != out[j].Hit {
+			return out[i].Hit > out[j].Hit
+		}
+		return out[i].ID < out[j].ID
+	})
+	return RuntimePathRuntimePrimitiveStats{Hit: hits, Error: errors, PerPrimitive: out}
 }

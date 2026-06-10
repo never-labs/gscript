@@ -9809,8 +9809,7 @@ func indexValue(v any, index any) (any, error) {
 	}
 	if array, ok := v.(data.Array); ok {
 		if indexArray, ok := index.(data.Array); ok && indexArray.Len() != 1 {
-			out, handled, err := data.TryGatherByI64IndexArray(array, indexArray)
-			recordRuntimeKernelProbe("ArrayGatherI64Indexes", "gather/"+string(array.Kind())+"/"+string(indexArray.Kind()), handled, err)
+			out, handled, err := qEvalArrayGatherI64Primitive(array, indexArray)
 			if err != nil {
 				return nil, err
 			}
@@ -13994,8 +13993,7 @@ func asc(v any) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		out, gathered, err := data.TryGatherByI64IndexArray(array, indexes)
-		recordRuntimeKernelProbe("ArrayGatherI64Indexes", "gather/"+string(array.Kind())+"/"+string(indexes.Kind()), gathered, err)
+		out, gathered, err := qEvalArrayGatherI64Primitive(array, indexes)
 		if err != nil {
 			return nil, err
 		}
@@ -14021,8 +14019,7 @@ func desc(v any) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		out, gathered, err := data.TryGatherByI64IndexArray(array, indexes)
-		recordRuntimeKernelProbe("ArrayGatherI64Indexes", "gather/"+string(array.Kind())+"/"+string(indexes.Kind()), gathered, err)
+		out, gathered, err := qEvalArrayGatherI64Primitive(array, indexes)
 		if err != nil {
 			return nil, err
 		}
