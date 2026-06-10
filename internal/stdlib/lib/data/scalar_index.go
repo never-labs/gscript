@@ -158,29 +158,6 @@ func TryTypedScalarIndex(array Array, row int) (any, bool, error) {
 			return NullValue, true, nil
 		}
 		return value, true, nil
-	case filledArray:
-		if row < 0 || row >= a.Len() {
-			return nil, true, scalarIndexOutOfRange(row)
-		}
-		var last any
-		hasLast := false
-		for i := 0; i <= row; i++ {
-			value, handled, err := TryTypedScalarIndex(a.source, i)
-			if err != nil {
-				return nil, true, err
-			}
-			if !handled {
-				return nil, false, nil
-			}
-			if !IsNull(value) {
-				last = value
-				hasLast = true
-			}
-		}
-		if !hasLast {
-			return NullValue, true, nil
-		}
-		return last, true, nil
 	case encodedArray:
 		if row < 0 || row >= len(a.codes) {
 			return nil, true, scalarIndexOutOfRange(row)

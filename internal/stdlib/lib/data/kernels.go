@@ -5458,6 +5458,11 @@ func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
 	if IsNull(fill) {
 		return array, true, nil
 	}
+	if values, ok := array.(nullableArray); ok {
+		if out, handled := typedScalarFillNullable(fill, values); handled {
+			return out, true, nil
+		}
+	}
 	if n, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
 		return i64FillArray{source: array, fill: n}, true, nil
 	}
@@ -5465,6 +5470,50 @@ func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
 		return f64FillArray{source: array, fill: n}, true, nil
 	}
 	return nil, false, nil
+}
+
+// typedScalarFillNullable materializes a scalar fill over boxed nullable
+// storage into a dense typed column in one pass. After the fill no nulls
+// remain, so the result supports unboxed O(1) row access instead of paying
+// boxed dispatch and coercion on every downstream read. The output kinds
+// mirror the lazy fill views: KindI64 for integer data, KindF64 otherwise.
+func typedScalarFillNullable(fill any, values nullableArray) (Array, bool) {
+	if fillI, ok := coerceInt64Exact(fill); ok {
+		out := make([]int64, len(values.data))
+		allInt := true
+		for i, v := range values.data {
+			if IsNull(v) {
+				out[i] = fillI
+				continue
+			}
+			n, ok := coerceInt64Exact(v)
+			if !ok {
+				allInt = false
+				break
+			}
+			out[i] = n
+		}
+		if allInt {
+			return newI64Trusted(out), true
+		}
+	}
+	fillF, ok := numeric(fill)
+	if !ok {
+		return nil, false
+	}
+	out := make([]float64, len(values.data))
+	for i, v := range values.data {
+		if IsNull(v) {
+			out[i] = fillF
+			continue
+		}
+		n, ok := numeric(v)
+		if !ok {
+			return nil, false
+		}
+		out[i] = n
+	}
+	return newF64Trusted(out), true
 }
 
 // TryTypedSortIndexesI64 returns stable row indexes for typed arrays when the
@@ -6041,8 +6090,6 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return i64ScalarDyadicRunningSumSum(a)
 	case i64SparseAmendArray:
 		return i64SparseAmendSum(a)
-	case filledArray:
-		return filledNumericSumValue(a)
 	case i64FillArray:
 		return a.sum(), true, nil
 	case fbyI64BroadcastArray:
@@ -9572,8 +9619,6 @@ func isNumericArray(array Array) bool {
 		return isNumericArray(a.source)
 	case indexedArray:
 		return isNumericArray(a.source)
-	case filledArray:
-		return isNumericArray(a.source)
 	case shiftedArray:
 		return isNumericArray(a.source)
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
@@ -12702,52 +12747,6 @@ func deltasNullableSum(values nullableArray) (any, bool, error) {
 		}
 		hasFloat = true
 		totalF += currentF - previousF
-	}
-	if hasFloat {
-		return totalF, true, nil
-	}
-	return totalI, true, nil
-}
-
-func filledNumericSumValue(values filledArray) (any, bool, error) {
-	var totalI int64
-	var totalF float64
-	var lastI int64
-	var lastF float64
-	hasLast := false
-	hasFloat := false
-	for row := 0; row < values.source.Len(); row++ {
-		value, ok := values.source.At(row)
-		if !ok {
-			return nil, true, fmt.Errorf("filled row %d out of range", row)
-		}
-		if !IsNull(value) {
-			if n, ok := coerceInt64Exact(value); ok && !hasFloat {
-				lastI = n
-				lastF = float64(n)
-				hasLast = true
-			} else {
-				n, ok := numeric(value)
-				if !ok {
-					return nil, false, nil
-				}
-				if !hasFloat {
-					totalF = float64(totalI)
-					hasFloat = true
-				}
-				lastF = n
-				hasLast = true
-			}
-		}
-		if !hasLast {
-			continue
-		}
-		if hasFloat {
-			totalF += lastF
-		} else {
-			totalI += lastI
-			totalF += lastF
-		}
 	}
 	if hasFloat {
 		return totalF, true, nil
