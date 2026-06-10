@@ -1,14 +1,16 @@
 # q.eval Breadth Performance Audit
 
-Date: 2026-06-10
+Date: 2026-06-11
 
-Baseline: `fd2c676c benchmarks: merge expanded q coverage`
+Baseline: `0844e0ef benchmarks: refresh q go-ratio baseline after wave-2, ratchet caps 320/56 -> 64/8`
 
-Command:
+Data sources:
 
-```bash
-go test ./benchmarks -run '^$' -bench 'BenchmarkQ(SessionEvalVectorWarmExecution|EvalVectorCold|EvalVectorGoBaseline)/Breadth' -benchmem -benchtime=200ms -count=1
-```
+- `/tmp/q_suite_run3.txt` — canonical post-wave-2 run of
+  `benchmarks/q_performance_suite.sh` (qSQL bind/native rows, the four
+  483-case q.eval families, and the 44-case JIT/VM script layer)
+- `benchmarks/data/qeval_go_ratio_baseline.json` — per-case Go ratios captured
+  from the same run (483 cases; 459 trusted warm ratios, 44 jit ratios)
 
 Machine:
 
@@ -20,79 +22,150 @@ cpu: Apple M4 Max
 
 ## Summary
 
-The new breadth suite is useful enough to expose the next runtime priorities, but some Go baselines are not yet reliable. Cases with sub-10 ns/op Go baselines are likely folded to constants or reduced to a scalar formula by the compiler, so their warm/go ratios should not drive runtime decisions until the Go side is rewritten to perform equivalent work over input data.
+Two build-out phases (case growth to 483 with honest row-scaled Go baselines;
+source-derived verb/form/combo coverage gates) and two optimization waves are
+in. The wave-1+2 fixes that landed:
 
-Important signals:
+- **fills O(n^2) eliminated** (`806e9922`): forward-fill and nullable scalar
+  fill materialize as typed kernels in one O(n) pass; the worst fills+msum
+  combos went from ~400ms/op to ~126us/op.
+- **Compound-predicate bulk masks + `not` precedence fix** (`c047ff6d`):
+  3-4 clause where predicates bulk-materialize lazy mask trees instead of
+  per-row dispatch (was 100-500x slower than Go); q `not` now correctly
+  negates everything to its right on the script-binding parse route.
+- **`OpQEvalSessionEval` JIT route** (`c901ad9d`): constant-source
+  `q.session().eval` lowers to a per-iteration Tier 2 op-exit, making the
+  JIT-script layer a real per-iteration measurement.
+- **Typed adverb kernels** (`bb1ca2df`): each-prior/over/scan route through
+  typed columnar kernels.
+- **Float/mixed numeric bulk kernels** (`ddc63fd8`): bulk typed kernels
+  extended beyond int to float and mixed numeric shapes.
+- **Set-op kernels + plan persistence fix** (`f36f1f76`): typed set-op
+  kernels (`inter`/`except`/`union`/`distinct`), constant-statement memoization,
+  plan-cache probe reorder, and lazy-carrier materialization; statements now
+  execute through pointers so per-statement fast plans actually persist.
 
-- Most breadth cases report 100% typed-kernel hit rate, so the main gap is often shell overhead, intermediate materialization, or an overly narrow fused shape rather than total absence of typed runtime coverage.
-- `BreadthSymbolDistinctGroupSort*` is the only breadth family with visible fallback pressure: 80% hit rate, 1 fallback/op.
-- The highest allocation families are symbol distinct/group/sort, div/mod envelope, and aggregate avg/med/range.
-- Warm execution is not consistently faster than cold for the largest allocation cases, which means schema-stable cache is not yet removing the dominant work there.
+Where that leaves the suite (459 trusted warm cases, 44 jit cases):
 
-## Worst Valid Warm vs Go Ratios
+| Layer | Geomean Leia/Go | Beat Go | >= 10x slower |
+|---|---:|---:|---:|
+| Session-warm | **0.99** | 253 / 459 | 68 |
+| JIT script | **0.47** | 33 / 44 | 0 |
 
-Only rows with Go baseline >= 10 ns/op are included here.
+The geomean is at Go parity warm and well under it on the JIT route, but the
+warm tail is long: 36 trusted cases are still >= 20x. Hard caps were
+tightened from 320/56 to **64 (warm) / 8 (jit)** in `milestone_caps`, with the
+x1.15 per-case no-regression ratchet as the primary guard.
+
+Fallback pressure is nearly gone: 8 of 483 warm rows report any typed-kernel
+fallbacks. The worst two are `TypeMatrixLongNullNotEqualEqualNullCount`
+(9% hit, 31 fallbacks/op) and `ComboNullMaskArithWithinEnvelope` (42% hit,
+7 fallbacks/op); everything else is at or near 100% hit with the remaining
+gap coming from shell overhead and intermediate materialization, not missing
+kernels.
+
+## Worst Warm vs Go Ratios
+
+Trusted Go baselines only (row-scaled, allowlist-checked). All numbers from
+`/tmp/q_suite_run3.txt`; ratios match `qeval_go_ratio_baseline.json`.
 
 | Case | Warm ns/op | Go ns/op | Warm/Go | B/op | allocs/op | typed hit | fallback/op |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `BreadthApplyBracketGatherWide` | 2,860 | 67.1 | 42.6x slower | 157 | 10 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod5Bias2` | 221,160 | 7,775 | 28.4x slower | 383,571 | 14,934 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod3Bias1` | 225,104 | 8,076 | 27.9x slower | 387,664 | 15,444 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod11Bias6` | 248,737 | 9,449 | 26.3x slower | 371,338 | 13,406 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod7Bias4` | 206,124 | 8,103 | 25.4x slower | 379,729 | 14,426 | 100% | 0 |
-| `BreadthApplyBracketGatherMedium` | 2,517 | 127.4 | 19.8x slower | 161 | 10 | 100% | 0 |
-| `BreadthListDropTakeSublistMid` | 2,442 | 149.2 | 16.4x slower | 224 | 12 | 100% | 0 |
-| `BreadthApplyBracketGatherSmall` | 2,498 | 247.6 | 10.1x slower | 157 | 10 | 100% | 0 |
-| `BreadthListCutRazeChecksumLong` | 17,635 | 1,772 | 10.0x slower | 2,231 | 67 | 100% | 0 |
-| `BreadthFloatFloorCeilingReciprocalMod5Bias2` | 108,020 | 10,925 | 9.9x slower | 2,544 | 110 | 100% | 0 |
+| `VerbFormPipeLogicalMaskCount` | 274,201 | 4,535 | 60.5x | 148,176 | 25 | 100% | 0 |
+| `VerbFormAmpLogicalMaskCount` | 223,516 | 4,334 | 51.6x | 148,176 | 25 | 100% | 0 |
+| `TypeMatrixWhereNullGuardCompoundGatherSum` | 567,780 | 12,410 | 45.8x | 399,433 | 172 | 100% | 0 |
+| `DeepReverseWhereWindowCountSmall` | 109,519 | 2,727 | 40.2x | 2,048 | 64 | 100% | 0 |
+| `DeepReverseWhereWindowCountMedium` | 111,095 | 2,912 | 38.2x | 2,056 | 65 | 100% | 0 |
+| `TypeMatrixCastBoolMaskGatherSum` | 155,835 | 4,106 | 38.0x | 940,288 | 67 | 100% | 0 |
+| `DeepReverseWhereWindowCountWide` | 108,313 | 2,858 | 37.9x | 2,048 | 64 | 100% | 0 |
+| `DeepReverseWhereWindowCountCycle` | 109,218 | 2,925 | 37.3x | 2,056 | 65 | 100% | 0 |
+| `FunctionalAmendWhereVector` | 77,156 | 2,086 | 37.0x | 69,920 | 86 | 100% | 0 |
+| `TypeMatrixCastRealLongRoundTripSum` | 331,815 | 9,322 | 35.6x | 423,288 | 23,892 | 100% | 0 |
+| `ComboNullMaskArithWithinEnvelope` | 361,084 | 10,375 | 34.8x | 15,536 | 178 | 42% | 7 |
+| `DeepDeltasFillsChecksumInts` | 161,815 | 4,659 | 34.7x | 264,976 | 43 | 100% | 0 |
+| `TypeMatrixCastRealLetterQuarterSum` | 340,918 | 11,030 | 30.9x | 295,994 | 16,189 | 100% | 0 |
+| `TypeMatrixLongNullVectorAddVectorSum` | 243,558 | 8,180 | 29.8x | 424,712 | 11,923 | 100% | 0 |
+| `TypeMatrixLongNullNotEqualEqualNullCount` | 278,247 | 9,408 | 29.6x | 161,672 | 236 | 9% | 31 |
 
-## Suspect Go Baselines
+Families, not cases, are the units here:
 
-These Go baselines are below 10 ns/op and should be fixed before comparing ratios:
+- **VerbForm logical masks (50-60x)**: `a & b` / `a | b` over int vectors
+  followed by `count where` — the bulk mask kernels cover compare leaves but
+  the bare int-vector `&`/`|` form still materializes boxed intermediates.
+- **Null-guard compound where (46x)** and the long-null arithmetic/compare
+  rows (~30x): null carriers still pay boxed per-row paths inside otherwise
+  typed pipelines.
+- **DeepReverseWhereWindow\* (37-40x)**: tiny allocation (2KB/op), 100% typed
+  hit, yet ~109us warm vs ~2.8us Go — almost pure q.eval statement shell, the
+  cleanest exhibit for the wave-3 shell work.
+- **FunctionalAmendWhere (37x)**: functional amend over a where mask lacks a
+  fused typed kernel.
+- **Cast real/long round trips (31-36x)**: cast chains allocate 12k-24k
+  times per op; cast carriers need bulk materialization like the wave-2
+  compare/arith ones.
 
-| Case | Warm ns/op | Go ns/op | B/op | allocs/op | Note |
-| --- | ---: | ---: | ---: | ---: | --- |
-| `BreadthAggregateAvgMedRange` | 90,343 | 0.744 | 130,828 | 8,017 | Go is a closed-form formula |
-| `BreadthAggregateProductOnesAndWavg` | 33,480 | 0.741 | 5,545 | 133 | Go is constant/closed-form |
-| `BreadthRunningMinMaxAvgEnvelope` | 14,552 | 0.744 | 1,648 | 73 | Go is closed-form |
-| `BreadthCallableDotApply*` | 10,418-13,387 | 0.742-0.775 | ~7,270 | 48 | Go is closed-form |
-| `BreadthApplyAtGather*` | 2,421-2,527 | 0.742-0.912 | 296 | 15 | Go is closed-form |
-| `BreadthMatrixReshapeCellProbe*` | 406-471 | 0.744-0.907 | 167-168 | 9 | Go is closed-form |
-| `BreadthListDropTakeSublistShort` | 2,011 | 8.276 | 207 | 10 | Too small to be stable |
+## Worst JIT-Script vs Go Ratios
 
-## Allocation Hotspots
+All 44 rows are now under the 8x hard cap (was 56). VM column included to
+show the JIT loop itself is not the gap — the residual cost is in the q
+runtime work per op-exit.
 
-| Case | Warm ns/op | B/op | allocs/op | typed hit | fallback/op |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `BreadthSymbolDistinctGroupSortSymbolsN` | 988,955 | 460,936 | 8,266 | 80% | 1 |
-| `BreadthSymbolDistinctGroupSortSymbolsA` | 637,750 | 460,728 | 8,264 | 80% | 1 |
-| `BreadthSymbolDistinctGroupSortVenuesX` | 708,316 | 460,728 | 8,264 | 80% | 1 |
-| `BreadthArithmeticDivModEnvelopeMod3Bias1` | 225,104 | 387,664 | 15,444 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod5Bias2` | 221,160 | 383,571 | 14,934 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod7Bias4` | 206,124 | 379,729 | 14,426 | 100% | 0 |
-| `BreadthArithmeticDivModEnvelopeMod11Bias6` | 248,737 | 371,338 | 13,406 | 100% | 0 |
-| `BreadthAggregateAvgMedRange` | 90,343 | 130,828 | 8,017 | 100% | 0 |
+| Case | JIT ns/op | VM ns/op | Go ns/op | JIT/Go | B/op | allocs/op |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `WhereGatherProjectionSum` | 6,665 | 6,602 | 1,085 | 6.1x | 3,411 | 55 |
+| `BreadthListCutRazeChecksumLong` | 7,135 | 7,038 | 1,843 | 3.9x | 2,368 | 68 |
+| `AdverbInitialOverScanProducts` | 7,716 | 7,762 | 2,168 | 3.6x | 2,497 | 75 |
+| `BreadthListCutRazeChecksumShort` | 5,902 | 5,738 | 1,961 | 3.0x | 2,240 | 52 |
+| `TaskDMathSqrtLogVectorSum` | 55,950 | 55,524 | 24,338 | 2.3x | 456 | 13 |
+| `FbyGroupedAggregateRowScaled` | 8,938 | 8,675 | 4,342 | 2.1x | 2,551 | 25 |
+| `NumericMonadExpReciprocalSignumNot` | 55,859 | 56,780 | 30,677 | 1.8x | 2,222 | 58 |
+| `BreadthFloatFloorCeilingReciprocalMod3Bias1` | 17,870 | 18,051 | 10,832 | 1.6x | 889 | 25 |
 
-## Warm vs Cold
+## Allocation Hotspots (warm layer)
 
-Warm execution is only materially better for small shell-heavy cases. For the large allocation families, warm is flat or sometimes slower:
-
-| Case | Warm ns/op | Cold ns/op | Warm/Cold |
+| Case | Warm ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BreadthArithmeticDivModEnvelopeMod11Bias6` | 248,737 | 202,181 | 1.23 |
-| `BreadthArithmeticDivModEnvelopeMod3Bias1` | 225,104 | 208,295 | 1.08 |
-| `BreadthArithmeticDivModEnvelopeMod5Bias2` | 221,160 | 214,354 | 1.03 |
-| `BreadthSymbolDistinctGroupSortSymbolsN` | 988,955 | 987,155 | 1.00 |
-| `BreadthSymbolDistinctGroupSortVenuesX` | 708,316 | 709,198 | 1.00 |
+| `ComboDictTableXgroupUngroupSum` | 1,387,264 | 3,240,179 | 33,187 |
+| `TypeMatrixCastBoolMaskGatherSum` | 155,835 | 940,288 | 67 |
+| `VerbFormWordAliasLeftRightGather` | 366,998 | 781,486 | 31,809 |
+| `VerbFormXdescColumnProbe` | 553,484 | 528,372 | 116 |
+| `TypeMatrixLongNullVectorAddVectorSum` | 243,558 | 424,712 | 11,923 |
+| `TypeMatrixCastRealLongRoundTripSum` | 331,815 | 423,288 | 23,892 |
+| `ComboDictTableFbyNotionalSum` | 132,153 | 402,919 | 281 |
+| `ComboDictTableXascHeadGatherSum` | 1,166,158 | 399,640 | 200 |
+| `TypeMatrixWhereNullGuardCompoundGatherSum` | 567,780 | 399,433 | 172 |
+| `ComboDepth3SumsModXbarReduce` | 222,662 | 392,880 | 16,308 |
 
-This points to runtime data work dominating plan construction for those shapes. The cache is useful, but it is not sufficient until these pipelines avoid materializing intermediate vectors.
+Two distinct profiles: dict/table chains (`xgroup`/`ungroup`, `xasc`/`xdesc`)
+allocate megabytes through frame materialization, while the cast/null
+TypeMatrix rows allocate tens of thousands of small boxes — per-row boxing
+that bulk carrier kernels should remove.
 
 ## Recommended Priority
 
-1. Fix suspect Go baselines in the benchmark suite. Every Go baseline should perform equivalent row/list work and write into a package-level sink so the compiler cannot erase it. Do this before using ratios as release gates.
-2. Add fused producer-reducer shapes for `sum(y div k)+sum(y mod k)+count y` and related integer dyadic chains. This is the largest valid gap: 25-28x slower than Go and 13k-15k allocs/op despite 100% typed hits.
-3. Add direct gather-sum/count and sublist/drop/take descriptor shapes. Current absolute times are small, but ratios are 10-42x slower and allocations show expression-shell overhead instead of data-work limits.
-4. Lower symbol `distinct/group/iasc` into a single typed symbol pipeline. This is the only breadth family with fallback pressure and the largest absolute runtime/allocation cost.
-5. Add aggregate descriptor shapes for avg/med/min/max/count and product/wavg once Go baselines are fixed. Current allocs are high, but ratio evidence is invalid until the baseline is repaired.
-6. Reduce warm-path allocation in callable dot apply and matrix cell probes. These are already fast in absolute terms, but the 7-48 alloc/op shell cost keeps them from becoming true near-zero overhead primitives.
+Wave-3 agents are already working items 1 and 2.
 
+1. **q.eval per-statement shell (~23us/statement)** — the identified next
+   bottleneck. Shell-bound rows like `DeepReverseWhereWindowCount*` spend
+   ~109us warm against ~2.8us of Go data work with only 2KB/op allocated and
+   100% typed hits: the cost is statement splitting, top-level operator
+   scanning, and plan lookup around each statement
+   (`EvalState.evalCachedOrString` and the `findTopLevel` /
+   `splitTopLevelOperator` / `TrimSpace` helpers dominate the shell profile),
+   not kernel work. *In progress (wave 3).*
+2. **Binding-plan coverage extension** — widen the set of expressions the
+   script-binding/JIT route can lower so more of the 483-case table gets
+   JIT-layer evidence (currently 44 representative rows) and more statements
+   skip the string-scanning shell entirely. *In progress (wave 3).*
+3. **Bare int-vector logical mask kernels** — route `a & b` / `a | b` mask
+   composition (no compare leaf) through the wave-2 bulk mask machinery; this
+   alone covers the two worst rows (50-60x).
+4. **Null-carrier and cast bulk kernels** — extend bulk materialization to
+   long-null arithmetic/compare and cast chains (real/long/letter round
+   trips); kills the 30-46x TypeMatrix tail, the two remaining fallback-heavy
+   rows, and the 12k-24k allocs/op boxing.
+5. **Fused functional-amend-over-where and reverse-where-window shapes** —
+   `FunctionalAmendWhereVector` (37x) and the window-count family need fused
+   typed kernels rather than mask + gather + amend stages.
+6. **Dict/table chain materialization** — `xgroup`/`ungroup` and sort-head
+   chains allocate 0.4-3.2MB/op; column views and reusable buffers apply.
