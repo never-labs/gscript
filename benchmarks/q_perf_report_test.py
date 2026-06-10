@@ -24,6 +24,10 @@ BenchmarkQSessionEvalVectorWarmExecution/FallbackShape-16    100  9000 ns/op  20
 BenchmarkQEvalVectorGoBaseline/FallbackShape-16              100  1000 ns/op  0 B/op  0 allocs/op
 """
 
+SAMPLE_JIT_SLOW_ROUTE = """
+BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute-16  100  6000 ns/op  256 B/op  6 allocs/op  1 jit_typed_direct_return/op  2 jit_typed_native_exit/op  1 jit_typed_op_exit/op  3 jit_typed_kernel_success/op  1 jit_typed_kernel_errors/op  2 jit_typed_pipeline_shapes
+"""
+
 FALLBACK_REPORT_LOG = """
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report cases=2 categories=2 rows=1
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report rank=1 category=xbar_within pipeline_shape=bin kernel=ArrayBin reason=unsupported_type outcome=fallback count=3
@@ -123,6 +127,25 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["success"].calls_per_op, 1)
         self.assertEqual(summary["error"].calls_per_op, 0)
 
+    def test_runtime_observability_summary_rolls_up_pipeline_primitive_and_jit(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
+        summary = {row.layer: row for row in report.build_runtime_observability_summary(rows)}
+
+        self.assertEqual(summary["qsql_kernel"].benchmark_count, 2)
+        self.assertEqual(summary["qsql_kernel"].fallbacks_op, 0)
+        self.assertEqual(summary["typed_primitive"].attempts_op, 2)
+        self.assertEqual(summary["typed_primitive"].hits_op, 1.8)
+        self.assertEqual(summary["typed_primitive"].fallbacks_op, 0.2)
+        self.assertEqual(summary["typed_primitive"].hit_pct, 90)
+        self.assertEqual(summary["unified_pipeline"].shapes, 4)
+        self.assertEqual(summary["unified_pipeline"].fallback_shapes, 1)
+        self.assertEqual(summary["unified_pipeline"].hit_pct, 75)
+        self.assertEqual(summary["jit_backend"].direct_return_op, 2)
+        self.assertEqual(summary["jit_backend"].native_exit_op, 2)
+        self.assertEqual(summary["jit_backend"].op_exit_op, 1)
+        self.assertEqual(summary["jit_backend"].errors_op, 1)
+        self.assertEqual(summary["jit_backend"].slow_route_pct, 60)
+
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
         policy = report.GatePolicy(
@@ -141,6 +164,24 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn(("pipeline_fallback_shapes", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
         self.assertIn(("allocs_op", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
         self.assertTrue(report.gate_failed(checks))
+
+    def test_gate_checks_cover_jit_backend_errors_and_slow_routes(self):
+        rows = report.parse_go_benchmarks(SAMPLE_JIT_SLOW_ROUTE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            max_jit_typed_errors_op=0,
+            max_jit_backend_slow_route_pct=50,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("jit_typed_errors_op", "BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute"), failed)
+        self.assertIn(("jit_backend_errors_op", "jit_backend"), failed)
+        self.assertIn(("jit_backend_slow_route_pct", "jit_backend"), failed)
 
     def test_fallback_shape_summary_filters_only_rows_with_fallback_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
@@ -201,6 +242,8 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("runtime_metrics", payload)
             self.assertIn("jit_route_summary", payload)
             self.assertEqual(payload["jit_route_summary"][0]["route"], "direct_return")
+            self.assertIn("runtime_observability_summary", payload)
+            self.assertEqual(payload["runtime_observability_summary"][0]["layer"], "qsql_kernel")
             self.assertIn("pipeline_category_metrics", payload)
             self.assertIn("pipeline_fallback_top", payload)
             self.assertIn("fallback_shape_summary", payload)
@@ -210,6 +253,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("Current vs Old Leia", markdown)
             self.assertIn("Gate Summary", markdown)
             self.assertIn("JIT Typed Runtime Routes", markdown)
+            self.assertIn("Runtime Observability Summary", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
 

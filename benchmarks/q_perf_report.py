@@ -125,6 +125,24 @@ class JITRouteSummaryRow:
 
 
 @dataclass
+class RuntimeObservabilityRow:
+    layer: str
+    benchmark_count: int
+    attempts_op: float | None = None
+    hits_op: float | None = None
+    fallbacks_op: float | None = None
+    errors_op: float | None = None
+    hit_pct: float | None = None
+    shapes: float | None = None
+    fallback_shapes: float | None = None
+    direct_return_op: float | None = None
+    native_exit_op: float | None = None
+    op_exit_op: float | None = None
+    slow_route_pct: float | None = None
+    note: str = ""
+
+
+@dataclass
 class PipelineFallbackTopRow:
     category: str
     pipeline_shape: str
@@ -153,6 +171,8 @@ class GatePolicy:
     max_typed_fallbacks_op: float
     max_pipeline_fallback_shapes: float
     max_allocs_op: float
+    max_jit_typed_errors_op: float = 0.0
+    max_jit_backend_slow_route_pct: float = 0.0
 
 
 @dataclass
@@ -475,6 +495,94 @@ def build_jit_route_summary(rows: dict[str, BenchRow]) -> list[JITRouteSummaryRo
     return out
 
 
+def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[RuntimeObservabilityRow]:
+    runtime_rows = build_runtime_metric_rows(rows)
+    out: list[RuntimeObservabilityRow] = []
+
+    qsql_kernel_rows = [row for row in runtime_rows if row.kernel_hit_pct is not None or row.fallbacks_op is not None]
+    if qsql_kernel_rows:
+        hit_values = [row.kernel_hit_pct for row in qsql_kernel_rows if row.kernel_hit_pct is not None]
+        out.append(
+            RuntimeObservabilityRow(
+                layer="qsql_kernel",
+                benchmark_count=len(qsql_kernel_rows),
+                fallbacks_op=sum(row.fallbacks_op or 0.0 for row in qsql_kernel_rows),
+                hit_pct=average(hit_values),
+                note="qSQL bind/runtime kernel metrics emitted directly by qSQL benchmarks",
+            )
+        )
+
+    typed_rows = [row for row in runtime_rows if row.typed_kernel_attempts_op is not None]
+    if typed_rows:
+        attempts = sum(row.typed_kernel_attempts_op or 0.0 for row in typed_rows)
+        hits = sum(row.typed_kernel_hits_op or 0.0 for row in typed_rows)
+        fallbacks = sum(row.typed_kernel_fallbacks_op or 0.0 for row in typed_rows)
+        errors = sum(row.typed_kernel_errors_op or 0.0 for row in typed_rows)
+        out.append(
+            RuntimeObservabilityRow(
+                layer="typed_primitive",
+                benchmark_count=len(typed_rows),
+                attempts_op=attempts,
+                hits_op=hits,
+                fallbacks_op=fallbacks,
+                errors_op=errors,
+                hit_pct=(100 * hits / attempts) if attempts > 0 else None,
+                note="ordinary q typed primitive dispatch across session-execution benchmarks",
+            )
+        )
+
+    pipeline_rows = [row for row in runtime_rows if row.typed_pipeline_shapes is not None]
+    if pipeline_rows:
+        shapes = sum(row.typed_pipeline_shapes or 0.0 for row in pipeline_rows)
+        fallback_shapes = sum(row.typed_pipeline_fallback_shapes or 0.0 for row in pipeline_rows)
+        out.append(
+            RuntimeObservabilityRow(
+                layer="unified_pipeline",
+                benchmark_count=len(pipeline_rows),
+                hit_pct=(100 * (shapes - fallback_shapes) / shapes) if shapes > 0 else None,
+                shapes=shapes,
+                fallback_shapes=fallback_shapes,
+                note="recognized q expression pipeline shapes and shapes that still fell back",
+            )
+        )
+
+    jit_rows = [
+        row
+        for row in runtime_rows
+        if row.jit_typed_direct_return_op is not None
+        or row.jit_typed_native_exit_op is not None
+        or row.jit_typed_op_exit_op is not None
+        or row.jit_typed_kernel_success_op is not None
+        or row.jit_typed_kernel_errors_op is not None
+    ]
+    if jit_rows:
+        direct = sum(row.jit_typed_direct_return_op or 0.0 for row in jit_rows)
+        native = sum(row.jit_typed_native_exit_op or 0.0 for row in jit_rows)
+        op_exit = sum(row.jit_typed_op_exit_op or 0.0 for row in jit_rows)
+        success = sum(row.jit_typed_kernel_success_op or 0.0 for row in jit_rows)
+        errors = sum(row.jit_typed_kernel_errors_op or 0.0 for row in jit_rows)
+        route_total = direct + native + op_exit
+        kernel_total = success + errors
+        out.append(
+            RuntimeObservabilityRow(
+                layer="jit_backend",
+                benchmark_count=len(jit_rows),
+                attempts_op=kernel_total if kernel_total > 0 else None,
+                hits_op=success,
+                errors_op=errors,
+                hit_pct=(100 * success / kernel_total) if kernel_total > 0 else None,
+                shapes=sum(row.jit_typed_pipeline_shapes or 0.0 for row in jit_rows),
+                direct_return_op=direct,
+                native_exit_op=native,
+                op_exit_op=op_exit,
+                slow_route_pct=(100 * (native + op_exit) / route_total) if route_total > 0 else None,
+                note="JIT typed backend route split; native/op exits indicate bridge work outside direct return",
+            )
+        )
+
+    return out
+
+
 def average(values: list[float]) -> float | None:
     if not values:
         return None
@@ -713,11 +821,82 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     status="pass" if item.allocs_op <= policy.max_allocs_op else "fail",
                 )
             )
+        if item.jit_typed_kernel_errors_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="jit_typed_errors_op",
+                    benchmark=item.benchmark,
+                    value=item.jit_typed_kernel_errors_op,
+                    threshold=f"<= {policy.max_jit_typed_errors_op:g}",
+                    status="pass" if item.jit_typed_kernel_errors_op <= policy.max_jit_typed_errors_op else "fail",
+                )
+            )
+    return checks
+
+
+def observability_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    for item in build_runtime_observability_summary(rows):
+        if item.layer == "typed_primitive" and item.hit_pct is not None:
+            checks.append(
+                GateCheck(
+                    signal="typed_primitive_hit_pct",
+                    benchmark=item.layer,
+                    value=item.hit_pct,
+                    threshold=f">= {policy.min_typed_hit_pct:g}",
+                    status="pass" if item.hit_pct >= policy.min_typed_hit_pct else "fail",
+                    note=item.note,
+                )
+            )
+        if item.layer == "typed_primitive" and item.fallbacks_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="typed_primitive_fallbacks_op",
+                    benchmark=item.layer,
+                    value=item.fallbacks_op,
+                    threshold=f"<= {policy.max_typed_fallbacks_op:g}",
+                    status="pass" if item.fallbacks_op <= policy.max_typed_fallbacks_op else "fail",
+                    note=item.note,
+                )
+            )
+        if item.layer == "unified_pipeline" and item.fallback_shapes is not None:
+            checks.append(
+                GateCheck(
+                    signal="unified_pipeline_fallback_shapes",
+                    benchmark=item.layer,
+                    value=item.fallback_shapes,
+                    threshold=f"<= {policy.max_pipeline_fallback_shapes:g}",
+                    status="pass" if item.fallback_shapes <= policy.max_pipeline_fallback_shapes else "fail",
+                    note=item.note,
+                )
+            )
+        if item.layer == "jit_backend" and item.errors_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="jit_backend_errors_op",
+                    benchmark=item.layer,
+                    value=item.errors_op,
+                    threshold=f"<= {policy.max_jit_typed_errors_op:g}",
+                    status="pass" if item.errors_op <= policy.max_jit_typed_errors_op else "fail",
+                    note=item.note,
+                )
+            )
+        if item.layer == "jit_backend" and item.slow_route_pct is not None:
+            checks.append(
+                GateCheck(
+                    signal="jit_backend_slow_route_pct",
+                    benchmark=item.layer,
+                    value=item.slow_route_pct,
+                    threshold=f"<= {policy.max_jit_backend_slow_route_pct:g}",
+                    status="pass" if item.slow_route_pct <= policy.max_jit_backend_slow_route_pct else "fail",
+                    note=item.note,
+                )
+            )
     return checks
 
 
 def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
-    return ratio_gate_checks(rows, policy) + runtime_gate_checks(rows, policy)
+    return ratio_gate_checks(rows, policy) + runtime_gate_checks(rows, policy) + observability_gate_checks(rows, policy)
 
 
 def gate_failed(checks: list[GateCheck]) -> bool:
@@ -809,6 +988,7 @@ def markdown_report(
     runtime_metrics = build_runtime_metric_rows(rows)
     fallback_shapes = build_fallback_shape_rows(rows)
     jit_routes = build_jit_route_summary(rows)
+    observability = build_runtime_observability_summary(rows)
     category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -980,6 +1160,34 @@ def markdown_report(
     lines.extend(
         [
             "",
+            "## Runtime Observability Summary",
+            "",
+            "| Layer | Benchmarks | attempts/op | hits/op | fallbacks/op | errors/op | hit pct | shapes | fallback shapes | direct return/op | native exit/op | op exit/op | slow route pct | Note |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    if observability:
+        for item in observability:
+            lines.append(
+                f"| {item.layer} | {item.benchmark_count} | "
+                f"{format_metric(item.attempts_op, 3)} | "
+                f"{format_metric(item.hits_op, 3)} | "
+                f"{format_metric(item.fallbacks_op, 3)} | "
+                f"{format_metric(item.errors_op, 3)} | "
+                f"{format_metric(item.hit_pct, 1)} | "
+                f"{format_metric(item.shapes, 0)} | "
+                f"{format_metric(item.fallback_shapes, 0)} | "
+                f"{format_metric(item.direct_return_op, 3)} | "
+                f"{format_metric(item.native_exit_op, 3)} | "
+                f"{format_metric(item.op_exit_op, 3)} | "
+                f"{format_metric(item.slow_route_pct, 1)} | "
+                f"{item.note} |"
+            )
+    else:
+        lines.append("| missing | 0 | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | no runtime observability metrics parsed |")
+    lines.extend(
+        [
+            "",
             "## Fallback Shape Summary",
             "",
             "| Benchmark | fallbacks/op | typed_kernel_fallbacks/op | typed_pipeline_fallback_shapes |",
@@ -1085,6 +1293,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-typed-fallbacks-op", type=float, default=0.0)
     parser.add_argument("--max-pipeline-fallback-shapes", type=float, default=0.0)
     parser.add_argument("--max-allocs-op", type=float, default=64.0)
+    parser.add_argument("--max-jit-typed-errors-op", type=float, default=0.0)
+    parser.add_argument("--max-jit-backend-slow-route-pct", type=float, default=0.0)
     parser.add_argument("--fallback-top-n", type=int, default=20)
     args = parser.parse_args(argv)
 
@@ -1148,6 +1358,8 @@ def main(argv: list[str]) -> int:
         max_typed_fallbacks_op=args.max_typed_fallbacks_op,
         max_pipeline_fallback_shapes=args.max_pipeline_fallback_shapes,
         max_allocs_op=args.max_allocs_op,
+        max_jit_typed_errors_op=args.max_jit_typed_errors_op,
+        max_jit_backend_slow_route_pct=args.max_jit_backend_slow_route_pct,
     )
     gate_checks = build_gate_checks(rows, policy) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
@@ -1160,6 +1372,7 @@ def main(argv: list[str]) -> int:
         "current_vs_old": [asdict(row) for row in current_vs_old],
         "runtime_metrics": [asdict(row) for row in build_runtime_metric_rows(rows)],
         "jit_route_summary": [asdict(row) for row in build_jit_route_summary(rows)],
+        "runtime_observability_summary": [asdict(row) for row in build_runtime_observability_summary(rows)],
         "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
         "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
