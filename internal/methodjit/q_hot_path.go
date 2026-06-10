@@ -1263,16 +1263,20 @@ func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
 			instr.Aux = int64(ref.ID)
 			instr.Aux2 = 0
 			blockID, valueID := qRemarkLocation(instr)
+			kernel := qEvalPipelinePlanRefKernel(ref)
+			shape := qEvalPipelinePlanRefShape(ref)
+			pipelineShape := qEvalPipelinePlanRefPipelineShape(ref)
+			backend := qEvalPipelineBackendNameFromRef(ref)
 			functionRemarks(fn).AddWithFields("QEvalPipelineLowering", "changed", blockID, valueID, OpQEvalPipelinePlan,
-				fmt.Sprintf("lowered constant q.eval source to typed pipeline plan id=%d shape=%s", ref.ID, ref.Shape),
+				fmt.Sprintf("lowered constant q.eval source to typed pipeline plan id=%d shape=%s", ref.ID, shape),
 				map[string]string{
 					"kind":           "runtime_kernel",
-					"kernel":         ref.Kernel,
-					"shape":          ref.Shape,
-					"pipeline_shape": ref.PipelineShape,
+					"kernel":         kernel,
+					"shape":          shape,
+					"pipeline_shape": pipelineShape,
 					"route":          "typed_pipeline_op",
 					"outcome":        "lowered",
-					"backend":        ref.Backend,
+					"backend":        backend,
 					"plan_id":        strconv.Itoa(ref.ID),
 				})
 		}
@@ -1297,7 +1301,7 @@ func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan, r
 	}
 	if ref.Valid() {
 		fields["plan_id"] = strconv.Itoa(ref.ID)
-		fields["backend"] = ref.Backend
+		fields["backend"] = qEvalPipelineBackendNameFromRef(ref)
 	}
 	functionRemarks(fn).AddWithFields("QEvalHotPlan", "changed", blockID, valueID, OpCall,
 		fmt.Sprintf("kernel=%s shape=%s plan_id=%d; constant q.eval source is bound to typed pipeline plan interface",
