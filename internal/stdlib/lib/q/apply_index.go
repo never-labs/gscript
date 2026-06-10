@@ -482,14 +482,24 @@ func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, err
 		return nil, false, nil
 	case data.Array:
 		shape := qScalarApplyIndexShape(mode, string(x.Kind()))
-		recordRuntimeKernelExecution("ArrayScalarIndex", shape, "attempt", "attempt")
-		value, ok := x.At(row)
-		if !ok {
-			err := fmt.Errorf("index %d out of range", row)
-			recordRuntimeKernelExecution("ArrayScalarIndex", shape, "error", "runtime_error")
+		value, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+			kernel:         "ArrayScalarIndex",
+			shape:          shape,
+			fallbackReason: RuntimeFallbackUnsupportedType,
+			call: func() (any, bool, error) {
+				return data.TryTypedScalarIndex(x, row)
+			},
+		})
+		if err != nil {
 			return nil, true, err
 		}
-		recordRuntimeKernelExecution("ArrayScalarIndex", shape, "hit", "typed_scalar_index")
+		if handled {
+			return value, true, nil
+		}
+		value, ok := x.At(row)
+		if !ok {
+			return nil, true, fmt.Errorf("index %d out of range", row)
+		}
 		return value, true, nil
 	case string:
 		shape := qScalarApplyIndexShape(mode, string(data.KindString))
