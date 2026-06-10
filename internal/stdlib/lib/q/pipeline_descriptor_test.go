@@ -123,6 +123,9 @@ func TestQPipelinePlanFromEvalDescriptorUsesShapeRegistry(t *testing.T) {
 			if got := plan.stablePipelineShape(); got != tt.wantPipelineShape {
 				t.Fatalf("pipeline shape = %q, want %q", got, tt.wantPipelineShape)
 			}
+			if got := qRuntimeKernelPipelineShape("QPipelinePlan", tt.shape); got != tt.wantPipelineShape {
+				t.Fatalf("runtime pipeline shape = %q, want %q", got, tt.wantPipelineShape)
+			}
 		})
 	}
 }

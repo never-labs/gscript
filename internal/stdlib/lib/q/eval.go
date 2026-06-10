@@ -541,53 +541,10 @@ func qRuntimeKernelPipelineShape(kernel, shape string) string {
 }
 
 func qRuntimeKernelQPipelinePlanShape(shape string) string {
-	switch shape {
-	case "where-reduce/sum", "where-index-reduce/sum",
-		"compare-to-index-sum", "compare-to-index-count",
-		"compare-to-index-sum-mod", "compare-to-index-count-mod":
-		return "mask_reduce"
-	case "gather-reduce/sum":
-		return "gather_reduce"
-	case "compare-to-index", "compare-to-index-mod":
-		return "compare_index"
-	case "vector-reduce/sum-deltas", "vector-reduce/sum-expr",
-		"vector-reduce/sum-dyadic-min", "vector-reduce/sum-dyadic-max",
-		"vector-reduce/sum-dyadic-float-xexp", "vector-reduce/sum-dyadic-float-xlog",
-		"vector-reduce/sum-reverse", "vector-reduce/sum-rotate",
-		"vector-reduce/sum-sublist", "vector-reduce/sum-ratios",
-		"vector-reduce/sum-raze", "vector-reduce/sum-msum",
-		"vector-reduce/sum-mavg", "vector-reduce/sum-mcount",
-		"vector-reduce/sum-mmin", "vector-reduce/sum-mmax":
-		return "vector_reduce"
-	case "vector-count/expr", "vector-count/sums", "vector-count/prds",
-		"vector-count/mins", "vector-count/maxs", "vector-count/avgs",
-		"vector-last/sums", "vector-last/prds", "vector-last/mins",
-		"vector-last/maxs", "vector-last/avgs":
-		return "vector_scan"
-	case "sequence-count/trim", "sequence-count/ltrim", "sequence-count/rtrim",
-		"sequence-count/cross", "sequence-count/cut", "sequence-count/sublist",
-		"sequence-count/raze", "sequence-count/value":
-		return "sequence_count"
-	case "bin-reduce/sum":
-		return "search_index_reduce"
-	case "apply-index/scalar-at", "apply-index/gather-at", "apply-index/scalar-dot", "apply-index/path-dot":
-		return "apply_index"
-	case "cast-envelope/sum":
-		return "cast"
-	default:
-		switch {
-		case strings.HasPrefix(shape, "numeric-unary-compare-to-index/"):
-			return "compare_index"
-		case strings.HasPrefix(shape, "vector-reduce/sum-unary-"):
-			return "vector_reduce"
-		case strings.HasPrefix(shape, "runtime-unary/"):
-			return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-unary/"))
-		case strings.HasPrefix(shape, "runtime-dyadic/"):
-			return qRuntimePrimitivePipelineShape(strings.TrimPrefix(shape, "runtime-dyadic/"))
-		default:
-			return ""
-		}
+	if spec, ok := qPipelineShapeSpecForShape(shape); ok {
+		return spec.PipelineShape
 	}
+	return ""
 }
 
 type qRuntimeShapeKey struct {

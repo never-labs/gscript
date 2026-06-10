@@ -136,6 +136,55 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Selector:      "index",
 			PipelineShape: "gather_reduce",
 		}, true
+	case qPipelineSumWhereCompare:
+		return qPipelineShapeSpec{
+			ID:            "compare-to-index-sum",
+			Family:        qPipelineShapeFamilyWhere,
+			Reducer:       "sum",
+			Selector:      "index",
+			PipelineShape: "mask_reduce",
+		}, true
+	case qPipelineCountWhereCompare:
+		return qPipelineShapeSpec{
+			ID:            "compare-to-index-count",
+			Family:        qPipelineShapeFamilyWhere,
+			Reducer:       "count",
+			Selector:      "index",
+			PipelineShape: "mask_reduce",
+		}, true
+	case qPipelineWhereCompareIndexes:
+		return qPipelineShapeSpec{
+			ID:            "compare-to-index",
+			Family:        qPipelineShapeFamilyWhere,
+			Selector:      "index",
+			PipelineShape: "compare_index",
+		}, true
+	case qPipelineSumWhereModuloCompare:
+		return qPipelineShapeSpec{
+			ID:            "compare-to-index-sum-mod",
+			Family:        qPipelineShapeFamilyWhere,
+			Reducer:       "sum",
+			Selector:      "index",
+			Transform:     "mod",
+			PipelineShape: "mask_reduce",
+		}, true
+	case qPipelineCountWhereModuloCompare:
+		return qPipelineShapeSpec{
+			ID:            "compare-to-index-count-mod",
+			Family:        qPipelineShapeFamilyWhere,
+			Reducer:       "count",
+			Selector:      "index",
+			Transform:     "mod",
+			PipelineShape: "mask_reduce",
+		}, true
+	case qPipelineWhereModuloCompareIndexes:
+		return qPipelineShapeSpec{
+			ID:            "compare-to-index-mod",
+			Family:        qPipelineShapeFamilyWhere,
+			Selector:      "index",
+			Transform:     "mod",
+			PipelineShape: "compare_index",
+		}, true
 	case qPipelineSumVectorExpr:
 		return qPipelineShapeSpec{
 			ID:            "vector-reduce/sum-expr",
@@ -352,6 +401,24 @@ func qPipelineApplyDescriptorShapeRegistry(plan *qPipelinePlan, shape string) bo
 		return true
 	}
 	return false
+}
+
+func qPipelineShapeSpecForShape(shape string) (qPipelineShapeSpec, bool) {
+	shape = strings.TrimSpace(shape)
+	if shape == "" {
+		return qPipelineShapeSpec{}, false
+	}
+	plan := qPipelinePlan{shape: shape}
+	if !qPipelineApplyDescriptorShapeRegistry(&plan, shape) {
+		return qPipelineShapeSpec{}, false
+	}
+	if plan.shapeSpec.valid() {
+		return plan.shapeSpec, true
+	}
+	if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.shapeVariant()); ok && spec.ID == shape {
+		return spec, true
+	}
+	return qPipelineShapeSpec{}, false
 }
 
 func qPipelineRuntimePrimitiveShapeSpec(prefix, verb string) qPipelineShapeSpec {
