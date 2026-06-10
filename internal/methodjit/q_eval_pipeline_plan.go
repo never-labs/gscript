@@ -1,6 +1,7 @@
 package methodjit
 
 import (
+	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -8,6 +9,8 @@ import (
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
+
+var errQEvalPipelineTypedExportUnhandled = errors.New("q eval pipeline typed export unhandled")
 
 // QEvalPipelineBackend is the stable handoff point between MethodJIT q.eval
 // hot-path recognition and the q typed pipeline backend. The current slice only
@@ -446,6 +449,9 @@ func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
 }
 
 func qEvalPipelineArrayRuntimeValue(array data.Array) (runtime.Value, error) {
+	if value, handled, err := qEvalPipelineTypedArrayRuntimeValue(array); handled || err != nil {
+		return value, err
+	}
 	switch array.Kind() {
 	case data.KindBool:
 		out := make([]bool, array.Len())
@@ -523,5 +529,87 @@ func qEvalPipelineArrayRuntimeValue(array data.Array) (runtime.Value, error) {
 			out.RawSetInt(int64(i+1), item)
 		}
 		return runtime.TableValue(out), nil
+	}
+}
+
+func qEvalPipelineTypedArrayRuntimeValue(array data.Array) (runtime.Value, bool, error) {
+	if array == nil {
+		return runtime.NilValue(), false, nil
+	}
+	switch array.Kind() {
+	case data.KindBool:
+		dense, err := runtime.NewDenseArrayBoolFromCopy(array.Len(), func(dst []bool) error {
+			handled, err := data.TryExportBoolCopy(array, dst)
+			if err != nil {
+				return err
+			}
+			if !handled {
+				return errQEvalPipelineTypedExportUnhandled
+			}
+			return nil
+		})
+		if err == errQEvalPipelineTypedExportUnhandled {
+			return runtime.NilValue(), false, nil
+		}
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		return runtime.DenseArrayValue(dense), true, nil
+	case data.KindI64:
+		dense, err := runtime.NewDenseArrayI64FromCopy(array.Len(), func(dst []int64) error {
+			handled, err := data.TryExportI64Copy(array, dst)
+			if err != nil {
+				return err
+			}
+			if !handled {
+				return errQEvalPipelineTypedExportUnhandled
+			}
+			return nil
+		})
+		if err == errQEvalPipelineTypedExportUnhandled {
+			return runtime.NilValue(), false, nil
+		}
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		return runtime.DenseArrayValue(dense), true, nil
+	case data.KindF64:
+		dense, err := runtime.NewDenseArrayF64FromCopy(array.Len(), func(dst []float64) error {
+			handled, err := data.TryExportF64Copy(array, dst)
+			if err != nil {
+				return err
+			}
+			if !handled {
+				return errQEvalPipelineTypedExportUnhandled
+			}
+			return nil
+		})
+		if err == errQEvalPipelineTypedExportUnhandled {
+			return runtime.NilValue(), false, nil
+		}
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		return runtime.DenseArrayValue(dense), true, nil
+	case data.KindString:
+		dense, err := runtime.NewDenseArrayStringFromCopy(array.Len(), func(dst []string) error {
+			handled, err := data.TryExportStringCopy(array, dst)
+			if err != nil {
+				return err
+			}
+			if !handled {
+				return errQEvalPipelineTypedExportUnhandled
+			}
+			return nil
+		})
+		if err == errQEvalPipelineTypedExportUnhandled {
+			return runtime.NilValue(), false, nil
+		}
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
+		return runtime.DenseArrayValue(dense), true, nil
+	default:
+		return runtime.NilValue(), false, nil
 	}
 }

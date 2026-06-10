@@ -2,15 +2,102 @@ package methodjit
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/internal/stdlib/lib/data"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 	"github.com/never-labs/leia/internal/vm"
 )
 
 var qEvalPipelineDescriptorBenchmarkSink runtime.Value
+
+func TestQEvalPipelineRuntimeValueUsesBulkTypedArrayExport(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		array  data.Array
+		assert func(*testing.T, *runtime.DenseArray)
+	}{
+		{
+			name:  "i64_range",
+			array: data.NewI64Range(10, 3, 4),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				got, ok := dense.I64()
+				if !ok || !reflect.DeepEqual(got, []int64{10, 13, 16, 19}) {
+					t.Fatalf("dense i64 = %v ok %v", got, ok)
+				}
+			},
+		},
+		{
+			name:  "f64_column",
+			array: data.NewF64([]float64{1.25, 2.5, 3.75}),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				got, ok := dense.F64()
+				if !ok || !reflect.DeepEqual(got, []float64{1.25, 2.5, 3.75}) {
+					t.Fatalf("dense f64 = %v ok %v", got, ok)
+				}
+			},
+		},
+		{
+			name:  "bool_column",
+			array: data.NewBool([]bool{true, false, true}),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				got, ok := dense.Bool()
+				if !ok || !reflect.DeepEqual(got, []bool{true, false, true}) {
+					t.Fatalf("dense bool = %v ok %v", got, ok)
+				}
+			},
+		},
+		{
+			name:  "string_column",
+			array: data.NewString([]string{"AAPL", "MSFT"}),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				assertDenseArrayStrings(t, dense, []string{"AAPL", "MSFT"})
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			value, err := qEvalPipelineRuntimeValue(tc.array)
+			if err != nil {
+				t.Fatalf("qEvalPipelineRuntimeValue: %v", err)
+			}
+			if !value.IsDenseArray() {
+				t.Fatalf("qEvalPipelineRuntimeValue returned %v, want DenseArray", value)
+			}
+			tc.assert(t, value.DenseArray())
+		})
+	}
+}
+
+func TestQEvalPipelineRuntimeValueKeepsUnsupportedArrayFallback(t *testing.T) {
+	value, err := qEvalPipelineRuntimeValue(data.NewSymbols([]string{"AAPL", "MSFT"}))
+	if err != nil {
+		t.Fatalf("qEvalPipelineRuntimeValue: %v", err)
+	}
+	if !value.IsDenseArray() {
+		t.Fatalf("symbol array bridge returned %v, want DenseArray from fallback", value)
+	}
+	assertDenseArrayStrings(t, value.DenseArray(), []string{"AAPL", "MSFT"})
+}
+
+func assertDenseArrayStrings(t *testing.T, dense *runtime.DenseArray, want []string) {
+	t.Helper()
+	if dense == nil || dense.Len() != len(want) {
+		t.Fatalf("dense string length = %v, want %d", dense, len(want))
+	}
+	for i, expected := range want {
+		got, err := dense.At(i)
+		if err != nil || !got.IsString() || got.String() != expected {
+			t.Fatalf("dense string row %d = %v err %v, want %q", i, got, err, expected)
+		}
+	}
+}
 
 func TestQEvalPipelineRuntimeBackendPrefersExecutablePlanOverFallbacks(t *testing.T) {
 	for _, tc := range []struct {
