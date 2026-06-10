@@ -99,9 +99,12 @@ type EvalPipelineBackendPlan struct {
 // It lets MethodJIT keep q planning behind the q package boundary while still
 // avoiding descriptor-to-plan rebuilding on every hot-path execution.
 type EvalPipelineExecutablePlan struct {
+	runner qEvalPipelineExecutable
+}
+
+type qEvalPipelineExecutableMetadata struct {
 	backend string
 	kind    string
-	runner  qEvalPipelineExecutable
 }
 
 type qEvalPipelineExecutable interface {
@@ -175,12 +178,27 @@ func (p EvalPipelineBackendPlan) Source() string {
 	return p.Descriptor.Source
 }
 
-func (p EvalPipelineExecutablePlan) Valid() bool {
-	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != "" && p.runner != nil && p.runner.kind() == p.kind && p.runner.valid()
+func (p EvalPipelineExecutablePlan) metadata() (qEvalPipelineExecutableMetadata, bool) {
+	runner := p.runner
+	if runner == nil || runner.kind() == "" || !runner.valid() {
+		return qEvalPipelineExecutableMetadata{}, false
+	}
+	return qEvalPipelineExecutableMetadata{
+		backend: EvalPipelineTypedRuntimeBackend,
+		kind:    runner.kind(),
+	}, true
 }
 
-func (p EvalPipelineExecutablePlan) executableRunner() qEvalPipelineExecutable {
-	return p.runner
+func (p EvalPipelineExecutablePlan) Valid() bool {
+	_, ok := p.metadata()
+	return ok
+}
+
+func (p EvalPipelineExecutablePlan) executableRunner() (qEvalPipelineExecutable, bool) {
+	if _, ok := p.metadata(); !ok {
+		return nil, false
+	}
+	return p.runner, true
 }
 
 func (p EvalPipelineExecutablePlan) clone() EvalPipelineExecutablePlan {
@@ -195,11 +213,7 @@ func evalPipelineExecutablePlanForRunner(runner qEvalPipelineExecutable) EvalPip
 	if runner == nil || runner.kind() == "" || !runner.valid() {
 		return EvalPipelineExecutablePlan{}
 	}
-	return EvalPipelineExecutablePlan{
-		backend: EvalPipelineTypedRuntimeBackend,
-		kind:    runner.kind(),
-		runner:  runner,
-	}
+	return EvalPipelineExecutablePlan{runner: runner}
 }
 
 func evalPipelineBackendPlan(descriptor EvalPipelineDescriptor) EvalPipelineBackendPlan {
@@ -368,8 +382,8 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlanRef(plan *EvalPipelineExecu
 	if s == nil || plan == nil || !plan.Valid() {
 		return nil, false, nil
 	}
-	runner := plan.executableRunner()
-	if runner == nil {
+	runner, ok := plan.executableRunner()
+	if !ok {
 		return nil, false, nil
 	}
 	return runner.run(s)

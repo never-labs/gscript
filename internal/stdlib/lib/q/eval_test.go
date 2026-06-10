@@ -618,25 +618,20 @@ func TestEvalPipelineExecutablePlanCloneUsesRunnerWithoutPayload(t *testing.T) {
 	if !ok {
 		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
 	}
-	runnerOnly := EvalPipelineExecutablePlan{
-		backend: executable.backend,
-		kind:    executable.kind,
-		runner:  executable.runner,
-	}
-	cloned := cloneEvalPipelineExecutablePlan(runnerOnly)
+	cloned := cloneEvalPipelineExecutablePlan(executable)
 	if !cloned.Valid() {
-		t.Fatalf("cloned runner-only executable is invalid: %#v", cloned)
+		t.Fatalf("cloned opaque executable is invalid: %#v", cloned)
 	}
 	out, handled, err := NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRef(&cloned)
 	if err != nil || !handled {
-		t.Fatalf("ExecuteEvalPipelineExecutablePlanRef cloned runner-only = %#v,%v,%v", out, handled, err)
+		t.Fatalf("ExecuteEvalPipelineExecutablePlanRef cloned opaque executable = %#v,%v,%v", out, handled, err)
 	}
 	if !qEvalPipelineTestValueEqual(out, data.NewI64([]int64{10, 30})) {
-		t.Fatalf("cloned runner-only output = %#v, want 10 30", out)
+		t.Fatalf("cloned opaque executable output = %#v, want 10 30", out)
 	}
 }
 
-func TestEvalPipelineExecutablePlanValidatesRunnerMetadata(t *testing.T) {
+func TestEvalPipelineExecutablePlanMetadataComesFromRunner(t *testing.T) {
 	src := "10 20 30 40 where 1010b"
 	backend, ok := DescribeEvalPipelineBackendPlan(src)
 	if !ok {
@@ -646,13 +641,12 @@ func TestEvalPipelineExecutablePlanValidatesRunnerMetadata(t *testing.T) {
 	if !ok {
 		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
 	}
-	staleKind := EvalPipelineExecutablePlan{
-		backend: executable.backend,
-		kind:    evalPipelineKindScript,
-		runner:  executable.runner,
+	metadata, ok := executable.metadata()
+	if !ok {
+		t.Fatalf("executable metadata is invalid")
 	}
-	if staleKind.Valid() {
-		t.Fatalf("executable with stale kind metadata is valid")
+	if metadata.backend != EvalPipelineTypedRuntimeBackend || metadata.kind != evalPipelineKindExpression {
+		t.Fatalf("executable metadata = %#v, want typed runtime expression", metadata)
 	}
 	invalidRunner := evalPipelineExecutablePlanForRunner(qEvalPipelineExpressionExecutable{})
 	if invalidRunner.Valid() {
