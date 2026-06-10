@@ -54,7 +54,7 @@ QEVAL_BENCH = (
     ")"
 )
 
-QJIT_BENCH = "BenchmarkQEvalPipelineNativeExitCallpath"
+QJIT_BENCH = "BenchmarkQEvalPipeline(NativeExitCallpath|ArrayRuntimeBridge)"
 
 
 @dataclass
@@ -224,6 +224,13 @@ class GatePolicy:
     max_runtime_allocs_per_direct_call: float = 32.0
     min_q_array_bridge_bulk_hit_pct: float = 95.0
     max_q_array_bridge_fallbacks_op: float = 0.0
+    min_runtime_typed_primitive_benchmarks: int = 1
+    min_runtime_jit_backend_benchmarks: int = 1
+    min_runtime_array_bridge_benchmarks: int = 1
+    min_runtime_bridge_benchmark_count: int = 3
+    min_q_array_bridge_rows_op: float = 1.0
+    max_q_array_bridge_avg_allocs_op: float = 64.0
+    max_q_array_bridge_max_allocs_op: float = 64.0
 
 
 @dataclass
@@ -1229,6 +1236,95 @@ def runtime_array_bridge_gate_checks(rows: dict[str, BenchRow], policy: GatePoli
                 note=item.note,
             )
         )
+        checks.append(
+            GateCheck(
+                signal="q_array_bridge_rows_op",
+                benchmark=item.scope,
+                value=item.rows_op,
+                threshold=f">= {policy.min_q_array_bridge_rows_op:g}",
+                status="pass" if item.rows_op >= policy.min_q_array_bridge_rows_op else "fail",
+                note="array bridge counters must cover a non-empty data volume",
+            )
+        )
+        if item.avg_allocs_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="q_array_bridge_avg_allocs_op",
+                    benchmark=item.scope,
+                    value=item.avg_allocs_op,
+                    threshold=f"<= {policy.max_q_array_bridge_avg_allocs_op:g}",
+                    status=(
+                        "pass"
+                        if item.avg_allocs_op <= policy.max_q_array_bridge_avg_allocs_op
+                        else "fail"
+                    ),
+                    note=item.note,
+                )
+            )
+        if item.max_allocs_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="q_array_bridge_max_allocs_op",
+                    benchmark=item.scope,
+                    value=item.max_allocs_op,
+                    threshold=f"<= {policy.max_q_array_bridge_max_allocs_op:g}",
+                    status=(
+                        "pass"
+                        if item.max_allocs_op <= policy.max_q_array_bridge_max_allocs_op
+                        else "fail"
+                    ),
+                    note=item.note,
+                )
+            )
+    return checks
+
+
+def runtime_metric_contract_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    observability = {item.layer: item for item in build_runtime_observability_summary(rows)}
+    bridge_summary = build_runtime_bridge_efficiency_summary(rows)
+    bridge_count = bridge_summary[0].benchmark_count if bridge_summary else 0
+    requirements = [
+        (
+            "runtime_contract_typed_primitive_benchmarks",
+            "typed_primitive",
+            float(observability.get("typed_primitive").benchmark_count if "typed_primitive" in observability else 0),
+            float(policy.min_runtime_typed_primitive_benchmarks),
+            "typed primitive counters must be present so typed kernel hit/fallback rates cannot silently disappear",
+        ),
+        (
+            "runtime_contract_jit_backend_benchmarks",
+            "jit_backend",
+            float(observability.get("jit_backend").benchmark_count if "jit_backend" in observability else 0),
+            float(policy.min_runtime_jit_backend_benchmarks),
+            "JIT route counters must be present so direct-return versus slow exits remain observable",
+        ),
+        (
+            "runtime_contract_array_bridge_benchmarks",
+            "methodjit_array_bridge",
+            float(observability.get("methodjit_array_bridge").benchmark_count if "methodjit_array_bridge" in observability else 0),
+            float(policy.min_runtime_array_bridge_benchmarks),
+            "array bridge counters must be present so bulk export regressions cannot be hidden",
+        ),
+        (
+            "runtime_contract_bridge_benchmark_count",
+            "typed_runtime_and_jit_backend",
+            float(bridge_count),
+            float(policy.min_runtime_bridge_benchmark_count),
+            "runtime bridge efficiency should aggregate typed primitive, JIT backend, and array bridge rows",
+        ),
+    ]
+    for signal, benchmark, value, threshold, note in requirements:
+        checks.append(
+            GateCheck(
+                signal=signal,
+                benchmark=benchmark,
+                value=value,
+                threshold=f">= {threshold:g}",
+                status="pass" if value >= threshold else "fail",
+                note=note,
+            )
+        )
     return checks
 
 
@@ -1240,6 +1336,7 @@ def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[Gat
         + runtime_health_gate_checks(rows, policy)
         + runtime_bridge_efficiency_gate_checks(rows, policy)
         + runtime_array_bridge_gate_checks(rows, policy)
+        + runtime_metric_contract_gate_checks(rows, policy)
     )
 
 
@@ -1719,6 +1816,13 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-runtime-allocs-per-direct-call", type=float, default=32.0)
     parser.add_argument("--min-q-array-bridge-bulk-hit-pct", type=float, default=95.0)
     parser.add_argument("--max-q-array-bridge-fallbacks-op", type=float, default=0.0)
+    parser.add_argument("--min-runtime-typed-primitive-benchmarks", type=int, default=1)
+    parser.add_argument("--min-runtime-jit-backend-benchmarks", type=int, default=1)
+    parser.add_argument("--min-runtime-array-bridge-benchmarks", type=int, default=1)
+    parser.add_argument("--min-runtime-bridge-benchmark-count", type=int, default=3)
+    parser.add_argument("--min-q-array-bridge-rows-op", type=float, default=1.0)
+    parser.add_argument("--max-q-array-bridge-avg-allocs-op", type=float, default=64.0)
+    parser.add_argument("--max-q-array-bridge-max-allocs-op", type=float, default=64.0)
     parser.add_argument("--fallback-top-n", type=int, default=20)
     args = parser.parse_args(argv)
 
@@ -1788,6 +1892,13 @@ def main(argv: list[str]) -> int:
         max_runtime_allocs_per_direct_call=args.max_runtime_allocs_per_direct_call,
         min_q_array_bridge_bulk_hit_pct=args.min_q_array_bridge_bulk_hit_pct,
         max_q_array_bridge_fallbacks_op=args.max_q_array_bridge_fallbacks_op,
+        min_runtime_typed_primitive_benchmarks=args.min_runtime_typed_primitive_benchmarks,
+        min_runtime_jit_backend_benchmarks=args.min_runtime_jit_backend_benchmarks,
+        min_runtime_array_bridge_benchmarks=args.min_runtime_array_bridge_benchmarks,
+        min_runtime_bridge_benchmark_count=args.min_runtime_bridge_benchmark_count,
+        min_q_array_bridge_rows_op=args.min_q_array_bridge_rows_op,
+        max_q_array_bridge_avg_allocs_op=args.max_q_array_bridge_avg_allocs_op,
+        max_q_array_bridge_max_allocs_op=args.max_q_array_bridge_max_allocs_op,
     )
     gate_checks = build_gate_checks(rows, policy) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))

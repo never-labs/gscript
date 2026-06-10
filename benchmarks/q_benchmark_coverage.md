@@ -27,6 +27,13 @@ shape where a hand-written Go baseline is practical:
 | Typed kernel hit rate | per-shape typed kernel hit and fallback counters |
 | Allocation pressure | `B/op` and `allocs/op` for every Go benchmark row |
 
+The report-level `--check` gate now also requires benchmark evidence for the
+three backend layers that matter to the new architecture: ordinary q typed
+primitive rows, MethodJIT direct/exit route rows, and MethodJIT array bridge
+rows. A run that omits one of those layers should fail the contract gate unless
+it explicitly lowers the corresponding minimum benchmark count for a partial
+local check.
+
 The suite needs broad q language coverage, not only qSQL. q's performance story
 depends on vector/list primitives, adverbs, dictionaries, symbols, temporal
 values, keyed tables, joins, mutations, and table metadata operations.
@@ -100,7 +107,7 @@ representative queries:
 | Join shape | inner, left, asof, asof variants, window, union, plus, chained joins, aliased keys |
 | Mutation | update/delete/insert/upsert, keyed mutation, grouped update, empty-match boundaries |
 | Cache behavior | cold parse/lower, warm plan cache, schema-stable cache, literal/bound-scalar split |
-| Runtime stats | typed kernel hit/fallback rows for each qSQL shape |
+| Runtime stats | typed kernel hit/fallback rows for each qSQL shape plus MethodJIT route and array bridge rows |
 
 ## Immediate Expansion Targets
 

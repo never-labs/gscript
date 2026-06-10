@@ -34,9 +34,14 @@ BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/
 """
 
 SAMPLE_ARRAY_BRIDGE = """
-BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  65536 B/op  1 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
-BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  131072 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
-BenchmarkQEvalPipelineArrayRuntimeBridge/FallbackMixedAny-16   100  9000 ns/op  131072 B/op  8193 allocs/op  0 q_array_bridge_bulk_hits/op  1 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  65648 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  131184 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/FallbackMixedAny-16   100  9000 ns/op  360648 B/op  7 allocs/op  0 q_array_bridge_bulk_hits/op  1 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+"""
+
+SAMPLE_ARRAY_BRIDGE_HEALTHY = """
+BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  65648 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  131184 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
 """
 
 FALLBACK_REPORT_LOG = """
@@ -195,8 +200,8 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(efficiency.direct_calls_op, 5.8)
         self.assertEqual(efficiency.slow_bridge_calls_op, 5.2)
         self.assertAlmostEqual(efficiency.direct_call_share_pct, 100 * 5.8 / 11)
-        self.assertEqual(efficiency.avg_allocs_op, 8304 / 7)
-        self.assertAlmostEqual(efficiency.allocs_per_direct_call, (8304 / 7) / 5.8)
+        self.assertEqual(efficiency.avg_allocs_op, 119 / 7)
+        self.assertAlmostEqual(efficiency.allocs_per_direct_call, (119 / 7) / 5.8)
 
     def test_runtime_array_bridge_summary_exposes_bulk_hit_and_fallback_counts(self):
         rows = report.parse_go_benchmarks(SAMPLE_ARRAY_BRIDGE)
@@ -212,8 +217,8 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(bridge.errors_op, 0)
         self.assertAlmostEqual(bridge.bulk_hit_pct, 100 * 2 / 3)
         self.assertEqual(bridge.rows_op, 24576)
-        self.assertEqual(bridge.avg_allocs_op, 8196 / 3)
-        self.assertEqual(bridge.max_allocs_op, 8193)
+        self.assertEqual(bridge.avg_allocs_op, 11 / 3)
+        self.assertEqual(bridge.max_allocs_op, 7)
 
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
@@ -281,15 +286,44 @@ class QPerfReportTest(unittest.TestCase):
             max_allocs_op=10000,
             min_q_array_bridge_bulk_hit_pct=90,
             max_q_array_bridge_fallbacks_op=0,
+            min_runtime_typed_primitive_benchmarks=0,
+            min_runtime_jit_backend_benchmarks=0,
+            min_runtime_array_bridge_benchmarks=1,
+            min_runtime_bridge_benchmark_count=1,
+            max_q_array_bridge_avg_allocs_op=3,
+            max_q_array_bridge_max_allocs_op=4,
         )
         checks = report.build_gate_checks(rows, policy)
         failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
 
         self.assertIn(("q_array_bridge_bulk_hit_pct", "methodjit_array_bridge"), failed)
         self.assertIn(("q_array_bridge_fallbacks_op", "methodjit_array_bridge"), failed)
+        self.assertIn(("q_array_bridge_avg_allocs_op", "methodjit_array_bridge"), failed)
+        self.assertIn(("q_array_bridge_max_allocs_op", "methodjit_array_bridge"), failed)
 
-    def test_runtime_bridge_efficiency_sample_passes_strict_gate(self):
-        rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY)
+    def test_gate_checks_fail_when_required_runtime_metric_layers_are_missing(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            min_runtime_typed_primitive_benchmarks=1,
+            min_runtime_jit_backend_benchmarks=1,
+            min_runtime_array_bridge_benchmarks=1,
+            min_runtime_bridge_benchmark_count=3,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertNotIn(("runtime_contract_typed_primitive_benchmarks", "typed_primitive"), failed)
+        self.assertNotIn(("runtime_contract_jit_backend_benchmarks", "jit_backend"), failed)
+        self.assertIn(("runtime_contract_array_bridge_benchmarks", "methodjit_array_bridge"), failed)
+        self.assertIn(("runtime_contract_bridge_benchmark_count", "typed_runtime_and_jit_backend"), failed)
+
+    def test_gate_checks_pass_runtime_contract_when_all_backend_layers_are_present(self):
+        rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY + SAMPLE_ARRAY_BRIDGE_HEALTHY)
         policy = report.GatePolicy(
             max_leia_go_ratio=5,
             min_typed_hit_pct=99,
@@ -300,6 +334,43 @@ class QPerfReportTest(unittest.TestCase):
             max_jit_backend_slow_route_pct=0,
             min_runtime_direct_bridge_share_pct=100,
             max_runtime_allocs_per_direct_call=1,
+            min_q_array_bridge_bulk_hit_pct=100,
+            max_q_array_bridge_fallbacks_op=0,
+            min_runtime_typed_primitive_benchmarks=1,
+            min_runtime_jit_backend_benchmarks=1,
+            min_runtime_array_bridge_benchmarks=2,
+            min_runtime_bridge_benchmark_count=4,
+            min_q_array_bridge_rows_op=1,
+            max_q_array_bridge_avg_allocs_op=2,
+            max_q_array_bridge_max_allocs_op=2,
+        )
+        checks = report.build_gate_checks(rows, policy)
+
+        self.assertFalse(report.gate_failed(checks))
+        by_signal = {check.signal: check for check in checks}
+        self.assertEqual(by_signal["runtime_contract_typed_primitive_benchmarks"].value, 1)
+        self.assertEqual(by_signal["runtime_contract_jit_backend_benchmarks"].value, 1)
+        self.assertEqual(by_signal["runtime_contract_array_bridge_benchmarks"].value, 2)
+        self.assertEqual(by_signal["q_array_bridge_rows_op"].value, 16384)
+
+    def test_runtime_bridge_efficiency_sample_passes_strict_gate(self):
+        rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY + SAMPLE_ARRAY_BRIDGE_HEALTHY)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=99,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=8,
+            max_jit_typed_errors_op=0,
+            max_jit_backend_slow_route_pct=0,
+            min_runtime_direct_bridge_share_pct=100,
+            max_runtime_allocs_per_direct_call=1,
+            min_q_array_bridge_bulk_hit_pct=100,
+            max_q_array_bridge_fallbacks_op=0,
+            min_runtime_array_bridge_benchmarks=2,
+            min_runtime_bridge_benchmark_count=4,
+            max_q_array_bridge_avg_allocs_op=2,
+            max_q_array_bridge_max_allocs_op=2,
         )
         checks = report.build_gate_checks(rows, policy)
 
@@ -307,7 +378,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertFalse(report.gate_failed(checks))
         by_signal = {check.signal: check for check in checks}
         self.assertEqual(by_signal["runtime_bridge_direct_call_share_pct"].value, 100)
-        self.assertEqual(by_signal["runtime_bridge_allocs_per_direct_call"].value, 1)
+        self.assertAlmostEqual(by_signal["runtime_bridge_allocs_per_direct_call"].value, (12 / 4) / 6)
 
     def test_gate_checks_cover_runtime_health_fallback_and_alloc_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE_WITH_FALLBACK)
