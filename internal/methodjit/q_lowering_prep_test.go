@@ -5830,10 +5830,10 @@ func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
 	ref := fn.QEvalPipelinePlans[0]
 	if !ref.Valid() ||
 		ref.ID != 0 ||
-		ref.Kernel != "QScriptPipelinePlan" ||
-		ref.Shape != "script-pipeline/where-reduce/sum/assignments" ||
-		ref.PipelineShape != "script_pipeline" ||
-		ref.Backend != "q_pipeline_typed_runtime" {
+		qEvalPipelinePlanRefKernel(ref) != "QScriptPipelinePlan" ||
+		qEvalPipelinePlanRefShape(ref) != "script-pipeline/where-reduce/sum/assignments" ||
+		qEvalPipelinePlanRefPipelineShape(ref) != "script_pipeline" ||
+		qEvalPipelineBackendNameFromRef(ref) != "q_pipeline_typed_runtime" {
 		t.Fatalf("QEvalPipelinePlans[0] = %+v, want valid q runtime script pipeline plan ref", ref)
 	}
 	backend := newQEvalPipelineStaticBackend("test_q_eval_pipeline", fn.QEvalPipelinePlans)

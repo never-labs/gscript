@@ -22,10 +22,11 @@ func TestQEvalPipelinePlanExecutionStatsUsePlanShape(t *testing.T) {
 	cf.recordQEvalPipelinePlanExecution(7, "error")
 	cf.recordQEvalPipelinePlanExecutionWithRoute(0, "typed_runtime_native_exit", "success")
 
+	shape := qEvalPipelinePlanRefShape(ref)
 	stats := cf.QKernelExecutionStats()
-	assertQEvalPipelineExecutionStat(t, stats, ref.Shape, "typed_runtime_op_exit", "success", 1)
+	assertQEvalPipelineExecutionStat(t, stats, shape, "typed_runtime_op_exit", "success", 1)
 	assertQEvalPipelineExecutionStat(t, stats, "q-eval/pipeline-plan", "typed_runtime_op_exit", "error", 1)
-	assertQEvalPipelineExecutionStat(t, stats, ref.Shape, "typed_runtime_native_exit", "success", 1)
+	assertQEvalPipelineExecutionStat(t, stats, shape, "typed_runtime_native_exit", "success", 1)
 }
 
 func TestQEvalPipelinePlanNativeExitExecutesTypedPlanRef(t *testing.T) {
@@ -48,7 +49,7 @@ func TestQEvalPipelinePlanNativeExitExecutesTypedPlanRef(t *testing.T) {
 	if !regs[0].IsInt() || regs[0].Int() != 16 {
 		t.Fatalf("executeQEvalPipelinePlanExit = %v, want int 16", regs[0])
 	}
-	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), ref.Shape, "typed_runtime_native_exit", "success", 1)
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_native_exit", "success", 1)
 }
 
 func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
@@ -93,7 +94,7 @@ func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
 		if len(result) != 1 || !result[0].IsInt() || result[0].Int() != 16 {
 			t.Fatalf("Execute result = %v, want int 16", result)
 		}
-		assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), ref.Shape, "typed_runtime_native_exit", "success", 1)
+		assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_native_exit", "success", 1)
 	})
 }
 
@@ -112,7 +113,7 @@ func TestQEvalPipelinePlanDirectReturnExecutesTypedPlanRef(t *testing.T) {
 	if len(result) != 1 || !result[0].IsInt() || result[0].Int() != 16 {
 		t.Fatalf("Execute result = %v, want int 16", result)
 	}
-	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), cf.QEvalPipelinePlans[0].Shape, "typed_runtime_direct_entry", "success", 1)
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(cf.QEvalPipelinePlans[0]), "typed_runtime_direct_entry", "success", 1)
 }
 
 func TestQEvalPipelineTerminalReturnTable(t *testing.T) {

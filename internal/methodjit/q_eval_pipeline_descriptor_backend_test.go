@@ -162,9 +162,7 @@ func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
-			if ref.Kernel != "QPipelinePlan" || ref.Shape == "" || ref.PipelineShape != "numeric_stats" {
-				t.Fatalf("ref = %+v, want numeric stats q pipeline", ref)
-			}
+			assertQEvalPipelinePlanRefView(t, ref, "QPipelinePlan", "", "numeric_stats", qEvalPipelineTypedRuntimeBackend)
 			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
 			backendPlanCalls := 0
 			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
@@ -202,11 +200,9 @@ func TestQEvalPipelineRuntimeBackendExecutesMathPrimitiveBackendPlan(t *testing.
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
-			if ref.Kernel != "QPipelinePlan" ||
-				ref.Shape != tc.shape ||
-				ref.PipelineShape != "numeric_math" ||
-				ref.ShapeFamily != "vector" ||
-				ref.ShapeTransform == "" {
+			assertQEvalPipelinePlanRefView(t, ref, "QPipelinePlan", tc.shape, "numeric_math", qEvalPipelineTypedRuntimeBackend)
+			descriptor, ok := qEvalPipelineDescriptorViewFromRef(ref)
+			if !ok || descriptor.ShapeFamily != "vector" || descriptor.ShapeTransform == "" {
 				t.Fatalf("ref = %+v, want numeric math q pipeline shape %q", ref, tc.shape)
 			}
 			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
@@ -258,12 +254,7 @@ func TestQEvalPipelineRuntimeBackendExecutesFusedRuntimeShapes(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ref := qEvalPipelineDescriptorBackendTestRef(t, tc.src)
-			if ref.Kernel == "" ||
-				ref.Shape != tc.shape ||
-				ref.PipelineShape != tc.pipelineShape ||
-				ref.Backend != qEvalPipelineTypedRuntimeBackend {
-				t.Fatalf("ref = %+v, want shape=%q pipeline=%q typed backend", ref, tc.shape, tc.pipelineShape)
-			}
+			assertQEvalPipelinePlanRefView(t, ref, "", tc.shape, tc.pipelineShape, qEvalPipelineTypedRuntimeBackend)
 			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
 			backendPlanCalls := 0
 			sourceCalls := 0
@@ -471,9 +462,7 @@ func TestQEvalPipelineLoweringRecognizesMathRuntimePrimitive(t *testing.T) {
 				t.Fatalf("QEvalPipelinePlans = %+v, want one math primitive plan", lowered.QEvalPipelinePlans)
 			}
 			ref := lowered.QEvalPipelinePlans[0]
-			if ref.Shape != tc.shape || ref.PipelineShape != "numeric_math" || ref.Backend != qEvalPipelineTypedRuntimeBackend {
-				t.Fatalf("lowered ref = %+v, want typed numeric math backend shape %q", ref, tc.shape)
-			}
+			assertQEvalPipelinePlanRefView(t, ref, "", tc.shape, "numeric_math", qEvalPipelineTypedRuntimeBackend)
 		})
 	}
 }
@@ -509,9 +498,7 @@ func TestQEvalPipelineLoweringRecognizesFusedRuntimeShapes(t *testing.T) {
 				t.Fatalf("QEvalPipelinePlans = %+v, want one fused runtime plan", lowered.QEvalPipelinePlans)
 			}
 			ref := lowered.QEvalPipelinePlans[0]
-			if ref.Shape != tc.shape || ref.PipelineShape != tc.pipelineShape || ref.Backend != qEvalPipelineTypedRuntimeBackend {
-				t.Fatalf("lowered ref = %+v, want typed backend shape=%q pipeline=%q", ref, tc.shape, tc.pipelineShape)
-			}
+			assertQEvalPipelinePlanRefView(t, ref, "", tc.shape, tc.pipelineShape, qEvalPipelineTypedRuntimeBackend)
 		})
 	}
 }
@@ -696,6 +683,22 @@ func qEvalPipelineDescriptorBackendTestRef(tb testing.TB, source string) QEvalPi
 		tb.Fatalf("q eval pipeline ref = %+v, want embedded q backend plan", ref)
 	}
 	return ref
+}
+
+func assertQEvalPipelinePlanRefView(tb testing.TB, ref QEvalPipelinePlanRef, kernel, shape, pipelineShape, backend string) {
+	tb.Helper()
+	if kernel != "" && qEvalPipelinePlanRefKernel(ref) != kernel {
+		tb.Fatalf("q eval pipeline ref kernel = %q, want %q; ref=%+v", qEvalPipelinePlanRefKernel(ref), kernel, ref)
+	}
+	if shape != "" && qEvalPipelinePlanRefShape(ref) != shape {
+		tb.Fatalf("q eval pipeline ref shape = %q, want %q; ref=%+v", qEvalPipelinePlanRefShape(ref), shape, ref)
+	}
+	if pipelineShape != "" && qEvalPipelinePlanRefPipelineShape(ref) != pipelineShape {
+		tb.Fatalf("q eval pipeline ref pipeline shape = %q, want %q; ref=%+v", qEvalPipelinePlanRefPipelineShape(ref), pipelineShape, ref)
+	}
+	if backend != "" && qEvalPipelineBackendNameFromRef(ref) != backend {
+		tb.Fatalf("q eval pipeline ref backend = %q, want %q; ref=%+v", qEvalPipelineBackendNameFromRef(ref), backend, ref)
+	}
 }
 
 func qEvalPipelineSourceBackedTestRef(tb testing.TB, source string) QEvalPipelinePlanRef {

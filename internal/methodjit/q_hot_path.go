@@ -1286,26 +1286,42 @@ func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
 
 func qEvalHotPlanSupportedRemark(fn *Function, call *Instr, plan qEvalHotPlan, ref QEvalPipelinePlanRef) {
 	blockID, valueID := qRemarkLocation(call)
+	kernel := plan.Kernel
+	shape := plan.Shape
+	pipelineShape := plan.PipelineShape
+	backend := ""
+	if ref.Valid() {
+		if got := qEvalPipelinePlanRefKernel(ref); got != "" {
+			kernel = got
+		}
+		if got := qEvalPipelinePlanRefShape(ref); got != "" {
+			shape = got
+		}
+		if got := qEvalPipelinePlanRefPipelineShape(ref); got != "" {
+			pipelineShape = got
+		}
+		backend = qEvalPipelineBackendNameFromRef(ref)
+	}
 	fields := map[string]string{
 		"kind":    "runtime_kernel",
-		"kernel":  plan.Kernel,
-		"shape":   plan.Shape,
+		"kernel":  kernel,
+		"shape":   shape,
 		"route":   "hot_plan",
 		"outcome": "supported",
 	}
 	if plan.Detail != "" {
 		fields["detail"] = plan.Detail
 	}
-	if plan.PipelineShape != "" {
-		fields["pipeline_shape"] = plan.PipelineShape
+	if pipelineShape != "" {
+		fields["pipeline_shape"] = pipelineShape
 	}
 	if ref.Valid() {
 		fields["plan_id"] = strconv.Itoa(ref.ID)
-		fields["backend"] = qEvalPipelineBackendNameFromRef(ref)
+		fields["backend"] = backend
 	}
 	functionRemarks(fn).AddWithFields("QEvalHotPlan", "changed", blockID, valueID, OpCall,
 		fmt.Sprintf("kernel=%s shape=%s plan_id=%d; constant q.eval source is bound to typed pipeline plan interface",
-			plan.Kernel, plan.Shape, ref.ID),
+			kernel, shape, ref.ID),
 		fields)
 }
 
