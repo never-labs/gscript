@@ -11317,6 +11317,18 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 			}
 		}
 	}
+	if op == 'd' {
+		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+		if out, handled, err := data.TryTypedIntegerFloorDivide(left, right, n); err != nil || handled {
+			out, handled, err = qTypedRuntimeResult("ArrayDyadicArithmetic", shape, out, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+		}
+	}
 	if dataOp, ok := qDataArithmeticOp(op); ok {
 		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
@@ -12182,6 +12194,27 @@ func medValue(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("med expects a numeric vector")
 	}
+	if bulk, owned, ok := data.TryBulkF64(array); ok {
+		values := bulk
+		if !owned {
+			// Owned bulk buffers are scratch and may be sorted in place;
+			// unowned slices alias column storage and must be copied first.
+			values = make([]float64, len(bulk))
+			copy(values, bulk)
+		}
+		if len(values) == 0 {
+			data.BulkF64Release(bulk, owned)
+			return data.NullValue, nil
+		}
+		sort.Float64s(values)
+		mid := len(values) / 2
+		out := values[mid]
+		if len(values)%2 == 0 {
+			out = (values[mid-1] + values[mid]) / 2
+		}
+		data.BulkF64Release(bulk, owned)
+		return out, nil
+	}
 	values := make([]float64, 0, array.Len())
 	for i := 0; i < array.Len(); i++ {
 		item, ok := array.At(i)
@@ -12215,6 +12248,17 @@ func numericAggregateStats(name string, v any) (float64, float64, int, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return 0, 0, 0, fmt.Errorf("%s expects a numeric vector", name)
+	}
+	if values, owned, ok := data.TryBulkF64(array); ok {
+		total := float64(0)
+		sumsq := float64(0)
+		for _, n := range values {
+			total += n
+			sumsq += n * n
+		}
+		count := len(values)
+		data.BulkF64Release(values, owned)
+		return total, sumsq, count, nil
 	}
 	total := float64(0)
 	sumsq := float64(0)
@@ -12261,6 +12305,27 @@ func wavg(weights, values any) (any, error) {
 			return nil, fmt.Errorf("wavg weight length %d does not match value length %d", length, valueArray.Len())
 		}
 		length = valueArray.Len()
+	}
+	if weightIsArray && valueIsArray {
+		if weightBulk, weightOwned, ok := data.TryBulkF64(weightArray); ok {
+			if valueBulk, valueOwned, ok := data.TryBulkF64(valueArray); ok && len(valueBulk) == len(weightBulk) {
+				total := float64(0)
+				denom := float64(0)
+				for i, w := range weightBulk {
+					total += w * valueBulk[i]
+					denom += w
+				}
+				data.BulkF64Release(weightBulk, weightOwned)
+				data.BulkF64Release(valueBulk, valueOwned)
+				if denom == 0 {
+					return data.NullValue, nil
+				}
+				return total / denom, nil
+			} else if ok {
+				data.BulkF64Release(valueBulk, valueOwned)
+			}
+			data.BulkF64Release(weightBulk, weightOwned)
+		}
 	}
 	total := float64(0)
 	denom := float64(0)

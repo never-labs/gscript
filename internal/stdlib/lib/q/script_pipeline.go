@@ -2860,6 +2860,10 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 		return nil, true, err
 	}
 	shape := "where-index-reduce/sum-count/" + string(array.Kind())
+	// When the gathered value expression is the same pure expression as the
+	// predicate source, the data layer can share one bulk carrier flatten
+	// between the selection mask and the reduction.
+	selfPredicate := strings.TrimSpace(plan.leftExpr) == strings.TrimSpace(descriptor.valueExpr)
 	var sum any
 	var count int64
 	var handled bool
@@ -2874,6 +2878,9 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 			shape:          shape,
 			fallbackReason: RuntimeFallbackUnsupportedType,
 			call: func() (any, int64, bool, error) {
+				if selfPredicate {
+					return data.TryTypedNumericSumCountWhereWithinSelf(array, low, high, true)
+				}
 				return data.TryTypedNumericSumCountWhereWithin(array, predicate, low, high, true)
 			},
 		})
@@ -2888,6 +2895,9 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 			shape:          shape,
 			fallbackReason: RuntimeFallbackUnsupportedType,
 			call: func() (any, int64, bool, error) {
+				if selfPredicate {
+					return data.TryTypedNumericSumCountWhereCompareSelf(array, dataOp, scalar)
+				}
 				return data.TryTypedNumericSumCountWhereCompare(array, predicate, dataOp, scalar)
 			},
 		})

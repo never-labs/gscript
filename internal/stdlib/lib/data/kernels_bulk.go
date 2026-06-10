@@ -1,6 +1,9 @@
 package data
 
-import "sync"
+import (
+	"math"
+	"sync"
+)
 
 // Bulk materialization kernels.
 //
@@ -80,6 +83,30 @@ func bulkBoolRelease(values []bool, owned bool) {
 	bulkBoolPool.Put(values[:0])
 }
 
+// TryBulkF64 exposes bulk float64 carrier flattening to sibling runtime
+// packages (q): lazy carrier trees become dense slices with one tight loop
+// per node. Callers must pass the returned slice and owned flag to
+// BulkF64Release when done.
+func TryBulkF64(array Array) (values []float64, owned bool, ok bool) {
+	return tryBulkF64Values(array)
+}
+
+// BulkF64Release recycles a slice produced by TryBulkF64.
+func BulkF64Release(values []float64, owned bool) {
+	bulkF64Release(values, owned)
+}
+
+// TryBulkI64 exposes bulk int64 carrier flattening to sibling runtime
+// packages. See TryBulkF64.
+func TryBulkI64(array Array) (values []int64, owned bool, ok bool) {
+	return tryBulkI64Values(array)
+}
+
+// BulkI64Release recycles a slice produced by TryBulkI64.
+func BulkI64Release(values []int64, owned bool) {
+	bulkI64Release(values, owned)
+}
+
 // tryBulkI64Values materializes any integer-producing array into []int64.
 func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 	switch a := array.(type) {
@@ -87,6 +114,24 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		return tryBulkI64Values(a.array)
 	case columnArray[int64]:
 		return a.data, false, true
+	case columnArray[int32]:
+		out := bulkI64Get(len(a.data))
+		for i, v := range a.data {
+			out[i] = int64(v)
+		}
+		return out, true, true
+	case columnArray[int16]:
+		out := bulkI64Get(len(a.data))
+		for i, v := range a.data {
+			out[i] = int64(v)
+		}
+		return out, true, true
+	case columnArray[int8]:
+		out := bulkI64Get(len(a.data))
+		for i, v := range a.data {
+			out[i] = int64(v)
+		}
+		return out, true, true
 	case i64RangeArray:
 		out := bulkI64Get(a.len)
 		value := a.start
@@ -166,11 +211,14 @@ func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) 
 			break
 		}
 		switch dyadic.op {
-		case OpAdd, OpSub, OpMul, OpMod:
+		case OpAdd, OpSub, OpMul, OpMod, OpIDiv:
 		default:
 			return tryBulkI64ValuesGeneric(a)
 		}
 		if dyadic.op == OpMod && !dyadic.scalarLeft && dyadic.scalar == 0 {
+			return nil, false, false
+		}
+		if dyadic.op == OpIDiv && !dyadic.scalarLeft && dyadic.scalar == 0 {
 			return nil, false, false
 		}
 		steps[stepCount] = i64ScalarDyadicStep{op: dyadic.op, scalar: dyadic.scalar, scalarLeft: dyadic.scalarLeft}
@@ -238,6 +286,23 @@ func applyI64ScalarDyadicStep(step i64ScalarDyadicStep, source, out []int64) boo
 				out[i] = qModInt64(v, step.scalar)
 			}
 		}
+	case OpIDiv:
+		const minInt64 = -1 << 63
+		if step.scalarLeft {
+			for i, v := range source {
+				if v == 0 || (step.scalar == minInt64 && v == -1) {
+					return false
+				}
+				out[i] = floorDivInt64(step.scalar, v)
+			}
+		} else {
+			if step.scalar == 0 || step.scalar == -1 {
+				return false
+			}
+			for i, v := range source {
+				out[i] = floorDivInt64(v, step.scalar)
+			}
+		}
 	default:
 		return false
 	}
@@ -270,10 +335,30 @@ func tryBulkF64Values(array Array) (values []float64, owned bool, ok bool) {
 		return tryBulkF64Values(a.array)
 	case columnArray[float64]:
 		return a.data, false, true
+	case f64RangeArray:
+		out := bulkF64Get(a.len)
+		for i := range out {
+			out[i] = a.start + float64(i)*a.step
+		}
+		return out, true, true
 	case f64NumericDyadicArray:
 		if out, ok := tryBulkF64NumericDyadicValues(a); ok {
 			return out, true, true
 		}
+	case f64BucketArray:
+		if source, sourceOwned, ok := tryBulkF64Values(a.source); ok {
+			if len(source) < a.len {
+				bulkF64Release(source, sourceOwned)
+				return nil, false, false
+			}
+			out := bulkF64Get(a.len)
+			for i, v := range source[:a.len] {
+				out[i] = math.Floor(v/a.width) * a.width
+			}
+			bulkF64Release(source, sourceOwned)
+			return out, true, true
+		}
+		return nil, false, false
 	}
 	if values, valuesOwned, ok := tryBulkI64Values(array); ok {
 		out := bulkF64Get(len(values))
@@ -309,6 +394,12 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 		for i := range out {
 			out[i] = float64(value)
 			value += p.values.step
+		}
+		return out, true, true
+	case f64F64RangeProducer:
+		out := bulkF64Get(p.values.len)
+		for i := range out {
+			out[i] = p.values.start + float64(i)*p.values.step
 		}
 		return out, true, true
 	case f64I64ScalarDyadicProducer:
@@ -933,6 +1024,197 @@ func compareCountBulk(array Array, op Op, value any) (int64, bool) {
 		return count, true
 	}
 	return 0, false
+}
+
+// bulkNumericSumCountWhereMask reduces a numeric values array over a dense
+// boolean mask produced by a bulk mask kernel (CompareMask, WithinMask, ...).
+// It mirrors typedNumericSumCountWherePredicate semantics (int64 totals for
+// dense integer arrays, float64 otherwise, NullValue on empty selection) while
+// replacing per-row predicate dispatch with two tight loops.
+//
+// A nil predicate means the predicate array is the values array itself; the
+// flattened values then feed the mask kernel directly so the carrier tree is
+// walked once instead of twice.
+func bulkNumericSumCountWhereMask(values, predicate Array, fillMask func(Array, []bool) bool) (any, int64, bool) {
+	length := values.Len()
+	var sum any
+	var count int64
+	handled := false
+	if isDenseIntegerArray(values) {
+		bulk, owned, ok := tryBulkI64Values(values)
+		if !ok || len(bulk) < length {
+			bulkI64Release(bulk, owned)
+			return nil, 0, false
+		}
+		maskSource := predicate
+		if maskSource == nil {
+			maskSource = columnArray[int64]{kind: KindI64, data: bulk[:length]}
+		}
+		mask := bulkBoolGet(length)
+		if fillMask(maskSource, mask) {
+			var total int64
+			for i, selected := range mask[:length] {
+				if selected {
+					count++
+					total += bulk[i]
+				}
+			}
+			sum, handled = total, true
+		}
+		bulkBoolRelease(mask, true)
+		bulkI64Release(bulk, owned)
+	} else if isNumericArray(values) {
+		bulk, owned, ok := tryBulkF64Values(values)
+		if !ok || len(bulk) < length {
+			bulkF64Release(bulk, owned)
+			return nil, 0, false
+		}
+		maskSource := predicate
+		if maskSource == nil {
+			maskSource = columnArray[float64]{kind: KindF64, data: bulk[:length]}
+		}
+		mask := bulkBoolGet(length)
+		if fillMask(maskSource, mask) {
+			var total float64
+			for i, selected := range mask[:length] {
+				if selected {
+					count++
+					total += bulk[i]
+				}
+			}
+			sum, handled = total, true
+		}
+		bulkBoolRelease(mask, true)
+		bulkF64Release(bulk, owned)
+	}
+	if !handled {
+		return nil, 0, false
+	}
+	if count == 0 {
+		return NullValue, 0, true
+	}
+	return sum, count, true
+}
+
+// numericIntegerDyadicBulk lowers array(+|-|*|mod)array integer dyadics over
+// lazy carriers to dense typed loops. It bails (ok=false) on nulls, length
+// mismatches, and zero mod divisors so callers keep null-aware fallbacks.
+func numericIntegerDyadicBulk(op Op, left, right any, length int) (Array, bool) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray || !rightIsArray || leftArray.Len() != length || rightArray.Len() != length {
+		return nil, false
+	}
+	leftValues, leftOwned, ok := tryBulkI64Values(leftArray)
+	if !ok || len(leftValues) < length {
+		bulkI64Release(leftValues, leftOwned)
+		return nil, false
+	}
+	rightValues, rightOwned, ok := tryBulkI64Values(rightArray)
+	if !ok || len(rightValues) < length {
+		bulkI64Release(leftValues, leftOwned)
+		bulkI64Release(rightValues, rightOwned)
+		return nil, false
+	}
+	leftValues = leftValues[:length]
+	rightValues = rightValues[:length]
+	out := make([]int64, length)
+	handled := true
+	switch op {
+	case OpAdd:
+		for i, v := range leftValues {
+			out[i] = v + rightValues[i]
+		}
+	case OpSub:
+		for i, v := range leftValues {
+			out[i] = v - rightValues[i]
+		}
+	case OpMul:
+		for i, v := range leftValues {
+			out[i] = v * rightValues[i]
+		}
+	case OpMod:
+		for i, v := range leftValues {
+			divisor := rightValues[i]
+			if divisor == 0 {
+				handled = false
+				break
+			}
+			out[i] = qModInt64(v, divisor)
+		}
+	case OpIDiv:
+		const minInt64 = -1 << 63
+		for i, v := range leftValues {
+			divisor := rightValues[i]
+			if divisor == 0 || (v == minInt64 && divisor == -1) {
+				handled = false
+				break
+			}
+			out[i] = floorDivInt64(v, divisor)
+		}
+	default:
+		handled = false
+	}
+	bulkI64Release(leftValues, leftOwned)
+	bulkI64Release(rightValues, rightOwned)
+	if !handled {
+		return nil, false
+	}
+	return columnArray[int64]{kind: KindI64, data: out}, true
+}
+
+// TryTypedIntegerFloorDivide vectorizes q integer `div` (floor division) over
+// dense/lazy integer carriers without boxing each row. Divide-by-zero and the
+// MinInt64/-1 overflow row bail out so callers keep null-producing fallbacks.
+func TryTypedIntegerFloorDivide(left, right any, length int) (Array, bool, error) {
+	const minInt64 = -1 << 63
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	switch {
+	case leftIsArray && !rightIsArray:
+		if leftArray.Len() != length || !isDenseIntegerArray(leftArray) {
+			return nil, false, nil
+		}
+		divisor, ok := integerScalarValue(right)
+		if !ok {
+			return nil, false, nil
+		}
+		return applyI64ArrayScalar(OpIDiv, leftArray, divisor, false)
+	case !leftIsArray && rightIsArray:
+		if rightArray.Len() != length || !isDenseIntegerArray(rightArray) {
+			return nil, false, nil
+		}
+		dividend, ok := integerScalarValue(left)
+		if !ok {
+			return nil, false, nil
+		}
+		values, owned, ok := tryBulkI64Values(rightArray)
+		if !ok || len(values) < length {
+			bulkI64Release(values, owned)
+			return nil, false, nil
+		}
+		out := make([]int64, length)
+		for i, divisor := range values[:length] {
+			if divisor == 0 || (dividend == minInt64 && divisor == -1) {
+				bulkI64Release(values, owned)
+				return nil, false, nil
+			}
+			out[i] = floorDivInt64(dividend, divisor)
+		}
+		bulkI64Release(values, owned)
+		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+	case leftIsArray && rightIsArray:
+		if !isDenseIntegerArray(leftArray) || !isDenseIntegerArray(rightArray) {
+			return nil, false, nil
+		}
+		out, ok := numericIntegerDyadicBulk(OpIDiv, left, right, length)
+		if !ok {
+			return nil, false, nil
+		}
+		return out, true, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 // TryTypedFindI64 vectorizes q find (`?`) for integer domain/query pairs:

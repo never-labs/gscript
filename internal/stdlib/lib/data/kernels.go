@@ -2793,6 +2793,14 @@ func f64DyadicProducerSumFloat(producer f64DyadicProducer) (float64, error) {
 	if right, ok := producer.right.(f64ScalarProducer); ok {
 		return f64DyadicScalarProducerSum(right.value, producer.left, false, producer.op, producer.apply)
 	}
+	if values, owned, ok := tryBulkF64ProducerValues(producer); ok {
+		var total float64
+		for _, value := range values {
+			total += value
+		}
+		bulkF64Release(values, owned)
+		return total, nil
+	}
 	var total float64
 	var cache f64DyadicEvalCache
 	for row := 0; row < producer.len; row++ {
@@ -3918,6 +3926,81 @@ func numericMinMaxOperandAt(value any, row int, length int) (float64, bool, erro
 	return numericOperandAt(value, row)
 }
 
+// tryTypedCastBulk lowers numeric casts over bulk-flattenable carriers to
+// dense loops while keeping TryTypedCast's exact range-check errors and null
+// fallback semantics. Shapes with dedicated lazy fast paths (i64 range to
+// f64) are left to the caller.
+func tryTypedCastBulk(kind Kind, array Array) (Array, bool, error) {
+	switch kind {
+	case KindI16, KindI32, KindI64:
+		if values, owned, ok := tryBulkI64Values(array); ok {
+			out, handled, err := castBulkI64Values(kind, values)
+			bulkI64Release(values, owned)
+			return out, handled, err
+		}
+		if !isIntegerArray(array) {
+			if values, owned, ok := tryBulkF64Values(array); ok {
+				truncated := bulkI64Get(len(values))
+				for i, value := range values {
+					if math.IsNaN(value) || math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
+						bulkF64Release(values, owned)
+						bulkI64Release(truncated, true)
+						return nil, false, nil
+					}
+					truncated[i] = int64(value)
+				}
+				bulkF64Release(values, owned)
+				out, handled, err := castBulkI64Values(kind, truncated)
+				bulkI64Release(truncated, true)
+				return out, handled, err
+			}
+		}
+		return nil, false, nil
+	case KindF64:
+		if _, ok := asI64RangeArray(array); ok {
+			return nil, false, nil
+		}
+		if values, owned, ok := tryBulkF64Values(array); ok {
+			out := make([]float64, len(values))
+			copy(out, values)
+			bulkF64Release(values, owned)
+			return newF64Trusted(out), true, nil
+		}
+		return nil, false, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func castBulkI64Values(kind Kind, values []int64) (Array, bool, error) {
+	switch kind {
+	case KindI16:
+		out := make([]int16, len(values))
+		for row, value := range values {
+			if value < -32768 || value > 32767 {
+				return nil, true, fmt.Errorf("value %d must be i16 for %s", row+1, kind)
+			}
+			out[row] = int16(value)
+		}
+		return columnArray[int16]{kind: KindI16, data: out}, true, nil
+	case KindI32:
+		out := make([]int32, len(values))
+		for row, value := range values {
+			if value < -2147483648 || value > 2147483647 {
+				return nil, true, fmt.Errorf("value %d must be i32 for %s", row+1, kind)
+			}
+			out[row] = int32(value)
+		}
+		return columnArray[int32]{kind: KindI32, data: out}, true, nil
+	case KindI64:
+		out := make([]int64, len(values))
+		copy(out, values)
+		return newI64Trusted(out), true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	if array == nil {
 		return nil, true, fmt.Errorf("typed cast array is nil")
@@ -3928,6 +4011,9 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	}
 	if !isIntegerArray(array) && !isNumericArray(array) {
 		return nil, false, nil
+	}
+	if out, handled, err := tryTypedCastBulk(kind, array); handled || err != nil {
+		return out, handled, err
 	}
 	switch kind {
 	case KindI16:
@@ -4578,6 +4664,11 @@ func TryTypedNumericSumCountWhereCompare(values, predicate Array, op Op, scalar 
 		return nil, 0, true, fmt.Errorf("sum count where compare length mismatch: values=%d predicate=%d", values.Len(), predicate.Len())
 	}
 	scalar = normalizeScalar(predicate.Kind(), scalar)
+	if sum, count, ok := bulkNumericSumCountWhereMask(values, predicate, func(maskSource Array, out []bool) bool {
+		return typedKernels.CompareMask(maskSource, op, scalar, out)
+	}); ok {
+		return sum, count, true, nil
+	}
 	pred, handled, err := typedCompareRowPredicate(predicate, op, scalar)
 	if err != nil || !handled {
 		return nil, 0, handled, err
@@ -4589,6 +4680,39 @@ func TryTypedNumericSumCountWhereCompare(values, predicate Array, op Op, scalar 
 	return sum, count, true, err
 }
 
+// TryTypedNumericSumCountWhereCompareSelf is the predicate==values form of
+// TryTypedNumericSumCountWhereCompare: the carrier tree is flattened once and
+// shared between the compare mask and the reduction.
+func TryTypedNumericSumCountWhereCompareSelf(values Array, op Op, scalar any) (any, int64, bool, error) {
+	if values == nil {
+		return nil, 0, true, fmt.Errorf("sum count where compare arrays must be non-nil")
+	}
+	scalar = normalizeScalar(values.Kind(), scalar)
+	if sum, count, ok := bulkNumericSumCountWhereMask(values, nil, func(maskSource Array, out []bool) bool {
+		return typedKernels.CompareMask(maskSource, op, scalar, out)
+	}); ok {
+		return sum, count, true, nil
+	}
+	return TryTypedNumericSumCountWhereCompare(values, values, op, scalar)
+}
+
+// TryTypedNumericSumCountWhereWithinSelf is the predicate==values form of
+// TryTypedNumericSumCountWhereWithin: the carrier tree is flattened once and
+// shared between the within mask and the reduction.
+func TryTypedNumericSumCountWhereWithinSelf(values Array, low, high any, highClosed bool) (any, int64, bool, error) {
+	if values == nil {
+		return nil, 0, true, fmt.Errorf("sum count where within arrays must be non-nil")
+	}
+	if !IsNull(low) && !IsNull(high) {
+		if sum, count, ok := bulkNumericSumCountWhereMask(values, nil, func(maskSource Array, out []bool) bool {
+			return typedKernels.WithinMask(maskSource, low, high, highClosed, out)
+		}); ok {
+			return sum, count, true, nil
+		}
+	}
+	return TryTypedNumericSumCountWhereWithin(values, values, low, high, highClosed)
+}
+
 // TryTypedNumericSumCountWhereWithin reduces a numeric value array over rows
 // selected by a typed within predicate without materializing a mask, index
 // vector, or gathered value vector.
@@ -4598,6 +4722,11 @@ func TryTypedNumericSumCountWhereWithin(values, predicate Array, low, high any, 
 	}
 	if values.Len() != predicate.Len() {
 		return nil, 0, true, fmt.Errorf("sum count where within length mismatch: values=%d predicate=%d", values.Len(), predicate.Len())
+	}
+	if sum, count, ok := bulkNumericSumCountWhereMask(values, predicate, func(maskSource Array, out []bool) bool {
+		return typedKernels.WithinMask(maskSource, low, high, highClosed, out)
+	}); ok {
+		return sum, count, true, nil
 	}
 	pred, handled, err := typedWithinRowPredicate(predicate, low, high, highClosed)
 	if err != nil || !handled {
@@ -9812,6 +9941,9 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 	if out, ok, err := numericIntegerDyadicArrayScalar(op, left, right, length); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok := numericIntegerDyadicBulk(op, left, right, length); ok {
+		return out, true, nil
+	}
 	values := make([]int64, length)
 	var nullable []any
 	for i := 0; i < length; i++ {
@@ -9898,6 +10030,9 @@ func numericIntegerDyadicArrayScalar(op Op, left, right any, length int) (Array,
 
 func applyI64ArrayScalar(op Op, values Array, scalar int64, scalarLeft bool) (Array, bool, error) {
 	if values.Len() == 0 || op == OpMod && (!scalarLeft && scalar == 0 || scalarLeft) {
+		return nil, false, nil
+	}
+	if op == OpIDiv && (scalarLeft || scalar == 0 || scalar == -1) {
 		return nil, false, nil
 	}
 	return i64ScalarDyadicArray{source: values, op: op, scalar: scalar, scalarLeft: scalarLeft, len: values.Len()}, true, nil
@@ -9999,6 +10134,7 @@ func i64RangeIntegerDivModSumCount(values i64RangeArray, terms []IntegerDivModRe
 }
 
 func applyI64ScalarDyadicValue(op Op, value, scalar int64, scalarLeft bool) (int64, bool, error) {
+	const minInt64 = -1 << 63
 	switch op {
 	case OpAdd:
 		return value + scalar, true, nil
@@ -10009,6 +10145,17 @@ func applyI64ScalarDyadicValue(op Op, value, scalar int64, scalarLeft bool) (int
 		return value - scalar, true, nil
 	case OpMul:
 		return value * scalar, true, nil
+	case OpIDiv:
+		divisor := scalar
+		dividend := value
+		if scalarLeft {
+			divisor = value
+			dividend = scalar
+		}
+		if divisor == 0 || (dividend == minInt64 && divisor == -1) {
+			return 0, false, nil
+		}
+		return floorDivInt64(dividend, divisor), true, nil
 	case OpMod:
 		divisor := scalar
 		dividend := value
@@ -11009,6 +11156,82 @@ func qNumericUnaryReturnsFloat(op string) bool {
 	}
 }
 
+// qNumericUnarySumIntegerSlice mirrors qNumericUnarySumIntegerArray over a
+// dense int64 slice so bulk-flattened lazy carriers skip per-row dispatch.
+func qNumericUnarySumIntegerSlice(op string, values []int64) (any, bool, error) {
+	const minInt64 = -1 << 63
+	switch op {
+	case NumericUnaryNeg:
+		var sum int64
+		for _, value := range values {
+			if value == minInt64 {
+				return nil, false, nil
+			}
+			sum -= value
+		}
+		return sum, true, nil
+	case NumericUnaryAbs:
+		var sum int64
+		for _, value := range values {
+			if value == minInt64 {
+				return nil, false, nil
+			}
+			if value < 0 {
+				value = -value
+			}
+			sum += value
+		}
+		return sum, true, nil
+	case NumericUnarySignum:
+		var sum int64
+		for _, value := range values {
+			switch {
+			case value < 0:
+				sum--
+			case value > 0:
+				sum++
+			}
+		}
+		return sum, true, nil
+	case NumericUnarySqrt:
+		var sum float64
+		for _, value := range values {
+			sum += math.Sqrt(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryLog:
+		var sum float64
+		for _, value := range values {
+			sum += math.Log(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryExp:
+		var sum float64
+		for _, value := range values {
+			sum += math.Exp(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryRecip:
+		var sum float64
+		for _, value := range values {
+			sum += 1 / float64(value)
+		}
+		return sum, true, nil
+	case NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan:
+		var sum float64
+		for _, value := range values {
+			out, err := applyNumericUnaryFloat(op, float64(value))
+			if err != nil {
+				return nil, true, err
+			}
+			sum += out
+		}
+		return sum, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
 func qNumericUnarySumIntegerArray(op string, array Array) (any, bool, error) {
 	switch op {
 	case NumericUnaryNeg, NumericUnaryAbs, NumericUnarySignum,
@@ -11079,6 +11302,15 @@ func qNumericUnarySumI64Values(op string, values []int64) (any, bool, error) {
 
 func qNumericUnarySumIntegerArraySlow(op string, array Array) (any, bool, error) {
 	const minInt64 = -1 << 63
+	switch op {
+	case NumericUnaryFloor, NumericUnaryCeiling:
+		return TryTypedNumericSum(array)
+	}
+	if values, owned, ok := tryBulkI64Values(array); ok {
+		out, handled, err := qNumericUnarySumIntegerSlice(op, values)
+		bulkI64Release(values, owned)
+		return out, handled, err
+	}
 	switch op {
 	case NumericUnaryNeg:
 		var sum int64
@@ -11165,7 +11397,31 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 			sum += math.Abs(float64(value))
 		}
 		return sum, true, nil
-	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
+	case NumericUnarySqrt:
+		var sum float64
+		for _, value := range values {
+			sum += math.Sqrt(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryLog:
+		var sum float64
+		for _, value := range values {
+			sum += math.Log(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryExp:
+		var sum float64
+		for _, value := range values {
+			sum += math.Exp(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryRecip:
+		var sum float64
+		for _, value := range values {
+			sum += 1 / float64(value)
+		}
+		return sum, true, nil
+	case NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan:
 		var sum float64
 		for _, value := range values {
 			out, err := applyNumericUnaryFloat(op, float64(value))
@@ -11204,6 +11460,11 @@ func qNumericUnarySumFloatSlice[T floatScalar](op string, values []T) (any, bool
 }
 
 func qNumericUnarySumFloatArray(op string, array Array) (any, bool, error) {
+	if values, owned, ok := tryBulkF64Values(array); ok {
+		out, handled, err := qNumericUnarySumFloatSlice(op, values)
+		bulkF64Release(values, owned)
+		return out, handled, err
+	}
 	switch op {
 	case NumericUnaryNeg, NumericUnaryAbs, NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
 		var sum float64
@@ -14131,6 +14392,16 @@ func (a notMask) valueAt(row int) (bool, bool, error) {
 }
 
 func (a notMask) trueCount() (int64, bool, error) {
+	if values, owned, ok := tryBulkBoolValues(a); ok {
+		var count int64
+		for _, value := range values {
+			if value {
+				count++
+			}
+		}
+		bulkBoolRelease(values, owned)
+		return count, true, nil
+	}
 	var count int64
 	for row := 0; row < a.Len(); row++ {
 		value, ok, err := a.valueAt(row)
