@@ -107,11 +107,16 @@ type EvalPipelineExecutablePlan struct {
 }
 
 type qEvalPipelineExecutable interface {
+	clone() qEvalPipelineExecutable
 	run(*EvalState) (any, bool, error)
 }
 
 type qEvalPipelineExpressionExecutable struct {
 	plan qPipelinePlan
+}
+
+func (e qEvalPipelineExpressionExecutable) clone() qEvalPipelineExecutable {
+	return qEvalPipelineExpressionExecutable{plan: cloneQPipelinePlan(e.plan)}
 }
 
 func (e qEvalPipelineExpressionExecutable) run(s *EvalState) (any, bool, error) {
@@ -120,6 +125,10 @@ func (e qEvalPipelineExpressionExecutable) run(s *EvalState) (any, bool, error) 
 
 type qEvalPipelineScriptExecutable struct {
 	descriptor *qScriptPipelineDescriptor
+}
+
+func (e qEvalPipelineScriptExecutable) clone() qEvalPipelineExecutable {
+	return qEvalPipelineScriptExecutable{descriptor: cloneQScriptPipelineDescriptor(e.descriptor)}
 }
 
 func (e qEvalPipelineScriptExecutable) run(s *EvalState) (any, bool, error) {
@@ -151,7 +160,26 @@ func (p EvalPipelineBackendPlan) Source() string {
 }
 
 func (p EvalPipelineExecutablePlan) Valid() bool {
-	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != ""
+	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != "" && p.executableRunner() != nil
+}
+
+func (p EvalPipelineExecutablePlan) executableRunner() qEvalPipelineExecutable {
+	if p.runner != nil {
+		return p.runner
+	}
+	return evalPipelineExecutableRunner(p.kind, p.expression, p.script)
+}
+
+func (p EvalPipelineExecutablePlan) clone() EvalPipelineExecutablePlan {
+	out := p
+	out.expression = cloneQPipelinePlan(p.expression)
+	out.script = cloneQScriptPipelineDescriptor(p.script)
+	if p.runner != nil {
+		out.runner = p.runner.clone()
+	} else {
+		out.runner = out.executableRunner()
+	}
+	return out
 }
 
 func evalPipelineBackendPlan(descriptor EvalPipelineDescriptor) EvalPipelineBackendPlan {
@@ -182,6 +210,25 @@ func evalPipelineScriptExecutable(plan *qScriptPipelineDescriptor) EvalPipelineE
 		kind:    evalPipelineKindScript,
 		script:  script,
 		runner:  qEvalPipelineScriptExecutable{descriptor: script},
+	}
+}
+
+func evalPipelineExecutableForDescriptor(descriptor EvalPipelineDescriptor) (EvalPipelineExecutablePlan, bool) {
+	switch descriptor.Kind {
+	case evalPipelineKindExpression:
+		expression, ok := qPipelinePlanFromEvalDescriptor(descriptor)
+		if !ok {
+			return EvalPipelineExecutablePlan{}, false
+		}
+		return evalPipelineExpressionExecutable(expression), true
+	case evalPipelineKindScript:
+		script, ok := qScriptPipelineDescriptorFromEvalDescriptor(descriptor)
+		if !ok {
+			return EvalPipelineExecutablePlan{}, false
+		}
+		return evalPipelineScriptExecutable(&script), true
+	default:
+		return EvalPipelineExecutablePlan{}, false
 	}
 }
 
@@ -292,22 +339,7 @@ func CompileEvalPipelineBackendPlan(plan EvalPipelineBackendPlan) (EvalPipelineE
 // should funnel through this helper so expression/script shape restoration has
 // one owner.
 func CompileEvalPipelineDescriptor(descriptor EvalPipelineDescriptor) (EvalPipelineExecutablePlan, bool) {
-	switch descriptor.Kind {
-	case evalPipelineKindExpression:
-		expression, ok := qPipelinePlanFromEvalDescriptor(descriptor)
-		if !ok {
-			return EvalPipelineExecutablePlan{}, false
-		}
-		return evalPipelineExpressionExecutable(expression), true
-	case evalPipelineKindScript:
-		script, ok := qScriptPipelineDescriptorFromEvalDescriptor(descriptor)
-		if !ok {
-			return EvalPipelineExecutablePlan{}, false
-		}
-		return evalPipelineScriptExecutable(&script), true
-	default:
-		return EvalPipelineExecutablePlan{}, false
-	}
+	return evalPipelineExecutableForDescriptor(descriptor)
 }
 
 // ExecuteEvalPipelineDescriptor executes a predecoded pipeline descriptor using
@@ -343,10 +375,7 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlanRef(plan *EvalPipelineExecu
 	if s == nil || plan == nil || !plan.Valid() {
 		return nil, false, nil
 	}
-	runner := plan.runner
-	if runner == nil {
-		runner = evalPipelineExecutableRunner(plan.kind, plan.expression, plan.script)
-	}
+	runner := plan.executableRunner()
 	if runner == nil {
 		return nil, false, nil
 	}

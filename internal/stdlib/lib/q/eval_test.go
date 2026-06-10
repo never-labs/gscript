@@ -608,6 +608,34 @@ func TestEvalPipelineDescriptorExecutionUsesExecutablePlan(t *testing.T) {
 	}
 }
 
+func TestEvalPipelineExecutablePlanCloneUsesRunnerWithoutPayload(t *testing.T) {
+	src := "10 20 30 40 where 1010b"
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) failed", src)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
+	}
+	runnerOnly := EvalPipelineExecutablePlan{
+		backend: executable.backend,
+		kind:    executable.kind,
+		runner:  executable.runner,
+	}
+	cloned := cloneEvalPipelineExecutablePlan(runnerOnly)
+	if !cloned.Valid() {
+		t.Fatalf("cloned runner-only executable is invalid: %#v", cloned)
+	}
+	out, handled, err := NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRef(&cloned)
+	if err != nil || !handled {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlanRef cloned runner-only = %#v,%v,%v", out, handled, err)
+	}
+	if !qEvalPipelineTestValueEqual(out, data.NewI64([]int64{10, 30})) {
+		t.Fatalf("cloned runner-only output = %#v, want 10 30", out)
+	}
+}
+
 func TestEvalSessionCachesExpressionExecutablePlan(t *testing.T) {
 	session := NewEvalSession(nil)
 	src := "10 20 30 40 where 1010b"

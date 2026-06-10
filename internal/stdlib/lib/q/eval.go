@@ -1125,11 +1125,7 @@ func cloneQScriptExecutablePlan(in *qScriptExecutablePlan) *qScriptExecutablePla
 }
 
 func cloneEvalPipelineExecutablePlan(in EvalPipelineExecutablePlan) EvalPipelineExecutablePlan {
-	out := in
-	out.expression = cloneQPipelinePlan(in.expression)
-	out.script = cloneQScriptPipelineDescriptor(in.script)
-	out.runner = evalPipelineExecutableRunner(out.kind, out.expression, out.script)
-	return out
+	return in.clone()
 }
 
 func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
