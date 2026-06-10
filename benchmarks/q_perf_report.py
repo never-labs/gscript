@@ -175,6 +175,21 @@ class RuntimeBridgeEfficiencyRow:
 
 
 @dataclass
+class RuntimeArrayBridgeRow:
+    scope: str
+    benchmark_count: int
+    attempts_op: float
+    bulk_hits_op: float
+    fallbacks_op: float
+    errors_op: float
+    bulk_hit_pct: float | None
+    rows_op: float
+    avg_allocs_op: float | None
+    max_allocs_op: float | None
+    note: str = ""
+
+
+@dataclass
 class PipelineFallbackTopRow:
     category: str
     pipeline_shape: str
@@ -207,6 +222,8 @@ class GatePolicy:
     max_jit_backend_slow_route_pct: float = 0.0
     min_runtime_direct_bridge_share_pct: float = 95.0
     max_runtime_allocs_per_direct_call: float = 32.0
+    min_q_array_bridge_bulk_hit_pct: float = 95.0
+    max_q_array_bridge_fallbacks_op: float = 0.0
 
 
 @dataclass
@@ -741,6 +758,39 @@ def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[R
     ]
 
 
+def build_runtime_array_bridge_summary(rows: dict[str, BenchRow]) -> list[RuntimeArrayBridgeRow]:
+    runtime_rows = build_runtime_metric_rows(rows)
+    array_rows = [
+        row
+        for row in runtime_rows
+        if row.q_array_bridge_bulk_hits_op is not None
+        or row.q_array_bridge_fallbacks_op is not None
+        or row.q_array_bridge_errors_op is not None
+    ]
+    if not array_rows:
+        return []
+    bulk_hits = sum(row.q_array_bridge_bulk_hits_op or 0.0 for row in array_rows)
+    fallbacks = sum(row.q_array_bridge_fallbacks_op or 0.0 for row in array_rows)
+    errors = sum(row.q_array_bridge_errors_op or 0.0 for row in array_rows)
+    attempts = bulk_hits + fallbacks + errors
+    alloc_values = [row.allocs_op for row in array_rows if row.allocs_op is not None]
+    return [
+        RuntimeArrayBridgeRow(
+            scope="methodjit_array_bridge",
+            benchmark_count=len(array_rows),
+            attempts_op=attempts,
+            bulk_hits_op=bulk_hits,
+            fallbacks_op=fallbacks,
+            errors_op=errors,
+            bulk_hit_pct=(100 * bulk_hits / attempts) if attempts > 0 else None,
+            rows_op=sum(row.q_array_bridge_rows_op or 0.0 for row in array_rows),
+            avg_allocs_op=average(alloc_values),
+            max_allocs_op=max(alloc_values) if alloc_values else None,
+            note="MethodJIT q array bridge route split; bulk hits avoid row-wise Array.At fallback",
+        )
+    ]
+
+
 def average(values: list[float]) -> float | None:
     if not values:
         return None
@@ -1147,6 +1197,41 @@ def runtime_bridge_efficiency_gate_checks(rows: dict[str, BenchRow], policy: Gat
     return checks
 
 
+def runtime_array_bridge_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    for item in build_runtime_array_bridge_summary(rows):
+        if item.bulk_hit_pct is not None:
+            checks.append(
+                GateCheck(
+                    signal="q_array_bridge_bulk_hit_pct",
+                    benchmark=item.scope,
+                    value=item.bulk_hit_pct,
+                    threshold=f">= {policy.min_q_array_bridge_bulk_hit_pct:g}",
+                    status=(
+                        "pass"
+                        if item.bulk_hit_pct >= policy.min_q_array_bridge_bulk_hit_pct
+                        else "fail"
+                    ),
+                    note=item.note,
+                )
+            )
+        checks.append(
+            GateCheck(
+                signal="q_array_bridge_fallbacks_op",
+                benchmark=item.scope,
+                value=item.fallbacks_op,
+                threshold=f"<= {policy.max_q_array_bridge_fallbacks_op:g}",
+                status=(
+                    "pass"
+                    if item.fallbacks_op <= policy.max_q_array_bridge_fallbacks_op
+                    else "fail"
+                ),
+                note=item.note,
+            )
+        )
+    return checks
+
+
 def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
     return (
         ratio_gate_checks(rows, policy)
@@ -1154,6 +1239,7 @@ def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[Gat
         + observability_gate_checks(rows, policy)
         + runtime_health_gate_checks(rows, policy)
         + runtime_bridge_efficiency_gate_checks(rows, policy)
+        + runtime_array_bridge_gate_checks(rows, policy)
     )
 
 
@@ -1249,6 +1335,7 @@ def markdown_report(
     observability = build_runtime_observability_summary(rows)
     health = build_runtime_health_summary(rows)
     bridge_efficiency = build_runtime_bridge_efficiency_summary(rows)
+    array_bridge = build_runtime_array_bridge_summary(rows)
     category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -1496,6 +1583,31 @@ def markdown_report(
     lines.extend(
         [
             "",
+            "## Runtime Array Bridge Summary",
+            "",
+            "| Scope | Benchmarks | attempts/op | bulk hits/op | fallbacks/op | errors/op | bulk hit pct | rows/op | avg allocs/op | max allocs/op | Note |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    if array_bridge:
+        for item in array_bridge:
+            lines.append(
+                f"| {item.scope} | {item.benchmark_count} | "
+                f"{item.attempts_op:.3f} | "
+                f"{item.bulk_hits_op:.3f} | "
+                f"{item.fallbacks_op:.3f} | "
+                f"{item.errors_op:.3f} | "
+                f"{format_metric(item.bulk_hit_pct, 1)} | "
+                f"{format_metric(item.rows_op, 0)} | "
+                f"{format_metric(item.avg_allocs_op, 1)} | "
+                f"{format_metric(item.max_allocs_op, 1)} | "
+                f"{item.note} |"
+            )
+    else:
+        lines.append("| missing | 0 | 0 | 0 | 0 | 0 | missing | 0 | missing | missing | no q array bridge metrics parsed |")
+    lines.extend(
+        [
+            "",
             "## Fallback Shape Summary",
             "",
             "| Benchmark | fallbacks/op | typed_kernel_fallbacks/op | typed_pipeline_fallback_shapes |",
@@ -1605,6 +1717,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-jit-backend-slow-route-pct", type=float, default=0.0)
     parser.add_argument("--min-runtime-direct-bridge-share-pct", type=float, default=95.0)
     parser.add_argument("--max-runtime-allocs-per-direct-call", type=float, default=32.0)
+    parser.add_argument("--min-q-array-bridge-bulk-hit-pct", type=float, default=95.0)
+    parser.add_argument("--max-q-array-bridge-fallbacks-op", type=float, default=0.0)
     parser.add_argument("--fallback-top-n", type=int, default=20)
     args = parser.parse_args(argv)
 
@@ -1672,6 +1786,8 @@ def main(argv: list[str]) -> int:
         max_jit_backend_slow_route_pct=args.max_jit_backend_slow_route_pct,
         min_runtime_direct_bridge_share_pct=args.min_runtime_direct_bridge_share_pct,
         max_runtime_allocs_per_direct_call=args.max_runtime_allocs_per_direct_call,
+        min_q_array_bridge_bulk_hit_pct=args.min_q_array_bridge_bulk_hit_pct,
+        max_q_array_bridge_fallbacks_op=args.max_q_array_bridge_fallbacks_op,
     )
     gate_checks = build_gate_checks(rows, policy) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
@@ -1687,6 +1803,7 @@ def main(argv: list[str]) -> int:
         "runtime_observability_summary": [asdict(row) for row in build_runtime_observability_summary(rows)],
         "runtime_health_summary": [asdict(row) for row in build_runtime_health_summary(rows)],
         "runtime_bridge_efficiency_summary": [asdict(row) for row in build_runtime_bridge_efficiency_summary(rows)],
+        "runtime_array_bridge_summary": [asdict(row) for row in build_runtime_array_bridge_summary(rows)],
         "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
         "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),

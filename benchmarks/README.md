@@ -254,6 +254,18 @@ depending on a specific optimizer implementation:
 | `direct call share` | direct calls divided by direct plus slow calls | gate with `--min-runtime-direct-bridge-share-pct` |
 | `allocs/direct call` | average `allocs/op` divided by direct calls/op | gate with `--max-runtime-allocs-per-direct-call` |
 
+The `Runtime Array Bridge Summary` section is the focused MethodJIT q array
+bridge gate. It consumes the `q_array_bridge_*` benchmark counters directly, so
+bulk export regressions are visible without inferring them from the broader
+runtime bridge aggregate:
+
+| Field | Meaning | Regression signal |
+|---|---|---|
+| `bulk hits/op` | arrays converted through typed bulk export | should cover supported primitive and symbol carriers |
+| `fallbacks/op` | arrays converted through row-wise fallback | gate with `--max-q-array-bridge-fallbacks-op` |
+| `bulk hit pct` | bulk hits divided by bulk hits plus fallback/error routes | gate with `--min-q-array-bridge-bulk-hit-pct` |
+| `rows/op` | array rows observed by the bridge benchmarks | sanity check that route counters cover meaningful data volume |
+
 Use this stricter gate after bulk export, direct return, executable backend, or
 typed kernel changes:
 
@@ -263,6 +275,8 @@ python3 benchmarks/q_perf_report.py \
   --check \
   --min-runtime-direct-bridge-share-pct=95 \
   --max-runtime-allocs-per-direct-call=32 \
+  --min-q-array-bridge-bulk-hit-pct=95 \
+  --max-q-array-bridge-fallbacks-op=0 \
   --max-jit-backend-slow-route-pct=0 \
   --max-jit-typed-errors-op=0
 ```
@@ -285,6 +299,8 @@ python3 benchmarks/q_perf_report.py \
   --check \
   --min-runtime-direct-bridge-share-pct=95 \
   --max-runtime-allocs-per-direct-call=32 \
+  --min-q-array-bridge-bulk-hit-pct=95 \
+  --max-q-array-bridge-fallbacks-op=0 \
   --markdown /tmp/q_perf_report.md \
   --json /tmp/q_perf_report.json
 ```

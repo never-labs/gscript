@@ -197,6 +197,23 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(efficiency.avg_allocs_op, 8302 / 6)
         self.assertAlmostEqual(efficiency.allocs_per_direct_call, (8302 / 6) / 4.8)
 
+    def test_runtime_array_bridge_summary_exposes_bulk_hit_and_fallback_counts(self):
+        rows = report.parse_go_benchmarks(SAMPLE_ARRAY_BRIDGE)
+        summary = report.build_runtime_array_bridge_summary(rows)
+
+        self.assertEqual(len(summary), 1)
+        bridge = summary[0]
+        self.assertEqual(bridge.scope, "methodjit_array_bridge")
+        self.assertEqual(bridge.benchmark_count, 2)
+        self.assertEqual(bridge.attempts_op, 2)
+        self.assertEqual(bridge.bulk_hits_op, 1)
+        self.assertEqual(bridge.fallbacks_op, 1)
+        self.assertEqual(bridge.errors_op, 0)
+        self.assertEqual(bridge.bulk_hit_pct, 50)
+        self.assertEqual(bridge.rows_op, 16384)
+        self.assertEqual(bridge.avg_allocs_op, 4097)
+        self.assertEqual(bridge.max_allocs_op, 8193)
+
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
         policy = report.GatePolicy(
@@ -252,6 +269,23 @@ class QPerfReportTest(unittest.TestCase):
 
         self.assertIn(("runtime_bridge_direct_call_share_pct", "typed_runtime_and_jit_backend"), failed)
         self.assertIn(("runtime_bridge_allocs_per_direct_call", "typed_runtime_and_jit_backend"), failed)
+
+    def test_gate_checks_cover_runtime_array_bridge_direct_metrics(self):
+        rows = report.parse_go_benchmarks(SAMPLE_ARRAY_BRIDGE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=10000,
+            min_q_array_bridge_bulk_hit_pct=90,
+            max_q_array_bridge_fallbacks_op=0,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("q_array_bridge_bulk_hit_pct", "methodjit_array_bridge"), failed)
+        self.assertIn(("q_array_bridge_fallbacks_op", "methodjit_array_bridge"), failed)
 
     def test_runtime_bridge_efficiency_sample_passes_strict_gate(self):
         rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY)
@@ -355,6 +389,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertEqual(payload["runtime_health_summary"][0]["scope"], "q_runtime_hotpath")
             self.assertIn("runtime_bridge_efficiency_summary", payload)
             self.assertEqual(payload["runtime_bridge_efficiency_summary"][0]["scope"], "typed_runtime_and_jit_backend")
+            self.assertIn("runtime_array_bridge_summary", payload)
             self.assertIn("pipeline_category_metrics", payload)
             self.assertIn("pipeline_fallback_top", payload)
             self.assertIn("fallback_shape_summary", payload)
@@ -367,6 +402,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("Runtime Observability Summary", markdown)
             self.assertIn("Runtime Health Summary", markdown)
             self.assertIn("Runtime Bridge Efficiency", markdown)
+            self.assertIn("Runtime Array Bridge Summary", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
 
@@ -374,8 +410,11 @@ class QPerfReportTest(unittest.TestCase):
         readme = (Path(__file__).resolve().parent / "README.md").read_text()
 
         self.assertIn("Runtime Bridge Efficiency", readme)
+        self.assertIn("Runtime Array Bridge Summary", readme)
         self.assertIn("--min-runtime-direct-bridge-share-pct", readme)
         self.assertIn("--max-runtime-allocs-per-direct-call", readme)
+        self.assertIn("--min-q-array-bridge-bulk-hit-pct", readme)
+        self.assertIn("--max-q-array-bridge-fallbacks-op", readme)
         self.assertIn("direct bridge", readme)
 
     def test_main_check_returns_nonzero_for_gate_failures(self):
