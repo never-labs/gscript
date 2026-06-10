@@ -5554,6 +5554,10 @@ func TestEvalControlSpecialForms(t *testing.T) {
 	assertEvalValue(t, "a:0;if[0;a:42];a", int64(0))
 	assertEvalValue(t, "a:0;do[3;a:a+2];a", int64(6))
 	assertEvalValue(t, "i:0;while[i<3;i:i+1];i", int64(3))
+	assertEvalValue(t, "a:0;b:0;if[1;a:10;b:a+5];b", int64(15))
+	assertEvalValue(t, "a:0;b:0;if[0;a:10;b:a+5];b", int64(0))
+	assertEvalValue(t, "a:0;b:0;do[3;a:a+1;b:b+a];b", int64(6))
+	assertEvalValue(t, "i:0;s:0;while[i<3;i:i+1;s:s+i];s", int64(6))
 }
 
 func TestEvalSqrtLogUnaryVerbs(t *testing.T) {

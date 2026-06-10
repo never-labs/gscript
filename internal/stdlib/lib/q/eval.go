@@ -1759,7 +1759,8 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 	switch name {
 	case "if":
 		args := splitQBracketFormArgs(inner)
-		if len(args) != 2 {
+		body, ok := qControlBodyScript(args)
+		if !ok {
 			return nil, true, fmt.Errorf("if[] expects condition and body")
 		}
 		cond, err := s.eval(args[0])
@@ -1773,11 +1774,12 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 		if !truth {
 			return data.NullValue, true, nil
 		}
-		out, err := s.evalScript(args[1])
+		out, err := s.evalScript(body)
 		return out, true, err
 	case "do":
 		args := splitQBracketFormArgs(inner)
-		if len(args) != 2 {
+		body, ok := qControlBodyScript(args)
+		if !ok {
 			return nil, true, fmt.Errorf("do[] expects count and body")
 		}
 		countValue, err := s.eval(args[0])
@@ -1790,7 +1792,7 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 		}
 		var out any = data.NullValue
 		for i := int64(0); i < count; i++ {
-			out, err = s.evalScript(args[1])
+			out, err = s.evalScript(body)
 			if err != nil {
 				return nil, true, err
 			}
@@ -1798,7 +1800,8 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 		return out, true, nil
 	case "while":
 		args := splitQBracketFormArgs(inner)
-		if len(args) != 2 {
+		body, ok := qControlBodyScript(args)
+		if !ok {
 			return nil, true, fmt.Errorf("while[] expects condition and body")
 		}
 		var out any = data.NullValue
@@ -1814,7 +1817,7 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 			if !truth {
 				return out, true, nil
 			}
-			out, err = s.evalScript(args[1])
+			out, err = s.evalScript(body)
 			if err != nil {
 				return nil, true, err
 			}
@@ -1822,6 +1825,13 @@ func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+func qControlBodyScript(args []string) (string, bool) {
+	if len(args) < 2 {
+		return "", false
+	}
+	return strings.Join(args[1:], ";"), true
 }
 
 func parseNamedBracketForm(src string) (string, string, bool) {
