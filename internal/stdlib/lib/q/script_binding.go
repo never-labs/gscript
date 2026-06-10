@@ -121,6 +121,9 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if plan := buildQScriptReshapeBindingPlan(src); plan.kind != qScriptBindingInvalid {
 		return plan
 	}
+	if plan := buildQScriptWordDyadicBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
 		if err != nil || !ok {
@@ -213,6 +216,35 @@ func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
 			return qScriptBindingPlan{}
 		}
 		return qScriptBindingBinaryPlan("sublist", indexPlan, valuePlan)
+	}
+	return qScriptBindingPlan{}
+}
+
+// qScriptWordDyadicOps are pure infix word verbs the binary binding evaluator
+// already routes through the shared dyadic verb table (evalValueBinary →
+// lookupDyadicVerbFunc), so binding plans for them keep eval semantics while
+// gaining plan reuse and literal-operand caching.
+var qScriptWordDyadicOps = []string{"mod", "div", "min", "max", "xbar"}
+
+func buildQScriptWordDyadicBindingPlan(src string) qScriptBindingPlan {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return qScriptBindingPlan{}
+	}
+	for _, op := range qScriptWordDyadicOps {
+		leftExpr, rightExpr, ok := splitTopLevelWord(src, op)
+		if !ok {
+			continue
+		}
+		left := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(leftExpr)), nil)
+		if left.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		right := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(rightExpr)), nil)
+		if right.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingBinaryPlan(op, left, right)
 	}
 	return qScriptBindingPlan{}
 }

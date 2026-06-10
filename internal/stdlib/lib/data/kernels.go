@@ -6694,7 +6694,10 @@ func TryTypedDeltas(array Array) (Array, bool, error) {
 	case nullableArray:
 		return deltasNullableArray(a)
 	default:
-		return nil, false, nil
+		// Lazy numeric carriers (scalar-dyadic chains, tiled views, ...) flatten
+		// through the typed each-prior kernel: deltas is each-prior subtraction
+		// over a null-free vector.
+		return TryTypedEachPriorDyadic(OpSub, nil, array)
 	}
 }
 
@@ -11007,6 +11010,74 @@ func qNumericUnaryReturnsFloat(op string) bool {
 }
 
 func qNumericUnarySumIntegerArray(op string, array Array) (any, bool, error) {
+	switch op {
+	case NumericUnaryNeg, NumericUnaryAbs, NumericUnarySignum,
+		NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan,
+		NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
+		if values, owned, ok := tryBulkI64Values(array); ok {
+			out, handled, err := qNumericUnarySumI64Values(op, values)
+			bulkI64Release(values, owned)
+			return out, handled, err
+		}
+	}
+	return qNumericUnarySumIntegerArraySlow(op, array)
+}
+
+// qNumericUnarySumI64Values reduces a unary primitive over bulk-materialized
+// integer values in one tight loop, mirroring the per-row loop semantics
+// (minInt64 bails out to the generic fallback, float primitives accumulate
+// through applyNumericUnaryFloat).
+func qNumericUnarySumI64Values(op string, values []int64) (any, bool, error) {
+	const minInt64 = -1 << 63
+	switch op {
+	case NumericUnaryNeg:
+		var sum int64
+		for _, value := range values {
+			if value == minInt64 {
+				return nil, false, nil
+			}
+			sum -= value
+		}
+		return sum, true, nil
+	case NumericUnaryAbs:
+		var sum int64
+		for _, value := range values {
+			if value == minInt64 {
+				return nil, false, nil
+			}
+			if value < 0 {
+				value = -value
+			}
+			sum += value
+		}
+		return sum, true, nil
+	case NumericUnarySignum:
+		var sum int64
+		for _, value := range values {
+			switch {
+			case value < 0:
+				sum--
+			case value > 0:
+				sum++
+			}
+		}
+		return sum, true, nil
+	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
+		var sum float64
+		for _, value := range values {
+			out, err := applyNumericUnaryFloat(op, float64(value))
+			if err != nil {
+				return nil, true, err
+			}
+			sum += out
+		}
+		return sum, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func qNumericUnarySumIntegerArraySlow(op string, array Array) (any, bool, error) {
 	const minInt64 = -1 << 63
 	switch op {
 	case NumericUnaryNeg:

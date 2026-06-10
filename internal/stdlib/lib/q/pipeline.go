@@ -1291,10 +1291,35 @@ func splitQPipelineModExpr(src string) (string, string, bool) {
 
 func qPipelineDeltasInput(src string) (string, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
-	if !strings.HasPrefix(src, "deltas ") || !wordBoundary(src, 0, len("deltas")) {
+	if strings.HasPrefix(src, "deltas ") && wordBoundary(src, 0, len("deltas")) {
+		input := strings.TrimSpace(src[len("deltas "):])
+		if input == "" {
+			return "", false
+		}
+		return input, true
+	}
+	// Each-prior subtraction is deltas-shaped: `-':x` and `(-':)[x]` reduce
+	// through the same typed deltas-sum kernel, with the boxed each-prior path
+	// kept as the fallback for kinds the kernel does not handle.
+	input := ""
+	switch {
+	case strings.HasPrefix(src, "-':"):
+		input = strings.TrimSpace(src[len("-':"):])
+	case strings.HasPrefix(src, "(-':)"):
+		input = strings.TrimSpace(src[len("(-':)"):])
+		if strings.HasPrefix(input, "[") {
+			if !strings.HasSuffix(input, "]") {
+				return "", false
+			}
+			inner := strings.TrimSpace(input[1 : len(input)-1])
+			if inner == "" || strings.ContainsAny(inner, ";[](){}\"") {
+				return "", false
+			}
+			input = inner
+		}
+	default:
 		return "", false
 	}
-	input := strings.TrimSpace(src[len("deltas "):])
 	if input == "" {
 		return "", false
 	}
