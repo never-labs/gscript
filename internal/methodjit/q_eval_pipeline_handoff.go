@@ -528,7 +528,7 @@ func (b qRuntimeEvalPipelineBackend) ExecuteQEvalPipelinePlan(ref QEvalPipelineP
 	if _, ok := b.LookupQEvalPipelinePlan(ref); !ok {
 		return nil, false, nil
 	}
-	if executable, ok := b.lookupExecutablePlan(ref); ok && b.canUseExecutablePlan() {
+	if executable, ok := b.lookupExecutablePlan(ref); ok {
 		return b.executeEvalPipelineExecutablePlan(executable)
 	}
 	if backendPlan, ok := b.lookupBackendPlan(ref); ok {
@@ -546,22 +546,6 @@ func (b qRuntimeEvalPipelineBackend) lookupExecutablePlan(ref QEvalPipelinePlanR
 	}
 	plan, ok := b.executablePlanByID[ref.ID]
 	return plan, ok && plan.Valid()
-}
-
-func (b qRuntimeEvalPipelineBackend) canUseExecutablePlan() bool {
-	if b.executeExecutable != nil {
-		return true
-	}
-	if b.executeBackendPlan != nil && !sameQEvalPipelineBackendPlanExecutor(b.executeBackendPlan, stdq.ExecuteEvalPipelineBackendPlan) {
-		return false
-	}
-	if b.executeDescriptor != nil && !sameQEvalPipelineDescriptorExecutor(b.executeDescriptor, stdq.ExecuteEvalPipelineDescriptor) {
-		return false
-	}
-	if b.executeSource != nil && !sameQEvalPipelineSourceExecutor(b.executeSource, stdq.ExecuteEvalPipeline) {
-		return false
-	}
-	return true
 }
 
 func (b qRuntimeEvalPipelineBackend) lookupBackendPlan(ref QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool) {

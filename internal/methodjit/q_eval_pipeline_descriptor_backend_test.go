@@ -11,7 +11,7 @@ import (
 
 var qEvalPipelineDescriptorBenchmarkSink runtime.Value
 
-func TestQEvalPipelineRuntimeBackendPrefersBackendPlanOverSourcePlanner(t *testing.T) {
+func TestQEvalPipelineRuntimeBackendPrefersExecutablePlanOverFallbacks(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		src  string
@@ -31,10 +31,7 @@ func TestQEvalPipelineRuntimeBackendPrefersBackendPlanOverSourcePlanner(t *testi
 			sourceCalls := 0
 			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 				backendPlanCalls++
-				if plan.Descriptor.Source != "not a q pipeline" {
-					t.Fatalf("backend plan Source = %q, want preserved ref source sentinel", plan.Descriptor.Source)
-				}
-				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+				return nil, false, errors.New("backend plan fallback should not execute when executable plan is available")
 			}
 			backend.executeSource = func(source string) (any, bool, error) {
 				sourceCalls++
@@ -48,8 +45,8 @@ func TestQEvalPipelineRuntimeBackendPrefersBackendPlanOverSourcePlanner(t *testi
 			if !handled || !value.IsInt() || value.Int() != tc.want {
 				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int %d handled", value, handled, tc.want)
 			}
-			if backendPlanCalls != 1 || sourceCalls != 0 {
-				t.Fatalf("backend plan/source calls = %d/%d, want 1/0", backendPlanCalls, sourceCalls)
+			if backendPlanCalls != 0 || sourceCalls != 0 {
+				t.Fatalf("backend plan/source calls = %d/%d, want 0/0", backendPlanCalls, sourceCalls)
 			}
 		})
 	}
@@ -73,7 +70,7 @@ func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing
 			backendPlanCalls := 0
 			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 				backendPlanCalls++
-				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+				return nil, false, errors.New("backend plan fallback should not execute when executable plan is available")
 			}
 			backend.executeSource = func(source string) (any, bool, error) {
 				return nil, false, errors.New("source planner fallback should not execute")
@@ -86,8 +83,8 @@ func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing
 			if !handled || !value.IsFloat() || value.Float() != tc.want {
 				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want float %v handled", value, handled, tc.want)
 			}
-			if backendPlanCalls != 1 {
-				t.Fatalf("backend plan calls = %d, want 1", backendPlanCalls)
+			if backendPlanCalls != 0 {
+				t.Fatalf("backend plan calls = %d, want 0", backendPlanCalls)
 			}
 		})
 	}
@@ -118,7 +115,7 @@ func TestQEvalPipelineRuntimeBackendExecutesMathPrimitiveBackendPlan(t *testing.
 			sourceCalls := 0
 			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 				backendPlanCalls++
-				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+				return nil, false, errors.New("backend plan fallback should not execute when executable plan is available")
 			}
 			backend.executeSource = func(source string) (any, bool, error) {
 				sourceCalls++
@@ -132,8 +129,8 @@ func TestQEvalPipelineRuntimeBackendExecutesMathPrimitiveBackendPlan(t *testing.
 			if !handled || !value.IsFloat() || value.Float() != tc.want {
 				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want float %v handled", value, handled, tc.want)
 			}
-			if backendPlanCalls != 1 || sourceCalls != 0 {
-				t.Fatalf("backend plan/source calls = %d/%d, want 1/0", backendPlanCalls, sourceCalls)
+			if backendPlanCalls != 0 || sourceCalls != 0 {
+				t.Fatalf("backend plan/source calls = %d/%d, want 0/0", backendPlanCalls, sourceCalls)
 			}
 		})
 	}
@@ -173,7 +170,7 @@ func TestQEvalPipelineRuntimeBackendExecutesFusedRuntimeShapes(t *testing.T) {
 			sourceCalls := 0
 			backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 				backendPlanCalls++
-				return stdq.ExecuteEvalPipelineBackendPlan(plan)
+				return nil, false, errors.New("backend plan fallback should not execute when executable plan is available")
 			}
 			backend.executeSource = func(source string) (any, bool, error) {
 				sourceCalls++
@@ -194,8 +191,8 @@ func TestQEvalPipelineRuntimeBackendExecutesFusedRuntimeShapes(t *testing.T) {
 			} else if !value.IsInt() || value.Int() != tc.wantInt {
 				t.Fatalf("executeQEvalPipelinePlanValue = %v, want int %d", value, tc.wantInt)
 			}
-			if backendPlanCalls != 1 || sourceCalls != 0 {
-				t.Fatalf("backend plan/source calls = %d/%d, want 1/0", backendPlanCalls, sourceCalls)
+			if backendPlanCalls != 0 || sourceCalls != 0 {
+				t.Fatalf("backend plan/source calls = %d/%d, want 0/0", backendPlanCalls, sourceCalls)
 			}
 		})
 	}
@@ -378,7 +375,7 @@ func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 	backendPlanCalls := 0
 	cf.QEvalPipelineBackend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 		backendPlanCalls++
-		return stdq.ExecuteEvalPipelineBackendPlan(plan)
+		return nil, false, errors.New("backend plan fallback should not execute when executable plan is available")
 	}
 	cf.QEvalPipelineBackend.executeSource = func(source string) (any, bool, error) {
 		return nil, false, errors.New("source planner fallback should not execute")
@@ -391,8 +388,8 @@ func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 	if !handled || !value.IsInt() || value.Int() != 8388608 {
 		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 8388608 handled", value, handled)
 	}
-	if backendPlanCalls != 1 {
-		t.Fatalf("backend plan calls = %d, want compiled function backend to be reused", backendPlanCalls)
+	if backendPlanCalls != 0 {
+		t.Fatalf("backend plan calls = %d, want compiled function executable backend to be reused", backendPlanCalls)
 	}
 }
 
