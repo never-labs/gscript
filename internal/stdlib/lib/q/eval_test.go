@@ -565,6 +565,61 @@ func TestQPipelineExecutablePlanCoversRuntimeDyadicWhere(t *testing.T) {
 	}
 }
 
+func TestEvalPipelineDescriptorExecutionUsesExecutablePlan(t *testing.T) {
+	src := "10 20 30 40 where 1010b"
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) failed", src)
+	}
+	descriptorOut, descriptorHandled, descriptorErr := ExecuteEvalPipelineDescriptor(backend.Descriptor)
+	if descriptorErr != nil || !descriptorHandled {
+		t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v", descriptorOut, descriptorHandled, descriptorErr)
+	}
+	executable, ok := CompileEvalPipelineDescriptor(backend.Descriptor)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineDescriptor(%q) failed", src)
+	}
+	executableOut, executableHandled, executableErr := NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+	if executableErr != nil || !executableHandled {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v", executableOut, executableHandled, executableErr)
+	}
+	if !qEvalPipelineTestValueEqual(descriptorOut, executableOut) {
+		t.Fatalf("descriptor/executable mismatch: %#v vs %#v", descriptorOut, executableOut)
+	}
+}
+
+func TestEvalSessionCachesExpressionExecutablePlan(t *testing.T) {
+	session := NewEvalSession(nil)
+	src := "10 20 30 40 where 1010b"
+	out, err := session.Eval(src)
+	if err != nil {
+		t.Fatalf("EvalSession.Eval: %v", err)
+	}
+	if !qEvalPipelineTestValueEqual(out, data.NewI64([]int64{10, 30})) {
+		t.Fatalf("EvalSession.Eval = %#v, want 10 30", out)
+	}
+	entry := session.cache[src]
+	if entry == nil || !entry.executable.Valid() || entry.descriptor.Kind != "expression" {
+		t.Fatalf("session cache entry = %#v, want expression executable plan", entry)
+	}
+}
+
+func TestEvalSessionMultiStatementFallbackDoesNotCompileAsExpression(t *testing.T) {
+	session := NewEvalSession(nil)
+	src := "x:til 8192;idx:where x>=0;+/idx"
+	got, err := session.Eval(src)
+	if err != nil || got != int64(33550336) {
+		t.Fatalf("EvalSession.Eval = %#v,%v; want 33550336,nil", got, err)
+	}
+	entry := session.cache[src]
+	if entry == nil {
+		t.Fatalf("session cache missing %q", src)
+	}
+	if entry.executable.Valid() {
+		t.Fatalf("session cache executable = %#v, want ordinary script fallback", entry.executable)
+	}
+}
+
 func TestQPipelinePlanRecognizesNumericUnaryComposedShapes(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1696,6 +1751,49 @@ func TestExecuteEvalPipelineRunsOnlyRecognizedRuntimePlans(t *testing.T) {
 	got, handled, err = ExecuteEvalPipeline("1+2")
 	if err != nil || handled || got != nil {
 		t.Fatalf("ExecuteEvalPipeline unsupported = %#v, %v, %v; want nil,false,nil", got, handled, err)
+	}
+}
+
+func TestEvalPipelineBackendEntrypointsShareExecutablePlan(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want any
+	}{
+		{name: "expression", src: "+/deltas til 8", want: int64(7)},
+		{name: "script", src: "x:til 16;y:x*3;idx:where x>=8;+/y[idx]", want: int64(276)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			descriptor, ok := DescribeEvalPipeline(tc.src)
+			if !ok {
+				t.Fatalf("DescribeEvalPipeline(%q) did not recognize pipeline", tc.src)
+			}
+			backend, ok := DescribeEvalPipelineBackendPlan(tc.src)
+			if !ok {
+				t.Fatalf("DescribeEvalPipelineBackendPlan(%q) did not recognize pipeline", tc.src)
+			}
+			executable, ok := CompileEvalPipelineBackendPlan(backend)
+			if !ok {
+				t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", tc.src)
+			}
+
+			for _, run := range []struct {
+				name string
+				call func() (any, bool, error)
+			}{
+				{name: "source", call: func() (any, bool, error) { return ExecuteEvalPipeline(tc.src) }},
+				{name: "descriptor", call: func() (any, bool, error) { return ExecuteEvalPipelineDescriptor(descriptor) }},
+				{name: "backend", call: func() (any, bool, error) { return ExecuteEvalPipelineBackendPlan(backend) }},
+				{name: "executable", call: func() (any, bool, error) {
+					return NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+				}},
+			} {
+				got, handled, err := run.call()
+				if err != nil || !handled || got != tc.want {
+					t.Fatalf("%s pipeline run = %#v,%v,%v; want %#v,true,nil", run.name, got, handled, err, tc.want)
+				}
+			}
+		})
 	}
 }
 
@@ -4423,6 +4521,31 @@ func TestEvalDyadicMinMaxReduceUsesTypedPipeline(t *testing.T) {
 	}
 	if !seenKernel["vector-reduce/sum-dyadic-min/i64/i64"] || !seenKernel["vector-reduce/sum-dyadic-max/i64/i64"] {
 		t.Fatalf("missing dyadic min/max reduce typed kernels: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
+func TestEvalRatiosUsesTypedCarrier(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalArray(t, "ratios 2 0N 8 16", data.KindF64, []any{2.0, data.NullValue, 8.0, 2.0})
+	assertEvalValue(t, "+/ratios 2 0N 8 16", 12.0)
+
+	seenRatios := false
+	seenSum := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected ratios typed runtime fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayRatios" && stat.Shape == "vector-scan/ratios/i64" && stat.Outcome == "hit" {
+			seenRatios = true
+		}
+		if stat.Kernel == "SequenceTransformSum" && stat.Shape == "vector-reduce/sum-ratios/i64" && stat.Outcome == "hit" {
+			seenSum = true
+		}
+	}
+	if !seenRatios || !seenSum {
+		t.Fatalf("missing ratios typed carrier/pipeline sum hits: %#v", RuntimeKernelExecutionStats())
 	}
 }
 

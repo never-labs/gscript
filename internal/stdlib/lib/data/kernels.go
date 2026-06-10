@@ -5999,6 +5999,8 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return f64RangeSum(a), true, nil
 	case f64NumericDyadicArray:
 		return f64NumericDyadicSum(a)
+	case qRatiosArray:
+		return TryTypedRatiosSum(a.source)
 	case f64BucketArray:
 		return f64BucketSum(a)
 	case f64FillArray:
@@ -6594,6 +6596,8 @@ func TryTypedRatiosSum(array Array) (any, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedRatiosSum(a.array)
+	case qRatiosArray:
+		return TryTypedRatiosSum(a.source)
 	}
 	if !isNumericArray(array) {
 		return nil, false, nil
@@ -6607,6 +6611,94 @@ func TryTypedRatiosSum(array Array) (any, bool, error) {
 		return nil, true, err
 	}
 	return total, true, nil
+}
+
+// TryTypedQRatios returns a lazy typed carrier for q's ratios primitive. This
+// keeps q list evaluation on the shared data numeric producer path without
+// changing data.VectorTransformExpr("ratios"), whose first-row null semantics
+// are query-engine specific.
+func TryTypedQRatios(array Array) (Array, bool, error) {
+	switch a := array.(type) {
+	case attributedArray:
+		out, handled, err := TryTypedQRatios(a.array)
+		if err != nil || !handled {
+			return out, handled, err
+		}
+		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+	}
+	if !isNumericArray(array) {
+		return nil, false, nil
+	}
+	return qRatiosArray{source: array}, true, nil
+}
+
+type qRatiosArray struct {
+	source Array
+}
+
+func (a qRatiosArray) Kind() Kind { return KindF64 }
+
+func (a qRatiosArray) Len() int { return a.source.Len() }
+
+func (a qRatiosArray) At(row int) (any, bool) {
+	value, ok, err := a.f64At(row)
+	if err != nil || !ok {
+		return NullValue, err == nil
+	}
+	return value, true
+}
+
+func (a qRatiosArray) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.f64At(row)
+		if err != nil {
+			panic(fmt.Sprintf("data q ratios row %d: %v", row, err))
+		}
+		if !ok {
+			out[row] = NullValue
+			continue
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a qRatiosArray) Gather(indexes []int) Array {
+	out := make([]any, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.f64At(row)
+		if err != nil {
+			panic(fmt.Sprintf("data q ratios gather index %d: %v", row, err))
+		}
+		if !ok {
+			out[i] = NullValue
+			continue
+		}
+		out[i] = value
+	}
+	return nullableArray{kind: KindF64, data: out}
+}
+
+func (a qRatiosArray) f64At(row int) (float64, bool, error) {
+	if row < 0 || row >= a.Len() {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	current, currentOK, err := typedKernels.NumericAt(a.source, row)
+	if err != nil || !currentOK {
+		return 0, currentOK, err
+	}
+	if row == 0 {
+		return current, true, nil
+	}
+	previous, previousOK, err := typedKernels.NumericAt(a.source, row-1)
+	if err != nil {
+		return 0, false, err
+	}
+	if !previousOK {
+		return current, true, nil
+	}
+	return current / previous, true, nil
 }
 
 func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
@@ -9293,6 +9385,8 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericF64RangeAt(a, row)
 	case f64NumericDyadicArray:
 		return a.f64At(row)
+	case qRatiosArray:
+		return a.f64At(row)
 	case f64BucketArray:
 		return a.f64At(row)
 	case f64FillArray:
@@ -9433,7 +9527,7 @@ func isNumericArray(array Array) bool {
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
 		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
-		i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
+		qRatiosArray, i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray, fbyF64BroadcastArray, fbyF64TiledBroadcastArray:
 		return true
 	case nullableArray:

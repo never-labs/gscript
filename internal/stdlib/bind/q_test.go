@@ -4626,6 +4626,9 @@ func TestQSessionEvalFastArg1KeepsWorkspaceState(t *testing.T) {
 	if got, err := eval.FastArg1(StringValue("x+1")); err != nil || !got.IsInt() || got.Int() != 42 {
 		t.Fatalf("q.session.eval readback = %s,%v; want 42,nil", got.String(), err)
 	}
+	if got, err := eval.FastArg1(StringValue("x:til 8192;idx:where x>=0;+/idx")); err != nil || !got.IsInt() || got.Int() != 33550336 {
+		t.Fatalf("q.session.eval script pipeline = %s,%v; want 33550336,nil", got.String(), err)
+	}
 }
 
 func TestQSQLArgs2MatchesTwoArgumentSemantics(t *testing.T) {

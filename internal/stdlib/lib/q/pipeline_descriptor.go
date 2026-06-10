@@ -8,6 +8,13 @@ import (
 
 const EvalPipelineTypedRuntimeBackend = "q_pipeline_typed_runtime"
 
+const (
+	evalPipelineKindExpression = "expression"
+	evalPipelineKindScript     = "script"
+	evalPipelineKernelExpr     = "QPipelinePlan"
+	evalPipelineKernelScript   = "QScriptPipelinePlan"
+)
+
 // EvalPipelineAssignment describes one assignment that participates in a q
 // script-level pipeline descriptor. It is metadata-only: values remain owned by
 // EvalState and the runtime evaluator.
@@ -126,6 +133,33 @@ func (p EvalPipelineExecutablePlan) Valid() bool {
 	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != ""
 }
 
+func evalPipelineBackendPlan(descriptor EvalPipelineDescriptor) EvalPipelineBackendPlan {
+	if descriptor.Kind == "" {
+		return EvalPipelineBackendPlan{}
+	}
+	return EvalPipelineBackendPlan{
+		Backend:    EvalPipelineTypedRuntimeBackend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	}
+}
+
+func evalPipelineExpressionExecutable(plan qPipelinePlan) EvalPipelineExecutablePlan {
+	return EvalPipelineExecutablePlan{
+		backend:    EvalPipelineTypedRuntimeBackend,
+		kind:       evalPipelineKindExpression,
+		expression: cloneQPipelinePlan(plan),
+	}
+}
+
+func evalPipelineScriptExecutable(plan *qScriptPipelineDescriptor) EvalPipelineExecutablePlan {
+	return EvalPipelineExecutablePlan{
+		backend: EvalPipelineTypedRuntimeBackend,
+		kind:    evalPipelineKindScript,
+		script:  cloneQScriptPipelineDescriptor(plan),
+	}
+}
+
 // DescribeEvalPipeline returns the stable descriptor for a q source string
 // when the runtime planner can recognize it as a typed pipeline candidate.
 func DescribeEvalPipeline(source string) (EvalPipelineDescriptor, bool) {
@@ -133,8 +167,12 @@ func DescribeEvalPipeline(source string) (EvalPipelineDescriptor, bool) {
 	if source == "" {
 		return EvalPipelineDescriptor{}, false
 	}
-	if plan := buildQScriptPlan(source); plan.scriptPipeline != nil {
-		return evalScriptPipelineDescriptor(source, plan.scriptPipeline), true
+	scriptPlan := buildQScriptPlan(source)
+	if scriptPlan.scriptPipeline != nil {
+		return evalScriptPipelineDescriptor(source, scriptPlan.scriptPipeline), true
+	}
+	if len(scriptPlan.statements) > 1 {
+		return EvalPipelineDescriptor{}, false
 	}
 	if plan := buildQPipelinePlan(source); plan.kind != qPipelineInvalid {
 		return evalExpressionPipelineDescriptor(source, plan), true
@@ -150,11 +188,7 @@ func DescribeEvalPipelineBackendPlan(source string) (EvalPipelineBackendPlan, bo
 	if !ok {
 		return EvalPipelineBackendPlan{}, false
 	}
-	return EvalPipelineBackendPlan{
-		Backend:    EvalPipelineTypedRuntimeBackend,
-		Detail:     "kind=" + descriptor.Kind,
-		Descriptor: descriptor,
-	}, true
+	return evalPipelineBackendPlan(descriptor), true
 }
 
 // ExecuteEvalPipeline executes source only when the q runtime pipeline planner
@@ -198,7 +232,7 @@ func ExecuteEvalPipelineBackendPlanWithEnv(plan EvalPipelineBackendPlan, env map
 		return nil, false, nil
 	}
 	state := NewEvalState(env)
-	return state.executeEvalPipelineDescriptor(plan.Descriptor)
+	return state.executeEvalPipelineBackendPlan(plan)
 }
 
 // CompileEvalPipelineBackendPlan predecodes a stable backend plan into an
@@ -208,27 +242,27 @@ func CompileEvalPipelineBackendPlan(plan EvalPipelineBackendPlan) (EvalPipelineE
 	if !plan.Valid() || plan.Backend != EvalPipelineTypedRuntimeBackend {
 		return EvalPipelineExecutablePlan{}, false
 	}
-	switch plan.Descriptor.Kind {
-	case "expression":
-		expression, ok := qPipelinePlanFromEvalDescriptor(plan.Descriptor)
+	return CompileEvalPipelineDescriptor(plan.Descriptor)
+}
+
+// CompileEvalPipelineDescriptor predecodes descriptor metadata into the
+// executable q runtime plan used by sessions and MethodJIT. Descriptor execution
+// should funnel through this helper so expression/script shape restoration has
+// one owner.
+func CompileEvalPipelineDescriptor(descriptor EvalPipelineDescriptor) (EvalPipelineExecutablePlan, bool) {
+	switch descriptor.Kind {
+	case evalPipelineKindExpression:
+		expression, ok := qPipelinePlanFromEvalDescriptor(descriptor)
 		if !ok {
 			return EvalPipelineExecutablePlan{}, false
 		}
-		return EvalPipelineExecutablePlan{
-			backend:    plan.Backend,
-			kind:       plan.Descriptor.Kind,
-			expression: expression,
-		}, true
-	case "script":
-		script, ok := qScriptPipelineDescriptorFromEvalDescriptor(plan.Descriptor)
+		return evalPipelineExpressionExecutable(expression), true
+	case evalPipelineKindScript:
+		script, ok := qScriptPipelineDescriptorFromEvalDescriptor(descriptor)
 		if !ok {
 			return EvalPipelineExecutablePlan{}, false
 		}
-		return EvalPipelineExecutablePlan{
-			backend: plan.Backend,
-			kind:    plan.Descriptor.Kind,
-			script:  &script,
-		}, true
+		return evalPipelineScriptExecutable(&script), true
 	default:
 		return EvalPipelineExecutablePlan{}, false
 	}
@@ -251,7 +285,7 @@ func (s *EvalState) ExecuteEvalPipelineBackendPlan(plan EvalPipelineBackendPlan)
 	if s == nil || !plan.Valid() || plan.Backend != EvalPipelineTypedRuntimeBackend {
 		return nil, false, nil
 	}
-	return s.executeEvalPipelineDescriptor(plan.Descriptor)
+	return s.executeEvalPipelineBackendPlan(plan)
 }
 
 // ExecuteEvalPipelineExecutablePlan executes an opaque predecoded plan using
@@ -268,54 +302,66 @@ func (s *EvalState) ExecuteEvalPipelineExecutablePlanRef(plan *EvalPipelineExecu
 		return nil, false, nil
 	}
 	switch plan.kind {
-	case "expression":
+	case evalPipelineKindExpression:
 		return s.evalQPipelinePlan(&plan.expression)
-	case "script":
+	case evalPipelineKindScript:
 		return s.tryEvalQScriptPipeline(plan.script)
 	default:
 		return nil, false, nil
 	}
 }
 
-func (s *EvalState) executeEvalPipeline(source string) (any, bool, error) {
-	if source == "" {
-		return nil, false, nil
+func (s *EvalState) compileEvalPipelineSource(source string) (EvalPipelineBackendPlan, EvalPipelineExecutablePlan, bool) {
+	source = strings.TrimSpace(source)
+	if s == nil || source == "" {
+		return EvalPipelineBackendPlan{}, EvalPipelineExecutablePlan{}, false
 	}
-	if plan := s.qScriptPlan(source); plan.scriptPipeline != nil {
-		return s.tryEvalQScriptPipeline(plan.scriptPipeline)
+	scriptPlan := s.qScriptPlan(source)
+	if scriptPlan.scriptPipeline != nil {
+		descriptor := evalScriptPipelineDescriptor(source, scriptPlan.scriptPipeline)
+		return evalPipelineBackendPlan(descriptor), evalPipelineScriptExecutable(scriptPlan.scriptPipeline), true
+	}
+	if len(scriptPlan.statements) > 1 {
+		return EvalPipelineBackendPlan{}, EvalPipelineExecutablePlan{}, false
 	}
 	if plan := s.qPipelinePlan(source); plan.kind != qPipelineInvalid {
-		return s.evalQPipelinePlan(&plan)
+		descriptor := evalExpressionPipelineDescriptor(source, plan)
+		return evalPipelineBackendPlan(descriptor), evalPipelineExpressionExecutable(plan), true
 	}
-	return nil, false, nil
+	return EvalPipelineBackendPlan{}, EvalPipelineExecutablePlan{}, false
+}
+
+func (s *EvalState) executeEvalPipeline(source string) (any, bool, error) {
+	_, executable, ok := s.compileEvalPipelineSource(source)
+	if !ok {
+		return nil, false, nil
+	}
+	return s.ExecuteEvalPipelineExecutablePlanRef(&executable)
+}
+
+func (s *EvalState) executeEvalPipelineBackendPlan(plan EvalPipelineBackendPlan) (any, bool, error) {
+	executable, ok := CompileEvalPipelineBackendPlan(plan)
+	if !ok {
+		return nil, false, nil
+	}
+	return s.ExecuteEvalPipelineExecutablePlanRef(&executable)
 }
 
 func (s *EvalState) executeEvalPipelineDescriptor(descriptor EvalPipelineDescriptor) (any, bool, error) {
-	switch descriptor.Kind {
-	case "expression":
-		plan, ok := qPipelinePlanFromEvalDescriptor(descriptor)
-		if !ok {
-			return nil, false, nil
-		}
-		return s.evalQPipelinePlan(&plan)
-	case "script":
-		plan, ok := qScriptPipelineDescriptorFromEvalDescriptor(descriptor)
-		if !ok {
-			return nil, false, nil
-		}
-		return s.tryEvalQScriptPipeline(&plan)
-	default:
+	plan, ok := CompileEvalPipelineDescriptor(descriptor)
+	if !ok {
 		return nil, false, nil
 	}
+	return s.ExecuteEvalPipelineExecutablePlanRef(&plan)
 }
 
 func evalScriptPipelineDescriptor(source string, d *qScriptPipelineDescriptor) EvalPipelineDescriptor {
 	out := EvalPipelineDescriptor{
 		Source:                 source,
-		Kind:                   "script",
-		Kernel:                 "QScriptPipelinePlan",
+		Kind:                   evalPipelineKindScript,
+		Kernel:                 evalPipelineKernelScript,
 		Shape:                  d.shape(),
-		PipelineShape:          qRuntimeKernelPipelineShape("QScriptPipelinePlan", d.shape()),
+		PipelineShape:          qRuntimeKernelPipelineShape(evalPipelineKernelScript, d.shape()),
 		Terminal:               d.terminal,
 		ValueExpr:              strings.TrimSpace(d.valueExpr),
 		ValueBinding:           strings.TrimSpace(d.valueBinding),
@@ -371,8 +417,8 @@ func evalExpressionPipelineDescriptor(source string, plan qPipelinePlan) EvalPip
 	shapeSpec := qPipelinePlanShapeSpec(plan)
 	out := EvalPipelineDescriptor{
 		Source:         source,
-		Kind:           "expression",
-		Kernel:         "QPipelinePlan",
+		Kind:           evalPipelineKindExpression,
+		Kernel:         evalPipelineKernelExpr,
 		Shape:          plan.stableShape(),
 		PipelineShape:  plan.stablePipelineShape(),
 		ShapeFamily:    string(shapeSpec.Family),

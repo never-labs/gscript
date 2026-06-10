@@ -16,6 +16,7 @@ BenchmarkQEvalVectorResultCacheWarm/MaskWhere-16         100  500 ns/op  64 B/op
 BenchmarkQEvalVectorCold/MaskWhere-16                    100  2500 ns/op  512 B/op  12 allocs/op
 BenchmarkQSessionEvalVectorWarmExecution/MaskWhere-16    100  2000 ns/op  256 B/op  8 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_where_project_reduce
 BenchmarkQEvalVectorGoBaseline/MaskWhere-16              100  1000 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit/ModuloWhereCount-16  100  3000 ns/op  128 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes
 """
 
 SAMPLE_WITH_FALLBACK = """
@@ -102,6 +103,13 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(qeval.typed_kernel_fallbacks_op, 0)
         self.assertEqual(qeval.typed_pipeline_shapes, 2)
         self.assertEqual(qeval.typed_pipeline_fallback_shapes, 0)
+        qjit = metrics["BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit/ModuloWhereCount"]
+        self.assertEqual(qjit.jit_typed_direct_return_op, 1)
+        self.assertEqual(qjit.jit_typed_native_exit_op, 0)
+        self.assertEqual(qjit.jit_typed_op_exit_op, 0)
+        self.assertEqual(qjit.jit_typed_kernel_success_op, 1)
+        self.assertEqual(qjit.jit_typed_kernel_errors_op, 0)
+        self.assertEqual(qjit.jit_typed_pipeline_shapes, 1)
 
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)

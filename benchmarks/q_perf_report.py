@@ -54,6 +54,8 @@ QEVAL_BENCH = (
     ")"
 )
 
+QJIT_BENCH = "BenchmarkQEvalPipelineNativeExitCallpath"
+
 
 @dataclass
 class CommandResult:
@@ -106,6 +108,12 @@ class RuntimeMetricRow:
     typed_kernel_errors_op: float | None
     typed_pipeline_shapes: float | None
     typed_pipeline_fallback_shapes: float | None
+    jit_typed_direct_return_op: float | None
+    jit_typed_native_exit_op: float | None
+    jit_typed_op_exit_op: float | None
+    jit_typed_kernel_success_op: float | None
+    jit_typed_kernel_errors_op: float | None
+    jit_typed_pipeline_shapes: float | None
 
 
 @dataclass
@@ -404,6 +412,12 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 typed_kernel_errors_op=metrics.get("typed_kernel_errors/op"),
                 typed_pipeline_shapes=metrics.get("typed_pipeline_shapes"),
                 typed_pipeline_fallback_shapes=metrics.get("typed_pipeline_fallback_shapes"),
+                jit_typed_direct_return_op=metrics.get("jit_typed_direct_return/op"),
+                jit_typed_native_exit_op=metrics.get("jit_typed_native_exit/op"),
+                jit_typed_op_exit_op=metrics.get("jit_typed_op_exit/op"),
+                jit_typed_kernel_success_op=metrics.get("jit_typed_kernel_success/op"),
+                jit_typed_kernel_errors_op=metrics.get("jit_typed_kernel_errors/op"),
+                jit_typed_pipeline_shapes=metrics.get("jit_typed_pipeline_shapes"),
             )
         )
     return out
@@ -881,8 +895,8 @@ def markdown_report(
             "",
             "## Runtime Metrics",
             "",
-            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes | jit_typed_direct_return/op | jit_typed_native_exit/op | jit_typed_op_exit/op | jit_typed_kernel_success/op | jit_typed_kernel_errors/op | jit_typed_pipeline_shapes |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for item in runtime_metrics:
@@ -897,7 +911,13 @@ def markdown_report(
             f"{format_metric(item.typed_kernel_fallbacks_op, 3)} | "
             f"{format_metric(item.typed_kernel_errors_op, 3)} | "
             f"{format_metric(item.typed_pipeline_shapes, 0)} | "
-            f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} |"
+            f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} | "
+            f"{format_metric(item.jit_typed_direct_return_op, 3)} | "
+            f"{format_metric(item.jit_typed_native_exit_op, 3)} | "
+            f"{format_metric(item.jit_typed_op_exit_op, 3)} | "
+            f"{format_metric(item.jit_typed_kernel_success_op, 3)} | "
+            f"{format_metric(item.jit_typed_kernel_errors_op, 3)} | "
+            f"{format_metric(item.jit_typed_pipeline_shapes, 0)} |"
         )
     lines.extend(
         [
@@ -1050,6 +1070,16 @@ def main(argv: list[str]) -> int:
         commands.append(qeval)
         rows.update(qeval_rows)
         pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qeval.output))
+
+        qjit = run_command(
+            "qjit-typed-runtime-callpath",
+            ["go", "test", "./internal/methodjit", "-run", "^$", "-bench", QJIT_BENCH, "-benchmem", f"-benchtime={args.benchtime}"],
+        )
+        qjit_rows = parse_go_benchmarks(qjit.output)
+        qjit.parsed_benchmark_count = len(qjit_rows)
+        commands.append(qjit)
+        rows.update(qjit_rows)
+        pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qjit.output))
 
     for path in args.timing_json:
         current_vs_old.extend(parse_timing_compare_json(path))

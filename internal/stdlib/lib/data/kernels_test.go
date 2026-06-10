@@ -2592,6 +2592,26 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if got, want := lazyRatiosSum.(float64), 8.0+9.0/8.0; got != want {
 		t.Fatalf("TryTypedRatiosSum lazy xexp = %v, want %v", got, want)
 	}
+	qRatios, ok, err := TryTypedQRatios(NewColumn("x", []any{2, NullValue, 8, 16}).Data)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedQRatios nullable = %#v,%v,%v; want handled nil error", qRatios, ok, err)
+	}
+	if _, lazy := qRatios.(qRatiosArray); !lazy {
+		t.Fatalf("TryTypedQRatios returned %T, want qRatiosArray", qRatios)
+	}
+	if got, want := qRatios.Values(), []any{2.0, NullValue, 8.0, 2.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQRatios values = %v, want %v", got, want)
+	}
+	if got, want := qRatios.Gather([]int{3, 1, 0}).Values(), []any{2.0, NullValue, 2.0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TryTypedQRatios gather = %v, want %v", got, want)
+	}
+	qRatioSum, ok, err := TryTypedNumericSum(qRatios)
+	if err != nil || !ok {
+		t.Fatalf("TryTypedNumericSum(qRatios) = %#v,%v,%v; want handled nil error", qRatioSum, ok, err)
+	}
+	if got, want := qRatioSum.(float64), 12.0; got != want {
+		t.Fatalf("TryTypedNumericSum(qRatios) = %v, want %v", got, want)
+	}
 	gotExp := exponent.Values()
 	if len(gotExp) != 2 || gotExp[0].(float64) != 1 || math.Abs(gotExp[1].(float64)-math.E) > 1e-12 {
 		t.Fatalf("exp NumericUnary values = %v, want [1 e]", gotExp)

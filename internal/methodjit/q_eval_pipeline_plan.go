@@ -6,6 +6,7 @@ import (
 
 	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
 // QEvalPipelineBackend is the stable handoff point between MethodJIT q.eval
@@ -44,6 +45,7 @@ type QEvalPipelinePlanRef struct {
 	ShapeTransform         string
 	Source                 string
 	Backend                string
+	BackendPlan            *stdq.EvalPipelineBackendPlan
 	Kind                   string
 	Terminal               string
 	AssignmentText         string
@@ -135,46 +137,7 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 			return ref
 		}
 	}
-	ref := QEvalPipelinePlanRef{
-		ID:                     len(fn.QEvalPipelinePlans),
-		Kernel:                 plan.Kernel,
-		Shape:                  plan.Shape,
-		PipelineShape:          plan.PipelineShape,
-		ShapeFamily:            plan.ShapeFamily,
-		ShapeReducer:           plan.ShapeReducer,
-		ShapeSelector:          plan.ShapeSelector,
-		ShapeTransform:         plan.ShapeTransform,
-		Source:                 source,
-		Backend:                plan.Backend,
-		Kind:                   plan.Kind,
-		Terminal:               plan.Terminal,
-		AssignmentText:         plan.AssignmentText,
-		ValueExpr:              plan.ValueExpr,
-		ValueBinding:           plan.ValueBinding,
-		IndexExpr:              plan.IndexExpr,
-		IndexBinding:           plan.IndexBinding,
-		MaskExpr:               plan.MaskExpr,
-		MaskBinding:            plan.MaskBinding,
-		RowValueExpr:           plan.RowValueExpr,
-		RowIndexExpr:           plan.RowIndexExpr,
-		ColIndexExpr:           plan.ColIndexExpr,
-		CallableExpr:           plan.CallableExpr,
-		DyadicOp:               plan.DyadicOp,
-		ScalarExpr:             plan.ScalarExpr,
-		ScalarLeft:             plan.ScalarLeft,
-		IncludeCount:           plan.IncludeCount,
-		SequenceValueExpr:      plan.SequenceValueExpr,
-		SequenceTransformChain: plan.SequenceTransformChain,
-		SequenceTransformNames: plan.SequenceTransformNames,
-		LeftExpr:               plan.LeftExpr,
-		RightExpr:              plan.RightExpr,
-		CompareOp:              plan.CompareOp,
-		ComparePrefix:          plan.ComparePrefix,
-		ModExpr:                plan.ModExpr,
-		ModulusExpr:            plan.ModulusExpr,
-		ModTargetExpr:          plan.ModTargetExpr,
-		ReductionInput:         plan.ReductionInput,
-	}
+	ref := qEvalPipelinePlanRefFromHotPlan(len(fn.QEvalPipelinePlans), source, plan)
 	fn.QEvalPipelinePlans = append(fn.QEvalPipelinePlans, ref)
 	return ref
 }

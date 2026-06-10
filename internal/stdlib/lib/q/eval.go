@@ -1066,12 +1066,8 @@ func buildQScriptPlan(src string) qScriptPlan {
 func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
 	if plan.scriptPipeline != nil {
 		return &qScriptExecutablePlan{
-			kind: qScriptExecutablePipelineBackend,
-			pipeline: EvalPipelineExecutablePlan{
-				backend: EvalPipelineTypedRuntimeBackend,
-				kind:    "script",
-				script:  cloneQScriptPipelineDescriptor(plan.scriptPipeline),
-			},
+			kind:     qScriptExecutablePipelineBackend,
+			pipeline: evalPipelineScriptExecutable(plan.scriptPipeline),
 		}
 	}
 	if plan.deferScanCandidates || len(plan.statements) != 1 {
@@ -12592,6 +12588,13 @@ func ratios(v any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("ratios expects a numeric vector")
 	}
+	if typed, handled, err := data.TryTypedQRatios(array); handled || err != nil {
+		recordRuntimeKernelProbe("ArrayRatios", "vector-scan/ratios/"+string(array.Kind()), handled, err)
+		if err != nil {
+			return nil, fmt.Errorf("ratios: %w", err)
+		}
+		return typed, nil
+	}
 	out := make([]any, array.Len())
 	var previous any
 	for i := 0; i < array.Len(); i++ {
@@ -12643,24 +12646,11 @@ func negValue(v any) (any, error) {
 			session: h.session,
 		}, nil
 	}
-	return mapNumericUnary("neg", v, func(n float64, isInt bool) any {
-		if isInt {
-			return int64(-n)
-		}
-		return -n
-	})
+	return qDataNumericUnary(data.NumericUnaryNeg, v)
 }
 
 func absValue(v any) (any, error) {
-	return mapNumericUnary("abs", v, func(n float64, isInt bool) any {
-		if n < 0 {
-			n = -n
-		}
-		if isInt {
-			return int64(n)
-		}
-		return n
-	})
+	return qDataNumericUnary(data.NumericUnaryAbs, v)
 }
 
 func sqrtValue(v any) (any, error) {
@@ -12689,64 +12679,6 @@ func floorValue(v any) (any, error) {
 
 func ceilingValue(v any) (any, error) {
 	return qDataNumericUnary(data.NumericUnaryCeiling, v)
-}
-
-func mapNumericUnary(name string, v any, fn func(float64, bool) any) (any, error) {
-	if data.IsNull(v) {
-		return data.NullValue, nil
-	}
-	if n, ok := numeric(v); ok {
-		_, isInt := integerValue(v)
-		return fn(n, isInt), nil
-	}
-	array, ok := v.(data.Array)
-	if !ok {
-		return nil, fmt.Errorf("%s expects a numeric value or vector", name)
-	}
-	shape := "vector-unary/" + name + "/" + string(array.Kind())
-	typed, handled, err := data.TryTypedQNumericUnary(name, array)
-	typed, handled, err = qTypedRuntimeResult("ArrayNumericUnary", shape, typed, handled, err)
-	if err != nil || handled {
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", name, err)
-		}
-		return typed, nil
-	}
-	out := make([]any, array.Len())
-	hasFloat := false
-	for i := 0; i < array.Len(); i++ {
-		item, ok := array.At(i)
-		if !ok {
-			return nil, fmt.Errorf("%s row %d out of range", name, i)
-		}
-		if data.IsNull(item) {
-			out[i] = data.NullValue
-			continue
-		}
-		n, ok := numeric(item)
-		if !ok {
-			return nil, fmt.Errorf("%s expects a numeric value or vector", name)
-		}
-		_, isInt := integerValue(item)
-		value := fn(n, isInt)
-		if _, ok := value.(float64); ok {
-			hasFloat = true
-		}
-		out[i] = value
-	}
-	if hasFloat {
-		for _, value := range out {
-			if data.IsNull(value) {
-				return data.InferArray(out), nil
-			}
-		}
-		xs := make([]float64, len(out))
-		for i, value := range out {
-			xs[i], _ = numeric(value)
-		}
-		return data.NewF64(xs), nil
-	}
-	return data.InferArray(out), nil
 }
 
 func allValue(v any) (any, error) {

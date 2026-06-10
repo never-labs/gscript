@@ -57,17 +57,11 @@ func (s *EvalSession) plan(source string) *evalSessionPlan {
 func (s *EvalSession) buildPlan(source string) *evalSessionPlan {
 	plan := s.state.qScriptPlan(source)
 	entry := &evalSessionPlan{source: source, script: plan}
-	if plan.scriptPipeline == nil {
+	backend, executable, ok := s.state.compileEvalPipelineSource(source)
+	if !ok {
 		return entry
 	}
-	descriptor := evalScriptPipelineDescriptor(source, plan.scriptPipeline)
-	backend := EvalPipelineBackendPlan{
-		Backend:    EvalPipelineTypedRuntimeBackend,
-		Detail:     "kind=" + descriptor.Kind,
-		Descriptor: descriptor,
-	}
-	executable, _ := CompileEvalPipelineBackendPlan(backend)
-	entry.descriptor = descriptor
+	entry.descriptor = backend.Descriptor
 	entry.backend = backend
 	entry.executable = executable
 	return entry

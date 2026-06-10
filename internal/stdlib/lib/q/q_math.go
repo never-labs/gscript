@@ -49,6 +49,7 @@ func qDataNumericUnary(name string, value any) (any, error) {
 			}
 			return typed, nil
 		}
+		return qDataNumericUnaryArrayFallback(name, array)
 	}
 	out, ok, err := data.ApplyNumericUnaryValue(name, value)
 	if err != nil {
@@ -58,6 +59,29 @@ func qDataNumericUnary(name string, value any) (any, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("%s expects a numeric value or vector", name)
+}
+
+func qDataNumericUnaryArrayFallback(name string, array data.Array) (any, error) {
+	out := make([]any, array.Len())
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("%s row %d out of range", name, i)
+		}
+		if data.IsNull(item) {
+			out[i] = data.NullValue
+			continue
+		}
+		value, ok, err := data.ApplyNumericUnaryValue(name, item)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("%s expects a numeric value or vector", name)
+		}
+		out[i] = value
+	}
+	return data.InferArray(out), nil
 }
 
 func qDataNumericDyadicFloat(name string, left, right any) (any, error) {

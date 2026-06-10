@@ -137,10 +137,15 @@ func (qRuntimeEvalPipelinePlanner) DescribeQEvalPipeline(source string) (QEvalPi
 }
 
 func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
-	descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline(source)
+	backendPlan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(source)
 	if !ok {
 		return qEvalHotPlan{}, false
 	}
+	return qEvalHotPlanFromBackendPlan(backendPlan), true
+}
+
+func qEvalHotPlanFromBackendPlan(backendPlan qEvalPipelineBackendPlan) qEvalHotPlan {
+	descriptor := backendPlan.plan.Descriptor
 	return qEvalHotPlan{
 		Kernel:                 descriptor.Kernel,
 		Shape:                  descriptor.Shape,
@@ -149,11 +154,11 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		ShapeReducer:           descriptor.ShapeReducer,
 		ShapeSelector:          descriptor.ShapeSelector,
 		ShapeTransform:         descriptor.ShapeTransform,
-		Backend:                descriptor.Backend,
-		Detail:                 descriptor.Detail,
+		Backend:                backendPlan.plan.Backend,
+		Detail:                 backendPlan.plan.Detail,
 		Kind:                   descriptor.Kind,
 		Terminal:               descriptor.Terminal,
-		AssignmentText:         descriptor.AssignmentText,
+		AssignmentText:         backendPlan.assignmentText,
 		ValueExpr:              descriptor.ValueExpr,
 		ValueBinding:           descriptor.ValueBinding,
 		IndexExpr:              descriptor.IndexExpr,
@@ -179,7 +184,104 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 		ModulusExpr:            descriptor.ModulusExpr,
 		ModTargetExpr:          descriptor.ModTargetExpr,
 		ReductionInput:         descriptor.ReductionInput,
-	}, true
+	}
+}
+
+func qEvalPipelinePlanRefFromHotPlan(id int, source string, plan qEvalHotPlan) QEvalPipelinePlanRef {
+	backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
+	ref := QEvalPipelinePlanRef{
+		ID:                     id,
+		Kernel:                 plan.Kernel,
+		Shape:                  plan.Shape,
+		PipelineShape:          plan.PipelineShape,
+		ShapeFamily:            plan.ShapeFamily,
+		ShapeReducer:           plan.ShapeReducer,
+		ShapeSelector:          plan.ShapeSelector,
+		ShapeTransform:         plan.ShapeTransform,
+		Source:                 source,
+		Backend:                plan.Backend,
+		Kind:                   plan.Kind,
+		Terminal:               plan.Terminal,
+		AssignmentText:         plan.AssignmentText,
+		ValueExpr:              plan.ValueExpr,
+		ValueBinding:           plan.ValueBinding,
+		IndexExpr:              plan.IndexExpr,
+		IndexBinding:           plan.IndexBinding,
+		MaskExpr:               plan.MaskExpr,
+		MaskBinding:            plan.MaskBinding,
+		RowValueExpr:           plan.RowValueExpr,
+		RowIndexExpr:           plan.RowIndexExpr,
+		ColIndexExpr:           plan.ColIndexExpr,
+		CallableExpr:           plan.CallableExpr,
+		DyadicOp:               plan.DyadicOp,
+		ScalarExpr:             plan.ScalarExpr,
+		ScalarLeft:             plan.ScalarLeft,
+		IncludeCount:           plan.IncludeCount,
+		SequenceValueExpr:      plan.SequenceValueExpr,
+		SequenceTransformChain: plan.SequenceTransformChain,
+		SequenceTransformNames: plan.SequenceTransformNames,
+		LeftExpr:               plan.LeftExpr,
+		RightExpr:              plan.RightExpr,
+		CompareOp:              plan.CompareOp,
+		ComparePrefix:          plan.ComparePrefix,
+		ModExpr:                plan.ModExpr,
+		ModulusExpr:            plan.ModulusExpr,
+		ModTargetExpr:          plan.ModTargetExpr,
+		ReductionInput:         plan.ReductionInput,
+	}
+	if backendPlan.Valid() {
+		ref.BackendPlan = &backendPlan
+		qEvalPipelineMirrorRefFromBackendPlan(&ref, backendPlan)
+	}
+	return ref
+}
+
+func qEvalPipelineBackendPlanFromHotPlan(source string, plan qEvalHotPlan) stdq.EvalPipelineBackendPlan {
+	if plan.Backend == "" || plan.Kind == "" || plan.Kernel == "" || plan.Shape == "" {
+		return stdq.EvalPipelineBackendPlan{}
+	}
+	return stdq.EvalPipelineBackendPlan{
+		Backend: plan.Backend,
+		Detail:  plan.Detail,
+		Descriptor: stdq.EvalPipelineDescriptor{
+			Source:                 source,
+			Kind:                   plan.Kind,
+			Kernel:                 plan.Kernel,
+			Shape:                  plan.Shape,
+			PipelineShape:          plan.PipelineShape,
+			ShapeFamily:            plan.ShapeFamily,
+			ShapeReducer:           plan.ShapeReducer,
+			ShapeSelector:          plan.ShapeSelector,
+			ShapeTransform:         plan.ShapeTransform,
+			Terminal:               plan.Terminal,
+			Assignments:            decodeQEvalPipelineAssignments(plan.AssignmentText),
+			ValueExpr:              plan.ValueExpr,
+			ValueBinding:           plan.ValueBinding,
+			IndexExpr:              plan.IndexExpr,
+			IndexBinding:           plan.IndexBinding,
+			MaskExpr:               plan.MaskExpr,
+			MaskBinding:            plan.MaskBinding,
+			RowValueExpr:           plan.RowValueExpr,
+			RowIndexExpr:           plan.RowIndexExpr,
+			ColIndexExpr:           plan.ColIndexExpr,
+			CallableExpr:           plan.CallableExpr,
+			DyadicOp:               plan.DyadicOp,
+			ScalarExpr:             plan.ScalarExpr,
+			ScalarLeft:             plan.ScalarLeft,
+			IncludeCount:           plan.IncludeCount,
+			SequenceValueExpr:      plan.SequenceValueExpr,
+			SequenceTransformChain: plan.SequenceTransformChain,
+			SequenceTransformNames: plan.SequenceTransformNames,
+			LeftExpr:               plan.LeftExpr,
+			RightExpr:              plan.RightExpr,
+			CompareOp:              plan.CompareOp,
+			ComparePrefix:          plan.ComparePrefix,
+			ModExpr:                plan.ModExpr,
+			ModulusExpr:            plan.ModulusExpr,
+			ModTargetExpr:          plan.ModTargetExpr,
+			ReductionInput:         plan.ReductionInput,
+		},
+	}
 }
 
 type qRuntimeEvalPipelineBackend struct {
@@ -213,13 +315,8 @@ func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPip
 	backendPlanByID := make(map[int]stdq.EvalPipelineBackendPlan, len(refs))
 	executablePlanByID := make(map[int]stdq.EvalPipelineExecutablePlan, len(refs))
 	for _, ref := range refs {
-		if descriptor, ok := qEvalPipelineDescriptorFromRef(ref); ok {
-			descriptorByID[ref.ID] = descriptor
-			plan := stdq.EvalPipelineBackendPlan{
-				Backend:    qEvalPipelineTypedRuntimeBackend,
-				Detail:     "kind=" + descriptor.Kind,
-				Descriptor: descriptor,
-			}
+		if plan, ok := qEvalPipelineBackendPlanFromRef(ref); ok {
+			descriptorByID[ref.ID] = plan.Descriptor
 			backendPlanByID[ref.ID] = plan
 			if executable, ok := stdq.CompileEvalPipelineBackendPlan(plan); ok {
 				executablePlanByID[ref.ID] = executable
@@ -453,16 +550,7 @@ func (b qRuntimeEvalPipelineBackend) lookupBackendPlan(ref QEvalPipelinePlanRef)
 			return plan, true
 		}
 	}
-	descriptor, ok := qEvalPipelineDescriptorFromRef(ref)
-	if !ok {
-		return stdq.EvalPipelineBackendPlan{}, false
-	}
-	plan := stdq.EvalPipelineBackendPlan{
-		Backend:    qEvalPipelineTypedRuntimeBackend,
-		Detail:     "kind=" + descriptor.Kind,
-		Descriptor: descriptor,
-	}
-	return plan, plan.Valid()
+	return qEvalPipelineBackendPlanFromRef(ref)
 }
 
 func (b qRuntimeEvalPipelineBackend) lookupDescriptor(ref QEvalPipelinePlanRef) (stdq.EvalPipelineDescriptor, bool) {
@@ -471,7 +559,11 @@ func (b qRuntimeEvalPipelineBackend) lookupDescriptor(ref QEvalPipelinePlanRef) 
 			return descriptor, true
 		}
 	}
-	return qEvalPipelineDescriptorFromRef(ref)
+	plan, ok := qEvalPipelineBackendPlanFromRef(ref)
+	if !ok {
+		return stdq.EvalPipelineDescriptor{}, false
+	}
+	return plan.Descriptor, true
 }
 
 func (b qRuntimeEvalPipelineBackend) executeEvalPipelineBackendPlan(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
@@ -519,47 +611,128 @@ func encodeQEvalPipelineAssignments(in []stdq.EvalPipelineAssignment) string {
 }
 
 func qEvalPipelineDescriptorFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipelineDescriptor, bool) {
-	if ref.Kind == "" || ref.Shape == "" {
+	plan, ok := qEvalPipelineBackendPlanFromRef(ref)
+	if !ok {
 		return stdq.EvalPipelineDescriptor{}, false
 	}
-	return stdq.EvalPipelineDescriptor{
-		Source:                 ref.Source,
-		Kind:                   ref.Kind,
-		Kernel:                 ref.Kernel,
-		Shape:                  ref.Shape,
-		PipelineShape:          ref.PipelineShape,
-		ShapeFamily:            ref.ShapeFamily,
-		ShapeReducer:           ref.ShapeReducer,
-		ShapeSelector:          ref.ShapeSelector,
-		ShapeTransform:         ref.ShapeTransform,
-		Terminal:               ref.Terminal,
-		Assignments:            decodeQEvalPipelineAssignments(ref.AssignmentText),
-		ValueExpr:              ref.ValueExpr,
-		ValueBinding:           ref.ValueBinding,
-		IndexExpr:              ref.IndexExpr,
-		IndexBinding:           ref.IndexBinding,
-		MaskExpr:               ref.MaskExpr,
-		MaskBinding:            ref.MaskBinding,
-		RowValueExpr:           ref.RowValueExpr,
-		RowIndexExpr:           ref.RowIndexExpr,
-		ColIndexExpr:           ref.ColIndexExpr,
-		CallableExpr:           ref.CallableExpr,
-		DyadicOp:               ref.DyadicOp,
-		ScalarExpr:             ref.ScalarExpr,
-		ScalarLeft:             ref.ScalarLeft,
-		IncludeCount:           ref.IncludeCount,
-		SequenceValueExpr:      ref.SequenceValueExpr,
-		SequenceTransformChain: ref.SequenceTransformChain,
-		SequenceTransformNames: ref.SequenceTransformNames,
-		LeftExpr:               ref.LeftExpr,
-		RightExpr:              ref.RightExpr,
-		CompareOp:              ref.CompareOp,
-		ComparePrefix:          ref.ComparePrefix,
-		ModExpr:                ref.ModExpr,
-		ModulusExpr:            ref.ModulusExpr,
-		ModTargetExpr:          ref.ModTargetExpr,
-		ReductionInput:         ref.ReductionInput,
-	}, true
+	return plan.Descriptor, true
+}
+
+func qEvalPipelineBackendPlanFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool) {
+	if ref.BackendPlan != nil && ref.BackendPlan.Valid() {
+		return *ref.BackendPlan, true
+	}
+	if ref.Kind != "" && ref.Shape != "" {
+		plan := stdq.EvalPipelineBackendPlan{
+			Backend: ref.Backend,
+			Detail:  "kind=" + ref.Kind,
+			Descriptor: stdq.EvalPipelineDescriptor{
+				Source:                 ref.Source,
+				Kind:                   ref.Kind,
+				Kernel:                 ref.Kernel,
+				Shape:                  ref.Shape,
+				PipelineShape:          ref.PipelineShape,
+				ShapeFamily:            ref.ShapeFamily,
+				ShapeReducer:           ref.ShapeReducer,
+				ShapeSelector:          ref.ShapeSelector,
+				ShapeTransform:         ref.ShapeTransform,
+				Terminal:               ref.Terminal,
+				Assignments:            decodeQEvalPipelineAssignments(ref.AssignmentText),
+				ValueExpr:              ref.ValueExpr,
+				ValueBinding:           ref.ValueBinding,
+				IndexExpr:              ref.IndexExpr,
+				IndexBinding:           ref.IndexBinding,
+				MaskExpr:               ref.MaskExpr,
+				MaskBinding:            ref.MaskBinding,
+				RowValueExpr:           ref.RowValueExpr,
+				RowIndexExpr:           ref.RowIndexExpr,
+				ColIndexExpr:           ref.ColIndexExpr,
+				CallableExpr:           ref.CallableExpr,
+				DyadicOp:               ref.DyadicOp,
+				ScalarExpr:             ref.ScalarExpr,
+				ScalarLeft:             ref.ScalarLeft,
+				IncludeCount:           ref.IncludeCount,
+				SequenceValueExpr:      ref.SequenceValueExpr,
+				SequenceTransformChain: ref.SequenceTransformChain,
+				SequenceTransformNames: ref.SequenceTransformNames,
+				LeftExpr:               ref.LeftExpr,
+				RightExpr:              ref.RightExpr,
+				CompareOp:              ref.CompareOp,
+				ComparePrefix:          ref.ComparePrefix,
+				ModExpr:                ref.ModExpr,
+				ModulusExpr:            ref.ModulusExpr,
+				ModTargetExpr:          ref.ModTargetExpr,
+				ReductionInput:         ref.ReductionInput,
+			},
+		}
+		if plan.Valid() {
+			return plan, true
+		}
+	}
+	if ref.Source == "" {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	plan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(ref.Source)
+	if !ok || !plan.valid() {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	if ref.Backend != "" && ref.Backend != plan.plan.Backend {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	if ref.Kind != "" && ref.Kind != plan.plan.Kind() {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	if ref.Shape != "" && ref.Shape != plan.plan.Shape() {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	if ref.PipelineShape != "" && ref.PipelineShape != plan.plan.PipelineShape() {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	return plan.plan, true
+}
+
+func qEvalPipelineMirrorRefFromBackendPlan(ref *QEvalPipelinePlanRef, plan stdq.EvalPipelineBackendPlan) {
+	if ref == nil || !plan.Valid() {
+		return
+	}
+	descriptor := plan.Descriptor
+	ref.Kernel = descriptor.Kernel
+	ref.Shape = descriptor.Shape
+	ref.PipelineShape = descriptor.PipelineShape
+	ref.ShapeFamily = descriptor.ShapeFamily
+	ref.ShapeReducer = descriptor.ShapeReducer
+	ref.ShapeSelector = descriptor.ShapeSelector
+	ref.ShapeTransform = descriptor.ShapeTransform
+	ref.Source = descriptor.Source
+	ref.Backend = plan.Backend
+	ref.Kind = descriptor.Kind
+	ref.Terminal = descriptor.Terminal
+	ref.AssignmentText = encodeQEvalPipelineAssignments(descriptor.Assignments)
+	ref.ValueExpr = descriptor.ValueExpr
+	ref.ValueBinding = descriptor.ValueBinding
+	ref.IndexExpr = descriptor.IndexExpr
+	ref.IndexBinding = descriptor.IndexBinding
+	ref.MaskExpr = descriptor.MaskExpr
+	ref.MaskBinding = descriptor.MaskBinding
+	ref.RowValueExpr = descriptor.RowValueExpr
+	ref.RowIndexExpr = descriptor.RowIndexExpr
+	ref.ColIndexExpr = descriptor.ColIndexExpr
+	ref.CallableExpr = descriptor.CallableExpr
+	ref.DyadicOp = descriptor.DyadicOp
+	ref.ScalarExpr = descriptor.ScalarExpr
+	ref.ScalarLeft = descriptor.ScalarLeft
+	ref.IncludeCount = descriptor.IncludeCount
+	ref.SequenceValueExpr = descriptor.SequenceValueExpr
+	ref.SequenceTransformChain = descriptor.SequenceTransformChain
+	ref.SequenceTransformNames = descriptor.SequenceTransformNames
+	ref.LeftExpr = descriptor.LeftExpr
+	ref.RightExpr = descriptor.RightExpr
+	ref.CompareOp = descriptor.CompareOp
+	ref.ComparePrefix = descriptor.ComparePrefix
+	ref.ModExpr = descriptor.ModExpr
+	ref.ModulusExpr = descriptor.ModulusExpr
+	ref.ModTargetExpr = descriptor.ModTargetExpr
+	ref.ReductionInput = descriptor.ReductionInput
 }
 
 func decodeQEvalPipelineAssignments(text string) []stdq.EvalPipelineAssignment {

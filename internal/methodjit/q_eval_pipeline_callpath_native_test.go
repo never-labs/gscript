@@ -162,6 +162,8 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 				}
 				qEvalPipelineDescriptorBenchmarkSink = result[0]
 			}
+			b.StopTimer()
+			reportQEvalPipelineJITRouteStats(b, cf)
 		})
 		b.Run("GoHandlerNativeExit/"+tc.name, func(b *testing.B) {
 			ref := qEvalPipelineSourceBackedTestRef(b, tc.src)
@@ -179,6 +181,8 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 				}
 				qEvalPipelineDescriptorBenchmarkSink = regs[0]
 			}
+			b.StopTimer()
+			reportQEvalPipelineJITRouteStats(b, cf)
 		})
 		b.Run("GoHandlerHelperSlot/"+tc.name, func(b *testing.B) {
 			ref := qEvalPipelineSourceBackedTestRef(b, tc.src)
@@ -198,6 +202,8 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 				}
 				qEvalPipelineDescriptorBenchmarkSink = regs[0]
 			}
+			b.StopTimer()
+			reportQEvalPipelineJITRouteStats(b, cf)
 		})
 		b.Run("GoHandlerOpExit/"+tc.name, func(b *testing.B) {
 			ref := qEvalPipelineSourceBackedTestRef(b, tc.src)
@@ -215,8 +221,47 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 				}
 				qEvalPipelineDescriptorBenchmarkSink = regs[0]
 			}
+			b.StopTimer()
+			reportQEvalPipelineJITRouteStats(b, cf)
 		})
 	}
+}
+
+func reportQEvalPipelineJITRouteStats(b *testing.B, cf *CompiledFunction) {
+	b.Helper()
+	if b.N <= 0 || cf == nil {
+		return
+	}
+	var directReturn, nativeExit, opExit, success, errors uint64
+	shapes := map[string]struct{}{}
+	for _, stat := range cf.QKernelExecutionStats() {
+		if stat.Source != "methodjit_q_eval_runtime" || stat.Kernel != "QEvalPipelinePlan" {
+			continue
+		}
+		if stat.Outcome == "success" {
+			success += stat.Count
+		}
+		if stat.Outcome == "error" {
+			errors += stat.Count
+		}
+		if stat.Shape != "" {
+			shapes[stat.Shape] = struct{}{}
+		}
+		switch stat.Route {
+		case "typed_runtime_direct_entry":
+			directReturn += stat.Count
+		case "typed_runtime_native_exit":
+			nativeExit += stat.Count
+		case "typed_runtime_op_exit":
+			opExit += stat.Count
+		}
+	}
+	b.ReportMetric(float64(directReturn)/float64(b.N), "jit_typed_direct_return/op")
+	b.ReportMetric(float64(nativeExit)/float64(b.N), "jit_typed_native_exit/op")
+	b.ReportMetric(float64(opExit)/float64(b.N), "jit_typed_op_exit/op")
+	b.ReportMetric(float64(success)/float64(b.N), "jit_typed_kernel_success/op")
+	b.ReportMetric(float64(errors)/float64(b.N), "jit_typed_kernel_errors/op")
+	b.ReportMetric(float64(len(shapes)), "jit_typed_pipeline_shapes")
 }
 
 func compileQEvalPipelineNativeExitBenchmark(tb testing.TB, source string) *CompiledFunction {

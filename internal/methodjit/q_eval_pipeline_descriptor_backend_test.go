@@ -516,51 +516,16 @@ func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {
 
 func qEvalPipelineDescriptorBackendTestRef(tb testing.TB, source string) QEvalPipelinePlanRef {
 	tb.Helper()
-	descriptor, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipeline(source)
+	plan, ok := qEvalRuntimePipelinePlan(source)
 	if !ok {
 		tb.Fatalf("DescribeQEvalPipeline(%q) did not recognize pipeline", source)
 	}
-	plan := qEvalHotPlan{
-		Kernel:                 descriptor.Kernel,
-		Shape:                  descriptor.Shape,
-		PipelineShape:          descriptor.PipelineShape,
-		ShapeFamily:            descriptor.ShapeFamily,
-		ShapeReducer:           descriptor.ShapeReducer,
-		ShapeSelector:          descriptor.ShapeSelector,
-		ShapeTransform:         descriptor.ShapeTransform,
-		Backend:                descriptor.Backend,
-		Detail:                 descriptor.Detail,
-		Kind:                   descriptor.Kind,
-		Terminal:               descriptor.Terminal,
-		AssignmentText:         descriptor.AssignmentText,
-		ValueExpr:              descriptor.ValueExpr,
-		ValueBinding:           descriptor.ValueBinding,
-		IndexExpr:              descriptor.IndexExpr,
-		IndexBinding:           descriptor.IndexBinding,
-		MaskExpr:               descriptor.MaskExpr,
-		MaskBinding:            descriptor.MaskBinding,
-		RowValueExpr:           descriptor.RowValueExpr,
-		RowIndexExpr:           descriptor.RowIndexExpr,
-		ColIndexExpr:           descriptor.ColIndexExpr,
-		CallableExpr:           descriptor.CallableExpr,
-		DyadicOp:               descriptor.DyadicOp,
-		ScalarExpr:             descriptor.ScalarExpr,
-		ScalarLeft:             descriptor.ScalarLeft,
-		IncludeCount:           descriptor.IncludeCount,
-		SequenceValueExpr:      descriptor.SequenceValueExpr,
-		SequenceTransformChain: descriptor.SequenceTransformChain,
-		SequenceTransformNames: descriptor.SequenceTransformNames,
-		LeftExpr:               descriptor.LeftExpr,
-		RightExpr:              descriptor.RightExpr,
-		CompareOp:              descriptor.CompareOp,
-		ComparePrefix:          descriptor.ComparePrefix,
-		ModExpr:                descriptor.ModExpr,
-		ModulusExpr:            descriptor.ModulusExpr,
-		ModTargetExpr:          descriptor.ModTargetExpr,
-		ReductionInput:         descriptor.ReductionInput,
-	}
 	fn := &Function{}
-	return fn.addQEvalPipelinePlan("not a q pipeline", plan)
+	ref := fn.addQEvalPipelinePlan("not a q pipeline", plan)
+	if ref.BackendPlan == nil || !ref.BackendPlan.Valid() {
+		tb.Fatalf("q eval pipeline ref = %+v, want embedded q backend plan", ref)
+	}
+	return ref
 }
 
 func qEvalPipelineSourceBackedTestRef(tb testing.TB, source string) QEvalPipelinePlanRef {
