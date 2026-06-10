@@ -11636,7 +11636,31 @@ func qNumericUnarySumI64Values(op string, values []int64) (any, bool, error) {
 			}
 		}
 		return sum, true, nil
-	case NumericUnarySqrt, NumericUnaryLog, NumericUnaryExp, NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan, NumericUnaryRecip:
+	case NumericUnarySqrt:
+		var sum float64
+		for _, value := range values {
+			sum += math.Sqrt(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryLog:
+		var sum float64
+		for _, value := range values {
+			sum += math.Log(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryExp:
+		var sum float64
+		for _, value := range values {
+			sum += math.Exp(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryRecip:
+		var sum float64
+		for _, value := range values {
+			sum += 1 / float64(value)
+		}
+		return sum, true, nil
+	case NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan:
 		var sum float64
 		for _, value := range values {
 			out, err := applyNumericUnaryFloat(op, float64(value))
@@ -12337,6 +12361,50 @@ func qNumericUnarySumI64Range(op string, values i64RangeArray) (any, bool) {
 		case first == 0 && last == 0:
 			return int64(0), true
 		}
+	case NumericUnarySqrt:
+		var sum float64
+		value := values.start
+		for i := 0; i < values.len; i++ {
+			sum += math.Sqrt(float64(value))
+			value += values.step
+		}
+		return sum, true
+	case NumericUnaryLog:
+		var sum float64
+		value := values.start
+		for i := 0; i < values.len; i++ {
+			sum += math.Log(float64(value))
+			value += values.step
+		}
+		return sum, true
+	case NumericUnaryExp:
+		var sum float64
+		value := values.start
+		for i := 0; i < values.len; i++ {
+			sum += math.Exp(float64(value))
+			value += values.step
+		}
+		return sum, true
+	case NumericUnaryRecip:
+		var sum float64
+		value := values.start
+		for i := 0; i < values.len; i++ {
+			sum += 1 / float64(value)
+			value += values.step
+		}
+		return sum, true
+	case NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan:
+		var sum float64
+		value := values.start
+		for i := 0; i < values.len; i++ {
+			out, err := applyNumericUnaryFloat(op, float64(value))
+			if err != nil {
+				return nil, false
+			}
+			sum += out
+			value += values.step
+		}
+		return sum, true
 	}
 	return nil, false
 }

@@ -917,6 +917,12 @@ type qScriptStatement struct {
 	valueExpr   Expr
 	bindingPlan qScriptBindingPlan
 	fastPlan    qEvalFastPlan
+	// compareIndexChecked/compareIndexPlan memoize the
+	// tryEvalCompareIndexStatsAssignment plan build (a per-call string walk
+	// otherwise); the runtime operand evaluation and kind checks still run
+	// per call.
+	compareIndexChecked bool
+	compareIndexPlan    *qPipelinePlan
 }
 
 type qEvalFastPlanKind uint8
@@ -927,6 +933,20 @@ const (
 	qEvalFastScalarApplyIndex
 	qEvalFastSortRankReducerBundle
 	qEvalFastNamePostfixSymbol
+	qEvalFastFby
+	qEvalFastAddChain
+	qEvalFastSingleTerm
+)
+
+// qEvalSyntaxState memoizes a pure syntactic predicate computed at plan
+// build time. The zero value (unknown) keeps the per-call probe for plans
+// built outside buildQEvalFastPlan.
+type qEvalSyntaxState uint8
+
+const (
+	qEvalSyntaxUnknown qEvalSyntaxState = iota
+	qEvalSyntaxYes
+	qEvalSyntaxNo
 )
 
 type qEvalConstState uint8
@@ -945,6 +965,11 @@ type qEvalFastPlan struct {
 	postfixName   string
 	postfixSymbol data.Symbol
 	constState    qEvalConstState
+	fby           *qFbyFastPlan
+	addChainTerms []qAddChainTermPlan
+	// applyIndexState memoizes the syntactic gate of evalApplyIndexForm so
+	// warm statements skip the per-call @/. apply string walks.
+	applyIndexState qEvalSyntaxState
 }
 
 type qScriptExecutableKind uint8
@@ -1178,12 +1203,30 @@ func cloneEvalPipelineExecutablePlan(in EvalPipelineExecutablePlan) EvalPipeline
 func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
 	stmt.bindingPlan = cloneQScriptBindingPlan(stmt.bindingPlan)
 	stmt.fastPlan = cloneQEvalFastPlan(stmt.fastPlan)
+	if stmt.compareIndexPlan != nil {
+		plan := cloneQPipelinePlan(*stmt.compareIndexPlan)
+		stmt.compareIndexPlan = &plan
+	}
 	return stmt
 }
 
 func cloneQEvalFastPlan(in qEvalFastPlan) qEvalFastPlan {
 	out := in
 	out.pipeline = cloneQPipelinePlan(in.pipeline)
+	if in.fby != nil {
+		fby := *in.fby
+		out.fby = &fby
+	}
+	if len(in.addChainTerms) > 0 {
+		out.addChainTerms = make([]qAddChainTermPlan, len(in.addChainTerms))
+		for i := range in.addChainTerms {
+			out.addChainTerms[i] = in.addChainTerms[i]
+			if sub := in.addChainTerms[i].fast; sub != nil {
+				cloned := cloneQEvalFastPlan(*sub)
+				out.addChainTerms[i].fast = &cloned
+			}
+		}
+	}
 	return out
 }
 
@@ -1467,9 +1510,15 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 		}
 	}
 	if !handled && stmt.assign != "" {
-		v, handled, err = s.tryEvalCompareIndexStatsAssignment(target)
-		if err != nil {
-			return nil, err
+		if !stmt.compareIndexChecked {
+			stmt.compareIndexChecked = true
+			stmt.compareIndexPlan = buildQCompareIndexStatsPlan(target)
+		}
+		if stmt.compareIndexPlan != nil {
+			v, handled, err = s.evalQCompareIndexStatsPlan(stmt.compareIndexPlan)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	if !handled {
@@ -1485,18 +1534,30 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 }
 
 func (s *EvalState) tryEvalCompareIndexStatsAssignment(src string) (any, bool, error) {
-	if !strings.HasPrefix(strings.TrimSpace(src), "where ") {
+	plan := buildQCompareIndexStatsPlan(src)
+	if plan == nil {
 		return nil, false, nil
+	}
+	return s.evalQCompareIndexStatsPlan(plan)
+}
+
+// buildQCompareIndexStatsPlan is the syntactic half of
+// tryEvalCompareIndexStatsAssignment; the result can be cached per
+// statement.
+func buildQCompareIndexStatsPlan(src string) *qPipelinePlan {
+	if !strings.HasPrefix(strings.TrimSpace(src), "where ") {
+		return nil
 	}
 	plan, ok := buildQPipelineWhereComparePlan(src, qPipelineWhereCompareIndexes, "compare-to-index")
-	if !ok {
-		return nil, false, nil
-	}
-	if plan.kind != qPipelineWhereCompareIndexes {
-		return nil, false, nil
+	if !ok || plan.kind != qPipelineWhereCompareIndexes {
+		return nil
 	}
 	plan = qPipelinePlanWithBindingPlans(plan)
-	left, right, err := s.evalQPipelineCompareOperands(&plan)
+	return &plan
+}
+
+func (s *EvalState) evalQCompareIndexStatsPlan(plan *qPipelinePlan) (any, bool, error) {
+	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return nil, true, err
 	}
@@ -1671,8 +1732,30 @@ func numericReductionStatsValue(stats data.NumericStats, op string) any {
 	}
 }
 
+// buildQEvalFastPlan builds the statement-level fast plan used by
+// evalCachedOrStringUncached. The add-chain route belongs ONLY here: it
+// mirrors the statement-level tryEvalScalarAddChain probe, which does not
+// exist inside s.eval, so term-level plans (buildQEvalFastPlanTermRoutes)
+// must not include it.
 func buildQEvalFastPlan(src string) qEvalFastPlan {
 	src = strings.TrimSpace(src)
+	plan := buildQEvalFastPlanRoutes(src, true)
+	if qMayBeApplyIndexForm(src) {
+		plan.applyIndexState = qEvalSyntaxYes
+	} else {
+		plan.applyIndexState = qEvalSyntaxNo
+	}
+	return plan
+}
+
+// buildQEvalFastPlanTermRoutes builds a fast plan for a sub-expression whose
+// per-call fallback is s.eval: only routes that are faithful to the s.eval
+// probe cascade (pipeline, sort-rank, fby, reducer-over-name) are allowed.
+func buildQEvalFastPlanTermRoutes(src string) qEvalFastPlan {
+	return buildQEvalFastPlanRoutes(strings.TrimSpace(src), false)
+}
+
+func buildQEvalFastPlanRoutes(src string, statementLevel bool) qEvalFastPlan {
 	if src == "" {
 		return qEvalFastPlan{}
 	}
@@ -1698,7 +1781,36 @@ func buildQEvalFastPlan(src string) qEvalFastPlan {
 			return qEvalFastPlan{kind: qEvalFastPipeline, pipeline: pipeline}
 		}
 	}
+	if fby := buildQFbyFastPlan(src); fby != nil {
+		return qEvalFastPlan{kind: qEvalFastFby, fby: fby}
+	}
+	if statementLevel {
+		if terms := buildQAddChainPlan(src); terms != nil {
+			return qEvalFastPlan{kind: qEvalFastAddChain, addChainTerms: terms}
+		}
+	}
+	if term, ok := buildQSingleTermFastPlan(src); ok {
+		return qEvalFastPlan{kind: qEvalFastSingleTerm, addChainTerms: []qAddChainTermPlan{term}}
+	}
 	return qEvalFastPlan{}
+}
+
+// qMayBeApplyIndexForm is the exact syntactic gate of evalApplyIndexForm:
+// when false, no branch of the per-call probe can handle src.
+func qMayBeApplyIndexForm(src string) bool {
+	if strings.HasPrefix(src, "@[") && strings.HasSuffix(src, "]") {
+		return true
+	}
+	if strings.HasPrefix(src, ".[") && strings.HasSuffix(src, "]") {
+		return true
+	}
+	if _, _, ok := splitTopLevelOperator(src, "@"); ok {
+		return true
+	}
+	if _, _, ok := splitTopLevelDotApply(src); ok {
+		return true
+	}
+	return false
 }
 
 func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
@@ -1719,6 +1831,12 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 		return scalarApplyIndexPlanValue(plan.scalarIndex, target)
 	case qEvalFastSortRankReducerBundle:
 		return s.evalSortRankReducerBundlePlan(plan.sortRankTerms)
+	case qEvalFastFby:
+		return s.evalQFbyFastPlan(plan.fby)
+	case qEvalFastAddChain:
+		return s.evalQAddChainPlan(plan.addChainTerms)
+	case qEvalFastSingleTerm:
+		return s.evalQSingleTermFastPlan(&plan.addChainTerms[0])
 	case qEvalFastNamePostfixSymbol:
 		collection, ok := s.lookupName(plan.postfixName)
 		if !ok || isCallable(collection) {
@@ -1797,8 +1915,10 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 }
 
 func (s *EvalState) evalCachedOrStringUncached(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
-	if out, handled, err := s.evalApplyIndexForm(src); err != nil || handled {
-		return out, err
+	if fastPlan == nil || fastPlan.applyIndexState != qEvalSyntaxNo {
+		if out, handled, err := s.evalApplyIndexForm(src); err != nil || handled {
+			return out, err
+		}
 	}
 	if bindingPlan != nil && bindingPlan.kind != qScriptBindingInvalid {
 		value, handled, err := s.evalQScriptBindingPlan(bindingPlan)
@@ -7534,6 +7654,12 @@ func (s *EvalState) evalFby(leftExpr, groupExpr string) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("fby group must be a vector")
 	}
+	return s.evalFbyArrays(agg, valueArray, groupArray)
+}
+
+// evalFbyArrays is the array-level core of evalFby, shared with the cached
+// qFbyFastPlan route; typed kernels and probes run per call.
+func (s *EvalState) evalFbyArrays(agg string, valueArray, groupArray data.Array) (any, error) {
 	if valueArray.Len() != groupArray.Len() {
 		return nil, fmt.Errorf("fby value length %d does not match group length %d", valueArray.Len(), groupArray.Len())
 	}

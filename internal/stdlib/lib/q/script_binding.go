@@ -124,6 +124,9 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if plan := buildQScriptWordDyadicBindingPlan(src); plan.kind != qScriptBindingInvalid {
 		return plan
 	}
+	if plan := buildQScriptCutBindingPlan(src); plan.kind != qScriptBindingInvalid {
+		return plan
+	}
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
 		if err != nil || !ok {
@@ -247,6 +250,47 @@ func buildQScriptWordDyadicBindingPlan(src string) qScriptBindingPlan {
 		return qScriptBindingBinaryPlan(op, left, right)
 	}
 	return qScriptBindingPlan{}
+}
+
+// buildQScriptCutBindingPlan plans `<indexes> cut <vector>` statements with
+// simple operands (literals, literal vectors, names). Execution funnels into
+// evalValueBinary → qCutValue, the same terminal s.eval's dyadic word table
+// reaches; restricting operands to simple values keeps the split position
+// identical to s.eval's leftmost dyadic word split.
+func buildQScriptCutBindingPlan(src string) qScriptBindingPlan {
+	src = strings.TrimSpace(src)
+	leftExpr, rightExpr, ok := splitTopLevelWord(src, "cut")
+	if !ok {
+		return qScriptBindingPlan{}
+	}
+	left := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(leftExpr)), nil)
+	if !qScriptBindingPlanIsSimpleValue(left) {
+		return qScriptBindingPlan{}
+	}
+	right := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(rightExpr)), nil)
+	if !qScriptBindingPlanIsSimpleValue(right) {
+		return qScriptBindingPlan{}
+	}
+	return qScriptBindingBinaryPlan("cut", left, right)
+}
+
+// qScriptBindingPlanIsSimpleValue reports whether a plan is a literal,
+// a literal vector, or a plain name — operand shapes that cannot embed
+// another dyadic word and therefore cannot change split precedence.
+func qScriptBindingPlanIsSimpleValue(plan qScriptBindingPlan) bool {
+	switch plan.kind {
+	case qScriptBindingLiteral, qScriptBindingName:
+		return true
+	case qScriptBindingVector:
+		for i := range plan.items {
+			if !qScriptBindingPlanIsSimpleValue(plan.items[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func splitQScriptPrefixDyadicArgs(src string) (string, string, bool) {
