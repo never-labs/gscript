@@ -300,6 +300,7 @@ func (cf *CompiledFunction) QKernelExecutionStats() []QKernelExecutionStat {
 	cf.qKernelStatsMu.Unlock()
 
 	cf.appendQEvalPipelinePlanExecutionStats(merged)
+	cf.appendQEvalSessionEvalExecutionStats(merged)
 	if len(merged) == 0 {
 		return nil
 	}

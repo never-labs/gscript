@@ -479,6 +479,12 @@ func (tm *TieringManager) shouldSuppressLoopCallTier2(proto *vm.FuncProto, profi
 	if hasStaticOpInLoop(proto, vm.OP_RESUME) {
 		return true
 	}
+	// Loops whose only calls are constant-source q session evals lose those
+	// calls to QEvalSessionEvalLoweringPass during the Tier 2 pipeline; do not
+	// suppress them as generic loop-call candidates.
+	if protoLoopCallsAreLowerableQSessionEval(proto) {
+		return false
+	}
 	globals := tm.buildLoopCallGlobals(proto)
 	return !canPromoteWithInlining(proto, globals) && !canPromoteWithNativeLoopCalls(proto, globals)
 }

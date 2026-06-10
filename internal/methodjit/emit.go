@@ -665,6 +665,12 @@ type CompiledFunction struct {
 	// QKernelExecutionStats rows.
 	QEvalPipelinePlanStats []qEvalPipelinePlanExecutionCounters
 
+	// QEvalSessionEvalStats keeps lock-free success/error counters for the
+	// constant-source q session eval op-exit (OpQEvalSessionEval). The exit
+	// fires per loop iteration, so recording must avoid the qKernelStats
+	// mutex; QKernelExecutionStats folds these counters back in.
+	QEvalSessionEvalStats qEvalSessionEvalExecutionCounters
+
 	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
 	// metadata alive for op-exit execution stats.
 	QVectorRuntimeKernelShapesByID map[int]string

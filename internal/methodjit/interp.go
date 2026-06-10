@@ -1266,6 +1266,17 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpQEvalSessionEval:
+		var constants []runtime.Value
+		if s.fn.Proto != nil {
+			constants = s.fn.Proto.Constants
+		}
+		out, err := executeQEvalSessionEvalValue(constants, int(instr.Aux), s.val(instr.Args[0]))
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = out
+
 	case OpVectorScan:
 		out, err := executeVectorScanValue(s.val(instr.Args[0]))
 		if err != nil {

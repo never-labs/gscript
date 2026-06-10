@@ -676,6 +676,22 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		ctx.OpExitAux = int64(aux)
 		return cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteOpExit)
 
+	case OpQEvalSessionEval:
+		if absArg1 >= len(regs) || absSlot >= len(regs) {
+			return fmt.Errorf("QEvalSessionEval op-exit out of register range")
+		}
+		var constants []runtime.Value
+		if proto != nil {
+			constants = proto.Constants
+		}
+		out, err := executeQEvalSessionEvalValue(constants, aux, regs[absArg1])
+		cf, _ := tm.tier2CompiledFor(proto)
+		cf.recordQEvalSessionEvalExecution(err)
+		if err != nil {
+			return err
+		}
+		regs[absSlot] = out
+
 	case OpVectorScan:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")

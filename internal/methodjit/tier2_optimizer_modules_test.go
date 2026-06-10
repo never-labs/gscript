@@ -1008,6 +1008,7 @@ func TestTier2FinalCallModuleOrder(t *testing.T) {
 		"QQueryHotPath",
 		"QEvalHotPlan",
 		"QEvalPipelineLowering",
+		"QEvalSessionEvalLowering",
 		"QQueryNativeLowering",
 	})
 }
@@ -1025,6 +1026,7 @@ func TestTier2FinalCallModuleOrderExperimentalFieldShapeSplit(t *testing.T) {
 		"QQueryHotPath",
 		"QEvalHotPlan",
 		"QEvalPipelineLowering",
+		"QEvalSessionEvalLowering",
 		"QQueryNativeLowering",
 		"FieldShapeCallSplit (experimental)",
 	})
@@ -1043,6 +1045,7 @@ func TestTier2FinalCallModuleOrderIgnoresOtherFieldShapeSplitValues(t *testing.T
 		"QQueryHotPath",
 		"QEvalHotPlan",
 		"QEvalPipelineLowering",
+		"QEvalSessionEvalLowering",
 		"QQueryNativeLowering",
 	})
 }
