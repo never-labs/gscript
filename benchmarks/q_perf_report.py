@@ -159,6 +159,18 @@ class RuntimeHealthRow:
 
 
 @dataclass
+class RuntimeBridgeEfficiencyRow:
+    scope: str
+    benchmark_count: int
+    direct_calls_op: float
+    slow_bridge_calls_op: float
+    direct_call_share_pct: float | None
+    avg_allocs_op: float | None
+    allocs_per_direct_call: float | None
+    note: str = ""
+
+
+@dataclass
 class PipelineFallbackTopRow:
     category: str
     pipeline_shape: str
@@ -189,6 +201,8 @@ class GatePolicy:
     max_allocs_op: float
     max_jit_typed_errors_op: float = 0.0
     max_jit_backend_slow_route_pct: float = 0.0
+    min_runtime_direct_bridge_share_pct: float = 95.0
+    max_runtime_allocs_per_direct_call: float = 32.0
 
 
 @dataclass
@@ -641,6 +655,49 @@ def build_runtime_health_summary(rows: dict[str, BenchRow]) -> list[RuntimeHealt
     ]
 
 
+def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[RuntimeBridgeEfficiencyRow]:
+    runtime_rows = build_runtime_metric_rows(rows)
+    bridge_rows = [
+        row
+        for row in runtime_rows
+        if row.typed_kernel_attempts_op is not None
+        or row.jit_typed_direct_return_op is not None
+        or row.jit_typed_native_exit_op is not None
+        or row.jit_typed_op_exit_op is not None
+        or row.jit_typed_kernel_success_op is not None
+        or row.jit_typed_kernel_errors_op is not None
+    ]
+    if not bridge_rows:
+        return []
+    typed_direct = sum(row.typed_kernel_hits_op or 0.0 for row in bridge_rows)
+    typed_slow = sum(row.typed_kernel_fallbacks_op or 0.0 for row in bridge_rows)
+    typed_slow += sum(row.typed_kernel_errors_op or 0.0 for row in bridge_rows)
+    jit_direct = sum(row.jit_typed_direct_return_op or 0.0 for row in bridge_rows)
+    jit_slow = sum(row.jit_typed_native_exit_op or 0.0 for row in bridge_rows)
+    jit_slow += sum(row.jit_typed_op_exit_op or 0.0 for row in bridge_rows)
+    jit_slow += sum(row.jit_typed_kernel_errors_op or 0.0 for row in bridge_rows)
+    direct = typed_direct + jit_direct
+    slow = typed_slow + jit_slow
+    total = direct + slow
+    alloc_values = [row.allocs_op for row in bridge_rows if row.allocs_op is not None]
+    avg_allocs = average(alloc_values)
+    return [
+        RuntimeBridgeEfficiencyRow(
+            scope="typed_runtime_and_jit_backend",
+            benchmark_count=len(bridge_rows),
+            direct_calls_op=direct,
+            slow_bridge_calls_op=slow,
+            direct_call_share_pct=(100 * direct / total) if total > 0 else None,
+            avg_allocs_op=avg_allocs,
+            allocs_per_direct_call=(avg_allocs / direct) if avg_allocs is not None and direct > 0 else None,
+            note=(
+                "direct calls combine typed primitive hits and JIT direct returns; slow bridge calls combine "
+                "typed fallback/error plus JIT native/op exits and errors"
+            ),
+        )
+    ]
+
+
 def average(values: list[float]) -> float | None:
     if not values:
         return None
@@ -1011,12 +1068,49 @@ def runtime_health_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) ->
     return checks
 
 
+def runtime_bridge_efficiency_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    for item in build_runtime_bridge_efficiency_summary(rows):
+        if item.direct_call_share_pct is not None:
+            checks.append(
+                GateCheck(
+                    signal="runtime_bridge_direct_call_share_pct",
+                    benchmark=item.scope,
+                    value=item.direct_call_share_pct,
+                    threshold=f">= {policy.min_runtime_direct_bridge_share_pct:g}",
+                    status=(
+                        "pass"
+                        if item.direct_call_share_pct >= policy.min_runtime_direct_bridge_share_pct
+                        else "fail"
+                    ),
+                    note=item.note,
+                )
+            )
+        if item.allocs_per_direct_call is not None:
+            checks.append(
+                GateCheck(
+                    signal="runtime_bridge_allocs_per_direct_call",
+                    benchmark=item.scope,
+                    value=item.allocs_per_direct_call,
+                    threshold=f"<= {policy.max_runtime_allocs_per_direct_call:g}",
+                    status=(
+                        "pass"
+                        if item.allocs_per_direct_call <= policy.max_runtime_allocs_per_direct_call
+                        else "fail"
+                    ),
+                    note=item.note,
+                )
+            )
+    return checks
+
+
 def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
     return (
         ratio_gate_checks(rows, policy)
         + runtime_gate_checks(rows, policy)
         + observability_gate_checks(rows, policy)
         + runtime_health_gate_checks(rows, policy)
+        + runtime_bridge_efficiency_gate_checks(rows, policy)
     )
 
 
@@ -1111,6 +1205,7 @@ def markdown_report(
     jit_routes = build_jit_route_summary(rows)
     observability = build_runtime_observability_summary(rows)
     health = build_runtime_health_summary(rows)
+    bridge_efficiency = build_runtime_bridge_efficiency_summary(rows)
     category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -1336,6 +1431,28 @@ def markdown_report(
     lines.extend(
         [
             "",
+            "## Runtime Bridge Efficiency",
+            "",
+            "| Scope | Benchmarks | direct calls/op | slow bridge calls/op | direct call share | avg allocs/op | allocs/direct call | Note |",
+            "|---|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    if bridge_efficiency:
+        for item in bridge_efficiency:
+            lines.append(
+                f"| {item.scope} | {item.benchmark_count} | "
+                f"{item.direct_calls_op:.3f} | "
+                f"{item.slow_bridge_calls_op:.3f} | "
+                f"{format_metric(item.direct_call_share_pct, 1)} | "
+                f"{format_metric(item.avg_allocs_op, 1)} | "
+                f"{format_metric(item.allocs_per_direct_call, 3)} | "
+                f"{item.note} |"
+            )
+    else:
+        lines.append("| missing | 0 | 0 | 0 | missing | missing | missing | no typed runtime or JIT bridge metrics parsed |")
+    lines.extend(
+        [
+            "",
             "## Fallback Shape Summary",
             "",
             "| Benchmark | fallbacks/op | typed_kernel_fallbacks/op | typed_pipeline_fallback_shapes |",
@@ -1443,6 +1560,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-allocs-op", type=float, default=64.0)
     parser.add_argument("--max-jit-typed-errors-op", type=float, default=0.0)
     parser.add_argument("--max-jit-backend-slow-route-pct", type=float, default=0.0)
+    parser.add_argument("--min-runtime-direct-bridge-share-pct", type=float, default=95.0)
+    parser.add_argument("--max-runtime-allocs-per-direct-call", type=float, default=32.0)
     parser.add_argument("--fallback-top-n", type=int, default=20)
     args = parser.parse_args(argv)
 
@@ -1508,6 +1627,8 @@ def main(argv: list[str]) -> int:
         max_allocs_op=args.max_allocs_op,
         max_jit_typed_errors_op=args.max_jit_typed_errors_op,
         max_jit_backend_slow_route_pct=args.max_jit_backend_slow_route_pct,
+        min_runtime_direct_bridge_share_pct=args.min_runtime_direct_bridge_share_pct,
+        max_runtime_allocs_per_direct_call=args.max_runtime_allocs_per_direct_call,
     )
     gate_checks = build_gate_checks(rows, policy) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
@@ -1522,6 +1643,7 @@ def main(argv: list[str]) -> int:
         "jit_route_summary": [asdict(row) for row in build_jit_route_summary(rows)],
         "runtime_observability_summary": [asdict(row) for row in build_runtime_observability_summary(rows)],
         "runtime_health_summary": [asdict(row) for row in build_runtime_health_summary(rows)],
+        "runtime_bridge_efficiency_summary": [asdict(row) for row in build_runtime_bridge_efficiency_summary(rows)],
         "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
         "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),

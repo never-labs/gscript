@@ -164,6 +164,20 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(health.jit_op_exit_op, 1)
         self.assertEqual(health.jit_slow_route_pct, 60)
 
+    def test_runtime_bridge_efficiency_summary_quantifies_direct_backend_value(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
+        summary = report.build_runtime_bridge_efficiency_summary(rows)
+
+        self.assertEqual(len(summary), 1)
+        efficiency = summary[0]
+        self.assertEqual(efficiency.scope, "typed_runtime_and_jit_backend")
+        self.assertEqual(efficiency.benchmark_count, 4)
+        self.assertEqual(efficiency.direct_calls_op, 3.8)
+        self.assertEqual(efficiency.slow_bridge_calls_op, 4.2)
+        self.assertAlmostEqual(efficiency.direct_call_share_pct, 47.5)
+        self.assertEqual(efficiency.avg_allocs_op, 27)
+        self.assertAlmostEqual(efficiency.allocs_per_direct_call, 27 / 3.8)
+
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
         policy = report.GatePolicy(
@@ -202,6 +216,23 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn(("jit_backend_slow_route_pct", "jit_backend"), failed)
         self.assertIn(("runtime_health_typed_errors_op", "q_runtime_hotpath"), failed)
         self.assertIn(("runtime_health_jit_slow_route_pct", "q_runtime_hotpath"), failed)
+
+    def test_gate_checks_cover_runtime_bridge_efficiency(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            min_runtime_direct_bridge_share_pct=90,
+            max_runtime_allocs_per_direct_call=4,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("runtime_bridge_direct_call_share_pct", "typed_runtime_and_jit_backend"), failed)
+        self.assertIn(("runtime_bridge_allocs_per_direct_call", "typed_runtime_and_jit_backend"), failed)
 
     def test_gate_checks_cover_runtime_health_fallback_and_alloc_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE_WITH_FALLBACK)
@@ -282,6 +313,8 @@ class QPerfReportTest(unittest.TestCase):
             self.assertEqual(payload["runtime_observability_summary"][0]["layer"], "qsql_kernel")
             self.assertIn("runtime_health_summary", payload)
             self.assertEqual(payload["runtime_health_summary"][0]["scope"], "q_runtime_hotpath")
+            self.assertIn("runtime_bridge_efficiency_summary", payload)
+            self.assertEqual(payload["runtime_bridge_efficiency_summary"][0]["scope"], "typed_runtime_and_jit_backend")
             self.assertIn("pipeline_category_metrics", payload)
             self.assertIn("pipeline_fallback_top", payload)
             self.assertIn("fallback_shape_summary", payload)
@@ -293,6 +326,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("JIT Typed Runtime Routes", markdown)
             self.assertIn("Runtime Observability Summary", markdown)
             self.assertIn("Runtime Health Summary", markdown)
+            self.assertIn("Runtime Bridge Efficiency", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
 
