@@ -35,7 +35,8 @@ BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/
 
 SAMPLE_ARRAY_BRIDGE = """
 BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  65536 B/op  1 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
-BenchmarkQEvalPipelineArrayRuntimeBridge/FallbackEncodedSymbol-16 100  9000 ns/op  131072 B/op  8193 allocs/op  0 q_array_bridge_bulk_hits/op  1 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  131072 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/FallbackMixedAny-16   100  9000 ns/op  131072 B/op  8193 allocs/op  0 q_array_bridge_bulk_hits/op  1 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
 """
 
 FALLBACK_REPORT_LOG = """
@@ -160,10 +161,10 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["jit_backend"].op_exit_op, 1)
         self.assertEqual(summary["jit_backend"].errors_op, 1)
         self.assertEqual(summary["jit_backend"].slow_route_pct, 60)
-        self.assertEqual(summary["methodjit_array_bridge"].attempts_op, 2)
-        self.assertEqual(summary["methodjit_array_bridge"].hits_op, 1)
+        self.assertEqual(summary["methodjit_array_bridge"].attempts_op, 3)
+        self.assertEqual(summary["methodjit_array_bridge"].hits_op, 2)
         self.assertEqual(summary["methodjit_array_bridge"].fallbacks_op, 1)
-        self.assertEqual(summary["methodjit_array_bridge"].hit_pct, 50)
+        self.assertAlmostEqual(summary["methodjit_array_bridge"].hit_pct, 100 * 2 / 3)
 
     def test_runtime_health_summary_combines_jit_fallback_and_alloc_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
@@ -190,12 +191,12 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(len(summary), 1)
         efficiency = summary[0]
         self.assertEqual(efficiency.scope, "typed_runtime_and_jit_backend")
-        self.assertEqual(efficiency.benchmark_count, 6)
-        self.assertEqual(efficiency.direct_calls_op, 4.8)
+        self.assertEqual(efficiency.benchmark_count, 7)
+        self.assertEqual(efficiency.direct_calls_op, 5.8)
         self.assertEqual(efficiency.slow_bridge_calls_op, 5.2)
-        self.assertAlmostEqual(efficiency.direct_call_share_pct, 48)
-        self.assertEqual(efficiency.avg_allocs_op, 8302 / 6)
-        self.assertAlmostEqual(efficiency.allocs_per_direct_call, (8302 / 6) / 4.8)
+        self.assertAlmostEqual(efficiency.direct_call_share_pct, 100 * 5.8 / 11)
+        self.assertEqual(efficiency.avg_allocs_op, 8304 / 7)
+        self.assertAlmostEqual(efficiency.allocs_per_direct_call, (8304 / 7) / 5.8)
 
     def test_runtime_array_bridge_summary_exposes_bulk_hit_and_fallback_counts(self):
         rows = report.parse_go_benchmarks(SAMPLE_ARRAY_BRIDGE)
@@ -204,14 +205,14 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(len(summary), 1)
         bridge = summary[0]
         self.assertEqual(bridge.scope, "methodjit_array_bridge")
-        self.assertEqual(bridge.benchmark_count, 2)
-        self.assertEqual(bridge.attempts_op, 2)
-        self.assertEqual(bridge.bulk_hits_op, 1)
+        self.assertEqual(bridge.benchmark_count, 3)
+        self.assertEqual(bridge.attempts_op, 3)
+        self.assertEqual(bridge.bulk_hits_op, 2)
         self.assertEqual(bridge.fallbacks_op, 1)
         self.assertEqual(bridge.errors_op, 0)
-        self.assertEqual(bridge.bulk_hit_pct, 50)
-        self.assertEqual(bridge.rows_op, 16384)
-        self.assertEqual(bridge.avg_allocs_op, 4097)
+        self.assertAlmostEqual(bridge.bulk_hit_pct, 100 * 2 / 3)
+        self.assertEqual(bridge.rows_op, 24576)
+        self.assertEqual(bridge.avg_allocs_op, 8196 / 3)
         self.assertEqual(bridge.max_allocs_op, 8193)
 
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
