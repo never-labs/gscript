@@ -4680,6 +4680,24 @@ func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
 		}
 		return f64BucketArray{source: a, width: width, kind: KindF64, len: a.Len()}, true, nil
 	default:
+		// Any other float-kind numeric carrier (lazy dyadic trees, producer
+		// views) buckets through bulk flattening into a dense float column.
+		// Null-bearing carriers fail the bulk flatten and keep the generic
+		// NullValue-producing fallback.
+		if array.Kind() == KindF64 && isNumericArray(array) {
+			width, err := bucketFloat64Interval(interval)
+			if err != nil {
+				return nil, true, err
+			}
+			if values, owned, ok := tryBulkF64Values(array); ok {
+				out := make([]float64, len(values))
+				for i, v := range values {
+					out[i] = math.Floor(v/width) * width
+				}
+				bulkF64Release(values, owned)
+				return newF64Trusted(out), true, nil
+			}
+		}
 		return nil, false, nil
 	}
 }
@@ -7558,7 +7576,9 @@ const (
 	OpSub Op = "-"
 	OpMul Op = "*"
 	OpDiv Op = "/"
-	OpMod Op = "mod"
+	// OpIDiv is q integer `div`: floor division over integer operands.
+	OpIDiv Op = "div"
+	OpMod  Op = "mod"
 	OpEQ  Op = "="
 	OpNE  Op = "!="
 	OpLT  Op = "<"
