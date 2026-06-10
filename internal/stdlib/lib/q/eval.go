@@ -2335,7 +2335,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 	}
 	if strings.HasPrefix(src, "@[") {
-		return s.evalAmend(src)
+		if value, ok, err := s.evalApplyIndexForm(src); ok || err != nil {
+			return value, err
+		}
 	}
 	if value, ok, err := s.evalListStringFunctionCall(src); ok || err != nil {
 		return value, err

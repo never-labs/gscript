@@ -36,6 +36,9 @@ func (s *EvalState) evalApplyIndexForm(src string) (any, bool, error) {
 	if out, ok, err := s.tryEvalScalarApplyIndexFastPath(src); ok || err != nil {
 		return out, ok, err
 	}
+	if strings.HasPrefix(src, "@[") && strings.HasSuffix(src, "]") {
+		return s.evalAtApplyOrAmend(src)
+	}
 	if strings.HasPrefix(src, ".[") && strings.HasSuffix(src, "]") {
 		return s.evalDotApplyOrAmend(src)
 	}
@@ -48,6 +51,33 @@ func (s *EvalState) evalApplyIndexForm(src string) (any, bool, error) {
 		return out, true, err
 	}
 	return nil, false, nil
+}
+
+func (s *EvalState) evalAtApplyOrAmend(src string) (any, bool, error) {
+	inner := strings.TrimSpace(src[2 : len(src)-1])
+	parts := splitTopLevelDelim(inner, ';')
+	switch len(parts) {
+	case 2:
+		target, err := s.eval(parts[0])
+		if err != nil {
+			return nil, true, err
+		}
+		if isCallable(target) {
+			out, err := s.applyCallableIndex(target, parts[1])
+			return out, true, err
+		}
+		index, err := s.eval(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := indexValue(target, index)
+		return out, true, err
+	case 4:
+		out, err := s.evalAmend(src)
+		return out, true, err
+	default:
+		return nil, true, fmt.Errorf("at apply expects @[fn;arg], @[collection;index], or @[collection;index;op;value]")
+	}
 }
 
 func (s *EvalState) evalDotApplyOrAmend(src string) (any, bool, error) {
