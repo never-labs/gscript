@@ -43,7 +43,7 @@ func TestQEvalPipelinePlanNativeExitExecutesTypedPlanRef(t *testing.T) {
 		OpExitID:   17,
 	}
 
-	if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, "typed_runtime_native_exit"); err != nil {
+	if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteNativeExit); err != nil {
 		t.Fatalf("executeQEvalPipelinePlanExit: %v", err)
 	}
 	if !regs[0].IsInt() || regs[0].Int() != 16 {
@@ -213,7 +213,7 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, "typed_runtime_native_exit"); err != nil {
+				if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteNativeExit); err != nil {
 					b.Fatalf("executeQEvalPipelinePlanExit: %v", err)
 				}
 				qEvalPipelineDescriptorBenchmarkSink = regs[0]
@@ -234,7 +234,7 @@ func BenchmarkQEvalPipelineNativeExitCallpath(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, "typed_runtime_native_exit"); err != nil {
+				if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteNativeExit); err != nil {
 					b.Fatalf("executeQEvalPipelinePlanExit: %v", err)
 				}
 				qEvalPipelineDescriptorBenchmarkSink = regs[0]

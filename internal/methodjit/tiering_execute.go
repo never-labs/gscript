@@ -492,10 +492,10 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			}
 			if tm.perfStatsEnabled {
 				start := time.Now()
-				err = cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_native_exit")
+				err = cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteNativeExit)
 				tm.perfStats.record(perfTier2OpExit, time.Since(start))
 			} else {
-				err = cf.executeQEvalPipelinePlanExit(ctx, regs, base, "typed_runtime_native_exit")
+				err = cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteNativeExit)
 			}
 			if err != nil {
 				return nil, fmt.Errorf("tier2: q eval pipeline exit: %w", err)

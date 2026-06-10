@@ -97,6 +97,18 @@ type qEvalPipelinePlanExecutionCounters struct {
 	directError   atomic.Uint64
 }
 
+type qEvalPipelineExecutionRoute string
+
+const (
+	qEvalPipelineExecutionRouteOpExit      qEvalPipelineExecutionRoute = "typed_runtime_op_exit"
+	qEvalPipelineExecutionRouteNativeExit  qEvalPipelineExecutionRoute = "typed_runtime_native_exit"
+	qEvalPipelineExecutionRouteDirectEntry qEvalPipelineExecutionRoute = "typed_runtime_direct_entry"
+)
+
+type qEvalPipelineExecutionAdapter struct {
+	cf *CompiledFunction
+}
+
 func (p qEvalPipelineStaticPlan) Ref() QEvalPipelinePlanRef {
 	return p.ref
 }
@@ -172,6 +184,10 @@ func formatQEvalPipelinePlanRefs(refs []QEvalPipelinePlanRef) string {
 }
 
 func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value, bool, error) {
+	return cf.executeQEvalPipelinePlanBackendValue(id)
+}
+
+func (cf *CompiledFunction) executeQEvalPipelinePlanBackendValue(id int) (runtime.Value, bool, error) {
 	if cf == nil {
 		return runtime.NilValue(), false, nil
 	}
@@ -189,6 +205,38 @@ func (cf *CompiledFunction) ExecuteQEvalPipelinePlanValue(id int) (runtime.Value
 	return executeQEvalPipelinePlanValue(backend, ref)
 }
 
+func (cf *CompiledFunction) qEvalPipelineExecutionAdapter() qEvalPipelineExecutionAdapter {
+	return qEvalPipelineExecutionAdapter{cf: cf}
+}
+
+func (a qEvalPipelineExecutionAdapter) executeValue(planID int, route qEvalPipelineExecutionRoute) (runtime.Value, bool, error) {
+	if a.cf == nil {
+		return runtime.NilValue(), false, nil
+	}
+	out, handled, err := a.cf.executeQEvalPipelinePlanBackendValue(planID)
+	if err != nil || !handled {
+		a.cf.recordQEvalPipelinePlanExecutionWithRoute(planID, string(route), "error")
+		return runtime.NilValue(), handled, err
+	}
+	a.cf.recordQEvalPipelinePlanExecutionWithRoute(planID, string(route), "success")
+	return out, true, nil
+}
+
+func (a qEvalPipelineExecutionAdapter) executeIntoSlot(planID, absSlot int, regs []runtime.Value, route qEvalPipelineExecutionRoute) error {
+	if absSlot < 0 || absSlot >= len(regs) {
+		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
+	}
+	out, handled, err := a.executeValue(planID, route)
+	if err != nil || !handled {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
+	}
+	regs[absSlot] = out
+	return nil
+}
+
 func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturn(args []runtime.Value) ([]runtime.Value, bool, error) {
 	if len(args) != 0 {
 		return nil, false, nil
@@ -204,16 +252,14 @@ func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturnValue() (runtime.
 	if cf == nil || !cf.QEvalPipelineDirectReturn || cf.QEvalPipelineDirectReturnID < 0 || exitResumeCheckEnabled() {
 		return runtime.NilValue(), false, nil
 	}
-	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(cf.QEvalPipelineDirectReturnID)
-	if err != nil || !handled {
-		cf.recordQEvalPipelinePlanExecutionWithRoute(cf.QEvalPipelineDirectReturnID, "typed_runtime_direct_entry", "error")
+	out, handled, err := cf.qEvalPipelineExecutionAdapter().executeValue(cf.QEvalPipelineDirectReturnID, qEvalPipelineExecutionRouteDirectEntry)
+	if !handled {
 		return runtime.NilValue(), true, err
 	}
-	cf.recordQEvalPipelinePlanExecutionWithRoute(cf.QEvalPipelineDirectReturnID, "typed_runtime_direct_entry", "success")
-	return out, true, nil
+	return out, true, err
 }
 
-func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs []runtime.Value, base int, route string) error {
+func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs []runtime.Value, base int, route qEvalPipelineExecutionRoute) error {
 	if cf == nil || ctx == nil {
 		return fmt.Errorf("QEvalPipelinePlan exit missing compiled function")
 	}
@@ -390,34 +436,8 @@ func (cf *CompiledFunction) qEvalPipelineTerminalReturn(instrID int) bool {
 	return cf.QEvalPipelineTerminalReturns[instrID]
 }
 
-func (cf *CompiledFunction) executeQEvalPipelinePlanSlot(planID, absSlot int, regs []runtime.Value, route string) error {
-	if absSlot < 0 || absSlot >= len(regs) {
-		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
-	}
-	if helper := cf.qEvalPipelinePlanHelper(planID); helper != nil {
-		out, handled, err := helper.execute()
-		if err != nil || !handled {
-			cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "error")
-			if err != nil {
-				return err
-			}
-			return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
-		}
-		cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "success")
-		regs[absSlot] = out
-		return nil
-	}
-	out, handled, err := cf.ExecuteQEvalPipelinePlanValue(planID)
-	if err != nil || !handled {
-		cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "error")
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
-	}
-	cf.recordQEvalPipelinePlanExecutionWithRoute(planID, route, "success")
-	regs[absSlot] = out
-	return nil
+func (cf *CompiledFunction) executeQEvalPipelinePlanSlot(planID, absSlot int, regs []runtime.Value, route qEvalPipelineExecutionRoute) error {
+	return cf.qEvalPipelineExecutionAdapter().executeIntoSlot(planID, absSlot, regs, route)
 }
 
 func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
