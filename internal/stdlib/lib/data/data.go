@@ -1441,6 +1441,21 @@ func (a tiledArray) Values() []any {
 }
 
 func (a tiledArray) Gather(indexes []int) Array {
+	// Delegate to the source array so gathers keep the source's typed
+	// representation (symbol/int columns) instead of boxing every row into a
+	// nullableArray, which would knock all downstream kernels off their
+	// typed paths (frame column clones, fby grouping, reductions).
+	sourceLen := a.source.Len()
+	if sourceLen > 0 {
+		mapped := make([]int, len(indexes))
+		for i, row := range indexes {
+			if row < 0 || row >= a.len {
+				panic(fmt.Sprintf("data tiled gather index %d out of range", row))
+			}
+			mapped[i] = (a.start + row) % sourceLen
+		}
+		return a.source.Gather(mapped)
+	}
 	out := make([]any, len(indexes))
 	for i, row := range indexes {
 		value, ok := a.At(row)
@@ -1615,6 +1630,15 @@ func NewFrame(cols ...Column) (Frame, error) {
 
 func newFrameTrusted(cols ...Column) (Frame, error) {
 	return newFrame(cols, false)
+}
+
+// NewFrameAdoptingColumns builds a frame that adopts the given column arrays
+// without the defensive per-column clone NewFrame performs. Arrays are
+// immutable value carriers in this runtime, so in-process producers that
+// already own their columns (q flip, joins, group pipelines) use this to
+// keep lazy carriers intact and skip a full table materialization.
+func NewFrameAdoptingColumns(cols ...Column) (Frame, error) {
+	return newFrameTrusted(cols...)
 }
 
 func newFrame(cols []Column, cloneColumns bool) (Frame, error) {

@@ -7996,8 +7996,44 @@ func fbyGroupIDsI64Computed(values interface {
 
 func fbyGroupIDsComparable[T comparable](values []T) ([]int, int, error) {
 	rowGroups := make([]int, len(values))
-	groupIDs := make(map[T]int)
-	for row, value := range values {
+	// Small-cardinality fast path: market-data style group columns carry a
+	// handful of distinct values, so a linear probe over the seen slice (with
+	// a last-value run check) beats hashing every row. Falls over to the map
+	// path the moment cardinality outgrows the probe window.
+	const linearMaxGroups = 16
+	seen := make([]T, 0, linearMaxGroups)
+	row := 0
+	for ; row < len(values); row++ {
+		value := values[row]
+		if row > 0 && value == values[row-1] {
+			rowGroups[row] = rowGroups[row-1]
+			continue
+		}
+		id := -1
+		for g := range seen {
+			if seen[g] == value {
+				id = g
+				break
+			}
+		}
+		if id < 0 {
+			if len(seen) == linearMaxGroups {
+				break
+			}
+			id = len(seen)
+			seen = append(seen, value)
+		}
+		rowGroups[row] = id
+	}
+	if row == len(values) {
+		return rowGroups, len(seen), nil
+	}
+	groupIDs := make(map[T]int, 64)
+	for g := range seen {
+		groupIDs[seen[g]] = g
+	}
+	for ; row < len(values); row++ {
+		value := values[row]
 		id, ok := groupIDs[value]
 		if !ok {
 			id = len(groupIDs)
@@ -13870,6 +13906,16 @@ func (a i64ScalarDyadicArray) Values() []any {
 }
 
 func (a i64ScalarDyadicArray) Gather(indexes []int) Array {
+	// Identity gathers (frame column clones) flatten through the bulk
+	// kernel: one fused loop instead of a carrier-tree walk per row.
+	if len(indexes) == a.len && isIdentityIndexes(indexes) {
+		if values, owned, ok := tryBulkI64Values(a); ok {
+			if !owned {
+				values = append([]int64(nil), values...)
+			}
+			return newI64Trusted(values)
+		}
+	}
 	out := make([]int64, len(indexes))
 	for i, row := range indexes {
 		value, ok, err := a.i64At(row)
@@ -13879,6 +13925,15 @@ func (a i64ScalarDyadicArray) Gather(indexes []int) Array {
 		out[i] = value
 	}
 	return newI64Trusted(out)
+}
+
+func isIdentityIndexes(indexes []int) bool {
+	for i, row := range indexes {
+		if row != i {
+			return false
+		}
+	}
+	return true
 }
 
 func (a i64ScalarDyadicArray) i64At(row int) (int64, bool, error) {

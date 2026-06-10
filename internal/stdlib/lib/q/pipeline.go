@@ -126,33 +126,60 @@ type qPipelineBoundPlan struct {
 	fallbackReason string
 }
 
-func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
+var qPipelinePlanInvalidShared = &qPipelinePlan{}
+
+// qPipelinePlanRef returns the session-cached plan for src, or a shared
+// invalid plan when src is not a pipeline candidate. The returned pointer
+// aliases the per-state cache entry: callers execute it in place so constant
+// binding-plan caches persist across session-warm calls, mirroring the
+// statement-level qEvalFastPlan persistence.
+func (s *EvalState) qPipelinePlanRef(src string) *qPipelinePlan {
 	src = strings.TrimSpace(src)
-	if src == "" || !qPipelinePlanCandidate(src) {
-		return qPipelinePlan{}
+	if src == "" {
+		return qPipelinePlanInvalidShared
 	}
+	// Probe the per-state cache before any candidate string scanning: hot
+	// session-warm evals re-visit the same subexpression sources every call,
+	// and the candidate prefilter alone walks the source several times.
+	// Negative results are cached too, so steady-state planning is one map hit.
 	if s.pipelineCache != nil {
 		if plan, ok := s.pipelineCache[src]; ok {
 			return plan
 		}
 	}
+	if !qPipelinePlanCandidate(src) {
+		s.storeQPipelinePlan(src, qPipelinePlanInvalidShared)
+		return qPipelinePlanInvalidShared
+	}
 	if qPipelinePlanGlobalCacheable(src) {
 		if plan, ok := qGlobalPipelinePlanCacheProbe(src); ok {
-			s.rememberQPipelinePlan(src, plan)
-			return plan
+			cached := new(qPipelinePlan)
+			*cached = plan
+			s.storeQPipelinePlan(src, cached)
+			return cached
 		}
 	}
 	plan := buildQPipelinePlan(src)
 	if qPipelinePlanGlobalCacheable(src) {
 		qGlobalPipelinePlanCacheStore(src, plan)
 	}
+	cached := new(qPipelinePlan)
+	*cached = plan
+	s.storeQPipelinePlan(src, cached)
+	return cached
+}
+
+func (s *EvalState) qPipelinePlan(src string) qPipelinePlan {
+	return *s.qPipelinePlanRef(src)
+}
+
+func (s *EvalState) storeQPipelinePlan(src string, plan *qPipelinePlan) {
 	if s.pipelineCache == nil {
-		s.pipelineCache = make(map[string]qPipelinePlan, 32)
+		s.pipelineCache = make(map[string]*qPipelinePlan, 32)
 	} else if len(s.pipelineCache) >= 512 {
-		s.pipelineCache = make(map[string]qPipelinePlan, 32)
+		s.pipelineCache = make(map[string]*qPipelinePlan, 32)
 	}
 	s.pipelineCache[src] = plan
-	return plan
 }
 
 func qPipelinePlanGlobalCacheable(src string) bool {
@@ -193,24 +220,6 @@ func qGlobalPipelinePlanCacheStore(src string, plan qPipelinePlan) {
 	qGlobalScriptPlanCacheMu.Unlock()
 }
 
-func (s *EvalState) rememberQPipelinePlan(src string, plan qPipelinePlan) {
-	src = strings.TrimSpace(src)
-	if src == "" || plan.kind == qPipelineInvalid {
-		return
-	}
-	if s.pipelineCache != nil {
-		if _, ok := s.pipelineCache[src]; ok {
-			return
-		}
-	}
-	if s.pipelineCache == nil {
-		s.pipelineCache = make(map[string]qPipelinePlan, 32)
-	} else if len(s.pipelineCache) >= 512 {
-		s.pipelineCache = make(map[string]qPipelinePlan, 32)
-	}
-	s.pipelineCache[src] = plan
-}
-
 func (s *EvalState) rememberQPipelinePlanKnownSource(src string, plan qPipelinePlan) {
 	if src == "" || plan.kind == qPipelineInvalid {
 		return
@@ -220,12 +229,9 @@ func (s *EvalState) rememberQPipelinePlanKnownSource(src string, plan qPipelineP
 			return
 		}
 	}
-	if s.pipelineCache == nil {
-		s.pipelineCache = make(map[string]qPipelinePlan, 32)
-	} else if len(s.pipelineCache) >= 512 {
-		s.pipelineCache = make(map[string]qPipelinePlan, 32)
-	}
-	s.pipelineCache[src] = plan
+	cached := new(qPipelinePlan)
+	*cached = plan
+	s.storeQPipelinePlan(src, cached)
 }
 
 func qPipelinePlanCandidate(src string) bool {
