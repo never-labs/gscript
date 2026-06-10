@@ -969,6 +969,60 @@ func TryTypedTrueCount(mask Array) (int64, bool, error) {
 	}
 }
 
+// TryTypedBoolAggregate reduces bool/numeric vectors using q-style truthiness.
+// Null values are ignored by the reduction, matching q frontend all/any
+// semantics while keeping carrier-aware array access in the data runtime.
+func TryTypedBoolAggregate(array Array, wantAny bool) (bool, bool, error) {
+	if array == nil {
+		return false, true, fmt.Errorf("bool aggregate array is nil")
+	}
+	if array.Kind() == KindBool {
+		trueCount, handled, err := TryTypedTrueCount(array)
+		if err != nil || !handled {
+			return false, handled, err
+		}
+		if wantAny {
+			return trueCount > 0, true, nil
+		}
+		nullCount, handled, err := TryTypedNullCount(array)
+		if err != nil || !handled {
+			return false, handled, err
+		}
+		return trueCount == int64(array.Len())-nullCount, true, nil
+	}
+	if !isNumericArray(array) {
+		return false, false, nil
+	}
+	if wantAny {
+		for row := 0; row < array.Len(); row++ {
+			value, ok, err := numericAt(array, row)
+			if err != nil {
+				return false, true, err
+			}
+			if !ok {
+				continue
+			}
+			if value != 0 {
+				return true, true, nil
+			}
+		}
+		return false, true, nil
+	}
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := numericAt(array, row)
+		if err != nil {
+			return false, true, err
+		}
+		if !ok {
+			continue
+		}
+		if value == 0 {
+			return false, true, nil
+		}
+	}
+	return true, true, nil
+}
+
 func (typedKernelRegistry) ComplementSortedIndexes(length int, exclude []int) ([]int, bool, error) {
 	if len(exclude) == 0 {
 		return allIndexes(length), true, nil

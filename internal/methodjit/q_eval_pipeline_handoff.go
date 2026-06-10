@@ -305,6 +305,7 @@ type qEvalPipelinePlanHelper struct {
 	hasExecutablePlan  bool
 	evalState          *stdq.EvalState
 	evalStateMu        sync.Mutex
+	executeExecutable  func(stdq.EvalPipelineExecutablePlan) (any, bool, error)
 	executeBackendPlan func(stdq.EvalPipelineBackendPlan) (any, bool, error)
 	executeDescriptor  func(stdq.EvalPipelineDescriptor) (any, bool, error)
 	executeSource      func(string) (any, bool, error)
@@ -348,7 +349,7 @@ func newQEvalPipelinePlanHelpers(refs []QEvalPipelinePlanRef, backend qRuntimeEv
 		}
 		backendPlan, hasBackendPlan := backend.lookupBackendPlan(ref)
 		descriptor, hasDescriptor := backend.lookupDescriptor(ref)
-		executablePlan, hasExecutablePlan := stdq.CompileEvalPipelineBackendPlan(backendPlan)
+		executablePlan, hasExecutablePlan := backend.lookupExecutablePlan(ref)
 		helpers[ref.ID] = qEvalPipelinePlanHelper{
 			ref:                ref,
 			descriptor:         descriptor,
@@ -358,6 +359,7 @@ func newQEvalPipelinePlanHelpers(refs []QEvalPipelinePlanRef, backend qRuntimeEv
 			hasBackendPlan:     hasBackendPlan,
 			hasExecutablePlan:  hasExecutablePlan,
 			evalState:          qEvalPipelineReusableEvalState(ref, backend, hasExecutablePlan),
+			executeExecutable:  backend.executeExecutable,
 			executeBackendPlan: backend.executeBackendPlan,
 			executeDescriptor:  backend.executeDescriptor,
 			executeSource:      backend.executeSource,
@@ -371,6 +373,9 @@ func qEvalPipelineReusableEvalState(ref QEvalPipelinePlanRef, backend qRuntimeEv
 		return nil
 	}
 	if hasExecutablePlan {
+		if backend.executeExecutable != nil {
+			return nil
+		}
 		// The q package has already validated and compiled the descriptor into
 		// an opaque executable plan, so a source round-trip is unnecessary.
 	} else if ref.Source == "" || !stdq.EvalSourceCacheable(ref.Source) {
@@ -384,14 +389,16 @@ func qEvalPipelineReusableEvalState(ref QEvalPipelinePlanRef, backend qRuntimeEv
 	if !hasExecutablePlan && ref.Source == "" {
 		return nil
 	}
-	if backend.executeBackendPlan != nil && !sameQEvalPipelineBackendPlanExecutor(backend.executeBackendPlan, stdq.ExecuteEvalPipelineBackendPlan) {
-		return nil
-	}
-	if backend.executeDescriptor != nil && !sameQEvalPipelineDescriptorExecutor(backend.executeDescriptor, stdq.ExecuteEvalPipelineDescriptor) {
-		return nil
-	}
-	if backend.executeSource != nil && !sameQEvalPipelineSourceExecutor(backend.executeSource, stdq.ExecuteEvalPipeline) {
-		return nil
+	if !hasExecutablePlan {
+		if backend.executeBackendPlan != nil && !sameQEvalPipelineBackendPlanExecutor(backend.executeBackendPlan, stdq.ExecuteEvalPipelineBackendPlan) {
+			return nil
+		}
+		if backend.executeDescriptor != nil && !sameQEvalPipelineDescriptorExecutor(backend.executeDescriptor, stdq.ExecuteEvalPipelineDescriptor) {
+			return nil
+		}
+		if backend.executeSource != nil && !sameQEvalPipelineSourceExecutor(backend.executeSource, stdq.ExecuteEvalPipeline) {
+			return nil
+		}
 	}
 	return stdq.NewEvalState(nil)
 }
@@ -428,6 +435,17 @@ func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 	if !h.ref.Valid() || h.ref.Backend != qEvalPipelineTypedRuntimeBackend {
 		return runtime.NilValue(), false, nil
 	}
+	if h.hasExecutablePlan && h.executeExecutable != nil {
+		out, handled, err := h.executeExecutable(h.executablePlan)
+		if err != nil || !handled {
+			return runtime.NilValue(), handled, err
+		}
+		value, err := qEvalPipelineRuntimeValue(out)
+		if err != nil {
+			return runtime.NilValue(), false, err
+		}
+		return value, true, nil
+	}
 	if h.evalState != nil {
 		h.evalStateMu.Lock()
 		var (
@@ -460,7 +478,9 @@ func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 		handled bool
 		err     error
 	)
-	if h.hasBackendPlan {
+	if h.hasExecutablePlan {
+		out, handled, err = stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlanRef(&h.executablePlan)
+	} else if h.hasBackendPlan {
 		execute := h.executeBackendPlan
 		if execute == nil {
 			execute = stdq.ExecuteEvalPipelineBackendPlan

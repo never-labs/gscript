@@ -117,6 +117,14 @@ class RuntimeMetricRow:
 
 
 @dataclass
+class JITRouteSummaryRow:
+    route: str
+    calls_per_op: float
+    share_pct: float
+    benchmark_count: int
+
+
+@dataclass
 class PipelineFallbackTopRow:
     category: str
     pipeline_shape: str
@@ -431,6 +439,40 @@ def build_fallback_shape_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
         or (row.typed_kernel_fallbacks_op or 0) > 0
         or (row.fallbacks_op or 0) > 0
     ]
+
+
+def build_jit_route_summary(rows: dict[str, BenchRow]) -> list[JITRouteSummaryRow]:
+    routes = {
+        "direct_return": "jit_typed_direct_return_op",
+        "native_exit": "jit_typed_native_exit_op",
+        "op_exit": "jit_typed_op_exit_op",
+        "success": "jit_typed_kernel_success_op",
+        "error": "jit_typed_kernel_errors_op",
+    }
+    totals = {route: 0.0 for route in routes}
+    counts = {route: 0 for route in routes}
+    for row in build_runtime_metric_rows(rows):
+        for route, attr in routes.items():
+            value = getattr(row, attr)
+            if value is None:
+                continue
+            totals[route] += value
+            counts[route] += 1
+    route_total = totals["direct_return"] + totals["native_exit"] + totals["op_exit"]
+    out: list[JITRouteSummaryRow] = []
+    for route in ("direct_return", "native_exit", "op_exit", "success", "error"):
+        share = 0.0
+        if route in {"direct_return", "native_exit", "op_exit"} and route_total > 0:
+            share = 100 * totals[route] / route_total
+        out.append(
+            JITRouteSummaryRow(
+                route=route,
+                calls_per_op=totals[route],
+                share_pct=share,
+                benchmark_count=counts[route],
+            )
+        )
+    return out
 
 
 def average(values: list[float]) -> float | None:
@@ -766,6 +808,7 @@ def markdown_report(
     ratios = build_ratios(rows)
     runtime_metrics = build_runtime_metric_rows(rows)
     fallback_shapes = build_fallback_shape_rows(rows)
+    jit_routes = build_jit_route_summary(rows)
     category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -919,6 +962,21 @@ def markdown_report(
             f"{format_metric(item.jit_typed_kernel_errors_op, 3)} | "
             f"{format_metric(item.jit_typed_pipeline_shapes, 0)} |"
         )
+    if any(item.benchmark_count > 0 for item in jit_routes):
+        lines.extend(
+            [
+                "",
+                "## JIT Typed Runtime Routes",
+                "",
+                "| Route | calls/op | route share | benchmarks |",
+                "|---|---:|---:|---:|",
+            ]
+        )
+        for item in jit_routes:
+            lines.append(
+                f"| {item.route} | {item.calls_per_op:.3f} | "
+                f"{item.share_pct:.1f}% | {item.benchmark_count} |"
+            )
     lines.extend(
         [
             "",
@@ -1101,6 +1159,7 @@ def main(argv: list[str]) -> int:
         "coverage": build_coverage(rows, current_vs_old),
         "current_vs_old": [asdict(row) for row in current_vs_old],
         "runtime_metrics": [asdict(row) for row in build_runtime_metric_rows(rows)],
+        "jit_route_summary": [asdict(row) for row in build_jit_route_summary(rows)],
         "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
         "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),

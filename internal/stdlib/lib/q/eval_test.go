@@ -4145,6 +4145,37 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	assertEvalErrorContains(t, "where -1 2", "non-negative")
 }
 
+func TestEvalBoolAggregateUsesTypedRuntime(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalValue(t, "all 1 2 3", true)
+	assertEvalValue(t, "any 0 0 3", true)
+	assertEvalValue(t, "all true 0N true", true)
+	assertEvalValue(t, "all not 0 0 0", true)
+
+	seenAllNumeric := false
+	seenAnyNumeric := false
+	seenAllBool := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayBoolAggregate" && (stat.Outcome == "fallback" || stat.Outcome == "error") {
+			t.Fatalf("unexpected bool aggregate typed runtime fallback/error: %#v stats=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayBoolAggregate" && stat.Shape == "vector-reduce/all/i64" && stat.Outcome == "hit" {
+			seenAllNumeric = true
+		}
+		if stat.Kernel == "ArrayBoolAggregate" && stat.Shape == "vector-reduce/any/i64" && stat.Outcome == "hit" {
+			seenAnyNumeric = true
+		}
+		if stat.Kernel == "ArrayBoolAggregate" && stat.Shape == "vector-reduce/all/bool" && stat.Outcome == "hit" {
+			seenAllBool = true
+		}
+	}
+	if !seenAllNumeric || !seenAnyNumeric || !seenAllBool {
+		t.Fatalf("missing bool aggregate typed hits allNumeric=%v anyNumeric=%v allBool=%v stats=%#v", seenAllNumeric, seenAnyNumeric, seenAllBool, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

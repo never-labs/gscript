@@ -12698,6 +12698,15 @@ func boolAggregate(name string, v any, initial bool, fn func(bool, bool) bool) (
 		}
 		return b, nil
 	}
+	shape := "vector-reduce/" + name + "/" + string(array.Kind())
+	typed, handled, err := data.TryTypedBoolAggregate(array, name == "any")
+	typed, handled, err = qTypedRuntimeResult("ArrayBoolAggregate", shape, typed, handled, err)
+	if err != nil || handled {
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		return typed, nil
+	}
 	acc := initial
 	for i := 0; i < array.Len(); i++ {
 		item, ok := array.At(i)

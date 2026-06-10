@@ -111,6 +111,18 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(qjit.jit_typed_kernel_errors_op, 0)
         self.assertEqual(qjit.jit_typed_pipeline_shapes, 1)
 
+    def test_jit_route_summary_aggregates_route_metrics(self):
+        rows = report.parse_go_benchmarks(SAMPLE)
+        summary = {row.route: row for row in report.build_jit_route_summary(rows)}
+
+        self.assertEqual(summary["direct_return"].calls_per_op, 1)
+        self.assertEqual(summary["direct_return"].share_pct, 100)
+        self.assertEqual(summary["direct_return"].benchmark_count, 1)
+        self.assertEqual(summary["native_exit"].calls_per_op, 0)
+        self.assertEqual(summary["op_exit"].calls_per_op, 0)
+        self.assertEqual(summary["success"].calls_per_op, 1)
+        self.assertEqual(summary["error"].calls_per_op, 0)
+
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)
         policy = report.GatePolicy(
@@ -187,6 +199,8 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("qsql_benchmark_coverage", payload)
             self.assertEqual(payload["current_vs_old"][0]["ratio"], 0.5)
             self.assertIn("runtime_metrics", payload)
+            self.assertIn("jit_route_summary", payload)
+            self.assertEqual(payload["jit_route_summary"][0]["route"], "direct_return")
             self.assertIn("pipeline_category_metrics", payload)
             self.assertIn("pipeline_fallback_top", payload)
             self.assertIn("fallback_shape_summary", payload)
@@ -195,6 +209,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("q Performance Completeness Report", markdown)
             self.assertIn("Current vs Old Leia", markdown)
             self.assertIn("Gate Summary", markdown)
+            self.assertIn("JIT Typed Runtime Routes", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
 

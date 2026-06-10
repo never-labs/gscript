@@ -402,15 +402,22 @@ func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
 	backendPlanCalls := 0
 	backend.executeBackendPlan = func(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
 		backendPlanCalls++
-		return stdq.ExecuteEvalPipelineBackendPlan(plan)
+		return nil, false, errors.New("backend plan fallback should not execute when helper has executable plan")
+	}
+	backend.executeDescriptor = func(descriptor stdq.EvalPipelineDescriptor) (any, bool, error) {
+		return nil, false, errors.New("descriptor fallback should not execute when helper has executable plan")
 	}
 	backend.executeSource = func(source string) (any, bool, error) {
-		return nil, false, errors.New("source planner fallback should not execute")
+		return nil, false, errors.New("source planner fallback should not execute when helper has executable plan")
+	}
+	helpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend)
+	if len(helpers) != 1 || !helpers[0].hasExecutablePlan || helpers[0].evalState == nil {
+		t.Fatalf("helper = %+v, want executable helper with reusable eval state", helpers)
 	}
 	cf := &CompiledFunction{
 		QEvalPipelinePlans:       []QEvalPipelinePlanRef{ref},
 		QEvalPipelineBackend:     qRuntimeEvalPipelineBackend{},
-		QEvalPipelinePlanHelpers: newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend),
+		QEvalPipelinePlanHelpers: helpers,
 	}
 
 	value, handled, err := cf.ExecuteQEvalPipelinePlanValue(ref.ID)
@@ -420,8 +427,8 @@ func TestCompiledFunctionUsesQEvalPipelineHelperSlot(t *testing.T) {
 	if !handled || !value.IsInt() || value.Int() != 16 {
 		t.Fatalf("ExecuteQEvalPipelinePlanValue = %v handled %v, want int 16 handled", value, handled)
 	}
-	if backendPlanCalls != 1 {
-		t.Fatalf("backend plan calls = %d, want helper slot execution", backendPlanCalls)
+	if backendPlanCalls != 0 {
+		t.Fatalf("backend plan calls = %d, want helper executable plan execution", backendPlanCalls)
 	}
 }
 
@@ -445,8 +452,24 @@ func TestQEvalPipelineHelperReusableEvalStateRequiresDefaultExecutableRuntime(t 
 		return int64(16), true, nil
 	}
 	customHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{sourceRef}, customBackend)
-	if len(customHelpers) != 1 || customHelpers[0].evalState != nil {
-		t.Fatalf("custom executor helper evalState = %+v, want nil", customHelpers)
+	if len(customHelpers) != 1 || customHelpers[0].evalState == nil || !customHelpers[0].hasExecutablePlan {
+		t.Fatalf("custom backend-plan executor helper = %+v, want executable helper to keep reusable eval state", customHelpers)
+	}
+
+	customExecutableBackend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{sourceRef})
+	customExecutableBackend.executeExecutable = func(plan stdq.EvalPipelineExecutablePlan) (any, bool, error) {
+		if !plan.Valid() {
+			t.Fatalf("custom executable plan = %+v, want valid", plan)
+		}
+		return int64(99), true, nil
+	}
+	customExecutableHelpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{sourceRef}, customExecutableBackend)
+	if len(customExecutableHelpers) != 1 || customExecutableHelpers[0].evalState != nil || !customExecutableHelpers[0].hasExecutablePlan {
+		t.Fatalf("custom executable helper = %+v, want executable helper without reusable eval state", customExecutableHelpers)
+	}
+	value, handled, err := customExecutableHelpers[0].execute()
+	if err != nil || !handled || !value.IsInt() || value.Int() != 99 {
+		t.Fatalf("custom executable helper execute = %v,%v,%v; want int 99,true,nil", value, handled, err)
 	}
 }
 

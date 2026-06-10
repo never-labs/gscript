@@ -247,6 +247,61 @@ func TestTryTypedQNumericUnaryCompareIndexes(t *testing.T) {
 	}
 }
 
+func TestTryTypedBoolAggregate(t *testing.T) {
+	tests := []struct {
+		name    string
+		array   Array
+		wantAll bool
+		wantAny bool
+	}{
+		{
+			name:    "bool",
+			array:   NewBool([]bool{true, true, false}),
+			wantAll: false,
+			wantAny: true,
+		},
+		{
+			name:    "nullable bool skips null",
+			array:   NewColumn("x", []any{true, NullValue, true}).Data,
+			wantAll: true,
+			wantAny: true,
+		},
+		{
+			name:    "integer truth",
+			array:   NewI64([]int64{1, 2, 0}),
+			wantAll: false,
+			wantAny: true,
+		},
+		{
+			name:    "nullable numeric skips null",
+			array:   NewColumn("x", []any{NullValue, int64(0), int64(3)}).Data,
+			wantAll: false,
+			wantAny: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotAll, handled, err := TryTypedBoolAggregate(tt.array, false)
+			if err != nil || !handled {
+				t.Fatalf("TryTypedBoolAggregate all = %v,%v,%v; want handled nil error", gotAll, handled, err)
+			}
+			if gotAll != tt.wantAll {
+				t.Fatalf("TryTypedBoolAggregate all = %v, want %v", gotAll, tt.wantAll)
+			}
+			gotAny, handled, err := TryTypedBoolAggregate(tt.array, true)
+			if err != nil || !handled {
+				t.Fatalf("TryTypedBoolAggregate any = %v,%v,%v; want handled nil error", gotAny, handled, err)
+			}
+			if gotAny != tt.wantAny {
+				t.Fatalf("TryTypedBoolAggregate any = %v, want %v", gotAny, tt.wantAny)
+			}
+		})
+	}
+	if _, handled, err := TryTypedBoolAggregate(NewString([]string{"a"}), true); err != nil || handled {
+		t.Fatalf("TryTypedBoolAggregate string = handled %v err %v; want false,nil", handled, err)
+	}
+}
+
 func TestTryTypedWithinIndexesAndStatsTiledTime(t *testing.T) {
 	times, err := TakeRepeat(NewTime([]Time{1, 2, 3, 4}), 10)
 	if err != nil {
