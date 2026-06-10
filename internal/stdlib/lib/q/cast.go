@@ -30,6 +30,18 @@ func qCastTargetFromDomain(domain any) (qCastTarget, bool) {
 		if kind, ok := qCastKindFromTypeText(x); ok {
 			return qCastTarget{kind: kind, sourceText: strconv.Quote(x)}, true
 		}
+	case int16:
+		if kind, ok := qCastKindFromTypeCode(int(x)); ok {
+			return qCastTarget{kind: kind, sourceText: strconv.FormatInt(int64(x), 10)}, true
+		}
+	case int32:
+		if kind, ok := qCastKindFromTypeCode(int(x)); ok {
+			return qCastTarget{kind: kind, sourceText: strconv.FormatInt(int64(x), 10)}, true
+		}
+	case int64:
+		if kind, ok := qCastKindFromTypeCode(int(x)); ok {
+			return qCastTarget{kind: kind, sourceText: strconv.FormatInt(x, 10)}, true
+		}
 	}
 	return qCastTarget{}, false
 }
@@ -81,6 +93,50 @@ func qCastKindFromTypeText(text string) (data.Kind, bool) {
 		return data.KindTime, true
 	case "p", "timestamp":
 		return data.KindTimestamp, true
+	default:
+		return "", false
+	}
+}
+
+func qCastKindFromTypeCode(code int) (data.Kind, bool) {
+	if code < 0 {
+		code = -code
+	}
+	switch code {
+	case 1:
+		return data.KindBool, true
+	case 4:
+		return data.KindU8, true
+	case 5:
+		return data.KindI16, true
+	case 6:
+		return data.KindI32, true
+	case 7:
+		return data.KindI64, true
+	case 8:
+		return data.KindF32, true
+	case 9:
+		return data.KindF64, true
+	case 10:
+		return data.KindString, true
+	case 11:
+		return data.KindSymbol, true
+	case 12:
+		return data.KindTimestamp, true
+	case 13:
+		return data.KindMonth, true
+	case 14:
+		return data.KindDate, true
+	case 15:
+		return data.KindDateTime, true
+	case 16:
+		return data.KindTimespan, true
+	case 17:
+		return data.KindMinute, true
+	case 18:
+		return data.KindSecond, true
+	case 19:
+		return data.KindTime, true
 	default:
 		return "", false
 	}
