@@ -591,7 +591,7 @@ func qEvalPipelineTypedArrayRuntimeValue(array data.Array) (runtime.Value, bool,
 			return runtime.NilValue(), true, err
 		}
 		return runtime.DenseArrayValue(dense), true, nil
-	case data.KindString:
+	case data.KindString, data.KindSymbol:
 		dense, err := runtime.NewDenseArrayStringFromCopy(array.Len(), func(dst []string) error {
 			handled, err := data.TryExportStringCopy(array, dst)
 			if err != nil {

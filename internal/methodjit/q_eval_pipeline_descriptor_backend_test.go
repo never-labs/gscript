@@ -61,6 +61,14 @@ func TestQEvalPipelineRuntimeValueUsesBulkTypedArrayExport(t *testing.T) {
 				assertDenseArrayStrings(t, dense, []string{"AAPL", "MSFT"})
 			},
 		},
+		{
+			name:  "symbol_column",
+			array: data.NewSymbols([]string{"AAPL", "MSFT"}),
+			assert: func(t *testing.T, dense *runtime.DenseArray) {
+				t.Helper()
+				assertDenseArrayStrings(t, dense, []string{"AAPL", "MSFT"})
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			value, err := qEvalPipelineRuntimeValue(tc.array)
@@ -75,13 +83,16 @@ func TestQEvalPipelineRuntimeValueUsesBulkTypedArrayExport(t *testing.T) {
 	}
 }
 
-func TestQEvalPipelineRuntimeValueKeepsUnsupportedArrayFallback(t *testing.T) {
-	value, err := qEvalPipelineRuntimeValue(data.NewSymbols([]string{"AAPL", "MSFT"}))
+func TestQEvalPipelineRuntimeValueBulkExportsSymbolArrays(t *testing.T) {
+	value, handled, err := qEvalPipelineTypedArrayRuntimeValue(data.NewSymbols([]string{"AAPL", "MSFT"}))
 	if err != nil {
-		t.Fatalf("qEvalPipelineRuntimeValue: %v", err)
+		t.Fatalf("qEvalPipelineTypedArrayRuntimeValue: %v", err)
+	}
+	if !handled {
+		t.Fatal("qEvalPipelineTypedArrayRuntimeValue did not handle symbol array")
 	}
 	if !value.IsDenseArray() {
-		t.Fatalf("symbol array bridge returned %v, want DenseArray from fallback", value)
+		t.Fatalf("symbol array bridge returned %v, want DenseArray", value)
 	}
 	assertDenseArrayStrings(t, value.DenseArray(), []string{"AAPL", "MSFT"})
 }

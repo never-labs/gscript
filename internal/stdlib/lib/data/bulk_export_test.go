@@ -122,7 +122,10 @@ func TestTryExportTypedCopyFloatBoolString(t *testing.T) {
 		want  []string
 	}{
 		{"indexed string", indexedArray{source: NewString([]string{"AAPL", "MSFT", "NVDA"}), indexes: NewI64([]int64{2, 0}), len: 2}, []string{"NVDA", "AAPL"}},
+		{"symbol column", NewSymbols([]string{"AAPL", "MSFT"}), []string{"AAPL", "MSFT"}},
+		{"indexed symbol", indexedArray{source: NewSymbols([]string{"AAPL", "MSFT", "NVDA"}), indexes: NewI64([]int64{2, 0}), len: 2}, []string{"NVDA", "AAPL"}},
 		{"nullable string", nullableArray{kind: KindString, data: []any{"bid", "ask"}}, []string{"bid", "ask"}},
+		{"nullable symbol", nullableArray{kind: KindSymbol, data: []any{Symbol("bid"), Symbol("ask")}}, []string{"bid", "ask"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := make([]string, tc.array.Len())

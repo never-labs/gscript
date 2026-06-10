@@ -302,6 +302,11 @@ func TryExportStringCopy(array Array, dst []string) (bool, error) {
 	case columnArray[string]:
 		copy(dst, a.data)
 		return true, nil
+	case columnArray[Symbol]:
+		for i, value := range a.data {
+			dst[i] = string(value)
+		}
+		return true, nil
 	case nullableArray:
 		return exportNullableStringCopy(a, dst)
 	case shiftedArray:
@@ -360,11 +365,14 @@ func exportNullableStringCopy(array nullableArray, dst []string) (bool, error) {
 		if IsNull(value) {
 			return false, nil
 		}
-		v, ok := value.(string)
-		if !ok {
+		switch v := value.(type) {
+		case string:
+			dst[i] = v
+		case Symbol:
+			dst[i] = string(v)
+		default:
 			return false, nil
 		}
-		dst[i] = v
 	}
 	return true, nil
 }
@@ -384,12 +392,23 @@ func stringArrayAt(array Array, row int) (string, bool) {
 			return "", false
 		}
 		return a.data[row], true
+	case columnArray[Symbol]:
+		if row < 0 || row >= len(a.data) {
+			return "", false
+		}
+		return string(a.data[row]), true
 	case nullableArray:
 		if row < 0 || row >= len(a.data) || IsNull(a.data[row]) {
 			return "", false
 		}
-		value, ok := a.data[row].(string)
-		return value, ok
+		switch value := a.data[row].(type) {
+		case string:
+			return value, true
+		case Symbol:
+			return string(value), true
+		default:
+			return "", false
+		}
 	case shiftedArray:
 		if a.offset != 0 {
 			return "", false
