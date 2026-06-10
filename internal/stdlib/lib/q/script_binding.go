@@ -465,7 +465,7 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver q
 		}
 		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
 		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
-		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
+		out, handled, err = qTypedRuntimeResultReason("ArrayWhereWithin", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 		if err != nil || handled {
 			return out, true, err
 		}
@@ -490,7 +490,7 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver q
 	case "where":
 		if mask, ok := arg.(data.Array); ok && mask.Kind() == data.KindBool {
 			out, handled, err := data.TryTypedWhereMaskI64(mask)
-			recordRuntimeKernelProbe("ArrayWhere", "mask-to-index/i64", handled, err)
+			out, handled, err = qTypedRuntimeResultReason("ArrayWhere", "mask-to-index/i64", RuntimeFallbackUnsupportedType, out, handled, err)
 			if err != nil || handled {
 				return out, true, err
 			}
@@ -545,7 +545,7 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver 
 	}
 	if plan.op == "and" || plan.op == "or" {
 		if out, handled, err := data.TryTypedBoolLogical(plan.op, left, right); err != nil || handled {
-			recordRuntimeKernelProbe("ArrayBoolLogical", qScriptBoolLogicalShape(plan.op), handled, err)
+			out, handled, err = qTypedRuntimeResultReason("ArrayBoolLogical", qScriptBoolLogicalShape(plan.op), RuntimeFallbackUnsupportedType, out, handled, err)
 			if err != nil {
 				return nil, true, err
 			}
@@ -559,7 +559,7 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver 
 		ra, _ := right.(data.Array)
 		if la != nil || ra != nil {
 			out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra)
-			recordRuntimeKernelProbe("ArrayDyadicCompare", qRuntimeKernelCompositeVectorDyadicShape(plan.op, left, right, la, ra), handled, err)
+			out, handled, err = qTypedRuntimeResultReason("ArrayDyadicCompare", qRuntimeKernelCompositeVectorDyadicShape(plan.op, left, right, la, ra), RuntimeFallbackUnsupportedType, out, handled, err)
 			if err != nil {
 				return nil, true, err
 			}
@@ -580,7 +580,7 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver 
 				}
 				if canUse && qVectorDyadicCanUseTypedArithmetic(typedLeft, typedRight) {
 					out, handled, err := qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight)
-					recordRuntimeKernelProbe("ArrayDyadicArithmetic", qRuntimeKernelVectorDyadicShape(op, left, right, la, ra), handled, err)
+					out, handled, err = qTypedRuntimeResultReason("ArrayDyadicArithmetic", qRuntimeKernelVectorDyadicShape(op, left, right, la, ra), RuntimeFallbackUnsupportedType, out, handled, err)
 					if err != nil {
 						return nil, true, err
 					}
