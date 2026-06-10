@@ -1480,6 +1480,213 @@ func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
 	return boolLogicalMask{op: op, leftScalar: lv, leftIsScalar: true, right: rightArray, len: length}, true, nil
 }
 
+// truthScalarValue maps a scalar onto q truthiness: null is false, numeric
+// values are true when nonzero, booleans pass through. ok=false reports a
+// value outside the truthiness domain so callers keep their fallback errors.
+func truthScalarValue(value any) (bool, bool) {
+	if IsNull(value) {
+		return false, true
+	}
+	switch x := value.(type) {
+	case bool:
+		return x, true
+	case int:
+		return x != 0, true
+	case int8:
+		return x != 0, true
+	case int16:
+		return x != 0, true
+	case int32:
+		return x != 0, true
+	case int64:
+		return x != 0, true
+	case uint:
+		return x != 0, true
+	case uint8:
+		return x != 0, true
+	case uint16:
+		return x != 0, true
+	case uint32:
+		return x != 0, true
+	case uint64:
+		return x != 0, true
+	case float32:
+		return x != 0, true
+	case float64:
+		return x != 0, true
+	default:
+		return false, false
+	}
+}
+
+// TryTypedTruthMask converts a boolean or numeric array into a q-truthiness
+// bool mask (null -> false, zero -> false, nonzero -> true) without per-row
+// boxing. Lazy integer scalar-dyadic carriers stay lazy as compare masks so
+// downstream where/count consumers keep their periodic index fast paths.
+func TryTypedTruthMask(array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, false, nil
+	}
+	if attributed, ok := array.(attributedArray); ok {
+		return TryTypedTruthMask(attributed.array)
+	}
+	if array.Kind() == KindBool {
+		return array, true, nil
+	}
+	switch a := array.(type) {
+	case i64ScalarDyadicArray:
+		return i64ScalarDyadicCompareMask{values: a, op: OpNE, scalar: 0}, true, nil
+	case tiledArray:
+		source, handled, err := TryTypedTruthMask(a.source)
+		if err != nil || !handled {
+			return nil, false, err
+		}
+		return tiledArray{source: source, start: a.start, len: a.len}, true, nil
+	case nullableArray:
+		out := make([]bool, len(a.data))
+		for i, v := range a.data {
+			truth, ok := truthScalarValue(v)
+			if !ok {
+				return nil, false, nil
+			}
+			out[i] = truth
+		}
+		return newBoolTrusted(out), true, nil
+	}
+	if isIntegerArray(array) {
+		if values, owned, ok := tryBulkI64Values(array); ok {
+			out := make([]bool, len(values))
+			for i, v := range values {
+				out[i] = v != 0
+			}
+			bulkI64Release(values, owned)
+			return newBoolTrusted(out), true, nil
+		}
+		return nil, false, nil
+	}
+	if isNumericArray(array) {
+		if values, owned, ok := tryBulkF64Values(array); ok {
+			out := make([]bool, len(values))
+			for i, v := range values {
+				out[i] = v != 0
+			}
+			bulkF64Release(values, owned)
+			return newBoolTrusted(out), true, nil
+		}
+	}
+	return nil, false, nil
+}
+
+// TryTypedTruthLogical applies q truthiness and/or over boolean or numeric
+// operands by converting each side to a truth mask and composing the lazy
+// logical-mask carrier, so verb-form `&`/`|` over derived integer vectors
+// avoids per-row boxing and keeps periodic where/count fast paths.
+func TryTypedTruthLogical(op string, left, right any) (Array, bool, error) {
+	leftArray, leftIsArray := left.(Array)
+	rightArray, rightIsArray := right.(Array)
+	if !leftIsArray && !rightIsArray {
+		return nil, false, nil
+	}
+	if leftIsArray {
+		mask, handled, err := TryTypedTruthMask(leftArray)
+		if err != nil || !handled {
+			return nil, false, err
+		}
+		left = mask
+	} else {
+		truth, ok := truthScalarValue(left)
+		if !ok {
+			return nil, false, nil
+		}
+		left = truth
+	}
+	if rightIsArray {
+		mask, handled, err := TryTypedTruthMask(rightArray)
+		if err != nil || !handled {
+			return nil, false, err
+		}
+		right = mask
+	} else {
+		truth, ok := truthScalarValue(right)
+		if !ok {
+			return nil, false, nil
+		}
+		right = truth
+	}
+	return TryTypedBoolLogical(op, left, right)
+}
+
+// TryTypedIsNullMask produces the `null xs` bool mask without routing every
+// row through Array.At boxing. Dense typed storage cannot hold nulls, so it
+// collapses to a constant-false cyclic view; boxed nullable columns scan
+// their backing slice once; cyclic takes push the scan onto the short cycle.
+func TryTypedIsNullMask(array Array) (Array, bool, error) {
+	if array == nil {
+		return nil, false, nil
+	}
+	switch a := array.(type) {
+	case attributedArray:
+		return TryTypedIsNullMask(a.array)
+	case tiledArray:
+		source, handled, err := TryTypedIsNullMask(a.source)
+		if err != nil || !handled {
+			return nil, false, err
+		}
+		return tiledArray{source: source, start: a.start, len: a.len}, true, nil
+	case nullableArray:
+		out := make([]bool, len(a.data))
+		for i, v := range a.data {
+			out[i] = IsNull(v)
+		}
+		return newBoolTrusted(out), true, nil
+	case encodedArray:
+		domainNull := make([]bool, len(a.domain))
+		for i, v := range a.domain {
+			domainNull[i] = IsNull(v)
+		}
+		out := make([]bool, len(a.codes))
+		for i, code := range a.codes {
+			if int(code) >= 0 && int(code) < len(domainNull) {
+				out[i] = domainNull[code]
+			}
+		}
+		return newBoolTrusted(out), true, nil
+	case columnArray[bool], columnArray[int8], columnArray[int16], columnArray[int32],
+		columnArray[int64], columnArray[uint8], columnArray[uint16], columnArray[uint32],
+		columnArray[uint64], columnArray[float32], columnArray[float64],
+		i64RangeArray, i64SegmentArray, f64RangeArray:
+		if array.Len() == 0 {
+			return newBoolTrusted(nil), true, nil
+		}
+		return tiledArray{source: newBoolTrusted([]bool{false}), start: 0, len: array.Len()}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+// TiledCycleView exposes a cyclic-take carrier (n#xs, rotations) so sibling
+// runtime packages can push elementwise work onto the short cycle and re-tile
+// the result instead of walking every row of the long view.
+func TiledCycleView(array Array) (source Array, start, length int, ok bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return TiledCycleView(a.array)
+	case tiledArray:
+		return a.source, a.start, a.len, true
+	default:
+		return nil, 0, 0, false
+	}
+}
+
+// NewTiledCycleView wraps source as a cyclic view of length rows starting at
+// offset start into the cycle.
+func NewTiledCycleView(source Array, start, length int) (Array, bool) {
+	if source == nil || source.Len() == 0 || length < 0 || start < 0 || start >= source.Len() {
+		return nil, false
+	}
+	return tiledArray{source: source, start: start, len: length}, true
+}
+
 func typedInMask(array Array, values []any) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
@@ -4009,6 +4216,9 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	case attributedArray:
 		return TryTypedCast(kind, a.array)
 	}
+	if kind == KindBool {
+		return tryTypedBoolCast(array)
+	}
 	if !isIntegerArray(array) && !isNumericArray(array) {
 		return nil, false, nil
 	}
@@ -4080,6 +4290,48 @@ func TryTypedCast(kind Kind, array Array) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+// tryTypedBoolCast lowers `"b"$xs` for boolean and 0/1 integer vectors. The q
+// bool cast only accepts 0 and 1, so any other value defers to the generic
+// fallback. Integer scalar-dyadic carriers (x mod 2, ...) stay lazy as
+// compare masks so where/count over the result keep periodic fast paths.
+func tryTypedBoolCast(array Array) (Array, bool, error) {
+	if array.Kind() == KindBool {
+		return array, true, nil
+	}
+	if !isIntegerArray(array) {
+		return nil, false, nil
+	}
+	// q-mod carriers over null-free integer sources have a provable [0,m-1]
+	// value domain, so `"b"$x mod 2` stays lazy without a validation scan.
+	if dyadic, isDyadic := array.(i64ScalarDyadicArray); isDyadic &&
+		dyadic.op == OpMod && !dyadic.scalarLeft && (dyadic.scalar == 1 || dyadic.scalar == 2) {
+		switch dyadic.source.(type) {
+		case i64RangeArray, i64SegmentArray:
+			return i64ScalarDyadicCompareMask{values: dyadic, op: OpNE, scalar: 0}, true, nil
+		}
+	}
+	values, owned, ok := tryBulkI64Values(array)
+	if !ok {
+		return nil, false, nil
+	}
+	for _, v := range values {
+		if v != 0 && v != 1 {
+			bulkI64Release(values, owned)
+			return nil, false, nil
+		}
+	}
+	if dyadic, isDyadic := array.(i64ScalarDyadicArray); isDyadic {
+		bulkI64Release(values, owned)
+		return i64ScalarDyadicCompareMask{values: dyadic, op: OpNE, scalar: 0}, true, nil
+	}
+	out := make([]bool, len(values))
+	for i, v := range values {
+		out[i] = v == 1
+	}
+	bulkI64Release(values, owned)
+	return newBoolTrusted(out), true, nil
 }
 
 func numericArrayTruncatedIntegerAt(array Array, row int) (int64, bool, error) {
@@ -6267,6 +6519,11 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 			return value, handled, err
 		}
 		return numericSumValueByAccess(a)
+	case indexedArray:
+		if value, handled, err := indexedArrayIntegerSum(a); err != nil || handled {
+			return value, handled, err
+		}
+		return numericSumValueByAccess(a)
 	case i64ScalarDyadicRunningSumArray:
 		return i64ScalarDyadicRunningSumSum(a)
 	case i64SparseAmendArray:
@@ -6346,6 +6603,64 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 	default:
 		return numericSumValueByAccess(array)
 	}
+}
+
+// indexedArrayIntegerSum reduces a gathered integer view without per-row
+// interface dispatch. Range sources use the affine closed form
+// sum = start*len + step*sum(indexes); index carriers with exact closed-form
+// sums (ranges, segments, periodic where-results) stay O(carrier), and dense
+// cases flatten through the bulk kernels.
+func indexedArrayIntegerSum(a indexedArray) (any, bool, error) {
+	source := a.source
+	if attributed, ok := source.(attributedArray); ok {
+		source = attributed.array
+	}
+	if values, ok := source.(i64RangeArray); ok {
+		switch a.indexes.(type) {
+		case i64RangeArray, i64SegmentArray, i64PeriodicIndexArray:
+			return values.start*int64(a.len) + values.step*i64IndexArraySum(a.indexes), true, nil
+		}
+		indexes, owned, ok := tryBulkI64Values(a.indexes)
+		if !ok || len(indexes) != a.len {
+			bulkI64Release(indexes, owned)
+			return nil, false, nil
+		}
+		var total int64
+		for _, index := range indexes {
+			if index < 0 || index >= int64(values.len) {
+				bulkI64Release(indexes, owned)
+				return nil, false, nil
+			}
+			total += index
+		}
+		bulkI64Release(indexes, owned)
+		return values.start*int64(a.len) + values.step*total, true, nil
+	}
+	if !isIntegerArray(source) {
+		return nil, false, nil
+	}
+	sourceValues, sourceOwned, ok := tryBulkI64Values(source)
+	if !ok {
+		return nil, false, nil
+	}
+	indexes, indexesOwned, ok := tryBulkI64Values(a.indexes)
+	if !ok || len(indexes) != a.len {
+		bulkI64Release(sourceValues, sourceOwned)
+		bulkI64Release(indexes, indexesOwned)
+		return nil, false, nil
+	}
+	var total int64
+	for _, index := range indexes {
+		if index < 0 || index >= int64(len(sourceValues)) {
+			bulkI64Release(sourceValues, sourceOwned)
+			bulkI64Release(indexes, indexesOwned)
+			return nil, false, nil
+		}
+		total += sourceValues[index]
+	}
+	bulkI64Release(sourceValues, sourceOwned)
+	bulkI64Release(indexes, indexesOwned)
+	return total, true, nil
 }
 
 func numericSumValueByAccess(array Array) (any, bool, error) {

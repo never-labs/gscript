@@ -11516,6 +11516,55 @@ func qDataCompositeComparisonOp(op string) (data.Op, bool) {
 	}
 }
 
+// qTryTiledCycleVectorDyadic pushes an elementwise dyadic verb with one
+// scalar operand onto the short cycle of a cyclic-take carrier (n#xs) and
+// re-tiles the result, so pattern vectors pay per-cycle instead of per-row
+// cost. Semantics match the per-row fallback exactly because the verb is
+// applied through the same applyVectorDyadic pipeline on the cycle.
+func qTryTiledCycleVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array, bool, error) {
+	var tiled data.Array
+	var scalar any
+	scalarLeft := false
+	switch {
+	case la != nil && ra == nil:
+		tiled, scalar = la, right
+	case ra != nil && la == nil:
+		tiled, scalar, scalarLeft = ra, left, true
+	default:
+		return nil, false, nil
+	}
+	source, start, length, ok := data.TiledCycleView(tiled)
+	if !ok || source.Len() == 0 || source.Len() >= length {
+		return nil, false, nil
+	}
+	shape := "tiled-cycle/" + string(op) + "/" + string(source.Kind())
+	var inner data.Array
+	var err error
+	if scalarLeft {
+		inner, err = applyVectorDyadic(op, scalar, source, nil, source)
+	} else {
+		inner, err = applyVectorDyadic(op, source, scalar, source, nil)
+	}
+	if err != nil {
+		_, _, _ = qTypedRuntimeResult[data.Array]("ArrayTiledCycleDyadic", shape, nil, true, err)
+		return nil, true, err
+	}
+	if inner == nil || inner.Len() != source.Len() {
+		recordRuntimeKernelProbeReason("ArrayTiledCycleDyadic", shape, false, nil, RuntimeFallbackUnsupportedType)
+		return nil, false, nil
+	}
+	out, ok := data.NewTiledCycleView(inner, start, length)
+	if !ok {
+		recordRuntimeKernelProbeReason("ArrayTiledCycleDyadic", shape, false, nil, RuntimeFallbackUnsupportedType)
+		return nil, false, nil
+	}
+	out2, handled, err := qTypedRuntimeResult("ArrayTiledCycleDyadic", shape, out, true, nil)
+	if err != nil || !handled {
+		return nil, false, err
+	}
+	return out2, true, nil
+}
+
 func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array, error) {
 	n := 0
 	switch {
@@ -11534,6 +11583,30 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		n = la.Len()
 	case ra != nil:
 		n = ra.Len()
+	}
+	if out, handled, err := qTryTiledCycleVectorDyadic(op, left, right, la, ra); err != nil || handled {
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
+	if op == '&' || op == '|' {
+		logical := "and"
+		if op == '|' {
+			logical = "or"
+		}
+		shape := "truth-logical/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
+		if out, handled, err := data.TryTypedTruthLogical(logical, left, right); err != nil || handled {
+			out, handled, err = qTypedRuntimeResult("ArrayBoolLogical", shape, out, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+		} else {
+			recordRuntimeKernelProbeReason("ArrayBoolLogical", shape, handled, err, RuntimeFallbackUnsupportedType)
+		}
 	}
 	if op == '^' {
 		if la == nil && ra != nil {
@@ -13872,6 +13945,15 @@ func notValue(v any) (any, error) {
 
 func nullValue(v any) (any, error) {
 	if array, ok := v.(data.Array); ok {
+		if out, handled, err := data.TryTypedIsNullMask(array); err != nil || handled {
+			recordRuntimeKernelProbe("ArrayIsNull", "is-null/"+string(array.Kind()), handled, err)
+			if err != nil {
+				return nil, err
+			}
+			return out, nil
+		} else {
+			recordRuntimeKernelProbeReason("ArrayIsNull", "is-null/"+string(array.Kind()), handled, err, RuntimeFallbackUnsupportedType)
+		}
 		out := make([]bool, array.Len())
 		for i := 0; i < array.Len(); i++ {
 			item, ok := array.At(i)
