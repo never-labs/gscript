@@ -77,7 +77,8 @@ type QEvalPipelinePlanRef struct {
 }
 
 func (r QEvalPipelinePlanRef) Valid() bool {
-	return r.ID >= 0 && r.Kernel != "" && r.Shape != "" && r.Backend != ""
+	descriptor, ok := qEvalPipelineDescriptorViewFromRef(r)
+	return r.ID >= 0 && ok && descriptor.Kernel != "" && descriptor.Shape != "" && qEvalPipelineBackendNameFromRef(r) != ""
 }
 
 type qEvalPipelineStaticPlan struct {
@@ -120,8 +121,10 @@ func (b qEvalPipelineStaticBackend) BackendName() string {
 }
 
 func (b qEvalPipelineStaticBackend) LookupQEvalPipelinePlan(ref QEvalPipelinePlanRef) (QEvalPipelinePlan, bool) {
+	kernel := qEvalPipelinePlanRefKernel(ref)
+	shape := qEvalPipelinePlanRefShape(ref)
 	for _, plan := range b.plans {
-		if plan.ref.ID == ref.ID && plan.ref.Kernel == ref.Kernel && plan.ref.Shape == ref.Shape {
+		if plan.ref.ID == ref.ID && qEvalPipelinePlanRefKernel(plan.ref) == kernel && qEvalPipelinePlanRefShape(plan.ref) == shape {
 			return plan, true
 		}
 	}
@@ -133,7 +136,10 @@ func (fn *Function) addQEvalPipelinePlan(source string, plan qEvalHotPlan) QEval
 		return QEvalPipelinePlanRef{ID: -1}
 	}
 	for _, ref := range fn.QEvalPipelinePlans {
-		if ref.Source == source && ref.Kernel == plan.Kernel && ref.Shape == plan.Shape && ref.Backend == plan.Backend {
+		if qEvalPipelinePlanRefSource(ref) == source &&
+			qEvalPipelinePlanRefKernel(ref) == plan.Kernel &&
+			qEvalPipelinePlanRefShape(ref) == plan.Shape &&
+			qEvalPipelineBackendNameFromRef(ref) == plan.Backend {
 			return ref
 		}
 	}
@@ -156,7 +162,8 @@ func formatQEvalPipelinePlanRefs(refs []QEvalPipelinePlanRef) string {
 	}
 	out := fmt.Sprintf("%d q.eval pipeline plan(s)\n", len(refs))
 	for i, ref := range refs {
-		out += fmt.Sprintf("  [%d] id=%d kernel=%s shape=%s pipeline_shape=%s backend=%s\n", i, ref.ID, ref.Kernel, ref.Shape, ref.PipelineShape, ref.Backend)
+		out += fmt.Sprintf("  [%d] id=%d kernel=%s shape=%s pipeline_shape=%s backend=%s\n",
+			i, ref.ID, qEvalPipelinePlanRefKernel(ref), qEvalPipelinePlanRefShape(ref), qEvalPipelinePlanRefPipelineShape(ref), qEvalPipelineBackendNameFromRef(ref))
 	}
 	return out
 }
@@ -234,8 +241,10 @@ func (cf *CompiledFunction) qEvalPipelinePlanHelper(id int) *qEvalPipelinePlanHe
 }
 
 func qEvalPipelinePlanExecutionShape(refs []QEvalPipelinePlanRef, id int) string {
-	if ref, ok := qEvalPipelinePlanRefByID(refs, id); ok && ref.Shape != "" {
-		return ref.Shape
+	if ref, ok := qEvalPipelinePlanRefByID(refs, id); ok {
+		if shape := qEvalPipelinePlanRefShape(ref); shape != "" {
+			return shape
+		}
 	}
 	return "q-eval/pipeline-plan"
 }

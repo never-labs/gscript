@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -275,6 +276,57 @@ func TestQEvalPipelinePlanRefPreservesCallableDotCountDescriptor(t *testing.T) {
 	out, handled, err := stdq.NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
 	if err != nil || !handled || out != int64(38) {
 		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v; want 38,true,nil", out, handled, err)
+	}
+}
+
+func TestQEvalPipelinePlanRefPrefersBackendPlanDescriptor(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "+/til 8")
+	wantShape := qEvalPipelinePlanRefShape(ref)
+	if wantShape == "" || ref.BackendPlan == nil || !ref.BackendPlan.Valid() {
+		t.Fatalf("ref = %+v, want embedded backend descriptor", ref)
+	}
+
+	ref.Kernel = "stale-kernel"
+	ref.Shape = "stale-shape"
+	ref.PipelineShape = "stale-pipeline"
+	ref.Backend = "stale-backend"
+	ref.Kind = "stale-kind"
+
+	if !ref.Valid() {
+		t.Fatalf("ref with valid BackendPlan descriptor should remain valid: %+v", ref)
+	}
+	if got := qEvalPipelinePlanRefKernel(ref); got != ref.BackendPlan.Descriptor.Kernel {
+		t.Fatalf("qEvalPipelinePlanRefKernel = %q, want backend descriptor %q", got, ref.BackendPlan.Descriptor.Kernel)
+	}
+	if got := qEvalPipelinePlanRefShape(ref); got != wantShape {
+		t.Fatalf("qEvalPipelinePlanRefShape = %q, want backend descriptor shape %q", got, wantShape)
+	}
+	if got := qEvalPipelineBackendNameFromRef(ref); got != qEvalPipelineTypedRuntimeBackend {
+		t.Fatalf("qEvalPipelineBackendNameFromRef = %q, want typed backend", got)
+	}
+	if got := qEvalPipelinePlanExecutionShape([]QEvalPipelinePlanRef{ref}, ref.ID); got != wantShape {
+		t.Fatalf("qEvalPipelinePlanExecutionShape = %q, want %q", got, wantShape)
+	}
+	if formatted := formatQEvalPipelinePlanRefs([]QEvalPipelinePlanRef{ref}); strings.Contains(formatted, "stale-") || !strings.Contains(formatted, wantShape) {
+		t.Fatalf("formatQEvalPipelinePlanRefs = %q, want backend descriptor fields", formatted)
+	}
+
+	descriptor, ok := qEvalPipelineDescriptorFromRef(ref)
+	if !ok || descriptor.Shape != wantShape {
+		t.Fatalf("qEvalPipelineDescriptorFromRef = %+v,%v; want backend descriptor shape %q", descriptor, ok, wantShape)
+	}
+	plan, ok := qEvalPipelineBackendPlanFromRef(ref)
+	if !ok || plan.Shape() != wantShape || plan.Backend != qEvalPipelineTypedRuntimeBackend {
+		t.Fatalf("qEvalPipelineBackendPlanFromRef = %+v,%v; want backend descriptor plan", plan, ok)
+	}
+
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+	if err != nil {
+		t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+	}
+	if !handled || !value.IsInt() || value.Int() != 28 {
+		t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int 28 handled", value, handled)
 	}
 }
 
