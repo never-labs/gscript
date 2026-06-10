@@ -33,6 +33,11 @@ BenchmarkQSessionEvalVectorWarmExecution/BridgeHealthy-16  100  900 ns/op  64 B/
 BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes
 """
 
+SAMPLE_ARRAY_BRIDGE = """
+BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  65536 B/op  1 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+BenchmarkQEvalPipelineArrayRuntimeBridge/FallbackEncodedSymbol-16 100  9000 ns/op  131072 B/op  8193 allocs/op  0 q_array_bridge_bulk_hits/op  1 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+"""
+
 FALLBACK_REPORT_LOG = """
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report cases=2 categories=2 rows=1
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report rank=1 category=xbar_within pipeline_shape=bin kernel=ArrayBin reason=unsupported_type outcome=fallback count=3
@@ -98,7 +103,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(coverage["current Leia vs old Leia"]["qSQL"], "covered")
 
     def test_runtime_metrics_structures_allocs_kernel_and_fallback_values(self):
-        rows = report.parse_go_benchmarks(SAMPLE)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_ARRAY_BRIDGE)
         metrics = {row.benchmark: row for row in report.build_runtime_metric_rows(rows)}
 
         qsql = metrics["BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject"]
@@ -119,6 +124,11 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(qjit.jit_typed_kernel_success_op, 1)
         self.assertEqual(qjit.jit_typed_kernel_errors_op, 0)
         self.assertEqual(qjit.jit_typed_pipeline_shapes, 1)
+        bridge = metrics["BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range"]
+        self.assertEqual(bridge.q_array_bridge_bulk_hits_op, 1)
+        self.assertEqual(bridge.q_array_bridge_fallbacks_op, 0)
+        self.assertEqual(bridge.q_array_bridge_errors_op, 0)
+        self.assertEqual(bridge.q_array_bridge_rows_op, 8192)
 
     def test_jit_route_summary_aggregates_route_metrics(self):
         rows = report.parse_go_benchmarks(SAMPLE)
@@ -133,7 +143,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["error"].calls_per_op, 0)
 
     def test_runtime_observability_summary_rolls_up_pipeline_primitive_and_jit(self):
-        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE + SAMPLE_ARRAY_BRIDGE)
         summary = {row.layer: row for row in report.build_runtime_observability_summary(rows)}
 
         self.assertEqual(summary["qsql_kernel"].benchmark_count, 2)
@@ -150,6 +160,10 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["jit_backend"].op_exit_op, 1)
         self.assertEqual(summary["jit_backend"].errors_op, 1)
         self.assertEqual(summary["jit_backend"].slow_route_pct, 60)
+        self.assertEqual(summary["methodjit_array_bridge"].attempts_op, 2)
+        self.assertEqual(summary["methodjit_array_bridge"].hits_op, 1)
+        self.assertEqual(summary["methodjit_array_bridge"].fallbacks_op, 1)
+        self.assertEqual(summary["methodjit_array_bridge"].hit_pct, 50)
 
     def test_runtime_health_summary_combines_jit_fallback_and_alloc_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
@@ -170,18 +184,18 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(health.jit_slow_route_pct, 60)
 
     def test_runtime_bridge_efficiency_summary_quantifies_direct_backend_value(self):
-        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE + SAMPLE_ARRAY_BRIDGE)
         summary = report.build_runtime_bridge_efficiency_summary(rows)
 
         self.assertEqual(len(summary), 1)
         efficiency = summary[0]
         self.assertEqual(efficiency.scope, "typed_runtime_and_jit_backend")
-        self.assertEqual(efficiency.benchmark_count, 4)
-        self.assertEqual(efficiency.direct_calls_op, 3.8)
-        self.assertEqual(efficiency.slow_bridge_calls_op, 4.2)
-        self.assertAlmostEqual(efficiency.direct_call_share_pct, 47.5)
-        self.assertEqual(efficiency.avg_allocs_op, 27)
-        self.assertAlmostEqual(efficiency.allocs_per_direct_call, 27 / 3.8)
+        self.assertEqual(efficiency.benchmark_count, 6)
+        self.assertEqual(efficiency.direct_calls_op, 4.8)
+        self.assertEqual(efficiency.slow_bridge_calls_op, 5.2)
+        self.assertAlmostEqual(efficiency.direct_call_share_pct, 48)
+        self.assertEqual(efficiency.avg_allocs_op, 8302 / 6)
+        self.assertAlmostEqual(efficiency.allocs_per_direct_call, (8302 / 6) / 4.8)
 
     def test_gate_checks_cover_ratio_hit_rate_fallback_and_allocs(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK)

@@ -71,9 +71,12 @@ func TestQEvalPipelineRuntimeValueUsesBulkTypedArrayExport(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			value, err := qEvalPipelineRuntimeValue(tc.array)
+			value, route, err := qEvalPipelineArrayRuntimeValueWithRoute(tc.array)
 			if err != nil {
 				t.Fatalf("qEvalPipelineRuntimeValue: %v", err)
+			}
+			if route != qEvalPipelineArrayBridgeRouteBulkTyped {
+				t.Fatalf("qEvalPipelineRuntimeValue route = %q, want bulk typed", route)
 			}
 			if !value.IsDenseArray() {
 				t.Fatalf("qEvalPipelineRuntimeValue returned %v, want DenseArray", value)
@@ -95,6 +98,21 @@ func TestQEvalPipelineRuntimeValueBulkExportsSymbolArrays(t *testing.T) {
 		t.Fatalf("symbol array bridge returned %v, want DenseArray", value)
 	}
 	assertDenseArrayStrings(t, value.DenseArray(), []string{"AAPL", "MSFT"})
+}
+
+func TestQEvalPipelineRuntimeValueKeepsUnsupportedArrayFallback(t *testing.T) {
+	encoded := data.NewEncodedSymbols([]data.Symbol{"AAPL", "MSFT", "AAPL"})
+	value, route, err := qEvalPipelineArrayRuntimeValueWithRoute(encoded)
+	if err != nil {
+		t.Fatalf("qEvalPipelineArrayRuntimeValueWithRoute: %v", err)
+	}
+	if route != qEvalPipelineArrayBridgeRouteFallback {
+		t.Fatalf("encoded symbol array bridge route = %q, want fallback", route)
+	}
+	if !value.IsDenseArray() {
+		t.Fatalf("encoded symbol array bridge returned %v, want DenseArray from fallback", value)
+	}
+	assertDenseArrayStrings(t, value.DenseArray(), []string{"AAPL", "MSFT", "AAPL"})
 }
 
 func assertDenseArrayStrings(t *testing.T, dense *runtime.DenseArray, want []string) {
@@ -605,6 +623,83 @@ func TestQEvalPipelineHelperReusableEvalStateRequiresDefaultExecutableRuntime(t 
 	if err != nil || !handled || !value.IsInt() || value.Int() != 99 {
 		t.Fatalf("custom executable helper execute = %v,%v,%v; want int 99,true,nil", value, handled, err)
 	}
+}
+
+func BenchmarkQEvalPipelineArrayRuntimeBridge(b *testing.B) {
+	const rows = 8192
+	cases := []struct {
+		name      string
+		array     data.Array
+		wantRoute qEvalPipelineArrayBridgeRoute
+	}{
+		{name: "BulkI64Range", array: data.NewI64Range(0, 1, rows), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
+		{name: "BulkF64Column", array: data.NewF64(makeF64BenchmarkColumn(rows)), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
+		{name: "BulkBoolColumn", array: data.NewBool(makeBoolBenchmarkColumn(rows)), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
+		{name: "BulkStringColumn", array: data.NewString(makeStringBenchmarkColumn(rows)), wantRoute: qEvalPipelineArrayBridgeRouteBulkTyped},
+		{name: "FallbackEncodedSymbol", array: makeEncodedSymbolBenchmarkColumn(rows), wantRoute: qEvalPipelineArrayBridgeRouteFallback},
+	}
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			var bulkHits, fallbacks, errors int
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				value, route, err := qEvalPipelineArrayRuntimeValueWithRoute(tc.array)
+				if err != nil {
+					errors++
+					b.Fatalf("qEvalPipelineArrayRuntimeValueWithRoute: %v", err)
+				}
+				if route != tc.wantRoute {
+					errors++
+					b.Fatalf("bridge route = %q, want %q", route, tc.wantRoute)
+				}
+				switch route {
+				case qEvalPipelineArrayBridgeRouteBulkTyped:
+					bulkHits++
+				case qEvalPipelineArrayBridgeRouteFallback:
+					fallbacks++
+				}
+				qEvalPipelineDescriptorBenchmarkSink = value
+			}
+			b.ReportMetric(float64(bulkHits)/float64(b.N), "q_array_bridge_bulk_hits/op")
+			b.ReportMetric(float64(fallbacks)/float64(b.N), "q_array_bridge_fallbacks/op")
+			b.ReportMetric(float64(errors)/float64(b.N), "q_array_bridge_errors/op")
+			b.ReportMetric(float64(tc.array.Len()), "q_array_bridge_rows/op")
+		})
+	}
+}
+
+func makeF64BenchmarkColumn(n int) []float64 {
+	out := make([]float64, n)
+	for i := range out {
+		out[i] = float64(i) * 1.25
+	}
+	return out
+}
+
+func makeBoolBenchmarkColumn(n int) []bool {
+	out := make([]bool, n)
+	for i := range out {
+		out[i] = i%3 == 0
+	}
+	return out
+}
+
+func makeStringBenchmarkColumn(n int) []string {
+	seed := []string{"AAPL", "MSFT", "NVDA", "TSLA", "META", "AMZN", "GOOG", "ORCL"}
+	out := make([]string, n)
+	for i := range out {
+		out[i] = seed[i%len(seed)]
+	}
+	return out
+}
+
+func makeEncodedSymbolBenchmarkColumn(n int) data.Array {
+	values := make([]data.Symbol, n)
+	for i, value := range makeStringBenchmarkColumn(n) {
+		values[i] = data.Symbol(value)
+	}
+	return data.NewEncodedSymbols(values)
 }
 
 func BenchmarkQEvalPipelineDescriptorBackend(b *testing.B) {

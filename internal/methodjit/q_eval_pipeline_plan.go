@@ -449,9 +449,26 @@ func qEvalPipelineRuntimeValue(v any) (runtime.Value, error) {
 }
 
 func qEvalPipelineArrayRuntimeValue(array data.Array) (runtime.Value, error) {
+	value, _, err := qEvalPipelineArrayRuntimeValueWithRoute(array)
+	return value, err
+}
+
+type qEvalPipelineArrayBridgeRoute string
+
+const (
+	qEvalPipelineArrayBridgeRouteBulkTyped qEvalPipelineArrayBridgeRoute = "bulk_typed"
+	qEvalPipelineArrayBridgeRouteFallback  qEvalPipelineArrayBridgeRoute = "fallback"
+)
+
+func qEvalPipelineArrayRuntimeValueWithRoute(array data.Array) (runtime.Value, qEvalPipelineArrayBridgeRoute, error) {
 	if value, handled, err := qEvalPipelineTypedArrayRuntimeValue(array); handled || err != nil {
-		return value, err
+		return value, qEvalPipelineArrayBridgeRouteBulkTyped, err
 	}
+	value, err := qEvalPipelineArrayRuntimeValueFallback(array)
+	return value, qEvalPipelineArrayBridgeRouteFallback, err
+}
+
+func qEvalPipelineArrayRuntimeValueFallback(array data.Array) (runtime.Value, error) {
 	switch array.Kind() {
 	case data.KindBool:
 		out := make([]bool, array.Len())

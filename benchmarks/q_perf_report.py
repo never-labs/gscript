@@ -114,6 +114,10 @@ class RuntimeMetricRow:
     jit_typed_kernel_success_op: float | None
     jit_typed_kernel_errors_op: float | None
     jit_typed_pipeline_shapes: float | None
+    q_array_bridge_bulk_hits_op: float | None
+    q_array_bridge_fallbacks_op: float | None
+    q_array_bridge_errors_op: float | None
+    q_array_bridge_rows_op: float | None
 
 
 @dataclass
@@ -476,6 +480,10 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 jit_typed_kernel_success_op=metrics.get("jit_typed_kernel_success/op"),
                 jit_typed_kernel_errors_op=metrics.get("jit_typed_kernel_errors/op"),
                 jit_typed_pipeline_shapes=metrics.get("jit_typed_pipeline_shapes"),
+                q_array_bridge_bulk_hits_op=metrics.get("q_array_bridge_bulk_hits/op"),
+                q_array_bridge_fallbacks_op=metrics.get("q_array_bridge_fallbacks/op"),
+                q_array_bridge_errors_op=metrics.get("q_array_bridge_errors/op"),
+                q_array_bridge_rows_op=metrics.get("q_array_bridge_rows/op"),
             )
         )
     return out
@@ -610,6 +618,32 @@ def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[Runti
             )
         )
 
+    array_bridge_rows = [
+        row
+        for row in runtime_rows
+        if row.q_array_bridge_bulk_hits_op is not None
+        or row.q_array_bridge_fallbacks_op is not None
+        or row.q_array_bridge_errors_op is not None
+    ]
+    if array_bridge_rows:
+        bulk_hits = sum(row.q_array_bridge_bulk_hits_op or 0.0 for row in array_bridge_rows)
+        fallbacks = sum(row.q_array_bridge_fallbacks_op or 0.0 for row in array_bridge_rows)
+        errors = sum(row.q_array_bridge_errors_op or 0.0 for row in array_bridge_rows)
+        attempts = bulk_hits + fallbacks + errors
+        out.append(
+            RuntimeObservabilityRow(
+                layer="methodjit_array_bridge",
+                benchmark_count=len(array_bridge_rows),
+                attempts_op=attempts,
+                hits_op=bulk_hits,
+                fallbacks_op=fallbacks,
+                errors_op=errors,
+                hit_pct=(100 * bulk_hits / attempts) if attempts > 0 else None,
+                shapes=sum(row.q_array_bridge_rows_op or 0.0 for row in array_bridge_rows),
+                note="MethodJIT q pipeline data.Array to runtime.Value bridge; hits use bulk typed export",
+            )
+        )
+
     return out
 
 
@@ -625,6 +659,9 @@ def build_runtime_health_summary(rows: dict[str, BenchRow]) -> list[RuntimeHealt
         or row.jit_typed_op_exit_op is not None
         or row.jit_typed_kernel_success_op is not None
         or row.jit_typed_kernel_errors_op is not None
+        or row.q_array_bridge_bulk_hits_op is not None
+        or row.q_array_bridge_fallbacks_op is not None
+        or row.q_array_bridge_errors_op is not None
     ]
     if not health_rows:
         return []
@@ -666,6 +703,9 @@ def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[R
         or row.jit_typed_op_exit_op is not None
         or row.jit_typed_kernel_success_op is not None
         or row.jit_typed_kernel_errors_op is not None
+        or row.q_array_bridge_bulk_hits_op is not None
+        or row.q_array_bridge_fallbacks_op is not None
+        or row.q_array_bridge_errors_op is not None
     ]
     if not bridge_rows:
         return []
@@ -676,8 +716,11 @@ def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[R
     jit_slow = sum(row.jit_typed_native_exit_op or 0.0 for row in bridge_rows)
     jit_slow += sum(row.jit_typed_op_exit_op or 0.0 for row in bridge_rows)
     jit_slow += sum(row.jit_typed_kernel_errors_op or 0.0 for row in bridge_rows)
-    direct = typed_direct + jit_direct
-    slow = typed_slow + jit_slow
+    array_direct = sum(row.q_array_bridge_bulk_hits_op or 0.0 for row in bridge_rows)
+    array_slow = sum(row.q_array_bridge_fallbacks_op or 0.0 for row in bridge_rows)
+    array_slow += sum(row.q_array_bridge_errors_op or 0.0 for row in bridge_rows)
+    direct = typed_direct + jit_direct + array_direct
+    slow = typed_slow + jit_slow + array_slow
     total = direct + slow
     alloc_values = [row.allocs_op for row in bridge_rows if row.allocs_op is not None]
     avg_allocs = average(alloc_values)
