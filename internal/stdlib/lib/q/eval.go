@@ -1679,6 +1679,9 @@ func (s *EvalState) evalQFastPlan(plan *qEvalFastPlan) (any, bool, error) {
 }
 
 func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
+	if out, handled, err := s.evalApplyIndexForm(src); err != nil || handled {
+		return out, err
+	}
 	if bindingPlan != nil && bindingPlan.kind != qScriptBindingInvalid {
 		value, handled, err := s.evalQScriptBindingPlan(bindingPlan)
 		if err != nil {

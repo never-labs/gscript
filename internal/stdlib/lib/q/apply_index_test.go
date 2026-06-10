@@ -38,11 +38,26 @@ func TestQApplyIndexCoreSemantics(t *testing.T) {
 		assertEvalValue(t, "a:10;f:{x+a};a:20;.[f;(1)]", int64(11))
 	})
 
+	t.Run("builtin dot apply", func(t *testing.T) {
+		assertEvalValue(t, "sqrt . enlist 4", 2.0)
+		assertEvalValue(t, ".[sqrt;enlist 9]", 3.0)
+		assertEvalValue(t, "xexp . (2;3)", 8.0)
+		assertEvalArray(t, ".[xexp;(2;3 4)]", data.KindF64, []any{8.0, 16.0})
+		assertEvalValue(t, "sum . enlist 1 2 3", int64(6))
+	})
+
 	t.Run("amend forms remain functional", func(t *testing.T) {
 		assertEvalDict(t, "@[(`a`b!10 20);`b;:;25]", []data.Symbol{"a", "b"}, []any{int64(10), int64(25)})
 		assertEvalDict(t, ".[(`a`b!10 20);`b;:;25]", []data.Symbol{"a", "b"}, []any{int64(10), int64(25)})
 		assertEvalArray(t, "@[(10 20 30);1;+;5]", data.KindI64, []any{int64(10), int64(25), int64(30)})
 	})
+}
+
+func TestQSplitTopLevelDotApplyAcceptsPrefixRightArgument(t *testing.T) {
+	left, right, ok := splitTopLevelDotApply("sqrt . enlist 4")
+	if !ok || left != "sqrt" || right != "enlist 4" {
+		t.Fatalf("splitTopLevelDotApply = %q,%q,%v; want sqrt,enlist 4,true", left, right, ok)
+	}
 }
 
 func TestQMatrixRowIndexRecordsTypedRuntimeKernel(t *testing.T) {
