@@ -805,7 +805,11 @@ func (p *parser) parsePrimary() (Expr, error) {
 		case "null", "nil":
 			return Null{}, nil
 		case "not":
-			arg, err := p.parseExpr(11)
+			// q `not` is right-to-left: it negates everything to its right,
+			// so `not x in s` means `not (x in s)`. Parsing the argument at
+			// minimum precedence keeps this parser aligned with the q.eval
+			// string interpreter and the where-pipeline recognizer.
+			arg, err := p.parseExpr(0)
 			if err != nil {
 				return nil, err
 			}
