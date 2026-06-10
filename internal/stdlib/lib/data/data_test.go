@@ -4496,6 +4496,56 @@ func TestTryGatherByI64IndexArrayPreservesRanges(t *testing.T) {
 	}
 }
 
+func TestTryTypedWhereMaskI64BoolColumnsReturnIndexArrays(t *testing.T) {
+	indexes, handled, err := TryTypedWhereMaskI64(NewBool([]bool{true, true, false, true, false, true, true}))
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWhereMaskI64 bool column = %T,%v,%v; want handled", indexes, handled, err)
+	}
+	if _, ok := indexes.(i64SegmentArray); !ok {
+		t.Fatalf("TryTypedWhereMaskI64 bool column returned %T, want i64SegmentArray", indexes)
+	}
+	if got, want := indexes.Values(), []any{int64(0), int64(1), int64(3), int64(5), int64(6)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("bool mask indexes = %#v, want %#v", got, want)
+	}
+
+	nullable := NewColumn("mask", []any{true, nil, true, false, true}).Data
+	indexes, handled, err = TryTypedWhereMaskI64(nullable)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWhereMaskI64 nullable bool column = %T,%v,%v; want handled", indexes, handled, err)
+	}
+	if got, want := indexes.Values(), []any{int64(0), int64(2), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("nullable bool mask indexes = %#v, want %#v", got, want)
+	}
+}
+
+func TestTryFilterFrameByBoolMaskUsesTypedIndexArray(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "qty", Data: NewI64Range(10, 2, 7)},
+		Column{Name: "sym", Data: NewSymbols([]string{"a", "b", "c", "d", "e", "f", "g"})},
+	)
+	mask := NewBool([]bool{true, true, false, true, false, true, true})
+	filtered, handled, err := TryFilterFrameByBoolMask(frame, mask)
+	if err != nil || !handled {
+		t.Fatalf("TryFilterFrameByBoolMask = %#v,%v,%v; want handled", filtered, handled, err)
+	}
+	qty := mustColumn(t, filtered, "qty")
+	if _, ok := qty.(i64SegmentArray); !ok {
+		t.Fatalf("filtered qty column = %T, want i64SegmentArray", qty)
+	}
+	if got, want := qty.Values(), []any{int64(10), int64(12), int64(16), int64(20), int64(22)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("filtered qty values = %#v, want %#v", got, want)
+	}
+	assertColumnValues(t, filtered, "sym", []any{Symbol("a"), Symbol("b"), Symbol("d"), Symbol("f"), Symbol("g")})
+
+	filteredViaPublicAPI, err := FilterMask(frame, mask)
+	if err != nil {
+		t.Fatalf("FilterMask returned error: %v", err)
+	}
+	if got, want := mustColumn(t, filteredViaPublicAPI, "qty").Values(), qty.Values(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("FilterMask qty values = %#v, want %#v", got, want)
+	}
+}
+
 func TestTryTypedAmendIndexesI64(t *testing.T) {
 	values := takeRepeatMust(t, NewI64([]int64{0}), 6)
 	amended, handled, err := TryTypedAmendIndexes(values, []int{1, 4}, []any{int64(10), int64(20)})

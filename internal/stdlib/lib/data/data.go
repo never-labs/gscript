@@ -2150,6 +2150,10 @@ func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
 	switch a := mask.(type) {
 	case attributedArray:
 		return typedWhereMaskIndexArray(a.array)
+	case columnArray[bool]:
+		return boolMaskIndexArray(a.data), true, nil
+	case nullableArray:
+		return nullableBoolMaskIndexArray(a)
 	case i64RangeCompareMask:
 		return i64RangeCompareMaskIndexArray(a)
 	case i64SegmentCompareMask:
@@ -2161,6 +2165,60 @@ func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+func boolMaskIndexArray(mask []bool) Array {
+	segments := make([]i64RangeArray, 0)
+	for row := 0; row < len(mask); {
+		if !mask[row] {
+			row++
+			continue
+		}
+		start := row
+		row++
+		for row < len(mask) && mask[row] {
+			row++
+		}
+		segments = append(segments, i64RangeArray{start: int64(start), step: 1, len: row - start})
+	}
+	return newI64SegmentArray(segments...)
+}
+
+func nullableBoolMaskIndexArray(mask nullableArray) (Array, bool, error) {
+	segments := make([]i64RangeArray, 0)
+	for row := 0; row < len(mask.data); {
+		value := mask.data[row]
+		if IsNull(value) {
+			row++
+			continue
+		}
+		keep, ok := value.(bool)
+		if !ok {
+			return nil, true, fmt.Errorf("where mask row %d is %T, want bool", row, value)
+		}
+		if !keep {
+			row++
+			continue
+		}
+		start := row
+		row++
+		for row < len(mask.data) {
+			value = mask.data[row]
+			if IsNull(value) {
+				break
+			}
+			keep, ok = value.(bool)
+			if !ok {
+				return nil, true, fmt.Errorf("where mask row %d is %T, want bool", row, value)
+			}
+			if !keep {
+				break
+			}
+			row++
+		}
+		segments = append(segments, i64RangeArray{start: int64(start), step: 1, len: row - start})
+	}
+	return newI64SegmentArray(segments...), true, nil
 }
 
 func boolLogicalMaskIndexArray(mask boolLogicalMask) (Array, bool, error) {
@@ -4478,11 +4536,34 @@ func FilterMask(frame Frame, mask Array) (Frame, error) {
 	if mask.Len() != frame.Len() {
 		return Frame{}, fmt.Errorf("filter mask length %d does not match frame length %d", mask.Len(), frame.Len())
 	}
+	if out, handled, err := TryFilterFrameByBoolMask(frame, mask); handled || err != nil {
+		return out, err
+	}
 	indexes, err := WhereMask(mask)
 	if err != nil {
 		return Frame{}, err
 	}
 	return frame.Gather(indexes)
+}
+
+// TryFilterFrameByBoolMask filters frame rows through typed mask and gather
+// primitives, preserving lazy index/range views when the mask can be lowered to
+// a typed i64 index vector.
+func TryFilterFrameByBoolMask(frame Frame, mask Array) (Frame, bool, error) {
+	if mask == nil {
+		return Frame{}, true, fmt.Errorf("filter mask is nil")
+	}
+	if mask.Kind() != KindBool {
+		return Frame{}, true, fmt.Errorf("filter mask kind is %s, want %s", mask.Kind(), KindBool)
+	}
+	if mask.Len() != frame.Len() {
+		return Frame{}, true, fmt.Errorf("filter mask length %d does not match frame length %d", mask.Len(), frame.Len())
+	}
+	indexes, handled, err := TryTypedWhereMaskI64(mask)
+	if err != nil || !handled {
+		return Frame{}, handled, err
+	}
+	return TryGatherFrameByI64IndexArray(frame, indexes)
 }
 
 func BucketFloor(array Array, interval any) (Array, error) {
