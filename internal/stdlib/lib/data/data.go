@@ -7884,12 +7884,12 @@ const (
 	// OpIDiv is q integer `div`: floor division over integer operands.
 	OpIDiv Op = "div"
 	OpMod  Op = "mod"
-	OpEQ  Op = "="
-	OpNE  Op = "!="
-	OpLT  Op = "<"
-	OpLE  Op = "<="
-	OpGT  Op = ">"
-	OpGE  Op = ">="
+	OpEQ   Op = "="
+	OpNE   Op = "!="
+	OpLT   Op = "<"
+	OpLE   Op = "<="
+	OpGT   Op = ">"
+	OpGE   Op = ">="
 )
 
 type Binary struct {
