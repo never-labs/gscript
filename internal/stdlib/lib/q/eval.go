@@ -917,6 +917,10 @@ type qScriptStatement struct {
 	valueExpr   Expr
 	bindingPlan qScriptBindingPlan
 	fastPlan    qEvalFastPlan
+	// compareIdxProbe memoizes whether the compare-index-stats assignment
+	// fast path applies to this statement: 0 unknown, 1 keep probing,
+	// 2 skip (probe declined once; the standard eval path stays correct).
+	compareIdxProbe uint8
 }
 
 type qEvalFastPlanKind uint8
@@ -1466,10 +1470,15 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 			return nil, err
 		}
 	}
-	if !handled && stmt.assign != "" {
+	if !handled && stmt.assign != "" && stmt.compareIdxProbe != 2 {
 		v, handled, err = s.tryEvalCompareIndexStatsAssignment(target)
 		if err != nil {
 			return nil, err
+		}
+		if handled {
+			stmt.compareIdxProbe = 1
+		} else if stmt.compareIdxProbe == 0 {
+			stmt.compareIdxProbe = 2
 		}
 	}
 	if !handled {

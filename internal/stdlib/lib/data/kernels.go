@@ -997,6 +997,16 @@ func TryTypedTrueCount(mask Array) (int64, bool, error) {
 		}
 		return count, true, nil
 	default:
+		if values, owned, ok := tryBulkBoolValues(mask); ok {
+			var count int64
+			for _, keep := range values {
+				if keep {
+					count++
+				}
+			}
+			bulkBoolRelease(values, owned)
+			return count, true, nil
+		}
 		return 0, false, nil
 	}
 }
@@ -2392,12 +2402,56 @@ func newF64NumericArrayProducer(array Array) (f64NumericProducer, error) {
 			return nil, err
 		}
 		return producer, nil
+	case castF32Array:
+		inner, err := newF64NumericArrayProducer(a.source)
+		if err != nil {
+			return nil, err
+		}
+		return f64CastF32Producer{source: inner}, nil
+	case castI64Array:
+		inner, err := newF64NumericArrayProducer(a.source)
+		if err != nil {
+			return nil, err
+		}
+		return f64CastI64Producer{source: inner}, nil
 	default:
 		if !isNumericArray(array) {
 			return nil, fmt.Errorf("typed numeric producer operand is %s, want numeric", array.Kind())
 		}
 		return f64ArrayProducer{array: array}, nil
 	}
+}
+
+// f64CastF32Producer streams a lazy `real$` view: source values rounded
+// through float32.
+type f64CastF32Producer struct {
+	source f64NumericProducer
+}
+
+func (p f64CastF32Producer) Len() int { return p.source.Len() }
+
+func (p f64CastF32Producer) f64At(row int) (float64, bool, error) {
+	value, ok, err := p.source.f64At(row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return float64(float32(value)), true, nil
+}
+
+// f64CastI64Producer streams a lazy integer cast view: source values
+// truncated toward zero.
+type f64CastI64Producer struct {
+	source f64NumericProducer
+}
+
+func (p f64CastI64Producer) Len() int { return p.source.Len() }
+
+func (p f64CastI64Producer) f64At(row int) (float64, bool, error) {
+	value, ok, err := p.source.f64At(row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return float64(int64(value)), true, nil
 }
 
 func (p f64NullProducer) Len() int { return p.len }
@@ -3933,12 +3987,21 @@ func numericMinMaxOperandAt(value any, row int, length int) (float64, bool, erro
 func tryTypedCastBulk(kind Kind, array Array) (Array, bool, error) {
 	switch kind {
 	case KindI16, KindI32, KindI64:
+		if kind == KindI64 && array.Kind() == KindI64 && castLazyNumericSource(array) {
+			// Identity cast over an immutable null-free integer carrier.
+			return array, true, nil
+		}
 		if values, owned, ok := tryBulkI64Values(array); ok {
 			out, handled, err := castBulkI64Values(kind, values)
 			bulkI64Release(values, owned)
 			return out, handled, err
 		}
 		if !isIntegerArray(array) {
+			if kind == KindI64 && castLazyNumericSource(array) {
+				if out, handled := tryLazyCastI64(array); handled {
+					return out, true, nil
+				}
+			}
 			if values, owned, ok := tryBulkF64Values(array); ok {
 				truncated := bulkI64Get(len(values))
 				for i, value := range values {
@@ -3956,6 +4019,24 @@ func tryTypedCastBulk(kind Kind, array Array) (Array, bool, error) {
 			}
 		}
 		return nil, false, nil
+	case KindF32:
+		if array.Kind() == KindF32 && castLazyNumericSource(array) {
+			return array, true, nil
+		}
+		if castLazyNumericSource(array) {
+			if out, handled := tryLazyCastF32(array); handled {
+				return out, true, nil
+			}
+		}
+		if values, owned, ok := tryBulkF64Values(array); ok {
+			out := make([]float32, len(values))
+			for i, value := range values {
+				out[i] = float32(value)
+			}
+			bulkF64Release(values, owned)
+			return columnArray[float32]{kind: KindF32, data: out}, true, nil
+		}
+		return nil, false, nil
 	case KindF64:
 		if _, ok := asI64RangeArray(array); ok {
 			return nil, false, nil
@@ -3970,6 +4051,53 @@ func tryTypedCastBulk(kind Kind, array Array) (Array, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+// castLazyNumericSource reports whether array is an immutable, null-free
+// numeric carrier that is cheap to re-stream, making it safe to wrap in a
+// lazy cast view instead of materializing a fresh column.
+func castLazyNumericSource(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return castLazyNumericSource(a.array)
+	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
+		columnArray[float32], columnArray[float64],
+		i64RangeArray, f64RangeArray, castF32Array, castI64Array:
+		return true
+	case i64ScalarDyadicArray:
+		return castLazyNumericSource(a.source)
+	default:
+		return false
+	}
+}
+
+// tryLazyCastF32 confirms the source streams through the bulk flatteners
+// (boxed nulls bail out, keeping the eager fallback semantics) and returns a
+// lazy `real$` view.
+func tryLazyCastF32(array Array) (Array, bool) {
+	values, owned, ok := tryBulkF64Values(array)
+	if !ok {
+		return nil, false
+	}
+	bulkF64Release(values, owned)
+	return castF32Array{source: array}, true
+}
+
+// tryLazyCastI64 validates a float carrier once (preserving eager `long$`
+// error and fallback semantics) and returns a lazy i64 cast view on success.
+func tryLazyCastI64(array Array) (Array, bool) {
+	values, owned, ok := tryBulkF64Values(array)
+	if !ok {
+		return nil, false
+	}
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
+			bulkF64Release(values, owned)
+			return nil, false
+		}
+	}
+	bulkF64Release(values, owned)
+	return castI64Array{source: array}, true
 }
 
 func castBulkI64Values(kind Kind, values []int64) (Array, bool, error) {
@@ -6353,6 +6481,14 @@ func numericSumValueByAccess(array Array) (any, bool, error) {
 		return nil, false, nil
 	}
 	if isIntegerArray(array) {
+		if values, owned, ok := tryBulkI64Values(array); ok {
+			var total int64
+			for _, value := range values {
+				total += value
+			}
+			bulkI64Release(values, owned)
+			return total, true, nil
+		}
 		var total int64
 		for row := 0; row < array.Len(); row++ {
 			value, ok, err := integerArrayAt(array, row)
@@ -6366,6 +6502,14 @@ func numericSumValueByAccess(array Array) (any, bool, error) {
 		return total, true, nil
 	}
 	if isNumericArray(array) {
+		if values, owned, ok := tryBulkF64Values(array); ok {
+			var total float64
+			for _, value := range values {
+				total += value
+			}
+			bulkF64Release(values, owned)
+			return total, true, nil
+		}
 		var total float64
 		for row := 0; row < array.Len(); row++ {
 			value, ok, err := typedKernels.NumericAt(array, row)
@@ -9710,6 +9854,14 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return a.f64At(row)
 	case f64BucketArray:
 		return a.f64At(row)
+	case castF32Array:
+		return a.f64At(row)
+	case castI64Array:
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		return float64(value), true, nil
 	case f64FillArray:
 		return a.valueAt(row)
 	case i64RunningSumArray:
@@ -9846,6 +9998,7 @@ func isNumericArray(array Array) bool {
 		columnArray[float32], columnArray[float64], i64RangeArray, f64RangeArray,
 		i64RunningSumArray, f64RunningSumArray, i64SegmentArray, i64ProductArray,
 		i64ScalarDyadicArray, i64ScalarDyadicRunningSumArray, f64NumericDyadicArray,
+		castF32Array, castI64Array,
 		qRatiosArray, i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray, fbyF64BroadcastArray, fbyF64TiledBroadcastArray:
 		return true
@@ -10333,6 +10486,8 @@ func isIntegerArray(array Array) bool {
 		return true
 	case i64ScalarDyadicRunningSumArray:
 		return true
+	case castI64Array:
+		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		i64RangeArray, i64RunningSumArray, i64SegmentArray, i64PeriodicIndexArray, i64ProductArray, i64BucketArray, i64XrankArray, i64FillArray,
@@ -10379,6 +10534,8 @@ func isDenseIntegerArray(array Array) bool {
 	case i64ScalarDyadicArray:
 		return true
 	case i64ScalarDyadicRunningSumArray:
+		return true
+	case castI64Array:
 		return true
 	case columnArray[int8], columnArray[int16], columnArray[int32], columnArray[int64],
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
@@ -10433,6 +10590,8 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 		}
 		return integerArrayAt(a.source, sourceRow)
 	case i64SparseAmendArray:
+		return a.i64At(row)
+	case castI64Array:
 		return a.i64At(row)
 	case fbyI64BroadcastArray:
 		return a.i64At(row)
@@ -13870,9 +14029,25 @@ func (a f64NumericDyadicArray) f64At(row int) (float64, bool, error) {
 }
 
 func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
+	if values, ok := tryBulkF64NumericDyadicValues(array); ok {
+		var total float64
+		for _, value := range values {
+			total += value
+		}
+		bulkF64Release(values, true)
+		return total, true, nil
+	}
 	producer, err := newF64NumericDyadicProducer(array)
 	if err != nil {
 		return nil, true, err
+	}
+	if values, owned, ok := tryBulkF64ProducerValues(producer); ok {
+		var total float64
+		for _, value := range values {
+			total += value
+		}
+		bulkF64Release(values, owned)
+		return total, true, nil
 	}
 	total, err := f64ProducerSum(producer)
 	if err != nil {
@@ -14059,7 +14234,44 @@ func i64ScalarDyadicSum(array i64ScalarDyadicArray) (any, bool, error) {
 	if out, handled := i64ScalarDyadicWholeRangeSum(array); handled {
 		return out, true, nil
 	}
+	if out, handled, err := i64ScalarDyadicLinearSum(array); handled || err != nil {
+		return out, handled, err
+	}
 	return i64ScalarDyadicRangeSum(array, 0, array.len)
+}
+
+// i64ScalarDyadicLinearSum reduces scalar +, -, and * carriers to one source
+// sum. Two's-complement wrap-around matches per-element evaluation because
+// int64 add/sub/mul are ring operations mod 2^64.
+func i64ScalarDyadicLinearSum(array i64ScalarDyadicArray) (any, bool, error) {
+	switch array.op {
+	case OpAdd, OpSub, OpMul:
+	default:
+		return nil, false, nil
+	}
+	if array.source == nil || array.source.Len() != array.len {
+		return nil, false, nil
+	}
+	value, handled, err := typedKernels.NumericSumValue(array.source)
+	if err != nil || !handled {
+		return nil, false, err
+	}
+	sum, ok := value.(int64)
+	if !ok {
+		return nil, false, nil
+	}
+	n := int64(array.len)
+	switch array.op {
+	case OpAdd:
+		return sum + array.scalar*n, true, nil
+	case OpMul:
+		return sum * array.scalar, true, nil
+	default: // OpSub
+		if array.scalarLeft {
+			return array.scalar*n - sum, true, nil
+		}
+		return sum - array.scalar*n, true, nil
+	}
 }
 
 func i64ScalarDyadicWholeRangeSum(array i64ScalarDyadicArray) (int64, bool) {
@@ -14539,6 +14751,16 @@ func (a boolLogicalMask) trueCount() (int64, bool, error) {
 	if count, ok := a.moduloCompareTrueCount(); ok {
 		return count, true, nil
 	}
+	if values, owned, ok := tryBulkBoolValues(a); ok {
+		var count int64
+		for _, keep := range values {
+			if keep {
+				count++
+			}
+		}
+		bulkBoolRelease(values, owned)
+		return count, true, nil
+	}
 	var count int64
 	for row := 0; row < a.len; row++ {
 		value, ok, err := a.valueAt(row)
@@ -14558,7 +14780,7 @@ func (a boolLogicalMask) rangeCompareTrueCount() (int64, bool) {
 	}
 	left, leftOK := a.left.(i64RangeCompareMask)
 	right, rightOK := a.right.(i64RangeCompareMask)
-	if leftOK && rightOK && sameI64Range(left.values, right.values) && left.values.step == 1 {
+	if leftOK && rightOK && sameI64Range(left.values, right.values) {
 		leftLow, leftHigh, ok := compareMaskValueInterval(left)
 		if !ok {
 			return 0, false
@@ -14748,18 +14970,34 @@ func i64RangeIntervalCount(values i64RangeArray, low, high int64) int64 {
 	if values.len <= 0 || low > high {
 		return 0
 	}
+	step := values.step
+	if step == 0 {
+		if low <= values.start && values.start <= high {
+			return int64(values.len)
+		}
+		return 0
+	}
+	if step < 0 {
+		// A descending range holds the same value multiset as the ascending
+		// range starting at its minimum, so counting is order-insensitive.
+		return i64RangeIntervalCount(i64RangeArray{
+			start: values.start + int64(values.len-1)*step,
+			step:  -step,
+			len:   values.len,
+		}, low, high)
+	}
 	start := values.start
-	last := values.start + int64(values.len-1)
+	last := start + int64(values.len-1)*step
 	if high < start || low > last {
 		return 0
 	}
 	firstRow := int64(0)
 	if low > start {
-		firstRow = low - start
+		firstRow = (low - start + step - 1) / step
 	}
 	lastRow := int64(values.len - 1)
 	if high < last {
-		lastRow = high - start
+		lastRow = (high - start) / step
 	}
 	if lastRow < firstRow {
 		return 0

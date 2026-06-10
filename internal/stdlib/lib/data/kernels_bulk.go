@@ -154,6 +154,17 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		return out, true, true
 	case i64ScalarDyadicArray:
 		return tryBulkI64ScalarDyadicValues(a)
+	case castI64Array:
+		source, sourceOwned, ok := tryBulkF64Values(a.source)
+		if !ok {
+			return tryBulkI64ValuesGeneric(array)
+		}
+		out := bulkI64Get(len(source))
+		for i, v := range source {
+			out[i] = int64(v)
+		}
+		bulkF64Release(source, sourceOwned)
+		return out, true, true
 	case i64BucketArray:
 		if a.width == 0 {
 			return nil, false, false
@@ -335,6 +346,34 @@ func tryBulkF64Values(array Array) (values []float64, owned bool, ok bool) {
 		return tryBulkF64Values(a.array)
 	case columnArray[float64]:
 		return a.data, false, true
+	case columnArray[float32]:
+		out := bulkF64Get(len(a.data))
+		for i, v := range a.data {
+			out[i] = float64(v)
+		}
+		return out, true, true
+	case castF32Array:
+		source, sourceOwned, ok := tryBulkF64Values(a.source)
+		if !ok {
+			return nil, false, false
+		}
+		out := bulkF64Get(len(source))
+		for i, v := range source {
+			out[i] = float64(float32(v))
+		}
+		bulkF64Release(source, sourceOwned)
+		return out, true, true
+	case castI64Array:
+		source, sourceOwned, ok := tryBulkF64Values(a.source)
+		if !ok {
+			return nil, false, false
+		}
+		out := bulkF64Get(len(source))
+		for i, v := range source {
+			out[i] = float64(int64(v))
+		}
+		bulkF64Release(source, sourceOwned)
+		return out, true, true
 	case f64RangeArray:
 		out := bulkF64Get(a.len)
 		for i := range out {
@@ -430,6 +469,28 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 		for i := range out {
 			out[i] = value
 		}
+		return out, true, true
+	case f64CastF32Producer:
+		source, sourceOwned, ok := tryBulkF64ProducerValues(p.source)
+		if !ok {
+			return nil, false, false
+		}
+		out := bulkF64Get(len(source))
+		for i, v := range source {
+			out[i] = float64(float32(v))
+		}
+		bulkF64Release(source, sourceOwned)
+		return out, true, true
+	case f64CastI64Producer:
+		source, sourceOwned, ok := tryBulkF64ProducerValues(p.source)
+		if !ok {
+			return nil, false, false
+		}
+		out := bulkF64Get(len(source))
+		for i, v := range source {
+			out[i] = float64(int64(v))
+		}
+		bulkF64Release(source, sourceOwned)
 		return out, true, true
 	case f64DyadicProducer:
 		left, leftOwned, ok := tryBulkF64ProducerValues(p.left)

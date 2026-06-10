@@ -513,6 +513,21 @@ type f64BucketArray struct {
 	len    int
 }
 
+// castF32Array is an immutable lazy `real$` (f32) cast view over a null-free
+// numeric source carrier. It defers materializing a float32 column per
+// evaluation; consumers stream it through NumericAt or the bulk flatteners
+// with float32 rounding applied per element.
+type castF32Array struct {
+	source Array
+}
+
+// castI64Array is an immutable lazy `long$` cast view over a float source
+// whose values were validated (finite, in int64 range) when the cast was
+// evaluated, preserving eager cast error semantics.
+type castI64Array struct {
+	source Array
+}
+
 type i64XrankArray struct {
 	source      Array
 	bucketCount int64
@@ -960,6 +975,94 @@ func (a f64BucketArray) f64At(row int) (float64, bool, error) {
 		return 0, ok, err
 	}
 	return math.Floor(value/a.width) * a.width, true, nil
+}
+
+func (a castF32Array) Kind() Kind { return KindF32 }
+
+func (a castF32Array) Len() int { return a.source.Len() }
+
+func (a castF32Array) f64At(row int) (float64, bool, error) {
+	value, ok, err := typedKernels.NumericAt(a.source, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return float64(float32(value)), true, nil
+}
+
+func (a castF32Array) At(row int) (any, bool) {
+	value, ok, err := a.f64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return float32(value), true
+}
+
+func (a castF32Array) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.f64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data cast f32 row %d out of range", row))
+		}
+		out[row] = float32(value)
+	}
+	return out
+}
+
+func (a castF32Array) Gather(indexes []int) Array {
+	out := make([]float32, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.f64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data cast f32 gather row %d out of range", row))
+		}
+		out[i] = float32(value)
+	}
+	return columnArray[float32]{kind: KindF32, data: out}
+}
+
+func (a castI64Array) Kind() Kind { return KindI64 }
+
+func (a castI64Array) Len() int { return a.source.Len() }
+
+func (a castI64Array) i64At(row int) (int64, bool, error) {
+	value, ok, err := typedKernels.NumericAt(a.source, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	return int64(value), true, nil
+}
+
+func (a castI64Array) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a castI64Array) Values() []any {
+	out := make([]any, a.Len())
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data cast i64 row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a castI64Array) Gather(indexes []int) Array {
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data cast i64 gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
 }
 
 func (a i64XrankArray) Kind() Kind { return KindI64 }
@@ -2580,11 +2683,39 @@ func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int
 		return compareTiledIndexStats(a, op, value)
 	case i64ScalarDyadicArray:
 		return compareScalarDyadicIndexStats(a, op, value)
-	case indexedArray, nullableArray:
+	case indexedArray:
+		// A reversal permutation maps row -> len-1-row, so compare stats can
+		// be derived from the source stats: counts match and selected row
+		// indexes mirror around the midpoint.
+		if isReversalIndexedArray(a) {
+			count, sum, handled, err := TryTypedCompareIndexStatsI64(a.source, op, value)
+			if err != nil || !handled {
+				if err != nil {
+					return 0, 0, handled, err
+				}
+				return typedCompareCarrierIndexStatsI64(a, op, value)
+			}
+			return count, count*int64(a.len-1) - sum, true, nil
+		}
+		return typedCompareCarrierIndexStatsI64(a, op, value)
+	case nullableArray:
 		return typedCompareCarrierIndexStatsI64(a, op, value)
 	default:
 		return typedCompareIndexStatsI64(a, op, value)
 	}
+}
+
+// isReversalIndexedArray reports whether array is a full-length descending
+// reindex of its source (the canonical `reverse` carrier).
+func isReversalIndexedArray(array indexedArray) bool {
+	indexes, ok := array.indexes.(i64RangeArray)
+	if !ok {
+		return false
+	}
+	return indexes.len == array.len &&
+		array.source.Len() == array.len &&
+		indexes.step == -1 &&
+		indexes.start == int64(array.len-1)
 }
 
 // TryTypedCompareCount returns the number of rows selected by an array/scalar
@@ -2677,6 +2808,17 @@ func TryTypedWithinIndexStatsI64(array Array, low, high any, highClosed bool) (c
 	case attributedArray:
 		return TryTypedWithinIndexStatsI64(a.array, low, high, highClosed)
 	case indexedArray:
+		// Reversal permutations preserve the selected multiset; row indexes
+		// mirror around the midpoint (see TryTypedCompareIndexStatsI64).
+		if isReversalIndexedArray(a) {
+			count, sum, handled, err := TryTypedWithinIndexStatsI64(a.source, low, high, highClosed)
+			if err == nil && handled {
+				return count, count*int64(a.len-1) - sum, true, nil
+			}
+			if err != nil {
+				return 0, 0, handled, err
+			}
+		}
 		return typedWithinIndexedIndexStatsI64(a, low, high, highClosed)
 	case i64BucketArray:
 		return withinI64BucketIndexStats(a, low, high, highClosed)
@@ -2846,6 +2988,16 @@ func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, b
 	target, ok := coerceInt64Exact(value)
 	if !ok {
 		return nil, false, nil
+	}
+	if flat, owned, ok := TryBulkI64(values); ok && len(flat) == values.len {
+		out := make([]int64, 0)
+		for row, item := range flat {
+			if boolCompare(op, item == target, compareInt64(item, target)) {
+				out = append(out, int64(row))
+			}
+		}
+		BulkI64Release(flat, owned)
+		return newI64Trusted(out), true, nil
 	}
 	out := make([]int64, 0)
 	for row := 0; row < values.len; row++ {
@@ -3748,6 +3900,49 @@ func TryTypedAmendIndexes(array Array, indexes []int, values []any) (Array, bool
 	}
 }
 
+// amendI64SourceCopy materializes the amend source into a fresh dense []int64,
+// using the bulk flatteners when the carrier supports them.
+func amendI64SourceCopy(array Array) ([]int64, bool, error) {
+	out := make([]int64, array.Len())
+	if values, owned, ok := TryBulkI64(array); ok && len(values) == len(out) {
+		copy(out, values)
+		BulkI64Release(values, owned)
+		return out, true, nil
+	}
+	for row := range out {
+		value, ok, err := integerArrayAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		out[row] = value
+	}
+	return out, true, nil
+}
+
+// amendF64SourceCopy is the float64 sibling of amendI64SourceCopy.
+func amendF64SourceCopy(array Array) ([]float64, bool, error) {
+	out := make([]float64, array.Len())
+	if values, owned, ok := TryBulkF64(array); ok && len(values) == len(out) {
+		copy(out, values)
+		BulkF64Release(values, owned)
+		return out, true, nil
+	}
+	for row := range out {
+		value, ok, err := typedAmendAddF64ArrayAt(array, row)
+		if err != nil {
+			return nil, true, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		out[row] = value
+	}
+	return out, true, nil
+}
+
 // TryTypedAmendAddIndexes applies @[array; indexes; +; values] as a typed
 // indexed accumulation. Repeated indexes are accumulated in q order.
 func TryTypedAmendAddIndexes(array Array, indexes []int, values any) (Array, bool, error) {
@@ -3759,16 +3954,9 @@ func TryTypedAmendAddIndexes(array Array, indexes []int, values any) (Array, boo
 		if out, ok, err := tryTypedSparseI64AmendAdd(array, indexes, values); ok || err != nil {
 			return out, ok, err
 		}
-		out := make([]int64, array.Len())
-		for row := range out {
-			value, ok, err := integerArrayAt(array, row)
-			if err != nil {
-				return nil, true, err
-			}
-			if !ok {
-				return nil, false, nil
-			}
-			out[row] = value
+		out, ok, err := amendI64SourceCopy(array)
+		if err != nil || !ok {
+			return nil, ok, err
 		}
 		for row, index := range indexes {
 			if index < 0 || index >= len(out) {
@@ -3785,16 +3973,9 @@ func TryTypedAmendAddIndexes(array Array, indexes []int, values any) (Array, boo
 		}
 		return newI64Trusted(out), true, nil
 	case KindF64:
-		out := make([]float64, array.Len())
-		for row := range out {
-			value, ok, err := typedAmendAddF64ArrayAt(array, row)
-			if err != nil {
-				return nil, true, err
-			}
-			if !ok {
-				return nil, false, nil
-			}
-			out[row] = value
+		out, ok, err := amendF64SourceCopy(array)
+		if err != nil || !ok {
+			return nil, ok, err
 		}
 		for row, index := range indexes {
 			if index < 0 || index >= len(out) {
@@ -3826,16 +4007,14 @@ func TryTypedAmendAddIndexArray(array Array, indexes Array, values any) (Array, 
 	}
 	switch array.Kind() {
 	case KindI64:
-		out := make([]int64, array.Len())
-		for row := range out {
-			value, ok, err := integerArrayAt(array, row)
-			if err != nil {
-				return nil, true, err
+		if idx, ok := trySmallAmendIndexes(indexes); ok {
+			if out, handled, err := tryTypedSparseI64AmendAdd(array, idx, values); handled || err != nil {
+				return out, handled, err
 			}
-			if !ok {
-				return nil, false, nil
-			}
-			out[row] = value
+		}
+		out, ok, err := amendI64SourceCopy(array)
+		if err != nil || !ok {
+			return nil, ok, err
 		}
 		for row := 0; row < indexes.Len(); row++ {
 			index, ok, err := i64IndexArrayAt(indexes, row)
@@ -3859,16 +4038,9 @@ func TryTypedAmendAddIndexArray(array Array, indexes Array, values any) (Array, 
 		}
 		return newI64Trusted(out), true, nil
 	case KindF64:
-		out := make([]float64, array.Len())
-		for row := range out {
-			value, ok, err := typedAmendAddF64ArrayAt(array, row)
-			if err != nil {
-				return nil, true, err
-			}
-			if !ok {
-				return nil, false, nil
-			}
-			out[row] = value
+		out, ok, err := amendF64SourceCopy(array)
+		if err != nil || !ok {
+			return nil, ok, err
 		}
 		for row := 0; row < indexes.Len(); row++ {
 			index, ok, err := i64IndexArrayAt(indexes, row)
@@ -3896,8 +4068,27 @@ func TryTypedAmendAddIndexArray(array Array, indexes Array, values any) (Array, 
 	}
 }
 
+const maxSparseAmendAddIndexes = 256
+
+// trySmallAmendIndexes lowers an index vector to []int when it is small
+// enough for the sparse amend representation.
+func trySmallAmendIndexes(indexes Array) ([]int, bool) {
+	n := indexes.Len()
+	if n == 0 || n > maxSparseAmendAddIndexes {
+		return nil, false
+	}
+	out := make([]int, n)
+	for row := 0; row < n; row++ {
+		value, ok, err := i64IndexArrayAt(indexes, row)
+		if err != nil || !ok {
+			return nil, false
+		}
+		out[row] = value
+	}
+	return out, true
+}
+
 func tryTypedSparseI64AmendAdd(array Array, indexes []int, values any) (Array, bool, error) {
-	const maxSparseAmendAddIndexes = 256
 	if !isDenseIntegerArray(array) || len(indexes) == 0 || len(indexes) > maxSparseAmendAddIndexes || len(indexes)*4 > array.Len() {
 		return nil, false, nil
 	}
