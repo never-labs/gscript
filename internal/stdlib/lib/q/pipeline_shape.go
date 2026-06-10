@@ -283,6 +283,49 @@ func qPipelineShapePlan(kind qPipelineKind, variant string) qPipelinePlan {
 	}
 }
 
+func qNormalizePipelinePlan(plan qPipelinePlan) qPipelinePlan {
+	plan = qPipelinePlanWithShapeSpec(plan)
+	plan.operands = plan.operands[:0]
+	qAddPipelineOperand(&plan, qPipelineOperandValue, plan.valueExpr, &plan.valuePlan)
+	qAddPipelineOperand(&plan, qPipelineOperandIndex, plan.indexExpr, &plan.indexPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandMask, plan.maskExpr, &plan.maskPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandLeft, plan.leftExpr, &plan.leftPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandRight, plan.rightExpr, &plan.rightPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandMod, plan.modExpr, &plan.modPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandModulus, plan.modulusExpr, &plan.modulusPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandModTarget, plan.modTargetExpr, &plan.modTargetPlan)
+	qAddPipelineOperand(&plan, qPipelineOperandReduction, plan.reductionInput, &plan.reductionPlan)
+	for i := range plan.castTerms {
+		if plan.castTerms[i].valueExpr != "" {
+			plan.castTerms[i].valuePlan = buildQPipelineBindingPlan(plan.castTerms[i].valueExpr)
+		}
+	}
+	if plan.maskExpr != "" {
+		if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
+			plan.moduloMaskPlan = &modPlan
+		}
+	}
+	return plan
+}
+
+func qPipelinePlanWithShapeSpec(plan qPipelinePlan) qPipelinePlan {
+	if !plan.shapeSpec.valid() {
+		if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.shapeVariant()); ok && (plan.shape == "" || plan.shape == spec.ID) {
+			plan.shapeSpec = spec
+			plan.shape = spec.ID
+		}
+	}
+	return plan
+}
+
+func qAddPipelineOperand(plan *qPipelinePlan, role qPipelineOperandRole, expr string, dst *qScriptBindingPlan) {
+	if expr == "" {
+		return
+	}
+	*dst = buildQPipelineBindingPlan(expr)
+	plan.operands = append(plan.operands, qPipelineOperandPlan{role: role, expr: expr, plan: *dst})
+}
+
 func qPipelinePlanShapeSpec(plan qPipelinePlan) qPipelineShapeSpec {
 	if plan.shapeSpec.valid() {
 		return plan.shapeSpec

@@ -1001,58 +1001,7 @@ func qPipelineRunningScanInput(src string) (scan, arg string, ok bool) {
 }
 
 func qPipelinePlanWithBindingPlans(plan qPipelinePlan) qPipelinePlan {
-	if !plan.shapeSpec.valid() {
-		if spec, ok := qPipelineShapeSpecForPlan(plan.kind, plan.shapeVariant()); ok && (plan.shape == "" || plan.shape == spec.ID) {
-			plan.shapeSpec = spec
-			plan.shape = spec.ID
-		}
-	}
-	if plan.valueExpr != "" {
-		plan.valuePlan = buildQPipelineBindingPlan(plan.valueExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandValue, expr: plan.valueExpr, plan: plan.valuePlan})
-	}
-	if plan.indexExpr != "" {
-		plan.indexPlan = buildQPipelineBindingPlan(plan.indexExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandIndex, expr: plan.indexExpr, plan: plan.indexPlan})
-	}
-	if plan.maskExpr != "" {
-		plan.maskPlan = buildQPipelineBindingPlan(plan.maskExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandMask, expr: plan.maskExpr, plan: plan.maskPlan})
-		if modPlan, ok := qPipelineModuloComparePlanFromMask(plan.maskExpr); ok {
-			plan.moduloMaskPlan = &modPlan
-		}
-	}
-	if plan.leftExpr != "" {
-		plan.leftPlan = buildQPipelineBindingPlan(plan.leftExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandLeft, expr: plan.leftExpr, plan: plan.leftPlan})
-	}
-	if plan.rightExpr != "" {
-		plan.rightPlan = buildQPipelineBindingPlan(plan.rightExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandRight, expr: plan.rightExpr, plan: plan.rightPlan})
-	}
-	if plan.modExpr != "" {
-		plan.modPlan = buildQPipelineBindingPlan(plan.modExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandMod, expr: plan.modExpr, plan: plan.modPlan})
-	}
-	if plan.modulusExpr != "" {
-		plan.modulusPlan = buildQPipelineBindingPlan(plan.modulusExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandModulus, expr: plan.modulusExpr, plan: plan.modulusPlan})
-	}
-	if plan.modTargetExpr != "" {
-		plan.modTargetPlan = buildQPipelineBindingPlan(plan.modTargetExpr)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandModTarget, expr: plan.modTargetExpr, plan: plan.modTargetPlan})
-	}
-	if plan.reductionInput != "" {
-		plan.reductionPlan = buildQPipelineBindingPlan(plan.reductionInput)
-		plan.operands = append(plan.operands, qPipelineOperandPlan{role: qPipelineOperandReduction, expr: plan.reductionInput, plan: plan.reductionPlan})
-	}
-	for i := range plan.castTerms {
-		if plan.castTerms[i].valueExpr == "" {
-			continue
-		}
-		plan.castTerms[i].valuePlan = buildQPipelineBindingPlan(plan.castTerms[i].valueExpr)
-	}
-	return plan
+	return qNormalizePipelinePlan(plan)
 }
 
 func buildQPipelineBindingPlan(src string) qScriptBindingPlan {

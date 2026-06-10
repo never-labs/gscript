@@ -203,6 +203,26 @@ func TestQPipelineModuloComparePlanFromMask(t *testing.T) {
 	}
 }
 
+func TestQPipelinePlanNormalizeIsIdempotent(t *testing.T) {
+	plan := qPipelinePlanWithBindingPlans(qPipelinePlan{
+		kind:      qPipelineSumWhereIndex,
+		shape:     "where-index-reduce/sum",
+		valueExpr: "y",
+		indexExpr: "idx",
+		maskExpr:  "(x mod 3)=0",
+	})
+	plan = qPipelinePlanWithBindingPlans(plan)
+	if got, want := len(plan.operands), 3; got != want {
+		t.Fatalf("operand count after repeated normalize = %d, want %d; plan=%#v", got, want, plan)
+	}
+	if plan.moduloMaskPlan == nil || plan.moduloMaskPlan.modPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("normalized modulo mask sub-plan missing or unbound: %#v", plan.moduloMaskPlan)
+	}
+	if plan.stableShape() != "where-index-reduce/sum" || plan.stablePipelineShape() != "mask_reduce" {
+		t.Fatalf("stable shape after normalize = %q/%q", plan.stableShape(), plan.stablePipelineShape())
+	}
+}
+
 func TestQPipelinePlanCachesBoundModuloMaskPlan(t *testing.T) {
 	state := NewEvalState(nil)
 	plan := state.qPipelinePlan("+/y[where (x mod 3)=0]")
@@ -983,6 +1003,26 @@ func TestQScriptPipelineCachesBoundModuloMaskPlan(t *testing.T) {
 	}
 	if len(d.assignments) == 0 || !qScriptPipelineCanDeferAssignment(d, d.assignments[len(d.assignments)-1]) {
 		t.Fatalf("script pipeline did not use cached modulo sub-plan for deferred assignment: %#v", d.assignments)
+	}
+}
+
+func TestQScriptPipelineDescriptorRestoreNormalizesTerminalPlan(t *testing.T) {
+	descriptor, ok := DescribeEvalPipeline("x:til 12;y:x*2;idx:where (x mod 3)=0;+/y[idx]")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize script pipeline")
+	}
+	restored, ok := qScriptPipelineDescriptorFromEvalDescriptor(descriptor)
+	if !ok {
+		t.Fatalf("qScriptPipelineDescriptorFromEvalDescriptor failed")
+	}
+	if restored.terminalPlan.kind != qPipelineSumWhereIndex {
+		t.Fatalf("restored terminal plan kind = %v, want qPipelineSumWhereIndex", restored.terminalPlan.kind)
+	}
+	if restored.terminalPlan.moduloMaskPlan == nil || restored.terminalPlan.moduloMaskPlan.modPlan.kind == qScriptBindingInvalid {
+		t.Fatalf("restored terminal modulo sub-plan missing or unbound: %#v", restored.terminalPlan.moduloMaskPlan)
+	}
+	if restored.shape() != descriptor.Shape {
+		t.Fatalf("restored shape = %q, want %q", restored.shape(), descriptor.Shape)
 	}
 }
 

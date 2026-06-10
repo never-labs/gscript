@@ -136,6 +136,13 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.assignments = assignments
 	descriptor.terminal = terminal.src
 	descriptor.terminalPlan = buildQPipelinePlan(terminal.src)
+	descriptor.sequenceShapeName = qScriptPipelineSequenceTransformName(descriptor.sequenceSteps)
+	descriptor = qNormalizeScriptPipelineDescriptor(descriptor)
+	return &descriptor, true
+}
+
+func qNormalizeScriptPipelineDescriptor(descriptor qScriptPipelineDescriptor) qScriptPipelineDescriptor {
+	descriptor.terminalPlan = qScriptPipelineDescriptorTerminalPlan(descriptor)
 	descriptor.valuePlan = buildQScriptBindingPlanForRHS(descriptor.valueExpr, nil)
 	if descriptor.kind == qScriptPipelineCallableOverScanSum && strings.TrimSpace(descriptor.valueBinding) != "" {
 		descriptor.valuePlan = buildQScriptWarmBindingPlan(descriptor.valueBinding, parseCachedValueExpr(descriptor.valueBinding))
@@ -150,7 +157,83 @@ func buildQScriptPipelineDescriptor(statements []qScriptStatement) (*qScriptPipe
 	descriptor.sequenceShapeName = qScriptPipelineSequenceTransformName(descriptor.sequenceSteps)
 	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
 	descriptor.shapeText = descriptor.shape()
-	return &descriptor, true
+	return descriptor
+}
+
+func qScriptPipelineDescriptorTerminalPlan(descriptor qScriptPipelineDescriptor) qPipelinePlan {
+	if descriptor.terminalPlan.kind != qPipelineInvalid {
+		return qPipelinePlanWithBindingPlans(descriptor.terminalPlan)
+	}
+	switch descriptor.kind {
+	case qScriptPipelineApplyScalarAt:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyScalarIndex,
+			shape:     "apply-index/scalar-at",
+			compareOp: "at",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+		})
+	case qScriptPipelineApplyGatherAt:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyGatherIndex,
+			shape:     "apply-index/gather-at",
+			compareOp: "at",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+		})
+	case qScriptPipelineApplyScalarDot:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyScalarIndex,
+			shape:     "apply-index/scalar-dot",
+			compareOp: "dot",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+		})
+	case qScriptPipelineApplyPathDot:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineApplyScalarIndex,
+			shape:     "apply-index/path-dot",
+			compareOp: "dot",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+		})
+	case qScriptPipelineWhereIndexReduceSum:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineSumWhereIndex,
+			shape:     "where-index-reduce/sum",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+			maskExpr:  descriptor.maskExpr,
+		})
+	case qScriptPipelineWhereReduceSum:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineSumWhereMask,
+			shape:     "where-reduce/sum",
+			valueExpr: descriptor.valueExpr,
+			maskExpr:  descriptor.maskExpr,
+		})
+	case qScriptPipelineGatherReduceSum:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineSumGatherIndexes,
+			shape:     "gather-reduce/sum",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+		})
+	case qScriptPipelineGatherReduceSumCount:
+		return qPipelinePlanWithBindingPlans(qPipelinePlan{
+			kind:      qPipelineSumGatherIndexes,
+			shape:     "gather-reduce/sum-count",
+			valueExpr: descriptor.valueExpr,
+			indexExpr: descriptor.indexExpr,
+		})
+	default:
+		if strings.TrimSpace(descriptor.terminal) != "" {
+			if plan := buildQPipelinePlan(descriptor.terminal); plan.kind != qPipelineInvalid {
+				return plan
+			}
+		}
+		return qPipelinePlan{}
+	}
 }
 
 func describeQScriptPipelineTerminal(src string, bindings map[string]string) (qScriptPipelineDescriptor, bool) {

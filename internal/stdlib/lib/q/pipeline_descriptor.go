@@ -641,12 +641,6 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineSequenceSumCount
 	case strings.Contains(shape, "gather-reduce/sum-count"):
 		out.kind = qScriptPipelineGatherReduceSumCount
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineSumGatherIndexes,
-			shape:     "gather-reduce/sum-count",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-		})
 	case strings.Contains(shape, "multi-reduce/sum-plus-dyadic-float-sum"):
 		out.kind = qScriptPipelineSumPlusDyadicFloat
 	case strings.Contains(shape, "multi-reduce/integer-divmod-sum-count"):
@@ -670,84 +664,25 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 		out.kind = qScriptPipelineStringJoinCounts
 	case strings.Contains(shape, "apply-index/scalar-at"):
 		out.kind = qScriptPipelineApplyScalarAt
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineApplyScalarIndex,
-			shape:     "apply-index/scalar-at",
-			compareOp: "at",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-		})
 	case strings.Contains(shape, "apply-index/gather-at"):
 		out.kind = qScriptPipelineApplyGatherAt
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineApplyGatherIndex,
-			shape:     "apply-index/gather-at",
-			compareOp: "at",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-		})
 	case strings.Contains(shape, "apply-index/scalar-dot"):
 		out.kind = qScriptPipelineApplyScalarDot
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineApplyScalarIndex,
-			shape:     "apply-index/scalar-dot",
-			compareOp: "dot",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-		})
 	case strings.Contains(shape, "apply-index/path-dot"):
 		out.kind = qScriptPipelineApplyPathDot
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineApplyScalarIndex,
-			shape:     "apply-index/path-dot",
-			compareOp: "dot",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-		})
 	case strings.Contains(shape, "where-index-reduce/sum"):
 		out.kind = qScriptPipelineWhereIndexReduceSum
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineSumWhereIndex,
-			shape:     "where-index-reduce/sum",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-			maskExpr:  out.maskExpr,
-		})
 	case strings.Contains(shape, "where-reduce/sum"):
 		out.kind = qScriptPipelineWhereReduceSum
 		out.terminalUsesWhere = true
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineSumWhereMask,
-			shape:     "where-reduce/sum",
-			valueExpr: out.valueExpr,
-			maskExpr:  out.maskExpr,
-		})
 	case strings.Contains(shape, "gather-reduce/sum"):
 		out.kind = qScriptPipelineGatherReduceSum
-		out.terminalPlan = qPipelinePlanWithBindingPlans(qPipelinePlan{
-			kind:      qPipelineSumGatherIndexes,
-			shape:     "gather-reduce/sum",
-			valueExpr: out.valueExpr,
-			indexExpr: out.indexExpr,
-		})
 	default:
 		return qScriptPipelineDescriptor{}, false
-	}
-	out.valuePlan = buildQScriptBindingPlanForRHS(out.valueExpr, nil)
-	if out.kind == qScriptPipelineCallableOverScanSum && strings.TrimSpace(out.valueBinding) != "" {
-		out.valuePlan = buildQScriptWarmBindingPlan(out.valueBinding, parseCachedValueExpr(out.valueBinding))
 	}
 	if out.kind == qScriptPipelineStringJoinCounts {
 		qScriptPipelineHoistStringJoinCounts(&out)
 	}
-	out.indexPlan = buildQScriptBindingPlanForRHS(out.indexExpr, nil)
-	out.maskPlan = buildQScriptBindingPlanForRHS(out.maskExpr, nil)
-	out.rowValuePlan = buildQScriptBindingPlanForRHS(out.rowValueExpr, nil)
-	out.rowIndexPlan = buildQScriptBindingPlanForRHS(out.rowIndexExpr, nil)
-	out.colIndexPlan = buildQScriptBindingPlanForRHS(out.colIndexExpr, nil)
-	out.scalarPlan = buildQScriptBindingPlanForRHS(out.scalarExpr, nil)
-	out.sequenceValuePlan = buildQScriptBindingPlanForRHS(out.sequenceValueExpr, nil)
-	out.moduloMaskPlan = qScriptPipelineModuloMaskPlan(out.maskExpr)
 	if len(descriptor.IntegerTerms) > 0 {
 		out.integerTerms = make([]qScriptPipelineIntegerDivModTerm, 0, len(descriptor.IntegerTerms))
 		for _, term := range descriptor.IntegerTerms {
@@ -766,6 +701,7 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 			})
 		}
 	}
+	out = qNormalizeScriptPipelineDescriptor(out)
 	if len(descriptor.Assignments) > 0 {
 		out.assignments = make([]qScriptPipelineAssignment, 0, len(descriptor.Assignments))
 		for _, assignment := range descriptor.Assignments {
