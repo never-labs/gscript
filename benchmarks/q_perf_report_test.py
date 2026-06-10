@@ -28,6 +28,11 @@ SAMPLE_JIT_SLOW_ROUTE = """
 BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute-16  100  6000 ns/op  256 B/op  6 allocs/op  1 jit_typed_direct_return/op  2 jit_typed_native_exit/op  1 jit_typed_op_exit/op  3 jit_typed_kernel_success/op  1 jit_typed_kernel_errors/op  2 jit_typed_pipeline_shapes
 """
 
+SAMPLE_BRIDGE_HEALTHY = """
+BenchmarkQSessionEvalVectorWarmExecution/BridgeHealthy-16  100  900 ns/op  64 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  3 typed_kernel_attempts/op  3 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  3 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_where_project_reduce
+BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes
+"""
+
 FALLBACK_REPORT_LOG = """
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report cases=2 categories=2 rows=1
     q_eval_vector_bench_test.go:2844: q_pipeline_fallback_report rank=1 category=xbar_within pipeline_shape=bin kernel=ArrayBin reason=unsupported_type outcome=fallback count=3
@@ -234,6 +239,27 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn(("runtime_bridge_direct_call_share_pct", "typed_runtime_and_jit_backend"), failed)
         self.assertIn(("runtime_bridge_allocs_per_direct_call", "typed_runtime_and_jit_backend"), failed)
 
+    def test_runtime_bridge_efficiency_sample_passes_strict_gate(self):
+        rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=99,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=8,
+            max_jit_typed_errors_op=0,
+            max_jit_backend_slow_route_pct=0,
+            min_runtime_direct_bridge_share_pct=100,
+            max_runtime_allocs_per_direct_call=1,
+        )
+        checks = report.build_gate_checks(rows, policy)
+
+        self.assertTrue(checks)
+        self.assertFalse(report.gate_failed(checks))
+        by_signal = {check.signal: check for check in checks}
+        self.assertEqual(by_signal["runtime_bridge_direct_call_share_pct"].value, 100)
+        self.assertEqual(by_signal["runtime_bridge_allocs_per_direct_call"].value, 1)
+
     def test_gate_checks_cover_runtime_health_fallback_and_alloc_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE_WITH_FALLBACK)
         policy = report.GatePolicy(
@@ -329,6 +355,14 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("Runtime Bridge Efficiency", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
+
+    def test_readme_documents_runtime_bridge_regression_gate(self):
+        readme = (Path(__file__).resolve().parent / "README.md").read_text()
+
+        self.assertIn("Runtime Bridge Efficiency", readme)
+        self.assertIn("--min-runtime-direct-bridge-share-pct", readme)
+        self.assertIn("--max-runtime-allocs-per-direct-call", readme)
+        self.assertIn("direct bridge", readme)
 
     def test_main_check_returns_nonzero_for_gate_failures(self):
         with tempfile.TemporaryDirectory() as td:

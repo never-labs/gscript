@@ -226,7 +226,11 @@ python3 benchmarks/q_perf_report.py \
   --min-typed-hit-pct=95 \
   --max-typed-fallbacks-op=0 \
   --max-pipeline-fallback-shapes=0 \
-  --max-allocs-op=64
+  --max-allocs-op=64 \
+  --max-jit-typed-errors-op=0 \
+  --max-jit-backend-slow-route-pct=0 \
+  --min-runtime-direct-bridge-share-pct=95 \
+  --max-runtime-allocs-per-direct-call=32
 ```
 
 For quick iteration on saved `go test -bench` output, skip rerunning benchmarks:
@@ -235,6 +239,54 @@ For quick iteration on saved `go test -bench` output, skip rerunning benchmarks:
 python3 benchmarks/q_perf_report.py \
   --from-output /tmp/qbench.txt \
   --check
+```
+
+### Runtime Bridge Efficiency Gate
+
+The `Runtime Bridge Efficiency` report section is the regression gate for bulk
+bridge and direct bridge work. It rolls up existing q benchmark metrics without
+depending on a specific optimizer implementation:
+
+| Field | Meaning | Regression signal |
+|---|---|---|
+| `direct calls/op` | typed primitive hits plus JIT direct runtime returns | should rise as typed runtime/JIT backend coverage improves |
+| `slow bridge calls/op` | typed fallback/error plus JIT native/op exits/errors | should trend to zero on supported hot paths |
+| `direct call share` | direct calls divided by direct plus slow calls | gate with `--min-runtime-direct-bridge-share-pct` |
+| `allocs/direct call` | average `allocs/op` divided by direct calls/op | gate with `--max-runtime-allocs-per-direct-call` |
+
+Use this stricter gate after bulk export, direct return, executable backend, or
+typed kernel changes:
+
+```bash
+python3 benchmarks/q_perf_report.py \
+  --from-output /tmp/qbench.txt \
+  --check \
+  --min-runtime-direct-bridge-share-pct=95 \
+  --max-runtime-allocs-per-direct-call=32 \
+  --max-jit-backend-slow-route-pct=0 \
+  --max-jit-typed-errors-op=0
+```
+
+For CI or release gating, generate `/tmp/qbench.txt` from the q benchmark
+families first, then feed it to the report:
+
+```bash
+{
+  go test ./internal/stdlib/bind -run '^$' \
+    -bench 'BenchmarkQSQL(Bind|DataRuntime|NativeGo)' \
+    -benchmem -benchtime=100x
+  go test ./benchmarks -run '^$' \
+    -bench 'Benchmark(QEvalVector|QSessionEvalVector|QEvalPipelineNativeExitCallpath)' \
+    -benchmem -benchtime=100x
+} | tee /tmp/qbench.txt
+
+python3 benchmarks/q_perf_report.py \
+  --from-output /tmp/qbench.txt \
+  --check \
+  --min-runtime-direct-bridge-share-pct=95 \
+  --max-runtime-allocs-per-direct-call=32 \
+  --markdown /tmp/q_perf_report.md \
+  --json /tmp/q_perf_report.json
 ```
 
 ## q.eval Vector/List Compute
