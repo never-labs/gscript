@@ -13538,29 +13538,23 @@ func nullValue(v any) (any, error) {
 }
 
 func logicalAnd(left, right any) (any, error) {
-	if out, handled, err := data.TryTypedBoolLogical("and", left, right); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayBoolLogical", "and/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-	} else {
-		recordRuntimeKernelProbe("ArrayBoolLogical", "and/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
+	if out, handled, err := typedBoolLogical("and", left, right); err != nil || handled {
+		return out, err
 	}
 	return applyLogical(left, right, func(a, b bool) bool { return a && b })
 }
 
 func logicalOr(left, right any) (any, error) {
-	if out, handled, err := data.TryTypedBoolLogical("or", left, right); err != nil || handled {
-		recordRuntimeKernelProbe("ArrayBoolLogical", "or/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-	} else {
-		recordRuntimeKernelProbe("ArrayBoolLogical", "or/"+logicalShape(left)+"/"+logicalShape(right), handled, err)
+	if out, handled, err := typedBoolLogical("or", left, right); err != nil || handled {
+		return out, err
 	}
 	return applyLogical(left, right, func(a, b bool) bool { return a || b })
+}
+
+func typedBoolLogical(op string, left, right any) (any, bool, error) {
+	shape := op + "/" + logicalShape(left) + "/" + logicalShape(right)
+	out, handled, err := data.TryTypedBoolLogical(op, left, right)
+	return qTypedRuntimeResultReason("ArrayBoolLogical", shape, RuntimeFallbackUnsupportedType, out, handled, err)
 }
 
 func logicalShape(value any) string {
