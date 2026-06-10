@@ -636,6 +636,30 @@ func TestEvalPipelineExecutablePlanCloneUsesRunnerWithoutPayload(t *testing.T) {
 	}
 }
 
+func TestEvalPipelineExecutablePlanValidatesRunnerMetadata(t *testing.T) {
+	src := "10 20 30 40 where 1010b"
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) failed", src)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
+	}
+	staleKind := EvalPipelineExecutablePlan{
+		backend: executable.backend,
+		kind:    evalPipelineKindScript,
+		runner:  executable.runner,
+	}
+	if staleKind.Valid() {
+		t.Fatalf("executable with stale kind metadata is valid")
+	}
+	invalidRunner := evalPipelineExecutablePlanForRunner(qEvalPipelineExpressionExecutable{})
+	if invalidRunner.Valid() {
+		t.Fatalf("invalid expression runner produced valid executable")
+	}
+}
+
 func TestEvalSessionCachesExpressionExecutablePlan(t *testing.T) {
 	session := NewEvalSession(nil)
 	src := "10 20 30 40 where 1010b"

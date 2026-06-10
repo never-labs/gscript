@@ -99,20 +99,28 @@ type EvalPipelineBackendPlan struct {
 // It lets MethodJIT keep q planning behind the q package boundary while still
 // avoiding descriptor-to-plan rebuilding on every hot-path execution.
 type EvalPipelineExecutablePlan struct {
-	backend    string
-	kind       string
-	expression qPipelinePlan
-	script     *qScriptPipelineDescriptor
-	runner     qEvalPipelineExecutable
+	backend string
+	kind    string
+	runner  qEvalPipelineExecutable
 }
 
 type qEvalPipelineExecutable interface {
+	kind() string
+	valid() bool
 	clone() qEvalPipelineExecutable
 	run(*EvalState) (any, bool, error)
 }
 
 type qEvalPipelineExpressionExecutable struct {
 	plan qPipelinePlan
+}
+
+func (e qEvalPipelineExpressionExecutable) kind() string {
+	return evalPipelineKindExpression
+}
+
+func (e qEvalPipelineExpressionExecutable) valid() bool {
+	return e.plan.kind != qPipelineInvalid
 }
 
 func (e qEvalPipelineExpressionExecutable) clone() qEvalPipelineExecutable {
@@ -125,6 +133,14 @@ func (e qEvalPipelineExpressionExecutable) run(s *EvalState) (any, bool, error) 
 
 type qEvalPipelineScriptExecutable struct {
 	descriptor *qScriptPipelineDescriptor
+}
+
+func (e qEvalPipelineScriptExecutable) kind() string {
+	return evalPipelineKindScript
+}
+
+func (e qEvalPipelineScriptExecutable) valid() bool {
+	return e.descriptor != nil && e.descriptor.kind != qScriptPipelineUnsupported
 }
 
 func (e qEvalPipelineScriptExecutable) clone() qEvalPipelineExecutable {
@@ -160,26 +176,30 @@ func (p EvalPipelineBackendPlan) Source() string {
 }
 
 func (p EvalPipelineExecutablePlan) Valid() bool {
-	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != "" && p.executableRunner() != nil
+	return p.backend == EvalPipelineTypedRuntimeBackend && p.kind != "" && p.runner != nil && p.runner.kind() == p.kind && p.runner.valid()
 }
 
 func (p EvalPipelineExecutablePlan) executableRunner() qEvalPipelineExecutable {
-	if p.runner != nil {
-		return p.runner
-	}
-	return evalPipelineExecutableRunner(p.kind, p.expression, p.script)
+	return p.runner
 }
 
 func (p EvalPipelineExecutablePlan) clone() EvalPipelineExecutablePlan {
 	out := p
-	out.expression = cloneQPipelinePlan(p.expression)
-	out.script = cloneQScriptPipelineDescriptor(p.script)
 	if p.runner != nil {
 		out.runner = p.runner.clone()
-	} else {
-		out.runner = out.executableRunner()
 	}
 	return out
+}
+
+func evalPipelineExecutablePlanForRunner(runner qEvalPipelineExecutable) EvalPipelineExecutablePlan {
+	if runner == nil || runner.kind() == "" || !runner.valid() {
+		return EvalPipelineExecutablePlan{}
+	}
+	return EvalPipelineExecutablePlan{
+		backend: EvalPipelineTypedRuntimeBackend,
+		kind:    runner.kind(),
+		runner:  runner,
+	}
 }
 
 func evalPipelineBackendPlan(descriptor EvalPipelineDescriptor) EvalPipelineBackendPlan {
@@ -195,22 +215,12 @@ func evalPipelineBackendPlan(descriptor EvalPipelineDescriptor) EvalPipelineBack
 
 func evalPipelineExpressionExecutable(plan qPipelinePlan) EvalPipelineExecutablePlan {
 	expression := cloneQPipelinePlan(plan)
-	return EvalPipelineExecutablePlan{
-		backend:    EvalPipelineTypedRuntimeBackend,
-		kind:       evalPipelineKindExpression,
-		expression: expression,
-		runner:     qEvalPipelineExpressionExecutable{plan: expression},
-	}
+	return evalPipelineExecutablePlanForRunner(qEvalPipelineExpressionExecutable{plan: expression})
 }
 
 func evalPipelineScriptExecutable(plan *qScriptPipelineDescriptor) EvalPipelineExecutablePlan {
 	script := cloneQScriptPipelineDescriptor(plan)
-	return EvalPipelineExecutablePlan{
-		backend: EvalPipelineTypedRuntimeBackend,
-		kind:    evalPipelineKindScript,
-		script:  script,
-		runner:  qEvalPipelineScriptExecutable{descriptor: script},
-	}
+	return evalPipelineExecutablePlanForRunner(qEvalPipelineScriptExecutable{descriptor: script})
 }
 
 func evalPipelineExecutableForDescriptor(descriptor EvalPipelineDescriptor) (EvalPipelineExecutablePlan, bool) {
@@ -229,23 +239,6 @@ func evalPipelineExecutableForDescriptor(descriptor EvalPipelineDescriptor) (Eva
 		return evalPipelineScriptExecutable(&script), true
 	default:
 		return EvalPipelineExecutablePlan{}, false
-	}
-}
-
-func evalPipelineExecutableRunner(kind string, expression qPipelinePlan, script *qScriptPipelineDescriptor) qEvalPipelineExecutable {
-	switch kind {
-	case evalPipelineKindExpression:
-		if expression.kind == qPipelineInvalid {
-			return nil
-		}
-		return qEvalPipelineExpressionExecutable{plan: expression}
-	case evalPipelineKindScript:
-		if script == nil || script.kind == qScriptPipelineUnsupported {
-			return nil
-		}
-		return qEvalPipelineScriptExecutable{descriptor: script}
-	default:
-		return nil
 	}
 }
 
