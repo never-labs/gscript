@@ -110,6 +110,46 @@ func TestRuntimePathStatsRuntimeSpecializationAttribution(t *testing.T) {
 	}
 }
 
+func TestRuntimePathStatsRuntimePrimitiveAttribution(t *testing.T) {
+	if _, ok := LookupRuntimePrimitive(RuntimePrimitiveDenseArrayGather); !ok {
+		t.Fatal("dense array gather primitive missing from registry")
+	}
+
+	_, _ = NewDenseArrayI64([]int64{1, 2, 3}).Gather(NewDenseArrayI64([]int64{1}))
+
+	stats := EnableRuntimePathStats()
+	defer DisableRuntimePathStats()
+
+	gathered, err := NewDenseArrayI64([]int64{10, 20, 30}).Gather(NewDenseArrayI64([]int64{3, 1}))
+	if err != nil {
+		t.Fatalf("Gather hit: %v", err)
+	}
+	if gathered.Len() != 2 {
+		t.Fatalf("Gather len = %d, want 2", gathered.Len())
+	}
+	if _, err := NewDenseArrayI64([]int64{10}).Gather(NewDenseArrayF64([]float64{1})); err == nil {
+		t.Fatal("Gather with f64 indexes returned nil error")
+	}
+
+	snap := stats.Snapshot()
+	if snap.RuntimePrimitive.Hit != 1 || snap.RuntimePrimitive.Error != 1 {
+		t.Fatalf("RuntimePrimitive = %+v, want hit=1 error=1", snap.RuntimePrimitive)
+	}
+	if len(snap.RuntimePrimitive.PerPrimitive) != 1 {
+		t.Fatalf("PerPrimitive length = %d, want 1: %+v", len(snap.RuntimePrimitive.PerPrimitive), snap.RuntimePrimitive.PerPrimitive)
+	}
+	row := snap.RuntimePrimitive.PerPrimitive[0]
+	if row.ID != string(RuntimePrimitiveDenseArrayGather) || row.Family != "vector" || row.Op != "gather" || row.Hit != 1 || row.Error != 1 {
+		t.Fatalf("primitive row = %+v", row)
+	}
+
+	var buf testWriter
+	stats.WriteText(&buf)
+	if !buf.seen {
+		t.Fatal("WriteText wrote no data")
+	}
+}
+
 type testWriter struct {
 	seen bool
 }

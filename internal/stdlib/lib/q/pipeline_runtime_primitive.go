@@ -6,6 +6,38 @@ import (
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
+type qRuntimePrimitiveDescriptor struct {
+	kernel         string
+	family         string
+	shapePrefix    string
+	fallbackReason string
+}
+
+var qRuntimeArrayGatherI64Primitive = qRuntimePrimitiveDescriptor{
+	kernel:         "ArrayGatherI64Indexes",
+	family:         "gather",
+	shapePrefix:    "gather",
+	fallbackReason: RuntimeFallbackUnsupportedType,
+}
+
+func qEvalArrayGatherI64Primitive(array, indexes data.Array) (data.Array, bool, error) {
+	out, handled, err := data.TryGatherByI64IndexArray(array, indexes)
+	shape := qRuntimeArrayPrimitiveShape(qRuntimeArrayGatherI64Primitive, array, indexes)
+	recordRuntimeKernelProbeReason(qRuntimeArrayGatherI64Primitive.kernel, shape, handled, err, qRuntimeArrayGatherI64Primitive.fallbackReason)
+	return out, handled, err
+}
+
+func qRuntimeArrayPrimitiveShape(desc qRuntimePrimitiveDescriptor, array, index data.Array) string {
+	prefix := desc.shapePrefix
+	if prefix == "" {
+		prefix = desc.family
+	}
+	if prefix == "" {
+		prefix = "array"
+	}
+	return prefix + "/" + string(array.Kind()) + "/" + string(index.Kind())
+}
+
 func (s *EvalState) evalQPipelineRuntimePrimitive(plan qPipelinePlan) (any, bool, error) {
 	verb := strings.TrimSpace(plan.compareOp)
 	shape := qRuntimePrimitiveShape(plan)
