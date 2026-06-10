@@ -542,10 +542,6 @@ type shiftedArray struct {
 	offset int
 }
 
-type filledArray struct {
-	source Array
-}
-
 type encodedArray struct {
 	kind   Kind
 	domain []any
@@ -1500,59 +1496,6 @@ func (a shiftedArray) Gather(indexes []int) Array {
 		out[i] = value
 	}
 	return nullableArray{kind: a.Kind(), data: out}
-}
-
-func (a filledArray) Kind() Kind { return a.source.Kind() }
-
-func (a filledArray) Len() int { return a.source.Len() }
-
-func (a filledArray) At(row int) (any, bool) {
-	if row < 0 || row >= a.Len() {
-		return nil, false
-	}
-	var last any
-	hasLast := false
-	for i := 0; i <= row; i++ {
-		value, ok := a.source.At(i)
-		if !ok {
-			return nil, false
-		}
-		if IsNull(value) {
-			continue
-		}
-		last = value
-		hasLast = true
-	}
-	if !hasLast {
-		return NullValue, true
-	}
-	return last, true
-}
-
-func (a filledArray) Values() []any {
-	out := make([]any, a.Len())
-	var last any
-	hasLast := false
-	for row := range out {
-		value, ok := a.source.At(row)
-		if !ok {
-			panic(fmt.Sprintf("data filled row %d out of range", row))
-		}
-		if !IsNull(value) {
-			last = value
-			hasLast = true
-		}
-		if hasLast {
-			out[row] = last
-		} else {
-			out[row] = NullValue
-		}
-	}
-	return out
-}
-
-func (a filledArray) Gather(indexes []int) Array {
-	return nullableArray{kind: a.Kind(), data: a.Values()}.Gather(indexes)
 }
 
 func (a encodedArray) Kind() Kind { return a.kind }
@@ -7393,7 +7336,87 @@ func vectorRatios(values Array) (Array, error) {
 }
 
 func vectorFills(values Array) Array {
-	return filledArray{source: values}
+	if out, ok := typedForwardFillArray(values); ok {
+		return out
+	}
+	out := make([]any, values.Len())
+	var last any
+	hasLast := false
+	for row := range out {
+		value, ok := values.At(row)
+		if !ok {
+			panic(fmt.Sprintf("data fills row %d out of range", row))
+		}
+		if !IsNull(value) {
+			last = value
+			hasLast = true
+		}
+		if hasLast {
+			out[row] = last
+		} else {
+			out[row] = NullValue
+		}
+	}
+	return nullableArray{kind: values.Kind(), data: out}
+}
+
+// typedForwardFillArray materializes a forward-fill into a typed column in a
+// single pass. It applies when the source is a KindI64/KindF64 vector whose
+// first row is non-null, so no nulls remain after filling and the result can
+// use unboxed storage with O(1) row access. It reports ok=false otherwise so
+// the caller falls back to the generic boxed forward pass.
+func typedForwardFillArray(values Array) (Array, bool) {
+	n := values.Len()
+	if n == 0 {
+		return nil, false
+	}
+	first, ok := values.At(0)
+	if !ok || IsNull(first) {
+		return nil, false
+	}
+	switch values.Kind() {
+	case KindI64:
+		out := make([]int64, n)
+		var last int64
+		for row := 0; row < n; row++ {
+			value, ok := values.At(row)
+			if !ok {
+				return nil, false
+			}
+			if IsNull(value) {
+				out[row] = last
+				continue
+			}
+			v, ok := coerceInt64Exact(value)
+			if !ok {
+				return nil, false
+			}
+			last = v
+			out[row] = v
+		}
+		return newI64Trusted(out), true
+	case KindF64:
+		out := make([]float64, n)
+		var last float64
+		for row := 0; row < n; row++ {
+			value, ok := values.At(row)
+			if !ok {
+				return nil, false
+			}
+			if IsNull(value) {
+				out[row] = last
+				continue
+			}
+			v, ok := numeric(value)
+			if !ok {
+				return nil, false
+			}
+			last = v
+			out[row] = v
+		}
+		return newF64Trusted(out), true
+	}
+	return nil, false
 }
 
 func TryTypedFills(values Array) (Array, bool, error) {
