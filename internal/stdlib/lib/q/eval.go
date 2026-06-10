@@ -8522,6 +8522,12 @@ func (s *EvalState) isPotentialCallableExpr(src string) bool {
 		if v, ok := s.env[src]; ok && isCallable(v) {
 			return true
 		}
+		if _, ok := lookupUnaryVerb(src); ok {
+			return true
+		}
+		if _, ok := lookupDyadicVerbFunc(src); ok {
+			return true
+		}
 	}
 	if strings.HasSuffix(src, "}") || strings.HasSuffix(src, "]") || strings.HasSuffix(src, ")") {
 		return true
@@ -8530,6 +8536,11 @@ func (s *EvalState) isPotentialCallableExpr(src string) bool {
 }
 
 func validateCallableReduceScanBoundary(fn any, adverb string) error {
+	if adverb == "':" {
+		if unary, ok := fn.(qUnaryFunction); ok {
+			return fmt.Errorf("%s cannot be used with each-prior", unary.name)
+		}
+	}
 	if adverb != "/" && adverb != "\\" {
 		return nil
 	}

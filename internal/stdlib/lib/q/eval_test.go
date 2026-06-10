@@ -4868,6 +4868,8 @@ func TestEvalCallableMonadicVerbRegistration(t *testing.T) {
 	assertEvalArray(t, "key[`a`b!10 20]", data.KindSymbol, []any{data.Symbol("a"), data.Symbol("b")})
 	assertEvalArray(t, "keys[`a`b!10 20]", data.KindSymbol, []any{data.Symbol("a"), data.Symbol("b")})
 	assertEvalArray(t, "raze[(1 2;3 4;5)]", data.KindI64, []any{int64(1), int64(2), int64(3), int64(4), int64(5)})
+	assertEvalArray(t, "sqrt'[4 9 16]", data.KindF64, []any{2.0, 3.0, 4.0})
+	assertEvalArray(t, "sin'[0 0]", data.KindF64, []any{0.0, 0.0})
 	assertEvalGroupedIndexes(t, "group[`AAPL`MSFT`AAPL]", []any{data.Symbol("AAPL"), data.Symbol("MSFT")}, [][]any{{int64(0), int64(2)}, {int64(1)}})
 	assertEvalArray(t, "domain[`sym$`AAPL`MSFT`AAPL]", data.KindSymbol, []any{data.Symbol("AAPL"), data.Symbol("MSFT")})
 	assertEvalArray(t, "codes[`sym$`AAPL`MSFT`AAPL]", data.KindI64, []any{int64(0), int64(1), int64(0)})
