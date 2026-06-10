@@ -2129,7 +2129,89 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	return newI64Trusted(out), true, nil
 }
 
+// arrayCyclePeriod reports the row-cycle period of lazily tiled carriers and
+// mask trees built over them: a cyclic take repeats every source-length rows,
+// truthiness/not wrappers preserve their operand's cycle, and logical masks
+// compose cycles through the lcm. ok=false means no provable cycle.
+func arrayCyclePeriod(array Array) (int64, bool) {
+	switch a := array.(type) {
+	case attributedArray:
+		return arrayCyclePeriod(a.array)
+	case tiledArray:
+		if a.source.Len() <= 0 {
+			return 0, false
+		}
+		return int64(a.source.Len()), true
+	case notMask:
+		return arrayCyclePeriod(a.array)
+	case boolLogicalMask:
+		leftPeriod := int64(1)
+		if !a.leftIsScalar {
+			if a.left.Len() != 1 {
+				if a.left.Len() != a.len {
+					return 0, false
+				}
+				period, ok := arrayCyclePeriod(a.left)
+				if !ok {
+					return 0, false
+				}
+				leftPeriod = period
+			}
+		}
+		rightPeriod := int64(1)
+		if !a.rightIsScalar {
+			if a.right.Len() != 1 {
+				if a.right.Len() != a.len {
+					return 0, false
+				}
+				period, ok := arrayCyclePeriod(a.right)
+				if !ok {
+					return 0, false
+				}
+				rightPeriod = period
+			}
+		}
+		return lcmInt64(leftPeriod, rightPeriod)
+	default:
+		return 0, false
+	}
+}
+
+// periodicBoolMaskIndexArray lowers `where mask` for cyclically periodic bool
+// masks (tiled pattern columns and logical trees over them) by evaluating one
+// cycle and emitting a periodic index carrier instead of scanning every row.
+func periodicBoolMaskIndexArray(mask Array) (Array, bool) {
+	length := mask.Len()
+	period, ok := arrayCyclePeriod(mask)
+	if !ok || period <= 0 || period > 65536 || int64(length) <= period {
+		return nil, false
+	}
+	residues := make([]int64, 0, period)
+	for row := int64(0); row < period; row++ {
+		value, ok := mask.At(int(row))
+		if !ok {
+			return nil, false
+		}
+		keep, isBool := value.(bool)
+		if !isBool {
+			return nil, false
+		}
+		if keep {
+			residues = append(residues, row)
+		}
+	}
+	if len(residues) == 0 {
+		return i64RangeArray{len: 0}, true
+	}
+	return newI64PeriodicIndexArray(period, residues, length), true
+}
+
 func typedWhereMaskIndexArray(mask Array) (Array, bool, error) {
+	if mask.Kind() == KindBool {
+		if out, ok := periodicBoolMaskIndexArray(mask); ok {
+			return out, true, nil
+		}
+	}
 	switch a := mask.(type) {
 	case attributedArray:
 		return typedWhereMaskIndexArray(a.array)
@@ -3564,14 +3646,22 @@ func validateI64IndexArray(indexes Array, length int) (bool, error) {
 		}
 		return true, nil
 	case i64PeriodicIndexArray:
-		for i := 0; i < idx.len; i++ {
-			value, ok := idx.i64At(i)
-			if !ok {
-				return true, fmt.Errorf("index vector row %d out of range", i)
-			}
-			if value < 0 || value >= int64(length) {
-				return true, fmt.Errorf("index vector row %d value %d outside length %d", i, value, length)
-			}
+		// Periodic where-results are monotone increasing (sorted residues,
+		// strictly increasing cycle bases), so checking the first and last
+		// rows bounds the whole vector in O(1).
+		if idx.len == 0 {
+			return true, nil
+		}
+		first, okFirst := idx.i64At(0)
+		last, okLast := idx.i64At(idx.len - 1)
+		if !okFirst || !okLast {
+			return true, fmt.Errorf("index vector row %d out of range", idx.len-1)
+		}
+		if first < 0 {
+			return true, fmt.Errorf("index vector row %d value %d outside length %d", 0, first, length)
+		}
+		if last >= int64(length) {
+			return true, fmt.Errorf("index vector row %d value %d outside length %d", idx.len-1, last, length)
 		}
 		return true, nil
 	case columnArray[int64]:

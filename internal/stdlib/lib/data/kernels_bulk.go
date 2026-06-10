@@ -154,6 +154,59 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		return out, true, true
 	case i64ScalarDyadicArray:
 		return tryBulkI64ScalarDyadicValues(a)
+	case i64PeriodicIndexArray:
+		if a.period <= 0 || len(a.residues) == 0 {
+			return nil, false, false
+		}
+		out := bulkI64Get(a.len)
+		row := 0
+		for cycle := int64(0); cycle < a.fullCycles && row < a.len; cycle++ {
+			base := cycle * a.period
+			for _, residue := range a.residues {
+				if row >= a.len {
+					break
+				}
+				out[row] = base + residue
+				row++
+			}
+		}
+		base := a.fullCycles * a.period
+		for _, residue := range a.tailResidues {
+			if row >= a.len {
+				break
+			}
+			out[row] = base + residue
+			row++
+		}
+		if row != a.len {
+			bulkI64Release(out, true)
+			return nil, false, false
+		}
+		return out, true, true
+	case indexedArray:
+		source, sourceOwned, ok := tryBulkI64Values(a.source)
+		if !ok {
+			return tryBulkI64ValuesGeneric(array)
+		}
+		indexes, indexesOwned, ok := tryBulkI64Values(a.indexes)
+		if !ok || len(indexes) != a.len {
+			bulkI64Release(source, sourceOwned)
+			bulkI64Release(indexes, indexesOwned)
+			return tryBulkI64ValuesGeneric(array)
+		}
+		out := bulkI64Get(a.len)
+		for i, index := range indexes {
+			if index < 0 || index >= int64(len(source)) {
+				bulkI64Release(source, sourceOwned)
+				bulkI64Release(indexes, indexesOwned)
+				bulkI64Release(out, true)
+				return nil, false, false
+			}
+			out[i] = source[index]
+		}
+		bulkI64Release(source, sourceOwned)
+		bulkI64Release(indexes, indexesOwned)
+		return out, true, true
 	case i64BucketArray:
 		if a.width == 0 {
 			return nil, false, false
