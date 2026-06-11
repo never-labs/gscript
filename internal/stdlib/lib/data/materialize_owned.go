@@ -58,6 +58,11 @@ func ownedNumericMaterializeCandidate(array Array) bool {
 	switch array.(type) {
 	case i64FillArray, f64FillArray:
 		return true
+	case f64BucketArray:
+		// Bucket (xbar) views over lazy sources re-walk the whole source
+		// tree per consuming statement; densifying once at assignment makes
+		// every downstream reducer a dense-column pass.
+		return true
 	}
 	// i64ScalarDyadicArray / f64NumericDyadicArray were measured (same-binary
 	// runtime toggle, 2026-06) and REGRESS when materialized: their consumers

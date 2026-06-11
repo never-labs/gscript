@@ -4331,6 +4331,21 @@ func castLazyNumericSource(array Array) bool {
 		return true
 	case i64ScalarDyadicArray:
 		return castLazyNumericSource(a.source)
+	case f64NumericDyadicArray:
+		// Lazy float dyadic trees over lazy-safe array operands re-stream
+		// through the fused bulk flatteners. The lazy-cast validators still
+		// flatten-probe once, so null/NaN-producing trees keep the eager
+		// fallback semantics.
+		if _, ok := numericDyadicFloatFunc(a.op); !ok {
+			return false
+		}
+		if left, ok := a.left.(Array); ok && !castLazyNumericSource(left) {
+			return false
+		}
+		if right, ok := a.right.(Array); ok && !castLazyNumericSource(right) {
+			return false
+		}
+		return true
 	default:
 		return false
 	}
@@ -12597,14 +12612,43 @@ func qNumericUnarySumI64Values(op string, values []int64) (any, bool, error) {
 			sum += 1 / float64(value)
 		}
 		return sum, true, nil
-	case NumericUnarySin, NumericUnaryCos, NumericUnaryTan, NumericUnaryAsin, NumericUnaryAcos, NumericUnaryAtan:
+	case NumericUnarySin:
+		// Trig ops hoist the per-element applyNumericUnaryFloat dispatch out
+		// of the loop: identical math.* call per element, identical
+		// accumulation order, and these ops never error.
 		var sum float64
 		for _, value := range values {
-			out, err := applyNumericUnaryFloat(op, float64(value))
-			if err != nil {
-				return nil, true, err
-			}
-			sum += out
+			sum += math.Sin(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryCos:
+		var sum float64
+		for _, value := range values {
+			sum += math.Cos(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryTan:
+		var sum float64
+		for _, value := range values {
+			sum += math.Tan(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryAsin:
+		var sum float64
+		for _, value := range values {
+			sum += math.Asin(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryAcos:
+		var sum float64
+		for _, value := range values {
+			sum += math.Acos(float64(value))
+		}
+		return sum, true, nil
+	case NumericUnaryAtan:
+		var sum float64
+		for _, value := range values {
+			sum += math.Atan(float64(value))
 		}
 		return sum, true, nil
 	default:
@@ -15293,7 +15337,66 @@ func (a f64NumericDyadicArray) f64At(row int) (float64, bool, error) {
 	return value, true, nil
 }
 
+// f64NumericDyadicOperandsSum reduces an array<op>array dyadic tree by
+// flattening both operands and accumulating apply(left[i], right[i]) directly
+// — the same per-element values in the same order as flatten-then-sum, minus
+// the materialized result buffer and its extra read pass.
+func f64NumericDyadicOperandsSum(a f64NumericDyadicArray) (float64, bool) {
+	leftArray, leftOK := a.left.(Array)
+	rightArray, rightOK := a.right.(Array)
+	if !leftOK || !rightOK || leftArray.Len() != a.len || rightArray.Len() != a.len {
+		return 0, false
+	}
+	switch a.op {
+	case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv), string(OpMod):
+	default:
+		return 0, false
+	}
+	left, leftOwned, ok := tryBulkF64Values(leftArray)
+	if !ok || len(left) < a.len {
+		bulkF64Release(left, leftOwned)
+		return 0, false
+	}
+	right, rightOwned, ok := tryBulkF64Values(rightArray)
+	if !ok || len(right) < a.len {
+		bulkF64Release(left, leftOwned)
+		bulkF64Release(right, rightOwned)
+		return 0, false
+	}
+	left = left[:a.len]
+	right = right[:a.len]
+	var total float64
+	switch a.op {
+	case string(OpAdd):
+		for i, v := range left {
+			total += v + right[i]
+		}
+	case string(OpSub):
+		for i, v := range left {
+			total += v - right[i]
+		}
+	case string(OpMul):
+		for i, v := range left {
+			total += v * right[i]
+		}
+	case string(OpDiv):
+		for i, v := range left {
+			total += v / right[i]
+		}
+	case string(OpMod):
+		for i, v := range left {
+			total += bulkF64ModFloat(v, right[i])
+		}
+	}
+	bulkF64Release(left, leftOwned)
+	bulkF64Release(right, rightOwned)
+	return total, true
+}
+
 func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
+	if total, ok := f64NumericDyadicOperandsSum(array); ok {
+		return total, true, nil
+	}
 	if values, ok := tryBulkF64NumericDyadicValues(array); ok {
 		var total float64
 		for _, value := range values {
@@ -15305,6 +15408,9 @@ func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
 	producer, err := newF64NumericDyadicProducer(array)
 	if err != nil {
 		return nil, true, err
+	}
+	if total, ok := f64DyadicProducerOperandsSum(producer); ok {
+		return total, true, nil
 	}
 	if values, owned, ok := tryBulkF64ProducerValues(producer); ok {
 		var total float64
@@ -15319,6 +15425,64 @@ func f64NumericDyadicSum(array f64NumericDyadicArray) (any, bool, error) {
 		return nil, true, err
 	}
 	return total, true, nil
+}
+
+// f64DyadicProducerOperandsSum reduces a dyadic producer by flattening both
+// operand producers and accumulating the op directly — the same per-element
+// values in the same order as flatten-then-sum, minus the result buffer and
+// its extra read pass. Scalar-operand trees decline (the fused scalar flatten
+// already produces a single buffer).
+func f64DyadicProducerOperandsSum(p f64DyadicProducer) (float64, bool) {
+	switch p.op {
+	case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv), string(OpMod):
+	default:
+		return 0, false
+	}
+	if _, scalarLeft := p.left.(f64ScalarProducer); scalarLeft {
+		return 0, false
+	}
+	if _, scalarRight := p.right.(f64ScalarProducer); scalarRight {
+		return 0, false
+	}
+	left, leftOwned, ok := tryBulkF64ProducerValues(p.left)
+	if !ok || len(left) < p.len {
+		bulkF64Release(left, leftOwned)
+		return 0, false
+	}
+	right, rightOwned, ok := tryBulkF64ProducerValues(p.right)
+	if !ok || len(right) < p.len {
+		bulkF64Release(left, leftOwned)
+		bulkF64Release(right, rightOwned)
+		return 0, false
+	}
+	left = left[:p.len]
+	right = right[:p.len]
+	var total float64
+	switch p.op {
+	case string(OpAdd):
+		for i, v := range left {
+			total += v + right[i]
+		}
+	case string(OpSub):
+		for i, v := range left {
+			total += v - right[i]
+		}
+	case string(OpMul):
+		for i, v := range left {
+			total += v * right[i]
+		}
+	case string(OpDiv):
+		for i, v := range left {
+			total += v / right[i]
+		}
+	case string(OpMod):
+		for i, v := range left {
+			total += bulkF64ModFloat(v, right[i])
+		}
+	}
+	bulkF64Release(left, leftOwned)
+	bulkF64Release(right, rightOwned)
+	return total, true
 }
 
 func (a i64ScalarDyadicArray) Kind() Kind { return KindI64 }

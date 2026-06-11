@@ -547,6 +547,21 @@ func applyI64ScalarDyadicStepRange(step i64ScalarDyadicStep, start, stride int64
 				}
 				return true
 			}
+			if step.scalar > 1 && stride == 1 && start >= 0 {
+				// Unit-stride non-negative walk over a non-power-of-two
+				// modulus: the residue advances by one and wraps at the
+				// modulus, replacing the per-element divide. Identical to
+				// qModInt64(v, m) for v >= 0, m > 0.
+				r := start % step.scalar
+				for i := range out {
+					out[i] = r
+					r++
+					if r == step.scalar {
+						r = 0
+					}
+				}
+				return true
+			}
 			for i := range out {
 				out[i] = qModInt64(v, step.scalar)
 				v += stride
@@ -843,6 +858,11 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 				return out, handled, handled
 			}
 		}
+		if lp, scalarLeft := p.left.(f64ScalarProducer); scalarLeft {
+			if out, handled, ok := bulkF64FusedScalarLeftDyadic(p, lp.value); ok {
+				return out, handled, handled
+			}
+		}
 		left, leftOwned, ok := tryBulkF64ProducerValues(p.left)
 		if !ok || len(left) < p.len {
 			bulkF64Release(left, leftOwned)
@@ -885,9 +905,18 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 // generic two-operand flatten; handled=false propagates a flatten failure.
 // Integer-backed left producers fuse float64(iv) <op> scalar in one pass —
 // identical per-element values to the staged convert-then-op passes.
+// bulkF64ModFloat is q float modulo, identical to numericDyadicFloatFunc's
+// OpMod case so fused loops stay bit-exact with the staged apply route.
+func bulkF64ModFloat(left, right float64) float64 {
+	if right == 0 {
+		return math.NaN()
+	}
+	return left - right*math.Floor(left/right)
+}
+
 func bulkF64FusedScalarRightDyadic(p f64DyadicProducer, scalar float64) ([]float64, bool, bool) {
 	switch p.op {
-	case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv):
+	case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv), string(OpMod):
 	default:
 		return nil, false, false
 	}
@@ -915,6 +944,10 @@ func bulkF64FusedScalarRightDyadic(p f64DyadicProducer, scalar float64) ([]float
 		case string(OpDiv):
 			for i, iv := range ivs {
 				out[i] = float64(iv) / scalar
+			}
+		case string(OpMod):
+			for i, iv := range ivs {
+				out[i] = bulkF64ModFloat(float64(iv), scalar)
 			}
 		}
 		bulkI64Release(ivs, ivsOwned)
@@ -944,8 +977,89 @@ func bulkF64FusedScalarRightDyadic(p f64DyadicProducer, scalar float64) ([]float
 		for i, v := range left {
 			out[i] = v / scalar
 		}
+	case string(OpMod):
+		for i, v := range left {
+			out[i] = bulkF64ModFloat(v, scalar)
+		}
 	}
 	bulkF64Release(left, leftOwned)
+	return out, true, true
+}
+
+// bulkF64FusedScalarLeftDyadic mirrors bulkF64FusedScalarRightDyadic for
+// scalar <op> array trees: the broadcast scalar side skips its dense
+// materialization pass and integer-backed right operands fuse the float64
+// conversion into the op pass. Element values are scalar <op> right[i] —
+// identical to the staged two-operand flatten.
+func bulkF64FusedScalarLeftDyadic(p f64DyadicProducer, scalar float64) ([]float64, bool, bool) {
+	switch p.op {
+	case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv), string(OpMod):
+	default:
+		return nil, false, false
+	}
+	if ri, isIntDyadic := p.right.(f64I64ScalarDyadicProducer); isIntDyadic {
+		ivs, ivsOwned, ok := tryBulkI64Values(ri.values)
+		if !ok || len(ivs) < p.len {
+			bulkI64Release(ivs, ivsOwned)
+			return nil, false, true
+		}
+		ivs = ivs[:p.len]
+		out := bulkF64Get(p.len)
+		switch p.op {
+		case string(OpAdd):
+			for i, iv := range ivs {
+				out[i] = scalar + float64(iv)
+			}
+		case string(OpSub):
+			for i, iv := range ivs {
+				out[i] = scalar - float64(iv)
+			}
+		case string(OpMul):
+			for i, iv := range ivs {
+				out[i] = scalar * float64(iv)
+			}
+		case string(OpDiv):
+			for i, iv := range ivs {
+				out[i] = scalar / float64(iv)
+			}
+		case string(OpMod):
+			for i, iv := range ivs {
+				out[i] = bulkF64ModFloat(scalar, float64(iv))
+			}
+		}
+		bulkI64Release(ivs, ivsOwned)
+		return out, true, true
+	}
+	right, rightOwned, ok := tryBulkF64ProducerValues(p.right)
+	if !ok || len(right) < p.len {
+		bulkF64Release(right, rightOwned)
+		return nil, false, true
+	}
+	right = right[:p.len]
+	out := bulkF64Get(p.len)
+	switch p.op {
+	case string(OpAdd):
+		for i, v := range right {
+			out[i] = scalar + v
+		}
+	case string(OpSub):
+		for i, v := range right {
+			out[i] = scalar - v
+		}
+	case string(OpMul):
+		for i, v := range right {
+			out[i] = scalar * v
+		}
+	case string(OpDiv):
+		for i, v := range right {
+			out[i] = scalar / v
+		}
+	case string(OpMod):
+		for i, v := range right {
+			out[i] = bulkF64ModFloat(scalar, v)
+		}
+	}
+	bulkF64Release(right, rightOwned)
 	return out, true, true
 }
 
@@ -966,6 +1080,10 @@ func applyBulkF64Dyadic(op string, apply f64DyadicFunc, left, right, out []float
 	case string(OpDiv):
 		for i := range out {
 			out[i] = left[i] / right[i]
+		}
+	case string(OpMod):
+		for i := range out {
+			out[i] = bulkF64ModFloat(left[i], right[i])
 		}
 	default:
 		if apply == nil {
