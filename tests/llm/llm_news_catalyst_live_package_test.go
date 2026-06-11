@@ -254,6 +254,7 @@ func TestFinRobotNewsCatalystLivePackageFixtureShape(t *testing.T) {
 		LiveNetwork  bool `json:"live_network"`
 		NewsEvents   []struct {
 			EventID        string  `json:"event_id"`
+			SourceName     string  `json:"source_name"`
 			Category       string  `json:"category"`
 			Sentiment      string  `json:"sentiment"`
 			RelevanceScore float64 `json:"relevance_score"`
@@ -272,11 +273,31 @@ func TestFinRobotNewsCatalystLivePackageFixtureShape(t *testing.T) {
 			ImpactScore      float64  `json:"impact_score"`
 			EvidenceEventIDs []string `json:"evidence_event_ids"`
 		} `json:"catalysts"`
+		CalibrationCases []struct {
+			CaseID                 string             `json:"case_id"`
+			Scenario               string             `json:"scenario"`
+			InputEventIDs          []string           `json:"input_event_ids"`
+			ExpectedPrimaryEventID string             `json:"expected_primary_event_id"`
+			ExpectedCategory       string             `json:"expected_category"`
+			ExpectedDirection      string             `json:"expected_direction"`
+			ExpectedRankedEventIDs []string           `json:"expected_ranked_event_ids"`
+			ScoreComponents        map[string]float64 `json:"score_components"`
+			Explanation            string             `json:"explanation"`
+		} `json:"calibration_cases"`
 	}
 	decodeNewsCatalystJSONFile(t, filepath.Join(base, "fixtures", "news_catalyst_ACME_fixture.json"), &newsFixture)
-	if !newsFixture.ProviderFree || newsFixture.LiveNetwork || len(newsFixture.NewsEvents) < 2 || len(newsFixture.SourceRankings) < 2 || len(newsFixture.Catalysts) < 2 {
+	if !newsFixture.ProviderFree || newsFixture.LiveNetwork || len(newsFixture.NewsEvents) < 6 || len(newsFixture.SourceRankings) < 6 || len(newsFixture.Catalysts) < 4 {
 		t.Fatalf("news fixture header/counts = %#v", newsFixture)
 	}
+	eventIDs := map[string]bool{}
+	eventByID := map[string]struct {
+		SourceName     string
+		Category       string
+		Sentiment      string
+		RelevanceScore float64
+		ImpactScore    float64
+		SourceRank     int
+	}{}
 	for _, event := range newsFixture.NewsEvents {
 		if event.EventID == "" || event.Category == "" || event.Sentiment == "" || event.RelevanceScore <= 0 || event.SourceRank <= 0 {
 			t.Fatalf("news event missing relevance/category/sentiment/source rank: %#v", event)
@@ -284,12 +305,51 @@ func TestFinRobotNewsCatalystLivePackageFixtureShape(t *testing.T) {
 		if event.ImpactScore < -1 || event.ImpactScore > 1 {
 			t.Fatalf("news impact out of range: %#v", event)
 		}
+		eventIDs[event.EventID] = true
+		eventByID[event.EventID] = struct {
+			SourceName     string
+			Category       string
+			Sentiment      string
+			RelevanceScore float64
+			ImpactScore    float64
+			SourceRank     int
+		}{
+			SourceName:     event.SourceName,
+			Category:       event.Category,
+			Sentiment:      event.Sentiment,
+			RelevanceScore: event.RelevanceScore,
+			ImpactScore:    event.ImpactScore,
+			SourceRank:     event.SourceRank,
+		}
+	}
+	sourceByName := map[string]struct {
+		Rank            int
+		TrustScore      float64
+		RecencyScore    float64
+		DirectnessScore float64
+	}{}
+	for _, source := range newsFixture.SourceRankings {
+		if source.SourceName == "" || source.Rank <= 0 || source.TrustScore <= 0 || source.RecencyScore < 0 || source.DirectnessScore <= 0 {
+			t.Fatalf("source ranking incomplete: %#v", source)
+		}
+		sourceByName[source.SourceName] = struct {
+			Rank            int
+			TrustScore      float64
+			RecencyScore    float64
+			DirectnessScore float64
+		}{
+			Rank:            source.Rank,
+			TrustScore:      source.TrustScore,
+			RecencyScore:    source.RecencyScore,
+			DirectnessScore: source.DirectnessScore,
+		}
 	}
 	for _, catalyst := range newsFixture.Catalysts {
 		if catalyst.CatalystID == "" || len(catalyst.EvidenceEventIDs) == 0 || catalyst.ImpactScore < -1 || catalyst.ImpactScore > 1 {
 			t.Fatalf("catalyst evidence/impact incomplete: %#v", catalyst)
 		}
 	}
+	assertNewsCatalystCalibrationCases(t, newsFixture.CalibrationCases, eventIDs, eventByID, sourceByName)
 
 	var sentimentFixture struct {
 		ProviderFree      bool    `json:"provider_free"`
@@ -304,21 +364,116 @@ func TestFinRobotNewsCatalystLivePackageFixtureShape(t *testing.T) {
 			SentimentScore float64 `json:"sentiment_score"`
 			MentionVolume  int     `json:"mention_volume"`
 		} `json:"platform_snapshots"`
+		Normalization map[string]any `json:"normalization"`
 	}
 	decodeNewsCatalystJSONFile(t, filepath.Join(base, "fixtures", "retail_sentiment_ACME_snapshot.json"), &sentimentFixture)
 	if !sentimentFixture.ProviderFree || sentimentFixture.LiveNetwork || sentimentFixture.MentionVolume == 0 || len(sentimentFixture.PlatformSnapshots) != 3 {
 		t.Fatalf("retail sentiment fixture header/counts = %#v", sentimentFixture)
 	}
 	platforms := map[string]bool{}
+	hasPositivePlatform := false
+	hasNegativePlatform := false
 	for _, snapshot := range sentimentFixture.PlatformSnapshots {
 		platforms[snapshot.Platform] = true
 		if snapshot.FixtureKey == "" || snapshot.MentionVolume < 0 || snapshot.SentimentScore < -1 || snapshot.SentimentScore > 1 {
 			t.Fatalf("platform snapshot incomplete: %#v", snapshot)
 		}
+		hasPositivePlatform = hasPositivePlatform || snapshot.SentimentScore > 0
+		hasNegativePlatform = hasNegativePlatform || snapshot.SentimentScore < 0
 	}
 	for _, want := range []string{"polymarket", "x_social", "reddit"} {
 		if !platforms[want] {
 			t.Fatalf("missing platform snapshot %q in %#v", want, platforms)
+		}
+	}
+	if !hasPositivePlatform || !hasNegativePlatform || sentimentFixture.Normalization["conflict_detected"] != true {
+		t.Fatalf("retail sentiment fixture must contain explicit platform conflict: %#v normalization=%#v", sentimentFixture.PlatformSnapshots, sentimentFixture.Normalization)
+	}
+}
+
+func assertNewsCatalystCalibrationCases(t *testing.T, cases []struct {
+	CaseID                 string             `json:"case_id"`
+	Scenario               string             `json:"scenario"`
+	InputEventIDs          []string           `json:"input_event_ids"`
+	ExpectedPrimaryEventID string             `json:"expected_primary_event_id"`
+	ExpectedCategory       string             `json:"expected_category"`
+	ExpectedDirection      string             `json:"expected_direction"`
+	ExpectedRankedEventIDs []string           `json:"expected_ranked_event_ids"`
+	ScoreComponents        map[string]float64 `json:"score_components"`
+	Explanation            string             `json:"explanation"`
+}, eventIDs map[string]bool, eventByID map[string]struct {
+	SourceName     string
+	Category       string
+	Sentiment      string
+	RelevanceScore float64
+	ImpactScore    float64
+	SourceRank     int
+}, sourceByName map[string]struct {
+	Rank            int
+	TrustScore      float64
+	RecencyScore    float64
+	DirectnessScore float64
+}) {
+	t.Helper()
+	if len(cases) < 5 {
+		t.Fatalf("calibration case count = %d, want at least 5", len(cases))
+	}
+	scenarios := map[string]bool{}
+	for _, calibrationCase := range cases {
+		if calibrationCase.CaseID == "" || calibrationCase.Scenario == "" || calibrationCase.ExpectedPrimaryEventID == "" || calibrationCase.Explanation == "" {
+			t.Fatalf("calibration case metadata incomplete: %#v", calibrationCase)
+		}
+		scenarios[calibrationCase.Scenario] = true
+		if !eventIDs[calibrationCase.ExpectedPrimaryEventID] {
+			t.Fatalf("%s primary event %q not in news events", calibrationCase.CaseID, calibrationCase.ExpectedPrimaryEventID)
+		}
+		if len(calibrationCase.InputEventIDs) < 2 || len(calibrationCase.ExpectedRankedEventIDs) < 2 {
+			t.Fatalf("%s must contain conflict inputs and expected ranking: %#v", calibrationCase.CaseID, calibrationCase)
+		}
+		for _, eventID := range append(calibrationCase.InputEventIDs, calibrationCase.ExpectedRankedEventIDs...) {
+			if !eventIDs[eventID] {
+				t.Fatalf("%s references unknown event %q", calibrationCase.CaseID, eventID)
+			}
+		}
+		if calibrationCase.ExpectedRankedEventIDs[0] != calibrationCase.ExpectedPrimaryEventID {
+			t.Fatalf("%s ranking must start with primary event: %#v", calibrationCase.CaseID, calibrationCase.ExpectedRankedEventIDs)
+		}
+		for _, component := range []string{"trust", "recency", "relevance", "impact", "conflict_penalty", "retail_sentiment_adjustment", "final_score"} {
+			if _, ok := calibrationCase.ScoreComponents[component]; !ok {
+				t.Fatalf("%s missing score component %q", calibrationCase.CaseID, component)
+			}
+		}
+		if score := calibrationCase.ScoreComponents["final_score"]; score < -1 || score > 1 {
+			t.Fatalf("%s final score out of range: %v", calibrationCase.CaseID, score)
+		}
+	}
+	for _, want := range []string{"conflicting_news", "recency_decay", "source_trust", "category_conflict", "retail_sentiment_conflict"} {
+		if !scenarios[want] {
+			t.Fatalf("missing calibration scenario %q in %#v", want, scenarios)
+		}
+	}
+
+	wire := sourceByName[eventByID["news-acme-guidance-001"].SourceName]
+	blog := sourceByName[eventByID["news-acme-guidance-004"].SourceName]
+	newsletter := sourceByName[eventByID["news-acme-guidance-006"].SourceName]
+	regulatory := sourceByName[eventByID["news-acme-regulatory-005"].SourceName]
+	if !(wire.TrustScore > blog.TrustScore && wire.Rank < blog.Rank) {
+		t.Fatalf("trusted wire must outrank unverified blog: wire=%#v blog=%#v", wire, blog)
+	}
+	if !(wire.RecencyScore > newsletter.RecencyScore && wire.Rank < newsletter.Rank) {
+		t.Fatalf("recency decay must push stale newsletter below current wire: wire=%#v newsletter=%#v", wire, newsletter)
+	}
+	if !(regulatory.TrustScore > blog.TrustScore && regulatory.Rank < blog.Rank) {
+		t.Fatalf("regulatory source trust must beat unverified blog: regulatory=%#v blog=%#v", regulatory, blog)
+	}
+
+	categorySet := map[string]bool{}
+	for _, eventID := range []string{"news-acme-earnings-003", "news-acme-guidance-001", "news-acme-regulatory-005"} {
+		categorySet[eventByID[eventID].Category] = true
+	}
+	for _, want := range []string{"earnings", "guidance", "regulatory"} {
+		if !categorySet[want] {
+			t.Fatalf("missing category conflict input %q in %#v", want, categorySet)
 		}
 	}
 }

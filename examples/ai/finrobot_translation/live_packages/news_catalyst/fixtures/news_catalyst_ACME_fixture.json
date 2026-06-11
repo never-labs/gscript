@@ -36,6 +36,86 @@
         "new product line expands addressable market",
         "commercial pricing remains undisclosed"
       ]
+    },
+    {
+      "event_id": "news-acme-earnings-003",
+      "headline": "ACME reports EPS beat while revenue guidance remains unchanged",
+      "source_name": "fixture_financial_wire",
+      "published_at": "2026-06-11T12:05:00Z",
+      "url": "fixture://news/acme/earnings-003",
+      "category": "earnings",
+      "sentiment": "positive",
+      "relevance_score": 0.9,
+      "impact_score": 0.42,
+      "source_rank": 1,
+      "evidence": [
+        "adjusted EPS beat consensus by 8%",
+        "revenue outlook reaffirmed rather than raised"
+      ]
+    },
+    {
+      "event_id": "news-acme-guidance-004",
+      "headline": "Blog claims ACME will cut guidance after order delays",
+      "source_name": "fixture_unverified_blog",
+      "published_at": "2026-06-11T15:40:00Z",
+      "url": "fixture://news/acme/guidance-004",
+      "category": "guidance",
+      "sentiment": "negative",
+      "relevance_score": 0.88,
+      "impact_score": -0.51,
+      "source_rank": 5,
+      "evidence": [
+        "unnamed distributor cites order delays",
+        "no company filing or independent confirmation"
+      ]
+    },
+    {
+      "event_id": "news-acme-regulatory-005",
+      "headline": "Regulator opens review of ACME industrial AI certifications",
+      "source_name": "fixture_regulatory_feed",
+      "published_at": "2026-06-11T14:25:00Z",
+      "url": "fixture://news/acme/regulatory-005",
+      "category": "regulatory",
+      "sentiment": "negative",
+      "relevance_score": 0.92,
+      "impact_score": -0.46,
+      "source_rank": 3,
+      "evidence": [
+        "formal review notice published by regulator",
+        "review covers certification timing rather than product safety"
+      ]
+    },
+    {
+      "event_id": "news-acme-guidance-006",
+      "headline": "Archived newsletter repeats last quarter ACME guidance reduction rumor",
+      "source_name": "fixture_archived_newsletter",
+      "published_at": "2026-06-06T16:00:00Z",
+      "url": "fixture://news/acme/guidance-006",
+      "category": "guidance",
+      "sentiment": "negative",
+      "relevance_score": 0.76,
+      "impact_score": -0.34,
+      "source_rank": 6,
+      "evidence": [
+        "published five days before fixture as_of",
+        "duplicates a rumor not present in current filings"
+      ]
+    },
+    {
+      "event_id": "news-acme-retail-007",
+      "headline": "Retail channels split on ACME after guidance raise and regulatory review",
+      "source_name": "fixture_retail_sentiment_rollup",
+      "published_at": "2026-06-11T15:55:00Z",
+      "url": "fixture://news/acme/retail-007",
+      "category": "retail_sentiment",
+      "sentiment": "mixed",
+      "relevance_score": 0.79,
+      "impact_score": 0.08,
+      "source_rank": 4,
+      "evidence": [
+        "x_social volume is bullish",
+        "polymarket and reddit snapshots are bearish"
+      ]
     }
   ],
   "source_rankings": [
@@ -54,6 +134,38 @@
       "recency_score": 0.72,
       "directness_score": 0.95,
       "rationale": "direct issuer source with lower independent confirmation"
+    },
+    {
+      "source_name": "fixture_regulatory_feed",
+      "rank": 3,
+      "trust_score": 0.88,
+      "recency_score": 0.94,
+      "directness_score": 0.9,
+      "rationale": "direct regulator feed is trusted for regulatory classification despite negative tone"
+    },
+    {
+      "source_name": "fixture_retail_sentiment_rollup",
+      "rank": 4,
+      "trust_score": 0.62,
+      "recency_score": 0.99,
+      "directness_score": 0.58,
+      "rationale": "near-real-time retail rollup is useful but lower trust than primary news or filings"
+    },
+    {
+      "source_name": "fixture_unverified_blog",
+      "rank": 5,
+      "trust_score": 0.31,
+      "recency_score": 0.99,
+      "directness_score": 0.24,
+      "rationale": "most recent conflicting claim is penalized for weak sourcing"
+    },
+    {
+      "source_name": "fixture_archived_newsletter",
+      "rank": 6,
+      "trust_score": 0.42,
+      "recency_score": 0.18,
+      "directness_score": 0.28,
+      "rationale": "stale duplicated rumor should decay below current trusted sources"
     }
   ],
   "catalysts": [
@@ -78,12 +190,163 @@
       "evidence_event_ids": [
         "news-acme-product-002"
       ]
+    },
+    {
+      "catalyst_id": "cat-acme-regulatory-review",
+      "catalyst_type": "regulatory_review",
+      "direction": "negative",
+      "impact_score": -0.34,
+      "time_horizon": "near_term",
+      "confidence": 0.76,
+      "evidence_event_ids": [
+        "news-acme-regulatory-005"
+      ]
+    },
+    {
+      "catalyst_id": "cat-acme-retail-conflict",
+      "catalyst_type": "retail_sentiment_divergence",
+      "direction": "mixed",
+      "impact_score": 0.05,
+      "time_horizon": "near_term",
+      "confidence": 0.54,
+      "evidence_event_ids": [
+        "news-acme-retail-007"
+      ]
     }
   ],
   "impact_summary": {
     "overall_direction": "positive",
-    "aggregate_impact_score": 0.55,
+    "aggregate_impact_score": 0.41,
     "primary_category": "guidance",
-    "source_count": 2
-  }
+    "source_count": 6
+  },
+  "calibration_cases": [
+    {
+      "case_id": "conflicting_guidance_news_trust_beats_recency",
+      "scenario": "conflicting_news",
+      "input_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-guidance-004"
+      ],
+      "expected_primary_event_id": "news-acme-guidance-001",
+      "expected_category": "guidance",
+      "expected_direction": "positive",
+      "expected_ranked_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-guidance-004"
+      ],
+      "score_components": {
+        "trust": 0.91,
+        "recency": 0.98,
+        "relevance": 0.94,
+        "impact": 0.72,
+        "conflict_penalty": -0.18,
+        "retail_sentiment_adjustment": 0,
+        "final_score": 0.74
+      },
+      "explanation": "A trusted financial wire with concrete guidance figures outranks a newer unverified negative blog claim."
+    },
+    {
+      "case_id": "recency_decay_stale_rumor_below_current_wire",
+      "scenario": "recency_decay",
+      "input_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-guidance-006"
+      ],
+      "expected_primary_event_id": "news-acme-guidance-001",
+      "expected_category": "guidance",
+      "expected_direction": "positive",
+      "expected_ranked_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-guidance-006"
+      ],
+      "score_components": {
+        "trust": 0.91,
+        "recency": 0.98,
+        "relevance": 0.94,
+        "impact": 0.72,
+        "conflict_penalty": -0.08,
+        "retail_sentiment_adjustment": 0,
+        "final_score": 0.79
+      },
+      "explanation": "The five-day-old newsletter rumor receives a recency decay penalty and cannot displace current high-trust guidance coverage."
+    },
+    {
+      "case_id": "source_trust_verified_regulatory_above_unverified_blog",
+      "scenario": "source_trust",
+      "input_event_ids": [
+        "news-acme-regulatory-005",
+        "news-acme-guidance-004"
+      ],
+      "expected_primary_event_id": "news-acme-regulatory-005",
+      "expected_category": "regulatory",
+      "expected_direction": "negative",
+      "expected_ranked_event_ids": [
+        "news-acme-regulatory-005",
+        "news-acme-guidance-004"
+      ],
+      "score_components": {
+        "trust": 0.88,
+        "recency": 0.94,
+        "relevance": 0.92,
+        "impact": -0.46,
+        "conflict_penalty": -0.06,
+        "retail_sentiment_adjustment": 0,
+        "final_score": 0.58
+      },
+      "explanation": "A direct regulator feed outranks an unverified blog even when both are recent negative signals."
+    },
+    {
+      "case_id": "category_conflict_earnings_guidance_regulatory",
+      "scenario": "category_conflict",
+      "input_event_ids": [
+        "news-acme-earnings-003",
+        "news-acme-guidance-001",
+        "news-acme-regulatory-005"
+      ],
+      "expected_primary_event_id": "news-acme-guidance-001",
+      "expected_category": "guidance",
+      "expected_direction": "positive",
+      "expected_ranked_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-regulatory-005",
+        "news-acme-earnings-003"
+      ],
+      "score_components": {
+        "trust": 0.9,
+        "recency": 0.94,
+        "relevance": 0.92,
+        "impact": 0.72,
+        "conflict_penalty": -0.12,
+        "retail_sentiment_adjustment": 0,
+        "final_score": 0.66
+      },
+      "explanation": "Guidance remains the primary catalyst because it changes forward margin expectations; the regulatory review is material but secondary."
+    },
+    {
+      "case_id": "retail_sentiment_conflict_muted_adjustment",
+      "scenario": "retail_sentiment_conflict",
+      "input_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-retail-007"
+      ],
+      "expected_primary_event_id": "news-acme-guidance-001",
+      "expected_category": "guidance",
+      "expected_direction": "positive",
+      "expected_ranked_event_ids": [
+        "news-acme-guidance-001",
+        "news-acme-retail-007"
+      ],
+      "score_components": {
+        "trust": 0.91,
+        "recency": 0.99,
+        "relevance": 0.94,
+        "impact": 0.72,
+        "conflict_penalty": -0.04,
+        "retail_sentiment_adjustment": -0.03,
+        "final_score": 0.77
+      },
+      "explanation": "Conflicting retail platforms slightly mute, but do not reverse, the trusted guidance catalyst."
+    }
+  ]
 }

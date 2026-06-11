@@ -46,6 +46,79 @@
         }
       }
     },
-    "impact_summary": {"type": "object"}
+    "impact_summary": {"type": "object"},
+    "calibration_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "scenario",
+          "input_event_ids",
+          "expected_primary_event_id",
+          "expected_category",
+          "expected_direction",
+          "expected_ranked_event_ids",
+          "score_components",
+          "explanation"
+        ],
+        "properties": {
+          "case_id": {"type": "string"},
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "conflicting_news",
+              "recency_decay",
+              "source_trust",
+              "category_conflict",
+              "retail_sentiment_conflict"
+            ]
+          },
+          "input_event_ids": {
+            "type": "array",
+            "minItems": 2,
+            "items": {"type": "string"}
+          },
+          "expected_primary_event_id": {"type": "string"},
+          "expected_category": {
+            "type": "string",
+            "enum": ["earnings", "guidance", "product", "regulatory", "macro", "mna", "litigation", "analyst", "retail_sentiment"]
+          },
+          "expected_direction": {
+            "type": "string",
+            "enum": ["positive", "neutral", "negative", "mixed"]
+          },
+          "expected_ranked_event_ids": {
+            "type": "array",
+            "minItems": 2,
+            "items": {"type": "string"}
+          },
+          "score_components": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "trust",
+              "recency",
+              "relevance",
+              "impact",
+              "conflict_penalty",
+              "retail_sentiment_adjustment",
+              "final_score"
+            ],
+            "properties": {
+              "trust": {"type": "number", "minimum": 0, "maximum": 1},
+              "recency": {"type": "number", "minimum": 0, "maximum": 1},
+              "relevance": {"type": "number", "minimum": 0, "maximum": 1},
+              "impact": {"type": "number", "minimum": -1, "maximum": 1},
+              "conflict_penalty": {"type": "number", "minimum": -1, "maximum": 0},
+              "retail_sentiment_adjustment": {"type": "number", "minimum": -1, "maximum": 1},
+              "final_score": {"type": "number", "minimum": -1, "maximum": 1}
+            }
+          },
+          "explanation": {"type": "string"}
+        }
+      }
+    }
   }
 }
