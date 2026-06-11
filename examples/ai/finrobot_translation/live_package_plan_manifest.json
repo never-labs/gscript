@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 31,
-  "translation_directory_file_count": 129,
+  "registered_examples_count": 32,
+  "translation_directory_file_count": 141,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -43,6 +43,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/optional_integrations/main.leia",
       "covers_package_ids": [
         "optional_integrations"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "tutorial_demo_parity",
+      "directory": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/main.leia",
+      "covers_package_ids": [
+        "tutorial_demo_parity"
       ],
       "status": "checked_in_registered_example"
     },
@@ -242,6 +251,32 @@
         "contract tests run with live_network=false and assert absent optional dependencies do not fail provider-free CI",
         "fixture tests validate FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, and Ollama metadata without imports",
         "approval policy tests deny live optional integrations unless the matching capability and dependency gate are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "tutorial_demo_parity",
+      "package_name": "leia-finrobot-tutorial-demo-parity",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity",
+      "planned_directory": "packages/finrobot/tutorial_demo_parity",
+      "manifest": "packages/finrobot/tutorial_demo_parity/package.manifest.json",
+      "contract": "packages/finrobot/tutorial_demo_parity/contracts/tutorial_demo_parity_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/tutorial_parity/ledger.json",
+      "capabilities": [
+        "parity.tutorial.ledger.validate",
+        "parity.tutorial.notebook.checklist",
+        "parity.demo.smoke_contract",
+        "parity.demo.agent_builder",
+        "parity.demo.backtrader",
+        "parity.replay.provider_records",
+        "parity.optional_gate.clean_skip"
+      ],
+      "test_gates": [
+        "fixture tests validate tutorial and demo parity ledgers without notebook execution or provider calls",
+        "contract tests require registered provider-free smoke examples and replay record links",
+        "optional gate tests require live_network_default=false, default_enabled=false, and clean skips",
+        "notebook-to-Leia conversion checklist gates any future live package implementation"
       ],
       "no_built_in_guarantee": true
     },
