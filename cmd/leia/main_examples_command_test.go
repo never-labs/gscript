@@ -704,6 +704,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-ai-coding_agent_project-main",
 		"repo-ai-tagged_agent_workflow",
 		"repo-ai-general_agent_workflow",
+		"repo-ai-translation_research_assistant",
 		"repo-ai-record_replay_trace_project",
 		"repo-workflow-support_triage_replay",
 		"repo-testing-jsonl_workflow_test",
@@ -728,6 +729,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-ai-coding_agent_project-main",
 		"ok      repo-ai-tagged_agent_workflow",
 		"ok      repo-ai-general_agent_workflow",
+		"ok      repo-ai-translation_research_assistant",
 		"ok      repo-ai-record_replay_trace_project",
 		"ok      repo-workflow-support_triage_replay",
 		"ok      repo-testing-jsonl_workflow_test",
@@ -735,7 +737,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 18 ok, 0 skipped, 0 failed",
+		"examples: 19 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)
