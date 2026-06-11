@@ -5,6 +5,7 @@ import (
 	"container/heap"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"math"
 	"sort"
 	"strconv"
@@ -1728,6 +1729,16 @@ func NewColumnWithKind(name Symbol, kind Kind, values []any) (Column, error) {
 type Schema struct {
 	names []Symbol
 	kinds map[Symbol]Kind
+	// fp memoizes Fingerprint for schemas that are sealed after construction
+	// (newFrame attaches it once the column set is final). Schema copies share
+	// the same memo cell, so every cache key derived from a frame schema pays
+	// the hash + format cost once per frame instead of once per query.
+	fp *schemaFingerprintMemo
+}
+
+type schemaFingerprintMemo struct {
+	once  sync.Once
+	value string
 }
 
 func (s Schema) Names() []Symbol {
@@ -1755,14 +1766,32 @@ func (s Schema) CompatibleWith(other Schema) bool {
 }
 
 func (s Schema) Fingerprint() string {
-	h := fnv.New64a()
-	for _, name := range s.names {
-		_, _ = h.Write([]byte(name))
-		_, _ = h.Write([]byte{0})
-		_, _ = h.Write([]byte(s.kinds[name]))
-		_, _ = h.Write([]byte{0xff})
+	if s.fp == nil {
+		return s.computeFingerprint()
 	}
-	return fmt.Sprintf("%016x", h.Sum64())
+	s.fp.once.Do(func() { s.fp.value = s.computeFingerprint() })
+	return s.fp.value
+}
+
+func (s Schema) computeFingerprint() string {
+	h := fnv.New64a()
+	var sep [1]byte
+	for _, name := range s.names {
+		_, _ = io.WriteString(h, string(name))
+		sep[0] = 0
+		_, _ = h.Write(sep[:])
+		_, _ = io.WriteString(h, string(s.kinds[name]))
+		sep[0] = 0xff
+		_, _ = h.Write(sep[:])
+	}
+	const hexDigits = "0123456789abcdef"
+	var buf [16]byte
+	v := h.Sum64()
+	for i := 15; i >= 0; i-- {
+		buf[i] = hexDigits[v&0xf]
+		v >>= 4
+	}
+	return string(buf[:])
 }
 
 type Frame struct {
@@ -1823,6 +1852,7 @@ func newFrame(cols []Column, cloneColumns bool) (Frame, error) {
 			frame.columns[col.Name] = col.Data
 		}
 	}
+	frame.schema.fp = &schemaFingerprintMemo{}
 	return frame, nil
 }
 
@@ -1863,7 +1893,7 @@ func (f Frame) Schema() Schema {
 	for name, kind := range f.schema.kinds {
 		kinds[name] = kind
 	}
-	return Schema{names: append([]Symbol(nil), f.schema.names...), kinds: kinds}
+	return Schema{names: append([]Symbol(nil), f.schema.names...), kinds: kinds, fp: f.schema.fp}
 }
 
 func (f Frame) SchemaFingerprint() string {
@@ -2791,7 +2821,7 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok := typedCompareBoolIndexesI64(array, op, value); ok {
 		return out, true, nil
 	}
-	indexes, ok := typedKernels.CompareIndexes(array, op, value, filterIndexScratch(array.Len()))
+	indexes, ok := typedKernels.CompareIndexes(array, op, value, nil)
 	if !ok {
 		return nil, false, nil
 	}
@@ -5518,7 +5548,9 @@ func DropColumns(frame Frame, names ...Symbol) (Frame, error) {
 		}
 		cols = append(cols, Column{Name: name, Data: frame.columns[name]})
 	}
-	return NewFrame(cols...)
+	// Frames are immutable values: dropping columns adopts the kept column
+	// arrays instead of dense-copying every survivor.
+	return NewFrameAdoptingColumns(cols...)
 }
 
 func InsertRow(frame Frame, columns []Symbol, values []any) (Frame, error) {
@@ -6464,56 +6496,79 @@ func InnerJoinKeyedOn(left Frame, right KeyedFrame, keys ...JoinKey) (Frame, err
 }
 
 func UnionJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
+	return UnionJoinOnWithOptions(left, right, JoinOptions{}, keys...)
+}
+
+// UnionJoinOnWithOptions runs a union join restricted to opts.LeftColumns /
+// opts.RightColumns when set (key columns must be included by the caller);
+// OrderBy/LimitN are not applied by union joins.
+func UnionJoinOnWithOptions(left, right Frame, opts JoinOptions, keys ...JoinKey) (Frame, error) {
 	if len(keys) == 0 {
 		return Frame{}, fmt.Errorf("union join requires at least one key")
 	}
 	if err := validateJoinKeys(left, right, keys); err != nil {
 		return Frame{}, err
 	}
-	rightRowsByKey, _, err := rightRowsByJoinKey(right, keys)
-	if err != nil {
-		return Frame{}, err
-	}
-	leftKeyCols := leftKeyColumns(keys)
-
-	leftIndexes := make([]int, 0, left.Len()+right.Len())
-	rightIndexes := make([]int, 0, left.Len()+right.Len())
-	matchedRight := make([]bool, right.Len())
-	for row := 0; row < left.Len(); row++ {
-		key, err := rowKey(left, row, leftKeyCols)
+	leftIndexes, rightIndexes, typedMatch := unionJoinIndexesTypedFast(left, right, keys)
+	if !typedMatch {
+		rightRowsByKey, _, err := rightRowsByJoinKey(right, keys)
 		if err != nil {
 			return Frame{}, err
 		}
-		matches := rightRowsByKey[key]
-		if len(matches) == 0 {
-			leftIndexes = append(leftIndexes, row)
-			rightIndexes = append(rightIndexes, -1)
-			continue
+		leftKeyCols := leftKeyColumns(keys)
+
+		leftIndexes = make([]int, 0, left.Len()+right.Len())
+		rightIndexes = make([]int, 0, left.Len()+right.Len())
+		matchedRight := make([]bool, right.Len())
+		for row := 0; row < left.Len(); row++ {
+			key, err := rowKey(left, row, leftKeyCols)
+			if err != nil {
+				return Frame{}, err
+			}
+			matches := rightRowsByKey[key]
+			if len(matches) == 0 {
+				leftIndexes = append(leftIndexes, row)
+				rightIndexes = append(rightIndexes, -1)
+				continue
+			}
+			for _, rightRow := range matches {
+				leftIndexes = append(leftIndexes, row)
+				rightIndexes = append(rightIndexes, rightRow)
+				matchedRight[rightRow] = true
+			}
 		}
-		for _, rightRow := range matches {
-			leftIndexes = append(leftIndexes, row)
-			rightIndexes = append(rightIndexes, rightRow)
-			matchedRight[rightRow] = true
+		for row := 0; row < right.Len(); row++ {
+			if matchedRight[row] {
+				continue
+			}
+			leftIndexes = append(leftIndexes, -1)
+			rightIndexes = append(rightIndexes, row)
 		}
-	}
-	for row := 0; row < right.Len(); row++ {
-		if matchedRight[row] {
-			continue
-		}
-		leftIndexes = append(leftIndexes, -1)
-		rightIndexes = append(rightIndexes, row)
 	}
 
-	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
-	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
+	leftNames := joinOutputLeftColumns(left, opts.LeftColumns)
+	rightNames := joinOutputRightColumns(right, opts.RightColumns)
+	cols := make([]Column, 0, len(leftNames)+len(rightNames))
+	usedNames := make(map[Symbol]struct{}, len(leftNames)+len(rightNames))
 	rightByLeftKey := make(map[Symbol]Symbol, len(keys))
 	rightKeys := make(map[Symbol]struct{}, len(keys))
 	for _, key := range keys {
 		rightByLeftKey[key.Left] = key.Right
 		rightKeys[key.Right] = struct{}{}
 	}
-	for _, name := range left.schema.names {
+	for _, name := range leftNames {
 		leftCol := left.columns[name]
+		rightName, isKey := rightByLeftKey[name]
+		if !isKey {
+			cols = append(cols, Column{Name: name, Data: gatherOptional(leftCol, leftIndexes)})
+			usedNames[name] = struct{}{}
+			continue
+		}
+		if col, ok := unionCoalesceKeyTyped(leftCol, leftIndexes, right.columns[rightName], rightIndexes); ok {
+			cols = append(cols, Column{Name: name, Data: col})
+			usedNames[name] = struct{}{}
+			continue
+		}
 		values := make([]any, len(leftIndexes))
 		for i, leftRow := range leftIndexes {
 			if leftRow >= 0 {
@@ -6524,16 +6579,12 @@ func UnionJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 				values[i] = v
 				continue
 			}
-			if rightName, ok := rightByLeftKey[name]; ok {
-				rightCol := right.columns[rightName]
-				v, ok := rightCol.At(rightIndexes[i])
-				if !ok {
-					return Frame{}, fmt.Errorf("union join right key column %q row %d out of range", rightName, rightIndexes[i])
-				}
-				values[i] = v
-			} else {
-				values[i] = NullValue
+			rightCol := right.columns[rightName]
+			v, ok := rightCol.At(rightIndexes[i])
+			if !ok {
+				return Frame{}, fmt.Errorf("union join right key column %q row %d out of range", rightName, rightIndexes[i])
 			}
+			values[i] = v
 		}
 		col, err := columnWithKind(name, leftCol.Kind(), values)
 		if err != nil {
@@ -6542,7 +6593,7 @@ func UnionJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 		cols = append(cols, col)
 		usedNames[name] = struct{}{}
 	}
-	for _, name := range right.schema.names {
+	for _, name := range rightNames {
 		if _, isJoinKey := rightKeys[name]; isJoinKey {
 			continue
 		}
@@ -6554,17 +6605,20 @@ func UnionJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 }
 
 func PlusJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
+	return PlusJoinOnWithOptions(left, right, JoinOptions{}, keys...)
+}
+
+// PlusJoinOnWithOptions runs a plus join restricted to opts.LeftColumns /
+// opts.RightColumns when set. Shared (added) column names must be kept on
+// both sides by the caller for the add semantics to hold; OrderBy/LimitN are
+// not applied by plus joins.
+func PlusJoinOnWithOptions(left, right Frame, opts JoinOptions, keys ...JoinKey) (Frame, error) {
 	if len(keys) == 0 {
 		return Frame{}, fmt.Errorf("plus join requires at least one key")
 	}
 	if err := validateJoinKeys(left, right, keys); err != nil {
 		return Frame{}, err
 	}
-	rightRowsByKey, _, err := rightRowsByJoinKey(right, keys)
-	if err != nil {
-		return Frame{}, err
-	}
-	leftKeyCols := leftKeyColumns(keys)
 	leftKeys := make(map[Symbol]struct{}, len(keys))
 	rightKeys := make(map[Symbol]struct{}, len(keys))
 	for _, key := range keys {
@@ -6572,28 +6626,43 @@ func PlusJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 		rightKeys[key.Right] = struct{}{}
 	}
 
-	matchedRight := make([]int, left.Len())
-	for i := range matchedRight {
-		matchedRight[i] = -1
-	}
-	for row := 0; row < left.Len(); row++ {
-		key, err := rowKey(left, row, leftKeyCols)
+	matchedRight, typedMatch := plusJoinMatchTypedFast(left, right, keys)
+	if !typedMatch {
+		rightRowsByKey, _, err := rightRowsByJoinKey(right, keys)
 		if err != nil {
 			return Frame{}, err
 		}
-		matches := rightRowsByKey[key]
-		if len(matches) > 0 {
-			matchedRight[row] = matches[0]
+		leftKeyCols := leftKeyColumns(keys)
+		matchedRight = make([]int, left.Len())
+		for i := range matchedRight {
+			matchedRight[i] = -1
+		}
+		for row := 0; row < left.Len(); row++ {
+			key, err := rowKey(left, row, leftKeyCols)
+			if err != nil {
+				return Frame{}, err
+			}
+			matches := rightRowsByKey[key]
+			if len(matches) > 0 {
+				matchedRight[row] = matches[0]
+			}
 		}
 	}
 
-	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
-	usedNames := make(map[Symbol]struct{}, len(left.schema.names)+len(right.schema.names))
-	for _, name := range left.schema.names {
+	leftNames := joinOutputLeftColumns(left, opts.LeftColumns)
+	rightNames := joinOutputRightColumns(right, opts.RightColumns)
+	cols := make([]Column, 0, len(leftNames)+len(rightNames))
+	usedNames := make(map[Symbol]struct{}, len(leftNames)+len(rightNames))
+	for _, name := range leftNames {
 		leftCol := left.columns[name]
 		rightCol, hasRight := right.Column(name)
 		_, isLeftKey := leftKeys[name]
 		if hasRight && !isLeftKey {
+			if col, ok := plusAddSharedTyped(leftCol, rightCol, matchedRight); ok {
+				cols = append(cols, Column{Name: name, Data: col})
+				usedNames[name] = struct{}{}
+				continue
+			}
 			values := make([]any, left.Len())
 			for row := 0; row < left.Len(); row++ {
 				leftValue, ok := leftCol.At(row)
@@ -6617,11 +6686,13 @@ func PlusJoinOn(left, right Frame, keys ...JoinKey) (Frame, error) {
 			}
 			cols = append(cols, NewColumn(name, values))
 		} else {
-			cols = append(cols, Column{Name: name, Data: leftCol.Gather(allIndexes(left.Len()))})
+			// Frames are immutable values, so untouched left columns are
+			// adopted without a defensive gather copy.
+			cols = append(cols, Column{Name: name, Data: leftCol})
 		}
 		usedNames[name] = struct{}{}
 	}
-	for _, name := range right.schema.names {
+	for _, name := range rightNames {
 		if _, isJoinKey := rightKeys[name]; isJoinKey {
 			continue
 		}
@@ -9169,7 +9240,7 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 				}
 			}
 			normalized := normalizeScalar(col.Kind(), literal.Value)
-			if rows, ok := typedKernels.CompareIndexes(col, op, normalized, filterIndexScratch(col.Len())); ok {
+			if rows, ok := typedKernels.CompareIndexes(col, op, normalized, nil); ok {
 				return rows, true, nil
 			}
 			mask, err := CompareMask(col, op, literal.Value)
@@ -9270,6 +9341,9 @@ func fastFilterIndexes(frame Frame, where Expr) ([]int, bool, error) {
 type rowPredicate func(row int) bool
 
 func fastLogicalAndFilterIndexes(frame Frame, expr Logical) ([]int, bool, error) {
+	if out, ok := typedAndCompareFilterIndexes(frame, expr); ok {
+		return out, true, nil
+	}
 	predicate, ok, err := filterRowPredicate(frame, expr)
 	if err != nil || !ok {
 		return nil, ok, err

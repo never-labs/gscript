@@ -3211,11 +3211,11 @@ func TestQSQLJoinBindingCacheLiteralAndPathSources(t *testing.T) {
 	if len(qSQLAlignedPlanCache) != 3 {
 		t.Fatalf("aligned cache entries = %d, want 3", len(qSQLAlignedPlanCache))
 	}
-	for key, plan := range qSQLAlignedPlanCache {
-		if got := plan.Source.Len(); got != 0 {
+	for key, entry := range qSQLAlignedPlanCache {
+		if got := entry.plan.Source.Len(); got != 0 {
 			t.Fatalf("aligned cache %q Source.Len() = %d, want zero frame", key, got)
 		}
-		if len(plan.Source.Schema().Names()) != 0 {
+		if len(entry.plan.Source.Schema().Names()) != 0 {
 			t.Fatalf("aligned cache %q stored source schema", key)
 		}
 	}
@@ -7916,11 +7916,11 @@ func TestQSQLPlanCachesDoNotStoreFrameData(t *testing.T) {
 	if len(qSQLAlignedPlanCache) != 1 {
 		t.Fatalf("aligned cache entries = %d, want 1", len(qSQLAlignedPlanCache))
 	}
-	for key, plan := range qSQLAlignedPlanCache {
-		if got := plan.Source.Len(); got != 0 {
+	for key, entry := range qSQLAlignedPlanCache {
+		if got := entry.plan.Source.Len(); got != 0 {
 			t.Fatalf("aligned cache %q Source.Len() = %d, want zero frame", key, got)
 		}
-		if len(plan.Source.Schema().Names()) != 0 {
+		if len(entry.plan.Source.Schema().Names()) != 0 {
 			t.Fatalf("aligned cache %q stored source schema", key)
 		}
 	}
@@ -8118,7 +8118,7 @@ func TestQSQLPlanCacheEvictsOldestEntriesAndStats(t *testing.T) {
 
 	qSQLAlignedPlanCacheMu.Lock()
 	for i := 0; i < qSQLPlanCacheLimit+2; i++ {
-		qSQLAlignedPlanCacheStoreLocked(strings.Repeat("a", i+1), data.QueryPlan{})
+		qSQLAlignedPlanCacheStoreLocked(strings.Repeat("a", i+1), data.QueryPlan{}, "")
 	}
 	if len(qSQLAlignedPlanCache) != qSQLPlanCacheLimit {
 		t.Fatalf("aligned cache entries = %d, want %d", len(qSQLAlignedPlanCache), qSQLPlanCacheLimit)

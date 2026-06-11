@@ -1934,16 +1934,7 @@
       "warm_go_ratio": 0.6746
     }
   },
-  "exceptions": {
-    "JoinPlusAddShared": {
-      "reason": "qSQL matrix row, unoptimized (R3-B first audit gm 33.5x); R4 worklist",
-      "ref": "benchmarks/qsql_matrix_audit.md"
-    },
-    "JoinUnionAppend": {
-      "reason": "qSQL matrix row, unoptimized (R3-B first audit gm 33.5x); R4 worklist",
-      "ref": "benchmarks/qsql_matrix_audit.md"
-    }
-  },
+  "exceptions": {},
   "family_targets": {},
   "max_untrusted_go_baselines": 26,
   "milestone_caps": {

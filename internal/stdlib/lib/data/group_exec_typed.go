@@ -52,6 +52,15 @@ func resolveNumericColumnFn(col Array) func(row int) (float64, bool) {
 	}
 }
 
+// groupAggF64Slice exposes a plain dense float64 column's storage for direct
+// aggregation loops (always-present values, no per-row reader call).
+func groupAggF64Slice(col Array) ([]float64, bool) {
+	if a, ok := unwrapAttributedArray(col).(columnArray[float64]); ok {
+		return a.data, true
+	}
+	return nil, false
+}
+
 // resolveAggNumericFn pre-binds the aggregate's numeric row reader for the
 // dense typed shapes (plain column or binary op over two dense columns).
 func resolveAggNumericFn(agg aggregateInput) func(row int) (float64, bool) {
@@ -63,11 +72,27 @@ func resolveAggNumericFn(agg aggregateInput) func(row int) (float64, bool) {
 	}
 	if agg.binaryOp == OpMul {
 		// Mirror aggregateBinaryNumericValueFast: i64*i64 multiplies in
-		// integer space before converting.
-		if li, ok := unwrapAttributedArray(agg.leftColumn).(columnArray[int64]); ok {
-			if ri, ok := unwrapAttributedArray(agg.rightColumn).(columnArray[int64]); ok {
-				ldata, rdata := li.data, ri.data
+		// integer space before converting. The mixed f64/i64 products fuse
+		// both operand reads into one closure instead of chaining two
+		// per-operand readers per row.
+		switch l := unwrapAttributedArray(agg.leftColumn).(type) {
+		case columnArray[int64]:
+			switch r := unwrapAttributedArray(agg.rightColumn).(type) {
+			case columnArray[int64]:
+				ldata, rdata := l.data, r.data
 				return func(row int) (float64, bool) { return float64(ldata[row] * rdata[row]), true }
+			case columnArray[float64]:
+				ldata, rdata := l.data, r.data
+				return func(row int) (float64, bool) { return float64(ldata[row]) * rdata[row], true }
+			}
+		case columnArray[float64]:
+			switch r := unwrapAttributedArray(agg.rightColumn).(type) {
+			case columnArray[int64]:
+				ldata, rdata := l.data, r.data
+				return func(row int) (float64, bool) { return ldata[row] * float64(rdata[row]), true }
+			case columnArray[float64]:
+				ldata, rdata := l.data, r.data
+				return func(row int) (float64, bool) { return ldata[row] * rdata[row], true }
 			}
 		}
 	}
@@ -190,22 +215,123 @@ func groupedArrayIndexCached(frame Frame, name Symbol, array Array) (ArrayIndex,
 	return ArrayIndex{}, false
 }
 
-// groupRowIDsCached combines per-column cached group ids positionally into
-// composite ids, mirroring arraysRowGroupIDs but with index reuse.
-func groupRowIDsCached(frame Frame, byInputs []groupInput, byArrays []Array, rows int) ([]int, int, bool) {
-	if len(byArrays) == 1 {
-		return groupColumnRowIDs(frame, byInputs[0], byArrays[0])
-	}
+// groupCompactRowIDs assigns each participating row its compact group id in
+// first-appearance order. Per-column ids come from the cached grouped
+// ArrayIndex (no per-call allocation); composite keys are folded inline
+// through a flat slate over the small composite domain, so multi-key groups
+// allocate only the per-row gid vector instead of a combined full-frame id
+// vector per key column.
+func groupCompactRowIDs(frame Frame, byInputs []groupInput, byArrays []Array, rows int, indexes []int, allRows bool) ([]int32, []int, bool) {
 	perColumn := make([][]int, len(byArrays))
 	counts := make([]int, len(byArrays))
 	for i, array := range byArrays {
 		ids, count, ok := groupColumnRowIDs(frame, byInputs[i], array)
 		if !ok {
-			return nil, 0, false
+			return nil, nil, false
 		}
 		perColumn[i], counts[i] = ids, count
 	}
-	return combineRowGroupIDs(perColumn, counts, rows)
+
+	n := rows
+	if !allRows {
+		n = len(indexes)
+		for _, row := range indexes {
+			if row < 0 || row >= rows {
+				return nil, nil, false
+			}
+		}
+	}
+
+	// Composite domain: product of per-column group counts, used as the slate
+	// size. Large or overflowing domains fall back to the pairwise combiner.
+	domain := int64(1)
+	for _, count := range counts {
+		if count <= 0 {
+			domain = 0
+			break
+		}
+		domain *= int64(count)
+		if domain > 1<<22 {
+			break
+		}
+	}
+	useSlate := domain > 0 && domain <= 1<<22 && (domain <= int64(rows)*4 || domain <= 1<<12)
+	var compositeIDs []int
+	if len(perColumn) > 1 && !useSlate {
+		combined, _, ok := combineRowGroupIDs(perColumn, counts, rows)
+		if !ok {
+			return nil, nil, false
+		}
+		compositeIDs = combined
+		domain = int64(rows)
+		useSlate = false
+	}
+
+	gids := make([]int32, n)
+	repRows := make([]int, 0, 16)
+	switch {
+	case len(perColumn) == 1 || compositeIDs != nil:
+		ids := perColumn[0]
+		slateSize := counts[0]
+		if compositeIDs != nil {
+			ids = compositeIDs
+			slateSize = rows
+		}
+		slate := make([]int32, slateSize)
+		if allRows {
+			for row := 0; row < rows; row++ {
+				g := slate[ids[row]]
+				if g == 0 {
+					repRows = append(repRows, row)
+					g = int32(len(repRows))
+					slate[ids[row]] = g
+				}
+				gids[row] = g - 1
+			}
+		} else {
+			for k, row := range indexes {
+				g := slate[ids[row]]
+				if g == 0 {
+					repRows = append(repRows, row)
+					g = int32(len(repRows))
+					slate[ids[row]] = g
+				}
+				gids[k] = g - 1
+			}
+		}
+	default:
+		slate := make([]int32, domain)
+		if allRows {
+			for row := 0; row < rows; row++ {
+				key := perColumn[0][row]
+				for ki := 1; ki < len(perColumn); ki++ {
+					key = key*counts[ki] + perColumn[ki][row]
+				}
+				g := slate[key]
+				if g == 0 {
+					repRows = append(repRows, row)
+					g = int32(len(repRows))
+					slate[key] = g
+				}
+				gids[row] = g - 1
+			}
+		} else {
+			for k, row := range indexes {
+				key := perColumn[0][row]
+				for ki := 1; ki < len(perColumn); ki++ {
+					key = key*counts[ki] + perColumn[ki][row]
+				}
+				g := slate[key]
+				if g == 0 {
+					repRows = append(repRows, row)
+					g = int32(len(repRows))
+					slate[key] = g
+				}
+				gids[k] = g - 1
+			}
+		}
+	}
+	return gids, repRows, true
 }
 
 // execGroupedTypedRowIDs executes grouped aggregates through positional group
@@ -225,10 +351,18 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 	if !ok {
 		return Frame{}, false, nil
 	}
-	ids, groupCount, ok := groupRowIDsCached(frame, byInputs, byArrays, rows)
+
+	// Compact group ids to filtered first-appearance order, mirroring the
+	// boxed map-insertion ordering. Phase 1 resolves each participating row's
+	// compact group id once (folding the composite-key combine into the same
+	// pass, so multi-key groups never materialize a full-frame combined id
+	// vector); phase 2 runs one tight monomorphic loop per accumulator
+	// instead of a per-row closure with a per-aggregate string switch.
+	gids, repRows, ok := groupCompactRowIDs(frame, byInputs, byArrays, rows, indexes, allRows)
 	if !ok {
 		return Frame{}, false, nil
 	}
+	groupCount := len(repRows)
 
 	accs := make([]typedRowIDsAccumulator, len(aggs))
 	for i, agg := range aggs {
@@ -256,38 +390,79 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 			accs[i].lastRow = make([]int, groupCount)
 		}
 	}
-
-	// Compact group ids to filtered first-appearance order, mirroring the
-	// boxed map-insertion ordering, while accumulating in the same pass.
-	remap := make([]int, groupCount)
-	for i := range remap {
-		remap[i] = -1
-	}
-	repRows := make([]int, 0, groupCount)
-	accumulate := func(row int) error {
-		id := ids[row]
-		g := remap[id]
-		if g < 0 {
-			g = len(repRows)
-			remap[id] = g
-			repRows = append(repRows, row)
+	rowAt := func(k int) int {
+		if allRows {
+			return k
 		}
-		for i := range accs {
-			acc := &accs[i]
-			switch acc.input.Func {
-			case "count":
+		return indexes[k]
+	}
+	for i := range accs {
+		acc := &accs[i]
+		switch acc.input.Func {
+		case "count":
+			for _, g := range gids {
 				acc.count[g]++
-			case "sum", "avg", "var", "dev":
-				var value float64
-				var ok bool
-				if acc.valueFn != nil {
-					value, ok = acc.valueFn(row)
-				} else {
-					var err error
-					value, ok, err = aggregateIndexedNumericValue(acc.input, row)
-					if err != nil {
-						return err
+			}
+		case "sum", "avg", "var", "dev":
+			if acc.input.column != nil {
+				// Plain dense numeric columns accumulate straight off the
+				// typed slice; no per-row reader call at all.
+				if data, ok := groupAggF64Slice(acc.input.column); ok {
+					if allRows {
+						for row, g := range gids {
+							value := data[row]
+							acc.sum[g] += value
+							if acc.sumsq != nil {
+								acc.sumsq[g] += value * value
+							}
+							acc.count[g]++
+						}
+					} else {
+						for k, g := range gids {
+							value := data[indexes[k]]
+							acc.sum[g] += value
+							if acc.sumsq != nil {
+								acc.sumsq[g] += value * value
+							}
+							acc.count[g]++
+						}
 					}
+					continue
+				}
+			}
+			if acc.valueFn != nil {
+				fn := acc.valueFn
+				if allRows {
+					for row, g := range gids {
+						value, ok := fn(row)
+						if !ok {
+							continue
+						}
+						acc.sum[g] += value
+						if acc.sumsq != nil {
+							acc.sumsq[g] += value * value
+						}
+						acc.count[g]++
+					}
+				} else {
+					for k, g := range gids {
+						value, ok := fn(indexes[k])
+						if !ok {
+							continue
+						}
+						acc.sum[g] += value
+						if acc.sumsq != nil {
+							acc.sumsq[g] += value * value
+						}
+						acc.count[g]++
+					}
+				}
+				continue
+			}
+			for k, g := range gids {
+				value, ok, err := aggregateIndexedNumericValue(acc.input, rowAt(k))
+				if err != nil {
+					return Frame{}, true, err
 				}
 				if !ok {
 					continue
@@ -297,29 +472,30 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 					acc.sumsq[g] += value * value
 				}
 				acc.count[g]++
-			case "first":
-				if acc.firstRow[g] < 0 {
-					acc.firstRow[g] = row
+			}
+		case "first":
+			if allRows {
+				for row, g := range gids {
+					if acc.firstRow[g] < 0 {
+						acc.firstRow[g] = row
+					}
 				}
-			case "last":
-				acc.lastRow[g] = row
+			} else {
+				for k, g := range gids {
+					if acc.firstRow[g] < 0 {
+						acc.firstRow[g] = indexes[k]
+					}
+				}
 			}
-		}
-		return nil
-	}
-	if allRows {
-		for row := 0; row < rows; row++ {
-			if err := accumulate(row); err != nil {
-				return Frame{}, true, err
-			}
-		}
-	} else {
-		for _, row := range indexes {
-			if row < 0 || row >= rows {
-				return Frame{}, false, nil
-			}
-			if err := accumulate(row); err != nil {
-				return Frame{}, true, err
+		case "last":
+			if allRows {
+				for row, g := range gids {
+					acc.lastRow[g] = row
+				}
+			} else {
+				for k, g := range gids {
+					acc.lastRow[g] = indexes[k]
+				}
 			}
 		}
 	}
@@ -327,7 +503,10 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 	outGroups := len(repRows)
 	cols := make([]Column, 0, len(byInputs)+len(aggs))
 	for i, item := range byInputs {
-		cols = append(cols, Column{Name: item.Name, Data: byArrays[i].Gather(repRows)})
+		// Gather the unwrapped storage: a grouped/unique attribute index is a
+		// fact about the full input column, and rebuilding it for the tiny
+		// per-group representative output costs more than it can ever save.
+		cols = append(cols, Column{Name: item.Name, Data: unwrapAttributedArray(byArrays[i]).Gather(repRows)})
 	}
 	for i := range accs {
 		acc := &accs[i]

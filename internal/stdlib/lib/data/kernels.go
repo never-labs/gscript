@@ -209,6 +209,13 @@ func (typedKernelRegistry) CompareMask(array Array, op Op, value any, out []bool
 }
 
 func (k typedKernelRegistry) CompareIndexes(array Array, op Op, value any, out []int) ([]int, bool) {
+	if out == nil {
+		// Bool columns count matches and size their index vector exactly, so
+		// a heuristic scratch allocation would only be thrown away.
+		if _, isBool := unwrapAttributedArray(array).(columnArray[bool]); !isBool {
+			out = filterIndexScratch(array.Len())
+		}
+	}
 	switch a := array.(type) {
 	case attributedArray:
 		return k.CompareIndexes(a.array, op, value, out)
@@ -14640,9 +14647,40 @@ func compareBoolIndexes(values []bool, target bool, ok bool, op Op, out []int) (
 	if !ok {
 		return nil, false
 	}
-	out = out[:0]
+	// Bool predicates have only two cell outcomes; counting matches first
+	// sizes the index vector exactly instead of paying append regrowth on
+	// low-selectivity filters.
+	holdsTrue := boolCompare(op, target, compareBool(true, target))
+	holdsFalse := boolCompare(op, !target, compareBool(false, target))
+	trues := 0
+	for _, v := range values {
+		if v {
+			trues++
+		}
+	}
+	n := 0
+	if holdsTrue {
+		n += trues
+	}
+	if holdsFalse {
+		n += len(values) - trues
+	}
+	if cap(out) < n {
+		out = make([]int, 0, n)
+	} else {
+		out = out[:0]
+	}
+	if n == 0 {
+		return out, true
+	}
+	if holdsTrue && holdsFalse {
+		for i := range values {
+			out = append(out, i)
+		}
+		return out, true
+	}
 	for i, v := range values {
-		if boolCompare(op, v == target, compareBool(v, target)) {
+		if v == holdsTrue {
 			out = append(out, i)
 		}
 	}

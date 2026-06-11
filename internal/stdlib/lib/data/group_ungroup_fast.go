@@ -24,6 +24,15 @@ func frameRowGroupIDs(frame Frame, keyColumns []Symbol) ([]int, int, bool) {
 		}
 		arrays[i] = col
 	}
+	// Borrow (or attach) the column's cached grouped ArrayIndex so repeated
+	// grouped mutations against the same frame skip the per-call hash pass.
+	if len(arrays) == 1 {
+		if index, ok := groupedArrayIndexCached(frame, keyColumns[0], arrays[0]); ok {
+			if ids, err := rowToGroupFromIndex(index); err == nil && len(ids) == rows {
+				return ids, len(index.Rows), true
+			}
+		}
+	}
 	return arraysRowGroupIDs(arrays, rows)
 }
 

@@ -559,7 +559,7 @@ var (
 	qSQLTemplateStats   qSQLPlanCacheStats
 
 	qSQLAlignedPlanCacheMu             sync.Mutex
-	qSQLAlignedPlanCache               = make(map[string]data.QueryPlan)
+	qSQLAlignedPlanCache               = make(map[string]qSQLAlignedPlanEntry)
 	qSQLAlignedPlanOrder               []string
 	qSQLAlignedMutationCache           = make(map[string]*stdq.MutationPlan)
 	qSQLAlignedMutationOrder           []string
@@ -2017,8 +2017,8 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 			}
 		}
 	}
-	plan := qPrepareSQLPlanForFrame(args.source, tmpl.plan, frame, bindings, true)
-	out, err := qRunSQLPlan(args.source, plan, frame)
+	plan, kernelKey := qPrepareSQLPlanForFrameWithKernelKey(args.source, tmpl.plan, frame, bindings, true)
+	out, err := qRunSQLPlanWithKernelKey(args.source, plan, frame, kernelKey)
 	if err != nil {
 		return NilValue(), fmt.Errorf("%s: exec: %w", name, err)
 	}
@@ -2078,7 +2078,11 @@ func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplat
 }
 
 func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame, error) {
-	kernel, ok, reason, err := qSQLKernelForFrame(src, plan, frame)
+	return qRunSQLPlanWithKernelKey(src, plan, frame, "")
+}
+
+func qRunSQLPlanWithKernelKey(src string, plan data.QueryPlan, frame data.Frame, kernelKey string) (data.Frame, error) {
+	kernel, ok, reason, err := qSQLKernelForFrameWithKey(src, plan, frame, kernelKey)
 	if err != nil {
 		qRecordFallbackReason(qFallbackKernelCompileErr, qKernelReasonCompileError, err.Error())
 		return data.Frame{}, err
@@ -2139,8 +2143,14 @@ func qApplySQLJoinForPlan(sources Value, left data.Frame, join *stdq.JoinPlan, p
 		}
 		return data.LeftJoinOn(left, right.frame, join.Keys...)
 	case "union":
+		if opts, ok := qSharedJoinPruneOptions(left, right.frame, join, plan, allowPrune); ok {
+			return data.UnionJoinOnWithOptions(left, right.frame, opts, join.Keys...)
+		}
 		return data.UnionJoinOn(left, right.frame, join.Keys...)
 	case "plus":
+		if opts, ok := qSharedJoinPruneOptions(left, right.frame, join, plan, allowPrune); ok {
+			return data.PlusJoinOnWithOptions(left, right.frame, opts, join.Keys...)
+		}
 		return data.PlusJoinOn(left, right.frame, join.Keys...)
 	case "asof", "asof0", "asof_fill", "asof_fill0":
 		if len(join.Keys) < 1 {
@@ -2209,6 +2219,41 @@ func qJoinPruneOptions(left data.Frame, right data.Frame, join *stdq.JoinPlan, p
 		RightColumns: qSymbolsInSchemaOrder(rightSchema, rightNeeded),
 		OrderBy:      qJoinPruneOrder(leftSchema, rightSchema, plan),
 		LimitN:       plan.LimitN,
+	}, true
+}
+
+// qSharedJoinPruneOptions builds column-prune options for union/plus joins.
+// Unlike inner/left pruning it keeps every needed name on both sides where
+// present: plus joins add same-named columns and union joins coalesce key
+// columns, so dropping one side's copy of a needed name would change the
+// merged values, not just the projection. OrderBy/LimitN are never set; the
+// plan re-applies ordering and limits after the join.
+func qSharedJoinPruneOptions(left data.Frame, right data.Frame, join *stdq.JoinPlan, plan data.QueryPlan, allowPrune bool) (data.JoinOptions, bool) {
+	if !allowPrune || join == nil || len(join.Keys) == 0 || plan.Distinct || len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
+		return data.JoinOptions{}, false
+	}
+	refs, ok := qQueryPlanColumnRefs(plan)
+	if !ok || len(refs) == 0 {
+		return data.JoinOptions{}, false
+	}
+	leftSchema := left.Schema()
+	rightSchema := right.Schema()
+	needed := make(map[data.Symbol]struct{}, len(refs)+2*len(join.Keys))
+	for _, key := range join.Keys {
+		needed[key.Left] = struct{}{}
+		needed[key.Right] = struct{}{}
+	}
+	for ref := range refs {
+		_, leftOK := leftSchema.Kind(ref)
+		_, rightOK := rightSchema.Kind(ref)
+		if !leftOK && !rightOK {
+			return data.JoinOptions{}, false
+		}
+		needed[ref] = struct{}{}
+	}
+	return data.JoinOptions{
+		LeftColumns:  qSymbolsInSchemaOrder(leftSchema, needed),
+		RightColumns: qSymbolsInSchemaOrder(rightSchema, needed),
 	}, true
 }
 
@@ -3345,35 +3390,73 @@ func qDropHiddenSQLColumns(frame data.Frame, hidden []data.Symbol) (data.Frame, 
 }
 
 func qPrepareSQLPlanForFrame(src string, tmpl data.QueryPlan, frame data.Frame, bindings map[data.Symbol]any, useAlignedCache bool) data.QueryPlan {
+	plan, _ := qPrepareSQLPlanForFrameWithKernelKey(src, tmpl, frame, bindings, useAlignedCache)
+	return plan
+}
+
+// qPrepareSQLPlanForFrameWithKernelKey prepares the frame-aligned plan and, on
+// the warm no-binding path, also returns the precomputed schema-stable kernel
+// cache key so re-execution skips both the per-call deep plan clone and the
+// per-call plan fingerprint serialization. The kernel key is empty whenever
+// the returned plan could differ from the cached aligned plan (cold path,
+// scalar bindings applied, or aligned cache bypassed).
+func qPrepareSQLPlanForFrameWithKernelKey(src string, tmpl data.QueryPlan, frame data.Frame, bindings map[data.Symbol]any, useAlignedCache bool) (data.QueryPlan, string) {
+	if useAlignedCache && len(bindings) == 0 {
+		// The cached aligned plan is treated as read-only downstream (kernel
+		// compile clones defensively; exec never mutates plan internals), so
+		// the warm path shares it instead of deep-cloning per call.
+		plan, kernelKey := qSQLPlanEntryForFrame(src, tmpl, frame, false)
+		plan.Source = frame
+		return plan, kernelKey
+	}
 	var plan data.QueryPlan
 	if useAlignedCache {
-		plan = qSQLPlanForFrame(src, tmpl, frame)
+		plan, _ = qSQLPlanEntryForFrame(src, tmpl, frame, true)
 	} else {
 		plan = qAlignSQLPlanForFrame(tmpl, frame)
 	}
 	qBindPlanOuterScalars(&plan, frame.Schema(), bindings)
 	plan.Source = frame
-	return plan
+	return plan, ""
 }
 
 func qSQLPlanForFrame(src string, tmpl data.QueryPlan, frame data.Frame) data.QueryPlan {
+	plan, _ := qSQLPlanEntryForFrame(src, tmpl, frame, true)
+	return plan
+}
+
+type qSQLAlignedPlanEntry struct {
+	plan data.QueryPlan
+	// kernelKey is the schema-stable query kernel cache key for the aligned
+	// (unbound) plan, computed once per (source, schema) instead of per call.
+	kernelKey string
+}
+
+func qSQLPlanEntryForFrame(src string, tmpl data.QueryPlan, frame data.Frame, clone bool) (data.QueryPlan, string) {
 	key := data.QueryAlignedPlanCacheKey(src, frame)
 	qSQLAlignedPlanCacheMu.Lock()
-	if plan, ok := qSQLAlignedPlanCache[key]; ok {
+	if entry, ok := qSQLAlignedPlanCache[key]; ok {
 		qSQLAlignedStats.AlignedHits++
 		qSQLAlignedPlanCacheMu.Unlock()
-		return qCloneDataQueryPlan(plan)
+		if clone {
+			return qCloneDataQueryPlan(entry.plan), entry.kernelKey
+		}
+		return entry.plan, entry.kernelKey
 	}
 	qSQLAlignedStats.AlignedMisses++
 	qSQLAlignedPlanCacheMu.Unlock()
 
 	plan := qAlignSQLPlanForFrame(tmpl, frame)
+	kernelKey := data.QueryKernelCacheKey(src, frame, plan)
 
 	qSQLAlignedPlanCacheMu.Lock()
-	qSQLAlignedPlanCacheStoreLocked(key, plan)
+	qSQLAlignedPlanCacheStoreLocked(key, plan, kernelKey)
 	qSQLAlignedPlanCacheMu.Unlock()
 
-	return qCloneDataQueryPlan(plan)
+	if clone {
+		return qCloneDataQueryPlan(plan), kernelKey
+	}
+	return plan, kernelKey
 }
 
 func qAlignSQLPlanForFrame(tmpl data.QueryPlan, frame data.Frame) data.QueryPlan {
@@ -3406,7 +3489,13 @@ func qSQLMutationForFrame(src string, tmpl *stdq.MutationPlan, frame data.Frame)
 }
 
 func qSQLKernelForFrame(src string, plan data.QueryPlan, frame data.Frame) (*data.QueryKernel, bool, string, error) {
-	key := data.QueryKernelCacheKey(src, frame, plan)
+	return qSQLKernelForFrameWithKey(src, plan, frame, "")
+}
+
+func qSQLKernelForFrameWithKey(src string, plan data.QueryPlan, frame data.Frame, key string) (*data.QueryKernel, bool, string, error) {
+	if key == "" {
+		key = data.QueryKernelCacheKey(src, frame, plan)
+	}
 	qSQLAlignedPlanCacheMu.Lock()
 	if kernel, ok := qSQLKernelCache[key]; ok {
 		qSQLAlignedStats.KernelHits++
@@ -3612,11 +3701,11 @@ func qSQLTemplateCacheStoreLocked(key string, tmpl qSQLPlanTemplate) {
 	}
 }
 
-func qSQLAlignedPlanCacheStoreLocked(key string, plan data.QueryPlan) {
+func qSQLAlignedPlanCacheStoreLocked(key string, plan data.QueryPlan, kernelKey string) {
 	if _, ok := qSQLAlignedPlanCache[key]; !ok {
 		qSQLAlignedPlanOrder = append(qSQLAlignedPlanOrder, key)
 	}
-	qSQLAlignedPlanCache[key] = qCloneDataQueryPlan(plan)
+	qSQLAlignedPlanCache[key] = qSQLAlignedPlanEntry{plan: qCloneDataQueryPlan(plan), kernelKey: kernelKey}
 	for len(qSQLAlignedPlanOrder) > qSQLPlanCacheLimit {
 		evict := qSQLAlignedPlanOrder[0]
 		qSQLAlignedPlanOrder = qSQLAlignedPlanOrder[1:]
@@ -6301,7 +6390,7 @@ func qClearCaches() {
 	qSQLTemplateCacheMu.Unlock()
 
 	qSQLAlignedPlanCacheMu.Lock()
-	qSQLAlignedPlanCache = make(map[string]data.QueryPlan)
+	qSQLAlignedPlanCache = make(map[string]qSQLAlignedPlanEntry)
 	qSQLAlignedPlanOrder = nil
 	qSQLAlignedMutationCache = make(map[string]*stdq.MutationPlan)
 	qSQLAlignedMutationOrder = nil
@@ -6524,6 +6613,15 @@ func qSQLScalarBindingsFromValue(v Value) map[data.Symbol]any {
 	v.Table().ForEachPlainRaw(func(key, val Value) bool {
 		if !key.IsString() {
 			return true
+		}
+		if val.IsTable() {
+			// Frame/keyed-frame carriers are query sources, not scalar
+			// bindings; without this check their facades (plain length 0)
+			// would register as nil scalars and force the per-call plan
+			// clone + rebind path for every query in the environment.
+			if _, isFrame := qNativeFrameRuntimeKind(val.Table()); isFrame {
+				return true
+			}
 		}
 		scalar, ok := qWireScalarFromValue(val)
 		if !ok {
@@ -8428,7 +8526,9 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 		kindNames[i] = string(name)
 		kindValues[i] = string(kind)
 	}
-	out := NewTable()
+	// Six eager marker keys land in the string part; pre-sizing avoids the
+	// 1->2->4->8 arena regrowth on every per-query result facade.
+	out := NewTableSized(0, 6)
 	out.RawSetString(dataFrameMarker, BoolValue(true))
 	out.RawSetString("len", IntValue(int64(frame.Len())))
 	out.RawSetString("kind", StringValue("data_frame"))
