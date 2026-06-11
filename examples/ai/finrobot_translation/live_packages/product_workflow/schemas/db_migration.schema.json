@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/product_workflow/db_migration.schema.json",
+  "title": "FinRobot Product Workflow DB Migration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "provider_free", "live_network", "capability", "migrations"],
+  "properties": {
+    "schema_version": {"type": "integer", "minimum": 1},
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "capability": {"const": "product.workflow.db.migration.plan"},
+    "migrations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "direction", "tables", "rollback_required"],
+        "properties": {
+          "id": {"type": "string"},
+          "direction": {"enum": ["up", "down"]},
+          "tables": {"type": "array", "minItems": 1},
+          "rollback_required": {"const": true}
+        }
+      }
+    }
+  }
+}
+

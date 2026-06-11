@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-product-workflow-provider-free-fixtures",
+  "provider_free": true,
+  "fixtures": {
+    "equity_cli_run": {
+      "ticker": "AAPL",
+      "status": "planned_not_rendered",
+      "stage_count": 7,
+      "artifact_manifest": "output/AAPL/report/artifact_manifest.json"
+    },
+    "web_product": {
+      "route_count": 12,
+      "session_count": 2,
+      "task_log_count": 4,
+      "download_count": 4,
+      "crud_ops": ["create", "read", "update", "delete"]
+    }
+  },
+  "db_seed": {
+    "users": ["usr_analyst", "usr_admin"],
+    "sessions": ["sess_user", "sess_admin"],
+    "report_requests": ["req_aapl_001"],
+    "reports": ["rep_aapl_001"],
+    "artifacts": ["artifact_html_report", "artifact_pdf_report", "artifact_manifest_json", "artifact_task_log"],
+    "task_events": ["queued", "started", "artifact_planned", "completed"]
+  }
+}
+
