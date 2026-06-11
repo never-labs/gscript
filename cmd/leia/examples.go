@@ -514,6 +514,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		return
 	case strings.Contains(example.Path, "/ai/coding_agent_replay.leia"),
 		strings.Contains(example.Path, "/ai/coding_agent_project/"),
+		strings.Contains(example.Path, "/ai/finrobot_translation/"),
 		strings.Contains(example.Path, "/ai/tagged_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/general_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/general_analysis_assistant.leia"),
@@ -529,7 +530,11 @@ func applyCLIExampleRunner(example *cliExample) {
 		}
 		example.Runnable = true
 		example.Checkable = true
-		example.Runner = "llm-mock"
+		if strings.Contains(example.Path, "/ai/finrobot_translation/") {
+			example.Runner = "host-vm"
+		} else {
+			example.Runner = "llm-mock"
+		}
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/macos/package_managed/"),
