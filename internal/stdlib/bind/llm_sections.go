@@ -156,6 +156,7 @@ func llmSectionEvidenceMessage(evidence Value) Value {
 		if len(messages) == 1 {
 			return messages[0]
 		}
+		return TableValue(llmMessageTable("user", llmMemoryValueText(evidence)))
 	}
 	return TableValue(llmMessageTable("user", evidence.Str()))
 }
