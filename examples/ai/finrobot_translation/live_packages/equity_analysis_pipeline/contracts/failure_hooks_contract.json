@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-equity-analysis-pipeline-failure-hooks-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "failure_hooks_fixture": "fixtures/failure_hooks_fixture.json",
+  "failure_hooks": [
+    {
+      "id": "fetch_provider_unavailable",
+      "stage_id": "fetch",
+      "fallback_action": "use_recorded_fixture",
+      "expected_status": "clean_skipped_without_provider"
+    },
+    {
+      "id": "normalization_missing_metric",
+      "stage_id": "normalize",
+      "fallback_action": "emit_quality_warning",
+      "expected_status": "completed_with_warning"
+    },
+    {
+      "id": "forecast_assumption_gap",
+      "stage_id": "forecast",
+      "fallback_action": "use_default_assumption_fixture",
+      "expected_status": "completed_with_warning"
+    },
+    {
+      "id": "artifact_renderer_missing",
+      "stage_id": "artifact_plan",
+      "fallback_action": "plan_artifact_without_rendering",
+      "expected_status": "planned_not_rendered"
+    }
+  ],
+  "acceptance_gates": [
+    "failure hooks are represented as deterministic offline fixture events",
+    "no hook imports live provider SDKs, renderer dependencies, pandas, numpy, requests, or network clients",
+    "each hook returns a clean-skip or warning envelope with stage_id and trace_event_id",
+    "failure hook trace can be joined to provider_free_trace fixture"
+  ]
+}

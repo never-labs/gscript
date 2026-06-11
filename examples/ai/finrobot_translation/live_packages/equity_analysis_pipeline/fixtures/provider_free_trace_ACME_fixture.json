@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "fixture_key": "equity_pipeline:trace:ACME:offline",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "run_id": "equity-pipeline-ACME-2026-06-11",
+  "stage_events": [
+    {
+      "event_id": "evt-fetch",
+      "stage_id": "fetch",
+      "status": "completed_from_fixture",
+      "fixture_key": "equity_pipeline:input:ACME:offline"
+    },
+    {
+      "event_id": "evt-normalize",
+      "stage_id": "normalize",
+      "status": "completed_from_fixture",
+      "fixture_key": "equity_pipeline:normalized:ACME:offline"
+    },
+    {
+      "event_id": "evt-forecast",
+      "stage_id": "forecast",
+      "status": "completed_from_fixture",
+      "fixture_key": "equity_pipeline:forecast:ACME:offline"
+    },
+    {
+      "event_id": "evt-section-agents",
+      "stage_id": "section_agents",
+      "status": "completed_from_fixture",
+      "fixture_key": "equity_pipeline:section_handoff:ACME:offline"
+    },
+    {
+      "event_id": "evt-artifact-plan",
+      "stage_id": "artifact_plan",
+      "status": "planned_not_rendered",
+      "fixture_key": "equity_pipeline:artifact_manifest:ACME:offline"
+    }
+  ],
+  "artifact_refs": [
+    "report_markdown",
+    "valuation_table",
+    "revenue_forecast_chart",
+    "provider_free_trace",
+    "ai_disclosure"
+  ]
+}
