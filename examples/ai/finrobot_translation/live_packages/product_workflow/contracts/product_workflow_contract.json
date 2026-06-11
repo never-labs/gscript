@@ -84,7 +84,14 @@
       "revoked_session",
       "csrf_missing_for_post",
       "role_mismatch"
-    ]
+    ],
+    "invariants": {
+      "protected_routes_require_authenticated_state": true,
+      "post_routes_require_csrf": true,
+      "admin_routes_require_admin_role": true,
+      "denied_cases_fixture_covered": true,
+      "session_state_changes_emit_audit_event": true
+    }
   },
   "auth_session": {
     "capability": "product.workflow.auth.session",

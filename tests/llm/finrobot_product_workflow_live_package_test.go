@@ -163,6 +163,13 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 				SideEffects          []string `json:"side_effects"`
 			} `json:"routes"`
 			DeniedCases []string `json:"denied_cases"`
+			Invariants  struct {
+				ProtectedRoutesRequireAuthenticatedState bool `json:"protected_routes_require_authenticated_state"`
+				PostRoutesRequireCSRF                    bool `json:"post_routes_require_csrf"`
+				AdminRoutesRequireAdminRole              bool `json:"admin_routes_require_admin_role"`
+				DeniedCasesFixtureCovered                bool `json:"denied_cases_fixture_covered"`
+				SessionStateChangesEmitAuditEvent        bool `json:"session_state_changes_emit_audit_event"`
+			} `json:"invariants"`
 		} `json:"route_session_state_contract"`
 		AuthSession map[string]any `json:"auth_session"`
 		RequestSM   struct {
@@ -793,6 +800,13 @@ func assertRouteSessionStateContract(t *testing.T, contract struct {
 		SideEffects          []string `json:"side_effects"`
 	} `json:"routes"`
 	DeniedCases []string `json:"denied_cases"`
+	Invariants  struct {
+		ProtectedRoutesRequireAuthenticatedState bool `json:"protected_routes_require_authenticated_state"`
+		PostRoutesRequireCSRF                    bool `json:"post_routes_require_csrf"`
+		AdminRoutesRequireAdminRole              bool `json:"admin_routes_require_admin_role"`
+		DeniedCasesFixtureCovered                bool `json:"denied_cases_fixture_covered"`
+		SessionStateChangesEmitAuditEvent        bool `json:"session_state_changes_emit_audit_event"`
+	} `json:"invariants"`
 }, webRoutes []string) {
 	t.Helper()
 	if contract.Capability != "product.workflow.web.route" || contract.Mode != "fixture_session_state" {
@@ -832,6 +846,13 @@ func assertRouteSessionStateContract(t *testing.T, contract struct {
 		if !contains(contract.DeniedCases, want) {
 			t.Fatalf("route/session denied cases missing %q: %#v", want, contract.DeniedCases)
 		}
+	}
+	if !contract.Invariants.ProtectedRoutesRequireAuthenticatedState ||
+		!contract.Invariants.PostRoutesRequireCSRF ||
+		!contract.Invariants.AdminRoutesRequireAdminRole ||
+		!contract.Invariants.DeniedCasesFixtureCovered ||
+		!contract.Invariants.SessionStateChangesEmitAuditEvent {
+		t.Fatalf("route/session invariants must all be explicit and enabled: %#v", contract.Invariants)
 	}
 }
 
