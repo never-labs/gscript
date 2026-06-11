@@ -1009,7 +1009,16 @@ func qEvalSymbolicValue(src Value) (Value, error) {
 	return qEvalSymbolicSource(src.Str())
 }
 
-func qEvalSymbolicSource(src string) (Value, error) {
+func qEvalSymbolicSource(src string) (v Value, err error) {
+	// Scope the eval + conversion: q evaluation is Go-native and the eval
+	// cache stores Go-native values, so only the returned value's roots need
+	// to survive this call.
+	scope := PushValueScope()
+	defer func() { scope.Release(v) }()
+	return qEvalSymbolicSourceScoped(src)
+}
+
+func qEvalSymbolicSourceScoped(src string) (Value, error) {
 	cacheable := stdq.EvalSourceCacheable(src)
 	var out any
 	if cacheable {
@@ -1048,17 +1057,21 @@ func qEvalSymbolicSource(src string) (Value, error) {
 func qSessionValue() *Table {
 	session := stdq.NewEvalSession(nil)
 	var mu sync.Mutex
-	evalValue := func(src Value) (Value, error) {
+	evalValue := func(src Value) (v Value, err error) {
 		if !src.IsString() {
 			return NilValue(), fmt.Errorf("q.session.eval: argument 1 must be a q source string")
 		}
+		// Scope the Go-native eval plus result conversion: only the returned
+		// value's roots survive, per-call conversion temporaries are dropped.
+		scope := PushValueScope()
+		defer func() { scope.Release(v) }()
 		mu.Lock()
 		out, err := session.Eval(src.Str())
 		mu.Unlock()
 		if err != nil {
 			return NilValue(), fmt.Errorf("q session: %w", err)
 		}
-		v, err := qEvalValueToValue(out)
+		v, err = qEvalValueToValue(out)
 		if err != nil {
 			return NilValue(), fmt.Errorf("q session: %w", err)
 		}
@@ -1082,14 +1095,16 @@ func qSessionValue() *Table {
 		if planned == nil {
 			return NilValue(), fmt.Errorf("q session: source could not be planned")
 		}
-		run := func(Value) (Value, error) {
+		run := func(Value) (v Value, err error) {
+			scope := PushValueScope()
+			defer func() { scope.Release(v) }()
 			mu.Lock()
 			out, err := planned.Eval()
 			mu.Unlock()
 			if err != nil {
 				return NilValue(), fmt.Errorf("q session: %w", err)
 			}
-			v, err := qEvalValueToValue(out)
+			v, err = qEvalValueToValue(out)
 			if err != nil {
 				return NilValue(), fmt.Errorf("q session: %w", err)
 			}
@@ -1948,7 +1963,20 @@ func qExplainQuery(s *SoA, spec *Table) (*Table, error) {
 	return out, nil
 }
 
-func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
+// qRunSQL evaluates a qSQL statement and exports the result as a Value.
+// The whole evaluation runs inside a runtime ValueScope: q evaluation is
+// Go-native (lib/q creates no runtime.Values) and the bind conversion layer
+// only builds fresh result structures, so every NaN-box root created here is
+// either dead on return or reachable from the returned value. Release(out)
+// re-publishes the result roots and drops the intermediates, keeping the
+// append-only root log from growing with per-call temporaries.
+func qRunSQL(name string, args qSQLArgsResult) (out Value, err error) {
+	scope := PushValueScope()
+	defer func() { scope.Release(out) }()
+	return qRunSQLScoped(name, args)
+}
+
+func qRunSQLScoped(name string, args qSQLArgsResult) (Value, error) {
 	tmpl, err := qSQLCachedPlanTemplate(name, args.source)
 	if err != nil {
 		return NilValue(), err
@@ -7253,7 +7281,8 @@ func qKeys(args []Value, keyFrame bool) ([]Value, error) {
 }
 
 func qKeyedFrameToValue(keyed data.KeyedFrame) Value {
-	t := NewTable()
+	// Unshared: carries the keyed-frame native payload (see NewUnsharedTable).
+	t := NewUnsharedTable()
 	t.RawSetString(qKeyedFrameMarker, BoolValue(true))
 	t.RawSetString("keys", qDataSymbolListValue(keyed.Keys()))
 	// The "frame" field uses the lazy frame facade: per-column wrappers and
@@ -8306,7 +8335,8 @@ func qOrderDescFlags(order []qOrderSpec) []bool {
 }
 
 func qNativeRowsFrameCarrier(nativeRows *SoA) Value {
-	carrier := NewTable()
+	// Unshared: carries the SoA native payload (see NewUnsharedTable).
+	carrier := NewUnsharedTable()
 	carrier.SetNativePayloadWithInfo(nativeRows, NativePayloadInfo{
 		Kind:       NativePayloadDataFrame,
 		Rows:       nativeRows.Len(),
@@ -8521,7 +8551,8 @@ func qDataFrameFacadeValueWithNative(frame data.Frame, soaNative bool) (Value, e
 		kindNames = append(kindNames, string(name))
 		kindMap[string(name)] = string(kind)
 	}
-	out := NewTable()
+	// Unshared: carries the frame native payload (see NewUnsharedTable).
+	out := NewUnsharedTable()
 	out.RawSetString(dataFrameMarker, BoolValue(true))
 	out.RawSetString("len", IntValue(int64(frame.Len())))
 	out.RawSetString("columns", TableValue(cols))
@@ -8558,7 +8589,10 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 	}
 	// Six eager marker keys land in the string part; pre-sizing avoids the
 	// 1->2->4->8 arena regrowth on every per-query result facade.
-	out := NewTableSized(0, 6)
+	// Unshared: this carrier attaches the (potentially large) result frame as
+	// a native payload; slab tables would pin it forever via permanent slab
+	// roots.
+	out := NewUnsharedTableSized(6)
 	out.RawSetString(dataFrameMarker, BoolValue(true))
 	out.RawSetString("len", IntValue(int64(frame.Len())))
 	out.RawSetString("kind", StringValue("data_frame"))
@@ -8589,23 +8623,36 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 	columnKinds := NilValue()
 	schemaValue := NilValue()
 	var columnValues map[string]Value
+	// memo caches a lazily built field value in a closure slot. The slots are
+	// invisible to runtime.ScanValueRoots, so while a ValueScope is capturing
+	// this goroutine's root-log appends the value is rebuilt per access
+	// instead of cached: a cached value would lose its GC roots when the
+	// scope is released (scope keep-scans can only see table-reachable
+	// storage).
+	memo := func(slot *Value, build func() Value) Value {
+		if !slot.IsNil() {
+			return *slot
+		}
+		v := build()
+		if !HasActiveValueScope() {
+			*slot = v
+		}
+		return v
+	}
 	out.SetLazyStringGetter(func(key string) (Value, bool) {
 		switch key {
 		case "column_names":
-			if columnNames.IsNil() {
-				columnNames = TableValue(dataColumnNamesTable(kindNames))
-			}
-			return columnNames, true
+			return memo(&columnNames, func() Value {
+				return TableValue(dataColumnNamesTable(kindNames))
+			}), true
 		case "column_kinds":
-			if columnKinds.IsNil() {
-				columnKinds = TableValue(dataColumnKindsTable(kindNames, kinds()))
-			}
-			return columnKinds, true
+			return memo(&columnKinds, func() Value {
+				return TableValue(dataColumnKindsTable(kindNames, kinds()))
+			}), true
 		case "schema":
-			if schemaValue.IsNil() {
-				schemaValue = TableValue(dataSchemaTable(kindNames, kinds()))
-			}
-			return schemaValue, true
+			return memo(&schemaValue, func() Value {
+				return TableValue(dataSchemaTable(kindNames, kinds()))
+			}), true
 		case "columns", "data":
 			if columns.IsNil() {
 				cols := NewTable()
@@ -8617,37 +8664,36 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 					kind, _ := schema.Kind(name)
 					cols.RawSetString(string(name), dataColumnValue(kind, dataArrayFacadeValue(col, qAnyToColumnValue)))
 				}
+				if HasActiveValueScope() {
+					return TableValue(cols), true
+				}
 				columns = TableValue(cols)
 			}
 			return columns, true
 		case "shape":
-			if shape.IsNil() {
+			return memo(&shape, func() Value {
 				t := NewTable()
 				t.RawSetString("rows", IntValue(int64(frame.Len())))
 				t.RawSetString("columns", IntValue(int64(len(names))))
-				shape = TableValue(t)
-			}
-			return shape, true
+				return TableValue(t)
+			}), true
 		case "row":
-			if rowFn.IsNil() {
-				rowFn = FunctionValue(&GoFunction{Name: "data.frame.row", Fn: dataFrameRowMethod(out)})
-			}
-			return rowFn, true
+			return memo(&rowFn, func() Value {
+				return FunctionValue(&GoFunction{Name: "data.frame.row", Fn: dataFrameRowMethod(out)})
+			}), true
 		case "gather":
-			if gatherFn.IsNil() {
-				gatherFn = FunctionValue(&GoFunction{Name: "data.frame.gather", Fn: dataFrameGatherMethod(out)})
-			}
-			return gatherFn, true
+			return memo(&gatherFn, func() Value {
+				return FunctionValue(&GoFunction{Name: "data.frame.gather", Fn: dataFrameGatherMethod(out)})
+			}), true
 		case "rows":
-			if rowsValue.IsNil() {
+			return memo(&rowsValue, func() Value {
 				rows := NewTable()
 				rows.RawSetString("len", IntValue(int64(frame.Len())))
 				if rowGetter != nil {
 					rows.SetLazyIntGetter(frame.Len(), rowGetter)
 				}
-				rowsValue = TableValue(rows)
-			}
-			return rowsValue, true
+				return TableValue(rows)
+			}), true
 		}
 		for _, name := range names {
 			if key != string(name) {
@@ -8661,10 +8707,12 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 				return NilValue(), false
 			}
 			value := dataArrayFacadeValue(col, qAnyToColumnValue)
-			if columnValues == nil {
-				columnValues = make(map[string]Value, len(names))
+			if !HasActiveValueScope() {
+				if columnValues == nil {
+					columnValues = make(map[string]Value, len(names))
+				}
+				columnValues[key] = value
 			}
-			columnValues[key] = value
 			return value, true
 		}
 		return NilValue(), false
@@ -8717,10 +8765,14 @@ func qLazyDataFrameRowGetter(frame data.Frame) func(int64) (Value, bool) {
 			row.RawSetString(string(name), qAnyToRowValue(v))
 		}
 		value := TableValue(row)
-		if cache == nil {
-			cache = make(map[int64]Value)
+		// The cache map is invisible to scope keep-scans; skip caching while
+		// a ValueScope is capturing this goroutine's roots.
+		if !HasActiveValueScope() {
+			if cache == nil {
+				cache = make(map[int64]Value)
+			}
+			cache[key] = value
 		}
-		cache[key] = value
 		return value, true
 	}
 }

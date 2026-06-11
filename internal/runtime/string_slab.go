@@ -145,7 +145,7 @@ func (h *Heap) publishStringBoxSlab(backing []string) {
 	start := uintptr(root)
 	end := start + uintptr(len(backing))*unsafe.Sizeof(backing[0])
 	registerStringBoxSlabRange(start, end)
-	keepAlive(root, nil)
+	keepAliveGlobal(root) // slab roots cover later allocations by any goroutine; never scope-captured
 	atomic.StoreUintptr(&h.stringBoxSlabNext, 0)
 	atomic.StoreUintptr(&h.stringBoxSlabStart, 0)
 	atomic.StoreUintptr(&h.stringBoxSlabEnd, end)

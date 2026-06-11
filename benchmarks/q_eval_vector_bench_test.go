@@ -5220,6 +5220,11 @@ func qSessionEvalVectorEval(tb testing.TB) *bind.GoFunction {
 
 func qEvalVectorRun(tb testing.TB, eval *bind.GoFunction, src string) int64 {
 	tb.Helper()
+	// Embedder lifetime discipline: the result value is fully consumed into
+	// an int64 checksum inside this scope, so all of its NaN-box roots are
+	// released on return instead of accumulating in the global root log.
+	scope := bind.PushValueScope()
+	defer scope.Release()
 	if eval.FastArg1 != nil {
 		out, err := eval.FastArg1(bind.StringValue(src))
 		if err != nil {

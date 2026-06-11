@@ -161,7 +161,10 @@ func CachedIntStringValue(i int64) (Value, bool) {
 	}
 	cachedIntStringOnce.Do(func() {
 		for n := cachedIntStringMin; n <= cachedIntStringMax; n++ {
-			cachedIntStringValues[n-cachedIntStringMin] = StringValue(strconv.FormatInt(int64(n), 10))
+			v := StringValue(strconv.FormatInt(int64(n), 10))
+			// Process-global cache: roots must survive any active ValueScope.
+			GlobalizeValueRoots(v)
+			cachedIntStringValues[n-cachedIntStringMin] = v
 		}
 	})
 	return cachedIntStringValues[i-cachedIntStringMin], true

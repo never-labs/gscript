@@ -79,7 +79,7 @@ func (h *Heap) publishTableSlab(backing []Table) {
 	start := uintptr(root)
 	end := start + uintptr(len(backing))*unsafe.Sizeof(backing[0])
 	registerTableSlabRange(start, end)
-	keepAlive(root, nil)
+	keepAliveGlobal(root) // slab roots cover later allocations by any goroutine; never scope-captured
 
 	atomic.StoreUintptr(&h.tableSlabNext, 0)
 	atomic.StoreUintptr(&h.tableSlabStart, 0)
@@ -263,7 +263,7 @@ func (h *Heap) publishTableSvalsSlab(backing []tableSvalsSlot) {
 	start := uintptr(root)
 	end := start + uintptr(len(backing))*tableSvalsSlotSize
 	registerTableSlabRange(start, end)
-	keepAlive(root, nil)
+	keepAliveGlobal(root) // slab roots cover later allocations by any goroutine; never scope-captured
 
 	atomic.StoreUintptr(&h.tableSvalsSlabNext, 0)
 	atomic.StoreUintptr(&h.tableSvalsSlabStart, 0)
@@ -283,7 +283,7 @@ func (h *Heap) publishTableSvalsNSlab(backing []tableSvalsNSlot) {
 	start := uintptr(root)
 	end := start + uintptr(len(backing))*tableSvalsNSlotSize
 	registerTableSlabRange(start, end)
-	keepAlive(root, nil)
+	keepAliveGlobal(root) // slab roots cover later allocations by any goroutine; never scope-captured
 
 	atomic.StoreUintptr(&h.tableSvalsNSlabNext, 0)
 	atomic.StoreUintptr(&h.tableSvalsNSlabStart, 0)

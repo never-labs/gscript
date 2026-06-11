@@ -97,8 +97,26 @@ func init() {
 
 // keepAlive registers a Go-heap pointer in the root log so the GC does not
 // collect the object while it is hidden inside a NaN-boxed Value.
-// Lock-free: uses atomic increment on the cursor.
+//
+// When the calling goroutine has an active ValueScope (value_scope.go), the
+// pointer is captured in the scope's private buffer instead of the global
+// append-only log, giving the scope owner a deterministic release point.
+// Shared, load-bearing roots (slab publish roots, interface roots) must call
+// keepAliveGlobal directly: they cover objects created by other goroutines or
+// at later times and may never be scope-released.
 func keepAlive(p unsafe.Pointer, _ any) {
+	if atomic.LoadInt32(&valueScopeActive) != 0 {
+		if s := currentValueScope(); s != nil && !s.barrier {
+			s.entries = append(s.entries, p)
+			return
+		}
+	}
+	keepAliveGlobal(p)
+}
+
+// keepAliveGlobal appends to the global append-only root log, bypassing any
+// active value scope. Lock-free: uses atomic increment on the cursor.
+func keepAliveGlobal(p unsafe.Pointer) {
 	idx := atomic.AddInt64(&gcLog.cursor, 1) - 1
 	if idx < int64(len(gcLog.entries)) {
 		gcLog.entries[idx] = p
@@ -380,8 +398,10 @@ func GCRootScannerCount() int {
 
 // keepAliveIface registers a Go-heap pointer AND stores the full interface
 // for later type recovery via lookupIface. Used only for AnyFunction/AnyCoroutine.
+// Always global: ifaceRoots entries are keyed by address and never deleted, so
+// the object must stay alive forever to prevent address-reuse collisions.
 func keepAliveIface(p unsafe.Pointer, obj any) {
-	keepAlive(p, obj)
+	keepAliveGlobal(p)
 	ifaceMu.Lock()
 	ifaceRoots[uintptr(p)] = obj
 	ifaceMu.Unlock()
