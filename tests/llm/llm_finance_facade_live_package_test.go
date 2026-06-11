@@ -40,6 +40,7 @@ type financeFacadeLiveManifest struct {
 	Schemas               map[string]string               `json:"schemas"`
 	Fixtures              map[string]string               `json:"fixtures"`
 	Modules               []financeFacadeModule           `json:"modules"`
+	FunctionMatrix        []financeFacadeFunctionMatrix   `json:"function_matrix"`
 	ProviderFallbackOrder []financeFacadeFallbackProvider `json:"provider_fallback_order"`
 	CachePolicy           financeFacadePolicy             `json:"cache_policy"`
 	RetryPolicy           financeFacadePolicy             `json:"retry_policy"`
@@ -62,6 +63,21 @@ type financeFacadeFallbackProvider struct {
 	DependencyImported bool   `json:"dependency_imported"`
 	CredentialRequired bool   `json:"credential_required"`
 	CleanSkip          bool   `json:"clean_skip"`
+}
+
+type financeFacadeFunctionMatrix struct {
+	ID                    string         `json:"id"`
+	SourceModule          string         `json:"source_module"`
+	Provider              string         `json:"provider"`
+	Capability            string         `json:"capability"`
+	Fixture               string         `json:"fixture"`
+	Schema                string         `json:"schema"`
+	FallbackOrder         []string       `json:"fallback_order"`
+	ProviderFree          bool           `json:"provider_free"`
+	LiveNetwork           bool           `json:"live_network"`
+	RealDependencyImports bool           `json:"real_dependency_imports"`
+	CleanSkip             bool           `json:"clean_skip"`
+	Metadata              map[string]any `json:"metadata"`
 }
 
 type financeFacadePolicy struct {
@@ -101,6 +117,7 @@ func TestFinRobotFinanceFacadeLivePackageManifest(t *testing.T) {
 	wantSources := []string{
 		"finrobot/data_source/finance_data.py",
 		"finrobot/data_source/market_data.py",
+		"finrobot/data_source/market_data_api.py",
 	}
 	if !reflect.DeepEqual(manifest.SourceModules, wantSources) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
@@ -110,7 +127,7 @@ func TestFinRobotFinanceFacadeLivePackageManifest(t *testing.T) {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"market_data_table", "fundamental_table", "provider_fallback", "error_envelope"} {
+	for _, key := range []string{"market_data_table", "fundamental_table", "function_fixture", "provider_fallback", "error_envelope"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
@@ -133,13 +150,14 @@ func TestFinRobotFinanceFacadeLivePackageManifest(t *testing.T) {
 		}
 	}
 	sort.Strings(moduleIDs)
-	wantModuleIDs := []string{"finance_data", "market_data"}
+	wantModuleIDs := []string{"finance_data", "market_data", "market_data_api"}
 	if !reflect.DeepEqual(moduleIDs, wantModuleIDs) {
 		t.Fatalf("module ids = %#v, want %#v", moduleIDs, wantModuleIDs)
 	}
+	assertFinanceFacadeFunctionMatrix(t, base, manifest.FunctionMatrix)
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"fallback", "typed table", "cache", "retry", "rate-limit", "provenance", "error envelope"} {
+	for _, want := range []string{"fallback", "typed table", "function matrix", "market_data_api.py", "cache", "retry", "rate-limit", "provenance", "error envelope"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -212,6 +230,14 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 			SourceModule   string   `json:"source_module"`
 			RequiredFields []string `json:"required_fields"`
 		} `json:"modules"`
+		FunctionMatrix []struct {
+			ID                   string   `json:"id"`
+			Provider             string   `json:"provider"`
+			Capability           string   `json:"capability"`
+			Schema               string   `json:"schema"`
+			Fixture              string   `json:"fixture"`
+			RequiredOutputFields []string `json:"required_output_fields"`
+		} `json:"function_matrix"`
 		TypedTables []struct {
 			ID              string   `json:"id"`
 			Schema          string   `json:"schema"`
@@ -232,8 +258,18 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 		AcceptanceGates []string `json:"acceptance_gates"`
 	}
 	decodeFinanceFacadeJSONFile(t, filepath.Join(base, "contracts", "finance_facade_contract.json"), &contract)
-	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 2 || len(contract.TypedTables) != 2 {
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 3 || len(contract.TypedTables) != 2 || len(contract.FunctionMatrix) != 9 {
 		t.Fatalf("contract header/modules/tables = %#v", contract)
+	}
+	for _, fn := range contract.FunctionMatrix {
+		if fn.ID == "" || fn.Provider == "" || fn.Capability == "" || fn.Schema == "" || fn.Fixture == "" || len(fn.RequiredOutputFields) == 0 {
+			t.Fatalf("function matrix contract incomplete: %#v", fn)
+		}
+		if !strings.HasPrefix(fn.Capability, "finance.facade.") {
+			t.Fatalf("%s capability = %q", fn.ID, fn.Capability)
+		}
+		assertFinanceFacadeJSONFile(t, filepath.Join(base, fn.Schema))
+		assertFinanceFacadeJSONFile(t, filepath.Join(base, fn.Fixture))
 	}
 	for _, table := range contract.TypedTables {
 		if table.ID == "" || table.Schema == "" || table.Fixture == "" || len(table.PrimaryKey) == 0 || len(table.RequiredColumns) < 7 {
@@ -262,9 +298,10 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeFinanceFacadeJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 12 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
+	indexCapabilities := map[string]bool{}
 	for _, fixture := range index.Fixtures {
 		if fixture.FixtureKey == "" || fixture.Capability == "" || fixture.Path == "" || fixture.Schema == "" {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
@@ -272,8 +309,93 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 		if fixture.Metadata["replay_ready"] != true {
 			t.Fatalf("%s replay_ready = %#v", fixture.FixtureKey, fixture.Metadata["replay_ready"])
 		}
+		indexCapabilities[fixture.Capability] = true
 		assertFinanceFacadeJSONFile(t, filepath.Join(base, fixture.Path))
 		assertFinanceFacadeJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+	for _, capability := range []string{
+		"finance.facade.fmp.enterprise_value.fetch",
+		"finance.facade.fmp.ratios_key_metrics.fetch",
+		"finance.facade.fmp.ratings.fetch",
+		"finance.facade.fmp.targets.fetch",
+		"finance.facade.fmp.technical_indicators.fetch",
+		"finance.facade.fmp.company_profile.fetch",
+		"finance.facade.yfinance.company_profile.fetch",
+		"finance.facade.yfinance.market_cap.fetch",
+		"finance.facade.provider.fallback.resolve",
+		"finance.facade.error.envelope",
+	} {
+		if !indexCapabilities[capability] {
+			t.Fatalf("fixture index missing capability %q", capability)
+		}
+	}
+}
+
+func TestFinRobotFinanceFacadeFunctionFixtures(t *testing.T) {
+	base := financeFacadeLivePackageDir(t)
+	manifest := loadFinanceFacadeLiveManifest(t, base)
+
+	wantFunctions := map[string]struct {
+		provider string
+		dataset  string
+		fields   []string
+	}{
+		"fmp_get_enterprise_value":        {provider: "fmp", dataset: "enterprise_value", fields: []string{"enterprise_value", "market_cap", "total_debt", "cash_and_equivalents"}},
+		"fmp_get_ratios_key_metrics":      {provider: "fmp", dataset: "ratios_key_metrics", fields: []string{"pe_ratio", "ev_to_ebitda", "gross_margin", "operating_margin"}},
+		"fmp_get_ratings":                 {provider: "fmp", dataset: "ratings", fields: []string{"rating", "rating_score", "recommendation"}},
+		"fmp_get_price_targets":           {provider: "fmp", dataset: "price_targets", fields: []string{"target_low", "target_median", "target_high", "analyst_count"}},
+		"fmp_get_technical_indicators":    {provider: "fmp", dataset: "technical_indicators", fields: []string{"sma_20", "sma_50", "ema_20", "rsi_14", "macd"}},
+		"fmp_get_company_profile":         {provider: "fmp", dataset: "company_profile", fields: []string{"company_name", "exchange", "sector", "industry"}},
+		"yfinance_get_company_profile":    {provider: "yfinance", dataset: "company_profile", fields: []string{"company_name", "exchange", "sector", "industry"}},
+		"yfinance_get_market_cap":         {provider: "yfinance", dataset: "market_cap", fields: []string{"market_cap", "shares_outstanding", "last_price"}},
+		"resolve_provider_fallback_order": {provider: "facade", dataset: "fallback_order", fields: []string{"ordered_providers", "selected_provider", "reason"}},
+	}
+	if len(manifest.FunctionMatrix) != len(wantFunctions) {
+		t.Fatalf("function matrix length = %d, want %d", len(manifest.FunctionMatrix), len(wantFunctions))
+	}
+
+	for _, entry := range manifest.FunctionMatrix {
+		want, ok := wantFunctions[entry.ID]
+		if !ok {
+			t.Fatalf("unexpected function matrix entry %q", entry.ID)
+		}
+		if entry.Provider != want.provider || !entry.ProviderFree || entry.LiveNetwork || entry.RealDependencyImports || !entry.CleanSkip {
+			t.Fatalf("function matrix provider-free metadata invalid for %s: %#v", entry.ID, entry)
+		}
+		if entry.SourceModule != "finrobot/data_source/market_data_api.py" || !strings.HasPrefix(entry.Capability, "finance.facade.") || entry.Schema == "" || entry.Fixture == "" {
+			t.Fatalf("function matrix entry incomplete: %#v", entry)
+		}
+		if entry.Metadata["replay_ready"] != true || entry.Metadata["domain"] != want.dataset {
+			t.Fatalf("%s metadata = %#v, want domain %q replay_ready=true", entry.ID, entry.Metadata, want.dataset)
+		}
+		if len(entry.FallbackOrder) == 0 {
+			t.Fatalf("%s fallback order missing", entry.ID)
+		}
+		assertFinanceFacadeJSONFile(t, filepath.Join(base, entry.Schema))
+
+		var fixture financeFacadeFunctionFixture
+		decodeFinanceFacadeJSONFile(t, filepath.Join(base, entry.Fixture), &fixture)
+		if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports || fixture.FunctionID != entry.ID || fixture.Provider != entry.Provider || fixture.Capability != entry.Capability || fixture.Symbol != "ACME" || fixture.Dataset != want.dataset {
+			t.Fatalf("function fixture header mismatch for %s: %#v", entry.ID, fixture)
+		}
+		if fixture.SourceModule != "finrobot/data_source/market_data_api.py" || fixture.Input["symbol"] != "ACME" || fixture.Output.SourceRef == "" {
+			t.Fatalf("function fixture shape incomplete for %s: %#v", entry.ID, fixture)
+		}
+		for _, field := range want.fields {
+			if _, ok := fixture.Output.Fields[field]; !ok {
+				t.Fatalf("%s output missing field %q: %#v", entry.ID, field, fixture.Output.Fields)
+			}
+		}
+		if !reflect.DeepEqual(fixture.Fallback.Order, entry.FallbackOrder) || fixture.Fallback.SelectedProvider == "" || len(fixture.Fallback.Attempted) == 0 || !fixture.Fallback.CleanSkipWithoutDependency {
+			t.Fatalf("%s fallback metadata mismatch: %#v vs %#v", entry.ID, fixture.Fallback, entry.FallbackOrder)
+		}
+		if entry.ID == "resolve_provider_fallback_order" && fixture.Fallback.ErrorEnvelopeFixture != "fixtures/error_envelope_yfinance_rate_limit_fixture.json" {
+			t.Fatalf("fallback fixture should reference provider error envelope: %#v", fixture.Fallback)
+		}
+		assertFinanceFacadeProvenance(t, fixture.Provenance)
+		if fixture.Provenance.Provider != fixture.Provider {
+			t.Fatalf("%s provenance provider = %q, want %q", entry.ID, fixture.Provenance.Provider, fixture.Provider)
+		}
 	}
 }
 
@@ -440,7 +562,7 @@ func TestFinRobotFinanceFacadeLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get finance_facade_live_package_summary: %v", err)
 			}
-			want := "finance_facade_live_package modules=2 providers=5 tables=2 policies=3 errors=1 provider_free=true live_network=false imports=false fixtures=3"
+			want := "finance_facade_live_package modules=3 providers=5 tables=2 functions=9 policies=3 errors=1 provider_free=true live_network=false imports=false fixtures=12"
 			if got != want {
 				t.Fatalf("finance_facade_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -459,6 +581,61 @@ type financeFacadeProvenance struct {
 	SourceURLRedacted bool   `json:"source_url_redacted"`
 	StaleAfterDays    int    `json:"stale_after_days"`
 	ReplayReady       bool   `json:"replay_ready"`
+}
+
+type financeFacadeFunctionFixture struct {
+	SchemaVersion         int                           `json:"schema_version"`
+	ProviderFree          bool                          `json:"provider_free"`
+	LiveNetwork           bool                          `json:"live_network"`
+	RealDependencyImports bool                          `json:"real_dependency_imports"`
+	FunctionID            string                        `json:"function_id"`
+	SourceModule          string                        `json:"source_module"`
+	Provider              string                        `json:"provider"`
+	Capability            string                        `json:"capability"`
+	Symbol                string                        `json:"symbol"`
+	Dataset               string                        `json:"dataset"`
+	Input                 map[string]any                `json:"input"`
+	Output                financeFacadeFunctionOutput   `json:"output"`
+	Fallback              financeFacadeFunctionFallback `json:"fallback"`
+	Provenance            financeFacadeProvenance       `json:"provenance"`
+}
+
+type financeFacadeFunctionOutput struct {
+	Fields    map[string]any `json:"fields"`
+	SourceRef string         `json:"source_ref"`
+}
+
+type financeFacadeFunctionFallback struct {
+	Order                      []string `json:"order"`
+	SelectedProvider           string   `json:"selected_provider"`
+	Attempted                  []string `json:"attempted"`
+	CleanSkipWithoutDependency bool     `json:"clean_skip_without_dependency"`
+	ErrorEnvelopeFixture       string   `json:"error_envelope_fixture"`
+}
+
+func assertFinanceFacadeFunctionMatrix(t *testing.T, base string, matrix []financeFacadeFunctionMatrix) {
+	t.Helper()
+	if len(matrix) != 9 {
+		t.Fatalf("function matrix length = %d, want 9", len(matrix))
+	}
+	seen := map[string]bool{}
+	for _, entry := range matrix {
+		if entry.ID == "" || entry.SourceModule != "finrobot/data_source/market_data_api.py" || entry.Provider == "" || entry.Fixture == "" || entry.Schema == "" || len(entry.FallbackOrder) == 0 {
+			t.Fatalf("function matrix entry incomplete: %#v", entry)
+		}
+		if seen[entry.ID] {
+			t.Fatalf("duplicate function matrix id %q", entry.ID)
+		}
+		seen[entry.ID] = true
+		if !strings.HasPrefix(entry.Capability, "finance.facade.") || !entry.ProviderFree || entry.LiveNetwork || entry.RealDependencyImports || !entry.CleanSkip {
+			t.Fatalf("function matrix metadata invalid: %#v", entry)
+		}
+		if entry.Metadata["replay_ready"] != true || entry.Metadata["domain"] == "" {
+			t.Fatalf("%s function matrix metadata incomplete: %#v", entry.ID, entry.Metadata)
+		}
+		assertFinanceFacadeJSONFile(t, filepath.Join(base, entry.Schema))
+		assertFinanceFacadeJSONFile(t, filepath.Join(base, entry.Fixture))
+	}
 }
 
 func assertFinanceFacadeProvenance(t *testing.T, provenance financeFacadeProvenance) {

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "function_id": "resolve_provider_fallback_order",
+  "source_module": "finrobot/data_source/market_data_api.py",
+  "provider": "facade",
+  "capability": "finance.facade.provider.fallback.resolve",
+  "symbol": "ACME",
+  "dataset": "fallback_order",
+  "input": {
+    "symbol": "ACME",
+    "requested_dataset": "company_profile"
+  },
+  "output": {
+    "fields": {
+      "ordered_providers": [
+        "yfinance",
+        "fmp",
+        "finnhub",
+        "sec",
+        "openbb"
+      ],
+      "selected_provider": "yfinance",
+      "reason": "first replay-ready provider fixture with schema-valid company profile"
+    },
+    "source_ref": "src_facade_fallback_order"
+  },
+  "fallback": {
+    "order": [
+      "yfinance",
+      "fmp",
+      "finnhub",
+      "sec",
+      "openbb"
+    ],
+    "selected_provider": "yfinance",
+    "attempted": [
+      "yfinance"
+    ],
+    "clean_skip_without_dependency": true,
+    "error_envelope_fixture": "fixtures/error_envelope_yfinance_rate_limit_fixture.json"
+  },
+  "provenance": {
+    "provider": "facade",
+    "fixture_key": "function:facade:fallback_order:ACME",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_schema": "function_fixture_v1",
+    "source_url_redacted": true,
+    "stale_after_days": 0,
+    "replay_ready": true
+  }
+}

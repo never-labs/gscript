@@ -6,7 +6,8 @@
   "description": "Provider-free live package skeleton for FinRobot finance_data.py and market_data facade contracts.",
   "source_modules": [
     "finrobot/data_source/finance_data.py",
-    "finrobot/data_source/market_data.py"
+    "finrobot/data_source/market_data.py",
+    "finrobot/data_source/market_data_api.py"
   ],
   "provider_free": true,
   "live_network_default": false,
@@ -36,6 +37,7 @@
   "schemas": {
     "market_data_table": "schemas/market_data_table_v1.schema.json",
     "fundamental_table": "schemas/fundamental_table_v1.schema.json",
+    "function_fixture": "schemas/function_fixture_v1.schema.json",
     "provider_fallback": "schemas/provider_fallback_v1.schema.json",
     "error_envelope": "schemas/error_envelope_v1.schema.json"
   },
@@ -43,6 +45,15 @@
     "index": "fixtures/provider_free_fixture_index.json",
     "market_data_table": "fixtures/market_data_ACME_daily_fixture.json",
     "fundamental_table": "fixtures/fundamentals_ACME_annual_fixture.json",
+    "fmp_enterprise_value": "fixtures/function_fmp_enterprise_value_ACME_fixture.json",
+    "fmp_ratios_key_metrics": "fixtures/function_fmp_key_metrics_ACME_fixture.json",
+    "fmp_ratings": "fixtures/function_fmp_ratings_ACME_fixture.json",
+    "fmp_targets": "fixtures/function_fmp_targets_ACME_fixture.json",
+    "fmp_technical_indicators": "fixtures/function_fmp_technical_indicators_ACME_fixture.json",
+    "fmp_company_profile": "fixtures/function_fmp_company_profile_ACME_fixture.json",
+    "yfinance_company_profile": "fixtures/function_yfinance_company_profile_ACME_fixture.json",
+    "yfinance_market_cap": "fixtures/function_yfinance_market_cap_ACME_fixture.json",
+    "provider_fallback_order": "fixtures/function_fallback_order_ACME_fixture.json",
     "error_envelope": "fixtures/error_envelope_yfinance_rate_limit_fixture.json"
   },
   "modules": [
@@ -77,6 +88,155 @@
         "provider_fallback",
         "error_envelope"
       ]
+    },
+    {
+      "id": "market_data_api",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "capabilities": [
+        "finance.facade.fmp.enterprise_value.fetch",
+        "finance.facade.fmp.ratios_key_metrics.fetch",
+        "finance.facade.fmp.ratings.fetch",
+        "finance.facade.fmp.targets.fetch",
+        "finance.facade.fmp.technical_indicators.fetch",
+        "finance.facade.fmp.company_profile.fetch",
+        "finance.facade.yfinance.company_profile.fetch",
+        "finance.facade.yfinance.market_cap.fetch",
+        "finance.facade.provider.fallback.resolve",
+        "finance.facade.error.envelope"
+      ],
+      "output_schemas": [
+        "function_fixture",
+        "provider_fallback",
+        "error_envelope"
+      ]
+    }
+  ],
+  "function_matrix": [
+    {
+      "id": "fmp_get_enterprise_value",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.enterprise_value.fetch",
+      "fixture": "fixtures/function_fmp_enterprise_value_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["fmp", "yfinance", "finnhub", "sec", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "enterprise_value", "replay_ready": true}
+    },
+    {
+      "id": "fmp_get_ratios_key_metrics",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.ratios_key_metrics.fetch",
+      "fixture": "fixtures/function_fmp_key_metrics_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["fmp", "finnhub", "yfinance", "sec", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "ratios_key_metrics", "replay_ready": true}
+    },
+    {
+      "id": "fmp_get_ratings",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.ratings.fetch",
+      "fixture": "fixtures/function_fmp_ratings_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["fmp", "yfinance", "finnhub", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "ratings", "replay_ready": true}
+    },
+    {
+      "id": "fmp_get_price_targets",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.targets.fetch",
+      "fixture": "fixtures/function_fmp_targets_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["fmp", "yfinance", "finnhub", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "price_targets", "replay_ready": true}
+    },
+    {
+      "id": "fmp_get_technical_indicators",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.technical_indicators.fetch",
+      "fixture": "fixtures/function_fmp_technical_indicators_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["fmp", "yfinance", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "technical_indicators", "replay_ready": true}
+    },
+    {
+      "id": "fmp_get_company_profile",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.company_profile.fetch",
+      "fixture": "fixtures/function_fmp_company_profile_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["fmp", "yfinance", "finnhub", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "company_profile", "replay_ready": true}
+    },
+    {
+      "id": "yfinance_get_company_profile",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "yfinance",
+      "capability": "finance.facade.yfinance.company_profile.fetch",
+      "fixture": "fixtures/function_yfinance_company_profile_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["yfinance", "fmp", "finnhub", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "company_profile", "replay_ready": true}
+    },
+    {
+      "id": "yfinance_get_market_cap",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "yfinance",
+      "capability": "finance.facade.yfinance.market_cap.fetch",
+      "fixture": "fixtures/function_yfinance_market_cap_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["yfinance", "fmp", "finnhub", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "market_cap", "replay_ready": true}
+    },
+    {
+      "id": "resolve_provider_fallback_order",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "provider": "facade",
+      "capability": "finance.facade.provider.fallback.resolve",
+      "fixture": "fixtures/function_fallback_order_ACME_fixture.json",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fallback_order": ["yfinance", "fmp", "finnhub", "sec", "openbb"],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "clean_skip": true,
+      "metadata": {"domain": "fallback_order", "replay_ready": true, "error_envelope": "fixtures/error_envelope_yfinance_rate_limit_fixture.json"}
     }
   ],
   "provider_fallback_order": [
@@ -163,6 +323,7 @@
   "test_gates": [
     "manifest and referenced JSON files decode without external dependencies",
     "provider fallback order covers yfinance, FMP, Finnhub, SEC, and OpenBB with live_network_default=false",
+    "market_data_api.py function matrix covers FMP enterprise value, ratios/key metrics, ratings, targets, technical indicators, company profile, YFinance company profile, YFinance market cap, fallback order, and provider error envelope",
     "typed table fixtures validate market data and fundamental rows with schema, currency, units, period, and provenance",
     "cache, retry, rate-limit, provenance, and error envelope contracts are fixture-backed and provider-free",
     "finance_data.py and market_data.py facade boundaries clean-skip without importing live provider SDKs"
