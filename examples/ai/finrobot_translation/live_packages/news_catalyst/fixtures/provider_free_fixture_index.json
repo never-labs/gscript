@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-news-catalyst-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "news_catalyst:ACME:2026-06-11",
+      "capability": "finance.catalyst.detect",
+      "path": "fixtures/news_catalyst_ACME_fixture.json",
+      "schema": "schemas/catalyst_analysis_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "as_of": "2026-06-11",
+        "replay_ready": true,
+        "contains_news_relevance": true,
+        "contains_source_ranking": true
+      }
+    },
+    {
+      "fixture_key": "retail_sentiment:ACME:2026-06-11",
+      "capability": "finance.retail_sentiment.snapshot",
+      "path": "fixtures/retail_sentiment_ACME_snapshot.json",
+      "schema": "schemas/retail_sentiment_snapshot_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "as_of": "2026-06-11",
+        "replay_ready": true,
+        "platforms": [
+          "polymarket",
+          "x_social",
+          "reddit"
+        ]
+      }
+    },
+    {
+      "fixture_key": "adapter_boundary:ACME:offline",
+      "capability": "finance.retail_sentiment.adapter.boundary",
+      "path": "fixtures/adapter_boundary_fixture.json",
+      "schema": "schemas/adapter_boundary_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "replay_ready": true,
+        "live_network": false
+      }
+    }
+  ]
+}

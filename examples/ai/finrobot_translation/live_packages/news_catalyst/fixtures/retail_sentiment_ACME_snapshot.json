@@ -1,0 +1,46 @@
+{
+  "fixture_key": "retail_sentiment:ACME:2026-06-11",
+  "provider_free": true,
+  "live_network": false,
+  "ticker": "ACME",
+  "as_of": "2026-06-11T16:00:00Z",
+  "aggregate_score": 0.31,
+  "mention_volume": 1840,
+  "bullish_ratio": 0.58,
+  "bearish_ratio": 0.27,
+  "neutral_ratio": 0.15,
+  "platform_snapshots": [
+    {
+      "platform": "polymarket",
+      "fixture_key": "polymarket:market_snapshot:ACME:offline",
+      "sentiment_score": 0.24,
+      "mention_volume": 40,
+      "bullish_ratio": 0.55,
+      "bearish_ratio": 0.32,
+      "confidence": 0.46
+    },
+    {
+      "platform": "x_social",
+      "fixture_key": "x:mention_snapshot:ACME:offline",
+      "sentiment_score": 0.36,
+      "mention_volume": 1500,
+      "bullish_ratio": 0.61,
+      "bearish_ratio": 0.24,
+      "confidence": 0.64
+    },
+    {
+      "platform": "reddit",
+      "fixture_key": "reddit:thread_snapshot:ACME:offline",
+      "sentiment_score": 0.18,
+      "mention_volume": 300,
+      "bullish_ratio": 0.49,
+      "bearish_ratio": 0.33,
+      "confidence": 0.57
+    }
+  ],
+  "normalization": {
+    "method": "provider_free_volume_weighted_fixture",
+    "dedupe_window_hours": 24,
+    "live_network": false
+  }
+}
