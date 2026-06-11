@@ -1,0 +1,58 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "deterministic_seed": "finrobot-backtest-strategy-offline-v1",
+  "fixtures": [
+    {
+      "fixture_key": "strategy_manifest:sma_cross:offline:v1",
+      "capability": "finance.backtest.strategy.bind",
+      "path": "fixtures/strategy_manifest_fixture.json",
+      "schema": "schemas/strategy_manifest_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "strategy_id": "sma_cross_strategy",
+        "provider_free": true,
+        "live_network": false
+      }
+    },
+    {
+      "fixture_key": "data_feed:ACME:daily:offline:v1",
+      "capability": "finance.backtest.data_feed.bind",
+      "path": "fixtures/data_feed_ACME_daily_fixture.json",
+      "schema": "schemas/data_feed_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "symbol": "ACME",
+        "row_count": 8,
+        "provider_free": true,
+        "live_network": false
+      }
+    },
+    {
+      "fixture_key": "trade_ledger:ACME:sma_cross:offline:v1",
+      "capability": "finance.backtest.analyzer.trades",
+      "path": "fixtures/trade_ledger_ACME_fixture.json",
+      "schema": "schemas/trade_ledger_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "trade_count": 3,
+        "provider_free": true,
+        "live_network": false
+      }
+    },
+    {
+      "fixture_key": "metrics:ACME:sma_cross:offline:v1",
+      "capability": "finance.backtest.metrics.collect",
+      "path": "fixtures/metrics_ACME_fixture.json",
+      "schema": "schemas/metrics_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "risk_limit_count": 4,
+        "provider_free": true,
+        "live_network": false
+      }
+    }
+  ]
+}
+

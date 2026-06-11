@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/backtest_strategy/trade_ledger_v1.schema.json",
+  "title": "FinRobot Backtest Trade Ledger",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "strategy_id",
+    "symbol",
+    "deterministic_seed",
+    "schema_fields",
+    "trades"
+  ],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "real_dependency_imports": {"const": false},
+    "fixture_key": {"type": "string"},
+    "strategy_id": {"type": "string"},
+    "symbol": {"type": "string"},
+    "deterministic_seed": {"type": "string"},
+    "schema_fields": {"type": "array", "items": {"type": "string"}},
+    "trades": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "trade_id",
+          "order_id",
+          "timestamp",
+          "side",
+          "quantity",
+          "price",
+          "gross_notional",
+          "commission",
+          "slippage",
+          "cash_after",
+          "position_after",
+          "realized_pnl",
+          "source_ref"
+        ],
+        "properties": {
+          "trade_id": {"type": "string"},
+          "order_id": {"type": "string"},
+          "timestamp": {"type": "string"},
+          "side": {"enum": ["buy", "sell"]},
+          "quantity": {"type": "number"},
+          "price": {"type": "number"},
+          "gross_notional": {"type": "number"},
+          "commission": {"type": "number"},
+          "slippage": {"type": "number"},
+          "cash_after": {"type": "number"},
+          "position_after": {"type": "number"},
+          "realized_pnl": {"type": "number"},
+          "source_ref": {"type": "string"}
+        }
+      }
+    }
+  }
+}
+

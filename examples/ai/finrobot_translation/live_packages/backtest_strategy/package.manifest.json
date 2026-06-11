@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-backtest-strategy-live-package",
+  "package_name": "leia-finrobot-backtest-strategy",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot BackTraderUtils.back_test strategy, sizer, indicator, analyzer, data-feed, trade-ledger, metrics, and risk-limit contracts.",
+  "source_modules": [
+    "finrobot/functional/quantitative.py",
+    "finrobot_zh/functional/quantitative.py",
+    "FinRobot.BackTraderUtils.back_test",
+    "backtrader.Strategy",
+    "backtrader.Sizer",
+    "backtrader.Indicator",
+    "backtrader.Analyzer"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; broker, live market data, Backtrader, pandas, yfinance, and exchange credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_backtest_strategy_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "backtest_strategy_contract": "contracts/backtest_strategy_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "strategy_manifest": "schemas/strategy_manifest_v1.schema.json",
+    "data_feed": "schemas/data_feed_v1.schema.json",
+    "trade_ledger": "schemas/trade_ledger_v1.schema.json",
+    "metrics": "schemas/metrics_v1.schema.json",
+    "risk_limits": "schemas/risk_limits_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "strategy_manifest": "fixtures/strategy_manifest_fixture.json",
+    "data_feed": "fixtures/data_feed_ACME_daily_fixture.json",
+    "trade_ledger": "fixtures/trade_ledger_ACME_fixture.json",
+    "metrics": "fixtures/metrics_ACME_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "back_test",
+      "source_module": "FinRobot.BackTraderUtils.back_test",
+      "capabilities": [
+        "finance.backtest.run.fixture",
+        "finance.backtest.strategy.bind",
+        "finance.backtest.data_feed.bind",
+        "finance.backtest.metrics.collect",
+        "finance.backtest.risk_limits.enforce"
+      ],
+      "output_schemas": [
+        "strategy_manifest",
+        "trade_ledger",
+        "metrics",
+        "risk_limits"
+      ]
+    },
+    {
+      "id": "strategy",
+      "source_module": "backtrader.Strategy",
+      "capabilities": [
+        "finance.backtest.strategy.signal",
+        "finance.backtest.strategy.order_intent",
+        "finance.backtest.strategy.parameters",
+        "finance.backtest.strategy.lifecycle"
+      ],
+      "output_schemas": [
+        "strategy_manifest",
+        "trade_ledger"
+      ]
+    },
+    {
+      "id": "sizer",
+      "source_module": "backtrader.Sizer",
+      "capabilities": [
+        "finance.backtest.sizer.position_size",
+        "finance.backtest.sizer.cash_guard",
+        "finance.backtest.sizer.lot_rounding",
+        "finance.backtest.sizer.risk_budget"
+      ],
+      "output_schemas": [
+        "strategy_manifest",
+        "risk_limits"
+      ]
+    },
+    {
+      "id": "indicator",
+      "source_module": "backtrader.Indicator",
+      "capabilities": [
+        "finance.backtest.indicator.sma",
+        "finance.backtest.indicator.crossover",
+        "finance.backtest.indicator.warmup",
+        "finance.backtest.indicator.provenance"
+      ],
+      "output_schemas": [
+        "strategy_manifest"
+      ]
+    },
+    {
+      "id": "analyzer",
+      "source_module": "backtrader.Analyzer",
+      "capabilities": [
+        "finance.backtest.analyzer.pnl",
+        "finance.backtest.analyzer.drawdown",
+        "finance.backtest.analyzer.sharpe",
+        "finance.backtest.analyzer.trades"
+      ],
+      "output_schemas": [
+        "metrics",
+        "trade_ledger"
+      ]
+    }
+  ],
+  "deterministic_replay": {
+    "seed": "finrobot-backtest-strategy-offline-v1",
+    "seed_hash": "sha256:75df5dcdf77a387392d370c0d97c902753615606f576a84f7408adcc5af5464d",
+    "start_cash": 100000,
+    "commission_bps": 5,
+    "slippage_bps": 2,
+    "timezone": "UTC",
+    "data_feed_fixture": "data_feed:ACME:daily:offline:v1",
+    "trade_ledger_fixture": "trade_ledger:ACME:sma_cross:offline:v1",
+    "metrics_fixture": "metrics:ACME:sma_cross:offline:v1",
+    "deterministic_order": true,
+    "provider_free": true,
+    "live_network": false
+  },
+  "strategy_outputs": [
+    {
+      "id": "sma_cross_strategy",
+      "capability": "finance.backtest.strategy.signal",
+      "fixture_key": "strategy_manifest:sma_cross:offline:v1",
+      "schema": "strategy_manifest",
+      "required_fields": [
+        "strategy_id",
+        "parameters",
+        "indicator_bindings",
+        "sizer_binding",
+        "analyzer_bindings",
+        "deterministic_seed"
+      ],
+      "provider_free": true,
+      "live_network": false
+    }
+  ],
+  "risk_limits": [
+    {
+      "id": "max_position_pct",
+      "metric": "position_weight",
+      "limit": 0.35,
+      "observed": 0.32,
+      "status": "pass",
+      "live_network": false
+    },
+    {
+      "id": "max_drawdown_pct",
+      "metric": "max_drawdown",
+      "limit": 0.12,
+      "observed": 0.0415,
+      "status": "pass",
+      "live_network": false
+    },
+    {
+      "id": "min_cash_pct",
+      "metric": "cash_weight",
+      "limit": 0.05,
+      "observed": 0.147,
+      "status": "pass",
+      "live_network": false
+    },
+    {
+      "id": "max_trade_notional_pct",
+      "metric": "trade_notional_weight",
+      "limit": 0.25,
+      "observed": 0.214,
+      "status": "pass",
+      "live_network": false
+    }
+  ],
+  "optional_dependencies": [
+    {
+      "id": "backtrader",
+      "import_name": "backtrader",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_reason": "Backtrader execution is represented by provider-free fixtures until an optional provider package is installed."
+    },
+    {
+      "id": "pandas",
+      "import_name": "pandas",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_reason": "Tabular conversion is represented by JSON fixtures in this skeleton."
+    }
+  ],
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "BackTraderUtils.back_test, strategy, sizer, indicator, and analyzer boundaries are represented without q runtime or live provider imports",
+    "strategy manifest fixture validates strategy, sizer, indicator, analyzer bindings and deterministic seed",
+    "data feed fixture validates OHLCV rows, timezone, calendar, provenance, and provider-free replay key",
+    "trade ledger schema validates order, fill, side, price, quantity, commission, slippage, cash, position, and realized PnL fields",
+    "metrics schema validates returns, drawdown, Sharpe, win rate, turnover, exposure, and risk-limit status",
+    "optional Backtrader and pandas dependencies clean-skip without importing real packages by default"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot BackTraderUtils, Backtrader strategy, sizer, indicator, analyzer, broker, or market-data integrations as built-ins; future external packages must satisfy these provider-free contracts before enabling live execution."
+  }
+}
+
