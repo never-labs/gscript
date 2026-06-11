@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-io-envelope",
+  "package_boundary_id": "generic-ai-turn-runner",
+  "capability_id": "generic.ai.turn.request",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "credentials_required": false,
+  "depends_on_q_runtime": false,
+  "real_dependency_imports": false,
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in model provider adapters; provider-specific behavior must stay behind external package contracts and provider-free replay fixtures."
+  },
+  "capability_surfaces": [
+    "turn",
+    "messages",
+    "response_format",
+    "usage"
+  ],
+  "contracts": {
+    "model_io_envelope": "contracts/model_io_envelope_contract.json"
+  },
+  "fixtures": {
+    "provider_free_replay": "fixtures/provider_free_replay_fixture.json"
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "adapter_identity": "generic-model-io-envelope-adapter",
+    "live_network": false,
+    "credential_absence_status": "skipped",
+    "redact_secret_values": true
+  }
+}
