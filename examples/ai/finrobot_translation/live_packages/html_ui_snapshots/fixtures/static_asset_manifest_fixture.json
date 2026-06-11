@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-html-ui-static-asset-manifest-fixture",
+  "provider_free": true,
+  "live_network": false,
+  "requires_browser": false,
+  "asset_policy": {
+    "external_fetch": false,
+    "remote_fonts": false,
+    "inline_or_local_only": true,
+    "hash_algorithm": "sha256",
+    "network_required": false
+  },
+  "assets": [
+    {"id": "asset_app_css", "type": "stylesheet", "source_path": "finrobot_equity/web_app/static/css/app.css", "fixture_sha256": "sha256:fixture-app-css", "remote": false},
+    {"id": "asset_report_css", "type": "stylesheet", "source_path": "finrobot_equity/web_app/static/css/report.css", "fixture_sha256": "sha256:fixture-report-css", "remote": false},
+    {"id": "asset_app_js", "type": "script", "source_path": "finrobot_equity/web_app/static/js/app.js", "fixture_sha256": "sha256:fixture-app-js", "remote": false},
+    {"id": "asset_status_icons", "type": "inline_svg_sprite", "source_path": "finrobot_equity/web_app/static/icons/status.svg", "fixture_sha256": "sha256:fixture-status-icons", "remote": false}
+  ],
+  "template_asset_refs": [
+    {"template_id": "tpl_base", "asset_ids": ["asset_app_css", "asset_app_js", "asset_status_icons"]},
+    {"template_id": "tpl_index", "asset_ids": ["asset_app_css", "asset_app_js"]},
+    {"template_id": "tpl_reports", "asset_ids": ["asset_app_css", "asset_app_js", "asset_status_icons"]},
+    {"template_id": "tpl_report_detail", "asset_ids": ["asset_app_css", "asset_report_css", "asset_status_icons"]},
+    {"template_id": "html_template_professional", "asset_ids": ["asset_report_css", "asset_status_icons"]}
+  ]
+}
