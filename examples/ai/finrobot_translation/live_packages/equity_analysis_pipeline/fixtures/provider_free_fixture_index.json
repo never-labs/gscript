@@ -13,7 +13,12 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "stage_id": "fetch"
+        "stage_id": "fetch",
+        "cache_key": "equity_pipeline:ACME:2026-06-11:fetch",
+        "cache_state": "miss",
+        "retryable": false,
+        "max_attempts": 1,
+        "budget_ms": 400
       }
     },
     {
@@ -25,7 +30,12 @@
         "replay_ready": true,
         "provider_free": true,
         "stage_id": "normalize",
-        "rows": 6
+        "rows": 6,
+        "cache_key": "equity_pipeline:ACME:2026-06-11:normalize",
+        "cache_state": "hit",
+        "retryable": false,
+        "max_attempts": 1,
+        "budget_ms": 450
       }
     },
     {
@@ -37,7 +47,12 @@
         "replay_ready": true,
         "provider_free": true,
         "stage_id": "forecast",
-        "forecast_periods": 3
+        "forecast_periods": 3,
+        "cache_key": "equity_pipeline:ACME:2026-06-11:forecast",
+        "cache_state": "hit",
+        "retryable": false,
+        "max_attempts": 1,
+        "budget_ms": 650
       }
     },
     {
@@ -49,7 +64,12 @@
         "replay_ready": true,
         "provider_free": true,
         "stage_id": "section_agents",
-        "sections": 4
+        "sections": 4,
+        "cache_key": "equity_pipeline:ACME:2026-06-11:section_agents",
+        "cache_state": "bypass",
+        "retryable": false,
+        "max_attempts": 1,
+        "budget_ms": 600
       }
     },
     {
@@ -61,7 +81,12 @@
         "replay_ready": true,
         "provider_free": true,
         "stage_id": "artifact_plan",
-        "artifacts": 5
+        "artifacts": 5,
+        "cache_key": "equity_pipeline:ACME:2026-06-11:artifact_plan",
+        "cache_state": "bypass",
+        "retryable": false,
+        "max_attempts": 1,
+        "budget_ms": 400
       }
     },
     {
@@ -72,7 +97,12 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "hooks": 4
+        "hooks": 5,
+        "cache_key": "equity_pipeline:ACME:2026-06-11:failure_hooks",
+        "cache_state": "bypass",
+        "retryable": true,
+        "max_attempts": 1,
+        "budget_ms": 250
       }
     },
     {
@@ -83,7 +113,12 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "events": 5
+        "events": 5,
+        "cache_key": "equity_pipeline:ACME:2026-06-11:trace",
+        "cache_state": "bypass",
+        "retryable": false,
+        "max_attempts": 1,
+        "budget_ms": 2500
       }
     }
   ]

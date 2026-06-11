@@ -103,13 +103,43 @@
       "provider_free",
       "live_network",
       "real_dependency_imports",
-      "artifact_refs"
+      "artifact_refs",
+      "cache_metadata",
+      "retry_metadata",
+      "timing"
+    ]
+  },
+  "retry_cache_contract": {
+    "provider_free": true,
+    "live_network": false,
+    "required_event_fields": [
+      "attempt",
+      "retry_metadata",
+      "cache_metadata"
+    ],
+    "cache_states": [
+      "hit",
+      "miss",
+      "bypass"
+    ],
+    "max_attempts": 1
+  },
+  "timing_contract": {
+    "clock": "fixture_monotonic_ms",
+    "total_budget_ms": 2500,
+    "required_event_fields": [
+      "started_ms",
+      "ended_ms",
+      "duration_ms",
+      "budget_ms"
     ]
   },
   "acceptance_gates": [
     "stage DAG preserves fetch to normalize to forecast to section_agents to artifact_plan ordering",
     "all stage outputs are backed by offline fixtures and schemas",
     "provider-free trace records every stage with live_network=false and real_dependency_imports=false",
+    "provider-free trace records retry/cache metadata without provider calls",
+    "stage timing envelope uses fixture_monotonic_ms and stays within declared budgets",
     "artifact plan references forecast and section-agent outputs without rendering or storage side effects"
   ]
 }

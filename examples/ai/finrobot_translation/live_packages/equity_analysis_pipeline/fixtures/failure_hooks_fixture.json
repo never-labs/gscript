@@ -11,7 +11,21 @@
       "trigger": "provider_dependency_missing",
       "fallback_action": "use_recorded_fixture",
       "status": "clean_skipped_without_provider",
-      "trace_event_id": "evt-fetch-skip"
+      "trace_event_id": "evt-fetch-skip",
+      "retry_metadata": {
+        "max_attempts": 1,
+        "retryable": true,
+        "retry_after_ms": 0
+      },
+      "cache_metadata": {
+        "cache_key": "equity_pipeline:ACME:2026-06-11:fetch",
+        "cache_state": "miss"
+      },
+      "timing": {
+        "clock": "fixture_monotonic_ms",
+        "duration_ms": 8,
+        "budget_ms": 50
+      }
     },
     {
       "id": "normalization_missing_metric",
@@ -19,7 +33,21 @@
       "trigger": "required_metric_absent",
       "fallback_action": "emit_quality_warning",
       "status": "completed_with_warning",
-      "trace_event_id": "evt-normalize-warning"
+      "trace_event_id": "evt-normalize-warning",
+      "retry_metadata": {
+        "max_attempts": 1,
+        "retryable": false,
+        "retry_after_ms": 0
+      },
+      "cache_metadata": {
+        "cache_key": "equity_pipeline:ACME:2026-06-11:normalize",
+        "cache_state": "hit"
+      },
+      "timing": {
+        "clock": "fixture_monotonic_ms",
+        "duration_ms": 6,
+        "budget_ms": 50
+      }
     },
     {
       "id": "forecast_assumption_gap",
@@ -27,7 +55,43 @@
       "trigger": "assumption_not_supplied",
       "fallback_action": "use_default_assumption_fixture",
       "status": "completed_with_warning",
-      "trace_event_id": "evt-forecast-default"
+      "trace_event_id": "evt-forecast-default",
+      "retry_metadata": {
+        "max_attempts": 1,
+        "retryable": false,
+        "retry_after_ms": 0
+      },
+      "cache_metadata": {
+        "cache_key": "equity_pipeline:ACME:2026-06-11:forecast",
+        "cache_state": "hit"
+      },
+      "timing": {
+        "clock": "fixture_monotonic_ms",
+        "duration_ms": 7,
+        "budget_ms": 50
+      }
+    },
+    {
+      "id": "section_agent_handoff_incomplete",
+      "stage_id": "section_agents",
+      "trigger": "section_payload_missing_evidence_ref",
+      "fallback_action": "emit_handoff_quality_warning",
+      "status": "completed_with_warning",
+      "trace_event_id": "evt-section-handoff-warning",
+      "retry_metadata": {
+        "max_attempts": 1,
+        "retryable": false,
+        "retry_after_ms": 0
+      },
+      "cache_metadata": {
+        "cache_key": "equity_pipeline:ACME:2026-06-11:section_agents",
+        "cache_state": "bypass"
+      },
+      "timing": {
+        "clock": "fixture_monotonic_ms",
+        "duration_ms": 9,
+        "budget_ms": 50
+      }
     },
     {
       "id": "artifact_renderer_missing",
@@ -35,7 +99,21 @@
       "trigger": "renderer_dependency_missing",
       "fallback_action": "plan_artifact_without_rendering",
       "status": "planned_not_rendered",
-      "trace_event_id": "evt-artifact-plan"
+      "trace_event_id": "evt-artifact-plan",
+      "retry_metadata": {
+        "max_attempts": 1,
+        "retryable": true,
+        "retry_after_ms": 0
+      },
+      "cache_metadata": {
+        "cache_key": "equity_pipeline:ACME:2026-06-11:artifact_plan",
+        "cache_state": "bypass"
+      },
+      "timing": {
+        "clock": "fixture_monotonic_ms",
+        "duration_ms": 5,
+        "budget_ms": 50
+      }
     }
   ]
 }

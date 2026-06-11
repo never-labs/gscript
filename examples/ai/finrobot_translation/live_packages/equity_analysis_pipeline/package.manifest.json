@@ -142,6 +142,14 @@
       "live_network": false
     },
     {
+      "id": "section_agent_handoff_incomplete",
+      "stage_id": "section_agents",
+      "capability": "finance.equity_analysis_pipeline.failure.section_agents",
+      "fixture_key": "equity_pipeline:failure_hooks:offline",
+      "clean_skip": true,
+      "live_network": false
+    },
+    {
       "id": "artifact_renderer_missing",
       "stage_id": "artifact_plan",
       "capability": "finance.equity_analysis_pipeline.failure.artifact",
@@ -150,6 +158,61 @@
       "live_network": false
     }
   ],
+  "cache_policy": {
+    "enabled": true,
+    "provider_free": true,
+    "live_network": false,
+    "mode": "fixture_metadata_only",
+    "key_fields": [
+      "ticker",
+      "as_of",
+      "stage_id",
+      "fixture_key"
+    ],
+    "cache_states": [
+      "hit",
+      "miss",
+      "bypass"
+    ]
+  },
+  "retry_policy": {
+    "enabled": true,
+    "provider_free": true,
+    "live_network": false,
+    "mode": "deterministic_fixture_replay",
+    "max_attempts": 1,
+    "backoff": "none",
+    "retryable_statuses": [
+      "provider_dependency_missing",
+      "renderer_dependency_missing"
+    ]
+  },
+  "stage_timing_envelope": {
+    "clock": "fixture_monotonic_ms",
+    "total_budget_ms": 2500,
+    "stage_budgets": [
+      {
+        "stage_id": "fetch",
+        "budget_ms": 400
+      },
+      {
+        "stage_id": "normalize",
+        "budget_ms": 450
+      },
+      {
+        "stage_id": "forecast",
+        "budget_ms": 650
+      },
+      {
+        "stage_id": "section_agents",
+        "budget_ms": 600
+      },
+      {
+        "stage_id": "artifact_plan",
+        "budget_ms": 400
+      }
+    ]
+  },
   "test_gates": [
     "generate_financial_analysis.py pipeline source is represented by a provider-free stage DAG",
     "fetch, normalize, forecast, section_agents, and artifact_plan fixtures decode without provider credentials",
@@ -157,6 +220,8 @@
     "section-agent handoff fixture includes ordered sections, evidence refs, and TERMINATE convention metadata",
     "artifact manifest fixture includes planned report, chart, table, trace, and disclosure artifacts",
     "failure hooks clean-skip without live network, provider credentials, or real dependency imports",
+    "retry/cache metadata is represented as deterministic fixture metadata",
+    "stage timing envelope records monotonic fixture timings within declared budgets",
     "main.leia contains no live provider SDK imports or network execution"
   ],
   "no_built_in_guarantee": {

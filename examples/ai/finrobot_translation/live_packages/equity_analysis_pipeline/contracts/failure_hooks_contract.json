@@ -26,16 +26,33 @@
       "expected_status": "completed_with_warning"
     },
     {
+      "id": "section_agent_handoff_incomplete",
+      "stage_id": "section_agents",
+      "fallback_action": "emit_handoff_quality_warning",
+      "expected_status": "completed_with_warning"
+    },
+    {
       "id": "artifact_renderer_missing",
       "stage_id": "artifact_plan",
       "fallback_action": "plan_artifact_without_rendering",
       "expected_status": "planned_not_rendered"
     }
   ],
+  "retry_cache_contract": {
+    "provider_free": true,
+    "live_network": false,
+    "max_attempts": 1,
+    "required_hook_fields": [
+      "retry_metadata",
+      "cache_metadata",
+      "timing"
+    ]
+  },
   "acceptance_gates": [
     "failure hooks are represented as deterministic offline fixture events",
     "no hook imports live provider SDKs, renderer dependencies, pandas, numpy, requests, or network clients",
     "each hook returns a clean-skip or warning envelope with stage_id and trace_event_id",
+    "each hook carries retry/cache metadata and fixture timing",
     "failure hook trace can be joined to provider_free_trace fixture"
   ]
 }

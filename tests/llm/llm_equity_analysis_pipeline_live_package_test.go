@@ -36,13 +36,16 @@ type equityAnalysisPipelineLiveManifest struct {
 		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
 		FixtureHook                 string `json:"fixture_hook"`
 	} `json:"default_policy"`
-	Entrypoints  map[string]string                   `json:"entrypoints"`
-	Schemas      map[string]string                   `json:"schemas"`
-	Fixtures     map[string]string                   `json:"fixtures"`
-	Stages       []equityAnalysisPipelineStage       `json:"stages"`
-	FailureHooks []equityAnalysisPipelineFailureHook `json:"failure_hooks"`
-	TestGates    []string                            `json:"test_gates"`
-	NoBuiltIn    map[string]json.RawMessage          `json:"no_built_in_guarantee"`
+	Entrypoints  map[string]string                    `json:"entrypoints"`
+	Schemas      map[string]string                    `json:"schemas"`
+	Fixtures     map[string]string                    `json:"fixtures"`
+	Stages       []equityAnalysisPipelineStage        `json:"stages"`
+	FailureHooks []equityAnalysisPipelineFailureHook  `json:"failure_hooks"`
+	CachePolicy  equityAnalysisPipelineCachePolicy    `json:"cache_policy"`
+	RetryPolicy  equityAnalysisPipelineRetryPolicy    `json:"retry_policy"`
+	Timing       equityAnalysisPipelineTimingEnvelope `json:"stage_timing_envelope"`
+	TestGates    []string                             `json:"test_gates"`
+	NoBuiltIn    map[string]json.RawMessage           `json:"no_built_in_guarantee"`
 }
 
 type equityAnalysisPipelineStage struct {
@@ -63,6 +66,34 @@ type equityAnalysisPipelineFailureHook struct {
 	FixtureKey  string `json:"fixture_key"`
 	CleanSkip   bool   `json:"clean_skip"`
 	LiveNetwork bool   `json:"live_network"`
+}
+
+type equityAnalysisPipelineCachePolicy struct {
+	Enabled      bool     `json:"enabled"`
+	ProviderFree bool     `json:"provider_free"`
+	LiveNetwork  bool     `json:"live_network"`
+	Mode         string   `json:"mode"`
+	KeyFields    []string `json:"key_fields"`
+	CacheStates  []string `json:"cache_states"`
+}
+
+type equityAnalysisPipelineRetryPolicy struct {
+	Enabled           bool     `json:"enabled"`
+	ProviderFree      bool     `json:"provider_free"`
+	LiveNetwork       bool     `json:"live_network"`
+	Mode              string   `json:"mode"`
+	MaxAttempts       int      `json:"max_attempts"`
+	Backoff           string   `json:"backoff"`
+	RetryableStatuses []string `json:"retryable_statuses"`
+}
+
+type equityAnalysisPipelineTimingEnvelope struct {
+	Clock         string `json:"clock"`
+	TotalBudgetMS int    `json:"total_budget_ms"`
+	StageBudgets  []struct {
+		StageID  string `json:"stage_id"`
+		BudgetMS int    `json:"budget_ms"`
+	} `json:"stage_budgets"`
 }
 
 func TestFinRobotEquityAnalysisPipelineLivePackageManifest(t *testing.T) {
@@ -118,11 +149,30 @@ func TestFinRobotEquityAnalysisPipelineLivePackageManifest(t *testing.T) {
 		}
 		assertEquityAnalysisPipelineJSONFile(t, filepath.Join(base, path))
 	}
+	if !manifest.CachePolicy.Enabled || !manifest.CachePolicy.ProviderFree || manifest.CachePolicy.LiveNetwork || manifest.CachePolicy.Mode != "fixture_metadata_only" || len(manifest.CachePolicy.KeyFields) < 4 || len(manifest.CachePolicy.CacheStates) != 3 {
+		t.Fatalf("cache policy must be fixture-only and explicit: %#v", manifest.CachePolicy)
+	}
+	if !manifest.RetryPolicy.Enabled || !manifest.RetryPolicy.ProviderFree || manifest.RetryPolicy.LiveNetwork || manifest.RetryPolicy.Mode != "deterministic_fixture_replay" || manifest.RetryPolicy.MaxAttempts != 1 || manifest.RetryPolicy.Backoff != "none" || len(manifest.RetryPolicy.RetryableStatuses) == 0 {
+		t.Fatalf("retry policy must be deterministic and offline: %#v", manifest.RetryPolicy)
+	}
+	if manifest.Timing.Clock != "fixture_monotonic_ms" || manifest.Timing.TotalBudgetMS != 2500 || len(manifest.Timing.StageBudgets) != 5 {
+		t.Fatalf("timing envelope must cover all stages: %#v", manifest.Timing)
+	}
+	var budgetStages []string
+	for _, budget := range manifest.Timing.StageBudgets {
+		budgetStages = append(budgetStages, budget.StageID)
+		if budget.BudgetMS <= 0 {
+			t.Fatalf("stage budget must be positive: %#v", budget)
+		}
+	}
+	if !reflect.DeepEqual(budgetStages, []string{"fetch", "normalize", "forecast", "section_agents", "artifact_plan"}) {
+		t.Fatalf("timing budget stages = %#v", budgetStages)
+	}
 	if len(manifest.NoBuiltIn) == 0 {
 		t.Fatal("missing no_built_in_guarantee")
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"generate_financial_analysis.py", "fetch", "normalize", "forecast", "section_agents", "artifact", "failure hooks", "provider"} {
+	for _, want := range []string{"generate_financial_analysis.py", "fetch", "normalize", "forecast", "section_agents", "artifact", "failure hooks", "provider", "retry/cache", "timing"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -177,6 +227,18 @@ func TestFinRobotEquityAnalysisPipelineStageDAGContract(t *testing.T) {
 			Fixture        string   `json:"fixture"`
 			RequiredFields []string `json:"required_fields"`
 		} `json:"trace_contract"`
+		RetryCacheContract struct {
+			ProviderFree        bool     `json:"provider_free"`
+			LiveNetwork         bool     `json:"live_network"`
+			RequiredEventFields []string `json:"required_event_fields"`
+			CacheStates         []string `json:"cache_states"`
+			MaxAttempts         int      `json:"max_attempts"`
+		} `json:"retry_cache_contract"`
+		TimingContract struct {
+			Clock               string   `json:"clock"`
+			TotalBudgetMS       int      `json:"total_budget_ms"`
+			RequiredEventFields []string `json:"required_event_fields"`
+		} `json:"timing_contract"`
 		AcceptanceGates []string `json:"acceptance_gates"`
 	}
 	decodeEquityAnalysisPipelineJSONFile(t, filepath.Join(base, "contracts", "stage_dag_contract.json"), &contract)
@@ -194,6 +256,18 @@ func TestFinRobotEquityAnalysisPipelineStageDAGContract(t *testing.T) {
 	}
 	assertEquityAnalysisPipelineJSONFile(t, filepath.Join(base, contract.TraceContract.Schema))
 	assertEquityAnalysisPipelineJSONFile(t, filepath.Join(base, contract.TraceContract.Fixture))
+	if !contract.RetryCacheContract.ProviderFree || contract.RetryCacheContract.LiveNetwork || contract.RetryCacheContract.MaxAttempts != 1 || len(contract.RetryCacheContract.RequiredEventFields) < 3 || len(contract.RetryCacheContract.CacheStates) != 3 {
+		t.Fatalf("retry/cache contract incomplete: %#v", contract.RetryCacheContract)
+	}
+	if contract.TimingContract.Clock != "fixture_monotonic_ms" || contract.TimingContract.TotalBudgetMS != 2500 || len(contract.TimingContract.RequiredEventFields) < 4 {
+		t.Fatalf("timing contract incomplete: %#v", contract.TimingContract)
+	}
+	joinedAcceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
+	for _, want := range []string{"retry/cache", "timing", "fixture_monotonic_ms"} {
+		if !strings.Contains(joinedAcceptance, want) {
+			t.Fatalf("stage DAG acceptance gates missing %q: %s", want, joinedAcceptance)
+		}
+	}
 }
 
 func TestFinRobotEquityAnalysisPipelineFixturesAndTrace(t *testing.T) {
@@ -221,6 +295,9 @@ func TestFinRobotEquityAnalysisPipelineFixturesAndTrace(t *testing.T) {
 		}
 		if fixture.Metadata["replay_ready"] != true || fixture.Metadata["provider_free"] != true {
 			t.Fatalf("%s replay/provider metadata = %#v", fixture.FixtureKey, fixture.Metadata)
+		}
+		if fixture.Metadata["cache_key"] == "" || fixture.Metadata["cache_state"] == "" || fixture.Metadata["max_attempts"] != float64(1) || fixture.Metadata["budget_ms"] == nil {
+			t.Fatalf("%s retry/cache/timing metadata incomplete: %#v", fixture.FixtureKey, fixture.Metadata)
 		}
 		assertEquityAnalysisPipelineJSONFile(t, filepath.Join(base, fixture.Path))
 		assertEquityAnalysisPipelineJSONFile(t, filepath.Join(base, fixture.Schema))
@@ -310,7 +387,30 @@ func TestFinRobotEquityAnalysisPipelineFixturesAndTrace(t *testing.T) {
 			StageID    string `json:"stage_id"`
 			Status     string `json:"status"`
 			FixtureKey string `json:"fixture_key"`
+			Attempt    int    `json:"attempt"`
+			Retry      struct {
+				MaxAttempts  int  `json:"max_attempts"`
+				Retryable    bool `json:"retryable"`
+				RetryAfterMS int  `json:"retry_after_ms"`
+			} `json:"retry_metadata"`
+			Cache struct {
+				CacheKey   string `json:"cache_key"`
+				CacheState string `json:"cache_state"`
+				TTLSeconds int    `json:"ttl_seconds"`
+			} `json:"cache_metadata"`
+			Timing struct {
+				Clock      string `json:"clock"`
+				StartedMS  int    `json:"started_ms"`
+				EndedMS    int    `json:"ended_ms"`
+				DurationMS int    `json:"duration_ms"`
+				BudgetMS   int    `json:"budget_ms"`
+			} `json:"timing"`
 		} `json:"stage_events"`
+		TimingEnvelope struct {
+			Clock           string `json:"clock"`
+			TotalBudgetMS   int    `json:"total_budget_ms"`
+			TotalDurationMS int    `json:"total_duration_ms"`
+		} `json:"timing_envelope"`
 		ArtifactRefs []string `json:"artifact_refs"`
 	}
 	decodeEquityAnalysisPipelineJSONFile(t, filepath.Join(base, "fixtures", "provider_free_trace_ACME_fixture.json"), &trace)
@@ -318,14 +418,34 @@ func TestFinRobotEquityAnalysisPipelineFixturesAndTrace(t *testing.T) {
 		t.Fatalf("provider-free trace incomplete: %#v", trace)
 	}
 	var eventStages []string
+	totalDuration := 0
+	lastEnded := 0
+	cacheStates := map[string]bool{}
 	for _, event := range trace.StageEvents {
 		eventStages = append(eventStages, event.StageID)
 		if event.EventID == "" || event.Status == "" || event.FixtureKey == "" {
 			t.Fatalf("trace event incomplete: %#v", event)
 		}
+		if event.Attempt != 1 || event.Retry.MaxAttempts != 1 || event.Retry.RetryAfterMS != 0 || event.Cache.CacheKey == "" || event.Cache.CacheState == "" {
+			t.Fatalf("trace retry/cache metadata incomplete: %#v", event)
+		}
+		if event.Timing.Clock != "fixture_monotonic_ms" || event.Timing.StartedMS != lastEnded || event.Timing.EndedMS < event.Timing.StartedMS || event.Timing.DurationMS != event.Timing.EndedMS-event.Timing.StartedMS || event.Timing.DurationMS > event.Timing.BudgetMS {
+			t.Fatalf("trace timing envelope invalid: %#v lastEnded=%d", event.Timing, lastEnded)
+		}
+		cacheStates[event.Cache.CacheState] = true
+		totalDuration += event.Timing.DurationMS
+		lastEnded = event.Timing.EndedMS
 	}
 	if !reflect.DeepEqual(eventStages, []string{"fetch", "normalize", "forecast", "section_agents", "artifact_plan"}) {
 		t.Fatalf("trace stages = %#v", eventStages)
+	}
+	for _, want := range []string{"hit", "miss", "bypass"} {
+		if !cacheStates[want] {
+			t.Fatalf("trace cache states missing %q: %#v", want, cacheStates)
+		}
+	}
+	if trace.TimingEnvelope.Clock != "fixture_monotonic_ms" || trace.TimingEnvelope.TotalBudgetMS != 2500 || trace.TimingEnvelope.TotalDurationMS != totalDuration || totalDuration > trace.TimingEnvelope.TotalBudgetMS {
+		t.Fatalf("trace timing envelope = %#v totalDuration=%d", trace.TimingEnvelope, totalDuration)
 	}
 }
 
@@ -341,7 +461,7 @@ func TestFinRobotEquityAnalysisPipelineFailureHooks(t *testing.T) {
 		}
 	}
 	sort.Strings(hookIDs)
-	wantHooks := []string{"artifact_renderer_missing", "fetch_provider_unavailable", "forecast_assumption_gap", "normalization_missing_metric"}
+	wantHooks := []string{"artifact_renderer_missing", "fetch_provider_unavailable", "forecast_assumption_gap", "normalization_missing_metric", "section_agent_handoff_incomplete"}
 	if !reflect.DeepEqual(hookIDs, wantHooks) {
 		t.Fatalf("failure hook ids = %#v, want %#v", hookIDs, wantHooks)
 	}
@@ -357,17 +477,65 @@ func TestFinRobotEquityAnalysisPipelineFailureHooks(t *testing.T) {
 			FallbackAction string `json:"fallback_action"`
 			ExpectedStatus string `json:"expected_status"`
 		} `json:"failure_hooks"`
+		RetryCacheContract struct {
+			ProviderFree       bool     `json:"provider_free"`
+			LiveNetwork        bool     `json:"live_network"`
+			MaxAttempts        int      `json:"max_attempts"`
+			RequiredHookFields []string `json:"required_hook_fields"`
+		} `json:"retry_cache_contract"`
 		AcceptanceGates []string `json:"acceptance_gates"`
 	}
 	decodeEquityAnalysisPipelineJSONFile(t, filepath.Join(base, "contracts", "failure_hooks_contract.json"), &contract)
-	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || contract.FailureHooksFixture == "" || len(contract.FailureHooks) != 4 {
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || contract.FailureHooksFixture == "" || len(contract.FailureHooks) != 5 {
 		t.Fatalf("failure hook contract incomplete: %#v", contract)
+	}
+	if !contract.RetryCacheContract.ProviderFree || contract.RetryCacheContract.LiveNetwork || contract.RetryCacheContract.MaxAttempts != 1 || len(contract.RetryCacheContract.RequiredHookFields) < 3 {
+		t.Fatalf("failure hook retry/cache contract incomplete: %#v", contract.RetryCacheContract)
 	}
 	assertEquityAnalysisPipelineJSONFile(t, filepath.Join(base, contract.FailureHooksFixture))
 	joined := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
-	for _, want := range []string{"offline fixture", "no hook imports", "clean-skip", "trace"} {
+	for _, want := range []string{"offline fixture", "no hook imports", "clean-skip", "retry/cache", "trace"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("failure hook acceptance gates missing %q: %s", want, joined)
+		}
+	}
+
+	var fixture struct {
+		ProviderFree bool `json:"provider_free"`
+		LiveNetwork  bool `json:"live_network"`
+		Hooks        []struct {
+			ID             string `json:"id"`
+			StageID        string `json:"stage_id"`
+			Trigger        string `json:"trigger"`
+			FallbackAction string `json:"fallback_action"`
+			Status         string `json:"status"`
+			TraceEventID   string `json:"trace_event_id"`
+			Retry          struct {
+				MaxAttempts  int  `json:"max_attempts"`
+				Retryable    bool `json:"retryable"`
+				RetryAfterMS int  `json:"retry_after_ms"`
+			} `json:"retry_metadata"`
+			Cache struct {
+				CacheKey   string `json:"cache_key"`
+				CacheState string `json:"cache_state"`
+			} `json:"cache_metadata"`
+			Timing struct {
+				Clock      string `json:"clock"`
+				DurationMS int    `json:"duration_ms"`
+				BudgetMS   int    `json:"budget_ms"`
+			} `json:"timing"`
+		} `json:"hooks"`
+	}
+	decodeEquityAnalysisPipelineJSONFile(t, filepath.Join(base, "fixtures", "failure_hooks_fixture.json"), &fixture)
+	if !fixture.ProviderFree || fixture.LiveNetwork || len(fixture.Hooks) != 5 {
+		t.Fatalf("failure hook fixture incomplete: %#v", fixture)
+	}
+	for _, hook := range fixture.Hooks {
+		if hook.ID == "" || hook.StageID == "" || hook.Trigger == "" || hook.FallbackAction == "" || hook.Status == "" || hook.TraceEventID == "" {
+			t.Fatalf("failure hook row incomplete: %#v", hook)
+		}
+		if hook.Retry.MaxAttempts != 1 || hook.Retry.RetryAfterMS != 0 || hook.Cache.CacheKey == "" || hook.Cache.CacheState == "" || hook.Timing.Clock != "fixture_monotonic_ms" || hook.Timing.DurationMS <= 0 || hook.Timing.DurationMS > hook.Timing.BudgetMS {
+			t.Fatalf("failure hook retry/cache/timing incomplete: %#v", hook)
 		}
 	}
 }
@@ -434,7 +602,7 @@ func TestFinRobotEquityAnalysisPipelineLivePackageExecutableSkeleton(t *testing.
 			if err != nil {
 				t.Fatalf("Get equity_analysis_pipeline_live_package_summary: %v", err)
 			}
-			want := "equity_analysis_pipeline_live_package stages=5 fixtures=7 schemas=7 failure_hooks=4 provider_free=true live_network=false imports=false trace=provider_free"
+			want := "equity_analysis_pipeline_live_package stages=5 fixtures=7 schemas=7 failure_hooks=5 provider_free=true live_network=false imports=false trace=provider_free retry_cache=true timing=fixture_monotonic_ms"
 			if got != want {
 				t.Fatalf("equity_analysis_pipeline_live_package_summary = %#v, want %#v", got, want)
 			}
