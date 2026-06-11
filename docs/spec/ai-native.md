@@ -349,16 +349,16 @@ incident := llm.agent("incident", incident_config, incident_flow, {
 
 `llm.workflow(steps)` creates a sequential workflow value from `llm.step(name,
 fn, opts)` tables or plain functions. The workflow exposes `run(input, opts)`
-and `mock(fixtures)`. A step function receives a context table containing the
-initial input, current input, previous step record, accumulated step records,
-and named context. A step may call `llm.turn`, call an agent, dispatch tools, or
-perform non-AI work.
+and `mock(fixtures)`. A step may call `llm.turn`, call an agent, dispatch
+tools, or perform non-AI work.
 
 Workflow execution is deterministic except for the operations performed inside
-steps. The helper records ordered step results and a name-indexed context table,
-feeds the prior step's text or value to the next step, and returns a final
-workflow result plus an error value when a step fails. Mock fixtures replace
-matching steps for tests and examples.
+steps. Each step receives a context table with `input`, `initial_input`,
+`previous`, accumulated `results`, and named `context`. The helper records
+ordered step results and a name-indexed context table, feeds the prior step's
+text or value to the next step, and returns a final workflow result plus an
+error value when a step fails. Mock fixtures replace matching steps for tests
+and examples.
 
 These helpers are sequencing helpers, not durable orchestration. They do not
 imply parallelism, retry policy, persistence, transactions, approval storage, or

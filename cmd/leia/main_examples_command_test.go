@@ -378,6 +378,24 @@ func TestExamplesCommandFinRobotTranslationSelectorChecksEveryExample(t *testing
 	}
 }
 
+func TestExamplesCommandJSONCaptureBlocksProcessOutputLeaks(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := captureCLIExampleProcessOutput(func() int {
+		_, _ = os.Stdout.WriteString("direct stdout leak\n")
+		_, _ = os.Stderr.WriteString("direct stderr leak\n")
+		return 0
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("capture code = %d, want 0", code)
+	}
+	if stdout.String() != "direct stdout leak\n" {
+		t.Fatalf("captured stdout = %q", stdout.String())
+	}
+	if stderr.String() != "direct stderr leak\n" {
+		t.Fatalf("captured stderr = %q", stderr.String())
+	}
+}
+
 func TestExamplesDocsIndexCoversTopLevelExampleDirectories(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
 	data, err := os.ReadFile(filepath.Join(root, "docs", "examples", "index.md"))

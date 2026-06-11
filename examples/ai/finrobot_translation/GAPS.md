@@ -5,6 +5,11 @@ Leia AI dialect examples. It intentionally avoids FinRobot-specific language
 features: domain behavior belongs in packages, package data, replay fixtures, or
 external adapters.
 
+Provider-free coverage evidence is summarized in `COVERAGE.md`. Reproducible
+checks are listed in `VERIFICATION.md`. Live production package work that
+replaces fixtures with vendor integrations is tracked in
+`live_package_plan.md` and `live_package_plan_manifest.json`.
+
 ## Gap Categories
 
 | Category | Meaning for FinRobot translation |

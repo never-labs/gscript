@@ -60,6 +60,8 @@ func TestFinRobotTranslationAggregateVerification(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(root, recordsPath)); err != nil {
 				t.Fatalf("%s registry points at missing replay records %s: %v", example.ID, recordsPath, err)
 			}
+		} else if finrobotAggregateHasEvaluateBlock(t, root, example.Path) {
+			wantRunner = "evaluate"
 		}
 		if example.Runner != wantRunner {
 			t.Fatalf("%s runner = %q, want %q", example.ID, example.Runner, wantRunner)
@@ -154,6 +156,20 @@ func finrobotAggregateFilesystemExamples(t *testing.T, root string) []string {
 	}
 	sort.Strings(paths)
 	return paths
+}
+
+func finrobotAggregateHasEvaluateBlock(t *testing.T, root, path string) bool {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "evaluate ") {
+			return true
+		}
+	}
+	return false
 }
 
 func pathsOfFinRobotAggregateExamples(examples []finrobotAggregateExample) []string {

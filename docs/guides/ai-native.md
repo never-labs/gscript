@@ -386,7 +386,8 @@ flow := llm.workflow({
 result, err := flow.run("release notes")
 ```
 
-Each step receives `ctx.input`, `ctx.previous`, `ctx.steps`, and `ctx.context`.
+Each step receives `ctx.input`, `ctx.initial_input`, `ctx.previous`,
+`ctx.results`, and `ctx.context`.
 The next step receives the previous step's text or value. The final result
 contains ordered `steps` plus named `context`, which makes tests and replay
 assertions straightforward.

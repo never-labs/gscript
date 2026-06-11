@@ -428,8 +428,8 @@ flow := llm.workflow({
 result, err := flow.run("release notes")
 ```
 
-Step functions receive a context table with the initial input, current input,
-previous step record, accumulated step records, and named context. A step may
+Step functions receive a context table with `input`, `initial_input`,
+`previous`, accumulated `results`, and named `context`. A step may
 return a provider/agent result table, a plain value, and optionally an error.
 The next step receives the prior step's text or value as its input. The final
 workflow result includes `status`, `text`, `value`, ordered `steps`, and named

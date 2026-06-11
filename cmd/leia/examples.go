@@ -40,6 +40,7 @@ type cliExampleCheckResult struct {
 }
 
 var cliExampleTestRunnerMu sync.Mutex
+var cliExampleProcessOutputMu sync.Mutex
 
 func runExamplesCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
@@ -140,7 +141,7 @@ func runExamplesCheckCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia examples: %v\n", err)
 		return 1
 	}
-	results := checkCLIExamples(examples, *jobs, *maxSteps, *timeout)
+	results := checkCLIExamples(examples, *jobs, *maxSteps, *timeout, *jsonOut)
 	failed := 0
 	runnable := 0
 	skipped := 0
@@ -387,7 +388,7 @@ func normalizeCLIExampleSelector(selector string) string {
 	return normalized
 }
 
-func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64, timeout time.Duration) []cliExampleCheckResult {
+func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64, timeout time.Duration, captureProcessOutput bool) []cliExampleCheckResult {
 	type indexedExample struct {
 		index   int
 		example cliExample
@@ -407,7 +408,7 @@ func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64, timeout t
 		go func() {
 			defer wg.Done()
 			for item := range work {
-				results[item.index] = checkCLIExample(item.example, maxSteps, timeout)
+				results[item.index] = checkCLIExample(item.example, maxSteps, timeout, captureProcessOutput)
 			}
 		}()
 	}
@@ -419,7 +420,7 @@ func checkCLIExamples(examples []cliExample, jobs int, maxSteps int64, timeout t
 	return results
 }
 
-func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) cliExampleCheckResult {
+func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration, captureProcessOutput bool) cliExampleCheckResult {
 	result := cliExampleCheckResult{
 		ID:       example.ID,
 		Path:     example.Path,
@@ -446,7 +447,7 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 				return
 			}
 		}
-		code := runCLIExampleRunner(example, path, maxSteps, &stdout, &stderr)
+		code := runCLIExampleRunnerCaptured(example, path, maxSteps, &stdout, &stderr, captureProcessOutput)
 		done <- runResult{code: code, stdout: stdout.String(), stderr: stderr.String()}
 	}()
 	var run runResult
@@ -470,6 +471,71 @@ func checkCLIExample(example cliExample, maxSteps int64, timeout time.Duration) 
 		}
 	}
 	return result
+}
+
+func runCLIExampleRunnerCaptured(example cliExample, path string, maxSteps int64, stdout, stderr *bytes.Buffer, captureProcessOutput bool) int {
+	if !captureProcessOutput {
+		return runCLIExampleRunner(example, path, maxSteps, stdout, stderr)
+	}
+	return captureCLIExampleProcessOutput(func() int {
+		return runCLIExampleRunner(example, path, maxSteps, stdout, stderr)
+	}, stdout, stderr)
+}
+
+func captureCLIExampleProcessOutput(run func() int, stdout, stderr *bytes.Buffer) int {
+	cliExampleProcessOutputMu.Lock()
+	defer cliExampleProcessOutputMu.Unlock()
+
+	oldStdout, oldStderr := os.Stdout, os.Stderr
+	stdoutReader, stdoutWriter, stdoutErr := os.Pipe()
+	stderrReader, stderrWriter, stderrErr := os.Pipe()
+	if stdoutErr != nil || stderrErr != nil {
+		if stdoutReader != nil {
+			_ = stdoutReader.Close()
+		}
+		if stdoutWriter != nil {
+			_ = stdoutWriter.Close()
+		}
+		if stderrReader != nil {
+			_ = stderrReader.Close()
+		}
+		if stderrWriter != nil {
+			_ = stderrWriter.Close()
+		}
+		return run()
+	}
+
+	var leakedStdout, leakedStderr bytes.Buffer
+	stdoutDone := make(chan struct{})
+	stderrDone := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&leakedStdout, stdoutReader)
+		_ = stdoutReader.Close()
+		close(stdoutDone)
+	}()
+	go func() {
+		_, _ = io.Copy(&leakedStderr, stderrReader)
+		_ = stderrReader.Close()
+		close(stderrDone)
+	}()
+
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+	code := 1
+	func() {
+		defer func() {
+			os.Stdout = oldStdout
+			os.Stderr = oldStderr
+		}()
+		code = run()
+	}()
+	_ = stdoutWriter.Close()
+	_ = stderrWriter.Close()
+	<-stdoutDone
+	<-stderrDone
+	_, _ = stdout.Write(leakedStdout.Bytes())
+	_, _ = stderr.Write(leakedStderr.Bytes())
+	return code
 }
 
 func cliExampleModuleRoot(path string) (string, bool) {

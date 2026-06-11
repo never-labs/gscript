@@ -1,15 +1,21 @@
 # FinRobot Translation Ledger
 
-This directory tracks the planned Leia translation of FinRobot as an external
-finance-agent workload. It is documentation only: it does not change runtime
-behavior, parser behavior, or package APIs.
+This directory tracks the Leia translation of FinRobot as an external
+finance-agent workload. The checked-in slice is provider-free: examples,
+fixtures, manifests, and tests exercise the generic Leia AI/runtime surfaces
+without live finance vendors or committed credentials.
 
-Source reviewed: `.external/FinRobot` from the local checkout, including the
-top-level README, `finrobot`, `finrobot_equity`, experiments, tutorials,
-deployment scripts, and tests.
+Source basis: a local `.external/FinRobot` checkout was used for the original
+audit, including the top-level README, `finrobot`, `finrobot_equity`,
+experiments, tutorials, deployment scripts, and tests. The current repository
+evidence for the translated slice is in this directory and the `tests/llm`
+FinRobot tests.
 
 Coverage audit: see `COVERAGE.md` for the module matrix, registered-example
 inventory, provider-free slice status, and live-package follow-up tasks.
+Verification gates are listed in `VERIFICATION.md`. Production live-package
+work is tracked separately in `live_package_plan.md` and
+`live_package_plan_manifest.json`.
 
 ## Scope
 
@@ -27,7 +33,13 @@ planned general surfaces:
 Non-goal: no `finrobot`, `finance`, `ticker`, `sec`, `trading`, valuation, or
 report-section syntax should be added to Leia.
 
-## Status Key
+## Source Inventory Status Key
+
+The module inventory below describes source-to-Leia translation targets and the
+remaining productionization shape for a faithful live package. It is not the
+provider-free CI gap ledger; the current provider-free slice has no open
+language or AI-dialect gaps. See `GAPS.md` for the closed FR-GAP ledger and
+`COVERAGE.md` for executable evidence.
 
 - `Mapped`: reviewed and mapped to a Leia target, with no runtime edit in this
   branch.
