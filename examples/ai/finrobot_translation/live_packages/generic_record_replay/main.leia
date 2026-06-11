@@ -1,0 +1,160 @@
+// Provider-free generic AI record/replay live package skeleton.
+//
+// This smoke file mirrors the checked-in contract and fixtures. It does not
+// import model providers, host runtimes, network clients, or storage adapters.
+
+generic_record_replay_live_package := {
+    id: "generic-ai-record-replay-live-package"
+    package_name: "generic.ai.record.replay"
+    provider_free: true
+    domain_specific: false
+    live_network: false
+    real_dependency_imports: false
+    default_policy: {
+        mode: "fixture_replay"
+        matching: "strict_ordered"
+        fixture_hook: "recorded_generic_ai_replay_fixture"
+    }
+    replay_index: {
+        fixture_id: "generic-ai-record-replay-fixture-index"
+        strategy: "strict_ordered"
+        scan_ahead: false
+        consume_on_match: true
+        consume_on_mismatch: false
+        identity_fields: {"operation", "capability", "replay_key", "request_hash"}
+        deterministic_summary_order: {
+            "fixture_id",
+            "strategy",
+            "loaded_records",
+            "requests",
+            "matched",
+            "mismatches",
+            "unconsumed",
+            "exhausted",
+            "next_index",
+            "finding_kinds",
+            "matched_record_ids",
+        }
+    }
+    records: {
+        {
+            record_id: "rec-000-analyst-intent"
+            sequence: 0
+            replay_key: "turn:000:llm.complete"
+            operation: "llm.complete"
+            capability: "generic.ai.completion"
+            request_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            response_hash: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            provider_free: true
+        },
+        {
+            record_id: "rec-001-tool-lookup"
+            sequence: 1
+            replay_key: "turn:001:tool.lookup"
+            operation: "tool.call"
+            capability: "generic.ai.tool.invoke"
+            request_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            response_hash: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            provider_free: true
+        },
+        {
+            record_id: "rec-002-final-summary"
+            sequence: 2
+            replay_key: "turn:002:llm.complete"
+            operation: "llm.complete"
+            capability: "generic.ai.completion"
+            request_hash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            response_hash: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            provider_free: true
+        },
+    }
+    expected_partial_summary: {
+        loaded_records: 3
+        requests: 2
+        matched: 2
+        mismatches: 0
+        unconsumed: 1
+        exhausted: 0
+        next_index: 2
+        finding_kinds: {"generic.ai.replay.unconsumed_record"}
+        matched_record_ids: {"rec-000-analyst-intent", "rec-001-tool-lookup"}
+    }
+    expected_mismatch_summary: {
+        loaded_records: 3
+        requests: 2
+        matched: 1
+        mismatches: 1
+        unconsumed: 2
+        exhausted: 0
+        next_index: 1
+        finding_kinds: {
+            "generic.ai.replay.mismatch",
+            "generic.ai.replay.unconsumed_record",
+            "generic.ai.replay.unconsumed_record",
+        }
+        matched_record_ids: {"rec-000-analyst-intent"}
+    }
+}
+
+func generic_record_replay_provider_free_ok(pkg) {
+    if pkg == nil {
+        return false
+    }
+    return pkg.provider_free == true &&
+        pkg.domain_specific == false &&
+        pkg.live_network == false &&
+        pkg.real_dependency_imports == false &&
+        pkg.default_policy.mode == "fixture_replay" &&
+        pkg.default_policy.matching == "strict_ordered" &&
+        pkg.replay_index.scan_ahead == false &&
+        pkg.replay_index.consume_on_match == true &&
+        pkg.replay_index.consume_on_mismatch == false
+}
+
+func generic_record_replay_records_ok(records) {
+    if records == nil || #records != 3 {
+        return false
+    }
+    for i := 1; i <= #records; i++ {
+        record := records[i]
+        if record.sequence != i - 1 ||
+            record.record_id == nil ||
+            record.replay_key == nil ||
+            record.operation == nil ||
+            record.capability == nil ||
+            record.request_hash == nil ||
+            record.response_hash == nil ||
+            record.provider_free != true {
+            return false
+        }
+    }
+    return true
+}
+
+assert(generic_record_replay_provider_free_ok(generic_record_replay_live_package))
+assert(generic_record_replay_records_ok(generic_record_replay_live_package.records))
+assert(#generic_record_replay_live_package.replay_index.identity_fields == 4)
+assert(#generic_record_replay_live_package.replay_index.deterministic_summary_order == 11)
+assert(generic_record_replay_live_package.expected_partial_summary.matched == 2)
+assert(generic_record_replay_live_package.expected_partial_summary.unconsumed == 1)
+assert(generic_record_replay_live_package.expected_mismatch_summary.mismatches == 1)
+assert(generic_record_replay_live_package.expected_mismatch_summary.next_index == 1)
+
+generic_record_replay_live_package_summary := string.format(
+"generic_record_replay_live_package strategy=%s records=%d partial_matched=%d partial_unconsumed=%d mismatch_matched=%d mismatches=%d mismatch_unconsumed=%d next_index=%d findings=%d provider_free=%s domain_specific=%s live_network=%s imports=%s",
+generic_record_replay_live_package.replay_index.strategy,
+#generic_record_replay_live_package.records,
+generic_record_replay_live_package.expected_partial_summary.matched,
+generic_record_replay_live_package.expected_partial_summary.unconsumed,
+generic_record_replay_live_package.expected_mismatch_summary.matched,
+generic_record_replay_live_package.expected_mismatch_summary.mismatches,
+generic_record_replay_live_package.expected_mismatch_summary.unconsumed,
+generic_record_replay_live_package.expected_mismatch_summary.next_index,
+#generic_record_replay_live_package.expected_mismatch_summary.finding_kinds,
+tostring(generic_record_replay_live_package.provider_free),
+tostring(generic_record_replay_live_package.domain_specific),
+tostring(generic_record_replay_live_package.live_network),
+tostring(generic_record_replay_live_package.real_dependency_imports)
+)
+
+print(generic_record_replay_live_package_summary)

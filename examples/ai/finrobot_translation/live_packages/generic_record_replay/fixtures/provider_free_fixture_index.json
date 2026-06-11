@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "fixture_id": "generic-ai-record-replay-fixture-index",
+  "provider_free": true,
+  "domain_specific": false,
+  "strategy": "strict_ordered",
+  "record_schema": "schemas/record_v1.schema.json",
+  "records_path": "fixtures/ordered_records_fixture.json#/records",
+  "request_fixtures": {
+    "strict_ordered_partial": "fixtures/matching_requests_fixture.json#/requests",
+    "strict_ordered_mismatch": "fixtures/mismatch_requests_fixture.json#/requests"
+  },
+  "matching": {
+    "scan_ahead": false,
+    "consume_on_match": true,
+    "consume_on_mismatch": false,
+    "identity_fields": ["operation", "capability", "replay_key", "request_hash"],
+    "mismatch_finding_kind": "generic.ai.replay.mismatch",
+    "unconsumed_finding_kind": "generic.ai.replay.unconsumed_record",
+    "exhausted_finding_kind": "generic.ai.replay.exhausted"
+  },
+  "fixtures": [
+    {
+      "id": "ordered_records",
+      "path": "fixtures/ordered_records_fixture.json",
+      "schema": "schemas/record_v1.schema.json",
+      "records": 3,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "id": "matching_requests",
+      "path": "fixtures/matching_requests_fixture.json",
+      "records": 2,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "strict_ordered_partial": true
+      }
+    },
+    {
+      "id": "mismatch_requests",
+      "path": "fixtures/mismatch_requests_fixture.json",
+      "records": 2,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "strict_ordered_mismatch": true
+      }
+    }
+  ],
+  "expected_summaries": {
+    "strict_ordered_partial": {
+      "fixture_id": "generic-ai-record-replay-fixture-index",
+      "strategy": "strict_ordered",
+      "loaded_records": 3,
+      "requests": 2,
+      "matched": 2,
+      "mismatches": 0,
+      "unconsumed": 1,
+      "exhausted": 0,
+      "next_index": 2,
+      "finding_kinds": ["generic.ai.replay.unconsumed_record"],
+      "matched_record_ids": ["rec-000-analyst-intent", "rec-001-tool-lookup"]
+    },
+    "strict_ordered_mismatch": {
+      "fixture_id": "generic-ai-record-replay-fixture-index",
+      "strategy": "strict_ordered",
+      "loaded_records": 3,
+      "requests": 2,
+      "matched": 1,
+      "mismatches": 1,
+      "unconsumed": 2,
+      "exhausted": 0,
+      "next_index": 1,
+      "finding_kinds": [
+        "generic.ai.replay.mismatch",
+        "generic.ai.replay.unconsumed_record",
+        "generic.ai.replay.unconsumed_record"
+      ],
+      "matched_record_ids": ["rec-000-analyst-intent"]
+    }
+  },
+  "deterministic_summary_order": [
+    "fixture_id",
+    "strategy",
+    "loaded_records",
+    "requests",
+    "matched",
+    "mismatches",
+    "unconsumed",
+    "exhausted",
+    "next_index",
+    "finding_kinds",
+    "matched_record_ids"
+  ]
+}

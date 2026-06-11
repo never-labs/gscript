@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "fixture_id": "generic-ai-record-replay-matching-requests",
+  "provider_free": true,
+  "domain_specific": false,
+  "requests": [
+    {
+      "replay_key": "turn:000:llm.complete",
+      "operation": "llm.complete",
+      "capability": "generic.ai.completion",
+      "request_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "replay_key": "turn:001:tool.lookup",
+      "operation": "tool.call",
+      "capability": "generic.ai.tool.invoke",
+      "request_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

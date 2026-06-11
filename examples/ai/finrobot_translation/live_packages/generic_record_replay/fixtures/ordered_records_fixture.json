@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "fixture_id": "generic-ai-record-replay-ordered-records",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "records": [
+    {
+      "record_id": "rec-000-analyst-intent",
+      "sequence": 0,
+      "replay_key": "turn:000:llm.complete",
+      "operation": "llm.complete",
+      "capability": "generic.ai.completion",
+      "request_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "response_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "request": {
+        "canonical_json": {
+          "messages": [{"role": "user", "content": "Summarize ACME revenue trend."}],
+          "tools": []
+        },
+        "redactions": []
+      },
+      "response": {
+        "canonical_json": {
+          "message": {"role": "assistant", "content": "I will inspect the normalized revenue table."},
+          "tool_calls": []
+        },
+        "status": "ok"
+      },
+      "provider_free": true,
+      "recorded_at": "2026-01-02T03:04:05Z",
+      "metadata": {
+        "fixture": true,
+        "deterministic": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    },
+    {
+      "record_id": "rec-001-tool-lookup",
+      "sequence": 1,
+      "replay_key": "turn:001:tool.lookup",
+      "operation": "tool.call",
+      "capability": "generic.ai.tool.invoke",
+      "request_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "response_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "request": {
+        "canonical_json": {
+          "tool": "fixture.lookup",
+          "arguments": {"dataset": "normalized_revenue", "symbol": "ACME"}
+        },
+        "redactions": []
+      },
+      "response": {
+        "canonical_json": {
+          "rows": [{"period": "2026Q1", "revenue": 1250000000}],
+          "source": "fixture"
+        },
+        "status": "ok"
+      },
+      "provider_free": true,
+      "recorded_at": "2026-01-02T03:04:06Z",
+      "metadata": {
+        "fixture": true,
+        "deterministic": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    },
+    {
+      "record_id": "rec-002-final-summary",
+      "sequence": 2,
+      "replay_key": "turn:002:llm.complete",
+      "operation": "llm.complete",
+      "capability": "generic.ai.completion",
+      "request_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "response_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "request": {
+        "canonical_json": {
+          "messages": [{"role": "user", "content": "Use the fixture lookup and produce the final summary."}],
+          "tools": []
+        },
+        "redactions": []
+      },
+      "response": {
+        "canonical_json": {
+          "message": {"role": "assistant", "content": "ACME revenue rose on the provider-free fixture row."},
+          "tool_calls": []
+        },
+        "status": "ok"
+      },
+      "provider_free": true,
+      "recorded_at": "2026-01-02T03:04:07Z",
+      "metadata": {
+        "fixture": true,
+        "deterministic": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    }
+  ]
+}

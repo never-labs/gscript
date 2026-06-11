@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generic.ai.record.replay.matching_summary.v1",
+  "title": "Generic AI replay matching summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture_id",
+    "strategy",
+    "loaded_records",
+    "requests",
+    "matched",
+    "mismatches",
+    "unconsumed",
+    "exhausted",
+    "next_index",
+    "finding_kinds",
+    "matched_record_ids"
+  ],
+  "properties": {
+    "fixture_id": {"type": "string"},
+    "strategy": {"type": "string", "const": "strict_ordered"},
+    "loaded_records": {"type": "integer", "minimum": 0},
+    "requests": {"type": "integer", "minimum": 0},
+    "matched": {"type": "integer", "minimum": 0},
+    "mismatches": {"type": "integer", "minimum": 0},
+    "unconsumed": {"type": "integer", "minimum": 0},
+    "exhausted": {"type": "integer", "minimum": 0},
+    "next_index": {"type": "integer", "minimum": 0},
+    "finding_kinds": {"type": "array", "items": {"type": "string"}},
+    "matched_record_ids": {"type": "array", "items": {"type": "string"}}
+  }
+}

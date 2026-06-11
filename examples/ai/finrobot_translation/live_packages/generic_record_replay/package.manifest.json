@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-record-replay-live-package",
+  "package_name": "generic.ai.record.replay",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for generic AI record/replay fixtures, strict ordered matching, mismatch findings, and deterministic replay summaries.",
+  "source_modules": [
+    "examples/ai/finrobot_translation/ai_dialect_index/backend_plan.json",
+    "examples/ai/finrobot_translation/ai_dialect_index/index.json"
+  ],
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; provider SDKs, model credentials, and network clients belong only to future provider-specific packages behind explicit capability gates."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "matching": "strict_ordered",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_ai_replay_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "record_replay_contract": "contracts/record_replay_contract.json",
+    "strict_ordered_matching_contract": "contracts/strict_ordered_matching_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "ordered_records_fixture": "fixtures/ordered_records_fixture.json",
+    "matching_requests_fixture": "fixtures/matching_requests_fixture.json",
+    "mismatch_requests_fixture": "fixtures/mismatch_requests_fixture.json"
+  },
+  "schemas": {
+    "record": "schemas/record_v1.schema.json",
+    "replay_index": "schemas/replay_index_v1.schema.json",
+    "match_finding": "schemas/match_finding_v1.schema.json",
+    "matching_summary": "schemas/matching_summary_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "ordered_records": "fixtures/ordered_records_fixture.json",
+    "matching_requests": "fixtures/matching_requests_fixture.json",
+    "mismatch_requests": "fixtures/mismatch_requests_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.record.schema",
+    "generic.ai.record.capture",
+    "generic.ai.replay.index",
+    "generic.ai.replay.match.strict_ordered",
+    "generic.ai.replay.finding.mismatch",
+    "generic.ai.replay.finding.unconsumed",
+    "generic.ai.replay.summary.deterministic"
+  ],
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true, domain_specific is false, and live_network_default is false",
+    "record schema requires record_id, sequence, replay_key, operation, capability, request_hash, response_hash, request, response, provider_free, and recorded_at",
+    "record schema forbids provider SDK, credential, and network client fields",
+    "fixture index declares strict_ordered matching and deterministic summary field order",
+    "strict ordered replay compares only the next unconsumed record and never scans ahead",
+    "mismatch findings include expected and actual request hashes plus the replay cursor",
+    "unconsumed record handling emits deterministic finding records after request replay ends",
+    "matching summary is stable for equivalent fixture inputs"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide provider-backed record/replay storage, model clients, or network capture as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}
