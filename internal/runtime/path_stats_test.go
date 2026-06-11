@@ -150,6 +150,46 @@ func TestRuntimePathStatsRuntimePrimitiveAttribution(t *testing.T) {
 	}
 }
 
+func TestRuntimePathStatsDenseArrayWhereMaskPrimitiveAttribution(t *testing.T) {
+	desc, ok := LookupRuntimePrimitive(RuntimePrimitiveDenseArrayWhereMaskI64)
+	if !ok {
+		t.Fatal("dense array where-mask primitive missing from registry")
+	}
+	if desc.Family != "mask" || desc.Op != "where" || desc.Shape != "dense-array/bool-to-i64-indexes" {
+		t.Fatalf("where-mask descriptor = %+v", desc)
+	}
+
+	stats := EnableRuntimePathStats()
+	defer DisableRuntimePathStats()
+
+	indexes, err := DenseArrayIndicesWhere(NewDenseArrayBool([]bool{true, false, true}))
+	if err != nil {
+		t.Fatalf("DenseArrayIndicesWhere hit: %v", err)
+	}
+	values, ok := indexes.I64()
+	if !ok || len(values) != 2 || values[0] != 1 || values[1] != 3 {
+		t.Fatalf("DenseArrayIndicesWhere values = %v ok=%v, want 1 3", values, ok)
+	}
+	if _, err := DenseArrayIndicesWhere(NewDenseArrayI64([]int64{1})); err == nil {
+		t.Fatal("DenseArrayIndicesWhere accepted non-bool mask")
+	}
+
+	snap := stats.Snapshot()
+	var row RuntimePathRuntimePrimitiveEntry
+	for _, entry := range snap.RuntimePrimitive.PerPrimitive {
+		if entry.ID == string(RuntimePrimitiveDenseArrayWhereMaskI64) {
+			row = entry
+			break
+		}
+	}
+	if row.ID == "" {
+		t.Fatalf("missing where-mask primitive row: %+v", snap.RuntimePrimitive.PerPrimitive)
+	}
+	if row.Hit != 1 || row.Error != 1 || row.Family != "mask" || row.Op != "where" {
+		t.Fatalf("where-mask primitive row = %+v", row)
+	}
+}
+
 type testWriter struct {
 	seen bool
 }

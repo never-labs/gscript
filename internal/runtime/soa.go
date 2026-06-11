@@ -487,7 +487,7 @@ func (s *SoA) IndicesWhere(mask *DenseArray) (*DenseArray, error) {
 	if mask.Len() != s.length {
 		return nil, ErrDenseArrayLength
 	}
-	return denseArrayIndicesWhere(mask)
+	return DenseArrayIndicesWhere(mask)
 }
 
 func (s *SoA) Mask(columnName, op string, rhs Value) (*DenseArray, error) {

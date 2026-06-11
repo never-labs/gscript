@@ -20,10 +20,23 @@ var qRuntimeArrayGatherI64Primitive = qRuntimePrimitiveDescriptor{
 	fallbackReason: RuntimeFallbackUnsupportedType,
 }
 
+var qRuntimeWhereMaskI64Primitive = qRuntimePrimitiveDescriptor{
+	kernel:         "ArrayWhere",
+	family:         "where",
+	shapePrefix:    "mask-to-index",
+	fallbackReason: RuntimeFallbackUnsupportedType,
+}
+
 func qEvalArrayGatherI64Primitive(array, indexes data.Array) (data.Array, bool, error) {
 	out, handled, err := data.TryGatherByI64IndexArray(array, indexes)
 	shape := qRuntimeArrayPrimitiveShape(qRuntimeArrayGatherI64Primitive, array, indexes)
 	recordRuntimeKernelProbeReason(qRuntimeArrayGatherI64Primitive.kernel, shape, handled, err, qRuntimeArrayGatherI64Primitive.fallbackReason)
+	return out, handled, err
+}
+
+func qEvalWhereMaskI64Primitive(mask data.Array) (data.Array, bool, error) {
+	out, handled, err := data.TryTypedWhereMaskI64(mask)
+	recordRuntimeKernelProbeReason(qRuntimeWhereMaskI64Primitive.kernel, "mask-to-index/i64", handled, err, qRuntimeWhereMaskI64Primitive.fallbackReason)
 	return out, handled, err
 }
 

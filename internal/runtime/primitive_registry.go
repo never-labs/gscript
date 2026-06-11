@@ -6,7 +6,8 @@ package runtime
 type RuntimePrimitiveID string
 
 const (
-	RuntimePrimitiveDenseArrayGather RuntimePrimitiveID = "dense_array.gather"
+	RuntimePrimitiveDenseArrayGather       RuntimePrimitiveID = "dense_array.gather"
+	RuntimePrimitiveDenseArrayWhereMaskI64 RuntimePrimitiveID = "dense_array.where_mask_i64"
 )
 
 // RuntimePrimitiveDescriptor describes a typed runtime operation independently
@@ -24,6 +25,12 @@ var runtimePrimitiveRegistry = map[RuntimePrimitiveID]RuntimePrimitiveDescriptor
 		Family: "vector",
 		Op:     "gather",
 		Shape:  "dense-array/i64-indexes",
+	},
+	RuntimePrimitiveDenseArrayWhereMaskI64: {
+		ID:     RuntimePrimitiveDenseArrayWhereMaskI64,
+		Family: "mask",
+		Op:     "where",
+		Shape:  "dense-array/bool-to-i64-indexes",
 	},
 }
 

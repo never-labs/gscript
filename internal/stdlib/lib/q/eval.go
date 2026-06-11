@@ -13903,8 +13903,7 @@ func where(v any) (any, error) {
 		return data.NewI64(make([]int64, n)), nil
 	}
 	if array.Kind() == data.KindBool {
-		typedOut, handled, err := data.TryTypedWhereMaskI64(array)
-		recordRuntimeKernelProbe("ArrayWhere", "mask-to-index/i64", handled, err)
+		typedOut, handled, err := qEvalWhereMaskI64Primitive(array)
 		if err != nil {
 			return nil, err
 		}
