@@ -82,6 +82,8 @@ func (b *llmLibBuilder) register() {
 	b.registerToolHelpers()
 	b.registerSchemaHelpers()
 	b.registerToolCheckHelper()
+	b.registerPolicyHelpers()
+	b.registerApprovalHelpers()
 	b.registerRuntimeHelpers()
 	b.registerValidationHelpers()
 	registerLLMWorkflowHelpers(b.t, b.call)
