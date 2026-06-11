@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-html-ui-snapshots-provider-free-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "requires_browser": false,
+  "requires_credentials": false,
+  "fixtures": [
+    {
+      "fixture_key": "html_ui:template_inventory:finrobot_equity:offline",
+      "capability": "finance.html_ui.template_inventory",
+      "path": "fixtures/template_inventory_fixture.json",
+      "schemas": ["schemas/template_inventory_v1.schema.json"],
+      "metadata": {
+        "replay_ready": true,
+        "browser_required": false,
+        "network_required": false,
+        "source_modules": ["finrobot_equity/web_app/templates/*", "finrobot_equity/core/src/modules/html_template_professional.py"]
+      }
+    },
+    {
+      "fixture_key": "html_ui:static_assets:finrobot_equity:offline",
+      "capability": "finance.html_ui.static_asset_manifest",
+      "path": "fixtures/static_asset_manifest_fixture.json",
+      "schemas": ["schemas/static_asset_manifest_v1.schema.json"],
+      "metadata": {
+        "replay_ready": true,
+        "browser_required": false,
+        "network_required": false,
+        "remote_assets_allowed": false
+      }
+    },
+    {
+      "fixture_key": "html_ui:snapshot:ACME:offline",
+      "capability": "finance.html_ui.deterministic_snapshot_hash",
+      "path": "fixtures/html_ui_snapshot_ACME_fixture.json",
+      "schemas": ["schemas/snapshot_metadata_v1.schema.json", "schemas/accessibility_checklist_v1.schema.json"],
+      "metadata": {
+        "replay_ready": true,
+        "browser_required": false,
+        "network_required": false,
+        "deterministic_hash_seed": "finrobot-html-ui-snapshots|ACME|provider-free|2026-06-11|templates-static-professional",
+        "deterministic_snapshot_hash": "fc0779b037111b16133371e271f272d08c2ceb4cae6c61329d49d9dfef2e91f6"
+      }
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-html-ui-snapshots-live-package",
+  "package_name": "leia-finrobot-html-ui-snapshots",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "browser_required_default": false,
+  "source_modules": [
+    "finrobot_equity/web_app/templates/*",
+    "finrobot_equity/web_app/static/*",
+    "finrobot_equity/core/src/modules/html_template_professional.py"
+  ],
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "HTML/UI snapshot fixtures are static package data and require no provider credentials, browser session, or network fetch."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "browser_required": false,
+    "clean_skip_without_browser": true,
+    "fixture_hook": "recorded_html_ui_snapshot_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "html_ui_snapshot_contract": "contracts/html_ui_snapshot_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "template_inventory": "schemas/template_inventory_v1.schema.json",
+    "static_asset_manifest": "schemas/static_asset_manifest_v1.schema.json",
+    "snapshot_metadata": "schemas/snapshot_metadata_v1.schema.json",
+    "accessibility_checklist": "schemas/accessibility_checklist_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "template_inventory": "fixtures/template_inventory_fixture.json",
+    "snapshot_contract": "fixtures/html_ui_snapshot_ACME_fixture.json",
+    "static_asset_manifest": "fixtures/static_asset_manifest_fixture.json"
+  },
+  "capabilities": [
+    "finance.html_ui.template_inventory",
+    "finance.html_ui.required_sections",
+    "finance.html_ui.table_placeholder_contract",
+    "finance.html_ui.chart_placeholder_contract",
+    "finance.html_ui.disclosure_markup",
+    "finance.html_ui.source_provenance_markup",
+    "finance.html_ui.accessibility_static_checklist",
+    "finance.html_ui.static_asset_manifest",
+    "finance.html_ui.deterministic_snapshot_hash",
+    "finance.html_ui.provider_free_clean_skip"
+  ],
+  "template_boundaries": [
+    {
+      "id": "web_app_templates",
+      "source_module": "finrobot_equity/web_app/templates/*",
+      "capability": "finance.html_ui.template_inventory",
+      "live_network": false,
+      "browser_required": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "web_app_static",
+      "source_module": "finrobot_equity/web_app/static/*",
+      "capability": "finance.html_ui.static_asset_manifest",
+      "live_network": false,
+      "browser_required": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "professional_html_template",
+      "source_module": "finrobot_equity/core/src/modules/html_template_professional.py",
+      "capability": "finance.html_ui.required_sections",
+      "live_network": false,
+      "browser_required": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "test_gates": [
+    "provider-free fixture package only; no product runtime substrate changes",
+    "template inventory covers web_app/templates and html_template_professional.py",
+    "required sections, table placeholders, and chart placeholders are declared",
+    "disclosure and source provenance markup hooks are explicit",
+    "accessibility checklist is static and browser-free",
+    "static asset manifest forbids remote fonts and network assets",
+    "deterministic snapshot hash derives from a stable fixture seed",
+    "no browser, network, provider credential, or renderer dependency required"
+  ]
+}

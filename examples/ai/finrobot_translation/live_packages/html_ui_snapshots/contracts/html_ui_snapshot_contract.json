@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-html-ui-snapshot-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "requires_browser": false,
+  "requires_credentials": false,
+  "contract_scope": [
+    "finrobot_equity/web_app/templates/*",
+    "finrobot_equity/web_app/static/*",
+    "finrobot_equity/core/src/modules/html_template_professional.py"
+  ],
+  "typed_fixtures": [
+    {
+      "id": "template_inventory",
+      "capability": "finance.html_ui.template_inventory",
+      "schema": "schemas/template_inventory_v1.schema.json",
+      "fixture": "fixtures/template_inventory_fixture.json",
+      "required_fields": ["templates", "professional_template", "required_sections", "table_placeholders", "chart_placeholders", "provenance_markup", "disclosure_markup"]
+    },
+    {
+      "id": "static_asset_manifest",
+      "capability": "finance.html_ui.static_asset_manifest",
+      "schema": "schemas/static_asset_manifest_v1.schema.json",
+      "fixture": "fixtures/static_asset_manifest_fixture.json",
+      "required_fields": ["assets", "asset_policy", "template_asset_refs"]
+    },
+    {
+      "id": "snapshot_metadata",
+      "capability": "finance.html_ui.deterministic_snapshot_hash",
+      "schema": "schemas/snapshot_metadata_v1.schema.json",
+      "fixture": "fixtures/html_ui_snapshot_ACME_fixture.json",
+      "required_fields": ["deterministic_hash_seed", "deterministic_snapshot_hash", "snapshots", "accessibility_checklist"]
+    }
+  ],
+  "required_section_contract": {
+    "source": "html_template_professional.py",
+    "sections": ["executive_summary", "company_overview", "financial_analysis", "valuation", "risk_assessment", "investment_recommendation", "sources", "disclosures"],
+    "section_anchor_required": true,
+    "heading_order_required": true
+  },
+  "placeholder_contract": {
+    "table_placeholders_required": true,
+    "chart_placeholders_required": true,
+    "missing_data_state": "render_static_placeholder_with_source_ref",
+    "placeholder_accessibility": ["aria-label", "role=status", "text_equivalent"]
+  },
+  "provenance_contract": {
+    "source_refs_must_resolve": true,
+    "source_markup_attributes": ["data-source-id", "data-source-kind", "data-as-of", "data-evidence-hash"],
+    "disclosure_markup_attributes": ["data-disclosure-id", "data-disclosure-kind"],
+    "unresolved_refs_allowed": false
+  },
+  "static_asset_contract": {
+    "external_fetch": false,
+    "remote_fonts": false,
+    "inline_or_local_only": true,
+    "hash_algorithm": "sha256"
+  },
+  "acceptance_gates": [
+    "all fixtures are provider_free=true and live_network=false",
+    "requires_browser=false for manifest, contract, and fixture index",
+    "template inventory maps web_app/templates/* plus html_template_professional.py",
+    "required report sections include sources and disclosures",
+    "table/chart placeholders include accessible text equivalents",
+    "source provenance and disclosure markup attributes are explicit",
+    "static asset manifest forbids remote assets and remote fonts",
+    "deterministic snapshot hash is sha256(seed)"
+  ]
+}
