@@ -1,20 +1,14 @@
 {
   "schema_version": 1,
-  "id": "finrobot-generic-evaluation-harness-live-package",
-  "package_name": "leia-finrobot-generic-evaluation-harness",
+  "id": "generic-ai-evaluation-harness-live-package",
+  "package_name": "leia-generic-ai-evaluation-harness",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for generic.ai.evaluation.harness and ai.eval.run with manifest-driven datasets, case inputs, metrics, judge replay records, findings, golden gates, and case result summaries.",
   "provider_free": true,
   "live_network_default": false,
   "real_dependency_import_default": false,
   "source_modules": [
-    "generic.ai.evaluation.harness",
-    "ai.eval.run",
-    "eval.load_jsonl",
-    "eval.case",
-    "eval.metric",
-    "eval.judge",
-    "llm.replay"
+    "main.leia"
   ],
   "credentials": {
     "required": [],

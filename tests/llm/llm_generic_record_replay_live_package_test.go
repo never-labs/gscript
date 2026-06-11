@@ -37,9 +37,11 @@ type genericRecordReplayManifest struct {
 	Schemas            map[string]string `json:"schemas"`
 	Fixtures           map[string]string `json:"fixtures"`
 	Capabilities       []string          `json:"capabilities"`
+	DialectSurface     []string          `json:"dialect_surface"`
 	TestGates          []string          `json:"test_gates"`
 	NoBuiltInGuarantee struct {
-		Required bool `json:"required"`
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
 	} `json:"no_built_in_guarantee"`
 }
 
@@ -140,7 +142,7 @@ func TestGenericRecordReplayLivePackageManifest(t *testing.T) {
 	manifest := loadGenericRecordReplayManifest(t, base)
 
 	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-record-replay-live-package" ||
-		manifest.PackageName != "generic.ai.record.replay" {
+		manifest.PackageName != "leia-generic-ai-record-replay" {
 		t.Fatalf("unexpected manifest header: %#v", manifest)
 	}
 	if !manifest.ProviderFree || manifest.DomainSpecific ||
@@ -197,8 +199,13 @@ func TestGenericRecordReplayLivePackageManifest(t *testing.T) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
 	}
-	if !manifest.NoBuiltInGuarantee.Required {
-		t.Fatal("generic record replay package must declare no built-in guarantee")
+	for _, want := range []string{"generic.ai.record.replay", "generic.ai.record", "generic.ai.replay"} {
+		if !containsGenericRecordReplay(manifest.DialectSurface, want) {
+			t.Fatalf("dialect surface missing %q: %#v", want, manifest.DialectSurface)
+		}
+	}
+	if !manifest.NoBuiltInGuarantee.Required || !strings.Contains(manifest.NoBuiltInGuarantee.Statement, "does not provide") {
+		t.Fatalf("generic record replay package must declare no built-in guarantee: %#v", manifest.NoBuiltInGuarantee)
 	}
 	gates := strings.ToLower(strings.Join(manifest.TestGates, " "))
 	for _, want := range []string{"record schema", "strict ordered", "mismatch", "unconsumed", "fixture index", "deterministic summary"} {

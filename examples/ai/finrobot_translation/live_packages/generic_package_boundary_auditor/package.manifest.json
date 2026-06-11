@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "generic-ai-package-boundary-audit-live-package",
-  "package_name": "generic.ai.package.boundary.audit",
-  "aliases": [
+  "package_name": "leia-generic-ai-package-boundary-auditor",
+  "dialect_aliases": [
     "ai.package.audit"
   ],
   "version": "0.1.0-skeleton",
@@ -103,6 +103,18 @@
       "real_dependency_imports": false
     }
   ],
+  "capabilities": [
+    "generic.ai.package.boundary.audit.manifest",
+    "generic.ai.package.boundary.audit.fixture_index",
+    "generic.ai.package.boundary.audit.example_registry",
+    "generic.ai.package.boundary.audit.capability_policy",
+    "generic.ai.package.boundary.audit.findings",
+    "generic.ai.package.boundary.audit.missing_boundary_records"
+  ],
+  "dialect_surface": [
+    "generic.ai.package.boundary.audit",
+    "ai.package.audit"
+  ],
   "test_gates": [
     "package manifest audit verifies provider-free defaults, entrypoints, schema references, no credentials, and no built-in guarantee",
     "fixture index audit verifies every fixture is local, replay-ready, schema-linked, and mapped to a capability",
@@ -113,6 +125,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide generic AI package boundary audits as built-ins; this skeleton defines the provider-free contract future packages must satisfy."
+    "statement": "Leia core does not provide generic AI package boundary audits as built-ins; leia-generic-ai-package-boundary-auditor defines the provider-free package boundary."
   }
 }

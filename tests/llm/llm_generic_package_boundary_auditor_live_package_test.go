@@ -18,7 +18,8 @@ type genericPackageBoundaryAuditorManifest struct {
 	SchemaVersion               int      `json:"schema_version"`
 	ID                          string   `json:"id"`
 	PackageName                 string   `json:"package_name"`
-	Aliases                     []string `json:"aliases"`
+	DialectAliases              []string `json:"dialect_aliases"`
+	DialectSurface              []string `json:"dialect_surface"`
 	ProviderFree                bool     `json:"provider_free"`
 	LiveNetworkDefault          bool     `json:"live_network_default"`
 	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
@@ -36,12 +37,13 @@ type genericPackageBoundaryAuditorManifest struct {
 		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
 		FixtureHook                 string `json:"fixture_hook"`
 	} `json:"default_policy"`
-	Entrypoints map[string]string                     `json:"entrypoints"`
-	Schemas     map[string]string                     `json:"schemas"`
-	Fixtures    map[string]string                     `json:"fixtures"`
-	Targets     []genericPackageBoundaryAuditorTarget `json:"audit_targets"`
-	TestGates   []string                              `json:"test_gates"`
-	NoBuiltIn   struct {
+	Entrypoints  map[string]string                     `json:"entrypoints"`
+	Schemas      map[string]string                     `json:"schemas"`
+	Fixtures     map[string]string                     `json:"fixtures"`
+	Targets      []genericPackageBoundaryAuditorTarget `json:"audit_targets"`
+	Capabilities []string                              `json:"capabilities"`
+	TestGates    []string                              `json:"test_gates"`
+	NoBuiltIn    struct {
 		Required  bool   `json:"required"`
 		Statement string `json:"statement"`
 	} `json:"no_built_in_guarantee"`
@@ -64,11 +66,16 @@ func TestGenericPackageBoundaryAuditorLivePackageManifest(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-package-boundary-audit-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.PackageName != "generic.ai.package.boundary.audit" {
+	if manifest.PackageName != "leia-generic-ai-package-boundary-auditor" {
 		t.Fatalf("package name = %q", manifest.PackageName)
 	}
-	if !reflect.DeepEqual(manifest.Aliases, []string{"ai.package.audit"}) {
-		t.Fatalf("aliases = %#v", manifest.Aliases)
+	if !reflect.DeepEqual(manifest.DialectAliases, []string{"ai.package.audit"}) {
+		t.Fatalf("dialect aliases = %#v", manifest.DialectAliases)
+	}
+	for _, want := range []string{"generic.ai.package.boundary.audit", "ai.package.audit"} {
+		if !genericPackageBoundaryAuditorContains(manifest.DialectSurface, want) {
+			t.Fatalf("dialect surface missing %q: %#v", want, manifest.DialectSurface)
+		}
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
 		t.Fatalf("provider-free defaults = provider_free:%v live_network:%v imports:%v", manifest.ProviderFree, manifest.LiveNetworkDefault, manifest.RealDependencyImportDefault)
@@ -123,6 +130,18 @@ func TestGenericPackageBoundaryAuditorLivePackageManifest(t *testing.T) {
 	wantTargetIDs := []string{"audit_findings", "capability_policy", "example_registry_audit", "fixture_index_audit", "missing_boundary_records", "package_manifest_audit"}
 	if !reflect.DeepEqual(targetIDs, wantTargetIDs) {
 		t.Fatalf("target ids = %#v, want %#v", targetIDs, wantTargetIDs)
+	}
+	for _, want := range []string{
+		"generic.ai.package.boundary.audit.manifest",
+		"generic.ai.package.boundary.audit.fixture_index",
+		"generic.ai.package.boundary.audit.example_registry",
+		"generic.ai.package.boundary.audit.capability_policy",
+		"generic.ai.package.boundary.audit.findings",
+		"generic.ai.package.boundary.audit.missing_boundary_records",
+	} {
+		if !genericPackageBoundaryAuditorContains(manifest.Capabilities, want) {
+			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
+		}
 	}
 	if !manifest.NoBuiltIn.Required || !strings.Contains(strings.ToLower(manifest.NoBuiltIn.Statement), "does not provide") {
 		t.Fatalf("no-built-in guarantee missing or weak: %#v", manifest.NoBuiltIn)

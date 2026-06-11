@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "generic-ai-record-replay-live-package",
-  "package_name": "generic.ai.record.replay",
+  "package_name": "leia-generic-ai-record-replay",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for generic AI record/replay fixtures, strict ordered matching, mismatch findings, and deterministic replay summaries.",
   "source_modules": [
@@ -59,6 +59,11 @@
     "generic.ai.replay.finding.unconsumed",
     "generic.ai.replay.summary.deterministic"
   ],
+  "dialect_surface": [
+    "generic.ai.record.replay",
+    "generic.ai.record",
+    "generic.ai.replay"
+  ],
   "test_gates": [
     "manifest and referenced JSON files decode without external dependencies",
     "provider_free is true, domain_specific is false, and live_network_default is false",
@@ -72,6 +77,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide provider-backed record/replay storage, model clients, or network capture as built-ins; future external packages must satisfy these provider-free contracts first."
+    "statement": "Leia core does not provide provider-backed record/replay storage, model clients, or network capture as built-ins; leia-generic-ai-record-replay defines the provider-free package boundary."
   }
 }

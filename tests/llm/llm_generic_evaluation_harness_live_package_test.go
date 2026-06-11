@@ -44,6 +44,10 @@ type genericEvaluationHarnessManifest struct {
 	ArtifactBoundaries []genericEvaluationBoundary    `json:"artifact_boundaries"`
 	GoldenGate         genericEvaluationGoldenGateRef `json:"golden_gate"`
 	TestGates          []string                       `json:"test_gates"`
+	NoBuiltIn          struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
 }
 
 type genericEvaluationBoundary struct {
@@ -68,10 +72,10 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 	base := genericEvaluationHarnessLivePackageDir(t)
 	manifest := loadGenericEvaluationHarnessManifest(t, base)
 
-	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-evaluation-harness-live-package" {
+	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-evaluation-harness-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.PackageName != "leia-finrobot-generic-evaluation-harness" {
+	if manifest.PackageName != "leia-generic-ai-evaluation-harness" {
 		t.Fatalf("package name = %q", manifest.PackageName)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
@@ -92,9 +96,12 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
 	for _, want := range []string{"generic.ai.evaluation.harness", "ai.eval.run"} {
-		if !contains(manifest.SourceModules, want) || !contains(manifest.DialectSurface, want) {
+		if !contains(manifest.DialectSurface, want) {
 			t.Fatalf("manifest missing dialect surface/source %q: sources=%#v surface=%#v", want, manifest.SourceModules, manifest.DialectSurface)
 		}
+	}
+	if !reflect.DeepEqual(manifest.SourceModules, []string{"main.leia"}) {
+		t.Fatalf("source modules must be file paths only: %#v", manifest.SourceModules)
 	}
 	for _, want := range []string{
 		"generic.ai.evaluation.harness.dataset_manifest",
@@ -116,6 +123,7 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
+		assertGenericEvaluationJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
 	for _, key := range []string{"dataset_manifest", "case_inputs", "metric_specs", "judge_replay_records", "findings", "golden_gates", "case_result_summary"} {
 		if manifest.Schemas[key] == "" || manifest.Fixtures[key] == "" {
@@ -139,6 +147,9 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		manifest.GoldenGate.CasesFailedMax != 0 || manifest.GoldenGate.FindingsMax != 0 ||
 		manifest.GoldenGate.JudgeReplayErrorsMax != 0 {
 		t.Fatalf("golden gate = %#v", manifest.GoldenGate)
+	}
+	if !manifest.NoBuiltIn.Required || !strings.Contains(manifest.NoBuiltIn.Statement, manifest.PackageName) {
+		t.Fatalf("no-built-in guarantee missing package name: %#v", manifest.NoBuiltIn)
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
 	for _, want := range []string{"generic.ai.evaluation.harness", "ai.eval.run", "dataset manifest", "case inputs", "metric specs", "judge replay records", "findings", "golden gates", "case result summary", "provider-free"} {
@@ -518,6 +529,17 @@ func assertGenericEvaluationJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeGenericEvaluationJSONFile(t, path, &value)
+}
+
+func assertGenericEvaluationJSONOrLeiaFile(t *testing.T, path string) {
+	t.Helper()
+	if strings.HasSuffix(path, ".leia") {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	assertGenericEvaluationJSONFile(t, path)
 }
 
 func decodeGenericEvaluationJSONFile(t *testing.T, path string, value any) {

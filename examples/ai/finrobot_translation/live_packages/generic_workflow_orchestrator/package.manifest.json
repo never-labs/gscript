@@ -1,12 +1,11 @@
 {
   "schema_version": 1,
-  "id": "finrobot-generic-workflow-orchestrator-live-package",
-  "package_name": "generic.ai.workflow.orchestration",
+  "id": "generic-ai-workflow-orchestrator-live-package",
+  "package_name": "leia-generic-ai-workflow-orchestrator",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for ai.workflow.orchestrate workflow graph execution, stage I/O, handoff trace, retry/cache policy, workflow result, and trace emission hooks.",
   "source_modules": [
-    "generic.ai.workflow.orchestration",
-    "ai.workflow.orchestrate"
+    "main.leia"
   ],
   "provider_free": true,
   "live_network_default": false,
@@ -173,6 +172,25 @@
       "live_network": false
     }
   ],
+  "capabilities": [
+    "generic.ai.workflow.orchestration.graph",
+    "generic.ai.workflow.orchestration.stage.plan",
+    "generic.ai.workflow.orchestration.stage.execute",
+    "generic.ai.workflow.orchestration.stage.handoff",
+    "generic.ai.workflow.orchestration.stage.finalize",
+    "generic.ai.workflow.orchestration.stage_io",
+    "generic.ai.workflow.orchestration.handoff_trace",
+    "generic.ai.workflow.orchestration.retry_cache_policy",
+    "generic.ai.workflow.orchestration.workflow_result",
+    "generic.ai.workflow.orchestration.trace.workflow_started",
+    "generic.ai.workflow.orchestration.trace.stage_completed",
+    "generic.ai.workflow.orchestration.trace.workflow_completed",
+    "ai.workflow.orchestrate.provider_free"
+  ],
+  "dialect_surface": [
+    "generic.ai.workflow.orchestration",
+    "ai.workflow.orchestrate"
+  ],
   "test_gates": [
     "generic.ai.workflow.orchestration is represented as a provider-free live package skeleton",
     "ai.workflow.orchestrate entrypoint has a deterministic workflow graph",
@@ -185,7 +203,7 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide generic AI workflow orchestration providers, model endpoints, queue brokers, storage backends, or trace exporters as built-ins; future packages must satisfy this provider-free contract first."
+    "statement": "Leia core does not provide generic AI workflow orchestration providers, model endpoints, queue brokers, storage backends, or trace exporters as built-ins; leia-generic-ai-workflow-orchestrator defines the provider-free package boundary."
   },
   "dialect_entrypoints": {
     "orchestrate": "ai.workflow.orchestrate"

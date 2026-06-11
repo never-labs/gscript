@@ -43,6 +43,8 @@ type genericWorkflowOrchestratorManifest struct {
 	RetryPolicy        genericWorkflowRetryPolicy         `json:"retry_policy"`
 	CachePolicy        genericWorkflowCachePolicy         `json:"cache_policy"`
 	TraceEmissionHooks []genericWorkflowTraceEmissionHook `json:"trace_emission_hooks"`
+	Capabilities       []string                           `json:"capabilities"`
+	DialectSurface     []string                           `json:"dialect_surface"`
 	TestGates          []string                           `json:"test_gates"`
 	NoBuiltIn          map[string]json.RawMessage         `json:"no_built_in_guarantee"`
 }
@@ -98,10 +100,10 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 	base := genericWorkflowOrchestratorLivePackageDir(t)
 	manifest := loadGenericWorkflowOrchestratorManifest(t, base)
 
-	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-workflow-orchestrator-live-package" {
+	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-workflow-orchestrator-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.PackageName != "generic.ai.workflow.orchestration" {
+	if manifest.PackageName != "leia-generic-ai-workflow-orchestrator" {
 		t.Fatalf("package name = %q", manifest.PackageName)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
@@ -124,14 +126,20 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
 
-	wantSources := []string{"generic.ai.workflow.orchestration", "ai.workflow.orchestrate"}
+	wantSources := []string{"main.leia"}
 	if !reflect.DeepEqual(manifest.SourceModules, wantSources) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
+	}
+	for _, want := range []string{"generic.ai.workflow.orchestration", "ai.workflow.orchestrate"} {
+		if !contains(manifest.DialectSurface, want) {
+			t.Fatalf("dialect surface missing %q: %#v", want, manifest.DialectSurface)
+		}
 	}
 	for _, key := range []string{"smoke", "workflow_graph_contract", "trace_hooks_contract", "fixture_index"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
+		assertGenericWorkflowOrchestratorJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
 	if manifest.DialectEntrypoints["orchestrate"] != "ai.workflow.orchestrate" {
 		t.Fatalf("orchestrate dialect entrypoint = %q", manifest.DialectEntrypoints["orchestrate"])
@@ -162,6 +170,19 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 	for _, hook := range manifest.TraceEmissionHooks {
 		if hook.ID == "" || hook.Phase == "" || hook.Capability == "" || hook.FixtureKey == "" || !hook.ProviderFree || hook.LiveNetwork {
 			t.Fatalf("trace hook metadata incomplete: %#v", hook)
+		}
+	}
+	for _, want := range []string{
+		"generic.ai.workflow.orchestration.graph",
+		"generic.ai.workflow.orchestration.stage.plan",
+		"generic.ai.workflow.orchestration.stage.execute",
+		"generic.ai.workflow.orchestration.stage.handoff",
+		"generic.ai.workflow.orchestration.stage.finalize",
+		"generic.ai.workflow.orchestration.workflow_result",
+		"ai.workflow.orchestrate.provider_free",
+	} {
+		if !contains(manifest.Capabilities, want) {
+			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
 	}
 	if len(manifest.NoBuiltIn) == 0 {
@@ -532,6 +553,17 @@ func assertGenericWorkflowOrchestratorJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeGenericWorkflowOrchestratorJSONFile(t, path, &value)
+}
+
+func assertGenericWorkflowOrchestratorJSONOrLeiaFile(t *testing.T, path string) {
+	t.Helper()
+	if strings.HasSuffix(path, ".leia") {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	assertGenericWorkflowOrchestratorJSONFile(t, path)
 }
 
 func decodeGenericWorkflowOrchestratorJSONFile(t *testing.T, path string, value any) {
