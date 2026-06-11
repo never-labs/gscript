@@ -58,6 +58,14 @@ calls. For example, a tool created with `tool { ... }` and a tool created with
 `llm.tool(...)` must go through the same tool validation, capability metadata,
 dispatch, tracing, and replay paths.
 
+Lower-level AI helpers such as `llm.workflow`, `llm.step`, `llm.doc`,
+`llm.collection`, `llm.retrieve`, `llm.context`, `llm.evidence`, `llm.schema`,
+`llm.output_schema`, `llm.schema_info`, `llm.handoff`, `llm.delegate`, and
+`llm.sections` are part of the same runtime layer. They are ordinary functions
+that return ordinary tables, callables, or `(value, err)` pairs. They must not
+introduce separate prompt memory, provider bypasses, hidden network access,
+global document stores, or a second orchestration engine.
+
 This stable lowering is observable without a live provider. A tagged tool must
 preserve helper-visible capability metadata:
 
@@ -305,6 +313,26 @@ incident := llm.agent("incident", incident_config, incident_flow, {
 })
 ```
 
+## Workflow Helpers
+
+`llm.workflow(steps)` creates a sequential workflow value from `llm.step(name,
+fn, opts)` tables or plain functions. The workflow exposes `run(input, opts)`
+and `mock(fixtures)`. A step function receives a context table containing the
+initial input, current input, previous step record, accumulated step records,
+and named context. A step may call `llm.turn`, call an agent, dispatch tools, or
+perform non-AI work.
+
+Workflow execution is deterministic except for the operations performed inside
+steps. The helper records ordered step results and a name-indexed context table,
+feeds the prior step's text or value to the next step, and returns a final
+workflow result plus an error value when a step fails. Mock fixtures replace
+matching steps for tests and examples.
+
+These helpers are sequencing helpers, not durable orchestration. They do not
+imply parallelism, retry policy, persistence, transactions, approval storage, or
+provider calls outside the step functions. Provider replay still observes only
+the turns actually made by step bodies.
+
 ## Agent As Tool
 
 An agent can be exposed as a tool with `llm.agent_as_tool(agent_value)`.
@@ -324,6 +352,15 @@ supervisor := agent {
 }
 ```
 
+`llm.handoff(agent, opts)` and `llm.delegate(agent, opts)` are aliases for the
+same agent-as-tool composition boundary. They may copy tool metadata from
+`opts` and agent metadata, including `name`, `description`, `params`,
+`requires`, and script-visible `output`. The provider-facing tool input schema
+must describe tool arguments only; an agent's output shape must not be sent as
+the tool input schema. If a nested agent returns a pending approval result, tool
+dispatch must surface a structured pending error instead of converting it to
+ordinary tool text.
+
 ## Output Validation
 
 Agents and turns may request structured output through request fields such as
@@ -339,6 +376,48 @@ the helper being used. They must not be silently converted to provider text.
 When validation succeeds, the validated value is still an ordinary Leia value.
 When parsing or validation fails, callers must handle a structured error rather
 than relying on best-effort text coercion.
+
+`llm.schema(spec)` normalizes lightweight schema specs and JSON Schema-like
+tables to JSON Schema tables. `llm.schema_info(spec)` and `llm.schemaInfo(spec)`
+return inspection metadata including `kind`. `llm.output_schema(name, spec,
+opts)` returns a provider-facing `response_format` table using JSON Schema,
+with strict mode enabled unless options override it. These helpers define
+request and validation metadata only. They do not add a language-level type
+checker for model text.
+
+## Retrieval Context And Evidence
+
+`llm.doc`/`llm.document`, `llm.collection`/`llm.docs`, `llm.retrieve`/`llm.search`,
+`llm.context`, and `llm.evidence` package local source text for AI requests.
+Documents are ordinary tables with `text` and optional metadata. Collections
+are ordinary tables with ordered `docs` and `count`. Retrieval returns local
+matches according to the runtime helper's ranking rules and options such as
+`limit` and `label`.
+
+`llm.context` and `llm.evidence` create message wrappers. When a turn, agent, or
+section request contains `context` or `evidence`, the runtime appends the
+corresponding normalized messages before the provider request. These helpers
+do not provide persistence, embeddings, vector search, citation verification,
+secret filtering, or authorization. Hosts and tools must still enforce access
+policy before source text is added to a request.
+
+## Section Generation
+
+`llm.sections(config)` and `llm.generate_sections(config)` run a shared request
+configuration once per section descriptor in `config.sections`. Each section
+must have a non-empty `name` and may provide `instructions` or `prompt`,
+`output`, evidence, messages, or other request fields. Top-level request fields
+such as `model`, `messages`, `tools`, `context`, and `evidence` are copied into
+each section request unless section-local fields override them according to the
+helper's normalization rules.
+
+The result is `(generated, nil)` on success. `generated.sections` preserves
+section order, `generated.results` indexes raw agent results by section name,
+and `generated.values` indexes parsed or validated values by section name.
+Validation and provider failures are returned as ordinary errors. Section
+generation is a convenience for independent report parts; it does not guarantee
+cross-section consistency, automatic citations, hidden shared memory, or a
+document rendering pipeline.
 
 ## Budgets, Cancellation, And Approval
 
