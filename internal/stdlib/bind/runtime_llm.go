@@ -13,4 +13,5 @@ type LLMOptions struct {
 	MaxHostResult   func() int64
 	Context         func() context.Context
 	Trace           runtime.LLMTraceSink
+	EnvironmentRead func() bool
 }

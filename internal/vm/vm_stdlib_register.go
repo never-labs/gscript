@@ -737,6 +737,9 @@ func (vm *VM) RegisterLLMLib() {
 				vm.llmTraceSink(event)
 			}
 		},
+		EnvironmentRead: func() bool {
+			return vm.environmentRead
+		},
 	})
 }
 
