@@ -12,5 +12,6 @@ The contract covers:
 - default provider policy
 - replay-safe execution descriptors
 - redaction policy
+- routing guard evidence for redirecting live provider candidates to replay
+  descriptors
 - capability flags
-

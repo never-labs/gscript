@@ -57,9 +57,10 @@ FinRobot-specific language features or FinRobot-owned product packages.
 
 The 2026-06-12 documentation semantic-guard refresh used read-only inventory to
 confirm 10 registered `live_packages/generic_*` examples and three top-level
-generic composition examples. That guard keeps generic AI dialect capability in
-the closed/non-gap bucket unless a future release gate or inventory check
-regresses.
+generic composition examples. It also rechecked approval/model/workflow/trace/eval
+wording in the coverage, verification, and gap documents. That guard keeps
+generic AI dialect capability in the closed/non-gap bucket unless a future
+release gate or inventory check regresses.
 
 ## Translation Slice Gaps
 

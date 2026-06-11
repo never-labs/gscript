@@ -278,6 +278,11 @@ func TestGenericWorkflowOrchestratorGraphStageIOAndContracts(t *testing.T) {
 
 func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 	base := genericWorkflowOrchestratorLivePackageDir(t)
+	manifest := loadGenericWorkflowOrchestratorManifest(t, base)
+	cacheStateAllowed := map[string]bool{}
+	for _, state := range manifest.CachePolicy.CacheStates {
+		cacheStateAllowed[state] = true
+	}
 
 	var index struct {
 		ProviderFree          bool `json:"provider_free"`
@@ -336,10 +341,40 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 	if !graph.ProviderFree || graph.LiveNetwork || graph.WorkflowID == "" || graph.Entrypoint != "ai.workflow.orchestrate" || len(graph.Stages) != 4 || len(graph.Edges) != 3 {
 		t.Fatalf("workflow graph fixture incomplete: %#v", graph)
 	}
+	graphStageOrder := make([]string, 0, len(graph.Stages))
+	graphStageByID := map[string]struct {
+		ID           string   `json:"id"`
+		DependsOn    []string `json:"depends_on"`
+		InputRef     string   `json:"input_ref"`
+		OutputRef    string   `json:"output_ref"`
+		InputSchema  string   `json:"input_schema"`
+		OutputSchema string   `json:"output_schema"`
+	}{}
+	graphOutputRefByStage := map[string]string{}
+	for _, stage := range graph.Stages {
+		if graphStageByID[stage.ID].ID != "" {
+			t.Fatalf("duplicate workflow graph stage id %q", stage.ID)
+		}
+		graphStageOrder = append(graphStageOrder, stage.ID)
+		graphStageByID[stage.ID] = stage
+		graphOutputRefByStage[stage.ID] = stage.OutputRef
+	}
+	if !reflect.DeepEqual(graphStageOrder, []string{"plan", "execute", "handoff", "finalize"}) {
+		t.Fatalf("workflow graph fixture stage order = %#v", graphStageOrder)
+	}
+	graphEdges := map[string]string{}
+	for _, edge := range graph.Edges {
+		if len(edge) != 2 || graphStageByID[edge[0]].ID == "" || graphStageByID[edge[1]].ID == "" {
+			t.Fatalf("workflow graph edge does not reference known stages: %#v", edge)
+		}
+		graphEdges[edge[0]] = edge[1]
+	}
 
 	var stageIO struct {
-		ProviderFree bool `json:"provider_free"`
-		LiveNetwork  bool `json:"live_network"`
+		ProviderFree bool   `json:"provider_free"`
+		LiveNetwork  bool   `json:"live_network"`
+		WorkflowID   string `json:"workflow_id"`
+		RunID        string `json:"run_id"`
 		StageIO      []struct {
 			StageID      string         `json:"stage_id"`
 			InputRef     string         `json:"input_ref"`
@@ -356,18 +391,44 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 		} `json:"stage_io"`
 	}
 	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, "fixtures", "stage_io_fixture.json"), &stageIO)
-	if !stageIO.ProviderFree || stageIO.LiveNetwork || len(stageIO.StageIO) != 2 {
+	if !stageIO.ProviderFree || stageIO.LiveNetwork || stageIO.WorkflowID != graph.WorkflowID || stageIO.RunID == "" || len(stageIO.StageIO) != 2 {
 		t.Fatalf("stage io fixture incomplete: %#v", stageIO)
 	}
+	stageIOByStage := map[string]struct {
+		StageID      string         `json:"stage_id"`
+		InputRef     string         `json:"input_ref"`
+		InputShape   map[string]any `json:"input_shape"`
+		OutputRef    string         `json:"output_ref"`
+		OutputShape  map[string]any `json:"output_shape"`
+		Status       string         `json:"status"`
+		FixtureKey   string         `json:"fixture_key"`
+		Attempt      int            `json:"attempt"`
+		MaxAttempts  int            `json:"max_attempts"`
+		CacheKey     string         `json:"cache_key"`
+		CacheState   string         `json:"cache_state"`
+		TraceEventID string         `json:"trace_event_id"`
+	}{}
+	traceEventIDs := map[string]bool{}
 	for _, stage := range stageIO.StageIO {
 		if stage.StageID == "" || stage.InputRef == "" || len(stage.InputShape) == 0 || stage.OutputRef == "" || len(stage.OutputShape) == 0 || stage.Status != "completed" || stage.FixtureKey == "" || stage.Attempt != 1 || stage.MaxAttempts != 1 || stage.CacheKey == "" || stage.CacheState == "" || stage.TraceEventID == "" {
 			t.Fatalf("stage io row incomplete: %#v", stage)
 		}
+		graphStage := graphStageByID[stage.StageID]
+		if graphStage.ID == "" || stage.InputRef != graphStage.InputRef || stage.OutputRef != graphStage.OutputRef {
+			t.Fatalf("stage io row does not correlate with graph stage: row=%#v graph=%#v", stage, graphStage)
+		}
+		if !strings.Contains(stage.CacheKey, stageIO.RunID) || !strings.Contains(stage.CacheKey, stage.StageID) || !cacheStateAllowed[stage.CacheState] {
+			t.Fatalf("stage io retry/cache metadata not tied to run/stage/cache policy: %#v", stage)
+		}
+		stageIOByStage[stage.StageID] = stage
+		traceEventIDs[stage.TraceEventID] = true
 	}
 
 	var handoff struct {
-		ProviderFree bool `json:"provider_free"`
-		LiveNetwork  bool `json:"live_network"`
+		ProviderFree bool   `json:"provider_free"`
+		LiveNetwork  bool   `json:"live_network"`
+		WorkflowID   string `json:"workflow_id"`
+		RunID        string `json:"run_id"`
 		Handoffs     []struct {
 			FromStage     string `json:"from_stage"`
 			ToStage       string `json:"to_stage"`
@@ -378,13 +439,17 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 		} `json:"handoffs"`
 	}
 	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, "fixtures", "handoff_trace_fixture.json"), &handoff)
-	if !handoff.ProviderFree || handoff.LiveNetwork || len(handoff.Handoffs) != 3 {
+	if !handoff.ProviderFree || handoff.LiveNetwork || handoff.WorkflowID != graph.WorkflowID || handoff.RunID != stageIO.RunID || len(handoff.Handoffs) != 3 {
 		t.Fatalf("handoff trace fixture incomplete: %#v", handoff)
 	}
 	for _, row := range handoff.Handoffs {
 		if row.FromStage == "" || row.ToStage == "" || row.PayloadRef == "" || row.PayloadSchema == "" || row.Status != "accepted" || row.TraceEventID == "" {
 			t.Fatalf("handoff row incomplete: %#v", row)
 		}
+		if graphEdges[row.FromStage] != row.ToStage || graphOutputRefByStage[row.FromStage] != row.PayloadRef {
+			t.Fatalf("handoff row does not correlate with graph edge/output ref: %#v", row)
+		}
+		traceEventIDs[row.TraceEventID] = true
 	}
 
 	var result struct {
@@ -409,8 +474,34 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 		TraceRefs []string `json:"trace_refs"`
 	}
 	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, "fixtures", "workflow_result_fixture.json"), &result)
-	if !result.ProviderFree || result.LiveNetwork || result.WorkflowID == "" || result.RunID == "" || result.Entrypoint != "ai.workflow.orchestrate" || result.Status != "completed" || len(result.StageResults) != 4 || len(result.Artifacts) != 2 || len(result.TraceRefs) < 6 {
+	if !result.ProviderFree || result.LiveNetwork || result.WorkflowID != graph.WorkflowID || result.RunID != stageIO.RunID || result.Entrypoint != "ai.workflow.orchestrate" || result.Status != "completed" || len(result.StageResults) != 4 || len(result.Artifacts) != 2 || len(result.TraceRefs) < 9 {
 		t.Fatalf("workflow result fixture incomplete: %#v", result)
+	}
+	resultTraceRefs := map[string]bool{}
+	for _, ref := range result.TraceRefs {
+		resultTraceRefs[ref] = true
+	}
+	for _, ref := range []string{"evt_workflow_started", "evt_workflow_completed"} {
+		if !resultTraceRefs[ref] {
+			t.Fatalf("workflow result trace refs missing lifecycle event %q: %#v", ref, result.TraceRefs)
+		}
+	}
+	if len(result.StageResults) != len(graphStageOrder) {
+		t.Fatalf("workflow result stage result count = %d, want graph stage count %d", len(result.StageResults), len(graphStageOrder))
+	}
+	for i, stage := range result.StageResults {
+		if stage.StageID != graphStageOrder[i] || stage.Status != "completed" || stage.OutputRef != graphOutputRefByStage[stage.StageID] || stage.TraceEventID == "" {
+			t.Fatalf("workflow result stage row does not correlate with graph order/output: row=%#v graph_order=%#v", stage, graphStageOrder)
+		}
+		traceEventIDs[stage.TraceEventID] = true
+		if !resultTraceRefs[stage.TraceEventID] {
+			t.Fatalf("workflow result trace refs missing stage event %q", stage.TraceEventID)
+		}
+	}
+	for eventID := range traceEventIDs {
+		if !resultTraceRefs[eventID] {
+			t.Fatalf("workflow result trace refs missing correlated event %q", eventID)
+		}
 	}
 
 	var hooksContract struct {
@@ -440,12 +531,16 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 	}
 
 	var hooks struct {
-		ProviderFree bool `json:"provider_free"`
-		LiveNetwork  bool `json:"live_network"`
+		ProviderFree bool   `json:"provider_free"`
+		LiveNetwork  bool   `json:"live_network"`
+		WorkflowID   string `json:"workflow_id"`
+		RunID        string `json:"run_id"`
 		Hooks        []struct {
 			ID            string         `json:"id"`
 			Phase         string         `json:"phase"`
 			EventID       string         `json:"event_id"`
+			StageID       string         `json:"stage_id"`
+			Status        string         `json:"status"`
 			EmissionMode  string         `json:"emission_mode"`
 			PayloadRef    string         `json:"payload_ref"`
 			ProviderSink  any            `json:"provider_sink"`
@@ -454,14 +549,40 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 		} `json:"hooks"`
 	}
 	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, "fixtures", "trace_emission_hooks_fixture.json"), &hooks)
-	if !hooks.ProviderFree || hooks.LiveNetwork || len(hooks.Hooks) != 3 {
+	if !hooks.ProviderFree || hooks.LiveNetwork || hooks.WorkflowID != graph.WorkflowID || hooks.RunID != result.RunID || len(hooks.Hooks) != 3 {
 		t.Fatalf("trace hooks fixture incomplete: %#v", hooks)
 	}
 	for _, hook := range hooks.Hooks {
 		if hook.ID == "" || hook.Phase == "" || hook.EventID == "" || hook.EmissionMode != "fixture_append_only" || hook.PayloadRef == "" || hook.ProviderSink != nil {
 			t.Fatalf("trace hook row incomplete: %#v", hook)
 		}
+		if !resultTraceRefs[hook.EventID] {
+			t.Fatalf("trace hook event %q is not present in workflow result trace refs", hook.EventID)
+		}
+		if hook.Phase == "stage_completed" {
+			stage := stageIOByStage[hook.StageID]
+			if stage.StageID == "" || hook.Status != stage.Status || hook.PayloadRef != stage.OutputRef || hook.EventID != stage.TraceEventID {
+				t.Fatalf("stage trace hook does not correlate with stage IO: hook=%#v stage=%#v", hook, stage)
+			}
+			if hook.RetryCacheRef["attempt"] != float64(stage.Attempt) ||
+				hook.RetryCacheRef["max_attempts"] != float64(stage.MaxAttempts) ||
+				hook.RetryCacheRef["cache_key"] != stage.CacheKey ||
+				hook.RetryCacheRef["cache_state"] != stage.CacheState {
+				t.Fatalf("stage trace hook retry/cache ref does not match stage IO: hook=%#v stage=%#v", hook.RetryCacheRef, stage)
+			}
+		}
+		if hook.Phase == "workflow_completed" {
+			if hook.Status != result.Status || hook.PayloadRef != "workflow_result" || len(hook.TraceRefs) == 0 {
+				t.Fatalf("workflow completed hook does not correlate with workflow result: %#v", hook)
+			}
+			for _, ref := range hook.TraceRefs {
+				if !resultTraceRefs[ref] {
+					t.Fatalf("workflow completed hook trace ref %q is not present in workflow result refs", ref)
+				}
+			}
+		}
 	}
+	assertGenericWorkflowOrchestratorNoSecretMarkers(t, base)
 }
 
 func TestGenericWorkflowOrchestratorLivePackageNoLiveImports(t *testing.T) {
@@ -574,5 +695,28 @@ func decodeGenericWorkflowOrchestratorJSONFile(t *testing.T, path string, value 
 	}
 	if err := json.Unmarshal(data, value); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
+	}
+}
+
+func assertGenericWorkflowOrchestratorNoSecretMarkers(t *testing.T, base string) {
+	t.Helper()
+	pattern := regexp.MustCompile(`(?i)(api[_-]?key\s*[:=]\s*["']?[a-z0-9._-]{8,}|secret[_-]?key\s*[:=]\s*["']?[a-z0-9._-]{8,}|token\s*[:=]\s*["']?[a-z0-9._-]{12,}|bearer\s+[a-z0-9._-]+|sk-[a-z0-9]{12,})`)
+	if err := filepath.WalkDir(base, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, match := range pattern.FindAllString(string(data), -1) {
+			t.Fatalf("%s contains secret-like marker %q", path, match)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

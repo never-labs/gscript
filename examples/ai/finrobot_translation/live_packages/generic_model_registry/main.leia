@@ -21,6 +21,12 @@ generic_model_registry_package := {
         descriptor_provider: "fixture-replay"
         live_model_calls: false
     }
+    routing_guard: {
+        request_provider_override: "ignored-when-replay-descriptor-present"
+        replay_descriptor_source: "model_alias_registry"
+        live_provider_behavior: "deny-or-redirect-to-fixture-replay"
+        decision_replay_stable: true
+    }
     capability_flags: {
         model_alias_registry: true
         provider_policy: true
@@ -55,4 +61,3 @@ func generic_model_registry_provider_free() {
         generic_model_registry_package.real_dependency_imports == false &&
         generic_model_registry_package.live_model_calls == false
 }
-

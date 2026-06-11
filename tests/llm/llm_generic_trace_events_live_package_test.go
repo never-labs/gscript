@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -84,6 +86,40 @@ type genericTraceEventsCorrelationPolicy struct {
 	OptionalIDs             []string `json:"optional_ids"`
 	Format                  string   `json:"format"`
 	ProviderRequestIDPolicy string   `json:"provider_request_id_policy"`
+}
+
+type genericTraceEventsContract struct {
+	SchemaVersion         int      `json:"schema_version"`
+	ID                    string   `json:"id"`
+	ProviderFree          bool     `json:"provider_free"`
+	LiveNetwork           bool     `json:"live_network"`
+	RealDependencyImports bool     `json:"real_dependency_imports"`
+	Capability            string   `json:"capability"`
+	EmitShape             string   `json:"emit_shape"`
+	RequiredEventTypes    []string `json:"required_event_types"`
+	RequiredEventFields   []string `json:"required_event_fields"`
+	CorrelationIDFields   []string `json:"correlation_id_fields"`
+	SequenceMarker        struct {
+		Name               string `json:"name"`
+		Clock              string `json:"clock"`
+		StrictlyIncreasing bool   `json:"strictly_increasing"`
+		StartSequence      int    `json:"start_sequence"`
+	} `json:"sequence_marker"`
+	RedactionContract struct {
+		PolicyRef               string `json:"policy_ref"`
+		DefaultAction           string `json:"default_action"`
+		HashAlgorithm           string `json:"hash_algorithm"`
+		ProviderRequestIDPolicy string `json:"provider_request_id_policy"`
+		RawPromptPolicy         string `json:"raw_prompt_policy"`
+		RawCompletionPolicy     string `json:"raw_completion_policy"`
+	} `json:"redaction_contract"`
+	ReplayContract struct {
+		Mode           string   `json:"mode"`
+		Fixture        string   `json:"fixture"`
+		MatchKeys      []string `json:"match_keys"`
+		MismatchPolicy string   `json:"mismatch_policy"`
+		AllowLiveSink  bool     `json:"allow_live_sink"`
+	} `json:"replay_contract"`
 }
 
 type genericTraceEventsSequenceFixture struct {
@@ -381,6 +417,75 @@ func TestGenericTraceEventsRedactionPolicy(t *testing.T) {
 	}
 }
 
+func TestGenericTraceEventsEnvelopeSequenceCorrelationRedactionAreConnected(t *testing.T) {
+	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
+	contract := loadGenericTraceEventsContract(t, base)
+	var sequence genericTraceEventsSequenceFixture
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "trace_sequence_ACME_fixture.json"), &sequence)
+	var policy genericTraceEventsRedactionPolicy
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "redaction_policy_fixture.json"), &policy)
+
+	if contract.SchemaVersion != 1 || contract.ID != "generic-ai-trace-events-contract" ||
+		!contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports {
+		t.Fatalf("contract header must stay provider-free and offline: %#v", contract)
+	}
+	if contract.Capability != "generic.ai.trace.events" ||
+		!genericTraceEventsContains(manifest.Capabilities, contract.Capability) ||
+		contract.EmitShape != "ai.trace.emit" ||
+		!genericTraceEventsContains(manifest.DialectSymbols, contract.EmitShape) {
+		t.Fatalf("contract capability/emit shape do not mirror manifest: %#v %#v", contract, manifest.DialectSymbols)
+	}
+	assertGenericTraceEventsSameStrings(t, "contract event types", contract.RequiredEventTypes, genericTraceEventsContractTypes(manifest.EventContracts))
+	assertGenericTraceEventsSameStrings(t, "contract correlation ids", contract.CorrelationIDFields, append(append([]string{}, manifest.CorrelationPolicy.RequiredIDs...), manifest.CorrelationPolicy.OptionalIDs...))
+	assertGenericTraceEventsSameStrings(t, "contract replay match keys", contract.ReplayContract.MatchKeys, manifest.ReplayContract.MatchingKeys)
+	if contract.RedactionContract.PolicyRef != manifest.RedactionPolicy.Fixture ||
+		contract.RedactionContract.PolicyRef != sequence.RedactionPolicyRef ||
+		manifest.RedactionPolicy.Fixture != filepath.ToSlash(filepath.Join("fixtures", "redaction_policy_fixture.json")) {
+		t.Fatalf("redaction policy references are disconnected: contract=%q manifest=%q sequence=%q", contract.RedactionContract.PolicyRef, manifest.RedactionPolicy.Fixture, sequence.RedactionPolicyRef)
+	}
+	if contract.RedactionContract.DefaultAction != manifest.RedactionPolicy.DefaultAction ||
+		contract.RedactionContract.DefaultAction != policy.DefaultAction ||
+		contract.RedactionContract.HashAlgorithm != manifest.RedactionPolicy.HashAlgorithm ||
+		contract.RedactionContract.HashAlgorithm != policy.HashAlgorithm {
+		t.Fatalf("redaction policy values are disconnected: contract=%#v manifest=%#v policy=%#v", contract.RedactionContract, manifest.RedactionPolicy, policy)
+	}
+	for _, field := range manifest.RedactionPolicy.SecretFields {
+		if !genericTraceEventsContains(policy.SecretFields, field) {
+			t.Fatalf("manifest redaction secret field %q is not declared by policy %#v", field, policy.SecretFields)
+		}
+	}
+	if contract.RedactionContract.ProviderRequestIDPolicy != policy.ProviderIdentityPolicy.ProviderRequestID {
+		t.Fatalf("provider request redaction mismatch: contract=%q policy=%q", contract.RedactionContract.ProviderRequestIDPolicy, policy.ProviderIdentityPolicy.ProviderRequestID)
+	}
+	if contract.SequenceMarker.Name != manifest.SequencePolicy.Marker ||
+		contract.SequenceMarker.Name != sequence.SequencePolicy.Marker ||
+		contract.SequenceMarker.Clock != manifest.SequencePolicy.Clock ||
+		contract.SequenceMarker.Clock != sequence.SequencePolicy.Clock ||
+		contract.SequenceMarker.StartSequence != manifest.SequencePolicy.StartSequence ||
+		contract.SequenceMarker.StartSequence != sequence.SequencePolicy.StartSequence ||
+		contract.SequenceMarker.StrictlyIncreasing != manifest.SequencePolicy.StrictlyIncreasing ||
+		contract.SequenceMarker.StrictlyIncreasing != sequence.SequencePolicy.StrictlyIncreasing {
+		t.Fatalf("sequence policy is disconnected: contract=%#v manifest=%#v sequence=%#v", contract.SequenceMarker, manifest.SequencePolicy, sequence.SequencePolicy)
+	}
+	if contract.ReplayContract.Fixture != manifest.ReplayContract.Fixture ||
+		contract.ReplayContract.Mode != manifest.ReplayContract.Mode ||
+		contract.ReplayContract.MismatchPolicy != manifest.ReplayContract.MismatchPolicy ||
+		contract.ReplayContract.AllowLiveSink != manifest.ReplayContract.AllowLiveSink {
+		t.Fatalf("replay policy is disconnected: contract=%#v manifest=%#v", contract.ReplayContract, manifest.ReplayContract)
+	}
+
+	requiredEnvelopeFields := []string{"schema_version", "fixture_key", "provider_free", "live_network", "real_dependency_imports", "trace_id", "run_id", "turn_id", "event_id", "event_type", "capability", "sequence", "sequence_marker", "timestamp_ms", "correlation", "redaction", "payload", "replay"}
+	for _, field := range requiredEnvelopeFields {
+		if !genericTraceEventsContains(contract.RequiredEventFields, field) {
+			t.Fatalf("contract required envelope fields missing %q: %#v", field, contract.RequiredEventFields)
+		}
+	}
+
+	assertGenericTraceEventsSequenceSemantics(t, manifest, sequence, policy)
+	assertGenericTraceEventsPackageHasNoRawLeak(t, base)
+}
+
 func TestGenericTraceEventsMainLeiaSmoke(t *testing.T) {
 	base := genericTraceEventsLivePackageDir(t)
 	data, err := os.ReadFile(filepath.Join(base, "main.leia"))
@@ -509,6 +614,13 @@ func loadGenericTraceEventsManifest(t *testing.T, base string) genericTraceEvent
 	return manifest
 }
 
+func loadGenericTraceEventsContract(t *testing.T, base string) genericTraceEventsContract {
+	t.Helper()
+	var contract genericTraceEventsContract
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "contracts", "trace_events_contract.json"), &contract)
+	return contract
+}
+
 func decodeGenericTraceEventsJSONFile(t *testing.T, path string, out any) {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -536,6 +648,175 @@ func assertGenericTraceEventsEntrypointPath(t *testing.T, path string) {
 	default:
 		t.Fatalf("entrypoint must reference a JSON or Leia file path: %q", path)
 	}
+}
+
+func assertGenericTraceEventsSequenceSemantics(t *testing.T, manifest genericTraceEventsManifest, sequence genericTraceEventsSequenceFixture, policy genericTraceEventsRedactionPolicy) {
+	t.Helper()
+	seenDedupeKeys := map[string]bool{}
+	seenEvents := map[string]bool{}
+	lastSequence := manifest.SequencePolicy.StartSequence - 1
+	lastTimestamp := -1
+	terminalTypes := map[string]bool{}
+	for _, eventType := range manifest.SequencePolicy.TerminalEventTypes {
+		terminalTypes[eventType] = true
+	}
+	for i, event := range sequence.Events {
+		if event.Sequence != lastSequence+1 || event.TimestampMS < lastTimestamp {
+			t.Fatalf("%s sequence/timestamp is not strictly explainable: seq=%d after %d ts=%d after %d", event.EventID, event.Sequence, lastSequence, event.TimestampMS, lastTimestamp)
+		}
+		lastSequence = event.Sequence
+		lastTimestamp = event.TimestampMS
+		dedupeKey := genericTraceEventsDedupeKey(event, manifest.SequencePolicy.DedupeKeyFields)
+		if seenDedupeKeys[dedupeKey] {
+			t.Fatalf("%s duplicate dedupe key %q", event.EventID, dedupeKey)
+		}
+		seenDedupeKeys[dedupeKey] = true
+		if terminalTypes[event.EventType] && i != len(sequence.Events)-1 {
+			t.Fatalf("%s terminal event type %q appears before final event", event.EventID, event.EventType)
+		}
+		if event.Correlation.ParentEventID != "" && !seenEvents[event.Correlation.ParentEventID] {
+			t.Fatalf("%s parent_event_id %q does not reference an earlier event", event.EventID, event.Correlation.ParentEventID)
+		}
+		seenEvents[event.EventID] = true
+		assertGenericTraceEventsRedactionExplainsPayload(t, event, policy)
+	}
+	if len(sequence.Events) == 0 || !terminalTypes[sequence.Events[len(sequence.Events)-1].EventType] {
+		t.Fatalf("final event must be one of terminal event types %#v", manifest.SequencePolicy.TerminalEventTypes)
+	}
+}
+
+func assertGenericTraceEventsRedactionExplainsPayload(t *testing.T, event genericTraceEventFixture, policy genericTraceEventsRedactionPolicy) {
+	t.Helper()
+	for _, field := range event.Redaction.RedactedFields {
+		if !genericTraceEventsContains(policy.SecretFields, field) {
+			t.Fatalf("%s redacted field %q is not declared secret by policy %#v", event.EventID, field, policy.SecretFields)
+		}
+	}
+	for _, field := range policy.DropFields {
+		if _, ok := event.Payload[field]; ok {
+			t.Fatalf("%s payload exposes dropped field %q: %#v", event.EventID, field, event.Payload)
+		}
+	}
+	for _, field := range policy.HashFields {
+		if _, ok := event.Payload[field]; ok {
+			t.Fatalf("%s payload exposes raw hash field %q: %#v", event.EventID, field, event.Payload)
+		}
+		if genericTraceEventsContains(event.Redaction.RedactedFields, field) {
+			if !genericTraceEventsPayloadHasDigestForField(event.Payload, field, policy.HashAlgorithm) {
+				t.Fatalf("%s redacts %q but lacks an explanatory %s digest: %#v", event.EventID, field, policy.HashAlgorithm, event.Payload)
+			}
+		}
+	}
+	if event.Redaction.Status == "clean" && len(event.Redaction.RedactedFields) != 0 {
+		t.Fatalf("%s clean redaction status cannot name redacted fields: %#v", event.EventID, event.Redaction)
+	}
+	if event.Redaction.Status != "clean" && len(event.Redaction.RedactedFields) == 0 {
+		t.Fatalf("%s non-clean redaction status must name redacted fields: %#v", event.EventID, event.Redaction)
+	}
+}
+
+func genericTraceEventsPayloadHasDigestForField(payload map[string]any, field, algorithm string) bool {
+	hashFields := []string{strings.TrimSuffix(field, "_raw") + "_hash"}
+	switch field {
+	case "tool_input_raw":
+		hashFields = append(hashFields, "input_digest")
+	case "tool_output_raw":
+		hashFields = append(hashFields, "output_digest")
+	}
+	for _, hashField := range hashFields {
+		value, ok := payload[hashField].(string)
+		if ok && strings.HasPrefix(value, algorithm+":") {
+			return true
+		}
+	}
+	return false
+}
+
+func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
+	t.Helper()
+	for _, rel := range []string{
+		"main.leia",
+		"package.manifest.json",
+		"contracts/trace_events_contract.json",
+		"fixtures/provider_free_fixture_index.json",
+		"fixtures/redaction_policy_fixture.json",
+		"fixtures/trace_sequence_ACME_fixture.json",
+		"schemas/correlation_ids_v1.schema.json",
+		"schemas/redaction_policy_v1.schema.json",
+		"schemas/trace_event_v1.schema.json",
+		"schemas/trace_sequence_v1.schema.json",
+	} {
+		data, err := os.ReadFile(filepath.Join(base, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertGenericTraceEventsTextHasNoRawLeak(t, rel, string(data))
+	}
+}
+
+func assertGenericTraceEventsTextHasNoRawLeak(t *testing.T, path, text string) {
+	t.Helper()
+	lower := strings.ToLower(text)
+	for _, forbidden := range []string{
+		"sk-",
+		"bearer ",
+		"api.openai.com",
+		"api.anthropic.com",
+		"generativelanguage.googleapis.com",
+		"azure.com/openai",
+		"localhost:",
+		"127.0.0.1",
+		"live_endpoint",
+		"provider_endpoint_url",
+	} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("%s contains raw secret/live endpoint/provider leak marker %q", path, forbidden)
+		}
+	}
+	for _, provider := range []string{"openai", "anthropic", "gemini", "azure-openai", "mistral", "cohere"} {
+		if strings.Contains(lower, `"provider_name": "`+provider+`"`) ||
+			strings.Contains(lower, `"provider": "`+provider+`"`) {
+			t.Fatalf("%s contains raw provider identity %q", path, provider)
+		}
+	}
+}
+
+func assertGenericTraceEventsSameStrings(t *testing.T, label string, got, want []string) {
+	t.Helper()
+	got = append([]string{}, got...)
+	want = append([]string{}, want...)
+	sort.Strings(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("%s = %#v, want %#v", label, got, want)
+	}
+}
+
+func genericTraceEventsContractTypes(contracts []genericTraceEventsEventContract) []string {
+	eventTypes := make([]string, 0, len(contracts))
+	for _, contract := range contracts {
+		eventTypes = append(eventTypes, contract.EventType)
+	}
+	return eventTypes
+}
+
+func genericTraceEventsDedupeKey(event genericTraceEventFixture, fields []string) string {
+	values := make([]string, 0, len(fields))
+	for _, field := range fields {
+		switch field {
+		case "trace_id":
+			values = append(values, event.TraceID)
+		case "event_id":
+			values = append(values, event.EventID)
+		case "sequence":
+			values = append(values, strconv.Itoa(event.Sequence))
+		case "event_type":
+			values = append(values, event.EventType)
+		default:
+			values = append(values, "")
+		}
+	}
+	return strings.Join(values, "\x00")
 }
 
 func genericTraceEventsContains(values []string, want string) bool {

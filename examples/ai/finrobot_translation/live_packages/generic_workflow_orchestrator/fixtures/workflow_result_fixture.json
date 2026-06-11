@@ -54,9 +54,11 @@
     "evt_workflow_started",
     "evt_plan_completed",
     "evt_execute_completed",
+    "evt_handoff_plan_execute",
+    "evt_handoff_execute_handoff",
+    "evt_handoff_handoff_finalize",
     "evt_handoff_completed",
     "evt_finalize_completed",
     "evt_workflow_completed"
   ]
 }
-

@@ -83,6 +83,51 @@
       "real_dependency_imports": false
     },
     {
+      "fixture_key": "generic_eval:findings:offline:v1",
+      "capability": "generic.ai.evaluation.harness.findings",
+      "path": "fixtures/findings_fixture.json",
+      "schemas": [
+        "schemas/findings_v1.schema.json"
+      ],
+      "metadata": {
+        "replay_ready": true,
+        "finding_kinds": 6,
+        "findings": 0,
+        "network_required": false,
+        "live_provider_calls": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "generic_eval:golden_gates:offline:v1",
+      "capability": "generic.ai.evaluation.harness.golden_gates",
+      "path": "fixtures/golden_gates_fixture.json",
+      "schemas": [
+        "schemas/golden_gates_v1.schema.json"
+      ],
+      "metadata": {
+        "replay_ready": true,
+        "gate": true,
+        "summary_pass_rate_min": 1,
+        "cases_failed_max": 0,
+        "findings_max": 0,
+        "judge_replay_errors_max": 0,
+        "network_required": false,
+        "live_provider_calls": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
       "fixture_key": "generic_eval:case_result_summary:offline:v1",
       "capability": "generic.ai.evaluation.harness.case_result_summary",
       "path": "fixtures/case_result_summary_fixture.json",

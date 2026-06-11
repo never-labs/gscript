@@ -132,15 +132,25 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		assertGenericEvaluationJSONFile(t, filepath.Join(base, manifest.Schemas[key]))
 		assertGenericEvaluationJSONFile(t, filepath.Join(base, manifest.Fixtures[key]))
 	}
-	if len(manifest.ArtifactBoundaries) != 5 {
+	if len(manifest.ArtifactBoundaries) != len(manifest.Schemas) {
 		t.Fatalf("artifact boundaries = %#v", manifest.ArtifactBoundaries)
 	}
+	boundaryIDs := map[string]bool{}
 	for _, boundary := range manifest.ArtifactBoundaries {
 		if boundary.ID == "" || boundary.Capability == "" || boundary.Schema == "" || boundary.Fixture == "" {
 			t.Fatalf("artifact boundary incomplete: %#v", boundary)
 		}
+		if manifest.Schemas[boundary.Schema] == "" || manifest.Fixtures[boundary.Fixture] == "" {
+			t.Fatalf("artifact boundary does not resolve through manifest schema/fixture maps: %#v", boundary)
+		}
 		if !boundary.ProviderFree || boundary.LiveNetwork {
 			t.Fatalf("artifact boundary must be provider-free/offline: %#v", boundary)
+		}
+		boundaryIDs[boundary.ID] = true
+	}
+	for _, want := range []string{"dataset_manifest", "case_inputs", "metric_specs", "judge_replay_records", "findings", "golden_gates", "case_result_summary"} {
+		if !boundaryIDs[want] {
+			t.Fatalf("artifact boundaries missing %q: %#v", want, manifest.ArtifactBoundaries)
 		}
 	}
 	if !manifest.GoldenGate.Gate || manifest.GoldenGate.SummaryPassRateMin != 1 ||
@@ -238,17 +248,24 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 	base := genericEvaluationHarnessLivePackageDir(t)
 
 	var dataset struct {
-		ProviderFree   bool     `json:"provider_free"`
-		LiveNetwork    bool     `json:"live_network"`
-		DatasetID      string   `json:"dataset_id"`
-		Format         string   `json:"format"`
-		IDField        string   `json:"id_field"`
-		CaseCount      int      `json:"case_count"`
-		RequiredFields []string `json:"required_fields"`
+		ProviderFree      bool     `json:"provider_free"`
+		LiveNetwork       bool     `json:"live_network"`
+		DatasetID         string   `json:"dataset_id"`
+		Format            string   `json:"format"`
+		IDField           string   `json:"id_field"`
+		CaseCount         int      `json:"case_count"`
+		RequiredFields    []string `json:"required_fields"`
+		CaseInputFixture  string   `json:"case_input_fixture"`
+		MetricSpecFixture string   `json:"metric_spec_fixture"`
 	}
 	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "dataset_manifest_fixture.json"), &dataset)
 	if !dataset.ProviderFree || dataset.LiveNetwork || dataset.Format != "json" || dataset.IDField != "case_id" || dataset.CaseCount != 2 {
 		t.Fatalf("dataset manifest = %#v", dataset)
+	}
+	if dataset.DatasetID == "" ||
+		dataset.CaseInputFixture != "fixtures/case_inputs_fixture.json" ||
+		dataset.MetricSpecFixture != "fixtures/metric_specs_fixture.json" {
+		t.Fatalf("dataset manifest must link checked-in case inputs and metric specs: %#v", dataset)
 	}
 	for _, field := range []string{"case_id", "input", "expected", "rubric"} {
 		if !contains(dataset.RequiredFields, field) {
@@ -257,8 +274,9 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 	}
 
 	var cases struct {
-		ProviderFree bool `json:"provider_free"`
-		LiveNetwork  bool `json:"live_network"`
+		ProviderFree bool   `json:"provider_free"`
+		LiveNetwork  bool   `json:"live_network"`
+		DatasetID    string `json:"dataset_id"`
 		Cases        []struct {
 			CaseID   string `json:"case_id"`
 			Name     string `json:"name"`
@@ -272,19 +290,28 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 		} `json:"cases"`
 	}
 	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "case_inputs_fixture.json"), &cases)
-	if !cases.ProviderFree || cases.LiveNetwork || len(cases.Cases) != dataset.CaseCount {
+	if !cases.ProviderFree || cases.LiveNetwork || cases.DatasetID != dataset.DatasetID || len(cases.Cases) != dataset.CaseCount {
 		t.Fatalf("case inputs = %#v", cases)
 	}
 	caseIDs := map[string]bool{}
+	caseNames := map[string]string{}
+	caseJudgeModels := map[string]string{}
 	for _, c := range cases.Cases {
 		if c.CaseID == "" || c.Name == "" || c.Input == nil || c.Expected == nil || c.Rubric.JudgeModel != "mock-ai-eval-judge" || c.Rubric.PassLabel != "pass" || len(c.Rubric.Criteria) == 0 {
 			t.Fatalf("case input incomplete: %#v", c)
 		}
+		if caseIDs[c.CaseID] {
+			t.Fatalf("duplicate case_id %q", c.CaseID)
+		}
 		caseIDs[c.CaseID] = true
+		caseNames[c.CaseID] = c.Name
+		caseJudgeModels[c.CaseID] = c.Rubric.JudgeModel
 	}
 
 	var metrics struct {
-		Metrics []struct {
+		ProviderFree bool `json:"provider_free"`
+		LiveNetwork  bool `json:"live_network"`
+		Metrics      []struct {
 			MetricID    string         `json:"metric_id"`
 			Type        string         `json:"type"`
 			Aggregation string         `json:"aggregation"`
@@ -292,12 +319,20 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 		} `json:"metrics"`
 	}
 	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "metric_specs_fixture.json"), &metrics)
+	if !metrics.ProviderFree || metrics.LiveNetwork {
+		t.Fatalf("metric specs must be provider-free/offline: %#v", metrics)
+	}
 	gotMetricTypes := map[string]string{}
+	metricGates := map[string]map[string]any{}
 	for _, metric := range metrics.Metrics {
 		if metric.MetricID == "" || metric.Type == "" || metric.Aggregation == "" || len(metric.Gate) == 0 {
 			t.Fatalf("metric spec incomplete: %#v", metric)
 		}
+		if gotMetricTypes[metric.MetricID] != "" {
+			t.Fatalf("duplicate metric_id %q", metric.MetricID)
+		}
 		gotMetricTypes[metric.MetricID] = metric.Type
+		metricGates[metric.MetricID] = metric.Gate
 	}
 	for _, want := range []string{"dataset_item_valid", "judge_passed", "answer_chars", "rubric_label", "judge_tokens"} {
 		if gotMetricTypes[want] == "" {
@@ -340,7 +375,72 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 			record.Usage.JudgeTokens <= 0 || record.Usage.JudgeCost != 0 {
 			t.Fatalf("judge replay record incomplete/offline violation: %#v", record)
 		}
+		if record.Request.Model != caseJudgeModels[record.CaseID] {
+			t.Fatalf("judge replay model for case %s = %q, want rubric model %q", record.CaseID, record.Request.Model, caseJudgeModels[record.CaseID])
+		}
+		if !strings.Contains(record.Request.Messages[1].Content, record.CaseID) {
+			t.Fatalf("judge replay request for case %s does not include case_id: %#v", record.CaseID, record.Request.Messages)
+		}
+		if traceIDs[record.TraceID] {
+			t.Fatalf("duplicate judge replay trace_id %q", record.TraceID)
+		}
 		traceIDs[record.TraceID] = true
+	}
+
+	var findings struct {
+		ProviderFree bool     `json:"provider_free"`
+		LiveNetwork  bool     `json:"live_network"`
+		FindingKinds []string `json:"finding_kinds"`
+		Findings     []struct {
+			Kind    string `json:"kind"`
+			CaseID  string `json:"case_id"`
+			Metric  string `json:"metric_id"`
+			TraceID string `json:"trace_id"`
+		} `json:"findings"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "findings_fixture.json"), &findings)
+	if !findings.ProviderFree || findings.LiveNetwork {
+		t.Fatalf("findings must be provider-free/offline: %#v", findings)
+	}
+	for _, want := range []string{"dataset_manifest_invalid", "case_input_invalid", "metric_gate_failed", "judge_replay_request_mismatch", "judge_replay_exhausted", "judge_replay_unconsumed"} {
+		if !contains(findings.FindingKinds, want) {
+			t.Fatalf("findings kinds missing %q: %#v", want, findings.FindingKinds)
+		}
+	}
+	for _, finding := range findings.Findings {
+		if !contains(findings.FindingKinds, finding.Kind) ||
+			(finding.CaseID != "" && !caseIDs[finding.CaseID]) ||
+			(finding.Metric != "" && gotMetricTypes[finding.Metric] == "") ||
+			(finding.TraceID != "" && !traceIDs[finding.TraceID]) {
+			t.Fatalf("finding does not resolve through case/metric/replay records: %#v", finding)
+		}
+	}
+
+	var golden struct {
+		ProviderFree         bool    `json:"provider_free"`
+		LiveNetwork          bool    `json:"live_network"`
+		Gate                 bool    `json:"gate"`
+		SummaryPassRateMin   float64 `json:"summary_pass_rate_min"`
+		CasesFailedMax       int     `json:"cases_failed_max"`
+		FindingsMax          int     `json:"findings_max"`
+		JudgeReplayErrorsMax int     `json:"judge_replay_errors_max"`
+		MetricThresholds     []struct {
+			MetricID string `json:"metric_id"`
+			Type     string `json:"type"`
+		} `json:"metric_thresholds"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "golden_gates_fixture.json"), &golden)
+	if !golden.ProviderFree || golden.LiveNetwork || !golden.Gate ||
+		golden.SummaryPassRateMin != 1 || golden.CasesFailedMax != 0 ||
+		golden.FindingsMax != 0 || golden.JudgeReplayErrorsMax != 0 {
+		t.Fatalf("golden gates = %#v", golden)
+	}
+	goldenMetricIDs := map[string]bool{}
+	for _, threshold := range golden.MetricThresholds {
+		if gotMetricTypes[threshold.MetricID] != threshold.Type || len(metricGates[threshold.MetricID]) == 0 {
+			t.Fatalf("golden gate threshold does not resolve through metric specs: %#v", threshold)
+		}
+		goldenMetricIDs[threshold.MetricID] = true
 	}
 
 	var summary struct {
@@ -357,13 +457,21 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 		} `json:"summary"`
 		Cases []struct {
 			CaseID        string `json:"case_id"`
+			Name          string `json:"name"`
 			Status        string `json:"status"`
 			JudgeTraceRef string `json:"judge_trace_ref"`
+			Assertions    int    `json:"assertions"`
 			Metrics       []struct {
 				MetricID string `json:"metric_id"`
 				Type     string `json:"type"`
+				Value    any    `json:"value"`
 			} `json:"metrics"`
 		} `json:"cases"`
+		Metrics []struct {
+			MetricID string `json:"metric_id"`
+			Type     string `json:"type"`
+			Count    int    `json:"count"`
+		} `json:"metrics"`
 		Findings []any `json:"findings"`
 	}
 	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "case_result_summary_fixture.json"), &summary)
@@ -374,14 +482,33 @@ func TestFinRobotGenericEvaluationHarnessDatasetReplayAndSummary(t *testing.T) {
 		len(summary.Findings) != 0 {
 		t.Fatalf("case result summary = %#v", summary)
 	}
+	summaryMetricCounts := map[string]int{}
+	for _, metric := range summary.Metrics {
+		if gotMetricTypes[metric.MetricID] != metric.Type || metric.Count != dataset.CaseCount {
+			t.Fatalf("summary aggregate metric does not resolve through metric specs/cases: %#v", metric)
+		}
+		summaryMetricCounts[metric.MetricID] = metric.Count
+	}
 	for _, c := range summary.Cases {
-		if !caseIDs[c.CaseID] || c.Status != "passed" || !traceIDs[c.JudgeTraceRef] || len(c.Metrics) != len(metrics.Metrics) {
+		if !caseIDs[c.CaseID] || c.Name != caseNames[c.CaseID] || c.Status != "passed" ||
+			!traceIDs[c.JudgeTraceRef] || c.Assertions <= 0 || len(c.Metrics) != len(metrics.Metrics) {
 			t.Fatalf("case result incomplete: %#v", c)
 		}
 		for _, metric := range c.Metrics {
 			if gotMetricTypes[metric.MetricID] != metric.Type {
 				t.Fatalf("case %s metric %s type = %q, want %q", c.CaseID, metric.MetricID, metric.Type, gotMetricTypes[metric.MetricID])
 			}
+			if summaryMetricCounts[metric.MetricID] != dataset.CaseCount {
+				t.Fatalf("case %s metric %s missing from summary aggregates: %#v", c.CaseID, metric.MetricID, summary.Metrics)
+			}
+			if metric.Value == nil {
+				t.Fatalf("case %s metric %s has nil value", c.CaseID, metric.MetricID)
+			}
+		}
+	}
+	for _, want := range []string{"dataset_item_valid", "judge_passed", "answer_chars", "judge_tokens"} {
+		if !goldenMetricIDs[want] {
+			t.Fatalf("golden gates missing threshold for required metric %q: %#v", want, golden.MetricThresholds)
 		}
 	}
 }
@@ -402,19 +529,37 @@ func TestFinRobotGenericEvaluationHarnessFixtureIndexAndNoRuntimeImports(t *test
 		} `json:"fixtures"`
 	}
 	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || index.RequiresCredentials || len(index.Fixtures) != 5 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || index.RequiresCredentials || len(index.Fixtures) != 7 {
 		t.Fatalf("fixture index header = %#v", index)
 	}
+	indexCapabilities := map[string]bool{}
 	for _, fixture := range index.Fixtures {
 		if fixture.FixtureKey == "" || fixture.Capability == "" || fixture.Path == "" || len(fixture.Schemas) == 0 {
 			t.Fatalf("fixture index entry incomplete: %#v", fixture)
 		}
+		indexCapabilities[fixture.Capability] = true
 		assertGenericEvaluationJSONFile(t, filepath.Join(base, fixture.Path))
 		for _, schema := range fixture.Schemas {
 			assertGenericEvaluationJSONFile(t, filepath.Join(base, schema))
 		}
 		if fixture.Metadata["network_required"] == true || fixture.Metadata["live_provider_calls"] == true {
 			t.Fatalf("fixture index entry requires live dependency: %#v", fixture)
+		}
+		if fixture.Metadata["provider_free"] != true || fixture.Metadata["live_network"] == true || fixture.Metadata["real_dependency_imports"] == true {
+			t.Fatalf("fixture index entry metadata must remain provider-free/offline/no-imports: %#v", fixture)
+		}
+	}
+	for _, want := range []string{
+		"generic.ai.evaluation.harness.dataset_manifest",
+		"generic.ai.evaluation.harness.case_inputs",
+		"generic.ai.evaluation.harness.metric_specs",
+		"generic.ai.evaluation.harness.judge_replay_records",
+		"generic.ai.evaluation.harness.findings",
+		"generic.ai.evaluation.harness.golden_gates",
+		"generic.ai.evaluation.harness.case_result_summary",
+	} {
+		if !indexCapabilities[want] {
+			t.Fatalf("fixture index missing capability %q: %#v", want, index.Fixtures)
 		}
 	}
 
@@ -440,6 +585,9 @@ func TestFinRobotGenericEvaluationHarnessFixtureIndexAndNoRuntimeImports(t *test
 			`(?m)^\s*load\s*\(`,
 			`(?m)^\s*require\s*\(`,
 			`(?m)^\s*(openai|anthropic|requests|http|curl)\s*[.(]`,
+			`(?i)(openai|anthropic|google|azure|aws|api)[_-]?key`,
+			`(?i)bearer\s+[a-z0-9._-]+`,
+			`sk-[A-Za-z0-9]{20,}`,
 		} {
 			if regexp.MustCompile(pattern).FindString(source) != "" {
 				t.Fatalf("%s contains forbidden runtime/provider/network dependency matching %q", rel, pattern)

@@ -54,6 +54,26 @@ type genericModelRegistryManifest struct {
 		FallbackProvider            string   `json:"fallback_provider"`
 		DenyReasons                 []string `json:"deny_reasons"`
 	} `json:"provider_policy"`
+	RoutingGuard struct {
+		ID                      string   `json:"id"`
+		ProviderFree            bool     `json:"provider_free"`
+		LiveNetwork             bool     `json:"live_network"`
+		SecretValuesPresent     bool     `json:"secret_values_present"`
+		RequestProviderOverride string   `json:"request_provider_override"`
+		ReplayDescriptorSource  string   `json:"replay_descriptor_source"`
+		LiveProviderBehavior    string   `json:"live_provider_behavior"`
+		FallbackProvider        string   `json:"fallback_provider"`
+		DecisionReplayStable    bool     `json:"decision_replay_stable"`
+		DeniedProviderKinds     []string `json:"denied_provider_kinds"`
+		RedirectEvidence        []struct {
+			RequestedAlias string `json:"requested_alias"`
+			DeniedProvider string `json:"denied_provider"`
+			RedirectAlias  string `json:"redirect_alias"`
+			DescriptorRef  string `json:"descriptor_ref"`
+			Provider       string `json:"provider"`
+			Reason         string `json:"reason"`
+		} `json:"redirect_evidence"`
+	} `json:"routing_guard"`
 	RedactionPolicy struct {
 		ID                  string   `json:"id"`
 		Enabled             bool     `json:"enabled"`
@@ -119,6 +139,7 @@ func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
 		"generic.ai.model.alias.resolve",
 		"generic.ai.model.descriptor.replay",
 		"generic.ai.model.redaction.policy",
+		"generic.ai.model.routing.guard",
 	} {
 		if !genericModelRegistryContains(manifest.Capabilities, want) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
@@ -173,6 +194,35 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 	for _, want := range []string{"live_provider_disabled", "credential_material_forbidden", "network_disabled"} {
 		if !genericModelRegistryContains(manifest.ProviderPolicy.DenyReasons, want) {
 			t.Fatalf("provider policy missing deny reason %q: %#v", want, manifest.ProviderPolicy.DenyReasons)
+		}
+	}
+	if manifest.RoutingGuard.ID != "provider-free-routing-guard-v1" ||
+		!manifest.RoutingGuard.ProviderFree ||
+		manifest.RoutingGuard.LiveNetwork ||
+		manifest.RoutingGuard.SecretValuesPresent ||
+		manifest.RoutingGuard.RequestProviderOverride != "ignored-when-replay-descriptor-present" ||
+		manifest.RoutingGuard.ReplayDescriptorSource != "model_alias_registry" ||
+		manifest.RoutingGuard.LiveProviderBehavior != "deny-or-redirect-to-fixture-replay" ||
+		manifest.RoutingGuard.FallbackProvider != manifest.ProviderPolicy.FallbackProvider ||
+		!manifest.RoutingGuard.DecisionReplayStable {
+		t.Fatalf("routing guard must be provider-free replay redirect policy: %#v", manifest.RoutingGuard)
+	}
+	for _, want := range []string{"future-live-provider", "request-scoped-live-provider", "provider-sdk-import"} {
+		if !genericModelRegistryContains(manifest.RoutingGuard.DeniedProviderKinds, want) {
+			t.Fatalf("routing guard missing denied provider kind %q: %#v", want, manifest.RoutingGuard.DeniedProviderKinds)
+		}
+	}
+	if len(manifest.RoutingGuard.RedirectEvidence) == 0 {
+		t.Fatalf("routing guard missing redirect evidence")
+	}
+	for _, evidence := range manifest.RoutingGuard.RedirectEvidence {
+		if evidence.RequestedAlias == "" ||
+			evidence.DeniedProvider == "" ||
+			evidence.RedirectAlias == "" ||
+			evidence.DescriptorRef == "" ||
+			evidence.Provider != "fixture-replay" ||
+			evidence.Reason != "replay" {
+			t.Fatalf("routing guard redirect evidence incomplete: %#v", evidence)
 		}
 	}
 	if !manifest.RedactionPolicy.Enabled ||
@@ -305,6 +355,12 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 			CredentialMaterial  string `json:"credential_material"`
 			Network             string `json:"network"`
 		} `json:"provider_policy"`
+		RoutingGuard struct {
+			RequestProviderOverride string `json:"request_provider_override"`
+			ReplayDescriptorSource  string `json:"replay_descriptor_source"`
+			LiveProviderBehavior    string `json:"live_provider_behavior"`
+			DecisionReplayStable    bool   `json:"decision_replay_stable"`
+		} `json:"routing_guard"`
 		ResolutionRules []struct {
 			Rule string `json:"rule"`
 		} `json:"resolution_rules"`
@@ -334,6 +390,12 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 		contract.ProviderPolicy.CredentialMaterial != "forbidden" ||
 		contract.ProviderPolicy.Network != "disabled" {
 		t.Fatalf("contract provider policy must deny live provider edges: %#v", contract.ProviderPolicy)
+	}
+	if contract.RoutingGuard.RequestProviderOverride != "ignored-when-replay-descriptor-present" ||
+		contract.RoutingGuard.ReplayDescriptorSource != "model_alias_registry" ||
+		contract.RoutingGuard.LiveProviderBehavior != "deny-or-redirect-to-fixture-replay" ||
+		!contract.RoutingGuard.DecisionReplayStable {
+		t.Fatalf("contract routing guard must cleanly redirect live provider candidates: %#v", contract.RoutingGuard)
 	}
 
 	for _, rel := range []string{

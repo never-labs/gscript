@@ -56,6 +56,16 @@ type genericApprovalPolicyRiskLevel struct {
 	Examples         []string `json:"examples"`
 }
 
+type genericApprovalPolicyCapabilityEntry struct {
+	ID               string `json:"id"`
+	Capability       string `json:"capability"`
+	RiskLevel        string `json:"risk_level"`
+	DefaultDecision  string `json:"default_decision"`
+	RequiresApproval bool   `json:"requires_approval"`
+	CleanSkip        bool   `json:"clean_skip"`
+	ProviderBinding  string `json:"provider_binding"`
+}
+
 func TestGenericApprovalPolicyLivePackageManifest(t *testing.T) {
 	base := genericApprovalPolicyPackageDir(t)
 	manifest := loadGenericApprovalPolicyManifest(t, base)
@@ -179,20 +189,12 @@ func TestGenericApprovalPolicyContractsAndFixtures(t *testing.T) {
 	}
 
 	var gate struct {
-		PackageName          string `json:"package_name"`
-		ProviderFree         bool   `json:"provider_free"`
-		LiveNetwork          bool   `json:"live_network"`
-		RealDependencyImport bool   `json:"real_dependency_imports"`
-		CapabilityVocabulary []struct {
-			ID               string `json:"id"`
-			Capability       string `json:"capability"`
-			RiskLevel        string `json:"risk_level"`
-			DefaultDecision  string `json:"default_decision"`
-			RequiresApproval bool   `json:"requires_approval"`
-			CleanSkip        bool   `json:"clean_skip"`
-			ProviderBinding  string `json:"provider_binding"`
-		} `json:"capability_vocabulary"`
-		GateDefaults struct {
+		PackageName          string                                 `json:"package_name"`
+		ProviderFree         bool                                   `json:"provider_free"`
+		LiveNetwork          bool                                   `json:"live_network"`
+		RealDependencyImport bool                                   `json:"real_dependency_imports"`
+		CapabilityVocabulary []genericApprovalPolicyCapabilityEntry `json:"capability_vocabulary"`
+		GateDefaults         struct {
 			ExactCapabilityMatchRequired bool   `json:"exact_capability_match_required"`
 			UnknownCapability            string `json:"unknown_capability"`
 			MissingDependency            string `json:"missing_dependency"`
@@ -238,9 +240,10 @@ func TestGenericApprovalPolicyContractsAndFixtures(t *testing.T) {
 	}
 
 	assertGenericApprovalPolicyFixtureIndex(t, base)
-	assertGenericApprovalPolicyOutcomes(t, base)
-	assertGenericApprovalPolicyTrace(t, base)
-	assertGenericApprovalPolicyCleanSkip(t, base)
+	vocabulary := genericApprovalPolicyVocabularyMap(t, gate.CapabilityVocabulary)
+	assertGenericApprovalPolicyOutcomes(t, base, vocabulary)
+	assertGenericApprovalPolicyTrace(t, base, vocabulary)
+	assertGenericApprovalPolicyCleanSkip(t, base, vocabulary)
 }
 
 func TestGenericApprovalPolicySmokeLeia(t *testing.T) {
@@ -300,19 +303,84 @@ func assertGenericApprovalPolicyFixtureIndex(t *testing.T, base string) {
 	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
+	want := map[string]struct {
+		capability string
+		path       string
+		schema     string
+		metadata   map[string]any
+	}{
+		"generic.ai.approval.policy:outcome_matrix:v1": {
+			capability: "generic.ai.approval.policy.evaluate",
+			path:       "fixtures/policy_outcome_matrix_fixture.json",
+			schema:     "schemas/policy_outcome_v1.schema.json",
+			metadata: map[string]any{
+				"decisions": []string{"allowed", "denied", "skipped"},
+			},
+		},
+		"generic.ai.approval.policy:trace:deny:trading_order:v1": {
+			capability: "generic.ai.approval.policy.trace",
+			path:       "fixtures/approval_trace_envelope_fixture.json",
+			schema:     "schemas/approval_trace_envelope_v1.schema.json",
+			metadata: map[string]any{
+				"decision":              "denied",
+				"secret_values_present": false,
+			},
+		},
+		"generic.ai.approval.policy:clean_skip:network_absent:v1": {
+			capability: "generic.ai.approval.policy.clean_skip",
+			path:       "fixtures/clean_skip_fixture.json",
+			schema:     "schemas/clean_skip_v1.schema.json",
+			metadata: map[string]any{
+				"clean_skip": true,
+				"status":     "skipped",
+			},
+		},
+	}
+	seen := map[string]bool{}
 	for _, fixture := range index.Fixtures {
 		if fixture.FixtureKey == "" || !strings.HasPrefix(fixture.Capability, "generic.ai.approval.policy.") {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
+		}
+		expected, ok := want[fixture.FixtureKey]
+		if !ok {
+			t.Fatalf("fixture index contains unexpected fixture %q", fixture.FixtureKey)
+		}
+		seen[fixture.FixtureKey] = true
+		if fixture.Capability != expected.capability || fixture.Path != expected.path || fixture.Schema != expected.schema {
+			t.Fatalf("fixture index mismatch for %s: %#v", fixture.FixtureKey, fixture)
 		}
 		assertGenericApprovalPolicyJSONFile(t, filepath.Join(base, fixture.Path))
 		assertGenericApprovalPolicyJSONFile(t, filepath.Join(base, fixture.Schema))
 		if fixture.Metadata["replay_ready"] != true {
 			t.Fatalf("%s replay_ready = %#v", fixture.FixtureKey, fixture.Metadata["replay_ready"])
 		}
+		if fixture.Metadata["provider_free"] != true || fixture.Metadata["live_network"] != false || fixture.Metadata["real_dependency_imports"] != false {
+			t.Fatalf("%s must be provider-free and offline in fixture index metadata: %#v", fixture.FixtureKey, fixture.Metadata)
+		}
+		for key, value := range expected.metadata {
+			if !genericApprovalPolicyMetadataValueEqual(fixture.Metadata[key], value) {
+				t.Fatalf("%s metadata[%s] = %#v, want %#v", fixture.FixtureKey, key, fixture.Metadata[key], value)
+			}
+		}
+		var target struct {
+			FixtureKey            string `json:"fixture_key"`
+			ProviderFree          bool   `json:"provider_free"`
+			LiveNetwork           bool   `json:"live_network"`
+			RealDependencyImports bool   `json:"real_dependency_imports"`
+		}
+		decodeGenericApprovalPolicyJSONFile(t, filepath.Join(base, fixture.Path), &target)
+		if target.FixtureKey != fixture.FixtureKey || !target.ProviderFree || target.LiveNetwork || target.RealDependencyImports {
+			t.Fatalf("%s index-to-fixture correlation mismatch: %#v", fixture.FixtureKey, target)
+		}
+	}
+	for key := range want {
+		if !seen[key] {
+			t.Fatalf("fixture index missing required fixture %q", key)
+		}
 	}
 }
 
-func assertGenericApprovalPolicyOutcomes(t *testing.T, base string) {
+func assertGenericApprovalPolicyOutcomes(t *testing.T, base string, vocabulary map[string]genericApprovalPolicyCapabilityEntry) {
 	t.Helper()
 	var fixture struct {
 		ProviderFree          bool   `json:"provider_free"`
@@ -339,6 +407,20 @@ func assertGenericApprovalPolicyOutcomes(t *testing.T, base string) {
 		if outcome.ID == "" || !strings.HasPrefix(outcome.Capability, "generic.ai.capability.") {
 			t.Fatalf("outcome incomplete: %#v", outcome)
 		}
+		entry, knownCapability := vocabulary[outcome.Capability]
+		if knownCapability {
+			if outcome.RiskLevel != entry.RiskLevel || outcome.RequiresApproval != entry.RequiresApproval {
+				t.Fatalf("outcome must mirror capability vocabulary risk/approval metadata: %#v vs %#v", outcome, entry)
+			}
+			if entry.DefaultDecision == "deny" && outcome.Grant == "missing" && outcome.Decision != "denied" {
+				t.Fatalf("missing approval grant for default-deny capability must deny: %#v", outcome)
+			}
+			if entry.CleanSkip && outcome.Grant == "missing_dependency" && (!outcome.CleanSkip || outcome.Decision != "skipped") {
+				t.Fatalf("missing dependency for clean-skip capability must skip cleanly: %#v", outcome)
+			}
+		} else if outcome.Capability != "generic.ai.capability.unknown" || outcome.Decision != "denied" || outcome.RiskLevel != "critical" {
+			t.Fatalf("unknown capability must be represented only as a critical default-deny outcome: %#v", outcome)
+		}
 		decisions[outcome.Decision] = true
 		if outcome.RiskLevel != "low" && outcome.Decision == "allowed" {
 			t.Fatalf("non-low risk outcome must not allow by default: %#v", outcome)
@@ -357,10 +439,12 @@ func assertGenericApprovalPolicyOutcomes(t *testing.T, base string) {
 	}
 }
 
-func assertGenericApprovalPolicyTrace(t *testing.T, base string) {
+func assertGenericApprovalPolicyTrace(t *testing.T, base string, vocabulary map[string]genericApprovalPolicyCapabilityEntry) {
 	t.Helper()
 	var trace struct {
 		Kind                  string `json:"kind"`
+		TraceID               string `json:"trace_id"`
+		FixtureKey            string `json:"fixture_key"`
 		ProviderFree          bool   `json:"provider_free"`
 		LiveNetwork           bool   `json:"live_network"`
 		RealDependencyImports bool   `json:"real_dependency_imports"`
@@ -396,8 +480,15 @@ func assertGenericApprovalPolicyTrace(t *testing.T, base string) {
 	if trace.Kind != "generic_ai_approval_trace" || !trace.ProviderFree || trace.LiveNetwork || trace.RealDependencyImports {
 		t.Fatalf("trace header must stay provider-free: %#v", trace)
 	}
+	if trace.TraceID == "" || trace.FixtureKey != "generic.ai.approval.policy:trace:deny:trading_order:v1" {
+		t.Fatalf("trace identity must be stable and index-correlatable: trace_id=%q fixture_key=%q", trace.TraceID, trace.FixtureKey)
+	}
 	if trace.Request.Capability != "generic.ai.capability.trading.order_submit" || trace.Request.RiskLevel != "critical" {
 		t.Fatalf("trace request mismatch: %#v", trace.Request)
+	}
+	entry := vocabulary[trace.Request.Capability]
+	if entry.Capability == "" || entry.RiskLevel != trace.Request.RiskLevel || entry.DefaultDecision != "deny" || !entry.RequiresApproval {
+		t.Fatalf("trace request must correlate with a default-deny approval-required capability: request=%#v vocabulary=%#v", trace.Request, entry)
 	}
 	if trace.Policy.Package != "generic.ai.approval.policy" || trace.Policy.DefaultDecision != "deny" || !trace.Policy.ExactCapabilityMatchRequired || len(trace.Policy.AllowedCapabilities) != 0 {
 		t.Fatalf("trace policy must be default-deny with exact grants: %#v", trace.Policy)
@@ -411,9 +502,10 @@ func assertGenericApprovalPolicyTrace(t *testing.T, base string) {
 	if trace.Replay.Mode != "fixture_replay" || !trace.Replay.Deterministic || trace.Replay.CreatedFromProvider {
 		t.Fatalf("trace replay metadata mismatch: %#v", trace.Replay)
 	}
+	assertGenericApprovalPolicyNoSecretPayload(t, filepath.Join(base, "fixtures", "approval_trace_envelope_fixture.json"))
 }
 
-func assertGenericApprovalPolicyCleanSkip(t *testing.T, base string) {
+func assertGenericApprovalPolicyCleanSkip(t *testing.T, base string, vocabulary map[string]genericApprovalPolicyCapabilityEntry) {
 	t.Helper()
 	var skip struct {
 		ProviderFree          bool   `json:"provider_free"`
@@ -440,6 +532,10 @@ func assertGenericApprovalPolicyCleanSkip(t *testing.T, base string) {
 	if !skip.ProviderFree || skip.LiveNetwork || skip.RealDependencyImports || skip.RequestedCapability != "generic.ai.capability.network.http" {
 		t.Fatalf("clean skip header mismatch: %#v", skip)
 	}
+	entry := vocabulary[skip.RequestedCapability]
+	if entry.Capability == "" || entry.RiskLevel != "medium" || entry.DefaultDecision != "deny" || !entry.RequiresApproval || !entry.CleanSkip || entry.ProviderBinding != "external" {
+		t.Fatalf("clean skip request must correlate with an external default-deny clean-skip capability: %#v", entry)
+	}
 	if skip.Status != "skipped" || !skip.CleanSkip || skip.DependencyImported || skip.CredentialsRequired || skip.SecretValuesPresent {
 		t.Fatalf("clean skip metadata incomplete: %#v", skip)
 	}
@@ -448,6 +544,7 @@ func assertGenericApprovalPolicyCleanSkip(t *testing.T, base string) {
 		skip.ResultEnvelope.Metadata.LiveNetwork || skip.ResultEnvelope.Metadata.RealDependencyImports {
 		t.Fatalf("clean skip result envelope mismatch: %#v", skip.ResultEnvelope)
 	}
+	assertGenericApprovalPolicyNoSecretPayload(t, filepath.Join(base, "fixtures", "clean_skip_fixture.json"))
 }
 
 func assertGenericRiskLevels(t *testing.T, levels []genericApprovalPolicyRiskLevel) {
@@ -542,4 +639,51 @@ func containsGenericApprovalPolicyString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func genericApprovalPolicyVocabularyMap(t *testing.T, entries []genericApprovalPolicyCapabilityEntry) map[string]genericApprovalPolicyCapabilityEntry {
+	t.Helper()
+	vocabulary := map[string]genericApprovalPolicyCapabilityEntry{}
+	for _, entry := range entries {
+		if entry.Capability == "" {
+			t.Fatalf("empty capability vocabulary entry: %#v", entry)
+		}
+		vocabulary[entry.Capability] = entry
+	}
+	return vocabulary
+}
+
+func genericApprovalPolicyMetadataValueEqual(got, want any) bool {
+	gotStrings, gotOK := got.([]any)
+	wantStrings, wantOK := want.([]string)
+	if gotOK && wantOK {
+		values := make([]string, 0, len(gotStrings))
+		for _, value := range gotStrings {
+			text, ok := value.(string)
+			if !ok {
+				return false
+			}
+			values = append(values, text)
+		}
+		gotCopy := append([]string(nil), values...)
+		wantCopy := append([]string(nil), wantStrings...)
+		sort.Strings(gotCopy)
+		sort.Strings(wantCopy)
+		return reflect.DeepEqual(gotCopy, wantCopy)
+	}
+	return reflect.DeepEqual(got, want)
+}
+
+func assertGenericApprovalPolicyNoSecretPayload(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lower := strings.ToLower(string(data))
+	for _, marker := range []string{"api_key", "apikey", "access_token", "bearer ", "password", "private_key", "sk-"} {
+		if strings.Contains(lower, marker) {
+			t.Fatalf("%s contains secret-like payload marker %q", path, marker)
+		}
+	}
 }

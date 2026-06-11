@@ -7,7 +7,7 @@ Baseline:
 - Leia branch: `codex/ai-dialect-polish` branch head.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 600 files, including 32
+- Current translation directory file count: 601 files, including 32
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 78 runnable/checkable examples discovered by
@@ -20,7 +20,8 @@ Baseline:
   `rg --files examples/ai/finrobot_translation | wc -l`,
   `go run ./cmd/leia examples list --json`, live-package directory inventory,
   provider-free fixture-index inventory, and documentation semantic-guard
-  searches. These commands are read-only.
+  searches for approval/model/workflow/trace/eval coverage. These commands are
+  read-only.
 
 ## Executive Summary
 
@@ -57,7 +58,7 @@ The following read-only inventory commands were run from this worktree on
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `600` files |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `601` files |
 | `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `78` examples: `67` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
 | `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `32` live-package skeleton directories |
 | `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `31` provider-free fixture indexes |
@@ -66,7 +67,9 @@ The following read-only inventory commands were run from this worktree on
 | Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
 | `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 
-No stale count was found in this document during this refresh.
+This refresh updated the file-inventory count from 600 to 601. The registered
+example, runner, live-package, generic live-package, and tutorial runnable
+counts remain unchanged.
 
 ## Registered Example Inventory
 
@@ -243,7 +246,7 @@ mistaken for missing language/runtime support.
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
 | Registered example inventory | 78 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 600 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| File inventory | 601 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 67 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 5 `evaluate` examples for equity CLI workflow, web product smoke metadata, generic workflow orchestration, and generic agent-loop composition | Complete |

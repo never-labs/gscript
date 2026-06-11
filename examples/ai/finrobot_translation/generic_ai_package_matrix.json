@@ -88,7 +88,8 @@
         "generic.ai.model.registry",
         "generic.ai.model.alias.resolve",
         "generic.ai.model.descriptor.replay",
-        "generic.ai.model.redaction.policy"
+        "generic.ai.model.redaction.policy",
+        "generic.ai.model.routing.guard"
       ],
       "backend_shape": "generic.ai.model.registry",
       "provider_free": true,

@@ -105,6 +105,22 @@
       "live_network": false
     },
     {
+      "id": "findings",
+      "capability": "generic.ai.evaluation.harness.findings",
+      "schema": "findings",
+      "fixture": "findings",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "golden_gates",
+      "capability": "generic.ai.evaluation.harness.golden_gates",
+      "schema": "golden_gates",
+      "fixture": "golden_gates",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
       "id": "case_result_summary",
       "capability": "generic.ai.evaluation.harness.case_result_summary",
       "schema": "case_result_summary",

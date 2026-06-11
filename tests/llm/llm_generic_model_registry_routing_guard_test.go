@@ -149,12 +149,21 @@ first_model := first.model
 first_provider_model := first.provider_model
 first_trace_reason := first.trace.reason
 first_trace_replayed := first.trace.replayed
+first_replay_path_1 := first.replay.path[1]
+first_replay_path_2 := first.replay.path[2]
+first_replay_path_3 := first.replay.path[3]
+first_replay_path_4 := first.replay.path[4]
 replayed_alias := replayed.alias
 replayed_provider := replayed.provider
 replayed_model := replayed.model
 replayed_provider_model := replayed.provider_model
 replayed_trace_reason := replayed.trace.reason
 replayed_trace_replayed := replayed.trace.replayed
+replayed_trace_path_1 := replayed.trace.path[1]
+replayed_trace_path_2 := replayed.trace.path[2]
+replayed_trace_path_3 := replayed.trace.path[3]
+replayed_trace_path_4 := replayed.trace.path[4]
+replayed_decision := replayed.decision
 same_decision := first.replay.decision == replayed.replay.decision
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -167,12 +176,21 @@ same_decision := first.replay.decision == replayed.replay.decision
 				"first_provider_model":    "generic-fixture-analyst-v1",
 				"first_trace_reason":      "alias",
 				"first_trace_replayed":    false,
+				"first_replay_path_1":     "default",
+				"first_replay_path_2":     "analyst",
+				"first_replay_path_3":     "fixture_analyst",
+				"first_replay_path_4":     "generic-fixture-analyst-v1",
 				"replayed_alias":          "default",
 				"replayed_provider":       "fixture-replay",
 				"replayed_model":          "generic-fixture-analyst-v1",
 				"replayed_provider_model": "generic-fixture-analyst-v1",
 				"replayed_trace_reason":   "replay",
 				"replayed_trace_replayed": true,
+				"replayed_trace_path_1":   "default",
+				"replayed_trace_path_2":   "analyst",
+				"replayed_trace_path_3":   "fixture_analyst",
+				"replayed_trace_path_4":   "generic-fixture-analyst-v1",
+				"replayed_decision":       "alias=default|provider=fixture-replay|model=generic-fixture-analyst-v1|provider_model=generic-fixture-analyst-v1",
 				"same_decision":           true,
 			} {
 				got, err := vm.Get(name)

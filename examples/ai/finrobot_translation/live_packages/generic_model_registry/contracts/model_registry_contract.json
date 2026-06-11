@@ -24,6 +24,12 @@
     "credential_material": "forbidden",
     "network": "disabled"
   },
+  "routing_guard": {
+    "request_provider_override": "ignored-when-replay-descriptor-present",
+    "replay_descriptor_source": "model_alias_registry",
+    "live_provider_behavior": "deny-or-redirect-to-fixture-replay",
+    "decision_replay_stable": true
+  },
   "resolution_rules": [
     {
       "rule": "alias-chain",
@@ -42,4 +48,3 @@
     }
   ]
 }
-
