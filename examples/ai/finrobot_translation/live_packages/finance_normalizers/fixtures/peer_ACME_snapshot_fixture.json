@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "peer_ACME_snapshot_fixture",
+  "provider_free": true,
+  "rows": [
+    {
+      "schema": "peer_snapshot_v1",
+      "peer_group_id": "software_midcap_fixture",
+      "symbol": "ACME",
+      "peer_symbol": "ACME",
+      "metric": "ev_to_revenue",
+      "value": 4.8,
+      "unit": "multiple",
+      "as_of": "2026-05-01",
+      "stale_after_days": 30,
+      "stale": true,
+      "source_id": "fixture.peer.acme.snapshot",
+      "record_hash": "sha256:peer-acme-ev-to-revenue"
+    },
+    {
+      "schema": "peer_snapshot_v1",
+      "peer_group_id": "software_midcap_fixture",
+      "symbol": "ACME",
+      "peer_symbol": "BETA",
+      "metric": "ev_to_revenue",
+      "value": 5.1,
+      "unit": "multiple",
+      "as_of": "2026-05-01",
+      "stale_after_days": 30,
+      "stale": true,
+      "source_id": "fixture.peer.acme.snapshot",
+      "record_hash": "sha256:peer-beta-ev-to-revenue"
+    }
+  ],
+  "deterministic_order": [
+    "peer_group_id",
+    "symbol",
+    "peer_symbol",
+    "metric"
+  ]
+}

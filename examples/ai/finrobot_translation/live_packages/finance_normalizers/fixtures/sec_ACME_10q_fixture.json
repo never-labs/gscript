@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "sec_ACME_10q_fixture",
+  "provider_free": true,
+  "rows": [
+    {
+      "schema": "normalized_sec_filing_v1",
+      "symbol": "ACME",
+      "cik": "0000000000",
+      "form": "10-Q",
+      "accession_number": "0000000000-26-000001",
+      "filed_at": "2026-05-01",
+      "period_end": "2026-03-31",
+      "sections": [
+        {
+          "name": "management_discussion",
+          "locator": "fixture://sec/acme/10q#mdna"
+        },
+        {
+          "name": "risk_factors",
+          "locator": "fixture://sec/acme/10q#risk"
+        }
+      ],
+      "as_of": "2026-05-01",
+      "stale_after_days": 180,
+      "stale": false,
+      "source_id": "fixture.sec.acme.10q.2026q1",
+      "record_hash": "sha256:sec-acme-10q-2026q1"
+    }
+  ],
+  "deterministic_order": [
+    "filed_at",
+    "accession_number"
+  ]
+}

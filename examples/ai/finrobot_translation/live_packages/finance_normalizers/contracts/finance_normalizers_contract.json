@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "finance_normalizers_contract_v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "domains": [
+    "statements",
+    "ratios",
+    "market",
+    "news",
+    "sec",
+    "peer",
+    "provenance"
+  ],
+  "canonical_field_rules": [
+    "All emitted field names are snake_case.",
+    "Symbols are uppercase tickers.",
+    "Dates use RFC3339 full-date or timestamp strings.",
+    "Currencies use uppercase ISO-4217 codes.",
+    "Numeric facts carry explicit unit and scale fields."
+  ],
+  "stale_missing_policy": {
+    "stale_basis": "as_of plus stale_after_days",
+    "stale_required": true,
+    "missing_required_policy": "reject_record",
+    "missing_optional_policy": "emit_null_with_missing_reason",
+    "warning_marker": "finance_normalizer_stale_field"
+  },
+  "deterministic_ordering_required": true,
+  "acceptance_gates": [
+    "Statement, ratio, market, news, SEC, peer, and provenance fixtures validate against declared required fields.",
+    "No fixture or example imports live provider SDKs or opens network paths.",
+    "Missing optional fields are explicit null values with missing_reason entries.",
+    "Stale fields carry stale=true and stale_after metadata.",
+    "Rows are emitted in the deterministic order declared by the manifest."
+  ]
+}
