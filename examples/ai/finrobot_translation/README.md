@@ -8,6 +8,9 @@ Source reviewed: `.external/FinRobot` from the local checkout, including the
 top-level README, `finrobot`, `finrobot_equity`, experiments, tutorials,
 deployment scripts, and tests.
 
+Coverage audit: see `COVERAGE.md` for the module matrix, registered-example
+inventory, provider-free slice status, and live-package follow-up tasks.
+
 ## Scope
 
 FinRobot should translate into ordinary Leia packages that compose existing or
