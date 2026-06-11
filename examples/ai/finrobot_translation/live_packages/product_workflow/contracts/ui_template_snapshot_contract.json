@@ -124,6 +124,30 @@
     ],
     "snapshot_fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/ui_snapshots/accessibility"
   },
+  "accessibility_snapshot_gate": {
+    "capability": "product.workflow.web.accessibility_snapshot_gate",
+    "mode": "static_fixture_gate",
+    "provider_free": true,
+    "requires_browser": false,
+    "requires_live_network": false,
+    "requires_credentials": false,
+    "coverage": {
+      "required_route_source": "route_to_template_mapping",
+      "required_route_coverage": "all_routes",
+      "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/ui_snapshots/accessibility_gate_results"
+    },
+    "blocking_violation_levels": ["critical", "serious"],
+    "waivers_allowed": false,
+    "fail_on": [
+      "missing_route_snapshot",
+      "missing_main_landmark",
+      "missing_h1",
+      "unlabelled_form_control",
+      "unnamed_button",
+      "table_without_caption_or_aria_label",
+      "browser_required"
+    ]
+  },
   "visual_regression_metadata": {
     "mode": "static_template_asset_contract",
     "requires_browser": false,

@@ -21,7 +21,7 @@ news_catalyst_live_package := {
         {
             id: "news_integrator"
             source_module: "news_integrator.py"
-            capabilities: {"ai.news.source.ingest.schema", "ai.news.event.extract", "ai.news.freshness.evaluate", "ai.news.dedupe.confidence.envelope", "finance.news.fetch.fixture", "finance.news.relevance.score", "finance.news.category.classify", "finance.news.sentiment.score", "finance.news.source.rank"}
+            capabilities: {"ai.news.source.ingest.schema", "ai.news.event.extract", "ai.event.lifecycle.canonicalize", "ai.news.freshness.evaluate", "ai.news.dedupe.confidence.envelope", "finance.news.fetch.fixture", "finance.news.relevance.score", "finance.news.category.classify", "finance.news.sentiment.score", "finance.news.source.rank"}
             required_fields: {"relevance_score", "category", "sentiment", "impact_score", "source_rank"}
         },
         {
@@ -51,6 +51,7 @@ news_catalyst_live_package := {
     dialect_capabilities: {
         "ai.news.source.ingest.schema",
         "ai.news.event.extract",
+        "ai.event.lifecycle.canonicalize",
         "ai.catalyst.classification.taxonomy",
         "ai.news.freshness.evaluate",
         "ai.news.dedupe.confidence.envelope",
@@ -92,7 +93,7 @@ for i := 1; i <= #news_catalyst_live_package.adapter_boundaries; i++ {
 assert(news_catalyst_module_count == 3)
 assert(news_catalyst_boundary_count == 3)
 assert(#news_catalyst_live_package.fixture_keys == 4)
-assert(#news_catalyst_live_package.dialect_capabilities == 6)
+assert(#news_catalyst_live_package.dialect_capabilities == 7)
 assert(news_catalyst_live_package.default_policy.mode == "fixture_replay")
 assert(news_catalyst_live_package.default_policy.clean_skip_without_dependency == true)
 

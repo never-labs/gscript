@@ -204,10 +204,12 @@ func TestFinRobotNewsCatalystDialectContract(t *testing.T) {
 	base := newsCatalystLivePackageDir(t)
 
 	var contract struct {
-		ProviderFree          bool   `json:"provider_free"`
-		LiveNetwork           bool   `json:"live_network"`
-		RealDependencyImports bool   `json:"real_dependency_imports"`
-		CapabilityFamily      string `json:"capability_family"`
+		ProviderFree          bool     `json:"provider_free"`
+		LiveNetwork           bool     `json:"live_network"`
+		RealDependencyImports bool     `json:"real_dependency_imports"`
+		CapabilityFamily      string   `json:"capability_family"`
+		ReuseTargets          []string `json:"reuse_targets"`
+		EventLifecycle        []string `json:"event_lifecycle"`
 		SourceIngestionSchema struct {
 			RequiredFields     []string `json:"required_fields"`
 			SourceKinds        []string `json:"source_kinds"`
@@ -247,6 +249,16 @@ func TestFinRobotNewsCatalystDialectContract(t *testing.T) {
 	decodeNewsCatalystJSONFile(t, filepath.Join(base, "contracts", "news_event_catalyst_dialect_contract.json"), &contract)
 	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || contract.CapabilityFamily != "ai.news_event_catalyst" {
 		t.Fatalf("dialect contract header = %#v", contract)
+	}
+	for _, target := range []string{"equity_news", "macro_event", "credit_event", "commodity_event"} {
+		if !newsCatalystContainsString(contract.ReuseTargets, target) {
+			t.Fatalf("dialect contract missing reuse target %q: %#v", target, contract.ReuseTargets)
+		}
+	}
+	for _, stage := range []string{"raw_source_ingestion", "event_mention_extraction", "canonical_event_dedupe", "catalyst_classification", "confidence_envelope_assignment", "prompt_contract_output"} {
+		if !newsCatalystContainsString(contract.EventLifecycle, stage) {
+			t.Fatalf("dialect contract missing lifecycle stage %q: %#v", stage, contract.EventLifecycle)
+		}
 	}
 	for _, field := range []string{"source_id", "source_kind", "published_at", "observed_at", "headline", "instrument_refs"} {
 		if !newsCatalystContainsString(contract.SourceIngestionSchema.RequiredFields, field) {
@@ -744,7 +756,7 @@ func TestFinRobotNewsCatalystLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get news_catalyst_live_package_summary: %v", err)
 			}
-			want := "news_catalyst_live_package modules=3 adapters=3 provider_free=true live_network=false imports=false fixtures=4 dialect_capabilities=6"
+			want := "news_catalyst_live_package modules=3 adapters=3 provider_free=true live_network=false imports=false fixtures=4 dialect_capabilities=7"
 			if got != want {
 				t.Fatalf("news_catalyst_live_package_summary = %#v, want %#v", got, want)
 			}

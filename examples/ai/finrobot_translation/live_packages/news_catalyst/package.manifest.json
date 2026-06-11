@@ -57,6 +57,7 @@
       "capabilities": [
         "ai.news.source.ingest.schema",
         "ai.news.event.extract",
+        "ai.event.lifecycle.canonicalize",
         "ai.news.freshness.evaluate",
         "ai.news.dedupe.confidence.envelope",
         "finance.news.fetch.fixture",
@@ -143,6 +144,7 @@
     "freshness/staleness policy separates recency decay from source trust",
     "dedupe/source confidence envelope preserves canonical and duplicate event ids",
     "catalyst classification taxonomy is reusable across news/event/catalyst prompts",
+    "generic reuse targets cover equity news, macro events, credit events, and commodity events",
     "news relevance, category, sentiment, impact, source ranking, and retail sentiment snapshot schemas are present",
     "Polymarket, X, and Reddit adapter boundaries are metadata-only and fixture-backed",
     "main.leia contains no live provider SDK imports or network execution"

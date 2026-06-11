@@ -155,6 +155,11 @@
             "requires_browser": false
           }
         ],
+        "accessibility_gate_results": [
+          {"route": "home", "template_id": "tmpl_home", "decision": "pass", "blocking_violations": [], "requires_browser": false},
+          {"route": "reports_index", "template_id": "tmpl_reports_index", "decision": "pass", "blocking_violations": [], "requires_browser": false},
+          {"route": "admin_task_log", "template_id": "tmpl_admin_task_log", "decision": "pass", "blocking_violations": [], "requires_browser": false}
+        ],
         "visual": [
           {
             "route": "home",

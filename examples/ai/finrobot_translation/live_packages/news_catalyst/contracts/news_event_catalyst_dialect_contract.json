@@ -5,6 +5,20 @@
   "live_network": false,
   "real_dependency_imports": false,
   "capability_family": "ai.news_event_catalyst",
+  "reuse_targets": [
+    "equity_news",
+    "macro_event",
+    "credit_event",
+    "commodity_event"
+  ],
+  "event_lifecycle": [
+    "raw_source_ingestion",
+    "event_mention_extraction",
+    "canonical_event_dedupe",
+    "catalyst_classification",
+    "confidence_envelope_assignment",
+    "prompt_contract_output"
+  ],
   "source_ingestion_schema": {
     "required_fields": [
       "source_id",
