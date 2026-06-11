@@ -124,6 +124,28 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_planning_graph",
+      "package_name": "leia-generic-ai-planning-graph",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+      "capability": "generic.planning.graph.define",
+      "capabilities": [
+        "generic.planning.graph.define",
+        "generic.planning.node.classify",
+        "generic.planning.dependency.validate",
+        "generic.planning.retry.replay",
+        "generic.planning.branch.merge",
+        "generic.planning.trace.evidence"
+      ],
+      "backend_shape": "ai.workflow.plan_graph",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_planning_graph/contracts/planning_graph_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_record_replay",
       "package_name": "leia-generic-ai-record-replay",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
@@ -172,6 +194,27 @@
         "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
       ],
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_tool_registry",
+      "package_name": "leia-generic-ai-tool-registry",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+      "capability": "generic.tool.registry.declare",
+      "capabilities": [
+        "generic.tool.registry.declare",
+        "generic.tool.registry.validate_schema",
+        "generic.tool.invocation.trace",
+        "generic.tool.approval.edge",
+        "generic.tool.registry.replay_fixture"
+      ],
+      "backend_shape": "ai.tool.registry",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_registry/contracts/tool_registry_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json"
     },
     {
       "id": "generic_trace_events",

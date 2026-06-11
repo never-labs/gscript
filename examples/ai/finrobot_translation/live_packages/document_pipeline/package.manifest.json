@@ -3,12 +3,13 @@
   "id": "finrobot-document-pipeline-live-package",
   "package_name": "leia-finrobot-document-pipeline",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for FinRobot SEC filing retrieval, document conversion, section extraction, RAG corpus manifests, chunk provenance, vector capability gates, citation consistency, and retriever adapter boundaries.",
+  "description": "Provider-free live package skeleton for FinRobot SEC filing retrieval, document conversion, section extraction, generic memory store contracts, RAG corpus manifests, chunk provenance, vector capability gates, citation consistency, and retriever adapter boundaries.",
   "source_modules": [
     "FinRobot/filings_src/sec_api.py",
     "FinRobot/marker_sec_src/sec_filings_to_markdown.py",
     "FinRobot/functional/rag.py",
-    "FinRobot/functional/ragquery.py"
+    "FinRobot/functional/ragquery.py",
+    "generic/memory_store.leia"
   ],
   "provider_free": true,
   "live_network_default": false,
@@ -33,7 +34,8 @@
     "smoke": "main.leia",
     "document_pipeline_contract": "contracts/document_pipeline_contract.json",
     "adapter_boundary_contract": "contracts/adapter_boundary_contract.json",
-    "fixture_index": "fixtures/provider_free_fixture_index.json"
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "generic_memory_store_contract": "contracts/document_pipeline_contract.json"
   },
   "schemas": {
     "filing_search_result": "schemas/filing_search_result_v1.schema.json",
@@ -42,7 +44,8 @@
     "rag_chunk": "schemas/rag_chunk_v1.schema.json",
     "retriever_query_result": "schemas/retriever_query_result_v1.schema.json",
     "adapter_boundary": "schemas/adapter_boundary_v1.schema.json",
-    "rag_corpus_manifest": "schemas/rag_corpus_manifest_v1.schema.json"
+    "rag_corpus_manifest": "schemas/rag_corpus_manifest_v1.schema.json",
+    "generic_memory_store": "schemas/generic_memory_store_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
@@ -51,7 +54,8 @@
     "rag_index": "fixtures/rag_chunks_ACME_10k_fixture.json",
     "retriever_query": "fixtures/retriever_query_ACME_fixture.json",
     "adapter_boundary": "fixtures/adapter_boundary_fixture.json",
-    "rag_corpus_manifest": "fixtures/rag_corpus_manifest_ACME_fixture.json"
+    "rag_corpus_manifest": "fixtures/rag_corpus_manifest_ACME_fixture.json",
+    "generic_memory_store": "fixtures/generic_memory_store_fixture.json"
   },
   "modules": [
     {
@@ -111,6 +115,21 @@
       "output_schemas": [
         "retriever_query_result",
         "rag_chunk"
+      ]
+    },
+    {
+      "id": "generic_memory",
+      "source_module": "generic/memory_store.leia",
+      "capabilities": [
+        "generic.memory.store",
+        "generic.memory.namespace",
+        "generic.memory.retrieve",
+        "generic.context.window",
+        "generic.retrieval.policy"
+      ],
+      "output_schemas": [
+        "generic_memory_store",
+        "retriever_query_result"
       ]
     }
   ],
@@ -191,19 +210,31 @@
       "dependency_imported": false,
       "credential_required": false,
       "clean_skip": true
+    },
+    {
+      "id": "generic_memory_store",
+      "display_name": "Generic memory store and context retrieval",
+      "capability": "generic.memory.store_retrieve",
+      "fixture_key": "generic:memory_store:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
     }
   ],
   "test_gates": [
     "manifest and referenced JSON files decode without external dependencies",
     "provider_free is true and live_network_default is false",
     "required and optional credentials are empty",
-    "SEC filing search/fetch, user-agent and rate-limit policy, redirect/cache metadata, HTML/PDF markdown conversion, section extraction, chunk citation provenance, and retriever schemas are present",
+    "SEC filing search/fetch, user-agent and rate-limit policy, redirect/cache metadata, HTML/PDF markdown conversion, section extraction, generic memory store, chunk citation provenance, and retriever schemas are present",
+    "generic memory store fixtures include namespace policy, memory item provenance, deterministic retrieval ranking, context window budgets, and provider-free adapter boundaries",
     "RAG corpus manifest, chunk provenance, citation consistency, and vector capability gates are fixture-backed and deterministic",
     "SEC client, HTML parser, PDF converter, chunk/citation/vector matrix, embedding, LangChain/vector dependencies, vector store, and retriever boundaries are metadata-only, fixture-backed, and clean-skip safe",
-    "main.leia contains no live provider SDK imports, vector database imports, or network execution"
+    "main.leia contains no live provider SDK imports, vector database imports, memory provider imports, or network execution"
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide FinRobot SEC filing clients, Marker conversion, embedding models, LangChain chains, vector stores, or retrievers as built-ins; future external packages must satisfy these provider-free contracts first."
+    "statement": "Leia core does not provide FinRobot SEC filing clients, Marker conversion, embedding models, LangChain chains, vector stores, memory providers, or retrievers as built-ins; future external packages must satisfy these provider-free contracts first."
   }
 }

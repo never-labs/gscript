@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "descriptor": {
+    "tool_name": "summarize_rows",
+    "description": "Summarize fixture rows without provider calls.",
+    "capability_ids": [
+      "generic.tool.registry.declare",
+      "generic.tool.registry.validate_schema",
+      "generic.tool.invocation.trace"
+    ],
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "output_schema": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "additionalProperties": false
+    },
+    "caller_role": "caller",
+    "executor_role": "executor",
+    "effect": "read_only",
+    "approval_policy": "not_required_for_fixture",
+    "provider_wire_format": "none",
+    "live_network": false,
+    "secret_parameters_allowed": false
+  },
+  "trace": {
+    "trace_id": "trace-generic-tool-registry-001",
+    "tool_name": "summarize_rows",
+    "caller_id": "fixture-caller",
+    "executor_id": "fixture-executor",
+    "capability_ids": [
+      "generic.tool.registry.declare",
+      "generic.tool.registry.validate_schema",
+      "generic.tool.invocation.trace"
+    ],
+    "events": [
+      {
+        "event": "registered",
+        "sequence": 1
+      },
+      {
+        "event": "schema_validated",
+        "sequence": 2
+      },
+      {
+        "event": "approval_checked",
+        "sequence": 3
+      },
+      {
+        "event": "invoked",
+        "sequence": 4
+      },
+      {
+        "event": "result_recorded",
+        "sequence": 5
+      }
+    ],
+    "schema_validation": {
+      "input_valid": true,
+      "output_valid": true,
+      "additional_properties_rejected": true
+    },
+    "approval": {
+      "required": false,
+      "decision": "allow_fixture",
+      "approval_id": null,
+      "reason": "read-only fixture replay does not require approval"
+    },
+    "result": {
+      "ok": true,
+      "status": "ok",
+      "content": "2 rows summarized from fixture data",
+      "metadata": {
+        "row_count": 2,
+        "output_format": "text"
+      }
+    },
+    "provenance": {
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "local_execution": false,
+      "fixture_key": "generic_tool:invocation:trace:v1"
+    }
+  }
+}

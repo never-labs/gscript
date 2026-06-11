@@ -35,96 +35,6 @@
   ],
   "entries": [
     {
-      "capability": "model",
-      "capability_id": "generic.ai.model.registry",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "model",
-        "model.default",
-        "provider_model_alias"
-      ],
-      "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_dialect_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-model-registry",
-        "boundary": "model alias registry with provider-free replay defaults",
-        "status": "missing",
-        "reason": "model alias behavior is covered by examples and tests but has no standalone provider-free production package boundary"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-model-registry",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
-      "capability": "turn",
-      "capability_id": "generic.ai.turn.request",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "turn",
-        "messages",
-        "response_format",
-        "usage"
-      ],
-      "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_ai_dialect_contract_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-turn-runner",
-        "boundary": "single-turn request, response, usage, and structured error envelope",
-        "status": "missing",
-        "reason": "turn specimens remain embedded in examples/tests rather than a reusable package contract"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-turn-runner",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
-      "capability": "tool",
-      "capability_id": "generic.ai.tool.contract",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "tool",
-        "params",
-        "description",
-        "requires",
-        "tool_result"
-      ],
-      "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_tool_contract_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-tool-contracts",
-        "boundary": "declarative tool schema, capability tags, and result envelope",
-        "status": "missing",
-        "reason": "tool metadata is proven by specimens but not packaged as a provider-neutral contract artifact"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-tool-contracts",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
       "capability": "agent",
       "capability_id": "generic.ai.agent.declarative",
       "provider_free": true,
@@ -157,36 +67,6 @@
       }
     },
     {
-      "capability": "workflow",
-      "capability_id": "generic.ai.workflow.orchestration",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "agent",
-        "turn",
-        "tool_history",
-        "workflow_state"
-      ],
-      "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_native_workflow_integration_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-workflow-orchestrator",
-        "boundary": "multi-step agent and review-turn orchestration with replayable state",
-        "status": "missing",
-        "reason": "workflow examples demonstrate orchestration without a production package boundary"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-workflow-orchestrator",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
       "capability": "approval",
       "capability_id": "generic.ai.approval.policy",
       "provider_free": true,
@@ -207,6 +87,36 @@
         "boundary": "capability-based approval decisions, clean skips, and replay trace envelopes",
         "status": "missing",
         "reason": "approval parity is fixture-backed but not extracted into a production package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-approval-policy",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "capability",
+      "capability_id": "generic.ai.capability.gate",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "requires",
+        "capability_tag",
+        "default_deny",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/compliance_policy.leia",
+      "test": "tests/llm/finrobot_policy_parity_test.go",
+      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-capability-gates",
+        "boundary": "capability vocabulary, default-deny policy, approval evidence, and clean-skip semantics",
+        "status": "missing",
+        "reason": "capability gates are currently audited through parity ledgers and examples, not a generic package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -249,6 +159,65 @@
       }
     },
     {
+      "capability": "model",
+      "capability_id": "generic.ai.model.registry",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "model",
+        "model.default",
+        "provider_model_alias"
+      ],
+      "example": "examples/ai/general_agent_workflow.leia",
+      "test": "tests/llm/llm_ai_dialect_test.go",
+      "fixture": "examples/ai/general_agent_workflow.records.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-model-registry",
+        "boundary": "model alias registry with provider-free replay defaults",
+        "status": "missing",
+        "reason": "model alias behavior is covered by examples and tests but has no standalone provider-free production package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "package-boundary",
+      "capability_id": "generic.ai.package.boundary.audit",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "package_manifest",
+        "provider_free_gate",
+        "no_built_in_guarantee",
+        "registered_example"
+      ],
+      "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",
+      "test": "tests/llm/finrobot_package_manifest_audit_test.go",
+      "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-package-boundary-auditor",
+        "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
+        "status": "missing",
+        "reason": "package boundary checks exist as an audit ledger and test but are not a reusable production package"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-package-boundary-auditor",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "capability": "replay",
       "capability_id": "generic.ai.record.replay",
       "provider_free": true,
@@ -273,6 +242,67 @@
         "package_id": "generic-record-replay",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "tool",
+      "capability_id": "generic.ai.tool.contract",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "tool",
+        "params",
+        "description",
+        "requires",
+        "tool_result"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_tool_contract_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-tool-contracts",
+        "boundary": "declarative tool schema, capability tags, and result envelope",
+        "status": "missing",
+        "reason": "tool metadata is proven by specimens but not packaged as a provider-neutral contract artifact"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-tool-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "tool",
+      "capability_id": "generic.ai.tool.registry",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "tool_descriptor",
+        "schema_validation",
+        "invocation_trace",
+        "approval_edge"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-tool-registry",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "missing",
+        "reason": "historical audit field retained; production package boundary is checked in below"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-tool-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
         "provider_free": true,
         "domain_specific": false
       }
@@ -308,61 +338,93 @@
       }
     },
     {
-      "capability": "capability",
-      "capability_id": "generic.ai.capability.gate",
+      "capability": "turn",
+      "capability_id": "generic.ai.turn.request",
       "provider_free": true,
       "domain_specific": false,
       "finrobot_specific_syntax_assumption": false,
       "dialect_surface": [
-        "requires",
-        "capability_tag",
-        "default_deny",
-        "clean_skip"
+        "turn",
+        "messages",
+        "response_format",
+        "usage"
       ],
-      "example": "examples/ai/finrobot_translation/compliance_policy.leia",
-      "test": "tests/llm/finrobot_policy_parity_test.go",
-      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_ai_dialect_contract_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
       "missing_production_package_boundary": {
-        "package_id": "generic-ai-capability-gates",
-        "boundary": "capability vocabulary, default-deny policy, approval evidence, and clean-skip semantics",
+        "package_id": "generic-ai-turn-runner",
+        "boundary": "single-turn request, response, usage, and structured error envelope",
         "status": "missing",
-        "reason": "capability gates are currently audited through parity ledgers and examples, not a generic package boundary"
+        "reason": "turn specimens remain embedded in examples/tests rather than a reusable package contract"
       },
       "production_package_boundary": {
         "status": "checked_in",
-        "package_id": "generic-approval-policy",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "package_id": "generic-turn-runner",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
         "provider_free": true,
         "domain_specific": false
       }
     },
     {
-      "capability": "package-boundary",
-      "capability_id": "generic.ai.package.boundary.audit",
+      "capability": "workflow",
+      "capability_id": "generic.ai.workflow.orchestration",
       "provider_free": true,
       "domain_specific": false,
       "finrobot_specific_syntax_assumption": false,
       "dialect_surface": [
-        "package_manifest",
-        "provider_free_gate",
-        "no_built_in_guarantee",
-        "registered_example"
+        "agent",
+        "turn",
+        "tool_history",
+        "workflow_state"
       ],
-      "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",
-      "test": "tests/llm/finrobot_package_manifest_audit_test.go",
-      "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
+      "example": "examples/ai/general_agent_workflow.leia",
+      "test": "tests/llm/llm_ai_native_workflow_integration_test.go",
+      "fixture": "examples/ai/general_agent_workflow.records.json",
       "missing_production_package_boundary": {
-        "package_id": "generic-ai-package-boundary-auditor",
-        "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
+        "package_id": "generic-ai-workflow-orchestrator",
+        "boundary": "multi-step agent and review-turn orchestration with replayable state",
         "status": "missing",
-        "reason": "package boundary checks exist as an audit ledger and test but are not a reusable production package"
+        "reason": "workflow examples demonstrate orchestration without a production package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
-        "package_id": "generic-package-boundary-auditor",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+        "package_id": "generic-workflow-orchestrator",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "workflow",
+      "capability_id": "generic.ai.workflow.planning_graph",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "plan_node",
+        "dependency_edge",
+        "retry_policy",
+        "branch",
+        "merge",
+        "trace_evidence"
+      ],
+      "example": "examples/ai/finrobot_translation/generic_workflow_orchestration.leia",
+      "test": "tests/llm/llm_generic_planning_graph_contract_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-planning-graph",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "missing",
+        "reason": "historical audit field retained; production package boundary is checked in below"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-planning-graph",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

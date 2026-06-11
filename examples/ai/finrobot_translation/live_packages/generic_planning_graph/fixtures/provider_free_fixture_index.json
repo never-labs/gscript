@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "generic-planning-graph-provider-free-fixture-index",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "id": "planning_graph_trace",
+      "path": "fixtures/planning_graph_trace_fixture.json",
+      "schema_ref": "schemas/planning_trace.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "contract": "contracts/planning_graph_contract.json",
+      "covers": [
+        "plan_node",
+        "dependency",
+        "retry",
+        "branch",
+        "merge",
+        "trace_evidence"
+      ]
+    }
+  ]
+}

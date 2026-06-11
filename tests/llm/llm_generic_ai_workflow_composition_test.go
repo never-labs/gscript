@@ -23,15 +23,15 @@ func TestGenericAIWorkflowCompositionExampleExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("composition_summary: %v", err)
 	}
-	if summary != "generic-ai-workflow-composition boundaries=10 edges=9 provider_free=true" {
+	if summary != "generic-ai-workflow-composition boundaries=12 edges=11 provider_free=true" {
 		t.Fatalf("composition_summary = %#v", summary)
 	}
 	count, err := vm.Get("package_boundary_count")
 	if err != nil {
 		t.Fatalf("package_boundary_count: %v", err)
 	}
-	if count != int64(10) {
-		t.Fatalf("package_boundary_count = %#v, want 10", count)
+	if count != int64(12) {
+		t.Fatalf("package_boundary_count = %#v, want 12", count)
 	}
 }
 
@@ -41,6 +41,8 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "model"`,
 		`role: "turn"`,
 		`role: "tool"`,
+		`role: "tool-registry"`,
+		`role: "planning"`,
 		`role: "agent"`,
 		`role: "workflow"`,
 		`role: "eval"`,
@@ -51,6 +53,8 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`package_id: "generic-model-registry"`,
 		`package_id: "generic-turn-runner"`,
 		`package_id: "generic-tool-contracts"`,
+		`package_id: "generic-tool-registry"`,
+		`package_id: "generic-planning-graph"`,
 		`package_id: "generic-agent-runner"`,
 		`package_id: "generic-workflow-orchestrator"`,
 		`package_id: "generic-evaluation-harness"`,
@@ -80,8 +84,8 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 
 	boundaries := parseGenericAIWorkflowCompositionBoundaries(t, data)
-	if len(boundaries) != 10 {
-		t.Fatalf("composition package boundaries = %d, want 10", len(boundaries))
+	if len(boundaries) != 12 {
+		t.Fatalf("composition package boundaries = %d, want 12", len(boundaries))
 	}
 
 	roles := map[string]genericAIWorkflowCompositionBoundary{}
@@ -136,8 +140,8 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 
 	edges := parseGenericAIWorkflowCompositionEdges(t, data)
-	if len(edges) != 9 {
-		t.Fatalf("composition edges = %d, want 9", len(edges))
+	if len(edges) != 11 {
+		t.Fatalf("composition edges = %d, want 11", len(edges))
 	}
 	seenEdges := map[string]bool{}
 	for _, edge := range edges {

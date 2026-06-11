@@ -94,539 +94,1133 @@
       "id": "overview-readme",
       "source_path": "README.md",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/README.md", "examples/ai/finrobot_translation/COVERAGE.md"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/README.md",
+        "examples/ai/finrobot_translation/COVERAGE.md"
+      ],
       "target_packages": [],
       "excluded_scope": [],
       "source_hash": "sha256:04c3646d58a5c0ec5c5139c0f6c510cae5241002114f5de7a0aa4dfd38e6c2ad",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "7305c27865cfe5c06bbe703a742860ccb7a0c3efd95883fbfefa6c0222248403"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/README.md",
+          "sha256": "eac5f301e6555759552894722ddc1067029bd4dfdd565fa3ef4d12337e938ee2"
+        }
+      ],
       "next_action": "Refresh coverage prose when upstream README changes product or package scope."
     },
     {
       "id": "agent-builder-demo",
       "source_path": "agent_builder_demo.py",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/agent_builder_replay.leia", "examples/ai/finrobot_translation/core_agents/main.leia", "examples/ai/finrobot_translation/model_alias_routing_example.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/optional_integrations"],
-      "excluded_scope": ["live AutoGen AgentBuilder execution", "live GPT model calls"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/agent_builder_replay.leia",
+        "examples/ai/finrobot_translation/core_agents/main.leia",
+        "examples/ai/finrobot_translation/model_alias_routing_example.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/optional_integrations"
+      ],
+      "excluded_scope": [
+        "live AutoGen AgentBuilder execution",
+        "live GPT model calls"
+      ],
       "source_hash": "sha256:9eaee7c13b4cc7b2eab6984d550c95cb3c3787a963c7da3897025e91c946df58",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+        }
+      ],
       "next_action": "Add an optional AutoGen package gate if dynamic builder execution becomes a supported external dependency."
     },
     {
       "id": "agent-library",
       "source_path": "finrobot/agents/agent_library.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/role_profiles.leia", "examples/ai/finrobot_translation/core_agents/main.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/prompt_roles"],
-      "excluded_scope": ["drop-in Python class import parity"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/role_profiles.leia",
+        "examples/ai/finrobot_translation/core_agents/main.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/prompt_roles"
+      ],
+      "excluded_scope": [
+        "drop-in Python class import parity"
+      ],
       "source_hash": "sha256:a52c10df77c01537d24d8045fcb47c75e567750bbd8737ccaa5efb3f119fb52f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/prompt_roles/package.manifest.json", "sha256": "4f3aaf5f72c5672fce83f327eb79a31f15f1386e89bca8a4ddd33c73389ea978"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/prompt_roles/package.manifest.json",
+          "sha256": "4f3aaf5f72c5672fce83f327eb79a31f15f1386e89bca8a4ddd33c73389ea978"
+        }
+      ],
       "next_action": "Track upstream role prompt drift in the prompt role package manifest."
     },
     {
       "id": "agent-prompts",
       "source_path": "finrobot/agents/prompts.py",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/role_profiles.leia", "examples/ai/finrobot_translation/section_agents.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/prompt_roles", "examples/ai/finrobot_translation/live_packages/analyzer_report"],
-      "excluded_scope": ["complete prompt library text parity"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/role_profiles.leia",
+        "examples/ai/finrobot_translation/section_agents.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/prompt_roles",
+        "examples/ai/finrobot_translation/live_packages/analyzer_report"
+      ],
+      "excluded_scope": [
+        "complete prompt library text parity"
+      ],
       "source_hash": "sha256:0493728a44c6f6cd9ac37cd0f2f1041160e216825a8b71f72db5940f33f3590d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json", "sha256": "ce3d6b7202a8da3b68908f3ab061a840723e862a9896ac9e149a6dad42bdaf38"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json",
+          "sha256": "ce3d6b7202a8da3b68908f3ab061a840723e862a9896ac9e149a6dad42bdaf38"
+        }
+      ],
       "next_action": "Promote prompt snapshots into versioned package data with drift fixtures."
     },
     {
       "id": "agent-utils",
       "source_path": "finrobot/agents/utils.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/core_agents/workflow_lifecycle.leia", "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/prompt_roles"],
-      "excluded_scope": ["AutoGen utility object compatibility"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/core_agents/workflow_lifecycle.leia",
+        "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/prompt_roles"
+      ],
+      "excluded_scope": [
+        "AutoGen utility object compatibility"
+      ],
       "source_hash": "sha256:953d8746efca1c6f903370d4da7f72d5e5e75043379a2b6935231db6592376c3",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+        }
+      ],
       "next_action": "Keep lifecycle helpers modeled as generic agent/workflow contracts."
     },
     {
       "id": "agent-workflow",
       "source_path": "finrobot/agents/workflow.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/core_agents/workflow_handoff.leia", "examples/ai/finrobot_translation/core_agents/workflow_lifecycle.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"],
-      "excluded_scope": ["mutable AutoGen GroupChatManager runtime object"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia",
+        "examples/ai/finrobot_translation/core_agents/workflow_lifecycle.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"
+      ],
+      "excluded_scope": [
+        "mutable AutoGen GroupChatManager runtime object"
+      ],
       "source_hash": "sha256:72b3765feac29d85c88c2eff1a0db3d22f90e4f0139428b64e471f94c696753d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+        }
+      ],
       "next_action": "Use replayed workflow traces for offline parity and package live workflow orchestration separately."
     },
     {
       "id": "toolkits",
       "source_path": "finrobot/toolkits.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/data_tools.leia", "examples/ai/finrobot_translation/vendor_adapters.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/vendor_adapters", "examples/ai/finrobot_translation/live_packages/finance_facade"],
-      "excluded_scope": ["AutoGen caller/executor registration side effects"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/data_tools.leia",
+        "examples/ai/finrobot_translation/vendor_adapters.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+        "examples/ai/finrobot_translation/live_packages/finance_facade"
+      ],
+      "excluded_scope": [
+        "AutoGen caller/executor registration side effects"
+      ],
       "source_hash": "sha256:79a5c67d9c44b49fdb4b21e7d9fd678e6c9e17cce4b12c642d28911e5553458f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json", "sha256": "0078a042e5ea159b2f45fcd9407136d9d112fae99808cc4e5a021053eb3e5466"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json",
+          "sha256": "0078a042e5ea159b2f45fcd9407136d9d112fae99808cc4e5a021053eb3e5466"
+        }
+      ],
       "next_action": "Implement live tool invocation only inside provider packages with explicit capabilities."
     },
     {
       "id": "utils-config",
       "source_path": "finrobot/utils.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/config_secret_example.leia", "examples/ai/finrobot_translation/model_alias_routing_example.leia"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/config_secret_example.leia",
+        "examples/ai/finrobot_translation/model_alias_routing_example.leia"
+      ],
       "target_packages": [],
-      "excluded_scope": ["install-time Python helper parity"],
+      "excluded_scope": [
+        "install-time Python helper parity"
+      ],
       "source_hash": "sha256:88cfd49feac5eb9a8d8559817d2d3ae252b0c962654a83d09f84956fa9685fc8",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/package_deploy_manifest.json", "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/package_deploy_manifest.json",
+          "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"
+        }
+      ],
       "next_action": "Keep config migration provider-free and add package bootstrap helpers only when needed."
     },
     {
       "id": "yfinance-source",
       "source_path": "finrobot/data_source/yfinance_utils.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/vendor_adapters.leia", "examples/ai/finrobot_translation/finance_normalizers.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/vendor_adapters", "examples/ai/finrobot_translation/live_packages/finance_facade"],
-      "excluded_scope": ["live yfinance client", "live network cache/retry"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+        "examples/ai/finrobot_translation/live_packages/finance_facade"
+      ],
+      "excluded_scope": [
+        "live yfinance client",
+        "live network cache/retry"
+      ],
       "source_hash": "sha256:d1b359cecc556667c651fb6b72abbdffb24ddb672df6c17b65724c017089e8d8",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/fixtures/yfinance_info_ACME.json", "sha256": "20b919961d6f32c67a124545cb0846a787c6a800252c038ab5707fa6834d1e35"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/fixtures/yfinance_info_ACME.json",
+          "sha256": "20b919961d6f32c67a124545cb0846a787c6a800252c038ab5707fa6834d1e35"
+        }
+      ],
       "next_action": "Build a Yahoo provider package with terms metadata, replay recording, and deterministic fixture refresh."
     },
     {
       "id": "finnhub-source",
       "source_path": "finrobot/data_source/finnhub_utils.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/vendor_adapters.leia", "examples/ai/finrobot_translation/api_replay.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/vendor_adapters", "examples/ai/finrobot_translation/live_packages/finance_facade"],
-      "excluded_scope": ["live Finnhub authenticated calls"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/api_replay.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+        "examples/ai/finrobot_translation/live_packages/finance_facade"
+      ],
+      "excluded_scope": [
+        "live Finnhub authenticated calls"
+      ],
       "source_hash": "sha256:17131d473438022321e5832cbe85d1da5cffd7bde7302428799a88c7e0bb47c6",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/fixtures/finnhub_profile_ACME.json", "sha256": "59850dd87d34603fc36937bb08de4aea45f4579fb66594588d4261b65b059f02"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/fixtures/finnhub_profile_ACME.json",
+          "sha256": "59850dd87d34603fc36937bb08de4aea45f4579fb66594588d4261b65b059f02"
+        }
+      ],
       "next_action": "Add live Finnhub package tests behind credentials and rate-limit gates."
     },
     {
       "id": "fmp-source",
       "source_path": "finrobot/data_source/fmp_utils.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/vendor_adapters.leia", "examples/ai/finrobot_translation/api_replay.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/vendor_adapters", "examples/ai/finrobot_translation/live_packages/finance_facade"],
-      "excluded_scope": ["live FMP authenticated calls"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/api_replay.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+        "examples/ai/finrobot_translation/live_packages/finance_facade"
+      ],
+      "excluded_scope": [
+        "live FMP authenticated calls"
+      ],
       "source_hash": "sha256:a344cf6e5d5f18f085b49696876dd3f9e72601d4b19de31f62f7a8c0448b5971",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/fixtures/fmp_key_metrics_ACME.json", "sha256": "36ece52dbc125c53282002b86c8e2c39411713cd49f571c416d871fe7a5fe96f"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/fixtures/fmp_key_metrics_ACME.json",
+          "sha256": "36ece52dbc125c53282002b86c8e2c39411713cd49f571c416d871fe7a5fe96f"
+        }
+      ],
       "next_action": "Implement provider fallback and pagination in the finance facade package."
     },
     {
       "id": "sec-source",
       "source_path": "finrobot/data_source/sec_utils.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/document_rag.leia", "examples/ai/finrobot_translation/api_replay.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/sec_filings", "examples/ai/finrobot_translation/live_packages/document_pipeline"],
-      "excluded_scope": ["live SEC downloader", "HTML/PDF conversion"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/api_replay.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/sec_filings",
+        "examples/ai/finrobot_translation/live_packages/document_pipeline"
+      ],
+      "excluded_scope": [
+        "live SEC downloader",
+        "HTML/PDF conversion"
+      ],
       "source_hash": "sha256:2ac2d87c7164ba166177ea1e90c213f588620e1055eaf920ccfe962546453029",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/sec_filings/package.manifest.json", "sha256": "0cac401e6b9fc75ae4f751fa77b289df72d0f9149b4fc1084ee61f22efeb343e"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/sec_filings/package.manifest.json",
+          "sha256": "0cac401e6b9fc75ae4f751fa77b289df72d0f9149b4fc1084ee61f22efeb343e"
+        }
+      ],
       "next_action": "Build SEC package fetch/search/extract adapters with user-agent and cache policy."
     },
     {
       "id": "finnlp-source",
       "source_path": "finrobot/data_source/finnlp_utils.py",
       "coverage_status": "mapped_optional_gate",
-      "target_examples": ["examples/ai/finrobot_translation/optional_integrations.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/optional_integrations"],
-      "excluded_scope": ["live FinNLP dataset downloads"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/optional_integrations.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/optional_integrations"
+      ],
+      "excluded_scope": [
+        "live FinNLP dataset downloads"
+      ],
       "source_hash": "sha256:fdd427ae455a596ce9c7fef420084b659e731cfd00d2f38986ce5cf092c8be21",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json", "sha256": "87c3a4fce21aaeab3bb63b990b675f0e62bdced16c26c5e63fe50c3950aa437e"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json",
+          "sha256": "87c3a4fce21aaeab3bb63b990b675f0e62bdced16c26c5e63fe50c3950aa437e"
+        }
+      ],
       "next_action": "Keep FinNLP optional until a provider-free dataset fixture and live gate are defined."
     },
     {
       "id": "reddit-source",
       "source_path": "finrobot/data_source/reddit_utils.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/vendor_adapters.leia", "examples/ai/finrobot_translation/finance_normalizers.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/retail_sentiment", "examples/ai/finrobot_translation/live_packages/news_catalyst"],
-      "excluded_scope": ["live Reddit/PRAW authentication and pagination"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/retail_sentiment",
+        "examples/ai/finrobot_translation/live_packages/news_catalyst"
+      ],
+      "excluded_scope": [
+        "live Reddit/PRAW authentication and pagination"
+      ],
       "source_hash": "sha256:fd856521c418c2f396e04f7f26191229b89176ab3cc471e1d7c4b5a7997ba3d0",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/retail_sentiment/package.manifest.json", "sha256": "8c490f1c27e6e185a41f684531a636eec5e8e8f20596abb06924ca040854d5cb"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/retail_sentiment/package.manifest.json",
+          "sha256": "8c490f1c27e6e185a41f684531a636eec5e8e8f20596abb06924ca040854d5cb"
+        }
+      ],
       "next_action": "Implement retail sentiment live adapters with redaction and source terms metadata."
     },
     {
       "id": "finance-data-facade",
       "source_path": "finrobot/data_source/finance_data.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/data_tools.leia", "examples/ai/finrobot_translation/finance_normalizers.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_facade", "examples/ai/finrobot_translation/live_packages/finance_normalizers"],
-      "excluded_scope": ["live provider dispatch"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/data_tools.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/finance_facade",
+        "examples/ai/finrobot_translation/live_packages/finance_normalizers"
+      ],
+      "excluded_scope": [
+        "live provider dispatch"
+      ],
       "source_hash": "sha256:67d6f787e6cbf88f380657be262a33a55fd99e5d368c47294243affde30e5f44",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/finance_facade/package.manifest.json", "sha256": "43a11092298ced590bbd780a026ca3fa27238a204c74c637fa4fe8b9bc3c4739"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/finance_facade/package.manifest.json",
+          "sha256": "43a11092298ced590bbd780a026ca3fa27238a204c74c637fa4fe8b9bc3c4739"
+        }
+      ],
       "next_action": "Promote provider fallback order and typed output tables into a live finance facade."
     },
     {
       "id": "earnings-calls-source",
       "source_path": "finrobot/data_source/earnings_calls_src/*",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/document_rag.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/earnings_transcript"],
-      "excluded_scope": ["live transcript retrieval"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/earnings_transcript"
+      ],
+      "excluded_scope": [
+        "live transcript retrieval"
+      ],
       "source_hash": "sha256:2d3f832e7af78930d1af1626234eaa94a1430f1edb9986dff61ec4e017172338",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/earnings_transcript/package.manifest.json", "sha256": "74b055af9f0c0542cbb2c04ee1e983b4b1b8e3df7a48008783eef007197f44ce"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/earnings_transcript/package.manifest.json",
+          "sha256": "74b055af9f0c0542cbb2c04ee1e983b4b1b8e3df7a48008783eef007197f44ce"
+        }
+      ],
       "next_action": "Add provider-specific transcript clients behind earnings transcript capability gates."
     },
     {
       "id": "filings-source",
       "source_path": "finrobot/data_source/filings_src/*",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/document_rag.leia", "examples/ai/finrobot_translation/api_replay.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/sec_filings", "examples/ai/finrobot_translation/live_packages/document_pipeline"],
-      "excluded_scope": ["live filing search/fetch and section parser"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/api_replay.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/sec_filings",
+        "examples/ai/finrobot_translation/live_packages/document_pipeline"
+      ],
+      "excluded_scope": [
+        "live filing search/fetch and section parser"
+      ],
       "source_hash": "sha256:b31beaf027884cd9a68f3b088084e49e02cc7dbed8bfa1fdc81a2243cbd7230d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json", "sha256": "066a1139ceb8f8483367588e1e5ca32db6845112f53ee4a658957645991c44e6"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json",
+          "sha256": "214a8f811d134cc0111f39bbb775c05bb8fb25316313fa3e6f95561f30363d63"
+        }
+      ],
       "next_action": "Attach section extraction fixtures to a document pipeline package implementation."
     },
     {
       "id": "marker-sec-source",
       "source_path": "finrobot/data_source/marker_sec_src/*",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/document_rag.leia", "examples/ai/finrobot_translation/report_contract.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/document_pipeline"],
-      "excluded_scope": ["live PDF-to-markdown and parallel conversion"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/report_contract.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/document_pipeline"
+      ],
+      "excluded_scope": [
+        "live PDF-to-markdown and parallel conversion"
+      ],
       "source_hash": "sha256:c0a0fd81543192be389c06212e7632a95cff44a5323bbd9e6d8bc5ec6a4d588c",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/document_pipeline/fixtures/provider_free_fixture_index.json", "sha256": "3cfd213bc3f78f423d87f910256cfb8379d42d6bf8e62212c89940c4661578c1"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/document_pipeline/fixtures/provider_free_fixture_index.json",
+          "sha256": "b9c8f69cd88e567e7c0abac2d87a5cfbcad3e2a74cfed51934b9fd652fc9b595"
+        }
+      ],
       "next_action": "Implement deterministic document conversion fixtures before enabling live PDF parsing."
     },
     {
       "id": "rag-functional",
       "source_path": "finrobot/functional/rag.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/document_rag.leia", "examples/ai/finrobot_translation/tutorials/notebook_parity/rag_earnings_sec.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/document_pipeline"],
-      "excluded_scope": ["live vector-store backend"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/tutorials/notebook_parity/rag_earnings_sec.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/document_pipeline"
+      ],
+      "excluded_scope": [
+        "live vector-store backend"
+      ],
       "source_hash": "sha256:b8a01726b7b083c3029a10c6c61222743e6f3c83eb9e05b2193c39051e3a2013",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+        }
+      ],
       "next_action": "Package vector-store adapters separately while preserving provider-free RAG fixtures."
     },
     {
       "id": "ragquery-functional",
       "source_path": "finrobot/functional/ragquery.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/document_rag.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/document_pipeline"],
-      "excluded_scope": ["live query model provider"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/document_pipeline"
+      ],
+      "excluded_scope": [
+        "live query model provider"
+      ],
       "source_hash": "sha256:91eb06b8cf5f1f6b0bd17a7e705e19e7b3786c0b16f18af9eea8ec2d1c98999f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json", "sha256": "066a1139ceb8f8483367588e1e5ca32db6845112f53ee4a658957645991c44e6"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json",
+          "sha256": "214a8f811d134cc0111f39bbb775c05bb8fb25316313fa3e6f95561f30363d63"
+        }
+      ],
       "next_action": "Keep query planning as generic tool/retrieval contracts."
     },
     {
       "id": "analyzer-functional",
       "source_path": "finrobot/functional/analyzer.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/section_agents.leia", "examples/ai/finrobot_translation/equity_report.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/analyzer_report"],
-      "excluded_scope": ["complete analyzer prompt library"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/section_agents.leia",
+        "examples/ai/finrobot_translation/equity_report.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/analyzer_report"
+      ],
+      "excluded_scope": [
+        "complete analyzer prompt library"
+      ],
       "source_hash": "sha256:4c86ca7913859c6a88cbdd85f4df05703fda133ce733c70db4bf93170a3575f7",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/fixtures/provider_free_fixture_index.json", "sha256": "86206cdc6475f53ab91e75834d5ad8c6eeaaa48855c4a901057c69120cffece8"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/analyzer_report/fixtures/provider_free_fixture_index.json",
+          "sha256": "86206cdc6475f53ab91e75834d5ad8c6eeaaa48855c4a901057c69120cffece8"
+        }
+      ],
       "next_action": "Add source evidence validation fixtures for each analyzer section."
     },
     {
       "id": "charting-functional",
       "source_path": "finrobot/functional/charting.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/report_contract.leia", "examples/ai/finrobot_translation/reporting.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/chart_renderer", "examples/ai/finrobot_translation/live_packages/analytics_report"],
-      "excluded_scope": ["real chart images and matplotlib runtime"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/reporting.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/chart_renderer",
+        "examples/ai/finrobot_translation/live_packages/analytics_report"
+      ],
+      "excluded_scope": [
+        "real chart images and matplotlib runtime"
+      ],
       "source_hash": "sha256:0b0982358223f6c3ff06e0d792bb7f5eaf842e7dd426cfa413415fbb572ed461",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/chart_renderer/package.manifest.json", "sha256": "df4228560ad52db20e48cd2a9a116a7431d692a9784eecf388359867adafa239"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/chart_renderer/package.manifest.json",
+          "sha256": "df4228560ad52db20e48cd2a9a116a7431d692a9784eecf388359867adafa239"
+        }
+      ],
       "next_action": "Implement renderer packages with snapshot tests and stale-data warnings."
     },
     {
       "id": "coding-functional",
       "source_path": "finrobot/functional/coding.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/generated_code_tooling.leia", "examples/ai/finrobot_translation/compliance_policy.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/coding_notebook"],
-      "excluded_scope": ["default Python code execution"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/generated_code_tooling.leia",
+        "examples/ai/finrobot_translation/compliance_policy.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/coding_notebook"
+      ],
+      "excluded_scope": [
+        "default Python code execution"
+      ],
       "source_hash": "sha256:437d2b20e19e64280953f916e35a3737dcb6cf74d61083b4b7b41409c35e797a",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/coding_notebook/package.manifest.json", "sha256": "992f420900461d3d4a658fb57ed105e95118f51a1e5e53d6e8270377f2a610d2"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/coding_notebook/package.manifest.json",
+          "sha256": "992f420900461d3d4a658fb57ed105e95118f51a1e5e53d6e8270377f2a610d2"
+        }
+      ],
       "next_action": "Keep sandbox execution opt-in with approval, denied-command, and artifact fixtures."
     },
     {
       "id": "quantitative-functional",
       "source_path": "finrobot/functional/quantitative.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia", "examples/ai/finrobot_translation/optional_integrations.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/backtest_strategy", "examples/ai/finrobot_translation/live_packages/factor_research"],
-      "excluded_scope": ["live Backtrader strategy execution"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/backtest_strategy",
+        "examples/ai/finrobot_translation/live_packages/factor_research"
+      ],
+      "excluded_scope": [
+        "live Backtrader strategy execution"
+      ],
       "source_hash": "sha256:ff6fdb23cf9dd94b4a572bb8dca5f9ed6109a93337e3a45708ac9dca07ce1ea2",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/backtest_strategy/package.manifest.json", "sha256": "d2ac7acb7bbb0904cddebd5078182c84ac608371b8c84d9229e0b81863918b21"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/backtest_strategy/package.manifest.json",
+          "sha256": "d2ac7acb7bbb0904cddebd5078182c84ac608371b8c84d9229e0b81863918b21"
+        }
+      ],
       "next_action": "Add deterministic trade ledger and market feed package implementations behind optional dependencies."
     },
     {
       "id": "reportlab-functional",
       "source_path": "finrobot/functional/reportlab.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/report_contract.leia", "examples/ai/finrobot_translation/reporting.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/report_renderer", "examples/ai/finrobot_translation/live_packages/analytics_report"],
-      "excluded_scope": ["styled PDF page layout runtime"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/reporting.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/report_renderer",
+        "examples/ai/finrobot_translation/live_packages/analytics_report"
+      ],
+      "excluded_scope": [
+        "styled PDF page layout runtime"
+      ],
       "source_hash": "sha256:5655f5f5d088b5c18ce62df5492fd53189b43bf205624233ed136f018fb5234f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json", "sha256": "7bc5848e0d5e04729cdeeb13fa8e82e4d2b08ac1e52a3d778a2f2543c6669bca"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json",
+          "sha256": "7bc5848e0d5e04729cdeeb13fa8e82e4d2b08ac1e52a3d778a2f2543c6669bca"
+        }
+      ],
       "next_action": "Promote HTML/PDF renderer contracts into a package with page-level render verification."
     },
     {
       "id": "text-functional",
       "source_path": "finrobot/functional/text.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/section_agents.leia", "examples/ai/finrobot_translation/reporting.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/analyzer_report"],
-      "excluded_scope": ["standalone Python text utility package"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/section_agents.leia",
+        "examples/ai/finrobot_translation/reporting.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/analyzer_report"
+      ],
+      "excluded_scope": [
+        "standalone Python text utility package"
+      ],
       "source_hash": "sha256:c3a92410f9d0495efca73136671e030483d6d60eaf677f26a784d6a7551ab583",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json", "sha256": "ce3d6b7202a8da3b68908f3ab061a840723e862a9896ac9e149a6dad42bdaf38"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json",
+          "sha256": "ce3d6b7202a8da3b68908f3ab061a840723e862a9896ac9e149a6dad42bdaf38"
+        }
+      ],
       "next_action": "Add reusable text helpers only if future packages need them outside section schemas."
     },
     {
       "id": "experiment-investment-group",
       "source_path": "experiments/investment_group.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/quant_experiments/investment_group.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"],
-      "excluded_scope": ["live provider-backed committee execution"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/quant_experiments/investment_group.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"
+      ],
+      "excluded_scope": [
+        "live provider-backed committee execution"
+      ],
       "source_hash": "sha256:fe94bfb4394890ef1004cc8de1d1d330c4b5af709c3af2a088c9e678edda6ab3",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+        }
+      ],
       "next_action": "Keep committee workflow covered by replay records until live package execution lands."
     },
     {
       "id": "experiment-multi-factor",
       "source_path": "experiments/multi_factor_agents.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/factor_research"],
-      "excluded_scope": ["live factor data provider execution"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/factor_research"
+      ],
+      "excluded_scope": [
+        "live factor data provider execution"
+      ],
       "source_hash": "sha256:601a82c8e60524e89386b2ef9120169b7e063f2e59f2f48436fb4702f2727795",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/factor_research/package.manifest.json", "sha256": "4c298c2cb595e73e2527405dbfd84dd38a9c2cb915792fb30cf0aae9df4f2ce6"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/factor_research/package.manifest.json",
+          "sha256": "4c298c2cb595e73e2527405dbfd84dd38a9c2cb915792fb30cf0aae9df4f2ce6"
+        }
+      ],
       "next_action": "Attach live factor transforms to the factor research package."
     },
     {
       "id": "experiment-portfolio-optimization",
       "source_path": "experiments/portfolio_optimization.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/backtest_strategy"],
-      "excluded_scope": ["live optimizer data feeds"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/backtest_strategy"
+      ],
+      "excluded_scope": [
+        "live optimizer data feeds"
+      ],
       "source_hash": "sha256:a12cd07ee23c10b7cf05c9b52e904c775ea3e4e7236ed923f6fa9015c9375d74",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/backtest_strategy/fixtures/provider_free_fixture_index.json", "sha256": "2598a6f20370f1c34a1bac8c40c7bfa463b05257be560286baea7bf796abea89"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/backtest_strategy/fixtures/provider_free_fixture_index.json",
+          "sha256": "2598a6f20370f1c34a1bac8c40c7bfa463b05257be560286baea7bf796abea89"
+        }
+      ],
       "next_action": "Use deterministic seeds and fixture refresh before enabling live optimization."
     },
     {
       "id": "beginner-tutorials",
       "source_path": "tutorials_beginner/*",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/tutorials/notebook_parity/annual_report.leia", "examples/ai/finrobot_translation/tutorials/notebook_parity/rag_earnings_sec.leia", "examples/ai/finrobot_translation/tutorials/notebook_parity/ollama_function_call_optional_gate.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/tutorial_demo_parity"],
-      "excluded_scope": ["notebook UI execution", "live Ollama/provider calls"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/tutorials/notebook_parity/annual_report.leia",
+        "examples/ai/finrobot_translation/tutorials/notebook_parity/rag_earnings_sec.leia",
+        "examples/ai/finrobot_translation/tutorials/notebook_parity/ollama_function_call_optional_gate.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity"
+      ],
+      "excluded_scope": [
+        "notebook UI execution",
+        "live Ollama/provider calls"
+      ],
       "source_hash": "sha256:c5307270ac7b45d5f4d1e9a91ed9f8be93b9458d90fe186eddbafdd805433457",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/package.manifest.json", "sha256": "5f87857bf574e7f5c34e83ab4d4d503730007b0704f38bb385366549910837c4"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/package.manifest.json",
+          "sha256": "5f87857bf574e7f5c34e83ab4d4d503730007b0704f38bb385366549910837c4"
+        }
+      ],
       "next_action": "Expand notebook-by-notebook parity with provider-free replay records."
     },
     {
       "id": "advanced-tutorials",
       "source_path": "tutorials_advanced/*",
       "coverage_status": "mapped_optional_gate",
-      "target_examples": ["examples/ai/finrobot_translation/optional_integrations.leia", "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/optional_integrations", "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity"],
-      "excluded_scope": ["OpenBB", "mplfinance", "FinGPT", "live notebook dependencies"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/optional_integrations",
+        "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity"
+      ],
+      "excluded_scope": [
+        "OpenBB",
+        "mplfinance",
+        "FinGPT",
+        "live notebook dependencies"
+      ],
       "source_hash": "sha256:4d4e13826a305390a995235de64210828328070c6bce8aeec47dfc9aca20a9d4",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json", "sha256": "87c3a4fce21aaeab3bb63b990b675f0e62bdced16c26c5e63fe50c3950aa437e"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json",
+          "sha256": "87c3a4fce21aaeab3bb63b990b675f0e62bdced16c26c5e63fe50c3950aa437e"
+        }
+      ],
       "next_action": "Land optional live gates per dependency without making them default CI requirements."
     },
     {
       "id": "configs",
       "source_path": "configs/*",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/config_secret_example.leia", "examples/ai/finrobot_translation/model_alias_routing_example.leia"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/config_secret_example.leia",
+        "examples/ai/finrobot_translation/model_alias_routing_example.leia"
+      ],
       "target_packages": [],
-      "excluded_scope": ["checked-in real credentials"],
+      "excluded_scope": [
+        "checked-in real credentials"
+      ],
       "source_hash": "sha256:e67e5ed90e8374d36fe66e0ebf0547e5ab7430c2bf6289eb891620a784d7d816",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/package_deploy_manifest.json", "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/package_deploy_manifest.json",
+          "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"
+        }
+      ],
       "next_action": "Keep secret resolution redacted and absent-safe in all package manifests."
     },
     {
       "id": "requirements",
       "source_path": "requirements*.txt",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/package_deploy_requirements.txt", "examples/ai/finrobot_translation/package_deploy_manifest.json"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/optional_integrations"],
-      "excluded_scope": ["installing optional Python dependency stacks in default tests"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/package_deploy_requirements.txt",
+        "examples/ai/finrobot_translation/package_deploy_manifest.json"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/optional_integrations"
+      ],
+      "excluded_scope": [
+        "installing optional Python dependency stacks in default tests"
+      ],
       "source_hash": "sha256:86ee9bbd402de2d0f7e2551fe82fd80ecf52b3f95c15c6af1b1774aa7c76af6d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/package_deploy_manifest.json", "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/package_deploy_manifest.json",
+          "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"
+        }
+      ],
       "next_action": "Move live dependencies into external package extras."
     },
     {
       "id": "setup",
       "source_path": "setup.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/package_deploy_setup.py", "examples/ai/finrobot_translation/package_deploy_manifest.json"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/package_deploy_setup.py",
+        "examples/ai/finrobot_translation/package_deploy_manifest.json"
+      ],
       "target_packages": [],
-      "excluded_scope": ["publishing Python package from Leia tests"],
+      "excluded_scope": [
+        "publishing Python package from Leia tests"
+      ],
       "source_hash": "sha256:a198605a997d1387d57172d28903d63f943403eb3573258cf76134a556998707",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/package_deploy_manifest.json", "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/package_deploy_manifest.json",
+          "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"
+        }
+      ],
       "next_action": "Add release packaging smoke only after provider packages are installable."
     },
     {
       "id": "dockerfile",
       "source_path": "Dockerfile",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/package_deploy_Dockerfile", "examples/ai/finrobot_translation/package_deploy_manifest.json"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/package_deploy_Dockerfile",
+        "examples/ai/finrobot_translation/package_deploy_manifest.json"
+      ],
       "target_packages": [],
-      "excluded_scope": ["building containers in provider-free tests"],
+      "excluded_scope": [
+        "building containers in provider-free tests"
+      ],
       "source_hash": "sha256:3e4d3c83865d4da515658d042089a1a3bce0a10c83d5b88077cc02ff78993cf1",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/package_deploy_manifest.json", "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/package_deploy_manifest.json",
+          "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"
+        }
+      ],
       "next_action": "Keep Docker deployment metadata as a contract until release smoke is added."
     },
     {
       "id": "deploy-scripts",
       "source_path": "deploy*.sh",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/package_deploy_gcloud.sh", "examples/ai/finrobot_translation/package_deploy_manifest.json"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/package_deploy_gcloud.sh",
+        "examples/ai/finrobot_translation/package_deploy_manifest.json"
+      ],
       "target_packages": [],
-      "excluded_scope": ["cloud deployment execution"],
+      "excluded_scope": [
+        "cloud deployment execution"
+      ],
       "source_hash": "sha256:56e111b62eeeb0c6ac895ce644d39a66ac415e28f2cc038d5541707efe503e0e",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/package_deploy_manifest.json", "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/package_deploy_manifest.json",
+          "sha256": "4a665d9eb018bb3a00ba3a6d468f861aac92902c416e627d9404ada952182f87"
+        }
+      ],
       "next_action": "Add explicit deployment smoke gates outside default provider-free CI."
     },
     {
       "id": "run-web-app",
       "source_path": "run_web_app.py",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/package_deploy_run_web_app.py", "examples/ai/finrobot_translation/web_product.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
-      "excluded_scope": ["starting a live web server"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/package_deploy_run_web_app.py",
+        "examples/ai/finrobot_translation/web_product.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/product_workflow"
+      ],
+      "excluded_scope": [
+        "starting a live web server"
+      ],
       "source_hash": "sha256:fc79b4e0a0cff13e8e80a65d0a952e3a7a7c460263e4b179f3343597d28e1abf",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "18637459db95f1f4515ca1abe8f0ccc5c4d969dcf56bb486267688f3faa412a6"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json",
+          "sha256": "18637459db95f1f4515ca1abe8f0ccc5c4d969dcf56bb486267688f3faa412a6"
+        }
+      ],
       "next_action": "Promote route/auth/task workflow into the product workflow package."
     },
     {
       "id": "equity-readme",
       "source_path": "finrobot_equity/README.md",
       "coverage_status": "covered_example",
-      "target_examples": ["examples/ai/finrobot_translation/equity_report/README.md", "examples/ai/finrobot_translation/equity_report.leia", "examples/ai/finrobot_translation/equity_cli_workflow.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"],
-      "excluded_scope": ["full product generated report over live data"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/equity_report/README.md",
+        "examples/ai/finrobot_translation/equity_report.leia",
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"
+      ],
+      "excluded_scope": [
+        "full product generated report over live data"
+      ],
       "source_hash": "sha256:1feb9b438e3cce6bedadea7ff23d849078f6152de2b8fa40a5f97941b7ecee4b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/package.manifest.json", "sha256": "4722bd83981076cea70ffb229e7ab20047dad268b586a50d99eca58f7c0d5222"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/package.manifest.json",
+          "sha256": "4722bd83981076cea70ffb229e7ab20047dad268b586a50d99eca58f7c0d5222"
+        }
+      ],
       "next_action": "Keep product workflow separated from core AI dialect capabilities."
     },
     {
       "id": "equity-create-report",
       "source_path": "finrobot_equity/core/src/create_equity_report.py",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/equity_cli_workflow.leia", "examples/ai/finrobot_translation/report_contract.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/analytics_report", "examples/ai/finrobot_translation/live_packages/report_renderer"],
-      "excluded_scope": ["live report assembly side effects"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+        "examples/ai/finrobot_translation/report_contract.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/analytics_report",
+        "examples/ai/finrobot_translation/live_packages/report_renderer"
+      ],
+      "excluded_scope": [
+        "live report assembly side effects"
+      ],
       "source_hash": "sha256:a7c46876da3c7dbf34f2396112bec7bf9b3ebf7b51a2c60b15065b424c15186d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json", "sha256": "88cd59d3b1ef99107cf3eb14f4632f78563946099722457ed50f7dc5b102c220"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json",
+          "sha256": "88cd59d3b1ef99107cf3eb14f4632f78563946099722457ed50f7dc5b102c220"
+        }
+      ],
       "next_action": "Implement report assembly in a package after renderer and chart packages are ready."
     },
     {
       "id": "equity-financial-analysis",
       "source_path": "finrobot_equity/core/src/generate_financial_analysis.py",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/equity_report.leia", "examples/ai/finrobot_translation/section_agents.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline", "examples/ai/finrobot_translation/live_packages/analyzer_report"],
-      "excluded_scope": ["live model calls and persisted report outputs"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/equity_report.leia",
+        "examples/ai/finrobot_translation/section_agents.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline",
+        "examples/ai/finrobot_translation/live_packages/analyzer_report"
+      ],
+      "excluded_scope": [
+        "live model calls and persisted report outputs"
+      ],
       "source_hash": "sha256:3ac04867911e4ad78e4d5861d1b15f73eeac66e4f1cd0ca5880e18e0e17f1d5d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+        }
+      ],
       "next_action": "Wire stage DAG package to section-agent prompt/version package."
     },
     {
       "id": "equity-pdf-report",
       "source_path": "finrobot_equity/core/src/generate_pdf_report.py",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/reporting.leia", "examples/ai/finrobot_translation/equity_cli_workflow.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/report_renderer"],
-      "excluded_scope": ["real PDF generation"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/reporting.leia",
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/report_renderer"
+      ],
+      "excluded_scope": [
+        "real PDF generation"
+      ],
       "source_hash": "sha256:f7ec7cb9242acb541f264114a1ef93a87e974cd178dd6ae3e511cc394d5af452",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json", "sha256": "7bc5848e0d5e04729cdeeb13fa8e82e4d2b08ac1e52a3d778a2f2543c6669bca"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json",
+          "sha256": "7bc5848e0d5e04729cdeeb13fa8e82e4d2b08ac1e52a3d778a2f2543c6669bca"
+        }
+      ],
       "next_action": "Add PDF renderer visual verification once package implementation exists."
     },
     {
       "id": "equity-core-modules",
       "source_path": "finrobot_equity/core/src/modules/*",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/data_normalization.leia", "examples/ai/finrobot_translation/valuation_analytics.leia", "examples/ai/finrobot_translation/sensitivity_math.leia", "examples/ai/finrobot_translation/report_contract.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_normalizers", "examples/ai/finrobot_translation/live_packages/valuation_engine", "examples/ai/finrobot_translation/live_packages/news_catalyst", "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"],
-      "excluded_scope": ["method-by-method pandas/chart/PDF runtime parity"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/data_normalization.leia",
+        "examples/ai/finrobot_translation/valuation_analytics.leia",
+        "examples/ai/finrobot_translation/sensitivity_math.leia",
+        "examples/ai/finrobot_translation/report_contract.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/finance_normalizers",
+        "examples/ai/finrobot_translation/live_packages/valuation_engine",
+        "examples/ai/finrobot_translation/live_packages/news_catalyst",
+        "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"
+      ],
+      "excluded_scope": [
+        "method-by-method pandas/chart/PDF runtime parity"
+      ],
       "source_hash": "sha256:11b270c0518bbb7a8a88d1f4b0661c2717cf75a8259fb47c22c5a65441f3f83b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "0724f0681b79421f6bf9e57334fbbd34303e1be92d5eddeb3480d906954d5dd0"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
+          "sha256": "2ce0ddaf190f394a6ecc04932080e5038bccc749c86743bc052b5739c0b2ff59"
+        }
+      ],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
     },
     {
       "id": "equity-core-tests",
       "source_path": "finrobot_equity/core/tests/*",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/regression_fixtures/finrobot_python_test_parity/coverage_manifest.json", "examples/ai/finrobot_translation/evaluation_harness/manifest.json"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/tutorial_demo_parity"],
-      "excluded_scope": ["executing Python pytest suite in default Leia tests"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/regression_fixtures/finrobot_python_test_parity/coverage_manifest.json",
+        "examples/ai/finrobot_translation/evaluation_harness/manifest.json"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity"
+      ],
+      "excluded_scope": [
+        "executing Python pytest suite in default Leia tests"
+      ],
       "source_hash": "sha256:d28616af4eac73ba5c9a03ad2f72ce3057c6e9348bfdf82bff6f654a740a9043",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/regression_fixtures/finrobot_python_test_parity/coverage_manifest.json", "sha256": "8c0f33bafa988a3832891fc2819d374791237a6fc56b10924e1a201ff67f0b83"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/regression_fixtures/finrobot_python_test_parity/coverage_manifest.json",
+          "sha256": "8c0f33bafa988a3832891fc2819d374791237a6fc56b10924e1a201ff67f0b83"
+        }
+      ],
       "next_action": "Port high-value Python assertions into provider-free Leia package/evaluation tests."
     },
     {
       "id": "web-app-routes",
       "source_path": "finrobot_equity/web_app/*",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/web_product.leia", "examples/ai/finrobot_translation/reporting.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
-      "excluded_scope": ["real FastAPI/Flask server, auth, background workers"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/web_product.leia",
+        "examples/ai/finrobot_translation/reporting.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/product_workflow"
+      ],
+      "excluded_scope": [
+        "real FastAPI/Flask server, auth, background workers"
+      ],
       "source_hash": "sha256:6937cfa273da7ee648af548fa34dc1349e8dc62f5558f74bc11e66cc846e8767",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "18637459db95f1f4515ca1abe8f0ccc5c4d969dcf56bb486267688f3faa412a6"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json",
+          "sha256": "18637459db95f1f4515ca1abe8f0ccc5c4d969dcf56bb486267688f3faa412a6"
+        }
+      ],
       "next_action": "Implement product workflow package with route, auth, task, log, and download gates."
     },
     {
       "id": "web-app-database",
       "source_path": "finrobot_equity/web_app/database/*",
       "coverage_status": "partial_fixture_contract",
-      "target_examples": ["examples/ai/finrobot_translation/web_product.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
-      "excluded_scope": ["SQLite/SQLAlchemy migration execution"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/web_product.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/product_workflow"
+      ],
+      "excluded_scope": [
+        "SQLite/SQLAlchemy migration execution"
+      ],
       "source_hash": "sha256:b3c32f6fc7d2ee50f3b3fdc22d64de871a2e61a7c447e63ebc19e04a5a4e7f8e",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/contracts/db_migration_contract.json", "sha256": "95655cd11a081ba0458a907d43b665ec7360f916e0c71ea1a340924a5cecc374"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/product_workflow/contracts/db_migration_contract.json",
+          "sha256": "95655cd11a081ba0458a907d43b665ec7360f916e0c71ea1a340924a5cecc374"
+        }
+      ],
       "next_action": "Add migration and CRUD fixtures before live database package execution."
     },
     {
       "id": "web-app-templates",
       "source_path": "finrobot_equity/web_app/templates/*",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/web_product.leia", "examples/ai/finrobot_translation/reporting.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/html_ui_snapshots", "examples/ai/finrobot_translation/live_packages/product_workflow"],
-      "excluded_scope": ["full rendered template visual parity"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/web_product.leia",
+        "examples/ai/finrobot_translation/reporting.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/html_ui_snapshots",
+        "examples/ai/finrobot_translation/live_packages/product_workflow"
+      ],
+      "excluded_scope": [
+        "full rendered template visual parity"
+      ],
       "source_hash": "sha256:b842b78c9cc263837c6067036ca0ec6c47f97c44cb562ed4918f5b89a7f1623f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/package.manifest.json", "sha256": "a0b91a3c8e79381704c66137d0ec6d3e60aa154cdcc943af977c51b6e1c5ad46"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/package.manifest.json",
+          "sha256": "a0b91a3c8e79381704c66137d0ec6d3e60aa154cdcc943af977c51b6e1c5ad46"
+        }
+      ],
       "next_action": "Add rendered page snapshots and accessibility assertions in the UI snapshot package."
     },
     {
       "id": "web-app-static",
       "source_path": "finrobot_equity/web_app/static/*",
       "coverage_status": "covered_live_package_skeleton",
-      "target_examples": ["examples/ai/finrobot_translation/web_product.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/html_ui_snapshots", "examples/ai/finrobot_translation/live_packages/product_workflow"],
-      "excluded_scope": ["binary/static asset visual diff parity"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/web_product.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/html_ui_snapshots",
+        "examples/ai/finrobot_translation/live_packages/product_workflow"
+      ],
+      "excluded_scope": [
+        "binary/static asset visual diff parity"
+      ],
       "source_hash": "sha256:4f8c9c0b8f10c7ef74b95ac5158f4a65f5c761729f0c5de5a2af5082ef69349b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/templates/static_asset_manifest.json", "sha256": "6a513ced95244df7d361ac315b5e6efcb0e54f67d17bb7b686e5a32ec2f0282c"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/product_workflow/templates/static_asset_manifest.json",
+          "sha256": "6a513ced95244df7d361ac315b5e6efcb0e54f67d17bb7b686e5a32ec2f0282c"
+        }
+      ],
       "next_action": "Track static asset hashes through the product workflow snapshot manifest."
     },
     {
       "id": "sample-reports",
       "source_path": "report/*.pdf",
       "coverage_status": "excluded_non_ai_surface",
-      "target_examples": ["examples/ai/finrobot_translation/reporting.leia"],
-      "target_packages": ["examples/ai/finrobot_translation/live_packages/report_renderer"],
-      "excluded_scope": ["large binary sample PDF content is not vendored into audit tests"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/reporting.leia"
+      ],
+      "target_packages": [
+        "examples/ai/finrobot_translation/live_packages/report_renderer"
+      ],
+      "excluded_scope": [
+        "large binary sample PDF content is not vendored into audit tests"
+      ],
       "source_hash": "sha256:5d64a786c1a6f85e6c61c4ea410f69bc32276ed72cafdfdcc5025fe536191843",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/fixtures/render_request_ACME_report_fixture.json", "sha256": "c8a306f6fde19363fdcc410b9c9fb0f73220440a1373c8c8d73f655e447eac97"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/live_packages/report_renderer/fixtures/render_request_ACME_report_fixture.json",
+          "sha256": "c8a306f6fde19363fdcc410b9c9fb0f73220440a1373c8c8d73f655e447eac97"
+        }
+      ],
       "next_action": "Use renderer fixture hashes and page snapshots rather than committing source report binaries."
     },
     {
       "id": "source-images",
       "source_path": "figs/*",
       "coverage_status": "excluded_non_ai_surface",
-      "target_examples": ["examples/ai/finrobot_translation/README.md"],
+      "target_examples": [
+        "examples/ai/finrobot_translation/README.md"
+      ],
       "target_packages": [],
-      "excluded_scope": ["logo/image branding assets are not AI dialect behavior"],
+      "excluded_scope": [
+        "logo/image branding assets are not AI dialect behavior"
+      ],
       "source_hash": "sha256:c992550027fdbbb5a3b8b12f3d5e65294946f294cd357d71771d468cf44c5c0d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "7305c27865cfe5c06bbe703a742860ccb7a0c3efd95883fbfefa6c0222248403"}],
+      "fixture_hashes": [
+        {
+          "path": "examples/ai/finrobot_translation/README.md",
+          "sha256": "eac5f301e6555759552894722ddc1067029bd4dfdd565fa3ef4d12337e938ee2"
+        }
+      ],
       "next_action": "Only add asset snapshots when UI/product visual parity requires them."
     }
   ]

@@ -1,8 +1,8 @@
 // Provider-free generic AI workflow composition.
 //
 // This is a thin Leia-native composition over the generic package boundaries:
-// model, turn, tool, agent, workflow, eval, replay, trace, approval, and
-// package-audit. It intentionally declares no provider SDK, network call,
+// model, turn, tool, tool-registry, planning, agent, workflow, eval, replay,
+// trace, approval, and package-audit. It intentionally declares no provider SDK, network call,
 // credential, or domain adapter.
 
 package_boundaries := {
@@ -11,8 +11,10 @@ package_boundaries := {
     {role: "trace" package_id: "generic-trace-events" capability: "generic.ai.trace.events" entrypoint: "ai.trace.emit" provider_free: true live_network: false},
     {role: "approval" package_id: "generic-approval-policy" capability: "generic.ai.approval.policy.evaluate" entrypoint: "generic.ai.approval.policy.evaluate" provider_free: true live_network: false},
     {role: "tool" package_id: "generic-tool-contracts" capability: "ai.tool.invoke" entrypoint: "ai.tool.invoke" provider_free: true live_network: false},
+    {role: "tool-registry" package_id: "generic-tool-registry" capability: "generic.tool.registry.declare" entrypoint: "ai.tool.registry" provider_free: true live_network: false},
     {role: "turn" package_id: "generic-turn-runner" capability: "ai.turn.execute" entrypoint: "ai.turn.execute" provider_free: true live_network: false},
     {role: "agent" package_id: "generic-agent-runner" capability: "ai.agent.config.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
+    {role: "planning" package_id: "generic-planning-graph" capability: "generic.planning.graph.define" entrypoint: "ai.workflow.plan_graph" provider_free: true live_network: false},
     {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "generic.ai.package.boundary.audit" provider_free: true live_network: false},
     {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "ai.workflow.orchestrate.provider_free" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
     {role: "eval" package_id: "generic-evaluation-harness" capability: "ai.eval.run.provider_free" entrypoint: "ai.eval.run" provider_free: true live_network: false},
@@ -27,6 +29,8 @@ composition_edges := {
     {from: "replay" to: "turn" handoff: "strict ordered record match"},
     {from: "trace" to: "workflow" handoff: "correlated events"},
     {from: "approval" to: "tool" handoff: "capability decision"},
+    {from: "tool-registry" to: "tool" handoff: "validated tool descriptor"},
+    {from: "planning" to: "workflow" handoff: "plan graph and dependency evidence"},
     {from: "package-audit" to: "workflow" handoff: "provider-free boundary gate"},
 }
 
@@ -38,7 +42,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "turn", "tool", "agent", "workflow", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "turn", "tool", "tool-registry", "planning", "agent", "workflow", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -64,11 +68,13 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 10 &&
-        #workflow_contract.edges == 9 &&
+    return #workflow_contract.composition == 12 &&
+        #workflow_contract.edges == 11 &&
         role_present("model") &&
         role_present("turn") &&
         role_present("tool") &&
+        role_present("tool-registry") &&
+        role_present("planning") &&
         role_present("agent") &&
         role_present("workflow") &&
         role_present("eval") &&

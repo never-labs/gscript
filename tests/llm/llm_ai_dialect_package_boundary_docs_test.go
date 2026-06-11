@@ -48,18 +48,7 @@ func TestAIDialectPackageBoundaryDocsReferenceExistingPackageDirs(t *testing.T) 
 		}
 	}
 
-	want := []string{
-		"examples/ai/finrobot_translation/live_packages/generic_agent_runner",
-		"examples/ai/finrobot_translation/live_packages/generic_approval_policy",
-		"examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
-		"examples/ai/finrobot_translation/live_packages/generic_model_registry",
-		"examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
-		"examples/ai/finrobot_translation/live_packages/generic_record_replay",
-		"examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
-		"examples/ai/finrobot_translation/live_packages/generic_trace_events",
-		"examples/ai/finrobot_translation/live_packages/generic_turn_runner",
-		"examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
-	}
+	want := documentedAIDialectGenericPackageDirs(t, root)
 	sort.Strings(got)
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("documented package directories:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -90,6 +79,24 @@ func TestAIDialectPackageBoundaryDocsReferenceExistingPackageDirs(t *testing.T) 
 			t.Fatalf("%s does not document required boundary term %q", docRel, required)
 		}
 	}
+}
+
+func documentedAIDialectGenericPackageDirs(t *testing.T, root string) []string {
+	t.Helper()
+	packagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+	entries, err := os.ReadDir(packagesRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dirs []string
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "generic_") {
+			continue
+		}
+		dirs = append(dirs, filepath.ToSlash(filepath.Join("examples", "ai", "finrobot_translation", "live_packages", entry.Name())))
+	}
+	sort.Strings(dirs)
+	return dirs
 }
 
 func TestFinRobotStatusDocsMarkGenericAIDialectAsCheckedInBoundary(t *testing.T) {

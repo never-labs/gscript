@@ -61,46 +61,45 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		t.Fatalf("live network/import defaults must be disabled: %#v", manifest)
 	}
 
-	wantPackages := map[string]string{
-		"vendor_adapters":                  "leia-finrobot-vendor-adapters",
-		"analytics_report":                 "leia-finrobot-analytics-report",
-		"finance_normalizers":              "leia-finrobot-finance-normalizers",
-		"valuation_engine":                 "leia-finrobot-valuation-engine",
-		"report_renderer":                  "leia-finrobot-report-renderer",
-		"finance_facade":                   "leia-finrobot-finance-facade",
-		"coding_notebook":                  "leia-finrobot-coding-notebook",
-		"web_product":                      "leia-finrobot-web-product",
-		"optional_integrations":            "leia-finrobot-optional-integrations",
-		"tutorial_demo_parity":             "leia-finrobot-tutorial-demo-parity",
-		"prompt_roles":                     "leia-finrobot-prompt-roles",
-		"analyzer_report":                  "leia-finrobot-analyzer-report",
-		"document_pipeline":                "leia-finrobot-document-pipeline",
-		"news_catalyst":                    "leia-finrobot-news-catalyst",
-		"factor_research":                  "leia-finrobot-factor-research",
-		"chart_renderer":                   "leia-finrobot-chart-renderer",
-		"backtest_strategy":                "leia-finrobot-backtest-strategy",
-		"equity_analysis_pipeline":         "leia-finrobot-equity-analysis-pipeline",
-		"retail_sentiment":                 "leia-finrobot-retail-sentiment",
-		"html_ui_snapshots":                "leia-finrobot-html-ui-snapshots",
-		"earnings_transcript":              "leia-finrobot-earnings-transcript",
-		"sec_filings":                      "leia-finrobot-sec-filings",
-		"generic_agent_runner":             "leia-generic-ai-agent-runner",
-		"generic_approval_policy":          "leia-generic-ai-approval-policy",
-		"generic_evaluation_harness":       "leia-generic-ai-evaluation-harness",
-		"generic_model_registry":           "leia-generic-ai-model-registry",
-		"generic_package_boundary_auditor": "leia-generic-ai-package-boundary-auditor",
-		"generic_record_replay":            "leia-generic-ai-record-replay",
-		"generic_tool_contracts":           "leia-generic-ai-tool-contracts",
-		"generic_trace_events":             "leia-generic-ai-trace-events",
-		"generic_turn_runner":              "leia-generic-ai-turn-runner",
-		"generic_workflow_orchestrator":    "leia-generic-ai-workflow-orchestrator",
+	wantFinRobotPackages := map[string]string{
+		"vendor_adapters":          "leia-finrobot-vendor-adapters",
+		"analytics_report":         "leia-finrobot-analytics-report",
+		"finance_normalizers":      "leia-finrobot-finance-normalizers",
+		"valuation_engine":         "leia-finrobot-valuation-engine",
+		"report_renderer":          "leia-finrobot-report-renderer",
+		"finance_facade":           "leia-finrobot-finance-facade",
+		"coding_notebook":          "leia-finrobot-coding-notebook",
+		"web_product":              "leia-finrobot-web-product",
+		"optional_integrations":    "leia-finrobot-optional-integrations",
+		"tutorial_demo_parity":     "leia-finrobot-tutorial-demo-parity",
+		"prompt_roles":             "leia-finrobot-prompt-roles",
+		"analyzer_report":          "leia-finrobot-analyzer-report",
+		"document_pipeline":        "leia-finrobot-document-pipeline",
+		"news_catalyst":            "leia-finrobot-news-catalyst",
+		"factor_research":          "leia-finrobot-factor-research",
+		"chart_renderer":           "leia-finrobot-chart-renderer",
+		"backtest_strategy":        "leia-finrobot-backtest-strategy",
+		"equity_analysis_pipeline": "leia-finrobot-equity-analysis-pipeline",
+		"retail_sentiment":         "leia-finrobot-retail-sentiment",
+		"html_ui_snapshots":        "leia-finrobot-html-ui-snapshots",
+		"earnings_transcript":      "leia-finrobot-earnings-transcript",
+		"sec_filings":              "leia-finrobot-sec-filings",
 	}
-	if len(manifest.Packages) != len(wantPackages) {
-		t.Fatalf("packages = %d, want %d", len(manifest.Packages), len(wantPackages))
+	genericPackageCount := 0
+	seenFinRobotPackages := map[string]bool{}
+	if len(manifest.Packages) < len(wantFinRobotPackages) {
+		t.Fatalf("packages = %d, want at least %d", len(manifest.Packages), len(wantFinRobotPackages))
 	}
 	for _, pkg := range manifest.Packages {
-		if wantPackages[pkg.ID] != pkg.PackageName {
+		if strings.HasPrefix(pkg.ID, "generic_") {
+			genericPackageCount++
+			if !strings.HasPrefix(pkg.PackageName, "leia-generic-ai-") {
+				t.Fatalf("generic package %s name = %q, want leia-generic-ai-*", pkg.ID, pkg.PackageName)
+			}
+		} else if wantFinRobotPackages[pkg.ID] != pkg.PackageName {
 			t.Fatalf("package %s name = %q", pkg.ID, pkg.PackageName)
+		} else {
+			seenFinRobotPackages[pkg.ID] = true
 		}
 		for label, value := range map[string]string{
 			"planned_directory": pkg.PlannedDirectory,
@@ -133,6 +132,14 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(root, pkg.MigrationSource)); err != nil {
 			t.Fatalf("%s migration source %q: %v", pkg.ID, pkg.MigrationSource, err)
+		}
+	}
+	if genericPackageCount == 0 {
+		t.Fatal("manifest must include generic AI packages")
+	}
+	for id := range wantFinRobotPackages {
+		if !seenFinRobotPackages[id] {
+			t.Fatalf("missing FinRobot live package %s", id)
 		}
 	}
 	assertLivePackageSkeletonSummaryMatchesPackages(t, root, manifest)

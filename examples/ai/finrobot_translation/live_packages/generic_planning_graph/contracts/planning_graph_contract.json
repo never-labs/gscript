@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "id": "generic-planning-graph-contract-v1",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "real_dependency_imports": false,
+  "semantics": {
+    "plan_node": {
+      "required_fields": [
+        "id",
+        "node_type",
+        "depends_on",
+        "retry_policy",
+        "trace_evidence"
+      ],
+      "allowed_node_types": [
+        "input",
+        "transform",
+        "branch",
+        "merge",
+        "decision",
+        "artifact"
+      ]
+    },
+    "dependency": {
+      "required_fields": [
+        "from",
+        "to",
+        "edge_type"
+      ],
+      "allowed_edge_types": [
+        "control",
+        "data",
+        "branch",
+        "merge"
+      ],
+      "acyclic": true
+    },
+    "retry": {
+      "required_fields": [
+        "max_attempts",
+        "attempts",
+        "retryable",
+        "backoff",
+        "final_status"
+      ],
+      "provider_free": true,
+      "allowed_backoff": [
+        "none",
+        "fixed_fixture_ms"
+      ]
+    },
+    "trace_evidence": {
+      "required_fields": [
+        "trace_id",
+        "event_id",
+        "evidence_kind",
+        "plan_node_id",
+        "sequence",
+        "status",
+        "provider_free",
+        "live_model"
+      ],
+      "evidence_kinds": [
+        "plan.node.started",
+        "plan.node.completed",
+        "plan.retry.attempt",
+        "plan.branch.selected",
+        "plan.merge.completed"
+      ]
+    }
+  },
+  "plan_nodes": [
+    {
+      "id": "receive_goal",
+      "node_type": "input",
+      "depends_on": [],
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable": false,
+        "backoff": "none"
+      },
+      "trace_evidence": [
+        "evt-receive-goal-started",
+        "evt-receive-goal-completed"
+      ]
+    },
+    {
+      "id": "expand_plan",
+      "node_type": "transform",
+      "depends_on": [
+        "receive_goal"
+      ],
+      "retry_policy": {
+        "max_attempts": 2,
+        "retryable": true,
+        "backoff": "fixed_fixture_ms"
+      },
+      "trace_evidence": [
+        "evt-expand-plan-attempt-1",
+        "evt-expand-plan-attempt-2",
+        "evt-expand-plan-completed"
+      ]
+    },
+    {
+      "id": "branch_parallel_checks",
+      "node_type": "branch",
+      "depends_on": [
+        "expand_plan"
+      ],
+      "branches": [
+        "validate_dependencies",
+        "collect_evidence"
+      ],
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable": false,
+        "backoff": "none"
+      },
+      "trace_evidence": [
+        "evt-branch-parallel-checks"
+      ]
+    },
+    {
+      "id": "validate_dependencies",
+      "node_type": "decision",
+      "depends_on": [
+        "branch_parallel_checks"
+      ],
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable": false,
+        "backoff": "none"
+      },
+      "trace_evidence": [
+        "evt-validate-dependencies-completed"
+      ]
+    },
+    {
+      "id": "collect_evidence",
+      "node_type": "transform",
+      "depends_on": [
+        "branch_parallel_checks"
+      ],
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable": false,
+        "backoff": "none"
+      },
+      "trace_evidence": [
+        "evt-collect-evidence-completed"
+      ]
+    },
+    {
+      "id": "merge_checks",
+      "node_type": "merge",
+      "depends_on": [
+        "validate_dependencies",
+        "collect_evidence"
+      ],
+      "merge_policy": {
+        "mode": "all_success",
+        "required_inputs": [
+          "validate_dependencies",
+          "collect_evidence"
+        ]
+      },
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable": false,
+        "backoff": "none"
+      },
+      "trace_evidence": [
+        "evt-merge-checks-completed"
+      ]
+    },
+    {
+      "id": "emit_artifact_plan",
+      "node_type": "artifact",
+      "depends_on": [
+        "merge_checks"
+      ],
+      "retry_policy": {
+        "max_attempts": 1,
+        "retryable": false,
+        "backoff": "none"
+      },
+      "trace_evidence": [
+        "evt-emit-artifact-plan-completed"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "receive_goal",
+      "to": "expand_plan",
+      "edge_type": "control"
+    },
+    {
+      "from": "expand_plan",
+      "to": "branch_parallel_checks",
+      "edge_type": "control"
+    },
+    {
+      "from": "branch_parallel_checks",
+      "to": "validate_dependencies",
+      "edge_type": "branch",
+      "branch_id": "dependency_check"
+    },
+    {
+      "from": "branch_parallel_checks",
+      "to": "collect_evidence",
+      "edge_type": "branch",
+      "branch_id": "evidence_check"
+    },
+    {
+      "from": "validate_dependencies",
+      "to": "merge_checks",
+      "edge_type": "merge"
+    },
+    {
+      "from": "collect_evidence",
+      "to": "merge_checks",
+      "edge_type": "merge"
+    },
+    {
+      "from": "merge_checks",
+      "to": "emit_artifact_plan",
+      "edge_type": "data"
+    }
+  ],
+  "acceptance_gates": [
+    "generic plan nodes expose dependency and retry metadata without provider names",
+    "branch nodes have at least two outgoing branch edges",
+    "merge nodes depend on all branch outputs they join",
+    "trace evidence covers retry attempts, branch selection, merge completion, and final artifact planning"
+  ]
+}

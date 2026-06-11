@@ -1,0 +1,36 @@
+generic_planning_graph_live_package := {
+    id: "generic-planning-graph-live-package",
+    package_name: "leia-generic-ai-planning-graph",
+    provider_free: true,
+    live_network: false,
+    real_dependency_imports: false,
+    node_count: 7,
+    edge_count: 7,
+    trace_event_count: 10,
+    capabilities: [
+        "generic.planning.graph.define",
+        "generic.planning.node.classify",
+        "generic.planning.dependency.validate",
+        "generic.planning.retry.replay",
+        "generic.planning.branch.merge",
+        "generic.planning.trace.evidence"
+    ]
+}
+
+assert(generic_planning_graph_live_package.provider_free)
+assert(!generic_planning_graph_live_package.live_network)
+assert(!generic_planning_graph_live_package.real_dependency_imports)
+assert(generic_planning_graph_live_package.node_count == 7)
+assert(generic_planning_graph_live_package.edge_count == 7)
+
+generic_planning_graph_live_package_summary := string.format(
+"generic_planning_graph_live_package nodes=%d edges=%d trace_events=%d capabilities=%d provider_free=%s live_network=%s imports=%s",
+generic_planning_graph_live_package.node_count,
+generic_planning_graph_live_package.edge_count,
+generic_planning_graph_live_package.trace_event_count,
+#generic_planning_graph_live_package.capabilities,
+tostring(generic_planning_graph_live_package.provider_free),
+tostring(generic_planning_graph_live_package.live_network),
+tostring(generic_planning_graph_live_package.real_dependency_imports))
+
+print(generic_planning_graph_live_package_summary)

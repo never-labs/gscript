@@ -1,0 +1,27 @@
+generic_document_memory_store := {
+    id: "generic_memory_store",
+    capability: "generic.memory.store_retrieve",
+    fixture_key: "generic:memory_store:offline",
+    provider_free: true,
+    live_network: false,
+    real_dependency_imports: false,
+    durable_provider: false,
+    context_window_budget: 2048,
+    ranked_items: 2
+}
+
+assert(generic_document_memory_store.provider_free)
+assert(!generic_document_memory_store.live_network)
+assert(!generic_document_memory_store.real_dependency_imports)
+assert(!generic_document_memory_store.durable_provider)
+
+generic_document_memory_store_summary := string.format(
+"generic_document_memory_store capability=%s fixture=%s ranked_items=%d provider_free=%s live_network=%s imports=%s",
+generic_document_memory_store.capability,
+generic_document_memory_store.fixture_key,
+generic_document_memory_store.ranked_items,
+tostring(generic_document_memory_store.provider_free),
+tostring(generic_document_memory_store.live_network),
+tostring(generic_document_memory_store.real_dependency_imports))
+
+print(generic_document_memory_store_summary)

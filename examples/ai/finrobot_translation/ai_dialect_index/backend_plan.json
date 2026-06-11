@@ -10,72 +10,25 @@
   },
   "backend_shapes": [
     {
-      "shape_id": "ai.model.resolve",
-      "status": "checked_in_package_boundary",
-      "capabilities": ["model"],
-      "contract": "Resolve provider-neutral model aliases into replay-safe execution descriptors.",
-      "inputs": ["model_alias", "provider_policy", "replay_mode"],
-      "outputs": ["model_descriptor", "capability_flags", "redaction_policy"],
-      "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_dialect_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
-      "package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-model-registry",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
-        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_model_registry/contracts/model_registry_contract.json",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
-      "shape_id": "ai.turn.execute",
-      "status": "checked_in_package_boundary",
-      "capabilities": ["turn", "replay"],
-      "contract": "Execute or replay a single structured model turn with deterministic usage and error envelopes.",
-      "inputs": ["messages", "response_format", "tool_policy", "replay_records"],
-      "outputs": ["assistant_message", "usage", "tool_requests", "turn_error"],
-      "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_ai_dialect_contract_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
-      "package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-turn-runner",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
-        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
-      "shape_id": "ai.tool.invoke",
-      "status": "checked_in_package_boundary",
-      "capabilities": ["tool", "approval", "capability"],
-      "contract": "Validate, authorize, invoke, and replay a tool call using a provider-neutral result envelope.",
-      "inputs": ["tool_schema", "arguments", "capability_tags", "approval_state"],
-      "outputs": ["tool_result", "approval_trace", "artifact_refs", "normalized_error"],
-      "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_tool_contract_test.go",
-      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
-      "package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-tool-contracts",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
-        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
       "shape_id": "ai.agent.run",
       "status": "checked_in_package_boundary",
-      "capabilities": ["agent", "workflow"],
+      "capabilities": [
+        "agent",
+        "workflow"
+      ],
       "contract": "Run declarative agent loops over turns, tools, memory snapshots, and structured outputs.",
-      "inputs": ["agent_config", "initial_state", "tool_registry", "max_steps"],
-      "outputs": ["final_output", "tool_history", "workflow_state", "loop_trace"],
+      "inputs": [
+        "agent_config",
+        "initial_state",
+        "tool_registry",
+        "max_steps"
+      ],
+      "outputs": [
+        "final_output",
+        "tool_history",
+        "workflow_state",
+        "loop_trace"
+      ],
       "example": "examples/ai/general_analysis_assistant.leia",
       "test": "tests/llm/llm_agent_replay_test.go",
       "fixture": "examples/ai/general_analysis_assistant.records.json",
@@ -90,32 +43,25 @@
       }
     },
     {
-      "shape_id": "ai.workflow.orchestrate",
-      "status": "checked_in_package_boundary",
-      "capabilities": ["workflow", "trace"],
-      "contract": "Coordinate multi-agent handoffs, stage retries, cache decisions, and trace emission.",
-      "inputs": ["workflow_graph", "stage_inputs", "retry_policy", "cache_policy"],
-      "outputs": ["stage_outputs", "handoff_trace", "cache_events", "workflow_result"],
-      "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_native_workflow_integration_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
-      "package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-workflow-orchestrator",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
-        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
       "shape_id": "ai.eval.run",
       "status": "checked_in_package_boundary",
-      "capabilities": ["evaluation", "replay"],
+      "capabilities": [
+        "evaluation",
+        "replay"
+      ],
       "contract": "Run provider-free evaluation cases with replayed judges, metrics, findings, and golden gates.",
-      "inputs": ["dataset_manifest", "case_inputs", "metric_specs", "judge_records"],
-      "outputs": ["case_results", "metric_summary", "findings", "gate_status"],
+      "inputs": [
+        "dataset_manifest",
+        "case_inputs",
+        "metric_specs",
+        "judge_records"
+      ],
+      "outputs": [
+        "case_results",
+        "metric_summary",
+        "findings",
+        "gate_status"
+      ],
       "example": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.source.txt",
       "test": "tests/llm/finrobot_evaluation_harness_parity_test.go",
       "fixture": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
@@ -130,12 +76,151 @@
       }
     },
     {
+      "shape_id": "ai.model.resolve",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "model"
+      ],
+      "contract": "Resolve provider-neutral model aliases into replay-safe execution descriptors.",
+      "inputs": [
+        "model_alias",
+        "provider_policy",
+        "replay_mode"
+      ],
+      "outputs": [
+        "model_descriptor",
+        "capability_flags",
+        "redaction_policy"
+      ],
+      "example": "examples/ai/general_agent_workflow.leia",
+      "test": "tests/llm/llm_ai_dialect_test.go",
+      "fixture": "examples/ai/general_agent_workflow.records.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_model_registry/contracts/model_registry_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "ai.package.audit",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "package-boundary",
+        "capability"
+      ],
+      "contract": "Audit package manifests, provider-free gates, registered examples, and no-built-in-language-feature guarantees.",
+      "inputs": [
+        "package_manifest",
+        "fixture_index",
+        "example_registry",
+        "capability_policy"
+      ],
+      "outputs": [
+        "audit_findings",
+        "coverage_status",
+        "missing_boundary_records"
+      ],
+      "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",
+      "test": "tests/llm/finrobot_package_manifest_audit_test.go",
+      "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-package-boundary-auditor",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/contracts/package_boundary_audit_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "ai.tool.invoke",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "tool",
+        "approval",
+        "capability"
+      ],
+      "contract": "Validate, authorize, invoke, and replay a tool call using a provider-neutral result envelope.",
+      "inputs": [
+        "tool_schema",
+        "arguments",
+        "capability_tags",
+        "approval_state"
+      ],
+      "outputs": [
+        "tool_result",
+        "approval_trace",
+        "artifact_refs",
+        "normalized_error"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_tool_contract_test.go",
+      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-tool-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "ai.tool.registry",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "tool"
+      ],
+      "contract": "Declare, validate, and replay provider-free tool registry descriptors and invocation traces.",
+      "inputs": [
+        "tool_descriptor",
+        "capability_policy",
+        "approval_state"
+      ],
+      "outputs": [
+        "validated_descriptor",
+        "invocation_trace",
+        "approval_edge"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-tool-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/contracts/tool_registry_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.trace.emit",
       "status": "checked_in_package_boundary",
-      "capabilities": ["trace", "approval", "replay"],
+      "capabilities": [
+        "trace",
+        "approval",
+        "replay"
+      ],
       "contract": "Emit normalized trace events for turns, streams, approvals, tools, artifacts, and replay matching.",
-      "inputs": ["event_type", "event_payload", "redaction_policy", "correlation_ids"],
-      "outputs": ["trace_event", "redacted_payload", "sequence_marker"],
+      "inputs": [
+        "event_type",
+        "event_payload",
+        "redaction_policy",
+        "correlation_ids"
+      ],
+      "outputs": [
+        "trace_event",
+        "redacted_payload",
+        "sequence_marker"
+      ],
       "example": "examples/ai/record_replay_trace_project.leia",
       "test": "tests/llm/llm_trace_test.go",
       "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
@@ -150,21 +235,97 @@
       }
     },
     {
-      "shape_id": "ai.package.audit",
+      "shape_id": "ai.turn.execute",
       "status": "checked_in_package_boundary",
-      "capabilities": ["package-boundary", "capability"],
-      "contract": "Audit package manifests, provider-free gates, registered examples, and no-built-in-language-feature guarantees.",
-      "inputs": ["package_manifest", "fixture_index", "example_registry", "capability_policy"],
-      "outputs": ["audit_findings", "coverage_status", "missing_boundary_records"],
-      "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",
-      "test": "tests/llm/finrobot_package_manifest_audit_test.go",
-      "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
+      "capabilities": [
+        "turn",
+        "replay"
+      ],
+      "contract": "Execute or replay a single structured model turn with deterministic usage and error envelopes.",
+      "inputs": [
+        "messages",
+        "response_format",
+        "tool_policy",
+        "replay_records"
+      ],
+      "outputs": [
+        "assistant_message",
+        "usage",
+        "tool_requests",
+        "turn_error"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_ai_dialect_contract_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
       "package_boundary": {
         "status": "checked_in",
-        "package_id": "generic-package-boundary-auditor",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
-        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/contracts/package_boundary_audit_contract.json",
+        "package_id": "generic-turn-runner",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "ai.workflow.orchestrate",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "workflow",
+        "trace"
+      ],
+      "contract": "Coordinate multi-agent handoffs, stage retries, cache decisions, and trace emission.",
+      "inputs": [
+        "workflow_graph",
+        "stage_inputs",
+        "retry_policy",
+        "cache_policy"
+      ],
+      "outputs": [
+        "stage_outputs",
+        "handoff_trace",
+        "cache_events",
+        "workflow_result"
+      ],
+      "example": "examples/ai/general_agent_workflow.leia",
+      "test": "tests/llm/llm_ai_native_workflow_integration_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-workflow-orchestrator",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "ai.workflow.plan_graph",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "workflow"
+      ],
+      "contract": "Define provider-free plan graph nodes, dependencies, retries, branch/merge joins, and trace evidence.",
+      "inputs": [
+        "goal_envelope",
+        "available_steps",
+        "retry_policy"
+      ],
+      "outputs": [
+        "plan_graph",
+        "dependency_edges",
+        "trace_evidence"
+      ],
+      "example": "examples/ai/finrobot_translation/generic_workflow_orchestration.leia",
+      "test": "tests/llm/llm_generic_planning_graph_contract_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-planning-graph",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/contracts/planning_graph_contract.json",
         "provider_free": true,
         "domain_specific": false
       }

@@ -94,6 +94,28 @@
         "score",
         "citation"
       ]
+    },
+    {
+      "id": "generic_memory",
+      "source_module": "generic/memory_store.leia",
+      "inputs": [
+        "memory_items",
+        "namespace_policy",
+        "retrieval_policy"
+      ],
+      "outputs": [
+        "generic_memory_store",
+        "context_window",
+        "retrieval_results"
+      ],
+      "required_fields": [
+        "memory_id",
+        "namespace",
+        "source_ref",
+        "retrieval_policy",
+        "context_ref",
+        "provenance"
+      ]
     }
   ],
   "field_contracts": {
@@ -262,6 +284,24 @@
       "vector_dependency_imported": false,
       "fallback_adapter": "fixture_vector_index",
       "skip_reason_required": true
+    },
+    "generic_memory_store": {
+      "type": "provider_free_memory_store",
+      "required": [
+        "memory_store.store_id",
+        "namespace_policy.namespace",
+        "memory_items.memory_id",
+        "memory_items.source_ref",
+        "memory_items.chunk_id",
+        "retrieval_policy.top_k",
+        "retrieval_results.context_ref",
+        "context_window.token_budget",
+        "adapter_boundaries.clean_skip",
+        "provenance.linked_chunk_fixture_key"
+      ],
+      "live_network": false,
+      "dependency_imports": false,
+      "credential_required": false
     }
   },
   "fixtures": [
@@ -294,6 +334,12 @@
       "path": "fixtures/retriever_query_ACME_fixture.json",
       "schema": "schemas/retriever_query_result_v1.schema.json",
       "replay_ready": true
+    },
+    {
+      "fixture_key": "generic:memory_store:offline",
+      "path": "fixtures/generic_memory_store_fixture.json",
+      "schema": "schemas/generic_memory_store_v1.schema.json",
+      "replay_ready": true
     }
   ],
   "acceptance_gates": [
@@ -303,6 +349,7 @@
     "RAG chunks include stable chunk ids, corpus manifest linkage, citations, source offsets, accession provenance, and a chunk/citation/vector adapter matrix without embedding model calls",
     "RAG corpus manifest records chunk ids, source fixture keys, citation consistency, retriever adapter boundaries, vector store capability gates, and optional LangChain/vector dependency clean-skip metadata",
     "retriever query fixtures include ranked chunks, scores, answer citations, vector adapter metadata, retriever boundary references, and embedding/retriever clean-skip metadata",
-    "fixture replay succeeds without credentials, live network, SEC clients, Marker, embedding models, LangChain, or vector database imports"
+    "generic memory store fixtures include namespace policy, memory item provenance, retrieval ranking, context window budget, and provider-free adapter boundaries",
+    "fixture replay succeeds without credentials, live network, SEC clients, Marker, embedding models, LangChain, memory provider, or vector database imports"
   ]
 }

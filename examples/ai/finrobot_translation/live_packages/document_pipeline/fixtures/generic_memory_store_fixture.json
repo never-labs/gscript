@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "memory_store": {
+    "store_id": "generic-memory-fixture-store",
+    "store_type": "fixture_in_memory",
+    "persistent": false,
+    "dependency_imported": false,
+    "credential_required": false,
+    "live_network": false,
+    "clean_skip": true,
+    "skip_reason": "fixture replay stores memory items as static JSON without Redis, Postgres, vector databases, embedding models, or managed memory providers"
+  },
+  "namespace_policy": {
+    "namespace": "generic/offline/context-store",
+    "tenant_scope": "fixture_only",
+    "allowed_tags": [
+      "runbook",
+      "risk",
+      "summary"
+    ],
+    "pii_policy": "no_personal_data_in_fixture",
+    "secret_policy": "no_secrets_or_credentials_allowed"
+  },
+  "memory_items": [
+    {
+      "memory_id": "mem:risk:operating:0001",
+      "text": "Supply disruption and customer concentration are operating risks in the offline context store.",
+      "tags": [
+        "risk",
+        "summary"
+      ],
+      "source_ref": "fixture://rag/chunks/ACME-2025-10K:risk_factors:0001",
+      "chunk_id": "ACME-2025-10K:risk_factors:0001",
+      "provenance": {
+        "fixture_key": "generic:memory_store:offline",
+        "source_fixture_key": "rag:chunks:ACME:10-K:offline",
+        "retriever_fixture_key": "retriever:ragquery:ACME:offline"
+      }
+    },
+    {
+      "memory_id": "mem:mda:revenue:0001",
+      "text": "Revenue increased due to services growth while hardware margin remained flat.",
+      "tags": [
+        "summary"
+      ],
+      "source_ref": "fixture://rag/chunks/ACME-2025-10K:mda:0001",
+      "chunk_id": "ACME-2025-10K:mda:0001",
+      "provenance": {
+        "fixture_key": "generic:memory_store:offline",
+        "source_fixture_key": "rag:chunks:ACME:10-K:offline",
+        "retriever_fixture_key": "retriever:ragquery:ACME:offline"
+      }
+    }
+  ],
+  "retrieval_policy": {
+    "query": "operating risks",
+    "top_k": 2,
+    "ranking": "deterministic_fixture_score",
+    "metadata_filters": {
+      "required_tags": [
+        "risk"
+      ],
+      "namespace": "generic/offline/context-store"
+    },
+    "embedding_dependency_imported": false,
+    "vector_dependency_imported": false,
+    "provider_credentials_required": false
+  },
+  "retrieval_results": [
+    {
+      "memory_id": "mem:risk:operating:0001",
+      "rank": 1,
+      "score": 0.97,
+      "reason": "tag and query term match",
+      "context_ref": "ctx:generic:operating-risk:0001"
+    },
+    {
+      "memory_id": "mem:mda:revenue:0001",
+      "rank": 2,
+      "score": 0.61,
+      "reason": "linked retrieved chunk remains available for answer context",
+      "context_ref": "ctx:generic:revenue:0001"
+    }
+  ],
+  "context_window": {
+    "strategy": "ranked_memory_items",
+    "max_context_items": 2,
+    "token_budget": 256,
+    "included_memory_ids": [
+      "mem:risk:operating:0001",
+      "mem:mda:revenue:0001"
+    ],
+    "excluded_memory_ids": [],
+    "deterministic_order": true
+  },
+  "adapter_boundaries": [
+    {
+      "id": "memory_store_boundary",
+      "adapter": "fixture_memory_store",
+      "capability": "generic.memory.store",
+      "fixture_key": "generic:memory_store:offline",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "context_retrieval_boundary",
+      "adapter": "fixture_context_retriever",
+      "capability": "generic.memory.retrieve",
+      "fixture_key": "generic:memory_store:offline",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    }
+  ],
+  "provenance": {
+    "fixture_key": "generic:memory_store:offline",
+    "linked_chunk_fixture_key": "rag:chunks:ACME:10-K:offline",
+    "linked_retriever_fixture_key": "retriever:ragquery:ACME:offline"
+  }
+}

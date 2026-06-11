@@ -7,8 +7,8 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 78 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples list --json`. All 32
+Current registered-example status: 81 runnable/checkable FinRobot translation
+examples are discovered by `go run ./cmd/leia examples list --json`. All 34
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI
@@ -42,7 +42,9 @@ package-audit boundaries consumed by the translation.
 | `live_packages/generic_model_registry` | `live_packages/generic_model_registry/main.leia` | `leia-generic-ai-model-registry` | `packages/generic_ai/model_registry` | `contracts/model_registry_contract.json` |
 | `live_packages/generic_turn_runner` | `live_packages/generic_turn_runner/main.leia` | `leia-generic-ai-turn-runner` | `packages/generic_ai/turn_runner` | `contracts/generic_turn_runner_contract.json` |
 | `live_packages/generic_tool_contracts` | `live_packages/generic_tool_contracts/main.leia` | `leia-generic-ai-tool-contracts` | `packages/generic_ai/tool_contracts` | `contracts/generic_tool_contract.json` |
+| `live_packages/generic_tool_registry` | `live_packages/generic_tool_registry/main.leia` | `leia-generic-ai-tool-registry` | `packages/generic_ai/tool_registry` | `contracts/tool_registry_contract.json` |
 | `live_packages/generic_agent_runner` | `live_packages/generic_agent_runner/main.leia` | `leia-generic-ai-agent-runner` | `packages/generic_ai/agent_runner` | `contracts/agent_runner_contract.json` |
+| `live_packages/generic_planning_graph` | `live_packages/generic_planning_graph/main.leia` | `leia-generic-ai-planning-graph` | `packages/generic_ai/planning_graph` | `contracts/planning_graph_contract.json` |
 | `live_packages/generic_workflow_orchestrator` | `live_packages/generic_workflow_orchestrator/main.leia` | `leia-generic-ai-workflow-orchestrator` | `packages/generic_ai/workflow_orchestrator` | `contracts/workflow_graph_contract.json` |
 | `live_packages/generic_evaluation_harness` | `live_packages/generic_evaluation_harness/main.leia` | `leia-generic-ai-evaluation-harness` | `packages/generic_ai/evaluation_harness` | `contracts/evaluation_harness_contract.json` |
 | `live_packages/generic_record_replay` | `live_packages/generic_record_replay/main.leia` | `leia-generic-ai-record-replay` | `packages/generic_ai/record_replay` | `contracts/record_replay_contract.json` |

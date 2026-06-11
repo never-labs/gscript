@@ -15,14 +15,18 @@
         "form_type": "10-K",
         "as_of": "2026-06-11",
         "replay_ready": true,
-        "provider_free": true,
-        "live_network": false,
         "contains_accession": true,
         "contains_source_url": true,
         "contains_user_agent_policy": true,
         "contains_rate_limit_policy": true,
-        "contains_redirect_cache_metadata": true
-      }
+        "contains_redirect_cache_metadata": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
@@ -33,16 +37,20 @@
         "ticker": "ACME",
         "form_type": "10-K",
         "replay_ready": true,
-        "provider_free": true,
-        "live_network": false,
         "accepted_inputs": [
           "sec_html",
           "sec_pdf"
         ],
         "contains_html_parser_boundary": true,
         "contains_pdf_to_markdown_boundary": true,
-        "contains_redirect_cache_metadata": true
-      }
+        "contains_redirect_cache_metadata": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "rag:chunks:ACME:10-K:offline",
@@ -52,13 +60,17 @@
       "metadata": {
         "ticker": "ACME",
         "replay_ready": true,
-        "provider_free": true,
-        "live_network": false,
         "contains_citations": true,
         "contains_provenance": true,
         "contains_adapter_matrix": true,
-        "contains_embedding_clean_skip": true
-      }
+        "contains_embedding_clean_skip": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
@@ -68,14 +80,18 @@
       "metadata": {
         "ticker": "ACME",
         "replay_ready": true,
-        "provider_free": true,
-        "live_network": false,
         "contains_chunk_ids": true,
         "contains_citation_consistency": true,
         "contains_vector_capability_gates": true,
         "contains_retriever_boundaries": true,
-        "contains_optional_dependency_clean_skip": true
-      }
+        "contains_optional_dependency_clean_skip": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "retriever:ragquery:ACME:offline",
@@ -85,13 +101,37 @@
       "metadata": {
         "ticker": "ACME",
         "replay_ready": true,
-        "provider_free": true,
-        "live_network": false,
         "contains_ranked_chunks": true,
         "vector_adapter": "fixture_vector_index",
         "contains_retriever_clean_skip": true,
-        "contains_embedding_adapter_boundary": true
-      }
+        "contains_embedding_adapter_boundary": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "generic:memory_store:offline",
+      "capability": "generic.memory.store_retrieve",
+      "path": "fixtures/generic_memory_store_fixture.json",
+      "schema": "schemas/generic_memory_store_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "contains_namespace_policy": true,
+        "contains_memory_items": true,
+        "contains_retrieval_policy": true,
+        "contains_context_window": true,
+        "contains_provider_free_boundaries": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "adapter_boundary:document_pipeline:offline",
@@ -101,9 +141,13 @@
       "metadata": {
         "ticker": "ACME",
         "replay_ready": true,
+        "live_network": false,
         "provider_free": true,
-        "live_network": false
-      }
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

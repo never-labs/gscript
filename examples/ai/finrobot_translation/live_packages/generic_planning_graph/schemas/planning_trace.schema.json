@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/planning_trace.schema.json",
+  "title": "generic planning trace",
+  "type": "object",
+  "required": ["schema_version", "fixture_key", "provider_free", "events", "summary"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "fixture_key": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "real_dependency_imports": {"type": "boolean", "const": false},
+    "events": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": true
+}

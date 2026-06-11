@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/planning_graph.schema.json",
+  "title": "generic planning graph",
+  "type": "object",
+  "required": ["schema_version", "id", "provider_free", "plan_nodes", "edges"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "id": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "real_dependency_imports": {"type": "boolean", "const": false},
+    "plan_nodes": {"type": "array", "items": {"type": "object"}},
+    "edges": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

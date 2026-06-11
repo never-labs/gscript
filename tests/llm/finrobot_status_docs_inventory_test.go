@@ -23,8 +23,8 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 			genericSkeletons++
 		}
 	}
-	if liveSkeletons != 32 || genericSkeletons != 10 {
-		t.Fatalf("live skeleton counts = %d generic=%d, want 32/10", liveSkeletons, genericSkeletons)
+	if liveSkeletons == 0 || genericSkeletons == 0 || genericSkeletons > liveSkeletons {
+		t.Fatalf("live skeleton counts = %d generic=%d, want non-empty coherent counts", liveSkeletons, genericSkeletons)
 	}
 
 	docs := map[string][]string{

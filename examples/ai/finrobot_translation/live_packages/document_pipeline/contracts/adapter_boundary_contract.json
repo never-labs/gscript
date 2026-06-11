@@ -82,6 +82,17 @@
       "dependency_imported": false,
       "credential_required": false,
       "clean_skip": true
+    },
+    {
+      "id": "generic_memory_store",
+      "display_name": "Generic memory store and context retrieval",
+      "capability": "generic.memory.store_retrieve",
+      "fixture_key": "generic:memory_store:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
     }
   ]
 }

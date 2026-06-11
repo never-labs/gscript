@@ -41,7 +41,9 @@ contracts, and fixtures for its boundary.
 - model: `examples/ai/finrobot_translation/live_packages/generic_model_registry`
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
 - tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
+- tool-registry: `examples/ai/finrobot_translation/live_packages/generic_tool_registry`
 - agent: `examples/ai/finrobot_translation/live_packages/generic_agent_runner`
+- planning: `examples/ai/finrobot_translation/live_packages/generic_planning_graph`
 - workflow: `examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator`
 - eval: `examples/ai/finrobot_translation/live_packages/generic_evaluation_harness`
 - replay: `examples/ai/finrobot_translation/live_packages/generic_record_replay`
@@ -63,8 +65,12 @@ orthogonal and layered:
   result.
 - tool validates a tool request, checks capability metadata, runs or replays the
   implementation, and returns a normalized result envelope.
+- tool-registry declares reusable tool descriptors, validates schemas, records
+  invocation traces, and keeps effectful approval edges provider-free by default.
 - agent joins turns, tools, memory snapshots, structured output validation, and
   loop budgets into a declarative agent run.
+- planning turns goals into explicit nodes, dependencies, retry rules,
+  branch/merge joins, and trace evidence before workflow execution.
 - workflow coordinates multiple agents or stages, handoffs, retries, cache
   policy, artifact plans, and trace hooks.
 - approval applies policy decisions before tool calls, workflow actions, and

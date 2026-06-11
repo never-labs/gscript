@@ -2,6 +2,7 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -42,17 +43,16 @@ func TestGenericAIPackageMatrixMapsTenGenericLivePackages(t *testing.T) {
 	if matrix.SourceRoot != "examples/ai/finrobot_translation/live_packages" {
 		t.Fatalf("source_root = %q", matrix.SourceRoot)
 	}
-	if len(matrix.Packages) != 10 {
-		t.Fatalf("packages = %d, want 10", len(matrix.Packages))
-	}
-
 	packagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
 	wantDirs := map[string]bool{}
 	for _, dir := range genericLivePackageDirs(t, packagesRoot) {
 		wantDirs[filepath.ToSlash(mustRel(t, root, dir))] = true
 	}
-	if len(wantDirs) != 10 {
-		t.Fatalf("generic live package dirs = %d, want 10", len(wantDirs))
+	if len(wantDirs) == 0 {
+		t.Fatal("generic live package dirs = 0")
+	}
+	if len(matrix.Packages) != len(wantDirs) {
+		t.Fatalf("packages = %d, want %d generic live package dirs", len(matrix.Packages), len(wantDirs))
 	}
 
 	seen := map[string]bool{}
@@ -98,7 +98,6 @@ func TestGenericAIPackageMatrixIsProviderFreeAndCapabilityGeneric(t *testing.T) 
 				t.Fatalf("%s manifest live_network_default = %#v, want false", row.ID, value)
 			}
 
-			var manifestCapabilities []string
 			data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(row.Manifest)))
 			if err != nil {
 				t.Fatal(err)
@@ -107,7 +106,8 @@ func TestGenericAIPackageMatrixIsProviderFreeAndCapabilityGeneric(t *testing.T) 
 			if err := json.Unmarshal(data, &raw); err != nil {
 				t.Fatal(err)
 			}
-			if err := json.Unmarshal(raw["capabilities"], &manifestCapabilities); err != nil {
+			manifestCapabilities, err := genericAIPackageMatrixManifestCapabilities(raw["capabilities"])
+			if err != nil {
 				t.Fatalf("%s capabilities: %v", row.Manifest, err)
 			}
 			sort.Strings(manifestCapabilities)
@@ -126,6 +126,32 @@ func TestGenericAIPackageMatrixIsProviderFreeAndCapabilityGeneric(t *testing.T) 
 			}
 		})
 	}
+}
+
+func genericAIPackageMatrixManifestCapabilities(raw json.RawMessage) ([]string, error) {
+	var values []any
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, err
+	}
+	capabilities := make([]string, 0, len(values))
+	for _, value := range values {
+		switch value := value.(type) {
+		case string:
+			capabilities = append(capabilities, value)
+		case map[string]any:
+			capability, _ := value["id"].(string)
+			if capability == "" {
+				capability, _ = value["capability_id"].(string)
+			}
+			if capability == "" {
+				return nil, fmt.Errorf("capability object missing id or capability_id")
+			}
+			capabilities = append(capabilities, capability)
+		default:
+			return nil, fmt.Errorf("unsupported capability value %T", value)
+		}
+	}
+	return capabilities, nil
 }
 
 func loadGenericAIPackageMatrix(t *testing.T, root string) genericAIPackageMatrix {

@@ -151,6 +151,24 @@
         "answer_citations_required": true
       },
       "gap": "Future package must provide embedding model, vector index, ranking, and persistence adapters."
+    },
+    {
+      "id": "generic_memory_store",
+      "display_name": "Generic memory store and context retrieval",
+      "capability": "generic.memory.store_retrieve",
+      "fixture_key": "generic:memory_store:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Memory store and context retrieval are static fixture records without external memory providers or persistence imports.",
+      "policy": {
+        "namespace_policy_required": true,
+        "memory_item_provenance_required": true,
+        "context_window_budget_required": true,
+        "provider_credentials_required": false
+      },
+      "gap": "Future package must provide durable memory storage, tenant isolation, retrieval ranking, and context packing outside Leia core."
     }
   ]
 }

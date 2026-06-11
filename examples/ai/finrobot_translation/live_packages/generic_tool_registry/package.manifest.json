@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "id": "generic-tool-registry-live-package",
+  "package_name": "leia-generic-ai-tool-registry",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic tool registry skeleton for declarative tool descriptors, capability gates, and replay-only tool invocation traces.",
+  "source_examples": [
+    "examples/ai/finrobot_translation/toolkit_parity/ledger.json"
+  ],
+  "provider_free": true,
+  "domain_specific": false,
+  "finrobot_specific": false,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "local_execution_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this generic package; provider keys and network clients belong only to future provider-specific packages behind explicit capability gates."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "local_execution": false,
+    "approval_required_for_effectful_tools": true,
+    "clean_skip_without_approval": true,
+    "clean_skip_without_descriptor": true,
+    "fixture_hook": "recorded_generic_tool_registry_fixture"
+  },
+  "entrypoints": {
+    "main": "main.leia",
+    "contract": "contracts/tool_registry_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "invocation_trace_fixture": "fixtures/tool_registry_replay_trace_fixture.json",
+    "approval_edge_fixture": "fixtures/approval_edge_fixture.json"
+  },
+  "schemas": {
+    "tool_descriptor": "schemas/tool_descriptor.schema.json",
+    "tool_invocation_trace": "schemas/tool_invocation_trace.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "trace": "fixtures/tool_registry_replay_trace_fixture.json",
+    "approval_edge": "fixtures/approval_edge_fixture.json"
+  },
+  "capabilities": [
+    {
+      "id": "generic.tool.registry.declare",
+      "capability_id": "generic.tool.registry.declare",
+      "schema": "schemas/tool_descriptor.schema.json",
+      "default": "fixture",
+      "approval_required": false
+    },
+    {
+      "id": "generic.tool.registry.validate_schema",
+      "capability_id": "generic.tool.registry.validate_schema",
+      "schema": "schemas/tool_descriptor.schema.json",
+      "default": "fixture",
+      "approval_required": false
+    },
+    {
+      "id": "generic.tool.invocation.trace",
+      "capability_id": "generic.tool.invocation.trace",
+      "schema": "schemas/tool_invocation_trace.schema.json",
+      "default": "fixture",
+      "approval_required": false
+    },
+    {
+      "id": "generic.tool.approval.edge",
+      "capability_id": "generic.tool.approval.edge",
+      "schema": "schemas/tool_invocation_trace.schema.json",
+      "default": "deny_without_approval",
+      "approval_required": true
+    },
+    {
+      "id": "generic.tool.registry.replay_fixture",
+      "capability_id": "generic.tool.registry.replay_fixture",
+      "schema": "schemas/tool_invocation_trace.schema.json",
+      "default": "fixture",
+      "approval_required": false
+    }
+  ],
+  "test_gates": [
+    "manifest, contract, schemas, and fixtures decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "required and optional credentials are empty",
+    "tool descriptors reject provider wire format, network requirements, and secret-bearing parameters by default",
+    "tool invocation trace records caller, executor, schema validation, replay source, approval decision, and result envelope",
+    "approval edge clean-skips denied effectful invocation without network, provider SDK, or local execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide leia-generic-ai-tool-registry as a built-in; this provider-free package boundary must be satisfied by future external packages before live tool registry implementations are enabled."
+  }
+}

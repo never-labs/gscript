@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "id": "generic-tool-invocation-trace-schema",
+  "provider_free": true,
+  "domain": "generic_ai_tool_registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "trace_id",
+    "tool_name",
+    "caller_id",
+    "executor_id",
+    "capability_ids",
+    "events",
+    "schema_validation",
+    "approval",
+    "result",
+    "provenance"
+  ],
+  "properties": {
+    "trace_id": {
+      "type": "string"
+    },
+    "tool_name": {
+      "type": "string"
+    },
+    "caller_id": {
+      "type": "string"
+    },
+    "executor_id": {
+      "type": "string"
+    },
+    "capability_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^generic\\.tool\\."
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": [
+          "event",
+          "sequence"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "enum": [
+              "registered",
+              "schema_validated",
+              "approval_checked",
+              "invoked",
+              "result_recorded"
+            ]
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "schema_validation": {
+      "type": "object",
+      "required": [
+        "input_valid",
+        "output_valid",
+        "additional_properties_rejected"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "input_valid": {
+          "type": "boolean"
+        },
+        "output_valid": {
+          "type": "boolean"
+        },
+        "additional_properties_rejected": {
+          "type": "boolean"
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "required": [
+        "required",
+        "decision",
+        "approval_id",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "decision": {
+          "enum": [
+            "allow_fixture",
+            "deny"
+          ]
+        },
+        "approval_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": [
+        "ok",
+        "status",
+        "content",
+        "metadata"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "skipped",
+            "denied"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "provider_free",
+        "live_network",
+        "real_dependency_imports",
+        "local_execution",
+        "fixture_key"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "provider_free": {
+          "const": true
+        },
+        "live_network": {
+          "const": false
+        },
+        "real_dependency_imports": {
+          "const": false
+        },
+        "local_execution": {
+          "const": false
+        },
+        "fixture_key": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

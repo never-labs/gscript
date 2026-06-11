@@ -104,24 +104,25 @@ func TestFinRobotDocumentPipelineLivePackageManifest(t *testing.T) {
 		"FinRobot/marker_sec_src/sec_filings_to_markdown.py",
 		"FinRobot/functional/rag.py",
 		"FinRobot/functional/ragquery.py",
+		"generic/memory_store.leia",
 	}
 	if !reflect.DeepEqual(manifest.SourceModules, wantSources) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
 	}
 
-	for _, key := range []string{"smoke", "document_pipeline_contract", "adapter_boundary_contract", "fixture_index"} {
+	for _, key := range []string{"smoke", "document_pipeline_contract", "adapter_boundary_contract", "fixture_index", "generic_memory_store_contract"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"filing_search_result", "document_markdown", "section_extraction", "rag_chunk", "retriever_query_result", "adapter_boundary", "rag_corpus_manifest"} {
+	for _, key := range []string{"filing_search_result", "document_markdown", "section_extraction", "rag_chunk", "retriever_query_result", "adapter_boundary", "rag_corpus_manifest", "generic_memory_store"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertDocumentPipelineJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "sec_search", "markdown_conversion", "rag_index", "retriever_query", "adapter_boundary", "rag_corpus_manifest"} {
+	for _, key := range []string{"index", "sec_search", "markdown_conversion", "rag_index", "retriever_query", "adapter_boundary", "rag_corpus_manifest", "generic_memory_store"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -137,13 +138,13 @@ func TestFinRobotDocumentPipelineLivePackageManifest(t *testing.T) {
 		}
 	}
 	sort.Strings(ids)
-	wantIDs := []string{"filings_src", "marker_sec_src", "rag", "ragquery"}
+	wantIDs := []string{"filings_src", "generic_memory", "marker_sec_src", "rag", "ragquery"}
 	if !reflect.DeepEqual(ids, wantIDs) {
 		t.Fatalf("module ids = %#v, want %#v", ids, wantIDs)
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"sec", "user-agent", "rate-limit", "redirect/cache", "html/pdf", "section", "chunk", "corpus", "citation", "provenance", "vector capability", "retriever", "langchain", "fixture"} {
+	for _, want := range []string{"sec", "user-agent", "rate-limit", "redirect/cache", "html/pdf", "section", "generic memory", "chunk", "corpus", "citation", "provenance", "vector capability", "retriever", "langchain", "fixture"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -169,16 +170,16 @@ func TestFinRobotDocumentPipelineLivePackageContractsAndFixtures(t *testing.T) {
 		AcceptanceGates []string       `json:"acceptance_gates"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "contracts", "document_pipeline_contract.json"), &contract)
-	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 4 {
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 5 {
 		t.Fatalf("contract header/modules = %#v", contract)
 	}
-	for _, field := range []string{"filing_search", "sec_access_policy", "redirect_cache_metadata", "html_pdf_to_markdown", "html_parser_boundary", "pdf_to_markdown_converter_boundary", "section_extraction", "chunk_citation_provenance", "rag_corpus_manifest", "chunk_citation_vector_adapter_matrix", "vector_store_capability_gates", "citation_consistency", "vector_retriever_adapter", "embedding_retriever_clean_skip"} {
+	for _, field := range []string{"filing_search", "sec_access_policy", "redirect_cache_metadata", "html_pdf_to_markdown", "html_parser_boundary", "pdf_to_markdown_converter_boundary", "section_extraction", "chunk_citation_provenance", "rag_corpus_manifest", "chunk_citation_vector_adapter_matrix", "vector_store_capability_gates", "citation_consistency", "vector_retriever_adapter", "embedding_retriever_clean_skip", "generic_memory_store"} {
 		if contract.FieldContracts[field] == nil {
 			t.Fatalf("missing field contract %q", field)
 		}
 	}
 	acceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
-	for _, want := range []string{"sec filing", "user-agent", "rate-limit", "redirect", "cache", "html parser", "pdf-to-markdown", "section", "corpus manifest", "adapter matrix", "capability gates", "clean-skip", "retriever", "langchain", "fixture replay"} {
+	for _, want := range []string{"sec filing", "user-agent", "rate-limit", "redirect", "cache", "html parser", "pdf-to-markdown", "section", "corpus manifest", "adapter matrix", "capability gates", "generic memory store", "context window", "clean-skip", "retriever", "langchain", "fixture replay"} {
 		if !strings.Contains(acceptance, want) {
 			t.Fatalf("acceptance gates missing %q: %s", want, acceptance)
 		}
@@ -197,7 +198,7 @@ func TestFinRobotDocumentPipelineLivePackageContractsAndFixtures(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 6 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 7 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	for _, fixture := range index.Fixtures {
@@ -220,6 +221,10 @@ func TestFinRobotDocumentPipelineLivePackageContractsAndFixtures(t *testing.T) {
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "rag_corpus_manifest_v1.schema.json"), []string{"schema_version", "provider_free", "live_network", "corpus_id", "document_id", "fixture_key", "source_fixture_keys", "chunk_fixture_key", "retriever_fixture_key", "chunk_ids", "citation_consistency", "vector_store_capabilities", "retriever_boundaries", "optional_dependencies"})
 	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "retriever_query_result_v1.schema.json"), []string{"properties", "retriever"}, []string{"adapter", "top_k", "live_network", "dependency_imported", "clean_skip_without_dependency", "skip_reason", "embedding_adapter", "vector_adapter"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "retriever_query_result_v1.schema.json"), []string{"schema_version", "provider_free", "live_network", "query", "answer", "retriever", "retriever_boundaries", "retrieved_chunks", "answer_citations", "provenance"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "generic_memory_store_v1.schema.json"), []string{"schema_version", "provider_free", "live_network", "memory_store", "namespace_policy", "memory_items", "retrieval_policy", "retrieval_results", "context_window", "adapter_boundaries", "provenance"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "generic_memory_store_v1.schema.json"), []string{"properties", "memory_store"}, []string{"store_id", "store_type", "persistent", "dependency_imported", "credential_required", "live_network", "clean_skip"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "generic_memory_store_v1.schema.json"), []string{"properties", "memory_items", "items"}, []string{"memory_id", "text", "tags", "source_ref", "chunk_id", "provenance"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "generic_memory_store_v1.schema.json"), []string{"properties", "retrieval_results", "items"}, []string{"memory_id", "rank", "score", "reason", "context_ref"})
 	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "adapter_boundary_v1.schema.json"), []string{"properties", "boundaries", "items"}, []string{"id", "display_name", "capability", "fixture_key", "live_network", "dependency_imported", "credential_required", "clean_skip", "clean_skip_reason", "policy", "gap"})
 }
 
@@ -238,7 +243,7 @@ func TestFinRobotDocumentPipelineLivePackageAdapterBoundaries(t *testing.T) {
 		}
 	}
 	sort.Strings(ids)
-	wantIDs := []string{"chunk_citation_adapter", "embedding_adapter", "html_parser", "pdf_to_markdown_converter", "sec_filing_client", "vector_retriever", "vector_store_adapter"}
+	wantIDs := []string{"chunk_citation_adapter", "embedding_adapter", "generic_memory_store", "html_parser", "pdf_to_markdown_converter", "sec_filing_client", "vector_retriever", "vector_store_adapter"}
 	if !reflect.DeepEqual(ids, wantIDs) {
 		t.Fatalf("adapter ids = %#v, want %#v", ids, wantIDs)
 	}
@@ -254,8 +259,8 @@ func TestFinRobotDocumentPipelineLivePackageAdapterBoundaries(t *testing.T) {
 	if !boundaryContract.ProviderFree || boundaryContract.LiveNetwork || boundaryContract.RealDependencyImports || !boundaryContract.CleanSkipWithoutDependency {
 		t.Fatalf("boundary contract header = %#v", boundaryContract)
 	}
-	if len(boundaryContract.Boundaries) != 7 {
-		t.Fatalf("boundary contract count = %d, want 7", len(boundaryContract.Boundaries))
+	if len(boundaryContract.Boundaries) != 8 {
+		t.Fatalf("boundary contract count = %d, want 8", len(boundaryContract.Boundaries))
 	}
 	for _, boundary := range boundaryContract.Boundaries {
 		if boundary.LiveNetwork || boundary.DependencyImported || boundary.CredentialRequired || !boundary.CleanSkip {
@@ -762,6 +767,170 @@ func TestFinRobotDocumentPipelineLivePackageRAGCorpusVectorParity(t *testing.T) 
 	}
 }
 
+func TestFinRobotDocumentPipelineLivePackageGenericMemoryStore(t *testing.T) {
+	base := documentPipelineLivePackageDir(t)
+
+	var memory struct {
+		ProviderFree bool `json:"provider_free"`
+		LiveNetwork  bool `json:"live_network"`
+		MemoryStore  struct {
+			StoreID            string `json:"store_id"`
+			StoreType          string `json:"store_type"`
+			Persistent         bool   `json:"persistent"`
+			DependencyImported bool   `json:"dependency_imported"`
+			CredentialRequired bool   `json:"credential_required"`
+			LiveNetwork        bool   `json:"live_network"`
+			CleanSkip          bool   `json:"clean_skip"`
+			SkipReason         string `json:"skip_reason"`
+		} `json:"memory_store"`
+		NamespacePolicy struct {
+			Namespace    string   `json:"namespace"`
+			TenantScope  string   `json:"tenant_scope"`
+			AllowedTags  []string `json:"allowed_tags"`
+			PIIPolicy    string   `json:"pii_policy"`
+			SecretPolicy string   `json:"secret_policy"`
+		} `json:"namespace_policy"`
+		MemoryItems []struct {
+			MemoryID   string   `json:"memory_id"`
+			Text       string   `json:"text"`
+			Tags       []string `json:"tags"`
+			SourceRef  string   `json:"source_ref"`
+			ChunkID    string   `json:"chunk_id"`
+			Provenance struct {
+				FixtureKey          string `json:"fixture_key"`
+				SourceFixtureKey    string `json:"source_fixture_key"`
+				RetrieverFixtureKey string `json:"retriever_fixture_key"`
+			} `json:"provenance"`
+		} `json:"memory_items"`
+		RetrievalPolicy struct {
+			Query                       string         `json:"query"`
+			TopK                        int            `json:"top_k"`
+			Ranking                     string         `json:"ranking"`
+			MetadataFilters             map[string]any `json:"metadata_filters"`
+			EmbeddingDependencyImported bool           `json:"embedding_dependency_imported"`
+			VectorDependencyImported    bool           `json:"vector_dependency_imported"`
+			ProviderCredentialsRequired bool           `json:"provider_credentials_required"`
+		} `json:"retrieval_policy"`
+		RetrievalResults []struct {
+			MemoryID   string  `json:"memory_id"`
+			Rank       int     `json:"rank"`
+			Score      float64 `json:"score"`
+			Reason     string  `json:"reason"`
+			ContextRef string  `json:"context_ref"`
+		} `json:"retrieval_results"`
+		ContextWindow struct {
+			Strategy           string   `json:"strategy"`
+			MaxContextItems    int      `json:"max_context_items"`
+			TokenBudget        int      `json:"token_budget"`
+			IncludedMemoryIDs  []string `json:"included_memory_ids"`
+			ExcludedMemoryIDs  []string `json:"excluded_memory_ids"`
+			DeterministicOrder bool     `json:"deterministic_order"`
+		} `json:"context_window"`
+		AdapterBoundaries []struct {
+			ID                 string `json:"id"`
+			Adapter            string `json:"adapter"`
+			Capability         string `json:"capability"`
+			FixtureKey         string `json:"fixture_key"`
+			DependencyImported bool   `json:"dependency_imported"`
+			CredentialRequired bool   `json:"credential_required"`
+			LiveNetwork        bool   `json:"live_network"`
+			CleanSkip          bool   `json:"clean_skip"`
+		} `json:"adapter_boundaries"`
+		Provenance struct {
+			FixtureKey                string `json:"fixture_key"`
+			LinkedChunkFixtureKey     string `json:"linked_chunk_fixture_key"`
+			LinkedRetrieverFixtureKey string `json:"linked_retriever_fixture_key"`
+		} `json:"provenance"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "generic_memory_store_fixture.json"), &memory)
+	if !memory.ProviderFree || memory.LiveNetwork || len(memory.MemoryItems) < 2 || len(memory.RetrievalResults) < 2 {
+		t.Fatalf("memory fixture header/counts = %#v", memory)
+	}
+	if memory.MemoryStore.StoreType != "fixture_in_memory" ||
+		memory.MemoryStore.Persistent ||
+		memory.MemoryStore.DependencyImported ||
+		memory.MemoryStore.CredentialRequired ||
+		memory.MemoryStore.LiveNetwork ||
+		!memory.MemoryStore.CleanSkip ||
+		!strings.Contains(strings.ToLower(memory.MemoryStore.SkipReason), "static json") {
+		t.Fatalf("memory store must remain provider-free fixture storage: %#v", memory.MemoryStore)
+	}
+	if memory.NamespacePolicy.Namespace == "" ||
+		memory.NamespacePolicy.TenantScope != "fixture_only" ||
+		!strings.Contains(strings.ToLower(memory.NamespacePolicy.SecretPolicy), "no_secrets") {
+		t.Fatalf("namespace policy incomplete: %#v", memory.NamespacePolicy)
+	}
+	if memory.RetrievalPolicy.Query == "" ||
+		memory.RetrievalPolicy.TopK != len(memory.RetrievalResults) ||
+		memory.RetrievalPolicy.Ranking != "deterministic_fixture_score" ||
+		memory.RetrievalPolicy.EmbeddingDependencyImported ||
+		memory.RetrievalPolicy.VectorDependencyImported ||
+		memory.RetrievalPolicy.ProviderCredentialsRequired {
+		t.Fatalf("retrieval policy must be deterministic and provider-free: %#v", memory.RetrievalPolicy)
+	}
+	if memory.ContextWindow.Strategy == "" ||
+		memory.ContextWindow.MaxContextItems != len(memory.ContextWindow.IncludedMemoryIDs) ||
+		memory.ContextWindow.TokenBudget <= 0 ||
+		!memory.ContextWindow.DeterministicOrder ||
+		len(memory.ContextWindow.ExcludedMemoryIDs) != 0 {
+		t.Fatalf("context window incomplete: %#v", memory.ContextWindow)
+	}
+	for _, boundary := range memory.AdapterBoundaries {
+		if boundary.ID == "" || boundary.Adapter == "" || boundary.Capability == "" || boundary.FixtureKey != "generic:memory_store:offline" || boundary.DependencyImported || boundary.CredentialRequired || boundary.LiveNetwork || !boundary.CleanSkip {
+			t.Fatalf("memory adapter boundary must be fixture-only: %#v", boundary)
+		}
+	}
+
+	var chunks struct {
+		Chunks []struct {
+			ChunkID string `json:"chunk_id"`
+		} `json:"chunks"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "rag_chunks_ACME_10k_fixture.json"), &chunks)
+	chunkIDs := map[string]bool{}
+	for _, chunk := range chunks.Chunks {
+		chunkIDs[chunk.ChunkID] = true
+	}
+
+	memoryByID := map[string]string{}
+	for _, item := range memory.MemoryItems {
+		if item.MemoryID == "" || item.Text == "" || item.SourceRef == "" || item.ChunkID == "" || item.Provenance.FixtureKey != memory.Provenance.FixtureKey || item.Provenance.SourceFixtureKey != memory.Provenance.LinkedChunkFixtureKey || item.Provenance.RetrieverFixtureKey != memory.Provenance.LinkedRetrieverFixtureKey {
+			t.Fatalf("memory item provenance incomplete: %#v", item)
+		}
+		if !chunkIDs[item.ChunkID] {
+			t.Fatalf("memory item %q references missing chunk %q", item.MemoryID, item.ChunkID)
+		}
+		memoryByID[item.MemoryID] = item.ChunkID
+	}
+	for i, result := range memory.RetrievalResults {
+		if result.MemoryID == "" || result.Rank != i+1 || result.Score <= 0 || result.Reason == "" || result.ContextRef == "" {
+			t.Fatalf("retrieval result incomplete: %#v", result)
+		}
+		if memoryByID[result.MemoryID] == "" {
+			t.Fatalf("retrieval result references missing memory id %q", result.MemoryID)
+		}
+		if memory.ContextWindow.IncludedMemoryIDs[i] != result.MemoryID {
+			t.Fatalf("context window order %d = %q, want retrieval result %q", i, memory.ContextWindow.IncludedMemoryIDs[i], result.MemoryID)
+		}
+	}
+
+	var query struct {
+		RetrievedChunks []struct {
+			ChunkID string `json:"chunk_id"`
+		} `json:"retrieved_chunks"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "retriever_query_ACME_fixture.json"), &query)
+	retrievedChunks := map[string]bool{}
+	for _, chunk := range query.RetrievedChunks {
+		retrievedChunks[chunk.ChunkID] = true
+	}
+	for memoryID, chunkID := range memoryByID {
+		if !retrievedChunks[chunkID] {
+			t.Fatalf("memory item %q chunk %q must remain retriever-visible", memoryID, chunkID)
+		}
+	}
+}
+
 func TestFinRobotDocumentPipelineLivePackageNoLiveImports(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(documentPipelineLivePackageDir(t), "main.leia"))
 	if err != nil {
@@ -773,7 +942,7 @@ func TestFinRobotDocumentPipelineLivePackageNoLiveImports(t *testing.T) {
 		`(?m)^\s*use\s+`,
 		`(?m)^\s*load\s*\(`,
 		`(?m)^\s*require\s*\(`,
-		`(?m)^\s*(requests|http|sec_api|marker|pymupdf|fitz|pdfplumber|chromadb|faiss|pinecone|weaviate|qdrant|langchain|openai)\s*[.(]`,
+		`(?m)^\s*(requests|http|sec_api|marker|pymupdf|fitz|pdfplumber|redis|postgres|chromadb|faiss|pinecone|weaviate|qdrant|langchain|openai)\s*[.(]`,
 	} {
 		if regexp.MustCompile(pattern).FindString(source) != "" {
 			t.Fatalf("main.leia contains live dependency loader matching %q", pattern)
@@ -793,6 +962,7 @@ func TestFinRobotDocumentPipelineLivePackageNoLiveNetworkOrDependencyFlags(t *te
 		"fixtures/rag_chunks_ACME_10k_fixture.json",
 		"fixtures/rag_corpus_manifest_ACME_fixture.json",
 		"fixtures/retriever_query_ACME_fixture.json",
+		"fixtures/generic_memory_store_fixture.json",
 		"fixtures/adapter_boundary_fixture.json",
 	} {
 		var value any
@@ -831,7 +1001,7 @@ func TestFinRobotDocumentPipelineLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get document_pipeline_live_package_summary: %v", err)
 			}
-			want := "document_pipeline_live_package modules=4 adapters=7 provider_free=true live_network=false imports=false fixtures=6"
+			want := "document_pipeline_live_package modules=5 adapters=8 provider_free=true live_network=false imports=false fixtures=7"
 			if got != want {
 				t.Fatalf("document_pipeline_live_package_summary = %#v, want %#v", got, want)
 			}
