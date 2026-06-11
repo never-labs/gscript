@@ -5,6 +5,13 @@ providers. The language-level surface is intentionally small: tagged `model`,
 `tool`, `agent`, and `turn` blocks plus ordinary `llm.*`, `msg.*`, and
 `history.*` helpers.
 
+AI native does not mean AI intrinsic. The tagged forms are syntax for building
+ordinary values and calling ordinary runtime helpers; they do not add hidden
+prompt memory, model-specific evaluation rules, or a separate agent engine.
+Provider I/O, tool dispatch, budgets, trace, record, and replay all pass through
+the same host-visible `llm` runtime paths whether the source uses dialect syntax
+or direct helper calls.
+
 ## Host Contract
 
 Embedders install providers through Go options:
@@ -90,6 +97,21 @@ history[#history + 1] = msg.assistant("draft")
 Message tables use normalized roles: `system`, `user`, `assistant`, and
 `tool`.
 
+A `prompt { role: "...", text: "..." }` block is message-object shorthand. It
+produces the same kind of normalized table accepted by `messages` and by the
+`msg` helpers:
+
+```leia
+messages := {
+    prompt { role: "system", text: "Answer from local evidence." }
+    prompt { role: "user", text: "Summarize the release." }
+}
+```
+
+Prompt message objects are data, not compiler directives. They may appear in
+message arrays, agent `instructions`, or generated config tables. Trace sinks
+may redact prompt text according to host policy.
+
 ## Turn Dialect
 
 `turn { ... }` performs exactly one provider request and returns
@@ -173,6 +195,12 @@ When `messages` is omitted, the first call argument becomes `user`. The
 Prompt field blocks with `role` and `text` are ordinary message tables, so they
 can be placed directly in `messages`.
 
+Use the shorthand when the agent is a prompt capsule: fixed model, fixed
+instructions, optional tools, sampling controls, metadata, budget, and expected
+output shape. Use an explicit `config` function when call arguments need custom
+mapping or dynamic request fields. Use a custom `flow` only when the script must
+own turn sequencing, message history, or dispatch.
+
 For an agent without a custom flow function, Leia runs the built-in loop:
 synthesize messages from `system` and `user`, call one turn, dispatch returned
 tool calls, append assistant tool-call and tool-result messages, and repeat
@@ -201,12 +229,38 @@ supervisor := agent {
 }
 ```
 
+## Structured Output
+
+Agents and turns can request structured output with an `output` shape and can
+also pass provider-facing hints through `response_format`.
+
+```leia
+extract := agent {
+    name: "extract"
+    params: {"note"}
+    model: "fast"
+    instructions: prompt { role: "system", text: "Extract project and owner." }
+    output: {project: "ORCHID", owner: "ADA"}
+}
+```
+
+`output` is a validation contract over provider results. It does not make model
+text part of Leia syntax or add a new type system rule. Built-in agent
+execution validates configured shapes; custom flows should call
+`llm.validate_output(value, schema)` when they need the same check. Validation
+failures are structured errors, not provider answers.
+
 ## Budgets, Replay, And Trace
 
 Budgets can be attached to agent config tables or managed with lower-level
 helpers such as `llm.with_budget`. Public dimensions include `turns`, `calls`,
 `tokens`, and `time`. Provider usage may include cost metadata, but Leia does
 not promise money accounting as a stable script-level budget dimension.
+
+Budgets gate AI runtime work before or after provider turns and tool dispatch.
+They do not change ordinary expression evaluation outside the helper paths.
+Declarative agents, explicit agents, and direct turns share the same accounting
+when they lower through `llm`.
 
 Use host-side record/replay for deterministic tests:
 
@@ -224,6 +278,11 @@ _ = replay
 
 Use `llm.NewTraceRecorder()` or `leia.WithLLMTrace` for metadata events. Trace
 events intentionally omit prompt text and tool result values by default.
+Record/replay observes normalized requests after dialect lowering, so replay
+fixtures should not depend on whether the source used shorthand syntax or
+direct helper calls. Trace is for operational visibility and may redact content;
+replay is for deterministic provider behavior and must be strict about request
+matching.
 
 ## Live Provider Tests
 

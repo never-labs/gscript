@@ -10,6 +10,31 @@ An AI operation is deterministic until it reaches a provider, host callback, or
 tool body with side effects. Conformance tests that need stable behavior should
 use host-side replay records or mock providers.
 
+## Design Principle
+
+Leia is AI native, but AI is not language intrinsic. The grammar may provide
+small tagged forms for common AI workflows, yet the language core does not gain
+model-specific evaluation rules, hidden prompt state, or a privileged AI
+scheduler. Every AI-native form must lower to ordinary runtime helpers and
+ordinary values before provider I/O occurs.
+
+This principle has four consequences:
+
+- Dialect syntax is a convenience boundary, not a semantic fork. `agent`,
+  `turn`, `tool`, `model`, prompt message objects, output schemas, budgets,
+  trace, and replay all use the same `llm`, `msg`, `history`, and host-provider
+  paths that direct library calls use.
+- Prompts and messages are data. A prompt object is a normalized message table
+  when it contains `role` and `text`; it is not a special string literal, hidden
+  compiler directive, or lexical scope.
+- Structured output is validation over provider results. Request fields may ask
+  the provider for a shape and the runtime may validate that shape, but Leia
+  does not treat model text as typed language syntax unless a helper explicitly
+  parses and validates it.
+- Operational controls are host-visible. Budgets, cancellation, approval,
+  trace, record, and replay must remain observable through runtime options and
+  host hooks instead of being embedded as unreachable language behavior.
+
 ## Stable Contract
 
 The stable AI-native contract is the following lowering boundary:
@@ -101,6 +126,23 @@ history[#history + 1] = msg.user("Now include the owner.")
 Stable roles are `system`, `user`, `assistant`, and `tool`. Tool-call and
 tool-result messages are paired by provider call id. A later turn observes
 prior work only through the `messages` value supplied to that turn.
+
+Prompt field blocks are message object shorthand. A table produced by
+`prompt { role: "system", text: "..." }` is valid anywhere a normalized message
+table is valid:
+
+```text
+messages := {
+    prompt { role: "system", text: "Answer from the runbook only." }
+    prompt { role: "user", text: "How do I restart search?" }
+}
+```
+
+The shorthand has no separate prompt lifetime. It must preserve the same role,
+text, name, metadata, tool-call, and tool-result fields that the `msg` helpers
+produce, subject to provider support and normalization rules. Hosts and helper
+modules may redact prompt text from trace or replay artifacts according to
+their own policies; the source-level object remains ordinary data.
 
 ## Tools
 
@@ -217,11 +259,19 @@ answer := agent {
 }
 ```
 
-The shorthand lowers to a generated config function passed to `llm.agent`.
-When `messages` is absent, the first call argument is used as `user`.
-`instructions` is copied to `system` unless `system` is already present.
-Prompt field blocks that contain `role` and `text` are valid message tables and
-can be placed directly in `messages`.
+The shorthand lowers to a generated config function passed to `llm.agent`. It
+does not create a second agent type. The generated function copies declarative
+request fields into a fresh request table for each call and then applies the
+same normalization as an explicit `config` function:
+
+- `model`, `tools`, `output`, `response_format`, sampling controls, metadata,
+  budgets, and other request fields are copied as ordinary table fields.
+- When `messages` is absent, the first call argument is used as `user`.
+- `instructions` is copied to `system` unless `system` is already present.
+- Prompt field blocks that contain `role` and `text` are valid message tables
+  and can be placed directly in `messages`.
+- If argument mapping, branching, dynamic tool selection, or persistent
+  workflow state is needed, use an explicit `config` or `flow` function.
 
 The required fields are:
 
@@ -277,13 +327,18 @@ supervisor := agent {
 ## Output Validation
 
 Agents and turns may request structured output through request fields such as
-`output` or provider response-format hints. Built-in agent execution validates
+`output` or provider response-format hints. `output` is a script-visible shape
+contract and `response_format` is a provider-facing hint; either may be present
+without changing Leia's core type system. Built-in agent execution validates
 known output shapes when configured to do so. Custom flows that return
 arbitrary values are responsible for calling `llm.validate_output(value,
 schema)` if they want the same check.
 
 Validation failures are runtime errors or `(nil, err)` results according to
 the helper being used. They must not be silently converted to provider text.
+When validation succeeds, the validated value is still an ordinary Leia value.
+When parsing or validation fails, callers must handle a structured error rather
+than relying on best-effort text coercion.
 
 ## Budgets, Cancellation, And Approval
 
@@ -291,6 +346,12 @@ Budgets may be attached to agent or turn option tables and may also be enforced
 by the host. Stable dimensions include turn count, call count, token count, and
 time. Provider usage may include cost metadata, but Leia does not promise money
 accounting as a stable script-level budget dimension.
+
+A budget check gates runtime work; it does not change expression evaluation
+outside AI helpers. A budget may stop a built-in agent loop before the next
+provider request, before the next tool dispatch, or after usage is reported by
+a provider. Custom flows that bypass the built-in loop should use lower-level
+budget helpers when they need the same accounting.
 
 Hosts may cancel a running AI operation through the VM context or provider
 context. Cancellation should stop future provider/tool calls and return a
@@ -306,9 +367,17 @@ Hosts can install trace sinks, recorders, or replay providers. Trace events are
 metadata-oriented and should avoid prompt text and tool result values unless an
 explicit host policy permits capture.
 
-Replay fixtures are strict. A request mismatch, exhausted fixture, or leftover
-unconsumed turn is a failure. Updating a replay fixture is an explicit command
-or host action, not an ordinary script side effect.
+Recorders observe normalized provider requests and results after dialect
+lowering, so replay does not depend on whether the source used `turn { ... }`,
+declarative `agent { ... }`, or direct `llm.turn`. Replay fixtures are strict:
+a request mismatch, exhausted fixture, or leftover unconsumed turn is a
+failure. Updating a replay fixture is an explicit command or host action, not
+an ordinary script side effect.
+
+Trace and replay serve different purposes. Trace is for audit and operational
+visibility and may redact content. Replay is for deterministic execution and
+must contain enough normalized request/result data to satisfy the replay
+provider under the host's chosen recording policy.
 
 ## Evaluate Blocks
 

@@ -5,6 +5,12 @@ tagged dialect forms and ordinary modules. Scripts use concise `model`, `tool`,
 `agent`, and `turn` blocks; the Go host still controls providers, credentials,
 capabilities, tracing, recording, and replay.
 
+The design rule is: AI native, but not language intrinsic. The syntax helps you
+write agent-shaped programs without making prompts, model calls, or traces
+special language semantics. Everything lowers to `llm`, `msg`, `history`, and
+host-provider APIs, so the same code can be tested with mocks, replayed from
+records, or embedded under host policy.
+
 ## Mental Model
 
 Use the simplest layer that fits the workflow:
@@ -40,7 +46,10 @@ not dispatch tools by itself.
 ```leia
 result, err := turn {
     model: "fast"
-    messages: {llm.system("Be concise."), llm.user("Return exactly: ok")}
+    messages: {
+        prompt { role: "system", text: "Be concise." }
+        prompt { role: "user", text: "Return exactly: ok" }
+    }
     max_tokens: 16
     temperature: 0
 }
@@ -53,6 +62,11 @@ print(result.text)
 
 Use `turn` when the script owns the message history and wants one provider
 round trip.
+
+Prompt blocks with `role` and `text` are message objects. They are interchangeable
+with `llm.system`, `llm.user`, and `msg.*` helper output in a `messages` array.
+They do not create hidden prompt state; later turns see only the message array
+you pass.
 
 ## Tools
 
@@ -154,8 +168,19 @@ extract := agent {
 result, err := extract("Owner Ada is handling Orchid.")
 ```
 
-Use explicit `config` or `flow` functions when argument mapping, branching,
-tool dispatch, or multi-turn state needs custom code.
+The shorthand is best for prompt capsules: fixed instructions, a small set of
+request options, optional tools, and an expected output shape. The first call
+argument becomes `user` when `messages` is absent, and `instructions` becomes
+`system` unless you set `system` yourself. Use explicit `config` or `flow`
+functions when argument mapping, branching, tool dispatch, or multi-turn state
+needs custom code.
+
+Structured output is validation, not magic parsing. The `output` field tells
+the runtime what shape you expect from the provider result; provider-specific
+JSON or schema hints can still travel through `response_format`. Built-in agent
+execution validates configured shapes. Custom flows should call
+`llm.validate_output(value, schema)` if they return provider-derived values that
+code will consume.
 
 ## Agent As Tool
 
@@ -196,6 +221,10 @@ Attach budgets to agent config tables or use lower-level helpers such as
 `llm.with_budget`. Provider usage may include cost metadata, but Leia does not
 promise money accounting as a stable script-level budget.
 
+Budget dimensions are runtime controls such as turns, tool calls, tokens, and
+time. They gate provider and tool work in the AI helper layer; they are not a
+general language statement and do not change normal expression evaluation.
+
 Record and replay are host-side:
 
 ```go
@@ -210,6 +239,10 @@ vm = leia.New(leia.WithLLMReplay(records))
 
 Use `llm.NewTraceRecorder()` or `leia.WithLLMTrace` for metadata events. Trace
 events intentionally omit prompt text and tool result values by default.
+Replay fixtures match normalized provider requests after dialect lowering, so a
+test should keep working if you rewrite a direct `llm.turn` as `turn { ... }`
+without changing the resulting request. Trace is for audit and visibility;
+replay is for deterministic provider behavior.
 
 ## Human Review And Resume
 
