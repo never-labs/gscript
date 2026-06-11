@@ -212,6 +212,7 @@ func llmMemoryMessages(v Value) []Value {
 		if len(messages) > 0 {
 			return messages
 		}
+		return []Value{TableValue(llmMessageTable("user", llmMemoryValueText(v)))}
 	}
 	return []Value{TableValue(llmMessageTable("user", v.Str()))}
 }
