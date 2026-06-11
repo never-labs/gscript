@@ -151,6 +151,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 	}
 
 	registerLLMMessageConstructors(t, "llm")
+	registerLLMMemoryHelpers(t)
 	set("assistantCall", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.assistantCall' (table expected)")
@@ -307,6 +308,8 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
 		if opts.RawGetString("messages").IsNil() {
+			memoryContext := opts.RawGetString("context")
+			memoryEvidence := opts.RawGetString("evidence")
 			normalized, err := llmLoopOptions(opts, stdlibllm.DefaultSimpleMaxSteps)
 			if err != nil {
 				agentConfigMu.RUnlock()
@@ -314,6 +317,12 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 				return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 			}
 			opts = normalized
+			if !memoryContext.IsNil() {
+				opts.RawSetString("context", memoryContext)
+			}
+			if !memoryEvidence.IsNil() {
+				opts.RawSetString("evidence", memoryEvidence)
+			}
 		} else if opts.RawGetString("response_format").IsNil() && opts.RawGetString("output").IsTable() {
 			// When an ambient agent (typically a flow agent) declares output:
 			// forward a json_object response_format to the provider so the
@@ -321,6 +330,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			// flow body via llm.validate_output.
 			opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
 		}
+		llmApplyMemoryContext(opts)
 		if !onStream.IsNil() {
 			if !onStream.IsFunction() {
 				agentConfigMu.RUnlock()
@@ -470,12 +480,21 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
+		memoryContext := merged.RawGetString("context")
+		memoryEvidence := merged.RawGetString("evidence")
 		opts, err := llmLoopOptions(merged, 0)
 		agentConfigMu.RUnlock()
 		if err == nil {
+			if !memoryContext.IsNil() {
+				opts.RawSetString("context", memoryContext)
+			}
+			if !memoryEvidence.IsNil() {
+				opts.RawSetString("evidence", memoryEvidence)
+			}
 			if tv := opts.RawGetString("tools"); llmToolsListHasAgents(tv) {
 				opts.RawSetString("tools", llmNormalizeToolsValue(call, tv))
 			}
+			llmApplyMemoryContext(opts)
 		}
 		if err != nil {
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
