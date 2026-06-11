@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "id": "normalizer_policy_fixture",
+  "schema": "normalizer_policy_v1",
+  "provider_free": true,
+  "live_network": false,
+  "canonical_case": "snake_case",
+  "currency_policy": "ISO-4217 uppercase",
+  "date_policy": "RFC3339 full-date or timestamp",
+  "symbol_policy": "uppercase ticker",
+  "numeric_unit_policy": "explicit unit and scale fields",
+  "stale_basis": "as_of plus stale_after_days",
+  "stale_required": true,
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason",
+  "warning_marker": "finance_normalizer_stale_field",
+  "deterministic_ordering": {
+    "statements": [
+      "symbol",
+      "fiscal_year",
+      "fiscal_period",
+      "statement_type",
+      "line_item"
+    ],
+    "ratios": [
+      "symbol",
+      "fiscal_year",
+      "fiscal_period",
+      "ratio"
+    ],
+    "market": [
+      "symbol",
+      "date"
+    ],
+    "news": [
+      "published_at",
+      "source_id",
+      "headline"
+    ],
+    "sec": [
+      "filed_at",
+      "accession_number"
+    ],
+    "peer": [
+      "peer_group_id",
+      "symbol",
+      "peer_symbol",
+      "metric"
+    ],
+    "provenance": [
+      "source_id",
+      "record_hash"
+    ]
+  }
+}
