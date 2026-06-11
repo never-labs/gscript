@@ -549,7 +549,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_normalizers", "examples/ai/finrobot_translation/live_packages/valuation_engine", "examples/ai/finrobot_translation/live_packages/news_catalyst", "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"],
       "excluded_scope": ["method-by-method pandas/chart/PDF runtime parity"],
       "source_hash": "sha256:11b270c0518bbb7a8a88d1f4b0661c2717cf75a8259fb47c22c5a65441f3f83b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "d13bb12c303fb90be18c533a47e941c4452287fdb514d19f3aadb0842febed70"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "89eab6064ad587231ffe7b207fd6243eac80ecc2a57a9f031105d02740c37ac9"}],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
     },
     {

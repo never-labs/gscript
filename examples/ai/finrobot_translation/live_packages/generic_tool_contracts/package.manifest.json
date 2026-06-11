@@ -105,6 +105,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide provider-specific tool execution for this skeleton; future adapter packages must satisfy these schemas, capability tags, approval states, result envelopes, normalized errors, and artifact refs."
+    "statement": "Leia core does not provide built-in generic AI tool invocation; leia-generic-ai-tool-contracts defines the provider-free package boundary."
   }
 }

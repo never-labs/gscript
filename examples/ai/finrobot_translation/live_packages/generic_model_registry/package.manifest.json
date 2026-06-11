@@ -165,6 +165,9 @@
     "alias registry resolves to replay-safe descriptors",
     "redaction policy forbids stored secret values",
     "capability flags expose registry and replay boundaries"
-  ]
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in generic AI model registry execution; leia-generic-ai-model-registry defines the provider-free package boundary."
+  }
 }
-

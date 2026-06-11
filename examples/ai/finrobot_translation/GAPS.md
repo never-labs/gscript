@@ -23,13 +23,17 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 65 registered examples plus
-22 checked-in live-package skeleton directories:
+directory. The current provider-free surface is 72 registered examples plus
+29 checked-in live-package skeleton directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
 `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`,
 `live_packages/finance_facade`, `live_packages/finance_normalizers`,
+`live_packages/generic_agent_runner`, `live_packages/generic_approval_policy`,
+`live_packages/generic_evaluation_harness`, `live_packages/generic_model_registry`,
+`live_packages/generic_tool_contracts`, `live_packages/generic_trace_events`,
+`live_packages/generic_turn_runner`,
 `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`,
 `live_packages/optional_integrations`, `live_packages/product_workflow`,
 `live_packages/prompt_roles`, `live_packages/report_renderer`,

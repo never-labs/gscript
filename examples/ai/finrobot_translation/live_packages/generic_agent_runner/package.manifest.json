@@ -41,6 +41,6 @@
   "backend_shape": "ai.agent.run",
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Generic AI agent execution is packaged as a dialect boundary and is not a built-in Leia language feature."
+    "statement": "Leia core does not provide built-in generic AI agent execution; leia-generic-ai-agent-runner defines the provider-free package boundary."
   }
 }

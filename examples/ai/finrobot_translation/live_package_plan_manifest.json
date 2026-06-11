@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 65,
-  "translation_directory_file_count": 463,
+  "registered_examples_count": 72,
+  "translation_directory_file_count": 549,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -203,6 +203,69 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/sec_filings/main.leia",
       "covers_package_ids": [
         "sec_filings"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_agent_runner",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+      "covers_package_ids": [
+        "generic_agent_runner"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_approval_policy",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "covers_package_ids": [
+        "generic_approval_policy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_evaluation_harness",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+      "covers_package_ids": [
+        "generic_evaluation_harness"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_model_registry",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+      "covers_package_ids": [
+        "generic_model_registry"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_tool_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_tool_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_trace_events",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+      "covers_package_ids": [
+        "generic_trace_events"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_turn_runner",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+      "covers_package_ids": [
+        "generic_turn_runner"
       ],
       "status": "checked_in_registered_example"
     }
@@ -830,6 +893,181 @@
         "contract tests run with live_network=false and assert no SEC credentials, user-agent, parser dependency, or live network is enabled by default",
         "fixture tests validate offline 10-K and 10-Q search, fetch, section extraction, HTML/PDF artifact provenance, redirect/cache metadata, user-agent policy, and terms metadata",
         "adapter boundary tests keep SEC search, archive fetch, HTML parser, and PDF reader calls metadata-only until explicit capability/env live gates are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_agent_runner",
+      "package_name": "leia-generic-ai-agent-runner",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+      "planned_directory": "packages/ai/generic_agent_runner",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/contracts/agent_runner_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+      "capabilities": [
+        "ai.agent.config.declarative",
+        "ai.agent.tool_history.replay",
+        "ai.agent.loop_trace.emit",
+        "ai.agent.structured_output.validate",
+        "ai.agent.replay_policy.enforce",
+        "ai.agent.max_steps.guard"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_approval_policy",
+      "package_name": "leia-generic-ai-approval-policy",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+      "planned_directory": "packages/ai/generic_approval_policy",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/contracts/generic_approval_policy_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "capabilities": [
+        "generic.ai.approval.policy",
+        "generic.ai.capability.gate",
+        "generic.ai.policy.default_deny",
+        "generic.ai.approval.trace",
+        "generic.ai.clean_skip",
+        "generic.ai.risk_level"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_evaluation_harness",
+      "package_name": "leia-generic-ai-evaluation-harness",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+      "planned_directory": "packages/ai/generic_evaluation_harness",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/contracts/evaluation_harness_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+      "capabilities": [
+        "generic.ai.evaluation.harness.dataset_manifest",
+        "generic.ai.evaluation.harness.case_inputs",
+        "generic.ai.evaluation.harness.metric_specs",
+        "generic.ai.evaluation.harness.judge_replay",
+        "generic.ai.evaluation.harness.findings",
+        "generic.ai.evaluation.harness.golden_gates"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_model_registry",
+      "package_name": "leia-generic-ai-model-registry",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+      "planned_directory": "packages/ai/generic_model_registry",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_model_registry/contracts/model_registry_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+      "capabilities": [
+        "generic.ai.model.registry",
+        "generic.ai.model.provider_policy",
+        "generic.ai.model.execution_descriptor",
+        "generic.ai.model.redaction_policy",
+        "generic.ai.model.capability_flags",
+        "generic.ai.model.alias_resolution"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_tool_contracts",
+      "package_name": "leia-generic-ai-tool-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+      "planned_directory": "packages/ai/generic_tool_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+      "capabilities": [
+        "generic.ai.tool.contract",
+        "generic.ai.tool.invoke",
+        "generic.ai.tool.argument_validation",
+        "generic.ai.tool.result_envelope",
+        "generic.ai.tool.normalized_error",
+        "generic.ai.tool.artifact_ref"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_trace_events",
+      "package_name": "leia-generic-ai-trace-events",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+      "planned_directory": "packages/ai/generic_trace_events",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_trace_events/contracts/trace_events_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+      "capabilities": [
+        "generic.ai.trace.events",
+        "generic.ai.trace.emit",
+        "generic.ai.trace.correlation_ids",
+        "generic.ai.trace.sequence_marker",
+        "generic.ai.trace.redaction_policy",
+        "generic.ai.trace.fixture_replay"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_turn_runner",
+      "package_name": "leia-generic-ai-turn-runner",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+      "planned_directory": "packages/ai/generic_turn_runner",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+      "capabilities": [
+        "generic.ai.turn.request",
+        "generic.ai.turn.execute",
+        "generic.ai.turn.response_envelope",
+        "generic.ai.turn.tool_request",
+        "generic.ai.turn.replay_match",
+        "generic.ai.turn.error_envelope"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
       ],
       "no_built_in_guarantee": true
     }

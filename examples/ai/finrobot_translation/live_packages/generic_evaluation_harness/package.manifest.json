@@ -134,5 +134,9 @@
     "judge replay records use deterministic mock model ids and forbid live provider calls",
     "golden gate requires pass_rate=1, cases_failed=0, findings=0, and judge replay errors=0",
     "case result summary records per-case metrics, judge trace refs, assertion counts, and aggregate report totals"
-  ]
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in generic AI evaluation execution; leia-generic-ai-evaluation-harness defines the provider-free package boundary."
+  }
 }
