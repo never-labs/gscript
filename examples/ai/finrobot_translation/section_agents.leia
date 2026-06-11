@@ -1,0 +1,192 @@
+// section_agents.leia - FR-GAP-016 FinRobot report-section package data.
+// Report taxonomy and schema fixtures only; section generation stays replayable.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+report_taxonomy := {
+    {
+        id: "company_overview",
+        title: "Company Overview",
+        family: "overview",
+        order: 1,
+        required: true,
+        role_id: "Report_Section_Writer",
+        prompt_ref: "overview_prompt_v1",
+        output_schema_ref: "overview_section_v1",
+        source_refs: {"src_company_profile", "src_financial_metrics"},
+    },
+    {
+        id: "financial_analysis",
+        title: "Financial Analysis",
+        family: "financials",
+        order: 2,
+        required: true,
+        role_id: "Data_Analyst",
+        prompt_ref: "financial_prompt_v1",
+        output_schema_ref: "financial_section_v1",
+        source_refs: {"src_financial_metrics"},
+    },
+    {
+        id: "valuation_analysis",
+        title: "Valuation Analysis",
+        family: "valuation",
+        order: 3,
+        required: true,
+        role_id: "Expert_Investor",
+        prompt_ref: "valuation_prompt_v1",
+        output_schema_ref: "valuation_section_v1",
+        source_refs: {"src_ratios", "src_peer_comparison"},
+    },
+    {
+        id: "news_and_catalysts",
+        title: "News and Catalysts",
+        family: "events",
+        order: 4,
+        required: true,
+        role_id: "Market_Analyst",
+        prompt_ref: "news_catalyst_prompt_v1",
+        output_schema_ref: "news_catalyst_section_v1",
+        source_refs: {"src_news", "src_catalysts"},
+    },
+    {
+        id: "risk_and_competitors",
+        title: "Risk and Competitors",
+        family: "risk",
+        order: 5,
+        required: true,
+        role_id: "Expert_Investor",
+        prompt_ref: "risk_competitor_prompt_v1",
+        output_schema_ref: "risk_competitor_section_v1",
+        source_refs: {"src_risk_inputs", "src_peer_comparison"},
+    },
+}
+
+section_prompt_templates := {
+    overview_prompt_v1: "Use normalized company profile and financial metric evidence to draft the company overview section.",
+    financial_prompt_v1: "Use normalized financial metrics to draft the financial analysis section with source-backed figures.",
+    valuation_prompt_v1: "Use valuation ratios and peer evidence to draft the valuation analysis section.",
+    news_catalyst_prompt_v1: "Use replayed news and catalyst evidence to draft the news and catalysts section.",
+    risk_competitor_prompt_v1: "Use risk inputs and peer evidence to draft the risk and competitors section.",
+}
+
+section_output_schemas := {
+    overview_section_v1: {
+        section_id: "company_overview",
+        title: "Company Overview",
+        summary: "section summary",
+        key_points: {"point"},
+        source_refs: {"source_id"},
+        ai_disclosure: true,
+    },
+    financial_section_v1: {
+        section_id: "financial_analysis",
+        title: "Financial Analysis",
+        summary: "section summary",
+        metrics: {{name: "Revenue", value: "$0.0B", period: "2024A"}},
+        source_refs: {"source_id"},
+        ai_disclosure: true,
+    },
+    valuation_section_v1: {
+        section_id: "valuation_analysis",
+        title: "Valuation Analysis",
+        summary: "section summary",
+        target_price: "$0.00",
+        methods: {"ev_ebitda"},
+        source_refs: {"source_id"},
+        ai_disclosure: true,
+    },
+    news_catalyst_section_v1: {
+        section_id: "news_and_catalysts",
+        title: "News and Catalysts",
+        summary: "section summary",
+        material_events: {"event"},
+        catalysts: {"catalyst"},
+        source_refs: {"source_id"},
+        ai_disclosure: true,
+    },
+    risk_competitor_section_v1: {
+        section_id: "risk_and_competitors",
+        title: "Risk and Competitors",
+        summary: "section summary",
+        risks: {"risk"},
+        competitors: {"peer"},
+        source_refs: {"source_id"},
+        ai_disclosure: true,
+    },
+}
+
+section_fixture_outputs := {
+    overview: {
+        section_id: "company_overview",
+        title: "Company Overview",
+        summary: "Apple Inc. remains a large-cap technology company with fixture-backed revenue and margin context.",
+        key_points: {"Installed base scale", "Services mix", "Hardware cycle exposure"},
+        source_refs: {"src_company_profile", "src_financial_metrics"},
+        ai_disclosure: true,
+    },
+    financial: {
+        section_id: "financial_analysis",
+        title: "Financial Analysis",
+        summary: "Revenue and EBITDA trends are grounded in the local financial metrics fixture.",
+        metrics: {{name: "Revenue", value: "$391.0B", period: "2024A"}},
+        source_refs: {"src_financial_metrics"},
+        ai_disclosure: true,
+    },
+    valuation: {
+        section_id: "valuation_analysis",
+        title: "Valuation Analysis",
+        summary: "The valuation fixture combines peer multiples and target-price context.",
+        target_price: "$225.00",
+        methods: {"ev_ebitda", "dcf", "peer_comparison"},
+        source_refs: {"src_ratios", "src_peer_comparison"},
+        ai_disclosure: true,
+    },
+    news_catalyst: {
+        section_id: "news_and_catalysts",
+        title: "News and Catalysts",
+        summary: "Recent replayed news centers on an AI product cycle and services growth.",
+        material_events: {"AI product update"},
+        catalysts: {"AI device refresh", "services margin expansion"},
+        source_refs: {"src_news", "src_catalysts"},
+        ai_disclosure: true,
+    },
+    risk_competitor: {
+        section_id: "risk_and_competitors",
+        title: "Risk and Competitors",
+        summary: "Risk and peer context remain replay-backed and source annotated.",
+        risks: {"China demand volatility", "regulatory scrutiny"},
+        competitors: {"MSFT", "GOOG", "AMZN"},
+        source_refs: {"src_risk_inputs", "src_peer_comparison"},
+        ai_disclosure: true,
+    },
+}
+
+overview_ok, overview_msg := llm.validate_output(section_fixture_outputs.overview, section_output_schemas.overview_section_v1)
+financial_ok, financial_msg := llm.validate_output(section_fixture_outputs.financial, section_output_schemas.financial_section_v1)
+valuation_ok, valuation_msg := llm.validate_output(section_fixture_outputs.valuation, section_output_schemas.valuation_section_v1)
+news_catalyst_ok, news_catalyst_msg := llm.validate_output(section_fixture_outputs.news_catalyst, section_output_schemas.news_catalyst_section_v1)
+risk_competitor_ok, risk_competitor_msg := llm.validate_output(section_fixture_outputs.risk_competitor, section_output_schemas.risk_competitor_section_v1)
+
+check("taxonomy count", #report_taxonomy == 5)
+check("taxonomy order", report_taxonomy[1].id == "company_overview" && report_taxonomy[5].id == "risk_and_competitors")
+check("overview schema", overview_ok == true)
+check("financial schema", financial_ok == true)
+check("valuation schema", valuation_ok == true)
+check("news catalyst schema", news_catalyst_ok == true)
+check("risk competitor schema", risk_competitor_ok == true)
+check("prompt data", section_prompt_templates.valuation_prompt_v1 == "Use valuation ratios and peer evidence to draft the valuation analysis section.")
+check("role mapping", report_taxonomy[4].role_id == "Market_Analyst")
+
+taxonomy_count := #report_taxonomy
+taxonomy_signature := report_taxonomy[1].id .. ">" .. report_taxonomy[2].id .. ">" .. report_taxonomy[3].id .. ">" .. report_taxonomy[4].id .. ">" .. report_taxonomy[5].id
+valuation_schema_methods := #section_output_schemas.valuation_section_v1.methods
+risk_competitor_peer_count := #section_fixture_outputs.risk_competitor.competitors
+
+print("taxonomy_count", taxonomy_count)
+print("taxonomy_signature", taxonomy_signature)
+print("valuation_schema_methods", valuation_schema_methods)
+print("risk_competitor_peer_count", risk_competitor_peer_count)
