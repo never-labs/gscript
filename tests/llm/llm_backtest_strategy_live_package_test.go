@@ -3,6 +3,7 @@ package leia_test
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,6 +43,7 @@ type backtestStrategyLiveManifest struct {
 	Modules              []backtestStrategyModule     `json:"modules"`
 	DeterministicReplay  backtestDeterministicReplay  `json:"deterministic_replay"`
 	StrategyOutputs      []backtestStrategyOutput     `json:"strategy_outputs"`
+	AnalyticsOutputs     []backtestStrategyOutput     `json:"analytics_outputs"`
 	RiskLimits           []backtestRiskLimit          `json:"risk_limits"`
 	OptionalDependencies []backtestOptionalDependency `json:"optional_dependencies"`
 	TestGates            []string                     `json:"test_gates"`
@@ -55,16 +57,18 @@ type backtestStrategyModule struct {
 }
 
 type backtestDeterministicReplay struct {
-	Seed               string  `json:"seed"`
-	StartCash          float64 `json:"start_cash"`
-	CommissionBPS      float64 `json:"commission_bps"`
-	SlippageBPS        float64 `json:"slippage_bps"`
-	DataFeedFixture    string  `json:"data_feed_fixture"`
-	TradeLedgerFixture string  `json:"trade_ledger_fixture"`
-	MetricsFixture     string  `json:"metrics_fixture"`
-	DeterministicOrder bool    `json:"deterministic_order"`
-	ProviderFree       bool    `json:"provider_free"`
-	LiveNetwork        bool    `json:"live_network"`
+	Seed                         string  `json:"seed"`
+	StartCash                    float64 `json:"start_cash"`
+	CommissionBPS                float64 `json:"commission_bps"`
+	SlippageBPS                  float64 `json:"slippage_bps"`
+	DataFeedFixture              string  `json:"data_feed_fixture"`
+	TradeLedgerFixture           string  `json:"trade_ledger_fixture"`
+	PortfolioWeightsFixture      string  `json:"portfolio_weights_fixture"`
+	ReturnsDrawdownSharpeFixture string  `json:"returns_drawdown_sharpe_fixture"`
+	MetricsFixture               string  `json:"metrics_fixture"`
+	DeterministicOrder           bool    `json:"deterministic_order"`
+	ProviderFree                 bool    `json:"provider_free"`
+	LiveNetwork                  bool    `json:"live_network"`
 }
 
 type backtestStrategyOutput struct {
@@ -139,14 +143,14 @@ func TestFinRobotBacktestStrategyLivePackageManifest(t *testing.T) {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"strategy_manifest", "data_feed", "trade_ledger", "metrics", "risk_limits"} {
+	for _, key := range []string{"strategy_manifest", "data_feed", "trade_ledger", "portfolio_weights", "returns_drawdown_sharpe", "metrics", "risk_limits"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertBacktestStrategyJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "strategy_manifest", "data_feed", "trade_ledger", "metrics"} {
+	for _, key := range []string{"index", "strategy_manifest", "data_feed", "trade_ledger", "portfolio_weights", "returns_drawdown_sharpe", "metrics"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -174,6 +178,8 @@ func TestFinRobotBacktestStrategyLivePackageManifest(t *testing.T) {
 		replay.SlippageBPS != 2 ||
 		replay.DataFeedFixture == "" ||
 		replay.TradeLedgerFixture == "" ||
+		replay.PortfolioWeightsFixture == "" ||
+		replay.ReturnsDrawdownSharpeFixture == "" ||
 		replay.MetricsFixture == "" ||
 		!replay.DeterministicOrder ||
 		!replay.ProviderFree ||
@@ -182,7 +188,7 @@ func TestFinRobotBacktestStrategyLivePackageManifest(t *testing.T) {
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"backtraderutils.back_test", "strategy", "sizer", "indicator", "analyzer", "trade ledger", "metrics", "risk-limit", "clean-skip"} {
+	for _, want := range []string{"backtraderutils.back_test", "strategy", "sizer", "indicator", "analyzer", "trade ledger", "portfolio weights", "returns/drawdown/sharpe", "metrics", "risk-limit", "clean-skip", "mplfinance", "openbb"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -210,6 +216,21 @@ func TestFinRobotBacktestStrategyContractsFixturesAndSchemas(t *testing.T) {
 			t.Fatalf("strategy output required fields missing %q: %#v", want, output.RequiredFields)
 		}
 	}
+	if len(manifest.AnalyticsOutputs) != 2 {
+		t.Fatalf("analytics outputs = %d, want 2", len(manifest.AnalyticsOutputs))
+	}
+	analyticsByID := map[string]backtestStrategyOutput{}
+	for _, output := range manifest.AnalyticsOutputs {
+		analyticsByID[output.ID] = output
+		if output.FixtureKey == "" || output.Schema == "" || !output.ProviderFree || output.LiveNetwork {
+			t.Fatalf("analytics output metadata incomplete: %#v", output)
+		}
+	}
+	for _, id := range []string{"portfolio_weights", "returns_drawdown_sharpe"} {
+		if analyticsByID[id].ID == "" {
+			t.Fatalf("missing analytics output %q: %#v", id, manifest.AnalyticsOutputs)
+		}
+	}
 
 	var contract struct {
 		ProviderFree               bool   `json:"provider_free"`
@@ -233,13 +254,13 @@ func TestFinRobotBacktestStrategyContractsFixturesAndSchemas(t *testing.T) {
 		len(contract.Modules) != 5 {
 		t.Fatalf("contract header/modules = %#v", contract)
 	}
-	for _, field := range []string{"strategy_manifest", "data_feed", "trade_ledger", "metrics", "risk_limits"} {
+	for _, field := range []string{"strategy_manifest", "data_feed", "trade_ledger", "portfolio_weights", "returns_drawdown_sharpe", "metrics", "risk_limits"} {
 		if contract.FieldContracts[field] == nil {
 			t.Fatalf("missing field contract %q", field)
 		}
 	}
 	acceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
-	for _, want := range []string{"backtraderutils.back_test", "strategy", "sizer", "indicator", "analyzer", "data feed", "trade ledger", "metrics", "risk limits", "clean-skip"} {
+	for _, want := range []string{"backtraderutils.back_test", "strategy", "sizer", "indicator", "analyzer", "data feed", "trade ledger", "portfolio weights", "returns", "drawdown", "sharpe", "metrics", "risk limits", "clean-skip", "mplfinance", "openbb"} {
 		if !strings.Contains(acceptance, want) {
 			t.Fatalf("acceptance gates missing %q: %s", want, acceptance)
 		}
@@ -261,7 +282,7 @@ func TestFinRobotBacktestStrategyContractsFixturesAndSchemas(t *testing.T) {
 	decodeBacktestStrategyJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
 	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports ||
 		index.DeterministicSeed != "finrobot-backtest-strategy-offline-v1" ||
-		len(index.Fixtures) != 4 {
+		len(index.Fixtures) != len(manifest.Fixtures)-1 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	for _, fixture := range index.Fixtures {
@@ -273,6 +294,22 @@ func TestFinRobotBacktestStrategyContractsFixturesAndSchemas(t *testing.T) {
 		}
 		assertBacktestStrategyJSONFile(t, filepath.Join(base, fixture.Path))
 		assertBacktestStrategyJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+	fixtureKeys := map[string]bool{}
+	for _, fixture := range index.Fixtures {
+		fixtureKeys[fixture.FixtureKey] = true
+	}
+	for _, key := range []string{
+		"strategy_manifest:sma_cross:offline:v1",
+		"data_feed:ACME:daily:offline:v1",
+		"trade_ledger:ACME:sma_cross:offline:v1",
+		"portfolio_weights:ACME:sma_cross:offline:v1",
+		"returns_drawdown_sharpe:ACME:sma_cross:offline:v1",
+		"metrics:ACME:sma_cross:offline:v1",
+	} {
+		if !fixtureKeys[key] {
+			t.Fatalf("fixture index missing %q: %#v", key, index.Fixtures)
+		}
 	}
 }
 
@@ -367,6 +404,106 @@ func TestFinRobotBacktestStrategyFixtureShapes(t *testing.T) {
 			t.Fatalf("data feed row incomplete: %#v", row)
 		}
 	}
+
+	var weightsFixture struct {
+		ProviderFree      bool   `json:"provider_free"`
+		LiveNetwork       bool   `json:"live_network"`
+		FixtureKey        string `json:"fixture_key"`
+		StrategyID        string `json:"strategy_id"`
+		Symbol            string `json:"symbol"`
+		DeterministicSeed string `json:"deterministic_seed"`
+		SourceRef         string `json:"source_ref"`
+		Rows              []struct {
+			Timestamp      string  `json:"timestamp"`
+			Cash           float64 `json:"cash"`
+			CashWeight     float64 `json:"cash_weight"`
+			Shares         float64 `json:"shares"`
+			MarketValue    float64 `json:"market_value"`
+			PositionWeight float64 `json:"position_weight"`
+			GrossExposure  float64 `json:"gross_exposure"`
+			NetExposure    float64 `json:"net_exposure"`
+			PortfolioValue float64 `json:"portfolio_value"`
+		} `json:"rows"`
+	}
+	decodeBacktestStrategyJSONFile(t, filepath.Join(base, "fixtures", "portfolio_weights_ACME_fixture.json"), &weightsFixture)
+	if !weightsFixture.ProviderFree || weightsFixture.LiveNetwork ||
+		weightsFixture.FixtureKey != "portfolio_weights:ACME:sma_cross:offline:v1" ||
+		weightsFixture.StrategyID != strategyFixture.StrategyID ||
+		weightsFixture.Symbol != feedFixture.Symbol ||
+		weightsFixture.DeterministicSeed != strategyFixture.DeterministicSeed ||
+		weightsFixture.SourceRef == "" ||
+		len(weightsFixture.Rows) != len(feedFixture.Rows) {
+		t.Fatalf("portfolio weights fixture incomplete: %#v", weightsFixture)
+	}
+	for _, row := range weightsFixture.Rows {
+		if row.Timestamp == "" || row.Cash < 0 || row.Shares < 0 || row.MarketValue < 0 || row.PortfolioValue <= 0 {
+			t.Fatalf("portfolio weight row incomplete: %#v", row)
+		}
+		if math.Abs(row.CashWeight+row.PositionWeight-1) > 0.00001 ||
+			math.Abs(row.PositionWeight-row.GrossExposure) > 0.00001 ||
+			math.Abs(row.PositionWeight-row.NetExposure) > 0.00001 {
+			t.Fatalf("portfolio weight row not normalized: %#v", row)
+		}
+	}
+
+	var returnsFixture struct {
+		ProviderFree      bool   `json:"provider_free"`
+		LiveNetwork       bool   `json:"live_network"`
+		FixtureKey        string `json:"fixture_key"`
+		StrategyID        string `json:"strategy_id"`
+		Symbol            string `json:"symbol"`
+		DeterministicSeed string `json:"deterministic_seed"`
+		SourceRef         string `json:"source_ref"`
+		Summary           struct {
+			StartValue       float64 `json:"start_value"`
+			EndValue         float64 `json:"end_value"`
+			TotalReturn      float64 `json:"total_return"`
+			MaxDrawdown      float64 `json:"max_drawdown"`
+			Annualization    float64 `json:"annualization_factor"`
+			FullPeriodSharpe float64 `json:"full_period_sharpe"`
+		} `json:"summary"`
+		Rows []struct {
+			Timestamp        string  `json:"timestamp"`
+			PortfolioValue   float64 `json:"portfolio_value"`
+			DailyReturn      float64 `json:"daily_return"`
+			CumulativeReturn float64 `json:"cumulative_return"`
+			Drawdown         float64 `json:"drawdown"`
+			RollingSharpe    float64 `json:"rolling_sharpe"`
+		} `json:"rows"`
+	}
+	decodeBacktestStrategyJSONFile(t, filepath.Join(base, "fixtures", "returns_drawdown_sharpe_ACME_fixture.json"), &returnsFixture)
+	if !returnsFixture.ProviderFree || returnsFixture.LiveNetwork ||
+		returnsFixture.FixtureKey != "returns_drawdown_sharpe:ACME:sma_cross:offline:v1" ||
+		returnsFixture.StrategyID != strategyFixture.StrategyID ||
+		returnsFixture.Symbol != feedFixture.Symbol ||
+		returnsFixture.DeterministicSeed != strategyFixture.DeterministicSeed ||
+		returnsFixture.SourceRef != weightsFixture.FixtureKey ||
+		len(returnsFixture.Rows) != len(weightsFixture.Rows) {
+		t.Fatalf("returns/drawdown/sharpe fixture incomplete: %#v", returnsFixture)
+	}
+	if returnsFixture.Summary.StartValue != 100000 ||
+		returnsFixture.Summary.EndValue <= returnsFixture.Summary.StartValue ||
+		returnsFixture.Summary.TotalReturn <= 0 ||
+		returnsFixture.Summary.MaxDrawdown >= 0 ||
+		returnsFixture.Summary.Annualization != 252 ||
+		returnsFixture.Summary.FullPeriodSharpe <= 0 {
+		t.Fatalf("returns/drawdown/sharpe summary incomplete: %#v", returnsFixture.Summary)
+	}
+	var sawDrawdown bool
+	for i, row := range returnsFixture.Rows {
+		if row.Timestamp == "" || row.PortfolioValue <= 0 {
+			t.Fatalf("returns row incomplete: %#v", row)
+		}
+		if math.Abs(row.PortfolioValue-weightsFixture.Rows[i].PortfolioValue) > 0.01 {
+			t.Fatalf("returns row value does not match portfolio weights row %d: %#v vs %#v", i, row, weightsFixture.Rows[i])
+		}
+		if row.Drawdown < 0 {
+			sawDrawdown = true
+		}
+	}
+	if !sawDrawdown {
+		t.Fatalf("returns/drawdown/sharpe fixture did not record any drawdown: %#v", returnsFixture.Rows)
+	}
 }
 
 func TestFinRobotBacktestStrategyLedgerMetricsRiskAndOptionalDependencies(t *testing.T) {
@@ -455,14 +592,53 @@ func TestFinRobotBacktestStrategyLedgerMetricsRiskAndOptionalDependencies(t *tes
 			t.Fatalf("metrics risk limit incomplete: %#v", limit)
 		}
 	}
-
-	if len(manifest.OptionalDependencies) != 2 {
-		t.Fatalf("optional dependencies = %d, want 2", len(manifest.OptionalDependencies))
+	if metricsFixture.Metrics["max_drawdown"] <= 0 ||
+		math.Abs(metricsFixture.Metrics["max_drawdown"]-0.006957) > 0.000001 ||
+		math.Abs(metricsFixture.Metrics["sharpe"]-0.1753) > 0.0001 {
+		t.Fatalf("metrics should align with deterministic returns/drawdown/sharpe fixture: %#v", metricsFixture.Metrics)
 	}
+
+	if len(manifest.OptionalDependencies) != 3 {
+		t.Fatalf("optional dependencies = %d, want 3", len(manifest.OptionalDependencies))
+	}
+	optionalIDs := map[string]bool{}
 	for _, dep := range manifest.OptionalDependencies {
 		if dep.ID == "" || dep.ImportName == "" || dep.RequiredByDefault || dep.RealDependencyImported || !dep.CleanSkipWithoutDependency {
 			t.Fatalf("optional dependency must clean-skip and avoid default imports: %#v", dep)
 		}
+		optionalIDs[dep.ID] = true
+	}
+	for _, id := range []string{"backtrader", "mplfinance", "openbb"} {
+		if !optionalIDs[id] {
+			t.Fatalf("optional dependencies missing %q: %#v", id, manifest.OptionalDependencies)
+		}
+	}
+
+	var optionalContract struct {
+		ProviderFree               bool                         `json:"provider_free"`
+		LiveNetwork                bool                         `json:"live_network"`
+		RealDependencyImports      bool                         `json:"real_dependency_imports"`
+		CleanSkipWithoutDependency bool                         `json:"clean_skip_without_dependency"`
+		Dependencies               []backtestOptionalDependency `json:"dependencies"`
+		DefaultBehavior            struct {
+			Mode                      string `json:"mode"`
+			RaisesOnMissingDependency bool   `json:"raises_on_missing_optional_dependency"`
+			ImportsLiveDependency     bool   `json:"imports_live_dependency"`
+			NetworkAccess             bool   `json:"network_access"`
+			DefaultCIEnabled          bool   `json:"default_ci_enabled"`
+		} `json:"default_behavior"`
+	}
+	decodeBacktestStrategyJSONFile(t, filepath.Join(base, "contracts", "optional_dependency_contract.json"), &optionalContract)
+	if !optionalContract.ProviderFree || optionalContract.LiveNetwork || optionalContract.RealDependencyImports || !optionalContract.CleanSkipWithoutDependency ||
+		optionalContract.DefaultBehavior.Mode != "fixture_replay" ||
+		optionalContract.DefaultBehavior.RaisesOnMissingDependency ||
+		optionalContract.DefaultBehavior.ImportsLiveDependency ||
+		optionalContract.DefaultBehavior.NetworkAccess ||
+		optionalContract.DefaultBehavior.DefaultCIEnabled {
+		t.Fatalf("optional dependency contract should stay clean-skip and outside default CI: %#v", optionalContract)
+	}
+	if len(optionalContract.Dependencies) != 3 {
+		t.Fatalf("optional dependency contract count = %d, want 3", len(optionalContract.Dependencies))
 	}
 }
 
@@ -527,7 +703,7 @@ func TestFinRobotBacktestStrategyLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get backtest_strategy_live_package_summary: %v", err)
 			}
-			want := "backtest_strategy_live_package strategies=1 data_feeds=1 seed=finrobot-backtest-strategy-offline-v1 ledgers=1 metrics=1 risk_limits=4 provider_free=true live_network=false imports=false fixtures=4"
+			want := "backtest_strategy_live_package strategies=1 data_feeds=1 seed=finrobot-backtest-strategy-offline-v1 ledgers=1 weights=1 returns=1 metrics=1 risk_limits=4 provider_free=true live_network=false imports=false fixtures=6"
 			if got != want {
 				t.Fatalf("backtest_strategy_live_package_summary = %#v, want %#v", got, want)
 			}

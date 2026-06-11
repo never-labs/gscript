@@ -42,6 +42,30 @@
       }
     },
     {
+      "fixture_key": "portfolio_weights:ACME:sma_cross:offline:v1",
+      "capability": "finance.backtest.portfolio.weights",
+      "path": "fixtures/portfolio_weights_ACME_fixture.json",
+      "schema": "schemas/portfolio_weights_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "row_count": 8,
+        "provider_free": true,
+        "live_network": false
+      }
+    },
+    {
+      "fixture_key": "returns_drawdown_sharpe:ACME:sma_cross:offline:v1",
+      "capability": "finance.backtest.returns.series",
+      "path": "fixtures/returns_drawdown_sharpe_ACME_fixture.json",
+      "schema": "schemas/returns_drawdown_sharpe_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "row_count": 8,
+        "provider_free": true,
+        "live_network": false
+      }
+    },
+    {
       "fixture_key": "metrics:ACME:sma_cross:offline:v1",
       "capability": "finance.backtest.metrics.collect",
       "path": "fixtures/metrics_ACME_fixture.json",
@@ -55,4 +79,3 @@
     }
   ]
 }
-

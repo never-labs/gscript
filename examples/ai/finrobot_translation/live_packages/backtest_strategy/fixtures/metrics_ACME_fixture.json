@@ -11,9 +11,9 @@
     "end_value": 100017.76,
     "total_return": 0.0001776,
     "annualized_return": 0.00561,
-    "volatility": 0.083,
-    "sharpe": 0.41,
-    "max_drawdown": 0.0415,
+    "volatility": 0.04137,
+    "sharpe": 0.1753,
+    "max_drawdown": 0.006957,
     "win_rate": 0.667,
     "trade_count": 3,
     "turnover": 0.66048,
@@ -32,7 +32,7 @@
       "id": "max_drawdown_pct",
       "metric": "max_drawdown",
       "limit": 0.12,
-      "observed": 0.0415,
+      "observed": 0.006957,
       "status": "pass"
     },
     {
@@ -51,4 +51,3 @@
     }
   ]
 }
-

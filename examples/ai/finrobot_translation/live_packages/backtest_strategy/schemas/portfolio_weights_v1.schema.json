@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/backtest_strategy/portfolio_weights_v1.schema.json",
+  "title": "FinRobot Backtest Portfolio Weights",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "strategy_id",
+    "symbol",
+    "deterministic_seed",
+    "source_ref",
+    "rows"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "fixture_key": {
+      "type": "string"
+    },
+    "strategy_id": {
+      "type": "string"
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "deterministic_seed": {
+      "type": "string"
+    },
+    "source_ref": {
+      "type": "string"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "timestamp",
+          "cash",
+          "cash_weight",
+          "shares",
+          "market_value",
+          "position_weight",
+          "gross_exposure",
+          "net_exposure",
+          "portfolio_value"
+        ]
+      }
+    }
+  }
+}

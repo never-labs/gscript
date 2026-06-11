@@ -1,0 +1,101 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_key": "portfolio_weights:ACME:sma_cross:offline:v1",
+  "strategy_id": "sma_cross_strategy",
+  "symbol": "ACME",
+  "currency": "USD",
+  "deterministic_seed": "finrobot-backtest-strategy-offline-v1",
+  "source_ref": "trade_ledger:ACME:sma_cross:offline:v1",
+  "rows": [
+    {
+      "timestamp": "2025-01-02T21:00:00Z",
+      "cash": 100000,
+      "cash_weight": 1,
+      "shares": 0,
+      "market_value": 0,
+      "position_weight": 0,
+      "gross_exposure": 0,
+      "net_exposure": 0,
+      "portfolio_value": 100000
+    },
+    {
+      "timestamp": "2025-01-03T21:00:00Z",
+      "cash": 100000,
+      "cash_weight": 1,
+      "shares": 0,
+      "market_value": 0,
+      "position_weight": 0,
+      "gross_exposure": 0,
+      "net_exposure": 0,
+      "portfolio_value": 100000
+    },
+    {
+      "timestamp": "2025-01-06T21:00:00Z",
+      "cash": 66984.9,
+      "cash_weight": 0.670004,
+      "shares": 320,
+      "market_value": 32992,
+      "position_weight": 0.329996,
+      "gross_exposure": 0.329996,
+      "net_exposure": 0.329996,
+      "portfolio_value": 99976.9
+    },
+    {
+      "timestamp": "2025-01-07T21:00:00Z",
+      "cash": 66984.9,
+      "cash_weight": 0.668079,
+      "shares": 320,
+      "market_value": 33280,
+      "position_weight": 0.331921,
+      "gross_exposure": 0.331921,
+      "net_exposure": 0.331921,
+      "portfolio_value": 100264.9
+    },
+    {
+      "timestamp": "2025-01-08T21:00:00Z",
+      "cash": 66984.9,
+      "cash_weight": 0.666165,
+      "shares": 320,
+      "market_value": 33568,
+      "position_weight": 0.333835,
+      "gross_exposure": 0.333835,
+      "net_exposure": 0.333835,
+      "portfolio_value": 100552.9
+    },
+    {
+      "timestamp": "2025-01-09T21:00:00Z",
+      "cash": 83517.32,
+      "cash_weight": 0.834661,
+      "shares": 160,
+      "market_value": 16544,
+      "position_weight": 0.165339,
+      "gross_exposure": 0.165339,
+      "net_exposure": 0.165339,
+      "portfolio_value": 100061.32
+    },
+    {
+      "timestamp": "2025-01-10T21:00:00Z",
+      "cash": 83517.32,
+      "cash_weight": 0.8364,
+      "shares": 160,
+      "market_value": 16336,
+      "position_weight": 0.1636,
+      "gross_exposure": 0.1636,
+      "net_exposure": 0.1636,
+      "portfolio_value": 99853.32
+    },
+    {
+      "timestamp": "2025-01-13T21:00:00Z",
+      "cash": 100017.76,
+      "cash_weight": 1,
+      "shares": 0,
+      "market_value": 0,
+      "position_weight": 0,
+      "gross_exposure": 0,
+      "net_exposure": 0,
+      "portfolio_value": 100017.76
+    }
+  ]
+}

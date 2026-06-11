@@ -15,6 +15,8 @@
         "strategy_manifest",
         "data_feed",
         "trade_ledger",
+        "portfolio_weights",
+        "returns_drawdown_sharpe",
         "metrics",
         "risk_limits"
       ]
@@ -116,6 +118,30 @@
         "risk_limits"
       ]
     },
+    "portfolio_weights": {
+      "schema": "schemas/portfolio_weights_v1.schema.json",
+      "fixture": "fixtures/portfolio_weights_ACME_fixture.json",
+      "required_fields": [
+        "timestamp",
+        "cash_weight",
+        "position_weight",
+        "gross_exposure",
+        "net_exposure",
+        "portfolio_value"
+      ]
+    },
+    "returns_drawdown_sharpe": {
+      "schema": "schemas/returns_drawdown_sharpe_v1.schema.json",
+      "fixture": "fixtures/returns_drawdown_sharpe_ACME_fixture.json",
+      "required_fields": [
+        "timestamp",
+        "portfolio_value",
+        "daily_return",
+        "cumulative_return",
+        "drawdown",
+        "rolling_sharpe"
+      ]
+    },
     "risk_limits": {
       "schema": "schemas/risk_limits_v1.schema.json",
       "fixture": "fixtures/metrics_ACME_fixture.json",
@@ -131,8 +157,7 @@
   "acceptance_gates": [
     "BackTraderUtils.back_test can be replayed from provider-free fixtures without importing Backtrader",
     "strategy, sizer, indicator, and analyzer output contracts are explicit and schema-backed",
-    "data feed, trade ledger, metrics, deterministic seed, and risk limits are fixture-backed",
-    "optional dependencies clean-skip when Backtrader or pandas are unavailable"
+    "data feed, trade ledger, portfolio weights, returns, drawdown, Sharpe, metrics, deterministic seed, and risk limits are fixture-backed",
+    "optional dependencies clean-skip when Backtrader, mplfinance, or OpenBB are unavailable"
   ]
 }
-
