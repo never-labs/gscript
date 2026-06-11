@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EarningsTranscriptFixtureV1",
+  "type": "object",
+  "required": ["fixture_key", "provider", "captured_at", "request", "payload"],
+  "properties": {
+    "fixture_key": {"const": "earnings:transcript:ACME:2025:Q4"},
+    "provider": {"const": "earnings"},
+    "request": {
+      "type": "object",
+      "required": ["symbol", "fiscal_year", "fiscal_quarter", "live_network"],
+      "properties": {
+        "symbol": {"type": "string"},
+        "fiscal_year": {"type": "string"},
+        "fiscal_quarter": {"type": "string"},
+        "live_network": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["symbol", "fiscal_year", "fiscal_quarter", "segments"]
+    }
+  }
+}

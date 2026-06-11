@@ -1,0 +1,17 @@
+{
+  "fixture_key": "fmp:key_metrics:ACME:annual",
+  "provider": "fmp",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "symbol": "ACME",
+    "period": "annual",
+    "live_network": false
+  },
+  "payload": {
+    "symbol": "ACME",
+    "date": "2025-12-31",
+    "revenue_per_share": 42.1,
+    "gross_profit_margin": 0.42,
+    "return_on_invested_capital": 0.18
+  }
+}

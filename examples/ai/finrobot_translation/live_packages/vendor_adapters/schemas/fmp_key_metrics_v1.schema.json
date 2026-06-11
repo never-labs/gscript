@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FMPKeyMetricsFixtureV1",
+  "type": "object",
+  "required": ["fixture_key", "provider", "captured_at", "request", "payload"],
+  "properties": {
+    "fixture_key": {"const": "fmp:key_metrics:ACME:annual"},
+    "provider": {"const": "fmp"},
+    "request": {
+      "type": "object",
+      "required": ["symbol", "period", "live_network"],
+      "properties": {
+        "symbol": {"type": "string"},
+        "period": {"type": "string"},
+        "live_network": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["symbol", "date", "revenue_per_share", "gross_profit_margin", "return_on_invested_capital"]
+    }
+  }
+}

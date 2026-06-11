@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SECFilingFixtureV1",
+  "type": "object",
+  "required": ["fixture_key", "provider", "captured_at", "request", "payload"],
+  "properties": {
+    "fixture_key": {"const": "sec:filing:ACME:10-K:2025"},
+    "provider": {"const": "sec"},
+    "request": {
+      "type": "object",
+      "required": ["symbol", "form", "live_network"],
+      "properties": {
+        "symbol": {"type": "string"},
+        "form": {"type": "string"},
+        "live_network": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["cik", "accession", "form", "filed", "sections"]
+    }
+  }
+}

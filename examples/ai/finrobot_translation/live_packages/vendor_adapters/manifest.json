@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-live-vendor-adapters",
+  "package": "example.com/leia/examples/ai/finrobot-translation/live-packages/vendor-adapters",
+  "version": "0.1.0-skeleton",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "clean_skip_without_credentials": true,
+    "redact_secret_values": true
+  },
+  "redaction": {
+    "enabled": true,
+    "secret_patterns": [
+      "env:FINNHUB_TOKEN",
+      "env:FMP_API_KEY",
+      "env:REDDIT_CLIENT_ID",
+      "env:REDDIT_CLIENT_SECRET",
+      "env:SEC_USER_AGENT"
+    ],
+    "replacement": "<redacted>"
+  },
+  "adapters": [
+    {
+      "id": "yfinance",
+      "display_name": "yfinance",
+      "provider": "yahoo_finance",
+      "capability": "finance.vendor.yfinance.chart",
+      "common_capabilities": [
+        "market_chart",
+        "ohlcv_history",
+        "quote_snapshot",
+        "currency_metadata"
+      ],
+      "credential": {
+        "required": false,
+        "secret_ref": null,
+        "redacted": true
+      },
+      "schema": "schemas/yfinance_chart_v1.schema.json",
+      "fixture": "fixtures/yfinance_chart_ACME_1mo.json",
+      "fixture_key": "yfinance:chart:ACME:1mo",
+      "rate_limit": {
+        "policy": "metadata-only",
+        "window_seconds": 60,
+        "limit": 120,
+        "retry_after_seconds": 1
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "provider terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "live_network": false
+      }
+    },
+    {
+      "id": "finnhub",
+      "display_name": "Finnhub",
+      "provider": "finnhub",
+      "capability": "finance.vendor.finnhub.profile",
+      "common_capabilities": [
+        "company_profile",
+        "exchange_metadata",
+        "industry_classification"
+      ],
+      "credential": {
+        "required": false,
+        "secret_ref": "env:FINNHUB_TOKEN",
+        "redacted": true
+      },
+      "schema": "schemas/finnhub_profile_v1.schema.json",
+      "fixture": "fixtures/finnhub_profile_ACME.json",
+      "fixture_key": "finnhub:profile:ACME",
+      "rate_limit": {
+        "policy": "metadata-only",
+        "window_seconds": 60,
+        "limit": 60,
+        "retry_after_seconds": 0
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "provider terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "live_network": false
+      }
+    },
+    {
+      "id": "fmp",
+      "display_name": "Financial Modeling Prep",
+      "provider": "fmp",
+      "capability": "finance.vendor.fmp.key_metrics",
+      "common_capabilities": [
+        "key_metrics",
+        "financial_ratios",
+        "periodic_fundamentals"
+      ],
+      "credential": {
+        "required": false,
+        "secret_ref": "env:FMP_API_KEY",
+        "redacted": true
+      },
+      "schema": "schemas/fmp_key_metrics_v1.schema.json",
+      "fixture": "fixtures/fmp_key_metrics_ACME_annual.json",
+      "fixture_key": "fmp:key_metrics:ACME:annual",
+      "rate_limit": {
+        "policy": "metadata-only",
+        "window_seconds": 86400,
+        "limit": 300,
+        "retry_after_seconds": 2
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "provider terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "live_network": false
+      }
+    },
+    {
+      "id": "sec",
+      "display_name": "SEC EDGAR",
+      "provider": "sec",
+      "capability": "finance.vendor.sec.filing",
+      "common_capabilities": [
+        "filing_lookup",
+        "company_facts",
+        "risk_factor_sections",
+        "accession_metadata"
+      ],
+      "credential": {
+        "required": false,
+        "secret_ref": "env:SEC_USER_AGENT",
+        "redacted": true
+      },
+      "schema": "schemas/sec_filing_v1.schema.json",
+      "fixture": "fixtures/sec_filing_ACME_10K_2025.json",
+      "fixture_key": "sec:filing:ACME:10-K:2025",
+      "rate_limit": {
+        "policy": "metadata-only",
+        "window_seconds": 1,
+        "limit": 10,
+        "retry_after_seconds": 1
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "SEC fair-access metadata retained",
+        "redistribution": "fixture-only",
+        "live_network": false,
+        "user_agent_required_for_live": true
+      }
+    },
+    {
+      "id": "reddit",
+      "display_name": "Reddit",
+      "provider": "reddit",
+      "capability": "finance.vendor.reddit.search",
+      "common_capabilities": [
+        "subreddit_search",
+        "post_metadata",
+        "sentiment_source"
+      ],
+      "credential": {
+        "required": false,
+        "secret_ref": "env:REDDIT_CLIENT_SECRET",
+        "redacted": true
+      },
+      "schema": "schemas/reddit_search_v1.schema.json",
+      "fixture": "fixtures/reddit_search_ACME_sentiment.json",
+      "fixture_key": "reddit:search:ACME:sentiment",
+      "rate_limit": {
+        "policy": "metadata-only",
+        "window_seconds": 600,
+        "limit": 600,
+        "retry_after_seconds": 0
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "live_network": false
+      }
+    },
+    {
+      "id": "earnings",
+      "display_name": "Earnings transcript adapter",
+      "provider": "earnings",
+      "capability": "finance.vendor.earnings.transcript",
+      "common_capabilities": [
+        "transcript_lookup",
+        "speaker_segments",
+        "fiscal_period_metadata"
+      ],
+      "credential": {
+        "required": false,
+        "secret_ref": null,
+        "redacted": true
+      },
+      "schema": "schemas/earnings_transcript_v1.schema.json",
+      "fixture": "fixtures/earnings_transcript_ACME_2025_Q4.json",
+      "fixture_key": "earnings:transcript:ACME:2025:Q4",
+      "rate_limit": {
+        "policy": "metadata-only",
+        "window_seconds": 60,
+        "limit": 30,
+        "retry_after_seconds": 0
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "transcript terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "live_network": false
+      }
+    }
+  ]
+}

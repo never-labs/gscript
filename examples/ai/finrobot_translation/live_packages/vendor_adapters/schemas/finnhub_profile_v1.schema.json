@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FinnhubProfileFixtureV1",
+  "type": "object",
+  "required": ["fixture_key", "provider", "captured_at", "request", "payload"],
+  "properties": {
+    "fixture_key": {"const": "finnhub:profile:ACME"},
+    "provider": {"const": "finnhub"},
+    "request": {
+      "type": "object",
+      "required": ["symbol", "live_network"],
+      "properties": {
+        "symbol": {"type": "string"},
+        "live_network": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["ticker", "name", "exchange", "industry", "currency"]
+    }
+  }
+}

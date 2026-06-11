@@ -1,0 +1,16 @@
+{
+  "fixture_key": "finnhub:profile:ACME",
+  "provider": "finnhub",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "symbol": "ACME",
+    "live_network": false
+  },
+  "payload": {
+    "ticker": "ACME",
+    "name": "ACME Corp",
+    "exchange": "XNAS",
+    "industry": "Industrial Automation",
+    "currency": "USD"
+  }
+}

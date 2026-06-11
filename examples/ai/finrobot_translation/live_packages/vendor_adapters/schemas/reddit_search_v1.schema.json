@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RedditSearchFixtureV1",
+  "type": "object",
+  "required": ["fixture_key", "provider", "captured_at", "request", "payload"],
+  "properties": {
+    "fixture_key": {"const": "reddit:search:ACME:sentiment"},
+    "provider": {"const": "reddit"},
+    "request": {
+      "type": "object",
+      "required": ["query", "subreddit", "live_network"],
+      "properties": {
+        "query": {"type": "string"},
+        "subreddit": {"type": "string"},
+        "live_network": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["posts"]
+    }
+  }
+}

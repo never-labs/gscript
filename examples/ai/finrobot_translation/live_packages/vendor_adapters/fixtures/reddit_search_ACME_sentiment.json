@@ -1,0 +1,15 @@
+{
+  "fixture_key": "reddit:search:ACME:sentiment",
+  "provider": "reddit",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "query": "ACME",
+    "subreddit": "investing",
+    "live_network": false
+  },
+  "payload": {
+    "posts": [
+      {"id": "r1", "title": "ACME backlog watch", "score": 42, "created_utc": 1772200800}
+    ]
+  }
+}

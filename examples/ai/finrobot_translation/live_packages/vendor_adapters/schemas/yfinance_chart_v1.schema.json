@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YFinanceChartFixtureV1",
+  "type": "object",
+  "required": ["fixture_key", "provider", "captured_at", "request", "payload"],
+  "properties": {
+    "fixture_key": {"const": "yfinance:chart:ACME:1mo"},
+    "provider": {"const": "yfinance"},
+    "captured_at": {"type": "string"},
+    "request": {
+      "type": "object",
+      "required": ["symbol", "range", "live_network"],
+      "properties": {
+        "symbol": {"type": "string"},
+        "range": {"type": "string"},
+        "live_network": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["symbol", "currency", "bars"],
+      "properties": {
+        "symbol": {"type": "string"},
+        "currency": {"type": "string"},
+        "bars": {"type": "array"}
+      }
+    }
+  }
+}
