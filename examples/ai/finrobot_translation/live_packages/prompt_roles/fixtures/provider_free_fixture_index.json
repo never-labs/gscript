@@ -47,6 +47,109 @@
       "schema": "section_agent_output_v1",
       "path": "fixtures/provider_free_fixture_index.json#/sample_section_output",
       "metadata": {"section_id": "company_overview", "replay_ready": true}
+    },
+    {
+      "fixture_key": "evidence_validation:source_rules:v1",
+      "capability": "prompt.role.evidence.validation",
+      "schema": "source_evidence_validation_v1",
+      "path": "fixtures/provider_free_fixture_index.json#/evidence_validation_cases",
+      "metadata": {"case_count": 3, "replay_ready": true}
+    },
+    {
+      "fixture_key": "termination_convention:drift_checks:v1",
+      "capability": "prompt.role.termination.convention",
+      "schema": "termination_convention_v1",
+      "path": "contracts/prompt_role_contract.json#/termination_convention/drift_checks",
+      "metadata": {"case_count": 5, "replay_ready": true}
+    },
+    {
+      "fixture_key": "role_profile_versions:v1",
+      "capability": "prompt.role.profile.version",
+      "schema": "role_profile_v1",
+      "path": "contracts/prompt_role_contract.json#/role_profile_versions",
+      "metadata": {"role_count": 4, "replay_ready": true}
+    },
+    {
+      "fixture_key": "delegation_triggers:parse_examples:v1",
+      "capability": "prompt.role.catalog.agent_library",
+      "schema": "delegation_trigger_examples_v1",
+      "path": "fixtures/provider_free_fixture_index.json#/delegation_trigger_parse_examples",
+      "metadata": {"case_count": 4, "replay_ready": true}
+    }
+  ],
+  "delegation_trigger_parse_examples": [
+    {
+      "catalog": "agent_library",
+      "entry_id": "market_analyst_system",
+      "input": "calculate margin ratio table from src_financial_metrics",
+      "matched": true,
+      "delegate_role_id": "Data_Analyst"
+    },
+    {
+      "catalog": "agent_library",
+      "entry_id": "market_analyst_system",
+      "input": "summarize industry backdrop from src_market_context",
+      "matched": false
+    },
+    {
+      "catalog": "equity_agents",
+      "entry_id": "equity_report_orchestrator",
+      "input": "route industry risk review for ACME",
+      "matched": true,
+      "delegate_role_id": "Market_Analyst"
+    },
+    {
+      "catalog": "text_generator_agents",
+      "entry_id": "section_writer_system",
+      "input": "draft from already validated source refs",
+      "matched": false
+    }
+  ],
+  "evidence_validation_cases": [
+    {
+      "id": "company_overview_pass",
+      "provider_free": true,
+      "live_network": false,
+      "validated": true,
+      "minimum_source_refs": 1,
+      "source_refs": ["src_company_profile", "src_financial_metrics"],
+      "unresolved_source_refs": [],
+      "fixture_keys": ["prompt_catalog:text_generator_agents:v1"],
+      "rules": [
+        {"id": "minimum_source_refs", "passes": true},
+        {"id": "no_unresolved_source_refs", "passes": true},
+        {"id": "fixture_key_required", "passes": true}
+      ]
+    },
+    {
+      "id": "missing_source_ref_fail",
+      "provider_free": true,
+      "live_network": false,
+      "validated": false,
+      "minimum_source_refs": 1,
+      "source_refs": [],
+      "unresolved_source_refs": [],
+      "fixture_keys": ["prompt_catalog:text_generator_agents:v1"],
+      "rules": [
+        {"id": "minimum_source_refs", "passes": false},
+        {"id": "no_unresolved_source_refs", "passes": true},
+        {"id": "fixture_key_required", "passes": true}
+      ]
+    },
+    {
+      "id": "unresolved_ref_fail",
+      "provider_free": true,
+      "live_network": false,
+      "validated": false,
+      "minimum_source_refs": 1,
+      "source_refs": ["src_company_profile"],
+      "unresolved_source_refs": ["src_missing_metric"],
+      "fixture_keys": ["prompt_catalog:text_generator_agents:v1"],
+      "rules": [
+        {"id": "minimum_source_refs", "passes": true},
+        {"id": "no_unresolved_source_refs", "passes": false},
+        {"id": "fixture_key_required", "passes": true}
+      ]
     }
   ],
   "sample_section_output": {
@@ -60,8 +163,15 @@
       "provider_free": true,
       "live_network": false,
       "validated": true,
+      "minimum_source_refs": 1,
+      "source_refs": ["src_company_profile", "src_financial_metrics"],
       "unresolved_source_refs": [],
-      "fixture_keys": ["prompt_catalog:text_generator_agents:v1"]
+      "fixture_keys": ["prompt_catalog:text_generator_agents:v1"],
+      "rules": [
+        {"id": "minimum_source_refs", "passes": true},
+        {"id": "no_unresolved_source_refs", "passes": true},
+        {"id": "fixture_key_required", "passes": true}
+      ]
     },
     "termination": "TERMINATE"
   }
