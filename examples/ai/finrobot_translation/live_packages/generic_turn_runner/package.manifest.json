@@ -153,6 +153,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide generic AI provider execution as a built-in; leia-generic-ai-turn-runner declares provider-free request, execution, tool, and replay contracts only."
+    "statement": "Leia core does not provide generic AI provider execution as a built-in; leia-generic-ai-turn-runner defines the provider-free package boundary for request, execution, tool, and replay contracts."
   }
 }

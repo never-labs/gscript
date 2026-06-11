@@ -36,21 +36,21 @@ No `docs/spec/index.html` generation was run.
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 2.997s` |
-| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `77 ok, 0 skipped, 0 failed` |
+| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 4.909s` |
+| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `78 ok, 0 skipped, 0 failed` |
 | Live package plan manifest JSON | `jq empty examples/ai/finrobot_translation/live_package_plan_manifest.json` | Pass |
 | Repo check, no generated docs/editor/examples | `go run ./cmd/leia check --no-docs --no-editor --no-examples .` | Pass: `fmt: ok`, `lint: ok`, `test: ok`, `manifest: ok`; docs/editor/examples skipped |
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples --json` discovers 77 runnable/checkable FinRobot
+`go run ./cmd/leia examples --json` discovers 78 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
 The examples gate validated:
 
 - 67 `host-vm` examples
 - 6 `llm-replay` examples
-- 4 `evaluate` examples
+- 5 `evaluate` examples
 - 32 registered live-package skeleton examples:
   `live_packages/analytics_report/analytics_report.leia`,
   `live_packages/analyzer_report/main.leia`,
@@ -88,20 +88,19 @@ The examples gate validated:
 The checker reported:
 
 ```text
-examples: 77 ok, 0 skipped, 0 failed
+examples: 78 ok, 0 skipped, 0 failed
 ```
 
 The repository check reported:
 
 ```text
-examples: 194 ok, 8 skipped, 0 failed
 fmt: ok
 lint: ok
 test: ok
 manifest: ok
 docs: skipped
 editor: skipped
-examples: ok
+examples: skipped
 ```
 
 ## Live-Package Skeleton Status
@@ -190,8 +189,8 @@ go run ./cmd/leia check --no-docs --no-editor --no-examples .
 ## Release-Gate Conclusion
 
 The FinRobot documentation status is aligned with the current
-`origin/codex/ai-dialect-polish` surface: 77 registered runnable/checkable
-examples, 597 files in the translation directory, and 32 checked-in
+`origin/codex/ai-dialect-polish` surface: 78 registered runnable/checkable
+examples, 599 files in the translation directory, and 32 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
 FinRobot-only work. The validation commands above passed without generating
