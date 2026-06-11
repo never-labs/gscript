@@ -164,7 +164,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/vendor_adapters", "examples/ai/finrobot_translation/live_packages/finance_facade"],
       "excluded_scope": ["AutoGen caller/executor registration side effects"],
       "source_hash": "sha256:79a5c67d9c44b49fdb4b21e7d9fd678e6c9e17cce4b12c642d28911e5553458f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json", "sha256": "a20a21119ff7f926bcea89cf42f29b520682b6db4ebab59b5c7df6117d8c6374"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json", "sha256": "0078a042e5ea159b2f45fcd9407136d9d112fae99808cc4e5a021053eb3e5466"}],
       "next_action": "Implement live tool invocation only inside provider packages with explicit capabilities."
     },
     {

@@ -5,13 +5,16 @@
   "version": "0.2.0-fixture-matrix",
   "provider_free": true,
   "live_network": false,
+  "live_network_default": false,
   "real_dependency_imports": false,
+  "real_dependency_import_default": false,
   "fixture_root": "fixtures",
   "schema_root": "schemas",
   "default_policy": {
     "mode": "fixture_replay",
     "live_network": false,
     "provider_credentials_required": false,
+    "real_dependency_imports": false,
     "clean_skip_without_credentials": true,
     "redact_secret_values": true
   },

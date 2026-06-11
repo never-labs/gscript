@@ -207,6 +207,7 @@ func TestFinRobotEvaluationHarnessParityDeclaresGenericAICapability(t *testing.T
 	if !manifest.GoldenThresholdGates.Gate || manifest.GoldenThresholdGates.SummaryPassRateMin != 1 || manifest.GoldenThresholdGates.CasesFailedMax != 0 {
 		t.Fatalf("golden threshold gate = %#v", manifest.GoldenThresholdGates)
 	}
+	assertGoldenThresholdGateMetrics(t, manifest)
 	if manifest.ProviderFreeModelStub.LiveProviderCalls || manifest.ProviderFreeModelStub.NetworkCalls || manifest.ProviderFreeModelStub.AllowedModelPrefix != "mock-" {
 		t.Fatalf("provider-free model stub = %#v", manifest.ProviderFreeModelStub)
 	}
@@ -516,6 +517,40 @@ func metricRegistryNames(manifest finrobotEvaluationHarnessParityManifest) []str
 		names = append(names, metric.Name)
 	}
 	return names
+}
+
+func assertGoldenThresholdGateMetrics(t *testing.T, manifest finrobotEvaluationHarnessParityManifest) {
+	t.Helper()
+	registryTypes := map[string]string{}
+	for _, metric := range manifest.MetricRegistry {
+		if metric.Name == "" || metric.Type == "" {
+			t.Fatalf("metric registry entry is incomplete: %#v", metric)
+		}
+		registryTypes[metric.Name] = metric.Type
+	}
+	goldenTypes := map[string]string{}
+	for _, metric := range manifest.AIEvaluationCapability.CapabilitySpecimen.GoldenReport.Metrics {
+		if metric.Name == "" || metric.Type == "" {
+			t.Fatalf("golden metric entry is incomplete: %#v", metric)
+		}
+		goldenTypes[metric.Name] = metric.Type
+	}
+	for _, gate := range manifest.GoldenThresholdGates.MetricThresholds {
+		registryType, ok := registryTypes[gate.Name]
+		if !ok {
+			t.Fatalf("golden threshold metric %q is not registered", gate.Name)
+		}
+		goldenType, ok := goldenTypes[gate.Name]
+		if !ok {
+			t.Fatalf("golden threshold metric %q is missing from golden report metrics", gate.Name)
+		}
+		if gate.Type == "" || gate.Type != registryType || gate.Type != goldenType {
+			t.Fatalf("golden threshold metric %q type = %q, registry = %q, golden = %q", gate.Name, gate.Type, registryType, goldenType)
+		}
+		if gate.PassRateMin == 0 && gate.MeanMax == 0 {
+			t.Fatalf("golden threshold metric %q has no threshold: %#v", gate.Name, gate)
+		}
+	}
 }
 
 func requireStringSet(t *testing.T, got, want []string) {

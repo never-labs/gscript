@@ -251,6 +251,71 @@ func TestFinRobotProductDeployGateCoverage(t *testing.T) {
 	}
 }
 
+func TestFinRobotProductDeployParityReflectsProductWorkflowDefaultPolicy(t *testing.T) {
+	base := filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation")
+	productWorkflowBase := filepath.Join(base, "live_packages", "product_workflow")
+	ledger := loadFinRobotProductDeployParityLedger(t, base)
+	workflowManifest := loadProductWorkflowLiveManifest(t, productWorkflowBase)
+	var packageManifest struct {
+		ProductDeployParity struct {
+			ProviderFree       bool `json:"provider_free"`
+			LiveNetworkDefault bool `json:"live_network_default"`
+			CleanSkipDefault   bool `json:"clean_skip_default"`
+		} `json:"product_deploy_parity"`
+	}
+	decodeDeployGateJSON(t, filepath.Join(base, "package_deploy_manifest.json"), &packageManifest)
+
+	if workflowManifest.DefaultPolicy.Mode != "fixture_replay" {
+		t.Fatalf("product workflow default_policy.mode = %q, want fixture_replay", workflowManifest.DefaultPolicy.Mode)
+	}
+	if workflowManifest.DefaultPolicy.LiveNetwork != ledger.LiveNetworkDefault ||
+		workflowManifest.DefaultPolicy.LiveNetwork != packageManifest.ProductDeployParity.LiveNetworkDefault ||
+		workflowManifest.LiveNetworkDefault != ledger.LiveNetworkDefault ||
+		workflowManifest.LiveNetworkDefault != packageManifest.ProductDeployParity.LiveNetworkDefault {
+		t.Fatalf("live-network defaults drifted: workflow policy=%v workflow default=%v ledger=%v package manifest=%v",
+			workflowManifest.DefaultPolicy.LiveNetwork,
+			workflowManifest.LiveNetworkDefault,
+			ledger.LiveNetworkDefault,
+			packageManifest.ProductDeployParity.LiveNetworkDefault)
+	}
+	if workflowManifest.ProviderFree != ledger.ProviderFree ||
+		workflowManifest.ProviderFree != packageManifest.ProductDeployParity.ProviderFree {
+		t.Fatalf("provider-free defaults drifted: workflow=%v ledger=%v package manifest=%v",
+			workflowManifest.ProviderFree,
+			ledger.ProviderFree,
+			packageManifest.ProductDeployParity.ProviderFree)
+	}
+	if workflowManifest.DefaultPolicy.ProviderCredentialsRequired ||
+		workflowManifest.DefaultPolicy.RealDependencyImports ||
+		!workflowManifest.DefaultPolicy.CleanSkipWithoutDependency ||
+		!ledger.CleanSkipDefault ||
+		!packageManifest.ProductDeployParity.CleanSkipDefault {
+		t.Fatalf("default policy is not reflected in deploy clean-skip gates: workflow=%#v ledger_clean_skip=%v package_clean_skip=%v",
+			workflowManifest.DefaultPolicy,
+			ledger.CleanSkipDefault,
+			packageManifest.ProductDeployParity.CleanSkipDefault)
+	}
+
+	var gates struct {
+		ProviderFree bool `json:"provider_free"`
+		LiveNetwork  bool `json:"live_network"`
+		Gates        []struct {
+			ID                  string `json:"id"`
+			RequiresCredentials bool   `json:"requires_credentials"`
+			LiveNetwork         bool   `json:"live_network"`
+		} `json:"gates"`
+	}
+	decodeDeployGateJSON(t, filepath.Join(productWorkflowBase, "contracts", "deployment_capability_gates.json"), &gates)
+	if gates.ProviderFree != workflowManifest.ProviderFree || gates.LiveNetwork != workflowManifest.DefaultPolicy.LiveNetwork {
+		t.Fatalf("deployment gate defaults drifted from workflow policy: gates=%#v workflow=%#v", gates, workflowManifest.DefaultPolicy)
+	}
+	for _, gate := range gates.Gates {
+		if gate.LiveNetwork != workflowManifest.DefaultPolicy.LiveNetwork || gate.RequiresCredentials != workflowManifest.DefaultPolicy.ProviderCredentialsRequired {
+			t.Fatalf("deployment gate %s does not reflect workflow default_policy: gate=%#v workflow=%#v", gate.ID, gate, workflowManifest.DefaultPolicy)
+		}
+	}
+}
+
 func TestFinRobotProductDeployAuthSessionAndDBMigrationGates(t *testing.T) {
 	base := filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation")
 	ledger := loadFinRobotProductDeployParityLedger(t, base)

@@ -8,7 +8,7 @@ web services are not Leia built-ins.
 ## Package Skeleton Status
 
 Current registered-example status: 78 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples --json`. All 32
+examples are discovered by `go run ./cmd/leia examples list --json`. All 32
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI

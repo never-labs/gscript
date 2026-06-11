@@ -9,7 +9,7 @@
   "status": "requested",
   "replay": {
     "fixture_key": "generic_turn:tool_request:fixture.lookup:v1",
-    "deterministic_tool_hash": "sha256:de0d0f5b6f6d1f5fdaf1c643c8a4a4dfb928d6a884a2c2df88f4956bba4475a1"
+    "deterministic_tool_hash": "sha256:33017b0a9e34a3efb6df012561c3a969a70b47a73a7345ae0bc68af5d707c74c"
   },
   "policy": {
     "execution_policy": "request-only-envelope",

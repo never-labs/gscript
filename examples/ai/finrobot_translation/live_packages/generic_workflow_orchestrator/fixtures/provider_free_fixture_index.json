@@ -13,8 +13,13 @@
         "replay_ready": true,
         "cache_key": "generic_orchestration_graph_v1:graph",
         "cache_state": "miss",
-        "max_attempts": 1
-      }
+        "max_attempts": 1,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic_workflow:stage_io:offline",
@@ -26,8 +31,13 @@
         "replay_ready": true,
         "cache_key": "generic_orchestration_graph_v1:stage_io",
         "cache_state": "hit",
-        "max_attempts": 1
-      }
+        "max_attempts": 1,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic_workflow:handoff_trace:offline",
@@ -39,8 +49,13 @@
         "replay_ready": true,
         "cache_key": "generic_orchestration_graph_v1:handoff_trace",
         "cache_state": "bypass",
-        "max_attempts": 1
-      }
+        "max_attempts": 1,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic_workflow:result:offline",
@@ -52,8 +67,13 @@
         "replay_ready": true,
         "cache_key": "generic_orchestration_graph_v1:result",
         "cache_state": "miss",
-        "max_attempts": 1
-      }
+        "max_attempts": 1,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic_workflow:trace_hooks:offline",
@@ -65,9 +85,14 @@
         "replay_ready": true,
         "cache_key": "generic_orchestration_graph_v1:trace_hooks",
         "cache_state": "bypass",
-        "max_attempts": 1
-      }
+        "max_attempts": 1,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
-  ]
+  ],
+  "schema_version": 1
 }
-

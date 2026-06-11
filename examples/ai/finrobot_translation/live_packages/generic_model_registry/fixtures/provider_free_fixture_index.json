@@ -7,18 +7,45 @@
     {
       "key": "model_registry:aliases:v1",
       "path": "fixtures/model_alias_registry_fixture.json",
-      "schema": "schemas/model_alias_registry_v1.schema.json"
+      "schema": "schemas/model_alias_registry_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     },
     {
       "key": "model_registry:descriptor:fixture_analyst:v1",
       "path": "fixtures/replay_execution_descriptor_fixture.json",
-      "schema": "schemas/execution_descriptor_v1.schema.json"
+      "schema": "schemas/execution_descriptor_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     },
     {
       "key": "model_registry:redaction:v1",
       "path": "fixtures/redaction_policy_fixture.json",
-      "schema": "schemas/redaction_policy_v1.schema.json"
+      "schema": "schemas/redaction_policy_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     }
-  ]
+  ],
+  "real_dependency_imports": false
 }
-

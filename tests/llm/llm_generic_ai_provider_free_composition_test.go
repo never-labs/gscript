@@ -178,6 +178,7 @@ func assertGenericCompositionTraceEnvelope(t *testing.T, traceSequence, turnRequ
 	toolRequestReplay := genericCompositionObject(t, turnToolRequest, "replay")
 	toolResult := genericCompositionObject(t, toolFixture, "result")
 	toolResultReplay := genericCompositionObject(t, toolResult, "replay")
+	expectedToolRequestDigest := "sha256:" + canonicalGenericCompositionHash(t, genericCompositionObject(t, toolFixture, "request"))
 
 	if genericCompositionString(t, turnToolDeclaration, "name") != genericCompositionString(t, turnToolRequest, "name") ||
 		genericCompositionString(t, turnToolRequest, "name") != genericCompositionString(t, genericCompositionObject(t, toolFixture, "request"), "tool_name") ||
@@ -192,7 +193,8 @@ func assertGenericCompositionTraceEnvelope(t *testing.T, traceSequence, turnRequ
 	if !reflect.DeepEqual(genericCompositionStringSlice(t, turnStartPayload, "tools_declared"), []string{genericCompositionString(t, turnToolDeclaration, "name")}) {
 		t.Fatalf("trace turn_start tools do not mirror turn request declarations: payload=%#v declaration=%#v", turnStartPayload, turnToolDeclaration)
 	}
-	if genericCompositionString(t, toolPayload, "input_digest") != genericCompositionString(t, toolRequestReplay, "deterministic_tool_hash") ||
+	if genericCompositionString(t, toolRequestReplay, "deterministic_tool_hash") != expectedToolRequestDigest ||
+		genericCompositionString(t, toolPayload, "input_digest") != expectedToolRequestDigest ||
 		genericCompositionString(t, toolPayload, "output_digest") != "sha256:"+canonicalGenericCompositionHash(t, toolResult) ||
 		genericCompositionString(t, toolPayload, "replay_key") != genericCompositionString(t, toolResultReplay, "replay_key") {
 		t.Fatalf("trace tool event must carry reusable request/result replay digests: payload=%#v request=%#v result=%#v", toolPayload, turnToolRequest, toolResult)

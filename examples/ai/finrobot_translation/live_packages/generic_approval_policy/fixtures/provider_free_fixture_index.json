@@ -12,9 +12,24 @@
       "schema": "schemas/policy_outcome_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "decisions": ["allowed", "denied", "skipped"],
-        "risk_levels": ["low", "medium", "high", "critical"]
-      }
+        "decisions": [
+          "allowed",
+          "denied",
+          "skipped"
+        ],
+        "risk_levels": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic.ai.approval.policy:trace:deny:trading_order:v1",
@@ -24,8 +39,14 @@
       "metadata": {
         "replay_ready": true,
         "decision": "denied",
-        "secret_values_present": false
-      }
+        "secret_values_present": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic.ai.approval.policy:clean_skip:network_absent:v1",
@@ -35,8 +56,14 @@
       "metadata": {
         "replay_ready": true,
         "clean_skip": true,
-        "status": "skipped"
-      }
+        "status": "skipped",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

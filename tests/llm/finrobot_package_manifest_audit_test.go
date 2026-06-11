@@ -98,6 +98,7 @@ func TestFinRobotPackageManifestConsistencyAudit(t *testing.T) {
 			manifest := readJSONMap(t, manifestPath)
 			assertFinRobotAuditProviderFree(t, manifestPath, manifest)
 			assertFinRobotAuditNetworkDisabled(t, manifestPath, manifest)
+			assertFinRobotAuditFixtureReplayDefaults(t, manifestPath, manifest)
 			assertFinRobotAuditNoBuiltIn(t, manifestPath, planned.ID, planned.NoBuiltInGuarantee, waivedNoBuiltIn, manifest)
 			assertFinRobotAuditEntrypoints(t, root, manifestPath, filepath.Dir(manifestPath), manifest)
 			assertFinRobotAuditReferencedArtifacts(t, root, manifestPath, filepath.Dir(manifestPath), manifest)
@@ -206,6 +207,28 @@ func assertFinRobotAuditNetworkDisabled(t *testing.T, path string, manifest map[
 	assertFinRobotAuditRecursiveBool(t, path, manifest, "allow_network", false)
 	assertFinRobotAuditRecursiveBool(t, path, manifest, "real_dependency_imports", false)
 	assertFinRobotAuditRecursiveBool(t, path, manifest, "real_dependency_import_default", false)
+}
+
+func assertFinRobotAuditFixtureReplayDefaults(t *testing.T, path string, manifest map[string]any) {
+	t.Helper()
+	if !finrobotLivePackageBoolOrConst(manifest["live_network_default"], false) {
+		t.Fatalf("%s live_network_default = %#v, want false", path, manifest["live_network_default"])
+	}
+	if !finrobotLivePackageBoolOrConst(manifest["real_dependency_import_default"], false) {
+		t.Fatalf("%s real_dependency_import_default = %#v, want false", path, manifest["real_dependency_import_default"])
+	}
+	policy, ok := manifest["default_policy"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s missing default_policy map", path)
+	}
+	if mode, _ := policy["mode"].(string); mode != "fixture_replay" {
+		t.Fatalf("%s default_policy.mode = %q, want fixture_replay", path, mode)
+	}
+	if !finrobotLivePackageBoolOrConst(policy["live_network"], false) ||
+		!finrobotLivePackageBoolOrConst(policy["provider_credentials_required"], false) ||
+		!finrobotLivePackageBoolOrConst(policy["real_dependency_imports"], false) {
+		t.Fatalf("%s default_policy must disable live network, credentials, and real imports: %#v", path, policy)
+	}
 }
 
 func assertFinRobotAuditRecursiveBool(t *testing.T, path string, value any, key string, want bool) {

@@ -31,6 +31,7 @@ func TestGenericLivePackageConsistency(t *testing.T) {
 			assertGenericLivePackageFixtureReplayDefaultPolicy(t, manifestPath, manifest)
 			assertGenericLivePackageEntrypoints(t, root, manifestPath, packageDir, manifest)
 			assertGenericLivePackageNoBuiltInGuarantee(t, manifestPath, manifest)
+			assertGenericLivePackageProviderFreeFixtureIndex(t, root, packageDir)
 			assertGenericLivePackageNoQRuntime(t, packageDir)
 
 			registeredExample := registeredExamples[relDir]
@@ -263,6 +264,59 @@ func assertGenericLivePackageNoBuiltInGuarantee(t *testing.T, manifestPath strin
 		}
 	default:
 		t.Fatalf("%s no_built_in_guarantee has unsupported shape %#v", manifestPath, value)
+	}
+}
+
+func assertGenericLivePackageProviderFreeFixtureIndex(t *testing.T, root, packageDir string) {
+	t.Helper()
+	indexPath := filepath.Join(packageDir, "fixtures", "provider_free_fixture_index.json")
+	index := readJSONMap(t, indexPath)
+	if !finrobotLivePackageBoolOrConst(index["provider_free"], true) ||
+		!finrobotLivePackageBoolOrConst(index["live_network"], false) ||
+		!finrobotLivePackageBoolOrConst(index["real_dependency_imports"], false) {
+		t.Fatalf("%s must declare provider-free offline defaults: %#v", indexPath, index)
+	}
+	fixtures, ok := index["fixtures"].([]any)
+	if !ok || len(fixtures) == 0 {
+		t.Fatalf("%s missing fixtures array", indexPath)
+	}
+	for i, value := range fixtures {
+		fixture, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("%s fixtures[%d] = %#v, want object", indexPath, i, value)
+		}
+		path, _ := fixture["path"].(string)
+		if path == "" || filepath.IsAbs(path) || strings.Contains(filepath.ToSlash(path), "../") || strings.Contains(path, "://") {
+			t.Fatalf("%s fixtures[%d].path = %q, want package-relative fixture path", indexPath, i, path)
+		}
+		if !strings.HasPrefix(filepath.ToSlash(path), "fixtures/") {
+			t.Fatalf("%s fixtures[%d].path = %q, want fixtures/... path", indexPath, i, path)
+		}
+		assertFinRobotAuditExistingRelativePath(t, root, indexPath, packageDir, path)
+		info, err := os.Stat(filepath.Join(packageDir, filepath.FromSlash(strings.SplitN(path, "#", 2)[0])))
+		if err != nil {
+			t.Fatalf("%s fixtures[%d].path %q: %v", indexPath, i, path, err)
+		}
+		if info.IsDir() {
+			t.Fatalf("%s fixtures[%d].path %q points to a directory", indexPath, i, path)
+		}
+		if filepath.Ext(strings.SplitN(path, "#", 2)[0]) != ".json" {
+			t.Fatalf("%s fixtures[%d].path = %q, want JSON fixture", indexPath, i, path)
+		}
+		if !finrobotLivePackageBoolOrConst(fixture["provider_free"], true) ||
+			!finrobotLivePackageBoolOrConst(fixture["live_network"], false) ||
+			!finrobotLivePackageBoolOrConst(fixture["real_dependency_imports"], false) {
+			t.Fatalf("%s fixtures[%d] must declare provider-free offline flags: %#v", indexPath, i, fixture)
+		}
+		metadata, ok := fixture["metadata"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s fixtures[%d] missing metadata map", indexPath, i)
+		}
+		if !finrobotLivePackageBoolOrConst(metadata["provider_free"], true) ||
+			!finrobotLivePackageBoolOrConst(metadata["live_network"], false) ||
+			!finrobotLivePackageBoolOrConst(metadata["real_dependency_imports"], false) {
+			t.Fatalf("%s fixtures[%d].metadata must declare provider-free offline flags: %#v", indexPath, i, metadata)
+		}
 	}
 }
 

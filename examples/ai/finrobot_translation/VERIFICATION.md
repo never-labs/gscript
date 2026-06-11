@@ -4,9 +4,9 @@ Verification date: 2026-06-12
 
 Branch under test: `codex/ai-dialect-polish`
 
-Base branch: `origin/codex/ai-dialect-polish`
+Base branch: `codex/ai-dialect-polish`
 
-Base commit: current branch head after live-package skeleton integration.
+Base commit: current `codex/ai-dialect-polish` branch head.
 
 Environment:
 
@@ -32,7 +32,10 @@ changes.
 
 No `docs/spec/index.html` generation was run.
 
-## Results
+## Last Recorded Release-Gate Results
+
+This status-doc refresh checked inventory only and did not rerun the release
+gates below.
 
 | Gate | Command | Result |
 | --- | --- | --- |
@@ -173,7 +176,7 @@ Current checked-in skeleton directories:
 
 ## Reproduction
 
-From a clean worktree based on `origin/codex/ai-dialect-polish`:
+From a clean worktree based on the audited branch:
 
 ```sh
 git fetch origin codex/ai-dialect-polish
@@ -188,10 +191,10 @@ go run ./cmd/leia check --no-docs --no-editor --no-examples .
 
 ## Release-Gate Conclusion
 
-The FinRobot documentation status is aligned with the current
-`origin/codex/ai-dialect-polish` surface: 78 registered runnable/checkable
+The FinRobot documentation inventory is aligned with the current
+`codex/ai-dialect-polish` surface: 78 registered runnable/checkable
 examples, 599 files in the translation directory, and 32 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
-FinRobot-only work. The validation commands above passed without generating
+FinRobot-only work. The recorded validation pass above did not generate
 `docs/spec/index.html`.

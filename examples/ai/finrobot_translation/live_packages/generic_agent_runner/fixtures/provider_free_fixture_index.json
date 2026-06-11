@@ -8,19 +8,44 @@
       "key": "agent_config",
       "schema": "agent_config_v1",
       "path": "fixtures/agent_config_fixture.json",
-      "provider_free": true
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     },
     {
       "key": "loop_trace",
       "schema": "loop_trace_v1",
       "path": "fixtures/loop_trace_fixture.json",
-      "provider_free": true
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     },
     {
       "key": "structured_output",
       "schema": "structured_output_v1",
       "path": "fixtures/structured_output_fixture.json",
-      "provider_free": true
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     }
-  ]
+  ],
+  "real_dependency_imports": false
 }

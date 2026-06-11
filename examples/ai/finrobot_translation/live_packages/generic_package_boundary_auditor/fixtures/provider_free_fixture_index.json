@@ -11,8 +11,14 @@
       "schema": "schemas/audit_finding_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "surface": "package_manifest"
-      }
+        "surface": "package_manifest",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic-package-boundary:fixture-index:offline",
@@ -21,8 +27,14 @@
       "schema": "schemas/audit_finding_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "surface": "fixture_index"
-      }
+        "surface": "fixture_index",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic-package-boundary:example-registry:offline",
@@ -31,8 +43,14 @@
       "schema": "schemas/audit_scope_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "surface": "example_registry"
-      }
+        "surface": "example_registry",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic-package-boundary:findings:offline",
@@ -41,8 +59,14 @@
       "schema": "schemas/audit_finding_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "surface": "audit_findings"
-      }
+        "surface": "audit_findings",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "generic-package-boundary:missing-boundary-records:offline",
@@ -51,8 +75,14 @@
       "schema": "schemas/missing_boundary_record_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "surface": "missing_boundary_records"
-      }
+        "surface": "missing_boundary_records",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

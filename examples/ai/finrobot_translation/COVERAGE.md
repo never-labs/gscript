@@ -4,7 +4,7 @@ Audit date: 2026-06-12.
 
 Baseline:
 
-- Leia branch: `origin/codex/ai-dialect-polish` at `71e30aa3`.
+- Leia branch: `codex/ai-dialect-polish` branch head.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
 - Current translation directory file count: 599 files, including 32

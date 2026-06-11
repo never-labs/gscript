@@ -14,7 +14,12 @@
     "scan_ahead": false,
     "consume_on_match": true,
     "consume_on_mismatch": false,
-    "identity_fields": ["operation", "capability", "replay_key", "request_hash"],
+    "identity_fields": [
+      "operation",
+      "capability",
+      "replay_key",
+      "request_hash"
+    ],
     "mismatch_finding_kind": "generic.ai.replay.mismatch",
     "unconsumed_finding_kind": "generic.ai.replay.unconsumed_record",
     "exhausted_finding_kind": "generic.ai.replay.exhausted"
@@ -28,8 +33,13 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "domain_specific": false
-      }
+        "domain_specific": false,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "id": "matching_requests",
@@ -38,8 +48,13 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "strict_ordered_partial": true
-      }
+        "strict_ordered_partial": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "id": "mismatch_requests",
@@ -48,8 +63,13 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "strict_ordered_mismatch": true
-      }
+        "strict_ordered_mismatch": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ],
   "expected_summaries": {
@@ -63,8 +83,13 @@
       "unconsumed": 1,
       "exhausted": 0,
       "next_index": 2,
-      "finding_kinds": ["generic.ai.replay.unconsumed_record"],
-      "matched_record_ids": ["rec-000-analyst-intent", "rec-001-tool-lookup"]
+      "finding_kinds": [
+        "generic.ai.replay.unconsumed_record"
+      ],
+      "matched_record_ids": [
+        "rec-000-analyst-intent",
+        "rec-001-tool-lookup"
+      ]
     },
     "strict_ordered_mismatch": {
       "fixture_id": "generic-ai-record-replay-fixture-index",
@@ -81,7 +106,9 @@
         "generic.ai.replay.unconsumed_record",
         "generic.ai.replay.unconsumed_record"
       ],
-      "matched_record_ids": ["rec-000-analyst-intent"]
+      "matched_record_ids": [
+        "rec-000-analyst-intent"
+      ]
     }
   },
   "deterministic_summary_order": [
@@ -96,5 +123,7 @@
     "next_index",
     "finding_kinds",
     "matched_record_ids"
-  ]
+  ],
+  "live_network": false,
+  "real_dependency_imports": false
 }

@@ -17,7 +17,16 @@
       ],
       "approval_state": "fixture_only",
       "expected_ok": true,
-      "replay_ready": true
+      "replay_ready": true,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     },
     {
       "fixture_key": "generic_tool:invoke:fixture.lookup:bad-args:validation",
@@ -32,7 +41,16 @@
       ],
       "approval_state": "fixture_only",
       "expected_ok": false,
-      "replay_ready": true
+      "replay_ready": true,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
     }
   ]
 }
