@@ -23,10 +23,11 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 27 registered examples plus
-three checked-in live-package skeleton directories:
-`live_packages/analytics_report`, `live_packages/product_workflow`, and
-`live_packages/vendor_adapters`. Remaining production work is external package
+directory. The current provider-free surface is 28 registered examples plus
+four checked-in live-package skeleton directories:
+`live_packages/analytics_report`, `live_packages/optional_integrations`,
+`live_packages/product_workflow`, and `live_packages/vendor_adapters`.
+Remaining production work is external package
 implementation work, not missing language or AI dialect surface: promoting the
 checked-in skeleton contracts into live external packages, hardening product UI,
 adding real renderers, and shipping optional provider integrations behind
@@ -96,7 +97,7 @@ capability gates.
 | FR-GAP-015 valuation and analytics packages | Implemented for the translation slice as deterministic DCF, EV/EBITDA, P/E, target-price synthesis, sensitivity, and tolerance fixtures. | `tests/llm/llm_valuation_analytics_test.go` runs `examples/ai/finrobot_translation/valuation_analytics.leia`; `tests/llm/llm_analytics_report_live_package_test.go` validates the checked-in valuation/report skeleton. |
 | FR-GAP-016 prompt/role/report-section packages | Implemented as data-only role registry, prompt render snapshots, section output schemas, and report taxonomy fixtures. | `tests/llm/llm_role_section_package_data_test.go` runs `examples/ai/finrobot_translation/role_profiles.leia` and `section_agents.leia`. |
 | FR-GAP-017 generated-code and notebook tooling | Implemented as capability-gated replay envelopes for file read/write, generated-code execution, image display, and denied command cases. | `tests/llm/llm_generated_code_tooling_test.go` runs `examples/ai/finrobot_translation/generated_code_tooling.leia`. |
-| FR-GAP-018 optional integrations | Implemented as optional package manifests and clean skip/capability gates for FinGPT, FinRL, FinML, Backtrader, mplfinance, Ollama, and OpenBB without importing those dependencies. | `tests/llm/llm_optional_integration_gating_test.go` runs `examples/ai/finrobot_translation/optional_integrations.leia`. |
+| FR-GAP-018 optional integrations | Implemented as optional package manifests and clean skip/capability gates for FinGPT, FinRL, FinML, Backtrader, mplfinance, Ollama, and OpenBB without importing those dependencies. | `tests/llm/llm_optional_integration_gating_test.go` runs `examples/ai/finrobot_translation/optional_integrations.leia`; `tests/llm/llm_optional_integrations_live_package_test.go` validates `live_packages/optional_integrations`. |
 | FR-GAP-019 equity report CLI workflow | Implemented as named stages with dependencies, artifacts, retry/stale-section metadata, chart/report outputs, and manifest checks. | `tests/llm/llm_equity_cli_workflow_test.go` runs `examples/ai/finrobot_translation/equity_cli_workflow.leia`. |
 | FR-GAP-020 web app product layer | Implemented as provider-free web product smoke fixtures covering route parity, auth/session, background task logs, downloads, CRUD state, report artifacts, and the checked-in product workflow skeleton contracts. | `tests/llm/llm_web_product_smoke_test.go` runs `examples/ai/finrobot_translation/web_product.leia`; `tests/llm/finrobot_product_workflow_live_package_test.go` validates `live_packages/product_workflow`. |
 | Finance vendors as built-ins | Not needed. Vendors belong in external packages with capabilities, credentials, schemas, rate-limit metadata, and terms metadata. | Vendor package manifests declare capabilities and replay fixtures. |

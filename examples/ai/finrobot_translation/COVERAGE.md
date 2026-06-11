@@ -7,9 +7,9 @@ Baseline:
 - Leia branch: `origin/codex/ai-dialect-polish` at `b3b6088d`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 78 files, including three
+- Current translation directory file count: 87 files, including four
   provider-free live-package skeleton directories and this audit artifact.
-- Registered examples: 27 runnable/checkable examples discovered by
+- Registered examples: 28 runnable/checkable examples discovered by
   `go run ./cmd/leia examples --json`.
 - Runtime changes in this audit: none.
 
@@ -48,6 +48,7 @@ notebook/tutorial parity.
 | `repo-ai-finrobot_translation-finance_normalizers` | `finance_normalizers.leia` | `host-vm` | Finance statement, market, peer, SEC, news schemas |
 | `repo-ai-finrobot_translation-generated_code_tooling` | `generated_code_tooling.leia` | `host-vm` | Capability-gated code/file/image tooling envelope |
 | `repo-ai-finrobot_translation-live_packages-analytics_report-analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `host-vm` | Checked-in analytics report live-package skeleton for normalizers, valuation, chart specs, report manifests, and renderer contracts |
+| `repo-ai-finrobot_translation-live_packages-optional_integrations-main` | `live_packages/optional_integrations/main.leia` | `host-vm` | Checked-in optional integrations live-package skeleton for FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, and Ollama gates |
 | `repo-ai-finrobot_translation-live_packages-vendor_adapters-main` | `live_packages/vendor_adapters/main.leia` | `host-vm` | Checked-in vendor adapter live-package skeleton with schemas, fixtures, capabilities, terms metadata, and network-off policy |
 | `repo-ai-finrobot_translation-model_alias_routing_example` | `model_alias_routing_example.leia` | `host-vm` | Model alias and route selection contract |
 | `repo-ai-finrobot_translation-optional_integrations` | `optional_integrations.leia` | `host-vm` | Optional package manifest and skip/capability gates |
@@ -63,8 +64,8 @@ notebook/tutorial parity.
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 19 `host-vm`, 6 `llm-replay`, 2 `evaluate`, 27 runnable,
-27 checkable.
+Runner summary: 20 `host-vm`, 6 `llm-replay`, 2 `evaluate`, 28 runnable,
+28 checkable.
 
 ## Module Coverage Matrix
 
@@ -90,7 +91,7 @@ Status key:
 | `finrobot/data_source/finnhub_utils.py` | `vendor_adapters.leia`, `finance_normalizers.leia`, `api_replay.leia`, `live_packages/vendor_adapters/*` | Partial | Finnhub manifest, auth/rate-limit metadata, live-package skeleton fixture, and schema | Live Finnhub client for profile, news, metrics, financials, errors |
 | `finrobot/data_source/fmp_utils.py` | `vendor_adapters.leia`, `finance_normalizers.leia`, `api_replay.leia`, `live_packages/vendor_adapters/*` | Partial | FMP manifest, pagination fixture, key metrics, competitor schema metadata, and live-package skeleton schema | Live FMP client for statements, market cap, targets, peers, ratings, historical metrics |
 | `finrobot/data_source/sec_utils.py` | `vendor_adapters.leia`, `document_rag.leia`, `api_replay.leia`, `live_packages/vendor_adapters/*` | Partial | SEC metadata, download replay, filing chunk contracts, live-package skeleton fixture and schema | Live SEC downloader, user-agent policy, cache, HTML/PDF conversion, section extraction |
-| `finrobot/data_source/finnlp_utils.py`, optional `FinNLP` sources | `optional_integrations.leia`, `optional_integrations_manifest.json` | Partial | Optional integration gating and manifest metadata | Live FinNLP dataset downloaders and schema normalizers |
+| `finrobot/data_source/finnlp_utils.py`, optional `FinNLP` sources | `optional_integrations.leia`, `optional_integrations_manifest.json`, `live_packages/optional_integrations/*` | Partial | Optional integration gating, manifest metadata, clean-skip contract, and live-package skeleton fixture index | Live FinNLP dataset downloaders and schema normalizers |
 | `finrobot/data_source/reddit_utils.py` | `vendor_adapters.leia`, `finance_normalizers.leia`, `optional_integrations.leia`, `live_packages/vendor_adapters/*` | Partial | Reddit adapter manifest, sentiment schema, terms/capability metadata, live-package skeleton fixture and schema | Live PRAW/auth/pagination/redaction implementation |
 | `finrobot/data_source/finance_data.py` | `data_tools.leia`, `finance_normalizers.leia` | Partial | Provider facade shape through replayable tools and normalized fixtures | Live facade dispatch, provider fallback order, typed table package |
 | `finrobot/data_source/earnings_calls_src/*` | `document_rag.leia`, `vendor_adapters.leia`, `live_packages/vendor_adapters/*` | Partial | Transcript chunk fixtures, RAG metadata, live-package skeleton fixture and schema | Live transcript retrieval, speaker parsing, date correction, LangChain document parity |
@@ -100,14 +101,14 @@ Status key:
 | `finrobot/functional/analyzer.py` | `section_agents.leia`, `equity_report.leia` | Partial | Section-specific schema and replayed analysis text | Complete finance analyzer prompt library with source evidence enforcement |
 | `finrobot/functional/charting.py` | `report_contract.leia`, `reporting.leia`, `equity_cli_workflow.leia`, `live_packages/analytics_report/*` | Partial | Chart spec/artifact metadata, dimensions, sources, stale-data checks, renderer skeleton contracts | Real stock, PE/EPS, revenue, EBITDA, margin, sensitivity, waterfall, radar chart rendering |
 | `finrobot/functional/coding.py` | `generated_code_tooling.leia`, `compliance_policy.leia` | Covered | File/code/image tool envelopes, denied-command and approval gates | Sandboxed live Python execution and notebook display integration |
-| `finrobot/functional/quantitative.py` | `quant_experiments/portfolio_optimization.leia`, `optional_integrations.leia` | Partial | Deterministic portfolio-stat fixture and optional Backtrader gate | Live Backtrader/strategy package, trade ledger, seed and data-source controls |
+| `finrobot/functional/quantitative.py` | `quant_experiments/portfolio_optimization.leia`, `optional_integrations.leia`, `live_packages/optional_integrations/*` | Partial | Deterministic portfolio-stat fixture and optional Backtrader gate skeleton | Live Backtrader/strategy package, trade ledger, seed and data-source controls |
 | `finrobot/functional/reportlab.py` | `report_contract.leia`, `reporting.leia`, `package_deploy_manifest.json`, `live_packages/analytics_report/*` | Partial | Report object/artifact boundaries, disclosure metadata, HTML/PDF renderer skeleton contracts | Styled PDF generation, pagination, fonts, image fitting, export package |
 | `finrobot/functional/text.py` | `section_agents.leia`, `reporting.leia` | Covered | Text length/schema constraints through section/report fixtures | Broader reusable text utility package, if needed |
 | `experiments/investment_group.py` | `quant_experiments/investment_group.leia` | Covered | Offline multi-agent investment group replay | Live market/filing/provider calls and full AutoGen execution lifecycle |
 | `experiments/multi_factor_agents.py` | `quant_experiments/multi_factor_agents.leia` | Covered | Offline multi-factor agent replay | Live factor data package and full provider-backed factor transforms |
 | `experiments/portfolio_optimization.py` | `quant_experiments/portfolio_optimization.leia` | Covered | Offline optimizer replay and deterministic stats | Live optimizer/backtest library and market-data integration |
 | `tutorials_beginner/*` | Existing registered examples cover annual report/RAG/forecast/chart concepts across files | Partial | Provider-free equivalents for key concepts: RAG, equity report, forecast-style section agents, chart specs | Notebook-by-notebook parity, Ollama function call/stock chart live gates |
-| `tutorials_advanced/*` | `optional_integrations.leia`, `quant_experiments/*.leia`, `generated_code_tooling.leia` | Partial | Optional gates for OpenBB, mplfinance, FinGPT, FinRL, Backtrader, Ollama; replayed quant workflows | Notebook-by-notebook parity, multimodal chart/document analysis, live optional package smoke tests |
+| `tutorials_advanced/*` | `optional_integrations.leia`, `quant_experiments/*.leia`, `generated_code_tooling.leia`, `tutorial_parity/ledger.json`, `live_packages/optional_integrations/*` | Partial | Optional gates for OpenBB, mplfinance, FinGPT, FinRL, Backtrader, Ollama; replayed quant workflows and tutorial parity ledger | Notebook-by-notebook parity, multimodal chart/document analysis, live optional package implementations |
 | `agent_builder_demo.py`, `test_module.py` | `core_agents/main.leia`, `evaluation_harness/manifest.json` | Partial | Small deterministic agent/tool fixtures and evaluation inventory | Direct demo/test translation with matching assertions |
 | `configs/*`, `OAI_CONFIG_LIST`, `config_api_keys` | `config_secret_example.leia`, `model_alias_routing_example.leia`, `package_deploy_manifest.json` | Covered | Secret-free config, missing key diagnostics, route metadata, deploy env docs | Full config migration helpers and live provider profile loading |
 | `requirements*.txt`, `setup.py`, `Dockerfile`, `deploy*.sh`, `run_web_app.py` | `package_deploy_*`, `package_deploy_manifest.json` | Covered | Provider-free package/deploy metadata, Docker/gcloud/run commands, health entrypoint | Release packaging, real dependency extras, deployment smoke in target cloud |
@@ -145,7 +146,7 @@ mistaken for missing language/runtime support.
 | Report rendering | HTML template rendering, markdown/table rendering, PDF export, page layout, fonts, image fitting, accessibility and visual snapshots | `functional/reportlab.py`, HTML/PDF generator modules |
 | Valuation and quant libraries | Production DCF/multiples engine, Backtrader strategy execution, optimizer package, live factor data transforms | `valuation_engine.py`, `sensitivity_analyzer.py`, `functional/quantitative.py`, experiments |
 | Section-agent package | Complete prompt library, all equity-agent classes, output evidence validators, prompt versioning | `analyzer.py`, `text_generator_agents.py`, `enhanced_text_generator.py`, `equity_agents/*` |
-| Optional integrations | FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, Ollama live package smoke tests | `tutorials_*`, `optional_integrations` targets |
+| Optional integrations | FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, Ollama live package implementations beyond the checked-in clean-skip skeleton | `tutorials_*`, `optional_integrations` targets |
 | Web product | Real web routes, auth, admin views, background workers, logs, report downloads, persistence, session recovery | `finrobot_equity/web_app/*` |
 | Packaging/release | Installable external packages, dependency extras, cloud deployment smoke, artifact publish process | `setup.py`, requirements, Dockerfile, deploy scripts |
 | Tutorial parity | Notebook-by-notebook beginner and advanced tutorial translations with provider-free and optional live gates | `tutorials_beginner/*`, `tutorials_advanced/*` |
@@ -154,19 +155,19 @@ mistaken for missing language/runtime support.
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
-| Registered example inventory | 27 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 78 files in the translation directory, including checked-in live-package skeleton directories and these status docs | Complete |
+| Registered example inventory | 28 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
+| File inventory | 87 files in the translation directory, including checked-in live-package skeleton directories and these status docs | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 19 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 2 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
-| Live-package skeletons | 3 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/product_workflow`, and `live_packages/vendor_adapters`; 2 of them include registered `.leia` examples | Complete |
+| Live-package skeletons | 4 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/optional_integrations`, `live_packages/product_workflow`, and `live_packages/vendor_adapters`; 3 of them include registered `.leia` examples | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
 | Evaluation harness | `evaluation_harness/manifest.json` inventories replay records, golden checksums, gates, and report metadata | Complete for current registered records |
 | Gap ledger alignment | `GAPS.md` records no open gaps for the provider-free slice; remaining work is package/product implementation | Complete |
 | Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
 Provider-free completion result: complete for the currently registered
-27-example translation slice, including live-package skeleton contracts.
+28-example translation slice, including live-package skeleton contracts.
 Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks

@@ -7,11 +7,12 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 27 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. Two checked-in live-package
-skeletons are registered examples (`analytics_report` and `vendor_adapters`);
-the product workflow skeleton is manifest/contracts/schemas/fixtures only and
-is covered by tests through the existing workflow examples.
+Current registered-example status: 28 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. Three checked-in
+live-package skeletons are registered examples (`analytics_report`,
+`optional_integrations`, and `vendor_adapters`); the product workflow skeleton
+is manifest/contracts/schemas/fixtures only and is covered by tests through the
+existing workflow examples.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
 | --- | --- | --- | --- | --- |
@@ -20,6 +21,7 @@ is covered by tests through the existing workflow examples.
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-valuation` | `packages/finrobot/valuation` | `contracts/valuation_contract.json` |
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |
 | `live_packages/product_workflow` | Covered through `equity_cli_workflow.leia` and `web_product.leia`; no standalone registered `.leia` file | `leia-finrobot-web-product` | `packages/finrobot/web_product` | `contracts/web_product_contract.json` |
+| `live_packages/optional_integrations` | `live_packages/optional_integrations/main.leia` | `leia-finrobot-optional-integrations` | `packages/finrobot/optional_integrations` | `contracts/optional_integration_capability_gates.json` |
 
 ## Contract Rules
 
