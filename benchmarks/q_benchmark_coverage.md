@@ -39,6 +39,15 @@ that omits one of those layers should fail the contract gate unless it
 explicitly lowers the corresponding minimum benchmark count for a partial
 local check.
 
+The gate also requires at least one lower-level backend route metric from either
+the VM runtime primitive registry (`runtime_primitive_hits/op` and
+`runtime_primitive_errors/op`) or MethodJIT Frame/Vector runtime routes
+(`methodjit_frame_runtime_success/op`, `methodjit_vector_runtime_success/op`,
+and their error counters). This is separate from typed-kernel hit rate: typed
+kernel rows prove q-level shape dispatch, while backend-route rows prove the
+runtime registry or Frame/Vector MethodJIT counters are still wired into the
+measurement surface.
+
 The suite needs broad q language coverage, not only qSQL. q's performance story
 depends on vector/list primitives, adverbs, dictionaries, symbols, temporal
 values, keyed tables, joins, mutations, and table metadata operations.
@@ -113,7 +122,9 @@ Leia-vs-Go is measured at two layers, both pinned by routing tests:
    per op where runtime instrumentation is available, so a case that silently
    stops doing kernel work is visible.
 2. **JIT-script layer** — `BenchmarkQEvalJITScriptWarm`
-   (`q_eval_jit_script_bench_test.go`, 44-case representative subset) runs the
+   (`q_eval_jit_script_bench_test.go`) enumerates the full `qEvalVectorCases`
+   table minus shrink-only harness exclusions, so the same ordinary q breadth
+   that has session and Go rows also has a JIT-script measurement. It runs the
    hot loop inside a Leia script through the public embedding API so the loop
    tiers up to Tier 2 native code. The loop body uses the
    `q.session().eval(<const source>)` route, which methodjit lowers to the
@@ -146,7 +157,7 @@ into a closed constant form silently degrades into a memo-lookup measurement.
 
 `benchmarks/data/qeval_go_ratio_baseline.json` snapshots per-case
 `warm_go_ratio` and `jit_go_ratio` (483 case entries; 459 trusted warm ratios,
-44 jit ratios). `q_perf_report.py --check` enforces:
+458 trusted jit ratios). `q_perf_report.py --check` enforces:
 
 - **No-regression ratchet**: each case may not regress beyond its baseline
   ratio x 1.15 (`RATIO_BASELINE_REGRESSION_TOLERANCE`).
@@ -156,12 +167,18 @@ into a closed constant form silently degrades into a memo-lookup measurement.
 - Baselines are refreshed deliberately with `--update-ratio-baseline` after an
   optimization wave lands; the file records its capture date.
 
-Current state (baseline captured 2026-06-11, post wave-2, commit `0844e0ef`):
+Current state (baseline captured 2026-06-11, post wave-2, origin/main `6e3d6cd3`):
 
 | Layer | Geomean Leia/Go | Cases beating Go |
 |---|---:|---:|
 | Session-warm (trusted) | **0.99** | 253 / 459 |
-| JIT script | **0.47** | 33 / 44 |
+| JIT script | **0.49** | 316 / 458 |
+
+The report-level gate now also checks family breadth in the actual benchmark
+output: ordinary list/adverb rows, `TypeMatrix*` rows, and `Combo*` rows must
+have matching session, Go baseline, and JIT-script rows. This catches partial
+perf runs that accidentally omit ordinary q breadth while still producing
+healthy qSQL or single-shape ratios.
 
 See `benchmarks/q_breadth_perf_audit.md` for the worst remaining rows and the
 wave-3 priorities.
@@ -224,7 +241,6 @@ coverage that now exists.
 |---|---|
 | Typed-kernel counters cover instrumented families only | 8 warm cases still show fallback pressure (worst: `TypeMatrixLongNullNotEqualEqualNullCount`, 9% hit, 31 fallbacks/op); uninstrumented families need runtime-side shape labels |
 | 206 of 459 trusted warm cases are still >= 1x Go, 68 >= 10x | The geomean is at parity but the tail is long; see the breadth audit for the wave-3 worklist |
-| JIT-script layer covers 44 representative cases, not all 483 | Binding-plan coverage extension (wave 3) should widen the set of expressions the JIT route can lower |
 | qSQL cold/warm coverage is select-heavy | Group, join, mutation, and temporal shapes also need cold/warm cache rows |
 | Mutation benchmarks are thin | Insert/upsert/keyed mutation interact with keyed frames and schema-stable cache |
 | Script-level q suite is narrow | Current-vs-HEAD evidence should include more ordinary q and market-data project shapes, not only the columnar scripts |
@@ -249,6 +265,8 @@ general mechanisms such as:
 - table/frame primitives for group, join, sort, keyed lookup, amend, and upsert
 - expression lowering that recognizes reusable q AST/data-expression shapes
 - JIT calls into typed runtime kernels for stable Frame/Vector shapes
+- runtime primitive registry and MethodJIT Frame/Vector route metrics that make
+  backend execution observable
 - allocation elimination through reusable buffers and immutable column views
 - schema-stable caches with explainable fallback and hit-rate statistics
 

@@ -65,7 +65,7 @@ BENCHTIME=100x bash benchmarks/q_general_compute_suite.sh
 
 # q.eval vector/list compute microbenchmarks with Go baselines and allocs/op.
 go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
-  -bench 'Benchmark(QEvalVector(ResultCacheWarm|Cold|GoBaseline)|QSessionEvalVectorWarmExecution)' \
+  -bench 'Benchmark(QEvalVector(ResultCacheWarm|Cold|GoBaseline)|QSessionEvalVectorWarmExecution|QEvalJITScriptWarm)' \
   -benchmem
 
 # Hot-loop scaling profile for low-resolution workloads.
@@ -147,6 +147,7 @@ The Go-level q benchmarks add these direct comparison families:
 | `BenchmarkQSQLNativeGo...` | simple and optimized hand-written Go qSQL baselines |
 | `BenchmarkQSessionEvalVectorWarmExecution/...` | ordinary q vector/list/math/adverb session expressions without global result-cache hits |
 | `BenchmarkQEvalVectorGoBaseline/...` | hand-written Go baselines for the same ordinary q shapes |
+| `BenchmarkQEvalJITScriptWarm/...` | the same ordinary q shapes inside a JIT-compiled Leia hot loop |
 
 Use the full wrapper after q runtime, frame/vector, schema-cache, or JIT path
 changes to keep measurements comparable:
@@ -164,7 +165,7 @@ go test ./internal/stdlib/bind -run '^$' \
   -benchmem -benchtime=100x
 
 go test ./benchmarks -run '^TestQEvalVectorBenchmarkExpressions$' \
-  -bench 'Benchmark(QEvalVector(ResultCacheWarm|Cold|GoBaseline)|QSessionEvalVectorWarmExecution)' \
+  -bench 'Benchmark(QEvalVector(ResultCacheWarm|Cold|GoBaseline)|QSessionEvalVectorWarmExecution|QEvalJITScriptWarm)' \
   -benchmem -benchtime=100x
 ```
 
@@ -237,7 +238,11 @@ python3 benchmarks/q_perf_report.py \
   --min-runtime-bridge-benchmark-count=3 \
   --min-q-array-bridge-rows-op=1 \
   --max-q-array-bridge-avg-allocs-op=64 \
-  --max-q-array-bridge-max-allocs-op=64
+  --max-q-array-bridge-max-allocs-op=64 \
+  --min-runtime-backend-route-benchmarks=1 \
+  --min-runtime-backend-route-hits-op=1 \
+  --max-runtime-backend-route-errors-op=0 \
+  --min-q-eval-family-cases=1
 ```
 
 For quick iteration on saved `go test -bench` output, skip rerunning benchmarks:
@@ -266,6 +271,23 @@ layers: ordinary q typed primitive counters, JIT backend route counters, and
 MethodJIT array bridge counters. This prevents a partial benchmark output from
 looking healthy merely because one layer was not run. For intentionally partial
 local checks, set the corresponding `--min-runtime-*-benchmarks=0` flag.
+
+The `Runtime Primitive Registry Routes` section is the lower-level backend
+contract. It accepts either VM runtime primitive registry counters such as
+`runtime_primitive_hits/op` and `runtime_primitive_errors/op`, or MethodJIT
+Frame/Vector route counters such as `methodjit_frame_runtime_success/op` and
+`methodjit_vector_runtime_success/op`. The default `--check` policy requires at
+least one backend-route benchmark row, at least one hit/op, and zero errors/op.
+This catches partial benchmark output where typed-kernel or JIT summary rows are
+present but the underlying runtime primitive registry or Frame/Vector route
+statistics stopped being emitted.
+
+The `Ordinary q Family Coverage` section is the breadth contract for non-qSQL
+q work. The default `--check` policy requires actual benchmark output for
+ordinary list/adverb rows, `TypeMatrix*` rows, and `Combo*` rows, with matching
+`BenchmarkQSessionEvalVectorWarmExecution`, `BenchmarkQEvalVectorGoBaseline`,
+and `BenchmarkQEvalJITScriptWarm` cases. This catches perf runs that have good
+qSQL or single-shape ratios but accidentally omit the ordinary q breadth layer.
 
 The `Runtime Array Bridge Summary` section is the focused MethodJIT q array
 bridge gate. It consumes the `q_array_bridge_*` benchmark counters directly, so
