@@ -3267,6 +3267,9 @@ func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, b
 	if out, ok, err := i64ScalarDyadicCompareMaskIndexArray(i64ScalarDyadicCompareMask{values: values, op: op, scalar: target}); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok := analyticWhereMask(i64ScalarDyadicCompareMask{values: values, op: op, scalar: target}); ok {
+		return out, true, nil
+	}
 	if flat, owned, ok := TryBulkI64(values); ok && len(flat) == values.len {
 		out := make([]int64, 0, len(flat))
 		for row, item := range flat {
@@ -4298,6 +4301,9 @@ func TryTypedAmendAddIndexArray(array Array, indexes Array, values any) (Array, 
 				return out, handled, err
 			}
 		}
+		if out, handled, err := tryBulkI64AmendAddIndexArray(array, indexes, values); handled || err != nil {
+			return out, handled, err
+		}
 		out, ok, err := amendI64SourceCopy(array)
 		if err != nil || !ok {
 			return nil, ok, err
@@ -4352,6 +4358,45 @@ func TryTypedAmendAddIndexArray(array Array, indexes Array, values any) (Array, 
 	default:
 		return nil, false, nil
 	}
+}
+
+// tryBulkI64AmendAddIndexArray applies @[array; indexes; +; values] with the
+// index and value vectors flattened once through the bulk kernels, replacing
+// the per-row interface-dispatch loop for dense integer carriers (where-index
+// vectors, periodic index carriers, lazy dyadic value chains).
+func tryBulkI64AmendAddIndexArray(array Array, indexes Array, values any) (Array, bool, error) {
+	valueArray, ok := values.(Array)
+	if !ok || indexes.Len() <= 1 || valueArray.Len() != indexes.Len() {
+		return nil, false, nil
+	}
+	idx, idxOwned, ok := tryBulkI64Values(indexes)
+	if !ok {
+		return nil, false, nil
+	}
+	defer bulkI64Release(idx, idxOwned)
+	if len(idx) < indexes.Len() {
+		return nil, false, nil
+	}
+	idx = idx[:indexes.Len()]
+	vals, valsOwned, ok := tryBulkI64Values(valueArray)
+	if !ok {
+		return nil, false, nil
+	}
+	defer bulkI64Release(vals, valsOwned)
+	if len(vals) < len(idx) {
+		return nil, false, nil
+	}
+	out, ok, err := amendI64SourceCopy(array)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	for row, index := range idx {
+		if index < 0 || index >= int64(len(out)) {
+			return nil, true, fmt.Errorf("amend index %d out of range", index)
+		}
+		out[index] += vals[row]
+	}
+	return newI64Trusted(out), true, nil
 }
 
 const maxSparseAmendAddIndexes = 256
