@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "id": "report_renderer_contract_v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "renderer_dependency_required": false,
+  "clean_skip_without_renderer": true,
+  "request_contract": {
+    "schema": "render_request_v1",
+    "required_fields": [
+      "report_id",
+      "title",
+      "as_of",
+      "sections",
+      "tables",
+      "charts",
+      "source_annotations",
+      "disclosures",
+      "output_formats"
+    ],
+    "output_formats": [
+      "text/html",
+      "application/pdf"
+    ]
+  },
+  "output_manifest_contract": {
+    "schema": "output_manifest_v1",
+    "required_fields": [
+      "report_id",
+      "renderer",
+      "outputs",
+      "page_snapshots",
+      "warnings",
+      "source_annotation_checks",
+      "disclosure_checks",
+      "deterministic_fixture_hash"
+    ],
+    "allowed_statuses": [
+      "specified_not_rendered",
+      "planned_not_rendered",
+      "clean_skipped_without_renderer"
+    ]
+  },
+  "page_snapshot_contract": {
+    "schema": "page_snapshot_metadata_v1",
+    "required_fields": [
+      "page_number",
+      "format",
+      "viewport",
+      "dimensions",
+      "status",
+      "content_hash",
+      "source_refs",
+      "warning_refs",
+      "disclosure_refs"
+    ],
+    "snapshot_formats": [
+      "text/html",
+      "application/pdf",
+      "image/png"
+    ]
+  },
+  "warning_contract": {
+    "schema": "render_warning_v1",
+    "required_kinds": [
+      "table_render_warning",
+      "markdown_render_warning",
+      "missing_chart_warning"
+    ],
+    "required_fields": [
+      "id",
+      "kind",
+      "severity",
+      "message",
+      "target_id",
+      "source_refs"
+    ]
+  },
+  "annotation_contract": {
+    "schema": "source_annotation_v1",
+    "source_required_fields": [
+      "id",
+      "title",
+      "kind",
+      "locator",
+      "as_of",
+      "retrieved_at",
+      "evidence_hash"
+    ],
+    "disclosure_required_fields": [
+      "id",
+      "kind",
+      "text",
+      "must_render",
+      "rendered"
+    ],
+    "all_source_refs_must_resolve": true,
+    "all_disclosures_must_render": true,
+    "unresolved_refs_allowed": false
+  },
+  "acceptance_gates": [
+    "HTML render request and output manifest fields are present",
+    "PDF render request and output manifest fields are present",
+    "page snapshot metadata includes dimensions, viewport, warning refs, source refs, and disclosure refs",
+    "table and markdown rendering warnings are explicit",
+    "missing chart handling is represented as a warning and placeholder contract",
+    "source annotations and disclosure annotations are checked without live rendering",
+    "renderer dependency absence produces a clean skip instead of a failure"
+  ]
+}
