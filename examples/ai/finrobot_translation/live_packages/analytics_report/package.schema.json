@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "id": "leia-analytics-report-package-schema",
+  "schemas": {
+    "finance_normalizer": {
+      "required": [
+        "schema",
+        "symbol",
+        "period",
+        "currency",
+        "value",
+        "source_id",
+        "captured_at",
+        "stale_after"
+      ],
+      "provenance_required": true
+    },
+    "valuation_result": {
+      "required": [
+        "method",
+        "symbol",
+        "valuation_date",
+        "currency",
+        "price",
+        "assumptions",
+        "source_refs"
+      ],
+      "methods": [
+        "dcf",
+        "peer_multiple",
+        "target_price"
+      ]
+    },
+    "sensitivity_matrix": {
+      "required": [
+        "base_case",
+        "row_axis",
+        "column_axis",
+        "cells",
+        "best_case",
+        "worst_case"
+      ]
+    },
+    "chart_artifact": {
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "source_refs",
+        "artifact"
+      ],
+      "artifact_required": [
+        "id",
+        "kind",
+        "path",
+        "status"
+      ]
+    },
+    "report_artifact": {
+      "required": [
+        "contract",
+        "report_id",
+        "generated_at",
+        "sections",
+        "charts",
+        "artifacts",
+        "source_annotations",
+        "warnings",
+        "ai_disclosure"
+      ]
+    },
+    "renderer_contract": {
+      "required": [
+        "id",
+        "format",
+        "input_schema",
+        "output_artifact",
+        "network_required",
+        "external_dependency_required"
+      ],
+      "formats": [
+        "text/html",
+        "application/pdf"
+      ]
+    }
+  },
+  "provider_free_gate": {
+    "network_required": false,
+    "credentials_required": false,
+    "provider_sdks_required": false
+  }
+}
