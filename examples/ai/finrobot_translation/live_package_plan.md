@@ -7,15 +7,13 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 65 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. All 22 checked-in
-live-package skeletons are registered provider-free examples: `analytics_report`,
-`analyzer_report`, `backtest_strategy`, `chart_renderer`, `coding_notebook`,
-`document_pipeline`, `earnings_transcript`, `equity_analysis_pipeline`, `factor_research`,
-`finance_facade`, `finance_normalizers`, `html_ui_snapshots`, `news_catalyst`,
-`optional_integrations`, `product_workflow`, `prompt_roles`, `report_renderer`,
-`retail_sentiment`, `sec_filings`, `tutorial_demo_parity`, `valuation_engine`, and
-`vendor_adapters`.
+Current registered-example status: 78 runnable/checkable FinRobot translation
+examples are discovered by `go run ./cmd/leia examples --json`. All 32
+checked-in live-package skeletons are registered provider-free examples. The
+FinRobot package skeletons cover finance, reporting, product, and optional
+integration boundaries; the `generic_*` skeletons cover reusable generic AI
+model, turn, tool, agent, workflow, evaluation, replay, trace, approval, and
+package-audit boundaries consumed by the translation.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
 | --- | --- | --- | --- | --- |
@@ -41,6 +39,16 @@ live-package skeletons are registered provider-free examples: `analytics_report`
 | `live_packages/html_ui_snapshots` | `live_packages/html_ui_snapshots/main.leia` | `leia-finrobot-html-ui-snapshots` | `packages/finrobot/html_ui_snapshots` | `contracts/html_ui_snapshot_contract.json` |
 | `live_packages/earnings_transcript` | `live_packages/earnings_transcript/main.leia` | `leia-finrobot-earnings-transcript` | `packages/finrobot/earnings_transcript` | `contracts/earnings_transcript_contract.json` |
 | `live_packages/sec_filings` | `live_packages/sec_filings/main.leia` | `leia-finrobot-sec-filings` | `packages/finrobot/sec_filings` | `contracts/sec_filings_contract.json` |
+| `live_packages/generic_model_registry` | `live_packages/generic_model_registry/main.leia` | `leia-generic-ai-model-registry` | `packages/generic_ai/model_registry` | `contracts/model_registry_contract.json` |
+| `live_packages/generic_turn_runner` | `live_packages/generic_turn_runner/main.leia` | `leia-generic-ai-turn-runner` | `packages/generic_ai/turn_runner` | `contracts/generic_turn_runner_contract.json` |
+| `live_packages/generic_tool_contracts` | `live_packages/generic_tool_contracts/main.leia` | `leia-generic-ai-tool-contracts` | `packages/generic_ai/tool_contracts` | `contracts/generic_tool_contract.json` |
+| `live_packages/generic_agent_runner` | `live_packages/generic_agent_runner/main.leia` | `leia-generic-ai-agent-runner` | `packages/generic_ai/agent_runner` | `contracts/agent_runner_contract.json` |
+| `live_packages/generic_workflow_orchestrator` | `live_packages/generic_workflow_orchestrator/main.leia` | `leia-generic-ai-workflow-orchestrator` | `packages/generic_ai/workflow_orchestrator` | `contracts/workflow_graph_contract.json` |
+| `live_packages/generic_evaluation_harness` | `live_packages/generic_evaluation_harness/main.leia` | `leia-generic-ai-evaluation-harness` | `packages/generic_ai/evaluation_harness` | `contracts/evaluation_harness_contract.json` |
+| `live_packages/generic_record_replay` | `live_packages/generic_record_replay/main.leia` | `leia-generic-ai-record-replay` | `packages/generic_ai/record_replay` | `contracts/record_replay_contract.json` |
+| `live_packages/generic_trace_events` | `live_packages/generic_trace_events/main.leia` | `leia-generic-ai-trace-events` | `packages/generic_ai/trace_events` | `contracts/trace_events_contract.json` |
+| `live_packages/generic_approval_policy` | `live_packages/generic_approval_policy/main.leia` | `leia-generic-ai-approval-policy` | `packages/generic_ai/approval_policy` | `contracts/generic_approval_policy_contract.json` |
+| `live_packages/generic_package_boundary_auditor` | `live_packages/generic_package_boundary_auditor/main.leia` | `leia-generic-ai-package-boundary-auditor` | `packages/generic_ai/package_boundary_auditor` | `contracts/package_boundary_audit_contract.json` |
 
 ## Contract Rules
 

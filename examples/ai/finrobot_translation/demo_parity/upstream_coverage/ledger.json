@@ -98,7 +98,7 @@
       "target_packages": [],
       "excluded_scope": [],
       "source_hash": "sha256:04c3646d58a5c0ec5c5139c0f6c510cae5241002114f5de7a0aa4dfd38e6c2ad",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "b69743bd49341e07e91659a51eac9892b92c841012c4079d5fc5ec7a0245a3f8"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "e62258151b97b70354bcd872e8784b497934577aa4bc9da05cbe90c08b150506"}],
       "next_action": "Refresh coverage prose when upstream README changes product or package scope."
     },
     {
@@ -626,7 +626,7 @@
       "target_packages": [],
       "excluded_scope": ["logo/image branding assets are not AI dialect behavior"],
       "source_hash": "sha256:c992550027fdbbb5a3b8b12f3d5e65294946f294cd357d71771d468cf44c5c0d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "b69743bd49341e07e91659a51eac9892b92c841012c4079d5fc5ec7a0245a3f8"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "e62258151b97b70354bcd872e8784b497934577aa4bc9da05cbe90c08b150506"}],
       "next_action": "Only add asset snapshots when UI/product visual parity requires them."
     }
   ]
