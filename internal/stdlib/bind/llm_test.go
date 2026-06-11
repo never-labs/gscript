@@ -41,6 +41,9 @@ func TestInstallLLMRegistersPublicBindingsAndToolofAlias(t *testing.T) {
 			t.Fatalf("%s module = %v, want table", name, val.Type())
 		}
 	}
+	if got := rec.modules["llm"].Table().RawGetString("config"); !got.IsTable() {
+		t.Fatalf("llm.config = %v, want table", got.Type())
+	}
 	toolof := rec.aliases["toolof"]
 	if !toolof.IsFunction() {
 		t.Fatalf("toolof alias = %v, want function", toolof.Type())
