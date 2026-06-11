@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-document-pipeline-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_hook": "recorded_document_pipeline_live_fixture",
+  "modules": [
+    {
+      "id": "filings_src",
+      "source_module": "filings_src/sec_api.py",
+      "inputs": [
+        "ticker",
+        "form_type",
+        "date_range"
+      ],
+      "outputs": [
+        "filing_search_results",
+        "filing_fetch_manifest"
+      ],
+      "required_fields": [
+        "accession_number",
+        "cik",
+        "form_type",
+        "filing_date",
+        "source_url",
+        "provenance"
+      ]
+    },
+    {
+      "id": "marker_sec_src",
+      "source_module": "marker_sec_src/sec_filings_to_markdown.py",
+      "inputs": [
+        "filing_fetch_manifest",
+        "html_or_pdf_bytes",
+        "conversion_policy"
+      ],
+      "outputs": [
+        "document_markdown",
+        "section_extractions"
+      ],
+      "required_fields": [
+        "markdown",
+        "conversion_source",
+        "page_spans",
+        "section_id",
+        "section_title",
+        "source_offsets"
+      ]
+    },
+    {
+      "id": "rag",
+      "source_module": "functional/rag.py",
+      "inputs": [
+        "document_markdown",
+        "section_extractions",
+        "chunk_policy"
+      ],
+      "outputs": [
+        "rag_chunks",
+        "citation_map",
+        "vector_adapter_payload"
+      ],
+      "required_fields": [
+        "chunk_id",
+        "text",
+        "section_id",
+        "citation",
+        "provenance",
+        "embedding_ref"
+      ]
+    },
+    {
+      "id": "ragquery",
+      "source_module": "functional/ragquery.py",
+      "inputs": [
+        "query",
+        "retriever_policy",
+        "rag_chunks"
+      ],
+      "outputs": [
+        "retriever_query_result",
+        "answer_citations"
+      ],
+      "required_fields": [
+        "query",
+        "answer",
+        "retrieved_chunks",
+        "rank",
+        "score",
+        "citation"
+      ]
+    }
+  ],
+  "field_contracts": {
+    "filing_search": {
+      "type": "list",
+      "required": [
+        "ticker",
+        "cik",
+        "accession_number",
+        "form_type",
+        "filing_date",
+        "source_url"
+      ]
+    },
+    "html_pdf_to_markdown": {
+      "type": "conversion_boundary",
+      "accepted_inputs": [
+        "sec_html",
+        "sec_pdf"
+      ],
+      "required_outputs": [
+        "markdown",
+        "page_spans",
+        "conversion_warnings",
+        "provenance"
+      ]
+    },
+    "section_extraction": {
+      "type": "ordered_sections",
+      "required_sections": [
+        "business",
+        "risk_factors",
+        "mda"
+      ]
+    },
+    "chunk_citation_provenance": {
+      "type": "chunk_list",
+      "required": [
+        "chunk_id",
+        "section_id",
+        "citation.source_url",
+        "citation.page",
+        "provenance.accession_number"
+      ]
+    },
+    "vector_retriever_adapter": {
+      "type": "adapter_boundary",
+      "dependency_imports": false,
+      "live_network": false,
+      "credential_required": false
+    }
+  },
+  "fixtures": [
+    {
+      "fixture_key": "sec:filing_search:ACME:10-K:offline",
+      "path": "fixtures/sec_filing_search_ACME_fixture.json",
+      "schema": "schemas/filing_search_result_v1.schema.json",
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "path": "fixtures/sec_markdown_ACME_10k_fixture.json",
+      "schema": "schemas/document_markdown_v1.schema.json",
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "rag:chunks:ACME:10-K:offline",
+      "path": "fixtures/rag_chunks_ACME_10k_fixture.json",
+      "schema": "schemas/rag_chunk_v1.schema.json",
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "path": "fixtures/retriever_query_ACME_fixture.json",
+      "schema": "schemas/retriever_query_result_v1.schema.json",
+      "replay_ready": true
+    }
+  ],
+  "acceptance_gates": [
+    "SEC filing search and fetch metadata includes accession number, CIK, filing date, source URL, and replay provenance",
+    "HTML and PDF conversion boundaries return markdown with page spans, source offsets, and conversion warnings without invoking Marker or network clients",
+    "section extraction preserves ordered business, risk factor, and MD&A section identifiers",
+    "RAG chunks include stable chunk ids, citations, source offsets, accession provenance, and embedding references without embedding model calls",
+    "retriever query fixtures include ranked chunks, scores, answer citations, and vector adapter metadata",
+    "fixture replay succeeds without credentials, live network, SEC clients, Marker, embedding models, or vector database imports"
+  ]
+}

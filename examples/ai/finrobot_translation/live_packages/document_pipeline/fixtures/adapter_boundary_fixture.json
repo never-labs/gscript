@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "boundaries": [
+    {
+      "id": "sec_filing_client",
+      "display_name": "SEC filing search and fetch",
+      "capability": "finance.document.sec.search_fetch",
+      "fixture_key": "sec:filing_search:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "gap": "Future package must implement SEC search/fetch rate limits and user-agent policy outside Leia core."
+    },
+    {
+      "id": "document_converter",
+      "display_name": "HTML/PDF to markdown converter",
+      "capability": "finance.document.converter.html_pdf_markdown",
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "gap": "Future package must choose Marker or another converter and document layout fidelity drift."
+    },
+    {
+      "id": "vector_retriever",
+      "display_name": "Vector store and retriever",
+      "capability": "finance.document.vector_retriever.query",
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "gap": "Future package must provide embedding model, vector index, ranking, and persistence adapters."
+    }
+  ]
+}

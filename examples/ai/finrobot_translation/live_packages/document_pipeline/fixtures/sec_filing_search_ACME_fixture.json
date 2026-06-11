@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "ticker": "ACME",
+  "query": {
+    "form_type": "10-K",
+    "date_from": "2025-01-01",
+    "date_to": "2026-06-11"
+  },
+  "results": [
+    {
+      "accession_number": "0000000000-26-000001",
+      "cik": "0000000000",
+      "company_name": "ACME Industrial Systems Inc.",
+      "ticker": "ACME",
+      "form_type": "10-K",
+      "filing_date": "2026-02-24",
+      "period_end": "2025-12-31",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+      "document_url": "fixtures/raw/acme-20251231.htm",
+      "provenance": {
+        "provider": "offline_fixture",
+        "fixture_key": "sec:filing_search:ACME:10-K:offline",
+        "captured_at": "2026-06-11T00:00:00Z",
+        "live_network": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "query": "What were the main operating risks for ACME?",
+  "answer": "The fixture identifies supply disruption and customer concentration as operating risks.",
+  "retriever": {
+    "adapter": "fixture_vector_index",
+    "top_k": 2,
+    "live_network": false,
+    "dependency_imported": false
+  },
+  "retrieved_chunks": [
+    {
+      "chunk_id": "ACME-2025-10K:risk_factors:0001",
+      "rank": 1,
+      "score": 0.92,
+      "section_id": "risk_factors",
+      "citation": {
+        "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+        "page": 2,
+        "section_title": "Item 1A. Risk Factors"
+      }
+    },
+    {
+      "chunk_id": "ACME-2025-10K:mda:0001",
+      "rank": 2,
+      "score": 0.63,
+      "section_id": "mda",
+      "citation": {
+        "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+        "page": 3,
+        "section_title": "Item 7. Management's Discussion and Analysis"
+      }
+    }
+  ],
+  "answer_citations": [
+    {
+      "chunk_id": "ACME-2025-10K:risk_factors:0001",
+      "claim": "Supply disruption and customer concentration are operating risks.",
+      "page": 2
+    }
+  ],
+  "provenance": {
+    "fixture_key": "retriever:ragquery:ACME:offline",
+    "chunk_fixture_key": "rag:chunks:ACME:10-K:offline",
+    "accession_number": "0000000000-26-000001"
+  }
+}
