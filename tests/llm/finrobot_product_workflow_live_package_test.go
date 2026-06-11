@@ -62,12 +62,12 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 			t.Fatalf("source example %q: %v", source, err)
 		}
 	}
-	for _, key := range []string{"equity_cli_workflow", "web_product", "db_migrations", "deployment_capability_gates"} {
+	for _, key := range []string{"equity_cli_workflow", "web_product", "ui_template_snapshots", "static_asset_manifest", "db_migrations", "deployment_capability_gates"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"workflow_run", "web_product", "db_migration", "deployment_gate"} {
+	for _, key := range []string{"workflow_run", "web_product", "ui_template_snapshot", "db_migration", "deployment_gate"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
@@ -82,6 +82,7 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 	wantCapabilities := []string{
 		"product.workflow.equity_cli.run",
 		"product.workflow.web.route",
+		"product.workflow.web.template_snapshot",
 		"product.workflow.auth.session",
 		"product.workflow.history.read",
 		"product.workflow.task_log.read",
@@ -115,6 +116,11 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 	for _, want := range []string{"provider_free", "credentials", "equity cli", "web product", "capability gates"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
+		}
+	}
+	for _, want := range []string{"template", "asset", "accessibility", "visual", "browser"} {
+		if !strings.Contains(joinedGates, want) {
+			t.Fatalf("test gates missing UI snapshot term %q: %s", want, joinedGates)
 		}
 	}
 }
@@ -199,6 +205,7 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 	if workflow.Download.Capability != "product.workflow.download.artifact" || workflow.Download.RemoteObjectFetch {
 		t.Fatalf("download contract = %#v", workflow.Download)
 	}
+	assertProductWorkflowUISnapshotContract(t, base, workflow.Workflows["web_product"].Routes)
 	assertProductWorkflowLifecycleContract(t, workflow.AuthSession)
 	assertReportRequestStateMachine(t, workflow.RequestSM)
 	assertTaskEventOrderingContract(t, workflow.TaskLog.Ordering.Key, workflow.TaskLog.Ordering.SequenceColumn, workflow.TaskLog.Ordering.MonotonicPerTask)
@@ -306,6 +313,231 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 		}
 		if gate.RequiresCredentials || gate.LiveNetwork {
 			t.Fatalf("gate must not require credentials or live network: %#v", gate)
+		}
+	}
+}
+
+func assertProductWorkflowUISnapshotContract(t *testing.T, base string, webRoutes []string) {
+	t.Helper()
+	var ui struct {
+		ProviderFree        bool   `json:"provider_free"`
+		LiveNetwork         bool   `json:"live_network"`
+		RequiresCredentials bool   `json:"requires_credentials"`
+		RequiresBrowser     bool   `json:"requires_browser"`
+		Capability          string `json:"capability"`
+		StaticAssetManifest string `json:"static_asset_manifest"`
+		RouteMapping        []struct {
+			Route         string   `json:"route"`
+			Path          string   `json:"path"`
+			TemplateID    string   `json:"template_id"`
+			TemplatePath  string   `json:"template_path"`
+			RequiredSlots []string `json:"required_slots"`
+			SnapshotID    string   `json:"snapshot_id"`
+		} `json:"route_to_template_mapping"`
+		Accessibility struct {
+			Mode                string   `json:"mode"`
+			RequiresBrowser     bool     `json:"requires_browser"`
+			RequiresLiveNetwork bool     `json:"requires_live_network"`
+			RequiresCredentials bool     `json:"requires_credentials"`
+			Standards           []string `json:"standards"`
+			Checks              []string `json:"checks"`
+			SnapshotFixturePath string   `json:"snapshot_fixture_path"`
+		} `json:"accessibility_snapshot_requirements"`
+		Visual struct {
+			Mode                string `json:"mode"`
+			RequiresBrowser     bool   `json:"requires_browser"`
+			RequiresLiveNetwork bool   `json:"requires_live_network"`
+			RequiresCredentials bool   `json:"requires_credentials"`
+			SnapshotSource      string `json:"snapshot_source"`
+			Viewports           []struct {
+				ID                string `json:"id"`
+				Width             int    `json:"width"`
+				Height            int    `json:"height"`
+				DeviceScaleFactor int    `json:"device_scale_factor"`
+			} `json:"viewports"`
+			MetadataFields      []string `json:"metadata_fields"`
+			SnapshotFixturePath string   `json:"snapshot_fixture_path"`
+			DiffPolicy          struct {
+				Baseline             string `json:"baseline"`
+				PixelThreshold       int    `json:"pixel_threshold"`
+				LayoutShiftThreshold int    `json:"layout_shift_threshold"`
+				FontSource           string `json:"font_source"`
+			} `json:"diff_policy"`
+		} `json:"visual_regression_metadata"`
+	}
+	decodeJSONFile(t, filepath.Join(base, "contracts", "ui_template_snapshot_contract.json"), &ui)
+	if !ui.ProviderFree || ui.LiveNetwork || ui.RequiresCredentials || ui.RequiresBrowser {
+		t.Fatalf("UI snapshot contract must be provider-free and browserless: %#v", ui)
+	}
+	if ui.Capability != "product.workflow.web.template_snapshot" || ui.StaticAssetManifest == "" {
+		t.Fatalf("UI snapshot contract header = %#v", ui)
+	}
+	if len(ui.RouteMapping) != len(webRoutes) {
+		t.Fatalf("UI route mapping count = %d, want %d", len(ui.RouteMapping), len(webRoutes))
+	}
+	templates := map[string]bool{}
+	for _, route := range webRoutes {
+		found := false
+		for _, mapping := range ui.RouteMapping {
+			if mapping.Route != route {
+				continue
+			}
+			found = true
+			templates[mapping.TemplateID] = true
+			if mapping.Path == "" || mapping.TemplatePath == "" || len(mapping.RequiredSlots) < 3 || mapping.SnapshotID == "" {
+				t.Fatalf("incomplete UI route mapping for %q: %#v", route, mapping)
+			}
+			if !strings.HasPrefix(mapping.TemplatePath, "templates/") || strings.Contains(mapping.TemplatePath, "://") {
+				t.Fatalf("template path must be local templates path: %#v", mapping)
+			}
+		}
+		if !found {
+			t.Fatalf("web route %q missing UI template mapping: %#v", route, ui.RouteMapping)
+		}
+	}
+	assertAccessibilitySnapshotRequirements(t, ui.Accessibility)
+	assertVisualRegressionMetadata(t, ui.Visual)
+	assertStaticAssetManifest(t, filepath.Join(base, ui.StaticAssetManifest), templates)
+}
+
+func assertAccessibilitySnapshotRequirements(t *testing.T, accessibility struct {
+	Mode                string   `json:"mode"`
+	RequiresBrowser     bool     `json:"requires_browser"`
+	RequiresLiveNetwork bool     `json:"requires_live_network"`
+	RequiresCredentials bool     `json:"requires_credentials"`
+	Standards           []string `json:"standards"`
+	Checks              []string `json:"checks"`
+	SnapshotFixturePath string   `json:"snapshot_fixture_path"`
+}) {
+	t.Helper()
+	if accessibility.Mode != "static_dom_contract" || accessibility.RequiresBrowser || accessibility.RequiresLiveNetwork || accessibility.RequiresCredentials {
+		t.Fatalf("accessibility snapshot requirements must be static/provider-free: %#v", accessibility)
+	}
+	for _, want := range []string{"WCAG_2_2_AA_static_subset", "ARIA_landmark_names"} {
+		if !contains(accessibility.Standards, want) {
+			t.Fatalf("accessibility standards missing %q: %#v", want, accessibility.Standards)
+		}
+	}
+	for _, want := range []string{"one_main_landmark", "one_h1_per_route", "form_controls_have_labels", "buttons_have_accessible_names", "tables_have_captions_or_aria_labels"} {
+		if !contains(accessibility.Checks, want) {
+			t.Fatalf("accessibility checks missing %q: %#v", want, accessibility.Checks)
+		}
+	}
+	if !strings.Contains(accessibility.SnapshotFixturePath, "provider_free_fixture_index.json#") {
+		t.Fatalf("accessibility fixture path must point at provider-free fixture index: %q", accessibility.SnapshotFixturePath)
+	}
+}
+
+func assertVisualRegressionMetadata(t *testing.T, visual struct {
+	Mode                string `json:"mode"`
+	RequiresBrowser     bool   `json:"requires_browser"`
+	RequiresLiveNetwork bool   `json:"requires_live_network"`
+	RequiresCredentials bool   `json:"requires_credentials"`
+	SnapshotSource      string `json:"snapshot_source"`
+	Viewports           []struct {
+		ID                string `json:"id"`
+		Width             int    `json:"width"`
+		Height            int    `json:"height"`
+		DeviceScaleFactor int    `json:"device_scale_factor"`
+	} `json:"viewports"`
+	MetadataFields      []string `json:"metadata_fields"`
+	SnapshotFixturePath string   `json:"snapshot_fixture_path"`
+	DiffPolicy          struct {
+		Baseline             string `json:"baseline"`
+		PixelThreshold       int    `json:"pixel_threshold"`
+		LayoutShiftThreshold int    `json:"layout_shift_threshold"`
+		FontSource           string `json:"font_source"`
+	} `json:"diff_policy"`
+}) {
+	t.Helper()
+	if visual.Mode != "static_template_asset_contract" || visual.RequiresBrowser || visual.RequiresLiveNetwork || visual.RequiresCredentials {
+		t.Fatalf("visual regression metadata must be static/provider-free: %#v", visual)
+	}
+	if visual.SnapshotSource != "template_hash_plus_static_asset_manifest" || len(visual.Viewports) < 2 {
+		t.Fatalf("visual snapshot source/viewports = %#v", visual)
+	}
+	for _, want := range []string{"mobile", "desktop"} {
+		found := false
+		for _, viewport := range visual.Viewports {
+			found = found || viewport.ID == want && viewport.Width > 0 && viewport.Height > 0 && viewport.DeviceScaleFactor > 0
+		}
+		if !found {
+			t.Fatalf("visual metadata missing viewport %q: %#v", want, visual.Viewports)
+		}
+	}
+	for _, want := range []string{"route", "template_id", "snapshot_id", "viewport_id", "fixture_dataset_id", "template_sha256", "asset_manifest_sha256"} {
+		if !contains(visual.MetadataFields, want) {
+			t.Fatalf("visual metadata fields missing %q: %#v", want, visual.MetadataFields)
+		}
+	}
+	if visual.DiffPolicy.Baseline != "provider_free_fixture" || visual.DiffPolicy.PixelThreshold != 0 || visual.DiffPolicy.LayoutShiftThreshold != 0 || visual.DiffPolicy.FontSource != "system_ui_only" {
+		t.Fatalf("visual diff policy = %#v", visual.DiffPolicy)
+	}
+	if !strings.Contains(visual.SnapshotFixturePath, "provider_free_fixture_index.json#") {
+		t.Fatalf("visual fixture path must point at provider-free fixture index: %q", visual.SnapshotFixturePath)
+	}
+}
+
+func assertStaticAssetManifest(t *testing.T, path string, templates map[string]bool) {
+	t.Helper()
+	var manifest struct {
+		ProviderFree        bool `json:"provider_free"`
+		LiveNetwork         bool `json:"live_network"`
+		RequiresCredentials bool `json:"requires_credentials"`
+		RequiresBrowser     bool `json:"requires_browser"`
+		AssetPolicy         struct {
+			ExternalFetch bool   `json:"external_fetch"`
+			RemoteFonts   bool   `json:"remote_fonts"`
+			InlineOnly    bool   `json:"inline_only"`
+			HashAlgorithm string `json:"hash_algorithm"`
+		} `json:"asset_policy"`
+		Assets []struct {
+			ID              string   `json:"id"`
+			Type            string   `json:"type"`
+			Path            string   `json:"path"`
+			FixtureSHA256   string   `json:"fixture_sha256"`
+			UsedByTemplates []string `json:"used_by_templates"`
+		} `json:"assets"`
+		TemplateAssets []struct {
+			TemplateID string   `json:"template_id"`
+			AssetIDs   []string `json:"asset_ids"`
+		} `json:"template_assets"`
+	}
+	decodeJSONFile(t, path, &manifest)
+	if !manifest.ProviderFree || manifest.LiveNetwork || manifest.RequiresCredentials || manifest.RequiresBrowser {
+		t.Fatalf("static asset manifest must be provider-free/browserless: %#v", manifest)
+	}
+	if manifest.AssetPolicy.ExternalFetch || manifest.AssetPolicy.RemoteFonts || !manifest.AssetPolicy.InlineOnly || manifest.AssetPolicy.HashAlgorithm != "sha256" {
+		t.Fatalf("static asset policy = %#v", manifest.AssetPolicy)
+	}
+	assets := map[string]bool{}
+	for _, asset := range manifest.Assets {
+		if asset.ID == "" || asset.Type == "" || asset.FixtureSHA256 == "" || len(asset.UsedByTemplates) == 0 {
+			t.Fatalf("incomplete static asset entry: %#v", asset)
+		}
+		if strings.Contains(asset.Path, "://") || !strings.HasPrefix(asset.Path, "templates/assets/") {
+			t.Fatalf("static asset path must be local templates/assets path: %#v", asset)
+		}
+		assets[asset.ID] = true
+	}
+	mappedTemplates := map[string]bool{}
+	for _, templateAssets := range manifest.TemplateAssets {
+		if !templates[templateAssets.TemplateID] {
+			t.Fatalf("static asset manifest references unknown template %q", templateAssets.TemplateID)
+		}
+		if len(templateAssets.AssetIDs) == 0 {
+			t.Fatalf("template %q missing asset refs", templateAssets.TemplateID)
+		}
+		for _, assetID := range templateAssets.AssetIDs {
+			if !assets[assetID] {
+				t.Fatalf("template %q references unknown asset %q", templateAssets.TemplateID, assetID)
+			}
+		}
+		mappedTemplates[templateAssets.TemplateID] = true
+	}
+	for templateID := range templates {
+		if !mappedTemplates[templateID] {
+			t.Fatalf("template %q missing static asset mapping", templateID)
 		}
 	}
 }
@@ -447,6 +679,24 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 					Decision   string `json:"decision"`
 					Reason     string `json:"reason"`
 				} `json:"download_authorization"`
+				UISnapshots struct {
+					Accessibility []struct {
+						Route           string   `json:"route"`
+						TemplateID      string   `json:"template_id"`
+						Checks          []string `json:"checks"`
+						RequiresBrowser bool     `json:"requires_browser"`
+					} `json:"accessibility"`
+					Visual []struct {
+						Route               string `json:"route"`
+						TemplateID          string `json:"template_id"`
+						SnapshotID          string `json:"snapshot_id"`
+						ViewportID          string `json:"viewport_id"`
+						FixtureDatasetID    string `json:"fixture_dataset_id"`
+						TemplateSHA256      string `json:"template_sha256"`
+						AssetManifestSHA256 string `json:"asset_manifest_sha256"`
+						RequiresBrowser     bool   `json:"requires_browser"`
+					} `json:"visual"`
+				} `json:"ui_snapshots"`
 			} `json:"web_product"`
 		} `json:"fixtures"`
 		DBSeed struct {
@@ -495,6 +745,19 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 	}
 	if !hasAllow || !hasDeny {
 		t.Fatalf("download authorization fixtures need allow and deny cases: %#v", fixtures.Fixtures.WebProduct.DownloadAuthorization)
+	}
+	if len(fixtures.Fixtures.WebProduct.UISnapshots.Accessibility) < 3 || len(fixtures.Fixtures.WebProduct.UISnapshots.Visual) < 3 {
+		t.Fatalf("UI snapshot fixtures too shallow: %#v", fixtures.Fixtures.WebProduct.UISnapshots)
+	}
+	for _, snapshot := range fixtures.Fixtures.WebProduct.UISnapshots.Accessibility {
+		if snapshot.Route == "" || snapshot.TemplateID == "" || len(snapshot.Checks) == 0 || snapshot.RequiresBrowser {
+			t.Fatalf("accessibility snapshot fixture incomplete or browser-bound: %#v", snapshot)
+		}
+	}
+	for _, snapshot := range fixtures.Fixtures.WebProduct.UISnapshots.Visual {
+		if snapshot.Route == "" || snapshot.TemplateID == "" || snapshot.SnapshotID == "" || snapshot.ViewportID == "" || snapshot.FixtureDatasetID == "" || snapshot.TemplateSHA256 == "" || snapshot.AssetManifestSHA256 == "" || snapshot.RequiresBrowser {
+			t.Fatalf("visual snapshot fixture incomplete or browser-bound: %#v", snapshot)
+		}
 	}
 	lastVersion := 0
 	for _, version := range fixtures.DBSeed.SchemaVersions {

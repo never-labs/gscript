@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-product-workflow-static-assets",
+  "provider_free": true,
+  "live_network": false,
+  "requires_credentials": false,
+  "requires_browser": false,
+  "asset_policy": {
+    "external_fetch": false,
+    "remote_fonts": false,
+    "inline_only": true,
+    "hash_algorithm": "sha256",
+    "description": "The skeleton records static asset contracts only; future packages must provide hashed local assets without remote fetches."
+  },
+  "assets": [
+    {
+      "id": "asset_app_css",
+      "type": "stylesheet",
+      "path": "templates/assets/app.css",
+      "fixture_sha256": "fixture-sha256-ui-app-css",
+      "used_by_templates": [
+        "tmpl_home",
+        "tmpl_login",
+        "tmpl_auth_callback",
+        "tmpl_logout",
+        "tmpl_reports_index",
+        "tmpl_report_detail",
+        "tmpl_report_download",
+        "tmpl_submit_equity_request",
+        "tmpl_task_status",
+        "tmpl_admin_dashboard",
+        "tmpl_admin_users",
+        "tmpl_admin_task_log"
+      ]
+    },
+    {
+      "id": "asset_status_icons",
+      "type": "inline_svg_sprite",
+      "path": "templates/assets/status-icons.svg",
+      "fixture_sha256": "fixture-sha256-ui-status-icons",
+      "used_by_templates": [
+        "tmpl_reports_index",
+        "tmpl_report_detail",
+        "tmpl_report_download",
+        "tmpl_task_status",
+        "tmpl_admin_dashboard",
+        "tmpl_admin_task_log"
+      ]
+    },
+    {
+      "id": "asset_table_sort_css",
+      "type": "stylesheet_fragment",
+      "path": "templates/assets/table-sort.css",
+      "fixture_sha256": "fixture-sha256-ui-table-sort-css",
+      "used_by_templates": [
+        "tmpl_reports_index",
+        "tmpl_admin_users",
+        "tmpl_admin_task_log"
+      ]
+    }
+  ],
+  "template_assets": [
+    {"template_id": "tmpl_home", "asset_ids": ["asset_app_css"]},
+    {"template_id": "tmpl_login", "asset_ids": ["asset_app_css"]},
+    {"template_id": "tmpl_auth_callback", "asset_ids": ["asset_app_css"]},
+    {"template_id": "tmpl_logout", "asset_ids": ["asset_app_css"]},
+    {"template_id": "tmpl_reports_index", "asset_ids": ["asset_app_css", "asset_status_icons", "asset_table_sort_css"]},
+    {"template_id": "tmpl_report_detail", "asset_ids": ["asset_app_css", "asset_status_icons"]},
+    {"template_id": "tmpl_report_download", "asset_ids": ["asset_app_css", "asset_status_icons"]},
+    {"template_id": "tmpl_submit_equity_request", "asset_ids": ["asset_app_css"]},
+    {"template_id": "tmpl_task_status", "asset_ids": ["asset_app_css", "asset_status_icons"]},
+    {"template_id": "tmpl_admin_dashboard", "asset_ids": ["asset_app_css", "asset_status_icons"]},
+    {"template_id": "tmpl_admin_users", "asset_ids": ["asset_app_css", "asset_table_sort_css"]},
+    {"template_id": "tmpl_admin_task_log", "asset_ids": ["asset_app_css", "asset_status_icons", "asset_table_sort_css"]}
+  ]
+}

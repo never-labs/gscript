@@ -12,6 +12,9 @@ pass before it can replace the replay-only examples.
   artifact planning, and deterministic task history.
 - Web product parity for route contracts, auth/session fixtures, report history,
   task logs, artifact downloads, CRUD operations, and admin views.
+- UI/template snapshot parity for route-to-template mapping, static asset
+  manifests, accessibility snapshot requirements, and visual regression
+  metadata without browser, network, or credential dependencies.
 - Auth/session lifecycle, report request state transitions, task event ordering,
   and owner-or-admin artifact download authorization fixtures.
 - Database migration contract for users, sessions, report requests, reports,

@@ -20,12 +20,15 @@
   "entrypoints": {
     "equity_cli_workflow": "contracts/product_workflow_contract.json#/workflows/equity_cli",
     "web_product": "contracts/product_workflow_contract.json#/workflows/web_product",
+    "ui_template_snapshots": "contracts/ui_template_snapshot_contract.json",
+    "static_asset_manifest": "templates/static_asset_manifest.json",
     "db_migrations": "contracts/db_migration_contract.json",
     "deployment_capability_gates": "contracts/deployment_capability_gates.json"
   },
   "schemas": {
     "workflow_run": "schemas/workflow_run.schema.json",
     "web_product": "schemas/web_product.schema.json",
+    "ui_template_snapshot": "schemas/ui_template_snapshot.schema.json",
     "db_migration": "schemas/db_migration.schema.json",
     "deployment_gate": "schemas/deployment_gate.schema.json"
   },
@@ -36,6 +39,7 @@
     "product.workflow.equity_cli.run",
     "product.workflow.equity_cli.artifact_plan",
     "product.workflow.web.route",
+    "product.workflow.web.template_snapshot",
     "product.workflow.auth.session",
     "product.workflow.history.read",
     "product.workflow.task_log.read",
@@ -89,6 +93,8 @@
     "provider_free is true and live_network_default is false",
     "required and optional credentials are empty",
     "equity CLI, web product, auth/session/history/task log/download/CRUD/db migration contracts are present",
+    "web routes map to deterministic templates with provider-free static asset and snapshot metadata",
+    "accessibility and visual regression snapshot contracts declare no browser, network, or credential dependency",
     "deployment capability gates declare capabilities and deny credentials by default"
   ],
   "no_built_in_guarantee": {

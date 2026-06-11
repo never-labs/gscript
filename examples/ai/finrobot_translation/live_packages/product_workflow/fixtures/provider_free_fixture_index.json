@@ -78,7 +78,61 @@
           "decision": "deny",
           "reason": "wrong_owner"
         }
-      ]
+      ],
+      "ui_snapshots": {
+        "accessibility": [
+          {
+            "route": "home",
+            "template_id": "tmpl_home",
+            "checks": ["one_main_landmark", "one_h1_per_route", "buttons_have_accessible_names"],
+            "requires_browser": false
+          },
+          {
+            "route": "reports_index",
+            "template_id": "tmpl_reports_index",
+            "checks": ["one_main_landmark", "tables_have_captions_or_aria_labels", "focus_order_follows_dom_order"],
+            "requires_browser": false
+          },
+          {
+            "route": "admin_task_log",
+            "template_id": "tmpl_admin_task_log",
+            "checks": ["one_main_landmark", "tables_have_captions_or_aria_labels", "status_regions_use_role_status_or_alert"],
+            "requires_browser": false
+          }
+        ],
+        "visual": [
+          {
+            "route": "home",
+            "template_id": "tmpl_home",
+            "snapshot_id": "snap_home_fixture",
+            "viewport_id": "desktop",
+            "fixture_dataset_id": "provider_free_web_product",
+            "template_sha256": "fixture-sha256-tmpl-home",
+            "asset_manifest_sha256": "fixture-sha256-static-asset-manifest",
+            "requires_browser": false
+          },
+          {
+            "route": "reports_index",
+            "template_id": "tmpl_reports_index",
+            "snapshot_id": "snap_reports_index_fixture",
+            "viewport_id": "desktop",
+            "fixture_dataset_id": "provider_free_web_product",
+            "template_sha256": "fixture-sha256-tmpl-reports-index",
+            "asset_manifest_sha256": "fixture-sha256-static-asset-manifest",
+            "requires_browser": false
+          },
+          {
+            "route": "submit_equity_request",
+            "template_id": "tmpl_submit_equity_request",
+            "snapshot_id": "snap_submit_equity_request_fixture",
+            "viewport_id": "mobile",
+            "fixture_dataset_id": "provider_free_web_product",
+            "template_sha256": "fixture-sha256-tmpl-submit-equity-request",
+            "asset_manifest_sha256": "fixture-sha256-static-asset-manifest",
+            "requires_browser": false
+          }
+        ]
+      }
     }
   },
   "db_seed": {
