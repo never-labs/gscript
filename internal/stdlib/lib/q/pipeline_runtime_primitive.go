@@ -109,7 +109,7 @@ func qRuntimePrimitiveShape(plan qPipelinePlan) string {
 	case qPipelineUnaryPrimitive:
 		return qRuntimeUnaryPrimitiveShape(verb)
 	case qPipelineDyadicPrimitive:
-		prefix = "runtime-dyadic"
+		return qRuntimeDyadicPrimitiveShape(verb)
 	}
 	return prefix + "/" + verb
 }

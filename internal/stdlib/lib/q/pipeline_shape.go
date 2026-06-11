@@ -443,7 +443,7 @@ func qPipelineRuntimePrimitiveShapeSpec(prefix, verb string) qPipelineShapeSpec 
 
 func qRuntimePrimitivePipelineShape(verb string) string {
 	switch verb {
-	case "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling", "xexp", "xlog":
+	case "abs", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan", "reciprocal", "signum", "floor", "ceiling", "xexp", "xlog":
 		return "numeric_math"
 	case "svar", "sdev", "wsum", "cov", "scov", "cor":
 		return "numeric_stats"
