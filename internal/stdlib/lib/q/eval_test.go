@@ -5901,6 +5901,11 @@ func TestEvalSequenceTransformSumAndCountRecordsRuntimeKernel(t *testing.T) {
 				if stat.Kernel == "SequenceTransformCount" && stat.Outcome == "hit" {
 					seen = true
 				}
+				// Length-preserving transform-chain counts resolve through the
+				// dedicated ArrayCount* kernels without materializing the chain.
+				if strings.HasPrefix(stat.Kernel, "ArrayCount") && stat.Outcome == "hit" {
+					seen = true
+				}
 			}
 			if !seen {
 				t.Fatalf("missing sequence transform runtime stat: %#v", RuntimeKernelExecutionStats())

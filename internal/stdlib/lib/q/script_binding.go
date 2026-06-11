@@ -546,6 +546,26 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver q
 			return out, true, err
 		}
 	}
+	if plan.op == "where" && plan.left != nil && plan.left.kind == qScriptBindingBinary {
+		if _, opOK := qDataCompareOpString(plan.left.op); opOK {
+			left, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left.left, resolver)
+			if err != nil || !handled {
+				return nil, handled, err
+			}
+			right, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left.right, resolver)
+			if err != nil || !handled {
+				return nil, handled, err
+			}
+			if array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.left.op); ok {
+				shape := "compare-to-index/" + plan.left.op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
+				out, handled, err := data.TryTypedCompareIndexesI64(array, dataOp, scalar)
+				out, handled, err = qTypedRuntimeResultReason("ArrayWhereCompare", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+				if err != nil || handled {
+					return out, true, err
+				}
+			}
+		}
+	}
 	arg, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left, resolver)
 	if err != nil || !handled {
 		return nil, handled, err

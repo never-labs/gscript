@@ -58,6 +58,12 @@ func TryTypedScalarIndex(array Array, row int) (any, bool, error) {
 		return scalarIndexFromSlice(a.data, row)
 	case nullableArray:
 		return scalarIndexFromSlice(a.data, row)
+	case nullBitmapCarrier:
+		if row < 0 || row >= a.Len() {
+			return nil, true, scalarIndexOutOfRange(row)
+		}
+		value, _ := a.At(row)
+		return value, true, nil
 	case indexedArray:
 		index, ok, err := i64IndexArrayAt(a.indexes, row)
 		if err != nil {

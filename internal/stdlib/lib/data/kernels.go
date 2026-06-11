@@ -768,7 +768,8 @@ func isTypedMinMaxArray(array Array) bool {
 		columnArray[uint8], columnArray[uint16], columnArray[uint32], columnArray[uint64],
 		columnArray[float32], columnArray[float64], columnArray[string], columnArray[Symbol],
 		columnArray[Month], columnArray[Date], columnArray[DateTime], columnArray[Timespan],
-		columnArray[Minute], columnArray[Second], columnArray[Time], columnArray[Timestamp], nullableArray:
+		columnArray[Minute], columnArray[Second], columnArray[Time], columnArray[Timestamp], nullableArray,
+		nullBitmapCarrier:
 		return true
 	default:
 		return false
@@ -892,6 +893,10 @@ func (typedKernelRegistry) NullMask(array Array, out []bool) bool {
 			out[i] = IsNull(v)
 		}
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			nullBitmapNullMask(carrier, out)
+			return true
+		}
 		for i := 0; i < array.Len(); i++ {
 			out[i] = false
 		}
@@ -1145,6 +1150,9 @@ func TryTypedNullCount(array Array) (int64, bool, error) {
 		}
 		return count, true, nil
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			return int64(nullBitmapCount(carrier.nullBits(), carrier.Len())), true, nil
+		}
 		return 0, true, nil
 	}
 }
@@ -1648,6 +1656,10 @@ func TryTypedIsNullMask(array Array) (Array, bool, error) {
 		for i, v := range a.data {
 			out[i] = IsNull(v)
 		}
+		return newBoolTrusted(out), true, nil
+	case nullBitmapCarrier:
+		out := make([]bool, a.Len())
+		nullBitmapNullMask(a, out)
 		return newBoolTrusted(out), true, nil
 	case encodedArray:
 		domainNull := make([]bool, len(a.domain))
@@ -2205,6 +2217,9 @@ func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, er
 	case nullableArray:
 		return numericUnaryNullable(op, a.data)
 	default:
+		if _, ok := asNullBitmapCarrier(array); ok {
+			return numericUnaryNullBitmap(op, array)
+		}
 		return nil, false, nil
 	}
 }
@@ -3082,6 +3097,21 @@ func f64DyadicScalarProducerSum(scalar float64, producer f64NumericProducer, sca
 			return total, err
 		}
 	}
+	// Null-bitmap backed arrays flatten once and reduce densely, skipping
+	// null rows; the per-row producer walk below would box every access.
+	if p, ok := producer.(f64ArrayProducer); ok && nullBitmapBackedArray(p.array) {
+		if values, nulls, owned, ok := tryBulkF64NullableValues(p.array); ok {
+			var total float64
+			for i, value := range values {
+				if nulls != nil && nullBitGet(nulls, i) {
+					continue
+				}
+				total += applyScalarDyadicFloat(scalar, value, scalarLeft, apply)
+			}
+			bulkF64Release(values, owned)
+			return total, nil
+		}
+	}
 	switch p := producer.(type) {
 	case f64NullProducer:
 		return 0, nil
@@ -3872,6 +3902,11 @@ func TryTypedQNumericUnary(op string, array Array) (Array, bool, error) {
 		if qNumericUnaryReturnsFloat(op) {
 			return numericUnaryNullable(op, a.data)
 		}
+	case nullBitmapCarrier:
+		if qNumericUnaryReturnsFloat(op) {
+			return numericUnaryNullBitmap(op, a)
+		}
+		return nil, false, nil
 	case f64RangeArray:
 		return qNumericUnaryFloatArray(op, a)
 	case f64RunningSumArray:
@@ -5539,6 +5574,27 @@ func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 	if sum, handled, err := typedIntegerSumByI64IndexView(array, indexes); handled || err != nil {
 		return sum, handled, err
 	}
+	// Affine range sources reduce over a dense index vector in one tight
+	// loop: sum = start*count + step*sum(indexes).
+	source := array
+	if attributed, ok := source.(attributedArray); ok {
+		source = attributed.array
+	}
+	if values, ok := source.(i64RangeArray); ok {
+		if rows, owned, ok := tryBulkI64Values(indexes); ok {
+			var rowSum int64
+			for _, row := range rows {
+				if row < 0 || row >= int64(values.len) {
+					bulkI64Release(rows, owned)
+					return nil, true, fmt.Errorf("index %d out of bounds for length %d", row, values.len)
+				}
+				rowSum += row
+			}
+			total := values.start*int64(len(rows)) + values.step*rowSum
+			bulkI64Release(rows, owned)
+			return total, true, nil
+		}
+	}
 	var total int64
 	if err := forEachTypedI64Index(indexes, array.Len(), func(row int) error {
 		value, ok, err := integerArrayAt(array, row)
@@ -5563,9 +5619,45 @@ func typedIntegerSumByI64IndexView(array, indexes Array) (any, bool, error) {
 		return typedIntegerSumRange(array, idx)
 	case i64PeriodicIndexArray:
 		return typedIntegerSumPeriodicIndex(array, idx)
+	case i64SegmentArray:
+		return typedIntegerSumSegments(array, idx)
 	default:
 		return nil, false, nil
 	}
+}
+
+// typedIntegerSumSegments reduces a gather-sum over a segment-compressed
+// where-result with one closed-form arithmetic-series sum per segment when
+// the source is an affine i64 range, so alternating masks (the canonical
+// null-mixed compare shape) cost O(segments) instead of O(rows) with a
+// boxed interface conversion per segment.
+func typedIntegerSumSegments(array Array, idx i64SegmentArray) (any, bool, error) {
+	source := array
+	if attributed, ok := source.(attributedArray); ok {
+		source = attributed.array
+	}
+	values, ok := source.(i64RangeArray)
+	if !ok {
+		return nil, false, nil
+	}
+	var total int64
+	for _, segment := range idx.segments {
+		if segment.len == 0 {
+			continue
+		}
+		first := segment.start
+		last := segment.start + int64(segment.len-1)*segment.step
+		low, high := first, last
+		if low > high {
+			low, high = high, low
+		}
+		if low < 0 || high >= int64(values.len) {
+			return nil, true, fmt.Errorf("index range %d..%d out of bounds for length %d", first, last, values.len)
+		}
+		rowSum := (first + last) * int64(segment.len) / 2
+		total += values.start*int64(segment.len) + values.step*rowSum
+	}
+	return total, true, nil
 }
 
 func typedIntegerSumContiguousRange(array Array, rows i64RangeArray) (any, bool, error) {
@@ -5762,9 +5854,20 @@ func forEachTypedI64Index(indexes Array, limit int, fn func(row int) error) erro
 		}
 		return nil
 	case i64SegmentArray:
+		// Iterate segments inline: passing each i64RangeArray segment through
+		// the Array parameter would box one interface value per segment.
 		for _, segment := range idx.segments {
-			if err := forEachTypedI64Index(segment, limit, fn); err != nil {
-				return err
+			for i := 0; i < segment.len; i++ {
+				row, err := checkedI64Index(segment.start + int64(i)*segment.step)
+				if err != nil {
+					return err
+				}
+				if row >= limit {
+					return fmt.Errorf("index %d out of bounds for length %d", row, limit)
+				}
+				if err := fn(row); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -6024,6 +6127,39 @@ func TryTypedScalarFill(fill any, array Array) (Array, bool, error) {
 			return out, true, nil
 		}
 	}
+	// Bitmap-backed carriers materialize the fill densely in one pass: the
+	// result has no nulls, so downstream reads stay unboxed (mirrors the
+	// boxed typedScalarFillNullable eager path).
+	if nullBitmapBackedArray(array) {
+		if fillI, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
+			if values, nulls, owned, ok := tryBulkI64NullableValues(array); ok {
+				out := make([]int64, len(values))
+				for i, v := range values {
+					if nulls != nil && nullBitGet(nulls, i) {
+						out[i] = fillI
+						continue
+					}
+					out[i] = v
+				}
+				bulkI64Release(values, owned)
+				return newI64Trusted(out), true, nil
+			}
+		}
+		if fillF, ok := numeric(fill); ok && isNumericArray(array) {
+			if values, nulls, owned, ok := tryBulkF64NullableValues(array); ok {
+				out := make([]float64, len(values))
+				for i, v := range values {
+					if nulls != nil && nullBitGet(nulls, i) {
+						out[i] = fillF
+						continue
+					}
+					out[i] = v
+				}
+				bulkF64Release(values, owned)
+				return newF64Trusted(out), true, nil
+			}
+		}
+	}
 	if n, ok := coerceInt64Exact(fill); ok && isIntegerArray(array) {
 		return i64FillArray{source: array, fill: n}, true, nil
 	}
@@ -6090,6 +6226,8 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 		return typedSortIndexesTiled(a, descending)
 	case nullableArray:
 		return typedSortRowIndexesByArray(a, descending), true, nil
+	case nullBitmapCarrier:
+		return typedSortRowIndexesByArray(a, descending), true, nil
 	case columnArray[int64]:
 		return typedSortIndexesBy(a.data, descending, compareTypedSigned[int64]), true, nil
 	case i64RangeArray:
@@ -6150,6 +6288,7 @@ func TryTypedSortIndexSumI64(array Array, descending bool) (int64, bool, error) 
 		}
 		return arithmeticSeriesSum(a.len), true, nil
 	case nullableArray,
+		nullBitmapCarrier,
 		columnArray[int64],
 		i64RangeArray,
 		columnArray[string],
@@ -6704,6 +6843,18 @@ func (k typedKernelRegistry) NumericSumValue(array Array) (any, bool, error) {
 		return numericSumFloatValue(a.data), true, nil
 	case columnArray[float64]:
 		return numericSumFloatValue(a.data), true, nil
+	case nullBitmapArray[int8]:
+		return nullBitmapSumInteger(a), true, nil
+	case nullBitmapArray[int16]:
+		return nullBitmapSumInteger(a), true, nil
+	case nullBitmapArray[int32]:
+		return nullBitmapSumInteger(a), true, nil
+	case nullBitmapArray[int64]:
+		return nullBitmapSumInteger(a), true, nil
+	case nullBitmapArray[float32]:
+		return nullBitmapSumFloat(a), true, nil
+	case nullBitmapArray[float64]:
+		return nullBitmapSumFloat(a), true, nil
 	case nullableArray:
 		var sumI int64
 		var sumF float64
@@ -6796,9 +6947,12 @@ func numericSumValueByAccess(array Array) (any, bool, error) {
 		return nil, false, nil
 	}
 	if isIntegerArray(array) {
-		if values, owned, ok := tryBulkI64Values(array); ok {
+		if values, nulls, owned, ok := tryBulkI64NullableValues(array); ok {
 			var total int64
-			for _, value := range values {
+			for i, value := range values {
+				if nulls != nil && nullBitGet(nulls, i) {
+					continue
+				}
 				total += value
 			}
 			bulkI64Release(values, owned)
@@ -6817,9 +6971,12 @@ func numericSumValueByAccess(array Array) (any, bool, error) {
 		return total, true, nil
 	}
 	if isNumericArray(array) {
-		if values, owned, ok := tryBulkF64Values(array); ok {
+		if values, nulls, owned, ok := tryBulkF64NullableValues(array); ok {
 			var total float64
-			for _, value := range values {
+			for i, value := range values {
+				if nulls != nil && nullBitGet(nulls, i) {
+					continue
+				}
 				total += value
 			}
 			bulkF64Release(values, owned)
@@ -6885,8 +7042,12 @@ func integerSumWindow(array Array, start, length int) (int64, bool, error) {
 			row %= sourceLen
 		}
 		value, ok, err := integerArrayAt(array, row)
-		if err != nil || !ok {
-			return 0, ok, err
+		if err != nil {
+			return 0, false, err
+		}
+		if !ok {
+			// Null row: sum skips nulls.
+			continue
 		}
 		sum += value
 	}
@@ -7282,6 +7443,9 @@ func TryTypedDeltas(array Array) (Array, bool, error) {
 	case nullableArray:
 		return deltasNullableArray(a)
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			return carrier.deltas(), true, nil
+		}
 		// Lazy numeric carriers (scalar-dyadic chains, tiled views, ...) flatten
 		// through the typed each-prior kernel: deltas is each-prior subtraction
 		// over a null-free vector.
@@ -7329,6 +7493,9 @@ func TryTypedDeltasSum(array Array) (any, bool, error) {
 	case nullableArray:
 		return deltasNullableSum(a)
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			return deltasNullableSum(nullableArray{kind: carrier.Kind(), data: carrier.Values()})
+		}
 		return nil, false, nil
 	}
 }
@@ -7519,6 +7686,9 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 		}
 		return newI64Trusted(outI), true, nil
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			return k.NumericSums(nullableArray{kind: carrier.Kind(), data: carrier.Values()})
+		}
 		return nil, false, nil
 	}
 }
@@ -7643,6 +7813,20 @@ func i64FilledSum(array Array, fill int64) (int64, bool) {
 	case i64RangeArray:
 		return i64RangeSum(a), true
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok && carrier.isIntegerCarrier() {
+			if values, nulls, owned, ok := tryBulkI64NullableValues(carrier); ok {
+				var total int64
+				for i, v := range values {
+					if nulls != nil && nullBitGet(nulls, i) {
+						total += fill
+						continue
+					}
+					total += v
+				}
+				bulkI64Release(values, owned)
+				return total, true
+			}
+		}
 		return 0, false
 	}
 }
@@ -7716,6 +7900,22 @@ func (a f64FillArray) valueAt(row int) (float64, bool, error) {
 }
 
 func (a f64FillArray) sum() float64 {
+	// Bitmap-backed sources flatten once: non-null rows add their value and
+	// null rows add the fill, with no per-row boxed Array.At walk.
+	if nullBitmapBackedArray(a.source) {
+		if values, nulls, owned, ok := tryBulkF64NullableValues(a.source); ok {
+			var total float64
+			for i, value := range values {
+				if nulls != nil && nullBitGet(nulls, i) {
+					total += a.fill
+					continue
+				}
+				total += value
+			}
+			bulkF64Release(values, owned)
+			return total
+		}
+	}
 	var total float64
 	for row := 0; row < a.Len(); row++ {
 		value, ok, err := a.valueAt(row)
@@ -8569,6 +8769,9 @@ func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int
 		}
 		return sum, count, true, nil
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			return nullBitmapNumericSumRows(carrier, rows)
+		}
 		return 0, 0, false, nil
 	}
 }
@@ -9947,6 +10150,8 @@ func singleColumnKeyFunc(col keyColumn) func(row int) (string, error) {
 		return typedColumnKeyFunc(col, a.data)
 	case nullableArray:
 		return nullableColumnKeyFunc(col, a.data)
+	case nullBitmapCarrier:
+		return nullableColumnKeyFunc(col, a.Values())
 	case encodedArray:
 		return encodedColumnKeyFunc(col, a)
 	default:
@@ -10245,6 +10450,18 @@ func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error
 		return numericColumnAt(a.data, row)
 	case columnArray[float64]:
 		return numericColumnAt(a.data, row)
+	case nullBitmapArray[int8]:
+		return nullBitmapNumericAt(a, row)
+	case nullBitmapArray[int16]:
+		return nullBitmapNumericAt(a, row)
+	case nullBitmapArray[int32]:
+		return nullBitmapNumericAt(a, row)
+	case nullBitmapArray[int64]:
+		return nullBitmapNumericAt(a, row)
+	case nullBitmapArray[float32]:
+		return nullBitmapNumericAt(a, row)
+	case nullBitmapArray[float64]:
+		return nullBitmapNumericAt(a, row)
 	default:
 		v, ok := array.At(row)
 		if !ok {
@@ -10337,6 +10554,9 @@ func isNumericArray(array Array) bool {
 		qRatiosArray, i64BucketArray, i64XrankArray, i64FillArray, f64BucketArray, f64FillArray,
 		fbyI64BroadcastArray, fbyI64TiledBroadcastArray, fbyF64BroadcastArray, fbyF64TiledBroadcastArray:
 		return true
+	case nullBitmapArray[int8], nullBitmapArray[int16], nullBitmapArray[int32],
+		nullBitmapArray[int64], nullBitmapArray[float32], nullBitmapArray[float64]:
+		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
 			v, ok := array.At(i)
@@ -10365,6 +10585,9 @@ func numericDyadic(op Op, left, right any, length int) (Array, bool, error) {
 			return nil, true, err
 		}
 		return bound.Array(), true, nil
+	}
+	if out, ok := numericDyadicNullBitmapBulk(op, left, right, length); ok {
+		return out, true, nil
 	}
 	values := make([]float64, length)
 	var nullable []any
@@ -10466,6 +10689,9 @@ func numericIntegerDyadic(op Op, left, right any, length int) (Array, bool, erro
 		return out, ok, err
 	}
 	if out, ok := numericIntegerDyadicBulk(op, left, right, length); ok {
+		return out, true, nil
+	}
+	if out, ok := numericIntegerDyadicNullBitmapBulk(op, left, right, length); ok {
 		return out, true, nil
 	}
 	values := make([]int64, length)
@@ -10846,6 +11072,8 @@ func isIntegerArray(array Array) bool {
 		}
 		row, ok := a.matrix.source.RowArray(0)
 		return ok && isIntegerArray(row)
+	case nullBitmapArray[int8], nullBitmapArray[int16], nullBitmapArray[int32], nullBitmapArray[int64]:
+		return true
 	case nullableArray:
 		for i := 0; i < array.Len(); i++ {
 			v, ok := array.At(i)
@@ -10958,6 +11186,14 @@ func integerArrayAt(array Array, row int) (int64, bool, error) {
 		return integerColumnAt(a.data, row)
 	case columnArray[int64]:
 		return integerColumnAt(a.data, row)
+	case nullBitmapArray[int8]:
+		return nullBitmapIntegerAt(a, row)
+	case nullBitmapArray[int16]:
+		return nullBitmapIntegerAt(a, row)
+	case nullBitmapArray[int32]:
+		return nullBitmapIntegerAt(a, row)
+	case nullBitmapArray[int64]:
+		return nullBitmapIntegerAt(a, row)
 	case i64RangeArray:
 		if row < 0 || row >= a.len {
 			return 0, false, fmt.Errorf("array row %d out of range", row)
@@ -11085,6 +11321,9 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		return out, true, nil
 	}
 	if out, ok := compareDyadicBulk(op, left, right, length); ok {
+		return out, true, nil
+	}
+	if out, ok := compareNullBitmapDyadicMask(op, left, right, length); ok {
 		return out, true, nil
 	}
 	out := make([]bool, length)
@@ -13851,6 +14090,22 @@ func minMax(array Array, mode string) (any, bool, bool, error) {
 		}
 		return best, hasBest, true, nil
 	default:
+		if carrier, ok := asNullBitmapCarrier(array); ok {
+			var best any
+			hasBest := false
+			nulls := carrier.nullBits()
+			for i := 0; i < carrier.Len(); i++ {
+				if nullBitGet(nulls, i) {
+					continue
+				}
+				v, _ := carrier.At(i)
+				if !hasBest || (mode == "min" && compare(v, best) < 0) || (mode == "max" && compare(v, best) > 0) {
+					best = v
+					hasBest = true
+				}
+			}
+			return best, hasBest, true, nil
+		}
 		return nil, false, false, nil
 	}
 }
