@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "document_id": "ACME-2025-10K",
+  "accession_number": "0000000000-26-000001",
+  "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+  "conversion": {
+    "conversion_source": "sec_html",
+    "converter": "offline_fixture_converter",
+    "html_supported": true,
+    "pdf_supported": true,
+    "warnings": [
+      "table layout normalized to markdown",
+      "page numbers are fixture spans, not live PDF extraction"
+    ]
+  },
+  "markdown": "# ACME Industrial Systems Inc. Form 10-K\n\n## Item 1. Business\nACME sells industrial automation systems to manufacturing customers.\n\n## Item 1A. Risk Factors\nSupply disruption and customer concentration could affect revenue.\n\n## Item 7. Management's Discussion and Analysis\nRevenue increased due to services growth while hardware margin remained flat.",
+  "page_spans": [
+    {
+      "page": 1,
+      "start_offset": 0,
+      "end_offset": 132
+    },
+    {
+      "page": 2,
+      "start_offset": 133,
+      "end_offset": 243
+    },
+    {
+      "page": 3,
+      "start_offset": 244,
+      "end_offset": 374
+    }
+  ],
+  "sections": [
+    {
+      "section_id": "business",
+      "section_title": "Item 1. Business",
+      "start_offset": 40,
+      "end_offset": 131,
+      "page_start": 1,
+      "page_end": 1
+    },
+    {
+      "section_id": "risk_factors",
+      "section_title": "Item 1A. Risk Factors",
+      "start_offset": 133,
+      "end_offset": 242,
+      "page_start": 2,
+      "page_end": 2
+    },
+    {
+      "section_id": "mda",
+      "section_title": "Item 7. Management's Discussion and Analysis",
+      "start_offset": 244,
+      "end_offset": 374,
+      "page_start": 3,
+      "page_end": 3
+    }
+  ],
+  "provenance": {
+    "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+    "accession_number": "0000000000-26-000001",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "live_network": false
+  }
+}

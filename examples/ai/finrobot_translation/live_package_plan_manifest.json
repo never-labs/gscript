@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 34,
-  "translation_directory_file_count": 173,
+  "registered_examples_count": 35,
+  "translation_directory_file_count": 189,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -25,6 +25,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/analyzer_report/main.leia",
       "covers_package_ids": [
         "analyzer_report"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "document_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/document_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/document_pipeline/main.leia",
+      "covers_package_ids": [
+        "document_pipeline"
       ],
       "status": "checked_in_registered_example"
     },
@@ -364,6 +373,35 @@
         "contract tests run with live_network=false and assert no required data provider or model credentials",
         "section schema fixtures validate risk, thesis, valuation, and news output envelopes with citations",
         "source evidence tests reject unresolved refs and require replayable expected sections before live analyzer packages are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "document_pipeline",
+      "package_name": "leia-finrobot-document-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/document_pipeline",
+      "planned_directory": "packages/finrobot/document_pipeline",
+      "manifest": "packages/finrobot/document_pipeline/package.manifest.json",
+      "contract": "packages/finrobot/document_pipeline/contracts/document_pipeline_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/document_rag.leia",
+      "capabilities": [
+        "finance.document.sec.search",
+        "finance.document.sec.fetch",
+        "finance.document.html.to_markdown",
+        "finance.document.pdf.to_markdown",
+        "finance.document.section.extract",
+        "finance.document.chunk",
+        "finance.document.citation.link",
+        "finance.document.provenance.trace",
+        "finance.document.vector.adapter",
+        "finance.document.retriever.query"
+      ],
+      "test_gates": [
+        "document pipeline manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no SEC, Marker, embedding, vector store, or retriever credentials",
+        "fixture tests validate SEC filing metadata, HTML/PDF markdown boundaries, section extraction, chunks, citations, provenance, and retriever query results",
+        "adapter boundary tests keep SEC search/fetch, converter, vector store, embedding, and retriever calls metadata-only until live packages are explicitly enabled"
       ],
       "no_built_in_guarantee": true
     },

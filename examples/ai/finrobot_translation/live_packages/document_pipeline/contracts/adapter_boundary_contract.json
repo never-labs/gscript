@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-document-pipeline-adapter-boundary-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "boundaries": [
+    {
+      "id": "sec_filing_client",
+      "display_name": "SEC filing search and fetch",
+      "capability": "finance.document.sec.search_fetch",
+      "fixture_key": "sec:filing_search:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "document_converter",
+      "display_name": "HTML/PDF to markdown converter",
+      "capability": "finance.document.converter.html_pdf_markdown",
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "vector_retriever",
+      "display_name": "Vector store and retriever",
+      "capability": "finance.document.vector_retriever.query",
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ]
+}

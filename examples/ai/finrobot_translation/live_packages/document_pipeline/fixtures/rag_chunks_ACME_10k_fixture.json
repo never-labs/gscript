@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "document_id": "ACME-2025-10K",
+  "chunk_policy": {
+    "max_tokens": 220,
+    "overlap_tokens": 40,
+    "section_aware": true
+  },
+  "chunks": [
+    {
+      "chunk_id": "ACME-2025-10K:business:0001",
+      "section_id": "business",
+      "text": "ACME sells industrial automation systems to manufacturing customers.",
+      "token_count": 9,
+      "citation": {
+        "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+        "page": 1,
+        "section_title": "Item 1. Business",
+        "start_offset": 40,
+        "end_offset": 131
+      },
+      "provenance": {
+        "accession_number": "0000000000-26-000001",
+        "fixture_key": "rag:chunks:ACME:10-K:offline",
+        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline"
+      },
+      "embedding_ref": {
+        "adapter": "fixture_vector_index",
+        "embedding_id": "fixture-embedding-business-0001",
+        "model": "offline-placeholder"
+      }
+    },
+    {
+      "chunk_id": "ACME-2025-10K:risk_factors:0001",
+      "section_id": "risk_factors",
+      "text": "Supply disruption and customer concentration could affect revenue.",
+      "token_count": 8,
+      "citation": {
+        "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+        "page": 2,
+        "section_title": "Item 1A. Risk Factors",
+        "start_offset": 133,
+        "end_offset": 242
+      },
+      "provenance": {
+        "accession_number": "0000000000-26-000001",
+        "fixture_key": "rag:chunks:ACME:10-K:offline",
+        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline"
+      },
+      "embedding_ref": {
+        "adapter": "fixture_vector_index",
+        "embedding_id": "fixture-embedding-risk-0001",
+        "model": "offline-placeholder"
+      }
+    },
+    {
+      "chunk_id": "ACME-2025-10K:mda:0001",
+      "section_id": "mda",
+      "text": "Revenue increased due to services growth while hardware margin remained flat.",
+      "token_count": 10,
+      "citation": {
+        "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+        "page": 3,
+        "section_title": "Item 7. Management's Discussion and Analysis",
+        "start_offset": 244,
+        "end_offset": 374
+      },
+      "provenance": {
+        "accession_number": "0000000000-26-000001",
+        "fixture_key": "rag:chunks:ACME:10-K:offline",
+        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline"
+      },
+      "embedding_ref": {
+        "adapter": "fixture_vector_index",
+        "embedding_id": "fixture-embedding-mda-0001",
+        "model": "offline-placeholder"
+      }
+    }
+  ]
+}

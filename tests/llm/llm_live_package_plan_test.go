@@ -73,6 +73,7 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		"tutorial_demo_parity":  "leia-finrobot-tutorial-demo-parity",
 		"prompt_roles":          "leia-finrobot-prompt-roles",
 		"analyzer_report":       "leia-finrobot-analyzer-report",
+		"document_pipeline":     "leia-finrobot-document-pipeline",
 		"news_catalyst":         "leia-finrobot-news-catalyst",
 		"factor_research":       "leia-finrobot-factor-research",
 	}
@@ -168,6 +169,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"tutorial_demo_parity":  "parity.",
 		"prompt_roles":          "prompt.role.",
 		"analyzer_report":       "finance.analyzer.",
+		"document_pipeline":     "finance.document.",
 		"news_catalyst":         "finance.",
 		"factor_research":       "finance.factor_research.",
 	}

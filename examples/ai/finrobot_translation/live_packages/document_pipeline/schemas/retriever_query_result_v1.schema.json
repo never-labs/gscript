@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/document_pipeline/retriever_query_result_v1.schema.json",
+  "title": "FinRobot document pipeline retriever query fixture",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "query",
+    "answer",
+    "retriever",
+    "retrieved_chunks",
+    "answer_citations",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "provider_free": {
+      "type": "boolean",
+      "const": true
+    },
+    "live_network": {
+      "type": "boolean",
+      "const": false
+    },
+    "query": {
+      "type": "string"
+    },
+    "answer": {
+      "type": "string"
+    },
+    "retriever": {
+      "type": "object",
+      "required": [
+        "adapter",
+        "top_k",
+        "live_network",
+        "dependency_imported"
+      ]
+    },
+    "retrieved_chunks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "chunk_id",
+          "rank",
+          "score",
+          "section_id",
+          "citation"
+        ]
+      }
+    },
+    "answer_citations": {
+      "type": "array",
+      "minItems": 1
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "fixture_key",
+        "chunk_fixture_key",
+        "accession_number"
+      ]
+    }
+  }
+}

@@ -1,0 +1,107 @@
+// Provider-free live package skeleton for FinRobot document pipeline.
+//
+// The manifest and contracts are the contract of record. This executable
+// mirror keeps the package discoverable by smoke tests without importing or
+// calling SEC clients, Marker, embedding models, vector stores, or retrievers.
+
+document_pipeline_live_package := {
+    id: "finrobot-document-pipeline-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    default_policy: {
+        mode: "fixture_replay"
+        live_network: false
+        provider_credentials_required: false
+        real_dependency_imports: false
+        clean_skip_without_dependency: true
+        fixture_hook: "recorded_document_pipeline_live_fixture"
+    }
+    modules: {
+        {
+            id: "filings_src"
+            source_module: "filings_src/sec_api.py"
+            capabilities: {"finance.document.sec.search", "finance.document.sec.fetch", "finance.document.sec.metadata.normalize", "finance.document.sec.accession.resolve"}
+            required_fields: {"accession_number", "cik", "form_type", "filing_date", "source_url", "provenance"}
+        },
+        {
+            id: "marker_sec_src"
+            source_module: "marker_sec_src/sec_filings_to_markdown.py"
+            capabilities: {"finance.document.html.to_markdown", "finance.document.pdf.to_markdown", "finance.document.section.extract", "finance.document.conversion.provenance"}
+            required_fields: {"markdown", "conversion_source", "page_spans", "section_id", "section_title", "source_offsets"}
+        },
+        {
+            id: "rag"
+            source_module: "functional/rag.py"
+            capabilities: {"finance.document.chunk", "finance.document.citation.link", "finance.document.provenance.trace", "finance.document.vector.adapter"}
+            required_fields: {"chunk_id", "text", "section_id", "citation", "provenance", "embedding_ref"}
+        },
+        {
+            id: "ragquery"
+            source_module: "functional/ragquery.py"
+            capabilities: {"finance.document.retriever.query", "finance.document.retriever.rank", "finance.document.answer.citations", "finance.document.answer.provenance"}
+            required_fields: {"query", "answer", "retrieved_chunks", "rank", "score", "citation"}
+        },
+    }
+    adapter_boundaries: {
+        {id: "sec_filing_client" capability: "finance.document.sec.search_fetch" fixture_key: "sec:filing_search:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "document_converter" capability: "finance.document.converter.html_pdf_markdown" fixture_key: "converter:sec_markdown:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "vector_retriever" capability: "finance.document.vector_retriever.query" fixture_key: "retriever:ragquery:ACME:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+    }
+    fixture_keys: {
+        "sec:filing_search:ACME:10-K:offline",
+        "converter:sec_markdown:ACME:10-K:offline",
+        "rag:chunks:ACME:10-K:offline",
+        "retriever:ragquery:ACME:offline",
+        "adapter_boundary:document_pipeline:offline",
+    }
+}
+
+func document_pipeline_module_ok(module) {
+    if module == nil {
+        return false
+    }
+    if document_pipeline_live_package.provider_free != true || document_pipeline_live_package.live_network != false || document_pipeline_live_package.real_dependency_imports != false {
+        return false
+    }
+    return module.id != nil && module.source_module != nil && #module.capabilities >= 4 && #module.required_fields >= 6
+}
+
+func document_pipeline_boundary_ok(boundary) {
+    if boundary == nil {
+        return false
+    }
+    return boundary.live_network == false && boundary.dependency_imported == false && boundary.credential_required == false && boundary.clean_skip == true && boundary.capability != nil && boundary.fixture_key != nil
+}
+
+document_pipeline_module_count := 0
+for i := 1; i <= #document_pipeline_live_package.modules; i++ {
+    module := document_pipeline_live_package.modules[i]
+    assert(document_pipeline_module_ok(module))
+    document_pipeline_module_count = document_pipeline_module_count + 1
+}
+
+document_pipeline_boundary_count := 0
+for i := 1; i <= #document_pipeline_live_package.adapter_boundaries; i++ {
+    boundary := document_pipeline_live_package.adapter_boundaries[i]
+    assert(document_pipeline_boundary_ok(boundary))
+    document_pipeline_boundary_count = document_pipeline_boundary_count + 1
+}
+
+assert(document_pipeline_module_count == 4)
+assert(document_pipeline_boundary_count == 3)
+assert(#document_pipeline_live_package.fixture_keys == 5)
+assert(document_pipeline_live_package.default_policy.mode == "fixture_replay")
+assert(document_pipeline_live_package.default_policy.clean_skip_without_dependency == true)
+
+document_pipeline_live_package_summary := string.format(
+"document_pipeline_live_package modules=%d adapters=%d provider_free=%s live_network=%s imports=%s fixtures=%d",
+document_pipeline_module_count,
+document_pipeline_boundary_count,
+tostring(document_pipeline_live_package.provider_free),
+tostring(document_pipeline_live_package.live_network),
+tostring(document_pipeline_live_package.real_dependency_imports),
+#document_pipeline_live_package.fixture_keys
+)
+
+print(document_pipeline_live_package_summary)

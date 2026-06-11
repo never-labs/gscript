@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-document-pipeline-live-package",
+  "package_name": "leia-finrobot-document-pipeline",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot SEC filing retrieval, document conversion, section extraction, RAG chunking, citation provenance, and retriever adapter boundaries.",
+  "source_modules": [
+    "FinRobot/filings_src/sec_api.py",
+    "FinRobot/marker_sec_src/sec_filings_to_markdown.py",
+    "FinRobot/functional/rag.py",
+    "FinRobot/functional/ragquery.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; SEC API, Marker, PDF conversion, embedding, vector database, and retriever credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_document_pipeline_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "document_pipeline_contract": "contracts/document_pipeline_contract.json",
+    "adapter_boundary_contract": "contracts/adapter_boundary_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "filing_search_result": "schemas/filing_search_result_v1.schema.json",
+    "document_markdown": "schemas/document_markdown_v1.schema.json",
+    "section_extraction": "schemas/section_extraction_v1.schema.json",
+    "rag_chunk": "schemas/rag_chunk_v1.schema.json",
+    "retriever_query_result": "schemas/retriever_query_result_v1.schema.json",
+    "adapter_boundary": "schemas/adapter_boundary_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "sec_search": "fixtures/sec_filing_search_ACME_fixture.json",
+    "markdown_conversion": "fixtures/sec_markdown_ACME_10k_fixture.json",
+    "rag_index": "fixtures/rag_chunks_ACME_10k_fixture.json",
+    "retriever_query": "fixtures/retriever_query_ACME_fixture.json",
+    "adapter_boundary": "fixtures/adapter_boundary_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "filings_src",
+      "source_module": "filings_src/sec_api.py",
+      "capabilities": [
+        "finance.document.sec.search",
+        "finance.document.sec.fetch",
+        "finance.document.sec.metadata.normalize",
+        "finance.document.sec.accession.resolve"
+      ],
+      "output_schemas": [
+        "filing_search_result",
+        "adapter_boundary"
+      ]
+    },
+    {
+      "id": "marker_sec_src",
+      "source_module": "marker_sec_src/sec_filings_to_markdown.py",
+      "capabilities": [
+        "finance.document.html.to_markdown",
+        "finance.document.pdf.to_markdown",
+        "finance.document.section.extract",
+        "finance.document.conversion.provenance"
+      ],
+      "output_schemas": [
+        "document_markdown",
+        "section_extraction"
+      ]
+    },
+    {
+      "id": "rag",
+      "source_module": "functional/rag.py",
+      "capabilities": [
+        "finance.document.chunk",
+        "finance.document.citation.link",
+        "finance.document.provenance.trace",
+        "finance.document.vector.adapter"
+      ],
+      "output_schemas": [
+        "rag_chunk",
+        "adapter_boundary"
+      ]
+    },
+    {
+      "id": "ragquery",
+      "source_module": "functional/ragquery.py",
+      "capabilities": [
+        "finance.document.retriever.query",
+        "finance.document.retriever.rank",
+        "finance.document.answer.citations",
+        "finance.document.answer.provenance"
+      ],
+      "output_schemas": [
+        "retriever_query_result",
+        "rag_chunk"
+      ]
+    }
+  ],
+  "adapter_boundaries": [
+    {
+      "id": "sec_filing_client",
+      "display_name": "SEC filing search and fetch",
+      "capability": "finance.document.sec.search_fetch",
+      "fixture_key": "sec:filing_search:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "document_converter",
+      "display_name": "HTML/PDF to markdown converter",
+      "capability": "finance.document.converter.html_pdf_markdown",
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "vector_retriever",
+      "display_name": "Vector store and retriever",
+      "capability": "finance.document.vector_retriever.query",
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "required and optional credentials are empty",
+    "SEC filing search/fetch, HTML/PDF markdown conversion, section extraction, chunk citation provenance, and retriever schemas are present",
+    "SEC client, converter, vector store, embedding, and retriever boundaries are metadata-only and fixture-backed",
+    "main.leia contains no live provider SDK imports, vector database imports, or network execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot SEC filing clients, Marker conversion, embedding models, vector stores, or retrievers as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}
