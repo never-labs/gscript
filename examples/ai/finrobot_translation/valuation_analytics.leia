@@ -1,0 +1,127 @@
+// FR-GAP-015 deterministic valuation analytics fixture.
+// Covers DCF, EV/EBITDA, P/E, target price synthesis, and explanation schema
+// without adding finance built-ins or live provider dependencies.
+
+func near(a, b, eps) {
+    return math.abs(a - b) <= eps
+}
+
+func check(name, ok) {
+    if !ok {
+        print("failed", name)
+    }
+    assert(ok)
+}
+
+valuation_assumptions := {
+    fixture_id: "FR-GAP-015-valuation-analytics-v1",
+    offline_only: true,
+    built_in_finance: false,
+    ticker: "AAPL",
+    valuation_date: "2026-06-11",
+    net_debt_b: -54.0,
+    diluted_shares_b: 15.2,
+    current_price: 196.0,
+    wacc: 0.09,
+    terminal_growth: 0.025,
+    terminal_ebitda_multiple: 18.0,
+}
+
+cash_flows := {
+    {year: "2026E", revenue_b: 412.0, ebitda_b: 137.0, fcf_b: 104.0, discount: 1.09},
+    {year: "2027E", revenue_b: 431.0, ebitda_b: 144.0, fcf_b: 110.0, discount: 1.1881},
+    {year: "2028E", revenue_b: 452.0, ebitda_b: 152.0, fcf_b: 118.0, discount: 1.295029},
+    {year: "2029E", revenue_b: 474.0, ebitda_b: 161.0, fcf_b: 126.0, discount: 1.41158161},
+    {year: "2030E", revenue_b: 498.0, ebitda_b: 171.0, fcf_b: 135.0, discount: 1.5386239549},
+}
+
+peers := {
+    {ticker: "MSFT", ev_ebitda: 24.0, pe: 29.0},
+    {ticker: "GOOG", ev_ebitda: 16.0, pe: 21.0},
+    {ticker: "AMZN", ev_ebitda: 21.0, pe: 34.0},
+    {ticker: "META", ev_ebitda: 14.0, pe: 22.0},
+}
+
+func sum_discounted_fcf(rows) {
+    total := 0.0
+    for i := 1; i <= #rows; i++ {
+        total = total + rows[i].fcf_b / rows[i].discount
+    }
+    return total
+}
+
+func average_peer_multiple(rows, field) {
+    total := 0.0
+    for i := 1; i <= #rows; i++ {
+        total = total + rows[i][field]
+    }
+    return total / #rows
+}
+
+dcf_pv_fcf_b := sum_discounted_fcf(cash_flows)
+terminal_value_b := cash_flows[5].fcf_b * (1 + valuation_assumptions.terminal_growth) / (valuation_assumptions.wacc - valuation_assumptions.terminal_growth)
+dcf_enterprise_value_b := dcf_pv_fcf_b + terminal_value_b / cash_flows[5].discount
+dcf_equity_value_b := dcf_enterprise_value_b - valuation_assumptions.net_debt_b
+dcf_price := dcf_equity_value_b / valuation_assumptions.diluted_shares_b
+
+peer_ev_ebitda_multiple := average_peer_multiple(peers, "ev_ebitda")
+ev_ebitda_enterprise_value_b := cash_flows[1].ebitda_b * peer_ev_ebitda_multiple
+ev_ebitda_equity_value_b := ev_ebitda_enterprise_value_b - valuation_assumptions.net_debt_b
+ev_ebitda_price := ev_ebitda_equity_value_b / valuation_assumptions.diluted_shares_b
+
+peer_pe_multiple := average_peer_multiple(peers, "pe")
+next_year_eps := 7.10
+pe_price := next_year_eps * peer_pe_multiple
+
+target_price := dcf_price * 0.50 + ev_ebitda_price * 0.30 + pe_price * 0.20
+upside_pct := (target_price / valuation_assumptions.current_price) - 1.0
+
+valuation_methods := {
+    {
+        method: "dcf",
+        price: dcf_price,
+        enterprise_value_b: dcf_enterprise_value_b,
+        equity_value_b: dcf_equity_value_b,
+        assumptions: {"wacc", "terminal_growth", "five_year_fcf"},
+    },
+    {
+        method: "ev_ebitda",
+        price: ev_ebitda_price,
+        enterprise_value_b: ev_ebitda_enterprise_value_b,
+        equity_value_b: ev_ebitda_equity_value_b,
+        assumptions: {"peer_average_multiple", "forward_ebitda"},
+    },
+    {
+        method: "pe",
+        price: pe_price,
+        enterprise_value_b: nil,
+        equity_value_b: nil,
+        assumptions: {"peer_average_multiple", "next_year_eps"},
+    },
+}
+
+valuation_explanation_schema := {
+    schema: "finrobot_valuation_analytics_v1",
+    required_methods: {"dcf", "ev_ebitda", "pe"},
+    target_price_basis: "weighted_method_synthesis",
+    deterministic_fixture: true,
+    no_finance_builtin: valuation_assumptions.built_in_finance == false,
+}
+
+valuation_analytics_summary := string.format(
+    "valuation_analytics methods=%d dcf=%.2f ev_ebitda=%.2f pe=%.2f target=%.2f upside=%.4f",
+    #valuation_methods,
+    dcf_price,
+    ev_ebitda_price,
+    pe_price,
+    target_price,
+    upside_pct
+)
+
+check("DCF present value fixture", near(dcf_pv_fcf_b, 456.1176, 0.0001) && near(dcf_price, 124.5869, 0.0001))
+check("EV/EBITDA peer multiple fixture", near(peer_ev_ebitda_multiple, 18.75, 0.000001) && near(ev_ebitda_price, 172.5493, 0.0001))
+check("P/E peer multiple fixture", near(peer_pe_multiple, 26.5, 0.000001) && near(pe_price, 188.15, 0.000001))
+check("target price weighted synthesis", near(target_price, 151.6883, 0.0001) && near(upside_pct, -0.2260802, 0.000001))
+check("valuation explanation schema is deterministic", valuation_explanation_schema.deterministic_fixture == true && valuation_explanation_schema.no_finance_builtin == true && valuation_methods[1].method == "dcf")
+
+print(valuation_analytics_summary)
