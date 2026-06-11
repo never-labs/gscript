@@ -5176,6 +5176,52 @@ func TryTypedI64IndexExprReducers(indexes Array, reducers []I64IndexExprReducer)
 		}
 	}
 	out := make([]int64, len(reducers))
+	// Vectorized path: flatten the index vector once, then evaluate each
+	// reducer expression tree over the whole dense index slice (one loop per
+	// distinct expression node) instead of re-walking the tree per selected
+	// row. Shared subtrees across reducers evaluate once. Wrapping int64 sums
+	// accumulate in the same index order as the per-row loop, so results
+	// match bit-for-bit.
+	if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+		valid := true
+		for _, row := range rows {
+			if row < 0 {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			eval := i64IndexExprBulkEval{rows: rows}
+			for i, reducer := range reducers {
+				switch reducer.Kind {
+				case I64IndexExprReducerSum:
+					if value, isConst := i64IndexExprConstValue(reducer.Expr); isConst {
+						// n wrapping additions of one constant equal one
+						// wrapping multiplication: int64 is a ring mod 2^64.
+						out[i] = value * int64(len(rows))
+						continue
+					}
+					values, err := eval.eval(reducer.Expr)
+					if err != nil {
+						eval.release()
+						bulkI64Release(rows, rowsOwned)
+						return nil, true, err
+					}
+					var total int64
+					for _, value := range values {
+						total += value
+					}
+					out[i] = total
+				case I64IndexExprReducerCount:
+					out[i] = int64(len(rows))
+				}
+			}
+			eval.release()
+			bulkI64Release(rows, rowsOwned)
+			return out, true, nil
+		}
+		bulkI64Release(rows, rowsOwned)
+	}
 	if err := forEachTypedI64Index(indexes, int(^uint(0)>>1), func(index int) error {
 		for i, reducer := range reducers {
 			switch reducer.Kind {
@@ -5194,6 +5240,177 @@ func TryTypedI64IndexExprReducers(indexes Array, reducers []I64IndexExprReducer)
 		return nil, true, err
 	}
 	return out, true, nil
+}
+
+// i64IndexExprBulkEval evaluates integer index expressions over a dense
+// index vector with one tight loop per distinct expression node. Structurally
+// equal subtrees (within and across reducers) evaluate once and share their
+// pooled result slice. Arithmetic mirrors evalI64IndexExpr exactly: wrapping
+// int64 ops, Go truncated / and %, and the same divide/modulo-by-zero errors.
+type i64IndexExprBulkEval struct {
+	rows    []int64
+	exprs   []I64IndexExpr
+	results [][]int64
+}
+
+func i64IndexExprConstValue(expr I64IndexExpr) (int64, bool) {
+	if expr.Op == I64IndexExprConst {
+		return expr.Value, true
+	}
+	return 0, false
+}
+
+func i64IndexExprEqual(a, b I64IndexExpr) bool {
+	if a.Op != b.Op || a.Value != b.Value {
+		return false
+	}
+	if (a.Left == nil) != (b.Left == nil) || (a.Right == nil) != (b.Right == nil) {
+		return false
+	}
+	if a.Left != nil && !i64IndexExprEqual(*a.Left, *b.Left) {
+		return false
+	}
+	if a.Right != nil && !i64IndexExprEqual(*a.Right, *b.Right) {
+		return false
+	}
+	return true
+}
+
+// eval returns a slice owned by the evaluator (or the shared rows slice);
+// callers must treat it as read-only and call release when finished.
+func (e *i64IndexExprBulkEval) eval(expr I64IndexExpr) ([]int64, error) {
+	switch expr.Op {
+	case I64IndexExprIndex:
+		return e.rows, nil
+	case I64IndexExprConst:
+		out := bulkI64Get(len(e.rows))
+		for i := range out {
+			out[i] = expr.Value
+		}
+		e.remember(expr, out)
+		return out, nil
+	}
+	for i := range e.exprs {
+		if i64IndexExprEqual(e.exprs[i], expr) {
+			return e.results[i], nil
+		}
+	}
+	switch expr.Op {
+	case I64IndexExprAdd, I64IndexExprSub, I64IndexExprMul, I64IndexExprDiv, I64IndexExprMod:
+		out, err := e.evalDyadic(expr)
+		if err != nil {
+			return nil, err
+		}
+		e.remember(expr, out)
+		return out, nil
+	case I64IndexExprXbar:
+		if expr.Value <= 0 {
+			return nil, fmt.Errorf("integer index expression xbar width must be positive")
+		}
+		left, err := e.eval(*expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		out := bulkI64Get(len(e.rows))
+		for i, v := range left {
+			out[i] = floorInt64(v, expr.Value)
+		}
+		e.remember(expr, out)
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unsupported integer index expression op %d", expr.Op)
+	}
+}
+
+func (e *i64IndexExprBulkEval) evalDyadic(expr I64IndexExpr) ([]int64, error) {
+	rightConst, rightIsConst := i64IndexExprConstValue(*expr.Right)
+	left, err := e.eval(*expr.Left)
+	if err != nil {
+		return nil, err
+	}
+	out := bulkI64Get(len(e.rows))
+	if rightIsConst {
+		switch expr.Op {
+		case I64IndexExprAdd:
+			for i, v := range left {
+				out[i] = v + rightConst
+			}
+		case I64IndexExprSub:
+			for i, v := range left {
+				out[i] = v - rightConst
+			}
+		case I64IndexExprMul:
+			for i, v := range left {
+				out[i] = v * rightConst
+			}
+		case I64IndexExprDiv:
+			if rightConst == 0 && len(left) > 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("integer index expression divide by zero")
+			}
+			for i, v := range left {
+				out[i] = v / rightConst
+			}
+		case I64IndexExprMod:
+			if rightConst == 0 && len(left) > 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("integer index expression modulo by zero")
+			}
+			for i, v := range left {
+				out[i] = v % rightConst
+			}
+		}
+		return out, nil
+	}
+	right, err := e.eval(*expr.Right)
+	if err != nil {
+		bulkI64Release(out, true)
+		return nil, err
+	}
+	switch expr.Op {
+	case I64IndexExprAdd:
+		for i, v := range left {
+			out[i] = v + right[i]
+		}
+	case I64IndexExprSub:
+		for i, v := range left {
+			out[i] = v - right[i]
+		}
+	case I64IndexExprMul:
+		for i, v := range left {
+			out[i] = v * right[i]
+		}
+	case I64IndexExprDiv:
+		for i, v := range left {
+			if right[i] == 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("integer index expression divide by zero")
+			}
+			out[i] = v / right[i]
+		}
+	case I64IndexExprMod:
+		for i, v := range left {
+			if right[i] == 0 {
+				bulkI64Release(out, true)
+				return nil, fmt.Errorf("integer index expression modulo by zero")
+			}
+			out[i] = v % right[i]
+		}
+	}
+	return out, nil
+}
+
+func (e *i64IndexExprBulkEval) remember(expr I64IndexExpr, values []int64) {
+	e.exprs = append(e.exprs, expr)
+	e.results = append(e.results, values)
+}
+
+func (e *i64IndexExprBulkEval) release() {
+	for _, values := range e.results {
+		bulkI64Release(values, true)
+	}
+	e.exprs = nil
+	e.results = nil
 }
 
 func TryTypedI64IndexExprSumCount(indexes Array, expr I64IndexExpr, includeCount bool) (int64, bool, error) {
@@ -5453,6 +5670,28 @@ func TryTypedModuloCompareIndexesI64(array Array, modulus any, op Op, target any
 	if !isDenseIntegerArray(array) {
 		return nil, false, nil
 	}
+	// Bulk-flatten the carrier once and select in a dense loop instead of
+	// walking the carrier tree per row. Null rows bail out of the flatteners,
+	// so the per-row fallback keeps its null compare semantics.
+	if values, owned, ok := tryBulkI64Values(array); ok {
+		indexes := make([]int64, 0, len(values)/2)
+		switch op {
+		case OpEQ:
+			for row, v := range values {
+				if qModInt64(v, modulusI64) == targetI64 {
+					indexes = append(indexes, int64(row))
+				}
+			}
+		case OpNE:
+			for row, v := range values {
+				if qModInt64(v, modulusI64) != targetI64 {
+					indexes = append(indexes, int64(row))
+				}
+			}
+		}
+		bulkI64Release(values, owned)
+		return newI64Trusted(indexes), true, nil
+	}
 	indexes := make([]int64, 0, array.Len()/2)
 	for row := 0; row < array.Len(); row++ {
 		selected, err := integerModuloCompareAt(array, row, modulusI64, op, targetI64)
@@ -5593,6 +5832,29 @@ func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 			total := values.start*int64(len(rows)) + values.step*rowSum
 			bulkI64Release(rows, owned)
 			return total, true, nil
+		}
+	}
+	// For dense-enough index sets, flatten the value carrier once and
+	// gather-reduce over flat slices instead of walking the carrier tree per
+	// selected row. Null values bail out of the flatteners, keeping the
+	// null-skipping fallback semantics below.
+	if indexes.Len()*4 >= array.Len() {
+		if values, valuesOwned, ok := tryBulkI64Values(source); ok {
+			if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+				var total int64
+				for _, row := range rows {
+					if row < 0 || row >= int64(len(values)) {
+						bulkI64Release(values, valuesOwned)
+						bulkI64Release(rows, rowsOwned)
+						return nil, true, fmt.Errorf("index %d out of bounds for length %d", row, len(values))
+					}
+					total += values[row]
+				}
+				bulkI64Release(values, valuesOwned)
+				bulkI64Release(rows, rowsOwned)
+				return total, true, nil
+			}
+			bulkI64Release(values, valuesOwned)
 		}
 	}
 	var total int64
@@ -7688,6 +7950,35 @@ func (k typedKernelRegistry) NumericSums(array Array) (Array, bool, error) {
 	default:
 		if carrier, ok := asNullBitmapCarrier(array); ok {
 			return k.NumericSums(nullableArray{kind: carrier.Kind(), data: carrier.Values()})
+		}
+		// Bulk fallback: flatten lazy carriers (gathers, buckets, tiles, ...)
+		// once and stream the running sum in a dense pass. The flatteners bail
+		// out on null rows, so the boxed null-aware fallback is preserved. The
+		// fold runs in source order with the same accumulator types as the
+		// dense column paths above, so results match bit-for-bit.
+		switch array.Kind() {
+		case KindI64:
+			if values, owned, ok := tryBulkI64Values(array); ok {
+				out := make([]int64, len(values))
+				var acc int64
+				for i, v := range values {
+					acc += v
+					out[i] = acc
+				}
+				bulkI64Release(values, owned)
+				return newI64Trusted(out), true, nil
+			}
+		case KindF64:
+			if values, owned, ok := tryBulkF64Values(array); ok {
+				out := make([]float64, len(values))
+				var acc float64
+				for i, v := range values {
+					acc += v
+					out[i] = acc
+				}
+				bulkF64Release(values, owned)
+				return newF64Trusted(out), true, nil
+			}
 		}
 		return nil, false, nil
 	}
@@ -13347,6 +13638,20 @@ func i64BucketSum(values i64BucketArray) (int64, bool, error) {
 			return i64BucketRangeStepOneSum(source.start, values.len, values.width), true, nil
 		}
 	}
+	// Bulk-flatten the source once and bucket-reduce in a dense loop instead
+	// of re-walking the carrier tree per row. Null sources bail out of the
+	// flatteners, so the per-row fallback keeps its null semantics.
+	if source, owned, ok := tryBulkI64Values(values.source); ok {
+		if len(source) >= values.len {
+			var total int64
+			for _, v := range source[:values.len] {
+				total += floorInt64(v, values.width)
+			}
+			bulkI64Release(source, owned)
+			return total, true, nil
+		}
+		bulkI64Release(source, owned)
+	}
 	var total int64
 	for row := 0; row < values.len; row++ {
 		value, ok, err := values.i64At(row)
@@ -13378,6 +13683,19 @@ func floorQuotientPrefixSum(n, width int64) int64 {
 func f64BucketSum(values f64BucketArray) (float64, bool, error) {
 	if values.width <= 0 || math.IsNaN(values.width) || math.IsInf(values.width, 0) {
 		return 0, true, fmt.Errorf("bucket floor interval must be finite and positive")
+	}
+	// Bulk-flatten the source once and bucket-reduce in source order, exactly
+	// matching the per-row fold below. Null sources bail out of the flattener.
+	if source, owned, ok := tryBulkF64Values(values.source); ok {
+		if len(source) >= values.len {
+			var total float64
+			for _, v := range source[:values.len] {
+				total += math.Floor(v/values.width) * values.width
+			}
+			bulkF64Release(source, owned)
+			return total, true, nil
+		}
+		bulkF64Release(source, owned)
 	}
 	var total float64
 	for row := 0; row < values.len; row++ {
@@ -14833,6 +15151,17 @@ func (a i64ScalarDyadicRunningSumArray) i64At(row int) (int64, bool, error) {
 }
 
 func i64ScalarDyadicRunningSumSum(array i64ScalarDyadicRunningSumArray) (int64, bool, error) {
+	// Flatten the dyadic source once and reduce the running sum in a single
+	// dense pass instead of evaluating a prefix range sum per row.
+	if values, owned, ok := tryBulkI64Values(array.source); ok && len(values) >= array.Len() {
+		var acc, total int64
+		for _, v := range values[:array.Len()] {
+			acc += v
+			total += acc
+		}
+		bulkI64Release(values, owned)
+		return total, true, nil
+	}
 	var total int64
 	for row := 0; row < array.Len(); row++ {
 		value, ok, err := array.i64At(row)

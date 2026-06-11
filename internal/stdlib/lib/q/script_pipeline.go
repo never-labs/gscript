@@ -78,6 +78,9 @@ type qScriptPipelineDescriptor struct {
 	terminalUsesWhere bool
 	terminalPlan      qPipelinePlan
 	moduloMaskPlan    *qPipelinePlan
+	// indexExprAssignmentSkip[i] marks assignments absorbed into the
+	// vectorized index-expr reducer plan; precomputed at plan-build time.
+	indexExprAssignmentSkip []bool
 }
 
 type qScriptPipelineAssignment struct {
@@ -156,8 +159,33 @@ func qNormalizeScriptPipelineDescriptor(descriptor qScriptPipelineDescriptor) qS
 	descriptor.sequenceValuePlan = buildQScriptBindingPlanForRHS(descriptor.sequenceValueExpr, nil)
 	descriptor.sequenceShapeName = qScriptPipelineSequenceTransformName(descriptor.sequenceSteps)
 	descriptor.moduloMaskPlan = qScriptPipelineModuloMaskPlan(descriptor.maskExpr)
+	descriptor.indexExprAssignmentSkip = qScriptPipelineIndexExprSkippedAssignments(&descriptor)
 	descriptor.shapeText = descriptor.shape()
 	return descriptor
+}
+
+// qScriptPipelineIndexExprSkippedAssignments precomputes which pipeline
+// assignments the index-expr reducer terminal absorbs into its vectorized
+// expression plan (and therefore never needs materialized in the
+// environment). The analysis is a pure function of the descriptor's static
+// expressions, so it runs once at plan-build time instead of re-walking the
+// binding strings on every execution.
+func qScriptPipelineIndexExprSkippedAssignments(descriptor *qScriptPipelineDescriptor) []bool {
+	if descriptor.kind != qScriptPipelineIndexExprSumCount || len(descriptor.assignments) == 0 {
+		return nil
+	}
+	bindings := make(map[string]string, len(descriptor.assignments))
+	for _, assignment := range descriptor.assignments {
+		bindings[assignment.name] = assignment.rhs
+	}
+	skip := make([]bool, len(descriptor.assignments))
+	indexExpr := strings.TrimSpace(descriptor.indexExpr)
+	for i, assignment := range descriptor.assignments {
+		name := strings.TrimSpace(assignment.name)
+		skip[i] = name == indexExpr ||
+			qScriptPipelineI64IndexExprDependsOnName(descriptor.valueExpr, name, descriptor.indexExpr, bindings, nil)
+	}
+	return skip
 }
 
 func qScriptPipelineDescriptorTerminalPlan(descriptor qScriptPipelineDescriptor) qPipelinePlan {
@@ -2767,14 +2795,12 @@ func qScriptPipelineHasAssignment(descriptor *qScriptPipelineDescriptor, name st
 }
 
 func (s *EvalState) evalQScriptIndexExprSumCountPipeline(descriptor *qScriptPipelineDescriptor) (any, bool, error) {
-	bindings := make(map[string]string, len(descriptor.assignments))
-	for _, assignment := range descriptor.assignments {
-		bindings[assignment.name] = assignment.rhs
+	skip := descriptor.indexExprAssignmentSkip
+	if len(skip) != len(descriptor.assignments) {
+		skip = qScriptPipelineIndexExprSkippedAssignments(descriptor)
 	}
-	for _, assignment := range descriptor.assignments {
-		name := strings.TrimSpace(assignment.name)
-		if name == strings.TrimSpace(descriptor.indexExpr) ||
-			qScriptPipelineI64IndexExprDependsOnName(descriptor.valueExpr, name, descriptor.indexExpr, bindings, nil) {
+	for i, assignment := range descriptor.assignments {
+		if i < len(skip) && skip[i] {
 			continue
 		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)

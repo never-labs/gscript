@@ -154,6 +154,37 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		return out, true, true
 	case i64ScalarDyadicArray:
 		return tryBulkI64ScalarDyadicValues(a)
+	case i64RunningSumArray:
+		// Streaming scan producer: one dense prefix-sum pass instead of a
+		// closed-form evaluation per row. Wrapping int64 addition matches the
+		// dense numericSumsInteger path bit-for-bit.
+		out := bulkI64Get(a.source.len)
+		var acc int64
+		value := a.source.start
+		for i := range out {
+			acc += value
+			out[i] = acc
+			value += a.source.step
+		}
+		return out, true, true
+	case i64ScalarDyadicRunningSumArray:
+		// Flatten the dyadic source once, then stream the running sum in a
+		// single dense pass so downstream stages (xbar, gather, reduce)
+		// consume a flat []int64 instead of re-walking the carrier per row.
+		source, sourceOwned, ok := tryBulkI64Values(a.source)
+		if !ok || len(source) < a.source.len {
+			bulkI64Release(source, sourceOwned)
+			return nil, false, false
+		}
+		source = source[:a.source.len]
+		out := bulkI64Get(a.source.len)
+		var acc int64
+		for i, v := range source {
+			acc += v
+			out[i] = acc
+		}
+		bulkI64Release(source, sourceOwned)
+		return out, true, true
 	case i64PeriodicIndexArray:
 		if a.period <= 0 || len(a.residues) == 0 {
 			return nil, false, false
@@ -184,6 +215,25 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		}
 		return out, true, true
 	case indexedArray:
+		// Affine range sources gather in closed form: out[i] = start +
+		// step*index[i], skipping the source materialization pass entirely.
+		if rangeSource, isRange := a.source.(i64RangeArray); isRange {
+			indexes, indexesOwned, ok := tryBulkI64Values(a.indexes)
+			if ok && len(indexes) == a.len {
+				out := bulkI64Get(a.len)
+				for i, index := range indexes {
+					if index < 0 || index >= int64(rangeSource.len) {
+						bulkI64Release(indexes, indexesOwned)
+						bulkI64Release(out, true)
+						return nil, false, false
+					}
+					out[i] = rangeSource.start + rangeSource.step*index
+				}
+				bulkI64Release(indexes, indexesOwned)
+				return out, true, true
+			}
+			bulkI64Release(indexes, indexesOwned)
+		}
 		source, sourceOwned, ok := tryBulkI64Values(a.source)
 		if !ok {
 			return tryBulkI64ValuesGeneric(array)
