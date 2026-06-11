@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "earnings_transcript_contract",
+  "provider_free": true,
+  "inputs": [
+    "raw_transcript",
+    "fiscal_calendar",
+    "normalization_policy"
+  ],
+  "outputs": [
+    "normalized_segments",
+    "transcript_chunks",
+    "clean_skip"
+  ],
+  "required_behaviors": [
+    "speaker_cleaning",
+    "date_correction",
+    "quarter_year_lookup",
+    "segment_provenance",
+    "transcript_chunking",
+    "optional_http_clean_skip"
+  ],
+  "network_policy": {
+    "live_network": false,
+    "optional_http_cleaner": "clean_skip_without_dependency"
+  },
+  "generic_domain_boundary": "The contract models earnings-call transcript normalization for finance workflows and must not hard-code a single vendor, company, or FinRobot example."
+}

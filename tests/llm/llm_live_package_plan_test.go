@@ -82,6 +82,8 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		"equity_analysis_pipeline": "leia-finrobot-equity-analysis-pipeline",
 		"retail_sentiment":         "leia-finrobot-retail-sentiment",
 		"html_ui_snapshots":        "leia-finrobot-html-ui-snapshots",
+		"earnings_transcript":      "leia-finrobot-earnings-transcript",
+		"sec_filings":              "leia-finrobot-sec-filings",
 	}
 	if len(manifest.Packages) != len(wantPackages) {
 		t.Fatalf("packages = %d, want %d", len(manifest.Packages), len(wantPackages))
@@ -184,6 +186,8 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"equity_analysis_pipeline": "finance.pipeline.",
 		"retail_sentiment":         "finance.retail_sentiment.",
 		"html_ui_snapshots":        "ui.",
+		"earnings_transcript":      "finance.earnings_transcript.",
+		"sec_filings":              "finance.document.sec.",
 	}
 	for _, pkg := range manifest.Packages {
 		if len(pkg.Capabilities) < 5 {
@@ -245,6 +249,7 @@ func TestFinRobotLivePackagePlanNoBuiltInGuarantee(t *testing.T) {
 		"leia-finrobot-finance-normalizers",
 		"leia-finrobot-valuation-engine",
 		"leia-finrobot-html-ui-snapshots",
+		"leia-finrobot-earnings-transcript",
 		"leia-finrobot-report-renderer",
 		"leia-finrobot-web-product",
 		"not Leia built-ins",

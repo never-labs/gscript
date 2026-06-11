@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "transcript_chunk_v1",
+  "domain": "earnings_transcript_chunk",
+  "provider_free": true,
+  "required": [
+    "schema",
+    "chunk_id",
+    "symbol",
+    "fiscal_year",
+    "fiscal_quarter",
+    "chunk_index",
+    "segment_ids",
+    "text",
+    "token_estimate",
+    "source_line_start",
+    "source_line_end",
+    "record_hash"
+  ],
+  "canonical_fields": [
+    "overlap_from_previous",
+    "preserve_segment_boundaries",
+    "provenance"
+  ],
+  "deterministic_order": [
+    "symbol",
+    "fiscal_year",
+    "fiscal_quarter",
+    "chunk_index"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason"
+}

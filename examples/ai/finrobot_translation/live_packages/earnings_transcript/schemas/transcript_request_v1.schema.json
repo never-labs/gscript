@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "transcript_request_v1",
+  "domain": "earnings_transcript_request",
+  "provider_free": true,
+  "required": [
+    "schema",
+    "request_id",
+    "symbol",
+    "company_name",
+    "raw_event_date",
+    "fiscal_year",
+    "fiscal_quarter",
+    "source_id"
+  ],
+  "canonical_fields": [
+    "calendar_event_date",
+    "source_date_confidence",
+    "source_format",
+    "normalization_policy_id"
+  ],
+  "deterministic_order": [
+    "symbol",
+    "fiscal_year",
+    "fiscal_quarter",
+    "source_id"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason"
+}

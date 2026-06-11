@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "transcript_segment_v1",
+  "domain": "earnings_transcript_segment",
+  "provider_free": true,
+  "required": [
+    "schema",
+    "segment_id",
+    "symbol",
+    "fiscal_year",
+    "fiscal_quarter",
+    "event_date",
+    "speaker_raw",
+    "speaker_clean",
+    "speaker_role",
+    "text",
+    "source_id",
+    "source_line_start",
+    "source_line_end",
+    "record_hash"
+  ],
+  "canonical_fields": [
+    "date_corrected",
+    "quarter_lookup_source",
+    "transform_notes",
+    "token_estimate"
+  ],
+  "deterministic_order": [
+    "symbol",
+    "fiscal_year",
+    "fiscal_quarter",
+    "source_line_start",
+    "speaker_clean"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason"
+}
