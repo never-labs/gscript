@@ -46,6 +46,31 @@ type genericAIDialectIndexItem struct {
 	} `json:"missing_production_package_boundary"`
 }
 
+type genericAIDialectBackendPlan struct {
+	SchemaVersion int    `json:"schema_version"`
+	ID            string `json:"id"`
+	Scope         struct {
+		ProviderFree                     bool `json:"provider_free"`
+		DomainSpecific                   bool `json:"domain_specific"`
+		ReadOnly                         bool `json:"read_only"`
+		DependsOnQRuntime                bool `json:"depends_on_q_runtime"`
+		FinRobotSpecificSyntaxAssumption bool `json:"finrobot_specific_syntax_assumption"`
+	} `json:"scope"`
+	BackendShapes []genericAIDialectBackendShape `json:"backend_shapes"`
+}
+
+type genericAIDialectBackendShape struct {
+	ShapeID      string   `json:"shape_id"`
+	Status       string   `json:"status"`
+	Capabilities []string `json:"capabilities"`
+	Contract     string   `json:"contract"`
+	Inputs       []string `json:"inputs"`
+	Outputs      []string `json:"outputs"`
+	Example      string   `json:"example"`
+	Test         string   `json:"test"`
+	Fixture      string   `json:"fixture"`
+}
+
 func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 	root := repoRoot(t)
 	index := loadGenericAIDialectIndex(t, root)
@@ -119,6 +144,63 @@ func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 	}
 }
 
+func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
+	root := repoRoot(t)
+	index := loadGenericAIDialectIndex(t, root)
+	plan := loadGenericAIDialectBackendPlan(t, root)
+
+	if plan.SchemaVersion != 1 || plan.ID != "generic-ai-dialect-backend-plan" {
+		t.Fatalf("unexpected backend plan header: %#v", plan)
+	}
+	if !plan.Scope.ProviderFree ||
+		plan.Scope.DomainSpecific ||
+		!plan.Scope.ReadOnly ||
+		plan.Scope.DependsOnQRuntime ||
+		plan.Scope.FinRobotSpecificSyntaxAssumption {
+		t.Fatalf("backend plan scope is not provider-free and generic: %#v", plan.Scope)
+	}
+
+	requiredCapabilities := map[string]bool{}
+	for _, capability := range index.RequiredCapabilities {
+		requiredCapabilities[capability] = false
+	}
+	seenShapes := map[string]bool{}
+	for _, shape := range plan.BackendShapes {
+		shape := shape
+		t.Run(shape.ShapeID, func(t *testing.T) {
+			if shape.ShapeID == "" || seenShapes[shape.ShapeID] {
+				t.Fatalf("invalid or duplicate backend shape id %q", shape.ShapeID)
+			}
+			seenShapes[shape.ShapeID] = true
+			if shape.Status != "planned" {
+				t.Fatalf("%s has unexpected status %q", shape.ShapeID, shape.Status)
+			}
+			if shape.Contract == "" || len(shape.Inputs) == 0 || len(shape.Outputs) == 0 || len(shape.Capabilities) == 0 {
+				t.Fatalf("%s has incomplete contract surface: %#v", shape.ShapeID, shape)
+			}
+			for _, capability := range shape.Capabilities {
+				if _, ok := requiredCapabilities[capability]; !ok {
+					t.Fatalf("%s references unknown capability %q", shape.ShapeID, capability)
+				}
+				requiredCapabilities[capability] = true
+			}
+			assertGenericAIDialectReference(t, root, shape.Example, true)
+			assertGenericAIDialectReference(t, root, shape.Test, true)
+			assertGenericAIDialectReference(t, root, shape.Fixture, true)
+			assertGenericAIDialectFixtureProviderFree(t, root, shape.Fixture)
+			assertGenericAIDialectBackendShapeGeneric(t, shape)
+		})
+	}
+	if len(seenShapes) < 8 {
+		t.Fatalf("backend plan is too narrow: got %d shapes", len(seenShapes))
+	}
+	for capability, covered := range requiredCapabilities {
+		if !covered {
+			t.Fatalf("required capability %q is not covered by backend plan", capability)
+		}
+	}
+}
+
 func loadGenericAIDialectIndex(t *testing.T, root string) genericAIDialectIndex {
 	t.Helper()
 	path := filepath.Join(root, "examples", "ai", "finrobot_translation", "ai_dialect_index", "index.json")
@@ -131,6 +213,20 @@ func loadGenericAIDialectIndex(t *testing.T, root string) genericAIDialectIndex 
 		t.Fatalf("%s: %v", path, err)
 	}
 	return index
+}
+
+func loadGenericAIDialectBackendPlan(t *testing.T, root string) genericAIDialectBackendPlan {
+	t.Helper()
+	path := filepath.Join(root, "examples", "ai", "finrobot_translation", "ai_dialect_index", "backend_plan.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan genericAIDialectBackendPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	return plan
 }
 
 func assertGenericAIDialectReference(t *testing.T, root, rel string, scanForQRuntime bool) {
@@ -196,6 +292,26 @@ func assertGenericAIDialectNoFinRobotSyntaxAssumption(t *testing.T, entry generi
 		for _, forbidden := range []string{"finrobot.", "finrobot_", "autogen", "openbb", "fingpt"} {
 			if strings.Contains(lower, forbidden) {
 				t.Fatalf("%s contains FinRobot-specific syntax assumption %q in %q", entry.Capability, forbidden, value)
+			}
+		}
+	}
+}
+
+func assertGenericAIDialectBackendShapeGeneric(t *testing.T, shape genericAIDialectBackendShape) {
+	t.Helper()
+	values := []string{
+		shape.ShapeID,
+		shape.Status,
+		shape.Contract,
+		strings.Join(shape.Capabilities, " "),
+		strings.Join(shape.Inputs, " "),
+		strings.Join(shape.Outputs, " "),
+	}
+	for _, value := range values {
+		lower := strings.ToLower(value)
+		for _, forbidden := range []string{"finrobot.", "finrobot_", "autogen", "openbb", "fingpt"} {
+			if strings.Contains(lower, forbidden) {
+				t.Fatalf("%s contains FinRobot-specific backend assumption %q in %q", shape.ShapeID, forbidden, value)
 			}
 		}
 	}
