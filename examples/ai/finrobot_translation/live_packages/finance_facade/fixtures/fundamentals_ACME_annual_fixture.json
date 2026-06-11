@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "table_id": "fundamental_table",
+  "dataset": "annual_fundamentals",
+  "symbol": "ACME",
+  "typed_columns": {
+    "symbol": "string",
+    "metric": "string",
+    "period": "fiscal_year",
+    "value": "float64",
+    "unit": "string",
+    "currency": "string",
+    "source_ref": "string"
+  },
+  "rows": [
+    {
+      "symbol": "ACME",
+      "metric": "revenue",
+      "period": "FY2025",
+      "value": 12840000000,
+      "unit": "currency",
+      "currency": "USD",
+      "source_ref": "prov:fundamentals:fmp:ACME:FY2025:revenue"
+    },
+    {
+      "symbol": "ACME",
+      "metric": "gross_margin",
+      "period": "FY2025",
+      "value": 0.417,
+      "unit": "ratio",
+      "currency": "USD",
+      "source_ref": "prov:fundamentals:fmp:ACME:FY2025:gross_margin"
+    },
+    {
+      "symbol": "ACME",
+      "metric": "free_cash_flow",
+      "period": "FY2025",
+      "value": 1420000000,
+      "unit": "currency",
+      "currency": "USD",
+      "source_ref": "prov:fundamentals:fmp:ACME:FY2025:free_cash_flow"
+    }
+  ],
+  "provenance": {
+    "provider": "fmp",
+    "fixture_key": "fundamentals:ACME:fmp:offline",
+    "captured_at": "2026-06-11T23:45:00Z",
+    "source_schema": "fmp.key_metrics.v1",
+    "source_url_redacted": true,
+    "stale_after_days": 30,
+    "replay_ready": true
+  }
+}

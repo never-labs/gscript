@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "ok": false,
+  "error_code": "RATE_LIMITED",
+  "provider": "yfinance",
+  "retryable": true,
+  "retry_after_seconds": 60,
+  "fallback_attempted": [
+    "yfinance",
+    "fmp"
+  ],
+  "message": "Offline fixture representing a provider rate-limit response; no live request was made.",
+  "provenance": {
+    "provider": "yfinance",
+    "fixture_key": "error:yfinance:rate_limited:offline",
+    "captured_at": "2026-06-11T23:45:00Z",
+    "source_schema": "finance_facade.error_envelope.v1",
+    "source_url_redacted": true,
+    "stale_after_days": 0,
+    "replay_ready": true
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/finance_facade/provider_fallback_v1.schema.json",
+  "title": "FinRobot Finance Facade Provider Fallback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "fallback_order"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "fallback_order": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "capability",
+          "fixture_key",
+          "live_network",
+          "dependency_imported",
+          "credential_required",
+          "clean_skip"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "fixture_key": {
+            "type": "string"
+          },
+          "live_network": {
+            "const": false
+          },
+          "dependency_imported": {
+            "const": false
+          },
+          "credential_required": {
+            "const": false
+          },
+          "clean_skip": {
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}

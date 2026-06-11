@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "market_data:ACME:yfinance:offline",
+      "capability": "finance.facade.market_data.fetch",
+      "path": "fixtures/market_data_ACME_daily_fixture.json",
+      "schema": "schemas/market_data_table_v1.schema.json",
+      "metadata": {
+        "provider": "yfinance",
+        "dataset": "daily_prices",
+        "replay_ready": true,
+        "cache_key": "yfinance:ACME:daily_prices:2026-06-11",
+        "stale_after_days": 7
+      }
+    },
+    {
+      "fixture_key": "fundamentals:ACME:fmp:offline",
+      "capability": "finance.facade.fundamentals.fetch",
+      "path": "fixtures/fundamentals_ACME_annual_fixture.json",
+      "schema": "schemas/fundamental_table_v1.schema.json",
+      "metadata": {
+        "provider": "fmp",
+        "dataset": "annual_fundamentals",
+        "replay_ready": true,
+        "cache_key": "fmp:ACME:annual_fundamentals:FY2025",
+        "stale_after_days": 30
+      }
+    },
+    {
+      "fixture_key": "error:yfinance:rate_limited:offline",
+      "capability": "finance.facade.error.envelope",
+      "path": "fixtures/error_envelope_yfinance_rate_limit_fixture.json",
+      "schema": "schemas/error_envelope_v1.schema.json",
+      "metadata": {
+        "provider": "yfinance",
+        "dataset": "daily_prices",
+        "replay_ready": true,
+        "retryable": true,
+        "fallback_contract": "contracts/provider_fallback_contract.json"
+      }
+    }
+  ]
+}

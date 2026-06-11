@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 32,
-  "translation_directory_file_count": 141,
+  "registered_examples_count": 33,
+  "translation_directory_file_count": 153,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -83,6 +83,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/vendor_adapters/main.leia",
       "covers_package_ids": [
         "vendor_adapters"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "finance_facade",
+      "directory": "examples/ai/finrobot_translation/live_packages/finance_facade",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/finance_facade/main.leia",
+      "covers_package_ids": [
+        "finance_facade"
       ],
       "status": "checked_in_registered_example"
     }
@@ -363,6 +372,34 @@
         "contract tests run with live_network=false and assert no required credentials",
         "fixture tests validate relevance, category, sentiment, impact, source ranking, and retail sentiment snapshots",
         "adapter boundary tests keep Polymarket, X, and Reddit metadata-only until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "finance_facade",
+      "package_name": "leia-finrobot-finance-facade",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/finance_facade",
+      "planned_directory": "packages/finrobot/finance_facade",
+      "manifest": "packages/finrobot/finance_facade/package.manifest.json",
+      "contract": "packages/finrobot/finance_facade/contracts/finance_facade_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/data_tools.leia",
+      "capabilities": [
+        "finance.facade.market_data.fetch",
+        "finance.facade.market_data.table",
+        "finance.facade.fundamentals.fetch",
+        "finance.facade.provider.fallback",
+        "finance.facade.cache.read_through",
+        "finance.facade.retry.backoff",
+        "finance.facade.rate_limit.apply",
+        "finance.facade.provenance.attach",
+        "finance.facade.error.envelope"
+      ],
+      "test_gates": [
+        "finance facade manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert provider fallback order remains fixture-only",
+        "fixture tests validate market data and fundamental typed table schemas with provenance",
+        "error envelope, cache, retry, and rate-limit metadata stay provider-free until live packages are explicitly enabled"
       ],
       "no_built_in_guarantee": true
     }

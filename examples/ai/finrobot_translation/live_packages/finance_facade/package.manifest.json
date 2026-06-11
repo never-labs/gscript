@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-finance-facade-live-package",
+  "package_name": "leia-finrobot-finance-facade",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot finance_data.py and market_data facade contracts.",
+  "source_modules": [
+    "finrobot/data_source/finance_data.py",
+    "finrobot/data_source/market_data.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; yfinance, FMP, Finnhub, SEC, and OpenBB credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_finance_facade_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "finance_facade_contract": "contracts/finance_facade_contract.json",
+    "provider_fallback_contract": "contracts/provider_fallback_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "market_data_table": "schemas/market_data_table_v1.schema.json",
+    "fundamental_table": "schemas/fundamental_table_v1.schema.json",
+    "provider_fallback": "schemas/provider_fallback_v1.schema.json",
+    "error_envelope": "schemas/error_envelope_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "market_data_table": "fixtures/market_data_ACME_daily_fixture.json",
+    "fundamental_table": "fixtures/fundamentals_ACME_annual_fixture.json",
+    "error_envelope": "fixtures/error_envelope_yfinance_rate_limit_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "finance_data",
+      "source_module": "finrobot/data_source/finance_data.py",
+      "capabilities": [
+        "finance.facade.profile.fetch",
+        "finance.facade.fundamentals.fetch",
+        "finance.facade.financials.fetch",
+        "finance.facade.provenance.attach",
+        "finance.facade.error.envelope"
+      ],
+      "output_schemas": [
+        "fundamental_table",
+        "error_envelope"
+      ]
+    },
+    {
+      "id": "market_data",
+      "source_module": "finrobot/data_source/market_data.py",
+      "capabilities": [
+        "finance.facade.market_data.fetch",
+        "finance.facade.market_data.table",
+        "finance.facade.provider.fallback",
+        "finance.facade.cache.read_through",
+        "finance.facade.rate_limit.apply",
+        "finance.facade.retry.backoff"
+      ],
+      "output_schemas": [
+        "market_data_table",
+        "provider_fallback",
+        "error_envelope"
+      ]
+    }
+  ],
+  "provider_fallback_order": [
+    {
+      "id": "yfinance",
+      "capability": "finance.facade.provider.yfinance",
+      "fixture_key": "market_data:ACME:yfinance:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "fmp",
+      "capability": "finance.facade.provider.fmp",
+      "fixture_key": "fundamentals:ACME:fmp:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "finnhub",
+      "capability": "finance.facade.provider.finnhub",
+      "fixture_key": "profile:ACME:finnhub:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "sec",
+      "capability": "finance.facade.provider.sec",
+      "fixture_key": "filing:ACME:sec:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "openbb",
+      "capability": "finance.facade.provider.openbb",
+      "fixture_key": "market_data:ACME:openbb:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "cache_policy": {
+    "enabled": true,
+    "mode": "fixture_read_through",
+    "key_fields": [
+      "provider",
+      "symbol",
+      "dataset",
+      "period",
+      "as_of"
+    ],
+    "ttl_seconds": 86400,
+    "stale_after_days": 7,
+    "live_network": false
+  },
+  "retry_policy": {
+    "enabled": true,
+    "max_attempts": 3,
+    "backoff": "exponential_jitter",
+    "base_delay_ms": 250,
+    "retryable_error_codes": [
+      "RATE_LIMITED",
+      "TEMPORARY_UNAVAILABLE",
+      "PROVIDER_TIMEOUT"
+    ],
+    "live_network": false
+  },
+  "rate_limit_policy": {
+    "enabled": true,
+    "window_seconds": 60,
+    "limit": 30,
+    "burst": 5,
+    "on_limit": "return_error_envelope",
+    "live_network": false
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider fallback order covers yfinance, FMP, Finnhub, SEC, and OpenBB with live_network_default=false",
+    "typed table fixtures validate market data and fundamental rows with schema, currency, units, period, and provenance",
+    "cache, retry, rate-limit, provenance, and error envelope contracts are fixture-backed and provider-free",
+    "finance_data.py and market_data.py facade boundaries clean-skip without importing live provider SDKs"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot finance_data or market_data live provider facades as built-ins; future external packages must satisfy these provider-free contracts before enabling live network access."
+  }
+}
