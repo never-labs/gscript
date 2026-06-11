@@ -220,6 +220,26 @@ func observeTier2NativeCalleeArgShapes(proto *vm.FuncProto, regs []runtime.Value
 }
 
 func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto) (runtime.Value, error) {
+	// This resume loop re-enters native code while reusing the caller's
+	// ExecContext. In alternate-stack mode it acquires its own JIT stack
+	// (each jit.CallJIT* here is a complete native execution, so the callee
+	// can run on a different stack than its suspended caller did) and keeps
+	// ctx.JITStackHdr/HelperCF pointing at THIS loop's stack and callee.
+	// Otherwise the header is hidden for the duration: direct-call sites
+	// CBZ on it and take the generic op-exit, because SP is then on the
+	// goroutine stack where direct BLR helper calls are invalid.
+	savedHdr, savedHelperCF := ctx.JITStackHdr, ctx.HelperCF
+	var altStk *jit.JITStack
+	if tier2AltStackEnabled() {
+		altStk = acquireTier2AltStack()
+	}
+	if altStk != nil {
+		ctx.JITStackHdr = altStk.Hdr()
+		defer releaseTier2AltStack(altStk)
+	} else {
+		ctx.JITStackHdr = 0
+	}
+	defer func() { ctx.JITStackHdr, ctx.HelperCF = savedHdr, savedHelperCF }()
 	tm.recordTier2NativeCalleeExit(proto, cf, ctx)
 	observeTier2NativeCalleeArgShapes(proto, regs, base)
 	codePtr := uintptr(0)
@@ -265,6 +285,14 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 			return runtime.NilValue(), fmt.Errorf("callee global-exit: no resume for %d", ctx.GlobalExitID)
 		}
 		codePtr = uintptr(cf.Code.Ptr()) + uintptr(resumeOff)
+	case ExitQEvalHelperErr:
+		err := ctx.HelperErr
+		ctx.HelperErr = nil
+		ctx.HelperErrFlag = 0
+		if err == nil {
+			err = fmt.Errorf("missing helper error")
+		}
+		return runtime.NilValue(), fmt.Errorf("callee op-exit: %w", err)
 	case ExitOpExit:
 		handlerMark := tm.tier2PerfStart()
 		err := tm.executeOpExit(ctx, regs, base, proto)
@@ -340,7 +368,14 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 
 	for {
 		nativeMark := tm.tier2PerfStart()
-		jit.CallJIT(codePtr, uintptr(unsafe.Pointer(ctx)))
+		if altStk != nil {
+			// cf can be switched mid-loop by refreshCallee; keep the
+			// helper-bridge target in sync with the code being entered.
+			ctx.HelperCF = uintptr(unsafe.Pointer(cf))
+			jit.CallJITOnStack(codePtr, uintptr(unsafe.Pointer(ctx)), altStk)
+		} else {
+			jit.CallJIT(codePtr, uintptr(unsafe.Pointer(ctx)))
+		}
 		tm.tier2PerfStop(perfTier2NativeExecution, nativeMark)
 		switch ctx.ExitCode {
 		case ExitNormal:
@@ -380,6 +415,14 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 			ctx.ExitCode = 0
 			ctx.ResumeNumericPass = 0
 			tm.tier2PerfStop(perfTier2ExitResume, resumeMark)
+		case ExitQEvalHelperErr:
+			err := ctx.HelperErr
+			ctx.HelperErr = nil
+			ctx.HelperErrFlag = 0
+			if err == nil {
+				err = fmt.Errorf("missing helper error")
+			}
+			return runtime.NilValue(), fmt.Errorf("callee op-exit: %w", err)
 		case ExitOpExit:
 			handlerMark := tm.tier2PerfStart()
 			err := tm.executeOpExit(ctx, currentRegs, base, proto)

@@ -199,6 +199,23 @@ type ExecContext struct {
 	// Dynamic table cache fields are kept at the end so existing ExecContext
 	// offsets remain stable for code-size guard tests.
 	BaselineTableStringKeyCache uintptr // pointer to proto.TableStringKeyCache[0] (nil if not yet allocated)
+
+	// JIT alternate-stack direct Go-helper call fields (R5-K prototype,
+	// LEIA_JIT_ALT_STACK=1). Appended at the end to keep all existing
+	// offsets stable.
+	//
+	// JITStackHdr is the header address of the JIT alternate stack the
+	// current native execution runs on, or 0 when native code runs on the
+	// goroutine stack (legacy trampoline). Direct-call sites CBZ on it and
+	// fall back to the generic op-exit when zero.
+	JITStackHdr uintptr
+	// HelperCF is the *CompiledFunction executing, for the helper bridge.
+	HelperCF uintptr
+	// HelperErrFlag is set non-zero by the helper bridge when the helper
+	// returned an error; emitted code then exits with ExitQEvalHelperErr.
+	HelperErrFlag int64
+	// HelperErr carries the helper error for ExitQEvalHelperErr.
+	HelperErr error
 }
 
 // callExitDescriptor names the shared CALL exit protocol fields stored in
@@ -362,6 +379,9 @@ var (
 	execCtxOffCoroutineNativeResumes = int(unsafe.Offsetof(ExecContext{}.CoroutineNativeResumes))
 	execCtxOffCoroutineNativeYields  = int(unsafe.Offsetof(ExecContext{}.CoroutineNativeYields))
 	execCtxOffCoroutineNativeMisses  = int(unsafe.Offsetof(ExecContext{}.CoroutineNativeMisses))
+	// JIT alternate-stack direct helper call offsets
+	execCtxOffJITStackHdr   = int(unsafe.Offsetof(ExecContext{}.JITStackHdr))
+	execCtxOffHelperErrFlag = int(unsafe.Offsetof(ExecContext{}.HelperErrFlag))
 )
 
 var (
