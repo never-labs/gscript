@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "id": "leia-analytics-report-live-package",
+  "package": {
+    "name": "leia-analytics-report",
+    "version": "0.1.0",
+    "description": "Provider-free live package skeleton for generic analytics reports"
+  },
+  "source_mode": "fixture-contract",
+  "target_mode": "live-package-skeleton",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in finance providers, valuation formulas, chart renderers, HTML renderers, or PDF renderers; this package declares those surfaces as external capabilities behind provider-free gates."
+  },
+  "capabilities": [
+    "finance.normalize.price_series",
+    "finance.normalize.fundamentals",
+    "finance.normalize.provenance",
+    "analytics.valuation.dcf",
+    "analytics.valuation.peer_multiple",
+    "analytics.valuation.target_price",
+    "analytics.sensitivity.matrix",
+    "artifact.chart.spec",
+    "artifact.report.manifest",
+    "renderer.html.contract",
+    "renderer.pdf.contract"
+  ],
+  "entrypoints": {
+    "example": "analytics_report.leia",
+    "schema": "package.schema.json"
+  },
+  "contracts": {
+    "normalizer": "schemas.finance_normalizer",
+    "valuation": "schemas.valuation_result",
+    "sensitivity": "schemas.sensitivity_matrix",
+    "chart_artifact": "schemas.chart_artifact",
+    "report_artifact": "schemas.report_artifact",
+    "renderer": "schemas.renderer_contract"
+  },
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "blocked_imports": [
+      "yfinance",
+      "finnhub",
+      "fredapi",
+      "openbb",
+      "sec_api",
+      "plotly",
+      "playwright",
+      "wkhtmltopdf"
+    ],
+    "test_rule": "package tests must pass with no credentials, no provider SDK imports, and no network I/O"
+  },
+  "artifact_contracts": {
+    "chart_kinds": [
+      "line",
+      "bar",
+      "sensitivity_heatmap"
+    ],
+    "report_formats": [
+      "text/html",
+      "application/pdf"
+    ],
+    "render_statuses": [
+      "specified_not_rendered",
+      "planned_not_rendered",
+      "rendered_by_external_package"
+    ],
+    "required_markers": [
+      "source_annotations",
+      "stale_data_warnings",
+      "ai_disclosure",
+      "renderer_contract",
+      "provider_free"
+    ]
+  },
+  "test_gates": [
+    "manifest and schema files are valid JSON and schema_version 1",
+    "provider_free is true and live_network_default is false",
+    "no provider credentials or provider SDKs are required for tests",
+    "Leia fixture execution validates finance normalizers, valuation analytics, sensitivity matrix, chart specs, report manifest, and HTML/PDF renderer contracts",
+    "artifact contracts declare planned HTML and PDF outputs without invoking a renderer"
+  ]
+}

@@ -1,0 +1,372 @@
+// Generic provider-free analytics report live package skeleton.
+// This is a Leia package example, not a finance provider client or renderer.
+
+func near(a, b, eps) {
+    return math.abs(a - b) <= eps
+}
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+package_manifest := {
+    name: "leia-analytics-report",
+    version: "0.1.0",
+    provider_free: true,
+    live_network_default: false,
+    real_dependency_import_default: false,
+    capabilities: {
+        "finance.normalize.price_series",
+        "finance.normalize.fundamentals",
+        "analytics.valuation.dcf",
+        "analytics.valuation.peer_multiple",
+        "analytics.valuation.target_price",
+        "analytics.sensitivity.matrix",
+        "artifact.chart.spec",
+        "artifact.report.manifest",
+        "renderer.html.contract",
+        "renderer.pdf.contract",
+    },
+}
+
+finance_normalizer_contract := {
+    schemas: {
+        price_bar_v1: {
+            required: {"schema", "symbol", "period", "currency", "open", "high", "low", "close", "volume", "source_id", "captured_at", "stale_after"},
+        },
+        fundamental_metric_v1: {
+            required: {"schema", "symbol", "period", "currency", "revenue", "ebitda", "free_cash_flow", "diluted_shares", "source_id", "captured_at", "stale_after"},
+        },
+    },
+}
+
+normalized_rows := {
+    {
+        schema: "price_bar_v1",
+        symbol: "ACME",
+        period: "2026-03-31",
+        currency: "USD",
+        open: 48.20,
+        high: 51.00,
+        low: 47.90,
+        close: 50.00,
+        volume: 1200000,
+        source_id: "fixture.price.acme.2026q1",
+        captured_at: "2026-06-11T00:00:00Z",
+        stale_after: "2026-06-30",
+    },
+    {
+        schema: "fundamental_metric_v1",
+        symbol: "ACME",
+        period: "2026E",
+        currency: "USD",
+        revenue: 640.0,
+        ebitda: 160.0,
+        free_cash_flow: 72.0,
+        diluted_shares: 20.0,
+        source_id: "fixture.fundamentals.acme.2026e",
+        captured_at: "2026-06-11T00:00:00Z",
+        stale_after: "2026-09-30",
+    },
+}
+
+func normalizer_schema(name) {
+    return finance_normalizer_contract.schemas[name]
+}
+
+func validate_required_fields(row, schema) {
+    for i := 1; i <= #schema.required; i++ {
+        field := schema.required[i]
+        if row[field] == nil {
+            return false, field
+        }
+    }
+    return true, nil
+}
+
+func validate_normalized_row(row) {
+    schema := normalizer_schema(row.schema)
+    if schema == nil {
+        return false, "unknown_schema"
+    }
+    return validate_required_fields(row, schema)
+}
+
+normalizers_ok := true
+normalizer_error := nil
+for i := 1; i <= #normalized_rows; i++ {
+    row_ok, row_error := validate_normalized_row(normalized_rows[i])
+    if !row_ok {
+        normalizers_ok = false
+        normalizer_error = row_error
+    }
+}
+
+valuation_assumptions := {
+    symbol: "ACME",
+    valuation_date: "2026-06-11",
+    currency: "USD",
+    current_price: normalized_rows[1].close,
+    net_debt: 120.0,
+    diluted_shares: normalized_rows[2].diluted_shares,
+    discount_rate: 0.10,
+    terminal_growth: 0.03,
+    peer_ebitda_multiple: 9.0,
+}
+
+cash_flows := {
+    {period: "2026E", free_cash_flow: 72.0, discount_factor: 1.10},
+    {period: "2027E", free_cash_flow: 78.0, discount_factor: 1.21},
+    {period: "2028E", free_cash_flow: 84.0, discount_factor: 1.331},
+}
+
+func sum_discounted_cash_flows(rows) {
+    total := 0.0
+    for i := 1; i <= #rows; i++ {
+        total = total + rows[i].free_cash_flow / rows[i].discount_factor
+    }
+    return total
+}
+
+pv_cash_flows := sum_discounted_cash_flows(cash_flows)
+terminal_value := cash_flows[3].free_cash_flow * (1 + valuation_assumptions.terminal_growth) / (valuation_assumptions.discount_rate - valuation_assumptions.terminal_growth)
+dcf_enterprise_value := pv_cash_flows + terminal_value / cash_flows[3].discount_factor
+dcf_equity_value := dcf_enterprise_value - valuation_assumptions.net_debt
+dcf_price := dcf_equity_value / valuation_assumptions.diluted_shares
+
+peer_enterprise_value := normalized_rows[2].ebitda * valuation_assumptions.peer_ebitda_multiple
+peer_equity_value := peer_enterprise_value - valuation_assumptions.net_debt
+peer_price := peer_equity_value / valuation_assumptions.diluted_shares
+target_price := dcf_price * 0.60 + peer_price * 0.40
+upside := target_price / valuation_assumptions.current_price - 1
+
+valuation_results := {
+    {
+        method: "dcf",
+        symbol: "ACME",
+        valuation_date: valuation_assumptions.valuation_date,
+        currency: valuation_assumptions.currency,
+        price: dcf_price,
+        assumptions: {"discount_rate", "terminal_growth", "cash_flows"},
+        source_refs: {normalized_rows[2].source_id},
+    },
+    {
+        method: "peer_multiple",
+        symbol: "ACME",
+        valuation_date: valuation_assumptions.valuation_date,
+        currency: valuation_assumptions.currency,
+        price: peer_price,
+        assumptions: {"peer_ebitda_multiple", "forward_ebitda"},
+        source_refs: {normalized_rows[2].source_id},
+    },
+    {
+        method: "target_price",
+        symbol: "ACME",
+        valuation_date: valuation_assumptions.valuation_date,
+        currency: valuation_assumptions.currency,
+        price: target_price,
+        assumptions: {"dcf_weight", "peer_weight"},
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+    },
+}
+
+discount_rate_cases := {0.09, 0.10, 0.11}
+growth_cases := {0.02, 0.03, 0.04}
+sensitivity_values := matrix.dense(#discount_rate_cases, #growth_cases)
+sensitivity_cells := {}
+
+for i := 1; i <= #discount_rate_cases; i++ {
+    for j := 1; j <= #growth_cases; j++ {
+        case_terminal_value := cash_flows[3].free_cash_flow * (1 + growth_cases[j]) / (discount_rate_cases[i] - growth_cases[j])
+        case_enterprise_value := pv_cash_flows + case_terminal_value / cash_flows[3].discount_factor
+        case_price := (case_enterprise_value - valuation_assumptions.net_debt) / valuation_assumptions.diluted_shares
+        matrix.setf(sensitivity_values, i - 1, j - 1, case_price)
+        sensitivity_cells[#sensitivity_cells + 1] = {
+            discount_rate: discount_rate_cases[i],
+            terminal_growth: growth_cases[j],
+            price: case_price,
+        }
+    }
+}
+
+best_case := sensitivity_cells[1]
+worst_case := sensitivity_cells[1]
+for i := 2; i <= #sensitivity_cells; i++ {
+    if sensitivity_cells[i].price > best_case.price {
+        best_case = sensitivity_cells[i]
+    }
+    if sensitivity_cells[i].price < worst_case.price {
+        worst_case = sensitivity_cells[i]
+    }
+}
+
+sensitivity_result := {
+    base_case: matrix.getf(sensitivity_values, 1, 1),
+    row_axis: "discount_rate",
+    column_axis: "terminal_growth",
+    cells: sensitivity_cells,
+    best_case: best_case,
+    worst_case: worst_case,
+}
+
+artifact_contract := llm.report_artifact_contract({
+    name: "leia_analytics_report_artifact_contract",
+    version: "analytics-report-v1",
+})
+
+source_annotations := {
+    {
+        id: normalized_rows[1].source_id,
+        title: "ACME price fixture",
+        kind: "fixture",
+        locator: "live_packages/analytics_report/analytics_report.leia",
+        as_of: "2026-03-31",
+        stale_after: "2026-06-30",
+        stale: true,
+        license: "fixture",
+        retrieved_at: "2026-06-11T00:00:00Z",
+        evidence_hash: "sha256:analytics-price-fixture",
+    },
+    {
+        id: normalized_rows[2].source_id,
+        title: "ACME fundamentals fixture",
+        kind: "fixture",
+        locator: "live_packages/analytics_report/analytics_report.leia",
+        as_of: "2026-03-31",
+        stale_after: "2026-09-30",
+        stale: false,
+        license: "fixture",
+        retrieved_at: "2026-06-11T00:00:00Z",
+        evidence_hash: "sha256:analytics-fundamentals-fixture",
+    },
+}
+
+chart_specs := {
+    {
+        id: "chart_target_price",
+        title: "Target Price Bridge",
+        section_id: "valuation",
+        kind: "bar",
+        renderer: "external.chart.renderer",
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+        x: "method",
+        series: {"price"},
+        artifact: {
+            id: "artifact_chart_target_price",
+            kind: "image/png",
+            path: "output/acme/target_price.png",
+            status: "specified_not_rendered",
+        },
+    },
+    {
+        id: "chart_sensitivity",
+        title: "Sensitivity Matrix",
+        section_id: "sensitivity",
+        kind: "sensitivity_heatmap",
+        renderer: "external.chart.renderer",
+        source_refs: {normalized_rows[2].source_id},
+        x: "terminal_growth",
+        series: {"discount_rate"},
+        artifact: {
+            id: "artifact_chart_sensitivity",
+            kind: "image/png",
+            path: "output/acme/sensitivity.png",
+            status: "specified_not_rendered",
+        },
+    },
+}
+
+report_sections := {
+    {
+        id: "valuation",
+        title: "Valuation",
+        order: 1,
+        required: true,
+        content: "Fixture-backed DCF and peer multiple valuation.",
+        chart_refs: {"chart_target_price"},
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+        ai_disclosure: true,
+        disclosure_ref: "ai_disclosure",
+    },
+    {
+        id: "sensitivity",
+        title: "Sensitivity",
+        order: 2,
+        required: true,
+        content: "Fixture-backed discount-rate and terminal-growth sensitivity matrix.",
+        chart_refs: {"chart_sensitivity"},
+        source_refs: {normalized_rows[2].source_id},
+        ai_disclosure: true,
+        disclosure_ref: "ai_disclosure",
+    },
+}
+
+html_renderer_contract := {
+    id: "renderer_html_v1",
+    format: "text/html",
+    input_schema: "artifact_manifest",
+    output_artifact: "artifact_html_report",
+    network_required: false,
+    external_dependency_required: true,
+    status: "planned_not_rendered",
+}
+
+pdf_renderer_contract := {
+    id: "renderer_pdf_v1",
+    format: "application/pdf",
+    input_schema: "artifact_manifest",
+    output_artifact: "artifact_pdf_report",
+    network_required: false,
+    external_dependency_required: true,
+    status: "planned_not_rendered",
+}
+
+artifact_manifest := {
+    contract: artifact_contract.version,
+    report_id: "ACME_2026_06_11_analytics_report",
+    generated_at: "2026-06-11T00:00:00Z",
+    report_sections: {"valuation", "sensitivity"},
+    chart_specs: {"chart_target_price", "chart_sensitivity"},
+    artifacts: {
+        {id: "artifact_html_report", kind: "text/html", path: "output/acme/analytics_report.html", status: "planned_not_rendered"},
+        {id: "artifact_pdf_report", kind: "application/pdf", path: "output/acme/analytics_report.pdf", status: "planned_not_rendered"},
+        chart_specs[1].artifact,
+        chart_specs[2].artifact,
+    },
+    source_annotations: source_annotations,
+    warnings: {"stale_data_warning: price fixture is stale after 2026-06-30"},
+    ai_disclosure: "AI_DISCLOSURE: AI-assisted, fixture-backed, and not investment advice.",
+}
+
+section_ok, section_msg := llm.validate_output(report_sections[1], artifact_contract.schemas.report_section)
+chart_ok, chart_msg := llm.validate_output(chart_specs[1], artifact_contract.schemas.chart_spec)
+source_ok, source_msg := llm.validate_output(source_annotations[1], artifact_contract.schemas.source_annotation)
+manifest_ok, manifest_msg := llm.validate_output(artifact_manifest, artifact_contract.schemas.artifact_manifest)
+
+renderer_contracts := {html_renderer_contract, pdf_renderer_contract}
+
+check("provider-free manifest", package_manifest.provider_free == true && package_manifest.live_network_default == false && package_manifest.real_dependency_import_default == false)
+check("normalizers", normalizers_ok == true && normalizer_error == nil && #normalized_rows == 2)
+check("valuation", #valuation_results == 3 && near(dcf_price, 50.0826, 0.0001) && near(peer_price, 66.0, 0.0001) && near(target_price, 56.4496, 0.0001))
+check("upside", near(upside, 0.128992, 0.0001))
+check("sensitivity", #sensitivity_result.cells == 9 && near(sensitivity_result.base_case, dcf_price, 0.0001) && best_case.price > worst_case.price)
+check("artifact contract", section_ok == true && chart_ok == true && source_ok == true && manifest_ok == true)
+check("renderer contracts", renderer_contracts[1].format == "text/html" && renderer_contracts[2].format == "application/pdf" && renderer_contracts[1].network_required == false && renderer_contracts[2].network_required == false)
+check("planned artifacts", artifact_manifest.artifacts[1].status == "planned_not_rendered" && artifact_manifest.artifacts[2].status == "planned_not_rendered")
+
+analytics_report_live_package_summary := string.format(
+    "analytics_report_live_package provider_free=%s normalizers=%d valuations=%d sensitivity=%dx%d charts=%d artifacts=%d html=%s pdf=%s",
+    tostring(package_manifest.provider_free),
+    #normalized_rows,
+    #valuation_results,
+    #discount_rate_cases,
+    #growth_cases,
+    #chart_specs,
+    #artifact_manifest.artifacts,
+    renderer_contracts[1].format,
+    renderer_contracts[2].format
+)
+
+print(analytics_report_live_package_summary)
