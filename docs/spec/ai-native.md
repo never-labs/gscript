@@ -203,12 +203,32 @@ answer := agent {
 result, err := answer("How do I restart search?")
 ```
 
+As a shorthand for common prompt capsules, `agent { ... }` may omit `config`
+and provide request fields directly:
+
+```text
+answer := agent {
+    name: "answer"
+    params: {"question"}
+    model: "fast"
+    instructions: prompt { role: "system", text: "Use tool evidence." }
+    tools: {search_runbook}
+    output: {answer: "short"}
+}
+```
+
+The shorthand lowers to a generated config function passed to `llm.agent`.
+When `messages` is absent, the first call argument is used as `user`.
+`instructions` is copied to `system` unless `system` is already present.
+Prompt field blocks that contain `role` and `text` are valid message tables and
+can be placed directly in `messages`.
+
 The required fields are:
 
 | Field | Meaning |
 |---|---|
 | `name` | Runtime and provider-visible agent name. |
-| `config` or `fn` | Function that returns an agent request table and optional error. |
+| `config` or `fn` | Optional function that returns an agent request table and optional error. Omit it to use declarative request fields. |
 
 Optional fields include `params`, `description`, `output`, and `flow`. Without
 a custom `flow` function, Leia executes the built-in loop:

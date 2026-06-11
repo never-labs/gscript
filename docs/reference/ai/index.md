@@ -151,6 +151,28 @@ answer := agent {
 result, err := answer("What changed?")
 ```
 
+For common single-input agents, the dialect also accepts a declarative shorthand.
+The shorthand synthesizes the same config function and still lowers through
+`llm.agent`; it does not introduce a separate execution engine.
+
+```leia
+summarize := agent {
+    name: "summarize"
+    params: {"topic"}
+    model: "fast"
+    instructions: prompt { role: "system", text: "Use evidence and be concise." }
+    tools: {search_runbook}
+    output: {summary: "short"}
+}
+
+result, err := summarize("release process")
+```
+
+When `messages` is omitted, the first call argument becomes `user`. The
+`instructions` field is treated as `system` unless `system` is already present.
+Prompt field blocks with `role` and `text` are ordinary message tables, so they
+can be placed directly in `messages`.
+
 For an agent without a custom flow function, Leia runs the built-in loop:
 synthesize messages from `system` and `user`, call one turn, dispatch returned
 tool calls, append assistant tool-call and tool-result messages, and repeat

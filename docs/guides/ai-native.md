@@ -138,6 +138,25 @@ incident := llm.agent("incident", incident_config, func(service) {
 No hidden turn or dispatch happens inside a custom flow; the script calls
 `llm.turn` and `llm.dispatch` explicitly.
 
+For agents that only need to bind a model, instructions, tools, and output
+shape, use the declarative shorthand. It remains a normal `llm.agent` value,
+but the dialect generates the config function for you:
+
+```leia
+extract := agent {
+    name: "extract"
+    params: {"note"}
+    model: "fast"
+    instructions: prompt { role: "system", text: "Extract project and owner." }
+    output: {project: "ORCHID", owner: "ADA"}
+}
+
+result, err := extract("Owner Ada is handling Orchid.")
+```
+
+Use explicit `config` or `flow` functions when argument mapping, branching,
+tool dispatch, or multi-turn state needs custom code.
+
 ## Agent As Tool
 
 Agents can be placed in another agent's tool list by using
