@@ -58,6 +58,7 @@ boundaries.
 | `repo-ai-finrobot_translation-equity_report` | `equity_report.leia` | `llm-replay` | End-to-end equity report replay fixture |
 | `repo-ai-finrobot_translation-finance_normalizers` | `finance_normalizers.leia` | `host-vm` | Finance statement, market, peer, SEC, news schemas |
 | `repo-ai-finrobot_translation-generated_code_tooling` | `generated_code_tooling.leia` | `host-vm` | Capability-gated code/file/image tooling envelope |
+| `repo-ai-finrobot_translation-generic_ai_workflow_composition` | `generic_ai_workflow_composition.leia` | `host-vm` | Provider-free Leia-native composition across generic model, turn, tool, agent, workflow, eval, replay, trace, approval, and package-audit boundaries |
 | `repo-ai-finrobot_translation-live_packages-analytics_report-analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `host-vm` | Checked-in analytics report live-package skeleton for normalizers, valuation, chart specs, report manifests, and renderer contracts |
 | `repo-ai-finrobot_translation-live_packages-analyzer_report-main` | `live_packages/analyzer_report/main.leia` | `host-vm` | Checked-in analyzer report live-package skeleton for section schemas, evidence rules, citations, and report envelopes |
 | `repo-ai-finrobot_translation-live_packages-backtest_strategy-main` | `live_packages/backtest_strategy/main.leia` | `host-vm` | Checked-in backtest strategy live-package skeleton for strategy manifests, data feeds, trade ledgers, metrics, risk limits, deterministic seeds, and optional dependency skips |
@@ -107,8 +108,8 @@ boundaries.
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 66 `host-vm`, 6 `llm-replay`, 3 `evaluate`, 75 runnable,
-75 checkable.
+Runner summary: 67 `host-vm`, 6 `llm-replay`, 3 `evaluate`, 76 runnable,
+76 checkable.
 
 ## Module Coverage Matrix
 

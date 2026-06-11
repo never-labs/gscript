@@ -1,0 +1,94 @@
+// Provider-free generic AI workflow composition.
+//
+// This is a thin Leia-native composition over the generic package boundaries:
+// model, turn, tool, agent, workflow, eval, replay, trace, approval, and
+// package-audit. It intentionally declares no provider SDK, network call,
+// credential, or domain adapter.
+
+package_boundaries := {
+    {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "ai.model.resolve" provider_free: true live_network: false},
+    {role: "turn" package_id: "generic-turn-runner" capability: "generic.ai.turn.request" entrypoint: "ai.turn.run" provider_free: true live_network: false},
+    {role: "tool" package_id: "generic-tool-contracts" capability: "generic.ai.tool.contract" entrypoint: "ai.tool.invoke" provider_free: true live_network: false},
+    {role: "agent" package_id: "generic-agent-runner" capability: "generic.ai.agent.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
+    {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "generic.ai.workflow.orchestration" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
+    {role: "eval" package_id: "generic-evaluation-harness" capability: "generic.ai.evaluation.harness" entrypoint: "ai.eval.run" provider_free: true live_network: false},
+    {role: "replay" package_id: "generic-record-replay" capability: "generic.ai.record.replay" entrypoint: "ai.replay.match" provider_free: true live_network: false},
+    {role: "trace" package_id: "generic-trace-events" capability: "generic.ai.trace.events" entrypoint: "ai.trace.emit" provider_free: true live_network: false},
+    {role: "approval" package_id: "generic-approval-policy" capability: "generic.ai.approval.policy" entrypoint: "ai.approval.check" provider_free: true live_network: false},
+    {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit" entrypoint: "ai.package.audit" provider_free: true live_network: false},
+}
+
+composition_edges := {
+    {from: "model" to: "turn" handoff: "resolved model descriptor"},
+    {from: "tool" to: "turn" handoff: "declarative tool schema"},
+    {from: "turn" to: "agent" handoff: "turn envelope and tool request"},
+    {from: "agent" to: "workflow" handoff: "agent result and loop trace"},
+    {from: "workflow" to: "eval" handoff: "workflow result fixture"},
+    {from: "replay" to: "turn" handoff: "strict ordered record match"},
+    {from: "trace" to: "workflow" handoff: "correlated events"},
+    {from: "approval" to: "tool" handoff: "capability decision"},
+    {from: "package-audit" to: "workflow" handoff: "provider-free boundary gate"},
+}
+
+workflow_contract := {
+    id: "generic-ai-workflow-composition"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    credential_required: false
+    composition: package_boundaries
+    edges: composition_edges
+    native_surfaces: {"model", "turn", "tool", "agent", "workflow", "eval", "replay", "trace", "approval", "package-audit"}
+}
+
+func role_present(role) {
+    for i := 1; i <= #workflow_contract.composition; i++ {
+        if workflow_contract.composition[i].role == role {
+            return true
+        }
+    }
+    return false
+}
+
+func provider_free_boundaries() {
+    for i := 1; i <= #workflow_contract.composition; i++ {
+        boundary := workflow_contract.composition[i]
+        if boundary.provider_free != true || boundary.live_network != false {
+            return false
+        }
+    }
+    return workflow_contract.provider_free == true &&
+        workflow_contract.live_network == false &&
+        workflow_contract.real_dependency_imports == false &&
+        workflow_contract.credential_required == false
+}
+
+func connected_native_surfaces() {
+    return #workflow_contract.composition == 10 &&
+        #workflow_contract.edges == 9 &&
+        role_present("model") &&
+        role_present("turn") &&
+        role_present("tool") &&
+        role_present("agent") &&
+        role_present("workflow") &&
+        role_present("eval") &&
+        role_present("replay") &&
+        role_present("trace") &&
+        role_present("approval") &&
+        role_present("package-audit")
+}
+
+assert(provider_free_boundaries())
+assert(connected_native_surfaces())
+
+package_boundary_count := #workflow_contract.composition
+composition_edge_count := #workflow_contract.edges
+composition_summary := string.format(
+    "%s boundaries=%d edges=%d provider_free=%s",
+    workflow_contract.id,
+    package_boundary_count,
+    composition_edge_count,
+    tostring(workflow_contract.provider_free)
+)
+
+print(composition_summary)
