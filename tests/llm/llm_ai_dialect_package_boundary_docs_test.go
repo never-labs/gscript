@@ -69,6 +69,12 @@ func TestAIDialectPackageBoundaryDocsReferenceExistingPackageDirs(t *testing.T) 
 	for _, required := range []string{
 		"not a built-in language feature",
 		"not a finrobot-only surface",
+		"small amount of leia code",
+		"package composition",
+		"provider-free replay",
+		"responsibility boundaries",
+		"record/replay",
+		"evaluation",
 		"model",
 		"turn",
 		"tool",
@@ -134,6 +140,32 @@ func TestFinRobotStatusDocsMarkGenericAIDialectAsCheckedInBoundary(t *testing.T)
 			if strings.Contains(doc, forbidden) {
 				t.Fatalf("%s regressed generic AI dialect status with %q", rel, forbidden)
 			}
+		}
+	}
+}
+
+func TestAIDialectPackageBoundaryReadmePointsToArchitecture(t *testing.T) {
+	root := repoRoot(t)
+	readmeRel := filepath.Join("examples", "ai", "finrobot_translation", "ai_dialect_index", "README.md")
+	data, err := os.ReadFile(filepath.Join(root, readmeRel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lowerReadme := strings.ToLower(string(data))
+	for _, required := range []string{
+		"package_boundaries.md",
+		"small leia assembly",
+		"complex ai projects",
+		"package composition",
+		"provider-free replay",
+		"approval",
+		"trace",
+		"evaluation",
+		"record/replay",
+		"docs tests parse the package list",
+	} {
+		if !strings.Contains(lowerReadme, required) {
+			t.Fatalf("%s does not document required architecture pointer %q", readmeRel, required)
 		}
 	}
 }
