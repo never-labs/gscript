@@ -79,7 +79,10 @@ QSQL_BENCH = (
     "NativeGoJoin|"
     "NativeGoJoinTopK|"
     "NativeGoJoinTopKMaterialized|"
-    "DataRuntimeJoinTopK"
+    "DataRuntimeJoinTopK|"
+    "BindMatrixWarm|"
+    "BindMatrixCold|"
+    "NativeGoMatrix"
     ")"
 )
 
@@ -1345,6 +1348,31 @@ def build_ratios(rows: dict[str, BenchRow]) -> list[RatioRow]:
             "fairer hand-written Go baseline for fused topK shape",
         ),
     ]
+    qsql_matrix_cases = sorted(
+        name.removeprefix("BenchmarkQSQLBindMatrixWarm/")
+        for name in rows
+        if name.startswith("BenchmarkQSQLBindMatrixWarm/")
+    )
+    for case in qsql_matrix_cases:
+        warm = f"BenchmarkQSQLBindMatrixWarm/{case}"
+        cold = f"BenchmarkQSQLBindMatrixCold/{case}"
+        go = f"BenchmarkQSQLNativeGoMatrix/{case}"
+        ratios.extend(
+            [
+                RatioRow(
+                    f"qSQL matrix {case} warm vs Go",
+                    warm,
+                    go,
+                    ratio(rows, warm, go),
+                ),
+                RatioRow(
+                    f"qSQL matrix {case} cold vs warm",
+                    cold,
+                    warm,
+                    ratio(rows, cold, warm),
+                ),
+            ]
+        )
     qeval_cases = sorted(
         name.removeprefix("BenchmarkQSessionEvalVectorWarmExecution/")
         for name in rows

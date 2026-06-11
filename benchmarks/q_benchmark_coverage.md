@@ -202,10 +202,10 @@ through the gates above.
 | Symbols and enums | symbol vectors, enum metadata, grouped/unique/sorted attributes | Covered at verb level; attribute matrices need more rows |
 | Temporal values | date, time, timestamp, timespan, temporal typed nulls, `.z.*` values | Covered at category level; full temporal kind matrix remains open |
 | Table verbs | `xcols`, `xasc`, `xdesc`, `xgroup`, `ungroup`, `meta`, `cols`, `key` | Covered via verb gate and combo dict-table chains |
-| qSQL select/exec | projection, computed projection, filter, order, limit/take, distinct, dict exec | Covered by qSQL Go benchmarks and columnar scripts |
-| qSQL grouped analytics | `by`, computed keys, `xbar`, aggregate aliases, extended aggregates | Partially covered; needs more aggregate/key/type combinations |
-| qSQL joins | inner, left, asof variants, union, plus, window joins, chained joins, aliased keys | Covered: warm-cache rows exist for inner/left/asof/window/union/plus/chained joins |
-| qSQL mutation | update, delete, insert, upsert, grouped mutation, keyed mutation | Update/delete-where rows exist; insert/upsert/keyed mutation benchmark coverage is limited |
+| qSQL select/exec | projection, computed projection, filter, order, limit/take, distinct, dict exec | Covered by qSQL Go benchmarks and columnar scripts; `exec` has a checksum-verified matrix row |
+| qSQL grouped analytics | `by`, computed keys, `xbar`, aggregate aliases, extended aggregates | Covered: multi-key, xbar temporal key, and var/dev/med/min/max/first/last matrix rows with Go baselines; `wavg` is backlogged (qSQL lowering emits no weight expression) |
+| qSQL joins | inner, left, asof variants, union, plus, window joins, chained joins, aliased keys | Covered: all ten parser join kinds (inner/left/union/plus/asof/asof0/asof_fill/asof_fill0/window/window1) plus chained and aliased-key rows have warm + cold + Go-baseline matrix rows |
+| qSQL mutation | update, delete, insert, upsert, grouped mutation, keyed mutation | Covered: update/delete/insert/upsert x {plain, keyed, grouped update, empty-match boundary} matrix rows with Go baselines |
 | Cache/fallback/runtime stats | plan cache, query kernel cache, schema-stable keys, explain/fallback stats | qSQL metric rows plus q.eval session typed-kernel counters per op |
 | IPC/system/session | loopback IPC, safe system commands, session state | Not core to in-memory analytics performance; benchmark only if it becomes a product target |
 
@@ -241,8 +241,7 @@ coverage that now exists.
 |---|---|
 | Typed-kernel counters cover instrumented families only | 8 warm cases still show fallback pressure (worst: `TypeMatrixLongNullNotEqualEqualNullCount`, 9% hit, 31 fallbacks/op); uninstrumented families need runtime-side shape labels |
 | 206 of 459 trusted warm cases are still >= 1x Go, 68 >= 10x | The geomean is at parity but the tail is long; see the breadth audit for the wave-3 worklist |
-| qSQL cold/warm coverage is select-heavy | Group, join, mutation, and temporal shapes also need cold/warm cache rows |
-| Mutation benchmarks are thin | Insert/upsert/keyed mutation interact with keyed frames and schema-stable cache |
+| `wavg` has no working qSQL form | qSQL lowering builds the aggregate without a weight expression; tracked in `qSQLAggregateBacklog` (shrink-only) until the parser grows a weighted form |
 | Script-level q suite is narrow | Current-vs-HEAD evidence should include more ordinary q and market-data project shapes, not only the columnar scripts |
 | Temporal kind matrix incomplete | All temporal kind x null combinations still need enumeration |
 
