@@ -1,0 +1,336 @@
+package data
+
+import "sort"
+
+// Typed asof/window join matching.
+//
+// The boxed asof/window pipeline builds a map[string][]int partition index on
+// the right frame and probes it with per-left-row encoded string keys, paying
+// several allocations per row plus boxed At calls inside every binary-search
+// step. These kernels keep the same partition + sorted-time-walk semantics
+// but operate on typed key slices (map[T][]int built once) and dense int64
+// time reprs, so matching is allocation-free per row. They cover the dominant
+// shapes — int64-family time columns with zero or one typed partition column —
+// and return ok=false for everything else, deferring to the boxed path.
+
+// asofTimeI64 returns the dense int64 repr of an int64-backed time column
+// (zero-copy for plain int64, converted copies for named int64 kinds).
+func asofTimeI64(array Array) ([]int64, bool) {
+	switch a := unwrapAttributedArray(array).(type) {
+	case columnArray[int64]:
+		return a.data, true
+	case columnArray[Month]:
+		return int64SliceOf(a.data), true
+	case columnArray[Date]:
+		return int64SliceOf(a.data), true
+	case columnArray[DateTime]:
+		return int64SliceOf(a.data), true
+	case columnArray[Timespan]:
+		return int64SliceOf(a.data), true
+	case columnArray[Minute]:
+		return int64SliceOf(a.data), true
+	case columnArray[Second]:
+		return int64SliceOf(a.data), true
+	case columnArray[Time]:
+		return int64SliceOf(a.data), true
+	case columnArray[Timestamp]:
+		return int64SliceOf(a.data), true
+	default:
+		return nil, false
+	}
+}
+
+func int64SliceOf[T ~int64](values []T) []int64 {
+	out := make([]int64, len(values))
+	for i, v := range values {
+		out[i] = int64(v)
+	}
+	return out
+}
+
+// asofMatchIndexesTypedFast computes the per-left-row right matches for an
+// asof join entirely through typed kernels. ok=false defers to the boxed
+// SortedRowsByPartition + AsofMatchIndexes pipeline.
+func asofMatchIndexesTypedFast(left Frame, leftTime Array, leftPartitionCols []Symbol, right Frame, rightTime Array, rightPartitionCols []Symbol) ([]int, bool) {
+	leftTimes, ok := asofTimeI64(leftTime)
+	if !ok {
+		return nil, false
+	}
+	rightTimes, ok := asofTimeI64(rightTime)
+	if !ok {
+		return nil, false
+	}
+	switch len(leftPartitionCols) {
+	case 0:
+		rows := sortedTimeRows(rightTimes, allIndexes(len(rightTimes)))
+		out := make([]int, len(leftTimes))
+		for row, t := range leftTimes {
+			out[row] = asofSearchRows(rows, rightTimes, t)
+		}
+		return out, true
+	case 1:
+		leftPart, okL := left.Column(leftPartitionCols[0])
+		rightPart, okR := right.Column(rightPartitionCols[0])
+		if !okL || !okR {
+			return nil, false
+		}
+		if leftIDs, resolved, ok := partitionAlignedRows(left, leftPartitionCols[0], leftPart, right, rightPartitionCols[0], rightPart, rightTimes); ok {
+			out := make([]int, len(leftTimes))
+			for row, t := range leftTimes {
+				out[row] = asofSearchRows(resolved[leftIDs[row]], rightTimes, t)
+			}
+			return out, true
+		}
+		return asofMatchSinglePartitionTyped(leftPart, rightPart, leftTimes, rightTimes)
+	default:
+		return nil, false
+	}
+}
+
+// partitionAlignedRows aligns the left partition column's groups with the
+// right partition column's time-sorted row lists through both columns' cached
+// grouped ArrayIndexes: one probe per distinct left key instead of one string
+// hash per left row. It requires identical partition kinds (the common case;
+// cross-kind coercion stays on the boxed path).
+func partitionAlignedRows(left Frame, leftName Symbol, leftPart Array, right Frame, rightName Symbol, rightPart Array, rightTimes []int64) ([]int, [][]int, bool) {
+	if leftPart.Kind() != rightPart.Kind() {
+		return nil, nil, false
+	}
+	switch leftPart.Kind() {
+	case KindF32, KindF64, KindAny, KindNull:
+		// Float/boxed partition keys keep the boxed encoder semantics.
+		return nil, nil, false
+	}
+	leftIndex, ok := groupedArrayIndexCached(left, leftName, leftPart)
+	if !ok {
+		return nil, nil, false
+	}
+	rightIndex, ok := groupedArrayIndexCached(right, rightName, rightPart)
+	if !ok {
+		return nil, nil, false
+	}
+	leftIDs, err := rowToGroupFromIndex(leftIndex)
+	if err != nil || len(leftIDs) != leftPart.Len() {
+		return nil, nil, false
+	}
+	kind := leftPart.Kind()
+	resolved := make([][]int, len(leftIndex.Keys))
+	for g, key := range leftIndex.Keys {
+		rows := rightIndex.RowsByKey[arrayValueKey(kind, key)]
+		if len(rows) > 0 && !int64RowsSorted(rightTimes, rows) {
+			rows = append([]int(nil), rows...)
+			sort.SliceStable(rows, func(i, j int) bool {
+				return rightTimes[rows[i]] < rightTimes[rows[j]]
+			})
+		}
+		resolved[g] = rows
+	}
+	return leftIDs, resolved, true
+}
+
+// windowMatchIndexesTypedFast computes per-left-row right row windows for a
+// window join through typed kernels. The returned row slices alias shared
+// backing storage and must be treated as read-only.
+func windowMatchIndexesTypedFast(left Frame, leftTime Array, leftPartitionCols []Symbol, right Frame, rightTime Array, rightPartitionCols []Symbol, opts WindowJoinOptions) ([][]int, bool) {
+	leftTimes, ok := asofTimeI64(leftTime)
+	if !ok {
+		return nil, false
+	}
+	rightTimes, ok := asofTimeI64(rightTime)
+	if !ok {
+		return nil, false
+	}
+	bounds := windowI64Bounds{}
+	if opts.HasBounds {
+		low, okLow := windowDeltaI64(leftTime.Kind(), opts.Low)
+		high, okHigh := windowDeltaI64(leftTime.Kind(), opts.High)
+		if !okLow || !okHigh || low > high {
+			return nil, false
+		}
+		bounds = windowI64Bounds{has: true, low: low, high: high}
+	}
+	switch len(leftPartitionCols) {
+	case 0:
+		rows := sortedTimeRows(rightTimes, allIndexes(len(rightTimes)))
+		out := make([][]int, len(leftTimes))
+		for row, t := range leftTimes {
+			out[row] = windowSliceRows(rows, rightTimes, t, bounds)
+		}
+		return out, true
+	case 1:
+		leftPart, okL := left.Column(leftPartitionCols[0])
+		rightPart, okR := right.Column(rightPartitionCols[0])
+		if !okL || !okR {
+			return nil, false
+		}
+		if leftIDs, resolved, ok := partitionAlignedRows(left, leftPartitionCols[0], leftPart, right, rightPartitionCols[0], rightPart, rightTimes); ok {
+			out := make([][]int, len(leftTimes))
+			for row, t := range leftTimes {
+				out[row] = windowSliceRows(resolved[leftIDs[row]], rightTimes, t, bounds)
+			}
+			return out, true
+		}
+		return windowMatchSinglePartitionTyped(leftPart, rightPart, leftTimes, rightTimes, bounds)
+	default:
+		return nil, false
+	}
+}
+
+type windowI64Bounds struct {
+	has  bool
+	low  int64
+	high int64
+}
+
+// windowDeltaI64 converts a window bound delta into the time column's int64
+// repr units, mirroring addWindowDelta/addWindowIntDelta (whose temporal
+// From*/To* conversions are all identity on the int64 repr).
+func windowDeltaI64(timeKind Kind, delta any) (int64, bool) {
+	if d, ok := numeric(delta); ok {
+		if d != float64(int64(d)) {
+			return 0, false
+		}
+		switch timeKind {
+		case KindI64, KindMonth, KindDate, KindDateTime, KindTimespan, KindMinute, KindSecond, KindTime, KindTimestamp:
+			return int64(d), true
+		}
+		return 0, false
+	}
+	if d, ok := delta.(Timespan); ok {
+		switch timeKind {
+		case KindDateTime, KindTimespan, KindTime, KindTimestamp:
+			return int64(d), true
+		}
+	}
+	return 0, false
+}
+
+func asofMatchSinglePartitionTyped(leftPart, rightPart Array, leftTimes, rightTimes []int64) ([]int, bool) {
+	switch lk := unwrapAttributedArray(leftPart).(type) {
+	case columnArray[Symbol]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[Symbol]); ok && lk.kind == rk.kind {
+			return asofMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes), true
+		}
+	case columnArray[string]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[string]); ok && lk.kind == rk.kind {
+			return asofMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes), true
+		}
+	case columnArray[int64]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int64]); ok && lk.kind == rk.kind {
+			return asofMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes), true
+		}
+	case columnArray[int32]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int32]); ok && lk.kind == rk.kind {
+			return asofMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes), true
+		}
+	}
+	return nil, false
+}
+
+func windowMatchSinglePartitionTyped(leftPart, rightPart Array, leftTimes, rightTimes []int64, bounds windowI64Bounds) ([][]int, bool) {
+	switch lk := unwrapAttributedArray(leftPart).(type) {
+	case columnArray[Symbol]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[Symbol]); ok && lk.kind == rk.kind {
+			return windowMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	case columnArray[string]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[string]); ok && lk.kind == rk.kind {
+			return windowMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	case columnArray[int64]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int64]); ok && lk.kind == rk.kind {
+			return windowMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	case columnArray[int32]:
+		if rk, ok := unwrapAttributedArray(rightPart).(columnArray[int32]); ok && lk.kind == rk.kind {
+			return windowMatchPartitionedTyped(lk.data, leftTimes, rk.data, rightTimes, bounds), true
+		}
+	}
+	return nil, false
+}
+
+// typedPartitionRows builds the right-side partition index: per distinct key,
+// row indexes in time order.
+func typedPartitionRows[T comparable](rightKeys []T, rightTimes []int64) map[T][]int {
+	rowsByKey := make(map[T][]int, 64)
+	for row, key := range rightKeys {
+		rowsByKey[key] = append(rowsByKey[key], row)
+	}
+	for key, rows := range rowsByKey {
+		rowsByKey[key] = sortedTimeRows(rightTimes, rows)
+	}
+	return rowsByKey
+}
+
+func sortedTimeRows(times []int64, rows []int) []int {
+	if !int64RowsSorted(times, rows) {
+		sort.SliceStable(rows, func(i, j int) bool {
+			return times[rows[i]] < times[rows[j]]
+		})
+	}
+	return rows
+}
+
+// asofSearchRows returns the last row whose time is <= t, or -1.
+func asofSearchRows(rows []int, times []int64, t int64) int {
+	lo, hi := 0, len(rows)
+	for lo < hi {
+		mid := int(uint(lo+hi) >> 1)
+		if times[rows[mid]] > t {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	if lo == 0 {
+		return -1
+	}
+	return rows[lo-1]
+}
+
+// windowSearchRows returns the first index whose time satisfies after(t)
+// per the predicate "times[rows[i]] > limit" (strict) or ">= limit".
+func windowSearchRows(rows []int, times []int64, limit int64, strict bool) int {
+	lo, hi := 0, len(rows)
+	for lo < hi {
+		mid := int(uint(lo+hi) >> 1)
+		v := times[rows[mid]]
+		if v > limit || (!strict && v >= limit) {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	return lo
+}
+
+func windowSliceRows(rows []int, times []int64, t int64, bounds windowI64Bounds) []int {
+	if !bounds.has {
+		end := windowSearchRows(rows, times, t, true)
+		return rows[:end]
+	}
+	start := windowSearchRows(rows, times, t+bounds.low, false)
+	end := windowSearchRows(rows, times, t+bounds.high, true)
+	if start > end {
+		start = end
+	}
+	return rows[start:end]
+}
+
+func asofMatchPartitionedTyped[T comparable](leftKeys []T, leftTimes []int64, rightKeys []T, rightTimes []int64) []int {
+	rowsByKey := typedPartitionRows(rightKeys, rightTimes)
+	out := make([]int, len(leftKeys))
+	for row, key := range leftKeys {
+		out[row] = asofSearchRows(rowsByKey[key], rightTimes, leftTimes[row])
+	}
+	return out
+}
+
+func windowMatchPartitionedTyped[T comparable](leftKeys []T, leftTimes []int64, rightKeys []T, rightTimes []int64, bounds windowI64Bounds) [][]int {
+	rowsByKey := typedPartitionRows(rightKeys, rightTimes)
+	out := make([][]int, len(leftKeys))
+	for row, key := range leftKeys {
+		out[row] = windowSliceRows(rowsByKey[key], rightTimes, leftTimes[row], bounds)
+	}
+	return out
+}

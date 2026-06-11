@@ -10354,6 +10354,9 @@ func (typedKernelRegistry) GatherOptional(array Array, indexes []int) Array {
 	if allPresent {
 		return array.Gather(indexes)
 	}
+	if out, ok := gatherOptionalNullBitmap(array, indexes); ok {
+		return out
+	}
 	out := make([]any, len(indexes))
 	for i, row := range indexes {
 		if row < 0 {
@@ -10367,6 +10370,56 @@ func (typedKernelRegistry) GatherOptional(array Array, indexes []int) Array {
 		out[i] = v
 	}
 	return nullableArray{kind: array.Kind(), data: out}
+}
+
+// gatherOptionalNullBitmap gathers a dense numeric column with missing (-1)
+// indexes into a typed null-bitmap carrier instead of per-cell boxed storage.
+func gatherOptionalNullBitmap(array Array, indexes []int) (Array, bool) {
+	switch a := unwrapAttributedArray(array).(type) {
+	case columnArray[int8]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[int16]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[int32]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[int64]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[float32]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[float64]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Month]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Date]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[DateTime]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Timespan]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Minute]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Second]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Time]:
+		return gatherNullBitmapColumn(a, indexes), true
+	case columnArray[Timestamp]:
+		return gatherNullBitmapColumn(a, indexes), true
+	default:
+		return nil, false
+	}
+}
+
+func gatherNullBitmapColumn[T nullBitmapElem](a columnArray[T], indexes []int) Array {
+	data := make([]T, len(indexes))
+	nulls := newNullBitmap(len(indexes))
+	for i, row := range indexes {
+		if row < 0 {
+			nullBitSet(nulls, i)
+			continue
+		}
+		data[i] = a.data[row]
+	}
+	return nullBitmapArray[T]{kind: a.kind, data: data, nulls: nulls}
 }
 
 type rowKeyEncoder struct {
@@ -10653,19 +10706,15 @@ func (typedKernelRegistry) GatherWindowLists(array Array, indexes [][]int) Array
 }
 
 func (typedKernelRegistry) GatherLastOptional(array Array, indexes [][]int) Array {
-	out := make([]any, len(indexes))
+	last := make([]int, len(indexes))
 	for i, rows := range indexes {
 		if len(rows) == 0 {
-			out[i] = NullValue
+			last[i] = -1
 			continue
 		}
-		v, ok := array.At(rows[len(rows)-1])
-		if !ok {
-			panic(fmt.Sprintf("data array gather index %d out of range", rows[len(rows)-1]))
-		}
-		out[i] = v
+		last[i] = rows[len(rows)-1]
 	}
-	return nullableArray{kind: array.Kind(), data: out}
+	return joinGatherOptional(array, last)
 }
 
 func (typedKernelRegistry) NumericAt(array Array, row int) (float64, bool, error) {

@@ -22,7 +22,8 @@ import (
 //   - sum/avg skip nulls
 //   - fills forward-fills from the last non-null row; deltas propagates nulls
 type nullBitmapElem interface {
-	int8 | int16 | int32 | int64 | float32 | float64
+	int8 | int16 | int32 | int64 | float32 | float64 |
+		Month | Date | DateTime | Timespan | Minute | Second | Time | Timestamp
 }
 
 type nullBitmapArray[T nullBitmapElem] struct {

@@ -338,6 +338,9 @@ func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
 	if array == nil {
 		return ArrayIndex{}, fmt.Errorf("array index source is nil")
 	}
+	if index, ok := buildArrayIndexTyped(array, attr); ok {
+		return index, nil
+	}
 	index := ArrayIndex{
 		Attribute:  attr,
 		Keys:       make([]any, 0),
@@ -366,6 +369,46 @@ func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
 	}
 	index.typedRowsByKey = typedRowsByKey(array)
 	return index, nil
+}
+
+// buildArrayIndexTyped builds the grouped/unique ArrayIndex through the typed
+// fby group-id kernels instead of per-row boxed At + string keys. It is
+// restricted to kinds whose typed equality matches arrayValueKey equality
+// (floats are excluded: -0.0 and 0.0 compare equal typed but key apart).
+func buildArrayIndexTyped(array Array, attr Symbol) (ArrayIndex, bool) {
+	switch array.Kind() {
+	case KindF32, KindF64, KindAny, KindNull:
+		return ArrayIndex{}, false
+	}
+	ids, count, err := fbyGroupIDs(array)
+	if err != nil || len(ids) != array.Len() {
+		return ArrayIndex{}, false
+	}
+	rows := rowGroupsFromIDs(ids, count)
+	keys := make([]any, count)
+	rowsByKey := make(map[string][]int, count)
+	for g, groupRows := range rows {
+		v, ok := array.At(groupRows[0])
+		if !ok {
+			return ArrayIndex{}, false
+		}
+		keys[g] = v
+		key := arrayValueKey(array.Kind(), v)
+		if _, dup := rowsByKey[key]; dup {
+			// Typed equality split keys that the string encoding merges;
+			// defer to the boxed builder for exact legacy grouping.
+			return ArrayIndex{}, false
+		}
+		rowsByKey[key] = groupRows
+	}
+	return ArrayIndex{
+		Attribute:      attr,
+		Keys:           keys,
+		Rows:           rows,
+		RowsByKey:      rowsByKey,
+		RowToGroup:     ids,
+		typedRowsByKey: typedRowsByKey(array),
+	}, true
 }
 
 func typedRowsByKey(array Array) any {
@@ -2744,7 +2787,10 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok, err := typedCompareCarrierIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
-	indexes, ok := typedKernels.CompareIndexes(array, op, value, nil)
+	if out, ok := typedCompareBoolIndexesI64(array, op, value); ok {
+		return out, true, nil
+	}
+	indexes, ok := typedKernels.CompareIndexes(array, op, value, filterIndexScratch(array.Len()))
 	if !ok {
 		return nil, false, nil
 	}
@@ -2753,6 +2799,33 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 		out[i] = int64(index)
 	}
 	return newI64Trusted(out), true, nil
+}
+
+// typedCompareBoolIndexesI64 selects matching rows of a dense bool column in
+// two passes (count, then exact-size fill) so the hot boolean where shapes
+// allocate the index vector once.
+func typedCompareBoolIndexesI64(array Array, op Op, value any) (Array, bool) {
+	a, isBool := unwrapAttributedArray(array).(columnArray[bool])
+	if !isBool {
+		return nil, false
+	}
+	target, isBool := value.(bool)
+	if !isBool {
+		return nil, false
+	}
+	count := 0
+	for _, v := range a.data {
+		if boolCompare(op, v == target, compareBool(v, target)) {
+			count++
+		}
+	}
+	out := make([]int64, 0, count)
+	for i, v := range a.data {
+		if boolCompare(op, v == target, compareBool(v, target)) {
+			out = append(out, int64(i))
+		}
+	}
+	return newI64Trusted(out), true
 }
 
 // TryTypedCompareIndexStatsI64 returns count and sum of q-style row indexes
@@ -4975,6 +5048,22 @@ func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return bucketFloorTyped(a.array, interval)
+	case columnArray[Month]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[Date]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[DateTime]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[Timespan]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[Minute]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[Second]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[Time]:
+		return bucketFloorTemporalColumn(a, interval)
+	case columnArray[Timestamp]:
+		return bucketFloorTemporalColumn(a, interval)
 	case columnArray[int64]:
 		width, err := bucketInt64Interval(KindI64, interval)
 		if err != nil {
@@ -5050,6 +5139,21 @@ func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
 		}
 		return nil, false, nil
 	}
+}
+
+// bucketFloorTemporalColumn floors a dense named-int64 temporal column in
+// place-type, preserving the source kind (mirroring bucketFloorInt64Value's
+// kind coercion without per-row boxing).
+func bucketFloorTemporalColumn[T ~int64](a columnArray[T], interval any) (Array, bool, error) {
+	width, err := bucketInt64Interval(a.kind, interval)
+	if err != nil {
+		return nil, true, err
+	}
+	out := make([]T, len(a.data))
+	for i, v := range a.data {
+		out[i] = T(floorInt64(int64(v), width))
+	}
+	return columnArray[T]{kind: a.kind, data: out}, true, nil
 }
 
 func bucketFloorI64Slice(values []int64, width int64) Array {
@@ -7152,19 +7256,21 @@ func AsofJoinOnWithOptions(left, right Frame, opts AsofJoinOptions) (Frame, erro
 	for i, key := range partitionKeys {
 		rightPartitionCols[i] = key.Right
 	}
-	rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
-	if err != nil {
-		return Frame{}, err
-	}
-
 	leftTime, _ := left.Column(timeKey.Left)
 	leftPartitionCols := make([]Symbol, len(partitionKeys))
 	for i, key := range partitionKeys {
 		leftPartitionCols[i] = key.Left
 	}
-	rightIndexes, err := typedKernels.AsofMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, joinRightKeyKinds(right, partitionKeys))
-	if err != nil {
-		return Frame{}, err
+	rightIndexes, matched := asofMatchIndexesTypedFast(left, leftTime, leftPartitionCols, right, rightTime, rightPartitionCols)
+	if !matched {
+		rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
+		if err != nil {
+			return Frame{}, err
+		}
+		rightIndexes, err = typedKernels.AsofMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, joinRightKeyKinds(right, partitionKeys))
+		if err != nil {
+			return Frame{}, err
+		}
 	}
 
 	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
@@ -7191,7 +7297,7 @@ func AsofJoinOnWithOptions(left, right Frame, opts AsofJoinOptions) (Frame, erro
 		cols = append(cols, Column{Name: outName, Data: joinGatherOptional(right.columns[name], rightIndexes)})
 		usedNames[outName] = struct{}{}
 	}
-	return NewFrame(cols...)
+	return NewFrameAdoptingColumns(cols...)
 }
 
 func WindowJoinOn(left, right Frame, timeKey JoinKey, partitionKeys ...JoinKey) (Frame, error) {
@@ -7219,19 +7325,21 @@ func WindowJoinOnWithOptions(left, right Frame, opts WindowJoinOptions) (Frame, 
 	for i, key := range partitionKeys {
 		rightPartitionCols[i] = key.Right
 	}
-	rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
-	if err != nil {
-		return Frame{}, err
-	}
-
 	leftTime, _ := left.Column(timeKey.Left)
 	leftPartitionCols := make([]Symbol, len(partitionKeys))
 	for i, key := range partitionKeys {
 		leftPartitionCols[i] = key.Left
 	}
-	rightIndexes, err := typedKernels.WindowMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, opts, joinRightKeyKinds(right, partitionKeys))
-	if err != nil {
-		return Frame{}, err
+	rightIndexes, matched := windowMatchIndexesTypedFast(left, leftTime, leftPartitionCols, right, rightTime, rightPartitionCols, opts)
+	if !matched {
+		rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
+		if err != nil {
+			return Frame{}, err
+		}
+		rightIndexes, err = typedKernels.WindowMatchIndexes(left, leftTime, leftPartitionCols, rightTime, rightByPartition, opts, joinRightKeyKinds(right, partitionKeys))
+		if err != nil {
+			return Frame{}, err
+		}
 	}
 
 	cols := make([]Column, 0, len(left.schema.names)+len(right.schema.names))
@@ -7258,7 +7366,7 @@ func WindowJoinOnWithOptions(left, right Frame, opts WindowJoinOptions) (Frame, 
 		}
 		usedNames[outName] = struct{}{}
 	}
-	return NewFrame(cols...)
+	return NewFrameAdoptingColumns(cols...)
 }
 
 func windowJoinAbsoluteBounds(timeValue, low, high any) (any, any, error) {
@@ -8317,6 +8425,9 @@ func (e BucketFloorExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
 		if !ok {
 			return nil, fmt.Errorf("unknown column %q", expr.Name)
 		}
+		if indexesCoverAllRows(indexes, col.Len()) {
+			return BucketFloor(col, e.Interval)
+		}
 		return BucketFloor(col.Gather(indexes), e.Interval)
 	case vectorProjector:
 		array, err := expr.EvalRows(frame, indexes)
@@ -8376,6 +8487,11 @@ func (e ListAggregateExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
 }
 
 func (e ListAggregateExpr) evalValue(v any) (any, error) {
+	if arr, isArray := v.(Array); isArray {
+		if out, handled, err := listAggregateTypedArrayValue(e.Func, arr); handled || err != nil {
+			return out, err
+		}
+	}
 	values, ok := listAggregateValues(v)
 	if !ok {
 		if IsNull(v) {
@@ -8717,6 +8833,12 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 }
 
 func execTypedFilterProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	// Mirror TryExecuteQueryKernelTypedCarrier's plan-shape preconditions
+	// before paying for the full plan describe.
+	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
+		len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+		return Frame{}, false, nil
+	}
 	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
 	if err != nil || !ok {
 		return Frame{}, ok, err
@@ -8725,6 +8847,15 @@ func execTypedFilterProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
 }
 
 func execTypedGroupedProjectionProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
+	// Mirror TryExecuteQueryKernelGroupedProjectionCarrier's plan-shape
+	// preconditions before paying for the full plan describe.
+	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
+		len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
+		return Frame{}, false, nil
+	}
+	if len(plan.By) == 0 && len(plan.ByExprs) == 0 {
+		return Frame{}, false, nil
+	}
 	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
 	if err != nil || !ok {
 		return Frame{}, ok, err
@@ -9752,6 +9883,9 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 			return out, err
 		}
 	}
+	if out, ok, err := execGroupedTypedRowIDs(frame, indexes, false, byInputs, aggs); ok || err != nil {
+		return out, err
+	}
 	groups := map[string]*groupState{}
 	order := make([]string, 0)
 	var keyBuilder strings.Builder
@@ -10075,6 +10209,9 @@ func execGroupedFromArrayIndex(frame Frame, byInputs []groupInput, aggs []aggreg
 	if out, ok, err := execTypedGroupedAggregateFrame(frame, byInputs, aggs, index, allIndexes(len(index.Rows)), nil, nil); ok || err != nil {
 		return out, err
 	}
+	if out, ok, err := execGroupedTypedRowIDs(frame, nil, true, byInputs, aggs); ok || err != nil {
+		return out, err
+	}
 	if states, ok, err := typedKernels.GroupAggregateStates(index, aggs); ok || err != nil {
 		if err != nil {
 			return Frame{}, err
@@ -10123,6 +10260,9 @@ func execGroupedFromFilteredArrayIndex(frame Frame, byInputs []groupInput, aggs 
 		return out, handled, err
 	}
 	if out, ok, err := execSimpleFilteredGroupedAggregates(frame, byInputs, aggs, index, indexes, nil); ok || err != nil {
+		return out, ok, err
+	}
+	if out, ok, err := execGroupedTypedRowIDs(frame, indexes, false, byInputs, aggs); ok || err != nil {
 		return out, ok, err
 	}
 	if groupOrder, states, ok, err := typedKernels.FilteredGroupAggregateStates(index, indexes, aggs); ok || err != nil {
