@@ -9,6 +9,126 @@
     "provider_free": true,
     "command_template": "leia evaluate --gate --report ${REPORT} --replay ${REPLAY_RECORDS} ${SOURCE}"
   },
+  "ai_evaluation_capability": {
+    "id": "ai-evaluation-dialect-provider-free-v1",
+    "scope": "generic-ai-evaluation",
+    "domain_specific": false,
+    "network_policy": "disabled_by_default",
+    "model_policy": "replay_or_stub_only",
+    "test_hardcoding_policy": "manifest_driven",
+    "dialect_surface": [
+      "evaluate_block",
+      "eval.load_jsonl",
+      "eval.case",
+      "eval.metric",
+      "eval.judge",
+      "eval.usage",
+      "eval.budget",
+      "llm.replay"
+    ],
+    "capability_specimen": {
+      "id": "generic_ai_evaluation_dialect",
+      "source_path": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.source.txt",
+      "dataset_path": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation_dataset.jsonl",
+      "replay_records_path": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.records.json",
+      "source_sha256": "a0f03802b778800261fec051db5820c1d8ffa9232b6e3451b775d9c15df63ba2",
+      "dataset_sha256": "495328590fb3fb8844b861ded85215da853774f139e000db30c5cd8ada216882",
+      "replay_records_sha256": "e6bb2f4b0c16303c759aa294663c9f40000a8a046e3f510c0a4f20613c3a01f5",
+      "turn_count": 1,
+      "models": ["mock-ai-eval-judge"],
+      "dataset_rows": 2,
+      "subcase_ids": ["judge-deterministic-replay", "manifest-threshold-gate"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 4,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": ["generic ai evaluation dialect specimen"],
+        "metrics": [
+          {"name": "dataset_item_valid", "type": "bool", "count": 2, "pass_rate": 1.0},
+          {"name": "judge_passed", "type": "bool", "count": 2, "pass_rate": 1.0},
+          {"name": "answer_chars", "type": "number", "count": 2, "mean": 64.0},
+          {"name": "rubric_label", "type": "string", "count": 2},
+          {"name": "judge_tokens", "type": "number", "count": 1, "mean": 7.0}
+        ]
+      }
+    }
+  },
+  "judge_spec": {
+    "id": "generic_binary_judge_v1",
+    "purpose": "Score any AI output against a rubric using replay-backed eval.judge.",
+    "request_contract": {
+      "required_fields": ["model", "messages"],
+      "default_max_tokens": 200,
+      "default_budget": {"turns": 1, "tokens": 512},
+      "message_roles": ["system", "user"]
+    },
+    "response_contract": {
+      "accepted_text_values": ["pass", "fail"],
+      "usage_metrics": ["judge_cost", "judge_input_tokens", "judge_output_tokens", "judge_tokens"],
+      "failure_finding_kind": "llm_replay_mismatch"
+    }
+  },
+  "metric_registry": [
+    {"name": "dataset_item_valid", "type": "bool", "aggregation": "pass_rate", "golden_min": 1.0},
+    {"name": "judge_passed", "type": "bool", "aggregation": "pass_rate", "golden_min": 1.0},
+    {"name": "answer_chars", "type": "number", "aggregation": "mean_min_max", "golden_min": 1.0},
+    {"name": "rubric_label", "type": "string", "aggregation": "value_counts"},
+    {"name": "judge_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 16.0},
+    {"name": "judge_cost", "type": "number", "aggregation": "mean_min_max", "golden_max": 0.02}
+  ],
+  "dataset_manifest": {
+    "format": "jsonl",
+    "id_field": "id",
+    "required_fields": ["id", "input", "answer", "rubric", "rubric_label", "needs_judge", "expected_judgment"],
+    "minimum_rows": 2,
+    "row_policy": "stable_ordered_fixture"
+  },
+  "record_replay_matching": {
+    "mode": "strict_ordered",
+    "matched_request_fields": ["model", "messages.role", "messages.text", "max_tokens", "tools", "stream"],
+    "unmatched_request_finding_kind": "llm_replay_mismatch",
+    "exhausted_replay_finding_kind": "llm_replay_exhausted",
+    "unconsumed_replay_finding_kind": "llm_replay_unconsumed",
+    "failure_details": ["expected", "actual", "case_id", "case_name"]
+  },
+  "scoring_trace": {
+    "report_fields": ["schema_version", "status", "summary", "llm", "cases", "metrics", "findings"],
+    "case_fields": ["case_id", "name", "source_path", "status", "llm", "subcases", "assertions"],
+    "llm_case_fields": ["trace_ref", "turns", "input_tokens", "output_tokens", "cost"],
+    "subcase_fields": ["case_id", "status", "metrics"],
+    "finding_policy": "empty_on_success_structured_on_failure"
+  },
+  "provider_free_model_stub": {
+    "allowed_model_prefix": "mock-",
+    "provider_env_policy": "ignored",
+    "live_provider_calls": false,
+    "network_calls": false,
+    "stub_modes": ["replay"]
+  },
+  "failure_envelope": {
+    "status_on_failure": "failed",
+    "finding_kinds": ["llm_replay_mismatch", "llm_replay_exhausted", "llm_replay_unconsumed", "evaluate_regression", "evaluate_metric_regression"],
+    "required_fields": ["kind", "severity", "message", "path"],
+    "details_required_for": ["llm_replay_mismatch", "llm_replay_exhausted", "llm_replay_unconsumed", "evaluate_regression", "evaluate_metric_regression"],
+    "details_policy": "machine_readable"
+  },
+  "golden_threshold_gates": {
+    "gate": true,
+    "summary_pass_rate_min": 1.0,
+    "cases_failed_max": 0,
+    "findings_max": 0,
+    "regression_threshold": 0.0,
+    "metric_thresholds": [
+      {"name": "dataset_item_valid", "type": "bool", "pass_rate_min": 1.0},
+      {"name": "judge_passed", "type": "bool", "pass_rate_min": 1.0},
+      {"name": "judge_tokens", "type": "number", "mean_max": 16.0}
+    ]
+  },
   "records_inventory": [
     {
       "id": "core_agents_main",

@@ -14,3 +14,18 @@ examples. The harness is intentionally data-driven:
 
 The harness fixture version is `finrobot-eval-fixtures-v1`. Bump it whenever a
 golden replay file or expected report summary changes.
+
+The harness also carries a generic AI evaluation dialect specimen:
+
+- `generic_ai_evaluation.source.txt` is materialized as a temporary `.leia`
+  file by the parity test and exercises `evaluate`, `eval.load_jsonl`,
+  `eval.case`, `eval.metric`, `eval.judge`, `eval.usage`, and `eval.budget`
+  without live providers.
+- `generic_ai_evaluation_dataset.jsonl` is the dataset manifest fixture.
+- `generic_ai_evaluation.records.json` is the provider-free judge replay stub.
+
+`manifest.json` is the contract of record for judge specs, metric registry,
+dataset shape, strict record/replay matching, scoring trace fields, failure
+envelope, and golden threshold gates. Tests consume those manifest sections so
+the harness remains a reusable AI evaluation capability instead of a
+FinRobot-specific test fixture.

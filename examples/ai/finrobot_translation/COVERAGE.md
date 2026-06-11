@@ -7,7 +7,7 @@ Baseline:
 - Leia branch: `origin/codex/ai-dialect-polish` at `b3b6088d`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 434 files, including 22
+- Current translation directory file count: 445 files, including 22
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 65 runnable/checkable examples discovered by
@@ -23,8 +23,8 @@ provider credentials. The slice covers the generic Leia contracts needed to
 model FinRobot: agent turns, tool contracts, replay, trace, config/secret
 resolution, API/web replay metadata, finance schemas, valuation fixtures,
 document/RAG fixtures, report/artifact contracts, compliance gates, packaging
-metadata, evaluation inventory, quant workflow fixtures, and web-product smoke
-metadata.
+metadata, generic AI evaluation harness parity, quant workflow fixtures, and
+web-product smoke metadata.
 
 This is not production-package parity with FinRobot. The remaining uncovered
 work is live-package implementation beyond the checked-in skeleton contracts:
@@ -134,7 +134,7 @@ Status key:
 | `experiments/portfolio_optimization.py` | `quant_experiments/portfolio_optimization.leia` | Covered | Offline optimizer replay and deterministic stats | Live optimizer/backtest library and market-data integration |
 | `tutorials_beginner/*` | Existing registered examples cover annual report/RAG/forecast/chart concepts across files | Partial | Provider-free equivalents for key concepts: RAG, equity report, forecast-style section agents, chart specs | Notebook-by-notebook parity, Ollama function call/stock chart live gates |
 | `tutorials_advanced/*` | `optional_integrations.leia`, `quant_experiments/*.leia`, `generated_code_tooling.leia`, `tutorial_parity/ledger.json`, `live_packages/optional_integrations/*` | Partial | Optional gates for OpenBB, mplfinance, FinGPT, FinRL, Backtrader, Ollama; replayed quant workflows and tutorial parity ledger | Notebook-by-notebook parity, multimodal chart/document analysis, live optional package implementations |
-| `agent_builder_demo.py`, `test_module.py` | `core_agents/main.leia`, `evaluation_harness/manifest.json` | Partial | Small deterministic agent/tool fixtures and evaluation inventory | Direct demo/test translation with matching assertions |
+| `agent_builder_demo.py`, `test_module.py` | `core_agents/main.leia`, `evaluation_harness/manifest.json` | Partial | Small deterministic agent/tool fixtures plus generic AI evaluation harness parity | Direct demo/test translation with matching assertions |
 | `configs/*`, `OAI_CONFIG_LIST`, `config_api_keys` | `config_secret_example.leia`, `model_alias_routing_example.leia`, `package_deploy_manifest.json` | Covered | Secret-free config, missing key diagnostics, route metadata, deploy env docs | Full config migration helpers and live provider profile loading |
 | `requirements*.txt`, `setup.py`, `Dockerfile`, `deploy*.sh`, `run_web_app.py` | `package_deploy_*`, `package_deploy_manifest.json` | Covered | Provider-free package/deploy metadata, Docker/gcloud/run commands, health entrypoint | Release packaging, real dependency extras, deployment smoke in target cloud |
 | `finrobot_equity/README.md` | `equity_report/README.md`, `equity_report.leia`, `equity_cli_workflow.leia` | Covered | Equity research product workflow, report replay, stage metadata | Full generated product parity over live data and renderers |
