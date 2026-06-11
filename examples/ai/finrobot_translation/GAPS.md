@@ -17,15 +17,11 @@ external adapters.
 
 ## Open Gaps
 
-| ID | Gap | Category | Affected FinRobot modules | Priority | Validation |
-| --- | --- | --- | --- | --- | --- |
-| FR-GAP-009 | Vector/matrix/math support needs deterministic optimization and sensitivity primitives. | stdlib, external library | sensitivity, valuation, portfolio optimization, Backtrader wrapper | P1 | Numeric fixtures with tolerance checks and fixed seeds |
-| FR-GAP-015 | Valuation and analytics packages need DCF, EV/EBITDA, P/E, BVPS, market cap, target price, sensitivity, catalysts, technical indicators, and thesis/risk helpers. | external library, stdlib | valuation, sensitivity, catalyst, news, analyzer modules | P1 | Deterministic fixtures compare calculations, assumptions, and explanation schemas |
-| FR-GAP-016 | Prompt/role/report-section packages need role profiles, financial prompts, equity section agents, report taxonomy, and templates as data. | AI dialect, external library | `agent_library.py`, `prompts.py`, `equity_agents/*`, text generators, templates | P1 | Snapshot tests for rendered prompts plus output-schema tests for each section agent |
-| FR-GAP-017 | Generated-code and notebook tooling needs capability-gated file operations, Python execution, image display, command approval, and replayable outputs. | AI dialect, stdlib, product layer | `functional/coding.py`, coding tutorials, notebooks | P1 | Approval/replay fixtures for read/write/execute/display, including denied command cases |
-| FR-GAP-018 | Optional integrations are missing for FinGPT, FinRL, FinML, Backtrader, mplfinance, multimodal chart/document models, Ollama, and OpenBB. | external library | tutorials, experiments, `functional/quantitative.py`, charting modules | P2 | Optional-package examples are capability-gated and skip cleanly when dependencies are absent |
-| FR-GAP-020 | Web app product layer needs route parity, auth/session handling, OAuth, admin endpoints, background logs, history, downloads, and SQLite CRUD. | product layer, stdlib | `finrobot_equity/web_app/*` | P2 | Route smoke tests with mocked workflows, DB fixtures, auth sessions, and log/report artifacts |
-| FR-GAP-024 | Product UI snapshots are needed for template/static parity but are not on the core translation path. | product layer | `web_app/templates/*`, `web_app/static/*` | P3 | Snapshot and accessibility checks after workflow/web parity exists |
+No open gaps remain for the provider-free Leia translation slice in this
+directory. Remaining production work is package implementation work, not missing
+language or AI dialect surface: replacing replay fixtures with live external
+packages, hardening product UI, adding real renderers, and shipping optional
+provider integrations behind capability gates.
 
 ## Translation Slice Gaps
 
@@ -82,17 +78,24 @@ external adapters.
 | FR-GAP-006 API substrate | Implemented as a provider-free API replay substrate covering auth metadata, JSON payload shape, pagination, rate-limit/cache metadata, and traceable errors. | `tests/llm/llm_api_replay_example_test.go` runs `examples/ai/finrobot_translation/api_replay.leia`. |
 | FR-GAP-007 web/download substrate | Implemented at the replay contract level for redirects/download metadata, generated artifacts, scraping terms, and provider-free web replay. | `tests/llm/llm_api_replay_example_test.go` validates web/download replay metadata in `api_replay.leia`. |
 | FR-GAP-008 typed table/data support | Implemented as fixture-backed typed table/data normalization with joins, rolling metrics, CSV/JSON-shaped records, nested JSON flattening, and provenance checks. | `tests/llm/llm_data_normalization_test.go` runs `examples/ai/finrobot_translation/data_normalization.leia`. |
+| FR-GAP-009 vector/matrix/math support | Implemented for the translation slice as deterministic sensitivity matrix and optimization-tolerance fixtures without changing q/runtime internals. | `tests/llm/llm_valuation_analytics_test.go` runs `examples/ai/finrobot_translation/sensitivity_math.leia`. |
 | FR-GAP-010 document parsing | Implemented as local document artifact/chunk contracts for SEC filings and earnings-call text, including artifact IDs and parse metadata. | `tests/llm/llm_document_rag_contract_test.go` runs `examples/ai/finrobot_translation/document_rag.leia`. |
 | FR-GAP-011 RAG contracts | Implemented as provider-free local corpus/retrieval contracts over document chunks with citations and reset behavior. | `tests/llm/llm_document_rag_contract_test.go` asserts retrieval inputs, chunks, citations, and no live provider dependency. |
 | FR-GAP-012 chart/report contracts | Implemented as artifact/report contracts with declared inputs, sources, artifact IDs, dimensions, stale-data checks, and AI disclosure markers. | `tests/llm/llm_artifact_report_contract_test.go` runs `examples/ai/finrobot_translation/report_contract.leia`. |
 | FR-GAP-013 finance vendor adapters | Implemented as external-package skeleton manifests for Yahoo, Finnhub, FMP, SEC, earnings, Reddit, and related providers with credentials, schemas, rate limits, fixtures, and terms metadata. | `tests/llm/llm_vendor_adapter_normalizer_test.go` runs `examples/ai/finrobot_translation/vendor_adapters.leia`. |
 | FR-GAP-014 finance normalizers | Implemented as fixture-backed schemas for statements, ratios, market data, recommendations, SEC sections, peers, and news/sentiment records with provenance and stale-field checks. | `tests/llm/llm_vendor_adapter_normalizer_test.go` runs `examples/ai/finrobot_translation/finance_normalizers.leia`. |
+| FR-GAP-015 valuation and analytics packages | Implemented for the translation slice as deterministic DCF, EV/EBITDA, P/E, target-price synthesis, sensitivity, and tolerance fixtures. | `tests/llm/llm_valuation_analytics_test.go` runs `examples/ai/finrobot_translation/valuation_analytics.leia`. |
+| FR-GAP-016 prompt/role/report-section packages | Implemented as data-only role registry, prompt render snapshots, section output schemas, and report taxonomy fixtures. | `tests/llm/llm_role_section_package_data_test.go` runs `examples/ai/finrobot_translation/role_profiles.leia` and `section_agents.leia`. |
+| FR-GAP-017 generated-code and notebook tooling | Implemented as capability-gated replay envelopes for file read/write, generated-code execution, image display, and denied command cases. | `tests/llm/llm_generated_code_tooling_test.go` runs `examples/ai/finrobot_translation/generated_code_tooling.leia`. |
+| FR-GAP-018 optional integrations | Implemented as optional package manifests and clean skip/capability gates for FinGPT, FinRL, FinML, Backtrader, mplfinance, Ollama, and OpenBB without importing those dependencies. | `tests/llm/llm_optional_integration_gating_test.go` runs `examples/ai/finrobot_translation/optional_integrations.leia`. |
 | FR-GAP-019 equity report CLI workflow | Implemented as named stages with dependencies, artifacts, retry/stale-section metadata, chart/report outputs, and manifest checks. | `tests/llm/llm_equity_cli_workflow_test.go` runs `examples/ai/finrobot_translation/equity_cli_workflow.leia`. |
+| FR-GAP-020 web app product layer | Implemented as provider-free web product smoke fixtures covering route parity, auth/session, background task logs, downloads, CRUD state, and report artifacts. | `tests/llm/llm_web_product_smoke_test.go` runs `examples/ai/finrobot_translation/web_product.leia`. |
 | Finance vendors as built-ins | Not needed. Vendors belong in external packages with capabilities, credentials, schemas, rate-limit metadata, and terms metadata. | Vendor package manifests declare capabilities and replay fixtures. |
 | Role profiles as language concepts | Not needed. Roles are package data consumed by generic `agent` declarations. | Role registry snapshot is data-only and uses no parser changes. |
 | FR-GAP-021 deployment/package metadata | Implemented as provider-free package/deploy metadata outside the core dialect: requirements, setup extras, Dockerfile, gcloud deploy script, run_web_app health entrypoint, manifest commands, and environment checks. | `tests/llm/finrobot_package_deploy_test.go` asserts package manifest smoke, optional extras, Docker/gcloud/run_web_app references, and environment setup checks. |
 | FR-GAP-022 compliance and safety gates | Implemented as explicit capability-policy gates for trading, generated code execution, external network calls, credentials, and report publication. | `tests/llm/llm_approval_policy_test.go` runs `examples/ai/finrobot_translation/compliance_policy.leia`. |
 | FR-GAP-023 evaluation harness | Implemented as offline records inventory, fixture versioning, checksums, golden outputs, and CI-friendly provider-free reports. | `tests/llm/finrobot_evaluation_harness_test.go` asserts manifest checksums and runs `leia evaluate --gate --report --replay`. |
+| FR-GAP-024 product UI snapshots | Implemented as static/template snapshot manifests and accessibility checklist fixtures for the translation slice. | `tests/llm/llm_web_product_smoke_test.go` validates the web product snapshot metadata. |
 
 ## First Landing Slice
 
