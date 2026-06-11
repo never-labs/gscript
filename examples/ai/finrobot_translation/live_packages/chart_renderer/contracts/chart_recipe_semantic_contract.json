@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-chart-recipe-semantic-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "dialect": "leia.finance.chart_recipe.v1",
+  "schema": "schemas/chart_recipe_matrix_v1.schema.json",
+  "fixture": "fixtures/chart_recipe_semantic_matrix_fixture.json",
+  "required_recipe_families": [
+    "revenue_ebitda",
+    "eps_pe",
+    "margin",
+    "radar",
+    "waterfall",
+    "cash_flow",
+    "technical_indicators"
+  ],
+  "required_fields": [
+    "recipe_id",
+    "semantic_family",
+    "chart_type",
+    "title",
+    "metrics",
+    "encoding",
+    "chart_spec",
+    "snapshot"
+  ],
+  "snapshot_contract": {
+    "required": true,
+    "hash_algorithm": "sha256",
+    "hash_field": "recipes[].snapshot.hash",
+    "deterministic_inputs": [
+      "recipe_id",
+      "semantic_family",
+      "chart_type",
+      "metrics",
+      "encoding",
+      "chart_spec"
+    ]
+  },
+  "renderer_boundary": {
+    "renderer_field_allowed": false,
+    "provider_field_allowed": false,
+    "artifact_field_allowed": false,
+    "real_render_allowed": false
+  },
+  "acceptance_gates": [
+    "recipe matrix covers revenue/EBITDA, EPS/P/E, margin, radar, waterfall, cash flow, and technical indicator semantics",
+    "each recipe declares metrics, semantic roles, units, encoding, generic chart spec fields, and deterministic sha256 snapshot hash",
+    "recipes remain renderer-neutral and provider-neutral; no mplfinance, matplotlib, plotly, browser, q/runtime, artifact, or network binding is declared",
+    "contract produces semantic specs and hashes only; real rendering belongs to future provider-specific packages"
+  ]
+}

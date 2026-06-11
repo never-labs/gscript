@@ -18,6 +18,19 @@
       }
     },
     {
+      "fixture_key": "recipes:semantic_matrix:v1:offline",
+      "capability": "finance.chart_renderer.recipe.semantic_matrix",
+      "path": "fixtures/chart_recipe_semantic_matrix_fixture.json",
+      "schema": "schemas/chart_recipe_matrix_v1.schema.json",
+      "metadata": {
+        "dialect": "leia.finance.chart_recipe.v1",
+        "recipe_count": 7,
+        "replay_ready": true,
+        "spec_hash_contract": true,
+        "renderer_neutral": true
+      }
+    },
+    {
       "fixture_key": "request:ACME:candlestick:mplfinance:offline",
       "capability": "finance.chart_renderer.request.build",
       "path": "fixtures/render_request_ACME_candlestick_fixture.json",

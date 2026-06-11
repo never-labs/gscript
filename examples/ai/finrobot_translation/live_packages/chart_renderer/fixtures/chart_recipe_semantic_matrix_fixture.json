@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "dialect": "leia.finance.chart_recipe.v1",
+  "coverage_goal": "Provider-free semantic chart recipe matrix for financial analysis specs, deterministic hashes, and contracts only.",
+  "recipes": [
+    {
+      "recipe_id": "recipe:revenue_ebitda:combo:v1",
+      "semantic_family": "revenue_ebitda",
+      "chart_type": "combo",
+      "title": "Revenue and EBITDA Trend",
+      "metrics": [
+        {
+          "id": "revenue",
+          "role": "primary_measure",
+          "unit": "currency",
+          "axis": "left"
+        },
+        {
+          "id": "ebitda",
+          "role": "profit_measure",
+          "unit": "currency",
+          "axis": "left"
+        }
+      ],
+      "encoding": {
+        "x": "period",
+        "bars": [
+          "revenue"
+        ],
+        "lines": [
+          "ebitda"
+        ],
+        "comparison": "same_unit_absolute"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "period",
+          "revenue",
+          "ebitda"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "a4c00aa4e4885bc581ab0489fd446b4c85ca26c55a54d39d5df7c17490919aa7",
+        "hash_input": "finrobot-chart-recipe:revenue_ebitda:v1"
+      }
+    },
+    {
+      "recipe_id": "recipe:eps_pe:dual_axis:v1",
+      "semantic_family": "eps_pe",
+      "chart_type": "dual_axis",
+      "title": "EPS and P/E Multiple",
+      "metrics": [
+        {
+          "id": "eps",
+          "role": "per_share_earnings",
+          "unit": "currency_per_share",
+          "axis": "left"
+        },
+        {
+          "id": "pe_ratio",
+          "role": "valuation_multiple",
+          "unit": "multiple",
+          "axis": "right"
+        }
+      ],
+      "encoding": {
+        "x": "period",
+        "bars": [
+          "eps"
+        ],
+        "lines": [
+          "pe_ratio"
+        ],
+        "comparison": "mixed_unit_dual_axis"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "period",
+          "eps",
+          "pe_ratio"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "d11b8b4a2b72a7ef15e2f4b93bf985aa41c5b7cb4734caeb2fa0b7a50717837f",
+        "hash_input": "finrobot-chart-recipe:eps_pe:v1"
+      }
+    },
+    {
+      "recipe_id": "recipe:margin:line:v1",
+      "semantic_family": "margin",
+      "chart_type": "line",
+      "title": "Margin Stack",
+      "metrics": [
+        {
+          "id": "gross_margin",
+          "role": "profitability_ratio",
+          "unit": "percent",
+          "axis": "left"
+        },
+        {
+          "id": "operating_margin",
+          "role": "profitability_ratio",
+          "unit": "percent",
+          "axis": "left"
+        },
+        {
+          "id": "ebitda_margin",
+          "role": "profitability_ratio",
+          "unit": "percent",
+          "axis": "left"
+        }
+      ],
+      "encoding": {
+        "x": "period",
+        "lines": [
+          "gross_margin",
+          "operating_margin",
+          "ebitda_margin"
+        ],
+        "comparison": "same_unit_ratio"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "period",
+          "gross_margin",
+          "operating_margin",
+          "ebitda_margin"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "34560a64e54f1953797694b985fc7a30f4b2efe3263814cc3c08f539c4b46940",
+        "hash_input": "finrobot-chart-recipe:margin:v1"
+      }
+    },
+    {
+      "recipe_id": "recipe:radar:factor_profile:v1",
+      "semantic_family": "radar",
+      "chart_type": "radar",
+      "title": "Factor Profile Radar",
+      "metrics": [
+        {
+          "id": "profitability_score",
+          "role": "factor_score",
+          "unit": "score",
+          "axis": "radial"
+        },
+        {
+          "id": "growth_score",
+          "role": "factor_score",
+          "unit": "score",
+          "axis": "radial"
+        },
+        {
+          "id": "quality_score",
+          "role": "factor_score",
+          "unit": "score",
+          "axis": "radial"
+        },
+        {
+          "id": "valuation_score",
+          "role": "factor_score",
+          "unit": "score",
+          "axis": "radial"
+        }
+      ],
+      "encoding": {
+        "theta": "factor_name",
+        "radius": "factor_score",
+        "closed_shape": true,
+        "comparison": "normalized_factor_profile"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "factor_name",
+          "factor_score"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "cdfe5d02668cbf2dfb5ae503ab177b5b6c25a2d153d21be7059380145ec03c9f",
+        "hash_input": "finrobot-chart-recipe:radar:v1"
+      }
+    },
+    {
+      "recipe_id": "recipe:waterfall:bridge:v1",
+      "semantic_family": "waterfall",
+      "chart_type": "waterfall",
+      "title": "Operating Income Bridge",
+      "metrics": [
+        {
+          "id": "starting_operating_income",
+          "role": "bridge_start",
+          "unit": "currency",
+          "axis": "left"
+        },
+        {
+          "id": "revenue_change",
+          "role": "bridge_delta",
+          "unit": "currency",
+          "axis": "left"
+        },
+        {
+          "id": "cost_change",
+          "role": "bridge_delta",
+          "unit": "currency",
+          "axis": "left"
+        },
+        {
+          "id": "ending_operating_income",
+          "role": "bridge_end",
+          "unit": "currency",
+          "axis": "left"
+        }
+      ],
+      "encoding": {
+        "x": "bridge_step",
+        "y": "amount",
+        "connectors": true,
+        "comparison": "start_delta_end_bridge"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "bridge_step",
+          "amount",
+          "bridge_role"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "ebbaa0f040e9c2c400aeec8c418de9ab422ac2db59db498af6f18ac84cc9d0b1",
+        "hash_input": "finrobot-chart-recipe:waterfall:v1"
+      }
+    },
+    {
+      "recipe_id": "recipe:cash_flow:stacked_bar:v1",
+      "semantic_family": "cash_flow",
+      "chart_type": "stacked_bar",
+      "title": "Cash Flow Composition",
+      "metrics": [
+        {
+          "id": "cash_from_operations",
+          "role": "operating_cash_flow",
+          "unit": "currency",
+          "axis": "left"
+        },
+        {
+          "id": "capital_expenditures",
+          "role": "investing_cash_flow",
+          "unit": "currency",
+          "axis": "left"
+        },
+        {
+          "id": "free_cash_flow",
+          "role": "derived_cash_flow",
+          "unit": "currency",
+          "axis": "left"
+        }
+      ],
+      "encoding": {
+        "x": "period",
+        "bars": [
+          "cash_from_operations",
+          "capital_expenditures"
+        ],
+        "line": "free_cash_flow",
+        "comparison": "cash_flow_components"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "period",
+          "cash_from_operations",
+          "capital_expenditures",
+          "free_cash_flow"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "e27310789c69c4d11d5aa93b2653399d4cdab21eda9f83e98b3f12be75f1d694",
+        "hash_input": "finrobot-chart-recipe:cash_flow:v1"
+      }
+    },
+    {
+      "recipe_id": "recipe:technical_indicators:multi_panel:v1",
+      "semantic_family": "technical_indicators",
+      "chart_type": "technical_indicators",
+      "title": "Price With Technical Indicators",
+      "metrics": [
+        {
+          "id": "ohlcv",
+          "role": "price_volume_series",
+          "unit": "market_quote",
+          "axis": "price"
+        },
+        {
+          "id": "sma_20",
+          "role": "moving_average",
+          "unit": "price",
+          "axis": "price"
+        },
+        {
+          "id": "rsi_14",
+          "role": "momentum_indicator",
+          "unit": "index",
+          "axis": "indicator"
+        },
+        {
+          "id": "macd",
+          "role": "trend_indicator",
+          "unit": "spread",
+          "axis": "indicator"
+        }
+      ],
+      "encoding": {
+        "x": "date",
+        "candles": "ohlcv",
+        "overlays": [
+          "sma_20"
+        ],
+        "panels": [
+          "volume",
+          "rsi_14",
+          "macd"
+        ],
+        "comparison": "multi_panel_technical_context"
+      },
+      "chart_spec": {
+        "semantic_version": 1,
+        "required_fields": [
+          "date",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "sma_20",
+          "rsi_14",
+          "macd"
+        ],
+        "forbidden_fields": [
+          "renderer",
+          "provider"
+        ]
+      },
+      "snapshot": {
+        "hash_algorithm": "sha256",
+        "hash": "ec280fea1f7ba5261d08171435a339204a60c75b980ae9adf450932b23c43dbd",
+        "hash_input": "finrobot-chart-recipe:technical_indicators:v1"
+      }
+    }
+  ]
+}

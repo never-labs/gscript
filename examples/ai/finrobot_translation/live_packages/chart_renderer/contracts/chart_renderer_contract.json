@@ -20,6 +20,7 @@
         "symbol",
         "chart_type",
         "series",
+        "recipe_semantics",
         "source_metadata",
         "stale_data_warning"
       ]
@@ -74,6 +75,20 @@
         "theme",
         "source_metadata",
         "stale_data_warning"
+      ]
+    },
+    {
+      "id": "chart_recipe_matrix",
+      "schema": "schemas/chart_recipe_matrix_v1.schema.json",
+      "fixture": "fixtures/chart_recipe_semantic_matrix_fixture.json",
+      "required_fields": [
+        "schema_version",
+        "provider_free",
+        "live_network",
+        "real_dependency_imports",
+        "dialect",
+        "recipes",
+        "snapshot"
       ]
     },
     {
@@ -144,6 +159,7 @@
   "acceptance_gates": [
     "charting and chart_generator return typed envelopes instead of renderer-native objects",
     "render requests and results carry provider_free=true and live_network=false",
+    "chart recipe matrix covers financial semantic families with deterministic spec hashes before any renderer binding",
     "source metadata redacts URLs, declares replay readiness, and emits a stale-data warning when data is stale",
     "dimensions and theme are explicit in both request and result contracts",
     "snapshot hashes are deterministic fixture values",

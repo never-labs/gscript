@@ -112,19 +112,19 @@ func TestFinRobotChartRendererLivePackageManifest(t *testing.T) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
 	}
 
-	for _, key := range []string{"smoke", "chart_renderer_contract", "unsupported_renderer_contract", "fixture_index"} {
+	for _, key := range []string{"smoke", "chart_renderer_contract", "chart_recipe_semantic_contract", "unsupported_renderer_contract", "fixture_index"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"chart_spec", "render_request", "render_result", "source_metadata", "renderer_skip"} {
+	for _, key := range []string{"chart_spec", "chart_recipe_matrix", "render_request", "render_result", "source_metadata", "renderer_skip"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertChartRendererJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "chart_spec", "render_request", "render_result", "unsupported_renderer"} {
+	for _, key := range []string{"index", "chart_spec", "chart_recipe_matrix", "render_request", "render_result", "unsupported_renderer"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -146,7 +146,7 @@ func TestFinRobotChartRendererLivePackageManifest(t *testing.T) {
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"chart spec", "render request", "result", "snapshot", "stale-data", "unsupported renderer", "q/runtime"} {
+	for _, want := range []string{"chart spec", "recipe semantic matrix", "render request", "result", "snapshot", "stale-data", "unsupported renderer", "q/runtime"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -211,7 +211,7 @@ func TestFinRobotChartRendererContractsAndFixtureIndex(t *testing.T) {
 		AcceptanceGates []string `json:"acceptance_gates"`
 	}
 	decodeChartRendererJSONFile(t, filepath.Join(base, "contracts", "chart_renderer_contract.json"), &contract)
-	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 4 || len(contract.TypedEnvelopes) != 3 {
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 4 || len(contract.TypedEnvelopes) != 4 {
 		t.Fatalf("contract header/modules/envelopes = %#v", contract)
 	}
 	for _, envelope := range contract.TypedEnvelopes {
@@ -231,7 +231,7 @@ func TestFinRobotChartRendererContractsAndFixtureIndex(t *testing.T) {
 		t.Fatalf("snapshot contract incomplete: %#v", contract.SnapshotContract)
 	}
 	acceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
-	for _, want := range []string{"typed envelopes", "live_network=false", "stale-data", "dimensions", "theme", "snapshot", "clean-skip"} {
+	for _, want := range []string{"typed envelopes", "live_network=false", "semantic families", "stale-data", "dimensions", "theme", "snapshot", "clean-skip"} {
 		if !strings.Contains(acceptance, want) {
 			t.Fatalf("acceptance gates missing %q: %s", want, acceptance)
 		}
@@ -250,7 +250,7 @@ func TestFinRobotChartRendererContractsAndFixtureIndex(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeChartRendererJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 4 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 5 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	for _, fixture := range index.Fixtures {
@@ -262,6 +262,118 @@ func TestFinRobotChartRendererContractsAndFixtureIndex(t *testing.T) {
 		}
 		assertChartRendererJSONFile(t, filepath.Join(base, fixture.Path))
 		assertChartRendererJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+}
+
+func TestFinRobotChartRendererRecipeSemanticMatrix(t *testing.T) {
+	base := chartRendererLivePackageDir(t)
+
+	var contract struct {
+		ProviderFree           bool     `json:"provider_free"`
+		LiveNetwork            bool     `json:"live_network"`
+		RealDependencyImports  bool     `json:"real_dependency_imports"`
+		Dialect                string   `json:"dialect"`
+		Schema                 string   `json:"schema"`
+		Fixture                string   `json:"fixture"`
+		RequiredRecipeFamilies []string `json:"required_recipe_families"`
+		RequiredFields         []string `json:"required_fields"`
+		SnapshotContract       struct {
+			Required      bool     `json:"required"`
+			HashAlgorithm string   `json:"hash_algorithm"`
+			HashField     string   `json:"hash_field"`
+			Inputs        []string `json:"deterministic_inputs"`
+		} `json:"snapshot_contract"`
+		RendererBoundary struct {
+			RendererFieldAllowed bool `json:"renderer_field_allowed"`
+			ProviderFieldAllowed bool `json:"provider_field_allowed"`
+			ArtifactFieldAllowed bool `json:"artifact_field_allowed"`
+			RealRenderAllowed    bool `json:"real_render_allowed"`
+		} `json:"renderer_boundary"`
+		AcceptanceGates []string `json:"acceptance_gates"`
+	}
+	decodeChartRendererJSONFile(t, filepath.Join(base, "contracts", "chart_recipe_semantic_contract.json"), &contract)
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || contract.Dialect != "leia.finance.chart_recipe.v1" || contract.Schema == "" || contract.Fixture == "" {
+		t.Fatalf("recipe semantic contract header incomplete: %#v", contract)
+	}
+	if len(contract.RequiredRecipeFamilies) != 7 || len(contract.RequiredFields) < 8 {
+		t.Fatalf("recipe semantic contract coverage incomplete: %#v", contract)
+	}
+	if !contract.SnapshotContract.Required || contract.SnapshotContract.HashAlgorithm != "sha256" || contract.SnapshotContract.HashField != "recipes[].snapshot.hash" || len(contract.SnapshotContract.Inputs) < 6 {
+		t.Fatalf("recipe snapshot contract incomplete: %#v", contract.SnapshotContract)
+	}
+	if contract.RendererBoundary.RendererFieldAllowed || contract.RendererBoundary.ProviderFieldAllowed || contract.RendererBoundary.ArtifactFieldAllowed || contract.RendererBoundary.RealRenderAllowed {
+		t.Fatalf("recipe contract must not allow renderer/provider/artifact/render bindings: %#v", contract.RendererBoundary)
+	}
+	joinedGates := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
+	for _, want := range []string{"revenue/ebitda", "eps/p/e", "margin", "radar", "waterfall", "cash flow", "technical indicator", "renderer-neutral", "hashes only"} {
+		if !strings.Contains(joinedGates, want) {
+			t.Fatalf("recipe acceptance gates missing %q: %s", want, joinedGates)
+		}
+	}
+
+	var matrix struct {
+		ProviderFree          bool   `json:"provider_free"`
+		LiveNetwork           bool   `json:"live_network"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		Dialect               string `json:"dialect"`
+		Recipes               []struct {
+			RecipeID       string           `json:"recipe_id"`
+			SemanticFamily string           `json:"semantic_family"`
+			ChartType      string           `json:"chart_type"`
+			Title          string           `json:"title"`
+			Metrics        []map[string]any `json:"metrics"`
+			Encoding       map[string]any   `json:"encoding"`
+			ChartSpec      struct {
+				SemanticVersion int      `json:"semantic_version"`
+				RequiredFields  []string `json:"required_fields"`
+				ForbiddenFields []string `json:"forbidden_fields"`
+			} `json:"chart_spec"`
+			Snapshot struct {
+				HashAlgorithm string `json:"hash_algorithm"`
+				Hash          string `json:"hash"`
+				HashInput     string `json:"hash_input"`
+			} `json:"snapshot"`
+		} `json:"recipes"`
+	}
+	decodeChartRendererJSONFile(t, filepath.Join(base, "fixtures", "chart_recipe_semantic_matrix_fixture.json"), &matrix)
+	if !matrix.ProviderFree || matrix.LiveNetwork || matrix.RealDependencyImports || matrix.Dialect != contract.Dialect || len(matrix.Recipes) != len(contract.RequiredRecipeFamilies) {
+		t.Fatalf("recipe matrix header/count incomplete: %#v", matrix)
+	}
+
+	wantFamilies := map[string]bool{}
+	for _, family := range contract.RequiredRecipeFamilies {
+		wantFamilies[family] = false
+	}
+	for _, recipe := range matrix.Recipes {
+		if _, ok := wantFamilies[recipe.SemanticFamily]; !ok {
+			t.Fatalf("unexpected semantic family %q in %#v", recipe.SemanticFamily, recipe)
+		}
+		wantFamilies[recipe.SemanticFamily] = true
+		if recipe.RecipeID == "" || recipe.ChartType == "" || recipe.Title == "" || len(recipe.Metrics) == 0 || len(recipe.Encoding) == 0 {
+			t.Fatalf("recipe semantic spec incomplete: %#v", recipe)
+		}
+		if recipe.ChartSpec.SemanticVersion != 1 || len(recipe.ChartSpec.RequiredFields) == 0 {
+			t.Fatalf("recipe chart spec incomplete: %#v", recipe.ChartSpec)
+		}
+		for _, field := range recipe.ChartSpec.ForbiddenFields {
+			if field != "renderer" && field != "provider" {
+				t.Fatalf("%s unexpected forbidden field %q", recipe.RecipeID, field)
+			}
+		}
+		if recipe.Snapshot.HashAlgorithm != "sha256" || !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(recipe.Snapshot.Hash) || recipe.Snapshot.HashInput == "" {
+			t.Fatalf("recipe snapshot hash incomplete: %#v", recipe.Snapshot)
+		}
+		if _, hasRenderer := recipe.Encoding["renderer"]; hasRenderer {
+			t.Fatalf("%s encoding must stay renderer-neutral: %#v", recipe.RecipeID, recipe.Encoding)
+		}
+		if _, hasProvider := recipe.Encoding["provider"]; hasProvider {
+			t.Fatalf("%s encoding must stay provider-neutral: %#v", recipe.RecipeID, recipe.Encoding)
+		}
+	}
+	for family, seen := range wantFamilies {
+		if !seen {
+			t.Fatalf("missing semantic family %q", family)
+		}
 	}
 }
 
@@ -448,7 +560,7 @@ func TestFinRobotChartRendererLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get chart_renderer_live_package_summary: %v", err)
 			}
-			want := "chart_renderer_live_package modules=4 renderers=3 schemas=5 fixtures=4 provider_free=true live_network=false imports=false clean_skip=true"
+			want := "chart_renderer_live_package modules=4 renderers=3 schemas=6 fixtures=5 provider_free=true live_network=false imports=false clean_skip=true"
 			if got != want {
 				t.Fatalf("chart_renderer_live_package_summary = %#v, want %#v", got, want)
 			}

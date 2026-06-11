@@ -38,7 +38,13 @@
         "ohlc",
         "line",
         "bar",
-        "volume"
+        "volume",
+        "combo",
+        "dual_axis",
+        "stacked_bar",
+        "radar",
+        "waterfall",
+        "technical_indicators"
       ]
     },
     "series": {
