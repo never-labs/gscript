@@ -71,6 +71,39 @@ func (ec *emitContext) emitQEvalSessionEvalExit(instr *Instr) {
 	asm.LoadImm64(jit.X0, int64(instr.ID))
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
+	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
+
+	// R5-K direct helper call (alternate-stack mode): BLR straight into the
+	// Go helper thunk instead of unwinding through the op-exit protocol.
+	// The thunk (jit.JITHelperEntryPC) switches SP back to the goroutine
+	// stack, runs the bridge (tier2_alt_stack.go) with the op-exit
+	// descriptor already staged in ctx above, and resumes here with
+	// X19-X28/D8-D11 preserved. Falls back to the generic op-exit when the
+	// execution is not on a JIT alternate stack (ctx.JITStackHdr == 0:
+	// legacy trampoline paths, Diagnose, native-callee resume loops).
+	if tier2AltStackEnabled() {
+		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_helper_err_%d", instr.ID))
+		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_helper_exit_%d", instr.ID))
+		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)
+		asm.CBZ(jit.X0, genericExitLabel)
+		asm.LoadImm64(jit.X16, int64(jit.JITHelperEntryPC()))
+		asm.BLR(jit.X16)
+		asm.LDR(jit.X16, mRegCtx, execCtxOffHelperErrFlag)
+		asm.CBNZ(jit.X16, helperErrLabel)
+		// Success: result already in its home slot; rejoin the shared
+		// reload/continue tail.
+		asm.B(continueLabel)
+		asm.Label(helperErrLabel)
+		asm.LoadImm64(jit.X0, int64(ExitQEvalHelperErr))
+		asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
+		if ec.numericMode {
+			asm.B("num_deopt_epilogue")
+		} else {
+			asm.B("deopt_epilogue")
+		}
+		asm.Label(genericExitLabel)
+	}
+
 	ec.emitSetResumeNumericPass()
 	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
@@ -80,7 +113,6 @@ func (ec *emitContext) emitQEvalSessionEvalExit(instr *Instr) {
 		asm.B("deopt_epilogue")
 	}
 
-	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 	asm.Label(continueLabel)
 
 	ec.emitReloadSelectiveForCall(gprLive, fprLive)

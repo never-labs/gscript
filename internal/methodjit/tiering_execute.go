@@ -131,6 +131,19 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 	exitCheck := newExitResumeCheckState(cf)
 	ctx.ExitResumeCheckShadow = exitCheck.shadowPtr()
 
+	// R5-K: run native code on a dedicated non-Go stack so emitted
+	// direct-call sites can BLR Go helpers without an exit round trip.
+	// ctx fields default to zero (acquire pools reset the struct), so
+	// direct-call sites fall back to generic op-exits when disabled.
+	var altStk *jit.JITStack
+	if tier2AltStackEnabled() {
+		if altStk = acquireTier2AltStack(); altStk != nil {
+			defer releaseTier2AltStack(altStk)
+			ctx.JITStackHdr = altStk.Hdr()
+			ctx.HelperCF = uintptr(unsafe.Pointer(cf))
+		}
+	}
+
 	codePtr := uintptr(cf.Code.Ptr())
 	ctxPtr := uintptr(unsafe.Pointer(ctx))
 	if tm.envR154Trace {
@@ -210,8 +223,14 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 		}
 		if tm.perfStatsEnabled {
 			start := time.Now()
-			jit.CallJIT(codePtr, ctxPtr)
+			if altStk != nil {
+				jit.CallJITOnStack(codePtr, ctxPtr, altStk)
+			} else {
+				jit.CallJIT(codePtr, ctxPtr)
+			}
 			tm.perfStats.record(perfTier2NativeExecution, time.Since(start))
+		} else if altStk != nil {
+			jit.CallJITOnStack(codePtr, ctxPtr, altStk)
 		} else {
 			jit.CallJIT(codePtr, ctxPtr)
 		}
@@ -495,6 +514,18 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			}
 			codePtr = tier2ExitResumeCodePtr(cf, ctx, resumeOff)
 			continue
+
+		case ExitQEvalHelperErr:
+			// A direct BLR helper (alternate-stack mode) reported an error.
+			// The helper already executed exactly once; return the error
+			// with the same wrap as the generic op-exit path.
+			err := ctx.HelperErr
+			ctx.HelperErr = nil
+			ctx.HelperErrFlag = 0
+			if err == nil {
+				err = fmt.Errorf("missing helper error")
+			}
+			return nil, fmt.Errorf("tier2: op-exit: %w", err)
 
 		case ExitQEvalPipelinePlan:
 			site := (*exitResumeCheckSite)(nil)

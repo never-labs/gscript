@@ -82,6 +82,7 @@ func TestExitKindDispatchExhaustive(t *testing.T) {
 		ExitTableExit:         true,
 		ExitOpExit:            true,
 		ExitQEvalPipelinePlan: true,
+		ExitQEvalHelperErr:    true,
 	}
 	// Kinds handled by the Tier 1 Go-side exit loop (tier1_manager.go).
 	tier1Handled := map[ExitKind]bool{
