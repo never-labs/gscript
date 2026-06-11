@@ -141,6 +141,7 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			defer releaseTier2AltStack(altStk)
 			ctx.JITStackHdr = altStk.Hdr()
 			ctx.HelperCF = uintptr(unsafe.Pointer(cf))
+			ctx.HelperTM = tm
 		}
 	}
 
@@ -518,12 +519,15 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 		case ExitQEvalHelperErr:
 			// A direct BLR helper (alternate-stack mode) reported an error.
 			// The helper already executed exactly once; return the error
-			// with the same wrap as the generic op-exit path.
+			// with the same wrap as the generic path it replaced.
 			err := ctx.HelperErr
 			ctx.HelperErr = nil
 			ctx.HelperErrFlag = 0
 			if err == nil {
 				err = fmt.Errorf("missing helper error")
+			}
+			if Op(ctx.OpExitOp) == OpQEvalPipelinePlan {
+				return nil, fmt.Errorf("tier2: q eval pipeline exit: %w", err)
 			}
 			return nil, fmt.Errorf("tier2: op-exit: %w", err)
 

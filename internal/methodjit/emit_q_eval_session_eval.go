@@ -13,9 +13,24 @@ package methodjit
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/never-labs/leia/internal/jit"
 )
+
+// emitDirectHelperSelfCF publishes this function's OWN CompiledFunction to
+// ctx.HelperCF immediately before a direct helper BLR. The Go side seeds
+// ctx.HelperCF with the entry function's cf, which is wrong for sites that
+// execute inside a natively-BLR'd callee (the ExecContext is shared across
+// the whole native execution); the self-cf cell (emit_compile.go) carries
+// the containing function's cf, resolved through one indirection because
+// the CompiledFunction does not exist yet at emit time. Clobbers X16.
+func (ec *emitContext) emitDirectHelperSelfCF() {
+	asm := ec.asm
+	asm.LoadImm64(jit.X16, int64(uintptr(unsafe.Pointer(ec.selfCFCell))))
+	asm.LDR(jit.X16, jit.X16, 0)
+	asm.STR(jit.X16, mRegCtx, execCtxOffHelperCF)
+}
 
 func (ec *emitContext) emitQEvalSessionEvalExit(instr *Instr) {
 	if instr == nil || len(instr.Args) != 1 || instr.Args[0] == nil {
@@ -81,11 +96,12 @@ func (ec *emitContext) emitQEvalSessionEvalExit(instr *Instr) {
 	// X19-X28/D8-D11 preserved. Falls back to the generic op-exit when the
 	// execution is not on a JIT alternate stack (ctx.JITStackHdr == 0:
 	// legacy trampoline paths, Diagnose, native-callee resume loops).
-	if tier2AltStackEnabled() {
+	if tier2AltStackEnabled() && ec.selfCFCell != nil {
 		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_helper_err_%d", instr.ID))
 		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_helper_exit_%d", instr.ID))
 		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)
 		asm.CBZ(jit.X0, genericExitLabel)
+		ec.emitDirectHelperSelfCF()
 		asm.LoadImm64(jit.X16, int64(jit.JITHelperEntryPC()))
 		asm.BLR(jit.X16)
 		asm.LDR(jit.X16, mRegCtx, execCtxOffHelperErrFlag)
