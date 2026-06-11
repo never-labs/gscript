@@ -18,6 +18,7 @@
     "policy": "No credentials are declared by this skeleton; live provider keys belong only to future provider-specific packages."
   },
   "entrypoints": {
+    "smoke": "main.leia",
     "equity_cli_workflow": "contracts/product_workflow_contract.json#/workflows/equity_cli",
     "web_product": "contracts/product_workflow_contract.json#/workflows/web_product",
     "ui_template_snapshots": "contracts/ui_template_snapshot_contract.json",

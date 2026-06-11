@@ -1,11 +1,17 @@
 package leia_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 type finrobotProductWorkflowLiveManifest struct {
@@ -62,10 +68,13 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 			t.Fatalf("source example %q: %v", source, err)
 		}
 	}
-	for _, key := range []string{"equity_cli_workflow", "web_product", "ui_template_snapshots", "static_asset_manifest", "db_migrations", "deployment_capability_gates"} {
+	for _, key := range []string{"smoke", "equity_cli_workflow", "web_product", "ui_template_snapshots", "static_asset_manifest", "db_migrations", "deployment_capability_gates"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
+	}
+	if manifest.Entrypoints["smoke"] != "main.leia" {
+		t.Fatalf("smoke entrypoint = %q, want main.leia", manifest.Entrypoints["smoke"])
 	}
 	for _, key := range []string{"workflow_run", "web_product", "ui_template_snapshot", "db_migration", "deployment_gate"} {
 		path := manifest.Schemas[key]
@@ -314,6 +323,94 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 		if gate.RequiresCredentials || gate.LiveNetwork {
 			t.Fatalf("gate must not require credentials or live network: %#v", gate)
 		}
+	}
+}
+
+func TestFinRobotProductWorkflowLivePackageNoLiveImports(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(productWorkflowLivePackageDir(t), "main.leia"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, pattern := range []string{
+		`(?m)^\s*import\s+`,
+		`(?m)^\s*use\s+`,
+		`(?m)^\s*load\s*\(`,
+		`(?m)^\s*require\s*\(`,
+		`(?m)^\s*(requests|http|fetch|sql|sqlite|postgres|mysql|redis|s3|boto|yfinance|finnhub|openbb)\s*[.(]`,
+	} {
+		if regexp.MustCompile(pattern).FindString(source) != "" {
+			t.Fatalf("main.leia contains live dependency loader matching %q", pattern)
+		}
+	}
+}
+
+func TestFinRobotProductWorkflowLivePackageExecutableSkeleton(t *testing.T) {
+	path := filepath.Join(productWorkflowLivePackageDir(t), "main.leia")
+
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var prints []string
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString),
+				leia.WithPrint(func(args ...any) {
+					var parts []string
+					for _, arg := range args {
+						parts = append(parts, fmt.Sprint(arg))
+					}
+					prints = append(prints, strings.Join(parts, " "))
+				}),
+			}, tc.opts...)...)
+
+			if err := vm.ExecFile(path); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			got, err := vm.Get("product_workflow_live_package_summary")
+			if err != nil {
+				t.Fatalf("Get product_workflow_live_package_summary: %v", err)
+			}
+			want := "product_workflow_live_package routes=12 auth=5 request_states=8 task_events=5 downloads=4 db_migrations=2 db_tables=9 ui_routes=12 accessibility=9 gates=6 provider_free=true live_network=false imports=false"
+			if got != want {
+				t.Fatalf("product_workflow_live_package_summary = %#v, want %#v", got, want)
+			}
+			if len(prints) != 1 || prints[0] != want {
+				t.Fatalf("prints = %#v, want %q", prints, want)
+			}
+		})
+	}
+}
+
+func TestFinRobotProductWorkflowLivePackageRegisteredExample(t *testing.T) {
+	const path = "examples/ai/finrobot_translation/live_packages/product_workflow/main.leia"
+	root := repoRoot(t)
+	examples := finrobotProductWorkflowRegistryExamples(t, root)
+	var found bool
+	for _, example := range examples {
+		if filepath.ToSlash(example.Path) != path {
+			continue
+		}
+		found = true
+		if !example.Runnable || !example.Checkable || example.Runner != "host-vm" || example.Requires != "" {
+			t.Fatalf("product workflow main registry metadata = %#v", example)
+		}
+	}
+	if !found {
+		t.Fatalf("examples list missing %s", path)
+	}
+
+	report := finrobotProductWorkflowExamplesCheck(t, root, path)
+	if report.SchemaVersion != 1 || !report.OK || report.Runnable != 1 || report.Skipped != 0 || report.Failed != 0 || len(report.Results) != 1 {
+		t.Fatalf("examples check summary = %#v", report)
+	}
+	result := report.Results[0]
+	if filepath.ToSlash(result.Path) != path || result.Status != "ok" || result.Requires != "" || result.Error != "" {
+		t.Fatalf("examples check result = %#v", result)
 	}
 }
 
@@ -846,6 +943,76 @@ func loadProductWorkflowLiveManifest(t *testing.T, base string) finrobotProductW
 	var manifest finrobotProductWorkflowLiveManifest
 	decodeJSONFile(t, filepath.Join(base, "package.manifest.json"), &manifest)
 	return manifest
+}
+
+func productWorkflowLivePackageDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation", "live_packages", "product_workflow")
+}
+
+func finrobotProductWorkflowRegistryExamples(t *testing.T, root string) []finrobotAggregateExample {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("go", "run", "./cmd/leia", "examples", "list", "--json")
+	cmd.Dir = root
+	cmd.Env = withoutLLMProviderEnv(os.Environ())
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("examples list failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+	var payload struct {
+		SchemaVersion int                        `json:"schema_version"`
+		Examples      []finrobotAggregateExample `json:"examples"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode examples list: %v\n%s", err, stdout.String())
+	}
+	if payload.SchemaVersion != 1 {
+		t.Fatalf("examples list schema_version = %d, want 1", payload.SchemaVersion)
+	}
+	return payload.Examples
+}
+
+type productWorkflowExamplesCheckReport struct {
+	SchemaVersion int                                  `json:"schema_version"`
+	OK            bool                                 `json:"ok"`
+	Runnable      int                                  `json:"runnable"`
+	Skipped       int                                  `json:"skipped"`
+	Failed        int                                  `json:"failed"`
+	Results       []productWorkflowExamplesCheckResult `json:"results"`
+}
+
+type productWorkflowExamplesCheckResult struct {
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	Status   string `json:"status"`
+	Requires string `json:"requires"`
+	Error    string `json:"error"`
+}
+
+func finrobotProductWorkflowExamplesCheck(t *testing.T, root, selector string) productWorkflowExamplesCheckReport {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command(
+		"go", "run", "./cmd/leia",
+		"examples", "check",
+		"--json",
+		"--timeout=30s",
+		selector,
+	)
+	cmd.Dir = root
+	cmd.Env = withoutLLMProviderEnv(os.Environ())
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("examples check failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+	var payload productWorkflowExamplesCheckReport
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode examples check: %v\n%s", err, stdout.String())
+	}
+	return payload
 }
 
 func assertJSONFile(t *testing.T, path string) {
