@@ -29,7 +29,13 @@ package_manifest := {
         "artifact.accessibility.checklist",
         "artifact.stale_data.policy",
         "artifact.source_annotation.requirements",
+        "artifact.evidence_citation.envelope",
         "artifact.report.manifest",
+        "artifact.render.manifest",
+        "report.outline.schema",
+        "report.section_dependency.dag",
+        "report.style_profile.policy",
+        "report.partial_failure.fixture",
         "renderer.html.contract",
         "renderer.pdf.contract",
     },
@@ -346,6 +352,46 @@ report_sections := {
     },
 }
 
+report_outline := {
+    id: "outline_acme_analytics_report_v1",
+    title: "ACME Analytics Report",
+    audience: "investment_committee",
+    time_horizon: "2026E",
+    style_profile_id: "style_profile_investment_committee_v1",
+    evidence_policy_id: "evidence_policy_source_bound_claims_v1",
+    render_manifest_id: "render_manifest_acme_analytics_report_v1",
+    sections: {
+        {
+            id: "valuation",
+            title: "Valuation",
+            order: 1,
+            required: true,
+            depends_on: {},
+            evidence_policy: "source_bound_claims_required",
+            render_targets: {"text/html", "application/pdf"},
+        },
+        {
+            id: "sensitivity",
+            title: "Sensitivity",
+            order: 2,
+            required: true,
+            depends_on: {"valuation"},
+            evidence_policy: "source_bound_claims_required",
+            render_targets: {"text/html", "application/pdf"},
+        },
+    },
+}
+
+section_dependency_dag := {
+    id: "section_dependency_dag_acme_analytics_report_v1",
+    nodes: {"valuation", "sensitivity"},
+    edges: {
+        {from: "valuation", to: "sensitivity", reason: "sensitivity section uses valuation base-case assumptions"},
+    },
+    acyclic: true,
+    missing_dependency_policy: "block_required_section_and_emit_partial_fixture",
+}
+
 html_renderer_contract := {
     id: "renderer_html_v1",
     format: "text/html",
@@ -551,11 +597,210 @@ for i := 1; i <= #accessibility_checklist; i++ {
 
 stale_policy_ok := stale_data_policy.warning_required_when_source_stale == true && stale_data_policy.warning_marker == "stale_data_warning" && #stale_data_warnings == 1 && stale_data_warnings[1].source_id == normalized_rows[1].source_id
 
+evidence_citation_envelopes := {
+    {
+        id: "evidence_valuation_target_price",
+        claim_id: "claim_target_price_uses_dcf_and_peer_multiple",
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+        citation_refs: {
+            {
+                id: "citation_price_fixture",
+                source_id: normalized_rows[1].source_id,
+                locator: "normalized_rows[1].close",
+                quote_policy: "no_verbatim_quote_required",
+                as_of: "2026-03-31",
+            },
+            {
+                id: "citation_fundamentals_fixture",
+                source_id: normalized_rows[2].source_id,
+                locator: "normalized_rows[2].free_cash_flow",
+                quote_policy: "no_verbatim_quote_required",
+                as_of: "2026-03-31",
+            },
+        },
+        evidence_quality: "fixture_verified",
+        provider_free: true,
+        unresolved_refs: {},
+    },
+    {
+        id: "evidence_sensitivity_matrix",
+        claim_id: "claim_sensitivity_uses_discount_rate_and_growth_grid",
+        source_refs: {normalized_rows[2].source_id},
+        citation_refs: {
+            {
+                id: "citation_sensitivity_fundamentals_fixture",
+                source_id: normalized_rows[2].source_id,
+                locator: "sensitivity_result.cells",
+                quote_policy: "no_verbatim_quote_required",
+                as_of: "2026-03-31",
+            },
+        },
+        evidence_quality: "fixture_verified",
+        provider_free: true,
+        unresolved_refs: {},
+    },
+}
+
+style_profile_policy := {
+    id: "style_profile_investment_committee_v1",
+    tone: "concise_analytical",
+    locale: "en-US",
+    number_format: "decimal_2dp_percent_1dp",
+    currency: valuation_assumptions.currency,
+    disclosure_policy: "ai_disclosure_required",
+    forbidden_content: {"investment_advice_guarantee", "unresolved_source_claim"},
+    provider_free: true,
+}
+
+render_artifact_manifest := {
+    id: "render_manifest_acme_analytics_report_v1",
+    renderer_contract_refs: {html_renderer_contract.id, pdf_renderer_contract.id},
+    dependency_required: false,
+    status: "planned_not_rendered",
+    outputs: {
+        {artifact_id: "artifact_html_report", format: "text/html", path: "output/acme/analytics_report.html", status: "planned_not_rendered", snapshot_ref: "snapshot_html_report"},
+        {artifact_id: "artifact_pdf_report", format: "application/pdf", path: "output/acme/analytics_report.pdf", status: "planned_not_rendered", snapshot_ref: "snapshot_pdf_report"},
+        {artifact_id: "artifact_chart_target_price", format: "image/png", path: "output/acme/target_price.png", status: "specified_not_rendered", snapshot_ref: "snapshot_chart_target_price"},
+        {artifact_id: "artifact_chart_sensitivity", format: "image/png", path: "output/acme/sensitivity.png", status: "specified_not_rendered", snapshot_ref: "snapshot_chart_sensitivity"},
+    },
+    snapshots: {"snapshot_html_report", "snapshot_pdf_report", "snapshot_chart_target_price", "snapshot_chart_sensitivity"},
+}
+
+partial_report_fixture := {
+    id: "partial_report_fixture_optional_macro_section_v1",
+    status: "partial",
+    completed_sections: {"valuation", "sensitivity"},
+    failed_sections: {
+        {
+            id: "macro_context",
+            required: false,
+            dependency: "external_macro_provider",
+            error_code: "provider_unavailable",
+        },
+    },
+    retryable: true,
+    renderable: true,
+    warning_refs: {"warning_optional_macro_section_skipped"},
+    failure_reason: "optional section skipped because no provider dependency is available in provider-free mode",
+}
+
+func outline_section_by_id(id) {
+    for i := 1; i <= #report_outline.sections; i++ {
+        if report_outline.sections[i].id == id {
+            return report_outline.sections[i]
+        }
+    }
+    return nil
+}
+
+func dag_node_exists(id) {
+    for i := 1; i <= #section_dependency_dag.nodes; i++ {
+        if section_dependency_dag.nodes[i] == id {
+            return true
+        }
+    }
+    return false
+}
+
+func validate_report_outline(outline) {
+    if outline.style_profile_id != style_profile_policy.id || outline.render_manifest_id != render_artifact_manifest.id || #outline.sections != #report_sections {
+        return false
+    }
+    for i := 1; i <= #outline.sections; i++ {
+        section := outline.sections[i]
+        if section.id != report_sections[i].id || section.order != report_sections[i].order || #section.render_targets != 2 {
+            return false
+        }
+        for j := 1; j <= #section.depends_on; j++ {
+            if outline_section_by_id(section.depends_on[j]) == nil {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+func validate_section_dependency_dag(dag) {
+    if dag.acyclic != true || dag.missing_dependency_policy != "block_required_section_and_emit_partial_fixture" {
+        return false
+    }
+    for i := 1; i <= #dag.edges; i++ {
+        edge := dag.edges[i]
+        if !dag_node_exists(edge.from) || !dag_node_exists(edge.to) || edge.from == edge.to {
+            return false
+        }
+    }
+    return true
+}
+
+func validate_evidence_envelope(envelope) {
+    if envelope.provider_free != true || #envelope.unresolved_refs != 0 || #envelope.source_refs == 0 || #envelope.citation_refs == 0 {
+        return false
+    }
+    for i := 1; i <= #envelope.source_refs; i++ {
+        if !source_ref_resolves(envelope.source_refs[i]) {
+            return false
+        }
+    }
+    for i := 1; i <= #envelope.citation_refs; i++ {
+        citation := envelope.citation_refs[i]
+        if citation.source_id == nil || !source_ref_resolves(citation.source_id) || citation.quote_policy == nil {
+            return false
+        }
+    }
+    return true
+}
+
+func snapshot_ref_exists(id) {
+    for i := 1; i <= #snapshot_metadata; i++ {
+        if snapshot_metadata[i].id == id {
+            return true
+        }
+    }
+    return false
+}
+
+func validate_render_artifact_manifest(manifest) {
+    if manifest.dependency_required != false || manifest.status != "planned_not_rendered" || #manifest.outputs != #snapshot_metadata {
+        return false
+    }
+    for i := 1; i <= #manifest.outputs; i++ {
+        output := manifest.outputs[i]
+        if output.artifact_id == nil || output.path == nil || output.status == nil || !snapshot_ref_exists(output.snapshot_ref) {
+            return false
+        }
+    }
+    return true
+}
+
+func validate_style_profile_policy(policy) {
+    return policy.provider_free == true && policy.disclosure_policy == "ai_disclosure_required" && policy.currency == valuation_assumptions.currency && #policy.forbidden_content == 2
+}
+
+func validate_partial_report_fixture(fixture) {
+    return fixture.status == "partial" && fixture.retryable == true && fixture.renderable == true && #fixture.completed_sections == #report_sections && #fixture.failed_sections == 1 && fixture.failed_sections[1].required == false
+}
+
+outline_ok := validate_report_outline(report_outline)
+section_dag_ok := validate_section_dependency_dag(section_dependency_dag)
+evidence_ok := true
+for i := 1; i <= #evidence_citation_envelopes; i++ {
+    if !validate_evidence_envelope(evidence_citation_envelopes[i]) {
+        evidence_ok = false
+    }
+}
+render_manifest_ok := validate_render_artifact_manifest(render_artifact_manifest)
+style_policy_ok := validate_style_profile_policy(style_profile_policy)
+partial_fixture_ok := validate_partial_report_fixture(partial_report_fixture)
+
 artifact_manifest := {
     contract: artifact_contract.version,
     report_id: "ACME_2026_06_11_analytics_report",
     generated_at: "2026-06-11T00:00:00Z",
+    report_outline: report_outline,
+    section_dependency_dag: section_dependency_dag,
     report_sections: {"valuation", "sensitivity"},
+    evidence_citation_envelopes: evidence_citation_envelopes,
     chart_specs: {"chart_target_price", "chart_sensitivity"},
     artifacts: {
         {id: "artifact_html_report", kind: "text/html", path: "output/acme/analytics_report.html", status: "planned_not_rendered"},
@@ -563,8 +808,11 @@ artifact_manifest := {
         chart_specs[1].artifact,
         chart_specs[2].artifact,
     },
+    render_artifact_manifest: render_artifact_manifest,
     snapshot_metadata: snapshot_metadata,
     accessibility_checklist: accessibility_checklist,
+    style_profile_policy: style_profile_policy,
+    partial_report_fixture: partial_report_fixture,
     stale_data_policy: stale_data_policy,
     source_annotation_requirements: source_annotation_requirements,
     source_annotations: source_annotations,
@@ -591,19 +839,30 @@ check("snapshot metadata", snapshot_ok == true && #snapshot_metadata == 4 && sna
 check("accessibility checklist", accessibility_ok == true && #accessibility_checklist == 4)
 check("stale data policy", stale_policy_ok == true && #artifact_manifest.warnings == 1)
 check("source annotation requirements", source_requirements_ok == true && source_requirements_error == nil)
+check("report outline", outline_ok == true && #report_outline.sections == 2)
+check("section dependency dag", section_dag_ok == true && #section_dependency_dag.edges == 1)
+check("evidence envelopes", evidence_ok == true && #evidence_citation_envelopes == 2)
+check("render artifact manifest", render_manifest_ok == true && #render_artifact_manifest.outputs == 4)
+check("style profile policy", style_policy_ok == true)
+check("partial report fixture", partial_fixture_ok == true)
 
 analytics_report_live_package_summary := string.format(
-    "analytics_report_live_package provider_free=%s normalizers=%d valuations=%d sensitivity=%dx%d charts=%d artifacts=%d snapshots=%d a11y=%d warnings=%d html=%s pdf=%s",
+    "analytics_report_live_package provider_free=%s normalizers=%d valuations=%d sensitivity=%dx%d outline=%d dag_edges=%d evidence=%d charts=%d artifacts=%d render_outputs=%d snapshots=%d a11y=%d warnings=%d partial_failures=%d html=%s pdf=%s",
     tostring(package_manifest.provider_free),
     #normalized_rows,
     #valuation_results,
     #discount_rate_cases,
     #growth_cases,
+    #report_outline.sections,
+    #section_dependency_dag.edges,
+    #evidence_citation_envelopes,
     #chart_specs,
     #artifact_manifest.artifacts,
+    #render_artifact_manifest.outputs,
     #snapshot_metadata,
     #accessibility_checklist,
     #artifact_manifest.warnings,
+    #partial_report_fixture.failed_sections,
     renderer_contracts[1].format,
     renderer_contracts[2].format
 )

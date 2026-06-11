@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "corporate_action_adjustment_fixture",
+  "provider_free": true,
+  "rows": [
+    {
+      "schema": "corporate_action_adjustment_v1",
+      "symbol": "ACME",
+      "effective_date": "2026-04-15",
+      "action_type": "cash_dividend",
+      "adjustment_factor": 0.990099,
+      "raw_close": 101,
+      "adjusted_close": 100,
+      "raw_volume": 1000000,
+      "adjusted_volume": 1000000,
+      "cash_amount": 1,
+      "currency": "USD",
+      "adjustment_method": "back_adjust_close_for_cash_dividend",
+      "as_of": "2026-05-01",
+      "stale_after_days": 30,
+      "stale": false,
+      "source_id": "fixture.corporate_actions.acme",
+      "record_hash": "sha256:corporate-action-acme-2026-04-15-dividend"
+    },
+    {
+      "schema": "corporate_action_adjustment_v1",
+      "symbol": "ACME",
+      "effective_date": "2026-05-02",
+      "action_type": "split",
+      "adjustment_factor": 0.5,
+      "raw_close": 100,
+      "adjusted_close": 50,
+      "raw_volume": 1000000,
+      "adjusted_volume": 2000000,
+      "currency": "USD",
+      "adjustment_method": "split_factor_price_inverse_volume_forward",
+      "as_of": "2026-05-02",
+      "stale_after_days": 30,
+      "stale": false,
+      "source_id": "fixture.corporate_actions.acme",
+      "record_hash": "sha256:corporate-action-acme-2026-05-02-split"
+    }
+  ],
+  "deterministic_order": [
+    "symbol",
+    "effective_date",
+    "action_type"
+  ]
+}

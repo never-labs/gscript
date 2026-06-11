@@ -1,6 +1,6 @@
 // Provider-free finance normalizers live package skeleton.
 // This example declares fixture-backed contracts only.
 
-finance_normalizers_live_package_summary := "finance_normalizers_live_package provider_free=true domains=7 schemas=8 fixtures=8 live_network=false imports=false"
+finance_normalizers_live_package_summary := "finance_normalizers_live_package provider_free=true domains=10 schemas=11 fixtures=11 live_network=false imports=false typed_boundaries=true"
 
 print(finance_normalizers_live_package_summary)

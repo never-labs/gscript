@@ -96,7 +96,10 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 		"product.workflow.history.read",
 		"product.workflow.task_log.read",
 		"product.workflow.download.artifact",
+		"product.workflow.download.artifact_manifest",
 		"product.workflow.crud.report_request",
+		"product.workflow.approval.boundary",
+		"product.workflow.replay.fixture",
 		"product.workflow.db.migration.plan",
 		"product.workflow.deploy.local",
 		"product.workflow.deploy.container",
@@ -122,7 +125,7 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 		}
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"provider_free", "credentials", "equity cli", "web product", "capability gates"} {
+	for _, want := range []string{"provider_free", "credentials", "equity cli", "web product", "capability gates", "crud command", "artifact manifests", "approval boundaries", "workflow replay"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -144,6 +147,22 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 			Routes    []string `json:"routes"`
 			Contracts []string `json:"contracts"`
 		} `json:"workflows"`
+		RouteSessionStateContract struct {
+			Capability          string `json:"capability"`
+			Mode                string `json:"mode"`
+			RequiresBrowser     bool   `json:"requires_browser"`
+			RequiresLiveNetwork bool   `json:"requires_live_network"`
+			RequiresCredentials bool   `json:"requires_credentials"`
+			StateSource         string `json:"state_source"`
+			Routes              []struct {
+				Route                string   `json:"route"`
+				Method               string   `json:"method"`
+				AllowedSessionStates []string `json:"allowed_session_states"`
+				RequiredRole         string   `json:"required_role"`
+				SideEffects          []string `json:"side_effects"`
+			} `json:"routes"`
+			DeniedCases []string `json:"denied_cases"`
+		} `json:"route_session_state_contract"`
 		AuthSession map[string]any `json:"auth_session"`
 		RequestSM   struct {
 			Capability     string   `json:"capability"`
@@ -187,7 +206,64 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 			} `json:"authorization"`
 			RemoteObjectFetch bool `json:"remote_object_fetch"`
 		} `json:"download"`
-		CRUD map[string]any `json:"crud"`
+		ArtifactManifestContract struct {
+			Capability          string   `json:"capability"`
+			ProviderFree        bool     `json:"provider_free"`
+			LiveNetwork         bool     `json:"live_network"`
+			RequiresCredentials bool     `json:"requires_credentials"`
+			ManifestPath        string   `json:"manifest_path"`
+			RequiredFields      []string `json:"required_fields"`
+			ArtifactFields      []string `json:"artifact_fields"`
+			PathPolicy          struct {
+				LocalFixturePrefix string `json:"local_fixture_prefix"`
+				RemoteURIAllowed   bool   `json:"remote_uri_allowed"`
+				SignedURLAllowed   bool   `json:"signed_url_allowed"`
+				ChecksumAlgorithm  string `json:"checksum_algorithm"`
+			} `json:"path_policy"`
+		} `json:"artifact_manifest_contract"`
+		CRUD struct {
+			Capability      string   `json:"capability"`
+			Operations      []string `json:"operations"`
+			Tables          []string `json:"tables"`
+			CommandEnvelope struct {
+				Mode                string   `json:"mode"`
+				RequiresLiveNetwork bool     `json:"requires_live_network"`
+				RequiresCredentials bool     `json:"requires_credentials"`
+				RequiredFields      []string `json:"required_fields"`
+				Operations          []struct {
+					Operation    string   `json:"operation"`
+					AllowedFrom  []string `json:"allowed_from"`
+					AllowedTo    string   `json:"allowed_to"`
+					RequiresRole string   `json:"requires_role"`
+				} `json:"operations"`
+				FixturePath string `json:"fixture_path"`
+			} `json:"command_envelope"`
+		} `json:"crud"`
+		ApprovalBoundary struct {
+			Capability                      string   `json:"capability"`
+			ProviderFree                    bool     `json:"provider_free"`
+			DefaultDecision                 string   `json:"default_decision"`
+			FixturePath                     string   `json:"fixture_path"`
+			RequiresExplicitCapabilityGrant bool     `json:"requires_explicit_capability_grant"`
+			DeniedByDefault                 []string `json:"denied_by_default"`
+			AllowedWithoutApproval          []string `json:"allowed_without_approval"`
+		} `json:"approval_boundary"`
+		WorkflowReplay struct {
+			Capability                string   `json:"capability"`
+			ProviderFree              bool     `json:"provider_free"`
+			LiveNetwork               bool     `json:"live_network"`
+			RequiresCredentials       bool     `json:"requires_credentials"`
+			RequiresProviderCallbacks bool     `json:"requires_provider_callbacks"`
+			FixturePath               string   `json:"fixture_path"`
+			Inputs                    []string `json:"inputs"`
+			OrderedEventSources       []string `json:"ordered_event_sources"`
+			Outputs                   []string `json:"outputs"`
+			Determinism               struct {
+				Clock             string `json:"clock"`
+				RandomSeed        string `json:"random_seed"`
+				ExternalCallbacks bool   `json:"external_callbacks"`
+			} `json:"determinism"`
+		} `json:"workflow_replay"`
 	}
 	decodeJSONFile(t, filepath.Join(base, "contracts", "product_workflow_contract.json"), &workflow)
 	if !workflow.ProviderFree || workflow.LiveNetwork {
@@ -202,7 +278,6 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 	for name, block := range map[string]map[string]any{
 		"auth_session": workflow.AuthSession,
 		"history":      workflow.History,
-		"crud":         workflow.CRUD,
 	} {
 		if block["capability"] == "" {
 			t.Fatalf("%s missing capability: %#v", name, block)
@@ -215,10 +290,15 @@ func TestFinRobotProductWorkflowLivePackageContracts(t *testing.T) {
 		t.Fatalf("download contract = %#v", workflow.Download)
 	}
 	assertProductWorkflowUISnapshotContract(t, base, workflow.Workflows["web_product"].Routes)
+	assertRouteSessionStateContract(t, workflow.RouteSessionStateContract, workflow.Workflows["web_product"].Routes)
 	assertProductWorkflowLifecycleContract(t, workflow.AuthSession)
 	assertReportRequestStateMachine(t, workflow.RequestSM)
 	assertTaskEventOrderingContract(t, workflow.TaskLog.Ordering.Key, workflow.TaskLog.Ordering.SequenceColumn, workflow.TaskLog.Ordering.MonotonicPerTask)
 	assertDownloadAuthorizationContract(t, workflow.Download.Authorization.Mode, workflow.Download.Authorization.RequiresSessionState, workflow.Download.Authorization.RequiresArtifactState, workflow.Download.Authorization.DeniedCases)
+	assertArtifactManifestContract(t, workflow.ArtifactManifestContract)
+	assertCRUDCommandEnvelopeContract(t, workflow.CRUD)
+	assertApprovalBoundaryContract(t, workflow.ApprovalBoundary)
+	assertWorkflowReplayContract(t, workflow.WorkflowReplay)
 
 	var migration struct {
 		ProviderFree bool   `json:"provider_free"`
@@ -375,7 +455,7 @@ func TestFinRobotProductWorkflowLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get product_workflow_live_package_summary: %v", err)
 			}
-			want := "product_workflow_live_package routes=12 auth=5 request_states=8 task_events=5 downloads=4 db_migrations=2 db_tables=9 ui_routes=12 accessibility=9 gates=6 provider_free=true live_network=false imports=false"
+			want := "product_workflow_live_package routes=12 auth=5 request_states=8 task_events=5 downloads=4 db_migrations=2 db_tables=9 ui_routes=12 accessibility=9 route_sessions=3 crud_commands=3 artifact_items=4 approvals=4 replay_events=8 gates=6 provider_free=true live_network=false imports=false"
 			if got != want {
 				t.Fatalf("product_workflow_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -639,6 +719,63 @@ func assertStaticAssetManifest(t *testing.T, path string, templates map[string]b
 	}
 }
 
+func assertRouteSessionStateContract(t *testing.T, contract struct {
+	Capability          string `json:"capability"`
+	Mode                string `json:"mode"`
+	RequiresBrowser     bool   `json:"requires_browser"`
+	RequiresLiveNetwork bool   `json:"requires_live_network"`
+	RequiresCredentials bool   `json:"requires_credentials"`
+	StateSource         string `json:"state_source"`
+	Routes              []struct {
+		Route                string   `json:"route"`
+		Method               string   `json:"method"`
+		AllowedSessionStates []string `json:"allowed_session_states"`
+		RequiredRole         string   `json:"required_role"`
+		SideEffects          []string `json:"side_effects"`
+	} `json:"routes"`
+	DeniedCases []string `json:"denied_cases"`
+}, webRoutes []string) {
+	t.Helper()
+	if contract.Capability != "product.workflow.web.route" || contract.Mode != "fixture_session_state" {
+		t.Fatalf("route/session contract header = %#v", contract)
+	}
+	if contract.RequiresBrowser || contract.RequiresLiveNetwork || contract.RequiresCredentials {
+		t.Fatalf("route/session contract must be static/provider-free: %#v", contract)
+	}
+	if !strings.Contains(contract.StateSource, "provider_free_fixture_index.json#") {
+		t.Fatalf("route/session state source must point at fixture index: %q", contract.StateSource)
+	}
+	if len(contract.Routes) != len(webRoutes) {
+		t.Fatalf("route/session contract route count = %d, want %d", len(contract.Routes), len(webRoutes))
+	}
+	for _, route := range webRoutes {
+		found := false
+		for _, entry := range contract.Routes {
+			if entry.Route != route {
+				continue
+			}
+			found = true
+			if entry.Method == "" || len(entry.AllowedSessionStates) == 0 || entry.RequiredRole == "" {
+				t.Fatalf("route/session entry incomplete for %q: %#v", route, entry)
+			}
+			if strings.HasPrefix(route, "admin_") && entry.RequiredRole != "admin" {
+				t.Fatalf("admin route %q must require admin role: %#v", route, entry)
+			}
+			if route != "home" && route != "login" && route != "oauth_callback" && !contains(entry.AllowedSessionStates, "authenticated") {
+				t.Fatalf("protected route %q must allow authenticated fixture state: %#v", route, entry)
+			}
+		}
+		if !found {
+			t.Fatalf("web route %q missing route/session contract: %#v", route, contract.Routes)
+		}
+	}
+	for _, want := range []string{"anonymous_on_protected_route", "expired_session", "csrf_missing_for_post", "role_mismatch"} {
+		if !contains(contract.DeniedCases, want) {
+			t.Fatalf("route/session denied cases missing %q: %#v", want, contract.DeniedCases)
+		}
+	}
+}
+
 func assertProductWorkflowLifecycleContract(t *testing.T, authSession map[string]any) {
 	t.Helper()
 	lifecycle, ok := authSession["lifecycle"].(map[string]any)
@@ -747,6 +884,163 @@ func assertDownloadAuthorizationContract(t *testing.T, mode, sessionState, artif
 	}
 }
 
+func assertArtifactManifestContract(t *testing.T, contract struct {
+	Capability          string   `json:"capability"`
+	ProviderFree        bool     `json:"provider_free"`
+	LiveNetwork         bool     `json:"live_network"`
+	RequiresCredentials bool     `json:"requires_credentials"`
+	ManifestPath        string   `json:"manifest_path"`
+	RequiredFields      []string `json:"required_fields"`
+	ArtifactFields      []string `json:"artifact_fields"`
+	PathPolicy          struct {
+		LocalFixturePrefix string `json:"local_fixture_prefix"`
+		RemoteURIAllowed   bool   `json:"remote_uri_allowed"`
+		SignedURLAllowed   bool   `json:"signed_url_allowed"`
+		ChecksumAlgorithm  string `json:"checksum_algorithm"`
+	} `json:"path_policy"`
+}) {
+	t.Helper()
+	if contract.Capability != "product.workflow.download.artifact_manifest" || !contract.ProviderFree || contract.LiveNetwork || contract.RequiresCredentials {
+		t.Fatalf("artifact manifest contract header = %#v", contract)
+	}
+	if !strings.Contains(contract.ManifestPath, "provider_free_fixture_index.json#") {
+		t.Fatalf("artifact manifest fixture path = %q", contract.ManifestPath)
+	}
+	for _, want := range []string{"manifest_version", "request_id", "owner_user_id", "artifacts", "created_at"} {
+		if !contains(contract.RequiredFields, want) {
+			t.Fatalf("artifact manifest required fields missing %q: %#v", want, contract.RequiredFields)
+		}
+	}
+	for _, want := range []string{"artifact_id", "kind", "media_type", "local_path", "sha256", "byte_size", "download_capability"} {
+		if !contains(contract.ArtifactFields, want) {
+			t.Fatalf("artifact fields missing %q: %#v", want, contract.ArtifactFields)
+		}
+	}
+	if contract.PathPolicy.LocalFixturePrefix != "output/fixture/" || contract.PathPolicy.RemoteURIAllowed || contract.PathPolicy.SignedURLAllowed || contract.PathPolicy.ChecksumAlgorithm != "sha256" {
+		t.Fatalf("artifact path policy = %#v", contract.PathPolicy)
+	}
+}
+
+func assertCRUDCommandEnvelopeContract(t *testing.T, crud struct {
+	Capability      string   `json:"capability"`
+	Operations      []string `json:"operations"`
+	Tables          []string `json:"tables"`
+	CommandEnvelope struct {
+		Mode                string   `json:"mode"`
+		RequiresLiveNetwork bool     `json:"requires_live_network"`
+		RequiresCredentials bool     `json:"requires_credentials"`
+		RequiredFields      []string `json:"required_fields"`
+		Operations          []struct {
+			Operation    string   `json:"operation"`
+			AllowedFrom  []string `json:"allowed_from"`
+			AllowedTo    string   `json:"allowed_to"`
+			RequiresRole string   `json:"requires_role"`
+		} `json:"operations"`
+		FixturePath string `json:"fixture_path"`
+	} `json:"command_envelope"`
+}) {
+	t.Helper()
+	if crud.Capability != "product.workflow.crud.report_request" {
+		t.Fatalf("CRUD capability = %q", crud.Capability)
+	}
+	for _, want := range []string{"create", "read", "update", "delete"} {
+		if !contains(crud.Operations, want) {
+			t.Fatalf("CRUD operations missing %q: %#v", want, crud.Operations)
+		}
+	}
+	envelope := crud.CommandEnvelope
+	if envelope.Mode != "deterministic_fixture_command" || envelope.RequiresLiveNetwork || envelope.RequiresCredentials {
+		t.Fatalf("CRUD command envelope must be deterministic/provider-free: %#v", envelope)
+	}
+	for _, want := range []string{"command_id", "operation", "actor_user_id", "actor_role", "idempotency_key", "expected_state", "payload", "fixture_result_id"} {
+		if !contains(envelope.RequiredFields, want) {
+			t.Fatalf("CRUD command envelope required fields missing %q: %#v", want, envelope.RequiredFields)
+		}
+	}
+	if !strings.Contains(envelope.FixturePath, "provider_free_fixture_index.json#") {
+		t.Fatalf("CRUD command envelope fixture path = %q", envelope.FixturePath)
+	}
+	if len(envelope.Operations) != 4 {
+		t.Fatalf("CRUD command envelope operations = %#v", envelope.Operations)
+	}
+	for _, op := range envelope.Operations {
+		if op.Operation == "" || len(op.AllowedFrom) == 0 || op.AllowedTo == "" || op.RequiresRole != "analyst" {
+			t.Fatalf("CRUD command operation incomplete: %#v", op)
+		}
+	}
+}
+
+func assertApprovalBoundaryContract(t *testing.T, boundary struct {
+	Capability                      string   `json:"capability"`
+	ProviderFree                    bool     `json:"provider_free"`
+	DefaultDecision                 string   `json:"default_decision"`
+	FixturePath                     string   `json:"fixture_path"`
+	RequiresExplicitCapabilityGrant bool     `json:"requires_explicit_capability_grant"`
+	DeniedByDefault                 []string `json:"denied_by_default"`
+	AllowedWithoutApproval          []string `json:"allowed_without_approval"`
+}) {
+	t.Helper()
+	if boundary.Capability != "product.workflow.approval.boundary" || !boundary.ProviderFree || boundary.DefaultDecision != "deny" || !boundary.RequiresExplicitCapabilityGrant {
+		t.Fatalf("approval boundary header = %#v", boundary)
+	}
+	if !strings.Contains(boundary.FixturePath, "provider_free_fixture_index.json#") {
+		t.Fatalf("approval fixture path = %q", boundary.FixturePath)
+	}
+	for _, want := range []string{"live_provider_call", "live_network_fetch", "credential_read", "provider_sdk_import", "external_deploy"} {
+		if !contains(boundary.DeniedByDefault, want) {
+			t.Fatalf("approval denied-by-default missing %q: %#v", want, boundary.DeniedByDefault)
+		}
+	}
+	for _, want := range []string{"read_checked_in_fixture", "render_static_template_snapshot", "replay_recorded_workflow", "validate_json_contract"} {
+		if !contains(boundary.AllowedWithoutApproval, want) {
+			t.Fatalf("approval allowed list missing %q: %#v", want, boundary.AllowedWithoutApproval)
+		}
+	}
+}
+
+func assertWorkflowReplayContract(t *testing.T, replay struct {
+	Capability                string   `json:"capability"`
+	ProviderFree              bool     `json:"provider_free"`
+	LiveNetwork               bool     `json:"live_network"`
+	RequiresCredentials       bool     `json:"requires_credentials"`
+	RequiresProviderCallbacks bool     `json:"requires_provider_callbacks"`
+	FixturePath               string   `json:"fixture_path"`
+	Inputs                    []string `json:"inputs"`
+	OrderedEventSources       []string `json:"ordered_event_sources"`
+	Outputs                   []string `json:"outputs"`
+	Determinism               struct {
+		Clock             string `json:"clock"`
+		RandomSeed        string `json:"random_seed"`
+		ExternalCallbacks bool   `json:"external_callbacks"`
+	} `json:"determinism"`
+}) {
+	t.Helper()
+	if replay.Capability != "product.workflow.replay.fixture" || !replay.ProviderFree || replay.LiveNetwork || replay.RequiresCredentials || replay.RequiresProviderCallbacks {
+		t.Fatalf("workflow replay header = %#v", replay)
+	}
+	if !strings.Contains(replay.FixturePath, "provider_free_fixture_index.json#") {
+		t.Fatalf("workflow replay fixture path = %q", replay.FixturePath)
+	}
+	for _, want := range []string{"ticker", "sections", "session_fixture_id", "crud_command_ids"} {
+		if !contains(replay.Inputs, want) {
+			t.Fatalf("workflow replay inputs missing %q: %#v", want, replay.Inputs)
+		}
+	}
+	for _, want := range []string{"report_request_lifecycle", "task_events", "download_authorization"} {
+		if !contains(replay.OrderedEventSources, want) {
+			t.Fatalf("workflow replay event sources missing %q: %#v", want, replay.OrderedEventSources)
+		}
+	}
+	for _, want := range []string{"artifact_manifest", "task_history", "ui_snapshot_metadata"} {
+		if !contains(replay.Outputs, want) {
+			t.Fatalf("workflow replay outputs missing %q: %#v", want, replay.Outputs)
+		}
+	}
+	if replay.Determinism.Clock != "fixture_logical_clock" || replay.Determinism.RandomSeed != "not_used" || replay.Determinism.ExternalCallbacks {
+		t.Fatalf("workflow replay determinism = %#v", replay.Determinism)
+	}
+}
+
 func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 	t.Helper()
 	var fixtures struct {
@@ -764,18 +1058,56 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 					Event    string `json:"event"`
 					To       string `json:"to"`
 				} `json:"report_request_lifecycle"`
+				RouteSessionSnapshots []struct {
+					Route        string `json:"route"`
+					Method       string `json:"method"`
+					SessionID    string `json:"session_id"`
+					SessionState string `json:"session_state"`
+					Role         string `json:"role"`
+					Decision     string `json:"decision"`
+					Reason       string `json:"reason"`
+				} `json:"route_session_snapshots"`
+				CRUDCommandEnvelopes []struct {
+					CommandID       string         `json:"command_id"`
+					Operation       string         `json:"operation"`
+					ActorUserID     string         `json:"actor_user_id"`
+					ActorRole       string         `json:"actor_role"`
+					IdempotencyKey  string         `json:"idempotency_key"`
+					ExpectedState   string         `json:"expected_state"`
+					Payload         map[string]any `json:"payload"`
+					FixtureResultID string         `json:"fixture_result_id"`
+				} `json:"crud_command_envelopes"`
 				TaskEvents []struct {
 					ID       string `json:"id"`
 					TaskID   string `json:"task_id"`
 					Sequence int    `json:"sequence"`
 					Event    string `json:"event"`
 				} `json:"task_events"`
+				ArtifactManifest struct {
+					ManifestVersion int    `json:"manifest_version"`
+					RequestID       string `json:"request_id"`
+					OwnerUserID     string `json:"owner_user_id"`
+					Artifacts       []struct {
+						ArtifactID         string `json:"artifact_id"`
+						Kind               string `json:"kind"`
+						MediaType          string `json:"media_type"`
+						LocalPath          string `json:"local_path"`
+						SHA256             string `json:"sha256"`
+						ByteSize           int    `json:"byte_size"`
+						DownloadCapability string `json:"download_capability"`
+					} `json:"artifacts"`
+				} `json:"artifact_manifest"`
 				DownloadAuthorization []struct {
 					ArtifactID string `json:"artifact_id"`
 					SessionID  string `json:"session_id"`
 					Decision   string `json:"decision"`
 					Reason     string `json:"reason"`
 				} `json:"download_authorization"`
+				ApprovalDecisions []struct {
+					Request  string `json:"request"`
+					Decision string `json:"decision"`
+					Reason   string `json:"reason"`
+				} `json:"approval_decisions"`
 				UISnapshots struct {
 					Accessibility []struct {
 						Route           string   `json:"route"`
@@ -795,6 +1127,20 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 					} `json:"visual"`
 				} `json:"ui_snapshots"`
 			} `json:"web_product"`
+			WorkflowReplay struct {
+				ID                  string `json:"id"`
+				ProviderFree        bool   `json:"provider_free"`
+				LiveNetwork         bool   `json:"live_network"`
+				RequiresCredentials bool   `json:"requires_credentials"`
+				Inputs              struct {
+					Ticker           string   `json:"ticker"`
+					Sections         []string `json:"sections"`
+					SessionFixtureID string   `json:"session_fixture_id"`
+					CRUDCommandIDs   []string `json:"crud_command_ids"`
+				} `json:"inputs"`
+				OrderedEvents []string          `json:"ordered_events"`
+				Outputs       map[string]string `json:"outputs"`
+			} `json:"workflow_replay"`
 		} `json:"fixtures"`
 		DBSeed struct {
 			SchemaVersions []struct {
@@ -831,7 +1177,40 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 		t.Fatalf("auth session fixtures missing expired denial case: %#v", fixtures.Fixtures.WebProduct.AuthSessions)
 	}
 	assertMonotonicSequences(t, "report request lifecycle", lifecycleSequences(fixtures.Fixtures.WebProduct.ReportRequestLifecycle))
+	hasRouteAllow, hasRouteDeny := false, false
+	for _, snapshot := range fixtures.Fixtures.WebProduct.RouteSessionSnapshots {
+		if snapshot.Route == "" || snapshot.Method == "" || snapshot.SessionID == "" || snapshot.SessionState == "" || snapshot.Role == "" || snapshot.Decision == "" {
+			t.Fatalf("route/session snapshot incomplete: %#v", snapshot)
+		}
+		hasRouteAllow = hasRouteAllow || snapshot.Decision == "allow"
+		hasRouteDeny = hasRouteDeny || snapshot.Decision == "deny" && snapshot.Reason != ""
+	}
+	if !hasRouteAllow || !hasRouteDeny {
+		t.Fatalf("route/session snapshots need allow and deny cases: %#v", fixtures.Fixtures.WebProduct.RouteSessionSnapshots)
+	}
+	for _, command := range fixtures.Fixtures.WebProduct.CRUDCommandEnvelopes {
+		if command.CommandID == "" || command.Operation == "" || command.ActorUserID == "" || command.ActorRole == "" || command.IdempotencyKey == "" || command.ExpectedState == "" || command.FixtureResultID == "" || len(command.Payload) == 0 {
+			t.Fatalf("CRUD command envelope fixture incomplete: %#v", command)
+		}
+	}
+	if len(fixtures.Fixtures.WebProduct.CRUDCommandEnvelopes) < 3 {
+		t.Fatalf("CRUD command envelope fixtures too shallow: %#v", fixtures.Fixtures.WebProduct.CRUDCommandEnvelopes)
+	}
 	assertMonotonicSequences(t, "task events", taskEventSequences(fixtures.Fixtures.WebProduct.TaskEvents))
+	if fixtures.Fixtures.WebProduct.ArtifactManifest.ManifestVersion != 1 || fixtures.Fixtures.WebProduct.ArtifactManifest.RequestID == "" || fixtures.Fixtures.WebProduct.ArtifactManifest.OwnerUserID == "" {
+		t.Fatalf("artifact manifest fixture header = %#v", fixtures.Fixtures.WebProduct.ArtifactManifest)
+	}
+	if len(fixtures.Fixtures.WebProduct.ArtifactManifest.Artifacts) != 4 {
+		t.Fatalf("artifact manifest items = %#v", fixtures.Fixtures.WebProduct.ArtifactManifest.Artifacts)
+	}
+	for _, artifact := range fixtures.Fixtures.WebProduct.ArtifactManifest.Artifacts {
+		if artifact.ArtifactID == "" || artifact.Kind == "" || artifact.MediaType == "" || artifact.SHA256 == "" || artifact.ByteSize <= 0 || artifact.DownloadCapability == "" {
+			t.Fatalf("artifact manifest item incomplete: %#v", artifact)
+		}
+		if !strings.HasPrefix(artifact.LocalPath, "output/fixture/") || strings.Contains(artifact.LocalPath, "://") {
+			t.Fatalf("artifact manifest path must be local fixture path: %#v", artifact)
+		}
+	}
 	hasAllow, hasDeny := false, false
 	for _, authz := range fixtures.Fixtures.WebProduct.DownloadAuthorization {
 		hasAllow = hasAllow || authz.Decision == "allow"
@@ -842,6 +1221,17 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 	}
 	if !hasAllow || !hasDeny {
 		t.Fatalf("download authorization fixtures need allow and deny cases: %#v", fixtures.Fixtures.WebProduct.DownloadAuthorization)
+	}
+	hasApprovalAllow, hasApprovalDeny := false, false
+	for _, decision := range fixtures.Fixtures.WebProduct.ApprovalDecisions {
+		if decision.Request == "" || decision.Decision == "" || decision.Reason == "" {
+			t.Fatalf("approval decision fixture incomplete: %#v", decision)
+		}
+		hasApprovalAllow = hasApprovalAllow || decision.Decision == "allow"
+		hasApprovalDeny = hasApprovalDeny || decision.Decision == "deny"
+	}
+	if !hasApprovalAllow || !hasApprovalDeny {
+		t.Fatalf("approval fixtures need allow and deny cases: %#v", fixtures.Fixtures.WebProduct.ApprovalDecisions)
 	}
 	if len(fixtures.Fixtures.WebProduct.UISnapshots.Accessibility) < 3 || len(fixtures.Fixtures.WebProduct.UISnapshots.Visual) < 3 {
 		t.Fatalf("UI snapshot fixtures too shallow: %#v", fixtures.Fixtures.WebProduct.UISnapshots)
@@ -870,6 +1260,21 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 	}
 	if len(fixtures.DBSeed.SchemaRollbacks) < 2 {
 		t.Fatalf("schema rollback fixtures = %#v", fixtures.DBSeed.SchemaRollbacks)
+	}
+	replay := fixtures.Fixtures.WorkflowReplay
+	if replay.ID == "" || !replay.ProviderFree || replay.LiveNetwork || replay.RequiresCredentials {
+		t.Fatalf("workflow replay fixture header = %#v", replay)
+	}
+	if replay.Inputs.Ticker == "" || len(replay.Inputs.Sections) == 0 || replay.Inputs.SessionFixtureID == "" || len(replay.Inputs.CRUDCommandIDs) == 0 {
+		t.Fatalf("workflow replay inputs incomplete: %#v", replay.Inputs)
+	}
+	if len(replay.OrderedEvents) < 8 {
+		t.Fatalf("workflow replay ordered events too shallow: %#v", replay.OrderedEvents)
+	}
+	for _, want := range []string{"artifact_manifest", "task_history", "ui_snapshot_metadata"} {
+		if !strings.Contains(replay.Outputs[want], "provider_free_fixture_index.json#") {
+			t.Fatalf("workflow replay output %q must point at fixture index: %#v", want, replay.Outputs)
+		}
 	}
 }
 

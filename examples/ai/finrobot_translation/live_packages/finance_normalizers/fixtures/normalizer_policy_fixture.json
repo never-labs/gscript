@@ -9,11 +9,51 @@
   "date_policy": "RFC3339 full-date or timestamp",
   "symbol_policy": "uppercase ticker",
   "numeric_unit_policy": "explicit unit and scale fields",
+  "typed_boundary_policy": "normalize symbol, date, currency, unit, and validation-error records before provider-specific interpretation",
+  "unit_currency_conversion_envelope": {
+    "required_fields": [
+      "raw_value",
+      "normalized_value",
+      "unit",
+      "scale",
+      "source_currency",
+      "target_currency",
+      "conversion_rate",
+      "precision"
+    ],
+    "provider_free": true,
+    "live_rate_lookup": false
+  },
+  "corporate_action_policy": {
+    "schema": "corporate_action_adjustment_v1",
+    "adjustment_methods": [
+      "split_factor_price_inverse_volume_forward",
+      "back_adjust_close_for_cash_dividend"
+    ],
+    "fixture_only": true
+  },
   "stale_basis": "as_of plus stale_after_days",
   "stale_required": true,
   "missing_required_policy": "reject_record",
   "missing_optional_policy": "emit_null_with_missing_reason",
+  "missing_reason_required_when_null": true,
+  "missing_reason_taxonomy": [
+    "source_not_disclosed",
+    "provider_fixture_did_not_include_field",
+    "dash_placeholder",
+    "not_available_placeholder",
+    "forecast_not_disclosed",
+    "currency_conversion_rate_missing"
+  ],
   "warning_marker": "finance_normalizer_stale_field",
+  "validation_error_taxonomy": [
+    "currency_conversion_rate_missing",
+    "date_not_rfc3339",
+    "missing_required_field",
+    "optional_value_missing",
+    "symbol_not_canonical",
+    "unit_scale_missing"
+  ],
   "deterministic_ordering": {
     "statements": [
       "symbol",
@@ -50,6 +90,21 @@
     "provenance": [
       "source_id",
       "record_hash"
+    ],
+    "normalization_boundary": [
+      "boundary_type",
+      "input_field",
+      "raw_value"
+    ],
+    "corporate_actions": [
+      "symbol",
+      "effective_date",
+      "action_type"
+    ],
+    "validation": [
+      "error_code",
+      "domain",
+      "field"
     ]
   }
 }

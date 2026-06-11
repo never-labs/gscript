@@ -17,6 +17,16 @@ pass before it can replace the replay-only examples.
   metadata without browser, network, or credential dependencies.
 - Auth/session lifecycle, report request state transitions, task event ordering,
   and owner-or-admin artifact download authorization fixtures.
+- Route/session state contracts that bind each web route to fixture-backed
+  session states, role requirements, side effects, and denied cases.
+- CRUD command envelopes with actor, idempotency key, expected state, payload,
+  and deterministic fixture result identifiers.
+- Download artifact manifests with local fixture paths, media types, checksums,
+  byte sizes, and no signed URL or remote object storage dependency.
+- Approval boundaries that deny live provider calls, network fetches,
+  credential reads, external deployment, and provider SDK imports by default.
+- Workflow replay fixtures that specify deterministic inputs, ordered events,
+  outputs, and no provider callbacks.
 - Database migration contract for users, sessions, report requests, reports,
   artifacts, task events, audit events, and schema version tracking.
 - Migration versioning and rollback fixtures for deterministic provider-free

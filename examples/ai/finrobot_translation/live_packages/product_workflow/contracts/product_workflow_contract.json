@@ -57,6 +57,35 @@
       ]
     }
   },
+  "route_session_state_contract": {
+    "capability": "product.workflow.web.route",
+    "mode": "fixture_session_state",
+    "requires_browser": false,
+    "requires_live_network": false,
+    "requires_credentials": false,
+    "state_source": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/auth_sessions",
+    "routes": [
+      {"route": "home", "method": "GET", "allowed_session_states": ["anonymous", "authenticated", "session_refreshed"], "required_role": "none", "side_effects": []},
+      {"route": "login", "method": "GET", "allowed_session_states": ["anonymous"], "required_role": "none", "side_effects": ["oauth_state_fixture_issued"]},
+      {"route": "oauth_callback", "method": "GET", "allowed_session_states": ["oauth_state_issued"], "required_role": "none", "side_effects": ["session_fixture_created", "audit_event_recorded"]},
+      {"route": "logout", "method": "POST", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "analyst", "side_effects": ["session_revoked", "audit_event_recorded"]},
+      {"route": "reports_index", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "analyst", "side_effects": []},
+      {"route": "report_detail", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "analyst", "side_effects": []},
+      {"route": "report_download", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "analyst", "side_effects": ["artifact_download_audit_event"]},
+      {"route": "submit_equity_request", "method": "POST", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "analyst", "side_effects": ["report_request_command_enqueued"]},
+      {"route": "task_status", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "analyst", "side_effects": []},
+      {"route": "admin_dashboard", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "admin", "side_effects": []},
+      {"route": "admin_users", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "admin", "side_effects": []},
+      {"route": "admin_task_log", "method": "GET", "allowed_session_states": ["authenticated", "session_refreshed"], "required_role": "admin", "side_effects": []}
+    ],
+    "denied_cases": [
+      "anonymous_on_protected_route",
+      "expired_session",
+      "revoked_session",
+      "csrf_missing_for_post",
+      "role_mismatch"
+    ]
+  },
   "auth_session": {
     "capability": "product.workflow.auth.session",
     "mode": "fixture",
@@ -249,6 +278,35 @@
     },
     "remote_object_fetch": false
   },
+  "artifact_manifest_contract": {
+    "capability": "product.workflow.download.artifact_manifest",
+    "provider_free": true,
+    "live_network": false,
+    "requires_credentials": false,
+    "manifest_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/artifact_manifest",
+    "required_fields": [
+      "manifest_version",
+      "request_id",
+      "owner_user_id",
+      "artifacts",
+      "created_at"
+    ],
+    "artifact_fields": [
+      "artifact_id",
+      "kind",
+      "media_type",
+      "local_path",
+      "sha256",
+      "byte_size",
+      "download_capability"
+    ],
+    "path_policy": {
+      "local_fixture_prefix": "output/fixture/",
+      "remote_uri_allowed": false,
+      "signed_url_allowed": false,
+      "checksum_algorithm": "sha256"
+    }
+  },
   "crud": {
     "capability": "product.workflow.crud.report_request",
     "operations": [
@@ -265,6 +323,79 @@
       "artifacts",
       "task_events",
       "audit_events"
+    ],
+    "command_envelope": {
+      "mode": "deterministic_fixture_command",
+      "requires_live_network": false,
+      "requires_credentials": false,
+      "required_fields": [
+        "command_id",
+        "operation",
+        "actor_user_id",
+        "actor_role",
+        "idempotency_key",
+        "expected_state",
+        "payload",
+        "fixture_result_id"
+      ],
+      "operations": [
+        {"operation": "create", "allowed_from": ["none"], "allowed_to": "draft", "requires_role": "analyst"},
+        {"operation": "read", "allowed_from": ["draft", "queued", "running", "artifact_ready", "completed", "failed", "cancelled"], "allowed_to": "same", "requires_role": "analyst"},
+        {"operation": "update", "allowed_from": ["draft"], "allowed_to": "draft", "requires_role": "analyst"},
+        {"operation": "delete", "allowed_from": ["draft"], "allowed_to": "deleted", "requires_role": "analyst"}
+      ],
+      "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/crud_command_envelopes"
+    }
+  },
+  "approval_boundary": {
+    "capability": "product.workflow.approval.boundary",
+    "provider_free": true,
+    "default_decision": "deny",
+    "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/approval_decisions",
+    "requires_explicit_capability_grant": true,
+    "denied_by_default": [
+      "live_provider_call",
+      "live_network_fetch",
+      "credential_read",
+      "provider_sdk_import",
+      "database_write_outside_fixture",
+      "object_storage_write",
+      "external_deploy"
+    ],
+    "allowed_without_approval": [
+      "read_checked_in_fixture",
+      "render_static_template_snapshot",
+      "replay_recorded_workflow",
+      "validate_json_contract"
     ]
+  },
+  "workflow_replay": {
+    "capability": "product.workflow.replay.fixture",
+    "provider_free": true,
+    "live_network": false,
+    "requires_credentials": false,
+    "requires_provider_callbacks": false,
+    "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/workflow_replay",
+    "inputs": [
+      "ticker",
+      "sections",
+      "session_fixture_id",
+      "crud_command_ids"
+    ],
+    "ordered_event_sources": [
+      "report_request_lifecycle",
+      "task_events",
+      "download_authorization"
+    ],
+    "outputs": [
+      "artifact_manifest",
+      "task_history",
+      "ui_snapshot_metadata"
+    ],
+    "determinism": {
+      "clock": "fixture_logical_clock",
+      "random_seed": "not_used",
+      "external_callbacks": false
+    }
   }
 }

@@ -51,6 +51,27 @@ type financeNormalizersManifest struct {
 	} `json:"provider_gate"`
 }
 
+type financeNormalizersContract struct {
+	Domains                    []string       `json:"domains"`
+	CanonicalFieldRules        []string       `json:"canonical_field_rules"`
+	StaleMissingPolicy         map[string]any `json:"stale_missing_policy"`
+	TypedNormalizationBoundary struct {
+		Schema       string   `json:"schema"`
+		Covers       []string `json:"covers"`
+		ProviderFree bool     `json:"provider_free"`
+	} `json:"typed_normalization_boundary"`
+	CorporateActionAdjustment struct {
+		Schema                   string   `json:"schema"`
+		RequiredAdjustmentFields []string `json:"required_adjustment_fields"`
+		ProviderFree             bool     `json:"provider_free"`
+	} `json:"corporate_action_adjustment"`
+	ValidationErrorTaxonomy struct {
+		Schema       string   `json:"schema"`
+		ErrorCodes   []string `json:"error_codes"`
+		ProviderFree bool     `json:"provider_free"`
+	} `json:"validation_error_taxonomy"`
+}
+
 type financeNormalizerSchema struct {
 	SchemaVersion         int      `json:"schema_version"`
 	ID                    string   `json:"id"`
@@ -92,7 +113,7 @@ func TestFinRobotFinanceNormalizersLivePackageManifest(t *testing.T) {
 		t.Fatalf("provider gate must stay closed: %#v", manifest.ProviderGate)
 	}
 
-	wantDomains := []string{"statements", "ratios", "market", "news", "sec", "peer", "provenance"}
+	wantDomains := []string{"statements", "ratios", "market", "news", "sec", "peer", "provenance", "normalization_boundary", "corporate_actions", "validation"}
 	if !reflect.DeepEqual(manifest.NormalizerDomains, wantDomains) {
 		t.Fatalf("domains = %#v, want %#v", manifest.NormalizerDomains, wantDomains)
 	}
@@ -102,7 +123,7 @@ func TestFinRobotFinanceNormalizersLivePackageManifest(t *testing.T) {
 		}
 		assertFinanceNormalizersJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
-	for _, key := range []string{"statement", "ratio", "market", "news", "sec", "peer", "provenance", "policy"} {
+	for _, key := range []string{"statement", "ratio", "market", "news", "sec", "peer", "provenance", "policy", "normalization_boundary", "corporate_action", "validation_error"} {
 		if manifest.Schemas[key] == "" {
 			t.Fatalf("missing schema %q", key)
 		}
@@ -120,6 +141,12 @@ func TestFinRobotFinanceNormalizersLivePackageManifest(t *testing.T) {
 		"finance.normalizers.sec.canonicalize",
 		"finance.normalizers.peer.canonicalize",
 		"finance.normalizers.provenance.attach",
+		"finance.normalizers.symbol.normalize",
+		"finance.normalizers.date.normalize",
+		"finance.normalizers.currency.normalize",
+		"finance.normalizers.corporate_actions.adjust",
+		"finance.normalizers.unit_currency.envelope",
+		"finance.normalizers.validation.error_taxonomy",
 		"finance.normalizers.field_policy.stale",
 		"finance.normalizers.field_policy.missing",
 		"finance.normalizers.ordering.deterministic",
@@ -130,14 +157,137 @@ func TestFinRobotFinanceNormalizersLivePackageManifest(t *testing.T) {
 	}
 	if manifest.FieldCanonicalization["case"] != "snake_case" ||
 		manifest.FieldCanonicalization["currency"] != "ISO-4217 uppercase" ||
+		manifest.FieldCanonicalization["typed_boundary"] == "" ||
+		manifest.FieldCanonicalization["conversion_envelope"] == "" ||
 		manifest.StaleMissingPolicy["missing_required_policy"] != "reject_record" ||
 		manifest.StaleMissingPolicy["missing_optional_policy"] != "emit_null_with_missing_reason" ||
-		manifest.StaleMissingPolicy["warning_marker"] != "finance_normalizer_stale_field" {
+		manifest.StaleMissingPolicy["warning_marker"] != "finance_normalizer_stale_field" ||
+		manifest.StaleMissingPolicy["missing_reason_required_when_null"] != true {
 		t.Fatalf("canonicalization/stale/missing policy is too weak: fields=%#v stale=%#v", manifest.FieldCanonicalization, manifest.StaleMissingPolicy)
 	}
 	for _, domain := range wantDomains {
 		if len(manifest.DeterministicOrdering[domain]) == 0 {
 			t.Fatalf("deterministic ordering missing for %q", domain)
+		}
+	}
+}
+
+func TestFinRobotFinanceNormalizersTypedBoundaryContract(t *testing.T) {
+	base := financeNormalizersLivePackageDir(t)
+
+	var contract financeNormalizersContract
+	decodeFinanceNormalizersJSONFile(t, filepath.Join(base, "contracts", "finance_normalizers_contract.json"), &contract)
+
+	for _, want := range []string{"normalization_boundary", "corporate_actions", "validation"} {
+		if !contains(contract.Domains, want) {
+			t.Fatalf("contract domains missing %q: %#v", want, contract.Domains)
+		}
+	}
+	for _, want := range []string{
+		"symbol",
+		"date",
+		"currency",
+		"missing_value",
+		"unit_currency_envelope",
+	} {
+		if !contains(contract.TypedNormalizationBoundary.Covers, want) {
+			t.Fatalf("typed boundary contract missing %q: %#v", want, contract.TypedNormalizationBoundary)
+		}
+	}
+	if !contract.TypedNormalizationBoundary.ProviderFree ||
+		contract.TypedNormalizationBoundary.Schema != "typed_normalization_boundary_v1" {
+		t.Fatalf("typed boundary contract must stay provider-free: %#v", contract.TypedNormalizationBoundary)
+	}
+	for _, want := range []string{"adjustment_factor", "raw_close", "adjusted_close", "raw_volume", "adjusted_volume", "adjustment_method"} {
+		if !contains(contract.CorporateActionAdjustment.RequiredAdjustmentFields, want) {
+			t.Fatalf("corporate action contract missing %q: %#v", want, contract.CorporateActionAdjustment)
+		}
+	}
+	if !contract.CorporateActionAdjustment.ProviderFree ||
+		contract.CorporateActionAdjustment.Schema != "corporate_action_adjustment_v1" {
+		t.Fatalf("corporate action contract must stay provider-free: %#v", contract.CorporateActionAdjustment)
+	}
+	for _, want := range []string{"currency_conversion_rate_missing", "date_not_rfc3339", "missing_required_field", "optional_value_missing", "symbol_not_canonical", "unit_scale_missing"} {
+		if !contains(contract.ValidationErrorTaxonomy.ErrorCodes, want) {
+			t.Fatalf("validation taxonomy missing %q: %#v", want, contract.ValidationErrorTaxonomy)
+		}
+	}
+	if !contract.ValidationErrorTaxonomy.ProviderFree ||
+		contract.ValidationErrorTaxonomy.Schema != "validation_error_taxonomy_v1" {
+		t.Fatalf("validation taxonomy contract must stay provider-free: %#v", contract.ValidationErrorTaxonomy)
+	}
+}
+
+func TestFinRobotFinanceNormalizersTypedBoundaryFixtures(t *testing.T) {
+	base := financeNormalizersLivePackageDir(t)
+
+	var boundary struct {
+		ProviderFree bool             `json:"provider_free"`
+		Rows         []map[string]any `json:"rows"`
+	}
+	decodeFinanceNormalizersJSONFile(t, filepath.Join(base, "fixtures", "typed_normalization_boundary_fixture.json"), &boundary)
+	if !boundary.ProviderFree {
+		t.Fatalf("typed boundary fixture must be provider-free")
+	}
+	boundaryTypes := map[string]bool{}
+	for _, row := range boundary.Rows {
+		boundaryTypes[financeNormalizerStringKey(row["boundary_type"])] = true
+		if row["boundary_type"] == "unit_currency_envelope" {
+			for _, field := range []string{"unit", "scale", "currency", "source_currency", "target_currency", "conversion_rate", "precision"} {
+				if row[field] == nil {
+					t.Fatalf("unit/currency envelope missing %q: %#v", field, row)
+				}
+			}
+		}
+		if row["boundary_type"] == "missing_value" && row["missing_reason"] == nil {
+			t.Fatalf("missing value boundary must carry missing_reason: %#v", row)
+		}
+	}
+	for _, want := range []string{"symbol", "date", "currency", "missing_value", "unit_currency_envelope"} {
+		if !boundaryTypes[want] {
+			t.Fatalf("typed boundary fixture missing %q: %#v", want, boundaryTypes)
+		}
+	}
+
+	var corporateActions struct {
+		ProviderFree bool             `json:"provider_free"`
+		Rows         []map[string]any `json:"rows"`
+	}
+	decodeFinanceNormalizersJSONFile(t, filepath.Join(base, "fixtures", "corporate_action_adjustment_fixture.json"), &corporateActions)
+	if !corporateActions.ProviderFree || len(corporateActions.Rows) < 2 {
+		t.Fatalf("corporate action fixture invalid: %#v", corporateActions)
+	}
+	actionTypes := map[string]bool{}
+	for _, row := range corporateActions.Rows {
+		actionTypes[financeNormalizerStringKey(row["action_type"])] = true
+		for _, field := range []string{"adjustment_factor", "raw_close", "adjusted_close", "raw_volume", "adjusted_volume", "adjustment_method"} {
+			if row[field] == nil {
+				t.Fatalf("corporate action row missing %q: %#v", field, row)
+			}
+		}
+	}
+	if !actionTypes["split"] || !actionTypes["cash_dividend"] {
+		t.Fatalf("corporate action fixture must cover split and dividend adjustments: %#v", actionTypes)
+	}
+
+	var taxonomy struct {
+		ProviderFree bool             `json:"provider_free"`
+		Rows         []map[string]any `json:"rows"`
+	}
+	decodeFinanceNormalizersJSONFile(t, filepath.Join(base, "fixtures", "validation_error_taxonomy_fixture.json"), &taxonomy)
+	if !taxonomy.ProviderFree {
+		t.Fatalf("validation taxonomy fixture must be provider-free")
+	}
+	errorCodes := map[string]bool{}
+	for _, row := range taxonomy.Rows {
+		errorCodes[financeNormalizerStringKey(row["error_code"])] = true
+		if row["policy"] != "reject_record" && row["policy"] != "emit_null_with_missing_reason" {
+			t.Fatalf("validation taxonomy policy not stable: %#v", row)
+		}
+	}
+	for _, want := range []string{"currency_conversion_rate_missing", "date_not_rfc3339", "missing_required_field", "optional_value_missing", "symbol_not_canonical", "unit_scale_missing"} {
+		if !errorCodes[want] {
+			t.Fatalf("validation taxonomy fixture missing %q: %#v", want, errorCodes)
 		}
 	}
 }

@@ -127,16 +127,129 @@
       "all_report_source_refs_must_resolve": true,
       "all_snapshot_source_refs_must_resolve": true
     },
+    "report_outline": {
+      "required": [
+        "id",
+        "title",
+        "audience",
+        "time_horizon",
+        "sections",
+        "style_profile_id",
+        "evidence_policy_id",
+        "render_manifest_id"
+      ],
+      "section_required": [
+        "id",
+        "title",
+        "order",
+        "required",
+        "depends_on",
+        "evidence_policy",
+        "render_targets"
+      ]
+    },
+    "section_dependency_dag": {
+      "required": [
+        "id",
+        "nodes",
+        "edges",
+        "acyclic",
+        "missing_dependency_policy"
+      ],
+      "edge_required": [
+        "from",
+        "to",
+        "reason"
+      ],
+      "must_be_acyclic": true
+    },
+    "evidence_citation_envelope": {
+      "required": [
+        "id",
+        "claim_id",
+        "source_refs",
+        "citation_refs",
+        "evidence_quality",
+        "provider_free",
+        "unresolved_refs"
+      ],
+      "citation_required": [
+        "id",
+        "source_id",
+        "locator",
+        "quote_policy",
+        "as_of"
+      ],
+      "all_citation_source_refs_must_resolve": true
+    },
+    "render_artifact_manifest": {
+      "required": [
+        "id",
+        "renderer_contract_refs",
+        "outputs",
+        "snapshots",
+        "dependency_required",
+        "status"
+      ],
+      "output_required": [
+        "artifact_id",
+        "format",
+        "path",
+        "status",
+        "snapshot_ref"
+      ],
+      "statuses": [
+        "planned_not_rendered",
+        "specified_not_rendered",
+        "rendered_by_external_package",
+        "partial_not_rendered"
+      ]
+    },
+    "style_profile_policy": {
+      "required": [
+        "id",
+        "tone",
+        "locale",
+        "number_format",
+        "currency",
+        "disclosure_policy",
+        "forbidden_content",
+        "provider_free"
+      ]
+    },
+    "partial_report_fixture": {
+      "required": [
+        "id",
+        "status",
+        "completed_sections",
+        "failed_sections",
+        "retryable",
+        "renderable",
+        "warning_refs",
+        "failure_reason"
+      ],
+      "statuses": [
+        "partial",
+        "failed",
+        "degraded"
+      ]
+    },
     "report_artifact": {
       "required": [
         "contract",
         "report_id",
         "generated_at",
+        "report_outline",
+        "section_dependency_dag",
         "report_sections",
+        "evidence_citation_envelopes",
         "chart_specs",
         "artifacts",
+        "render_artifact_manifest",
         "snapshot_metadata",
         "accessibility_checklist",
+        "style_profile_policy",
+        "partial_report_fixture",
         "stale_data_policy",
         "source_annotation_requirements",
         "source_annotations",

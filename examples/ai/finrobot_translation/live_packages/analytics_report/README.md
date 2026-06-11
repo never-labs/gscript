@@ -10,7 +10,14 @@ The skeleton covers these package surfaces:
 - Finance normalizers for price and fundamentals rows with provenance.
 - Valuation analytics for DCF, peer multiple, and target price synthesis.
 - Sensitivity matrix output over discount-rate and growth assumptions.
+- Reusable report outline schema and section dependency DAG.
+- Evidence/citation envelopes that bind claims to source annotations.
 - Chart and report artifact manifests.
+- Render artifact manifest for planned outputs and snapshots.
+- Style/profile policy for tone, locale, numeric format, disclosures, and
+  forbidden content.
+- Failure/partial report fixture that remains renderable without provider
+  credentials or external renderers.
 - HTML and PDF renderer contracts that are planned, not invoked, and do not
   require renderer dependencies.
 - HTML, PDF, and chart snapshot metadata for externally captured artifacts.
@@ -35,3 +42,6 @@ Renderer and snapshot contract notes:
 - Source annotations require identity, title, kind, locator, freshness fields,
   stale flag, license, retrieval time, and evidence hash. Report and snapshot
   source refs must resolve to one of those annotations.
+- The outline, dependency DAG, evidence envelope, render manifest, style policy,
+  and partial failure fixture are generic analytics-report contracts. They avoid
+  provider-specific syntax so other packages can reuse the same dialect surface.

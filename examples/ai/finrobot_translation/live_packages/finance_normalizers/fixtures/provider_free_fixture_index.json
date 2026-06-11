@@ -52,6 +52,24 @@
       "schema": "normalizer_policy_v1",
       "path": "fixtures/normalizer_policy_fixture.json",
       "rows": 1
+    },
+    {
+      "key": "normalization_boundary",
+      "schema": "typed_normalization_boundary_v1",
+      "path": "fixtures/typed_normalization_boundary_fixture.json",
+      "rows": 5
+    },
+    {
+      "key": "corporate_action",
+      "schema": "corporate_action_adjustment_v1",
+      "path": "fixtures/corporate_action_adjustment_fixture.json",
+      "rows": 2
+    },
+    {
+      "key": "validation_error",
+      "schema": "validation_error_taxonomy_v1",
+      "path": "fixtures/validation_error_taxonomy_fixture.json",
+      "rows": 6
     }
   ]
 }

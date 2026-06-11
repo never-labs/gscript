@@ -28,7 +28,13 @@
     "artifact.accessibility.checklist",
     "artifact.stale_data.policy",
     "artifact.source_annotation.requirements",
+    "artifact.evidence_citation.envelope",
     "artifact.report.manifest",
+    "artifact.render.manifest",
+    "report.outline.schema",
+    "report.section_dependency.dag",
+    "report.style_profile.policy",
+    "report.partial_failure.fixture",
     "renderer.html.contract",
     "renderer.pdf.contract"
   ],
@@ -45,6 +51,12 @@
     "accessibility_checklist": "schemas.accessibility_checklist",
     "stale_data_policy": "schemas.stale_data_policy",
     "source_annotation_requirements": "schemas.source_annotation_requirements",
+    "evidence_citation_envelope": "schemas.evidence_citation_envelope",
+    "report_outline": "schemas.report_outline",
+    "section_dependency_dag": "schemas.section_dependency_dag",
+    "render_artifact_manifest": "schemas.render_artifact_manifest",
+    "style_profile_policy": "schemas.style_profile_policy",
+    "partial_report_fixture": "schemas.partial_report_fixture",
     "report_artifact": "schemas.report_artifact",
     "renderer": "schemas.renderer_contract"
   },
@@ -105,12 +117,73 @@
       "retrieved_at",
       "evidence_hash"
     ],
+    "report_outline_requirements": [
+      "id",
+      "title",
+      "audience",
+      "time_horizon",
+      "sections",
+      "style_profile_id",
+      "evidence_policy_id",
+      "render_manifest_id"
+    ],
+    "section_dependency_dag_requirements": [
+      "id",
+      "nodes",
+      "edges",
+      "acyclic",
+      "missing_dependency_policy"
+    ],
+    "evidence_envelope_requirements": [
+      "id",
+      "claim_id",
+      "source_refs",
+      "citation_refs",
+      "evidence_quality",
+      "provider_free",
+      "unresolved_refs"
+    ],
+    "render_artifact_manifest_requirements": [
+      "id",
+      "renderer_contract_refs",
+      "outputs",
+      "snapshots",
+      "dependency_required",
+      "status"
+    ],
+    "style_profile_policy_requirements": [
+      "id",
+      "tone",
+      "locale",
+      "number_format",
+      "currency",
+      "disclosure_policy",
+      "forbidden_content",
+      "provider_free"
+    ],
+    "partial_report_fixture_requirements": [
+      "id",
+      "status",
+      "completed_sections",
+      "failed_sections",
+      "retryable",
+      "renderable",
+      "warning_refs",
+      "failure_reason"
+    ],
     "render_statuses": [
       "specified_not_rendered",
       "planned_not_rendered",
-      "rendered_by_external_package"
+      "rendered_by_external_package",
+      "partial_not_rendered"
     ],
     "required_markers": [
+      "report_outline",
+      "section_dependency_dag",
+      "evidence_citation_envelopes",
+      "render_artifact_manifest",
+      "style_profile_policy",
+      "partial_report_fixture",
       "source_annotations",
       "stale_data_warnings",
       "ai_disclosure",

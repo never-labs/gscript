@@ -41,8 +41,14 @@ type analyticsReportLivePackageManifest struct {
 			StaleSourceRefsMustBeNamed     bool   `json:"stale_source_refs_must_be_named"`
 			SnapshotsMustCarryWarningRefs  bool   `json:"snapshots_must_carry_warning_refs"`
 		} `json:"stale_data_warning_policy"`
-		SourceAnnotationRequirements []string `json:"source_annotation_requirements"`
-		RequiredMarkers              []string `json:"required_markers"`
+		SourceAnnotationRequirements       []string `json:"source_annotation_requirements"`
+		ReportOutlineRequirements          []string `json:"report_outline_requirements"`
+		SectionDependencyDAGRequirements   []string `json:"section_dependency_dag_requirements"`
+		EvidenceEnvelopeRequirements       []string `json:"evidence_envelope_requirements"`
+		RenderArtifactManifestRequirements []string `json:"render_artifact_manifest_requirements"`
+		StyleProfilePolicyRequirements     []string `json:"style_profile_policy_requirements"`
+		PartialReportFixtureRequirements   []string `json:"partial_report_fixture_requirements"`
+		RequiredMarkers                    []string `json:"required_markers"`
 	} `json:"artifact_contracts"`
 }
 
@@ -55,8 +61,14 @@ type analyticsReportLivePackageSchema struct {
 		Statuses                         []string `json:"statuses"`
 		Methods                          []string `json:"methods"`
 		ItemRequired                     []string `json:"item_required"`
+		SectionRequired                  []string `json:"section_required"`
+		EdgeRequired                     []string `json:"edge_required"`
+		CitationRequired                 []string `json:"citation_required"`
+		OutputRequired                   []string `json:"output_required"`
+		MustBeAcyclic                    bool     `json:"must_be_acyclic"`
 		AllReportSourceRefsMustResolve   bool     `json:"all_report_source_refs_must_resolve"`
 		AllSnapshotSourceRefsMustResolve bool     `json:"all_snapshot_source_refs_must_resolve"`
+		AllCitationSourceRefsMustResolve bool     `json:"all_citation_source_refs_must_resolve"`
 	} `json:"schemas"`
 	ProviderFreeGate struct {
 		NetworkRequired      bool `json:"network_required"`
@@ -89,28 +101,34 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 		"artifact.accessibility.checklist",
 		"artifact.stale_data.policy",
 		"artifact.source_annotation.requirements",
+		"artifact.evidence_citation.envelope",
 		"artifact.report.manifest",
+		"artifact.render.manifest",
+		"report.outline.schema",
+		"report.section_dependency.dag",
+		"report.style_profile.policy",
+		"report.partial_failure.fixture",
 		"renderer.html.contract",
 		"renderer.pdf.contract",
 	} {
-		if !contains(manifest.Capabilities, want) {
+		if !analyticsReportContains(manifest.Capabilities, want) {
 			t.Fatalf("manifest capabilities missing %q", want)
 		}
 	}
-	if !contains(manifest.ArtifactContracts.ReportFormats, "text/html") || !contains(manifest.ArtifactContracts.ReportFormats, "application/pdf") {
+	if !analyticsReportContains(manifest.ArtifactContracts.ReportFormats, "text/html") || !analyticsReportContains(manifest.ArtifactContracts.ReportFormats, "application/pdf") {
 		t.Fatalf("report formats = %#v, want HTML and PDF", manifest.ArtifactContracts.ReportFormats)
 	}
 	for _, want := range []string{"text/html", "application/pdf", "image/png"} {
-		if !contains(manifest.ArtifactContracts.SnapshotFormats, want) {
+		if !analyticsReportContains(manifest.ArtifactContracts.SnapshotFormats, want) {
 			t.Fatalf("snapshot formats missing %q: %#v", want, manifest.ArtifactContracts.SnapshotFormats)
 		}
 	}
 	for _, want := range []string{"specified_not_rendered", "planned_not_rendered"} {
-		if !contains(manifest.ArtifactContracts.SnapshotStatuses, want) {
+		if !analyticsReportContains(manifest.ArtifactContracts.SnapshotStatuses, want) {
 			t.Fatalf("snapshot statuses missing %q: %#v", want, manifest.ArtifactContracts.SnapshotStatuses)
 		}
 	}
-	if !contains(manifest.ArtifactContracts.AccessibilityStandards, "WCAG 2.2 AA contract checklist") {
+	if !analyticsReportContains(manifest.ArtifactContracts.AccessibilityStandards, "WCAG 2.2 AA contract checklist") {
 		t.Fatalf("accessibility standards = %#v", manifest.ArtifactContracts.AccessibilityStandards)
 	}
 	if !manifest.ArtifactContracts.StaleDataWarningPolicy.WarningRequiredWhenSourceStale ||
@@ -120,12 +138,42 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 		t.Fatalf("stale data warning policy not strict enough: %#v", manifest.ArtifactContracts.StaleDataWarningPolicy)
 	}
 	for _, want := range []string{"id", "title", "kind", "locator", "as_of", "stale_after", "stale", "license", "retrieved_at", "evidence_hash"} {
-		if !contains(manifest.ArtifactContracts.SourceAnnotationRequirements, want) {
+		if !analyticsReportContains(manifest.ArtifactContracts.SourceAnnotationRequirements, want) {
 			t.Fatalf("source annotation requirements missing %q: %#v", want, manifest.ArtifactContracts.SourceAnnotationRequirements)
 		}
 	}
-	for _, marker := range []string{"source_annotations", "stale_data_warnings", "ai_disclosure", "renderer_contract", "snapshot_metadata", "accessibility_checklist", "source_annotation_requirements", "provider_free"} {
-		if !contains(manifest.ArtifactContracts.RequiredMarkers, marker) {
+	for _, want := range []string{"id", "title", "audience", "time_horizon", "sections", "style_profile_id", "evidence_policy_id", "render_manifest_id"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.ReportOutlineRequirements, want) {
+			t.Fatalf("report outline requirements missing %q: %#v", want, manifest.ArtifactContracts.ReportOutlineRequirements)
+		}
+	}
+	for _, want := range []string{"id", "nodes", "edges", "acyclic", "missing_dependency_policy"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.SectionDependencyDAGRequirements, want) {
+			t.Fatalf("section DAG requirements missing %q: %#v", want, manifest.ArtifactContracts.SectionDependencyDAGRequirements)
+		}
+	}
+	for _, want := range []string{"id", "claim_id", "source_refs", "citation_refs", "evidence_quality", "provider_free", "unresolved_refs"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.EvidenceEnvelopeRequirements, want) {
+			t.Fatalf("evidence envelope requirements missing %q: %#v", want, manifest.ArtifactContracts.EvidenceEnvelopeRequirements)
+		}
+	}
+	for _, want := range []string{"id", "renderer_contract_refs", "outputs", "snapshots", "dependency_required", "status"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.RenderArtifactManifestRequirements, want) {
+			t.Fatalf("render artifact manifest requirements missing %q: %#v", want, manifest.ArtifactContracts.RenderArtifactManifestRequirements)
+		}
+	}
+	for _, want := range []string{"id", "tone", "locale", "number_format", "currency", "disclosure_policy", "forbidden_content", "provider_free"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.StyleProfilePolicyRequirements, want) {
+			t.Fatalf("style profile policy requirements missing %q: %#v", want, manifest.ArtifactContracts.StyleProfilePolicyRequirements)
+		}
+	}
+	for _, want := range []string{"id", "status", "completed_sections", "failed_sections", "retryable", "renderable", "warning_refs", "failure_reason"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.PartialReportFixtureRequirements, want) {
+			t.Fatalf("partial report fixture requirements missing %q: %#v", want, manifest.ArtifactContracts.PartialReportFixtureRequirements)
+		}
+	}
+	for _, marker := range []string{"report_outline", "section_dependency_dag", "evidence_citation_envelopes", "render_artifact_manifest", "style_profile_policy", "partial_report_fixture", "source_annotations", "stale_data_warnings", "ai_disclosure", "renderer_contract", "snapshot_metadata", "accessibility_checklist", "source_annotation_requirements", "provider_free"} {
+		if !analyticsReportContains(manifest.ArtifactContracts.RequiredMarkers, marker) {
 			t.Fatalf("artifact contract markers missing %q", marker)
 		}
 	}
@@ -135,37 +183,55 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 	if schema.ProviderFreeGate.NetworkRequired || schema.ProviderFreeGate.CredentialsRequired || schema.ProviderFreeGate.ProviderSDKsRequired {
 		t.Fatalf("schema provider-free gate must require no network, credentials, or provider SDKs: %#v", schema.ProviderFreeGate)
 	}
-	for _, key := range []string{"finance_normalizer", "valuation_result", "sensitivity_matrix", "chart_artifact", "snapshot_metadata", "accessibility_checklist", "stale_data_policy", "source_annotation_requirements", "report_artifact", "renderer_contract"} {
+	for _, key := range []string{"finance_normalizer", "valuation_result", "sensitivity_matrix", "chart_artifact", "snapshot_metadata", "accessibility_checklist", "stale_data_policy", "source_annotation_requirements", "report_outline", "section_dependency_dag", "evidence_citation_envelope", "render_artifact_manifest", "style_profile_policy", "partial_report_fixture", "report_artifact", "renderer_contract"} {
 		if len(schema.Schemas[key].Required) == 0 {
 			t.Fatalf("schema %q missing required fields", key)
 		}
 	}
-	if !contains(schema.Schemas["renderer_contract"].Formats, "text/html") || !contains(schema.Schemas["renderer_contract"].Formats, "application/pdf") {
+	if !analyticsReportContains(schema.Schemas["renderer_contract"].Formats, "text/html") || !analyticsReportContains(schema.Schemas["renderer_contract"].Formats, "application/pdf") {
 		t.Fatalf("renderer formats = %#v, want HTML and PDF", schema.Schemas["renderer_contract"].Formats)
 	}
 	for _, want := range []string{"text/html", "application/pdf", "image/png"} {
-		if !contains(schema.Schemas["snapshot_metadata"].Formats, want) {
+		if !analyticsReportContains(schema.Schemas["snapshot_metadata"].Formats, want) {
 			t.Fatalf("snapshot metadata formats missing %q: %#v", want, schema.Schemas["snapshot_metadata"].Formats)
 		}
 	}
 	for _, want := range []string{"renderer_dependency_required", "warning_refs", "accessibility_refs"} {
-		if !contains(schema.Schemas["snapshot_metadata"].Required, want) {
+		if !analyticsReportContains(schema.Schemas["snapshot_metadata"].Required, want) {
 			t.Fatalf("snapshot metadata required fields missing %q: %#v", want, schema.Schemas["snapshot_metadata"].Required)
 		}
 	}
 	for _, want := range []string{"report_sections", "chart_specs", "snapshot_metadata", "accessibility_checklist", "stale_data_policy", "source_annotation_requirements"} {
-		if !contains(schema.Schemas["report_artifact"].Required, want) {
+		if !analyticsReportContains(schema.Schemas["report_artifact"].Required, want) {
 			t.Fatalf("report artifact required fields missing %q: %#v", want, schema.Schemas["report_artifact"].Required)
 		}
 	}
 	for _, want := range []string{"snapshot_metadata_schema", "accessibility_checklist_schema", "stale_data_policy"} {
-		if !contains(schema.Schemas["renderer_contract"].Required, want) {
+		if !analyticsReportContains(schema.Schemas["renderer_contract"].Required, want) {
 			t.Fatalf("renderer contract required fields missing %q: %#v", want, schema.Schemas["renderer_contract"].Required)
 		}
 	}
 	if !schema.Schemas["source_annotation_requirements"].AllReportSourceRefsMustResolve ||
 		!schema.Schemas["source_annotation_requirements"].AllSnapshotSourceRefsMustResolve {
 		t.Fatalf("source annotation refs must resolve: %#v", schema.Schemas["source_annotation_requirements"])
+	}
+	if !schema.Schemas["section_dependency_dag"].MustBeAcyclic || !analyticsReportContains(schema.Schemas["section_dependency_dag"].EdgeRequired, "reason") {
+		t.Fatalf("section DAG schema must be acyclic and require edge reasons: %#v", schema.Schemas["section_dependency_dag"])
+	}
+	if !schema.Schemas["evidence_citation_envelope"].AllCitationSourceRefsMustResolve || !analyticsReportContains(schema.Schemas["evidence_citation_envelope"].CitationRequired, "quote_policy") {
+		t.Fatalf("evidence envelope citations must resolve and carry quote policy: %#v", schema.Schemas["evidence_citation_envelope"])
+	}
+	for _, want := range []string{"report_outline", "section_dependency_dag", "evidence_citation_envelopes", "render_artifact_manifest", "style_profile_policy", "partial_report_fixture"} {
+		if !analyticsReportContains(schema.Schemas["report_artifact"].Required, want) {
+			t.Fatalf("report artifact required fields missing %q: %#v", want, schema.Schemas["report_artifact"].Required)
+		}
+	}
+	if !analyticsReportContains(schema.Schemas["render_artifact_manifest"].Statuses, "partial_not_rendered") ||
+		!analyticsReportContains(schema.Schemas["render_artifact_manifest"].OutputRequired, "snapshot_ref") {
+		t.Fatalf("render artifact manifest schema missing partial status or snapshot refs: %#v", schema.Schemas["render_artifact_manifest"])
+	}
+	if !analyticsReportContains(schema.Schemas["partial_report_fixture"].Statuses, "partial") {
+		t.Fatalf("partial report fixture schema statuses = %#v", schema.Schemas["partial_report_fixture"].Statuses)
 	}
 
 	exampleData, err := os.ReadFile(filepath.Join(base, manifest.Entrypoints.Example))
@@ -204,7 +270,7 @@ func TestAnalyticsReportLivePackageLeiaFixture(t *testing.T) {
 			if err := vm.ExecFile(path); err != nil {
 				t.Fatalf("ExecFile: %v", err)
 			}
-			assertVMValue(t, vm, "analytics_report_live_package_summary", "analytics_report_live_package provider_free=true normalizers=2 valuations=3 sensitivity=3x3 charts=2 artifacts=4 snapshots=4 a11y=4 warnings=1 html=text/html pdf=application/pdf")
+			assertVMValue(t, vm, "analytics_report_live_package_summary", "analytics_report_live_package provider_free=true normalizers=2 valuations=3 sensitivity=3x3 outline=2 dag_edges=1 evidence=2 charts=2 artifacts=4 render_outputs=4 snapshots=4 a11y=4 warnings=1 partial_failures=1 html=text/html pdf=application/pdf")
 			for name, want := range map[string]any{
 				"normalizers_ok":         true,
 				"section_ok":             true,
@@ -215,6 +281,12 @@ func TestAnalyticsReportLivePackageLeiaFixture(t *testing.T) {
 				"accessibility_ok":       true,
 				"stale_policy_ok":        true,
 				"source_requirements_ok": true,
+				"outline_ok":             true,
+				"section_dag_ok":         true,
+				"evidence_ok":            true,
+				"render_manifest_ok":     true,
+				"style_policy_ok":        true,
+				"partial_fixture_ok":     true,
 				"dcf_price":              float64(50.0826446281),
 				"peer_price":             float64(66),
 				"target_price":           float64(56.4495867769),
@@ -236,7 +308,7 @@ func TestAnalyticsReportLivePackageLeiaFixture(t *testing.T) {
 					}
 				}
 			}
-			if len(prints) != 1 || prints[0] != "analytics_report_live_package provider_free=true normalizers=2 valuations=3 sensitivity=3x3 charts=2 artifacts=4 snapshots=4 a11y=4 warnings=1 html=text/html pdf=application/pdf" {
+			if len(prints) != 1 || prints[0] != "analytics_report_live_package provider_free=true normalizers=2 valuations=3 sensitivity=3x3 outline=2 dag_edges=1 evidence=2 charts=2 artifacts=4 render_outputs=4 snapshots=4 a11y=4 warnings=1 partial_failures=1 html=text/html pdf=application/pdf" {
 				t.Fatalf("prints = %#v", prints)
 			}
 		})
@@ -274,4 +346,13 @@ func absFloat(v float64) float64 {
 		return -v
 	}
 	return v
+}
+
+func analyticsReportContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

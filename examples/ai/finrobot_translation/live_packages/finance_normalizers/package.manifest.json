@@ -3,7 +3,7 @@
   "id": "finrobot-finance-normalizers-live-package",
   "package_name": "leia-finrobot-finance-normalizers",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for FinRobot finance normalizer contracts.",
+  "description": "Provider-free live package skeleton for FinRobot finance normalizer contracts and typed data normalization boundaries.",
   "source_mode": "fixture-contract",
   "target_mode": "live-package-skeleton",
   "source_modules": [
@@ -45,7 +45,10 @@
     "sec": "schemas/normalized_sec_filing_v1.schema.json",
     "peer": "schemas/peer_snapshot_v1.schema.json",
     "provenance": "schemas/provenance_record_v1.schema.json",
-    "policy": "schemas/normalizer_policy_v1.schema.json"
+    "policy": "schemas/normalizer_policy_v1.schema.json",
+    "normalization_boundary": "schemas/typed_normalization_boundary_v1.schema.json",
+    "corporate_action": "schemas/corporate_action_adjustment_v1.schema.json",
+    "validation_error": "schemas/validation_error_taxonomy_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
@@ -56,7 +59,10 @@
     "sec": "fixtures/sec_ACME_10q_fixture.json",
     "peer": "fixtures/peer_ACME_snapshot_fixture.json",
     "provenance": "fixtures/provenance_ACME_fixture.json",
-    "policy": "fixtures/normalizer_policy_fixture.json"
+    "policy": "fixtures/normalizer_policy_fixture.json",
+    "normalization_boundary": "fixtures/typed_normalization_boundary_fixture.json",
+    "corporate_action": "fixtures/corporate_action_adjustment_fixture.json",
+    "validation_error": "fixtures/validation_error_taxonomy_fixture.json"
   },
   "normalizer_domains": [
     "statements",
@@ -65,7 +71,10 @@
     "news",
     "sec",
     "peer",
-    "provenance"
+    "provenance",
+    "normalization_boundary",
+    "corporate_actions",
+    "validation"
   ],
   "capabilities": [
     "finance.normalizers.statements.canonicalize",
@@ -75,6 +84,12 @@
     "finance.normalizers.sec.canonicalize",
     "finance.normalizers.peer.canonicalize",
     "finance.normalizers.provenance.attach",
+    "finance.normalizers.symbol.normalize",
+    "finance.normalizers.date.normalize",
+    "finance.normalizers.currency.normalize",
+    "finance.normalizers.corporate_actions.adjust",
+    "finance.normalizers.unit_currency.envelope",
+    "finance.normalizers.validation.error_taxonomy",
     "finance.normalizers.field_policy.stale",
     "finance.normalizers.field_policy.missing",
     "finance.normalizers.ordering.deterministic"
@@ -105,14 +120,25 @@
     "date": "RFC3339 full-date or timestamp",
     "symbol": "uppercase ticker",
     "numeric_units": "explicit unit and scale fields",
-    "null_policy": "missing required fields fail; optional unavailable values are explicit null with missing_reason"
+    "null_policy": "missing required fields fail; optional unavailable values are explicit null with missing_reason",
+    "typed_boundary": "symbol, date, currency, unit, corporate action, and validation errors are normalized before provider-specific interpretation",
+    "conversion_envelope": "raw value, normalized value, unit, scale, currency, conversion rate, source currency, target currency, and precision metadata"
   },
   "stale_missing_policy": {
     "stale_basis": "as_of plus stale_after_days",
     "stale_required": true,
     "missing_required_policy": "reject_record",
     "missing_optional_policy": "emit_null_with_missing_reason",
-    "warning_marker": "finance_normalizer_stale_field"
+    "warning_marker": "finance_normalizer_stale_field",
+    "missing_reason_required_when_null": true,
+    "missing_reason_taxonomy": [
+      "source_not_disclosed",
+      "provider_fixture_did_not_include_field",
+      "dash_placeholder",
+      "not_available_placeholder",
+      "forecast_not_disclosed",
+      "currency_conversion_rate_missing"
+    ]
   },
   "deterministic_ordering": {
     "statements": [
@@ -150,6 +176,21 @@
     "provenance": [
       "source_id",
       "record_hash"
+    ],
+    "normalization_boundary": [
+      "boundary_type",
+      "input_field",
+      "raw_value"
+    ],
+    "corporate_actions": [
+      "symbol",
+      "effective_date",
+      "action_type"
+    ],
+    "validation": [
+      "error_code",
+      "domain",
+      "field"
     ]
   },
   "test_gates": [

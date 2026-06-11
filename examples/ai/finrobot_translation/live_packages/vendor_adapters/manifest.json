@@ -26,6 +26,167 @@
     ],
     "replacement": "<redacted>"
   },
+  "capability_registry": {
+    "version": "vendor-adapter-capabilities-v1",
+    "mode": "provider-free-boundary",
+    "provider_free": true,
+    "live_network": false,
+    "registry_scope": "external-data-and-tool-adapter-dialect",
+    "common_capabilities": [
+      "market_chart",
+      "financial_statement_history",
+      "company_profile",
+      "dividend_history",
+      "analyst_recommendations",
+      "key_metrics",
+      "technical_indicators",
+      "company_news",
+      "sec_filings",
+      "social_search",
+      "transcript_lookup"
+    ],
+    "providers": [
+      {
+        "provider": "yfinance",
+        "adapter_count": 6,
+        "credential_refs": [],
+        "fixture_replay": true
+      },
+      {
+        "provider": "fmp",
+        "adapter_count": 6,
+        "credential_refs": [
+          "env:FMP_API_KEY"
+        ],
+        "fixture_replay": true
+      },
+      {
+        "provider": "sec",
+        "adapter_count": 4,
+        "credential_refs": [
+          "env:SEC_USER_AGENT"
+        ],
+        "fixture_replay": true
+      },
+      {
+        "provider": "finnhub",
+        "adapter_count": 3,
+        "credential_refs": [
+          "env:FINNHUB_TOKEN"
+        ],
+        "fixture_replay": true
+      },
+      {
+        "provider": "reddit",
+        "adapter_count": 1,
+        "credential_refs": [
+          "env:REDDIT_CLIENT_SECRET"
+        ],
+        "fixture_replay": true
+      },
+      {
+        "provider": "earnings",
+        "adapter_count": 1,
+        "credential_refs": [],
+        "fixture_replay": true
+      }
+    ]
+  },
+  "auth_redaction": {
+    "enabled": true,
+    "secret_value_policy": "never-store-secret-values",
+    "credential_required_for_fixture_replay": false,
+    "secret_values_present": false,
+    "replacement": "<redacted>",
+    "headers": [
+      "authorization",
+      "x-api-key",
+      "finnhub-token"
+    ],
+    "query_params": [
+      "token",
+      "apikey",
+      "api_key",
+      "client_secret"
+    ],
+    "env_refs": [
+      "env:FINNHUB_TOKEN",
+      "env:FMP_API_KEY",
+      "env:REDDIT_CLIENT_ID",
+      "env:REDDIT_CLIENT_SECRET",
+      "env:SEC_USER_AGENT"
+    ]
+  },
+  "retry_cache_envelope": {
+    "mode": "deterministic_fixture_replay",
+    "provider_free": true,
+    "live_network": false,
+    "max_attempts": 1,
+    "backoff": "none",
+    "retryable_error_kinds": [
+      "rate_limited",
+      "timeout",
+      "transient_provider_error"
+    ],
+    "cache": {
+      "mode": "fixture_replay",
+      "namespace": "finrobot.vendor_adapters",
+      "key_source": "fixture_key",
+      "ttl_seconds": 0,
+      "hit_state": "fixture-hit",
+      "miss_behavior": "clean-skip"
+    }
+  },
+  "rate_limit_fixture": {
+    "fixture": "fixtures/rate_limit_matrix.json",
+    "fixture_key": "vendor_adapters:rate_limits:offline",
+    "capability": "finance.vendor.adapter.rate_limits",
+    "live_network": false
+  },
+  "error_taxonomy": {
+    "version": "vendor-error-taxonomy-v1",
+    "normalized_errors": [
+      {
+        "kind": "rate_limited",
+        "http_status": 429,
+        "retryable": true,
+        "cache_state": "stale-allowed"
+      },
+      {
+        "kind": "auth_missing",
+        "http_status": 401,
+        "retryable": false,
+        "cache_state": "fixture-only"
+      },
+      {
+        "kind": "not_found",
+        "http_status": 404,
+        "retryable": false,
+        "cache_state": "negative-cache"
+      },
+      {
+        "kind": "schema_mismatch",
+        "http_status": 422,
+        "retryable": false,
+        "cache_state": "quarantine"
+      },
+      {
+        "kind": "transient_provider_error",
+        "http_status": 503,
+        "retryable": true,
+        "cache_state": "stale-allowed"
+      }
+    ]
+  },
+  "offline_replay": {
+    "enabled": true,
+    "fixture_index": "fixtures/offline_replay_index.json",
+    "require_fixture_key": true,
+    "live_network": false,
+    "provider_credentials_required": false,
+    "miss_behavior": "clean-skip",
+    "secret_values_present": false
+  },
   "adapters": [
     {
       "id": "yfinance_chart",

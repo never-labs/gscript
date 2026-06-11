@@ -45,7 +45,10 @@
     "product.workflow.history.read",
     "product.workflow.task_log.read",
     "product.workflow.download.artifact",
+    "product.workflow.download.artifact_manifest",
     "product.workflow.crud.report_request",
+    "product.workflow.approval.boundary",
+    "product.workflow.replay.fixture",
     "product.workflow.db.migration.plan",
     "product.workflow.deploy.local",
     "product.workflow.deploy.container",
@@ -95,7 +98,12 @@
     "required and optional credentials are empty",
     "equity CLI, web product, auth/session/history/task log/download/CRUD/db migration contracts are present",
     "web routes map to deterministic templates with provider-free static asset and snapshot metadata",
+    "route/session state contracts deny protected routes without authenticated fixture state",
+    "CRUD command envelopes carry idempotency, actor, state precondition, and deterministic result fixtures",
+    "artifact manifests use local fixture paths, checksums, media types, and no remote object fetch",
     "accessibility and visual regression snapshot contracts declare no browser, network, or credential dependency",
+    "approval boundaries deny live providers, live network, credential use, external deployment, and provider SDK imports by default",
+    "workflow replay fixtures define deterministic inputs, ordered events, outputs, and no provider callbacks",
     "deployment capability gates declare capabilities and deny credentials by default"
   ],
   "no_built_in_guarantee": {
