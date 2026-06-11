@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 31,
-  "translation_directory_file_count": 129,
+  "registered_examples_count": 33,
+  "translation_directory_file_count": 153,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -47,6 +47,15 @@
       "status": "checked_in_registered_example"
     },
     {
+      "id": "tutorial_demo_parity",
+      "directory": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/main.leia",
+      "covers_package_ids": [
+        "tutorial_demo_parity"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
       "id": "product_workflow",
       "directory": "examples/ai/finrobot_translation/live_packages/product_workflow",
       "registered_example": null,
@@ -74,6 +83,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/vendor_adapters/main.leia",
       "covers_package_ids": [
         "vendor_adapters"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "finance_facade",
+      "directory": "examples/ai/finrobot_translation/live_packages/finance_facade",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/finance_facade/main.leia",
+      "covers_package_ids": [
+        "finance_facade"
       ],
       "status": "checked_in_registered_example"
     }
@@ -246,6 +264,32 @@
       "no_built_in_guarantee": true
     },
     {
+      "id": "tutorial_demo_parity",
+      "package_name": "leia-finrobot-tutorial-demo-parity",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity",
+      "planned_directory": "packages/finrobot/tutorial_demo_parity",
+      "manifest": "packages/finrobot/tutorial_demo_parity/package.manifest.json",
+      "contract": "packages/finrobot/tutorial_demo_parity/contracts/tutorial_demo_parity_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/tutorial_parity/ledger.json",
+      "capabilities": [
+        "parity.tutorial.ledger.validate",
+        "parity.tutorial.notebook.checklist",
+        "parity.demo.smoke_contract",
+        "parity.demo.agent_builder",
+        "parity.demo.backtrader",
+        "parity.replay.provider_records",
+        "parity.optional_gate.clean_skip"
+      ],
+      "test_gates": [
+        "fixture tests validate tutorial and demo parity ledgers without notebook execution or provider calls",
+        "contract tests require registered provider-free smoke examples and replay record links",
+        "optional gate tests require live_network_default=false, default_enabled=false, and clean skips",
+        "notebook-to-Leia conversion checklist gates any future live package implementation"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
       "id": "prompt_roles",
       "package_name": "leia-finrobot-prompt-roles",
       "status": "skeleton_contract_checked_in",
@@ -328,6 +372,34 @@
         "contract tests run with live_network=false and assert no required credentials",
         "fixture tests validate relevance, category, sentiment, impact, source ranking, and retail sentiment snapshots",
         "adapter boundary tests keep Polymarket, X, and Reddit metadata-only until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "finance_facade",
+      "package_name": "leia-finrobot-finance-facade",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/finance_facade",
+      "planned_directory": "packages/finrobot/finance_facade",
+      "manifest": "packages/finrobot/finance_facade/package.manifest.json",
+      "contract": "packages/finrobot/finance_facade/contracts/finance_facade_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/data_tools.leia",
+      "capabilities": [
+        "finance.facade.market_data.fetch",
+        "finance.facade.market_data.table",
+        "finance.facade.fundamentals.fetch",
+        "finance.facade.provider.fallback",
+        "finance.facade.cache.read_through",
+        "finance.facade.retry.backoff",
+        "finance.facade.rate_limit.apply",
+        "finance.facade.provenance.attach",
+        "finance.facade.error.envelope"
+      ],
+      "test_gates": [
+        "finance facade manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert provider fallback order remains fixture-only",
+        "fixture tests validate market data and fundamental typed table schemas with provenance",
+        "error envelope, cache, retry, and rate-limit metadata stay provider-free until live packages are explicitly enabled"
       ],
       "no_built_in_guarantee": true
     }

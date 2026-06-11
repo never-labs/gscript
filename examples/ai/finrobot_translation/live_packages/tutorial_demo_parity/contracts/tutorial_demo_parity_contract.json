@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-tutorial-demo-parity-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "ledgers": [
+    {
+      "id": "tutorial_parity",
+      "path": "examples/ai/finrobot_translation/tutorial_parity/ledger.json",
+      "expected_entries": 13,
+      "required_roots": [
+        "tutorials_beginner",
+        "tutorials_advanced"
+      ]
+    },
+    {
+      "id": "demo_parity",
+      "path": "examples/ai/finrobot_translation/demo_parity/ledger.json",
+      "expected_entries": 5,
+      "required_sources": [
+        "agent_builder_demo.py",
+        "test_module.py"
+      ]
+    }
+  ],
+  "contract_surfaces": [
+    "tutorial parity ledger",
+    "provider-free replay records",
+    "optional integration gates",
+    "demo smoke contracts",
+    "notebook-to-Leia conversion checklist"
+  ],
+  "acceptance": {
+    "tutorial_ledger_complete": true,
+    "demo_ledger_complete": true,
+    "registered_examples_checked_in": true,
+    "provider_free_replay_records_checked_in": true,
+    "optional_gates_disabled_by_default": true,
+    "notebook_conversion_checklist_required": true
+  }
+}

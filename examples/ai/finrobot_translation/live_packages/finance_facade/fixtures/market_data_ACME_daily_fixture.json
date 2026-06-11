@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "table_id": "market_data_table",
+  "dataset": "daily_prices",
+  "symbol": "ACME",
+  "typed_columns": {
+    "symbol": "string",
+    "as_of": "date",
+    "open": "float64",
+    "high": "float64",
+    "low": "float64",
+    "close": "float64",
+    "adjusted_close": "float64",
+    "volume": "int64",
+    "currency": "string",
+    "source_ref": "string"
+  },
+  "rows": [
+    {
+      "symbol": "ACME",
+      "as_of": "2026-06-09",
+      "open": 101.2,
+      "high": 103.8,
+      "low": 100.7,
+      "close": 102.9,
+      "adjusted_close": 102.9,
+      "volume": 1845000,
+      "currency": "USD",
+      "source_ref": "prov:market:yfinance:ACME:2026-06-09"
+    },
+    {
+      "symbol": "ACME",
+      "as_of": "2026-06-10",
+      "open": 103.1,
+      "high": 104.4,
+      "low": 101.9,
+      "close": 103.7,
+      "adjusted_close": 103.7,
+      "volume": 1723000,
+      "currency": "USD",
+      "source_ref": "prov:market:yfinance:ACME:2026-06-10"
+    },
+    {
+      "symbol": "ACME",
+      "as_of": "2026-06-11",
+      "open": 104.0,
+      "high": 105.2,
+      "low": 102.8,
+      "close": 104.6,
+      "adjusted_close": 104.6,
+      "volume": 1911000,
+      "currency": "USD",
+      "source_ref": "prov:market:yfinance:ACME:2026-06-11"
+    }
+  ],
+  "provenance": {
+    "provider": "yfinance",
+    "fixture_key": "market_data:ACME:yfinance:offline",
+    "captured_at": "2026-06-11T23:45:00Z",
+    "source_schema": "yfinance.history.v1",
+    "source_url_redacted": true,
+    "stale_after_days": 7,
+    "replay_ready": true
+  }
+}

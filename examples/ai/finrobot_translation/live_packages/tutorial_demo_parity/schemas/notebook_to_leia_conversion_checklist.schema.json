@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "provider_free",
+    "required_before_live_package_implementation",
+    "items"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "required_before_live_package_implementation": {
+      "const": true
+    },
+    "items": {
+      "type": "array",
+      "minItems": 5
+    }
+  }
+}

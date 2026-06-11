@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-finance-facade-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "source_modules": [
+    "finrobot/data_source/finance_data.py",
+    "finrobot/data_source/market_data.py"
+  ],
+  "modules": [
+    {
+      "id": "finance_data",
+      "source_module": "finrobot/data_source/finance_data.py",
+      "required_fields": [
+        "symbol",
+        "dataset",
+        "period",
+        "currency",
+        "rows",
+        "provenance"
+      ]
+    },
+    {
+      "id": "market_data",
+      "source_module": "finrobot/data_source/market_data.py",
+      "required_fields": [
+        "symbol",
+        "dataset",
+        "as_of",
+        "typed_columns",
+        "rows",
+        "provenance"
+      ]
+    }
+  ],
+  "typed_tables": [
+    {
+      "id": "market_data_table",
+      "schema": "schemas/market_data_table_v1.schema.json",
+      "fixture": "fixtures/market_data_ACME_daily_fixture.json",
+      "primary_key": [
+        "symbol",
+        "as_of"
+      ],
+      "required_columns": [
+        "symbol",
+        "as_of",
+        "open",
+        "high",
+        "low",
+        "close",
+        "adjusted_close",
+        "volume",
+        "currency",
+        "source_ref"
+      ]
+    },
+    {
+      "id": "fundamental_table",
+      "schema": "schemas/fundamental_table_v1.schema.json",
+      "fixture": "fixtures/fundamentals_ACME_annual_fixture.json",
+      "primary_key": [
+        "symbol",
+        "metric",
+        "period"
+      ],
+      "required_columns": [
+        "symbol",
+        "metric",
+        "period",
+        "value",
+        "unit",
+        "currency",
+        "source_ref"
+      ]
+    }
+  ],
+  "cache_policy": {
+    "enabled": true,
+    "mode": "fixture_read_through",
+    "ttl_seconds": 86400,
+    "stale_after_days": 7,
+    "key_fields": [
+      "provider",
+      "symbol",
+      "dataset",
+      "period",
+      "as_of"
+    ],
+    "live_network": false
+  },
+  "retry_policy": {
+    "enabled": true,
+    "max_attempts": 3,
+    "backoff": "exponential_jitter",
+    "base_delay_ms": 250,
+    "live_network": false
+  },
+  "rate_limit_policy": {
+    "enabled": true,
+    "window_seconds": 60,
+    "limit": 30,
+    "on_limit": "return_error_envelope",
+    "live_network": false
+  },
+  "provenance_contract": {
+    "required_fields": [
+      "provider",
+      "fixture_key",
+      "captured_at",
+      "source_schema",
+      "source_url_redacted",
+      "stale_after_days",
+      "replay_ready"
+    ],
+    "redact_source_url": true,
+    "live_network": false
+  },
+  "error_envelope": {
+    "schema": "schemas/error_envelope_v1.schema.json",
+    "fixture": "fixtures/error_envelope_yfinance_rate_limit_fixture.json",
+    "required_fields": [
+      "ok",
+      "error_code",
+      "provider",
+      "retryable",
+      "retry_after_seconds",
+      "fallback_attempted",
+      "provenance"
+    ]
+  },
+  "acceptance_gates": [
+    "finance_data and market_data facades return typed table envelopes, not provider-native payloads",
+    "provider fallback order is explicit and clean-skips while live network is disabled",
+    "cache, retry, and rate-limit policies produce deterministic fixture replay metadata",
+    "every data row carries source_ref provenance and every fixture has replay_ready=true",
+    "provider errors are returned through the error envelope contract"
+  ]
+}
