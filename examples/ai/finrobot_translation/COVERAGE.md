@@ -16,6 +16,10 @@ Baseline:
   `fixtures/provider_free_fixture_index.json`; `live_packages/vendor_adapters`
   retains its provider-specific `fixtures/offline_replay_index.json`.
 - Runtime changes in this audit: none.
+- Inventory-only refresh commands run for this audit:
+  `rg --files examples/ai/finrobot_translation | wc -l`,
+  `go run ./cmd/leia examples list --json`, live-package directory inventory,
+  and provider-free fixture-index inventory. These commands are read-only.
 
 ## Executive Summary
 
@@ -38,10 +42,25 @@ notebook/tutorial parity.
 The generic AI dialect convergence items are no longer missing or planned
 FinRobot work. They are checked-in package boundaries under
 `live_packages/generic_*`, with manifests, contracts, fixtures, registered
-examples, and tests. These packages define reusable generic AI boundaries for
-model resolution, turns, tools, agents, workflows, evaluation, replay, trace,
-approval, and package auditing; FinRobot is only one consumer of those generic
-boundaries.
+examples, and tests. Current inventory finds 10 registered generic live-package
+examples covering model resolution, turns, tools, agents, workflows,
+evaluation, replay, trace, approval, and package auditing; FinRobot is only one
+consumer of those generic boundaries.
+
+## Inventory Commands
+
+The following read-only inventory commands were run from this worktree on
+2026-06-12:
+
+| Command | Result |
+| --- | --- |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `600` files |
+| `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `78` examples: `67` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
+| `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `32` live-package skeleton directories |
+| `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `31` provider-free fixture indexes |
+| `go run ./cmd/leia examples list --json` filtered to `/live_packages/generic_` | `10` registered generic AI live-package examples |
+
+No stale count was found in this document during this refresh.
 
 ## Registered Example Inventory
 

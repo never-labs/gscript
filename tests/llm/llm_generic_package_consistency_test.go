@@ -115,6 +115,7 @@ func TestGenericLivePackageMatrixMatchesManifestAndDirectories(t *testing.T) {
 		if got, _ := packageManifest["provider_free"].(bool); !got {
 			t.Fatalf("%s package manifest provider_free = %#v", pkg.ID, packageManifest["provider_free"])
 		}
+		assertGenericLivePackageMatrixFixtureIndexGuard(t, root, pkg, packageManifest)
 		matrixIDs[pkg.ID] = pkg.PackageDir
 	}
 
@@ -271,11 +272,72 @@ func assertGenericLivePackageProviderFreeFixtureIndex(t *testing.T, root, packag
 	t.Helper()
 	indexPath := filepath.Join(packageDir, "fixtures", "provider_free_fixture_index.json")
 	index := readJSONMap(t, indexPath)
+	assertGenericLivePackageFixtureIndexContent(t, root, packageDir, indexPath, index)
+}
+
+func assertGenericLivePackageMatrixFixtureIndexGuard(t *testing.T, root string, pkg genericAIPackageRow, manifest map[string]any) {
+	t.Helper()
+	packageDir := filepath.Join(root, filepath.FromSlash(pkg.PackageDir))
+	matrixFixtureIndexRel := genericLivePackagePackageRelativePath(t, pkg.PackageDir, pkg.FixtureIndex)
+	manifestFixtureIndexRefs := genericLivePackageManifestFixtureIndexRefs(manifest)
+	if len(manifestFixtureIndexRefs) == 0 {
+		t.Fatalf("%s manifest must declare a fixture index under entrypoints, fixtures, or artifacts", pkg.ID)
+	}
+	for source, rel := range manifestFixtureIndexRefs {
+		if rel != matrixFixtureIndexRel {
+			t.Fatalf("%s %s fixture index = %q, matrix fixture_index = %q", pkg.ID, source, rel, matrixFixtureIndexRel)
+		}
+	}
+
+	indexPath := filepath.Join(root, filepath.FromSlash(pkg.FixtureIndex))
+	index := readJSONMap(t, indexPath)
+	assertGenericLivePackageFixtureIndexContent(t, root, packageDir, indexPath, index)
+}
+
+func genericLivePackagePackageRelativePath(t *testing.T, packageDir, repoRel string) string {
+	t.Helper()
+	prefix := strings.TrimSuffix(packageDir, "/") + "/"
+	if !strings.HasPrefix(repoRel, prefix) {
+		t.Fatalf("%s is not under package_dir %s", repoRel, packageDir)
+	}
+	rel := strings.TrimPrefix(repoRel, prefix)
+	if rel == "" || filepath.IsAbs(rel) || strings.Contains(filepath.ToSlash(rel), "../") || strings.Contains(rel, "://") {
+		t.Fatalf("%s has invalid package-relative path %q", packageDir, rel)
+	}
+	return filepath.ToSlash(rel)
+}
+
+func genericLivePackageManifestFixtureIndexRefs(manifest map[string]any) map[string]string {
+	refs := map[string]string{}
+	for _, owner := range []string{"entrypoints", "fixtures", "artifacts"} {
+		object, ok := manifest[owner].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, key := range []string{"fixture_index", "index"} {
+			ref, _ := object[key].(string)
+			if ref != "" && strings.HasPrefix(filepath.ToSlash(ref), "fixtures/") {
+				refs[owner+"."+key] = filepath.ToSlash(ref)
+			}
+		}
+	}
+	return refs
+}
+
+func assertGenericLivePackageFixtureIndexContent(t *testing.T, root, packageDir, indexPath string, index map[string]any) {
+	t.Helper()
+	if got, ok := genericLivePackageJSONNumberAsInt(index["schema_version"]); !ok || got != 1 {
+		t.Fatalf("%s schema_version = %#v, want 1", indexPath, index["schema_version"])
+	}
 	if !finrobotLivePackageBoolOrConst(index["provider_free"], true) ||
 		!finrobotLivePackageBoolOrConst(index["live_network"], false) ||
 		!finrobotLivePackageBoolOrConst(index["real_dependency_imports"], false) {
 		t.Fatalf("%s must declare provider-free offline defaults: %#v", indexPath, index)
 	}
+	assertFinRobotAuditRecursiveBool(t, indexPath, index, "provider_free", true)
+	assertFinRobotAuditRecursiveBool(t, indexPath, index, "live_network", false)
+	assertFinRobotAuditRecursiveBool(t, indexPath, index, "real_dependency_imports", false)
+
 	fixtures, ok := index["fixtures"].([]any)
 	if !ok || len(fixtures) == 0 {
 		t.Fatalf("%s missing fixtures array", indexPath)
@@ -317,7 +379,21 @@ func assertGenericLivePackageProviderFreeFixtureIndex(t *testing.T, root, packag
 			!finrobotLivePackageBoolOrConst(metadata["real_dependency_imports"], false) {
 			t.Fatalf("%s fixtures[%d].metadata must declare provider-free offline flags: %#v", indexPath, i, metadata)
 		}
+
+		fixturePath := filepath.Join(packageDir, filepath.FromSlash(strings.SplitN(path, "#", 2)[0]))
+		fixturePayload := readJSONMap(t, fixturePath)
+		assertFinRobotAuditRecursiveBool(t, fixturePath, fixturePayload, "provider_free", true)
+		assertFinRobotAuditRecursiveBool(t, fixturePath, fixturePayload, "live_network", false)
+		assertFinRobotAuditRecursiveBool(t, fixturePath, fixturePayload, "real_dependency_imports", false)
 	}
+}
+
+func genericLivePackageJSONNumberAsInt(value any) (int, bool) {
+	number, ok := value.(float64)
+	if !ok || number != float64(int(number)) {
+		return 0, false
+	}
+	return int(number), true
 }
 
 func assertGenericLivePackageNoQRuntime(t *testing.T, packageDir string) {

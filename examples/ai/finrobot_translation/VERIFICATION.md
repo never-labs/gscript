@@ -32,24 +32,50 @@ changes.
 
 No `docs/spec/index.html` generation was run.
 
-## Last Recorded Release-Gate Results
+## Current Release-Gate Results
 
-This status-doc refresh checked inventory only and did not rerun the release
-gates below.
+The release gates below were rerun from this worktree on 2026-06-12 after the
+fixture-index, manifest-audit, workflow-composition, and evaluation-harness
+guard updates.
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 4.909s` |
+| LLM/bind/CLI tests | `go test ./tests/llm ./internal/stdlib/bind ./cmd/leia -count=1` | Pass |
 | FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `78 ok, 0 skipped, 0 failed` |
-| Live package plan manifest JSON | `jq empty examples/ai/finrobot_translation/live_package_plan_manifest.json` | Pass |
+| Upstream coverage ledger hashes | local SHA-256 check over `fixture_hashes` | Pass |
 | Repo check, no generated docs/editor/examples | `go run ./cmd/leia check --no-docs --no-editor --no-examples .` | Pass: `fmt: ok`, `lint: ok`, `test: ok`, `manifest: ok`; docs/editor/examples skipped |
+
+## Inventory Refresh
+
+Read-only inventory commands run on 2026-06-12 from
+`/Users/jxwr/ai/ai_agent_experiment_gscript/gscript/.worktrees/ai-dialect-polish`:
+
+| Command | Result |
+| --- | --- |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `600` files |
+| `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `78` examples |
+| Same example inventory grouped by runner | `67` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
+| Same example inventory filtered to `/live_packages/` | `32` registered live-package examples |
+| Same example inventory filtered to `/live_packages/generic_` | `10` registered generic AI live-package examples |
+| `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `32` live-package skeleton directories |
+| `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `31` provider-free fixture indexes |
+
+The inventory confirms the documented counts are current. `AI_DIALECT_GAPS.md`
+is absent in this worktree, so no AI-dialect gap document required updates.
+
+Guard note: the recent generic AI boundary guard state is reflected here as
+checked-in package-owned surface, not as planned FinRobot work. The generic
+model, turn, tool, agent, workflow, evaluation, replay, trace, approval, and
+package-audit boundaries have registered live-package examples, so verification
+language should treat them as inventoried coverage unless a future release gate
+fails.
 
 ## FinRobot Example Coverage
 
 `go run ./cmd/leia examples list --json` discovers 78 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
-The examples gate validated:
+The current examples gate validated:
 
 - 67 `host-vm` examples
 - 6 `llm-replay` examples
@@ -196,5 +222,5 @@ The FinRobot documentation inventory is aligned with the current
 examples, 600 files in the translation directory, and 32 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
-FinRobot-only work. The recorded validation pass above did not generate
+FinRobot-only work. The current validation pass above did not generate
 `docs/spec/index.html`.

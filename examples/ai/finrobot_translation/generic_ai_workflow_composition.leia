@@ -6,16 +6,16 @@
 // credential, or domain adapter.
 
 package_boundaries := {
-    {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "ai.model.resolve" provider_free: true live_network: false},
-    {role: "turn" package_id: "generic-turn-runner" capability: "generic.ai.turn.request" entrypoint: "ai.turn.run" provider_free: true live_network: false},
-    {role: "tool" package_id: "generic-tool-contracts" capability: "generic.ai.tool.contract" entrypoint: "ai.tool.invoke" provider_free: true live_network: false},
-    {role: "agent" package_id: "generic-agent-runner" capability: "generic.ai.agent.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
-    {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "generic.ai.workflow.orchestration" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
-    {role: "eval" package_id: "generic-evaluation-harness" capability: "generic.ai.evaluation.harness" entrypoint: "ai.eval.run" provider_free: true live_network: false},
-    {role: "replay" package_id: "generic-record-replay" capability: "generic.ai.record.replay" entrypoint: "ai.replay.match" provider_free: true live_network: false},
+    {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "generic.ai.model.registry" provider_free: true live_network: false},
+    {role: "replay" package_id: "generic-record-replay" capability: "generic.ai.record.capture" entrypoint: "generic.ai.record.replay.fixture" provider_free: true live_network: false},
     {role: "trace" package_id: "generic-trace-events" capability: "generic.ai.trace.events" entrypoint: "ai.trace.emit" provider_free: true live_network: false},
-    {role: "approval" package_id: "generic-approval-policy" capability: "generic.ai.approval.policy" entrypoint: "ai.approval.check" provider_free: true live_network: false},
-    {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit" entrypoint: "ai.package.audit" provider_free: true live_network: false},
+    {role: "approval" package_id: "generic-approval-policy" capability: "generic.ai.approval.policy.evaluate" entrypoint: "generic.ai.approval.policy.evaluate" provider_free: true live_network: false},
+    {role: "tool" package_id: "generic-tool-contracts" capability: "ai.tool.invoke" entrypoint: "ai.tool.invoke" provider_free: true live_network: false},
+    {role: "turn" package_id: "generic-turn-runner" capability: "ai.turn.execute" entrypoint: "ai.turn.execute" provider_free: true live_network: false},
+    {role: "agent" package_id: "generic-agent-runner" capability: "ai.agent.config.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
+    {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "generic.ai.package.boundary.audit" provider_free: true live_network: false},
+    {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "ai.workflow.orchestrate.provider_free" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
+    {role: "eval" package_id: "generic-evaluation-harness" capability: "ai.eval.run.provider_free" entrypoint: "ai.eval.run" provider_free: true live_network: false},
 }
 
 composition_edges := {

@@ -15,10 +15,11 @@ type finrobotPackageManifestAuditLedger struct {
 	ID            string `json:"id"`
 	AuditKind     string `json:"audit_kind"`
 	Scope         struct {
-		LivePackagesRoot       string `json:"live_packages_root"`
-		PlanManifest           string `json:"plan_manifest"`
-		ReadOnly               bool   `json:"read_only"`
-		GenericPackageBoundary bool   `json:"generic_package_boundary"`
+		LivePackagesRoot            string `json:"live_packages_root"`
+		PlanManifest                string `json:"plan_manifest"`
+		ReadOnly                    bool   `json:"read_only"`
+		GenericPackageBoundary      bool   `json:"generic_package_boundary"`
+		FixtureIndexCapabilityScope string `json:"fixture_index_capability_scope"`
 	} `json:"scope"`
 	Rules   map[string]bool `json:"rules"`
 	Waivers struct {
@@ -42,6 +43,9 @@ func TestFinRobotPackageManifestConsistencyAudit(t *testing.T) {
 	}
 	if !ledger.Scope.ReadOnly || !ledger.Scope.GenericPackageBoundary {
 		t.Fatalf("audit scope must be a read-only generic package boundary: %#v", ledger.Scope)
+	}
+	if ledger.Scope.FixtureIndexCapabilityScope != "all_package_manifests" {
+		t.Fatalf("fixture index capability scope must cover all package manifests: %#v", ledger.Scope)
 	}
 	for _, rule := range []string{
 		"provider_free",
@@ -104,7 +108,7 @@ func TestFinRobotPackageManifestConsistencyAudit(t *testing.T) {
 			assertFinRobotAuditEntrypoints(t, root, manifestPath, filepath.Dir(manifestPath), manifest)
 			assertFinRobotAuditReferencedArtifacts(t, root, manifestPath, filepath.Dir(manifestPath), manifest)
 			assertFinRobotAuditCapabilities(t, manifestPath, planned.PackageName, planned.Capabilities, manifest)
-			assertFinRobotAuditFixtureIndexCapabilities(t, root, manifestPath, planned.ID, planned.Capabilities, manifest)
+			assertFinRobotAuditFixtureIndexCapabilities(t, root, manifestPath, planned.Capabilities, manifest)
 			if registered := registeredExamples[relDir]; registered == "" {
 				t.Fatalf("%s has no registered example mapping", relDir)
 			} else if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(registered))); err != nil {
@@ -387,21 +391,18 @@ func assertFinRobotAuditCapabilities(t *testing.T, manifestPath, packageName str
 	}
 }
 
-func assertFinRobotAuditFixtureIndexCapabilities(t *testing.T, root, manifestPath, packageID string, plannedCapabilities []string, manifest map[string]any) {
+func assertFinRobotAuditFixtureIndexCapabilities(t *testing.T, root, manifestPath string, plannedCapabilities []string, manifest map[string]any) {
 	t.Helper()
-	if packageID != "generic_package_boundary_auditor" {
-		return
-	}
 	fixtureIndex, ok := finrobotAuditFixtureIndexPath(manifest)
 	if !ok {
-		t.Fatalf("%s package-boundary auditor manifest has no fixture index", manifestPath)
+		return
 	}
 	packageDir := filepath.Dir(manifestPath)
 	indexPath := filepath.Join(packageDir, filepath.FromSlash(strings.SplitN(fixtureIndex, "#", 2)[0]))
 	index := readJSONMap(t, indexPath)
 	manifestCapabilities := finrobotAuditStringSet(finrobotAuditCollectCapabilities(manifest))
 	plannedCapabilitySet := finrobotAuditStringSet(plannedCapabilities)
-	for _, capability := range finrobotAuditCollectCapabilities(index) {
+	for _, capability := range finrobotAuditCollectCapabilityLists(index) {
 		assertFinRobotAuditNamespacedCapability(t, indexPath, capability)
 		if !manifestCapabilities[capability] {
 			t.Fatalf("%s fixture index capability %q is not declared by %s", indexPath, capability, manifestPath)
@@ -433,6 +434,40 @@ func finrobotAuditStringSet(values []string) map[string]bool {
 		result[value] = true
 	}
 	return result
+}
+
+func finrobotAuditCollectCapabilityLists(value any) []string {
+	seen := map[string]bool{}
+	var walk func(any)
+	walk = func(value any) {
+		switch value := value.(type) {
+		case map[string]any:
+			for key, child := range value {
+				if key == "capabilities" || key == "common_capabilities" {
+					if items, ok := child.([]any); ok {
+						for _, item := range items {
+							if capability, ok := item.(string); ok && strings.Contains(capability, ".") {
+								seen[capability] = true
+							}
+						}
+						continue
+					}
+				}
+				walk(child)
+			}
+		case []any:
+			for _, child := range value {
+				walk(child)
+			}
+		}
+	}
+	walk(value)
+	capabilities := make([]string, 0, len(seen))
+	for capability := range seen {
+		capabilities = append(capabilities, capability)
+	}
+	sort.Strings(capabilities)
+	return capabilities
 }
 
 func finrobotAuditCapabilityPrefixes(capabilities []string) []string {

@@ -109,7 +109,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/optional_integrations"],
       "excluded_scope": ["live AutoGen AgentBuilder execution", "live GPT model calls"],
       "source_hash": "sha256:9eaee7c13b4cc7b2eab6984d550c95cb3c3787a963c7da3897025e91c946df58",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "b465fbab27fca75d62e3c64586cfe68d1898ea27da1ad3cc151a53cc89a74aa2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
       "next_action": "Add an optional AutoGen package gate if dynamic builder execution becomes a supported external dependency."
     },
     {
@@ -142,7 +142,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/prompt_roles"],
       "excluded_scope": ["AutoGen utility object compatibility"],
       "source_hash": "sha256:953d8746efca1c6f903370d4da7f72d5e5e75043379a2b6935231db6592376c3",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "b465fbab27fca75d62e3c64586cfe68d1898ea27da1ad3cc151a53cc89a74aa2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
       "next_action": "Keep lifecycle helpers modeled as generic agent/workflow contracts."
     },
     {
@@ -153,7 +153,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"],
       "excluded_scope": ["mutable AutoGen GroupChatManager runtime object"],
       "source_hash": "sha256:72b3765feac29d85c88c2eff1a0db3d22f90e4f0139428b64e471f94c696753d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "b465fbab27fca75d62e3c64586cfe68d1898ea27da1ad3cc151a53cc89a74aa2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
       "next_action": "Use replayed workflow traces for offline parity and package live workflow orchestration separately."
     },
     {
@@ -296,7 +296,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/document_pipeline"],
       "excluded_scope": ["live vector-store backend"],
       "source_hash": "sha256:b8a01726b7b083c3029a10c6c61222743e6f3c83eb9e05b2193c39051e3a2013",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "b465fbab27fca75d62e3c64586cfe68d1898ea27da1ad3cc151a53cc89a74aa2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
       "next_action": "Package vector-store adapters separately while preserving provider-free RAG fixtures."
     },
     {
@@ -384,7 +384,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"],
       "excluded_scope": ["live provider-backed committee execution"],
       "source_hash": "sha256:fe94bfb4394890ef1004cc8de1d1d330c4b5af709c3af2a088c9e678edda6ab3",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "b465fbab27fca75d62e3c64586cfe68d1898ea27da1ad3cc151a53cc89a74aa2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
       "next_action": "Keep committee workflow covered by replay records until live package execution lands."
     },
     {
@@ -527,7 +527,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline", "examples/ai/finrobot_translation/live_packages/analyzer_report"],
       "excluded_scope": ["live model calls and persisted report outputs"],
       "source_hash": "sha256:3ac04867911e4ad78e4d5861d1b15f73eeac66e4f1cd0ca5880e18e0e17f1d5d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "b465fbab27fca75d62e3c64586cfe68d1898ea27da1ad3cc151a53cc89a74aa2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json", "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"}],
       "next_action": "Wire stage DAG package to section-agent prompt/version package."
     },
     {
@@ -549,7 +549,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_normalizers", "examples/ai/finrobot_translation/live_packages/valuation_engine", "examples/ai/finrobot_translation/live_packages/news_catalyst", "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"],
       "excluded_scope": ["method-by-method pandas/chart/PDF runtime parity"],
       "source_hash": "sha256:11b270c0518bbb7a8a88d1f4b0661c2717cf75a8259fb47c22c5a65441f3f83b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "7ea7ef13cdaa0441a7d48e5cb707c1abe943f9c955362410a7a07a6dd9365702"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "0724f0681b79421f6bf9e57334fbbd34303e1be92d5eddeb3480d906954d5dd0"}],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
     },
     {

@@ -14,6 +14,12 @@ import (
 )
 
 type finrobotEvaluationHarnessParityManifest struct {
+	HarnessID      string `json:"harness_id"`
+	FixtureVersion string `json:"fixture_version"`
+	CIReport       struct {
+		ProviderFree bool   `json:"provider_free"`
+		Command      string `json:"command_template"`
+	} `json:"ci_report"`
 	AIEvaluationCapability struct {
 		ID                   string   `json:"id"`
 		Scope                string   `json:"scope"`
@@ -135,6 +141,7 @@ type finrobotEvaluationHarnessParityReport struct {
 	} `json:"summary"`
 	LLM *struct {
 		Mode          string  `json:"mode"`
+		ReplayPath    string  `json:"replay_path"`
 		LoadedTurns   int     `json:"loaded_turns"`
 		ReplayedTurns int     `json:"replayed_turns"`
 		Turns         int     `json:"turns"`
@@ -143,6 +150,10 @@ type finrobotEvaluationHarnessParityReport struct {
 		Cost          float64 `json:"cost"`
 		Errors        int     `json:"errors"`
 	} `json:"llm"`
+	Inputs []struct {
+		Path   string `json:"path"`
+		Status string `json:"status"`
+	} `json:"inputs"`
 	Cases []struct {
 		CaseID     string `json:"case_id"`
 		Name       string `json:"name"`
@@ -211,6 +222,10 @@ func TestFinRobotEvaluationHarnessParityDeclaresGenericAICapability(t *testing.T
 	if manifest.ProviderFreeModelStub.LiveProviderCalls || manifest.ProviderFreeModelStub.NetworkCalls || manifest.ProviderFreeModelStub.AllowedModelPrefix != "mock-" {
 		t.Fatalf("provider-free model stub = %#v", manifest.ProviderFreeModelStub)
 	}
+	if !manifest.CIReport.ProviderFree || manifest.HarnessID == "" || manifest.FixtureVersion == "" ||
+		!strings.Contains(manifest.CIReport.Command, "--replay") {
+		t.Fatalf("offline CI report/fixture marker = harness %q fixture %q ci %#v", manifest.HarnessID, manifest.FixtureVersion, manifest.CIReport)
+	}
 	assertFileSHA256(t, filepath.Join(root, capability.CapabilitySpecimen.SourcePath), capability.CapabilitySpecimen.SourceSHA256)
 	assertFileSHA256(t, filepath.Join(root, capability.CapabilitySpecimen.DatasetPath), capability.CapabilitySpecimen.DatasetSHA256)
 	assertFileSHA256(t, filepath.Join(root, capability.CapabilitySpecimen.ReplayRecordsPath), capability.CapabilitySpecimen.ReplaySHA256)
@@ -261,6 +276,7 @@ func TestFinRobotEvaluationHarnessParityRunsGenericAISpecimenProviderFree(t *tes
 	}
 	assertGoldenMetrics(t, report, golden.Metrics)
 	assertGoldenMetricsHaveSubcaseEvidence(t, report, golden.Metrics)
+	assertReportMetricEvidenceTraceableToManifest(t, report, manifest)
 }
 
 func TestFinRobotEvaluationHarnessParityFailureEnvelopeForReplayMismatch(t *testing.T) {
@@ -308,6 +324,7 @@ func TestFinRobotEvaluationHarnessParityFailureEnvelopeForReplayMismatch(t *test
 			t.Fatalf("mismatch details missing %q: %#v", detail, mismatchFinding.Details)
 		}
 	}
+	assertReplayMismatchEnvelopeEvidence(t, report, manifest, *mismatchFinding, sourcePath, mismatchPath)
 }
 
 func loadFinRobotEvaluationHarnessParityManifest(t *testing.T, root string) finrobotEvaluationHarnessParityManifest {
@@ -549,6 +566,93 @@ func assertGoldenMetricsHaveSubcaseEvidence(t *testing.T, report finrobotEvaluat
 	}
 }
 
+func assertReportMetricEvidenceTraceableToManifest(t *testing.T, report finrobotEvaluationHarnessParityReport, manifest finrobotEvaluationHarnessParityManifest) {
+	t.Helper()
+	registry := map[string]struct {
+		Type        string
+		Aggregation string
+		GoldenMin   float64
+		GoldenMax   float64
+	}{}
+	for _, metric := range manifest.MetricRegistry {
+		registry[metric.Name] = struct {
+			Type        string
+			Aggregation string
+			GoldenMin   float64
+			GoldenMax   float64
+		}{Type: metric.Type, Aggregation: metric.Aggregation, GoldenMin: metric.GoldenMin, GoldenMax: metric.GoldenMax}
+	}
+	wantCaseNames := finrobotEvaluationHarnessParityStringSet(manifest.AIEvaluationCapability.CapabilitySpecimen.GoldenReport.CaseNames)
+	wantSubcases := finrobotEvaluationHarnessParityStringSet(manifest.AIEvaluationCapability.CapabilitySpecimen.SubcaseIDs)
+	evidence := map[string]struct {
+		Type     string
+		Count    int
+		CaseIDs  map[string]bool
+		Subcases map[string]bool
+	}{}
+	for _, c := range report.Cases {
+		if !wantCaseNames[c.Name] || c.CaseID == "" {
+			t.Fatalf("report case %q/%q is not manifest-declared; want names %#v", c.CaseID, c.Name, manifest.AIEvaluationCapability.CapabilitySpecimen.GoldenReport.CaseNames)
+		}
+		for _, subcase := range c.Subcases {
+			if !wantSubcases[subcase.CaseID] {
+				t.Fatalf("report subcase %q is not manifest-declared; want %#v", subcase.CaseID, manifest.AIEvaluationCapability.CapabilitySpecimen.SubcaseIDs)
+			}
+			for _, metric := range subcase.Metrics {
+				registered, ok := registry[metric.Name]
+				if !ok {
+					t.Fatalf("subcase %q metric %q is not in manifest metric_registry", subcase.CaseID, metric.Name)
+				}
+				if registered.Type != metric.Type {
+					t.Fatalf("subcase %q metric %q type = %q, registry = %q", subcase.CaseID, metric.Name, metric.Type, registered.Type)
+				}
+				item := evidence[metric.Name]
+				if item.CaseIDs == nil {
+					item.CaseIDs = map[string]bool{}
+					item.Subcases = map[string]bool{}
+				}
+				item.Type = metric.Type
+				item.Count++
+				item.CaseIDs[c.CaseID] = true
+				item.Subcases[subcase.CaseID] = true
+				evidence[metric.Name] = item
+			}
+		}
+	}
+	for _, metric := range report.Metrics {
+		registered, ok := registry[metric.Name]
+		if !ok {
+			t.Fatalf("report metric %q is not in manifest metric_registry", metric.Name)
+		}
+		actual, ok := evidence[metric.Name]
+		if !ok {
+			t.Fatalf("report metric %q has no case/subcase evidence", metric.Name)
+		}
+		if metric.Type != registered.Type || metric.Type != actual.Type || metric.Count != actual.Count {
+			t.Fatalf("report metric %q = type %q count %d, registry type %q, evidence %#v", metric.Name, metric.Type, metric.Count, registered.Type, actual)
+		}
+		if len(actual.CaseIDs) == 0 || len(actual.Subcases) == 0 {
+			t.Fatalf("report metric %q evidence lacks case/subcase ids: %#v", metric.Name, actual)
+		}
+	}
+	reportMetrics := reportMetricsByName(report)
+	for _, gate := range manifest.GoldenThresholdGates.MetricThresholds {
+		metric, ok := reportMetrics[gate.Name]
+		if !ok {
+			t.Fatalf("gate metric %q has no report metric evidence", gate.Name)
+		}
+		if _, ok := evidence[gate.Name]; !ok {
+			t.Fatalf("gate metric %q has no subcase evidence", gate.Name)
+		}
+		if gate.PassRateMin != 0 && metric.PassRate < gate.PassRateMin {
+			t.Fatalf("gate metric %q pass_rate = %v, min %v", gate.Name, metric.PassRate, gate.PassRateMin)
+		}
+		if gate.MeanMax != 0 && metric.Mean > gate.MeanMax {
+			t.Fatalf("gate metric %q mean = %v, max %v", gate.Name, metric.Mean, gate.MeanMax)
+		}
+	}
+}
+
 func metricRegistryNames(manifest finrobotEvaluationHarnessParityManifest) []string {
 	var names []string
 	for _, metric := range manifest.MetricRegistry {
@@ -589,6 +693,104 @@ func assertGoldenThresholdGateMetrics(t *testing.T, manifest finrobotEvaluationH
 			t.Fatalf("golden threshold metric %q has no threshold: %#v", gate.Name, gate)
 		}
 	}
+}
+
+func assertReplayMismatchEnvelopeEvidence(t *testing.T, report finrobotEvaluationHarnessParityReport, manifest finrobotEvaluationHarnessParityManifest, finding struct {
+	Kind     string         `json:"kind"`
+	Severity string         `json:"severity"`
+	Message  string         `json:"message"`
+	Path     string         `json:"path"`
+	Details  map[string]any `json:"details"`
+}, sourcePath, replayPath string) {
+	t.Helper()
+	if report.LLM == nil || report.LLM.Mode != "replay" || report.LLM.ReplayPath != replayPath {
+		t.Fatalf("mismatch envelope replay association = %#v, want replay path %q", report.LLM, replayPath)
+	}
+	if !manifest.CIReport.ProviderFree ||
+		manifest.AIEvaluationCapability.NetworkPolicy != "disabled_by_default" ||
+		manifest.AIEvaluationCapability.ModelPolicy != "replay_or_stub_only" ||
+		manifest.ProviderFreeModelStub.LiveProviderCalls || manifest.ProviderFreeModelStub.NetworkCalls {
+		t.Fatalf("mismatch envelope is not anchored to provider-free offline manifest policy: ci %#v capability %#v stub %#v", manifest.CIReport, manifest.AIEvaluationCapability, manifest.ProviderFreeModelStub)
+	}
+	if len(report.Inputs) != 1 || report.Inputs[0].Path != sourcePath || report.Inputs[0].Status != "error" {
+		t.Fatalf("mismatch envelope source fixture association = %#v, want %q error", report.Inputs, sourcePath)
+	}
+	caseID, _ := finding.Details["case_id"].(string)
+	if caseID == "" {
+		t.Fatalf("mismatch envelope missing case_id detail: %#v", finding.Details)
+	}
+	if _, ok := finding.Details["turn"]; !ok {
+		t.Fatalf("mismatch envelope missing replay turn detail: %#v", finding.Details)
+	}
+	if _, ok := finding.Details["expected"]; !ok {
+		t.Fatalf("mismatch envelope missing replay expected detail: %#v", finding.Details)
+	}
+	if _, ok := finding.Details["actual"]; !ok {
+		t.Fatalf("mismatch envelope missing replay actual detail: %#v", finding.Details)
+	}
+	wantSubcases := finrobotEvaluationHarnessParityStringSet(manifest.AIEvaluationCapability.CapabilitySpecimen.SubcaseIDs)
+	for _, c := range report.Cases {
+		if c.CaseID != caseID {
+			continue
+		}
+		if c.SourcePath != sourcePath || finding.Path != sourcePath {
+			t.Fatalf("mismatch case/source path association = case %q finding %q, want %q", c.SourcePath, finding.Path, sourcePath)
+		}
+		for _, subcase := range c.Subcases {
+			if subcase.Status == "failed" {
+				if !wantSubcases[subcase.CaseID] {
+					t.Fatalf("failed subcase %q is not manifest-declared", subcase.CaseID)
+				}
+				return
+			}
+		}
+		t.Fatalf("mismatch case %q has no failed manifest subcase: %#v", caseID, c.Subcases)
+	}
+	t.Fatalf("mismatch finding case_id %q has no report case", caseID)
+}
+
+func reportMetricsByName(report finrobotEvaluationHarnessParityReport) map[string]struct {
+	Name     string
+	Type     string
+	Count    int
+	PassRate float64
+	Mean     float64
+	Values   map[string]int
+} {
+	metrics := map[string]struct {
+		Name     string
+		Type     string
+		Count    int
+		PassRate float64
+		Mean     float64
+		Values   map[string]int
+	}{}
+	for _, metric := range report.Metrics {
+		metrics[metric.Name] = struct {
+			Name     string
+			Type     string
+			Count    int
+			PassRate float64
+			Mean     float64
+			Values   map[string]int
+		}{
+			Name:     metric.Name,
+			Type:     metric.Type,
+			Count:    metric.Count,
+			PassRate: metric.PassRate,
+			Mean:     metric.Mean,
+			Values:   metric.Values,
+		}
+	}
+	return metrics
+}
+
+func finrobotEvaluationHarnessParityStringSet(values []string) map[string]bool {
+	set := map[string]bool{}
+	for _, value := range values {
+		set[value] = true
+	}
+	return set
 }
 
 func requireStringSet(t *testing.T, got, want []string) {

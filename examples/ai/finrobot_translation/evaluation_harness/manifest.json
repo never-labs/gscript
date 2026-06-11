@@ -53,6 +53,9 @@
           {"name": "judge_passed", "type": "bool", "count": 2, "pass_rate": 1.0},
           {"name": "answer_chars", "type": "number", "count": 2, "mean": 64.0},
           {"name": "rubric_label", "type": "string", "count": 2},
+          {"name": "judge_cost", "type": "number", "count": 1, "mean": 0.004},
+          {"name": "judge_input_tokens", "type": "number", "count": 1, "mean": 4.0},
+          {"name": "judge_output_tokens", "type": "number", "count": 1, "mean": 3.0},
           {"name": "judge_tokens", "type": "number", "count": 1, "mean": 7.0}
         ]
       }
@@ -79,6 +82,8 @@
     {"name": "answer_chars", "type": "number", "aggregation": "mean_min_max", "golden_min": 1.0},
     {"name": "rubric_label", "type": "string", "aggregation": "value_counts"},
     {"name": "judge_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 16.0},
+    {"name": "judge_input_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 512.0},
+    {"name": "judge_output_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 200.0},
     {"name": "judge_cost", "type": "number", "aggregation": "mean_min_max", "golden_max": 0.02}
   ],
   "dataset_manifest": {

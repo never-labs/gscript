@@ -26,7 +26,8 @@
         "live_packages_root",
         "plan_manifest",
         "read_only",
-        "generic_package_boundary"
+        "generic_package_boundary",
+        "fixture_index_capability_scope"
       ],
       "properties": {
         "live_packages_root": {
@@ -40,6 +41,9 @@
         },
         "generic_package_boundary": {
           "const": true
+        },
+        "fixture_index_capability_scope": {
+          "const": "all_package_manifests"
         }
       }
     },

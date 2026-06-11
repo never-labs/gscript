@@ -2,6 +2,7 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -87,7 +88,7 @@ func TestFinRobotLivePackageFixtureIndexesReferenceExistingJSON(t *testing.T) {
 			for _, indexPath := range indexPaths {
 				index := readJSONMap(t, indexPath)
 				assertFinRobotFixtureIndexOfflineFlags(t, filepath.ToSlash(indexPath), index)
-				assertFinRobotFixtureIndexReferences(t, pkgDir, indexPath, index)
+				assertFinRobotFixtureIndexEntries(t, pkgDir, indexPath, index)
 			}
 		})
 	}
@@ -249,6 +250,124 @@ func assertFinRobotFixtureIndexReferences(t *testing.T, pkgDir, indexPath string
 	assertFinRobotFixtureIndexReferencesValue(t, pkgDir, filepath.Dir(indexPath), filepath.ToSlash(indexPath), "", value, seen)
 }
 
+func assertFinRobotFixtureIndexEntries(t *testing.T, pkgDir, indexPath string, index map[string]any) {
+	t.Helper()
+	slashIndexPath := filepath.ToSlash(indexPath)
+	seen := map[string]bool{}
+	rootFlags := finrobotFixtureIndexRootFlags(t, slashIndexPath, index)
+	assertFinRobotFixtureIndexMetadataConsistent(t, slashIndexPath, "metadata", index, rootFlags)
+
+	fixtures, ok := index["fixtures"]
+	if !ok {
+		return
+	}
+	switch entries := fixtures.(type) {
+	case []any:
+		for i, rawEntry := range entries {
+			entryPath := fmt.Sprintf("%s fixtures[%d]", slashIndexPath, i)
+			assertFinRobotFixtureIndexEntry(t, pkgDir, indexPath, entryPath, rawEntry, rootFlags, seen)
+		}
+	case map[string]any:
+		keys := make([]string, 0, len(entries))
+		for key := range entries {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			entryPath := fmt.Sprintf("%s fixtures.%s", slashIndexPath, key)
+			assertFinRobotFixtureIndexEntry(t, pkgDir, indexPath, entryPath, entries[key], rootFlags, seen)
+		}
+	default:
+		t.Fatalf("%s fixtures = %#v, want array or object", slashIndexPath, fixtures)
+	}
+}
+
+func assertFinRobotFixtureIndexEntry(t *testing.T, pkgDir, indexPath, entryPath string, rawEntry any, rootFlags map[string]bool, seen map[string]bool) {
+	t.Helper()
+	entry, ok := rawEntry.(map[string]any)
+	if !ok {
+		t.Fatalf("%s = %#v, want object", entryPath, rawEntry)
+	}
+	assertFinRobotFixtureIndexReferencesValue(t, pkgDir, filepath.Dir(indexPath), entryPath, "", entry, seen)
+	entryFlags := finrobotFixtureIndexEntryFlags(t, entryPath, entry, rootFlags)
+	assertFinRobotFixtureIndexMetadataConsistent(t, entryPath, "metadata", entry, entryFlags)
+}
+
+func finrobotFixtureIndexRootFlags(t *testing.T, path string, root map[string]any) map[string]bool {
+	t.Helper()
+	flags := map[string]bool{}
+	for _, policy := range finrobotFixtureIndexMetadataPolicies() {
+		got, ok := finrobotFixtureIndexBoolValue(root[policy.key])
+		if !ok {
+			t.Fatalf("%s %s = %#v, want bool or const bool", path, policy.key, root[policy.key])
+		}
+		if got != policy.want {
+			t.Fatalf("%s %s = %#v, want %v", path, policy.key, root[policy.key], policy.want)
+		}
+		flags[policy.key] = got
+	}
+	return flags
+}
+
+func finrobotFixtureIndexEntryFlags(t *testing.T, path string, entry map[string]any, rootFlags map[string]bool) map[string]bool {
+	t.Helper()
+	flags := map[string]bool{}
+	for _, policy := range finrobotFixtureIndexMetadataPolicies() {
+		want := rootFlags[policy.key]
+		got := want
+		if raw, ok := entry[policy.key]; ok {
+			var valid bool
+			got, valid = finrobotFixtureIndexBoolValue(raw)
+			if !valid {
+				t.Fatalf("%s %s = %#v, want bool or const bool", path, policy.key, raw)
+			}
+			if got != want {
+				t.Fatalf("%s %s = %#v contradicts root %s = %v", path, policy.key, raw, policy.key, want)
+			}
+		}
+		flags[policy.key] = got
+	}
+	return flags
+}
+
+func assertFinRobotFixtureIndexMetadataConsistent(t *testing.T, path, metadataKey string, object map[string]any, expected map[string]bool) {
+	t.Helper()
+	rawMetadata, ok := object[metadataKey]
+	if !ok {
+		return
+	}
+	metadata, ok := rawMetadata.(map[string]any)
+	if !ok {
+		t.Fatalf("%s %s = %#v, want object", path, metadataKey, rawMetadata)
+	}
+	for _, policy := range finrobotFixtureIndexMetadataPolicies() {
+		raw, ok := metadata[policy.key]
+		if !ok {
+			continue
+		}
+		got, valid := finrobotFixtureIndexBoolValue(raw)
+		if !valid {
+			t.Fatalf("%s %s.%s = %#v, want bool or const bool", path, metadataKey, policy.key, raw)
+		}
+		if got != expected[policy.key] {
+			t.Fatalf("%s %s.%s = %#v contradicts entry/root %s = %v", path, metadataKey, policy.key, raw, policy.key, expected[policy.key])
+		}
+	}
+}
+
+type finrobotFixtureIndexMetadataPolicy struct {
+	key  string
+	want bool
+}
+
+func finrobotFixtureIndexMetadataPolicies() []finrobotFixtureIndexMetadataPolicy {
+	return []finrobotFixtureIndexMetadataPolicy{
+		{key: "provider_free", want: true},
+		{key: "live_network", want: false},
+		{key: "real_dependency_imports", want: false},
+	}
+}
+
 func assertFinRobotFixtureIndexReferencesValue(t *testing.T, pkgDir, indexDir, indexPath, key string, value any, seen map[string]bool) {
 	t.Helper()
 	switch value := value.(type) {
@@ -272,7 +391,7 @@ func assertFinRobotFixtureIndexReferencesValue(t *testing.T, pkgDir, indexDir, i
 
 func finrobotFixtureIndexPathReferenceKey(key string) bool {
 	switch key {
-	case "path", "paths", "schema", "schemas", "schema_path", "schema_paths", "record_schema", "records_path", "fixture_path", "fixture_paths", "index", "fixture_index":
+	case "path", "paths", "schema", "schemas", "schema_path", "schema_paths", "record_schema", "records_path", "contract", "contracts", "contract_path", "contract_paths", "fixture_path", "fixture_paths", "index", "fixture_index":
 		return true
 	default:
 		return false
@@ -341,13 +460,18 @@ func finrobotResolveFixtureIndexReference(pkgDir, indexDir, ref string) (string,
 }
 
 func finrobotLivePackageBoolOrConst(value any, want bool) bool {
+	got, ok := finrobotFixtureIndexBoolValue(value)
+	return ok && got == want
+}
+
+func finrobotFixtureIndexBoolValue(value any) (bool, bool) {
 	if got, ok := value.(bool); ok {
-		return got == want
+		return got, true
 	}
 	object, ok := value.(map[string]any)
 	if !ok {
-		return false
+		return false, false
 	}
 	got, ok := object["const"].(bool)
-	return ok && got == want
+	return got, ok
 }

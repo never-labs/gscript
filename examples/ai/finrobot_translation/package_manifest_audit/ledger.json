@@ -6,7 +6,8 @@
     "live_packages_root": "examples/ai/finrobot_translation/live_packages",
     "plan_manifest": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
     "read_only": true,
-    "generic_package_boundary": true
+    "generic_package_boundary": true,
+    "fixture_index_capability_scope": "all_package_manifests"
   },
   "rules": {
     "provider_free": true,
