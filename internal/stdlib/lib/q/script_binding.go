@@ -494,26 +494,26 @@ func (s *EvalState) evalQScriptBindingPlanWithResolver(plan *qScriptBindingPlan,
 	case qScriptBindingBinary:
 		value, handled, err = s.evalQScriptBinaryBinding(plan, resolver)
 	case qScriptBindingIndex:
-		collection, handled, err := s.evalQScriptBindingPlanWithResolver(plan.left, resolver)
-		if err != nil || !handled {
-			return nil, handled, err
+		collection, collectionHandled, collectionErr := s.evalQScriptBindingPlanWithResolver(plan.left, resolver)
+		if collectionErr != nil || !collectionHandled {
+			return nil, collectionHandled, collectionErr
 		}
-		index, handled, err := s.evalQScriptBindingPlanWithResolver(plan.right, resolver)
-		if err != nil || !handled {
-			return nil, handled, err
+		index, indexHandled, indexErr := s.evalQScriptBindingPlanWithResolver(plan.right, resolver)
+		if indexErr != nil || !indexHandled {
+			return nil, indexHandled, indexErr
 		}
 		if isCallable(collection) {
-			out, err := s.applyCallable(collection, []any{index})
+			out, applyErr := s.applyCallable(collection, []any{index})
 			value, handled = out, true
-			if err != nil {
-				return value, handled, err
+			if applyErr != nil {
+				return value, handled, applyErr
 			}
 			break
 		}
-		out, err := indexValue(collection, index)
+		out, indexValueErr := indexValue(collection, index)
 		value, handled = out, true
-		if err != nil {
-			return value, handled, err
+		if indexValueErr != nil {
+			return value, handled, indexValueErr
 		}
 	default:
 		return nil, false, nil

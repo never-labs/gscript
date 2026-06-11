@@ -140,6 +140,24 @@ type qAddChainTermPlan struct {
 	over        qCallableApplicationPlan
 	scanWord    string
 	scanInner   qTermArgPlan
+	// monadBundle, when set on the first term of a run of consecutive
+	// sum-unary terms over the same reduction input, evaluates the whole
+	// run through the fused multi-monad sum kernel (one pass over the
+	// source). The covered terms keep their individual plans so a kernel
+	// decline falls back to per-term evaluation unchanged.
+	monadBundle *qMonadSumBundlePlan
+}
+
+// qMonadSumBundlePlan groups span consecutive add-chain terms of the form
+// (+/<monad> <input>) sharing one reduction input. terms holds the original
+// per-term plans: terms[0]'s pipeline supplies the input expression and
+// binding plan, and all terms remain the fallback route when the fused
+// kernel declines the runtime value shape.
+type qMonadSumBundlePlan struct {
+	ops    []string
+	span   int
+	terms  []qAddChainTermPlan
+	kernel *data.QNumericUnaryMultiSumPlan
 }
 
 // buildQAddChainPlan validates src with the exact tryEvalScalarAddChain
@@ -164,7 +182,84 @@ func buildQAddChainPlan(src string) []qAddChainTermPlan {
 	for i, term := range terms {
 		plans[i] = buildQAddChainTermPlan(term)
 	}
+	attachQMonadSumBundles(plans)
 	return plans
+}
+
+// qMonadSumBundleTermPipeline returns the sum-unary pipeline plan backing an
+// add-chain term, or nil when the term is not a fused-monad-sum candidate.
+func qMonadSumBundleTermPipeline(plan *qAddChainTermPlan) *qPipelinePlan {
+	if plan.kind != qAddChainTermFast || plan.fast == nil {
+		return nil
+	}
+	if plan.fast.kind != qEvalFastPipeline || plan.fast.pipeline.kind != qPipelineSumUnaryPrimitive {
+		return nil
+	}
+	if strings.TrimSpace(plan.fast.pipeline.unaryOp) == "" || strings.TrimSpace(plan.fast.pipeline.reductionInput) == "" {
+		return nil
+	}
+	return &plan.fast.pipeline
+}
+
+// attachQMonadSumBundles marks runs of >=2 consecutive sum-unary terms over
+// the same reduction input for fused evaluation (one source pass via
+// data.TryTypedQNumericUnaryMultiSum instead of one per term).
+func attachQMonadSumBundles(plans []qAddChainTermPlan) {
+	for i := 0; i < len(plans); {
+		first := qMonadSumBundleTermPipeline(&plans[i])
+		if first == nil {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(plans) {
+			next := qMonadSumBundleTermPipeline(&plans[j])
+			if next == nil || next.reductionInput != first.reductionInput {
+				break
+			}
+			j++
+		}
+		if j-i >= 2 {
+			bundle := &qMonadSumBundlePlan{
+				ops:   make([]string, j-i),
+				span:  j - i,
+				terms: make([]qAddChainTermPlan, j-i),
+			}
+			copy(bundle.terms, plans[i:j])
+			for k := i; k < j; k++ {
+				bundle.ops[k-i] = qMonadSumBundleTermPipeline(&plans[k]).unaryOp
+			}
+			if kernel, ok := data.NewQNumericUnaryMultiSumPlan(bundle.ops); ok {
+				bundle.kernel = kernel
+				plans[i].monadBundle = bundle
+			}
+		}
+		i = j
+	}
+}
+
+// evalQMonadSumBundlePlan evaluates the shared reduction input once and asks
+// the fused multi-monad kernel for all per-term sums. handled=false keeps
+// the caller on its per-term route (identical fallback semantics).
+func (s *EvalState) evalQMonadSumBundlePlan(bundle *qMonadSumBundlePlan) ([]any, bool, error) {
+	if bundle.kernel == nil {
+		return nil, false, nil
+	}
+	pipeline := qMonadSumBundleTermPipeline(&bundle.terms[0])
+	if pipeline == nil {
+		return nil, false, nil
+	}
+	value, err := s.evalQPipelinePlannedExpr(pipeline.reductionInput, &pipeline.reductionPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	values, handled, err := data.TryTypedQNumericUnaryMultiSumPlanned(bundle.kernel, array)
+	recordRuntimeKernelProbe("ArrayNumericUnaryMultiSum", "vector-reduce/multi-sum/"+string(array.Kind()), handled, err)
+	return values, handled, err
 }
 
 // qWhereCompareCountSumCandidate is the pure syntactic gate of
@@ -347,23 +442,45 @@ func qLastDyadicTerminalCandidate(src string) bool {
 // the cached term plans.
 func (s *EvalState) evalQAddChainPlan(terms []qAddChainTermPlan) (any, bool, error) {
 	var acc any
-	for i := range terms {
+	started := false
+	fold := func(value any) error {
+		if !started {
+			acc = value
+			started = true
+			return nil
+		}
+		if out, ok := addScalarNumericFast(acc, value); ok {
+			acc = out
+			return nil
+		}
+		var err error
+		acc, err = applyDyadic('+', acc, value)
+		return err
+	}
+	for i := 0; i < len(terms); {
+		if bundle := terms[i].monadBundle; bundle != nil {
+			values, handled, err := s.evalQMonadSumBundlePlan(bundle)
+			if err != nil {
+				return nil, true, err
+			}
+			if handled {
+				for _, value := range values {
+					if err := fold(value); err != nil {
+						return nil, true, err
+					}
+				}
+				i += bundle.span
+				continue
+			}
+		}
 		value, err := s.evalQAddChainTerm(&terms[i])
 		if err != nil {
 			return nil, true, err
 		}
-		if i == 0 {
-			acc = value
-			continue
-		}
-		if out, ok := addScalarNumericFast(acc, value); ok {
-			acc = out
-			continue
-		}
-		acc, err = applyDyadic('+', acc, value)
-		if err != nil {
+		if err := fold(value); err != nil {
 			return nil, true, err
 		}
+		i++
 	}
 	return acc, true, nil
 }

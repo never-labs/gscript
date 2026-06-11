@@ -3099,8 +3099,14 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 	if !ok {
 		t.Fatal("TryTypedIntegerDyadic tiled mod did not match")
 	}
-	if _, ok := modTiled.(i64ScalarDyadicArray); !ok {
-		t.Fatalf("TryTypedIntegerDyadic tiled mod returned %T, want i64ScalarDyadicArray", modTiled)
+	// Tiled pushdown keeps the dyadic on the (small) tile source so
+	// whole-vector consumers stay on the O(period) cycle kernels.
+	tiledOut, ok := modTiled.(tiledArray)
+	if !ok {
+		t.Fatalf("TryTypedIntegerDyadic tiled mod returned %T, want tiledArray", modTiled)
+	}
+	if _, ok := tiledOut.source.(i64ScalarDyadicArray); !ok {
+		t.Fatalf("TryTypedIntegerDyadic tiled mod source = %T, want i64ScalarDyadicArray", tiledOut.source)
 	}
 	if got, want := modTiled.(Array).Values(), []any{int64(0), int64(1), int64(0), int64(1), int64(0), int64(1), int64(0), int64(1), int64(0), int64(1)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedIntegerDyadic tiled mod values = %v, want %v", got, want)

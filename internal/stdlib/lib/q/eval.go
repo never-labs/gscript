@@ -923,6 +923,12 @@ type qScriptStatement struct {
 	// per call.
 	compareIndexChecked bool
 	compareIndexPlan    *qPipelinePlan
+	// reduction/reductionOK memoize parseNumericReductionBinding at plan
+	// build time: the classification is purely syntactic (assign + rhs),
+	// and re-parsing it per evaluation costs string concatenation in hot
+	// multi-statement scripts.
+	reduction   numericReductionBinding
+	reductionOK bool
 }
 
 type qEvalFastPlanKind uint8
@@ -1127,6 +1133,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 			stmt.valueExpr = parseCachedValueExpr(part)
 			stmt.fastPlan = buildQEvalFastPlan(part)
 		}
+		stmt.reduction, stmt.reductionOK = parseNumericReductionBinding(stmt)
 		statements = append(statements, stmt)
 	}
 	pipeline, _ := buildQScriptPipelineDescriptor(statements)
@@ -1210,6 +1217,27 @@ func cloneQScriptStatement(stmt qScriptStatement) qScriptStatement {
 	return stmt
 }
 
+func cloneQAddChainTermPlan(in qAddChainTermPlan) qAddChainTermPlan {
+	out := in
+	if in.fast != nil {
+		cloned := cloneQEvalFastPlan(*in.fast)
+		out.fast = &cloned
+	}
+	if in.monadBundle != nil {
+		bundle := &qMonadSumBundlePlan{
+			ops:    append([]string(nil), in.monadBundle.ops...),
+			span:   in.monadBundle.span,
+			terms:  make([]qAddChainTermPlan, len(in.monadBundle.terms)),
+			kernel: in.monadBundle.kernel, // immutable after build; shareable
+		}
+		for i := range in.monadBundle.terms {
+			bundle.terms[i] = cloneQAddChainTermPlan(in.monadBundle.terms[i])
+		}
+		out.monadBundle = bundle
+	}
+	return out
+}
+
 func cloneQEvalFastPlan(in qEvalFastPlan) qEvalFastPlan {
 	out := in
 	out.pipeline = cloneQPipelinePlan(in.pipeline)
@@ -1220,11 +1248,7 @@ func cloneQEvalFastPlan(in qEvalFastPlan) qEvalFastPlan {
 	if len(in.addChainTerms) > 0 {
 		out.addChainTerms = make([]qAddChainTermPlan, len(in.addChainTerms))
 		for i := range in.addChainTerms {
-			out.addChainTerms[i] = in.addChainTerms[i]
-			if sub := in.addChainTerms[i].fast; sub != nil {
-				cloned := cloneQEvalFastPlan(*sub)
-				out.addChainTerms[i].fast = &cloned
-			}
+			out.addChainTerms[i] = cloneQAddChainTermPlan(in.addChainTerms[i])
 		}
 	}
 	return out
@@ -1630,10 +1654,10 @@ type numericReductionBinding struct {
 }
 
 func (s *EvalState) tryEvalNumericReductionBundle(statements []qScriptStatement, start int) (any, int, bool, error) {
-	first, ok := parseNumericReductionBinding(statements[start])
-	if !ok {
+	if !statements[start].reductionOK {
 		return nil, start, false, nil
 	}
+	first := statements[start].reduction
 	sourceName := s.resolveAssignmentName(first.source)
 	source, ok := s.lookupName(first.source)
 	if !ok {
@@ -1643,21 +1667,19 @@ func (s *EvalState) tryEvalNumericReductionBundle(statements []qScriptStatement,
 	if !ok {
 		return nil, start, false, nil
 	}
-	bindings := []numericReductionBinding{first}
 	next := start + 1
 	for next < len(statements) {
-		binding, ok := parseNumericReductionBinding(statements[next])
-		if !ok || s.resolveAssignmentName(binding.source) != sourceName {
+		if !statements[next].reductionOK || s.resolveAssignmentName(statements[next].reduction.source) != sourceName {
 			break
 		}
-		bindings = append(bindings, binding)
 		next++
 	}
-	if len(bindings) < 2 {
+	if next-start < 2 {
 		return nil, start, false, nil
 	}
-	for _, binding := range bindings {
-		if s.resolveAssignmentName(binding.assign) == sourceName {
+	bindings := statements[start:next]
+	for i := range bindings {
+		if s.resolveAssignmentName(bindings[i].reduction.assign) == sourceName {
 			return nil, start, false, nil
 		}
 	}
@@ -1667,9 +1689,9 @@ func (s *EvalState) tryEvalNumericReductionBundle(statements []qScriptStatement,
 		return nil, start, handled, err
 	}
 	var last any
-	for _, binding := range bindings {
-		value := numericReductionStatsValue(stats, binding.op)
-		s.env[s.resolveAssignmentName(binding.assign)] = value
+	for i := range bindings {
+		value := numericReductionStatsValue(stats, bindings[i].reduction.op)
+		s.env[s.resolveAssignmentName(bindings[i].reduction.assign)] = value
 		last = value
 	}
 	return last, next, true, nil

@@ -386,6 +386,16 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 				return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountDistinct, shape: "distinct-count", reductionInput: arg}))
 			}
 		}
+		// count group <arg> has the same cardinality as count distinct
+		// <arg> over arrays (group keys are exactly the distinct values);
+		// comparePrefix gates the array-only fallback in the evaluator so
+		// non-array group semantics stay on the probe chain.
+		if strings.HasPrefix(inputExpr, "group ") && wordBoundary(inputExpr, 0, len("group")) {
+			arg := strings.TrimSpace(inputExpr[len("group "):])
+			if arg != "" {
+				return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountDistinct, shape: "distinct-count", comparePrefix: "group", reductionInput: arg}))
+			}
+		}
 		if scan, arg, ok := qPipelineRunningScanInput(inputExpr); ok {
 			return qPipelinePlanWithBindingPlans(withSource(qPipelinePlan{kind: qPipelineCountRunningScan, shape: "vector-count/" + scan, compareOp: scan, reductionInput: arg}))
 		}
@@ -2811,6 +2821,11 @@ func (s *EvalState) evalQPipelineCountDistinct(plan *qPipelinePlan) (any, bool, 
 	}
 	array, ok := value.(data.Array)
 	if !ok {
+		if plan.comparePrefix == "group" {
+			// Keep non-array `count group` on the generic probe chain;
+			// only the array cardinality equivalence is pinned here.
+			return nil, false, nil
+		}
 		out, err := count(value)
 		return out, true, err
 	}
