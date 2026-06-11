@@ -7,14 +7,14 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 48 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. All 21 checked-in
+Current registered-example status: 52 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. All 22 checked-in
 live-package skeletons are registered provider-free examples: `analytics_report`,
 `analyzer_report`, `backtest_strategy`, `chart_renderer`, `coding_notebook`,
 `document_pipeline`, `earnings_transcript`, `equity_analysis_pipeline`, `factor_research`,
 `finance_facade`, `finance_normalizers`, `html_ui_snapshots`, `news_catalyst`,
 `optional_integrations`, `product_workflow`, `prompt_roles`, `report_renderer`,
-`retail_sentiment`, `tutorial_demo_parity`, `valuation_engine`, and
+`retail_sentiment`, `sec_filings`, `tutorial_demo_parity`, `valuation_engine`, and
 `vendor_adapters`.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
@@ -40,6 +40,7 @@ live-package skeletons are registered provider-free examples: `analytics_report`
 | `live_packages/retail_sentiment` | `live_packages/retail_sentiment/main.leia` | `leia-finrobot-retail-sentiment` | `packages/finrobot/retail_sentiment` | `contracts/retail_sentiment_contract.json` |
 | `live_packages/html_ui_snapshots` | `live_packages/html_ui_snapshots/main.leia` | `leia-finrobot-html-ui-snapshots` | `packages/finrobot/html_ui_snapshots` | `contracts/html_ui_snapshot_contract.json` |
 | `live_packages/earnings_transcript` | `live_packages/earnings_transcript/main.leia` | `leia-finrobot-earnings-transcript` | `packages/finrobot/earnings_transcript` | `contracts/earnings_transcript_contract.json` |
+| `live_packages/sec_filings` | `live_packages/sec_filings/main.leia` | `leia-finrobot-sec-filings` | `packages/finrobot/sec_filings` | `contracts/sec_filings_contract.json` |
 
 ## Contract Rules
 
