@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 33,
-  "translation_directory_file_count": 153,
+  "registered_examples_count": 34,
+  "translation_directory_file_count": 163,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -16,6 +16,15 @@
         "normalizers",
         "valuation",
         "report_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "analyzer_report",
+      "directory": "examples/ai/finrobot_translation/live_packages/analyzer_report",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/analyzer_report/main.leia",
+      "covers_package_ids": [
+        "analyzer_report"
       ],
       "status": "checked_in_registered_example"
     },
@@ -314,6 +323,35 @@
         "contract tests run with live_network=false and assert role profile versions plus TERMINATE convention",
         "section output schema fixture tests validate source evidence references without credentials",
         "provider-free package tests deny external I/O, provider credentials, and external prompt/model SDK imports"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "analyzer_report",
+      "package_name": "leia-finrobot-analyzer-report",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analyzer_report",
+      "planned_directory": "packages/finrobot/analyzer_report",
+      "manifest": "packages/finrobot/analyzer_report/package.manifest.json",
+      "contract": "packages/finrobot/analyzer_report/contracts/analyzer_report_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/section_agents.leia",
+      "capabilities": [
+        "finance.analyzer.report.orchestrate",
+        "finance.analyzer.section.schema",
+        "finance.analyzer.prompt.catalog",
+        "finance.analyzer.evidence.enforce",
+        "finance.analyzer.citation.require",
+        "finance.analyzer.output.risk",
+        "finance.analyzer.output.thesis",
+        "finance.analyzer.output.valuation",
+        "finance.analyzer.output.news",
+        "finance.analyzer.expected_sections.replay"
+      ],
+      "test_gates": [
+        "analyzer report manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required data provider or model credentials",
+        "section schema fixtures validate risk, thesis, valuation, and news output envelopes with citations",
+        "source evidence tests reject unresolved refs and require replayable expected sections before live analyzer packages are enabled"
       ],
       "no_built_in_guarantee": true
     },

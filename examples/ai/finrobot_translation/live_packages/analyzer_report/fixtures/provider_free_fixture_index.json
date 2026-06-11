@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "fixtures": [
+    {
+      "fixture_key": "prompt_catalog:finance_analysis:v1",
+      "capability": "finance.analyzer.prompt.catalog",
+      "path": "contracts/analyzer_report_contract.json",
+      "schema": "schemas/prompt_catalog_v1.schema.json",
+      "metadata": {"replay_ready": true, "source_module": "finrobot/functional/prompts/finance_analysis.py"}
+    },
+    {
+      "fixture_key": "section_schema:risk:v1",
+      "capability": "finance.analyzer.output.risk",
+      "path": "fixtures/expected_sections_ACME_fixture.json",
+      "schema": "schemas/section_schema_v1.schema.json",
+      "metadata": {"replay_ready": true, "section_id": "risk"}
+    },
+    {
+      "fixture_key": "section_schema:thesis:v1",
+      "capability": "finance.analyzer.output.thesis",
+      "path": "fixtures/expected_sections_ACME_fixture.json",
+      "schema": "schemas/section_schema_v1.schema.json",
+      "metadata": {"replay_ready": true, "section_id": "thesis"}
+    },
+    {
+      "fixture_key": "section_schema:valuation:v1",
+      "capability": "finance.analyzer.output.valuation",
+      "path": "fixtures/expected_sections_ACME_fixture.json",
+      "schema": "schemas/section_schema_v1.schema.json",
+      "metadata": {"replay_ready": true, "section_id": "valuation"}
+    },
+    {
+      "fixture_key": "section_schema:news:v1",
+      "capability": "finance.analyzer.output.news",
+      "path": "fixtures/expected_sections_ACME_fixture.json",
+      "schema": "schemas/section_schema_v1.schema.json",
+      "metadata": {"replay_ready": true, "section_id": "news"}
+    },
+    {
+      "fixture_key": "analyzer_report:ACME:offline:v1",
+      "capability": "finance.analyzer.expected_sections.replay",
+      "path": "fixtures/expected_sections_ACME_fixture.json",
+      "schema": "schemas/expected_section_v1.schema.json",
+      "metadata": {"replay_ready": true, "deterministic_order": true, "ticker": "ACME"}
+    }
+  ]
+}

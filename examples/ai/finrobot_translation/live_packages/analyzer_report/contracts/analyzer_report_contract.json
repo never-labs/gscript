@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-analyzer-report-contract-v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "source_modules": [
+    "finrobot/functional/analyzer.py",
+    "finrobot/functional/analyzer/*.py",
+    "finrobot/functional/prompts/finance_analysis.py"
+  ],
+  "capabilities": [
+    "finance.analyzer.report.orchestrate",
+    "finance.analyzer.section.schema",
+    "finance.analyzer.prompt.catalog",
+    "finance.analyzer.evidence.enforce",
+    "finance.analyzer.citation.require",
+    "finance.analyzer.output.risk",
+    "finance.analyzer.output.thesis",
+    "finance.analyzer.output.valuation",
+    "finance.analyzer.output.news",
+    "finance.analyzer.expected_sections.replay"
+  ],
+  "prompt_catalog": {
+    "id": "finance_analysis_prompt_library",
+    "version": "1.0.0",
+    "capability": "finance.analyzer.prompt.catalog",
+    "source_path": "finrobot.functional.prompts.finance_analysis",
+    "entries": [
+      {"id": "risk_prompt", "section_id": "risk", "requires_evidence": true, "requires_citations": true},
+      {"id": "thesis_prompt", "section_id": "thesis", "requires_evidence": true, "requires_citations": true},
+      {"id": "valuation_prompt", "section_id": "valuation", "requires_evidence": true, "requires_citations": true},
+      {"id": "news_prompt", "section_id": "news", "requires_evidence": true, "requires_citations": true}
+    ]
+  },
+  "section_schemas": [
+    {"id": "risk", "schema": "section_schema_v1", "output_envelope": "risk_output_v1", "required_fields": ["section_id", "title", "summary", "risk_factors", "source_refs", "citations", "evidence_validation"]},
+    {"id": "thesis", "schema": "section_schema_v1", "output_envelope": "thesis_output_v1", "required_fields": ["section_id", "title", "summary", "bull_case", "bear_case", "base_case", "source_refs", "citations", "evidence_validation"]},
+    {"id": "valuation", "schema": "section_schema_v1", "output_envelope": "valuation_output_v1", "required_fields": ["section_id", "title", "summary", "method", "assumptions", "target_price", "source_refs", "citations", "evidence_validation"]},
+    {"id": "news", "schema": "section_schema_v1", "output_envelope": "news_output_v1", "required_fields": ["section_id", "title", "summary", "catalysts", "sentiment", "time_horizon", "source_refs", "citations", "evidence_validation"]}
+  ],
+  "source_evidence_enforcement": {
+    "schema": "source_evidence_rule_v1",
+    "minimum_source_refs_per_section": 2,
+    "rejects_unresolved_refs": true,
+    "requires_source_quote_or_metric": true,
+    "requires_fixture_key": true,
+    "requires_provider_free": true,
+    "live_network": false,
+    "allowed_evidence_kinds": ["filing", "price_series", "earnings_transcript", "news_event", "analyst_estimate", "fundamental_metric"]
+  },
+  "citation_requirements": {
+    "capability": "finance.analyzer.citation.require",
+    "required_fields": ["source_id", "title", "publisher", "published_at", "retrieved_at", "locator", "evidence_hash"],
+    "inline_citation_format": "[source:{source_id}]",
+    "all_claims_require_source_refs": true,
+    "unresolved_refs_allowed": false
+  },
+  "replay_contract": {
+    "fixture_key": "analyzer_report:ACME:offline:v1",
+    "expected_sections": ["risk", "thesis", "valuation", "news"],
+    "deterministic_order": true,
+    "requires_resolved_source_refs": true,
+    "provider_free": true,
+    "live_network": false
+  }
+}

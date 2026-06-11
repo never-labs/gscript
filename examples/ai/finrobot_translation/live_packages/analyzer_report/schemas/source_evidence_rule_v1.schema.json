@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "source_evidence_rule_v1",
+  "type": "object",
+  "required": ["provider_free", "live_network", "validated", "unresolved_source_refs", "fixture_key"],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "validated": {"const": true},
+    "unresolved_source_refs": {"type": "array", "maxItems": 0},
+    "fixture_key": {"type": "string"},
+    "minimum_source_refs_per_section": {"type": "integer", "minimum": 2},
+    "rejects_unresolved_refs": {"const": true},
+    "requires_source_quote_or_metric": {"const": true},
+    "requires_fixture_key": {"const": true}
+  }
+}

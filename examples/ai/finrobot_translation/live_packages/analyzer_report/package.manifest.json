@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-analyzer-report-live-package",
+  "package_name": "leia-finrobot-analyzer-report",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot analyzer.py, section analyzers, finance analysis prompt library, evidence enforcement, citation requirements, and replayable analyzer report sections.",
+  "source_modules": [
+    "finrobot/functional/analyzer.py",
+    "finrobot/functional/analyzer/*.py",
+    "finrobot/functional/prompts/finance_analysis.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; analyzer reports replay recorded fixtures and never call live market data, search, or model providers."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "live_model_calls": false,
+    "fixture_hook": "recorded_analyzer_report_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "analyzer_report_contract": "contracts/analyzer_report_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "prompt_catalog": "schemas/prompt_catalog_v1.schema.json",
+    "section_schema": "schemas/section_schema_v1.schema.json",
+    "source_evidence_rule": "schemas/source_evidence_rule_v1.schema.json",
+    "report_envelope": "schemas/report_envelope_v1.schema.json",
+    "expected_section": "schemas/expected_section_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "expected_sections": "fixtures/expected_sections_ACME_fixture.json"
+  },
+  "capabilities": [
+    "finance.analyzer.report.orchestrate",
+    "finance.analyzer.section.schema",
+    "finance.analyzer.prompt.catalog",
+    "finance.analyzer.evidence.enforce",
+    "finance.analyzer.citation.require",
+    "finance.analyzer.output.risk",
+    "finance.analyzer.output.thesis",
+    "finance.analyzer.output.valuation",
+    "finance.analyzer.output.news",
+    "finance.analyzer.expected_sections.replay"
+  ],
+  "prompt_catalogs": [
+    {
+      "id": "finance_analysis_prompt_library",
+      "source_path": "finrobot.functional.prompts.finance_analysis",
+      "capability": "finance.analyzer.prompt.catalog",
+      "fixture_key": "prompt_catalog:finance_analysis:v1",
+      "schema": "prompt_catalog_v1"
+    },
+    {
+      "id": "analyzer_report_orchestrator",
+      "source_path": "finrobot.functional.analyzer.ReportAnalysisUtils",
+      "capability": "finance.analyzer.report.orchestrate",
+      "fixture_key": "prompt_catalog:analyzer_report:v1",
+      "schema": "prompt_catalog_v1"
+    }
+  ],
+  "section_schemas": [
+    {"id": "risk", "title": "Risk Assessment", "capability": "finance.analyzer.output.risk", "schema": "section_schema_v1", "min_source_refs": 2, "envelope": "risk_output_v1"},
+    {"id": "thesis", "title": "Investment Thesis", "capability": "finance.analyzer.output.thesis", "schema": "section_schema_v1", "min_source_refs": 2, "envelope": "thesis_output_v1"},
+    {"id": "valuation", "title": "Valuation Analysis", "capability": "finance.analyzer.output.valuation", "schema": "section_schema_v1", "min_source_refs": 2, "envelope": "valuation_output_v1"},
+    {"id": "news", "title": "Recent News and Catalysts", "capability": "finance.analyzer.output.news", "schema": "section_schema_v1", "min_source_refs": 2, "envelope": "news_output_v1"}
+  ],
+  "evidence_rules": {
+    "capability": "finance.analyzer.evidence.enforce",
+    "schema": "source_evidence_rule_v1",
+    "minimum_source_refs_per_section": 2,
+    "rejects_unresolved_refs": true,
+    "requires_source_quote_or_metric": true,
+    "requires_fixture_key": true,
+    "requires_provider_free": true,
+    "live_network": false
+  },
+  "citation_requirements": {
+    "capability": "finance.analyzer.citation.require",
+    "required_fields": ["source_id", "title", "publisher", "published_at", "retrieved_at", "locator", "evidence_hash"],
+    "inline_citation_format": "[source:{source_id}]",
+    "all_claims_require_source_refs": true,
+    "unresolved_refs_allowed": false
+  },
+  "output_envelopes": [
+    {"id": "risk_output_v1", "section_id": "risk", "required_fields": ["risk_factors", "severity", "mitigants", "source_refs", "citations"]},
+    {"id": "thesis_output_v1", "section_id": "thesis", "required_fields": ["bull_case", "bear_case", "base_case", "investment_view", "source_refs", "citations"]},
+    {"id": "valuation_output_v1", "section_id": "valuation", "required_fields": ["method", "assumptions", "target_price", "sensitivity", "source_refs", "citations"]},
+    {"id": "news_output_v1", "section_id": "news", "required_fields": ["catalysts", "sentiment", "time_horizon", "impact", "source_refs", "citations"]}
+  ],
+  "replay": {
+    "expected_sections_fixture": "fixtures/expected_sections_ACME_fixture.json",
+    "expected_section_ids": ["risk", "thesis", "valuation", "news"],
+    "deterministic_order": true,
+    "provider_free": true,
+    "live_network": false
+  },
+  "test_gates": [
+    "manifest and referenced schemas decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "analyzer.py orchestration is represented by fixture replay instead of core runtime integration",
+    "section schemas cover risk, thesis, valuation, and news output envelopes",
+    "finance analysis prompt catalog requires source evidence and citation rules",
+    "expected sections are replayable in deterministic order with resolved source refs"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot analyzer report agents, finance prompt libraries, source evidence validators, or citation renderers as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}
