@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/finrobot/coding_notebook/sandbox_command.schema.json",
+  "title": "FinRobot coding notebook sandbox command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["replay_key", "operation", "capability", "command", "approval", "result", "deterministic"],
+  "properties": {
+    "replay_key": {"type": "string"},
+    "operation": {"const": "execute_command"},
+    "capability": {"type": "string", "pattern": "^coding\\.notebook\\.command\\."},
+    "command": {"type": "string"},
+    "cwd": {"type": "string"},
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_id", "decision", "gate", "reason"],
+      "properties": {
+        "approval_id": {"type": "string"},
+        "decision": {"enum": ["allow_fixture", "deny"]},
+        "gate": {"type": "string"},
+        "reason": {"type": "string"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit_code", "stdout", "stderr", "duration_ms"],
+      "properties": {
+        "exit_code": {"type": "integer"},
+        "stdout": {"type": "string"},
+        "stderr": {"type": "string"},
+        "duration_ms": {"type": "integer", "minimum": 0}
+      }
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "deterministic": {"const": true}
+  }
+}
