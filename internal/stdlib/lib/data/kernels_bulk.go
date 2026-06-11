@@ -261,11 +261,19 @@ type i64ScalarDyadicStep struct {
 	scalarLeft bool
 }
 
-// tryBulkI64ScalarDyadicValues flattens chains like ((x mod 97)+5) into a
-// single output slice, applying every scalar-dyadic step inside one loop
-// nest instead of materializing each intermediate carrier.
-func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) {
-	var steps [4]i64ScalarDyadicStep
+type i64DyadicStepStatus uint8
+
+const (
+	i64DyadicStepsOK i64DyadicStepStatus = iota
+	i64DyadicStepsGeneric
+	i64DyadicStepsFail
+)
+
+// collectI64ScalarDyadicSteps walks a scalar-dyadic chain outermost-first
+// into steps, returning the non-dyadic base carrier. Generic means the
+// caller should use the boxed fallback; Fail means the chain is invalid
+// (mod/idiv by zero).
+func collectI64ScalarDyadicSteps(a i64ScalarDyadicArray, steps *[4]i64ScalarDyadicStep) (Array, int, i64DyadicStepStatus) {
 	stepCount := 0
 	length := a.len
 	base := Array(a)
@@ -277,20 +285,36 @@ func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) 
 		switch dyadic.op {
 		case OpAdd, OpSub, OpMul, OpMod, OpIDiv:
 		default:
-			return tryBulkI64ValuesGeneric(a)
+			return nil, 0, i64DyadicStepsGeneric
 		}
 		if dyadic.op == OpMod && !dyadic.scalarLeft && dyadic.scalar == 0 {
-			return nil, false, false
+			return nil, 0, i64DyadicStepsFail
 		}
 		if dyadic.op == OpIDiv && !dyadic.scalarLeft && dyadic.scalar == 0 {
-			return nil, false, false
+			return nil, 0, i64DyadicStepsFail
 		}
 		steps[stepCount] = i64ScalarDyadicStep{op: dyadic.op, scalar: dyadic.scalar, scalarLeft: dyadic.scalarLeft}
 		stepCount++
 		base = dyadic.source
 	}
 	if _, stillDyadic := base.(i64ScalarDyadicArray); stillDyadic || stepCount == 0 {
+		return nil, 0, i64DyadicStepsGeneric
+	}
+	return base, stepCount, i64DyadicStepsOK
+}
+
+// tryBulkI64ScalarDyadicValues flattens chains like ((x mod 97)+5) into a
+// single output slice, applying every scalar-dyadic step inside one loop
+// nest instead of materializing each intermediate carrier.
+func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) {
+	var steps [4]i64ScalarDyadicStep
+	length := a.len
+	base, stepCount, status := collectI64ScalarDyadicSteps(a, &steps)
+	switch status {
+	case i64DyadicStepsGeneric:
 		return tryBulkI64ValuesGeneric(a)
+	case i64DyadicStepsFail:
+		return nil, false, false
 	}
 	source, sourceOwned, ok := tryBulkI64Values(base)
 	if !ok || len(source) < length {
@@ -756,6 +780,43 @@ func tryBulkBoolValues(mask Array) (values []bool, owned bool, ok bool) {
 		return nil, false, false
 	case boolLogicalMask:
 		return tryBulkBoolLogicalValues(a)
+	case i64MembershipMask:
+		source, sourceOwned, ok := tryBulkI64Values(a.source)
+		if !ok || len(source) < a.len {
+			bulkI64Release(source, sourceOwned)
+			return nil, false, false
+		}
+		source = source[:a.len]
+		out := bulkBoolGet(len(source))
+		for i, v := range source {
+			out[i] = i64ProbesContain(a.probes, v)
+		}
+		bulkI64Release(source, sourceOwned)
+		return out, true, true
+	case i64WithinMask:
+		source, sourceOwned, ok := tryBulkI64Values(a.source)
+		if !ok || len(source) < a.len {
+			bulkI64Release(source, sourceOwned)
+			return nil, false, false
+		}
+		source = source[:a.len]
+		out := bulkBoolGet(len(source))
+		for i, v := range source {
+			out[i] = a.valueOf(v)
+		}
+		bulkI64Release(source, sourceOwned)
+		return out, true, true
+	case f64CompareMask:
+		source, sourceOwned, ok := tryBulkF64Values(a.source)
+		if !ok || len(source) < a.source.len {
+			bulkF64Release(source, sourceOwned)
+			return nil, false, false
+		}
+		source = source[:a.source.len]
+		out := bulkBoolGet(len(source))
+		compareFloatSlice(source, a.scalar, true, a.op, out)
+		bulkF64Release(source, sourceOwned)
+		return out, true, true
 	case i64ScalarDyadicCompareMask:
 		source, sourceOwned, ok := tryBulkI64Values(a.values)
 		if !ok || len(source) < a.values.len {

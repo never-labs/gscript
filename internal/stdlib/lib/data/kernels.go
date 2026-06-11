@@ -1810,12 +1810,28 @@ func typedInMask(array Array, values []any) (Array, bool, error) {
 		set, ok := exactMembership[Timestamp](values)
 		return membershipSignedMask(a.data, set, ok), ok, nil
 	default:
-		if rows, rowsOwned, ok := tryBulkI64Values(array); ok {
-			set, setOK := int64Membership(normalizeMembershipValues(KindI64, values))
-			if !setOK {
-				bulkI64Release(rows, rowsOwned)
-				return nil, false, nil
+		set, setOK := int64Membership(normalizeMembershipValues(KindI64, values))
+		if !setOK {
+			return nil, false, nil
+		}
+		// Small literal sets over derived integer carriers stay lazy so the
+		// fused where evaluator can fold the probe into its single pass over
+		// the shared flattened source instead of materializing the mask (and
+		// re-flattening the source) here.
+		if len(set) <= 8 && isDenseIntegerArray(array) {
+			probes := make([]int64, 0, len(set))
+			for _, value := range normalizeMembershipValues(KindI64, values) {
+				v, ok := coerceInt64Exact(value)
+				if !ok {
+					return nil, false, nil
+				}
+				if !i64ProbesContain(probes, v) {
+					probes = append(probes, v)
+				}
 			}
+			return i64MembershipMask{source: array, probes: probes, len: array.Len()}, true, nil
+		}
+		if rows, rowsOwned, ok := tryBulkI64Values(array); ok {
 			mask := bulkI64MembershipMask(rows, set)
 			bulkI64Release(rows, rowsOwned)
 			return newBoolTrusted(mask), true, nil
@@ -5594,6 +5610,72 @@ func typedIntegerSumByI64Indexes(array, indexes Array) (any, bool, error) {
 			bulkI64Release(rows, owned)
 			return total, true, nil
 		}
+	}
+	// Scalar-dyadic gather-then-transform: gather only the selected base rows
+	// and apply the chain's scalar steps to that small buffer, so low
+	// selectivity avoids a full-length transform pass per consumer.
+	if dyadic, ok := source.(i64ScalarDyadicArray); ok && dyadic.len == array.Len() {
+		var steps [4]i64ScalarDyadicStep
+		base, stepCount, status := collectI64ScalarDyadicSteps(dyadic, &steps)
+		if status == i64DyadicStepsOK {
+			if baseValues, baseOwned, ok := tryBulkI64Values(base); ok && len(baseValues) >= dyadic.len {
+				if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+					limit := int64(dyadic.len)
+					gathered := bulkI64Get(len(rows))
+					for i, row := range rows {
+						if row < 0 || row >= limit {
+							bulkI64Release(gathered, true)
+							bulkI64Release(rows, rowsOwned)
+							bulkI64Release(baseValues, baseOwned)
+							return nil, true, fmt.Errorf("index %d out of bounds for length %d", row, limit)
+						}
+						gathered[i] = baseValues[row]
+					}
+					bulkI64Release(rows, rowsOwned)
+					bulkI64Release(baseValues, baseOwned)
+					stepsOK := true
+					for s := stepCount - 1; s >= 0; s-- {
+						if !applyI64ScalarDyadicStep(steps[s], gathered, gathered) {
+							stepsOK = false
+							break
+						}
+					}
+					if stepsOK {
+						var total int64
+						for _, v := range gathered {
+							total += v
+						}
+						bulkI64Release(gathered, true)
+						return total, true, nil
+					}
+					bulkI64Release(gathered, true)
+				} else {
+					bulkI64Release(baseValues, baseOwned)
+				}
+			}
+		}
+	}
+	// Dense gather-sum: flatten the source once and reduce with direct slice
+	// indexing instead of per-row carrier dispatch through integerArrayAt.
+	if rows, rowsOwned, ok := tryBulkI64Values(indexes); ok {
+		if values, valuesOwned, ok := tryBulkI64Values(array); ok && len(values) == array.Len() {
+			limit := int64(len(values))
+			var total int64
+			for _, row := range rows {
+				if row < 0 || row >= limit {
+					bulkI64Release(values, valuesOwned)
+					bulkI64Release(rows, rowsOwned)
+					return nil, true, fmt.Errorf("index %d out of bounds for length %d", row, limit)
+				}
+				total += values[row]
+			}
+			bulkI64Release(values, valuesOwned)
+			bulkI64Release(rows, rowsOwned)
+			return total, true, nil
+		} else if ok {
+			bulkI64Release(values, valuesOwned)
+		}
+		bulkI64Release(rows, rowsOwned)
 	}
 	var total int64
 	if err := forEachTypedI64Index(indexes, array.Len(), func(row int) error {
@@ -10798,6 +10880,12 @@ func applyI64ArrayScalar(op Op, values Array, scalar int64, scalarLeft bool) (Ar
 }
 
 func qModInt64(left, right int64) int64 {
+	// Non-negative left with positive right is the hot kernel shape; the
+	// hardware remainder is exact there (and exact where the float-floor
+	// route below would lose precision past 2^53).
+	if left >= 0 && right > 0 {
+		return left % right
+	}
 	return left - right*int64(math.Floor(float64(left)/float64(right)))
 }
 
@@ -11318,6 +11406,9 @@ func compareDyadic(op Op, left, right any, length int) (Array, bool, error) {
 		return out, true, nil
 	}
 	if out, ok := compareI64ScalarDyadicScalarDyadic(op, left, right, length); ok {
+		return out, true, nil
+	}
+	if out, ok := lazyF64CompareMask(op, left, right, length); ok {
 		return out, true, nil
 	}
 	if out, ok := compareDyadicBulk(op, left, right, length); ok {

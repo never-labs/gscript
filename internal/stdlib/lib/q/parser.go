@@ -684,7 +684,7 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 				left = Call{Func: tok.text, Arg: Vector{Items: []Expr{left, right}}}
 				continue
 			}
-			if op != "in" && op != "within" && op != "and" && op != "or" {
+			if op != "in" && op != "within" && op != "and" && op != "or" && op != "mod" && op != "div" {
 				break
 			}
 			prec := precedence(op)
@@ -722,17 +722,51 @@ func (p *parser) parseVector() (Expr, error) {
 		return nil, err
 	}
 	items := []Expr{first}
-	for canStartVectorItem(p.peek()) {
-		item, err := p.parsePostfix()
-		if err != nil {
-			return nil, err
+	for {
+		if canStartVectorItem(p.peek()) {
+			item, err := p.parsePostfix()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+			continue
 		}
-		items = append(items, item)
+		// Negative literals inside juxtaposed numeric vectors: `5.5 -1.5
+		// 7.25` is a three-element vector (the minus is attached to the
+		// digits and separated from the previous number), matching the
+		// string evaluator's whitespace-split literal rule. `5.5-1.5` and
+		// `x -1` stay subtraction.
+		if p.peekNegativeNumberVectorItem(items[len(items)-1]) {
+			p.next()
+			numTok := p.next()
+			items = append(items, Number{Text: "-" + numTok.text})
+			continue
+		}
+		break
 	}
 	if len(items) == 1 {
 		return first, nil
 	}
 	return Vector{Items: items}, nil
+}
+
+func (p *parser) peekNegativeNumberVectorItem(prev Expr) bool {
+	if _, ok := prev.(Number); !ok {
+		return false
+	}
+	tok := p.peek()
+	if tok.kind != tokenOp || tok.text != "-" {
+		return false
+	}
+	number := p.look(1)
+	if number.kind != tokenNumber || number.pos != tok.pos+len(tok.text) {
+		return false
+	}
+	if p.pos == 0 {
+		return false
+	}
+	before := p.tokens[p.pos-1]
+	return tok.pos > before.pos+len(before.text)
 }
 
 func (p *parser) parsePostfix() (Expr, error) {
@@ -1177,6 +1211,11 @@ func precedence(op string) int {
 		return 2
 	case "and", "&":
 		return 3
+	// mod/div mirror the string evaluator's word-dyadic split: looser than
+	// compare/in (`x mod 4=1` is x mod (4=1), q's right-grab) but tighter
+	// than and/or so predicate conjunctions split first.
+	case "mod", "div":
+		return 5
 	case "in", "within":
 		return 10
 	case "*", "/", "%":

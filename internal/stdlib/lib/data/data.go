@@ -2204,6 +2204,9 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	if out, handled, err := typedWhereMaskIndexArray(mask); handled || err != nil {
 		return out, handled, err
 	}
+	if out, ok := fusedPredicateWhereIndexArray(mask); ok {
+		return out, true, nil
+	}
 	if values, owned, ok := tryBulkBoolValues(mask); ok {
 		count := 0
 		for _, keep := range values {
@@ -3081,6 +3084,12 @@ func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, b
 	target, ok := coerceInt64Exact(value)
 	if !ok {
 		return nil, false, nil
+	}
+	// Modulo-pattern chains have a closed-form periodic index carrier; it
+	// keeps downstream count/gather consumers on O(period) kernels instead
+	// of materializing the scan below.
+	if out, handled, err := i64ScalarDyadicCompareMaskIndexArray(i64ScalarDyadicCompareMask{values: values, op: op, scalar: target}); handled || err != nil {
+		return out, handled, err
 	}
 	if flat, owned, ok := TryBulkI64(values); ok && len(flat) == values.len {
 		out := make([]int64, 0)
@@ -4754,6 +4763,9 @@ func WithinMask(array Array, low, high any, highClosed bool) (Array, error) {
 	}
 	low = normalizeScalar(array.Kind(), low)
 	high = normalizeScalar(array.Kind(), high)
+	if mask, ok := lazyWithinMask(array, low, high, highClosed); ok {
+		return mask, nil
+	}
 	if ok := withinMaskTyped(array, low, high, highClosed, out); ok {
 		return newBoolTrusted(out), nil
 	}
