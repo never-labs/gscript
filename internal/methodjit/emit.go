@@ -671,6 +671,12 @@ type CompiledFunction struct {
 	// mutex; QKernelExecutionStats folds these counters back in.
 	QEvalSessionEvalStats qEvalSessionEvalExecutionCounters
 
+	// QEvalSessionEvalSites memoizes resolved planned session-eval executors
+	// indexed by OpQEvalSessionEval instruction ID (nil entries for other
+	// IDs). The slice is immutable after compile; each site updates
+	// lock-free at runtime (see qEvalSessionEvalSite).
+	QEvalSessionEvalSites []*qEvalSessionEvalSite
+
 	// QVectorRuntimeKernelShapesByID keeps q vector runtime-kernel shape
 	// metadata alive for op-exit execution stats.
 	QVectorRuntimeKernelShapesByID map[int]string

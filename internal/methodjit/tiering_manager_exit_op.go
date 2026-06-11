@@ -653,13 +653,18 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("QEvalSessionEval op-exit out of register range")
 		}
-		var constants []runtime.Value
-		if proto != nil {
-			constants = proto.Constants
-		}
-		out, err := executeQEvalSessionEvalValue(constants, aux, regs[absArg1])
 		cf, _ := tm.tier2CompiledFor(proto)
-		cf.recordQEvalSessionEvalExecution(err)
+		var out runtime.Value
+		var err error
+		if cf != nil {
+			out, err = cf.executeQEvalSessionEval(int(ctx.OpExitID), aux, regs[absArg1])
+		} else {
+			var constants []runtime.Value
+			if proto != nil {
+				constants = proto.Constants
+			}
+			out, err = executeQEvalSessionEvalValue(constants, aux, regs[absArg1])
+		}
 		if err != nil {
 			return err
 		}
