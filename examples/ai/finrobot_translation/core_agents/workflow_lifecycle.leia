@@ -1,0 +1,212 @@
+// finrobot_translation/core_agents/workflow_lifecycle.leia
+//
+// Provider-free AutoGen workflow lifecycle parity fixture.
+// Source mapping:
+// - SingleAssistant -> resettable single agent state with deterministic local cache
+// - SingleAssistantShadow -> trigger-only shadow run that summarizes without mutating the primary state
+// - MultiAssistantWithLeader -> explicit leader-to-specialist handoff trace and max-round stop
+// - TERMINATE -> prompt/output convention validated by assertions, not a runtime control signal
+
+lifecycle_fixture := {
+    provider_free: true,
+    live_network: false,
+    credentials_required: false,
+    replay_mode: "local-fixture",
+    cache_policy: "memory-fixture-only",
+}
+
+func new_lifecycle_state(name) {
+    return {
+        name: name,
+        reset_count: 0,
+        cache_hits: 0,
+        cache_misses: 0,
+        turns: {},
+        trace: {},
+    }
+}
+
+func reset_lifecycle(state, reason) {
+    state.reset_count = state.reset_count + 1
+    state.turns = {}
+    state.trace[#state.trace + 1] = "reset:" .. reason
+    return state
+}
+
+func cache_lookup(state, key, value) {
+    for i := 1; i <= #state.turns; i++ {
+        if state.turns[i].key == key {
+            state.cache_hits = state.cache_hits + 1
+            state.trace[#state.trace + 1] = "cache-hit:" .. key
+            return state.turns[i].value
+        }
+    }
+    state.cache_misses = state.cache_misses + 1
+    state.turns[#state.turns + 1] = {key: key, value: value}
+    state.trace[#state.trace + 1] = "cache-miss:" .. key
+    return value
+}
+
+func single_assistant_run(state, task) {
+    cached := cache_lookup(state, "single:" .. task, "single assistant processed " .. task .. " TERMINATE")
+    state.trace[#state.trace + 1] = "trigger:user"
+    return {
+        mode: "SingleAssistant",
+        text: cached,
+        terminated: string.find(cached, "TERMINATE", 1, true) != nil,
+        cache_hits: state.cache_hits,
+        cache_misses: state.cache_misses,
+        reset_count: state.reset_count,
+        provider_free: lifecycle_fixture.provider_free,
+    }, nil
+}
+
+func shadow_assistant_run(primary_state, shadow_state, trigger, task) {
+    shadow_state.trace[#shadow_state.trace + 1] = "trigger:" .. trigger
+    summary := "shadow summary for " .. task .. " from " .. trigger .. " TERMINATE"
+    shadow_state.turns[#shadow_state.turns + 1] = {key: "shadow:" .. task, value: summary}
+    return {
+        mode: "SingleAssistantShadow",
+        text: summary,
+        nested_summary: "shadow observed primary resets=" .. primary_state.reset_count,
+        primary_turns_after_shadow: #primary_state.turns,
+        shadow_turns: #shadow_state.turns,
+        terminated: string.find(summary, "TERMINATE", 1, true) != nil,
+        provider_free: lifecycle_fixture.provider_free,
+    }, nil
+}
+
+func specialist_config(order) {
+    return {
+        model: "provider-free-specialist",
+        messages: {
+            llm.system("Translated FinRobot specialist. Use only local fixture evidence and reply TERMINATE."),
+            llm.user(order),
+        }
+    }
+}
+
+func specialist_flow(order) {
+    return {
+        status: "done",
+        text: "specialist completed " .. order .. " TERMINATE",
+        value: {
+            completed: true,
+            summary: "nested chat summary: " .. order,
+            next_speaker: "User_Proxy",
+            terminated: true,
+        }
+    }, nil
+}
+
+specialist := llm.agent("Lifecycle_Market_Analyst", specialist_config, specialist_flow, {
+    params: {"order"}
+    description: "Provider-free translated AutoGen specialist."
+})
+
+lifecycle_handoff := llm.handoff(specialist, {name: "leader_to_market_analyst"})
+
+func leader_workflow(task, max_round) {
+    rounds := {}
+    rounds[#rounds + 1] = {round: 1, speaker: "User_Proxy", trigger: "initial_task", text: task}
+    rounds[#rounds + 1] = {round: 2, speaker: "FinRobot_Group_Leader", trigger: "order_message", text: "[Lifecycle_Market_Analyst] collect local lifecycle evidence"}
+
+    handoff_result, handoff_err := llm.dispatch({
+        id: "lifecycle_handoff",
+        tool: "leader_to_market_analyst",
+        args: {order: "collect local lifecycle evidence"},
+    }, {lifecycle_handoff})
+    if handoff_err != nil {
+        return nil, handoff_err
+    }
+
+    rounds[#rounds + 1] = {round: 3, speaker: "Lifecycle_Market_Analyst", trigger: "handoff_return", text: handoff_result.summary}
+    stopped_by_max_round := false
+    if #rounds >= max_round {
+        stopped_by_max_round = true
+    } else {
+        rounds[#rounds + 1] = {round: 4, speaker: "FinRobot_Group_Leader", trigger: "final", text: "leader accepted specialist result TERMINATE"}
+    }
+
+    final_text := "leader accepted specialist result TERMINATE"
+    return {
+        mode: "MultiAssistantWithLeader",
+        text: final_text,
+        rounds: rounds,
+        round_count: #rounds,
+        max_round: max_round,
+        stopped_by_max_round: stopped_by_max_round,
+        nested_chat_summary: handoff_result.summary,
+        handoff_trace_type: handoff_result.trace.type,
+        handoff_trace_name: handoff_result.trace.name,
+        handoff_child_name: handoff_result.trace.children[1].name,
+        handoff_child_parent: handoff_result.trace.children[1].parent.name,
+        next_speaker: handoff_result.next_speaker,
+        terminated: string.find(final_text, "TERMINATE", 1, true) != nil,
+        provider_free_replay: {
+            mode: lifecycle_fixture.replay_mode,
+            live_network: lifecycle_fixture.live_network,
+            credentials_required: lifecycle_fixture.credentials_required,
+            cache_policy: lifecycle_fixture.cache_policy,
+        }
+    }, nil
+}
+
+evaluate "single assistant lifecycle reset cache trigger terminate" {
+    state := new_lifecycle_state("single")
+    state = reset_lifecycle(state, "new_chat")
+    first, first_err := single_assistant_run(state, "draft lifecycle note")
+    second, second_err := single_assistant_run(state, "draft lifecycle note")
+
+    assert(first_err == nil)
+    assert(second_err == nil)
+    assert(first.mode == "SingleAssistant")
+    assert(first.reset_count == 1)
+    assert(first.cache_misses == 1)
+    assert(second.cache_hits == 1)
+    assert(second.terminated == true)
+    assert(second.provider_free == true)
+    assert(state.trace[1] == "reset:new_chat")
+    assert(state.trace[2] == "cache-miss:single:draft lifecycle note")
+    assert(state.trace[4] == "cache-hit:single:draft lifecycle note")
+}
+
+evaluate "single assistant shadow keeps primary state isolated" {
+    primary := new_lifecycle_state("primary")
+    shadow := new_lifecycle_state("shadow")
+    primary = reset_lifecycle(primary, "primary_start")
+    primary_result, primary_err := single_assistant_run(primary, "prepare primary answer")
+    shadow_result, shadow_err := shadow_assistant_run(primary, shadow, "after_primary_reply", "prepare primary answer")
+
+    assert(primary_err == nil)
+    assert(shadow_err == nil)
+    assert(primary_result.terminated == true)
+    assert(shadow_result.mode == "SingleAssistantShadow")
+    assert(shadow_result.primary_turns_after_shadow == 1)
+    assert(shadow_result.shadow_turns == 1)
+    assert(shadow_result.nested_summary == "shadow observed primary resets=1")
+    assert(shadow_result.terminated == true)
+    assert(shadow_result.provider_free == true)
+}
+
+evaluate "multi assistant leader lifecycle handoff max round replay" {
+    result, err := leader_workflow("Coordinate provider-free lifecycle parity.", 3)
+
+    assert(err == nil)
+    assert(result.mode == "MultiAssistantWithLeader")
+    assert(result.round_count == 3)
+    assert(result.max_round == 3)
+    assert(result.stopped_by_max_round == true)
+    assert(result.rounds[2].trigger == "order_message")
+    assert(result.nested_chat_summary == "nested chat summary: collect local lifecycle evidence")
+    assert(result.next_speaker == "User_Proxy")
+    assert(result.handoff_trace_type == "agent_tool")
+    assert(result.handoff_trace_name == "leader_to_market_analyst")
+    assert(result.handoff_child_name == "Lifecycle_Market_Analyst")
+    assert(result.handoff_child_parent == "leader_to_market_analyst")
+    assert(result.terminated == true)
+    assert(result.provider_free_replay.mode == "local-fixture")
+    assert(result.provider_free_replay.live_network == false)
+    assert(result.provider_free_replay.credentials_required == false)
+    assert(result.provider_free_replay.cache_policy == "memory-fixture-only")
+}
