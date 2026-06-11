@@ -1,0 +1,327 @@
+package leia_test
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+)
+
+func TestGenericLivePackageConsistency(t *testing.T) {
+	root := repoRoot(t)
+	packagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+	genericDirs := genericLivePackageDirs(t, packagesRoot)
+	if len(genericDirs) == 0 {
+		t.Fatal("no generic live packages found")
+	}
+
+	registeredExamples := genericLivePackageRegisteredExamples(t, root)
+	indexBoundaries := genericLivePackageIndexBoundaries(t, root)
+	for _, packageDir := range genericDirs {
+		packageDir := packageDir
+		relDir := filepath.ToSlash(mustRel(t, root, packageDir))
+		t.Run(filepath.Base(packageDir), func(t *testing.T) {
+			assertGenericLivePackageLayout(t, packageDir)
+
+			manifestPath := filepath.Join(packageDir, "package.manifest.json")
+			manifest := readJSONMap(t, manifestPath)
+			assertGenericLivePackageProviderFree(t, manifestPath, manifest)
+			assertGenericLivePackageEntrypoints(t, root, manifestPath, packageDir, manifest)
+			assertGenericLivePackageNoBuiltInGuarantee(t, manifestPath, manifest)
+			assertGenericLivePackageNoQRuntime(t, packageDir)
+
+			registeredExample := registeredExamples[relDir]
+			if registeredExample == "" {
+				t.Fatalf("%s has no registered example in live_package_plan_manifest.json", relDir)
+			}
+			if registeredExample != filepath.ToSlash(filepath.Join(relDir, "main.leia")) {
+				t.Fatalf("%s registered example = %q, want main.leia", relDir, registeredExample)
+			}
+			assertGenericLivePackageRepoFile(t, root, relDir, registeredExample)
+
+			indexExamples := indexBoundaries[relDir]
+			if len(indexExamples) == 0 {
+				t.Fatalf("%s is not discoverable from ai_dialect_index production_package_boundary", relDir)
+			}
+			if !genericLivePackageContains(indexExamples, registeredExample) {
+				t.Fatalf("%s registered example %q not listed by ai_dialect_index: %#v", relDir, registeredExample, indexExamples)
+			}
+		})
+	}
+}
+
+func genericLivePackageDirs(t *testing.T, packagesRoot string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(packagesRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dirs []string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "generic_") {
+			dirs = append(dirs, filepath.Join(packagesRoot, entry.Name()))
+		}
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
+func assertGenericLivePackageLayout(t *testing.T, packageDir string) {
+	t.Helper()
+	for _, rel := range []string{"main.leia", "package.manifest.json"} {
+		path := filepath.Join(packageDir, rel)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		if info.IsDir() {
+			t.Fatalf("%s must be a file", path)
+		}
+	}
+	for _, rel := range []string{"contracts", "fixtures", "schemas"} {
+		path := filepath.Join(packageDir, rel)
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		if len(entries) == 0 {
+			t.Fatalf("%s must not be empty", path)
+		}
+	}
+}
+
+func assertGenericLivePackageProviderFree(t *testing.T, manifestPath string, manifest map[string]any) {
+	t.Helper()
+	if !finrobotLivePackageBoolOrConst(manifest["provider_free"], true) {
+		t.Fatalf("%s provider_free = %#v, want true", manifestPath, manifest["provider_free"])
+	}
+	if _, ok := manifest["live_network"]; !ok {
+		if _, ok := manifest["live_network_default"]; !ok {
+			t.Fatalf("%s missing live_network or live_network_default false declaration", manifestPath)
+		}
+	}
+	if value, ok := manifest["live_network"]; ok && !finrobotLivePackageBoolOrConst(value, false) {
+		t.Fatalf("%s live_network = %#v, want false", manifestPath, value)
+	}
+	if value, ok := manifest["live_network_default"]; ok && !finrobotLivePackageBoolOrConst(value, false) {
+		t.Fatalf("%s live_network_default = %#v, want false", manifestPath, value)
+	}
+	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "live_network", false)
+	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "allow_network", false)
+	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "real_dependency_imports", false)
+	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "real_dependency_import_default", false)
+}
+
+func assertGenericLivePackageEntrypoints(t *testing.T, root, manifestPath, packageDir string, manifest map[string]any) {
+	t.Helper()
+	entrypoints, ok := manifest["entrypoints"].(map[string]any)
+	if !ok || len(entrypoints) == 0 {
+		t.Fatalf("%s missing entrypoints map", manifestPath)
+	}
+	for name, value := range entrypoints {
+		rel, ok := value.(string)
+		if !ok || rel == "" {
+			t.Fatalf("%s entrypoint %s = %#v, want relative file path", manifestPath, name, value)
+		}
+		if filepath.IsAbs(rel) || strings.Contains(filepath.ToSlash(rel), "../") || strings.Contains(rel, "://") {
+			t.Fatalf("%s entrypoint %s = %q, want package-relative file path", manifestPath, name, rel)
+		}
+		assertFinRobotAuditExistingRelativePath(t, root, manifestPath, packageDir, rel)
+		info, err := os.Stat(filepath.Join(packageDir, filepath.FromSlash(strings.SplitN(rel, "#", 2)[0])))
+		if err != nil {
+			t.Fatalf("%s entrypoint %s %q: %v", manifestPath, name, rel, err)
+		}
+		if info.IsDir() {
+			t.Fatalf("%s entrypoint %s = %q points to a directory", manifestPath, name, rel)
+		}
+	}
+}
+
+func assertGenericLivePackageNoBuiltInGuarantee(t *testing.T, manifestPath string, manifest map[string]any) {
+	t.Helper()
+	value, ok := manifest["no_built_in_guarantee"]
+	if !ok {
+		t.Fatalf("%s missing no_built_in_guarantee", manifestPath)
+	}
+	switch value := value.(type) {
+	case bool:
+		if !value {
+			t.Fatalf("%s no_built_in_guarantee = false", manifestPath)
+		}
+	case map[string]any:
+		if !finrobotLivePackageBoolOrConst(value["required"], true) {
+			t.Fatalf("%s no_built_in_guarantee.required = %#v, want true", manifestPath, value["required"])
+		}
+		statement, _ := value["statement"].(string)
+		lower := strings.ToLower(statement)
+		if !strings.Contains(lower, "does not provide") || !strings.Contains(lower, "built-in") {
+			t.Fatalf("%s no_built_in_guarantee statement is weak: %q", manifestPath, statement)
+		}
+	default:
+		t.Fatalf("%s no_built_in_guarantee has unsupported shape %#v", manifestPath, value)
+	}
+}
+
+func assertGenericLivePackageNoQRuntime(t *testing.T, packageDir string) {
+	t.Helper()
+	for _, rel := range []string{"main.leia", "package.manifest.json", "contracts", "fixtures", "schemas"} {
+		path := filepath.Join(packageDir, rel)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		if info.IsDir() {
+			err = filepath.WalkDir(path, func(child string, d os.DirEntry, err error) error {
+				if err != nil || d == nil || d.IsDir() {
+					return err
+				}
+				assertGenericLivePackageFileNoQRuntime(t, child)
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if rel == "package.manifest.json" {
+			assertGenericLivePackageManifestNoQRuntimeDependency(t, path)
+			continue
+		}
+		assertGenericLivePackageFileNoQRuntime(t, path)
+	}
+}
+
+func assertGenericLivePackageFileNoQRuntime(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	forbiddenRuntime := "q/" + "runtime"
+	if strings.Contains(strings.ToLower(string(data)), forbiddenRuntime) {
+		t.Fatalf("%s must not depend on the q runtime package", path)
+	}
+}
+
+func assertGenericLivePackageManifestNoQRuntimeDependency(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	var manifest any
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	var walk func(any, []string)
+	walk = func(value any, keys []string) {
+		switch value := value.(type) {
+		case map[string]any:
+			for key, child := range value {
+				walk(child, append(keys, key))
+			}
+		case []any:
+			for _, child := range value {
+				walk(child, keys)
+			}
+		case string:
+			lower := strings.ToLower(value)
+			forbiddenRuntime := "q/" + "runtime"
+			if !strings.Contains(lower, forbiddenRuntime) {
+				return
+			}
+			keyPath := strings.Join(keys, ".")
+			if strings.Contains(keyPath, "blocked_imports") || strings.Contains(lower, "no "+forbiddenRuntime+" dependency") {
+				return
+			}
+			t.Fatalf("%s has q runtime dependency at %s: %q", path, keyPath, value)
+		}
+	}
+	walk(manifest, nil)
+}
+
+func genericLivePackageRegisteredExamples(t *testing.T, root string) map[string]string {
+	t.Helper()
+	manifest := loadLivePackagePlanManifest(t, root)
+	registered := map[string]string{}
+	for _, skeleton := range manifest.LivePackageSkeletons {
+		dir := filepath.ToSlash(skeleton.Directory)
+		if !strings.Contains(dir, "/generic_") {
+			continue
+		}
+		if skeleton.RegisteredExample == nil || *skeleton.RegisteredExample == "" {
+			t.Fatalf("%s missing registered_example", skeleton.ID)
+		}
+		if len(skeleton.CoversPackageIDs) == 0 || !genericLivePackageContains(skeleton.CoversPackageIDs, skeleton.ID) {
+			t.Fatalf("%s covers_package_ids = %#v, want to include its own id", skeleton.ID, skeleton.CoversPackageIDs)
+		}
+		assertGenericLivePackageRepoFile(t, root, dir, *skeleton.RegisteredExample)
+		registered[dir] = filepath.ToSlash(*skeleton.RegisteredExample)
+	}
+	return registered
+}
+
+func genericLivePackageIndexBoundaries(t *testing.T, root string) map[string][]string {
+	t.Helper()
+	index := loadGenericAIDialectIndex(t, root)
+	boundaries := map[string][]string{}
+	for _, entry := range index.Entries {
+		if entry.ProductionPackageBoundary == nil || entry.ProductionPackageBoundary.Status != "checked_in" {
+			continue
+		}
+		boundary := *entry.ProductionPackageBoundary
+		dir := filepath.ToSlash(boundary.Directory)
+		if !strings.Contains(dir, "/generic_") {
+			continue
+		}
+		if !boundary.ProviderFree || boundary.DomainSpecific {
+			t.Fatalf("%s index boundary must be generic and provider-free: %#v", entry.Capability, boundary)
+		}
+		assertGenericLivePackageRepoFile(t, root, dir, boundary.RegisteredExample)
+		boundaries[dir] = append(boundaries[dir], filepath.ToSlash(boundary.RegisteredExample))
+	}
+	for dir := range boundaries {
+		sort.Strings(boundaries[dir])
+	}
+	return boundaries
+}
+
+func assertGenericLivePackageRepoFile(t *testing.T, root, ownerDir, rel string) {
+	t.Helper()
+	if rel == "" || filepath.IsAbs(rel) || strings.Contains(filepath.ToSlash(rel), "../") {
+		t.Fatalf("%s has invalid repo file reference %q", ownerDir, rel)
+	}
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("%s references missing repo file %q: %v", ownerDir, rel, err)
+	}
+	if info.IsDir() {
+		t.Fatalf("%s references directory %q, want file", ownerDir, rel)
+	}
+}
+
+func genericLivePackageContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestGenericLivePackageConsistencyHelpersCompileWithoutRuntimeDeps(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), "tests", "llm", "llm_generic_package_consistency_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	forbiddenRuntime := "q/" + "runtime"
+	if strings.Contains(strings.ToLower(string(data)), forbiddenRuntime) {
+		t.Fatal("generic package consistency test must not import or mention q runtime dependencies")
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(`{"provider_free":true,"live_network":false}`), &decoded); err != nil {
+		t.Fatalf("json helper dependency unavailable: %v", err)
+	}
+}
