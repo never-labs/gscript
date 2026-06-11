@@ -293,7 +293,8 @@ func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
 		Policy     map[string]any `json:"policy"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "tool_request_fixture.json"), &tool)
-	if tool.Schema != "tool_request_envelope_v1" || tool.ToolCallID == "" || tool.Name != "quote_lookup" || tool.Arguments["symbol"] != "ACME" {
+	if tool.Schema != "tool_request_envelope_v1" || tool.ToolCallID == "" || tool.Name != "fixture.lookup" ||
+		tool.Arguments["ticker"] != "ACME" || tool.Arguments["horizon"] != "1d" {
 		t.Fatalf("tool request fixture incomplete: %#v", tool)
 	}
 	if tool.Status != "requested" || tool.Policy["execution_policy"] != "request-only-envelope" || tool.Policy["live_execution"] != false || tool.Policy["provider_free"] != true {

@@ -28,6 +28,7 @@ func TestGenericLivePackageConsistency(t *testing.T) {
 			manifestPath := filepath.Join(packageDir, "package.manifest.json")
 			manifest := readJSONMap(t, manifestPath)
 			assertGenericLivePackageProviderFree(t, manifestPath, manifest)
+			assertGenericLivePackageFixtureReplayDefaultPolicy(t, manifestPath, manifest)
 			assertGenericLivePackageEntrypoints(t, root, manifestPath, packageDir, manifest)
 			assertGenericLivePackageNoBuiltInGuarantee(t, manifestPath, manifest)
 			assertGenericLivePackageNoQRuntime(t, packageDir)
@@ -180,6 +181,39 @@ func assertGenericLivePackageProviderFree(t *testing.T, manifestPath string, man
 	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "allow_network", false)
 	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "real_dependency_imports", false)
 	assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, "real_dependency_import_default", false)
+}
+
+func assertGenericLivePackageFixtureReplayDefaultPolicy(t *testing.T, manifestPath string, manifest map[string]any) {
+	t.Helper()
+	policy, ok := manifest["default_policy"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s missing default_policy map", manifestPath)
+	}
+	if mode, _ := policy["mode"].(string); mode != "fixture_replay" {
+		t.Fatalf("%s default_policy.mode = %q, want fixture_replay", manifestPath, mode)
+	}
+	if value, ok := policy["provider_policy"]; ok {
+		if got, _ := value.(string); got != "provider-free" {
+			t.Fatalf("%s default_policy.provider_policy = %#v, want provider-free", manifestPath, value)
+		}
+	}
+	if !finrobotLivePackageBoolOrConst(policy["live_network"], false) ||
+		!finrobotLivePackageBoolOrConst(policy["provider_credentials_required"], false) ||
+		!finrobotLivePackageBoolOrConst(policy["real_dependency_imports"], false) {
+		t.Fatalf("%s default_policy must disable live network, credentials, and real imports: %#v", manifestPath, policy)
+	}
+	if value, ok := policy["live_model_calls"]; ok && !finrobotLivePackageBoolOrConst(value, false) {
+		t.Fatalf("%s default_policy.live_model_calls = %#v, want false", manifestPath, value)
+	}
+	hook, _ := policy["fixture_hook"].(string)
+	if !strings.HasPrefix(hook, "recorded_generic_") || !strings.HasSuffix(hook, "_fixture") {
+		t.Fatalf("%s default_policy.fixture_hook = %q, want recorded generic fixture hook", manifestPath, hook)
+	}
+	if !finrobotLivePackageBoolOrConst(policy["clean_skip_without_dependency"], true) &&
+		!finrobotLivePackageBoolOrConst(policy["clean_skip_without_descriptor"], true) &&
+		!finrobotLivePackageBoolOrConst(policy["clean_skip_without_sink"], true) {
+		t.Fatalf("%s default_policy missing clean-skip guard: %#v", manifestPath, policy)
+	}
 }
 
 func assertGenericLivePackageEntrypoints(t *testing.T, root, manifestPath, packageDir string, manifest map[string]any) {

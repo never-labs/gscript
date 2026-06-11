@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -87,12 +88,7 @@ type finrobotEvaluationHarnessParityManifest struct {
 		UnconsumedReplayFindingKind string   `json:"unconsumed_replay_finding_kind"`
 		FailureDetails              []string `json:"failure_details"`
 	} `json:"record_replay_matching"`
-	ScoringTrace struct {
-		ReportFields  []string `json:"report_fields"`
-		CaseFields    []string `json:"case_fields"`
-		LLMCaseFields []string `json:"llm_case_fields"`
-		SubcaseFields []string `json:"subcase_fields"`
-	} `json:"scoring_trace"`
+	ScoringTrace          finrobotEvaluationScoringTraceManifest `json:"scoring_trace"`
 	ProviderFreeModelStub struct {
 		AllowedModelPrefix string   `json:"allowed_model_prefix"`
 		LiveProviderCalls  bool     `json:"live_provider_calls"`
@@ -120,7 +116,15 @@ type finrobotEvaluationHarnessParityManifest struct {
 	} `json:"golden_threshold_gates"`
 }
 
+type finrobotEvaluationScoringTraceManifest struct {
+	ReportFields  []string `json:"report_fields"`
+	CaseFields    []string `json:"case_fields"`
+	LLMCaseFields []string `json:"llm_case_fields"`
+	SubcaseFields []string `json:"subcase_fields"`
+}
+
 type finrobotEvaluationHarnessParityReport struct {
+	raw     map[string]json.RawMessage
 	Status  string `json:"status"`
 	Summary struct {
 		EvaluateBlocks int     `json:"evaluate_blocks"`
@@ -144,6 +148,7 @@ type finrobotEvaluationHarnessParityReport struct {
 		Name       string `json:"name"`
 		SourcePath string `json:"source_path"`
 		Status     string `json:"status"`
+		Assertions []any  `json:"assertions"`
 		LLM        *struct {
 			TraceRef     string  `json:"trace_ref"`
 			Turns        int     `json:"turns"`
@@ -229,6 +234,7 @@ func TestFinRobotEvaluationHarnessParityRunsGenericAISpecimenProviderFree(t *tes
 		report.LLM.ReplayedTurns != golden.LLMReplayedTurns || report.LLM.Turns != golden.LLMTurns {
 		t.Fatalf("llm summary = %#v, golden = %#v", report.LLM, golden)
 	}
+	assertFinRobotEvaluationScoringTraceCoverage(t, report, manifest.ScoringTrace)
 	if len(report.Findings) > manifest.GoldenThresholdGates.FindingsMax {
 		t.Fatalf("findings = %#v, gate max = %d", report.Findings, manifest.GoldenThresholdGates.FindingsMax)
 	}
@@ -338,7 +344,66 @@ func runFinRobotEvaluationHarnessParityReport(t *testing.T, root, sourcePath, re
 	if err := json.Unmarshal(data, &report); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, string(data))
 	}
+	if err := json.Unmarshal(data, &report.raw); err != nil {
+		t.Fatalf("decode raw report: %v\n%s", err, string(data))
+	}
 	return report
+}
+
+func assertFinRobotEvaluationScoringTraceCoverage(t *testing.T, report finrobotEvaluationHarnessParityReport, scoring finrobotEvaluationScoringTraceManifest) {
+	t.Helper()
+	requireJSONFields(t, "report", report.raw, scoring.ReportFields)
+	var rawCases []map[string]json.RawMessage
+	if err := json.Unmarshal(report.raw["cases"], &rawCases); err != nil {
+		t.Fatalf("decode raw cases: %v", err)
+	}
+	if len(rawCases) != len(report.Cases) {
+		t.Fatalf("raw cases = %d, typed cases = %d", len(rawCases), len(report.Cases))
+	}
+	for i, rawCase := range rawCases {
+		casePath := "cases[" + strconv.Itoa(i) + "]"
+		requireJSONFields(t, casePath, rawCase, scoring.CaseFields)
+		if report.Cases[i].LLM == nil {
+			t.Fatalf("%s missing typed llm trace", casePath)
+		}
+		var rawLLM map[string]json.RawMessage
+		if err := json.Unmarshal(rawCase["llm"], &rawLLM); err != nil {
+			t.Fatalf("decode %s.llm: %v", casePath, err)
+		}
+		requireJSONFields(t, casePath+".llm", rawLLM, scoring.LLMCaseFields)
+		var rawSubcases []map[string]json.RawMessage
+		if err := json.Unmarshal(rawCase["subcases"], &rawSubcases); err != nil {
+			t.Fatalf("decode %s.subcases: %v", casePath, err)
+		}
+		if len(rawSubcases) != len(report.Cases[i].Subcases) {
+			t.Fatalf("%s raw subcases = %d, typed subcases = %d", casePath, len(rawSubcases), len(report.Cases[i].Subcases))
+		}
+		for j, rawSubcase := range rawSubcases {
+			requireJSONFields(t, casePath+".subcases["+strconv.Itoa(j)+"]", rawSubcase, scoring.SubcaseFields)
+		}
+	}
+}
+
+func requireJSONFields(t *testing.T, path string, object map[string]json.RawMessage, fields []string) {
+	t.Helper()
+	for _, field := range fields {
+		value, ok := object[field]
+		if !ok {
+			t.Fatalf("%s missing manifest-declared field %q in %#v", path, field, sortedJSONFieldNames(object))
+		}
+		if bytes.Equal(value, []byte("null")) {
+			t.Fatalf("%s field %q is null", path, field)
+		}
+	}
+}
+
+func sortedJSONFieldNames(object map[string]json.RawMessage) []string {
+	fields := make([]string, 0, len(object))
+	for field := range object {
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+	return fields
 }
 
 func materializeFinRobotEvaluationHarnessSpecimen(t *testing.T, root, sourceRel, datasetRel string) string {

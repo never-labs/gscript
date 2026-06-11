@@ -494,7 +494,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
       "excluded_scope": ["starting a live web server"],
       "source_hash": "sha256:fc79b4e0a0cff13e8e80a65d0a952e3a7a7c460263e4b179f3343597d28e1abf",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "1350264a5f97bc2c8a300bc7faf70501d8deab970562d97a0217ca562fad4bb9"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "18637459db95f1f4515ca1abe8f0ccc5c4d969dcf56bb486267688f3faa412a6"}],
       "next_action": "Promote route/auth/task workflow into the product workflow package."
     },
     {
@@ -516,7 +516,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/analytics_report", "examples/ai/finrobot_translation/live_packages/report_renderer"],
       "excluded_scope": ["live report assembly side effects"],
       "source_hash": "sha256:a7c46876da3c7dbf34f2396112bec7bf9b3ebf7b51a2c60b15065b424c15186d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json", "sha256": "d12e05f29e888b254d6041a658f086689bec76f479141c6fe9c317fe03388450"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json", "sha256": "88cd59d3b1ef99107cf3eb14f4632f78563946099722457ed50f7dc5b102c220"}],
       "next_action": "Implement report assembly in a package after renderer and chart packages are ready."
     },
     {
@@ -571,7 +571,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
       "excluded_scope": ["real FastAPI/Flask server, auth, background workers"],
       "source_hash": "sha256:6937cfa273da7ee648af548fa34dc1349e8dc62f5558f74bc11e66cc846e8767",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "1350264a5f97bc2c8a300bc7faf70501d8deab970562d97a0217ca562fad4bb9"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "18637459db95f1f4515ca1abe8f0ccc5c4d969dcf56bb486267688f3faa412a6"}],
       "next_action": "Implement product workflow package with route, auth, task, log, and download gates."
     },
     {

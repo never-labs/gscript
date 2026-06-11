@@ -18,9 +18,12 @@ func TestGenericAIProviderFreeContractComposition(t *testing.T) {
 		filepath.Join(genericTurnRunnerPackageDir(t), "fixtures", "ai_turn_execute_fixture.json"))
 	turnToolRequest := loadGenericCompositionMap(t,
 		filepath.Join(genericTurnRunnerPackageDir(t), "fixtures", "tool_request_fixture.json"))
+	traceSequence := loadGenericCompositionMap(t,
+		filepath.Join(genericTraceEventsLivePackageDir(t), "fixtures", "trace_sequence_ACME_fixture.json"))
 
 	assertGenericCompositionToolEnvelope(t, toolFixture)
 	assertGenericCompositionTurnEnvelope(t, turnRequest, turnResponse, turnToolRequest)
+	assertGenericCompositionTraceEnvelope(t, traceSequence, turnRequest, turnToolRequest, toolFixture)
 
 	turnRequestHash := canonicalGenericCompositionHash(t, turnRequest, "request_id")
 	toolRequestHash := canonicalGenericCompositionHash(t, genericCompositionObject(t, toolFixture, "request"))
@@ -155,6 +158,60 @@ func assertGenericCompositionTurnEnvelope(t *testing.T, request, response, toolR
 		genericCompositionBool(t, policy, "live_execution") {
 		t.Fatalf("turn runner tool request is not reusable as a provider-free envelope: %#v", toolRequest)
 	}
+}
+
+func assertGenericCompositionTraceEnvelope(t *testing.T, traceSequence, turnRequest, turnToolRequest, toolFixture map[string]any) {
+	t.Helper()
+	turnTools := genericCompositionSlice(t, turnRequest, "tools")
+	if len(turnTools) != 1 {
+		t.Fatalf("turn request must declare exactly one composed tool: %#v", turnTools)
+	}
+	turnToolDeclaration, ok := turnTools[0].(map[string]any)
+	if !ok {
+		t.Fatalf("turn tool declaration is not an object: %#v", turnTools[0])
+	}
+	toolEvent := genericCompositionTraceEvent(t, traceSequence, "tool")
+	turnStartEvent := genericCompositionTraceEvent(t, traceSequence, "turn_start")
+	turnStartPayload := genericCompositionObject(t, turnStartEvent, "payload")
+	toolPayload := genericCompositionObject(t, toolEvent, "payload")
+	toolCorrelation := genericCompositionObject(t, toolEvent, "correlation")
+	toolRequestReplay := genericCompositionObject(t, turnToolRequest, "replay")
+	toolResult := genericCompositionObject(t, toolFixture, "result")
+	toolResultReplay := genericCompositionObject(t, toolResult, "replay")
+
+	if genericCompositionString(t, turnToolDeclaration, "name") != genericCompositionString(t, turnToolRequest, "name") ||
+		genericCompositionString(t, turnToolRequest, "name") != genericCompositionString(t, genericCompositionObject(t, toolFixture, "request"), "tool_name") ||
+		genericCompositionString(t, toolResult, "tool_name") != genericCompositionString(t, turnToolRequest, "name") {
+		t.Fatalf("turn runner and tool contract names do not compose: declaration=%#v request=%#v fixture=%#v", turnToolDeclaration, turnToolRequest, toolFixture)
+	}
+	if genericCompositionString(t, toolCorrelation, "tool_call_id") != genericCompositionString(t, turnToolRequest, "tool_call_id") ||
+		genericCompositionString(t, toolPayload, "tool_call_id") != genericCompositionString(t, turnToolRequest, "tool_call_id") ||
+		genericCompositionString(t, toolPayload, "tool_name") != genericCompositionString(t, turnToolRequest, "name") {
+		t.Fatalf("trace tool event does not correlate with turn runner tool request: event=%#v request=%#v", toolEvent, turnToolRequest)
+	}
+	if !reflect.DeepEqual(genericCompositionStringSlice(t, turnStartPayload, "tools_declared"), []string{genericCompositionString(t, turnToolDeclaration, "name")}) {
+		t.Fatalf("trace turn_start tools do not mirror turn request declarations: payload=%#v declaration=%#v", turnStartPayload, turnToolDeclaration)
+	}
+	if genericCompositionString(t, toolPayload, "input_digest") != genericCompositionString(t, toolRequestReplay, "deterministic_tool_hash") ||
+		genericCompositionString(t, toolPayload, "output_digest") != "sha256:"+canonicalGenericCompositionHash(t, toolResult) ||
+		genericCompositionString(t, toolPayload, "replay_key") != genericCompositionString(t, toolResultReplay, "replay_key") {
+		t.Fatalf("trace tool event must carry reusable request/result replay digests: payload=%#v request=%#v result=%#v", toolPayload, turnToolRequest, toolResult)
+	}
+}
+
+func genericCompositionTraceEvent(t *testing.T, traceSequence map[string]any, eventType string) map[string]any {
+	t.Helper()
+	for _, rawEvent := range genericCompositionSlice(t, traceSequence, "events") {
+		event, ok := rawEvent.(map[string]any)
+		if !ok {
+			t.Fatalf("trace event is not an object: %#v", rawEvent)
+		}
+		if genericCompositionString(t, event, "event_type") == eventType {
+			return event
+		}
+	}
+	t.Fatalf("trace sequence missing event_type %q", eventType)
+	return nil
 }
 
 func newGenericCompositionRecord(recordID string, sequence int, replayKey, operation, capability, requestHash, responseHash string) genericReplayRecord {

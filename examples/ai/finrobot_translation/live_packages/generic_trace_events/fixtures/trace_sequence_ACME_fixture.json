@@ -52,8 +52,7 @@
         "model_alias": "mock-fast",
         "message_count": 2,
         "tools_declared": [
-          "fetch_prices",
-          "build_report"
+          "fixture.lookup"
         ],
         "provider_name": "generic",
         "raw_prompt_hash": "sha256:0d1d7f7e2c6d2d447e8a2a03f0f8580d2b7a5b7e0e2b3c4d5e6f708192a3b4c5"
@@ -146,7 +145,7 @@
         "turn_id": "turn-acme-001",
         "event_id": "evt-003-tool",
         "parent_event_id": "evt-001-turn-start",
-        "tool_call_id": "tool-call-fetch-prices"
+        "tool_call_id": "tool-call-fixture-lookup-001"
       },
       "redaction": {
         "policy_id": "generic-trace-redaction-v1",
@@ -158,11 +157,12 @@
         "hash_algorithm": "sha256"
       },
       "payload": {
-        "tool_call_id": "tool-call-fetch-prices",
-        "tool_name": "fetch_prices",
+        "tool_call_id": "tool-call-fixture-lookup-001",
+        "tool_name": "fixture.lookup",
         "status": "completed_from_fixture",
-        "input_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-        "output_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "input_digest": "sha256:de0d0f5b6f6d1f5fdaf1c643c8a4a4dfb928d6a884a2c2df88f4956bba4475a1",
+        "output_digest": "sha256:d564ab4cdd738aa184c6a63bd942dfdceccdad6b05558d12324ef47dc2a3846d",
+        "replay_key": "generic_tool:invoke:fixture.lookup:ACME:1d:success",
         "provider_name": "generic"
       },
       "replay": {
@@ -264,7 +264,7 @@
       },
       "payload": {
         "approval_id": "approval-fixture-tool-fetch",
-        "operation": "tool.fetch_prices",
+        "operation": "tool.fixture.lookup",
         "decision": "allow_fixture",
         "policy_id": "fixture-only-tool-policy",
         "provider_name": "generic"

@@ -1,13 +1,14 @@
 {
   "schema": "tool_request_envelope_v1",
-  "tool_call_id": "tool-call-quote-lookup-001",
-  "name": "quote_lookup",
+  "tool_call_id": "tool-call-fixture-lookup-001",
+  "name": "fixture.lookup",
   "arguments": {
-    "symbol": "ACME"
+    "ticker": "ACME",
+    "horizon": "1d"
   },
   "status": "requested",
   "replay": {
-    "fixture_key": "generic_turn:tool_request:quote_lookup:v1",
+    "fixture_key": "generic_turn:tool_request:fixture.lookup:v1",
     "deterministic_tool_hash": "sha256:de0d0f5b6f6d1f5fdaf1c643c8a4a4dfb928d6a884a2c2df88f4956bba4475a1"
   },
   "policy": {

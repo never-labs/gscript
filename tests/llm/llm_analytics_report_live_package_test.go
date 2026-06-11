@@ -22,6 +22,14 @@ type analyticsReportLivePackageManifest struct {
 		Example string `json:"example"`
 		Schema  string `json:"schema"`
 	} `json:"entrypoints"`
+	DefaultPolicy struct {
+		Mode                        string `json:"mode"`
+		LiveNetwork                 bool   `json:"live_network"`
+		ProviderCredentialsRequired bool   `json:"provider_credentials_required"`
+		RealDependencyImports       bool   `json:"real_dependency_imports"`
+		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
+		FixtureHook                 string `json:"fixture_hook"`
+	} `json:"default_policy"`
 	Contracts    map[string]string `json:"contracts"`
 	ProviderGate struct {
 		AllowNetwork        bool     `json:"allow_network"`
@@ -91,6 +99,14 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 	}
 	if len(manifest.ProviderGate.RequiredCredentials) != 0 || len(manifest.ProviderGate.OptionalCredentials) != 0 {
 		t.Fatalf("provider credentials must not be required by this skeleton: %#v", manifest.ProviderGate)
+	}
+	if manifest.DefaultPolicy.Mode != "fixture_replay" ||
+		manifest.DefaultPolicy.LiveNetwork ||
+		manifest.DefaultPolicy.ProviderCredentialsRequired ||
+		manifest.DefaultPolicy.RealDependencyImports ||
+		!manifest.DefaultPolicy.CleanSkipWithoutDependency ||
+		manifest.DefaultPolicy.FixtureHook != "recorded_analytics_report_live_fixture" {
+		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
 	for _, want := range []string{
 		"finance.normalize.price_series",

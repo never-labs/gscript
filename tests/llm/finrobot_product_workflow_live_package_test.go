@@ -15,13 +15,21 @@ import (
 )
 
 type finrobotProductWorkflowLiveManifest struct {
-	SchemaVersion             int               `json:"schema_version"`
-	ID                        string            `json:"id"`
-	PackageName               string            `json:"package_name"`
-	SourceExamples            []string          `json:"source_examples"`
-	ProviderFree              bool              `json:"provider_free"`
-	LiveNetworkDefault        bool              `json:"live_network_default"`
-	Credentials               credentialsBlock  `json:"credentials"`
+	SchemaVersion      int              `json:"schema_version"`
+	ID                 string           `json:"id"`
+	PackageName        string           `json:"package_name"`
+	SourceExamples     []string         `json:"source_examples"`
+	ProviderFree       bool             `json:"provider_free"`
+	LiveNetworkDefault bool             `json:"live_network_default"`
+	Credentials        credentialsBlock `json:"credentials"`
+	DefaultPolicy      struct {
+		Mode                        string `json:"mode"`
+		LiveNetwork                 bool   `json:"live_network"`
+		ProviderCredentialsRequired bool   `json:"provider_credentials_required"`
+		RealDependencyImports       bool   `json:"real_dependency_imports"`
+		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
+		FixtureHook                 string `json:"fixture_hook"`
+	} `json:"default_policy"`
 	Entrypoints               map[string]string `json:"entrypoints"`
 	Schemas                   map[string]string `json:"schemas"`
 	Fixtures                  map[string]string `json:"fixtures"`
@@ -61,6 +69,14 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 	}
 	if !strings.Contains(strings.ToLower(manifest.Credentials.Policy), "no credentials") {
 		t.Fatalf("credential policy should document no credentials: %q", manifest.Credentials.Policy)
+	}
+	if manifest.DefaultPolicy.Mode != "fixture_replay" ||
+		manifest.DefaultPolicy.LiveNetwork ||
+		manifest.DefaultPolicy.ProviderCredentialsRequired ||
+		manifest.DefaultPolicy.RealDependencyImports ||
+		!manifest.DefaultPolicy.CleanSkipWithoutDependency ||
+		manifest.DefaultPolicy.FixtureHook != "recorded_product_workflow_fixture" {
+		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
 
 	for _, source := range manifest.SourceExamples {

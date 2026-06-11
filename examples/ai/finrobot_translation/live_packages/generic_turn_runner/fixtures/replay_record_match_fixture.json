@@ -3,7 +3,7 @@
   "record_id": "record-generic-turn-acme-summary-001",
   "fixture_key": "generic_turn:replay_match:acme_summary:v1",
   "match_key": "deterministic_request_hash",
-  "request_hash": "sha256:5ce74338ee73b96325f17fbe6e9a756b81f8c2f1f62a81c955d802f1cb5b30bc",
+  "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
   "request": {
     "schema": "single_turn_request_v1",
     "model": "fixture-model",
@@ -20,7 +20,7 @@
     },
     "temperature": 0,
     "max_output_tokens": 128,
-    "tools": ["quote_lookup"]
+    "tools": ["fixture.lookup"]
   },
   "response": {
     "schema": "execute_response_envelope_v1",

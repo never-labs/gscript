@@ -153,7 +153,7 @@
       "shape_id": "ai.package.audit",
       "status": "checked_in_package_boundary",
       "capabilities": ["package-boundary", "capability"],
-      "contract": "Audit package manifests, provider-free gates, registered examples, and missing built-in guarantees.",
+      "contract": "Audit package manifests, provider-free gates, registered examples, and no-built-in-language-feature guarantees.",
       "inputs": ["package_manifest", "fixture_index", "example_registry", "capability_policy"],
       "outputs": ["audit_findings", "coverage_status", "missing_boundary_records"],
       "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",

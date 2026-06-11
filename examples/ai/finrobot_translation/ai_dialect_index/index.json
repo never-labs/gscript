@@ -354,7 +354,7 @@
       "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-package-boundary-auditor",
-        "boundary": "read-only manifest audit for provider-free package skeletons and missing built-in guarantees",
+        "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
         "status": "missing",
         "reason": "package boundary checks exist as an audit ledger and test but are not a reusable production package"
       },

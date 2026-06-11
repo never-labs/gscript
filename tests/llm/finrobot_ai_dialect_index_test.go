@@ -163,6 +163,7 @@ func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 			t.Fatalf("required capability %q is not represented in entries; got %v", capability, sortedStringKeys(seenCapabilities))
 		}
 	}
+	assertGenericAIDialectDocumentedBoundaryList(t, root, index)
 }
 
 func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
@@ -249,6 +250,52 @@ func genericAIDialectIndexedProductionBoundaries(t *testing.T, index genericAIDi
 		indexed[packageID] = entry
 	}
 	return indexed
+}
+
+func assertGenericAIDialectDocumentedBoundaryList(t *testing.T, root string, index genericAIDialectIndex) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "examples", "ai", "finrobot_translation", "ai_dialect_index", "PACKAGE_BOUNDARIES.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	documented := map[string]bool{}
+	inPackageList := false
+	for _, line := range strings.Split(string(data), "\n") {
+		switch strings.TrimSpace(line) {
+		case "<!-- ai-dialect-boundary-package-list:start -->":
+			inPackageList = true
+			continue
+		case "<!-- ai-dialect-boundary-package-list:end -->":
+			inPackageList = false
+			continue
+		}
+		if !inPackageList || !strings.HasPrefix(line, "- ") {
+			continue
+		}
+		parts := strings.Split(line, "`")
+		if len(parts) != 3 {
+			t.Fatalf("malformed documented package boundary line %q", line)
+		}
+		documented[parts[1]] = true
+	}
+
+	indexed := map[string]bool{}
+	for _, entry := range index.Entries {
+		if entry.ProductionPackageBoundary == nil || entry.ProductionPackageBoundary.Status != "checked_in" {
+			continue
+		}
+		indexed[entry.ProductionPackageBoundary.Directory] = true
+	}
+	for directory := range indexed {
+		if !documented[directory] {
+			t.Fatalf("checked-in production boundary %q is missing from PACKAGE_BOUNDARIES.md", directory)
+		}
+	}
+	for directory := range documented {
+		if !indexed[directory] {
+			t.Fatalf("PACKAGE_BOUNDARIES.md documents stale package boundary %q", directory)
+		}
+	}
 }
 
 func assertGenericAIDialectBackendBoundaryIndexed(t *testing.T, shape genericAIDialectBackendShape, indexed map[string]genericAIDialectIndexItem) {

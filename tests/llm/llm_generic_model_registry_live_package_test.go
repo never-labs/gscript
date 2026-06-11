@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -119,7 +120,7 @@ func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
 		"generic.ai.model.descriptor.replay",
 		"generic.ai.model.redaction.policy",
 	} {
-		if !contains(manifest.Capabilities, want) {
+		if !genericModelRegistryContains(manifest.Capabilities, want) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
 	}
@@ -157,7 +158,8 @@ func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
 }
 
 func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T) {
-	manifest := loadGenericModelRegistryManifest(t, genericModelRegistryPackageDir(t))
+	base := genericModelRegistryPackageDir(t)
+	manifest := loadGenericModelRegistryManifest(t, base)
 
 	if manifest.ProviderPolicy.ID != "provider-free-model-policy-v1" ||
 		manifest.ProviderPolicy.AllowNamedProviders ||
@@ -169,7 +171,7 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 		t.Fatalf("provider policy must deny live providers: %#v", manifest.ProviderPolicy)
 	}
 	for _, want := range []string{"live_provider_disabled", "credential_material_forbidden", "network_disabled"} {
-		if !contains(manifest.ProviderPolicy.DenyReasons, want) {
+		if !genericModelRegistryContains(manifest.ProviderPolicy.DenyReasons, want) {
 			t.Fatalf("provider policy missing deny reason %q: %#v", want, manifest.ProviderPolicy.DenyReasons)
 		}
 	}
@@ -180,6 +182,37 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 		len(manifest.RedactionPolicy.RedactFields) < 5 ||
 		len(manifest.RedactionPolicy.EnvRefPatterns) < 4 {
 		t.Fatalf("redaction policy incomplete: %#v", manifest.RedactionPolicy)
+	}
+	var fixtureRedaction struct {
+		SchemaVersion       int      `json:"schema_version"`
+		ID                  string   `json:"id"`
+		ProviderFree        bool     `json:"provider_free"`
+		Enabled             bool     `json:"enabled"`
+		Replacement         string   `json:"replacement"`
+		SecretValuePolicy   string   `json:"secret_value_policy"`
+		SecretValuesPresent bool     `json:"secret_values_present"`
+		RedactFields        []string `json:"redact_fields"`
+		EnvRefPatterns      []string `json:"env_ref_patterns"`
+	}
+	readJSONFile(t, filepath.Join(base, "fixtures", "redaction_policy_fixture.json"), &fixtureRedaction)
+	if fixtureRedaction.SchemaVersion != 1 ||
+		fixtureRedaction.ID != manifest.RedactionPolicy.ID ||
+		!fixtureRedaction.ProviderFree ||
+		!fixtureRedaction.Enabled ||
+		fixtureRedaction.Replacement != manifest.RedactionPolicy.Replacement ||
+		fixtureRedaction.SecretValuePolicy != manifest.RedactionPolicy.SecretValuePolicy ||
+		fixtureRedaction.SecretValuesPresent {
+		t.Fatalf("redaction fixture must mirror provider-free no-secret policy: %#v", fixtureRedaction)
+	}
+	for _, field := range manifest.RedactionPolicy.RedactFields {
+		if !genericModelRegistryContains(fixtureRedaction.RedactFields, field) {
+			t.Fatalf("redaction fixture missing manifest redact field %q: %#v", field, fixtureRedaction.RedactFields)
+		}
+	}
+	for _, pattern := range fixtureRedaction.EnvRefPatterns {
+		if !strings.HasPrefix(pattern, "env:") {
+			t.Fatalf("redaction fixture env pattern must be an env ref, got %q", pattern)
+		}
 	}
 	for _, want := range []string{
 		"model_alias_registry",
@@ -239,7 +272,7 @@ func TestGenericModelRegistryAliasResolutionToReplayDescriptors(t *testing.T) {
 			t.Fatalf("descriptor must be replay-safe and provider-free: %#v", descriptor)
 		}
 		for _, want := range []string{"model_alias_registry", "provider_policy", "replay_safe_execution_descriptor", "redaction_policy"} {
-			if !contains(descriptor.CapabilityFlags, want) {
+			if !genericModelRegistryContains(descriptor.CapabilityFlags, want) {
 				t.Fatalf("%s missing descriptor capability %q: %#v", descriptor.DescriptorRef, want, descriptor.CapabilityFlags)
 			}
 		}
@@ -287,12 +320,12 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 		t.Fatalf("contract boundary is not provider-free generic model registry: %#v", contract)
 	}
 	for _, want := range []string{"model_alias", "provider_policy", "replay_mode"} {
-		if !contains(contract.Inputs, want) {
+		if !genericModelRegistryContains(contract.Inputs, want) {
 			t.Fatalf("contract input missing %q: %#v", want, contract.Inputs)
 		}
 	}
 	for _, want := range []string{"model_descriptor", "capability_flags", "redaction_policy"} {
-		if !contains(contract.Outputs, want) {
+		if !genericModelRegistryContains(contract.Outputs, want) {
 			t.Fatalf("contract output missing %q: %#v", want, contract.Outputs)
 		}
 	}
@@ -312,13 +345,13 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 		"schemas/execution_descriptor_v1.schema.json",
 		"schemas/redaction_policy_v1.schema.json",
 	} {
-		assertJSONFile(t, filepath.Join(base, rel))
+		assertGenericModelRegistryJSONFile(t, filepath.Join(base, rel))
 	}
 }
 
 func genericModelRegistryPackageDir(t *testing.T) string {
 	t.Helper()
-	return filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation", "live_packages", "generic_model_registry")
+	return filepath.Join(genericModelRegistryRepoRoot(t), "examples", "ai", "finrobot_translation", "live_packages", "generic_model_registry")
 }
 
 func loadGenericModelRegistryManifest(t *testing.T, base string) genericModelRegistryManifest {
@@ -337,6 +370,30 @@ func readJSONFile(t *testing.T, path string, into any) {
 	if err := json.Unmarshal(data, into); err != nil {
 		t.Fatalf("%s: %v", path, err)
 	}
+}
+
+func assertGenericModelRegistryJSONFile(t *testing.T, path string) {
+	t.Helper()
+	var value any
+	readJSONFile(t, path, &value)
+}
+
+func genericModelRegistryRepoRoot(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+}
+
+func genericModelRegistryContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveGenericModelAlias(t *testing.T, aliases map[string]struct {

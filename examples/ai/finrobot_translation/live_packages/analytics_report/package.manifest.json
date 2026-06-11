@@ -15,6 +15,14 @@
     "required": true,
     "statement": "Leia core does not provide built-in finance providers, valuation formulas, chart renderers, HTML renderers, or PDF renderers; this package declares those surfaces as external capabilities behind provider-free gates."
   },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_analytics_report_live_fixture"
+  },
   "capabilities": [
     "finance.normalize.price_series",
     "finance.normalize.fundamentals",

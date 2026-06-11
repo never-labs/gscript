@@ -17,6 +17,14 @@
     "secret_env_patterns": [],
     "policy": "No credentials are declared by this skeleton; live provider keys belong only to future provider-specific packages."
   },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_product_workflow_fixture"
+  },
   "entrypoints": {
     "smoke": "main.leia",
     "equity_cli_workflow": "contracts/product_workflow_contract.json#/workflows/equity_cli",

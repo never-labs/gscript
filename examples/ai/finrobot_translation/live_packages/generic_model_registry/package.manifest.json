@@ -45,7 +45,8 @@
     "live_model_calls": false,
     "clean_skip_without_descriptor": true,
     "redact_secret_values": true,
-    "replay_miss_behavior": "clean-skip"
+    "replay_miss_behavior": "clean-skip",
+    "fixture_hook": "recorded_generic_model_registry_fixture"
   },
   "provider_policy": {
     "id": "provider-free-model-policy-v1",

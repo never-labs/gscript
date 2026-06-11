@@ -19,7 +19,7 @@
       "metadata": {"replay_ready": true, "provider_free": true, "live_network": false}
     },
     {
-      "fixture_key": "generic_turn:tool_request:quote_lookup:v1",
+      "fixture_key": "generic_turn:tool_request:fixture.lookup:v1",
       "capability": "ai.turn.execute",
       "path": "fixtures/tool_request_fixture.json",
       "schema": "tool_request_envelope_v1",
