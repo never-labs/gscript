@@ -2121,7 +2121,7 @@ func TryTypedStringCast(array Array) (Array, bool, error) {
 		if err != nil || !handled {
 			return out, handled, err
 		}
-		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+		return a.withLazyRebuiltIndexes(out), true, nil
 	case tiledArray:
 		source, handled, err := TryTypedStringCast(a.source)
 		if err != nil || !handled {
@@ -2174,7 +2174,7 @@ func TryTypedStringCase(array Array, upper bool) (Array, bool, error) {
 		if err != nil || !handled {
 			return out, handled, err
 		}
-		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+		return a.withLazyRebuiltIndexes(out), true, nil
 	case tiledArray:
 		source, handled, err := TryTypedStringCase(a.source, upper)
 		if err != nil || !handled {
@@ -7881,7 +7881,7 @@ func TryTypedQRatios(array Array) (Array, bool, error) {
 		if err != nil || !handled {
 			return out, handled, err
 		}
-		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+		return a.withLazyRebuiltIndexes(out), true, nil
 	}
 	if !isNumericArray(array) {
 		return nil, false, nil
@@ -10726,19 +10726,61 @@ func windowMatchIndexesI64(left Frame, leftTime []int64, leftPartitionColumns []
 }
 
 func (typedKernelRegistry) GatherWindowLists(array Array, indexes [][]int) Array {
-	out := make([]any, len(indexes))
-	for i, rows := range indexes {
-		values := make([]any, len(rows))
-		for j, row := range rows {
-			v, ok := array.At(row)
-			if !ok {
-				panic(fmt.Sprintf("data array gather index %d out of range", row))
-			}
-			values[j] = v
-		}
-		out[i] = values
+	// Window-join list columns stay lazy: most consumers immediately
+	// aggregate each window (sum/avg/count), which the windowListArray fast
+	// path serves straight from the typed source without boxing any element.
+	return windowListArray{source: array, windows: indexes}
+}
+
+// windowListArray is a lazy list column whose row i is the source values at
+// windows[i]. At/Values reproduce the boxed list shape the eager gather
+// produced; aggregation consumers read source+windows directly.
+type windowListArray struct {
+	source  Array
+	windows [][]int
+}
+
+func (a windowListArray) Kind() Kind { return KindAny }
+
+func (a windowListArray) Len() int { return len(a.windows) }
+
+func (a windowListArray) At(row int) (any, bool) {
+	if row < 0 || row >= len(a.windows) {
+		return nil, false
 	}
-	return nullableArray{kind: KindAny, data: out}
+	rows := a.windows[row]
+	values := make([]any, len(rows))
+	for j, r := range rows {
+		v, ok := a.source.At(r)
+		if !ok {
+			return nil, false
+		}
+		values[j] = v
+	}
+	return values, true
+}
+
+func (a windowListArray) Values() []any {
+	out := make([]any, len(a.windows))
+	for i := range a.windows {
+		v, ok := a.At(i)
+		if !ok {
+			panic(fmt.Sprintf("window list row %d out of range", i))
+		}
+		out[i] = v
+	}
+	return out
+}
+
+func (a windowListArray) Gather(indexes []int) Array {
+	windows := make([][]int, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= len(a.windows) {
+			panic(fmt.Sprintf("data array gather index %d out of range", row))
+		}
+		windows[i] = a.windows[row]
+	}
+	return windowListArray{source: a.source, windows: windows}
 }
 
 func (typedKernelRegistry) GatherLastOptional(array Array, indexes [][]int) Array {

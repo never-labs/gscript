@@ -282,6 +282,69 @@ func (m ArrayMetadata) cloneWithRebuiltIndexes(array Array) ArrayMetadata {
 type attributedArray struct {
 	array    Array
 	metadata ArrayMetadata
+	// lazy, when non-nil, carries index sidecars that are rebuilt on first
+	// use instead of eagerly on every derive (gather/slice/reverse/rotate).
+	// metadata.Indexes is empty while lazy is pending; all index reads go
+	// through resolvedMetadata.
+	lazy *lazyRebuiltIndexes
+}
+
+// lazyRebuiltIndexes defers BuildArrayIndex for derived attributed arrays.
+// Most derived columns (query projections, mutation survivors) never have
+// their index sidecar queried, so rebuilding value->rows maps per derive is
+// pure waste; the cell rebuilds once on first index access.
+type lazyRebuiltIndexes struct {
+	attrs   []Symbol
+	once    sync.Once
+	indexes map[Symbol]ArrayIndex
+}
+
+func (l *lazyRebuiltIndexes) resolve(array Array) map[Symbol]ArrayIndex {
+	l.once.Do(func() {
+		indexes := make(map[Symbol]ArrayIndex, len(l.attrs))
+		for _, attr := range l.attrs {
+			if index, err := BuildArrayIndex(array, attr); err == nil {
+				indexes[attr] = index
+			}
+		}
+		l.indexes = indexes
+	})
+	return l.indexes
+}
+
+// resolvedMetadata returns the metadata with index sidecars materialized.
+func (a attributedArray) resolvedMetadata() ArrayMetadata {
+	if a.lazy == nil {
+		return a.metadata
+	}
+	m := a.metadata
+	m.Indexes = a.lazy.resolve(a.array)
+	return m
+}
+
+// indexedAttrs lists the attributes that carry (or will carry) an index.
+func (a attributedArray) indexedAttrs() []Symbol {
+	if a.lazy != nil {
+		return a.lazy.attrs
+	}
+	if len(a.metadata.Indexes) == 0 {
+		return nil
+	}
+	attrs := make([]Symbol, 0, len(a.metadata.Indexes))
+	for attr := range a.metadata.Indexes {
+		attrs = append(attrs, attr)
+	}
+	return attrs
+}
+
+// withLazyRebuiltIndexes wraps derived storage with the same attributes and
+// index sidecars deferred to first use.
+func (a attributedArray) withLazyRebuiltIndexes(derived Array) attributedArray {
+	out := attributedArray{array: derived, metadata: a.metadata.cloneWithoutIndexes()}
+	if attrs := a.indexedAttrs(); len(attrs) > 0 {
+		out.lazy = &lazyRebuiltIndexes{attrs: attrs}
+	}
+	return out
 }
 
 // WithArrayAttribute returns an Array carrying an additional planner attribute.
@@ -328,12 +391,11 @@ func (a attributedArray) At(row int) (any, bool) { return a.array.At(row) }
 func (a attributedArray) Values() []any { return a.array.Values() }
 
 func (a attributedArray) Gather(indexes []int) Array {
-	gathered := a.array.Gather(indexes)
-	return attributedArray{array: gathered, metadata: a.metadata.cloneWithRebuiltIndexes(gathered)}
+	return a.withLazyRebuiltIndexes(a.array.Gather(indexes))
 }
 
 func (a attributedArray) ArrayMetadata() ArrayMetadata {
-	return a.metadata.clone()
+	return a.resolvedMetadata().clone()
 }
 
 func BuildArrayIndex(array Array, attr Symbol) (ArrayIndex, error) {
@@ -485,7 +547,7 @@ func ArrayIndexFor(array Array, attr Symbol) (ArrayIndex, bool) {
 func arrayIndexForBorrowed(array Array, attr Symbol) (ArrayIndex, bool) {
 	switch a := array.(type) {
 	case attributedArray:
-		return a.metadata.indexBorrowed(attr)
+		return a.resolvedMetadata().indexBorrowed(attr)
 	case storedAttributedEncodedArray:
 		return a.metadata.indexBorrowed(attr)
 	default:
@@ -1963,7 +2025,7 @@ func Slice(array Array, start, count int) (Array, error) {
 		if err != nil {
 			return nil, err
 		}
-		return attributedArray{array: sliced, metadata: a.metadata.cloneWithRebuiltIndexes(sliced)}, nil
+		return a.withLazyRebuiltIndexes(sliced), nil
 	case tiledArray:
 		if a.source.Len() == 0 {
 			return array.Gather(nil), nil
@@ -2049,7 +2111,7 @@ func Reverse(array Array) (Array, bool, error) {
 		if err != nil || !handled {
 			return reversed, handled, err
 		}
-		return attributedArray{array: reversed, metadata: a.metadata.cloneWithRebuiltIndexes(reversed)}, true, nil
+		return a.withLazyRebuiltIndexes(reversed), true, nil
 	case i64RangeArray:
 		if a.len == 0 {
 			return a, true, nil
@@ -3778,7 +3840,7 @@ func tryGatherRangeByI64IndexArray(array Array, indexes Array) (Array, bool, err
 		if err != nil || !handled {
 			return out, handled, err
 		}
-		return attributedArray{array: out, metadata: a.metadata.cloneWithRebuiltIndexes(out)}, true, nil
+		return a.withLazyRebuiltIndexes(out), true, nil
 	case i64RangeArray:
 		switch idx := indexes.(type) {
 		case attributedArray:
@@ -8410,7 +8472,7 @@ func TryTypedRotate(array Array, n int) (Array, bool, error) {
 		if err != nil || !ok {
 			return rotated, ok, err
 		}
-		return attributedArray{array: rotated, metadata: a.metadata.cloneWithRebuiltIndexes(rotated)}, true, nil
+		return a.withLazyRebuiltIndexes(rotated), true, nil
 	case i64RangeArray:
 		if a.len == 0 {
 			return a, true, nil
@@ -8723,6 +8785,11 @@ func (e ListAggregateExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
 	if err != nil {
 		return nil, err
 	}
+	if wl, ok := unwrapAttributedArray(array).(windowListArray); ok {
+		if out, handled, err := windowListAggregateRows(e.Func, wl); handled || err != nil {
+			return out, err
+		}
+	}
 	values := make([]any, array.Len())
 	for i := 0; i < array.Len(); i++ {
 		v, ok := array.At(i)
@@ -8736,6 +8803,71 @@ func (e ListAggregateExpr) EvalRows(frame Frame, indexes []int) (Array, error) {
 		values[i] = agg
 	}
 	return InferArray(values), nil
+}
+
+// windowListAggregateRows aggregates every window of a lazy window-list
+// column straight from the typed source column, mirroring evalValue's boxed
+// semantics (per-window accumulation order, sum of an empty window is 0,
+// avg of an empty window is null). handled=false defers to the boxed path.
+func windowListAggregateRows(fn string, wl windowListArray) (Array, bool, error) {
+	switch fn {
+	case "sum", "avg", "count":
+	default:
+		return nil, false, nil
+	}
+	if fn == "count" {
+		out := make([]int64, len(wl.windows))
+		for i, rows := range wl.windows {
+			out[i] = int64(len(rows))
+		}
+		return columnArray[int64]{kind: KindI64, data: out}, true, nil
+	}
+	n := wl.source.Len()
+	values := make([]float64, n)
+	if ok, err := TryExportF64Copy(wl.source, values); !ok || err != nil {
+		ints := make([]int64, n)
+		if ok, err := TryExportI64Copy(wl.source, ints); !ok || err != nil {
+			return nil, false, nil
+		}
+		for i, v := range ints {
+			values[i] = float64(v)
+		}
+	}
+	sums := make([]float64, len(wl.windows))
+	hasEmpty := false
+	for i, rows := range wl.windows {
+		if len(rows) == 0 {
+			hasEmpty = true
+			continue
+		}
+		var sum float64
+		for _, row := range rows {
+			if row < 0 || row >= n {
+				return nil, true, fmt.Errorf("window list row %d out of range", row)
+			}
+			sum += values[row]
+		}
+		sums[i] = sum
+	}
+	if fn == "sum" {
+		return columnArray[float64]{kind: KindF64, data: sums}, true, nil
+	}
+	// avg: empty windows are null, matching the boxed count==0 path.
+	if !hasEmpty {
+		for i, rows := range wl.windows {
+			sums[i] /= float64(len(rows))
+		}
+		return columnArray[float64]{kind: KindF64, data: sums}, true, nil
+	}
+	out := make([]any, len(wl.windows))
+	for i, rows := range wl.windows {
+		if len(rows) == 0 {
+			out[i] = NullValue
+			continue
+		}
+		out[i] = sums[i] / float64(len(rows))
+	}
+	return InferArray(out), true, nil
 }
 
 func (e ListAggregateExpr) evalValue(v any) (any, error) {
