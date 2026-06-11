@@ -40,12 +40,24 @@ type codingNotebookLiveManifest struct {
 	Entrypoints        map[string]string                  `json:"entrypoints"`
 	Schemas            map[string]string                  `json:"schemas"`
 	Fixtures           map[string]string                  `json:"fixtures"`
+	ArtifactManifests  map[string]string                  `json:"artifact_manifests"`
+	CleanupPolicy      codingNotebookCleanupPolicy        `json:"cleanup_policy"`
 	Capabilities       []string                           `json:"capabilities"`
 	CapabilityMetadata []codingNotebookCapabilityMetadata `json:"capability_metadata"`
 	TestGates          []string                           `json:"test_gates"`
 	NoBuiltInGuarantee struct {
 		Required bool `json:"required"`
 	} `json:"no_built_in_guarantee"`
+}
+
+type codingNotebookCleanupPolicy struct {
+	Mode                     string   `json:"mode"`
+	DeleteUnapprovedOutputs  bool     `json:"delete_unapproved_outputs"`
+	PreserveFixtureArtifacts bool     `json:"preserve_fixture_artifacts"`
+	CleanupReplayKey         string   `json:"cleanup_replay_key"`
+	Paths                    []string `json:"paths"`
+	Reason                   string   `json:"reason"`
+	Executed                 bool     `json:"executed"`
 }
 
 type codingNotebookCapabilityMetadata struct {
@@ -118,6 +130,18 @@ func TestFinRobotCodingNotebookLivePackageManifest(t *testing.T) {
 		}
 		assertCodingNotebookJSONFile(t, filepath.Join(base, manifest.Fixtures[key]))
 	}
+	if manifest.ArtifactManifests["file"] != "fixtures/deterministic_replay_fixture.json#/file_artifact_manifest" ||
+		manifest.ArtifactManifests["image"] != "fixtures/deterministic_replay_fixture.json#/image_artifact_manifest" {
+		t.Fatalf("artifact manifests = %#v", manifest.ArtifactManifests)
+	}
+	if manifest.CleanupPolicy.Mode != "fixture_noop" ||
+		!manifest.CleanupPolicy.DeleteUnapprovedOutputs ||
+		!manifest.CleanupPolicy.PreserveFixtureArtifacts ||
+		manifest.CleanupPolicy.CleanupReplayKey != "cleanup:coding-notebook:fixture-noop" ||
+		len(manifest.CleanupPolicy.Paths) != 2 ||
+		!strings.Contains(manifest.CleanupPolicy.Reason, "without touching the host filesystem") {
+		t.Fatalf("cleanup policy = %#v", manifest.CleanupPolicy)
+	}
 
 	wantCapabilities := []string{
 		"coding.notebook.artifact.publish",
@@ -141,7 +165,7 @@ func TestFinRobotCodingNotebookLivePackageManifest(t *testing.T) {
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"sandbox", "file", "image", "denied command", "stdout", "stderr", "deterministic replay", "capability metadata"} {
+	for _, want := range []string{"sandbox", "file", "image", "denied command", "command envelopes", "stdout", "stderr", "file artifact manifest", "image artifact manifest", "deterministic replay", "cleanup policy", "capability metadata"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -169,7 +193,11 @@ func TestFinRobotCodingNotebookLivePackageSmokeExecutes(t *testing.T) {
 		"stdout",
 		"stderr",
 		"deterministic_replay",
+		"command_envelope",
 		"file_image_artifacts",
+		"file_artifact_manifest",
+		"image_artifact_manifest",
+		"cleanup_policy",
 		"capability_metadata",
 	} {
 		if !strings.Contains(source, want) {
@@ -198,6 +226,10 @@ func TestFinRobotCodingNotebookLivePackageSmokeExecutes(t *testing.T) {
 		"stdout=signals: PDD=0.18 BABA=0.11",
 		"stderr=denied: notebook kernel execution is disabled in replay mode",
 		"replay=finrobot-coding-notebook-v1",
+		"executed=false",
+		"file_manifest=2",
+		"image_manifest=1",
+		"cleanup=fixture_noop",
 		"artifacts=3",
 		"displays=1",
 		"capabilities=5",
@@ -224,20 +256,32 @@ func TestFinRobotCodingNotebookPolicyFixturesAndArtifactSchema(t *testing.T) {
 			Decision string `json:"decision"`
 		} `json:"approval_gates"`
 		CaptureContract struct {
-			StdoutRequired               bool `json:"stdout_required"`
-			StderrRequired               bool `json:"stderr_required"`
-			ExitCodeRequired             bool `json:"exit_code_required"`
-			ApprovalDecisionRequired     bool `json:"approval_decision_required"`
-			DeniedCommandsMustHaveReason bool `json:"denied_commands_must_have_reason"`
+			StdoutRequired                     bool `json:"stdout_required"`
+			StderrRequired                     bool `json:"stderr_required"`
+			ExitCodeRequired                   bool `json:"exit_code_required"`
+			ApprovalDecisionRequired           bool `json:"approval_decision_required"`
+			DeniedCommandsMustHaveReason       bool `json:"denied_commands_must_have_reason"`
+			CommandEnvelopeRequired            bool `json:"command_envelope_required"`
+			ExecutedFlagRequired               bool `json:"executed_flag_required"`
+			StdoutStderrChannelRecordsRequired bool `json:"stdout_stderr_channel_records_required"`
 		} `json:"capture_contract"`
+		CleanupPolicy codingNotebookCleanupPolicy `json:"cleanup_policy"`
 	}
 	decodeCodingNotebookJSONFile(t, filepath.Join(base, "contracts", "sandbox_policy_gates.json"), &policy)
 	if !policy.ProviderFree || policy.LiveNetwork || policy.RealDependencyImports || policy.DefaultDecision != "deny" {
 		t.Fatalf("policy header/default decision = %#v", policy)
 	}
 	if !policy.CaptureContract.StdoutRequired || !policy.CaptureContract.StderrRequired || !policy.CaptureContract.ExitCodeRequired ||
-		!policy.CaptureContract.ApprovalDecisionRequired || !policy.CaptureContract.DeniedCommandsMustHaveReason {
+		!policy.CaptureContract.ApprovalDecisionRequired || !policy.CaptureContract.DeniedCommandsMustHaveReason ||
+		!policy.CaptureContract.CommandEnvelopeRequired || !policy.CaptureContract.ExecutedFlagRequired ||
+		!policy.CaptureContract.StdoutStderrChannelRecordsRequired {
 		t.Fatalf("capture contract incomplete: %#v", policy.CaptureContract)
+	}
+	if policy.CleanupPolicy.Mode != "fixture_noop" ||
+		!policy.CleanupPolicy.DeleteUnapprovedOutputs ||
+		!policy.CleanupPolicy.PreserveFixtureArtifacts ||
+		policy.CleanupPolicy.CleanupReplayKey != "cleanup:coding-notebook:fixture-noop" {
+		t.Fatalf("policy cleanup = %#v", policy.CleanupPolicy)
 	}
 	decisions := map[string]string{}
 	for _, gate := range policy.ApprovalGates {
@@ -256,20 +300,42 @@ func TestFinRobotCodingNotebookPolicyFixturesAndArtifactSchema(t *testing.T) {
 			Decision string `json:"decision"`
 			Reason   string `json:"reason"`
 		} `json:"approval"`
+		CommandEnvelope struct {
+			Argv            []string `json:"argv"`
+			CWD             string   `json:"cwd"`
+			EnvAllowlist    []string `json:"env_allowlist"`
+			Shell           bool     `json:"shell"`
+			TimeoutBucket   string   `json:"timeout_bucket"`
+			Network         bool     `json:"network"`
+			FilesystemWrite bool     `json:"filesystem_write"`
+			Executed        bool     `json:"executed"`
+		} `json:"command_envelope"`
 		Result struct {
-			ExitCode int    `json:"exit_code"`
-			Stdout   string `json:"stdout"`
-			Stderr   string `json:"stderr"`
+			ExitCode       int    `json:"exit_code"`
+			Stdout         string `json:"stdout"`
+			Stderr         string `json:"stderr"`
+			DurationBucket string `json:"duration_bucket"`
 		} `json:"result"`
+		Captures []struct {
+			Channel   string `json:"channel"`
+			Text      string `json:"text"`
+			Bytes     int    `json:"bytes"`
+			Truncated bool   `json:"truncated"`
+		} `json:"captures"`
+		Executed      bool `json:"executed"`
 		Deterministic bool `json:"deterministic"`
 	}
 	decodeCodingNotebookJSONFile(t, filepath.Join(base, "fixtures", "denied_command_fixture.json"), &denied)
 	if !denied.ProviderFree || denied.LiveNetwork || denied.ReplayKey != "command:deny:notebook-kernel" ||
 		denied.Capability != "coding.notebook.command.execute" || denied.Approval.Decision != "deny" ||
 		denied.Approval.Reason == "" || denied.Result.ExitCode == 0 || denied.Result.Stdout != "" ||
-		!strings.Contains(denied.Result.Stderr, "denied") || !denied.Deterministic {
+		!strings.Contains(denied.Result.Stderr, "denied") || denied.Result.DurationBucket != "denied" ||
+		len(denied.CommandEnvelope.Argv) == 0 || denied.CommandEnvelope.Shell || denied.CommandEnvelope.Network ||
+		denied.CommandEnvelope.FilesystemWrite || denied.CommandEnvelope.Executed || denied.Executed ||
+		!denied.Deterministic {
 		t.Fatalf("denied command fixture = %#v", denied)
 	}
+	assertCodingNotebookCaptureChannels(t, denied.Captures, denied.Result.Stdout, denied.Result.Stderr)
 
 	var artifactSchema struct {
 		Required   []string `json:"required"`
@@ -329,12 +395,28 @@ func TestFinRobotCodingNotebookDeterministicReplayAndCapabilityMetadata(t *testi
 			Approval struct {
 				Decision string `json:"decision"`
 			} `json:"approval"`
+			CommandEnvelope struct {
+				Argv            []string `json:"argv"`
+				Shell           bool     `json:"shell"`
+				TimeoutBucket   string   `json:"timeout_bucket"`
+				Network         bool     `json:"network"`
+				FilesystemWrite bool     `json:"filesystem_write"`
+				Executed        bool     `json:"executed"`
+			} `json:"command_envelope"`
 			Result struct {
-				ExitCode int    `json:"exit_code"`
-				Stdout   string `json:"stdout"`
-				Stderr   string `json:"stderr"`
+				ExitCode       int    `json:"exit_code"`
+				Stdout         string `json:"stdout"`
+				Stderr         string `json:"stderr"`
+				DurationBucket string `json:"duration_bucket"`
 			} `json:"result"`
+			Captures []struct {
+				Channel   string `json:"channel"`
+				Text      string `json:"text"`
+				Bytes     int    `json:"bytes"`
+				Truncated bool   `json:"truncated"`
+			} `json:"captures"`
 			ArtifactRefs  []string `json:"artifact_refs"`
+			Executed      bool     `json:"executed"`
 			Deterministic bool     `json:"deterministic"`
 		} `json:"commands"`
 		Artifacts []struct {
@@ -352,14 +434,38 @@ func TestFinRobotCodingNotebookDeterministicReplayAndCapabilityMetadata(t *testi
 			SHA256       string `json:"sha256"`
 			LiveNotebook bool   `json:"live_notebook"`
 		} `json:"displays"`
+		FileArtifactManifest struct {
+			ManifestID  string   `json:"manifest_id"`
+			ReplayKey   string   `json:"replay_key"`
+			Kind        string   `json:"kind"`
+			ArtifactIDs []string `json:"artifact_ids"`
+			Count       int      `json:"count"`
+			TotalBytes  int      `json:"total_bytes"`
+			SHA256      string   `json:"sha256"`
+		} `json:"file_artifact_manifest"`
+		ImageArtifactManifest struct {
+			ManifestID  string   `json:"manifest_id"`
+			ReplayKey   string   `json:"replay_key"`
+			Kind        string   `json:"kind"`
+			ArtifactIDs []string `json:"artifact_ids"`
+			Count       int      `json:"count"`
+			TotalBytes  int      `json:"total_bytes"`
+			SHA256      string   `json:"sha256"`
+			Displays    []string `json:"displays"`
+		} `json:"image_artifact_manifest"`
 		ReplayAssertions struct {
-			Stdout        string `json:"stdout"`
-			Stderr        string `json:"stderr"`
-			ExitCode      int    `json:"exit_code"`
-			ArtifactCount int    `json:"artifact_count"`
-			DisplayCount  int    `json:"display_count"`
-			LiveNotebook  bool   `json:"live_notebook"`
+			Stdout                     string `json:"stdout"`
+			Stderr                     string `json:"stderr"`
+			ExitCode                   int    `json:"exit_code"`
+			DurationBucket             string `json:"duration_bucket"`
+			ArtifactCount              int    `json:"artifact_count"`
+			FileArtifactManifestCount  int    `json:"file_artifact_manifest_count"`
+			ImageArtifactManifestCount int    `json:"image_artifact_manifest_count"`
+			DisplayCount               int    `json:"display_count"`
+			LiveNotebook               bool   `json:"live_notebook"`
+			Executed                   bool   `json:"executed"`
 		} `json:"replay_assertions"`
+		CleanupPolicy codingNotebookCleanupPolicy `json:"cleanup_policy"`
 	}
 	decodeCodingNotebookJSONFile(t, filepath.Join(base, "fixtures", "deterministic_replay_fixture.json"), &replay)
 	if !replay.ProviderFree || replay.LiveNetwork || len(replay.Commands) != 1 || len(replay.Artifacts) != 3 || len(replay.Displays) != 1 {
@@ -368,9 +474,13 @@ func TestFinRobotCodingNotebookDeterministicReplayAndCapabilityMetadata(t *testi
 	command := replay.Commands[0]
 	if command.Approval.Decision != "allow_fixture" || command.Result.ExitCode != 0 ||
 		command.Result.Stdout != replay.ReplayAssertions.Stdout || command.Result.Stderr != replay.ReplayAssertions.Stderr ||
-		len(command.ArtifactRefs) != 2 || !command.Deterministic {
+		command.Result.DurationBucket != replay.ReplayAssertions.DurationBucket ||
+		len(command.ArtifactRefs) != 2 || len(command.CommandEnvelope.Argv) == 0 || command.CommandEnvelope.Shell ||
+		command.CommandEnvelope.Network || command.CommandEnvelope.FilesystemWrite || command.CommandEnvelope.Executed ||
+		command.Executed || !command.Deterministic {
 		t.Fatalf("command replay is not deterministic/captured: %#v", command)
 	}
+	assertCodingNotebookCaptureChannels(t, command.Captures, command.Result.Stdout, command.Result.Stderr)
 	for _, artifact := range replay.Artifacts {
 		if artifact.ArtifactID == "" || artifact.ReplayKey == "" || len(artifact.SHA256) != 64 ||
 			artifact.Provenance.SourceModule != "finrobot/functional/coding.py" || !artifact.Provenance.Fixture {
@@ -381,11 +491,37 @@ func TestFinRobotCodingNotebookDeterministicReplayAndCapabilityMetadata(t *testi
 	if display.Capability != "coding.notebook.image.display" || display.MediaType != "image/png" || len(display.SHA256) != 64 || display.LiveNotebook {
 		t.Fatalf("display image fixture = %#v", display)
 	}
+	if replay.FileArtifactManifest.ManifestID != "manifest:file:strategy-fixtures" ||
+		replay.FileArtifactManifest.Kind != "file" ||
+		replay.FileArtifactManifest.Count != 2 ||
+		len(replay.FileArtifactManifest.ArtifactIDs) != replay.FileArtifactManifest.Count ||
+		len(replay.FileArtifactManifest.SHA256) != 64 {
+		t.Fatalf("file artifact manifest = %#v", replay.FileArtifactManifest)
+	}
+	if replay.ImageArtifactManifest.ManifestID != "manifest:image:allocation-fixtures" ||
+		replay.ImageArtifactManifest.Kind != "image" ||
+		replay.ImageArtifactManifest.Count != 1 ||
+		len(replay.ImageArtifactManifest.ArtifactIDs) != replay.ImageArtifactManifest.Count ||
+		len(replay.ImageArtifactManifest.Displays) != 1 ||
+		len(replay.ImageArtifactManifest.SHA256) != 64 {
+		t.Fatalf("image artifact manifest = %#v", replay.ImageArtifactManifest)
+	}
 	if replay.ReplayAssertions.ArtifactCount != len(replay.Artifacts) ||
+		replay.ReplayAssertions.FileArtifactManifestCount != replay.FileArtifactManifest.Count ||
+		replay.ReplayAssertions.ImageArtifactManifestCount != replay.ImageArtifactManifest.Count ||
 		replay.ReplayAssertions.DisplayCount != len(replay.Displays) ||
 		replay.ReplayAssertions.ExitCode != command.Result.ExitCode ||
-		replay.ReplayAssertions.LiveNotebook {
+		replay.ReplayAssertions.LiveNotebook ||
+		replay.ReplayAssertions.Executed {
 		t.Fatalf("replay assertions = %#v", replay.ReplayAssertions)
+	}
+	if replay.CleanupPolicy.Mode != "fixture_noop" ||
+		!replay.CleanupPolicy.DeleteUnapprovedOutputs ||
+		!replay.CleanupPolicy.PreserveFixtureArtifacts ||
+		replay.CleanupPolicy.CleanupReplayKey != "cleanup:coding-notebook:fixture-noop" ||
+		len(replay.CleanupPolicy.Paths) != 2 ||
+		replay.CleanupPolicy.Executed {
+		t.Fatalf("replay cleanup policy = %#v", replay.CleanupPolicy)
 	}
 }
 
@@ -405,6 +541,42 @@ func assertCodingNotebookJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeCodingNotebookJSONFile(t, path, &value)
+}
+
+func assertCodingNotebookCaptureChannels(t *testing.T, captures []struct {
+	Channel   string `json:"channel"`
+	Text      string `json:"text"`
+	Bytes     int    `json:"bytes"`
+	Truncated bool   `json:"truncated"`
+}, stdout, stderr string) {
+	t.Helper()
+	if len(captures) != 2 {
+		t.Fatalf("capture channel count = %d, want 2", len(captures))
+	}
+	byChannel := map[string]struct {
+		Text      string
+		Bytes     int
+		Truncated bool
+	}{}
+	for _, capture := range captures {
+		if capture.Channel != "stdout" && capture.Channel != "stderr" {
+			t.Fatalf("unexpected capture channel: %#v", capture)
+		}
+		byChannel[capture.Channel] = struct {
+			Text      string
+			Bytes     int
+			Truncated bool
+		}{Text: capture.Text, Bytes: capture.Bytes, Truncated: capture.Truncated}
+	}
+	if byChannel["stdout"].Text != stdout || byChannel["stderr"].Text != stderr {
+		t.Fatalf("capture text mismatch: captures=%#v stdout=%q stderr=%q", captures, stdout, stderr)
+	}
+	if byChannel["stdout"].Bytes != len(stdout) || byChannel["stderr"].Bytes != len(stderr) {
+		t.Fatalf("capture byte count mismatch: captures=%#v", captures)
+	}
+	if byChannel["stdout"].Truncated || byChannel["stderr"].Truncated {
+		t.Fatalf("captures must not be truncated: %#v", captures)
+	}
 }
 
 func decodeCodingNotebookJSONFile(t *testing.T, path string, out any) {

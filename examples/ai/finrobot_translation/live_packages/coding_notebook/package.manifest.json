@@ -49,6 +49,18 @@
     "denied_command": "fixtures/denied_command_fixture.json",
     "deterministic_replay": "fixtures/deterministic_replay_fixture.json"
   },
+  "artifact_manifests": {
+    "file": "fixtures/deterministic_replay_fixture.json#/file_artifact_manifest",
+    "image": "fixtures/deterministic_replay_fixture.json#/image_artifact_manifest"
+  },
+  "cleanup_policy": {
+    "mode": "fixture_noop",
+    "delete_unapproved_outputs": true,
+    "preserve_fixture_artifacts": true,
+    "cleanup_replay_key": "cleanup:coding-notebook:fixture-noop",
+    "paths": ["artifacts/strategy.py", "artifacts/allocation.png"],
+    "reason": "Provider-free replay records cleanup intent without touching the host filesystem."
+  },
   "capabilities": [
     "coding.notebook.file.read",
     "coding.notebook.file.write",
@@ -104,7 +116,12 @@
     "sandbox command execution, file writes, and notebook kernels deny by default unless an approval fixture grants the exact capability",
     "file and image artifact contracts require artifact_id, path, media_type, sha256, bytes, provenance, and replay_key",
     "denied command fixture captures command, reason, stdout, stderr, exit_code, and approval decision",
+    "denied command envelopes record cwd, argv, env allowlist, shell disabled, timeout bucket, and executed=false",
+    "stdout and stderr captures are explicit channel records and are compared during replay",
+    "file artifact manifest separates generated file outputs from image display outputs",
+    "image artifact manifest pins dimensions, notebook cell id, media type, and artifact hash",
     "deterministic replay fixture pins stdout, stderr, duration bucket, artifact hashes, and display-image metadata",
+    "cleanup policy is fixture_noop, preserves checked-in fixture metadata, and records host paths that would be cleaned by a real package",
     "capability metadata declares file, command, stdout, stderr, image display, artifact publish, and replay boundaries"
   ],
   "no_built_in_guarantee": {

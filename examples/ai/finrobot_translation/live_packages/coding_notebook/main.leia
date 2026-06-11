@@ -50,11 +50,26 @@ coding_notebook_live_package := {
         replay_key: "command:deny:notebook-kernel"
         capability: "coding.notebook.command.execute"
         command: "python -m ipykernel_launcher -f /tmp/live-kernel.json"
+        command_envelope: {
+            argv: {"python", "-m", "ipykernel_launcher", "-f", "/tmp/live-kernel.json"}
+            cwd: "examples/ai/finrobot_translation"
+            env_allowlist: {}
+            shell: false
+            timeout_bucket: "denied"
+            network: false
+            filesystem_write: false
+            executed: false
+        }
         approval_decision: "deny"
         approval_reason: "notebook kernel execution is disabled in replay mode"
         exit_code: 126
         stdout: ""
         stderr: "denied: notebook kernel execution is disabled in replay mode"
+        captures: {
+            {channel: "stdout" text: "" bytes: 0 truncated: false},
+            {channel: "stderr" text: "denied: notebook kernel execution is disabled in replay mode" bytes: 60 truncated: false},
+        }
+        executed: false
         deterministic: true
     }
     deterministic_replay: {
@@ -63,7 +78,11 @@ coding_notebook_live_package := {
         command_stdout: "signals: PDD=0.18 BABA=0.11"
         command_stderr: ""
         command_exit_code: 0
+        command_duration_bucket: "short"
+        command_executed: false
         artifact_count: 3
+        file_artifact_manifest_count: 2
+        image_artifact_manifest_count: 1
         display_count: 1
         live_notebook: false
     }
@@ -101,6 +120,33 @@ coding_notebook_live_package := {
             operation: "display_image"
         },
     }
+    file_artifact_manifest: {
+        manifest_id: "manifest:file:strategy-fixtures"
+        replay_key: "manifest:file:strategy-fixtures"
+        kind: "file"
+        artifact_ids: {"artifact_strategy_ipynb", "artifact_strategy_py"}
+        count: 2
+        total_bytes: 2560
+        sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+    image_artifact_manifest: {
+        manifest_id: "manifest:image:allocation-fixtures"
+        replay_key: "manifest:image:allocation-fixtures"
+        kind: "image"
+        artifact_ids: {"artifact_allocation_png"}
+        count: 1
+        total_bytes: 4096
+        sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        displays: {"display_allocation_chart"}
+    }
+    cleanup_policy: {
+        mode: "fixture_noop"
+        delete_unapproved_outputs: true
+        preserve_fixture_artifacts: true
+        cleanup_replay_key: "cleanup:coding-notebook:fixture-noop"
+        paths: {"artifacts/strategy.py", "artifacts/allocation.png"}
+        executed: false
+    }
     capability_metadata: {
         {id: "file_read" capability: "coding.notebook.file.read" default: "fixture" schema: "file_image_artifact" approval_required: false},
         {id: "file_write" capability: "coding.notebook.file.write" default: "deny_without_approval" schema: "file_image_artifact" approval_required: true},
@@ -132,6 +178,10 @@ func coding_notebook_denied_command_ok(command) {
         command.exit_code == 126 &&
         command.stdout == "" &&
         command.stderr == "denied: notebook kernel execution is disabled in replay mode" &&
+        command.command_envelope.executed == false &&
+        command.command_envelope.shell == false &&
+        command.executed == false &&
+        #command.captures == 2 &&
         command.deterministic == true
 }
 
@@ -143,9 +193,24 @@ func coding_notebook_replay_ok(replay) {
         replay.command_stdout == "signals: PDD=0.18 BABA=0.11" &&
         replay.command_stderr == "" &&
         replay.command_exit_code == 0 &&
+        replay.command_duration_bucket == "short" &&
+        replay.command_executed == false &&
         replay.artifact_count == 3 &&
+        replay.file_artifact_manifest_count == 2 &&
+        replay.image_artifact_manifest_count == 1 &&
         replay.display_count == 1 &&
         replay.live_notebook == false
+}
+
+func coding_notebook_cleanup_ok(policy) {
+    if policy == nil {
+        return false
+    }
+    return policy.mode == "fixture_noop" &&
+        policy.delete_unapproved_outputs == true &&
+        policy.preserve_fixture_artifacts == true &&
+        policy.cleanup_replay_key == "cleanup:coding-notebook:fixture-noop" &&
+        policy.executed == false
 }
 
 func coding_notebook_artifact_ok(artifact) {
@@ -178,6 +243,9 @@ assert(coding_notebook_replay_ok(coding_notebook_live_package.deterministic_repl
 assert(#coding_notebook_live_package.sandbox_approvals == 3)
 assert(#coding_notebook_live_package.artifact_contract.required_fields == 7)
 assert(#coding_notebook_live_package.file_image_artifacts == 3)
+assert(coding_notebook_live_package.file_artifact_manifest.count == 2)
+assert(coding_notebook_live_package.image_artifact_manifest.count == 1)
+assert(coding_notebook_cleanup_ok(coding_notebook_live_package.cleanup_policy))
 assert(#coding_notebook_live_package.capability_metadata == 5)
 
 coding_notebook_artifact_count := 0
@@ -195,12 +263,16 @@ for i := 1; i <= #coding_notebook_live_package.capability_metadata; i++ {
 }
 
 coding_notebook_live_package_summary := string.format(
-"coding_notebook_live_package approvals=%d denied=%s stdout=%s stderr=%s replay=%s artifacts=%d displays=%d capabilities=%d provider_free=%s live_network=%s imports=%s",
+"coding_notebook_live_package approvals=%d denied=%s stdout=%s stderr=%s replay=%s executed=%s file_manifest=%d image_manifest=%d cleanup=%s artifacts=%d displays=%d capabilities=%d provider_free=%s live_network=%s imports=%s",
 #coding_notebook_live_package.sandbox_approvals,
 coding_notebook_live_package.denied_command.approval_decision,
 coding_notebook_live_package.deterministic_replay.command_stdout,
 coding_notebook_live_package.denied_command.stderr,
 coding_notebook_live_package.deterministic_replay.replay_seed,
+tostring(coding_notebook_live_package.deterministic_replay.command_executed),
+coding_notebook_live_package.file_artifact_manifest.count,
+coding_notebook_live_package.image_artifact_manifest.count,
+coding_notebook_live_package.cleanup_policy.mode,
 coding_notebook_artifact_count,
 coding_notebook_live_package.deterministic_replay.display_count,
 coding_notebook_capability_count,

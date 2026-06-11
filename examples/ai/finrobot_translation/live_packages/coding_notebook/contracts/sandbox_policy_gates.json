@@ -34,6 +34,15 @@
     "stderr_required": true,
     "exit_code_required": true,
     "approval_decision_required": true,
-    "denied_commands_must_have_reason": true
+    "denied_commands_must_have_reason": true,
+    "command_envelope_required": true,
+    "executed_flag_required": true,
+    "stdout_stderr_channel_records_required": true
+  },
+  "cleanup_policy": {
+    "mode": "fixture_noop",
+    "delete_unapproved_outputs": true,
+    "preserve_fixture_artifacts": true,
+    "cleanup_replay_key": "cleanup:coding-notebook:fixture-noop"
   }
 }

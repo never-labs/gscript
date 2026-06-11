@@ -37,6 +37,28 @@
         "approval_decision": "deny",
         "stdout_stderr_captured": true
       }
+    },
+    {
+      "fixture_key": "coding:notebook:file-artifact-manifest:strategy",
+      "capability": "coding.notebook.artifact.publish",
+      "path": "fixtures/deterministic_replay_fixture.json#/file_artifact_manifest",
+      "schema": "schemas/file_image_artifact.schema.json",
+      "metadata": {
+        "operation": "publish_file_manifest",
+        "artifact_kind": "file",
+        "deterministic": true
+      }
+    },
+    {
+      "fixture_key": "coding:notebook:image-artifact-manifest:allocation",
+      "capability": "coding.notebook.artifact.publish",
+      "path": "fixtures/deterministic_replay_fixture.json#/image_artifact_manifest",
+      "schema": "schemas/file_image_artifact.schema.json",
+      "metadata": {
+        "operation": "publish_image_manifest",
+        "artifact_kind": "image",
+        "deterministic": true
+      }
     }
   ]
 }

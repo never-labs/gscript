@@ -29,7 +29,7 @@
       "approval": "required",
       "input_schema": "sandbox_command",
       "output_schema": "sandbox_command",
-      "captures": ["command", "exit_code", "stdout", "stderr", "duration_ms", "approval_decision"]
+      "captures": ["command", "command_envelope", "exit_code", "stdout", "stderr", "duration_ms", "approval_decision", "executed"]
     },
     {
       "id": "display_image",
@@ -49,7 +49,19 @@
   "deterministic_replay": {
     "fixture": "fixtures/deterministic_replay_fixture.json",
     "sort_keys": ["replay_key", "artifact_id"],
-    "pinned_fields": ["stdout", "stderr", "exit_code", "sha256", "media_type"]
+    "pinned_fields": ["stdout", "stderr", "exit_code", "sha256", "media_type", "duration_bucket", "executed"],
+    "comparison": {
+      "mode": "fixture_snapshot",
+      "command_key": "command:execute:factor-signal-fixture",
+      "artifact_manifest_key": "manifest:file:strategy-fixtures",
+      "image_manifest_key": "manifest:image:allocation-fixtures"
+    }
+  },
+  "cleanup_policy": {
+    "mode": "fixture_noop",
+    "delete_unapproved_outputs": true,
+    "preserve_fixture_artifacts": true,
+    "cleanup_replay_key": "cleanup:coding-notebook:fixture-noop"
   },
   "acceptance_gates": [
     "coding.py operations stay fixture-backed in this skeleton",

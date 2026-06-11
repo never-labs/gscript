@@ -8,6 +8,16 @@
   "operation": "execute_command",
   "capability": "coding.notebook.command.execute",
   "command": "python -m ipykernel_launcher -f /tmp/live-kernel.json",
+  "command_envelope": {
+    "argv": ["python", "-m", "ipykernel_launcher", "-f", "/tmp/live-kernel.json"],
+    "cwd": "examples/ai/finrobot_translation",
+    "env_allowlist": [],
+    "shell": false,
+    "timeout_bucket": "short",
+    "network": false,
+    "filesystem_write": false,
+    "executed": false
+  },
   "cwd": "examples/ai/finrobot_translation",
   "approval": {
     "approval_id": "approval-deny-live-notebook-kernel",
@@ -19,8 +29,24 @@
     "exit_code": 126,
     "stdout": "",
     "stderr": "denied: notebook kernel execution is disabled in replay mode",
-    "duration_ms": 0
+    "duration_ms": 0,
+    "duration_bucket": "denied"
   },
+  "captures": [
+    {
+      "channel": "stdout",
+      "text": "",
+      "bytes": 0,
+      "truncated": false
+    },
+    {
+      "channel": "stderr",
+      "text": "denied: notebook kernel execution is disabled in replay mode",
+      "bytes": 60,
+      "truncated": false
+    }
+  ],
   "artifact_refs": [],
+  "executed": false,
   "deterministic": true
 }
