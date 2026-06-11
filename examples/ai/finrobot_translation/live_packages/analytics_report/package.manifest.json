@@ -24,6 +24,10 @@
     "analytics.valuation.target_price",
     "analytics.sensitivity.matrix",
     "artifact.chart.spec",
+    "artifact.snapshot.metadata",
+    "artifact.accessibility.checklist",
+    "artifact.stale_data.policy",
+    "artifact.source_annotation.requirements",
     "artifact.report.manifest",
     "renderer.html.contract",
     "renderer.pdf.contract"
@@ -37,6 +41,10 @@
     "valuation": "schemas.valuation_result",
     "sensitivity": "schemas.sensitivity_matrix",
     "chart_artifact": "schemas.chart_artifact",
+    "snapshot_metadata": "schemas.snapshot_metadata",
+    "accessibility_checklist": "schemas.accessibility_checklist",
+    "stale_data_policy": "schemas.stale_data_policy",
+    "source_annotation_requirements": "schemas.source_annotation_requirements",
     "report_artifact": "schemas.report_artifact",
     "renderer": "schemas.renderer_contract"
   },
@@ -66,6 +74,37 @@
       "text/html",
       "application/pdf"
     ],
+    "snapshot_formats": [
+      "text/html",
+      "application/pdf",
+      "image/png"
+    ],
+    "snapshot_statuses": [
+      "specified_not_rendered",
+      "planned_not_rendered",
+      "captured_by_external_package"
+    ],
+    "accessibility_standards": [
+      "WCAG 2.2 AA contract checklist"
+    ],
+    "stale_data_warning_policy": {
+      "warning_required_when_source_stale": true,
+      "warning_marker": "stale_data_warning",
+      "stale_source_refs_must_be_named": true,
+      "snapshots_must_carry_warning_refs": true
+    },
+    "source_annotation_requirements": [
+      "id",
+      "title",
+      "kind",
+      "locator",
+      "as_of",
+      "stale_after",
+      "stale",
+      "license",
+      "retrieved_at",
+      "evidence_hash"
+    ],
     "render_statuses": [
       "specified_not_rendered",
       "planned_not_rendered",
@@ -76,6 +115,9 @@
       "stale_data_warnings",
       "ai_disclosure",
       "renderer_contract",
+      "snapshot_metadata",
+      "accessibility_checklist",
+      "source_annotation_requirements",
       "provider_free"
     ]
   },

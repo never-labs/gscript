@@ -25,6 +25,10 @@ package_manifest := {
         "analytics.valuation.target_price",
         "analytics.sensitivity.matrix",
         "artifact.chart.spec",
+        "artifact.snapshot.metadata",
+        "artifact.accessibility.checklist",
+        "artifact.stale_data.policy",
+        "artifact.source_annotation.requirements",
         "artifact.report.manifest",
         "renderer.html.contract",
         "renderer.pdf.contract",
@@ -243,6 +247,45 @@ source_annotations := {
     },
 }
 
+source_annotation_requirements := {
+    required_fields: {"id", "title", "kind", "locator", "as_of", "stale_after", "stale", "license", "retrieved_at", "evidence_hash"},
+    all_report_source_refs_must_resolve: true,
+    all_snapshot_source_refs_must_resolve: true,
+}
+
+func source_annotation_by_id(id) {
+    for i := 1; i <= #source_annotations; i++ {
+        if source_annotations[i].id == id {
+            return source_annotations[i]
+        }
+    }
+    return nil
+}
+
+func source_ref_resolves(id) {
+    return source_annotation_by_id(id) != nil
+}
+
+func validate_source_annotation_requirements(source) {
+    for i := 1; i <= #source_annotation_requirements.required_fields; i++ {
+        field := source_annotation_requirements.required_fields[i]
+        if source[field] == nil {
+            return false, field
+        }
+    }
+    return true, nil
+}
+
+source_requirements_ok := true
+source_requirements_error := nil
+for i := 1; i <= #source_annotations; i++ {
+    source_req_ok, source_req_error := validate_source_annotation_requirements(source_annotations[i])
+    if !source_req_ok {
+        source_requirements_ok = false
+        source_requirements_error = source_req_error
+    }
+}
+
 chart_specs := {
     {
         id: "chart_target_price",
@@ -309,7 +352,10 @@ html_renderer_contract := {
     input_schema: "artifact_manifest",
     output_artifact: "artifact_html_report",
     network_required: false,
-    external_dependency_required: true,
+    external_dependency_required: false,
+    snapshot_metadata_schema: "schemas.snapshot_metadata",
+    accessibility_checklist_schema: "schemas.accessibility_checklist",
+    stale_data_policy: "schemas.stale_data_policy",
     status: "planned_not_rendered",
 }
 
@@ -319,9 +365,191 @@ pdf_renderer_contract := {
     input_schema: "artifact_manifest",
     output_artifact: "artifact_pdf_report",
     network_required: false,
-    external_dependency_required: true,
+    external_dependency_required: false,
+    snapshot_metadata_schema: "schemas.snapshot_metadata",
+    accessibility_checklist_schema: "schemas.accessibility_checklist",
+    stale_data_policy: "schemas.stale_data_policy",
     status: "planned_not_rendered",
 }
+
+stale_data_policy := {
+    policy_id: "analytics_report_stale_data_policy_v1",
+    generated_at: "2026-06-11T00:00:00Z",
+    freshness_basis: "source_annotations.stale_after",
+    warning_required_when_source_stale: true,
+    warning_marker: "stale_data_warning",
+    warning_scope: "report_manifest_and_snapshots",
+    snapshot_warning_refs_required: true,
+}
+
+stale_data_warnings := {
+    {
+        id: "warning_price_fixture_stale",
+        marker: stale_data_policy.warning_marker,
+        source_id: normalized_rows[1].source_id,
+        message: "price fixture is stale after 2026-06-30",
+    },
+}
+
+accessibility_checklist := {
+    {
+        id: "a11y_html_report",
+        target_artifact_id: "artifact_html_report",
+        standard: "WCAG 2.2 AA contract checklist",
+        status: "specified_not_rendered",
+        checked_at: "2026-06-11T00:00:00Z",
+        provider_free: true,
+        items: {
+            {id: "document_title", requirement: "HTML snapshot declares a non-empty title.", required: true, status: "specified_not_rendered"},
+            {id: "heading_order", requirement: "HTML snapshot preserves report section heading order.", required: true, status: "specified_not_rendered"},
+            {id: "chart_alt_text", requirement: "Chart snapshots referenced from HTML include alt text or text equivalent.", required: true, status: "specified_not_rendered"},
+        },
+    },
+    {
+        id: "a11y_pdf_report",
+        target_artifact_id: "artifact_pdf_report",
+        standard: "WCAG 2.2 AA contract checklist",
+        status: "specified_not_rendered",
+        checked_at: "2026-06-11T00:00:00Z",
+        provider_free: true,
+        items: {
+            {id: "tagged_structure", requirement: "PDF snapshot declares tagged reading order requirements.", required: true, status: "specified_not_rendered"},
+            {id: "chart_descriptions", requirement: "PDF chart snapshots include text descriptions.", required: true, status: "specified_not_rendered"},
+        },
+    },
+    {
+        id: "a11y_chart_target_price",
+        target_artifact_id: "artifact_chart_target_price",
+        standard: "WCAG 2.2 AA contract checklist",
+        status: "specified_not_rendered",
+        checked_at: "2026-06-11T00:00:00Z",
+        provider_free: true,
+        items: {
+            {id: "chart_title", requirement: "Chart snapshot title matches chart spec title.", required: true, status: "specified_not_rendered"},
+            {id: "text_equivalent", requirement: "Chart snapshot has a text equivalent for method and price values.", required: true, status: "specified_not_rendered"},
+        },
+    },
+    {
+        id: "a11y_chart_sensitivity",
+        target_artifact_id: "artifact_chart_sensitivity",
+        standard: "WCAG 2.2 AA contract checklist",
+        status: "specified_not_rendered",
+        checked_at: "2026-06-11T00:00:00Z",
+        provider_free: true,
+        items: {
+            {id: "axis_labels", requirement: "Chart snapshot carries discount-rate and terminal-growth labels.", required: true, status: "specified_not_rendered"},
+            {id: "table_equivalent", requirement: "Heatmap snapshot has a table equivalent.", required: true, status: "specified_not_rendered"},
+        },
+    },
+}
+
+snapshot_metadata := {
+    {
+        id: "snapshot_html_report",
+        artifact_id: "artifact_html_report",
+        media_type: "text/html",
+        snapshot_kind: "html_dom_snapshot",
+        renderer_contract_id: html_renderer_contract.id,
+        status: "planned_not_rendered",
+        created_at: "2026-06-11T00:00:00Z",
+        dimensions: {unit: "css_px", width: 1440, height: 1800},
+        checksum: "sha256:planned-html-snapshot",
+        accessibility_refs: {"a11y_html_report"},
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+        warning_refs: {"warning_price_fixture_stale"},
+        renderer_dependency_required: false,
+    },
+    {
+        id: "snapshot_pdf_report",
+        artifact_id: "artifact_pdf_report",
+        media_type: "application/pdf",
+        snapshot_kind: "pdf_page_snapshot",
+        renderer_contract_id: pdf_renderer_contract.id,
+        status: "planned_not_rendered",
+        created_at: "2026-06-11T00:00:00Z",
+        dimensions: {unit: "pt", width: 612, height: 792},
+        checksum: "sha256:planned-pdf-snapshot",
+        accessibility_refs: {"a11y_pdf_report"},
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+        warning_refs: {"warning_price_fixture_stale"},
+        renderer_dependency_required: false,
+    },
+    {
+        id: "snapshot_chart_target_price",
+        artifact_id: "artifact_chart_target_price",
+        media_type: "image/png",
+        snapshot_kind: "chart_image_snapshot",
+        renderer_contract_id: "external_chart_renderer_contract",
+        status: "specified_not_rendered",
+        created_at: "2026-06-11T00:00:00Z",
+        dimensions: {unit: "px", width: 1200, height: 720},
+        checksum: "sha256:planned-target-price-chart",
+        accessibility_refs: {"a11y_chart_target_price"},
+        source_refs: {normalized_rows[1].source_id, normalized_rows[2].source_id},
+        warning_refs: {"warning_price_fixture_stale"},
+        renderer_dependency_required: false,
+    },
+    {
+        id: "snapshot_chart_sensitivity",
+        artifact_id: "artifact_chart_sensitivity",
+        media_type: "image/png",
+        snapshot_kind: "chart_image_snapshot",
+        renderer_contract_id: "external_chart_renderer_contract",
+        status: "specified_not_rendered",
+        created_at: "2026-06-11T00:00:00Z",
+        dimensions: {unit: "px", width: 1200, height: 720},
+        checksum: "sha256:planned-sensitivity-chart",
+        accessibility_refs: {"a11y_chart_sensitivity"},
+        source_refs: {normalized_rows[2].source_id},
+        warning_refs: {},
+        renderer_dependency_required: false,
+    },
+}
+
+func validate_accessibility_checklist(checklist) {
+    if checklist.provider_free != true || #checklist.items == 0 {
+        return false
+    }
+    for i := 1; i <= #checklist.items; i++ {
+        if checklist.items[i].required != true || checklist.items[i].status != "specified_not_rendered" {
+            return false
+        }
+    }
+    return true
+}
+
+func validate_snapshot_metadata(snapshot) {
+    if snapshot.renderer_dependency_required != false {
+        return false
+    }
+    for i := 1; i <= #snapshot.source_refs; i++ {
+        if !source_ref_resolves(snapshot.source_refs[i]) {
+            return false
+        }
+    }
+    for i := 1; i <= #snapshot.warning_refs; i++ {
+        if snapshot.warning_refs[i] != stale_data_warnings[1].id {
+            return false
+        }
+    }
+    return true
+}
+
+snapshot_ok := true
+for i := 1; i <= #snapshot_metadata; i++ {
+    if !validate_snapshot_metadata(snapshot_metadata[i]) {
+        snapshot_ok = false
+    }
+}
+
+accessibility_ok := true
+for i := 1; i <= #accessibility_checklist; i++ {
+    if !validate_accessibility_checklist(accessibility_checklist[i]) {
+        accessibility_ok = false
+    }
+}
+
+stale_policy_ok := stale_data_policy.warning_required_when_source_stale == true && stale_data_policy.warning_marker == "stale_data_warning" && #stale_data_warnings == 1 && stale_data_warnings[1].source_id == normalized_rows[1].source_id
 
 artifact_manifest := {
     contract: artifact_contract.version,
@@ -335,8 +563,12 @@ artifact_manifest := {
         chart_specs[1].artifact,
         chart_specs[2].artifact,
     },
+    snapshot_metadata: snapshot_metadata,
+    accessibility_checklist: accessibility_checklist,
+    stale_data_policy: stale_data_policy,
+    source_annotation_requirements: source_annotation_requirements,
     source_annotations: source_annotations,
-    warnings: {"stale_data_warning: price fixture is stale after 2026-06-30"},
+    warnings: {"stale_data_warning: fixture.price.acme.2026q1 price fixture is stale after 2026-06-30"},
     ai_disclosure: "AI_DISCLOSURE: AI-assisted, fixture-backed, and not investment advice.",
 }
 
@@ -353,11 +585,15 @@ check("valuation", #valuation_results == 3 && near(dcf_price, 50.0826, 0.0001) &
 check("upside", near(upside, 0.128992, 0.0001))
 check("sensitivity", #sensitivity_result.cells == 9 && near(sensitivity_result.base_case, dcf_price, 0.0001) && best_case.price > worst_case.price)
 check("artifact contract", section_ok == true && chart_ok == true && source_ok == true && manifest_ok == true)
-check("renderer contracts", renderer_contracts[1].format == "text/html" && renderer_contracts[2].format == "application/pdf" && renderer_contracts[1].network_required == false && renderer_contracts[2].network_required == false)
+check("renderer contracts", renderer_contracts[1].format == "text/html" && renderer_contracts[2].format == "application/pdf" && renderer_contracts[1].network_required == false && renderer_contracts[2].network_required == false && renderer_contracts[1].external_dependency_required == false && renderer_contracts[2].external_dependency_required == false)
 check("planned artifacts", artifact_manifest.artifacts[1].status == "planned_not_rendered" && artifact_manifest.artifacts[2].status == "planned_not_rendered")
+check("snapshot metadata", snapshot_ok == true && #snapshot_metadata == 4 && snapshot_metadata[1].media_type == "text/html" && snapshot_metadata[2].media_type == "application/pdf" && snapshot_metadata[3].media_type == "image/png")
+check("accessibility checklist", accessibility_ok == true && #accessibility_checklist == 4)
+check("stale data policy", stale_policy_ok == true && #artifact_manifest.warnings == 1)
+check("source annotation requirements", source_requirements_ok == true && source_requirements_error == nil)
 
 analytics_report_live_package_summary := string.format(
-    "analytics_report_live_package provider_free=%s normalizers=%d valuations=%d sensitivity=%dx%d charts=%d artifacts=%d html=%s pdf=%s",
+    "analytics_report_live_package provider_free=%s normalizers=%d valuations=%d sensitivity=%dx%d charts=%d artifacts=%d snapshots=%d a11y=%d warnings=%d html=%s pdf=%s",
     tostring(package_manifest.provider_free),
     #normalized_rows,
     #valuation_results,
@@ -365,6 +601,9 @@ analytics_report_live_package_summary := string.format(
     #growth_cases,
     #chart_specs,
     #artifact_manifest.artifacts,
+    #snapshot_metadata,
+    #accessibility_checklist,
+    #artifact_manifest.warnings,
     renderer_contracts[1].format,
     renderer_contracts[2].format
 )
