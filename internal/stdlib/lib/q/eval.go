@@ -1201,7 +1201,11 @@ func (s *EvalState) evalQScriptExecutablePlan(plan *qScriptExecutablePlan) (any,
 		out, err := s.evalCachedOrString(stmt.src, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
 		return out, true, err
 	case qScriptExecutablePipelineBackend:
-		return s.ExecuteEvalPipelineExecutablePlanRef(&plan.pipeline)
+		out, handled, err := s.ExecuteEvalPipelineExecutablePlanRef(&plan.pipeline)
+		if handled && err == nil {
+			recordQEvalDispatch("<script pipeline backend>", EvalDispatchPipelineBackend)
+		}
+		return out, handled, err
 	default:
 		return nil, false, nil
 	}
@@ -1565,6 +1569,9 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		if handled {
+			recordQEvalDispatch(target, EvalDispatchDeferredScan)
+		}
 	}
 	if !handled && stmt.assign != "" {
 		if !stmt.compareIndexChecked {
@@ -1576,10 +1583,16 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 			if err != nil {
 				return nil, err
 			}
+			if handled {
+				recordQEvalDispatch(target, EvalDispatchCompareIndexPlan)
+			}
 		}
 	}
 	if !handled && stmt.assign != "" && s.assignPool.active {
 		v, handled = s.tryEvalAssignPoolFillsFill(stmt, s.resolveAssignmentName(stmt.assign))
+		if handled {
+			recordQEvalDispatch(target, EvalDispatchAssignPool)
+		}
 	}
 	if !handled {
 		v, err = s.evalCachedOrString(target, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
@@ -1951,6 +1964,7 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 		switch fastPlan.constState {
 		case qEvalConstValue:
 			if value, ok := s.constValueCache[src]; ok {
+				recordQEvalDispatch(src, EvalDispatchConstMemo)
 				return value, nil
 			}
 		case qEvalConstUnknown:
@@ -1979,6 +1993,7 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 func (s *EvalState) evalCachedOrStringUncached(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
 	if fastPlan == nil || fastPlan.applyIndexState != qEvalSyntaxNo {
 		if out, handled, err := s.evalApplyIndexForm(src); err != nil || handled {
+			recordQEvalDispatch(src, EvalDispatchApplyIndexString)
 			return out, err
 		}
 	}
@@ -1988,29 +2003,53 @@ func (s *EvalState) evalCachedOrStringUncached(src string, expr Expr, bindingPla
 			return nil, err
 		}
 		if handled {
+			recordQEvalDispatch(src, EvalDispatchBindingPlan)
 			return value, nil
 		}
 	}
 	if out, handled, err := s.evalQFastPlan(fastPlan); err != nil || handled {
+		recordQEvalDispatch(src, EvalDispatchFastPlan)
 		return out, err
 	}
 	if plan := s.qPipelinePlanRef(src); plan.kind != qPipelineInvalid {
 		if out, handled, err := s.evalQPipelinePlan(plan); err != nil || handled {
+			recordQEvalDispatch(src, EvalDispatchPipelinePlan)
 			return out, err
 		}
 	}
 	if out, handled, err := s.tryEvalWhereCompareCountSum(src); err != nil || handled {
+		recordQEvalDispatch(src, EvalDispatchWhereCompareSum)
 		return out, err
 	}
 	if out, handled, err := s.tryEvalScalarAddChain(src); err != nil || handled {
+		recordQEvalDispatch(src, EvalDispatchScalarAddChain)
 		return out, err
 	}
 	if expr != nil {
 		value, err := s.evalValueExpr(expr)
 		if err == nil {
+			recordQEvalDispatch(src, EvalDispatchValueExpr)
 			return value, nil
 		}
 	}
+	// Statement compilation: the default warm path for statements no plan
+	// claimed. The compiled tree mirrors the string evaluator's dispatch
+	// (same split order, same verb functions), so compiled evaluation is
+	// value- and error-identical; only unsupported-expression errors (for
+	// example unbound names that the string cascade resolves further) fall
+	// back to the string evaluator.
+	if compiled := compiledQStatementExprCached(src); compiled != nil {
+		value, err := s.evalValueExpr(compiled)
+		if err == nil {
+			recordQEvalDispatch(src, EvalDispatchCompiledExpr)
+			return value, nil
+		}
+		if !isUnsupportedEvalValueExpr(err) {
+			recordQEvalDispatch(src, EvalDispatchCompiledExpr)
+			return nil, err
+		}
+	}
+	recordQEvalDispatch(src, EvalDispatchStringEval)
 	return s.eval(src)
 }
 
@@ -3314,13 +3353,77 @@ func (s *EvalState) evalValueExpr(expr Expr) (any, error) {
 		if value, ok := s.lookupName(x.Name); ok {
 			return value, nil
 		}
-		if fn, ok := lookupUnaryVerb(x.Name); ok {
-			return qUnaryFunction{name: x.Name, fn: fn}, nil
-		}
+		// Dyadic before unary mirrors the string evaluator's bare-verb
+		// resolution order for names that are both (min, max, wsum, where).
 		if fn, ok := lookupDyadicVerbFunc(x.Name); ok {
 			return qDyadicFunction{name: x.Name, fn: fn}, nil
 		}
+		if fn, ok := lookupUnaryVerb(x.Name); ok {
+			return qUnaryFunction{name: x.Name, fn: fn}, nil
+		}
 		return nil, unsupportedEvalValueExpr{expr: expr}
+	case Const:
+		return x.Value, nil
+	case ListExpr:
+		values := make([]any, len(x.Items))
+		for i, item := range x.Items {
+			value, err := s.evalValueExpr(item)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = value
+		}
+		if x.Bare {
+			return data.NewAny(values), nil
+		}
+		return inferQArray(values), nil
+	case CastExpr:
+		var domain any
+		if x.Domain == nil {
+			domain = qSymbolCastTarget()
+		} else {
+			value, err := s.evalValueExpr(x.Domain)
+			if err == nil {
+				domain = value
+			} else if x.BareSym != "" {
+				domain = x.BareSym
+			} else {
+				return nil, err
+			}
+		}
+		values, err := s.evalValueExpr(x.Value)
+		if err != nil {
+			return nil, err
+		}
+		return castOrEnum(domain, values)
+	case DyadicWordExpr:
+		ops := qDyadicWordOps
+		if x.Set {
+			ops = qSetWordOps
+		}
+		op, ok := ops[x.Word]
+		if !ok {
+			return nil, unsupportedEvalValueExpr{expr: expr}
+		}
+		left, err := s.evalValueExpr(x.Left)
+		if err != nil {
+			return nil, err
+		}
+		right, err := s.evalValueExpr(x.Right)
+		if err != nil {
+			return nil, err
+		}
+		return op.fn(left, right)
+	case NameVectorExpr:
+		values := make([]any, len(x.Names))
+		for i, name := range x.Names {
+			value, ok := s.lookupName(name)
+			if !ok {
+				return nil, unsupportedEvalValueExpr{expr: expr}
+			}
+			values[i] = value
+		}
+		return evalValueVector(values)
 	case Vector:
 		values := make([]any, len(x.Items))
 		for i, item := range x.Items {
@@ -3395,6 +3498,26 @@ func (s *EvalState) evalValueCall(expr Call) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// til/enlist/flip mirror the string evaluator's dedicated prefix
+	// branches; they are not unary-verb registry entries.
+	switch expr.Func {
+	case "til":
+		n, ok := arg.(int64)
+		if !ok {
+			return nil, fmt.Errorf("til expects an integer")
+		}
+		if n < 0 {
+			return nil, fmt.Errorf("til expects a non-negative integer")
+		}
+		if int64(int(n)) != n {
+			return nil, fmt.Errorf("til count is too large")
+		}
+		return data.NewI64Range(0, 1, int(n)), nil
+	case "enlist":
+		return data.NewAny([]any{arg}), nil
+	case "flip":
+		return flip(arg)
+	}
 	if fn, ok := lookupUnaryVerb(expr.Func); ok {
 		return fn(arg)
 	}
@@ -3417,6 +3540,10 @@ func evalValueBinary(op string, left, right any) (any, error) {
 		return applyCompositeDyadic(op, left, right)
 	case "~":
 		return matchValue(left, right), nil
+	case "_":
+		return cutOrDrop(left, right)
+	case "?":
+		return findValue(left, right)
 	case "#":
 		if _, ok := left.(data.Array); ok {
 			return reshapeValue(left, right)
