@@ -17,20 +17,20 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
-Current status: `go run ./cmd/leia examples --json` discovers 39 runnable and
+Current status: `go run ./cmd/leia examples --json` discovers 44 runnable and
 checkable FinRobot translation examples under this directory. The checked-in
-live-package skeleton surface has 15 directories:
+live-package skeleton surface has 19 directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
-`live_packages/factor_research`, `live_packages/finance_facade`,
+`live_packages/equity_analysis_pipeline`, `live_packages/factor_research`,
+`live_packages/finance_facade`, `live_packages/finance_normalizers`,
 `live_packages/news_catalyst`, `live_packages/optional_integrations`,
 `live_packages/product_workflow`, `live_packages/prompt_roles`,
-`live_packages/report_renderer`, `live_packages/tutorial_demo_parity`, and
-`live_packages/vendor_adapters`. Fourteen of those skeletons provide registered
-provider-free `.leia` examples; `coding_notebook` is a
-manifest/contracts/schemas/fixtures skeleton covered by dedicated tests and the
-existing generated-code tooling example.
+`live_packages/report_renderer`, `live_packages/retail_sentiment`,
+`live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and
+`live_packages/vendor_adapters`. All 19 skeletons provide registered
+provider-free `.leia` examples.
 
 ## Scope
 
@@ -91,7 +91,7 @@ Gap categories:
 | `finrobot/data_source/sec_utils.py` | SEC client/document package for 10-K metadata, downloads, PDF conversion, and section extraction | Partial | stdlib, external library | P0 | Fixture-backed download, document/RAG skeleton, and section-extraction tests over known 10-K filings |
 | `finrobot/data_source/finnlp_utils.py`, `FinNLP/` | Optional FinNLP adapter package for news/social datasets | Partial | stdlib, external library | P2 | Optional integration skeleton records dataset gates and schema normalization expectations |
 | `finrobot/data_source/reddit_utils.py` | Reddit sentiment/source adapter with explicit capability and terms metadata | Partial | stdlib, external library, product layer | P2 | Recorded fixture and vendor-adapter skeleton validate auth, pagination, post schema, terms metadata, and redaction |
-| `finrobot/data_source/finance_data.py` | Generic finance data facade over provider adapters | Partial | stdlib, external library | P1 | Contract fixtures and finance facade skeleton ensure typed tables, fallback order, cache/retry metadata, provenance, and provider-free errors |
+| `finrobot/data_source/finance_data.py` | Generic finance data facade over provider adapters | Partial | stdlib, external library | P1 | Contract fixtures plus finance facade and normalizer skeletons ensure typed tables, fallback order, cache/retry metadata, provenance, and provider-free errors |
 | `finrobot/data_source/earnings_calls_src/*` | Earnings-call transcript package and RAG corpus builder | Partial | stdlib, external library | P1 | Fixture transcript retrieval, chunking, metadata, and replayable RAG lookup skeleton |
 | `finrobot/data_source/filings_src/*` | SEC filing search/fetch/section parser package | Partial | stdlib, external library | P0 | Document pipeline skeleton validates 10-K search/fetch, section extraction, adapter boundaries, and traceable provider-free errors |
 | `finrobot/data_source/marker_sec_src/*` | PDF-to-markdown and SEC filing conversion tools | Partial | stdlib, external library | P1 | Document pipeline skeleton verifies deterministic markdown chunk expectations, conversion boundaries, and provenance |
@@ -111,14 +111,14 @@ Gap categories:
 | `configs/*`, `OAI_CONFIG_LIST`, `config_api_keys` | Config, model alias, and secret mapping examples | Partial | AI dialect, stdlib, product layer | P0 | Secret-free config fixture checks env lookup, missing-key diagnostics, and trace metadata |
 | `requirements*.txt`, `setup.py`, `Dockerfile`, `deploy*.sh`, `run_web_app.py` | Package/deploy metadata and local service entry points | Partial | product layer, external library | P2 | Packaging smoke test and deployment metadata exist; release packaging and cloud smoke remain external package work |
 | `finrobot_equity/README.md` | Equity research product workload spec | Mapped | AI dialect, stdlib, external library, product layer | P0 | Trace every product pipeline step to analysis, text, chart, report, and web rows |
-| `finrobot_equity/core/src/generate_financial_analysis.py` | CLI workflow for fetching, processing, forecasting, agent text, and artifacts | Open | AI dialect, stdlib, external library | P0 | End-to-end fixture run with recorded data and model outputs |
+| `finrobot_equity/core/src/generate_financial_analysis.py` | CLI workflow for fetching, processing, forecasting, agent text, and artifacts | Partial | AI dialect, stdlib, external library | P0 | Equity analysis pipeline skeleton validates fetch, normalize, forecast, section-agent handoff, artifact plan, failure hooks, and provider-free trace |
 | `finrobot_equity/core/src/create_equity_report.py`, `generate_pdf_report.py` | Report generation workflows over CSVs, charts, text sections, and PDF/HTML outputs | Partial | stdlib, external library, product layer | P0 | Golden HTML/PDF artifact skeletons with stale-date and required-section checks; real rendering remains package work |
 | `finrobot_equity/core/src/modules/market_data_api.py` | FMP/YFinance market data package | Partial | stdlib, external library | P0 | Recorded fixtures and vendor-adapter skeleton cover statements, EV, ratios, target price, rating, profile, news, indicators |
-| `finrobot_equity/core/src/modules/financial_data_processor.py` | Typed table normalization, historical metrics, and forecast transforms | Partial | stdlib, external library | P0 | Unit fixtures cover numeric cleaning, statement extraction, forecast formulas, and missing data |
-| `finrobot_equity/core/src/modules/valuation_engine.py` | DCF, EV/EBITDA, peer comparison, synthesis, and football-field data package | Partial | stdlib, external library | P1 | Deterministic valuation skeleton covers fixtures with sensitivity to assumptions |
+| `finrobot_equity/core/src/modules/financial_data_processor.py` | Typed table normalization, historical metrics, and forecast transforms | Partial | stdlib, external library | P0 | Finance normalizers skeleton covers statements, ratios, market, news, SEC, peer, provenance, field policy, and deterministic ordering |
+| `finrobot_equity/core/src/modules/valuation_engine.py` | DCF, EV/EBITDA, peer comparison, synthesis, and football-field data package | Partial | stdlib, external library | P1 | Valuation engine skeleton covers DCF, EV/EBITDA, P/E, target synthesis, football field, assumption audit, tolerance gates, currency/period, and provenance |
 | `finrobot_equity/core/src/modules/sensitivity_analyzer.py` | Sensitivity and confidence interval package | Partial | stdlib, external library | P1 | Matrix/table fixtures for revenue and margin ranges |
 | `finrobot_equity/core/src/modules/catalyst_analyzer.py`, `news_integrator.py` | News/catalyst classification and summary package with optional AI sections | Partial | AI dialect, stdlib, external library | P1 | News/catalyst skeleton validates relevance, category, sentiment, impact, adapter boundaries, and generated summaries |
-| `finrobot_equity/core/src/modules/retail_sentiment_client.py` | Adanos/retail sentiment adapter over Reddit, X.com, and Polymarket snapshots | Partial | stdlib, external library, product layer | P2 | Recorded snapshot fixtures and vendor-adapter skeleton validate source normalization and prompt formatting |
+| `finrobot_equity/core/src/modules/retail_sentiment_client.py` | Adanos/retail sentiment adapter over Reddit, X.com, and Polymarket snapshots | Partial | stdlib, external library, product layer | P2 | Retail sentiment skeleton validates source snapshots, aggregate schema, redaction, terms metadata, stale warnings, prompt formatting, and clean skips |
 | `finrobot_equity/core/src/modules/text_generator_agents.py`, `enhanced_text_generator.py`, `equity_agents/*` | Section-specific AI agents for thesis, risks, valuation, news, company overview, and takeaways | Partial | AI dialect, external library | P0 | Output-schema tests and replay records for each section agent |
 | `finrobot_equity/core/src/modules/chart_generator.py`, `enhanced_chart_generator.py` | Chart/report artifact package | Partial | stdlib, external library | P1 | Fixture chart skeletons validate dimensions, source metadata, and report references |
 | `finrobot_equity/core/src/modules/html_renderer.py`, `html_template_professional.py` | HTML report templating package | Open | stdlib, product layer | P1 | Golden HTML snapshots with required sections, tables, charts, disclaimers, and accessibility checks |

@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 39,
-  "translation_directory_file_count": 259,
+  "registered_examples_count": 44,
+  "translation_directory_file_count": 327,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -13,8 +13,7 @@
       "directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
       "registered_example": "examples/ai/finrobot_translation/live_packages/analytics_report/analytics_report.leia",
       "covers_package_ids": [
-        "normalizers",
-        "valuation"
+        "analytics_report"
       ],
       "status": "checked_in_registered_example"
     },
@@ -39,14 +38,11 @@
     {
       "id": "coding_notebook",
       "directory": "examples/ai/finrobot_translation/live_packages/coding_notebook",
-      "registered_example": null,
-      "covered_by_examples": [
-        "examples/ai/finrobot_translation/generated_code_tooling.leia"
-      ],
+      "registered_example": "examples/ai/finrobot_translation/live_packages/coding_notebook/main.leia",
       "covers_package_ids": [
         "coding_notebook"
       ],
-      "status": "checked_in_contracts_schemas_fixtures"
+      "status": "checked_in_registered_example"
     },
     {
       "id": "factor_research",
@@ -146,6 +142,42 @@
         "report_renderer"
       ],
       "status": "checked_in_registered_example"
+    },
+    {
+      "id": "equity_analysis_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/main.leia",
+      "covers_package_ids": [
+        "equity_analysis_pipeline"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "finance_normalizers",
+      "directory": "examples/ai/finrobot_translation/live_packages/finance_normalizers",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/finance_normalizers/main.leia",
+      "covers_package_ids": [
+        "finance_normalizers"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "retail_sentiment",
+      "directory": "examples/ai/finrobot_translation/live_packages/retail_sentiment",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/retail_sentiment/main.leia",
+      "covers_package_ids": [
+        "retail_sentiment"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "valuation_engine",
+      "directory": "examples/ai/finrobot_translation/live_packages/valuation_engine",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/valuation_engine/main.leia",
+      "covers_package_ids": [
+        "valuation_engine"
+      ],
+      "status": "checked_in_registered_example"
     }
   ],
   "live_network_default": false,
@@ -184,57 +216,6 @@
         "contract tests run with live_network=false and assert clean skips when optional provider credentials are absent",
         "fixture replay tests validate response schema compatibility without importing yfinance, Finnhub, FMP, SEC, earnings, or Reddit clients",
         "approval policy tests deny external network calls unless the matching provider capability is granted"
-      ],
-      "no_built_in_guarantee": true
-    },
-    {
-      "id": "normalizers",
-      "package_name": "leia-finrobot-normalizers",
-      "status": "skeleton_contract_checked_in",
-      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
-      "planned_directory": "packages/finrobot/normalizers",
-      "manifest": "packages/finrobot/normalizers/package.manifest.json",
-      "contract": "packages/finrobot/normalizers/contracts/finance_normalizer_contract.json",
-      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
-      "capabilities": [
-        "finance.normalize.market_price_bar",
-        "finance.normalize.fundamental_metric_row",
-        "finance.normalize.sec_section",
-        "finance.normalize.earnings_segment",
-        "finance.normalize.social_sentiment_record",
-        "finance.normalize.analyst_recommendation",
-        "finance.normalize.provenance"
-      ],
-      "test_gates": [
-        "schema tests preserve provider, replay_key, captured_at, source_schema, stale_after_days, and missing_field provenance",
-        "golden fixture tests reject unknown financial fields and stale market rows without calling live providers",
-        "package contract tests require deterministic output ordering across interpreter and bytecode replay runs",
-        "normalizer package remains installable without vendor adapter extras"
-      ],
-      "no_built_in_guarantee": true
-    },
-    {
-      "id": "valuation",
-      "package_name": "leia-finrobot-valuation",
-      "status": "skeleton_contract_checked_in",
-      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
-      "planned_directory": "packages/finrobot/valuation",
-      "manifest": "packages/finrobot/valuation/package.manifest.json",
-      "contract": "packages/finrobot/valuation/contracts/valuation_contract.json",
-      "migration_source": "examples/ai/finrobot_translation/valuation_analytics.leia",
-      "capabilities": [
-        "finance.valuation.dcf",
-        "finance.valuation.ev_ebitda",
-        "finance.valuation.pe_multiple",
-        "finance.valuation.target_price_synthesis",
-        "finance.valuation.sensitivity_matrix",
-        "finance.valuation.assumption_audit"
-      ],
-      "test_gates": [
-        "offline fixture tests pin DCF, EV/EBITDA, P/E, target-price synthesis, and sensitivity outputs to tolerances",
-        "contract tests require explicit assumptions, currency, period, source provenance, and stale-data warnings",
-        "package tests reject hidden live data fetches and require all input tables to arrive through declared capabilities",
-        "numerical gates define acceptable tolerance drift before any live package replaces replay math"
       ],
       "no_built_in_guarantee": true
     },
@@ -600,6 +581,143 @@
         "contract tests run with live_network=false and assert Backtrader and pandas imports clean-skip by default",
         "fixture tests validate strategy, sizer, indicator, analyzer, data feed, deterministic seed, trade ledger, metrics, and risk-limit schemas",
         "provider-free tests keep strategy execution outside Leia core until the external backtest package is explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "analytics_report",
+      "package_name": "leia-finrobot-analytics-report",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
+      "planned_directory": "packages/finrobot/analytics_report",
+      "manifest": "packages/finrobot/analytics_report/package.manifest.json",
+      "contract": "packages/finrobot/analytics_report/contracts/analytics_report_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/reporting.leia",
+      "capabilities": [
+        "finance.analytics_report.normalized_inputs",
+        "finance.analytics_report.valuation_summary",
+        "finance.analytics_report.sensitivity_matrix",
+        "finance.analytics_report.chart_specs",
+        "finance.analytics_report.snapshot_metadata",
+        "finance.analytics_report.accessibility_checklist",
+        "finance.analytics_report.stale_data_policy",
+        "finance.analytics_report.source_annotations",
+        "finance.analytics_report.output_manifest"
+      ],
+      "test_gates": [
+        "analytics report manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and require provider-free report artifacts",
+        "fixture tests validate normalized inputs, valuation summaries, chart specs, stale-data checks, source annotations, accessibility metadata, and output manifests",
+        "aggregate report skeleton remains composition-only and delegates live finance providers, valuation engines, chart renderers, and report renderers to external packages"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "finance_normalizers",
+      "package_name": "leia-finrobot-finance-normalizers",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/finance_normalizers",
+      "planned_directory": "packages/finrobot/finance_normalizers",
+      "manifest": "packages/finrobot/finance_normalizers/package.manifest.json",
+      "contract": "packages/finrobot/finance_normalizers/contracts/finance_normalizers_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.normalizers.statements.canonicalize",
+        "finance.normalizers.ratios.canonicalize",
+        "finance.normalizers.market.canonicalize",
+        "finance.normalizers.news.canonicalize",
+        "finance.normalizers.sec.canonicalize",
+        "finance.normalizers.peer.canonicalize",
+        "finance.normalizers.provenance.attach",
+        "finance.normalizers.field_policy.stale",
+        "finance.normalizers.field_policy.missing",
+        "finance.normalizers.ordering.deterministic"
+      ],
+      "test_gates": [
+        "finance normalizers contract manifest and referenced JSON files decode without external dependencies",
+        "schema tests cover statements, ratios, market, news, SEC, peer, provenance, and normalizer policy",
+        "fixture tests validate canonical fields, stale and missing field policy, and deterministic ordering",
+        "provider gates forbid live network access, provider credentials, provider SDK imports, and q/runtime coupling"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "valuation_engine",
+      "package_name": "leia-finrobot-valuation-engine",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/valuation_engine",
+      "planned_directory": "packages/finrobot/valuation_engine",
+      "manifest": "packages/finrobot/valuation_engine/package.manifest.json",
+      "contract": "packages/finrobot/valuation_engine/contracts/valuation_engine_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/valuation_analytics.leia",
+      "capabilities": [
+        "finance.valuation.dcf",
+        "finance.valuation.ev_ebitda",
+        "finance.valuation.pe_multiple",
+        "finance.valuation.target_price_synthesis",
+        "finance.valuation.football_field",
+        "finance.valuation.assumption_audit",
+        "finance.valuation.tolerance_gate",
+        "finance.valuation.currency_period_provenance"
+      ],
+      "test_gates": [
+        "valuation engine manifest and referenced JSON files decode without external dependencies",
+        "fixture tests cover DCF, EV/EBITDA, P/E, target price synthesis, football-field data, assumption audit, and tolerance gates",
+        "contract tests require formulas, currency, period, provenance, explicit assumptions, and deterministic tolerance metadata",
+        "provider-free gates reject hidden live data fetches and q/runtime valuation optimization dependencies"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "equity_analysis_pipeline",
+      "package_name": "leia-finrobot-equity-analysis-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline",
+      "planned_directory": "packages/finrobot/equity_analysis_pipeline",
+      "manifest": "packages/finrobot/equity_analysis_pipeline/package.manifest.json",
+      "contract": "packages/finrobot/equity_analysis_pipeline/contracts/stage_dag_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+      "capabilities": [
+        "finance.pipeline.stage_dag",
+        "finance.pipeline.fetch_fixture",
+        "finance.pipeline.normalize_fixture",
+        "finance.pipeline.forecast_fixture",
+        "finance.pipeline.section_agent_handoff",
+        "finance.pipeline.artifact_manifest",
+        "finance.pipeline.failure_hooks",
+        "finance.pipeline.provider_free_trace"
+      ],
+      "test_gates": [
+        "equity analysis pipeline contract manifest and referenced JSON files decode without external dependencies",
+        "stage DAG tests cover fetch, normalize, forecast, section_agents, and artifact_plan ordering",
+        "fixture tests validate input, normalized financials, forecast output, section-agent handoff, artifact manifest, failure hooks, and provider-free trace",
+        "provider-free gates forbid live provider SDK imports, network calls, and hidden runtime dependencies"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "retail_sentiment",
+      "package_name": "leia-finrobot-retail-sentiment",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/retail_sentiment",
+      "planned_directory": "packages/finrobot/retail_sentiment",
+      "manifest": "packages/finrobot/retail_sentiment/package.manifest.json",
+      "contract": "packages/finrobot/retail_sentiment/contracts/retail_sentiment_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.retail_sentiment.source_snapshot",
+        "finance.retail_sentiment.aggregate",
+        "finance.retail_sentiment.redaction_policy",
+        "finance.retail_sentiment.terms_metadata",
+        "finance.retail_sentiment.prompt_format",
+        "finance.retail_sentiment.stale_snapshot_warning",
+        "finance.retail_sentiment.adapter_clean_skip"
+      ],
+      "test_gates": [
+        "retail sentiment manifest and referenced JSON files decode without external dependencies",
+        "fixture tests cover Adanos, Reddit, X, and Polymarket source snapshots without live adapters",
+        "schema tests validate sentiment aggregates, redaction policy, terms metadata, prompt-format contract, and stale snapshot warning",
+        "adapter boundary tests clean-skip optional providers and reject raw handles, raw URLs, tokens, cookies, and authorization headers"
       ],
       "no_built_in_guarantee": true
     }
