@@ -426,6 +426,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 	}
 	set("validate_output", validateOutput)
 	set("validateOutput", validateOutput)
+	registerLLMWorkflowHelpers(t, call)
 
 	set("agent_defaults", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
