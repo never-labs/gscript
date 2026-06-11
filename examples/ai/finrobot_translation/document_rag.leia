@@ -1,0 +1,54 @@
+// FR-GAP-010/011 contract example: local document chunks and RAG corpus.
+// This is intentionally fixture-backed. It does not parse PDFs or call a vector DB.
+
+filing := llm.document({
+    id: "acme-2025-10k"
+    title: "ACME 2025 Form 10-K"
+    source: "fixtures/sec/acme-2025-10k.md"
+    artifact_id: "artifact://finrobot/sec/acme-2025-10k.md"
+    tags: {"sec", "10-k", "acme"}
+    sections: {
+        item1: "Business overview covers cloud devices and subscription services."
+        item1a: "Risk factors identify customer concentration and export-control exposure."
+        item7: "Management discussion reports margin expansion and higher recurring revenue."
+    }
+})
+
+earnings_call := llm.document({
+    id: "acme-2025-q4-call"
+    title: "ACME Q4 2025 earnings call"
+    source: "fixtures/transcripts/acme-2025-q4.txt"
+    artifact_id: "artifact://finrobot/transcripts/acme-2025-q4.txt"
+    sections: {
+        prepared: "Prepared remarks cite services growth and supply-chain normalization."
+        qa: "Analyst Q&A asks about export controls and customer concentration."
+    }
+})
+
+filing_chunks := llm.chunks(filing)
+call_chunks := llm.chunks(earnings_call)
+
+corpus := llm.corpus({filing_chunks.docs[1], filing_chunks.docs[2], filing_chunks.docs[3], call_chunks.docs[1], call_chunks.docs[2]}, {
+    id: "finrobot-local-rag"
+})
+corpus = llm.corpus_reset(corpus)
+assert(corpus.count == 0)
+
+corpus = llm.corpus_add(corpus, filing_chunks)
+corpus = llm.corpus_add(corpus, call_chunks)
+
+retrieved := llm.retrieve(corpus, "export controls customer concentration risk", {
+    limit: 2
+    label: "FinRobot local RAG evidence"
+})
+citation := llm.citation(retrieved.matches[1])
+
+assert(filing_chunks.count == 3)
+assert(corpus.count == 5)
+assert(retrieved.matches[1].section == "item1a")
+assert(citation.artifact_id == "artifact://finrobot/sec/acme-2025-10k.md")
+assert(citation.doc_id == "acme-2025-10k")
+
+print("document_chunks", filing_chunks.count)
+print("corpus_count", corpus.count)
+print("top_citation", citation.doc_id .. " " .. citation.section .. " " .. citation.artifact_id)

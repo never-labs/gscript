@@ -12,6 +12,7 @@ const (
 	llmMemoryDocMarker        = "__llm_doc"
 	llmMemoryCollectionMarker = "__llm_collection"
 	llmMemoryContextMarker    = "__llm_context"
+	llmMemoryCorpusMarker     = "__llm_corpus"
 )
 
 func registerLLMMemoryHelpers(t *Table) {
@@ -36,6 +37,61 @@ func registerLLMMemoryHelpers(t *Table) {
 	}
 	setLLMFunction(t, "llm", "collection", collectionFn)
 	setLLMFunction(t, "llm", "docs", collectionFn)
+
+	chunksFn := func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.chunks'")
+		}
+		opts := NilValue()
+		if len(args) >= 2 {
+			opts = args[1]
+		}
+		return []Value{TableValue(llmMemoryChunks(args[0], opts))}, nil
+	}
+	setLLMFunction(t, "llm", "chunks", chunksFn)
+	setLLMFunction(t, "llm", "chunk", chunksFn)
+
+	citationFn := func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.citation'")
+		}
+		return []Value{TableValue(llmMemoryCitation(args[0]))}, nil
+	}
+	setLLMFunction(t, "llm", "citation", citationFn)
+	setLLMFunction(t, "llm", "cite", citationFn)
+
+	corpusFn := func(args []Value) ([]Value, error) {
+		input := NilValue()
+		if len(args) >= 1 {
+			input = args[0]
+		}
+		opts := NilValue()
+		if len(args) >= 2 {
+			opts = args[1]
+		}
+		return []Value{TableValue(llmMemoryCorpus(input, opts))}, nil
+	}
+	setLLMFunction(t, "llm", "corpus", corpusFn)
+
+	corpusAddFn := func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'llm.corpus_add' (corpus, docs expected)")
+		}
+		return []Value{TableValue(llmMemoryCorpusAdd(args[0], args[1]))}, nil
+	}
+	setLLMFunction(t, "llm", "corpus_add", corpusAddFn)
+
+	corpusResetFn := func(args []Value) ([]Value, error) {
+		opts := NewTable()
+		if len(args) >= 1 {
+			if args[0].IsTable() {
+				llmCopyTable(opts, args[0].Table(), true)
+			}
+		}
+		opts.RawSetString("reset", BoolValue(true))
+		return []Value{TableValue(llmMemoryCorpus(NilValue(), TableValue(opts)))}, nil
+	}
+	setLLMFunction(t, "llm", "corpus_reset", corpusResetFn)
 
 	contextFn := func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -105,6 +161,15 @@ func llmMemoryDoc(input, opts Value) *Table {
 	if doc.RawGetString("text").IsNil() {
 		doc.RawSetString("text", StringValue(llmMemoryValueText(input)))
 	}
+	if doc.RawGetString("artifact_id").IsNil() {
+		doc.RawSetString("artifact_id", doc.RawGetString("id"))
+	}
+	if doc.RawGetString("metadata").IsNil() {
+		doc.RawSetString("metadata", TableValue(llmMemoryDocMetadata(doc)))
+	}
+	if doc.RawGetString("citation").IsNil() {
+		doc.RawSetString("citation", TableValue(llmMemoryCitation(TableValue(doc))))
+	}
 	return doc
 }
 
@@ -119,6 +184,117 @@ func llmMemoryCollection(input Value) *Table {
 	coll.RawSetString("docs", TableValue(list))
 	coll.RawSetString("count", IntValue(int64(len(docs))))
 	return coll
+}
+
+func llmMemoryChunks(input, opts Value) *Table {
+	chunks := make([]*Table, 0)
+	for _, doc := range llmMemoryDocs(input) {
+		chunks = append(chunks, llmMemoryDocChunks(doc, opts)...)
+	}
+	list := NewSequentialArrayTable(len(chunks))
+	for i, chunk := range chunks {
+		list.RawSet(IntValue(int64(i+1)), TableValue(chunk))
+	}
+	coll := llmMemoryCollection(TableValue(list))
+	coll.RawSetString("kind", StringValue("chunks"))
+	return coll
+}
+
+func llmMemoryDocChunks(doc *Table, opts Value) []*Table {
+	if doc == nil {
+		return nil
+	}
+	if sections := doc.RawGetString("sections").Table(); sections != nil {
+		keys := llmMemorySectionKeys(sections)
+		out := make([]*Table, 0, len(keys))
+		for _, key := range keys {
+			text := sections.RawGetString(key).Str()
+			if text == "" {
+				text = llmMemoryValueText(sections.RawGetString(key))
+			}
+			out = append(out, llmMemoryChunkDoc(doc, key, text, len(out)+1, opts))
+		}
+		return out
+	}
+	return []*Table{llmMemoryChunkDoc(doc, "", doc.RawGetString("text").Str(), 1, opts)}
+}
+
+func llmMemoryChunkDoc(doc *Table, section, text string, index int, opts Value) *Table {
+	chunk := NewTable()
+	llmCopyTable(chunk, doc, true)
+	docID := doc.RawGetString("id").Str()
+	if docID == "" {
+		docID = fmt.Sprintf("doc%d", index)
+	}
+	chunkID := doc.RawGetString("chunk_id").Str()
+	if chunkID == "" {
+		if section != "" {
+			chunkID = docID + "#" + section
+		} else {
+			chunkID = fmt.Sprintf("%s#chunk%d", docID, index)
+		}
+	}
+	if opts.IsTable() {
+		llmCopyTable(chunk, opts.Table(), true)
+	}
+	chunk.RawSetString(llmMemoryDocMarker, BoolValue(true))
+	chunk.RawSetString("doc_id", StringValue(docID))
+	chunk.RawSetString("chunk_id", StringValue(chunkID))
+	chunk.RawSetString("id", StringValue(chunkID))
+	chunk.RawSetString("chunk_index", IntValue(int64(index)))
+	chunk.RawSetString("text", StringValue(text))
+	if section != "" {
+		chunk.RawSetString("section", StringValue(section))
+	}
+	if chunk.RawGetString("artifact_id").IsNil() {
+		chunk.RawSetString("artifact_id", doc.RawGetString("artifact_id"))
+	}
+	chunk.RawSetString("metadata", TableValue(llmMemoryDocMetadata(chunk)))
+	chunk.RawSetString("citation", TableValue(llmMemoryCitation(TableValue(chunk))))
+	return chunk
+}
+
+func llmMemoryCorpus(input, opts Value) *Table {
+	corpus := llmMemoryCollection(input)
+	corpus.RawSetString(llmMemoryCorpusMarker, BoolValue(true))
+	corpus.RawSetString("kind", StringValue("local_corpus"))
+	corpus.RawSetString("reset", BoolValue(false))
+	if opts.IsTable() {
+		llmCopyTable(corpus, opts.Table(), true)
+		if opts.Table().RawGetString("reset").Truthy() {
+			empty := NewSequentialArrayTable(0)
+			corpus.RawSetString("docs", TableValue(empty))
+			corpus.RawSetString("count", IntValue(0))
+			corpus.RawSetString("reset", BoolValue(true))
+		}
+	}
+	return corpus
+}
+
+func llmMemoryCorpusAdd(corpus, input Value) *Table {
+	existing := llmMemoryDocs(corpus)
+	additions := llmMemoryDocs(input)
+	list := NewSequentialArrayTable(len(existing) + len(additions))
+	for i, doc := range existing {
+		list.RawSet(IntValue(int64(i+1)), TableValue(doc))
+	}
+	for i, doc := range additions {
+		list.RawSet(IntValue(int64(len(existing)+i+1)), TableValue(doc))
+	}
+	out := llmMemoryCorpus(TableValue(list), NilValue())
+	if corpus.IsTable() {
+		for _, key := range corpus.Table().PairsKeysSnapshot() {
+			if key.IsString() {
+				switch key.Str() {
+				case "docs", "count", "reset":
+					continue
+				}
+			}
+			out.RawSet(key, corpus.Table().RawGet(key))
+		}
+	}
+	out.RawSetString("reset", BoolValue(false))
+	return out
 }
 
 func llmMemoryContext(input, opts Value, defaultLabel string) *Table {
@@ -183,6 +359,7 @@ func llmMemoryRetrieve(collection Value, query string, opts Value) *Table {
 	for i, doc := range docs {
 		copyDoc := llmCloneTable(doc)
 		copyDoc.RawSetString("score", IntValue(int64(llmMemoryScore(doc, terms))))
+		copyDoc.RawSetString("citation", TableValue(llmMemoryCitation(TableValue(copyDoc))))
 		list.RawSet(IntValue(int64(i+1)), TableValue(copyDoc))
 	}
 	ctx := llmMemoryContext(TableValue(list), opts, label)
@@ -265,9 +442,17 @@ func llmMemoryContextText(label string, docs []*Table) string {
 			b.WriteString(" ")
 			b.WriteString(title)
 		}
+		if section := doc.RawGetString("section").Str(); section != "" {
+			b.WriteString(" section ")
+			b.WriteString(section)
+		}
 		if source := doc.RawGetString("source").Str(); source != "" {
 			b.WriteString("\nSource: ")
 			b.WriteString(source)
+		}
+		if artifact := doc.RawGetString("artifact_id").Str(); artifact != "" {
+			b.WriteString("\nArtifact: ")
+			b.WriteString(artifact)
 		}
 		text := doc.RawGetString("text").Str()
 		if text != "" {
@@ -287,6 +472,94 @@ func llmMemoryValueText(v Value) string {
 		return v.Str()
 	}
 	return string(data)
+}
+
+func llmMemoryDocMetadata(doc *Table) *Table {
+	meta := NewTable()
+	if doc == nil {
+		return meta
+	}
+	for _, key := range []string{"id", "doc_id", "chunk_id", "title", "source", "artifact_id", "section", "chunk_index"} {
+		if v := doc.RawGetString(key); !v.IsNil() {
+			meta.RawSetString(key, v)
+		}
+	}
+	if tags := doc.RawGetString("tags"); !tags.IsNil() {
+		meta.RawSetString("tags", tags)
+	}
+	return meta
+}
+
+func llmMemoryCitation(input Value) *Table {
+	doc := input.Table()
+	if doc == nil {
+		docs := llmMemoryDocs(input)
+		if len(docs) > 0 {
+			doc = docs[0]
+		}
+	}
+	citation := NewTable()
+	if doc == nil {
+		citation.RawSetString("text", StringValue(input.Str()))
+		return citation
+	}
+	docID := doc.RawGetString("doc_id")
+	if docID.IsNil() {
+		docID = doc.RawGetString("id")
+	}
+	for _, key := range []string{"id", "chunk_id", "title", "source", "artifact_id", "section", "score"} {
+		if v := doc.RawGetString(key); !v.IsNil() {
+			citation.RawSetString(key, v)
+		}
+	}
+	if !docID.IsNil() {
+		citation.RawSetString("doc_id", docID)
+	}
+	if doc.RawGetString("chunk_id").IsNil() && !doc.RawGetString("id").IsNil() {
+		citation.RawSetString("chunk_id", doc.RawGetString("id"))
+	}
+	if snippet := doc.RawGetString("text").Str(); snippet != "" {
+		citation.RawSetString("snippet", StringValue(llmMemorySnippet(snippet, 180)))
+	}
+	return citation
+}
+
+func llmMemorySnippet(s string, limit int) string {
+	s = strings.TrimSpace(s)
+	if limit <= 0 || len(s) <= limit {
+		return s
+	}
+	return strings.TrimSpace(s[:limit]) + "..."
+}
+
+func llmMemorySectionKeys(sections *Table) []string {
+	if sections == nil {
+		return nil
+	}
+	if sections.Length() > 0 {
+		keys := make([]string, 0, sections.Length())
+		for i := 1; i <= sections.Length(); i++ {
+			if section := sections.RawGet(IntValue(int64(i))).Table(); section != nil {
+				name := section.RawGetString("name").Str()
+				if name == "" {
+					name = fmt.Sprintf("section%d", i)
+				}
+				sections.RawSetString(name, section.RawGetString("text"))
+				keys = append(keys, name)
+			}
+		}
+		if len(keys) > 0 {
+			return keys
+		}
+	}
+	keys := make([]string, 0)
+	for _, key := range sections.PairsKeysSnapshot() {
+		if key.IsString() {
+			keys = append(keys, key.Str())
+		}
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func llmMemoryTerms(s string) []string {
@@ -312,9 +585,14 @@ func llmMemoryScore(doc *Table, terms []string) int {
 		doc.RawGetString("id").Str(),
 		doc.RawGetString("title").Str(),
 		doc.RawGetString("source").Str(),
+		doc.RawGetString("artifact_id").Str(),
+		doc.RawGetString("doc_id").Str(),
+		doc.RawGetString("chunk_id").Str(),
+		doc.RawGetString("section").Str(),
 		doc.RawGetString("text").Str(),
 		llmMemoryValueText(doc.RawGetString("tags")),
 		llmMemoryValueText(doc.RawGetString("metadata")),
+		llmMemoryValueText(doc.RawGetString("citation")),
 	}, "\n"))
 	score := 0
 	for _, term := range terms {
