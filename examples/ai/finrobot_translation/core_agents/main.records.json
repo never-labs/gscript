@@ -1,0 +1,67 @@
+[
+  {
+    "Request": {
+      "Model": "mock-finrobot-core",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Translate FinRobot agent_library entries into Leia agents with generic local evidence tools and structured output."
+        },
+        {
+          "Role": "user",
+          "Text": "Map Market_Analyst and Expert_Investor to Leia core agents."
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "load_profile",
+          "Description": "Load a translated FinRobot library profile from local configuration.",
+          "Params": [
+            "agent_name"
+          ]
+        },
+        {
+          "Name": "search_local_notes",
+          "Description": "Search local non-financial notes used by the translated agent.",
+          "Params": [
+            "query"
+          ]
+        },
+        {
+          "Name": "build_report_outline",
+          "Description": "Build a generic report outline from structured local evidence.",
+          "Params": [
+            "agent_name",
+            "sections"
+          ]
+        }
+      ],
+      "ResponseFormat": {
+        "type": "json_object"
+      }
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "{\"mapped_agents\":[\"Market_Analyst\",\"Expert_Investor\"],\"single_assistant\":\"agent invocation with a user message\",\"tool_calling\":\"explicit tools array\",\"structured_output\":true,\"termination\":\"TERMINATE as prompt convention\"}"
+    }
+  },
+  {
+    "Request": {
+      "Model": "mock-finrobot-review",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Review the FinRobot core agent mapping for replayability and runtime neutrality."
+        },
+        {
+          "Role": "user",
+          "Text": "{\"mapped_agents\":[\"Market_Analyst\",\"Expert_Investor\"],\"single_assistant\":\"agent invocation with a user message\",\"tool_calling\":\"explicit tools array\",\"structured_output\":true,\"termination\":\"TERMINATE as prompt convention\"}"
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Core agent mapping is replayable: library profiles become prompts, toolkit entries become explicit tools, and outputs stay structured."
+    }
+  }
+]
