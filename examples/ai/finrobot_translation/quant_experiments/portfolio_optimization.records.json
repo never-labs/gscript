@@ -1,0 +1,22 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Optimize a quantitative portfolio using local q risk and return tables."
+        },
+        {
+          "Role": "user",
+          "Text": "Allocate capital, cap concentration, and backtest the SMA_CrossOver baseline."
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Direct llm.turn keeps examples simple."
+    }
+  }
+]
+
