@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-prompt-roles-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "fixtures": [
+    {
+      "fixture_key": "prompt_catalog:agent_library:v1",
+      "capability": "prompt.role.catalog.agent_library",
+      "schema": "prompt_catalog_v1",
+      "path": "contracts/prompt_role_contract.json#/prompt_catalogs/0",
+      "metadata": {"catalog": "agent_library", "replay_ready": true}
+    },
+    {
+      "fixture_key": "prompt_catalog:prompts:v1",
+      "capability": "prompt.role.catalog.prompts",
+      "schema": "prompt_catalog_v1",
+      "path": "contracts/prompt_role_contract.json#/prompt_catalogs/1",
+      "metadata": {"catalog": "prompts", "replay_ready": true}
+    },
+    {
+      "fixture_key": "prompt_catalog:utils:v1",
+      "capability": "prompt.role.catalog.utils",
+      "schema": "prompt_catalog_v1",
+      "path": "contracts/prompt_role_contract.json#/prompt_catalogs/2",
+      "metadata": {"catalog": "utils", "replay_ready": true}
+    },
+    {
+      "fixture_key": "prompt_catalog:text_generator_agents:v1",
+      "capability": "prompt.role.catalog.text_generator_agents",
+      "schema": "prompt_catalog_v1",
+      "path": "contracts/prompt_role_contract.json#/prompt_catalogs/3",
+      "metadata": {"catalog": "text_generator_agents", "replay_ready": true}
+    },
+    {
+      "fixture_key": "prompt_catalog:equity_agents:v1",
+      "capability": "prompt.role.catalog.equity_agents",
+      "schema": "prompt_catalog_v1",
+      "path": "contracts/prompt_role_contract.json#/prompt_catalogs/4",
+      "metadata": {"catalog": "equity_agents", "replay_ready": true}
+    },
+    {
+      "fixture_key": "section_agent_output:company_overview:v1",
+      "capability": "prompt.role.section.output_schema",
+      "schema": "section_agent_output_v1",
+      "path": "fixtures/provider_free_fixture_index.json#/sample_section_output",
+      "metadata": {"section_id": "company_overview", "replay_ready": true}
+    }
+  ],
+  "sample_section_output": {
+    "section_id": "company_overview",
+    "title": "Company Overview",
+    "summary": "Fixture-backed overview drafted from local normalized evidence.",
+    "body": "ACME remains a fixture-only equity example with cited profile and metrics evidence.",
+    "key_points": ["Fixture profile loaded", "Financial metrics cited"],
+    "source_refs": ["src_company_profile", "src_financial_metrics"],
+    "evidence_validation": {
+      "provider_free": true,
+      "live_network": false,
+      "validated": true,
+      "unresolved_source_refs": [],
+      "fixture_keys": ["prompt_catalog:text_generator_agents:v1"]
+    },
+    "termination": "TERMINATE"
+  }
+}

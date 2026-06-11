@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-prompt-role-contract-v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "capabilities": [
+    "prompt.role.catalog.agent_library",
+    "prompt.role.catalog.prompts",
+    "prompt.role.catalog.utils",
+    "prompt.role.catalog.text_generator_agents",
+    "prompt.role.catalog.equity_agents",
+    "prompt.role.profile.version",
+    "prompt.role.section.output_schema",
+    "prompt.role.termination.convention",
+    "prompt.role.evidence.validation"
+  ],
+  "prompt_catalogs": [
+    {
+      "id": "agent_library",
+      "source_path": "FinRobot.agent_library",
+      "version": "1.0.0",
+      "fixture_key": "prompt_catalog:agent_library:v1",
+      "capability": "prompt.role.catalog.agent_library",
+      "entries": [
+        {"id": "market_analyst_system", "role_id": "Market_Analyst", "kind": "system", "termination": "TERMINATE"},
+        {"id": "expert_investor_system", "role_id": "Expert_Investor", "kind": "system", "termination": "TERMINATE"},
+        {"id": "data_analyst_system", "role_id": "Data_Analyst", "kind": "system", "termination": "TERMINATE"}
+      ]
+    },
+    {
+      "id": "prompts",
+      "source_path": "FinRobot.prompts",
+      "version": "1.0.0",
+      "fixture_key": "prompt_catalog:prompts:v1",
+      "capability": "prompt.role.catalog.prompts",
+      "entries": [
+        {"id": "report_instruction", "role_id": "Expert_Investor", "kind": "instruction", "termination": "TERMINATE"},
+        {"id": "market_context_instruction", "role_id": "Market_Analyst", "kind": "instruction", "termination": "TERMINATE"}
+      ]
+    },
+    {
+      "id": "utils",
+      "source_path": "FinRobot.utils",
+      "version": "1.0.0",
+      "fixture_key": "prompt_catalog:utils:v1",
+      "capability": "prompt.role.catalog.utils",
+      "entries": [
+        {"id": "evidence_guardrail", "role_id": "Report_Section_Writer", "kind": "guardrail", "termination": "TERMINATE"},
+        {"id": "source_citation_rule", "role_id": "Data_Analyst", "kind": "guardrail", "termination": "TERMINATE"}
+      ]
+    },
+    {
+      "id": "text_generator_agents",
+      "source_path": "FinRobot.text_generator_agents",
+      "version": "1.0.0",
+      "fixture_key": "prompt_catalog:text_generator_agents:v1",
+      "capability": "prompt.role.catalog.text_generator_agents",
+      "entries": [
+        {"id": "section_writer_system", "role_id": "Report_Section_Writer", "kind": "system", "termination": "TERMINATE"},
+        {"id": "section_revision_instruction", "role_id": "Report_Section_Writer", "kind": "instruction", "termination": "TERMINATE"}
+      ]
+    },
+    {
+      "id": "equity_agents",
+      "source_path": "FinRobot.equity_agents",
+      "version": "1.0.0",
+      "fixture_key": "prompt_catalog:equity_agents:v1",
+      "capability": "prompt.role.catalog.equity_agents",
+      "entries": [
+        {"id": "equity_report_orchestrator", "role_id": "Expert_Investor", "kind": "orchestration", "termination": "TERMINATE"},
+        {"id": "equity_source_review", "role_id": "Market_Analyst", "kind": "review", "termination": "TERMINATE"}
+      ]
+    }
+  ],
+  "role_profile_versions": [
+    {"id": "Market_Analyst", "version": "1.0.0", "status": "fixture_locked", "source_catalog": "agent_library", "output_schema": "role_handoff_v1", "termination": "TERMINATE"},
+    {"id": "Expert_Investor", "version": "1.0.0", "status": "fixture_locked", "source_catalog": "agent_library", "output_schema": "role_handoff_v1", "termination": "TERMINATE"},
+    {"id": "Data_Analyst", "version": "1.0.0", "status": "fixture_locked", "source_catalog": "agent_library", "output_schema": "role_handoff_v1", "termination": "TERMINATE"},
+    {"id": "Report_Section_Writer", "version": "1.0.0", "status": "fixture_locked", "source_catalog": "text_generator_agents", "output_schema": "section_agent_output_v1", "termination": "TERMINATE"}
+  ],
+  "section_agent_output": {
+    "schema": "section_agent_output_v1",
+    "capability": "prompt.role.section.output_schema",
+    "required_fields": [
+      "section_id",
+      "title",
+      "summary",
+      "body",
+      "key_points",
+      "source_refs",
+      "evidence_validation",
+      "termination"
+    ],
+    "termination": "TERMINATE"
+  },
+  "source_evidence_validation": {
+    "schema": "source_evidence_validation_v1",
+    "capability": "prompt.role.evidence.validation",
+    "minimum_source_refs": 1,
+    "rejects_unresolved_refs": true,
+    "requires_fixture_key": true,
+    "requires_provider_free": true,
+    "live_network": false
+  },
+  "termination_convention": {
+    "capability": "prompt.role.termination.convention",
+    "literal": "TERMINATE",
+    "required_on_complete": true,
+    "allowed_final_statuses": ["complete", "blocked_fixture_missing"]
+  }
+}

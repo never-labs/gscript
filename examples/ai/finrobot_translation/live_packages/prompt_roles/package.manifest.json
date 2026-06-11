@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-prompt-roles-live-package",
+  "package_name": "leia-finrobot-prompt-roles",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot prompt catalogs, role profile versions, section-agent output contracts, termination conventions, and source evidence validation.",
+  "source_examples": [
+    "examples/ai/finrobot_translation/role_profiles.leia",
+    "examples/ai/finrobot_translation/section_agents.leia"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; prompt and role contracts are static fixtures and never call live model providers."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "live_model_calls": false,
+    "fixture_hook": "recorded_prompt_role_fixture"
+  },
+  "entrypoints": {
+    "prompt_role_contract": "contracts/prompt_role_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "smoke": "main.leia"
+  },
+  "schemas": {
+    "prompt_catalog": "schemas/prompt_catalog.schema.json",
+    "role_profile": "schemas/role_profile.schema.json",
+    "section_agent_output": "schemas/section_agent_output.schema.json",
+    "source_evidence_validation": "schemas/source_evidence_validation.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json"
+  },
+  "capabilities": [
+    "prompt.role.catalog.agent_library",
+    "prompt.role.catalog.prompts",
+    "prompt.role.catalog.utils",
+    "prompt.role.catalog.text_generator_agents",
+    "prompt.role.catalog.equity_agents",
+    "prompt.role.profile.version",
+    "prompt.role.section.output_schema",
+    "prompt.role.termination.convention",
+    "prompt.role.evidence.validation"
+  ],
+  "prompt_catalogs": [
+    {
+      "id": "agent_library",
+      "source_path": "FinRobot.agent_library",
+      "capability": "prompt.role.catalog.agent_library",
+      "fixture_key": "prompt_catalog:agent_library:v1",
+      "schema": "prompt_catalog_v1"
+    },
+    {
+      "id": "prompts",
+      "source_path": "FinRobot.prompts",
+      "capability": "prompt.role.catalog.prompts",
+      "fixture_key": "prompt_catalog:prompts:v1",
+      "schema": "prompt_catalog_v1"
+    },
+    {
+      "id": "utils",
+      "source_path": "FinRobot.utils",
+      "capability": "prompt.role.catalog.utils",
+      "fixture_key": "prompt_catalog:utils:v1",
+      "schema": "prompt_catalog_v1"
+    },
+    {
+      "id": "text_generator_agents",
+      "source_path": "FinRobot.text_generator_agents",
+      "capability": "prompt.role.catalog.text_generator_agents",
+      "fixture_key": "prompt_catalog:text_generator_agents:v1",
+      "schema": "prompt_catalog_v1"
+    },
+    {
+      "id": "equity_agents",
+      "source_path": "FinRobot.equity_agents",
+      "capability": "prompt.role.catalog.equity_agents",
+      "fixture_key": "prompt_catalog:equity_agents:v1",
+      "schema": "prompt_catalog_v1"
+    }
+  ],
+  "role_profiles": [
+    {
+      "id": "Market_Analyst",
+      "version": "1.0.0",
+      "status": "fixture_locked",
+      "capability": "prompt.role.profile.version",
+      "termination": "TERMINATE",
+      "output_schema": "role_handoff_v1"
+    },
+    {
+      "id": "Expert_Investor",
+      "version": "1.0.0",
+      "status": "fixture_locked",
+      "capability": "prompt.role.profile.version",
+      "termination": "TERMINATE",
+      "output_schema": "role_handoff_v1"
+    },
+    {
+      "id": "Data_Analyst",
+      "version": "1.0.0",
+      "status": "fixture_locked",
+      "capability": "prompt.role.profile.version",
+      "termination": "TERMINATE",
+      "output_schema": "role_handoff_v1"
+    },
+    {
+      "id": "Report_Section_Writer",
+      "version": "1.0.0",
+      "status": "fixture_locked",
+      "capability": "prompt.role.profile.version",
+      "termination": "TERMINATE",
+      "output_schema": "section_agent_output_v1"
+    }
+  ],
+  "test_gates": [
+    "manifest and referenced schemas decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "required and optional credentials are empty",
+    "fixture contract covers agent_library, prompts, utils, text_generator_agents, and equity_agents prompt catalogs",
+    "role profiles declare semantic versions and TERMINATE completion convention",
+    "section agent output schema and source evidence validation fixtures are provider-free"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot prompt catalogs or live model role behavior as built-ins; future external packages must satisfy these provider-free contracts before enabling live implementations."
+  }
+}
