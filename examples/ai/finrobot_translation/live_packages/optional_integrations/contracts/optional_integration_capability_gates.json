@@ -4,6 +4,7 @@
   "provider_free": true,
   "live_network": false,
   "real_dependency_imports": false,
+  "no_live_import_default": true,
   "clean_skip_without_dependency": true,
   "fixture_hook": "recorded_optional_live_fixture",
   "gates": [
@@ -77,7 +78,91 @@
       "requires_credentials": false,
       "live_network": false,
       "dependency_imported": false,
-      "status_without_dependency": "skipped"
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "request_schema": {
+        "schema_version": 1,
+        "type": "object",
+        "required": [
+          "dataset",
+          "query"
+        ],
+        "properties": {
+          "dataset": {
+            "const": "market_data"
+          },
+          "query": {
+            "type": "object",
+            "required": [
+              "symbol",
+              "asset_class",
+              "interval",
+              "adjusted"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "asset_class": {
+                "enum": [
+                  "equity"
+                ]
+              },
+              "interval": {
+                "enum": [
+                  "1d"
+                ]
+              },
+              "adjusted": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "pat": {
+          "env": "OPENBB_PAT",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        },
+        "database": {
+          "env": "OPENBB_DATABASE_URL",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "openbb",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      }
     },
     {
       "id": "ollama",

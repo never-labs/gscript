@@ -42,8 +42,29 @@
     "dependency_imported": {
       "const": false
     },
+    "no_live_import_default": {
+      "const": true
+    },
+    "provider_credentials_required": {
+      "const": false
+    },
+    "credential_absent_safe": {
+      "const": true
+    },
     "status_without_dependency": {
       "const": "skipped"
+    },
+    "request_schema": {
+      "type": "object"
+    },
+    "tool_adapter_result_envelope": {
+      "type": "object"
+    },
+    "absence_gates": {
+      "type": "object"
+    },
+    "terms_metadata": {
+      "type": "object"
     }
   },
   "additionalProperties": true
