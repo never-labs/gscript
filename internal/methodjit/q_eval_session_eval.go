@@ -330,6 +330,12 @@ func qEvalSessionEvalNopDeadEvalFields(fn *Function) {
 // correct (they re-resolve and overwrite each other without corruption).
 type qEvalSessionEvalSite struct {
 	planned atomic.Pointer[qEvalSessionEvalPlanned]
+	// resumeOff/resumeOffNumeric memoize the native resume code offset for
+	// the slim exit lane (tiering_exit_fast_q_eval.go): 0 = unresolved,
+	// -1 = known-missing, >0 = offset into cf.Code. Fills are idempotent
+	// (the offset for a site never changes within one CompiledFunction).
+	resumeOff        atomic.Int32
+	resumeOffNumeric atomic.Int32
 }
 
 // qEvalSessionEvalPlanned binds a resolved planned-eval executor to the
@@ -404,16 +410,12 @@ func (cf *CompiledFunction) qEvalSessionEvalSite(instrID int) *qEvalSessionEvalS
 // so resolving the executor once per receiver is semantically equivalent to
 // the shell's per-iteration field lookup.
 func (cf *CompiledFunction) executeQEvalSessionEval(instrID, aux int, receiver runtime.Value) (runtime.Value, error) {
-	var constants []runtime.Value
-	if cf != nil && cf.Proto != nil {
-		constants = cf.Proto.Constants
-	}
 	if cf != nil && receiver.IsTable() {
 		if site := cf.qEvalSessionEvalSite(instrID); site != nil {
 			tbl := receiver.Table()
 			planned := site.planned.Load()
 			if planned == nil || planned.receiver != tbl {
-				if exec, ok := resolveQEvalSessionPlannedExec(tbl, constants, aux); ok {
+				if exec, ok := resolveQEvalSessionPlannedExec(tbl, cf.protoConstants(), aux); ok {
 					planned = &qEvalSessionEvalPlanned{receiver: tbl, exec: exec}
 					site.planned.Store(planned)
 				} else {
@@ -427,9 +429,17 @@ func (cf *CompiledFunction) executeQEvalSessionEval(instrID, aux int, receiver r
 			}
 		}
 	}
-	out, err := executeQEvalSessionEvalValue(constants, aux, receiver)
+	out, err := executeQEvalSessionEvalValue(cf.protoConstants(), aux, receiver)
 	cf.recordQEvalSessionEvalExecution(err)
 	return out, err
+}
+
+// protoConstants returns the compiled proto's constant pool (nil-safe).
+func (cf *CompiledFunction) protoConstants() []runtime.Value {
+	if cf == nil || cf.Proto == nil {
+		return nil
+	}
+	return cf.Proto.Constants
 }
 
 // resolveQEvalSessionPlannedExec asks the receiver session table's reserved
