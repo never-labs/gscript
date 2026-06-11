@@ -1,0 +1,52 @@
+// Provider-free live package skeleton for FinRobot report rendering.
+//
+// The JSON manifest and contracts are the contract of record. This smoke file
+// mirrors the renderer boundaries without importing browser, PDF, or chart
+// rendering dependencies.
+
+report_renderer_live_package := {
+    id: "finrobot-report-renderer-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    renderer_dependency_required: false
+    clean_skip_without_renderer: true
+    output_formats: {"text/html", "application/pdf"}
+    snapshot_formats: {"text/html", "application/pdf", "image/png"}
+    warning_kinds: {"table_render_warning", "markdown_render_warning", "missing_chart_warning"}
+    source_annotations: {"src-acme-10k", "src-acme-model"}
+    disclosures: {"disc-ai", "disc-risk"}
+    deterministic_fixture_hash: "1e04d0e6fc7bbd1ec883a92460bf71c34850f5428972490adf03f0b04edf2814"
+}
+
+func report_renderer_contract_ok(pkg) {
+    if pkg == nil {
+        return false
+    }
+    return pkg.provider_free == true &&
+        pkg.live_network == false &&
+        pkg.real_dependency_imports == false &&
+        pkg.renderer_dependency_required == false &&
+        pkg.clean_skip_without_renderer == true &&
+        #pkg.output_formats == 2 &&
+        #pkg.snapshot_formats == 3 &&
+        #pkg.warning_kinds == 3 &&
+        #pkg.source_annotations == 2 &&
+        #pkg.disclosures == 2
+}
+
+report_renderer_contract_valid := report_renderer_contract_ok(report_renderer_live_package)
+assert(report_renderer_contract_valid)
+
+report_renderer_live_package_summary := string.format(
+"report_renderer_live_package formats=%d snapshots=%d warnings=%d sources=%d disclosures=%d provider_free=%s clean_skip=%s",
+#report_renderer_live_package.output_formats,
+#report_renderer_live_package.snapshot_formats,
+#report_renderer_live_package.warning_kinds,
+#report_renderer_live_package.source_annotations,
+#report_renderer_live_package.disclosures,
+tostring(report_renderer_live_package.provider_free),
+tostring(report_renderer_live_package.clean_skip_without_renderer)
+)
+
+print(report_renderer_live_package_summary)

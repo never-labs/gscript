@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "source_annotation_v1",
+  "type": "object",
+  "source_required": [
+    "id",
+    "title",
+    "kind",
+    "locator",
+    "as_of",
+    "retrieved_at",
+    "evidence_hash"
+  ],
+  "disclosure_required": [
+    "id",
+    "kind",
+    "text",
+    "must_render"
+  ],
+  "checks": {
+    "all_source_refs_must_resolve": true,
+    "all_disclosures_must_render": true,
+    "unresolved_refs_allowed": false
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "output_manifest_v1",
+  "type": "object",
+  "required": [
+    "report_id",
+    "renderer",
+    "outputs",
+    "page_snapshots",
+    "warnings",
+    "source_annotation_checks",
+    "disclosure_checks",
+    "deterministic_fixture_hash"
+  ],
+  "output_required": [
+    "artifact_id",
+    "format",
+    "uri",
+    "status",
+    "content_hash",
+    "page_snapshot_ids"
+  ],
+  "statuses": [
+    "specified_not_rendered",
+    "planned_not_rendered",
+    "clean_skipped_without_renderer"
+  ],
+  "formats": [
+    "text/html",
+    "application/pdf"
+  ],
+  "renderer_required": [
+    "id",
+    "dependency_available",
+    "clean_skip",
+    "status"
+  ]
+}

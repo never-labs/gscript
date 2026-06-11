@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "render_request_v1",
+  "type": "object",
+  "required": [
+    "report_id",
+    "title",
+    "as_of",
+    "sections",
+    "tables",
+    "charts",
+    "source_annotations",
+    "disclosures",
+    "output_formats"
+  ],
+  "formats": [
+    "text/html",
+    "application/pdf"
+  ],
+  "section_required": [
+    "id",
+    "heading",
+    "markdown",
+    "source_refs"
+  ],
+  "table_required": [
+    "id",
+    "caption",
+    "columns",
+    "rows",
+    "source_refs"
+  ],
+  "chart_required": [
+    "id",
+    "kind",
+    "status",
+    "placeholder_required",
+    "source_refs"
+  ]
+}
