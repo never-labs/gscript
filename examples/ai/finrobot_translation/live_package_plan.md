@@ -7,13 +7,14 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 31 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. Six checked-in
-live-package skeletons are registered examples (`analytics_report`,
-`factor_research`, `news_catalyst`, `optional_integrations`, `prompt_roles`,
-and `vendor_adapters`); the product workflow skeleton is
-manifest/contracts/schemas/fixtures only and is covered by tests through the
-existing workflow examples.
+Current registered-example status: 35 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. Ten checked-in live-package
+skeletons are registered examples (`analytics_report`, `analyzer_report`,
+`document_pipeline`, `factor_research`, `finance_facade`, `news_catalyst`,
+`optional_integrations`, `prompt_roles`, `tutorial_demo_parity`, and
+`vendor_adapters`); `coding_notebook` and `product_workflow` are
+manifest/contracts/schemas/fixtures skeletons covered by dedicated tests and
+existing workflow/tooling examples.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
 | --- | --- | --- | --- | --- |
@@ -26,6 +27,11 @@ existing workflow examples.
 | `live_packages/optional_integrations` | `live_packages/optional_integrations/main.leia` | `leia-finrobot-optional-integrations` | `packages/finrobot/optional_integrations` | `contracts/optional_integration_capability_gates.json` |
 | `live_packages/prompt_roles` | `live_packages/prompt_roles/main.leia` | `leia-finrobot-prompt-roles` | `packages/finrobot/prompt_roles` | `contracts/prompt_role_contract.json` |
 | `live_packages/news_catalyst` | `live_packages/news_catalyst/main.leia` | `leia-finrobot-news-catalyst` | `packages/finrobot/news_catalyst` | `contracts/news_catalyst_contract.json` |
+| `live_packages/finance_facade` | `live_packages/finance_facade/main.leia` | `leia-finrobot-finance-facade` | `packages/finrobot/finance_facade` | `contracts/finance_facade_contract.json` |
+| `live_packages/document_pipeline` | `live_packages/document_pipeline/main.leia` | `leia-finrobot-document-pipeline` | `packages/finrobot/document_pipeline` | `contracts/document_pipeline_contract.json` |
+| `live_packages/analyzer_report` | `live_packages/analyzer_report/main.leia` | `leia-finrobot-analyzer-report` | `packages/finrobot/analyzer_report` | `contracts/analyzer_report_contract.json` |
+| `live_packages/coding_notebook` | Covered through `generated_code_tooling.leia`; no standalone registered `.leia` file | `leia-finrobot-coding-notebook` | `packages/finrobot/coding_notebook` | `contracts/coding_notebook_contract.json` |
+| `live_packages/tutorial_demo_parity` | `live_packages/tutorial_demo_parity/main.leia` | `leia-finrobot-tutorial-demo-parity` | `packages/finrobot/tutorial_demo_parity` | `contracts/tutorial_demo_parity_contract.json` |
 
 ## Contract Rules
 
