@@ -158,7 +158,31 @@ func TestFinRobotOptionalIntegrationsLivePackageContractsAndFixtures(t *testing.
 			RequiresCredentials     bool   `json:"requires_credentials"`
 			LiveNetwork             bool   `json:"live_network"`
 			DependencyImported      bool   `json:"dependency_imported"`
+			NoLiveImportDefault     bool   `json:"no_live_import_default"`
+			ProviderCredentials     bool   `json:"provider_credentials_required"`
+			CredentialAbsentSafe    bool   `json:"credential_absent_safe"`
 			StatusWithoutDependency string `json:"status_without_dependency"`
+			VersionMetadata         struct {
+				Package               string  `json:"package"`
+				VersionSource         string  `json:"version_source"`
+				MinimumSupported      string  `json:"minimum_supported"`
+				DetectedVersion       *string `json:"detected_version"`
+				DependencyAbsentState string  `json:"dependency_absent_status"`
+			} `json:"version_metadata"`
+			ToolAdapterResultEnvelope map[string]any            `json:"tool_adapter_result_envelope"`
+			AbsenceGates              map[string]map[string]any `json:"absence_gates"`
+			TermsMetadata             struct {
+				Integration                       string `json:"integration"`
+				Mode                              string `json:"mode"`
+				MetadataOnly                      bool   `json:"metadata_only"`
+				LiveTermsRequiredBeforeNetworkUse bool   `json:"live_terms_required_before_network_use"`
+				LiveNetworkEnabled                bool   `json:"live_network_enabled"`
+			} `json:"terms_metadata"`
+			CredentialRedaction struct {
+				Status              string   `json:"status"`
+				SecretValuesPresent bool     `json:"secret_values_present"`
+				RedactedFields      []string `json:"redacted_fields"`
+			} `json:"credential_redaction"`
 		} `json:"gates"`
 	}
 	decodeOptionalLiveJSONFile(t, filepath.Join(base, "contracts", "optional_integration_capability_gates.json"), &contract)
@@ -177,6 +201,22 @@ func TestFinRobotOptionalIntegrationsLivePackageContractsAndFixtures(t *testing.
 		}
 		if !gate.CleanSkip || gate.RequiresCredentials || gate.LiveNetwork || gate.DependencyImported || gate.StatusWithoutDependency != "skipped" {
 			t.Fatalf("gate must cleanly skip without live imports: %#v", gate)
+		}
+		if !gate.NoLiveImportDefault || gate.ProviderCredentials || !gate.CredentialAbsentSafe {
+			t.Fatalf("%s optional gate must be provider-free by default: %#v", gate.ID, gate)
+		}
+		assertOptionalLiveVersionMetadata(t, gate.ID, gate.PackageName, gate.VersionMetadata.Package, gate.VersionMetadata.VersionSource, gate.VersionMetadata.DependencyAbsentState, gate.VersionMetadata.DetectedVersion)
+		assertOptionalLiveResultEnvelope(t, gate.ID, gate.Capability, gate.FixtureKey, gate.ToolAdapterResultEnvelope)
+		assertOptionalLiveAbsenceGates(t, gate.ID, gate.AbsenceGates)
+		if gate.TermsMetadata.Integration != gate.ID ||
+			gate.TermsMetadata.Mode != "fixture_replay" ||
+			!gate.TermsMetadata.MetadataOnly ||
+			!gate.TermsMetadata.LiveTermsRequiredBeforeNetworkUse ||
+			gate.TermsMetadata.LiveNetworkEnabled {
+			t.Fatalf("%s terms metadata must stay fixture-only: %#v", gate.ID, gate.TermsMetadata)
+		}
+		if gate.CredentialRedaction.Status != "redacted" || gate.CredentialRedaction.SecretValuesPresent || len(gate.CredentialRedaction.RedactedFields) == 0 {
+			t.Fatalf("%s credential redaction metadata incomplete: %#v", gate.ID, gate.CredentialRedaction)
 		}
 	}
 
@@ -202,7 +242,25 @@ func TestFinRobotOptionalIntegrationsLivePackageContractsAndFixtures(t *testing.
 		if fixture.Metadata["replay_ready"] != true {
 			t.Fatalf("%s replay_ready = %#v", fixture.FixtureKey, fixture.Metadata["replay_ready"])
 		}
+		version, _ := fixture.Metadata["version_metadata"].(map[string]any)
+		assertOptionalLiveVersionMetadata(t, fixture.IntegrationID, fixture.IntegrationID, stringValue(version["package"]), stringValue(version["version_source"]), stringValue(version["dependency_absent_status"]), nil)
+		envelope, _ := fixture.Metadata["result_envelope"].(map[string]any)
+		assertOptionalLiveResultEnvelope(t, fixture.IntegrationID, fixture.Capability, fixture.FixtureKey, envelope)
+		absence, _ := fixture.Metadata["absence_gates"].(map[string]any)
+		if len(absence) == 0 {
+			t.Fatalf("%s fixture absence gates missing", fixture.FixtureKey)
+		}
+		terms, _ := fixture.Metadata["terms"].(map[string]any)
+		if terms["mode"] != "fixture_replay" || terms["metadata_only"] != true || terms["live_terms_required_before_network_use"] != true {
+			t.Fatalf("%s terms metadata incomplete: %#v", fixture.FixtureKey, terms)
+		}
+		redaction, _ := fixture.Metadata["credential_redaction"].(map[string]any)
+		if redaction["status"] != "redacted" || redaction["secret_values_present"] != false {
+			t.Fatalf("%s credential redaction metadata incomplete: %#v", fixture.FixtureKey, redaction)
+		}
 	}
+	assertOptionalLiveNoCredentialLeakage(t, filepath.Join(base, "contracts", "optional_integration_capability_gates.json"))
+	assertOptionalLiveNoCredentialLeakage(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"))
 }
 
 func TestFinRobotOptionalIntegrationsLivePackageNoLiveImports(t *testing.T) {
@@ -287,6 +345,95 @@ func assertOptionalLiveJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeOptionalLiveJSONFile(t, path, &value)
+}
+
+func assertOptionalLiveVersionMetadata(t *testing.T, id, wantPackage, gotPackage, source, absentStatus string, detected *string) {
+	t.Helper()
+	if gotPackage != wantPackage || source != "fixture_metadata" || absentStatus != "skipped" {
+		t.Fatalf("%s version metadata = package:%q source:%q absent:%q, want package:%q fixture_metadata skipped", id, gotPackage, source, absentStatus, wantPackage)
+	}
+	if detected != nil {
+		t.Fatalf("%s detected version must stay nil without importing dependency: %q", id, *detected)
+	}
+}
+
+func assertOptionalLiveResultEnvelope(t *testing.T, id, capability, fixtureKey string, envelope map[string]any) {
+	t.Helper()
+	if len(envelope) == 0 {
+		t.Fatalf("%s result envelope missing", id)
+	}
+	providerFree := envelope["provider_free"]
+	liveNetwork := envelope["live_network"]
+	realImports := envelope["real_dependency_imports"]
+	if metadata, _ := envelope["metadata"].(map[string]any); len(metadata) != 0 {
+		if providerFree == nil {
+			providerFree = metadata["provider_free"]
+		}
+		if liveNetwork == nil {
+			liveNetwork = metadata["live_network"]
+		}
+		if realImports == nil {
+			realImports = metadata["real_dependency_imports"]
+		}
+	}
+	if providerFree != true || liveNetwork != false || realImports != false {
+		t.Fatalf("%s result envelope must stay provider-free: %#v", id, envelope)
+	}
+	if envelope["skip_status"] != nil && envelope["skip_status"] != "skipped" {
+		t.Fatalf("%s result envelope skip status = %#v", id, envelope["skip_status"])
+	}
+	if envelope["data_source"] != nil && envelope["data_source"] != "fixture" {
+		t.Fatalf("%s result envelope data source = %#v", id, envelope["data_source"])
+	}
+	if envelope["status"] != nil && envelope["status"] != "ok" {
+		t.Fatalf("%s fixture result status = %#v", id, envelope["status"])
+	}
+	if envelope["capability"] != nil && envelope["capability"] != capability {
+		t.Fatalf("%s fixture result capability = %#v, want %q", id, envelope["capability"], capability)
+	}
+	if envelope["fixture_key"] != nil && envelope["fixture_key"] != fixtureKey {
+		t.Fatalf("%s fixture result fixture_key = %#v, want %q", id, envelope["fixture_key"], fixtureKey)
+	}
+}
+
+func assertOptionalLiveAbsenceGates(t *testing.T, id string, gates map[string]map[string]any) {
+	t.Helper()
+	if len(gates) == 0 {
+		t.Fatalf("%s absence gates missing", id)
+	}
+	for name, gate := range gates {
+		if gate["clean_skip"] != true || gate["absent_status"] != "skipped" {
+			t.Fatalf("%s absence gate %q must cleanly skip: %#v", id, name, gate)
+		}
+	}
+}
+
+func assertOptionalLiveNoCredentialLeakage(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, pattern := range []string{
+		`sk-[A-Za-z0-9_-]{12,}`,
+		`Bearer\s+[A-Za-z0-9._-]{12,}`,
+		`gh[pousr]_[A-Za-z0-9_]{20,}`,
+		`xox[baprs]-[A-Za-z0-9-]{12,}`,
+		`(?i)"(?:api_key|access_token|secret|password)"\s*:\s*"[^"<{\[][^"]{7,}"`,
+	} {
+		if regexp.MustCompile(pattern).FindString(source) != "" {
+			t.Fatalf("%s appears to contain an unredacted credential matching %q", path, pattern)
+		}
+	}
+}
+
+func stringValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	s, _ := value.(string)
+	return s
 }
 
 func decodeOptionalLiveJSONFile(t *testing.T, path string, value any) {
