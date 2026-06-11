@@ -97,6 +97,133 @@ result, err := llm.turn({
 	}
 }
 
+func TestLLMToolParamsGenerateProviderSchema(t *testing.T) {
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(query, source) {
+    return query .. ":" .. source, nil
+}, {
+    description: "lookup docs",
+    params: {"query", "source"},
+    requires: {"docs.read"},
+    output: {answer: "string"},
+})
+info := llm.tool_schema(lookup)
+info_schema_type := info.schema.type
+info_required_1 := info.schema.required[1]
+info_required_2 := info.schema.required[2]
+info_prop_query_type := info.schema.properties.query.type
+info_output_answer := info.output.answer
+result, err := llm.turn({
+    messages: {llm.user("hello")},
+    tools: {lookup},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(provider.last.Tools) != 1 {
+		t.Fatalf("tools = %#v", provider.last.Tools)
+	}
+	schema, ok := provider.last.Tools[0].Schema.(map[string]any)
+	if !ok || schema["type"] != "object" {
+		t.Fatalf("schema = %#v", provider.last.Tools[0].Schema)
+	}
+	required, ok := schema["required"].([]any)
+	if !ok || len(required) != 2 || required[0] != "query" || required[1] != "source" {
+		t.Fatalf("required = %#v", schema["required"])
+	}
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties = %#v", schema["properties"])
+	}
+	query, ok := props["query"].(map[string]any)
+	if !ok || query["type"] != "string" {
+		t.Fatalf("query schema = %#v", props["query"])
+	}
+	for name, want := range map[string]interface{}{
+		"info_schema_type":     "object",
+		"info_required_1":      "query",
+		"info_required_2":      "source",
+		"info_prop_query_type": "string",
+		"info_output_answer":   "string",
+	} {
+		got, _ := vm.Get(name)
+		if got != want {
+			t.Fatalf("%s = %#v, want %#v", name, got, want)
+		}
+	}
+}
+
+func TestLLMToolExplicitSchemaWinsOverGeneratedParamsSchema(t *testing.T) {
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
+	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(provider))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(query) {
+    return query, nil
+}, {
+    params: {"query"},
+    schema: {
+        type: "object",
+        properties: {query: {type: "string", description: "search terms"}},
+        required: {"query"},
+        additionalProperties: false,
+    },
+})
+info := llm.toolSchema({lookup})
+info_additional := info[1].schema.additionalProperties
+result, err := llm.turn({
+    messages: {llm.user("hello")},
+    tools: {lookup},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	schema, ok := provider.last.Tools[0].Schema.(map[string]any)
+	if !ok || schema["additionalProperties"] != false {
+		t.Fatalf("schema = %#v", provider.last.Tools[0].Schema)
+	}
+	got, _ := vm.Get("info_additional")
+	if got != false {
+		t.Fatalf("info_additional = %#v, want false", got)
+	}
+}
+
+func TestDialectToolUsesLLMToolSchemaHelper(t *testing.T) {
+	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM | leia.LibDialect))
+	if err := vm.Exec(`
+search_runbook := tool {
+    name: "search_runbook"
+    params: {"service"}
+    description: "Search local runbooks."
+    requires: {"docs.read", "runbooks.read"}
+    fn: func(service) {
+        return "runbook:" .. service, nil
+    }
+}
+info := llm.tool_schema({search_runbook})
+tool_name := info[1].name
+schema_type := info[1].schema.type
+required_1 := info[1].schema.required[1]
+cap_1 := info[1].requires[1]
+cap_2 := info[1].requires[2]
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	for name, want := range map[string]interface{}{
+		"tool_name":   "search_runbook",
+		"schema_type": "object",
+		"required_1":  "service",
+		"cap_1":       "docs.read",
+		"cap_2":       "runbooks.read",
+	} {
+		got, _ := vm.Get(name)
+		if got != want {
+			t.Fatalf("%s = %#v, want %#v", name, got, want)
+		}
+	}
+}
+
 func TestLLMToolCapabilities(t *testing.T) {
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM))
 	if err := vm.Exec(`

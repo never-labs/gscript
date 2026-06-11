@@ -121,15 +121,14 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		var params Value
 		var requires Value
 		var schema Value
+		var output Value
 		if opts.IsTable() {
 			optTable := opts.Table()
 			desc = optTable.RawGetString("description").Str()
 			params = optTable.RawGetString("params")
 			requires = optTable.RawGetString("requires")
 			schema = optTable.RawGetString("schema")
-			if schema.IsNil() {
-				schema = optTable.RawGetString("output")
-			}
+			output = optTable.RawGetString("output")
 		}
 		tool := NewTable()
 		tool.RawSetString("__llm_tool", BoolValue(true))
@@ -144,6 +143,9 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		}
 		if !schema.IsNil() {
 			tool.RawSetString("schema", schema)
+		}
+		if !output.IsNil() {
+			tool.RawSetString("output", output)
 		}
 		return TableValue(tool)
 	}
@@ -235,6 +237,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		}})
 		tool := newToolValue(name, wrapper, opts)
 		if tt := tool.Table(); tt != nil {
+			tt.RawSetString("__llm_agent_tool", BoolValue(true))
 			if !tt.RawGetString("params").IsTable() && len(meta.Params) > 0 {
 				tt.RawSetString("params", llmStringArrayValue(meta.Params))
 			}
@@ -253,6 +256,15 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		}
 		return []Value{llmToolCapsValue(args[0].Table())}, nil
 	})
+
+	toolSchema := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.tool_schema' (tool or tools table expected)")
+		}
+		return []Value{llmToolSchemaValue(args[0])}, nil
+	}
+	set("tool_schema", toolSchema)
+	set("toolSchema", toolSchema)
 
 	set("check_tools", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsTable() || !args[1].IsTable() {
