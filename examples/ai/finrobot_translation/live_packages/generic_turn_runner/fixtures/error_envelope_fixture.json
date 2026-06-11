@@ -1,0 +1,15 @@
+{
+  "schema": "error_envelope_v1",
+  "request_id": "turn-request-acme-summary-001",
+  "correlation_id": "corr-generic-turn-acme-summary-001",
+  "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+  "code": "replay_miss",
+  "message": "Fixture replay miss is represented as a provider-free clean skip.",
+  "retryable": false,
+  "provider_free": true,
+  "live_network": false,
+  "credentials_required": false,
+  "secret_env_patterns": [],
+  "no_secret": true,
+  "source": "fixture"
+}

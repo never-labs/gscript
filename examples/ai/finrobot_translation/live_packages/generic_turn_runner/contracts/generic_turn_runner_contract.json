@@ -10,7 +10,9 @@
       "turn_model": "single_turn",
       "requires_messages": true,
       "requires_response_format": true,
-      "requires_replay_key": true
+      "requires_replay_key": true,
+      "requires_correlation_id": true,
+      "requires_no_secret_evidence": true
     },
     {
       "name": "ai.turn.execute",
@@ -18,7 +20,9 @@
       "requires_usage": true,
       "requires_error_envelope": true,
       "requires_tool_request_envelope": true,
-      "requires_replay_match": true
+      "requires_replay_match": true,
+      "requires_correlation_id": true,
+      "requires_no_secret_evidence": true
     }
   ],
   "message_contract": {
@@ -38,7 +42,7 @@
     "provider_free": true
   },
   "error_contract": {
-    "fields": ["code", "message", "retryable", "provider_free"],
+    "fields": ["code", "message", "retryable", "provider_free", "live_network", "credentials_required", "secret_env_patterns", "no_secret", "request_hash", "correlation_id"],
     "codes": ["replay_miss", "schema_mismatch", "tool_request_invalid", "provider_unavailable"],
     "provider_free": true
   },
@@ -46,7 +50,7 @@
     "schema": "tool_request_envelope_v1",
     "request_only": true,
     "live_execution": false,
-    "required_fields": ["tool_call_id", "name", "arguments", "status", "replay"],
+    "required_fields": ["tool_call_id", "correlation_id", "name", "arguments", "status", "replay", "policy"],
     "provider_free": true
   },
   "replay_record_match_contract": {
@@ -56,5 +60,15 @@
     "miss_behavior": "clean-skip",
     "provider_free": true,
     "live_network": false
+  },
+  "semantic_guard_contract": {
+    "stable_request_hash": true,
+    "correlation_id_required": true,
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true,
+    "covered_envelopes": ["turn_request", "tool_request", "replay_match", "execute_response", "error_envelope"]
   }
 }

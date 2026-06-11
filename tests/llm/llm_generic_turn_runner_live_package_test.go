@@ -116,7 +116,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 		!manifest.RequestContract.ProviderFree {
 		t.Fatalf("request contract incomplete: %#v", manifest.RequestContract)
 	}
-	for _, want := range []string{"request_id", "model", "messages", "response_format", "replay"} {
+	for _, want := range []string{"request_id", "correlation_id", "model", "messages", "response_format", "replay"} {
 		if !contains(manifest.RequestContract.RequiredFields, want) {
 			t.Fatalf("request contract missing required field %q: %#v", want, manifest.RequestContract.RequiredFields)
 		}
@@ -136,7 +136,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 		!manifest.ExecuteContract.ProviderFree {
 		t.Fatalf("execute contract incomplete: %#v", manifest.ExecuteContract)
 	}
-	for _, want := range []string{"status", "message", "response_format", "usage", "error", "tool_requests", "replay"} {
+	for _, want := range []string{"status", "request_id", "correlation_id", "message", "response_format", "usage", "error", "tool_requests", "replay"} {
 		if !contains(manifest.ExecuteContract.ResponseEnvelopeFields, want) {
 			t.Fatalf("execute envelope missing %q: %#v", want, manifest.ExecuteContract.ResponseEnvelopeFields)
 		}
@@ -146,7 +146,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 			t.Fatalf("usage envelope missing %q: %#v", want, manifest.ExecuteContract.UsageFields)
 		}
 	}
-	for _, want := range []string{"code", "message", "retryable", "provider_free"} {
+	for _, want := range []string{"code", "message", "retryable", "provider_free", "live_network", "credentials_required", "no_secret", "request_hash", "correlation_id"} {
 		if !contains(manifest.ExecuteContract.ErrorFields, want) {
 			t.Fatalf("error envelope missing %q: %#v", want, manifest.ExecuteContract.ErrorFields)
 		}
@@ -200,7 +200,7 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 			t.Fatalf("%s schema lacks required fields", key)
 		}
 	}
-	for _, key := range []string{"index", "turn_request", "execute_response", "tool_request", "replay_record"} {
+	for _, key := range []string{"index", "turn_request", "execute_response", "tool_request", "replay_record", "error"} {
 		if manifest.Fixtures[key] == "" {
 			t.Fatalf("missing fixture %q", key)
 		}
@@ -233,6 +233,39 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 			t.Fatalf("%s must declare provider_free: %#v", name, section)
 		}
 	}
+
+	var fixtureIndex struct {
+		ProviderFree bool             `json:"provider_free"`
+		LiveNetwork  bool             `json:"live_network"`
+		Fixtures     []map[string]any `json:"fixtures"`
+	}
+	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &fixtureIndex)
+	if !fixtureIndex.ProviderFree || fixtureIndex.LiveNetwork {
+		t.Fatalf("fixture index must stay provider-free/offline: %#v", fixtureIndex)
+	}
+	wantSchemas := map[string]bool{
+		"single_turn_request_v1":       false,
+		"execute_response_envelope_v1": false,
+		"tool_request_envelope_v1":     false,
+		"replay_record_match_v1":       false,
+		"error_envelope_v1":            false,
+	}
+	for _, fixture := range fixtureIndex.Fixtures {
+		schema, _ := fixture["schema"].(string)
+		if _, ok := wantSchemas[schema]; !ok {
+			continue
+		}
+		wantSchemas[schema] = true
+		requireGenericTurnRunnerGuardEvidence(t, "fixture index "+schema, fixture, "corr-generic-turn-acme-summary-001", "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba")
+		metadata, _ := fixture["metadata"].(map[string]any)
+		requireGenericTurnRunnerGuardEvidence(t, "fixture index metadata "+schema, metadata, "corr-generic-turn-acme-summary-001", "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba")
+		assertGenericTurnRunnerJSONFile(t, filepath.Join(base, fixture["path"].(string)))
+	}
+	for schema, seen := range wantSchemas {
+		if !seen {
+			t.Fatalf("fixture index does not cover core envelope schema %q: %#v", schema, fixtureIndex.Fixtures)
+		}
+	}
 }
 
 func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
@@ -241,23 +274,29 @@ func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
 	var request struct {
 		Schema         string           `json:"schema"`
 		RequestID      string           `json:"request_id"`
+		CorrelationID  string           `json:"correlation_id"`
 		Model          string           `json:"model"`
 		Messages       []map[string]any `json:"messages"`
 		ResponseFormat map[string]any   `json:"response_format"`
 		Tools          []map[string]any `json:"tools"`
+		Metadata       map[string]any   `json:"metadata"`
 		Replay         map[string]any   `json:"replay"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "generic_turn_request_fixture.json"), &request)
-	if request.Schema != "single_turn_request_v1" || request.RequestID == "" || request.Model == "" || len(request.Messages) != 2 {
+	if request.Schema != "single_turn_request_v1" || request.RequestID == "" || request.CorrelationID == "" || request.Model == "" || len(request.Messages) != 2 {
 		t.Fatalf("request fixture incomplete: %#v", request)
 	}
 	if request.ResponseFormat["type"] != "json_schema" || len(request.Tools) != 1 || request.Replay["match_key"] != "deterministic_request_hash" {
 		t.Fatalf("request response_format/tools/replay incomplete: %#v", request)
 	}
+	requestHash, _ := request.Replay["request_hash"].(string)
+	requireGenericTurnRunnerStableHash(t, "request replay request_hash", requestHash)
+	requireGenericTurnRunnerGuardEvidence(t, "request metadata", request.Metadata, request.CorrelationID, "")
 
 	var response struct {
 		Schema         string           `json:"schema"`
 		RequestID      string           `json:"request_id"`
+		CorrelationID  string           `json:"correlation_id"`
 		Status         string           `json:"status"`
 		Message        map[string]any   `json:"message"`
 		ResponseFormat map[string]any   `json:"response_format"`
@@ -267,7 +306,7 @@ func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
 		Replay         map[string]any   `json:"replay"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "ai_turn_execute_fixture.json"), &response)
-	if response.Schema != "execute_response_envelope_v1" || response.RequestID != request.RequestID || response.Status != "ok" {
+	if response.Schema != "execute_response_envelope_v1" || response.RequestID != request.RequestID || response.CorrelationID != request.CorrelationID || response.Status != "ok" {
 		t.Fatalf("execute fixture header incomplete: %#v", response)
 	}
 	if response.Message["role"] != "assistant" || response.ResponseFormat["type"] != "json_schema" {
@@ -282,28 +321,34 @@ func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
 	if response.Replay["match_key"] != request.Replay["match_key"] || response.Replay["request_hash"] != request.Replay["request_hash"] {
 		t.Fatalf("replay envelope does not match request: response=%#v request=%#v", response.Replay, request.Replay)
 	}
+	requireGenericTurnRunnerGuardEvidence(t, "execute replay", response.Replay, request.CorrelationID, requestHash)
+	requireGenericTurnRunnerGuardEvidence(t, "execute error", response.Error, request.CorrelationID, requestHash)
 
 	var tool struct {
-		Schema     string         `json:"schema"`
-		ToolCallID string         `json:"tool_call_id"`
-		Name       string         `json:"name"`
-		Arguments  map[string]any `json:"arguments"`
-		Status     string         `json:"status"`
-		Replay     map[string]any `json:"replay"`
-		Policy     map[string]any `json:"policy"`
+		Schema        string         `json:"schema"`
+		ToolCallID    string         `json:"tool_call_id"`
+		CorrelationID string         `json:"correlation_id"`
+		Name          string         `json:"name"`
+		Arguments     map[string]any `json:"arguments"`
+		Status        string         `json:"status"`
+		Replay        map[string]any `json:"replay"`
+		Policy        map[string]any `json:"policy"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "tool_request_fixture.json"), &tool)
-	if tool.Schema != "tool_request_envelope_v1" || tool.ToolCallID == "" || tool.Name != "fixture.lookup" ||
+	if tool.Schema != "tool_request_envelope_v1" || tool.ToolCallID == "" || tool.CorrelationID != request.CorrelationID || tool.Name != "fixture.lookup" ||
 		tool.Arguments["ticker"] != "ACME" || tool.Arguments["horizon"] != "1d" {
 		t.Fatalf("tool request fixture incomplete: %#v", tool)
 	}
 	if tool.Status != "requested" || tool.Policy["execution_policy"] != "request-only-envelope" || tool.Policy["live_execution"] != false || tool.Policy["provider_free"] != true {
 		t.Fatalf("tool request policy invalid: %#v", tool)
 	}
+	requireGenericTurnRunnerGuardEvidence(t, "tool replay", tool.Replay, request.CorrelationID, requestHash)
+	requireGenericTurnRunnerGuardEvidence(t, "tool policy", tool.Policy, "", "")
 
 	var replay struct {
 		Schema        string         `json:"schema"`
 		RecordID      string         `json:"record_id"`
+		CorrelationID string         `json:"correlation_id"`
 		MatchKey      string         `json:"match_key"`
 		RequestHash   string         `json:"request_hash"`
 		Request       map[string]any `json:"request"`
@@ -311,12 +356,20 @@ func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
 		MatchContract map[string]any `json:"match_contract"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "replay_record_match_fixture.json"), &replay)
-	if replay.Schema != "replay_record_match_v1" || replay.RecordID == "" || replay.MatchKey != "deterministic_request_hash" || replay.RequestHash != request.Replay["request_hash"] {
+	if replay.Schema != "replay_record_match_v1" || replay.RecordID == "" || replay.CorrelationID != request.CorrelationID || replay.MatchKey != "deterministic_request_hash" || replay.RequestHash != request.Replay["request_hash"] {
 		t.Fatalf("replay fixture header invalid: %#v", replay)
 	}
 	if replay.MatchContract["miss_behavior"] != "clean-skip" || replay.MatchContract["provider_free"] != true || replay.MatchContract["live_network"] != false {
 		t.Fatalf("replay match contract invalid: %#v", replay.MatchContract)
 	}
+	requireGenericTurnRunnerGuardEvidence(t, "replay match contract", replay.MatchContract, "", "")
+
+	var errorEnvelope map[string]any
+	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "error_envelope_fixture.json"), &errorEnvelope)
+	if errorEnvelope["schema"] != "error_envelope_v1" || errorEnvelope["code"] != "replay_miss" || errorEnvelope["retryable"] != false {
+		t.Fatalf("error fixture invalid: %#v", errorEnvelope)
+	}
+	requireGenericTurnRunnerGuardEvidence(t, "error fixture", errorEnvelope, request.CorrelationID, requestHash)
 }
 
 func TestGenericTurnRunnerSmokeAndNoProviderDependencies(t *testing.T) {
@@ -331,7 +384,7 @@ func TestGenericTurnRunnerSmokeAndNoProviderDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get summary: %v", err)
 	}
-	want := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=2 schemas=5 fixtures=4 replay_match=deterministic_request_hash"
+	want := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=2 schemas=5 fixtures=5 replay_match=deterministic_request_hash"
 	if got != want {
 		t.Fatalf("summary = %#v, want %#v", got, want)
 	}
@@ -404,5 +457,39 @@ func decodeGenericTurnRunnerJSONFile(t *testing.T, path string, out any) {
 	}
 	if err := json.Unmarshal(data, out); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
+	}
+}
+
+func requireGenericTurnRunnerGuardEvidence(t *testing.T, name string, got map[string]any, wantCorrelationID, wantRequestHash string) {
+	t.Helper()
+	if got == nil {
+		t.Fatalf("%s missing guard evidence", name)
+	}
+	if got["provider_free"] != true || got["live_network"] != false || got["credentials_required"] != false || got["no_secret"] != true {
+		t.Fatalf("%s must be provider-free/offline/no-secret: %#v", name, got)
+	}
+	if patterns, ok := got["secret_env_patterns"].([]any); ok && len(patterns) != 0 {
+		t.Fatalf("%s must not declare secret env patterns: %#v", name, patterns)
+	}
+	if wantCorrelationID != "" && got["correlation_id"] != wantCorrelationID {
+		t.Fatalf("%s correlation_id = %#v, want %#v", name, got["correlation_id"], wantCorrelationID)
+	}
+	if wantRequestHash != "" && got["request_hash"] != wantRequestHash {
+		t.Fatalf("%s request_hash = %#v, want %#v", name, got["request_hash"], wantRequestHash)
+	}
+	if hash, _ := got["request_hash"].(string); hash != "" {
+		requireGenericTurnRunnerStableHash(t, name+" request_hash", hash)
+	}
+}
+
+func requireGenericTurnRunnerStableHash(t *testing.T, name, hash string) {
+	t.Helper()
+	if !strings.HasPrefix(hash, "sha256:") || len(hash) != len("sha256:")+64 {
+		t.Fatalf("%s must be stable sha256 hash, got %q", name, hash)
+	}
+	for _, r := range strings.TrimPrefix(hash, "sha256:") {
+		if !strings.ContainsRune("0123456789abcdef", r) {
+			t.Fatalf("%s must use lowercase hex sha256, got %q", name, hash)
+		}
 	}
 }

@@ -1,6 +1,6 @@
 // Provider-free generic AI turn runner live package skeleton.
 // This package declares request/execute/replay contracts only.
 
-generic_turn_runner_live_package_summary := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=2 schemas=5 fixtures=4 replay_match=deterministic_request_hash"
+generic_turn_runner_live_package_summary := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=2 schemas=5 fixtures=5 replay_match=deterministic_request_hash"
 
 print(generic_turn_runner_live_package_summary)

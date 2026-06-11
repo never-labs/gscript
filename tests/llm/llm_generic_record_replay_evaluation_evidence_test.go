@@ -2,10 +2,13 @@ package leia_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -28,6 +31,7 @@ func TestGenericRecordReplayReportIsEvaluationCaseEvidence(t *testing.T) {
 		successEvidence.Summary.LLMMode != "replay" ||
 		successEvidence.Summary.LoadedTurns != 1 ||
 		successEvidence.Summary.ReplayedTurns != 1 ||
+		successEvidence.Summary.RemainingTurns != 0 ||
 		successEvidence.Summary.LLMTurns != 1 ||
 		successEvidence.Summary.LLMErrors != 0 ||
 		len(successEvidence.Findings) != 0 {
@@ -39,6 +43,9 @@ func TestGenericRecordReplayReportIsEvaluationCaseEvidence(t *testing.T) {
 	if mismatchEvidence.Status != "failed" ||
 		mismatchEvidence.Summary.Status != "failed" ||
 		mismatchEvidence.Summary.LLMMode != "replay" ||
+		mismatchEvidence.Summary.LoadedTurns != 1 ||
+		mismatchEvidence.Summary.ReplayedTurns != 1 ||
+		mismatchEvidence.Summary.RemainingTurns != 0 ||
 		mismatchEvidence.Summary.LLMErrors == 0 ||
 		!genericEvidenceHasFinding(mismatchEvidence, "llm_replay_mismatch") {
 		t.Fatalf("mismatch replay report is not usable failure evidence: %#v", mismatchEvidence)
@@ -53,20 +60,97 @@ func TestGenericRecordReplayReportIsEvaluationCaseEvidence(t *testing.T) {
 					t.Fatalf("mismatch finding missing detail %q: %#v", key, finding)
 				}
 			}
+			assertGenericReplayFindingDetailsExplainMismatch(t, finding.Details, "mock-generic-eval-drift", "mock-generic-eval-judge")
 		}
+		assertGenericReplayFindingHasNoSecretsOrLiveNetwork(t, finding)
+	}
+
+	unconsumedReport := runGenericRecordReplayEvidenceReport(t, root, specimen.unconsumedSourcePath, specimen.successRecordsPath, false)
+	if unconsumedReport.Status != "failed" ||
+		unconsumedReport.LLM == nil ||
+		unconsumedReport.LLM.Mode != "replay" ||
+		unconsumedReport.LLM.LoadedTurns != 1 ||
+		unconsumedReport.LLM.ReplayedTurns != 0 ||
+		unconsumedReport.LLM.RemainingTurns != 1 ||
+		len(unconsumedReport.Findings) != 1 ||
+		!genericReportHasFinding(unconsumedReport, "llm_replay_unconsumed") {
+		t.Fatalf("unconsumed replay report is not usable failure evidence: %#v", unconsumedReport)
+	}
+	for _, finding := range unconsumedReport.Findings {
+		if finding.Kind == "llm_replay_unconsumed" && (finding.Path != specimen.successRecordsPath || finding.Details["remaining_turns"] != float64(1)) {
+			t.Fatalf("unconsumed finding is not tied to fixture records and count: %#v", finding)
+		}
+		assertGenericReplayFindingHasNoSecretsOrLiveNetwork(t, finding)
 	}
 }
 
+func TestGenericRecordReplayEvaluationEvidenceGuardTracesFixtureRecordsAndHashes(t *testing.T) {
+	base := genericRecordReplayLivePackageDir(t)
+	index := loadGenericReplayIndex(t, base)
+	records := loadGenericReplayRecords(t, base)
+	partialRequests := loadGenericReplayRequests(t, base, "matching_requests_fixture.json")
+	mismatchRequests := loadGenericReplayRequests(t, base, "mismatch_requests_fixture.json")
+
+	partialSummary, partialFindings := runGenericStrictOrderedReplay(index, records, partialRequests)
+	if !reflect.DeepEqual(partialSummary, index.ExpectedSummaries["strict_ordered_partial"]) {
+		t.Fatalf("partial summary = %#v, want fixture summary %#v", partialSummary, index.ExpectedSummaries["strict_ordered_partial"])
+	}
+	if partialSummary.NextIndex != 2 || partialSummary.Unconsumed != 1 ||
+		!reflect.DeepEqual(partialSummary.MatchedRecordIDs, []string{"rec-000-analyst-intent", "rec-001-tool-lookup"}) {
+		t.Fatalf("partial replay did not preserve strict ordered cursor and fixture record ids: %#v", partialSummary)
+	}
+	if len(partialFindings) != 1 ||
+		partialFindings[0].Kind != index.Matching.UnconsumedFindingKind ||
+		partialFindings[0].Cursor != partialSummary.NextIndex ||
+		partialFindings[0].RecordID != records[2].RecordID ||
+		partialFindings[0].Expected.RequestHash != records[2].RequestHash {
+		t.Fatalf("partial unconsumed finding is not traceable to fixture record/hash: summary=%#v findings=%#v", partialSummary, partialFindings)
+	}
+
+	mismatchSummary, mismatchFindings := runGenericStrictOrderedReplay(index, records, mismatchRequests)
+	if !reflect.DeepEqual(mismatchSummary, index.ExpectedSummaries["strict_ordered_mismatch"]) {
+		t.Fatalf("mismatch summary = %#v, want fixture summary %#v", mismatchSummary, index.ExpectedSummaries["strict_ordered_mismatch"])
+	}
+	if mismatchSummary.NextIndex != 1 || mismatchSummary.Mismatches != 1 || mismatchSummary.Unconsumed != 2 ||
+		!reflect.DeepEqual(mismatchSummary.MatchedRecordIDs, []string{"rec-000-analyst-intent"}) {
+		t.Fatalf("mismatch replay did not preserve strict ordered statistics: %#v", mismatchSummary)
+	}
+	if len(mismatchFindings) != 3 {
+		t.Fatalf("mismatch findings = %#v, want mismatch plus two unconsumed records", mismatchFindings)
+	}
+	mismatch := mismatchFindings[0]
+	if mismatch.Kind != index.Matching.MismatchFindingKind ||
+		mismatch.Cursor != mismatchSummary.NextIndex ||
+		mismatch.RecordID != records[1].RecordID ||
+		mismatch.Expected.RequestHash != records[1].RequestHash ||
+		mismatch.Actual.RequestHash != mismatchRequests[1].RequestHash ||
+		mismatch.Actual.RequestHash != records[2].RequestHash {
+		t.Fatalf("mismatch finding is not traceable to next fixture record and deterministic request hash: %#v", mismatch)
+	}
+	for i, finding := range mismatchFindings[1:] {
+		record := records[mismatchSummary.NextIndex+i]
+		if finding.Kind != index.Matching.UnconsumedFindingKind ||
+			finding.Cursor != record.Sequence ||
+			finding.RecordID != record.RecordID ||
+			finding.Expected.RequestHash != record.RequestHash {
+			t.Fatalf("unconsumed finding[%d] is not traceable to fixture record/hash: %#v record=%#v", i, finding, record)
+		}
+	}
+	assertGenericReplaySummaryOrderAndStats(t, index, mismatchSummary, mismatchFindings)
+}
+
 type genericRecordReplayEvidenceSpecimen struct {
-	sourcePath          string
-	successRecordsPath  string
-	mismatchRecordsPath string
+	sourcePath           string
+	unconsumedSourcePath string
+	successRecordsPath   string
+	mismatchRecordsPath  string
 }
 
 func writeGenericRecordReplayEvidenceSpecimen(t *testing.T) genericRecordReplayEvidenceSpecimen {
 	t.Helper()
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "generic_record_replay_evidence.leia")
+	unconsumedSourcePath := filepath.Join(dir, "generic_record_replay_evidence_unconsumed.leia")
 	datasetPath := filepath.Join(dir, "generic_record_replay_evidence_dataset.jsonl")
 	successRecordsPath := filepath.Join(dir, "generic_record_replay_evidence.records.json")
 	mismatchRecordsPath := filepath.Join(dir, "generic_record_replay_evidence_mismatch.records.json")
@@ -125,6 +209,12 @@ func writeGenericRecordReplayEvidenceSpecimen(t *testing.T) genericRecordReplayE
 	if err := os.WriteFile(sourcePath, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	unconsumedSource := `evaluate "generic record replay unconsumed evidence bridge" {
+    assert(true)
+}`
+	if err := os.WriteFile(unconsumedSourcePath, []byte(unconsumedSource), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(datasetPath, []byte(dataset), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -136,9 +226,10 @@ func writeGenericRecordReplayEvidenceSpecimen(t *testing.T) genericRecordReplayE
 		t.Fatal(err)
 	}
 	return genericRecordReplayEvidenceSpecimen{
-		sourcePath:          sourcePath,
-		successRecordsPath:  successRecordsPath,
-		mismatchRecordsPath: mismatchRecordsPath,
+		sourcePath:           sourcePath,
+		unconsumedSourcePath: unconsumedSourcePath,
+		successRecordsPath:   successRecordsPath,
+		mismatchRecordsPath:  mismatchRecordsPath,
 	}
 }
 
@@ -151,11 +242,12 @@ type genericEvidenceReport struct {
 		Assertions     int `json:"assertions"`
 	} `json:"summary"`
 	LLM *struct {
-		Mode          string `json:"mode"`
-		LoadedTurns   int    `json:"loaded_turns"`
-		ReplayedTurns int    `json:"replayed_turns"`
-		Turns         int    `json:"turns"`
-		Errors        int    `json:"errors"`
+		Mode           string `json:"mode"`
+		LoadedTurns    int    `json:"loaded_turns"`
+		ReplayedTurns  int    `json:"replayed_turns"`
+		RemainingTurns int    `json:"remaining_turns"`
+		Turns          int    `json:"turns"`
+		Errors         int    `json:"errors"`
 	} `json:"llm"`
 	Cases []struct {
 		CaseID     string `json:"case_id"`
@@ -224,6 +316,7 @@ type genericRecordReplayEvaluationEvidence struct {
 		LLMMode        string `json:"llm_mode"`
 		LoadedTurns    int    `json:"loaded_turns"`
 		ReplayedTurns  int    `json:"replayed_turns"`
+		RemainingTurns int    `json:"remaining_turns"`
 		LLMTurns       int    `json:"llm_turns"`
 		LLMErrors      int    `json:"llm_errors"`
 	} `json:"summary"`
@@ -281,6 +374,7 @@ func genericEvidenceFromReplayReport(
 		evidence.Summary.LLMMode = report.LLM.Mode
 		evidence.Summary.LoadedTurns = report.LLM.LoadedTurns
 		evidence.Summary.ReplayedTurns = report.LLM.ReplayedTurns
+		evidence.Summary.RemainingTurns = report.LLM.RemainingTurns
 		evidence.Summary.LLMTurns = report.LLM.Turns
 		evidence.Summary.LLMErrors = report.LLM.Errors
 	}
@@ -314,4 +408,79 @@ func genericEvidenceHasFinding(evidence genericRecordReplayEvaluationEvidence, k
 		}
 	}
 	return false
+}
+
+func genericReportHasFinding(report genericEvidenceReport, kind string) bool {
+	for _, finding := range report.Findings {
+		if finding.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func assertGenericReplayFindingDetailsExplainMismatch(t *testing.T, details map[string]any, expectedModel, actualModel string) {
+	t.Helper()
+	expected, ok := details["expected"].(map[string]any)
+	if !ok {
+		t.Fatalf("mismatch expected details are not structured: %#v", details)
+	}
+	actual, ok := details["actual"].(map[string]any)
+	if !ok {
+		t.Fatalf("mismatch actual details are not structured: %#v", details)
+	}
+	if expected["model"] != expectedModel || actual["model"] != actualModel {
+		t.Fatalf("mismatch finding does not explain expected/actual model drift: %#v", details)
+	}
+	if genericEvidenceStableDetailsHash(t, expected) == genericEvidenceStableDetailsHash(t, actual) {
+		t.Fatalf("mismatch expected/actual deterministic request hashes should differ: %#v", details)
+	}
+}
+
+func assertGenericReplayFindingHasNoSecretsOrLiveNetwork(t *testing.T, finding struct {
+	Kind     string         `json:"kind"`
+	Severity string         `json:"severity"`
+	Message  string         `json:"message"`
+	Path     string         `json:"path"`
+	Details  map[string]any `json:"details"`
+}) {
+	t.Helper()
+	data, err := json.Marshal(finding)
+	if err != nil {
+		t.Fatalf("marshal finding: %v", err)
+	}
+	lower := strings.ToLower(string(data))
+	for _, forbidden := range []string{"api_key", "authorization", "bearer ", "credential", "secret", "live_endpoint", "http://", "https://"} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("finding leaks secret or live network marker %q: %s", forbidden, data)
+		}
+	}
+}
+
+func assertGenericReplaySummaryOrderAndStats(t *testing.T, index genericReplayIndex, summary genericReplaySummary, findings []genericReplayFinding) {
+	t.Helper()
+	gotOrder := []string{"fixture_id", "strategy", "loaded_records", "requests", "matched", "mismatches", "unconsumed", "exhausted", "next_index", "finding_kinds", "matched_record_ids"}
+	if !reflect.DeepEqual(index.DeterministicSummaryOrder, gotOrder) {
+		t.Fatalf("fixture summary order = %#v, want %#v", index.DeterministicSummaryOrder, gotOrder)
+	}
+	if summary.LoadedRecords != summary.Matched+summary.Unconsumed || summary.Requests != summary.Matched+summary.Mismatches+summary.Exhausted {
+		t.Fatalf("summary statistics are not internally explainable: %#v", summary)
+	}
+	findingKinds := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		findingKinds = append(findingKinds, finding.Kind)
+	}
+	if !reflect.DeepEqual(summary.FindingKinds, findingKinds) {
+		t.Fatalf("summary finding kinds do not match findings: summary=%#v findings=%#v", summary, findings)
+	}
+}
+
+func genericEvidenceStableDetailsHash(t *testing.T, details map[string]any) string {
+	t.Helper()
+	data, err := json.Marshal(details)
+	if err != nil {
+		t.Fatalf("marshal details for hash: %v", err)
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("sha256:%x", sum)
 }

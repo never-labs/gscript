@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 func TestGenericAIProviderFreeContractComposition(t *testing.T) {
@@ -104,6 +106,85 @@ func TestGenericAITurnCanonicalizationForComposition(t *testing.T) {
 	changedFormat["response_format"] = map[string]any{"type": "text"}
 	if got := canonicalGenericCompositionHash(t, changedFormat, "request_id"); got == baseline {
 		t.Fatalf("response_format must participate in generic turn replay hash")
+	}
+}
+
+func TestGenericAgentLoopCompositionGuardExplainsProviderFreeChain(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+			}, tc.opts...)...)
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), filepath.FromSlash(genericAgentLoopCompositionExample))); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			if err := vm.Exec(`
+func generic_composition_has_tag(tags, want) {
+    for i := 1; i <= #tags; i++ {
+        if tags[i] == want {
+            return true
+        }
+    }
+    return false
+}
+
+probe_model_tags_ok := generic_composition_has_tag(generic_model_contract.capability_tags, "generic.ai.model.contract") && generic_composition_has_tag(generic_model_contract.capability_tags, "generic.ai.provider_free")
+probe_agent_tags_ok := generic_composition_has_tag(generic_agent_runner.capability_tags, "generic.ai.agent.runner") && generic_composition_has_tag(generic_agent_runner.capability_tags, "generic.ai.policy.fixture_replay")
+probe_turn_tags_ok := generic_composition_has_tag(generic_turn_runner.capability_tags, "generic.ai.turn.runner") && generic_composition_has_tag(agent_loop_result.turns[1].capability_tags, "generic.ai.tool.request")
+probe_tool_tags_ok := generic_composition_has_tag(generic_tool_contracts.capability_tags, "generic.ai.tool.contract") && generic_composition_has_tag(agent_loop_result.turns[2].calls[1].capability_tags, "local.response.compose")
+probe_trace_tags_ok := generic_composition_has_tag(generic_trace_events.capability_tags, "generic.ai.trace.events") && generic_composition_has_tag(generic_trace_events.capability_tags, "generic.ai.redaction.no_secret")
+probe_replay_tags_ok := generic_composition_has_tag(generic_model_contract.capability_tags, "generic.ai.replay.fixture") && generic_composition_has_tag(generic_turn_runner.capability_tags, "generic.ai.replay.fixture")
+
+probe_provider_free_chain_ok := generic_model_contract.provider_free == true && generic_agent_runner.provider_free == true && generic_turn_runner.provider_free == true && generic_tool_contracts.provider_free == true && generic_trace_events.provider_free == true && agent_loop_result.provider_free == true
+probe_live_network_chain_ok := generic_model_contract.live_network == false && generic_agent_runner.live_network == false && generic_turn_runner.live_network == false && generic_tool_contracts.live_network == false && generic_trace_events.live_network == false && agent_loop_result.live_network == false
+probe_real_imports_chain_ok := generic_model_contract.real_dependency_imports == false && generic_agent_runner.real_dependency_imports == false && generic_turn_runner.real_dependency_imports == false && generic_tool_contracts.real_dependency_imports == false && generic_trace_events.real_dependency_imports == false && agent_loop_result.real_dependency_imports == false
+probe_redaction_chain_ok := generic_model_contract.redaction.secret_values_present == false && generic_agent_runner.redaction.secret_values_present == false && agent_loop_result.redaction.raw_prompt_stored == false && agent_loop_result.redaction.raw_completion_stored == false && generic_trace_events.events[1].redaction.secret_values_present == false
+probe_policy_chain_ok := generic_model_contract.policy.mode == "fixture_replay" && generic_agent_runner.policy.mode == generic_model_contract.policy.mode && generic_agent_runner.policy.provider_credentials_required == false && generic_agent_runner.policy.live_model_calls == false && agent_loop_result.policy.secret_values_allowed == false
+probe_replay_chain_ok := generic_model_contract.replay.match_key == "deterministic_contract_hash" && generic_agent_runner.replay.match_key == generic_model_contract.replay.match_key && agent_loop_result.replay.provider_free == true && agent_loop_result.replay.real_dependency_imports == false
+
+probe_trace_correlation_chain_ok := generic_model_contract.correlation_id == generic_agent_runner.correlation_id && generic_agent_runner.correlation_id == generic_turn_runner.correlation_id && generic_turn_runner.correlation_id == generic_tool_contracts.correlation_id && generic_tool_contracts.correlation_id == generic_trace_events.correlation_id && generic_trace_events.correlation_id == agent_loop_result.correlation_id
+probe_turn_tool_trace_correlation_ok := agent_loop_result.turns[1].correlation_id == agent_loop_result.turns[1].calls[1].correlation_id && agent_loop_result.turns[2].correlation_id == agent_loop_result.turns[2].calls[1].correlation_id && agent_loop_result.turns[1].calls[1].correlation_id == generic_trace_events.events[4].correlation.correlation_id && agent_loop_result.turns[2].calls[1].correlation_id == generic_trace_events.events[7].correlation.correlation_id && generic_trace_events.events[8].correlation.correlation_id == agent_loop_result.correlation_id
+probe_trace_id_chain_ok := generic_model_contract.trace_id == generic_agent_runner.trace_id && generic_agent_runner.trace_id == generic_turn_runner.trace_id && generic_trace_events.events[1].correlation.trace_id == generic_trace_events.trace_id && generic_trace_events.events[8].correlation.trace_id == agent_loop_result.trace_id
+probe_explainable_chain := generic_model_contract.id .. ">" .. generic_agent_runner.model_contract .. ">" .. generic_agent_runner.turn_runner .. ">" .. generic_agent_runner.tool_contracts .. ">" .. generic_agent_runner.trace_events
+probe_event_components := generic_trace_events.events[1].component .. ">" .. generic_trace_events.events[2].component .. ">" .. generic_trace_events.events[4].component .. ">" .. generic_trace_events.events[8].component
+`); err != nil {
+				t.Fatalf("Exec probes: %v", err)
+			}
+
+			for name, want := range map[string]any{
+				"probe_model_tags_ok":                  true,
+				"probe_agent_tags_ok":                  true,
+				"probe_turn_tags_ok":                   true,
+				"probe_tool_tags_ok":                   true,
+				"probe_trace_tags_ok":                  true,
+				"probe_replay_tags_ok":                 true,
+				"probe_provider_free_chain_ok":         true,
+				"probe_live_network_chain_ok":          true,
+				"probe_real_imports_chain_ok":          true,
+				"probe_redaction_chain_ok":             true,
+				"probe_policy_chain_ok":                true,
+				"probe_replay_chain_ok":                true,
+				"probe_trace_correlation_chain_ok":     true,
+				"probe_turn_tool_trace_correlation_ok": true,
+				"probe_trace_id_chain_ok":              true,
+				"probe_explainable_chain":              "generic_model_contract_v1>generic_model_contract_v1>generic_turn_runner_v1>generic_tool_contracts_v1>generic_trace_events_v1",
+				"probe_event_components":               "generic_agent_runner>generic_turn_runner>generic_tool_contracts>generic_agent_runner",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
 	}
 }
 

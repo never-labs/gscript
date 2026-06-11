@@ -19,7 +19,8 @@ Baseline:
 - Inventory-only refresh commands run for this audit:
   `rg --files examples/ai/finrobot_translation | wc -l`,
   `go run ./cmd/leia examples list --json`, live-package directory inventory,
-  and provider-free fixture-index inventory. These commands are read-only.
+  provider-free fixture-index inventory, and documentation semantic-guard
+  searches. These commands are read-only.
 
 ## Executive Summary
 
@@ -45,7 +46,9 @@ FinRobot work. They are checked-in package boundaries under
 examples, and tests. Current inventory finds 10 registered generic live-package
 examples covering model resolution, turns, tools, agents, workflows,
 evaluation, replay, trace, approval, and package auditing; FinRobot is only one
-consumer of those generic boundaries.
+consumer of those generic boundaries. The same inventory finds three top-level
+generic composition examples, including `generic_workflow_orchestration.leia`;
+these are covered examples, not planned or missing dialect work.
 
 ## Inventory Commands
 
@@ -59,6 +62,9 @@ The following read-only inventory commands were run from this worktree on
 | `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `32` live-package skeleton directories |
 | `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `31` provider-free fixture indexes |
 | `go run ./cmd/leia examples list --json` filtered to `/live_packages/generic_` | `10` registered generic AI live-package examples |
+| Same example inventory filtered to top-level `generic_*.leia` examples | `3` registered generic AI composition examples |
+| Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
+| `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 
 No stale count was found in this document during this refresh.
 
@@ -66,13 +72,13 @@ No stale count was found in this document during this refresh.
 
 | ID | Path | Runner | Coverage role |
 | --- | --- | --- | --- |
-| `repo-ai-finrobot_translation-agent_builder_replay` | `agent_builder_replay.leia` | `evaluate` | Provider-free AgentBuilder roster, config save/load, max-round, tool assignment, and trace replay |
+| `repo-ai-finrobot_translation-agent_builder_replay` | `agent_builder_replay.leia` | `host-vm` | Provider-free AgentBuilder roster, config save/load, max-round, tool assignment, and trace replay |
 | `repo-ai-finrobot_translation-api_replay` | `api_replay.leia` | `host-vm` | API/web replay substrate, provider metadata, pagination, errors |
 | `repo-ai-finrobot_translation-compliance_policy` | `compliance_policy.leia` | `host-vm` | Safety, approval, capability, publication, network, credential gates |
 | `repo-ai-finrobot_translation-config_secret_example` | `config_secret_example.leia` | `host-vm` | Secret-free config/env handling and redaction |
 | `repo-ai-finrobot_translation-core_agents-main` | `core_agents/main.leia` | `llm-replay` | Role/tool/agent contract fixture |
-| `repo-ai-finrobot_translation-core_agents-workflow_lifecycle` | `core_agents/workflow_lifecycle.leia` | `host-vm` | Provider-free workflow lifecycle fixture for reset, cache, trigger, TERMINATE, nested summary, handoff trace, and max round |
 | `repo-ai-finrobot_translation-core_agents-workflow_handoff` | `core_agents/workflow_handoff.leia` | `llm-replay` | Parent/child workflow handoff and trace fixture |
+| `repo-ai-finrobot_translation-core_agents-workflow_lifecycle` | `core_agents/workflow_lifecycle.leia` | `evaluate` | Provider-free workflow lifecycle fixture for reset, cache, trigger, TERMINATE, nested summary, handoff trace, and max round |
 | `repo-ai-finrobot_translation-data_normalization` | `data_normalization.leia` | `host-vm` | Typed table and nested JSON normalization |
 | `repo-ai-finrobot_translation-data_tools` | `data_tools.leia` | `host-vm` | Finance tool inventory and provider-free tool outputs |
 | `repo-ai-finrobot_translation-document_rag` | `document_rag.leia` | `host-vm` | SEC/earnings document chunks and RAG corpus contracts |
@@ -82,6 +88,7 @@ No stale count was found in this document during this refresh.
 | `repo-ai-finrobot_translation-generated_code_tooling` | `generated_code_tooling.leia` | `host-vm` | Capability-gated code/file/image tooling envelope |
 | `repo-ai-finrobot_translation-generic_agent_loop_composition` | `generic_agent_loop_composition.leia` | `evaluate` | Provider-free generic AI agent loop composition across agent runner, turn runner, tool contracts, and trace events |
 | `repo-ai-finrobot_translation-generic_ai_workflow_composition` | `generic_ai_workflow_composition.leia` | `host-vm` | Provider-free Leia-native composition across generic model, turn, tool, agent, workflow, eval, replay, trace, approval, and package-audit boundaries |
+| `repo-ai-finrobot_translation-generic_workflow_orchestration` | `generic_workflow_orchestration.leia` | `evaluate` | Provider-free generic workflow orchestration guard for stage DAG, replayed agent handoff, trace hooks, and gate reporting |
 | `repo-ai-finrobot_translation-live_packages-analytics_report-analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `host-vm` | Checked-in analytics report live-package skeleton for normalizers, valuation, chart specs, report manifests, and renderer contracts |
 | `repo-ai-finrobot_translation-live_packages-analyzer_report-main` | `live_packages/analyzer_report/main.leia` | `host-vm` | Checked-in analyzer report live-package skeleton for section schemas, evidence rules, citations, and report envelopes |
 | `repo-ai-finrobot_translation-live_packages-backtest_strategy-main` | `live_packages/backtest_strategy/main.leia` | `host-vm` | Checked-in backtest strategy live-package skeleton for strategy manifests, data feeds, trade ledgers, metrics, risk limits, deterministic seeds, and optional dependency skips |
@@ -124,6 +131,19 @@ No stale count was found in this document during this refresh.
 | `repo-ai-finrobot_translation-role_profiles` | `role_profiles.leia` | `host-vm` | FinRobot-style role registry as data |
 | `repo-ai-finrobot_translation-section_agents` | `section_agents.leia` | `host-vm` | Section prompt/output schemas |
 | `repo-ai-finrobot_translation-sensitivity_math` | `sensitivity_math.leia` | `host-vm` | Matrix/sensitivity fixture math |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-advanced_agent_annual_report` | `tutorial_parity/runnable/advanced_agent_annual_report.leia` | `host-vm` | Runnable provider-free advanced annual-report tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-advanced_agent_fingpt_forecaster` | `tutorial_parity/runnable/advanced_agent_fingpt_forecaster.leia` | `host-vm` | Runnable provider-free advanced FinGPT forecaster tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-advanced_agent_openbb` | `tutorial_parity/runnable/advanced_agent_openbb.leia` | `host-vm` | Runnable provider-free advanced OpenBB tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-advanced_agent_trade_strategist` | `tutorial_parity/runnable/advanced_agent_trade_strategist.leia` | `host-vm` | Runnable provider-free advanced trade strategist tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-advanced_lmm_agent_mplfinance` | `tutorial_parity/runnable/advanced_lmm_agent_mplfinance.leia` | `host-vm` | Runnable provider-free advanced mplfinance tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-advanced_lmm_agent_opt_smacross` | `tutorial_parity/runnable/advanced_lmm_agent_opt_smacross.leia` | `host-vm` | Runnable provider-free advanced SMA-cross optional strategy tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_agent_annual_report` | `tutorial_parity/runnable/beginner_agent_annual_report.leia` | `host-vm` | Runnable provider-free beginner annual-report tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_agent_fingpt_forecaster` | `tutorial_parity/runnable/beginner_agent_fingpt_forecaster.leia` | `host-vm` | Runnable provider-free beginner FinGPT forecaster tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_agent_rag_earnings_call_sec_filings` | `tutorial_parity/runnable/beginner_agent_rag_earnings_call_sec_filings.leia` | `host-vm` | Runnable provider-free beginner RAG earnings-call and SEC-filings tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_agent_rag_qa` | `tutorial_parity/runnable/beginner_agent_rag_qa.leia` | `host-vm` | Runnable provider-free beginner RAG QA tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_agent_rag_qa_up` | `tutorial_parity/runnable/beginner_agent_rag_qa_up.leia` | `host-vm` | Runnable provider-free beginner RAG QA update tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_ollama_function_call` | `tutorial_parity/runnable/beginner_ollama_function_call.leia` | `host-vm` | Runnable provider-free beginner Ollama function-call tutorial parity fixture |
+| `repo-ai-finrobot_translation-tutorial_parity-runnable-beginner_ollama_stock_chart` | `tutorial_parity/runnable/beginner_ollama_stock_chart.leia` | `host-vm` | Runnable provider-free beginner Ollama stock-chart tutorial parity fixture |
 | `repo-ai-finrobot_translation-tutorials-notebook_parity-annual_report` | `tutorials/notebook_parity/annual_report.leia` | `host-vm` | Provider-free annual-report notebook parity fixture |
 | `repo-ai-finrobot_translation-tutorials-notebook_parity-ollama_function_call_optional_gate` | `tutorials/notebook_parity/ollama_function_call_optional_gate.leia` | `host-vm` | Provider-free optional Ollama function-call gate fixture |
 | `repo-ai-finrobot_translation-tutorials-notebook_parity-rag_earnings_sec` | `tutorials/notebook_parity/rag_earnings_sec.leia` | `host-vm` | Provider-free RAG earnings/SEC notebook parity fixture |
@@ -174,8 +194,8 @@ Status key:
 | `experiments/investment_group.py` | `quant_experiments/investment_group.leia` | Covered | Offline multi-agent investment group replay | Live market/filing/provider calls and full AutoGen execution lifecycle |
 | `experiments/multi_factor_agents.py` | `quant_experiments/multi_factor_agents.leia` | Covered | Offline multi-factor agent replay | Live factor data package and full provider-backed factor transforms |
 | `experiments/portfolio_optimization.py` | `quant_experiments/portfolio_optimization.leia` | Covered | Offline optimizer replay and deterministic stats | Live optimizer/backtest library and market-data integration |
-| `tutorials_beginner/*` | Existing registered examples cover annual report/RAG/forecast/chart concepts across files | Partial | Provider-free equivalents for key concepts: RAG, equity report, forecast-style section agents, chart specs | Notebook-by-notebook parity, Ollama function call/stock chart live gates |
-| `tutorials_advanced/*` | `optional_integrations.leia`, `quant_experiments/*.leia`, `generated_code_tooling.leia`, `tutorial_parity/ledger.json`, `live_packages/optional_integrations/*` | Partial | Optional gates for OpenBB, mplfinance, FinGPT, FinRL, Backtrader, Ollama; replayed quant workflows and tutorial parity ledger | Notebook-by-notebook parity, multimodal chart/document analysis, live optional package implementations |
+| `tutorials_beginner/*` | `tutorial_parity/runnable/*`, `tutorials/notebook_parity/*`, existing registered examples | Partial | Provider-free runnable equivalents for annual report, RAG QA, RAG earnings/SEC, FinGPT forecaster, Ollama function call, and stock-chart concepts | Live optional-provider execution and broader notebook artifact parity |
+| `tutorials_advanced/*` | `tutorial_parity/runnable/*`, `optional_integrations.leia`, `quant_experiments/*.leia`, `generated_code_tooling.leia`, `tutorial_parity/ledger.json`, `live_packages/optional_integrations/*` | Partial | Runnable provider-free parity for annual report, FinGPT forecaster, OpenBB, trade strategist, mplfinance, and optional SMA-cross examples; replayed quant workflows and tutorial parity ledger | Multimodal chart/document analysis and live optional package implementations |
 | `agent_builder_demo.py`, `test_module.py` | `core_agents/main.leia`, `evaluation_harness/manifest.json` | Partial | Small deterministic agent/tool fixtures plus generic AI evaluation harness parity | Direct demo/test translation with matching assertions |
 | `configs/*`, `OAI_CONFIG_LIST`, `config_api_keys` | `config_secret_example.leia`, `model_alias_routing_example.leia`, `package_deploy_manifest.json` | Covered | Secret-free config, missing key diagnostics, route metadata, deploy env docs | Full config migration helpers and live provider profile loading |
 | `requirements*.txt`, `setup.py`, `Dockerfile`, `deploy*.sh`, `run_web_app.py` | `package_deploy_*`, `package_deploy_manifest.json` | Covered | Provider-free package/deploy metadata, Docker/gcloud/run commands, health entrypoint | Release packaging, real dependency extras, deployment smoke in target cloud |
@@ -216,7 +236,7 @@ mistaken for missing language/runtime support.
 | Optional integrations | FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, Ollama live package implementations beyond the checked-in clean-skip skeleton | `tutorials_*`, `optional_integrations` targets |
 | Web product | Real web routes, auth, admin views, background workers, logs, report downloads, persistence, session recovery | `finrobot_equity/web_app/*` |
 | Packaging/release | Installable external packages, dependency extras, cloud deployment smoke, artifact publish process | `setup.py`, requirements, Dockerfile, deploy scripts |
-| Tutorial parity | Notebook-by-notebook beginner and advanced tutorial translations with provider-free and optional live gates | `tutorials_beginner/*`, `tutorials_advanced/*` |
+| Tutorial parity | Live optional-provider execution and broader notebook artifact parity beyond the registered provider-free runnable tutorial examples | `tutorials_beginner/*`, `tutorials_advanced/*` |
 
 ## Provider-Free Slice Completion
 

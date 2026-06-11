@@ -3,11 +3,12 @@
   "id": "tool_request_envelope_v1",
   "provider_free": true,
   "live_network": false,
-  "required": ["schema", "tool_call_id", "name", "arguments", "status", "replay"],
+  "required": ["schema", "tool_call_id", "correlation_id", "name", "arguments", "status", "replay", "policy"],
   "statuses": ["requested", "validated", "rejected"],
   "argument_encoding": "json_object",
   "execution_policy": "request-only-envelope",
   "live_execution": false,
-  "replay_required": ["fixture_key", "deterministic_tool_hash"],
+  "replay_required": ["fixture_key", "match_key", "request_hash", "correlation_id", "deterministic_tool_hash"],
+  "policy_required": ["execution_policy", "live_execution", "provider_free", "live_network", "credentials_required", "secret_env_patterns", "no_secret"],
   "additional_properties": false
 }

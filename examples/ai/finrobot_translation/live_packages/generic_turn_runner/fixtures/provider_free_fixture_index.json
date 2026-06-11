@@ -13,11 +13,19 @@
         "replay_ready": true,
         "provider_free": true,
         "live_network": false,
-        "real_dependency_imports": false
+        "real_dependency_imports": false,
+        "credentials_required": false,
+        "no_secret": true,
+        "correlation_id": "corr-generic-turn-acme-summary-001",
+        "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
       },
       "provider_free": true,
       "live_network": false,
-      "real_dependency_imports": false
+      "real_dependency_imports": false,
+      "credentials_required": false,
+      "no_secret": true,
+      "correlation_id": "corr-generic-turn-acme-summary-001",
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
     },
     {
       "fixture_key": "generic_turn:execute:acme_summary:v1",
@@ -28,11 +36,19 @@
         "replay_ready": true,
         "provider_free": true,
         "live_network": false,
-        "real_dependency_imports": false
+        "real_dependency_imports": false,
+        "credentials_required": false,
+        "no_secret": true,
+        "correlation_id": "corr-generic-turn-acme-summary-001",
+        "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
       },
       "provider_free": true,
       "live_network": false,
-      "real_dependency_imports": false
+      "real_dependency_imports": false,
+      "credentials_required": false,
+      "no_secret": true,
+      "correlation_id": "corr-generic-turn-acme-summary-001",
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
     },
     {
       "fixture_key": "generic_turn:tool_request:fixture.lookup:v1",
@@ -44,11 +60,19 @@
         "provider_free": true,
         "live_network": false,
         "real_dependency_imports": false,
+        "credentials_required": false,
+        "no_secret": true,
+        "correlation_id": "corr-generic-turn-acme-summary-001",
+        "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
         "replay_ready": true
       },
       "provider_free": true,
       "live_network": false,
-      "real_dependency_imports": false
+      "real_dependency_imports": false,
+      "credentials_required": false,
+      "no_secret": true,
+      "correlation_id": "corr-generic-turn-acme-summary-001",
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
     },
     {
       "fixture_key": "generic_turn:replay_match:acme_summary:v1",
@@ -60,11 +84,43 @@
         "provider_free": true,
         "live_network": false,
         "real_dependency_imports": false,
+        "credentials_required": false,
+        "no_secret": true,
+        "correlation_id": "corr-generic-turn-acme-summary-001",
+        "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
         "replay_ready": true
       },
       "provider_free": true,
       "live_network": false,
-      "real_dependency_imports": false
+      "real_dependency_imports": false,
+      "credentials_required": false,
+      "no_secret": true,
+      "correlation_id": "corr-generic-turn-acme-summary-001",
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
+    },
+    {
+      "fixture_key": "generic_turn:error:replay_miss:v1",
+      "capability": "ai.turn.execute",
+      "path": "fixtures/error_envelope_fixture.json",
+      "schema": "error_envelope_v1",
+      "metadata": {
+        "error_code": "replay_miss",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "credentials_required": false,
+        "no_secret": true,
+        "correlation_id": "corr-generic-turn-acme-summary-001",
+        "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+        "replay_ready": true
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "credentials_required": false,
+      "no_secret": true,
+      "correlation_id": "corr-generic-turn-acme-summary-001",
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
     }
   ],
   "real_dependency_imports": false

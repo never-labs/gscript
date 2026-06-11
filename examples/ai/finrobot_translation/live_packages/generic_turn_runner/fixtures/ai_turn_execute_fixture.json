@@ -1,6 +1,7 @@
 {
   "schema": "execute_response_envelope_v1",
   "request_id": "turn-request-acme-summary-001",
+  "correlation_id": "corr-generic-turn-acme-summary-001",
   "status": "ok",
   "message": {
     "role": "assistant",
@@ -23,7 +24,13 @@
     "code": "",
     "message": "",
     "retryable": false,
-    "provider_free": true
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true,
+    "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+    "correlation_id": "corr-generic-turn-acme-summary-001"
   },
   "tool_requests": [],
   "replay": {
@@ -31,6 +38,12 @@
     "fixture_key": "generic_turn:execute:acme_summary:v1",
     "match_key": "deterministic_request_hash",
     "matched": true,
-    "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
+    "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+    "correlation_id": "corr-generic-turn-acme-summary-001",
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true
   }
 }

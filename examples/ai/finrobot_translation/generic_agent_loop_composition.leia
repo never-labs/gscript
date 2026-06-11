@@ -1,8 +1,9 @@
 // Generic agent loop composition.
 //
-// Shows a provider-free agent loop made from four explicit, reusable contracts:
-// generic_agent_runner, generic_turn_runner, generic_tool_contracts, and
-// generic_trace_events. All work is local and deterministic.
+// Shows a provider-free agent loop made from five explicit, reusable contracts:
+// generic_model_contract, generic_agent_runner, generic_turn_runner,
+// generic_tool_contracts, and generic_trace_events. All work is local and
+// deterministic.
 
 func check(name, ok) {
     if !ok {
@@ -10,11 +11,61 @@ func check(name, ok) {
     }
 }
 
+generic_contract_context := {
+    trace_id: "generic-agent-loop-trace-001",
+    correlation_id: "generic-agent-loop-correlation-001",
+    provider_free: true,
+    live_network: false,
+    live_model: false,
+    real_dependency_imports: false,
+    redaction: {
+        enabled: true,
+        secret_values_present: false,
+        raw_prompt_stored: false,
+        raw_completion_stored: false,
+    },
+    policy: {
+        mode: "fixture_replay",
+        provider_credentials_required: false,
+        live_network: false,
+        live_model_calls: false,
+        real_dependency_imports: false,
+        secret_values_allowed: false,
+    },
+    replay: {
+        match_key: "deterministic_contract_hash",
+        provider_free: true,
+        live_network: false,
+        real_dependency_imports: false,
+    },
+}
+
+generic_model_contract := {
+    id: "generic_model_contract_v1",
+    provider_free: true,
+    live_network: false,
+    live_model: false,
+    real_dependency_imports: false,
+    capability_tags: {"generic.ai.model.contract", "generic.ai.provider_free", "generic.ai.replay.fixture"},
+    trace_id: generic_contract_context.trace_id,
+    correlation_id: generic_contract_context.correlation_id,
+    redaction: generic_contract_context.redaction,
+    policy: generic_contract_context.policy,
+    replay: generic_contract_context.replay,
+}
+
 generic_trace_events := {
     id: "generic_trace_events_v1",
     provider_free: true,
     live_network: false,
     live_model: false,
+    real_dependency_imports: false,
+    capability_tags: {"generic.ai.trace.events", "generic.ai.provider_free", "generic.ai.redaction.no_secret"},
+    trace_id: generic_contract_context.trace_id,
+    correlation_id: generic_contract_context.correlation_id,
+    redaction: generic_contract_context.redaction,
+    policy: generic_contract_context.policy,
+    replay: generic_contract_context.replay,
     events: {},
 }
 
@@ -27,6 +78,13 @@ func record_generic_trace(kind, component, status, payload) {
         provider_free: true,
         live_network: false,
         live_model: false,
+        real_dependency_imports: false,
+        redaction: generic_contract_context.redaction,
+        correlation: {
+            trace_id: generic_contract_context.trace_id,
+            correlation_id: generic_contract_context.correlation_id,
+            component: component,
+        },
     }
     return generic_trace_events.events[#generic_trace_events.events]
 }
@@ -65,15 +123,23 @@ generic_tool_contracts := {
     provider_free: true,
     live_network: false,
     live_model: false,
+    real_dependency_imports: false,
+    capability_tags: {"generic.ai.tool.contract", "generic.ai.tool.invoke", "generic.ai.provider_free", "generic.ai.redaction.no_secret"},
     tools: {lookup_context, compose_response},
     schemas: llm.tool_schema({lookup_context, compose_response}),
     capabilities: {"local.context.read", "local.response.compose"},
+    trace_id: generic_contract_context.trace_id,
+    correlation_id: generic_contract_context.correlation_id,
+    redaction: generic_contract_context.redaction,
+    policy: generic_contract_context.policy,
+    replay: generic_contract_context.replay,
 }
 
 func run_generic_turn(turn) {
     record_generic_trace("turn.start", "generic_turn_runner", "ok", {
         step: turn.step,
-        input: turn.input,
+        input_digest: "local-digest:" .. tostring(turn.step),
+        correlation_id: generic_contract_context.correlation_id,
     })
 
     if turn.step == 1 {
@@ -81,10 +147,16 @@ func run_generic_turn(turn) {
             id: "call_lookup_context_1",
             tool: "lookup_context",
             args: {topic: turn.input},
+            capability_tags: {"generic.ai.tool.call", "local.context.read", "generic.ai.provider_free"},
+            trace_id: generic_contract_context.trace_id,
+            correlation_id: generic_contract_context.correlation_id,
+            policy: generic_contract_context.policy,
+            replay: generic_contract_context.replay,
         }
         record_generic_trace("turn.tool_request", "generic_turn_runner", "ok", {
             tool: call.tool,
             call_id: call.id,
+            correlation_id: call.correlation_id,
         })
         return {
             status: "tool_request",
@@ -94,6 +166,13 @@ func run_generic_turn(turn) {
             provider_free: true,
             live_network: false,
             live_model: false,
+            real_dependency_imports: false,
+            capability_tags: {"generic.ai.turn.runner", "generic.ai.tool.request", "generic.ai.provider_free"},
+            trace_id: generic_contract_context.trace_id,
+            correlation_id: generic_contract_context.correlation_id,
+            redaction: generic_contract_context.redaction,
+            policy: generic_contract_context.policy,
+            replay: generic_contract_context.replay,
         }, nil
     }
 
@@ -104,10 +183,16 @@ func run_generic_turn(turn) {
             context: turn.context.content,
             request: turn.input,
         },
+        capability_tags: {"generic.ai.tool.call", "local.response.compose", "generic.ai.provider_free"},
+        trace_id: generic_contract_context.trace_id,
+        correlation_id: generic_contract_context.correlation_id,
+        policy: generic_contract_context.policy,
+        replay: generic_contract_context.replay,
     }
     record_generic_trace("turn.tool_request", "generic_turn_runner", "ok", {
         tool: call.tool,
         call_id: call.id,
+        correlation_id: call.correlation_id,
     })
     return {
         status: "tool_request",
@@ -117,6 +202,13 @@ func run_generic_turn(turn) {
         provider_free: true,
         live_network: false,
         live_model: false,
+        real_dependency_imports: false,
+        capability_tags: {"generic.ai.turn.runner", "generic.ai.tool.request", "generic.ai.provider_free"},
+        trace_id: generic_contract_context.trace_id,
+        correlation_id: generic_contract_context.correlation_id,
+        redaction: generic_contract_context.redaction,
+        policy: generic_contract_context.policy,
+        replay: generic_contract_context.replay,
     }, nil
 }
 
@@ -125,12 +217,22 @@ generic_turn_runner := {
     provider_free: true,
     live_network: false,
     live_model: false,
+    real_dependency_imports: false,
+    capability_tags: {"generic.ai.turn.runner", "generic.ai.provider_free", "generic.ai.replay.fixture"},
+    trace_id: generic_contract_context.trace_id,
+    correlation_id: generic_contract_context.correlation_id,
+    redaction: generic_contract_context.redaction,
+    policy: generic_contract_context.policy,
+    replay: generic_contract_context.replay,
     max_steps: 2,
     run: run_generic_turn,
 }
 
 func run_generic_agent(request) {
-    record_generic_trace("agent.start", "generic_agent_runner", "ok", {request: request})
+    record_generic_trace("agent.start", "generic_agent_runner", "ok", {
+        request_digest: "local-request-digest",
+        model_contract: generic_model_contract.id,
+    })
 
     first_turn, first_err := generic_turn_runner.run({step: 1, input: request})
     if first_err != nil {
@@ -143,6 +245,7 @@ func run_generic_agent(request) {
     record_generic_trace("tool.dispatch", "generic_tool_contracts", "ok", {
         tool: first_turn.calls[1].tool,
         source: context_value.source,
+        correlation_id: first_turn.calls[1].correlation_id,
     })
 
     second_turn, second_err := generic_turn_runner.run({
@@ -159,7 +262,8 @@ func run_generic_agent(request) {
     }
     record_generic_trace("tool.dispatch", "generic_tool_contracts", "ok", {
         tool: second_turn.calls[1].tool,
-        summary: response_value.summary,
+        output_digest: "local-output-digest",
+        correlation_id: second_turn.calls[1].correlation_id,
     })
 
     result := {
@@ -172,11 +276,19 @@ func run_generic_agent(request) {
         provider_free: true,
         live_network: false,
         live_model: false,
+        real_dependency_imports: false,
         live_provider_calls: 0,
+        capability_tags: {"generic.ai.agent.runner", "generic.ai.provider_free", "generic.ai.redaction.no_secret"},
+        trace_id: generic_contract_context.trace_id,
+        correlation_id: generic_contract_context.correlation_id,
+        redaction: generic_contract_context.redaction,
+        policy: generic_contract_context.policy,
+        replay: generic_contract_context.replay,
     }
     record_generic_trace("agent.done", "generic_agent_runner", result.status, {
         trace_count_before_done: #generic_trace_events.events,
-        output_summary: response_value.summary,
+        output_digest: "local-output-digest",
+        correlation_id: result.correlation_id,
     })
     result.trace = generic_trace_events.events
     return result, nil
@@ -187,10 +299,18 @@ generic_agent_runner := {
     provider_free: true,
     live_network: false,
     live_model: false,
+    real_dependency_imports: false,
     live_provider_calls: 0,
+    capability_tags: {"generic.ai.agent.runner", "generic.ai.provider_free", "generic.ai.policy.fixture_replay"},
+    model_contract: generic_model_contract.id,
     turn_runner: generic_turn_runner.id,
     tool_contracts: generic_tool_contracts.id,
     trace_events: generic_trace_events.id,
+    trace_id: generic_contract_context.trace_id,
+    correlation_id: generic_contract_context.correlation_id,
+    redaction: generic_contract_context.redaction,
+    policy: generic_contract_context.policy,
+    replay: generic_contract_context.replay,
     run: run_generic_agent,
 }
 
@@ -203,7 +323,10 @@ check("tool contracts", #generic_tool_contracts.tools == 2 && generic_tool_contr
 check("turns", #agent_loop_result.turns == 2 && agent_loop_result.turns[1].step == 1 && agent_loop_result.turns[2].step == 2)
 check("tool results", #agent_loop_result.tool_results == 2 && agent_loop_result.tool_results[1].source == "local_fixture")
 check("trace events", #generic_trace_events.events == 8 && generic_trace_events.events[8].kind == "agent.done")
-check("provider-free", agent_loop_result.provider_free == true && agent_loop_result.live_model == false && agent_loop_result.live_provider_calls == 0)
+check("provider-free", agent_loop_result.provider_free == true && agent_loop_result.live_model == false && agent_loop_result.live_provider_calls == 0 && agent_loop_result.real_dependency_imports == false)
+check("correlation", generic_model_contract.correlation_id == generic_agent_runner.correlation_id && generic_agent_runner.correlation_id == agent_loop_result.turns[1].correlation_id && agent_loop_result.turns[1].correlation_id == agent_loop_result.turns[1].calls[1].correlation_id && agent_loop_result.turns[2].calls[1].correlation_id == generic_trace_events.events[8].correlation.correlation_id)
+check("redaction", generic_agent_runner.redaction.secret_values_present == false && agent_loop_result.redaction.raw_prompt_stored == false && generic_trace_events.events[1].redaction.secret_values_present == false)
+check("policy replay", generic_agent_runner.policy.mode == "fixture_replay" && generic_agent_runner.replay.match_key == "deterministic_contract_hash" && agent_loop_result.policy.real_dependency_imports == false)
 check("summary", agent_loop_summary == "response:compose a launch checklist:local-context:compose a launch checklist")
 
 print("generic_agent_loop_composition", generic_agent_runner.id)

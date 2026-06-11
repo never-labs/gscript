@@ -2,6 +2,7 @@
   "schema": "replay_record_match_v1",
   "record_id": "record-generic-turn-acme-summary-001",
   "fixture_key": "generic_turn:replay_match:acme_summary:v1",
+  "correlation_id": "corr-generic-turn-acme-summary-001",
   "match_key": "deterministic_request_hash",
   "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
   "request": {
@@ -24,6 +25,8 @@
   },
   "response": {
     "schema": "execute_response_envelope_v1",
+    "request_id": "turn-request-acme-summary-001",
+    "correlation_id": "corr-generic-turn-acme-summary-001",
     "status": "ok",
     "usage": {
       "input_tokens": 42,
@@ -35,7 +38,13 @@
       "code": "",
       "message": "",
       "retryable": false,
-      "provider_free": true
+      "provider_free": true,
+      "live_network": false,
+      "credentials_required": false,
+      "secret_env_patterns": [],
+      "no_secret": true,
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+      "correlation_id": "corr-generic-turn-acme-summary-001"
     }
   },
   "match_contract": {
@@ -44,6 +53,9 @@
     "canonicalization": ["exclude_request_id", "preserve_message_order", "sort_object_keys", "include_response_format", "include_tool_declarations"],
     "miss_behavior": "clean-skip",
     "provider_free": true,
-    "live_network": false
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true
   }
 }

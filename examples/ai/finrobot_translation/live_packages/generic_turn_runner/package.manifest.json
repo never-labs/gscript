@@ -42,7 +42,8 @@
     "turn_request": "fixtures/generic_turn_request_fixture.json",
     "execute_response": "fixtures/ai_turn_execute_fixture.json",
     "tool_request": "fixtures/tool_request_fixture.json",
-    "replay_record": "fixtures/replay_record_match_fixture.json"
+    "replay_record": "fixtures/replay_record_match_fixture.json",
+    "error": "fixtures/error_envelope_fixture.json"
   },
   "capabilities": [
     "generic.ai.turn.request",
@@ -66,6 +67,7 @@
     "turn_model": "single_turn",
     "required_fields": [
       "request_id",
+      "correlation_id",
       "model",
       "messages",
       "response_format",
@@ -89,6 +91,8 @@
     "schema": "execute_response_envelope_v1",
     "response_envelope_fields": [
       "status",
+      "request_id",
+      "correlation_id",
       "message",
       "response_format",
       "usage",
@@ -106,7 +110,12 @@
       "code",
       "message",
       "retryable",
-      "provider_free"
+      "provider_free",
+      "live_network",
+      "credentials_required",
+      "no_secret",
+      "request_hash",
+      "correlation_id"
     ],
     "provider_free": true
   },
@@ -114,6 +123,7 @@
     "schema": "tool_request_envelope_v1",
     "required_fields": [
       "tool_call_id",
+      "correlation_id",
       "name",
       "arguments",
       "status",
@@ -149,7 +159,8 @@
     "single-turn request schema carries messages, response_format, usage-free request metadata, and replay key material",
     "ai.turn.execute response envelope carries message, response_format, usage, error, tool request, and replay metadata",
     "tool request envelope is request-only and provider-free",
-    "replay record match contract is deterministic, provider-free, and clean-skips on misses"
+    "replay record match contract is deterministic, provider-free, and clean-skips on misses",
+    "turn request, tool request, replay match, execute response, and error envelope carry stable request hash, correlation id, offline provider-free state, and no-secret evidence"
   ],
   "no_built_in_guarantee": {
     "required": true,

@@ -236,6 +236,7 @@ func TestFinRobotGenericToolContractsContractAndFixtures(t *testing.T) {
 		contract.ArgumentValidation.SchemaRef == "" {
 		t.Fatalf("argument validation contract incomplete: %#v", contract.ArgumentValidation)
 	}
+	assertGenericToolContractsSchemaRef(t, contract.ArgumentValidation.SchemaRef)
 	if contract.ApprovalState.RequiredField != "approval" ||
 		contract.ApprovalState.DefaultState != "fixture_only" ||
 		!contract.ApprovalState.DenyWithoutExplicitFixture ||
@@ -251,6 +252,7 @@ func TestFinRobotGenericToolContractsContractAndFixtures(t *testing.T) {
 	if !contract.ResultEnvelope.SuccessErrorNull || !contract.ResultEnvelope.FailureValueNull {
 		t.Fatalf("result envelope null semantics missing: %#v", contract.ResultEnvelope)
 	}
+	assertGenericToolContractsSchemaRef(t, contract.ResultEnvelope.SchemaRef)
 	for _, want := range []string{"kind", "message", "field", "retryable", "provider_free"} {
 		if !containsGenericToolContractsString(contract.NormalizedError.RequiredFields, want) {
 			t.Fatalf("normalized error missing %q: %#v", want, contract.NormalizedError)
@@ -259,6 +261,7 @@ func TestFinRobotGenericToolContractsContractAndFixtures(t *testing.T) {
 	if !contract.NormalizedError.ProviderFree || !containsGenericToolContractsString(contract.NormalizedError.Kinds, "validation") {
 		t.Fatalf("normalized error taxonomy incomplete: %#v", contract.NormalizedError)
 	}
+	assertGenericToolContractsSchemaRef(t, contract.NormalizedError.SchemaRef)
 	if !contract.ArtifactRefs.MetadataRefOnly || contract.ArtifactRefs.InlinePayloadDefault {
 		t.Fatalf("artifact ref policy must be metadata-only: %#v", contract.ArtifactRefs)
 	}
@@ -267,6 +270,7 @@ func TestFinRobotGenericToolContractsContractAndFixtures(t *testing.T) {
 			t.Fatalf("artifact refs missing %q: %#v", want, contract.ArtifactRefs)
 		}
 	}
+	assertGenericToolContractsSchemaRef(t, contract.ArtifactRefs.SchemaRef)
 	if len(contract.Tools) != 1 {
 		t.Fatalf("tools = %d, want 1", len(contract.Tools))
 	}
@@ -284,8 +288,16 @@ func TestFinRobotGenericToolContractsContractAndFixtures(t *testing.T) {
 			t.Fatalf("tool capability tags missing %q: %#v", want, tool.CapabilityTags)
 		}
 	}
+	assertGenericToolContractsCapabilityTags(t, tool.CapabilityTags)
 	if tool.Approval.Required || tool.Approval.State != "fixture_only" || tool.ResultSchemaRef == "" || tool.ErrorSchemaRef == "" || tool.ArtifactSchemaRef == "" || len(tool.FixtureKeys) != 2 {
 		t.Fatalf("tool approval/schema refs incomplete: %#v", tool)
+	}
+	assertGenericToolContractsSchemaRef(t, tool.ResultSchemaRef)
+	assertGenericToolContractsSchemaRef(t, tool.ErrorSchemaRef)
+	assertGenericToolContractsSchemaRef(t, tool.ArtifactSchemaRef)
+	if !containsGenericToolContractsString(tool.FixtureKeys, "generic_tool:invoke:fixture.lookup:ACME:1d:success") ||
+		!containsGenericToolContractsString(tool.FixtureKeys, "generic_tool:invoke:fixture.lookup:bad-args:validation") {
+		t.Fatalf("tool fixture keys must cover success and validation error: %#v", tool.FixtureKeys)
 	}
 
 	assertGenericToolContractsInvokeFixture(t, filepath.Join(base, "fixtures", "invoke_success_fixture.json"), true, "fixture_only", "", 1)
@@ -299,14 +311,17 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		LiveNetwork           bool `json:"live_network"`
 		RealDependencyImports bool `json:"real_dependency_imports"`
 		Fixtures              []struct {
-			FixtureKey     string   `json:"fixture_key"`
-			Path           string   `json:"path"`
-			DialectExport  string   `json:"dialect_export"`
-			ToolName       string   `json:"tool_name"`
-			CapabilityTags []string `json:"capability_tags"`
-			ApprovalState  string   `json:"approval_state"`
-			ExpectedOK     bool     `json:"expected_ok"`
-			ReplayReady    bool     `json:"replay_ready"`
+			FixtureKey            string   `json:"fixture_key"`
+			Path                  string   `json:"path"`
+			DialectExport         string   `json:"dialect_export"`
+			ToolName              string   `json:"tool_name"`
+			CapabilityTags        []string `json:"capability_tags"`
+			ApprovalState         string   `json:"approval_state"`
+			ExpectedOK            bool     `json:"expected_ok"`
+			ReplayReady           bool     `json:"replay_ready"`
+			ProviderFree          bool     `json:"provider_free"`
+			LiveNetwork           bool     `json:"live_network"`
+			RealDependencyImports bool     `json:"real_dependency_imports"`
 		} `json:"fixtures"`
 	}
 	decodeGenericToolContractsJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
@@ -314,18 +329,28 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	keys := map[string]bool{}
+	coveredOutcomes := map[bool]bool{}
 	for _, fixture := range index.Fixtures {
 		if fixture.FixtureKey == "" || fixture.Path == "" || fixture.DialectExport != "ai.tool.invoke" || fixture.ToolName != "fixture.lookup" {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
 		}
+		assertGenericToolContractsRefString(t, "fixture key", fixture.FixtureKey, "generic_tool:")
+		assertGenericToolContractsCapabilityTags(t, fixture.CapabilityTags)
 		if keys[fixture.FixtureKey] {
 			t.Fatalf("duplicate fixture key %q", fixture.FixtureKey)
 		}
 		keys[fixture.FixtureKey] = true
+		coveredOutcomes[fixture.ExpectedOK] = true
 		if fixture.ApprovalState != "fixture_only" || !fixture.ReplayReady {
 			t.Fatalf("fixture must be replay-ready and fixture-only: %#v", fixture)
 		}
+		if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports {
+			t.Fatalf("fixture metadata must stay provider-free/offline/no-import: %#v", fixture)
+		}
 		assertGenericToolContractsJSONFile(t, filepath.Join(base, fixture.Path))
+	}
+	if !coveredOutcomes[true] || !coveredOutcomes[false] {
+		t.Fatalf("fixture index must cover success and validation error paths: %#v", keys)
 	}
 
 	mainPath := filepath.Join(base, "main.leia")
@@ -423,6 +448,8 @@ func assertGenericToolContractsInvokeFixture(t *testing.T, path string, wantOK b
 		len(fixture.Request.Arguments) == 0 {
 		t.Fatalf("request envelope incomplete: %#v", fixture.Request)
 	}
+	assertGenericToolContractsCapabilityTags(t, fixture.Request.CapabilityTags)
+	assertGenericToolContractsRefString(t, "request replay key", fixture.Request.ReplayKey, "generic_tool:")
 	if fixture.Result.OK != wantOK ||
 		fixture.Result.ToolName != fixture.Request.ToolName ||
 		fixture.Result.Approval.State != wantApproval ||
@@ -435,6 +462,8 @@ func assertGenericToolContractsInvokeFixture(t *testing.T, path string, wantOK b
 		fixture.Result.Replay.LiveNetwork {
 		t.Fatalf("result envelope incomplete: %#v", fixture.Result)
 	}
+	assertGenericToolContractsCapabilityTags(t, fixture.Result.CapabilityTags)
+	assertGenericToolContractsRefString(t, "result replay key", fixture.Result.Replay.ReplayKey, "generic_tool:")
 	if wantOK {
 		if fixture.Result.Error != nil || fixture.Result.Value == nil {
 			t.Fatalf("success envelope value/error = value:%#v error:%#v", fixture.Result.Value, fixture.Result.Error)
@@ -444,6 +473,7 @@ func assertGenericToolContractsInvokeFixture(t *testing.T, path string, wantOK b
 			fixture.Result.Error.Field == "" || fixture.Result.Error.Retryable || !fixture.Result.Error.ProviderFree {
 			t.Fatalf("error envelope incomplete: value:%#v error:%#v", fixture.Result.Value, fixture.Result.Error)
 		}
+		assertGenericToolContractsRefString(t, "error field", fixture.Result.Error.Field, "arguments.")
 	}
 	for _, artifact := range fixture.Result.ArtifactRefs {
 		if artifact.ArtifactID == "" || !strings.HasPrefix(artifact.URI, "artifact://") ||
@@ -453,6 +483,9 @@ func assertGenericToolContractsInvokeFixture(t *testing.T, path string, wantOK b
 			artifact.ReplayKey == "" {
 			t.Fatalf("artifact ref incomplete: %#v", artifact)
 		}
+		assertGenericToolContractsRefString(t, "artifact id", artifact.ArtifactID, "artifact_")
+		assertGenericToolContractsArtifactURI(t, artifact.URI)
+		assertGenericToolContractsRefString(t, "artifact replay key", artifact.ReplayKey, "generic_tool:")
 	}
 }
 
@@ -483,6 +516,80 @@ func assertGenericToolContractsEntrypointPath(t *testing.T, path string) {
 	case ".json", ".leia":
 	default:
 		t.Fatalf("entrypoint must reference a JSON or Leia file path: %q", path)
+	}
+}
+
+func assertGenericToolContractsSchemaRef(t *testing.T, ref string) {
+	t.Helper()
+	if ref == "" {
+		t.Fatal("schema ref must be non-empty")
+	}
+	path, _, _ := strings.Cut(ref, "#")
+	if filepath.IsAbs(path) || filepath.Clean(path) != path || !strings.HasPrefix(path, "schemas/") || !strings.HasSuffix(path, ".schema.json") {
+		t.Fatalf("schema ref must be an explainable relative schemas/*.schema.json ref: %q", ref)
+	}
+	assertGenericToolContractsProviderFreeString(t, "schema ref", ref)
+}
+
+func assertGenericToolContractsCapabilityTags(t *testing.T, tags []string) {
+	t.Helper()
+	if len(tags) == 0 {
+		t.Fatal("capability tags must be explicit")
+	}
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		if tag == "" || seen[tag] {
+			t.Fatalf("capability tags must be non-empty and unique: %#v", tags)
+		}
+		seen[tag] = true
+		if !(strings.HasPrefix(tag, "generic.ai.") || strings.HasPrefix(tag, "ai.tool.")) {
+			t.Fatalf("capability tag must use generic AI/tool namespace: %q", tag)
+		}
+		for _, r := range tag {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '.' && r != '-' && r != '_' {
+				t.Fatalf("capability tag must be lowercase provider-neutral token: %q", tag)
+			}
+		}
+		assertGenericToolContractsProviderFreeString(t, "capability tag", tag)
+	}
+}
+
+func assertGenericToolContractsArtifactURI(t *testing.T, uri string) {
+	t.Helper()
+	if !strings.HasPrefix(uri, "artifact://") || strings.Contains(uri, "://http") {
+		t.Fatalf("artifact refs must be artifact:// metadata refs only: %q", uri)
+	}
+	assertGenericToolContractsProviderFreeString(t, "artifact uri", uri)
+}
+
+func assertGenericToolContractsRefString(t *testing.T, label, value, prefix string) {
+	t.Helper()
+	if value == "" || !strings.HasPrefix(value, prefix) {
+		t.Fatalf("%s must be explainable and start with %q: %q", label, prefix, value)
+	}
+	assertGenericToolContractsProviderFreeString(t, label, value)
+}
+
+func assertGenericToolContractsProviderFreeString(t *testing.T, label, value string) {
+	t.Helper()
+	lower := strings.ToLower(value)
+	for _, forbidden := range []string{
+		"openai",
+		"anthropic",
+		"gemini",
+		"vertex",
+		"bedrock",
+		"azure",
+		"api_key",
+		"apikey",
+		"secret",
+		"password",
+		"bearer",
+		"credential",
+	} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("%s must stay provider-free/offline/no-secret; found %q in %q", label, forbidden, value)
+		}
 	}
 }
 

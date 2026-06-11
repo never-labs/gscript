@@ -292,6 +292,7 @@ func assertGenericLivePackageMatrixFixtureIndexGuard(t *testing.T, root string, 
 	indexPath := filepath.Join(root, filepath.FromSlash(pkg.FixtureIndex))
 	index := readJSONMap(t, indexPath)
 	assertGenericLivePackageFixtureIndexContent(t, root, packageDir, indexPath, index)
+	assertGenericLivePackageFixtureIndexSchemaRefs(t, packageDir, indexPath, index)
 }
 
 func genericLivePackagePackageRelativePath(t *testing.T, packageDir, repoRel string) string {
@@ -386,6 +387,107 @@ func assertGenericLivePackageFixtureIndexContent(t *testing.T, root, packageDir,
 		assertFinRobotAuditRecursiveBool(t, fixturePath, fixturePayload, "live_network", false)
 		assertFinRobotAuditRecursiveBool(t, fixturePath, fixturePayload, "real_dependency_imports", false)
 	}
+}
+
+func assertGenericLivePackageFixtureIndexSchemaRefs(t *testing.T, packageDir, indexPath string, index map[string]any) {
+	t.Helper()
+	schemas := genericLivePackageSchemaRefIndex(t, packageDir)
+	fixtures, ok := index["fixtures"].([]any)
+	if !ok || len(fixtures) == 0 {
+		t.Fatalf("%s missing fixtures array", indexPath)
+	}
+	for i, value := range fixtures {
+		fixture, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("%s fixtures[%d] = %#v, want object", indexPath, i, value)
+		}
+		for _, schemaRef := range genericLivePackageFixtureSchemaRefs(t, indexPath, i, fixture) {
+			if strings.HasSuffix(schemaRef, ".json") || strings.Contains(schemaRef, ".json#") {
+				assertGenericLivePackageFixtureSchemaPath(t, packageDir, indexPath, i, schemaRef)
+				continue
+			}
+			if _, ok := schemas[schemaRef]; !ok {
+				t.Fatalf("%s fixtures[%d].schema = %q does not resolve to a schema filename, $id, or title in %s/schemas", indexPath, i, schemaRef, packageDir)
+			}
+		}
+	}
+}
+
+func genericLivePackageSchemaRefIndex(t *testing.T, packageDir string) map[string]string {
+	t.Helper()
+	schemaDir := filepath.Join(packageDir, "schemas")
+	entries, err := os.ReadDir(schemaDir)
+	if err != nil {
+		t.Fatalf("%s: %v", schemaDir, err)
+	}
+	refs := map[string]string{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".schema.json") {
+			continue
+		}
+		rel := filepath.ToSlash(filepath.Join("schemas", entry.Name()))
+		path := filepath.Join(schemaDir, entry.Name())
+		schema := readJSONMap(t, path)
+		refs[rel] = rel
+		refs[entry.Name()] = rel
+		refs[strings.TrimSuffix(entry.Name(), ".schema.json")] = rel
+		for _, key := range []string{"id", "$id", "title"} {
+			if value, _ := schema[key].(string); value != "" {
+				refs[value] = rel
+				refs[strings.TrimSuffix(filepath.Base(value), ".schema.json")] = rel
+			}
+		}
+	}
+	if len(refs) == 0 {
+		t.Fatalf("%s must contain decodable *.schema.json files", schemaDir)
+	}
+	return refs
+}
+
+func genericLivePackageFixtureSchemaRefs(t *testing.T, indexPath string, i int, fixture map[string]any) []string {
+	t.Helper()
+	var refs []string
+	if schema, ok := fixture["schema"]; ok {
+		ref, ok := schema.(string)
+		if !ok || ref == "" {
+			t.Fatalf("%s fixtures[%d].schema = %#v, want non-empty string", indexPath, i, schema)
+		}
+		refs = append(refs, filepath.ToSlash(ref))
+	}
+	if schemas, ok := fixture["schemas"]; ok {
+		values, ok := schemas.([]any)
+		if !ok || len(values) == 0 {
+			t.Fatalf("%s fixtures[%d].schemas = %#v, want non-empty string array", indexPath, i, schemas)
+		}
+		for j, value := range values {
+			ref, ok := value.(string)
+			if !ok || ref == "" {
+				t.Fatalf("%s fixtures[%d].schemas[%d] = %#v, want non-empty string", indexPath, i, j, value)
+			}
+			refs = append(refs, filepath.ToSlash(ref))
+		}
+	}
+	return refs
+}
+
+func assertGenericLivePackageFixtureSchemaPath(t *testing.T, packageDir, indexPath string, i int, schemaRef string) {
+	t.Helper()
+	pathRef := strings.SplitN(schemaRef, "#", 2)[0]
+	if pathRef == "" || filepath.IsAbs(pathRef) || strings.Contains(pathRef, "://") || strings.Contains(pathRef, "../") {
+		t.Fatalf("%s fixtures[%d].schema = %q, want package-relative schema path", indexPath, i, schemaRef)
+	}
+	if !strings.HasPrefix(pathRef, "schemas/") {
+		t.Fatalf("%s fixtures[%d].schema = %q, want schemas/... path", indexPath, i, schemaRef)
+	}
+	schemaPath := filepath.Join(packageDir, filepath.FromSlash(pathRef))
+	info, err := os.Stat(schemaPath)
+	if err != nil {
+		t.Fatalf("%s fixtures[%d].schema %q: %v", indexPath, i, schemaRef, err)
+	}
+	if info.IsDir() {
+		t.Fatalf("%s fixtures[%d].schema %q points to a directory", indexPath, i, schemaRef)
+	}
+	readJSONMap(t, schemaPath)
 }
 
 func genericLivePackageJSONNumberAsInt(value any) (int, bool) {

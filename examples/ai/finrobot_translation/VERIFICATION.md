@@ -35,8 +35,9 @@ No `docs/spec/index.html` generation was run.
 ## Current Release-Gate Results
 
 The release gates below were rerun from this worktree on 2026-06-12 after the
-fixture-index, manifest-audit, workflow-composition, and evaluation-harness
-guard updates.
+generic AI package schema/fixture, agent-loop composition, turn-runner,
+tool-contract, record-replay evidence, fixture-index, manifest-audit,
+workflow-composition, and evaluation-harness guard updates.
 
 | Gate | Command | Result |
 | --- | --- | --- |
@@ -47,7 +48,7 @@ guard updates.
 
 ## Inventory Refresh
 
-Read-only inventory commands run on 2026-06-12 from
+Inventory and semantic-guard commands run on 2026-06-12 from
 `/Users/jxwr/ai/ai_agent_experiment_gscript/gscript/.worktrees/ai-dialect-polish`:
 
 | Command | Result |
@@ -57,18 +58,22 @@ Read-only inventory commands run on 2026-06-12 from
 | Same example inventory grouped by runner | `67` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
 | Same example inventory filtered to `/live_packages/` | `32` registered live-package examples |
 | Same example inventory filtered to `/live_packages/generic_` | `10` registered generic AI live-package examples |
+| Same example inventory filtered to top-level `generic_*.leia` examples | `3` registered generic AI composition examples |
+| Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
 | `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `32` live-package skeleton directories |
 | `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `31` provider-free fixture indexes |
+| `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 
 The inventory confirms the documented counts are current. `AI_DIALECT_GAPS.md`
 is absent in this worktree, so no AI-dialect gap document required updates.
 
-Guard note: the recent generic AI boundary guard state is reflected here as
-checked-in package-owned surface, not as planned FinRobot work. The generic
-model, turn, tool, agent, workflow, evaluation, replay, trace, approval, and
-package-audit boundaries have registered live-package examples, so verification
-language should treat them as inventoried coverage unless a future release gate
-fails.
+Semantic guard note: the recent generic AI boundary guard state is reflected
+here as checked-in package-owned surface, not as planned FinRobot work. The
+generic model, turn, tool, agent, workflow, evaluation, replay, trace, approval,
+and package-audit boundaries have registered live-package examples, and the
+top-level generic composition examples include workflow orchestration coverage.
+Verification language should treat those items as inventoried coverage unless a
+future release gate fails.
 
 ## FinRobot Example Coverage
 
