@@ -427,20 +427,53 @@ after := before
 	}
 }
 
-func TestAIDialectReplayExampleIsDeterministic(t *testing.T) {
-	records, err := llm.LoadRecords(filepath.Join("..", "..", "examples", "ai", "coding_agent_replay.records.json"))
-	if err != nil {
-		t.Fatalf("LoadRecords: %v", err)
-	}
-	vm := leia.New(
-		leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect),
-		leia.WithLLMReplay(records),
-	)
-	if err := vm.ExecFile(filepath.Join("..", "..", "examples", "ai", "coding_agent_replay.leia")); err != nil {
-		t.Fatalf("ExecFile: %v", err)
-	}
-	text, _ := vm.Get("summary")
-	if text != "Use read_file, search_text, apply_patch, and run_shell." {
-		t.Fatalf("summary = %#v", text)
+func TestAIDialectReplayExamplesAreDeterministic(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		source  string
+		records string
+		want    map[string]any
+	}{
+		{
+			name:    "coding agent tools",
+			source:  "coding_agent_replay.leia",
+			records: "coding_agent_replay.records.json",
+			want: map[string]any{
+				"summary": "Use read_file, search_text, apply_patch, and run_shell.",
+			},
+		},
+		{
+			name:    "general agent workflow",
+			source:  "general_agent_workflow.leia",
+			records: "general_agent_workflow.records.json",
+			want: map[string]any{
+				"plan_summary": "Ship passwordless onboarding in three verified steps.",
+				"plan_owner":   "platform",
+				"review_text":  "Plan is replay-friendly: deterministic inputs, local evidence, and explicit verification.",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			records, err := llm.LoadRecords(filepath.Join("..", "..", "examples", "ai", tc.records))
+			if err != nil {
+				t.Fatalf("LoadRecords: %v", err)
+			}
+			vm := leia.New(
+				leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect),
+				leia.WithLLMReplay(records),
+			)
+			if err := vm.ExecFile(filepath.Join("..", "..", "examples", "ai", tc.source)); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			for name, want := range tc.want {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
 	}
 }
