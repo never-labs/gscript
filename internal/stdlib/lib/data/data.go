@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -5156,44 +5157,66 @@ func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, e
 	if err != nil {
 		return Frame{}, err
 	}
-	matched := make([]bool, frame.Len())
-	for _, row := range indexes {
-		matched[row] = true
-	}
-	cols := make([]Column, 0, len(frame.schema.names))
+	cols := make([]Column, 0, len(frame.schema.names)+len(assignments))
 	for _, name := range frame.schema.names {
-		values := frame.columns[name].Values()
-		if expr, ok := assignments[name]; ok {
-			for row := 0; row < frame.Len(); row++ {
-				if !matched[row] {
-					continue
-				}
-				v, err := expr.EvalRow(frame, row)
-				if err != nil {
-					return Frame{}, err
-				}
-				values[row] = v
-			}
+		col := frame.columns[name]
+		expr, assigned := assignments[name]
+		if !assigned || len(indexes) == 0 {
+			// Copy-on-write: untouched (or no-match) columns are shared.
+			cols = append(cols, Column{Name: name, Data: col})
+			continue
 		}
-		col, err := columnWithKind(name, frame.columns[name].Kind(), values)
+		vals, err := evalProjectionExprRows(frame, indexes, expr)
 		if err != nil {
 			return Frame{}, err
 		}
-		cols = append(cols, col)
+		if out, ok := arrayScatterArray(col, indexes, vals); ok {
+			cols = append(cols, Column{Name: name, Data: out})
+			continue
+		}
+		// Boxed fallback preserving legacy kind-coercion semantics.
+		values := col.Values()
+		for i, row := range indexes {
+			v, ok := vals.At(i)
+			if !ok {
+				return Frame{}, fmt.Errorf("update assignment for column %q row %d out of range", name, row)
+			}
+			values[row] = v
+		}
+		out, err := columnWithKind(name, col.Kind(), values)
+		if err != nil {
+			return Frame{}, err
+		}
+		cols = append(cols, out)
 	}
 	for name, expr := range assignments {
 		if _, ok := frame.Column(name); ok {
 			continue
 		}
-		values := make([]any, frame.Len())
-		for row := 0; row < frame.Len(); row++ {
-			if !matched[row] {
+		if len(indexes) == 0 {
+			values := make([]any, frame.Len())
+			for row := range values {
 				values[row] = NullValue
-				continue
 			}
-			v, err := expr.EvalRow(frame, row)
-			if err != nil {
-				return Frame{}, err
+			cols = append(cols, NewColumn(name, values))
+			continue
+		}
+		vals, err := evalProjectionExprRows(frame, indexes, expr)
+		if err != nil {
+			return Frame{}, err
+		}
+		if out, ok := newSparseColumnArray(frame.Len(), indexes, vals); ok {
+			cols = append(cols, Column{Name: name, Data: out})
+			continue
+		}
+		values := make([]any, frame.Len())
+		for row := range values {
+			values[row] = NullValue
+		}
+		for i, row := range indexes {
+			v, ok := vals.At(i)
+			if !ok {
+				return Frame{}, fmt.Errorf("update assignment for column %q row %d out of range", name, row)
 			}
 			values[row] = v
 		}
@@ -5243,6 +5266,9 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 	indexes, err := filterIndexes(frame, where)
 	if err != nil {
 		return Frame{}, err
+	}
+	if out, ok, err := updateByGroupedTyped(frame, indexes, byInputs, aggs, assignments); ok {
+		return out, err
 	}
 	matched := make([]bool, frame.Len())
 	rowKeys := make([]string, frame.Len())
@@ -5344,6 +5370,10 @@ func DeleteWhere(frame Frame, where Expr) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
+	if len(deleteIndexes) == 0 {
+		// Frames are immutable values; an empty match is a no-op.
+		return frame, nil
+	}
 	if indexes, ok, err := typedKernels.ComplementSortedIndexes(frame.Len(), deleteIndexes); ok || err != nil {
 		if err != nil {
 			return Frame{}, err
@@ -5395,6 +5425,10 @@ func InsertRow(frame Frame, columns []Symbol, values []any) (Frame, error) {
 	cols := make([]Column, 0, len(frame.schema.names))
 	for _, name := range frame.schema.names {
 		current := frame.columns[name]
+		if out, ok := arrayWithTypedEdits(current, nil, nil, []any{row[name]}); ok {
+			cols = append(cols, Column{Name: name, Data: out})
+			continue
+		}
 		colValues := current.Values()
 		colValues = append(colValues, row[name])
 		col, err := columnWithKind(name, current.Kind(), colValues)
@@ -5403,7 +5437,7 @@ func InsertRow(frame Frame, columns []Symbol, values []any) (Frame, error) {
 		}
 		cols = append(cols, col)
 	}
-	return NewFrame(cols...)
+	return newFrameTrusted(cols...)
 }
 
 func UpsertRow(frame Frame, columns []Symbol, values []any) (Frame, error) {
@@ -5425,7 +5459,7 @@ func (k KeyedFrame) InsertRow(columns []Symbol, values []any) (KeyedFrame, error
 	if err != nil {
 		return KeyedFrame{}, err
 	}
-	if rows := k.rowsByKey[key]; len(rows) > 0 {
+	if rows := k.lookupRowsByKey(key); len(rows) > 0 {
 		return KeyedFrame{}, fmt.Errorf("keyed insert duplicate key")
 	}
 	valueColumns, err := rowMutationValueColumns(k.keys, k.frame.schema.names, columns)
@@ -5713,7 +5747,63 @@ type KeyedFrame struct {
 	frame     Frame
 	keys      []Symbol
 	rowsByKey map[string][]int
-	index     KeyedIndexMetadata
+	// rowsOverlay holds key->rows entries for keys appended after rowsByKey
+	// was built; its key set is disjoint from rowsByKey. Keeping appends in a
+	// small overlay makes single-row keyed inserts O(delta) instead of
+	// cloning the whole index map; mutateTyped flattens the overlay once it
+	// grows past keyedRowsOverlayFlattenLimit.
+	rowsOverlay map[string][]int
+	index       KeyedIndexMetadata
+	// fp memoizes the O(rows) key fingerprint; it is computed lazily so that
+	// keyed mutations stay O(delta). The cell is shared between derived keyed
+	// frames whose row->key mapping is provably unchanged.
+	fp *keyedFingerprintCell
+}
+
+const keyedRowsOverlayFlattenLimit = 256
+
+// lookupRowsByKey resolves a key against the base index plus the append
+// overlay.
+func (k KeyedFrame) lookupRowsByKey(key string) []int {
+	if rows, ok := k.rowsOverlay[key]; ok {
+		return rows
+	}
+	return k.rowsByKey[key]
+}
+
+func (k KeyedFrame) indexKeyCount() int {
+	return len(k.rowsByKey) + len(k.rowsOverlay)
+}
+
+// forEachIndexKey visits every key->rows entry (base first, then overlay).
+func (k KeyedFrame) forEachIndexKey(fn func(key string, rows []int)) {
+	for key, rows := range k.rowsByKey {
+		fn(key, rows)
+	}
+	for key, rows := range k.rowsOverlay {
+		fn(key, rows)
+	}
+}
+
+// mergedRowsByKey materializes the base+overlay index into a single map.
+func (k KeyedFrame) mergedRowsByKey() map[string][]int {
+	if len(k.rowsOverlay) == 0 {
+		return k.rowsByKey
+	}
+	out := make(map[string][]int, k.indexKeyCount())
+	for key, rows := range k.rowsByKey {
+		out[key] = rows
+	}
+	for key, rows := range k.rowsOverlay {
+		out[key] = rows
+	}
+	return out
+}
+
+type keyedFingerprintCell struct {
+	once  sync.Once
+	value uint64
+	err   error
 }
 
 // KeyedIndexMetadata describes the key index sidecar attached to a KeyedFrame.
@@ -5727,15 +5817,19 @@ type KeyedIndexMetadata struct {
 }
 
 func newKeyedFrameWithIndex(frame Frame, keys []Symbol, rowsByKey map[string][]int) (KeyedFrame, error) {
-	index, err := buildKeyedIndexMetadata(frame, keys)
-	if err != nil {
+	if _, err := validateKeyColumns(frame, keys, "keyed frame index"); err != nil {
 		return KeyedFrame{}, err
 	}
 	return KeyedFrame{
 		frame:     frame,
 		keys:      append([]Symbol(nil), keys...),
-		rowsByKey: cloneRowsByKey(rowsByKey),
-		index:     index,
+		rowsByKey: rowsByKey,
+		index: KeyedIndexMetadata{
+			Rows:       frame.Len(),
+			Keys:       append([]Symbol(nil), keys...),
+			SchemaHash: frame.SchemaFingerprint(),
+		},
+		fp: &keyedFingerprintCell{},
 	}, nil
 }
 
@@ -5743,8 +5837,21 @@ func buildKeyedIndexMetadata(frame Frame, keys []Symbol) (KeyedIndexMetadata, er
 	if _, err := validateKeyColumns(frame, keys, "keyed frame index"); err != nil {
 		return KeyedIndexMetadata{}, err
 	}
-	h := fnv.New64a()
 	schemaHash := frame.SchemaFingerprint()
+	fingerprint, err := keyedRowsFingerprint(frame, keys, schemaHash)
+	if err != nil {
+		return KeyedIndexMetadata{}, err
+	}
+	return KeyedIndexMetadata{
+		Rows:        frame.Len(),
+		Keys:        append([]Symbol(nil), keys...),
+		SchemaHash:  schemaHash,
+		Fingerprint: fingerprint,
+	}, nil
+}
+
+func keyedRowsFingerprint(frame Frame, keys []Symbol, schemaHash string) (uint64, error) {
+	h := fnv.New64a()
 	_, _ = h.Write([]byte(schemaHash))
 	_, _ = h.Write([]byte{0})
 	for _, key := range keys {
@@ -5754,17 +5861,65 @@ func buildKeyedIndexMetadata(frame Frame, keys []Symbol) (KeyedIndexMetadata, er
 	for row := 0; row < frame.Len(); row++ {
 		key, err := rowKey(frame, row, keys)
 		if err != nil {
-			return KeyedIndexMetadata{}, err
+			return 0, err
 		}
 		_, _ = h.Write([]byte(key))
 		_, _ = h.Write([]byte{0})
 	}
-	return KeyedIndexMetadata{
-		Rows:        frame.Len(),
-		Keys:        append([]Symbol(nil), keys...),
-		SchemaHash:  schemaHash,
-		Fingerprint: h.Sum64(),
-	}, nil
+	return h.Sum64(), nil
+}
+
+// indexFingerprintFromRows reproduces keyedRowsFingerprint from the stored
+// key index (base map plus append overlay) instead of re-deriving per-row key
+// strings from the frame: index keys are exactly the rowKey() strings, so
+// hashing them in row order yields the same fingerprint without per-row
+// formatting. Deriving the fingerprint from the index (not the live frame)
+// keeps ValidateIndex able to detect index/frame divergence.
+func (k KeyedFrame) indexFingerprintFromRows() (uint64, error) {
+	rows := k.index.Rows
+	keyByRow := make([]string, rows)
+	var rangeErr error
+	k.forEachIndexKey(func(key string, keyRows []int) {
+		if rangeErr != nil {
+			return
+		}
+		for _, row := range keyRows {
+			if row < 0 || row >= rows {
+				rangeErr = fmt.Errorf("keyed frame index row %d out of range", row)
+				return
+			}
+			keyByRow[row] = key
+		}
+	})
+	if rangeErr != nil {
+		return 0, rangeErr
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(k.index.SchemaHash))
+	_, _ = h.Write([]byte{0})
+	for _, key := range k.index.Keys {
+		_, _ = h.Write([]byte(key))
+		_, _ = h.Write([]byte{0xff})
+	}
+	for _, key := range keyByRow {
+		_, _ = h.Write([]byte(key))
+		_, _ = h.Write([]byte{0})
+	}
+	return h.Sum64(), nil
+}
+
+// indexFingerprint forces the lazily-computed key fingerprint.
+func (k KeyedFrame) indexFingerprint() (uint64, error) {
+	if k.index.Fingerprint != 0 || len(k.keys) == 0 {
+		return k.index.Fingerprint, nil
+	}
+	if k.fp == nil {
+		return k.indexFingerprintFromRows()
+	}
+	k.fp.once.Do(func() {
+		k.fp.value, k.fp.err = k.indexFingerprintFromRows()
+	})
+	return k.fp.value, k.fp.err
 }
 
 func cloneRowsByKey(rowsByKey map[string][]int) map[string][]int {
@@ -5811,11 +5966,9 @@ func KeyBy(frame Frame, keys ...Symbol) (KeyedFrame, error) {
 }
 
 func (k KeyedFrame) Frame() Frame {
-	frame, err := k.frame.Gather(allIndexes(k.frame.Len()))
-	if err != nil {
-		panic(err)
-	}
-	return frame
+	// Frames are immutable values, so the backing frame can be shared
+	// directly instead of gathering a full defensive copy.
+	return k.frame
 }
 
 // KeyedFrameColumnNames returns the underlying table's column names without
@@ -5848,7 +6001,7 @@ func ReorderKeyedFrameColumns(keyed KeyedFrame, requested ...Symbol) (KeyedFrame
 	if err != nil {
 		return KeyedFrame{}, err
 	}
-	return newKeyedFrameWithIndex(frame, keyed.keys, keyed.rowsByKey)
+	return newKeyedFrameWithIndex(frame, keyed.keys, keyed.mergedRowsByKey())
 }
 
 // XGroupKeyed groups a keyed frame's underlying table without first cloning it.
@@ -5893,8 +6046,8 @@ func (k KeyedFrame) LatestFrame() (Frame, error) {
 	if len(k.keys) == 0 {
 		return Frame{}, fmt.Errorf("keyed frame is not initialized")
 	}
-	latest := make([]int, 0, len(k.rowsByKey))
-	positionByKey := make(map[string]int, len(k.rowsByKey))
+	latest := make([]int, 0, k.indexKeyCount())
+	positionByKey := make(map[string]int, k.indexKeyCount())
 	for row := 0; row < k.frame.Len(); row++ {
 		key, err := rowKey(k.frame, row, k.keys)
 		if err != nil {
@@ -5915,11 +6068,15 @@ func (k KeyedFrame) Keys() []Symbol {
 }
 
 func (k KeyedFrame) IndexMetadata() KeyedIndexMetadata {
+	fingerprint, err := k.indexFingerprint()
+	if err != nil {
+		fingerprint = 0
+	}
 	return KeyedIndexMetadata{
 		Rows:        k.index.Rows,
 		Keys:        append([]Symbol(nil), k.index.Keys...),
 		SchemaHash:  k.index.SchemaHash,
-		Fingerprint: k.index.Fingerprint,
+		Fingerprint: fingerprint,
 	}
 }
 
@@ -5934,7 +6091,11 @@ func (k KeyedFrame) ValidateIndex() error {
 	if err != nil {
 		return err
 	}
-	if current.Fingerprint != k.index.Fingerprint {
+	fingerprint, err := k.indexFingerprint()
+	if err != nil {
+		return err
+	}
+	if current.Fingerprint != fingerprint {
 		return fmt.Errorf("keyed frame index fingerprint mismatch")
 	}
 	return nil
@@ -5951,7 +6112,7 @@ func (k KeyedFrame) LookupByKey(values ...any) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
-	rows := k.rowsByKey[key]
+	rows := k.lookupRowsByKey(key)
 	if rows == nil {
 		rows = []int{}
 	}
@@ -6047,6 +6208,9 @@ func (k KeyedFrame) mutate(delta Frame, appendMissing bool, valueColumns ...Symb
 	if err != nil {
 		return KeyedFrame{}, err
 	}
+	if out, ok, err := k.mutateTyped(delta, appendMissing, valueCols); ok {
+		return out, err
+	}
 	cols, colValues, err := keyedMutationColumns(k, delta, valueCols)
 	if err != nil {
 		return KeyedFrame{}, err
@@ -6060,7 +6224,7 @@ func (k KeyedFrame) mutate(delta Frame, appendMissing bool, valueColumns ...Symb
 		if err != nil {
 			return KeyedFrame{}, err
 		}
-		targetRows := k.rowsByKey[key]
+		targetRows := k.lookupRowsByKey(key)
 		if len(targetRows) > 0 {
 			for _, targetRow := range targetRows {
 				for _, name := range valueCols {

@@ -1916,7 +1916,7 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 		}
 		mutation := qSQLMutationForFrame(args.source, tmpl.mutation, frame)
 		qBindMutationOuterScalars(mutation, frame.Schema(), bindings)
-		if hasKeyedSource && (mutation.Kind == stdq.InsertQuery || mutation.Kind == stdq.UpsertQuery) {
+		if hasKeyedSource {
 			keyedOut, err := qRunSQLKeyedMutation(keyedSource, mutation)
 			if err != nil {
 				return NilValue(), fmt.Errorf("%s: exec: keyed mutation: %w", name, err)
@@ -1931,13 +1931,6 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 			keyedOut, err := data.KeyBy(out, tmpl.literalKeys...)
 			if err != nil {
 				return NilValue(), fmt.Errorf("%s: exec: keyed literal mutation: %w", name, err)
-			}
-			return qKeyedFrameToValue(keyedOut), nil
-		}
-		if hasKeyedSource {
-			keyedOut, err := data.KeyBy(out, keyedSource.Keys()...)
-			if err != nil {
-				return NilValue(), fmt.Errorf("%s: exec: keyed mutation: %w", name, err)
 			}
 			return qKeyedFrameToValue(keyedOut), nil
 		}
@@ -3440,15 +3433,37 @@ func qRunSQLKeyedMutation(keyed data.KeyedFrame, mutation *stdq.MutationPlan) (d
 	}
 	switch mutation.Kind {
 	case stdq.InsertQuery:
-		if err := qValidateSQLInsertMutation(keyed.Frame().Schema(), keyed.Keys(), mutation); err != nil {
+		if err := qValidateSQLInsertMutation(keyed.Schema(), keyed.Keys(), mutation); err != nil {
 			return data.KeyedFrame{}, err
 		}
 		return data.InsertRowKeyed(keyed, mutation.InsertColumns, qSQLMutationValues(mutation))
 	case stdq.UpsertQuery:
-		if err := qValidateSQLInsertMutation(keyed.Frame().Schema(), keyed.Keys(), mutation); err != nil {
+		if err := qValidateSQLInsertMutation(keyed.Schema(), keyed.Keys(), mutation); err != nil {
 			return data.KeyedFrame{}, err
 		}
 		return data.UpsertRowKeyed(keyed, mutation.InsertColumns, qSQLMutationValues(mutation))
+	case stdq.UpdateQuery:
+		if len(mutation.ByExprs) > 0 {
+			assignments := make([]data.GroupedAssignment, len(mutation.Assignments))
+			for i, assign := range mutation.Assignments {
+				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr}
+			}
+			return data.UpdateByKeyed(keyed, mutation.Where, mutation.ByExprs, assignments)
+		}
+		assignments := make(map[data.Symbol]data.Expr, len(mutation.Assignments))
+		for _, assign := range mutation.Assignments {
+			assignments[assign.Name] = assign.Expr
+		}
+		return data.UpdateWhereKeyed(keyed, mutation.Where, assignments)
+	case stdq.DeleteQuery:
+		if len(mutation.DeleteColumns) == 0 {
+			return data.DeleteWhereKeyed(keyed, mutation.Where)
+		}
+		frame, err := qRunSQLMutation(keyed.Frame(), mutation)
+		if err != nil {
+			return data.KeyedFrame{}, err
+		}
+		return data.KeyBy(frame, keyed.Keys()...)
 	default:
 		frame, err := qRunSQLMutation(keyed.Frame(), mutation)
 		if err != nil {
