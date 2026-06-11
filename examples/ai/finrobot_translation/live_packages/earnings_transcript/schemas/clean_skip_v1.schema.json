@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "clean_skip_v1",
+  "domain": "earnings_transcript_clean_skip",
+  "provider_free": true,
+  "required": [
+    "schema",
+    "skip_code",
+    "dependency",
+    "clean_skip",
+    "reason",
+    "live_network",
+    "provider_credentials_required"
+  ],
+  "canonical_fields": [
+    "fallback_fixture",
+    "capability_required",
+    "user_visible_message"
+  ],
+  "deterministic_order": [
+    "skip_code",
+    "dependency"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason"
+}

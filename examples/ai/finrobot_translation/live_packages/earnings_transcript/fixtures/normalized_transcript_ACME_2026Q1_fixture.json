@@ -1,0 +1,105 @@
+{
+  "schema": "transcript_segment_v1",
+  "provider_free": true,
+  "deterministic_order": [
+    "symbol",
+    "fiscal_year",
+    "fiscal_quarter",
+    "source_line_start",
+    "speaker_clean"
+  ],
+  "rows": [
+    {
+      "schema": "transcript_segment_v1",
+      "segment_id": "ACME-2026Q1-0001",
+      "symbol": "ACME",
+      "fiscal_year": 2026,
+      "fiscal_quarter": "Q1",
+      "event_date": "2026-05-03",
+      "speaker_raw": "Operator:",
+      "speaker_clean": "Operator",
+      "speaker_role": "operator",
+      "text": "Good afternoon and welcome to the Acme Components fiscal first quarter 2026 earnings call.",
+      "source_id": "fixture_transcript_ACME_2026Q1",
+      "source_line_start": 1,
+      "source_line_end": 1,
+      "date_corrected": true,
+      "quarter_lookup_source": "fiscal_calendar_fixture",
+      "transform_notes": [
+        "trimmed_trailing_colon",
+        "event_date_corrected_from_raw_2025-05-03"
+      ],
+      "token_estimate": 15,
+      "record_hash": "sha256:earnings-segment-0001"
+    },
+    {
+      "schema": "transcript_segment_v1",
+      "segment_id": "ACME-2026Q1-0002",
+      "symbol": "ACME",
+      "fiscal_year": 2026,
+      "fiscal_quarter": "Q1",
+      "event_date": "2026-05-03",
+      "speaker_raw": "Jane Doe - Chief Executive Officer",
+      "speaker_clean": "Jane Doe",
+      "speaker_role": "executive",
+      "text": "Revenue grew 12 percent as industrial demand improved.",
+      "source_id": "fixture_transcript_ACME_2026Q1",
+      "source_line_start": 2,
+      "source_line_end": 2,
+      "date_corrected": true,
+      "quarter_lookup_source": "fiscal_calendar_fixture",
+      "transform_notes": [
+        "removed_title_suffix",
+        "mapped_role_from_title"
+      ],
+      "token_estimate": 9,
+      "record_hash": "sha256:earnings-segment-0002"
+    },
+    {
+      "schema": "transcript_segment_v1",
+      "segment_id": "ACME-2026Q1-0003",
+      "symbol": "ACME",
+      "fiscal_year": 2026,
+      "fiscal_quarter": "Q1",
+      "event_date": "2026-05-03",
+      "speaker_raw": "John Smith, CFO",
+      "speaker_clean": "John Smith",
+      "speaker_role": "executive",
+      "text": "Gross margin was 44 percent and free cash flow was positive.",
+      "source_id": "fixture_transcript_ACME_2026Q1",
+      "source_line_start": 3,
+      "source_line_end": 3,
+      "date_corrected": true,
+      "quarter_lookup_source": "fiscal_calendar_fixture",
+      "transform_notes": [
+        "removed_role_suffix",
+        "mapped_role_from_title"
+      ],
+      "token_estimate": 11,
+      "record_hash": "sha256:earnings-segment-0003"
+    },
+    {
+      "schema": "transcript_segment_v1",
+      "segment_id": "ACME-2026Q1-0004",
+      "symbol": "ACME",
+      "fiscal_year": 2026,
+      "fiscal_quarter": "Q1",
+      "event_date": "2026-05-03",
+      "speaker_raw": "Analyst - North Coast Research",
+      "speaker_clean": "Analyst",
+      "speaker_role": "analyst",
+      "text": "Can you discuss backlog conversion into the second quarter?",
+      "source_id": "fixture_transcript_ACME_2026Q1",
+      "source_line_start": 4,
+      "source_line_end": 4,
+      "date_corrected": true,
+      "quarter_lookup_source": "fiscal_calendar_fixture",
+      "transform_notes": [
+        "removed_affiliation_suffix",
+        "mapped_role_from_affiliation"
+      ],
+      "token_estimate": 9,
+      "record_hash": "sha256:earnings-segment-0004"
+    }
+  ]
+}

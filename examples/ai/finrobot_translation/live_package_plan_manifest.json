@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-live-external-package-plan",
+  "base_package": "leia-finrobot-translation",
+  "source_mode": "replay-slice",
+  "target_mode": "live-external-packages",
+  "registered_examples_count": 1,
+  "translation_directory_file_count": 12,
+  "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
+  "live_package_skeletons": [
+    {
+      "id": "earnings_transcript",
+      "directory": "examples/ai/finrobot_translation/live_packages/earnings_transcript",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/earnings_transcript/main.leia",
+      "covers_package_ids": [
+        "earnings_transcript"
+      ],
+      "status": "checked_in_registered_example"
+    }
+  ],
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in finance vendors, earnings-call transcript normalizers, or report services; live behavior must ship as external packages behind capability gates.",
+    "core_boundary": [
+      "composition",
+      "capability contracts",
+      "trace and replay metadata",
+      "approval policy",
+      "provider-free test gates"
+    ]
+  },
+  "packages": [
+    {
+      "id": "earnings_transcript",
+      "package_name": "leia-finrobot-earnings-transcript",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/earnings_transcript",
+      "planned_directory": "packages/finrobot/earnings_transcript",
+      "manifest": "packages/finrobot/earnings_transcript/package.manifest.json",
+      "contract": "packages/finrobot/earnings_transcript/contracts/earnings_transcript_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/earnings_transcript/main.leia",
+      "capabilities": [
+        "finance.earnings_transcript.speaker.clean",
+        "finance.earnings_transcript.date.correct",
+        "finance.earnings_transcript.period.lookup",
+        "finance.earnings_transcript.segment.provenance",
+        "finance.earnings_transcript.chunk",
+        "finance.earnings_transcript.http_clean.skip"
+      ],
+      "test_gates": [
+        "manifest and contract tests run against provider-free fixtures",
+        "fixture replay proves speaker cleaning, date correction, quarter/year lookup, segment provenance, and chunking",
+        "optional HTTP cleaner absence produces clean skip with live_network=false",
+        "approval policy tests deny external network calls unless a future provider package grants matching capability"
+      ],
+      "no_built_in_guarantee": true
+    }
+  ],
+  "global_test_gates": [
+    "no test may require real network access",
+    "live_network defaults to false",
+    "credentials are not required for provider-free skeletons",
+    "capabilities must be explicit before future live provider packages can run"
+  ]
+}

@@ -1,0 +1,6 @@
+// Provider-free earnings-call transcript normalizer live package skeleton.
+// This example declares fixture-backed contracts only.
+
+earnings_transcript_live_package_summary := "earnings_transcript_live_package provider_free=true domains=transcript_normalization schemas=4 fixtures=4 live_network=false imports=false clean_skip=true"
+
+print(earnings_transcript_live_package_summary)
