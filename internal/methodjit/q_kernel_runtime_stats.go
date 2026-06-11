@@ -10,6 +10,19 @@ import (
 	"github.com/never-labs/leia/internal/vm"
 )
 
+// QKernelExecutionStatsFor returns the q typed-runtime kernel execution stat
+// rows recorded on proto's current Tier 2 compiled function (nil when proto
+// has no live Tier 2 compilation). Diagnostic accessor for tests and tooling
+// that observe per-route execution counters without reaching into
+// CompiledFunction directly.
+func (tm *TieringManager) QKernelExecutionStatsFor(proto *vm.FuncProto) []QKernelExecutionStat {
+	if tm == nil || proto == nil {
+		return nil
+	}
+	cf, _ := tm.tier2CompiledFor(proto)
+	return cf.QKernelExecutionStats()
+}
+
 func (tm *TieringManager) recordQRuntimePrimitiveExecution(proto *vm.FuncProto, op Op, outcome string) {
 	if tm == nil || proto == nil {
 		return

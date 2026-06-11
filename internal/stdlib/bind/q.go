@@ -1064,6 +1064,39 @@ func qSessionValue() *Table {
 		}
 		return v, nil
 	}
+	// plannedEvalValue resolves source once into a pinned EvalSession plan
+	// handle and returns a zero-state executor (the FastArg1 argument is
+	// ignored). Warm callers — MethodJIT's constant-source session-eval
+	// op-exit — invoke the executor per iteration, skipping the per-call
+	// string-eval shell (TrimSpace + plan-cache probe + eval field lookup)
+	// while running the exact same cached plan chain, error wrapping, and
+	// value conversion as evalValue. No result memoization: every executor
+	// call re-executes the typed q runtime kernels.
+	plannedEvalValue := func(src Value) (Value, error) {
+		if !src.IsString() {
+			return NilValue(), fmt.Errorf("q.session.eval: argument 1 must be a q source string")
+		}
+		mu.Lock()
+		planned := session.Planned(src.Str())
+		mu.Unlock()
+		if planned == nil {
+			return NilValue(), fmt.Errorf("q session: source could not be planned")
+		}
+		run := func(Value) (Value, error) {
+			mu.Lock()
+			out, err := planned.Eval()
+			mu.Unlock()
+			if err != nil {
+				return NilValue(), fmt.Errorf("q session: %w", err)
+			}
+			v, err := qEvalValueToValue(out)
+			if err != nil {
+				return NilValue(), fmt.Errorf("q session: %w", err)
+			}
+			return v, nil
+		}
+		return FunctionValue(&GoFunction{Name: "q.session.eval.planned", FastArg1: run}), nil
+	}
 	t := NewTable()
 	t.RawSetString("kind", StringValue("q_session"))
 	t.RawSetString("eval", FunctionValue(&GoFunction{Name: "q.session.eval", Fn: func(args []Value) ([]Value, error) {
@@ -1076,6 +1109,10 @@ func qSessionValue() *Table {
 		}
 		return []Value{v}, nil
 	}, FastArg1: evalValue}))
+	t.RawSetString(stdq.SessionPlannedEvalField, FunctionValue(&GoFunction{
+		Name:     "q.session." + stdq.SessionPlannedEvalField,
+		FastArg1: plannedEvalValue,
+	}))
 	return t
 }
 

@@ -523,6 +523,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		QEvalPipelineNumericResumeOffsets: qEvalPipelineNumericResumeOffsets,
 		QEvalPipelineTerminalReturns:      qEvalPipelineTerminalReturns,
 		QEvalPipelinePlanStats:            newQEvalPipelinePlanExecutionCounters(fn.QEvalPipelinePlans),
+		QEvalSessionEvalSites:             qEvalSessionEvalSiteTable(fn),
 		QVectorRuntimeKernelShapesByID:    qVectorRuntimeKernelShapesByID(fn),
 		CallSiteNoResultRuntimeSpecializationBatches: functionCallFacts(fn).CallSiteNoResultRuntimeSpecializationBatchMap(),
 		RecordArrayLoopCaches:                        fn.RecordArrayLoopCaches,
