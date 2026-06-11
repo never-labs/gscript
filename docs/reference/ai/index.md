@@ -229,6 +229,15 @@ supervisor := agent {
 }
 ```
 
+`llm.handoff(agent, opts)` and `llm.delegate(agent, opts)` are agent-as-tool
+aliases for composition-oriented code. They wrap an existing agent as a tool
+descriptor, copy supported metadata such as `name`, `description`, `params`,
+`requires`, and `output`, and invoke the nested agent through the same dispatch
+path as other tools. They do not create a private scheduler or send the nested
+agent's output shape as the provider-facing tool input schema. If the delegated
+agent pauses for approval, dispatch returns a structured pending error so the
+host can persist or resume the outer workflow.
+
 ## Structured Output
 
 Agents and turns can request structured output with an `output` shape and can
@@ -249,6 +258,143 @@ text part of Leia syntax or add a new type system rule. Built-in agent
 execution validates configured shapes; custom flows should call
 `llm.validate_output(value, schema)` when they need the same check. Validation
 failures are structured errors, not provider answers.
+
+The lower-level schema helpers are useful when the same shape is shared across
+tools, turns, agents, and section generation:
+
+| Helper | Meaning |
+|---|---|
+| `llm.schema(spec)` | Normalize a lightweight shape or JSON Schema-like table to a JSON Schema table. |
+| `llm.schema_info(spec)` / `llm.schemaInfo(spec)` | Return `{schema, json_schema, kind}` for inspection. |
+| `llm.output_schema(name, spec, opts)` | Build a provider-facing `response_format` table of type `json_schema`. |
+
+Lightweight object specs treat string values as field types, a trailing `?` as
+optional, one-element arrays as array item specs, and descriptor tables as field
+schemas with metadata such as `description`.
+
+```leia
+contact_schema := llm.schema({
+    name: {type: "string", description: "Display name"}
+    score: "number"
+    nickname: "string?"
+    tags: {"string"}
+})
+
+format := llm.output_schema("contact", contact_schema)
+result, err := llm.turn({
+    model: "fast"
+    messages: {llm.user("Extract the contact.")}
+    response_format: format
+})
+ok, message := llm.validate_output(result.text, contact_schema)
+```
+
+Schemas are request and validation metadata. They do not make model output a
+typed Leia value until the script parses or validates it.
+
+## Retrieval Context And Evidence
+
+The memory/RAG helpers build ordinary tables and messages for small local
+retrieval workflows:
+
+| Helper | Meaning |
+|---|---|
+| `llm.doc(value, opts)` / `llm.document(value, opts)` | Build a document table with `text` plus optional `id`, `title`, `source`, `tags`, or other metadata. |
+| `llm.collection(docs)` / `llm.docs(docs)` | Build a collection table with `docs` and `count`. |
+| `llm.retrieve(collection, query, opts)` / `llm.search(...)` | Return ranked local matches; `opts.limit` caps results and `opts.label` labels generated context. |
+| `llm.context(matches, opts)` | Build a context message wrapper, default label `Context`. |
+| `llm.evidence(matches, opts)` | Build an evidence message wrapper, default label `Evidence`. |
+
+`context` and `evidence` fields on turn, agent, and section request tables are
+expanded into user messages before the provider call. These helpers are for
+script-local packaging and simple lexical retrieval; they are not a vector
+database, persistence layer, citation verifier, or permission boundary.
+
+```leia
+docs := llm.collection({
+    llm.doc("Checkout runbook says payment queue owns sev2 incidents.", {
+        id: "runbook"
+        title: "Checkout runbook"
+        source: "local/runbook"
+        tags: {"checkout", "payments"}
+    })
+})
+
+ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
+result, err := llm.turn({
+    model: "fast"
+    user: "Who owns the incident?"
+    evidence: llm.evidence(ctx.matches, {label: "Runbook evidence"})
+})
+```
+
+## Workflows
+
+`llm.workflow(steps)` creates a sequential runner for named AI or non-AI steps.
+Each step is built with `llm.step(name, fn, opts)` or supplied as a function. A
+workflow value exposes `run(input, opts)` and `mock(fixtures)`.
+
+```leia
+flow := llm.workflow({
+    llm.step("draft", func(ctx) {
+        return llm.turn({model: "fast", messages: {llm.user(ctx.input)}})
+    })
+    llm.step("revise", func(ctx) {
+        return llm.turn({model: "fast", messages: {llm.user(ctx.input)}})
+    })
+})
+
+result, err := flow.run("release notes")
+```
+
+Step functions receive a context table with the initial input, current input,
+previous step record, accumulated step records, and named context. A step may
+return a provider/agent result table, a plain value, and optionally an error.
+The next step receives the prior step's text or value as its input. The final
+workflow result includes `status`, `text`, `value`, ordered `steps`, and named
+`context`.
+
+Use workflows for deterministic sequencing, replay, and test fixtures around
+agent calls. They are not parallel execution, durable orchestration, retries, or
+transaction management. `flow.mock({step_name: fixture})` replaces named steps
+with fixtures and is intended for tests and offline examples.
+
+## Section Generation
+
+`llm.sections(config)` and `llm.generate_sections(config)` run the same agent
+request shape once per requested section and return ordered and name-indexed
+results.
+
+```leia
+generated, err := llm.sections({
+    model: "fast"
+    messages: {llm.system("Return JSON."), llm.user("Draft the report.")}
+    evidence: "Evidence: launch checklist is complete."
+    sections: {
+        {
+            name: "summary"
+            instructions: "Create the summary section."
+            output: {headline: "Short headline", confidence: 0.5}
+        }
+        {
+            name: "risk"
+            prompt: "Create the risk section."
+            output: {risk: "Low", owner: "team"}
+        }
+    }
+})
+headline := generated.values.summary.headline
+```
+
+Top-level request fields such as `model`, `messages`, `tools`, `context`, and
+`evidence` are shared. Each section must have `name` and may provide
+`instructions` or `prompt`, `output`, section-local evidence, and other request
+fields. Results are returned as `sections` in order, `results` by section name,
+and parsed `values` by section name when structured output is configured.
+
+Sections are a convenience for independent report parts. They do not guarantee
+cross-section consistency, automatic citations, or shared hidden memory beyond
+the request fields supplied to each section.
 
 ## Budgets, Replay, And Trace
 

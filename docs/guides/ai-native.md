@@ -182,6 +182,30 @@ execution validates configured shapes. Custom flows should call
 `llm.validate_output(value, schema)` if they return provider-derived values that
 code will consume.
 
+For reusable shapes, normalize them once with `llm.schema` and use
+`llm.output_schema` when the provider supports JSON Schema response-format
+hints:
+
+```leia
+contact_schema := llm.schema({
+    name: {type: "string", description: "Display name"}
+    score: "number"
+    nickname: "string?"
+})
+
+format := llm.output_schema("contact", contact_schema)
+result, err := llm.turn({
+    model: "fast"
+    messages: {llm.user("Extract Ada with score 0.99.")}
+    response_format: format
+})
+ok, message := llm.validate_output(result.text, contact_schema)
+```
+
+Use `llm.schema_info(schema).kind` when generic helper code needs to inspect a
+shape. These helpers create request and validation metadata; they do not turn
+unparsed model text into typed data by themselves.
+
 ## Agent As Tool
 
 Agents can be placed in another agent's tool list by using
@@ -214,6 +238,137 @@ supervisor := agent {
     }
 }
 ```
+
+For supervisor/specialist flows, `llm.handoff(agent, opts)` and
+`llm.delegate(agent, opts)` are clearer aliases around the same tool boundary:
+
+```leia
+reviewer := llm.agent("reviewer", func(topic) {
+    return {
+        model: "fast"
+        system: "Review delegated work."
+        user: topic
+        output: {summary: "short finding", confidence: 1}
+    }, nil
+}, nil, {params: {"topic"}})
+
+delegate_review := llm.delegate(reviewer, {
+    name: "delegate_review"
+    description: "Delegate review to a specialist agent."
+})
+```
+
+Delegation is still tool dispatch. The supervisor sees a tool result or a
+structured pending/error result; there is no hidden parallel agent runtime.
+
+## Retrieval Context
+
+Use `llm.doc`, `llm.collection`, and `llm.retrieve` for small local evidence
+sets that should be packaged into a turn or agent request.
+
+```leia
+docs := llm.collection({
+    llm.doc("Checkout runbook says payment queue owns sev2 incidents.", {
+        id: "runbook"
+        title: "Checkout runbook"
+        source: "local/runbook"
+        tags: {"checkout", "payments"}
+    })
+    llm.document({
+        id: "notes"
+        title: "Release notes"
+        text: "Search indexing work is unrelated to checkout incidents."
+        source: "local/notes"
+    })
+})
+
+ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
+result, err := llm.turn({
+    model: "fast"
+    user: "Who owns the incident?"
+    evidence: llm.evidence(ctx.matches, {label: "Runbook evidence"})
+})
+```
+
+`llm.context` and `llm.evidence` create labeled messages from documents or
+matches. They are useful for prompt assembly, not for access control or durable
+memory. Put only source text into the collection that the current request is
+allowed to send to the provider.
+
+## Workflows
+
+Use `llm.workflow` when you want a deterministic sequence of named steps that
+can mix agents, direct turns, and normal Leia code.
+
+```leia
+writer := llm.agent("writer", func(topic) {
+    return {model: "fast", messages: {llm.user(topic)}}, nil
+})
+
+flow := llm.workflow({
+    llm.step("draft", func(ctx) {
+        return writer(ctx.input)
+    })
+    llm.step("final", func(ctx) {
+        return writer(ctx.input)
+    })
+})
+
+result, err := flow.run("release notes")
+```
+
+Each step receives `ctx.input`, `ctx.previous`, `ctx.steps`, and `ctx.context`.
+The next step receives the previous step's text or value. The final result
+contains ordered `steps` plus named `context`, which makes tests and replay
+assertions straightforward.
+
+For offline tests, replace steps with fixtures:
+
+```leia
+mocked := flow.mock({draft: {text: "mock draft"}})
+result, err := mocked.run("release notes")
+```
+
+Workflow helpers sequence work inside one script run. They are not a durable
+queue, retry engine, or parallel scheduler.
+
+## Sections
+
+Use `llm.sections` when a report or response has independent parts that should
+share the same request context but have separate instructions and output
+shapes.
+
+```leia
+generated, err := llm.sections({
+    model: "fast"
+    messages: {
+        llm.system("Use the provided evidence and return JSON.")
+        llm.user("Project: reusable generation helpers.")
+    }
+    evidence: "Evidence: launch checklist is complete."
+    sections: {
+        {
+            name: "summary"
+            instructions: "Create the summary section."
+            output: {headline: "Short headline", confidence: 0.5}
+        }
+        {
+            name: "risk"
+            prompt: "Create the risk section."
+            output: {risk: "Low", owner: "team"}
+        }
+    }
+})
+
+headline := generated.values.summary.headline
+risk_owner := generated.values.risk.owner
+```
+
+Top-level fields are copied into each section request; section-local fields can
+add prompts, evidence, and output shapes. The helper returns ordered
+`sections`, raw `results` by name, and parsed `values` by name. It does not
+prove that sections agree with each other, so validate cross-section invariants
+in ordinary Leia code when that matters.
 
 ## Budgets, Replay, And Trace
 
