@@ -23,10 +23,10 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. Remaining production work is package implementation work, not missing
-language or AI dialect surface: replacing replay fixtures with live external
-packages, hardening product UI, adding real renderers, and shipping optional
-provider integrations behind capability gates.
+directory. Remaining production work is external package implementation work,
+not missing language or AI dialect surface: promoting the checked-in skeleton
+contracts into live external packages, hardening product UI, adding real
+renderers, and shipping optional provider integrations behind capability gates.
 
 ## Translation Slice Gaps
 
@@ -40,7 +40,7 @@ provider integrations behind capability gates.
 
 ### Data Tools
 
-- Real provider clients are intentionally not translated: yfinance, Finnhub, SEC API, FMP, Reddit/PRAW, FinNLP downloaders, and earnings-call HTTP calls are represented by replay documents and `llm.tool`.
+- Real provider clients are intentionally not translated: yfinance, Finnhub, SEC API, FMP, Reddit/PRAW, FinNLP downloaders, and earnings-call HTTP calls are represented by replay documents, `llm.tool`, and vendor-adapter skeleton contracts.
 - DataFrame-specific behavior is approximated as Leia tables with field projection and row limits; CSV/file save paths, pandas index handling, and provider pagination are not modeled.
 - SEC filing download/render/PDF conversion/cache behavior is reduced to replay metadata plus section text evidence.
 - Earnings-call transcript parsing is represented as pre-split speaker segments; retry behavior, date correction, and LangChain `Document` interoperability remain out of scope.
@@ -64,11 +64,11 @@ provider integrations behind capability gates.
 
 ### Reporting/Web
 
-- Chart rendering is represented as chart specs only. A real translation still needs a chart package for stock price, share-performance, PE/EPS, revenue/EBITDA, EV/EBITDA, margin, sensitivity, technical-indicator, waterfall, radar, and comparison charts.
+- Chart rendering is represented as chart specs and report artifact skeletons only. A real translation still needs a chart package for stock price, share-performance, PE/EPS, revenue/EBITDA, EV/EBITDA, margin, sensitivity, technical-indicator, waterfall, radar, and comparison charts.
 - HTML rendering is modeled as a deterministic artifact boundary. The full template system still needs reusable template assets, table renderers, markdown-to-HTML conversion, fallback formatting, disclosure components, and source-provenance markup.
-- PDF generation is planned but not implemented. A document/export package must provide styled A4 layouts, frames/columns, cover pages, table pagination, image fitting, page headers/footers, font registration, and HTML-to-PDF or report-object-to-PDF conversion.
+- PDF generation has a provider-free artifact skeleton but no live renderer. A document/export package must provide styled A4 layouts, frames/columns, cover pages, table pagination, image fitting, page headers/footers, font registration, and HTML-to-PDF or report-object-to-PDF conversion.
 - Web orchestration is captured as staged task metadata only; routes, workers, logs, persistence, downloads, auth, admin views, static assets, and status recovery remain product-layer work.
-- Artifact contracts need formal schemas for report sections, chart specs, source annotations, AI markers, stale-data checks, HTML/PDF output manifests, and user-visible warnings.
+- Artifact contracts have provider-free skeleton coverage; live package APIs still need to promote those schemas for report sections, chart specs, source annotations, AI markers, stale-data checks, HTML/PDF output manifests, and user-visible warnings.
 
 ## Closed Or Non-Gaps
 

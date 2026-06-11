@@ -1,12 +1,13 @@
 # FinRobot Live External Package Plan
 
-This plan moves the remaining live FinRobot work out of the replay slice and
-into future external packages. The replay examples stay provider-free golden
-contracts; live vendors, finance formulas, renderers, and web services are not Leia built-ins.
+This plan keeps the remaining live FinRobot work out of the replay slice and
+targets external package implementations. The replay examples now include
+provider-free skeleton contracts; live vendors, finance formulas, renderers, and
+web services are not Leia built-ins.
 
-## Package Skeletons
+## Package Skeleton Status
 
-| Replay source | Future package | Planned directory | Contract |
+| Skeleton source | Target external package | Target directory | Contract |
 | --- | --- | --- | --- |
 | `vendor_adapters.leia` | `leia-finrobot-vendor-adapters` | `packages/finrobot/vendor_adapters` | `contracts/vendor_adapter_contract.json` |
 | `finance_normalizers.leia` | `leia-finrobot-normalizers` | `packages/finrobot/normalizers` | `contracts/finance_normalizer_contract.json` |
@@ -16,8 +17,9 @@ contracts; live vendors, finance formulas, renderers, and web services are not L
 
 ## Contract Rules
 
-- Every package manifest must name its package, planned directory, contract
-  file, capabilities, optional credentials, replay fixture keys, and test gates.
+- Every target package manifest must name its package, target directory,
+  contract file, capabilities, optional credentials, replay fixture keys, and
+  test gates.
 - Live network and real dependency imports default to disabled. Tests for this
   plan only validate manifests and replay contracts; they must not call real providers.
 - Capabilities are the boundary between the replay slice and live packages.
@@ -32,6 +34,6 @@ contracts; live vendors, finance formulas, renderers, and web services are not L
 ## Test Gates
 
 The machine-readable gate list lives in
-`live_package_plan_manifest.json`. It is intentionally separate from future
+`live_package_plan_manifest.json`. It is intentionally separate from live
 package implementations so this repository can keep testing the migration plan
 without shipping live clients or performing real network I/O.

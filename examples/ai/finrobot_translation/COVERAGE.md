@@ -4,11 +4,11 @@ Audit date: 2026-06-11.
 
 Baseline:
 
-- Leia branch: `origin/codex/ai-dialect-polish` at `e9917e40`.
+- Leia branch: `origin/codex/ai-dialect-polish` at `cb3a9ec6`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Audit input file count: 45 files before this audit artifact; 46 files after
-  adding `COVERAGE.md`.
+- Current translation directory file count: 49 files, including the
+  provider-free live-package skeleton examples and this audit artifact.
 - Registered examples: 25 runnable/checkable examples discovered by
   `go run ./cmd/leia examples --json`.
 - Runtime changes in this audit: none.
@@ -26,9 +26,10 @@ metadata, evaluation inventory, quant workflow fixtures, and web-product smoke
 metadata.
 
 This is not production-package parity with FinRobot. The remaining uncovered
-work is live-package implementation: real provider clients, real document
-parsers, real chart/HTML/PDF renderers, real database/web orchestration,
-optional integrations, and broader notebook/tutorial parity.
+work is live-package implementation beyond the checked-in skeleton contracts:
+real provider clients, real document parsers, real chart/HTML/PDF renderers,
+real database/web orchestration, optional integrations, and broader
+notebook/tutorial parity.
 
 ## Registered Example Inventory
 
@@ -157,16 +158,18 @@ mistaken for missing language/runtime support.
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
 | Evaluation harness | `evaluation_harness/manifest.json` inventories replay records, golden checksums, gates, and report metadata | Complete for current registered records |
 | Gap ledger alignment | `GAPS.md` records no open gaps for the provider-free slice; remaining work is package/product implementation | Complete |
-| Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks | Not complete by design |
+| Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
-Provider-free completion result: complete for the currently registered 25-example
-translation slice. Production/live-package parity result: incomplete by design.
+Provider-free completion result: complete for the currently registered
+25-example translation slice, including live-package skeleton contracts.
+Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks
 
-1. Finance provider packages: implement Yahoo, Finnhub, FMP, SEC, Reddit, FinNLP,
-   and earnings-call clients behind explicit capabilities, credentials, rate
-   limits, terms metadata, replay recording, and fixture refresh tooling.
+1. Finance provider packages: turn the checked-in vendor-adapter skeleton into
+   Yahoo, Finnhub, FMP, SEC, Reddit, FinNLP, and earnings-call clients behind
+   explicit capabilities, credentials, rate limits, terms metadata, replay
+   recording, and fixture refresh tooling.
 2. Finance normalizer package: promote the fixture schemas in
    `finance_normalizers.leia` into reusable typed packages with provenance,
    stale-data checks, statement cleaning, peer/news normalization, and provider
