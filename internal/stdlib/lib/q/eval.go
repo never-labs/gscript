@@ -7986,10 +7986,6 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 		return qVSValue, true
 	case "mmu":
 		return matrixMultiplyValue, true
-	case "xexp":
-		return xexpValue, true
-	case "xlog":
-		return xlogValue, true
 	case "wavg":
 		return wavg, true
 	case "wsum":
@@ -8015,7 +8011,7 @@ func lookupDyadicVerbFunc(verb string) (func(any, any) (any, error), bool) {
 	case "union":
 		return union, true
 	default:
-		return nil, false
+		return lookupNumericDyadicFloatVerb(verb)
 	}
 }
 
@@ -8117,34 +8113,6 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return rank, true
 	case "neg":
 		return negValue, true
-	case "abs":
-		return absValue, true
-	case "sqrt":
-		return sqrtValue, true
-	case "log":
-		return logValue, true
-	case "exp":
-		return expValue, true
-	case "sin":
-		return sinValue, true
-	case "cos":
-		return cosValue, true
-	case "tan":
-		return tanValue, true
-	case "asin":
-		return asinValue, true
-	case "acos":
-		return acosValue, true
-	case "atan":
-		return atanValue, true
-	case "reciprocal":
-		return reciprocalValue, true
-	case "signum":
-		return signumValue, true
-	case "floor":
-		return floorValue, true
-	case "ceiling":
-		return ceilingValue, true
 	case "inv":
 		return matrixInverseValue, true
 	case "sum":
@@ -8170,7 +8138,7 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 	case "null":
 		return nullValue, true
 	default:
-		return nil, false
+		return lookupNumericUnaryVerb(strings.TrimSpace(verb))
 	}
 }
 

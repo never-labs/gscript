@@ -6,6 +6,60 @@ import (
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
+type qNumericUnaryVerbDescriptor struct {
+	op string
+}
+
+type qNumericDyadicFloatVerbDescriptor struct {
+	op string
+}
+
+var qNumericUnaryVerbDescriptors = map[string]qNumericUnaryVerbDescriptor{
+	"abs":        {op: data.NumericUnaryAbs},
+	"sqrt":       {op: data.NumericUnarySqrt},
+	"log":        {op: data.NumericUnaryLog},
+	"exp":        {op: data.NumericUnaryExp},
+	"sin":        {op: data.NumericUnarySin},
+	"cos":        {op: data.NumericUnaryCos},
+	"tan":        {op: data.NumericUnaryTan},
+	"asin":       {op: data.NumericUnaryAsin},
+	"acos":       {op: data.NumericUnaryAcos},
+	"atan":       {op: data.NumericUnaryAtan},
+	"reciprocal": {op: data.NumericUnaryRecip},
+	"signum":     {op: data.NumericUnarySignum},
+	"floor":      {op: data.NumericUnaryFloor},
+	"ceiling":    {op: data.NumericUnaryCeiling},
+}
+
+var qNumericDyadicFloatVerbDescriptors = map[string]qNumericDyadicFloatVerbDescriptor{
+	"xexp": {op: data.NumericDyadicXExp},
+	"xlog": {op: data.NumericDyadicXLog},
+}
+
+func lookupNumericUnaryVerb(verb string) (func(any) (any, error), bool) {
+	desc, ok := qNumericUnaryVerbDescriptors[verb]
+	if !ok {
+		return nil, false
+	}
+	return desc.apply, true
+}
+
+func lookupNumericDyadicFloatVerb(verb string) (func(any, any) (any, error), bool) {
+	desc, ok := qNumericDyadicFloatVerbDescriptors[verb]
+	if !ok {
+		return nil, false
+	}
+	return desc.apply, true
+}
+
+func (d qNumericUnaryVerbDescriptor) apply(v any) (any, error) {
+	return qDataNumericUnary(d.op, v)
+}
+
+func (d qNumericDyadicFloatVerbDescriptor) apply(left, right any) (any, error) {
+	return qDataNumericDyadicFloat(d.op, left, right)
+}
+
 func sinValue(v any) (any, error) {
 	return qDataNumericUnary(data.NumericUnarySin, v)
 }
@@ -92,6 +146,21 @@ func qDataNumericUnaryArrayFallback(name string, array data.Array) (any, error) 
 }
 
 func qDataNumericDyadicFloat(name string, left, right any) (any, error) {
+	if _, leftIsArray := left.(data.Array); leftIsArray {
+		if out, handled, err := qTypedNumericDyadicFloat(name, left, right); err != nil || handled {
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			return out, nil
+		}
+	} else if _, rightIsArray := right.(data.Array); rightIsArray {
+		if out, handled, err := qTypedNumericDyadicFloat(name, left, right); err != nil || handled {
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			return out, nil
+		}
+	}
 	out, ok, err := data.ApplyNumericDyadicFloat(name, left, right)
 	if err != nil {
 		return nil, err
@@ -100,4 +169,17 @@ func qDataNumericDyadicFloat(name string, left, right any) (any, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("%s expects numeric operands", name)
+}
+
+func qTypedNumericDyadicFloat(name string, left, right any) (data.Array, bool, error) {
+	shape := qRuntimeDyadicPrimitiveShape(name)
+	typed, handled, err := data.TryTypedQNumericDyadicFloat(name, left, right)
+	return qTypedRuntimeResult("ArrayNumericDyadicFloat", shape, typed, handled, err)
+}
+
+func qRuntimeDyadicPrimitiveShape(name string) string {
+	if name == "" {
+		name = "unknown"
+	}
+	return "runtime-dyadic/" + name
 }

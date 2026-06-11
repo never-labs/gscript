@@ -163,6 +163,61 @@ func TestRuntimeNumericUnaryUsesRuntimePrimitiveShape(t *testing.T) {
 	}
 }
 
+func TestRuntimeNumericMathVerbFamilyUsesTypedOrdinaryExpressionPath(t *testing.T) {
+	tests := []struct {
+		name   string
+		expr   string
+		kernel string
+		shape  string
+	}{
+		{name: "abs", expr: "abs -2 3 0", kernel: "ArrayNumericUnary", shape: "runtime-unary/abs"},
+		{name: "sqrt", expr: "sqrt 4 9 16", kernel: "ArrayNumericUnary", shape: "runtime-unary/sqrt"},
+		{name: "log", expr: "log 1 2 4", kernel: "ArrayNumericUnary", shape: "runtime-unary/log"},
+		{name: "exp", expr: "exp 0 1 2", kernel: "ArrayNumericUnary", shape: "runtime-unary/exp"},
+		{name: "sin", expr: "sin 0 1 2", kernel: "ArrayNumericUnary", shape: "runtime-unary/sin"},
+		{name: "cos", expr: "cos 0 1 2", kernel: "ArrayNumericUnary", shape: "runtime-unary/cos"},
+		{name: "tan", expr: "tan 0 1 2", kernel: "ArrayNumericUnary", shape: "runtime-unary/tan"},
+		{name: "asin", expr: "asin -0.5 0 0.5", kernel: "ArrayNumericUnary", shape: "runtime-unary/asin"},
+		{name: "acos", expr: "acos -0.5 0 0.5", kernel: "ArrayNumericUnary", shape: "runtime-unary/acos"},
+		{name: "atan", expr: "atan -1 0 1", kernel: "ArrayNumericUnary", shape: "runtime-unary/atan"},
+		{name: "reciprocal", expr: "reciprocal 2 4 8", kernel: "ArrayNumericUnary", shape: "runtime-unary/reciprocal"},
+		{name: "signum", expr: "signum -2 0 3", kernel: "ArrayNumericUnary", shape: "runtime-unary/signum"},
+		{name: "floor", expr: "floor 1.9 -1.2 3.0", kernel: "ArrayNumericUnary", shape: "runtime-unary/floor"},
+		{name: "ceiling", expr: "ceiling 1.1 -1.2 3.0", kernel: "ArrayNumericUnary", shape: "runtime-unary/ceiling"},
+		{name: "xexp", expr: "2 xexp 3 4 5", kernel: "ArrayNumericDyadicFloat", shape: "runtime-dyadic/xexp"},
+		{name: "xlog", expr: "2 xlog 8 16 32", kernel: "ArrayNumericDyadicFloat", shape: "runtime-dyadic/xlog"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			if _, err := Eval(tt.expr); err != nil {
+				t.Fatalf("Eval(%q) returned error: %v", tt.expr, err)
+			}
+
+			seen := false
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Outcome == "fallback" || stat.Outcome == "error" {
+					t.Fatalf("unexpected runtime fallback/error for %q: %#v all=%#v", tt.expr, stat, RuntimeKernelExecutionStats())
+				}
+				if stat.Kernel == tt.kernel &&
+					stat.Shape == tt.shape &&
+					stat.PipelineShape == "numeric_math" &&
+					stat.Outcome == "hit" &&
+					stat.ReasonCode == "typed_kernel" &&
+					stat.Count > 0 {
+					seen = true
+				}
+			}
+			if !seen {
+				t.Fatalf("missing %s typed runtime hit for %q: %#v", tt.kernel, tt.expr, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 func TestEvalFunctionalAmendAddUsesTypedIndexedAccumulation(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
