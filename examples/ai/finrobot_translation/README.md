@@ -17,6 +17,14 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
+Current status: `go run ./cmd/leia examples --json` discovers 27 runnable and
+checkable FinRobot translation examples under this directory. The checked-in
+live-package skeleton surface has three directories:
+`live_packages/analytics_report`, `live_packages/product_workflow`, and
+`live_packages/vendor_adapters`; analytics report and vendor adapters also
+provide registered provider-free `.leia` examples, while product workflow is a
+manifest/contracts/schemas/fixtures skeleton for the existing workflow examples.
+
 ## Scope
 
 FinRobot should translate into ordinary Leia packages that compose existing

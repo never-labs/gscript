@@ -23,10 +23,14 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. Remaining production work is external package implementation work,
-not missing language or AI dialect surface: promoting the checked-in skeleton
-contracts into live external packages, hardening product UI, adding real
-renderers, and shipping optional provider integrations behind capability gates.
+directory. The current provider-free surface is 27 registered examples plus
+three checked-in live-package skeleton directories:
+`live_packages/analytics_report`, `live_packages/product_workflow`, and
+`live_packages/vendor_adapters`. Remaining production work is external package
+implementation work, not missing language or AI dialect surface: promoting the
+checked-in skeleton contracts into live external packages, hardening product UI,
+adding real renderers, and shipping optional provider integrations behind
+capability gates.
 
 ## Translation Slice Gaps
 
@@ -87,14 +91,14 @@ renderers, and shipping optional provider integrations behind capability gates.
 | FR-GAP-010 document parsing | Implemented as local document artifact/chunk contracts for SEC filings and earnings-call text, including artifact IDs and parse metadata. | `tests/llm/llm_document_rag_contract_test.go` runs `examples/ai/finrobot_translation/document_rag.leia`. |
 | FR-GAP-011 RAG contracts | Implemented as provider-free local corpus/retrieval contracts over document chunks with citations and reset behavior. | `tests/llm/llm_document_rag_contract_test.go` asserts retrieval inputs, chunks, citations, and no live provider dependency. |
 | FR-GAP-012 chart/report contracts | Implemented as artifact/report contracts with declared inputs, sources, artifact IDs, dimensions, stale-data checks, and AI disclosure markers. | `tests/llm/llm_artifact_report_contract_test.go` runs `examples/ai/finrobot_translation/report_contract.leia`. |
-| FR-GAP-013 finance vendor adapters | Implemented as external-package skeleton manifests for Yahoo, Finnhub, FMP, SEC, earnings, Reddit, and related providers with credentials, schemas, rate limits, fixtures, and terms metadata. | `tests/llm/llm_vendor_adapter_normalizer_test.go` runs `examples/ai/finrobot_translation/vendor_adapters.leia`. |
-| FR-GAP-014 finance normalizers | Implemented as fixture-backed schemas for statements, ratios, market data, recommendations, SEC sections, peers, and news/sentiment records with provenance and stale-field checks. | `tests/llm/llm_vendor_adapter_normalizer_test.go` runs `examples/ai/finrobot_translation/finance_normalizers.leia`. |
-| FR-GAP-015 valuation and analytics packages | Implemented for the translation slice as deterministic DCF, EV/EBITDA, P/E, target-price synthesis, sensitivity, and tolerance fixtures. | `tests/llm/llm_valuation_analytics_test.go` runs `examples/ai/finrobot_translation/valuation_analytics.leia`. |
+| FR-GAP-013 finance vendor adapters | Implemented as external-package skeleton manifests for Yahoo, Finnhub, FMP, SEC, earnings, Reddit, and related providers with credentials, schemas, rate limits, fixtures, and terms metadata. | `tests/llm/llm_vendor_adapter_normalizer_test.go` runs `examples/ai/finrobot_translation/vendor_adapters.leia`; `tests/llm/llm_vendor_live_package_test.go` validates `live_packages/vendor_adapters`. |
+| FR-GAP-014 finance normalizers | Implemented as fixture-backed schemas for statements, ratios, market data, recommendations, SEC sections, peers, and news/sentiment records with provenance and stale-field checks. | `tests/llm/llm_vendor_adapter_normalizer_test.go` runs `examples/ai/finrobot_translation/finance_normalizers.leia`; `tests/llm/llm_analytics_report_live_package_test.go` validates the analytics report skeleton normalizer contracts. |
+| FR-GAP-015 valuation and analytics packages | Implemented for the translation slice as deterministic DCF, EV/EBITDA, P/E, target-price synthesis, sensitivity, and tolerance fixtures. | `tests/llm/llm_valuation_analytics_test.go` runs `examples/ai/finrobot_translation/valuation_analytics.leia`; `tests/llm/llm_analytics_report_live_package_test.go` validates the checked-in valuation/report skeleton. |
 | FR-GAP-016 prompt/role/report-section packages | Implemented as data-only role registry, prompt render snapshots, section output schemas, and report taxonomy fixtures. | `tests/llm/llm_role_section_package_data_test.go` runs `examples/ai/finrobot_translation/role_profiles.leia` and `section_agents.leia`. |
 | FR-GAP-017 generated-code and notebook tooling | Implemented as capability-gated replay envelopes for file read/write, generated-code execution, image display, and denied command cases. | `tests/llm/llm_generated_code_tooling_test.go` runs `examples/ai/finrobot_translation/generated_code_tooling.leia`. |
 | FR-GAP-018 optional integrations | Implemented as optional package manifests and clean skip/capability gates for FinGPT, FinRL, FinML, Backtrader, mplfinance, Ollama, and OpenBB without importing those dependencies. | `tests/llm/llm_optional_integration_gating_test.go` runs `examples/ai/finrobot_translation/optional_integrations.leia`. |
 | FR-GAP-019 equity report CLI workflow | Implemented as named stages with dependencies, artifacts, retry/stale-section metadata, chart/report outputs, and manifest checks. | `tests/llm/llm_equity_cli_workflow_test.go` runs `examples/ai/finrobot_translation/equity_cli_workflow.leia`. |
-| FR-GAP-020 web app product layer | Implemented as provider-free web product smoke fixtures covering route parity, auth/session, background task logs, downloads, CRUD state, and report artifacts. | `tests/llm/llm_web_product_smoke_test.go` runs `examples/ai/finrobot_translation/web_product.leia`. |
+| FR-GAP-020 web app product layer | Implemented as provider-free web product smoke fixtures covering route parity, auth/session, background task logs, downloads, CRUD state, report artifacts, and the checked-in product workflow skeleton contracts. | `tests/llm/llm_web_product_smoke_test.go` runs `examples/ai/finrobot_translation/web_product.leia`; `tests/llm/finrobot_product_workflow_live_package_test.go` validates `live_packages/product_workflow`. |
 | Finance vendors as built-ins | Not needed. Vendors belong in external packages with capabilities, credentials, schemas, rate-limit metadata, and terms metadata. | Vendor package manifests declare capabilities and replay fixtures. |
 | Role profiles as language concepts | Not needed. Roles are package data consumed by generic `agent` declarations. | Role registry snapshot is data-only and uses no parser changes. |
 | FR-GAP-021 deployment/package metadata | Implemented as provider-free package/deploy metadata outside the core dialect: requirements, setup extras, Dockerfile, gcloud deploy script, run_web_app health entrypoint, manifest commands, and environment checks. | `tests/llm/finrobot_package_deploy_test.go` asserts package manifest smoke, optional extras, Docker/gcloud/run_web_app references, and environment setup checks. |
