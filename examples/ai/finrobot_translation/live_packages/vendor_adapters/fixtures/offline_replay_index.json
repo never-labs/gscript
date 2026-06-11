@@ -1,10 +1,12 @@
 {
+  "schema_version": 1,
   "fixture_key": "vendor_adapters:offline_replay:index",
   "provider": "vendor_adapters",
   "capability": "finance.vendor.adapter.offline_replay",
   "captured_at": "2026-06-11T00:00:00Z",
   "live_network": false,
   "provider_free": true,
+  "real_dependency_imports": false,
   "mode": "fixture_replay",
   "require_fixture_key": true,
   "provider_credentials_required": false,
@@ -43,5 +45,15 @@
       "retry_after_seconds": 60,
       "cache_state": "stale-allowed"
     }
-  ]
+  ],
+  "metadata": {
+    "replay_ready": true,
+    "provider_free": true,
+    "live_network": false,
+    "real_dependency_imports": false,
+    "mode": "fixture_replay",
+    "miss_behavior": "clean-skip",
+    "provider_credentials_required": false,
+    "secret_values_present": false
+  }
 }

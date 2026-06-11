@@ -18,8 +18,14 @@
         "contains_freshness_policy_eval": true,
         "contains_dedupe_groups": true,
         "contains_confidence_envelopes": true,
-        "contains_prompt_contract_eval": true
-      }
+        "contains_prompt_contract_eval": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "news_catalyst:ACME:2026-06-11",
@@ -40,8 +46,14 @@
           "retail_sentiment_conflict",
           "expected_ranking_output",
           "explainable_score_components"
-        ]
-      }
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "retail_sentiment:ACME:2026-06-11",
@@ -57,8 +69,14 @@
           "polymarket",
           "x_social",
           "reddit"
-        ]
-      }
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "adapter_boundary:ACME:offline",
@@ -68,8 +86,13 @@
       "metadata": {
         "ticker": "ACME",
         "replay_ready": true,
-        "live_network": false
-      }
+        "live_network": false,
+        "provider_free": true,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

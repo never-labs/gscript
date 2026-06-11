@@ -11,70 +11,70 @@
       "capability": "prompt.role.catalog.agent_library",
       "schema": "prompt_catalog_v1",
       "path": "contracts/prompt_role_contract.json#/prompt_catalogs/0",
-      "metadata": {"catalog": "agent_library", "replay_ready": true}
+      "metadata": {"catalog": "agent_library", "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "prompt_catalog:prompts:v1",
       "capability": "prompt.role.catalog.prompts",
       "schema": "prompt_catalog_v1",
       "path": "contracts/prompt_role_contract.json#/prompt_catalogs/1",
-      "metadata": {"catalog": "prompts", "replay_ready": true}
+      "metadata": {"catalog": "prompts", "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "prompt_catalog:utils:v1",
       "capability": "prompt.role.catalog.utils",
       "schema": "prompt_catalog_v1",
       "path": "contracts/prompt_role_contract.json#/prompt_catalogs/2",
-      "metadata": {"catalog": "utils", "replay_ready": true}
+      "metadata": {"catalog": "utils", "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "prompt_catalog:text_generator_agents:v1",
       "capability": "prompt.role.catalog.text_generator_agents",
       "schema": "prompt_catalog_v1",
       "path": "contracts/prompt_role_contract.json#/prompt_catalogs/3",
-      "metadata": {"catalog": "text_generator_agents", "replay_ready": true}
+      "metadata": {"catalog": "text_generator_agents", "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "prompt_catalog:equity_agents:v1",
       "capability": "prompt.role.catalog.equity_agents",
       "schema": "prompt_catalog_v1",
       "path": "contracts/prompt_role_contract.json#/prompt_catalogs/4",
-      "metadata": {"catalog": "equity_agents", "replay_ready": true}
+      "metadata": {"catalog": "equity_agents", "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "section_agent_output:company_overview:v1",
       "capability": "prompt.role.section.output_schema",
       "schema": "section_agent_output_v1",
       "path": "fixtures/provider_free_fixture_index.json#/sample_section_output",
-      "metadata": {"section_id": "company_overview", "replay_ready": true}
+      "metadata": {"section_id": "company_overview", "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "evidence_validation:source_rules:v1",
       "capability": "prompt.role.evidence.validation",
       "schema": "source_evidence_validation_v1",
       "path": "fixtures/provider_free_fixture_index.json#/evidence_validation_cases",
-      "metadata": {"case_count": 3, "replay_ready": true}
+      "metadata": {"case_count": 3, "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "termination_convention:drift_checks:v1",
       "capability": "prompt.role.termination.convention",
       "schema": "termination_convention_v1",
       "path": "contracts/prompt_role_contract.json#/termination_convention/drift_checks",
-      "metadata": {"case_count": 5, "replay_ready": true}
+      "metadata": {"case_count": 5, "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "role_profile_versions:v1",
       "capability": "prompt.role.profile.version",
       "schema": "role_profile_v1",
       "path": "contracts/prompt_role_contract.json#/role_profile_versions",
-      "metadata": {"role_count": 4, "replay_ready": true}
+      "metadata": {"role_count": 4, "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "delegation_triggers:parse_examples:v1",
       "capability": "prompt.role.catalog.agent_library",
       "schema": "delegation_trigger_examples_v1",
       "path": "fixtures/provider_free_fixture_index.json#/delegation_trigger_parse_examples",
-      "metadata": {"case_count": 4, "replay_ready": true}
+      "metadata": {"case_count": 4, "replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false, "requires_credentials": false, "live_model_calls": false}
     },
     {
       "fixture_key": "prompt_template_drift:corpus:v1",
@@ -87,7 +87,12 @@
         "response_drift_cases": 4,
         "evidence_cases": 4,
         "termination_cases": 6,
-        "replay_ready": true
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false,
+        "live_model_calls": false
       }
     }
   ],

@@ -13,6 +13,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "stage_id": "fetch",
         "cache_key": "equity_pipeline:ACME:2026-06-11:fetch",
         "cache_state": "miss",
@@ -29,6 +30,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "stage_id": "normalize",
         "rows": 6,
         "cache_key": "equity_pipeline:ACME:2026-06-11:normalize",
@@ -46,6 +48,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "stage_id": "forecast",
         "forecast_periods": 3,
         "cache_key": "equity_pipeline:ACME:2026-06-11:forecast",
@@ -63,6 +66,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "stage_id": "section_agents",
         "sections": 4,
         "cache_key": "equity_pipeline:ACME:2026-06-11:section_agents",
@@ -80,6 +84,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "stage_id": "artifact_plan",
         "artifacts": 5,
         "cache_key": "equity_pipeline:ACME:2026-06-11:artifact_plan",
@@ -97,6 +102,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "hooks": 5,
         "cache_key": "equity_pipeline:ACME:2026-06-11:failure_hooks",
         "cache_state": "bypass",
@@ -113,6 +119,7 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
+        "live_network": false,
         "events": 5,
         "cache_key": "equity_pipeline:ACME:2026-06-11:trace",
         "cache_state": "bypass",

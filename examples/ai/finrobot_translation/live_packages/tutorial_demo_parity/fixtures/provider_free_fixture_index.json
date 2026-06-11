@@ -14,7 +14,11 @@
       "metadata": {
         "beginner_count": 7,
         "advanced_count": 6,
-        "replay_ready": true
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false
       }
     },
     {
@@ -27,7 +31,11 @@
           "core_agents_main",
           "core_agents_workflow_handoff"
         ],
-        "replay_ready": true
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false
       }
     },
     {
@@ -39,7 +47,11 @@
         "record_ids": [
           "quant_portfolio_optimization"
         ],
-        "replay_ready": true
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false
       }
     }
   ]

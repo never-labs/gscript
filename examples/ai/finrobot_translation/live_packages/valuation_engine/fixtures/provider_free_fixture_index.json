@@ -12,8 +12,14 @@
       "metadata": {
         "replay_ready": true,
         "deterministic_math": true,
-        "hidden_live_data_fetch": false
-      }
+        "hidden_live_data_fetch": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "valuation:ACME:football_field:offline",
@@ -23,8 +29,14 @@
       "metadata": {
         "replay_ready": true,
         "deterministic_math": true,
-        "hidden_live_data_fetch": false
-      }
+        "hidden_live_data_fetch": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "valuation:ACME:assumption_audit:offline",
@@ -34,8 +46,14 @@
       "metadata": {
         "replay_ready": true,
         "deterministic_math": true,
-        "hidden_live_data_fetch": false
-      }
+        "hidden_live_data_fetch": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "valuation:ACME:tolerance_gates:offline",
@@ -45,8 +63,14 @@
       "metadata": {
         "replay_ready": true,
         "deterministic_math": true,
-        "hidden_live_data_fetch": false
-      }
+        "hidden_live_data_fetch": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "valuation:ACME:scenario_book:offline",
@@ -58,8 +82,14 @@
         "deterministic_math": true,
         "hidden_live_data_fetch": false,
         "scenario_weighted_target": true,
-        "tolerance_metadata": true
-      }
+        "tolerance_metadata": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "valuation_scenario_coverage",
@@ -76,8 +106,14 @@
           "peer outlier rejection",
           "analyst target conflict",
           "scenario audit trail"
-        ]
-      }
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

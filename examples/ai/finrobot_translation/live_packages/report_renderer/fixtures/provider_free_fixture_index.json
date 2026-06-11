@@ -29,8 +29,14 @@
         ],
         "renderer_clean_skip": true,
         "artifact_manifest_id": "artifact-manifest-ACME-equity-brief",
-        "artifact_manifest_hash": "sha256:102a0d26fa3895b2b773c239f4b5096f6985364e5b4f14be174409a29312a020"
-      }
+        "artifact_manifest_hash": "sha256:102a0d26fa3895b2b773c239f4b5096f6985364e5b4f14be174409a29312a020",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

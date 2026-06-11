@@ -14,8 +14,12 @@
       "schemas": ["schemas/template_inventory_v1.schema.json"],
       "metadata": {
         "replay_ready": true,
+        "provider_free": true,
         "browser_required": false,
         "network_required": false,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false,
         "source_modules": ["finrobot_equity/web_app/templates/*", "finrobot_equity/core/src/modules/html_template_professional.py"]
       }
     },
@@ -26,8 +30,12 @@
       "schemas": ["schemas/static_asset_manifest_v1.schema.json"],
       "metadata": {
         "replay_ready": true,
+        "provider_free": true,
         "browser_required": false,
         "network_required": false,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false,
         "remote_assets_allowed": false
       }
     },
@@ -38,8 +46,12 @@
       "schemas": ["schemas/snapshot_metadata_v1.schema.json", "schemas/accessibility_checklist_v1.schema.json"],
       "metadata": {
         "replay_ready": true,
+        "provider_free": true,
         "browser_required": false,
         "network_required": false,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false,
         "deterministic_hash_seed": "finrobot-html-ui-snapshots|ACME|provider-free|2026-06-11|templates-static-professional",
         "deterministic_snapshot_hash": "fc0779b037111b16133371e271f272d08c2ceb4cae6c61329d49d9dfef2e91f6"
       }
@@ -51,8 +63,12 @@
       "schemas": ["schemas/ui_snapshot_evaluation_v1.schema.json"],
       "metadata": {
         "replay_ready": true,
+        "provider_free": true,
         "browser_required": false,
         "network_required": false,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "requires_credentials": false,
         "route_dom_snapshot_count": 2,
         "viewport_count": 3,
         "visual_diff_budget_count": 3,

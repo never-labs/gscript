@@ -48,8 +48,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "finrl:strategy:ACME:offline",
@@ -95,8 +101,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "finml:factors:ACME:offline",
@@ -146,8 +158,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "backtrader:sma_cross:ACME:offline",
@@ -193,8 +211,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "mplfinance:candles:ACME:offline",
@@ -238,8 +262,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "openbb:market_data:ACME:offline",
@@ -293,8 +323,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "ollama:function_call:ACME:offline",
@@ -338,8 +374,14 @@
           "status": "redacted",
           "secret_values_present": false
         },
-        "replay_ready": true
-      }
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

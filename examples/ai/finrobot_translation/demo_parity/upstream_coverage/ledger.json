@@ -285,7 +285,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/document_pipeline"],
       "excluded_scope": ["live PDF-to-markdown and parallel conversion"],
       "source_hash": "sha256:c0a0fd81543192be389c06212e7632a95cff44a5323bbd9e6d8bc5ec6a4d588c",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/document_pipeline/fixtures/provider_free_fixture_index.json", "sha256": "a2981f68eb8767b10e120c85d6a2eb933dc31aef0f59b12b97f5b731bc608247"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/document_pipeline/fixtures/provider_free_fixture_index.json", "sha256": "3cfd213bc3f78f423d87f910256cfb8379d42d6bf8e62212c89940c4661578c1"}],
       "next_action": "Implement deterministic document conversion fixtures before enabling live PDF parsing."
     },
     {
@@ -318,7 +318,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/analyzer_report"],
       "excluded_scope": ["complete analyzer prompt library"],
       "source_hash": "sha256:4c86ca7913859c6a88cbdd85f4df05703fda133ce733c70db4bf93170a3575f7",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/fixtures/provider_free_fixture_index.json", "sha256": "364ed150ed068bbec95f9fdcad91aec25ec1d440709b4bd2a92606d2c9b47eab"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/fixtures/provider_free_fixture_index.json", "sha256": "86206cdc6475f53ab91e75834d5ad8c6eeaaa48855c4a901057c69120cffece8"}],
       "next_action": "Add source evidence validation fixtures for each analyzer section."
     },
     {

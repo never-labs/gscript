@@ -14,8 +14,14 @@
         "chart_type": "candlestick",
         "renderer": "mplfinance",
         "replay_ready": true,
-        "stale_after_days": 7
-      }
+        "stale_after_days": 7,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "recipes:semantic_matrix:v1:offline",
@@ -27,8 +33,14 @@
         "recipe_count": 7,
         "replay_ready": true,
         "spec_hash_contract": true,
-        "renderer_neutral": true
-      }
+        "renderer_neutral": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "request:ACME:candlestick:mplfinance:offline",
@@ -39,8 +51,13 @@
         "renderer": "mplfinance",
         "output_format": "svg",
         "replay_ready": true,
-        "live_network": false
-      }
+        "live_network": false,
+        "provider_free": true,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "render:ACME:candlestick:mplfinance:offline",
@@ -52,8 +69,14 @@
         "hash_algorithm": "sha256",
         "snapshot_hash": "1d7b2a0a74d79d1c8cfab39e89c9d9b73e8cfe9656e8f2d3b4c6a7e9f1023456",
         "replay_ready": true,
-        "stale_data_warning": true
-      }
+        "stale_data_warning": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "skip:renderer:plotly:offline",
@@ -64,8 +87,14 @@
         "renderer": "plotly",
         "replay_ready": true,
         "clean_skip": true,
-        "dependency_imported": false
-      }
+        "dependency_imported": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

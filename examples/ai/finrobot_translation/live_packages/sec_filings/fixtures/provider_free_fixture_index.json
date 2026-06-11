@@ -15,8 +15,14 @@
           "10-K",
           "10-Q"
         ],
-        "live_gate_required_for_network": true
-      }
+        "live_gate_required_for_network": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "sec:fetch:ACME:10K:offline",
@@ -28,8 +34,14 @@
         "form_type": "10-K",
         "artifact_types": [
           "sec_html"
-        ]
-      }
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "sec:fetch:ACME:10Q:offline",
@@ -41,8 +53,14 @@
         "form_type": "10-Q",
         "artifact_types": [
           "sec_pdf"
-        ]
-      }
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "sec:section_extract:ACME:offline",
@@ -54,8 +72,14 @@
         "forms": [
           "10-K",
           "10-Q"
-        ]
-      }
+        ],
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     },
     {
       "fixture_key": "adapter_boundary:sec_filings:offline",
@@ -64,8 +88,14 @@
       "schema": "schemas/adapter_boundary_v1.schema.json",
       "metadata": {
         "replay_ready": true,
-        "clean_skip": true
-      }
+        "clean_skip": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

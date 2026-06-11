@@ -52,6 +52,44 @@ func TestFinRobotLivePackageAggregateGate(t *testing.T) {
 	}
 }
 
+func TestFinRobotNonGenericProviderFreeFixtureIndexesStayOffline(t *testing.T) {
+	root := repoRoot(t)
+	livePackagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+
+	for _, relDir := range finrobotNonGenericLivePackageDirs(t, root, livePackagesRoot) {
+		t.Run(filepath.Base(relDir), func(t *testing.T) {
+			indexPaths := finrobotPackageFixtureIndexPaths(t, root, relDir)
+			if len(indexPaths) == 0 {
+				t.Skip("package does not use provider-free fixture indexes")
+			}
+			for _, indexPath := range indexPaths {
+				index := readJSONMap(t, indexPath)
+				if !finrobotLivePackageBoolOrConst(index["provider_free"], true) {
+					t.Fatalf("%s provider_free = %#v, want true", indexPath, index["provider_free"])
+				}
+				assertFinRobotFixtureIndexOfflineFlags(t, filepath.ToSlash(indexPath), index)
+			}
+		})
+	}
+}
+
+func finrobotPackageFixtureIndexPaths(t *testing.T, root, relDir string) []string {
+	t.Helper()
+	var paths []string
+	for _, rel := range []string{
+		"fixtures/provider_free_fixture_index.json",
+		"fixtures/offline_replay_index.json",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(relDir), filepath.FromSlash(rel))
+		if _, err := os.Stat(path); err == nil {
+			paths = append(paths, path)
+		} else if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	return paths
+}
+
 func finrobotLivePackageDirs(t *testing.T, root, livePackagesRoot string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(livePackagesRoot)
@@ -71,6 +109,19 @@ func finrobotLivePackageDirs(t *testing.T, root, livePackagesRoot string) []stri
 	}
 	sort.Strings(dirs)
 	return dirs
+}
+
+func finrobotNonGenericLivePackageDirs(t *testing.T, root, livePackagesRoot string) []string {
+	t.Helper()
+	dirs := finrobotLivePackageDirs(t, root, livePackagesRoot)
+	filtered := dirs[:0]
+	for _, dir := range dirs {
+		if strings.HasPrefix(filepath.Base(dir), "generic_") {
+			continue
+		}
+		filtered = append(filtered, dir)
+	}
+	return filtered
 }
 
 func finrobotLivePackagePlanSkeletonDirs(t *testing.T, root string, plan livePackagePlanManifest) []string {
@@ -140,6 +191,34 @@ func assertFinRobotProviderFreeGate(t *testing.T, path string, value any) {
 	case []any:
 		for _, child := range value {
 			assertFinRobotProviderFreeGate(t, path, child)
+		}
+	}
+}
+
+func assertFinRobotFixtureIndexOfflineFlags(t *testing.T, path string, value any) {
+	t.Helper()
+	switch value := value.(type) {
+	case map[string]any:
+		for key, child := range value {
+			switch key {
+			case "provider_free":
+				if !finrobotLivePackageBoolOrConst(child, true) {
+					t.Fatalf("%s provider_free = %#v, want true", path, child)
+				}
+			case "live_network", "live_network_default", "allow_network":
+				if !finrobotLivePackageBoolOrConst(child, false) {
+					t.Fatalf("%s %s = %#v, want false", path, key, child)
+				}
+			case "real_dependency_imports", "real_dependency_import_default", "provider_credentials_required", "requires_credentials":
+				if !finrobotLivePackageBoolOrConst(child, false) {
+					t.Fatalf("%s %s = %#v, want false", path, key, child)
+				}
+			}
+			assertFinRobotFixtureIndexOfflineFlags(t, path, child)
+		}
+	case []any:
+		for _, child := range value {
+			assertFinRobotFixtureIndexOfflineFlags(t, path, child)
 		}
 	}
 }

@@ -2,6 +2,8 @@
   "schema_version": 1,
   "id": "earnings_transcript_provider_free_fixture_index",
   "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
   "fixtures": [
     {
       "key": "raw_transcript",
@@ -10,7 +12,16 @@
         "quarter_year_lookup",
         "date_correction_input",
         "speaker_cleaning_input"
-      ]
+      ],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
     },
     {
       "key": "normalized_transcript",
@@ -19,7 +30,16 @@
         "speaker_cleaning",
         "date_correction",
         "segment_provenance"
-      ]
+      ],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
     },
     {
       "key": "chunks",
@@ -27,14 +47,32 @@
       "covers": [
         "transcript_chunking",
         "segment_boundary_preservation"
-      ]
+      ],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
     },
     {
       "key": "http_clean_skip",
       "path": "fixtures/http_clean_skip_fixture.json",
       "covers": [
         "optional_http_clean_skip"
-      ]
+      ],
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
     }
   ]
 }
