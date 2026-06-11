@@ -77,29 +77,7 @@ func llmAgentToolResultValue(v Value) Value {
 	return v
 }
 
-// llmIsAgentValue returns true if v is an agent function value produced by
-// llm.agent (it carries an llm.agent.* GoFunction name and has registered
-// metadata).
-func llmIsAgentValue(v Value) bool {
-	if !v.IsFunction() {
-		return false
-	}
-	gf := v.GoFunction()
-	if gf == nil {
-		return false
-	}
-	if _, ok := llmAgentMetadataByFunction.Load(gf); ok {
-		return true
-	}
-	return strings.HasPrefix(gf.Name, "llm.agent.")
-}
-
-// llmAgentFunctionToToolTable builds a tool table from an agent function value
-// so it can be passed directly inside a `tools: [...]` list. The wrapper calls
-// the agent through `call`, unwraps result.value, and propagates pending/stopped
-// statuses as tool-level signals.
-func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table {
-	meta, _ := llmAgentMetadataForValue(agent)
+func llmAgentToolName(agent Value, meta llmAgentMetadata, fallback string) string {
 	name := meta.Name
 	if name == "" {
 		if gf := agent.GoFunction(); gf != nil {
@@ -107,9 +85,13 @@ func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table 
 		}
 	}
 	if name == "" {
-		name = "agent"
+		name = fallback
 	}
-	wrapper := FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
+	return name
+}
+
+func llmAgentToolWrapper(call ScriptFunctionCaller, agent Value, meta llmAgentMetadata, name string) Value {
+	return FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
 		if call == nil {
 			return []Value{NilValue(), llmErrorValue("internal", "agent-as-tool requires a function caller")}, nil
 		}
@@ -141,8 +123,36 @@ func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table 
 		}
 		return []Value{llmAgentToolResultValue(result), NilValue()}, nil
 	}})
+}
+
+// llmIsAgentValue returns true if v is an agent function value produced by
+// llm.agent (it carries an llm.agent.* GoFunction name and has registered
+// metadata).
+func llmIsAgentValue(v Value) bool {
+	if !v.IsFunction() {
+		return false
+	}
+	gf := v.GoFunction()
+	if gf == nil {
+		return false
+	}
+	if _, ok := llmAgentMetadataByFunction.Load(gf); ok {
+		return true
+	}
+	return strings.HasPrefix(gf.Name, "llm.agent.")
+}
+
+// llmAgentFunctionToToolTable builds a tool table from an agent function value
+// so it can be passed directly inside a `tools: [...]` list. The wrapper calls
+// the agent through `call`, unwraps result.value, and propagates pending/stopped
+// statuses as tool-level signals.
+func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table {
+	meta, _ := llmAgentMetadataForValue(agent)
+	name := llmAgentToolName(agent, meta, "agent")
+	wrapper := llmAgentToolWrapper(call, agent, meta, name)
 	tool := NewTable()
 	tool.RawSetString("__llm_tool", BoolValue(true))
+	tool.RawSetString("__llm_agent_tool", BoolValue(true))
 	tool.RawSetString("name", StringValue(name))
 	tool.RawSetString("fn", wrapper)
 	tool.RawSetString("description", StringValue(meta.Description))
