@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "harness_id": "FR-GAP-023-finrobot-evaluation-harness",
+  "fixture_version": "finrobot-eval-fixtures-v1",
+  "generated_at": "2026-06-11T00:00:00Z",
+  "ci_report": {
+    "format": "json",
+    "gate": true,
+    "provider_free": true,
+    "command_template": "leia evaluate --gate --report ${REPORT} --replay ${REPLAY_RECORDS} ${SOURCE}"
+  },
+  "records_inventory": [
+    {
+      "id": "core_agents_main",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/core_agents/main.leia",
+      "source_records_path": "examples/ai/finrobot_translation/core_agents/main.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/core_agents/main.records.json",
+      "source_records_sha256": "175945fc031f63f2fce5322565be41cc93c988a27531ba4fcb7f1fa553e5bfa3",
+      "replay_records_sha256": "175945fc031f63f2fce5322565be41cc93c988a27531ba4fcb7f1fa553e5bfa3",
+      "turn_count": 2,
+      "models": ["mock-finrobot-core", "mock-finrobot-review"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 2,
+        "cases_passed": 2,
+        "cases_failed": 0,
+        "assertions": 12,
+        "llm_loaded_turns": 2,
+        "llm_replayed_turns": 2,
+        "llm_turns": 2,
+        "case_names": [
+          "agent library maps to declarative Leia agents",
+          "role prompt mirrors FinRobot responsibility preprocessing"
+        ]
+      }
+    },
+    {
+      "id": "core_agents_workflow_handoff",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia",
+      "source_records_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/evaluation_harness/records/workflow_handoff.records.json",
+      "source_records_sha256": "e418214981cccf22b3f7d348eca7ca6f580ca43f17003d2a421eb5fa777d9d2f",
+      "replay_records_sha256": "b144488bde3b9bdffbd64876743f1ebd9232956aaaf25920ec90681a080ee660",
+      "turn_count": 3,
+      "models": ["mock-employee", "mock-leader"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 2,
+        "cases_passed": 2,
+        "cases_failed": 0,
+        "assertions": 10,
+        "llm_loaded_turns": 3,
+        "llm_replayed_turns": 3,
+        "llm_turns": 3,
+        "case_names": [
+          "leader workflow delegates through agent as tool",
+          "group chat speaker policy is represented as explicit history"
+        ]
+      }
+    },
+    {
+      "id": "equity_report",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/equity_report.leia",
+      "source_records_path": "examples/ai/finrobot_translation/equity_report.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/equity_report.records.json",
+      "source_records_sha256": "d108ebc8ca2d1fc83b16c601d2eae04be4443e77627aed26b9c8db775423d9b1",
+      "replay_records_sha256": "d108ebc8ca2d1fc83b16c601d2eae04be4443e77627aed26b9c8db775423d9b1",
+      "turn_count": 5,
+      "models": ["mock-finrobot-equity", "mock-finrobot-report-review"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 22,
+        "llm_loaded_turns": 5,
+        "llm_replayed_turns": 5,
+        "llm_turns": 5,
+        "case_names": ["finrobot equity report replay"]
+      }
+    },
+    {
+      "id": "quant_investment_group",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/quant_experiments/investment_group.leia",
+      "source_records_path": "examples/ai/finrobot_translation/quant_experiments/investment_group.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/investment_group.records.json",
+      "source_records_sha256": "c62fab49c671ba913ed15cbb3f4b6536835a454c14f519f380fd3f6725298e75",
+      "replay_records_sha256": "c62fab49c671ba913ed15cbb3f4b6536835a454c14f519f380fd3f6725298e75",
+      "turn_count": 1,
+      "models": ["mock-fast"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 1,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": ["FinRobot investment group replay"]
+      }
+    },
+    {
+      "id": "quant_multi_factor_agents",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.leia",
+      "source_records_path": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.records.json",
+      "source_records_sha256": "4c60f3da875a2ca9123d8a7bf5fbf7c9938157015f6261e882245421f2b83a6b",
+      "replay_records_sha256": "4c60f3da875a2ca9123d8a7bf5fbf7c9938157015f6261e882245421f2b83a6b",
+      "turn_count": 1,
+      "models": ["mock-fast"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 1,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": ["FinRobot multi-factor agents replay"]
+      }
+    },
+    {
+      "id": "quant_portfolio_optimization",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+      "source_records_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.records.json",
+      "source_records_sha256": "1b03a3f1f7a494f92d1956e5e60d62cbaba4bcf925b48e0dbd68827f81c6080f",
+      "replay_records_sha256": "1b03a3f1f7a494f92d1956e5e60d62cbaba4bcf925b48e0dbd68827f81c6080f",
+      "turn_count": 1,
+      "models": ["mock-fast"],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 1,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": ["FinRobot portfolio optimization replay"]
+      }
+    }
+  ]
+}
