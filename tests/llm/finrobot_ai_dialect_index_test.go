@@ -69,15 +69,26 @@ type genericAIDialectBackendPlan struct {
 }
 
 type genericAIDialectBackendShape struct {
-	ShapeID      string   `json:"shape_id"`
-	Status       string   `json:"status"`
-	Capabilities []string `json:"capabilities"`
-	Contract     string   `json:"contract"`
-	Inputs       []string `json:"inputs"`
-	Outputs      []string `json:"outputs"`
-	Example      string   `json:"example"`
-	Test         string   `json:"test"`
-	Fixture      string   `json:"fixture"`
+	ShapeID         string                           `json:"shape_id"`
+	Status          string                           `json:"status"`
+	Capabilities    []string                         `json:"capabilities"`
+	Contract        string                           `json:"contract"`
+	Inputs          []string                         `json:"inputs"`
+	Outputs         []string                         `json:"outputs"`
+	Example         string                           `json:"example"`
+	Test            string                           `json:"test"`
+	Fixture         string                           `json:"fixture"`
+	PackageBoundary *genericAIDialectPackageBoundary `json:"package_boundary"`
+}
+
+type genericAIDialectPackageBoundary struct {
+	Status            string `json:"status"`
+	PackageID         string `json:"package_id"`
+	Directory         string `json:"directory"`
+	RegisteredExample string `json:"registered_example"`
+	ContractPath      string `json:"contract_path"`
+	ProviderFree      bool   `json:"provider_free"`
+	DomainSpecific    bool   `json:"domain_specific"`
 }
 
 func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
@@ -199,6 +210,7 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 			assertGenericAIDialectReference(t, root, shape.Fixture, true)
 			assertGenericAIDialectFixtureProviderFree(t, root, shape.Fixture)
 			assertGenericAIDialectBackendShapeGeneric(t, shape)
+			assertGenericAIDialectBackendPackageBoundary(t, root, shape)
 		})
 	}
 	if len(seenShapes) < 8 {
@@ -208,6 +220,44 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 		if !covered {
 			t.Fatalf("required capability %q is not covered by backend plan", capability)
 		}
+	}
+}
+
+func assertGenericAIDialectBackendPackageBoundary(t *testing.T, root string, shape genericAIDialectBackendShape) {
+	t.Helper()
+	if shape.PackageBoundary == nil {
+		t.Fatalf("%s has no checked-in package boundary", shape.ShapeID)
+	}
+	boundary := *shape.PackageBoundary
+	if boundary.Status != "checked_in" {
+		t.Fatalf("%s package boundary is not checked_in: %#v", shape.ShapeID, boundary)
+	}
+	if boundary.PackageID == "" || boundary.Directory == "" || boundary.RegisteredExample == "" || boundary.ContractPath == "" {
+		t.Fatalf("%s checked-in package boundary is incomplete: %#v", shape.ShapeID, boundary)
+	}
+	if !boundary.ProviderFree || boundary.DomainSpecific {
+		t.Fatalf("%s package boundary is not generic/provider-free: %#v", shape.ShapeID, boundary)
+	}
+	assertGenericAIDialectPackageBoundaryGeneric(t, shape.ShapeID, boundary)
+
+	manifest := filepath.ToSlash(filepath.Join(boundary.Directory, "package.manifest.json"))
+	assertGenericAIDialectReference(t, root, manifest, false)
+	assertGenericAIDialectReference(t, root, boundary.RegisteredExample, true)
+	assertGenericAIDialectReference(t, root, boundary.ContractPath, true)
+	assertGenericAIDialectPackageManifestProviderFree(t, root, manifest)
+
+	dirInfo, err := os.Stat(filepath.Join(root, filepath.FromSlash(boundary.Directory)))
+	if err != nil {
+		t.Fatalf("%s package boundary directory %q: %v", shape.ShapeID, boundary.Directory, err)
+	}
+	if !dirInfo.IsDir() {
+		t.Fatalf("%s package boundary directory %q is not a directory", shape.ShapeID, boundary.Directory)
+	}
+	if got, want := filepath.ToSlash(filepath.Dir(boundary.RegisteredExample)), boundary.Directory; got != want {
+		t.Fatalf("%s registered example %q is outside package directory %q", shape.ShapeID, boundary.RegisteredExample, boundary.Directory)
+	}
+	if got, want := filepath.ToSlash(filepath.Dir(filepath.Dir(boundary.ContractPath))), boundary.Directory; got != want {
+		t.Fatalf("%s contract path %q is outside package directory %q", shape.ShapeID, boundary.ContractPath, boundary.Directory)
 	}
 }
 
@@ -233,6 +283,33 @@ func assertGenericAIDialectProductionBoundary(t *testing.T, root string, entry g
 		}
 	default:
 		t.Fatalf("%s has unsupported production boundary status %q", entry.Capability, boundary.Status)
+	}
+}
+
+func assertGenericAIDialectPackageManifestProviderFree(t *testing.T, root, rel string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("%s: %v", rel, err)
+	}
+	var manifest struct {
+		ProviderFree                bool `json:"provider_free"`
+		DomainSpecific              bool `json:"domain_specific"`
+		LiveNetworkDefault          bool `json:"live_network_default"`
+		RealDependencyImportDefault bool `json:"real_dependency_import_default"`
+		LiveModelCalls              bool `json:"live_model_calls"`
+		RealDependencyImports       bool `json:"real_dependency_imports"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("%s: %v", rel, err)
+	}
+	if !manifest.ProviderFree ||
+		manifest.DomainSpecific ||
+		manifest.LiveNetworkDefault ||
+		manifest.RealDependencyImportDefault ||
+		manifest.LiveModelCalls ||
+		manifest.RealDependencyImports {
+		t.Fatalf("package manifest %q is not provider-free: %#v", rel, manifest)
 	}
 }
 
@@ -349,6 +426,28 @@ func assertGenericAIDialectBackendShapeGeneric(t *testing.T, shape genericAIDial
 				t.Fatalf("%s contains FinRobot-specific backend assumption %q in %q", shape.ShapeID, forbidden, value)
 			}
 		}
+	}
+}
+
+func assertGenericAIDialectPackageBoundaryGeneric(t *testing.T, shapeID string, boundary genericAIDialectPackageBoundary) {
+	t.Helper()
+	values := []string{
+		shapeID,
+		boundary.PackageID,
+		filepath.Base(filepath.FromSlash(boundary.Directory)),
+		filepath.Base(filepath.FromSlash(boundary.RegisteredExample)),
+		filepath.Base(filepath.FromSlash(boundary.ContractPath)),
+	}
+	for _, value := range values {
+		lower := strings.ToLower(value)
+		for _, forbidden := range []string{"finrobot.", "finrobot_", "autogen", "openbb", "fingpt"} {
+			if strings.Contains(lower, forbidden) {
+				t.Fatalf("%s contains FinRobot-specific package boundary assumption %q in %q", shapeID, forbidden, value)
+			}
+		}
+	}
+	if !strings.HasPrefix(filepath.Base(filepath.FromSlash(boundary.Directory)), "generic_") {
+		t.Fatalf("%s package boundary directory is not a generic live package: %q", shapeID, boundary.Directory)
 	}
 }
 
