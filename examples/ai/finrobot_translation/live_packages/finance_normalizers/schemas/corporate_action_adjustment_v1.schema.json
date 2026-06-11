@@ -14,6 +14,7 @@
     "raw_volume",
     "adjusted_volume",
     "currency",
+    "adjustment_method",
     "as_of",
     "stale_after_days",
     "stale",
