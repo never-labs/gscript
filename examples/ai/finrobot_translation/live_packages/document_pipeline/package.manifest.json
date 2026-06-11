@@ -19,7 +19,7 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No credentials are declared by this skeleton; SEC API, Marker, PDF conversion, embedding, vector database, and retriever credentials belong only to future provider-specific packages."
+    "policy": "No credentials are declared by this skeleton; SEC API, SEC user-agent contact, rate-limit state, Marker, PDF conversion, embedding, vector database, and retriever credentials belong only to future provider-specific packages."
   },
   "default_policy": {
     "mode": "fixture_replay",
@@ -70,8 +70,8 @@
       "id": "marker_sec_src",
       "source_module": "marker_sec_src/sec_filings_to_markdown.py",
       "capabilities": [
-        "finance.document.html.to_markdown",
-        "finance.document.pdf.to_markdown",
+        "finance.document.html.parse_boundary",
+        "finance.document.pdf.to_markdown_boundary",
         "finance.document.section.extract",
         "finance.document.conversion.provenance"
       ],
@@ -86,7 +86,7 @@
       "capabilities": [
         "finance.document.chunk",
         "finance.document.citation.link",
-        "finance.document.provenance.trace",
+        "finance.document.vector.adapter_matrix",
         "finance.document.vector.adapter"
       ],
       "output_schemas": [
@@ -122,10 +122,43 @@
       "clean_skip": true
     },
     {
-      "id": "document_converter",
-      "display_name": "HTML/PDF to markdown converter",
-      "capability": "finance.document.converter.html_pdf_markdown",
+      "id": "html_parser",
+      "display_name": "SEC HTML parser boundary",
+      "capability": "finance.document.html.parse_boundary",
       "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "pdf_to_markdown_converter",
+      "display_name": "PDF to markdown converter boundary",
+      "capability": "finance.document.pdf.to_markdown_boundary",
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "chunk_citation_adapter",
+      "display_name": "Chunk citation and vector payload adapter",
+      "capability": "finance.document.chunk_citation.vector_matrix",
+      "fixture_key": "rag:chunks:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "embedding_adapter",
+      "display_name": "Embedding adapter clean skip",
+      "capability": "finance.document.embedding.clean_skip",
+      "fixture_key": "rag:chunks:ACME:10-K:offline",
       "schema": "adapter_boundary",
       "live_network": false,
       "dependency_imported": false,
@@ -148,8 +181,8 @@
     "manifest and referenced JSON files decode without external dependencies",
     "provider_free is true and live_network_default is false",
     "required and optional credentials are empty",
-    "SEC filing search/fetch, HTML/PDF markdown conversion, section extraction, chunk citation provenance, and retriever schemas are present",
-    "SEC client, converter, vector store, embedding, and retriever boundaries are metadata-only and fixture-backed",
+    "SEC filing search/fetch, user-agent and rate-limit policy, redirect/cache metadata, HTML/PDF markdown conversion, section extraction, chunk citation provenance, and retriever schemas are present",
+    "SEC client, HTML parser, PDF converter, chunk/citation/vector matrix, embedding, vector store, and retriever boundaries are metadata-only, fixture-backed, and clean-skip safe",
     "main.leia contains no live provider SDK imports, vector database imports, or network execution"
   ],
   "no_built_in_guarantee": {

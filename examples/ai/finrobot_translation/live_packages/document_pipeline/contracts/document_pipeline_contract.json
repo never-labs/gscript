@@ -104,6 +104,28 @@
         "source_url"
       ]
     },
+    "sec_access_policy": {
+      "type": "metadata_only_boundary",
+      "user_agent_required_for_live": true,
+      "live_user_agent_declared": false,
+      "rate_limit_policy": {
+        "source": "SEC fair access policy",
+        "max_requests_per_second": 10,
+        "enforced_in_skeleton": false
+      },
+      "clean_skip_without_policy": true
+    },
+    "redirect_cache_metadata": {
+      "type": "fetch_metadata",
+      "required": [
+        "redirect_chain",
+        "cache.key",
+        "cache.mode",
+        "cache.hit",
+        "cache.ttl_seconds"
+      ],
+      "live_network": false
+    },
     "html_pdf_to_markdown": {
       "type": "conversion_boundary",
       "accepted_inputs": [
@@ -115,6 +137,32 @@
         "page_spans",
         "conversion_warnings",
         "provenance"
+      ]
+    },
+    "html_parser_boundary": {
+      "type": "parser_boundary",
+      "accepted_inputs": [
+        "sec_html"
+      ],
+      "dependency_imports": false,
+      "clean_skip": true,
+      "required_outputs": [
+        "normalized_dom_ref",
+        "section_anchor_map",
+        "table_policy"
+      ]
+    },
+    "pdf_to_markdown_converter_boundary": {
+      "type": "converter_boundary",
+      "accepted_inputs": [
+        "sec_pdf"
+      ],
+      "dependency_imports": false,
+      "clean_skip": true,
+      "required_outputs": [
+        "page_spans",
+        "layout_warnings",
+        "markdown"
       ]
     },
     "section_extraction": {
@@ -135,11 +183,36 @@
         "provenance.accession_number"
       ]
     },
+    "chunk_citation_vector_adapter_matrix": {
+      "type": "adapter_matrix",
+      "required_columns": [
+        "stage",
+        "input",
+        "output",
+        "adapter",
+        "fixture_key",
+        "clean_skip"
+      ],
+      "stages": [
+        "chunk",
+        "citation",
+        "vector_payload"
+      ],
+      "live_network": false,
+      "dependency_imports": false
+    },
     "vector_retriever_adapter": {
       "type": "adapter_boundary",
       "dependency_imports": false,
       "live_network": false,
       "credential_required": false
+    },
+    "embedding_retriever_clean_skip": {
+      "type": "clean_skip_boundary",
+      "embedding_dependency_imported": false,
+      "retriever_dependency_imported": false,
+      "fallback_adapter": "fixture_vector_index",
+      "skip_reason_required": true
     }
   },
   "fixtures": [
@@ -169,11 +242,11 @@
     }
   ],
   "acceptance_gates": [
-    "SEC filing search and fetch metadata includes accession number, CIK, filing date, source URL, and replay provenance",
-    "HTML and PDF conversion boundaries return markdown with page spans, source offsets, and conversion warnings without invoking Marker or network clients",
+    "SEC filing search and fetch metadata includes accession number, CIK, filing date, source URL, user-agent policy, rate-limit policy, redirect chain, cache metadata, and replay provenance",
+    "HTML parser and PDF-to-markdown converter boundaries return markdown with page spans, source offsets, and conversion warnings without invoking Marker or network clients",
     "section extraction preserves ordered business, risk factor, and MD&A section identifiers",
-    "RAG chunks include stable chunk ids, citations, source offsets, accession provenance, and embedding references without embedding model calls",
-    "retriever query fixtures include ranked chunks, scores, answer citations, and vector adapter metadata",
+    "RAG chunks include stable chunk ids, citations, source offsets, accession provenance, and a chunk/citation/vector adapter matrix without embedding model calls",
+    "retriever query fixtures include ranked chunks, scores, answer citations, vector adapter metadata, and embedding/retriever clean-skip metadata",
     "fixture replay succeeds without credentials, live network, SEC clients, Marker, embedding models, or vector database imports"
   ]
 }

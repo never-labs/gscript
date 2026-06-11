@@ -39,7 +39,11 @@
         "adapter",
         "top_k",
         "live_network",
-        "dependency_imported"
+        "dependency_imported",
+        "clean_skip_without_dependency",
+        "skip_reason",
+        "embedding_adapter",
+        "vector_adapter"
       ]
     },
     "retrieved_chunks": {

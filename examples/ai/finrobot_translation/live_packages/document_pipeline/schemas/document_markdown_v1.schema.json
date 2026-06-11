@@ -45,6 +45,9 @@
         "converter",
         "html_supported",
         "pdf_supported",
+        "html_parser_boundary",
+        "pdf_to_markdown_boundary",
+        "redirect_cache_metadata",
         "warnings"
       ]
     },

@@ -30,7 +30,9 @@
     "query": {
       "type": "object",
       "required": [
-        "form_type"
+        "form_type",
+        "user_agent_policy",
+        "rate_limit_policy"
       ]
     },
     "results": {
@@ -47,6 +49,8 @@
           "filing_date",
           "source_url",
           "document_url",
+          "redirect_chain",
+          "cache",
           "provenance"
         ],
         "properties": {
@@ -73,6 +77,19 @@
           },
           "document_url": {
             "type": "string"
+          },
+          "redirect_chain": {
+            "type": "array",
+            "minItems": 1
+          },
+          "cache": {
+            "type": "object",
+            "required": [
+              "key",
+              "mode",
+              "hit",
+              "ttl_seconds"
+            ]
           },
           "provenance": {
             "type": "object",

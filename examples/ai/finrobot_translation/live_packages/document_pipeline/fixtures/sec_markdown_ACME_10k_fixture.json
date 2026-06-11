@@ -10,6 +10,46 @@
     "converter": "offline_fixture_converter",
     "html_supported": true,
     "pdf_supported": true,
+    "html_parser_boundary": {
+      "adapter": "fixture_html_parser",
+      "accepted_input": "sec_html",
+      "dependency_imported": false,
+      "live_network": false,
+      "clean_skip": true,
+      "normalized_dom_ref": "fixture-dom:ACME-2025-10K",
+      "section_anchor_map": {
+        "business": "item-1",
+        "risk_factors": "item-1a",
+        "mda": "item-7"
+      },
+      "table_policy": "normalize_to_markdown"
+    },
+    "pdf_to_markdown_boundary": {
+      "adapter": "fixture_pdf_to_markdown",
+      "accepted_input": "sec_pdf",
+      "dependency_imported": false,
+      "live_network": false,
+      "clean_skip": true,
+      "layout_warnings": [
+        "fixture does not import Marker or PDF libraries"
+      ]
+    },
+    "redirect_cache_metadata": {
+      "redirect_chain": [
+        {
+          "from": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+          "to": "fixtures/raw/acme-20251231.htm",
+          "status": 200,
+          "fixture_redirect": true
+        }
+      ],
+      "cache": {
+        "key": "sec:ACME:10-K:0000000000-26-000001:markdown",
+        "mode": "fixture_replay",
+        "hit": true,
+        "ttl_seconds": 0
+      }
+    },
     "warnings": [
       "table layout normalized to markdown",
       "page numbers are fixture spans, not live PDF extraction"

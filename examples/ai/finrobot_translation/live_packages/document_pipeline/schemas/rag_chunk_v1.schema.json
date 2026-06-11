@@ -9,6 +9,7 @@
     "live_network",
     "document_id",
     "chunk_policy",
+    "adapter_matrix",
     "chunks"
   ],
   "properties": {
@@ -34,6 +35,23 @@
         "overlap_tokens",
         "section_aware"
       ]
+    },
+    "adapter_matrix": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "stage",
+          "input",
+          "output",
+          "adapter",
+          "fixture_key",
+          "live_network",
+          "dependency_imported",
+          "clean_skip"
+        ]
+      }
     },
     "chunks": {
       "type": "array",
@@ -73,7 +91,9 @@
             "required": [
               "adapter",
               "embedding_id",
-              "model"
+              "model",
+              "dependency_imported",
+              "clean_skip"
             ]
           }
         }
