@@ -14,3 +14,10 @@ provider-neutral backend shapes. The plan is intentionally implementation
 agnostic: it names inputs, outputs, and verification fixtures so the dialect can
 later move from examples into reusable packages without adding FinRobot-specific
 syntax or built-in language coupling.
+
+`PACKAGE_BOUNDARIES.md` documents the checked-in package boundary architecture
+for the same generic AI dialect. It explains that the dialect is composed from
+ordinary packages rather than built-in language features, that the packages are
+not FinRobot-specific, and how model, turn, tool, agent, workflow, evaluation,
+replay, trace, approval, and package-audit boundaries compose into complex AI
+applications.
