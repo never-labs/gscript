@@ -1,0 +1,324 @@
+// FinRobot API/web replay substrate example.
+//
+// This is deliberately not a provider client. It models the generic offline
+// substrate that vendor packages can build on: request identity, auth headers,
+// typed JSON decode, retry/pagination/rate-limit/error metadata, and replayed
+// download artifacts.
+
+api_replay_fixture := {
+    records: {
+        {
+            replay_key: "fmp:metrics:ACME:2025:page-1"
+            request: {
+                method: "GET"
+                url: "https://financialmodelingprep.example/stable/key-metrics/ACME?period=annual&page=1"
+                headers: {
+                    Authorization: "Bearer ${FMP_API_KEY}"
+                    Accept: "application/json"
+                    user_agent: "leia-finrobot-replay/1"
+                    x_replay_key: "fmp:metrics:ACME:2025:page-1"
+                }
+                header_names: {"Authorization", "Accept", "User-Agent", "X-Replay-Key"}
+                auth: {scheme: "bearer" secret_ref: "env:FMP_API_KEY" redacted: true}
+                capability: "network.api.fmp"
+                cache: {policy: "fixture-only" ttl_seconds: 86400}
+            }
+            response: {
+                status: 200
+                headers: {
+                    content_type: "application/json"
+                    x_ratelimit_limit: "300"
+                    x_ratelimit_remaining: "1"
+                    retry_after: "2"
+                }
+                header_names: {"Content-Type", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"}
+                body: "[{\"symbol\":\"ACME\",\"date\":\"2025-12-31\",\"revenue\":8420000000,\"grossMargin\":0.42,\"roic\":0.18}]"
+                typed_as: "MetricRow[]"
+            }
+            retry: {attempt: 2 max_attempts: 3 backoff_ms: 250 reason: "429-before-fixture"}
+            pagination: {cursor: "page-1" next: "fmp:metrics:ACME:2025:page-2" has_more: true}
+            rate_limit: {limit: 300 remaining: 1 reset_at: "2026-02-22T00:00:00Z" retry_after_seconds: 2}
+            terms: {provider: "fmp" usage: "offline-fixture" live_network: false}
+        }
+        {
+            replay_key: "fmp:metrics:ACME:2025:page-2"
+            request: {
+                method: "GET"
+                url: "https://financialmodelingprep.example/stable/key-metrics/ACME?period=annual&page=2"
+                headers: {
+                    Authorization: "Bearer ${FMP_API_KEY}"
+                    Accept: "application/json"
+                    x_replay_key: "fmp:metrics:ACME:2025:page-2"
+                }
+                header_names: {"Authorization", "Accept", "X-Replay-Key"}
+                auth: {scheme: "bearer" secret_ref: "env:FMP_API_KEY" redacted: true}
+                capability: "network.api.fmp"
+            }
+            response: {
+                status: 200
+                headers: {content_type: "application/json" x_ratelimit_remaining: "0"}
+                header_names: {"Content-Type", "X-RateLimit-Remaining"}
+                body: "[{\"symbol\":\"ACME\",\"date\":\"2024-12-31\",\"revenue\":7810000000,\"grossMargin\":0.40,\"roic\":0.16}]"
+                typed_as: "MetricRow[]"
+            }
+            retry: {attempt: 1 max_attempts: 3 backoff_ms: 0 reason: "first-try"}
+            pagination: {cursor: "page-2" next: nil has_more: false}
+            rate_limit: {limit: 300 remaining: 0 reset_at: "2026-02-22T00:00:00Z" retry_after_seconds: 0}
+            terms: {provider: "fmp" usage: "offline-fixture" live_network: false}
+        }
+        {
+            replay_key: "finnhub:profile:ACME:auth-failure"
+            request: {
+                method: "GET"
+                url: "https://finnhub.example/api/v1/stock/profile2?symbol=ACME"
+                headers: {Authorization: "Bearer ${FINNHUB_TOKEN}" Accept: "application/json"}
+                header_names: {"Authorization", "Accept"}
+                auth: {scheme: "bearer" secret_ref: "env:FINNHUB_TOKEN" redacted: true}
+                capability: "network.api.finnhub"
+            }
+            response: {
+                status: 401
+                headers: {content_type: "application/json"}
+                header_names: {"Content-Type"}
+                body: "{\"error\":\"missing token\",\"code\":\"auth_missing\"}"
+                typed_as: "ApiError"
+            }
+            retry: {attempt: 1 max_attempts: 1 backoff_ms: 0 reason: "non-retryable-auth"}
+            pagination: {cursor: nil next: nil has_more: false}
+            rate_limit: {limit: 60 remaining: 60 reset_at: "2026-02-22T00:00:00Z" retry_after_seconds: 0}
+            error: {kind: "auth" retryable: false redacted: true message: "missing token"}
+            terms: {provider: "finnhub" usage: "offline-fixture" live_network: false}
+        }
+    }
+    downloads: {
+        {
+            replay_key: "sec:download:ACME:10-K:2025"
+            request: {
+                method: "GET"
+                url: "https://sec.example/Archives/edgar/data/acme/10-k.html"
+                headers: {
+                    Accept: "text/html,application/pdf"
+                    user_agent: "leia-contact@example.test"
+                    x_replay_key: "sec:download:ACME:10-K:2025"
+                }
+                header_names: {"Accept", "User-Agent", "X-Replay-Key"}
+                capability: "network.web.sec-download"
+            }
+            redirects: {
+                {status: 302 location: "mock://sec/acme/2025/10-k.html" reason: "fixture-canonicalized"}
+            }
+            response: {
+                status: 200
+                headers: {content_type: "text/html" etag: "\"acme-10k-2025\""}
+                header_names: {"Content-Type", "ETag"}
+                body: "<html><body><section id=\"item-1a\">Risk factors: supply concentration.</section></body></html>"
+            }
+            artifact: {
+                id: "artifact-sec-acme-10k-2025-html"
+                media_type: "text/html"
+                filename: "ACME_2025_10K.html"
+                bytes: 91
+                sha256: "fixture-sec-acme-10k-2025"
+                replay_uri: "mock://artifacts/sec/acme/2025/10-k.html"
+            }
+            parse: {selector: "section#item-1a" text: "Risk factors: supply concentration."}
+            terms: {provider: "sec" usage: "offline-fixture" live_network: false}
+        }
+    }
+}
+
+func find_api_record(key) {
+    for i := 1; i <= #api_replay_fixture.records; i++ {
+        rec := api_replay_fixture.records[i]
+        if rec.replay_key == key {
+            return rec
+        }
+    }
+    return nil
+}
+
+func find_download(key) {
+    for i := 1; i <= #api_replay_fixture.downloads; i++ {
+        rec := api_replay_fixture.downloads[i]
+        if rec.replay_key == key {
+            return rec
+        }
+    }
+    return nil
+}
+
+func require_fields(row, fields, schema_name) {
+    for i := 1; i <= #fields; i++ {
+        name := fields[i]
+        if row[name] == nil {
+            return {kind: "schema_mismatch" schema: schema_name field: name retryable: false}
+        }
+    }
+    return nil
+}
+
+func typed_json_decode(text, schema_name, required_fields) {
+    value, err := json.decode(text)
+    if err != nil {
+        return nil, {kind: "json_decode" message: tostring(err) retryable: false}
+    }
+    if schema_name == "MetricRow[]" {
+        for i := 1; i <= #value; i++ {
+            field_err := require_fields(value[i], required_fields, schema_name)
+            if field_err != nil {
+                return nil, field_err
+            }
+        }
+    }
+    return {schema: schema_name rows: value}, nil
+}
+
+func replay_api_call(key, required_fields) {
+    rec := find_api_record(key)
+    if rec == nil {
+        return nil, {kind: "replay_miss" retryable: false key: key}
+    }
+    if rec.response.status >= 400 {
+        decoded, _ := json.decode(rec.response.body)
+        return nil, {
+            kind: rec.error.kind
+            status: rec.response.status
+            code: decoded.code
+            retryable: rec.error.retryable
+            rate_limit: rec.rate_limit
+            request: {method: rec.request.method url: rec.request.url headers: rec.request.headers auth: rec.request.auth}
+            terms: rec.terms
+        }
+    }
+    decoded, decode_err := typed_json_decode(rec.response.body, rec.response.typed_as, required_fields)
+    if decode_err != nil {
+        return nil, {
+            kind: decode_err.kind
+            schema: decode_err.schema
+            field: decode_err.field
+            retryable: false
+            request: {method: rec.request.method url: rec.request.url headers: rec.request.headers auth: rec.request.auth}
+        }
+    }
+    return {
+        replay_key: key
+        request: {method: rec.request.method url: rec.request.url headers: rec.request.headers auth: rec.request.auth cache: rec.request.cache}
+        data: decoded.rows
+        schema: decoded.schema
+        retry: rec.retry
+        pagination: rec.pagination
+        rate_limit: rec.rate_limit
+        terms: rec.terms
+    }, nil
+}
+
+func replay_paginated_api(first_key, required_fields) {
+    out := {}
+    events := {}
+    key := first_key
+    for page_index := 1; page_index <= 8; page_index++ {
+        if key == nil {
+            return {rows: out events: events}, nil
+        }
+        page, err := replay_api_call(key, required_fields)
+        if err != nil {
+            return nil, err
+        }
+        events[#events + 1] = {
+            key: key
+            attempt: page.retry.attempt
+            next: page.pagination.next
+            remaining: page.rate_limit.remaining
+        }
+        for i := 1; i <= #page.data; i++ {
+            out[#out + 1] = page.data[i]
+        }
+        key = page.pagination.next
+    }
+    return nil, {kind: "pagination_limit" retryable: false max_pages: 8}
+}
+
+func replay_download_artifact(key) {
+    rec := find_download(key)
+    if rec == nil {
+        return nil, {kind: "download_replay_miss" retryable: false key: key}
+    }
+    return {
+        replay_key: key
+        request: rec.request
+        redirects: rec.redirects
+        status: rec.response.status
+        artifact: rec.artifact
+        parsed: rec.parse
+        evidence: llm.evidence({
+            llm.doc({
+                id: rec.artifact.id
+                title: rec.artifact.filename
+                source: rec.artifact.replay_uri
+                text: rec.parse.text
+            })
+        }, {label: "Download artifact replay"})
+        terms: rec.terms
+    }, nil
+}
+
+func replay_year_key(year) {
+    return string.sub(tostring(year), 1, 4)
+}
+
+fetch_metrics := llm.tool("fetch_metrics_replay", func(entity, year) {
+    return replay_paginated_api("fmp:metrics:" .. string.upper(entity) .. ":" .. replay_year_key(year) .. ":page-1", {"symbol", "date", "revenue", "grossMargin", "roic"})
+}, {
+    description: "Replay a paginated metrics API call with auth, typed JSON, retry, and rate-limit metadata."
+    params: {"entity", "year"}
+    requires: {"local.replay.read", "network.api.fmp"}
+})
+
+download_filing := llm.tool("download_filing_replay", func(entity, form, year) {
+    return replay_download_artifact("sec:download:" .. string.upper(entity) .. ":" .. form .. ":" .. replay_year_key(year))
+}, {
+    description: "Replay a web download artifact with redirect, capability, terms, and parse metadata."
+    params: {"entity", "form", "year"}
+    requires: {"local.replay.read", "network.web.sec-download"}
+})
+
+metrics, metrics_err := llm.dispatch({id: "call-metrics" tool: "fetch_metrics_replay" args: {entity: "acme" year: "2025"}}, {fetch_metrics})
+if metrics_err != nil {
+    print(metrics_err.kind)
+    return
+}
+
+auth_failure, auth_err := replay_api_call("finnhub:profile:ACME:auth-failure", {"name"})
+filing_artifact, filing_err := llm.dispatch({id: "call-download" tool: "download_filing_replay" args: {entity: "ACME" form: "10-K" year: "2025"}}, {download_filing})
+if filing_err != nil {
+    print(filing_err.kind)
+    return
+}
+
+api_replay_summary := string.format(
+"api_replay rows=%d pages=%d first_attempt=%d auth_error=%s artifact=%s redirect=%s",
+#metrics.rows,
+#metrics.events,
+metrics.events[1].attempt,
+auth_err.kind,
+filing_artifact.artifact.id,
+filing_artifact.redirects[1].location
+)
+
+assert(#metrics.rows == 2)
+assert(metrics.rows[1].symbol == "ACME")
+assert(metrics.rows[2].date == "2024-12-31")
+assert(metrics.events[1].attempt == 2)
+assert(metrics.events[2].remaining == 0)
+assert(auth_failure == nil)
+assert(auth_err.kind == "auth")
+assert(auth_err.status == 401)
+assert(auth_err.rate_limit.remaining == 60)
+assert(filing_artifact.status == 200)
+assert(filing_artifact.request.capability == "network.web.sec-download")
+assert(filing_artifact.redirects[1].location == "mock://sec/acme/2025/10-k.html")
+assert(filing_artifact.artifact.media_type == "text/html")
+assert(filing_artifact.parsed.text == "Risk factors: supply concentration.")
+assert(string.find(filing_artifact.evidence.text, "Download artifact replay:", 1, true) != nil)
+
+print(api_replay_summary)
