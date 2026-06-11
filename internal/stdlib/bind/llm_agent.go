@@ -77,6 +77,87 @@ func llmAgentToolResultValue(v Value) Value {
 	return v
 }
 
+func llmTraceContractNode(kind, name, status string, parent, children, errValue Value) Value {
+	t := NewTable()
+	t.RawSetString("type", StringValue(kind))
+	t.RawSetString("name", StringValue(name))
+	t.RawSetString("status", StringValue(status))
+	t.RawSetString("parent", parent)
+	if children.IsNil() {
+		children = TableValue(NewSequentialArrayTable(0))
+	}
+	t.RawSetString("children", children)
+	t.RawSetString("error", errValue)
+	t.RawSetString("budget", NilValue())
+	t.RawSetString("cancel", NilValue())
+	if errValue.IsTable() {
+		switch errValue.Table().RawGetString("kind").Str() {
+		case "budget":
+			t.RawSetString("budget", llmCloneValue(errValue))
+		case "cancelled":
+			t.RawSetString("cancel", llmCloneValue(errValue))
+		}
+	}
+	t.RawSetString("metadata", TableValue(NewTable()))
+	return TableValue(t)
+}
+
+func llmTraceContractParentRef(kind, name, status string) Value {
+	t := NewTable()
+	t.RawSetString("type", StringValue(kind))
+	t.RawSetString("name", StringValue(name))
+	t.RawSetString("status", StringValue(status))
+	return TableValue(t)
+}
+
+func llmTraceContractChildren(items ...Value) Value {
+	out := NewSequentialArrayTable(0)
+	for _, item := range items {
+		if item.IsNil() {
+			continue
+		}
+		out.RawSet(IntValue(int64(out.Length()+1)), item)
+	}
+	return TableValue(out)
+}
+
+func llmTraceContractStatus(v Value, fallback string) string {
+	if v.IsTable() {
+		if status := v.Table().RawGetString("status").Str(); status != "" {
+			return status
+		}
+	}
+	return fallback
+}
+
+func llmTraceContractAttach(t *Table, trace Value) {
+	if t == nil || trace.IsNil() {
+		return
+	}
+	if t.RawGetString("trace").IsNil() {
+		t.RawSetString("trace", trace)
+	}
+}
+
+func llmTraceContractAttachAgentToolResult(result Value, toolTrace Value) Value {
+	if result.IsTable() {
+		result.Table().RawSetString("tool_trace", toolTrace)
+		llmTraceContractAttach(result.Table(), toolTrace)
+	}
+	value := llmAgentToolResultValue(result)
+	if value.IsTable() {
+		llmTraceContractAttach(value.Table(), toolTrace)
+	}
+	return value
+}
+
+func llmTraceContractAttachError(errValue Value, trace Value) Value {
+	if errValue.IsTable() {
+		errValue.Table().RawSetString("trace", trace)
+	}
+	return errValue
+}
+
 func llmAgentToolName(agent Value, meta llmAgentMetadata, fallback string) string {
 	name := meta.Name
 	if name == "" {
@@ -93,35 +174,60 @@ func llmAgentToolName(agent Value, meta llmAgentMetadata, fallback string) strin
 func llmAgentToolWrapper(call ScriptFunctionCaller, agent Value, meta llmAgentMetadata, name string) Value {
 	return FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
 		if call == nil {
-			return []Value{NilValue(), llmErrorValue("internal", "agent-as-tool requires a function caller")}, nil
+			errValue := llmErrorValue("internal", "agent-as-tool requires a function caller")
+			trace := llmTraceContractNode("agent_tool", name, "error", NilValue(), NilValue(), errValue)
+			return []Value{NilValue(), llmTraceContractAttachError(errValue, trace)}, nil
 		}
 		results, err := call(agent, llmAgentCallArgs(meta, callArgs))
 		if err != nil {
 			return nil, err
 		}
 		if len(results) >= 2 && !results[1].IsNil() {
-			return []Value{NilValue(), results[1]}, nil
+			trace := llmTraceContractNode("agent_tool", name, "error", NilValue(), NilValue(), results[1])
+			return []Value{NilValue(), llmTraceContractAttachError(results[1], trace)}, nil
 		}
 		if len(results) == 0 {
 			return []Value{NilValue(), NilValue()}, nil
 		}
 		result := results[0]
+		status := llmTraceContractStatus(result, "ok")
+		parent := llmTraceContractParentRef("agent_tool", name, status)
+		agentName := meta.Name
+		if agentName == "" {
+			agentName = llmAgentToolName(agent, meta, "agent")
+		}
+		agentTrace := llmTraceContractNode("agent", agentName, status, parent, NilValue(), NilValue())
+		if result.IsTable() {
+			if existing := result.Table().RawGetString("trace"); !existing.IsNil() {
+				agentTrace = existing
+				if existing.IsTable() && existing.Table().RawGetString("parent").IsNil() {
+					existing.Table().RawSetString("parent", parent)
+				}
+			} else {
+				llmTraceContractAttach(result.Table(), agentTrace)
+			}
+		}
+		toolTrace := llmTraceContractNode("agent_tool", name, status, NilValue(), llmTraceContractChildren(agentTrace), NilValue())
 		if result.IsTable() {
 			status := result.Table().RawGetString("status").Str()
 			switch status {
 			case "pending":
 				pendErr := llmErrorValue("pending", "delegated agent paused for approval")
 				pendErr.Table().RawSetString("pending", result)
-				return []Value{NilValue(), pendErr}, nil
+				toolTrace = llmTraceContractNode("agent_tool", name, status, NilValue(), llmTraceContractChildren(agentTrace), pendErr)
+				result.Table().RawSetString("tool_trace", toolTrace)
+				return []Value{NilValue(), llmTraceContractAttachError(pendErr, toolTrace)}, nil
 			case "stopped":
 				reason := result.Table().RawGetString("reason").Str()
 				if reason == "" {
 					reason = "delegated agent stopped"
 				}
-				return []Value{NilValue(), llmErrorValue("tool", reason)}, nil
+				errValue := llmErrorValue("tool", reason)
+				toolTrace = llmTraceContractNode("agent_tool", name, status, NilValue(), llmTraceContractChildren(agentTrace), errValue)
+				return []Value{NilValue(), llmTraceContractAttachError(errValue, toolTrace)}, nil
 			}
 		}
-		return []Value{llmAgentToolResultValue(result), NilValue()}, nil
+		return []Value{llmTraceContractAttachAgentToolResult(result, toolTrace), NilValue()}, nil
 	}})
 }
 
@@ -153,6 +259,7 @@ func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table 
 	tool := NewTable()
 	tool.RawSetString("__llm_tool", BoolValue(true))
 	tool.RawSetString("__llm_agent_tool", BoolValue(true))
+	tool.RawSetString("trace_contract", StringValue("agent_tool.v1"))
 	tool.RawSetString("name", StringValue(name))
 	tool.RawSetString("fn", wrapper)
 	tool.RawSetString("description", StringValue(meta.Description))

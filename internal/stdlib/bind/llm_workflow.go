@@ -129,6 +129,7 @@ func llmWorkflowStepListValue(steps []llmWorkflowStep) Value {
 
 func llmRunWorkflow(call ScriptFunctionCaller, steps []llmWorkflowStep, initialInput Value, fixtures *Table) (Value, Value, error) {
 	records := NewSequentialArrayTable(0)
+	traceChildren := NewSequentialArrayTable(0)
 	context := NewTable()
 	currentInput := initialInput
 	var previous Value = NilValue()
@@ -142,6 +143,11 @@ func llmRunWorkflow(call ScriptFunctionCaller, steps []llmWorkflowStep, initialI
 		}
 		records.RawSet(IntValue(int64(i+1)), record)
 		context.RawSetString(step.Name, record)
+		if rt := record.Table(); rt != nil {
+			if trace := rt.RawGetString("trace"); !trace.IsNil() {
+				traceChildren.RawSet(IntValue(int64(traceChildren.Length()+1)), trace)
+			}
+		}
 		lastRecord = record
 		previous = record
 		if rt := record.Table(); rt != nil {
@@ -154,11 +160,21 @@ func llmRunWorkflow(call ScriptFunctionCaller, steps []llmWorkflowStep, initialI
 	}
 
 	result := NewTable()
-	result.RawSetString("status", StringValue("ok"))
+	status := "ok"
 	if !workflowErr.IsNil() {
-		result.RawSetString("status", StringValue("error"))
+		status = "error"
 		result.RawSetString("err", workflowErr)
 	}
+	for i := 1; i <= traceChildren.Length(); i++ {
+		trace := traceChildren.RawGet(IntValue(int64(i)))
+		if trace.IsTable() {
+			parent := trace.Table().RawGetString("parent")
+			if parent.IsTable() {
+				parent.Table().RawSetString("status", StringValue(status))
+			}
+		}
+	}
+	result.RawSetString("status", StringValue(status))
 	result.RawSetString("input", initialInput)
 	result.RawSetString("value", NilValue())
 	result.RawSetString("text", StringValue(""))
@@ -169,6 +185,7 @@ func llmRunWorkflow(call ScriptFunctionCaller, steps []llmWorkflowStep, initialI
 	}
 	result.RawSetString("steps", TableValue(records))
 	result.RawSetString("context", TableValue(context))
+	result.RawSetString("trace", llmTraceContractNode("workflow", "workflow", status, NilValue(), TableValue(traceChildren), workflowErr))
 	return TableValue(result), workflowErr, nil
 }
 
@@ -205,14 +222,27 @@ func llmRunWorkflowStep(call ScriptFunctionCaller, step llmWorkflowStep, index i
 
 func llmWorkflowRecord(step llmWorkflowStep, index int, input, value, errValue Value, mocked bool) Value {
 	record := NewTable()
+	status := "ok"
+	if !errValue.IsNil() {
+		status = "error"
+	}
 	record.RawSetString("name", StringValue(step.Name))
 	record.RawSetString("index", IntValue(int64(index)))
+	record.RawSetString("status", StringValue(status))
 	record.RawSetString("input", input)
 	record.RawSetString("result", value)
 	record.RawSetString("value", llmWorkflowOutputValue(value))
 	record.RawSetString("text", StringValue(llmWorkflowOutputText(value)))
 	record.RawSetString("err", errValue)
 	record.RawSetString("mocked", BoolValue(mocked))
+	trace := llmTraceContractNode("workflow_step", step.Name, status, llmTraceContractParentRef("workflow", "workflow", ""), NilValue(), errValue)
+	if tt := trace.Table(); tt != nil {
+		metadata := NewTable()
+		metadata.RawSetString("index", IntValue(int64(index)))
+		metadata.RawSetString("mocked", BoolValue(mocked))
+		tt.RawSetString("metadata", TableValue(metadata))
+	}
+	record.RawSetString("trace", trace)
 	return TableValue(record)
 }
 

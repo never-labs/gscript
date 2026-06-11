@@ -229,6 +229,7 @@ func (b *llmLibBuilder) registerToolHelpers() {
 		tool := llmNewToolValue(name, wrapper, opts)
 		if tt := tool.Table(); tt != nil {
 			tt.RawSetString("__llm_agent_tool", BoolValue(true))
+			tt.RawSetString("trace_contract", StringValue("agent_tool.v1"))
 			if !tt.RawGetString("params").IsTable() && len(meta.Params) > 0 {
 				tt.RawSetString("params", llmStringArrayValue(meta.Params))
 			}
