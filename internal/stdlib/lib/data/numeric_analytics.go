@@ -20,6 +20,35 @@ func NumericArrayMoments(array Array) (NumericMoments, bool, error) {
 	if !isNumericArray(array) {
 		return NumericMoments{}, false, nil
 	}
+	// Range fast path: stream the carrier without materializing. The int64
+	// walk and float64 conversion match tryBulkI64Values / NumericAt
+	// bit-for-bit, and the accumulators update in the same row order.
+	if r, ok := statsStreamI64Range(array); ok {
+		var out NumericMoments
+		value := r.start
+		for i := 0; i < r.len; i++ {
+			v := float64(value)
+			out.Sum += v
+			out.SumSquares += v * v
+			value += r.step
+		}
+		out.Count = int64(r.len)
+		return out, true, nil
+	}
+	// Bulk fast path: flatten once and accumulate over the dense slice with
+	// the exact per-row updates of the NumericAt loop below (same element
+	// values, same order), so results are bit-identical. tryBulkF64Values
+	// bails on null rows, which keeps null-skipping on the boxed loop.
+	if values, owned, ok := tryBulkF64Values(array); ok {
+		var out NumericMoments
+		for _, value := range values {
+			out.Sum += value
+			out.SumSquares += value * value
+		}
+		out.Count = int64(len(values))
+		bulkF64Release(values, owned)
+		return out, true, nil
+	}
 	var out NumericMoments
 	for row := 0; row < array.Len(); row++ {
 		value, ok, err := typedKernels.NumericAt(array, row)
@@ -110,6 +139,41 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 		}
 		length = valueArray.Len()
 	}
+	// Range fast path for the array-array case: stream both carriers without
+	// materializing; identical element values and accumulation order.
+	if weightIsArray && valueIsArray {
+		if wr, ok := statsStreamI64Range(weightArray); ok {
+			if vr, ok := statsStreamI64Range(valueArray); ok && vr.len == wr.len {
+				total := float64(0)
+				wv, vv := wr.start, vr.start
+				for i := 0; i < wr.len; i++ {
+					total += float64(wv) * float64(vv)
+					wv += wr.step
+					vv += vr.step
+				}
+				return total, true, nil
+			}
+		}
+	}
+	// Bulk fast path for the array-array case: same per-row product and
+	// accumulation order as the boxed loop below, over slices that flatten
+	// to the exact NumericAt element values (nulls bail to the boxed loop).
+	if weightIsArray && valueIsArray {
+		if wvs, wOwned, ok := tryBulkF64Values(weightArray); ok {
+			if vvs, vOwned, ok := tryBulkF64Values(valueArray); ok && len(vvs) == len(wvs) {
+				total := float64(0)
+				for i, w := range wvs {
+					total += w * vvs[i]
+				}
+				bulkF64Release(vvs, vOwned)
+				bulkF64Release(wvs, wOwned)
+				return total, true, nil
+			} else if ok {
+				bulkF64Release(vvs, vOwned)
+			}
+			bulkF64Release(wvs, wOwned)
+		}
+	}
 	total := float64(0)
 	for row := 0; row < length; row++ {
 		weight := weightScalar
@@ -161,6 +225,42 @@ func NumericArrayCovariance(left, right Array, sample bool) (any, bool, error) {
 	}
 	var sx, sy, sxy float64
 	var count int64
+	// Range fast path: stream both carriers without materializing; identical
+	// element values and accumulation order.
+	if lr, ok := statsStreamI64Range(left); ok {
+		if rr, ok := statsStreamI64Range(right); ok && rr.len == lr.len {
+			lvalue, rvalue := lr.start, rr.start
+			for i := 0; i < lr.len; i++ {
+				lv := float64(lvalue)
+				rv := float64(rvalue)
+				sx += lv
+				sy += rv
+				sxy += lv * rv
+				lvalue += lr.step
+				rvalue += rr.step
+			}
+			return numericCovarianceFromSums(sx, sy, sxy, int64(lr.len), sample)
+		}
+	}
+	// Bulk fast path: identical accumulators in identical row order over the
+	// flattened slices (nulls bail to the boxed loop below).
+	if lvs, lOwned, ok := tryBulkF64Values(left); ok {
+		if rvs, rOwned, ok := tryBulkF64Values(right); ok && len(rvs) == len(lvs) {
+			for i, lv := range lvs {
+				rv := rvs[i]
+				sx += lv
+				sy += rv
+				sxy += lv * rv
+			}
+			count = int64(len(lvs))
+			bulkF64Release(rvs, rOwned)
+			bulkF64Release(lvs, lOwned)
+			return numericCovarianceFromSums(sx, sy, sxy, count, sample)
+		} else if ok {
+			bulkF64Release(rvs, rOwned)
+		}
+		bulkF64Release(lvs, lOwned)
+	}
 	for row := 0; row < left.Len(); row++ {
 		lv, lok, err := typedKernels.NumericAt(left, row)
 		if err != nil {
@@ -178,6 +278,10 @@ func NumericArrayCovariance(left, right Array, sample bool) (any, bool, error) {
 		sxy += lv * rv
 		count++
 	}
+	return numericCovarianceFromSums(sx, sy, sxy, count, sample)
+}
+
+func numericCovarianceFromSums(sx, sy, sxy float64, count int64, sample bool) (any, bool, error) {
 	if count == 0 || (sample && count < 2) {
 		return NullValue, true, nil
 	}
@@ -204,6 +308,46 @@ func NumericArrayCorrelation(left, right Array) (any, bool, error) {
 	}
 	var sx, sy, sx2, sy2, sxy float64
 	var count int64
+	// Range fast path: stream both carriers without materializing; identical
+	// element values and accumulation order.
+	if lr, ok := statsStreamI64Range(left); ok {
+		if rr, ok := statsStreamI64Range(right); ok && rr.len == lr.len {
+			lvalue, rvalue := lr.start, rr.start
+			for i := 0; i < lr.len; i++ {
+				lv := float64(lvalue)
+				rv := float64(rvalue)
+				sx += lv
+				sy += rv
+				sx2 += lv * lv
+				sy2 += rv * rv
+				sxy += lv * rv
+				lvalue += lr.step
+				rvalue += rr.step
+			}
+			return numericCorrelationFromSums(sx, sy, sx2, sy2, sxy, int64(lr.len))
+		}
+	}
+	// Bulk fast path: identical accumulators in identical row order over the
+	// flattened slices (nulls bail to the boxed loop below).
+	if lvs, lOwned, ok := tryBulkF64Values(left); ok {
+		if rvs, rOwned, ok := tryBulkF64Values(right); ok && len(rvs) == len(lvs) {
+			for i, lv := range lvs {
+				rv := rvs[i]
+				sx += lv
+				sy += rv
+				sx2 += lv * lv
+				sy2 += rv * rv
+				sxy += lv * rv
+			}
+			count = int64(len(lvs))
+			bulkF64Release(rvs, rOwned)
+			bulkF64Release(lvs, lOwned)
+			return numericCorrelationFromSums(sx, sy, sx2, sy2, sxy, count)
+		} else if ok {
+			bulkF64Release(rvs, rOwned)
+		}
+		bulkF64Release(lvs, lOwned)
+	}
 	for row := 0; row < left.Len(); row++ {
 		lv, lok, err := typedKernels.NumericAt(left, row)
 		if err != nil {
@@ -223,6 +367,10 @@ func NumericArrayCorrelation(left, right Array) (any, bool, error) {
 		sxy += lv * rv
 		count++
 	}
+	return numericCorrelationFromSums(sx, sy, sx2, sy2, sxy, count)
+}
+
+func numericCorrelationFromSums(sx, sy, sx2, sy2, sxy float64, count int64) (any, bool, error) {
 	if count < 2 {
 		return NullValue, true, nil
 	}
@@ -321,6 +469,26 @@ func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, e
 		return NewColumn("_", nullable).Data, true, nil
 	}
 	return newF64Trusted(out), true, nil
+}
+
+// I64RangeView reports the affine parameters of an integer range carrier,
+// letting frontend reducers stream or close-form ranges without
+// materializing them.
+func I64RangeView(array Array) (start, step int64, n int, ok bool) {
+	if r, isRange := unwrapAttributedArray(array).(i64RangeArray); isRange {
+		return r.start, r.step, r.len, true
+	}
+	return 0, 0, 0, false
+}
+
+// numericStatsI64Range unwraps attribute wrappers and reports the underlying
+// i64RangeArray, letting stats kernels stream range carriers without
+// materializing them.
+func statsStreamI64Range(array Array) (i64RangeArray, bool) {
+	if r, ok := unwrapAttributedArray(array).(i64RangeArray); ok {
+		return r, true
+	}
+	return i64RangeArray{}, false
 }
 
 func ensureNumericNullableOutput(nullable []any, values []float64, filled int) []any {
