@@ -19,6 +19,12 @@ BenchmarkQEvalVectorGoBaseline/MaskWhere-16              100  1000 ns/op  0 B/op
 BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit/ModuloWhereCount-16  100  3000 ns/op  128 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes
 """
 
+SAMPLE_QSQL_MATRIX = """
+BenchmarkQSQLBindMatrixWarm/JoinInnerAliasedKeyTopK-16    100  3000 ns/op  8192 input_rows/s  400 B/op  6 allocs/op  99.0 kernel_hit_pct  0 fallbacks/op
+BenchmarkQSQLBindMatrixCold/JoinInnerAliasedKeyTopK-16    100  9000 ns/op  8192 input_rows/s  900 B/op  20 allocs/op  0 kernel_hit_pct  0 fallbacks/op
+BenchmarkQSQLNativeGoMatrix/JoinInnerAliasedKeyTopK-16    100  1500 ns/op  8192 input_rows/s  100 B/op  1 allocs/op
+"""
+
 SAMPLE_WITH_FALLBACK = """
 BenchmarkQSessionEvalVectorWarmExecution/FallbackShape-16    100  9000 ns/op  2048 B/op  90 allocs/op  80.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  0.8 typed_kernel_hits/op  0.2 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  2 typed_pipeline_shapes  1 typed_pipeline_fallback_shapes  1 q_pipeline_category_xbar_within
 BenchmarkQEvalVectorGoBaseline/FallbackShape-16              100  1000 ns/op  0 B/op  0 allocs/op
@@ -130,6 +136,20 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(ratios["q.eval MaskWhere session execution vs Go"], 2.0)
         self.assertEqual(ratios["q.eval MaskWhere result-cache warm vs session execution"], 0.25)
         self.assertEqual(ratios["q.eval MaskWhere cold vs session execution"], 1.25)
+
+    def test_build_ratios_includes_qsql_matrix_family(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_QSQL_MATRIX)
+        ratios = {row.scenario: row.ratio for row in report.build_ratios(rows)}
+
+        self.assertEqual(ratios["qSQL matrix JoinInnerAliasedKeyTopK warm vs Go"], 2.0)
+        self.assertEqual(ratios["qSQL matrix JoinInnerAliasedKeyTopK cold vs warm"], 3.0)
+
+    def test_qsql_matrix_rows_counted_in_qsql_coverage(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_QSQL_MATRIX)
+        coverage = report.build_qsql_benchmark_coverage(rows)
+
+        self.assertEqual(coverage.leia_case_count, 4)
+        self.assertEqual(coverage.native_go_case_count, 2)
 
     def test_coverage_marks_qeval_kernel_stats_covered(self):
         rows = report.parse_go_benchmarks(SAMPLE)
