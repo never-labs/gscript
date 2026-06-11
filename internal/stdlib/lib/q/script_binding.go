@@ -724,6 +724,26 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver 
 		out, err := evalValueBinary(plan.op, left, right)
 		return out, true, err
 	}
+	// Tiled-cycle pushdown for compares mirrors the string evaluator's
+	// applyVectorDyadic probe: comparing a long cyclic view computes on the
+	// short tile and re-tiles, keeping downstream `where` on the O(period)
+	// periodic kernels. Arithmetic ops stay on the typed dyadic kernels
+	// below, whose eager null-bitmap forms feed the bulk reducers directly.
+	if opByte, _, ok := lookupDyadicVerb(plan.op); ok {
+		switch opByte {
+		case '=', '<', '>':
+			la, _ := left.(data.Array)
+			ra, _ := right.(data.Array)
+			if la != nil || ra != nil {
+				if out, handled, err := qTryTiledCycleVectorDyadic(opByte, left, right, la, ra); err != nil || handled {
+					if err != nil {
+						return nil, true, err
+					}
+					return out, true, nil
+				}
+			}
+		}
+	}
 	if dataOp, ok := qDataCompareOpString(plan.op); ok {
 		la, _ := left.(data.Array)
 		ra, _ := right.(data.Array)

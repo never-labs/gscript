@@ -2215,6 +2215,9 @@ func TryTypedWhereMaskI64(mask Array) (Array, bool, error) {
 	if out, handled, err := typedWhereMaskIndexArray(mask); handled || err != nil {
 		return out, handled, err
 	}
+	if out, ok := fusedPredicateWhereIndexArray(mask); ok {
+		return out, true, nil
+	}
 	if values, owned, ok := tryBulkBoolValues(mask); ok {
 		count := 0
 		for _, keep := range values {
@@ -4770,6 +4773,9 @@ func WithinMask(array Array, low, high any, highClosed bool) (Array, error) {
 	}
 	low = normalizeScalar(array.Kind(), low)
 	high = normalizeScalar(array.Kind(), high)
+	if mask, ok := lazyWithinMask(array, low, high, highClosed); ok {
+		return mask, nil
+	}
 	if ok := withinMaskTyped(array, low, high, highClosed, out); ok {
 		return newBoolTrusted(out), nil
 	}
