@@ -57,7 +57,39 @@ func TestQSQLRuntimeDescriptorClassifiesReadPipelines(t *testing.T) {
 			if descriptor.Supported != tt.wantSupported {
 				t.Fatalf("supported = %v, want %v reason=%q", descriptor.Supported, tt.wantSupported, descriptor.Reason)
 			}
+			if got := descriptor.Pipeline.String(); got != descriptor.PipelineShape {
+				t.Fatalf("structured pipeline string = %q, want descriptor pipeline %q", got, descriptor.PipelineShape)
+			}
+			if descriptor.QueryShape == "" {
+				t.Fatalf("query shape missing from descriptor: %+v", descriptor)
+			}
+			if !descriptor.Supported && descriptor.Unsupported.ReasonCode == "" {
+				t.Fatalf("unsupported reason code missing from descriptor: %+v", descriptor)
+			}
 		})
+	}
+}
+
+func TestQSQLRuntimeDescriptorCarriesStructuredJoinFallback(t *testing.T) {
+	lowered, err := Lower(mustParse(t, "select sym,price,bid from trades join quotes on sym"))
+	if err != nil {
+		t.Fatalf("Lower returned error: %v", err)
+	}
+	descriptor := lowered.RuntimeDescriptor()
+	if descriptor.Pipeline.Join.Count != 1 {
+		t.Fatalf("join count = %d, want 1 descriptor=%+v", descriptor.Pipeline.Join.Count, descriptor)
+	}
+	if descriptor.Pipeline.Join.KeyCount != 1 {
+		t.Fatalf("join key count = %d, want 1 descriptor=%+v", descriptor.Pipeline.Join.KeyCount, descriptor)
+	}
+	if got, want := descriptor.Pipeline.Join.Kinds, []string{"inner"}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("join kinds = %#v, want %#v", got, want)
+	}
+	if descriptor.Unsupported.ReasonCode != RuntimeFallbackPlannerUnhandled {
+		t.Fatalf("unsupported reason code = %q, want %q reason=%q", descriptor.Unsupported.ReasonCode, RuntimeFallbackPlannerUnhandled, descriptor.Unsupported.Reason)
+	}
+	if !strings.Contains(descriptor.Unsupported.Reason, "join plan") {
+		t.Fatalf("unsupported reason = %q, want join-specific reason", descriptor.Unsupported.Reason)
 	}
 }
 
@@ -149,12 +181,66 @@ func TestQSQLExecRuntimeFallbackIsObservableWithPipelineShape(t *testing.T) {
 	}
 }
 
+func TestQSQLExecRuntimeBackendUnsupportedFallbackStatsAreExplicit(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	frame := mustQSQLRuntimeFrame(t)
+	lowered, err := Lower(mustParse(t, "select notional:size*price from trades where size>=20"))
+	if err != nil {
+		t.Fatalf("Lower returned error: %v", err)
+	}
+	descriptor := lowered.RuntimeDescriptor()
+	out, err := lowered.execRuntime(frame, qSQLRuntimeUnsupportedBackend{})
+	if err != nil {
+		t.Fatalf("ExecRuntime fallback returned error: %v", err)
+	}
+	if out.Len() != 2 {
+		t.Fatalf("fallback output len = %d, want 2", out.Len())
+	}
+
+	var attempts, fallbacks uint64
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Source != qSQLRuntimeSource || stat.Kernel != qSQLPlanKernel || stat.Shape != descriptor.Shape {
+			continue
+		}
+		switch stat.Outcome {
+		case "attempt":
+			if stat.Route != "test_backend" {
+				t.Fatalf("attempt route = %q, want test_backend", stat.Route)
+			}
+			attempts += stat.Count
+		case "fallback":
+			if stat.Route != qSQLRuntimeRoutePlanFallback {
+				t.Fatalf("fallback route = %q, want %q", stat.Route, qSQLRuntimeRoutePlanFallback)
+			}
+			if stat.ReasonCode != RuntimeFallbackUnsupportedShape {
+				t.Fatalf("fallback reason code = %q, want %q", stat.ReasonCode, RuntimeFallbackUnsupportedShape)
+			}
+			fallbacks += stat.Count
+		}
+	}
+	if attempts != 1 || fallbacks != 1 {
+		t.Fatalf("backend attempts=%d fallbacks=%d stats=%#v", attempts, fallbacks, RuntimeKernelExecutionStats())
+	}
+}
+
 type qSQLRuntimeUnsupportedExpr struct {
 	Value any
 }
 
 func (e qSQLRuntimeUnsupportedExpr) EvalRow(data.Frame, int) (any, error) {
 	return e.Value, nil
+}
+
+type qSQLRuntimeUnsupportedBackend struct{}
+
+func (qSQLRuntimeUnsupportedBackend) Route() string {
+	return "test_backend"
+}
+
+func (qSQLRuntimeUnsupportedBackend) Compile(data.Frame, data.QueryPlan, QSQLRuntimeDescriptor) (qSQLRuntimeExecutable, bool, error) {
+	return nil, false, nil
 }
 
 func mustQSQLRuntimeFrame(t *testing.T) data.Frame {
