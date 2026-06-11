@@ -8,7 +8,21 @@
     "adapter": "fixture_vector_index",
     "top_k": 2,
     "live_network": false,
-    "dependency_imported": false
+    "dependency_imported": false,
+    "clean_skip_without_dependency": true,
+    "skip_reason": "fixture replay does not import embedding models or vector stores",
+    "embedding_adapter": {
+      "adapter": "fixture_embedding_ref",
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    "vector_adapter": {
+      "adapter": "fixture_vector_index",
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
   },
   "retrieved_chunks": [
     {

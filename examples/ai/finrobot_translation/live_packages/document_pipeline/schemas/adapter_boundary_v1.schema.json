@@ -41,6 +41,8 @@
           "dependency_imported",
           "credential_required",
           "clean_skip",
+          "clean_skip_reason",
+          "policy",
           "gap"
         ]
       }
