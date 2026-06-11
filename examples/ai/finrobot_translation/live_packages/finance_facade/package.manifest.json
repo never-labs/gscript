@@ -32,6 +32,7 @@
     "smoke": "main.leia",
     "finance_facade_contract": "contracts/finance_facade_contract.json",
     "provider_fallback_contract": "contracts/provider_fallback_contract.json",
+    "provider_edge_matrix_contract": "contracts/provider_edge_matrix_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json"
   },
   "schemas": {
@@ -39,6 +40,7 @@
     "fundamental_table": "schemas/fundamental_table_v1.schema.json",
     "function_fixture": "schemas/function_fixture_v1.schema.json",
     "provider_fallback": "schemas/provider_fallback_v1.schema.json",
+    "provider_edge_matrix": "schemas/provider_edge_matrix_v1.schema.json",
     "error_envelope": "schemas/error_envelope_v1.schema.json"
   },
   "fixtures": {
@@ -54,6 +56,7 @@
     "yfinance_company_profile": "fixtures/function_yfinance_company_profile_ACME_fixture.json",
     "yfinance_market_cap": "fixtures/function_yfinance_market_cap_ACME_fixture.json",
     "provider_fallback_order": "fixtures/function_fallback_order_ACME_fixture.json",
+    "provider_edge_matrix": "fixtures/provider_edge_matrix_fixture.json",
     "error_envelope": "fixtures/error_envelope_yfinance_rate_limit_fixture.json"
   },
   "modules": [
@@ -326,6 +329,7 @@
     "market_data_api.py function matrix covers FMP enterprise value, ratios/key metrics, ratings, targets, technical indicators, company profile, YFinance company profile, YFinance market cap, fallback order, and provider error envelope",
     "typed table fixtures validate market data and fundamental rows with schema, currency, units, period, and provenance",
     "cache, retry, rate-limit, provenance, and error envelope contracts are fixture-backed and provider-free",
+    "provider retry/cache/error edge matrix covers partial outage, stale rows, empty result, malformed response, capability denial, fallback explanation, and provider terms metadata",
     "finance_data.py and market_data.py facade boundaries clean-skip without importing live provider SDKs"
   ],
   "no_built_in_guarantee": {

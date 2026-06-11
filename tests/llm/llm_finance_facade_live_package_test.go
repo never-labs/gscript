@@ -127,7 +127,7 @@ func TestFinRobotFinanceFacadeLivePackageManifest(t *testing.T) {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"market_data_table", "fundamental_table", "function_fixture", "provider_fallback", "error_envelope"} {
+	for _, key := range []string{"market_data_table", "fundamental_table", "function_fixture", "provider_fallback", "provider_edge_matrix", "error_envelope"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
@@ -157,7 +157,7 @@ func TestFinRobotFinanceFacadeLivePackageManifest(t *testing.T) {
 	assertFinanceFacadeFunctionMatrix(t, base, manifest.FunctionMatrix)
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"fallback", "typed table", "function matrix", "market_data_api.py", "cache", "retry", "rate-limit", "provenance", "error envelope"} {
+	for _, want := range []string{"fallback", "typed table", "function matrix", "market_data_api.py", "cache", "retry", "rate-limit", "provenance", "error envelope", "edge matrix", "partial outage", "stale rows", "empty result", "malformed response", "capability denial", "terms metadata"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -298,10 +298,11 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeFinanceFacadeJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 12 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 13 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	indexCapabilities := map[string]bool{}
+	fixtureKeys := map[string]bool{}
 	for _, fixture := range index.Fixtures {
 		if fixture.FixtureKey == "" || fixture.Capability == "" || fixture.Path == "" || fixture.Schema == "" {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
@@ -309,6 +310,7 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 		if fixture.Metadata["replay_ready"] != true {
 			t.Fatalf("%s replay_ready = %#v", fixture.FixtureKey, fixture.Metadata["replay_ready"])
 		}
+		fixtureKeys[fixture.FixtureKey] = true
 		indexCapabilities[fixture.Capability] = true
 		assertFinanceFacadeJSONFile(t, filepath.Join(base, fixture.Path))
 		assertFinanceFacadeJSONFile(t, filepath.Join(base, fixture.Schema))
@@ -323,10 +325,115 @@ func TestFinRobotFinanceFacadeContractsAndFixtures(t *testing.T) {
 		"finance.facade.yfinance.company_profile.fetch",
 		"finance.facade.yfinance.market_cap.fetch",
 		"finance.facade.provider.fallback.resolve",
+		"finance.facade.provider.edge_matrix",
 		"finance.facade.error.envelope",
 	} {
 		if !indexCapabilities[capability] {
 			t.Fatalf("fixture index missing capability %q", capability)
+		}
+	}
+	if !fixtureKeys["edge:provider_matrix:offline"] {
+		t.Fatalf("fixture index missing provider edge matrix fixture: %#v", fixtureKeys)
+	}
+}
+
+func TestFinRobotFinanceFacadeProviderEdgeMatrix(t *testing.T) {
+	base := financeFacadeLivePackageDir(t)
+
+	var contract financeFacadeProviderEdgeContract
+	decodeFinanceFacadeJSONFile(t, filepath.Join(base, "contracts", "provider_edge_matrix_contract.json"), &contract)
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || !contract.CleanSkipWithoutDependency {
+		t.Fatalf("edge matrix contract must stay provider-free and clean-skip safe: %#v", contract)
+	}
+	if contract.Fixture == "" || contract.Schema == "" || len(contract.DialectCapabilities) < 9 || len(contract.EdgeCases) < 8 {
+		t.Fatalf("edge matrix contract incomplete: %#v", contract)
+	}
+	assertFinanceFacadeJSONFile(t, filepath.Join(base, contract.Fixture))
+	assertFinanceFacadeJSONFile(t, filepath.Join(base, contract.Schema))
+
+	capabilityText := strings.Join(contract.DialectCapabilities, " ")
+	for _, want := range []string{"retry_observable", "cache_state", "partial_outage", "stale_rows", "empty_result", "malformed_response", "capability_denied", "fallback_explanation", "terms_metadata"} {
+		if !strings.Contains(capabilityText, want) {
+			t.Fatalf("edge dialect capabilities missing %q: %#v", want, contract.DialectCapabilities)
+		}
+	}
+
+	var fixture financeFacadeProviderEdgeFixture
+	decodeFinanceFacadeJSONFile(t, filepath.Join(base, "fixtures", "provider_edge_matrix_fixture.json"), &fixture)
+	if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports || fixture.Dialect != "finance_facade.provider_edge_matrix.v1" {
+		t.Fatalf("edge matrix fixture header = %#v", fixture)
+	}
+
+	providerTerms := map[string]financeFacadeProviderTerms{}
+	for _, provider := range fixture.Providers {
+		if provider.ProviderID == "" || len(provider.Capabilities) == 0 {
+			t.Fatalf("provider edge metadata incomplete: %#v", provider)
+		}
+		if provider.Terms.TermsRef == "" || len(provider.Terms.AllowedUses) == 0 ||
+			!provider.Terms.AttributionRequired || provider.Terms.Redistribution == "" ||
+			provider.Terms.LiveNetwork || provider.Terms.CredentialRequired {
+			t.Fatalf("%s terms metadata incomplete or live-enabled: %#v", provider.ProviderID, provider.Terms)
+		}
+		providerTerms[provider.ProviderID] = provider.Terms
+	}
+	if len(providerTerms) < 5 {
+		t.Fatalf("edge fixture should provide terms metadata for the provider dialect: %#v", providerTerms)
+	}
+
+	rowsByID := map[string]financeFacadeProviderEdgeRow{}
+	categories := map[string]bool{}
+	for _, row := range fixture.EdgeRows {
+		if row.CaseID == "" || row.Category == "" || row.ProviderID == "" || row.FixtureKey == "" || row.Operation == "" {
+			t.Fatalf("edge row metadata incomplete: %#v", row)
+		}
+		if row.ErrorEnvelope.OK || row.ErrorEnvelope.ErrorCode == "" || row.Retry.Attempts < 0 || row.CacheState == "" {
+			t.Fatalf("edge row retry/cache/error envelope incomplete: %#v", row)
+		}
+		if row.Fallback.Required && (len(row.Fallback.Attempted) < 2 || row.Fallback.SelectedProvider == "" || row.Fallback.Explanation == "") {
+			t.Fatalf("required fallback row missing explanation/attempts: %#v", row)
+		}
+		if row.Category != "provider_terms_metadata" {
+			if _, ok := providerTerms[row.ProviderID]; !ok {
+				t.Fatalf("edge row %s references provider without terms metadata: %q", row.CaseID, row.ProviderID)
+			}
+			if row.Provenance.FixtureKey == "" || !row.Provenance.SourceURLRedacted || !row.Provenance.ReplayReady {
+				t.Fatalf("edge row provenance incomplete: %#v", row.Provenance)
+			}
+		}
+		rowsByID[row.CaseID] = row
+		categories[row.Category] = true
+	}
+
+	requiredCategories := []string{
+		"retry_cache_error",
+		"partial_provider_outage",
+		"stale_rows",
+		"empty_provider_result",
+		"malformed_response",
+		"capability_denied",
+		"provider_terms_metadata",
+	}
+	for _, category := range requiredCategories {
+		if !categories[category] {
+			t.Fatalf("edge matrix missing category %q: %#v", category, categories)
+		}
+	}
+
+	for _, edgeCase := range contract.EdgeCases {
+		row, ok := rowsByID[edgeCase.ID]
+		if !ok {
+			t.Fatalf("contract edge case %q missing fixture row", edgeCase.ID)
+		}
+		if row.Category != edgeCase.Category ||
+			row.FixtureKey != edgeCase.TriggerFixtureKey ||
+			row.ErrorEnvelope.ErrorCode != edgeCase.ExpectedErrorCode ||
+			row.Retry.Retryable != edgeCase.Retryable ||
+			row.CacheState != edgeCase.CacheState ||
+			row.Fallback.Required != edgeCase.FallbackRequired {
+			t.Fatalf("fixture row does not satisfy contract edge case %#v: %#v", edgeCase, row)
+		}
+		if edgeCase.FallbackExplanationRequired && row.Fallback.Explanation == "" {
+			t.Fatalf("edge case %s requires fallback explanation", edgeCase.ID)
 		}
 	}
 }
@@ -562,7 +669,7 @@ func TestFinRobotFinanceFacadeLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get finance_facade_live_package_summary: %v", err)
 			}
-			want := "finance_facade_live_package modules=3 providers=5 tables=2 functions=9 policies=3 errors=1 provider_free=true live_network=false imports=false fixtures=12"
+			want := "finance_facade_live_package modules=3 providers=5 tables=2 functions=9 policies=3 errors=8 provider_free=true live_network=false imports=false fixtures=13 edge_matrix=8"
 			if got != want {
 				t.Fatalf("finance_facade_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -611,6 +718,83 @@ type financeFacadeFunctionFallback struct {
 	Attempted                  []string `json:"attempted"`
 	CleanSkipWithoutDependency bool     `json:"clean_skip_without_dependency"`
 	ErrorEnvelopeFixture       string   `json:"error_envelope_fixture"`
+}
+
+type financeFacadeProviderEdgeContract struct {
+	ProviderFree               bool                            `json:"provider_free"`
+	LiveNetwork                bool                            `json:"live_network"`
+	RealDependencyImports      bool                            `json:"real_dependency_imports"`
+	CleanSkipWithoutDependency bool                            `json:"clean_skip_without_dependency"`
+	Fixture                    string                          `json:"fixture"`
+	Schema                     string                          `json:"schema"`
+	DialectCapabilities        []string                        `json:"dialect_capabilities"`
+	EdgeCases                  []financeFacadeProviderEdgeCase `json:"edge_cases"`
+}
+
+type financeFacadeProviderEdgeCase struct {
+	ID                          string `json:"id"`
+	Category                    string `json:"category"`
+	TriggerFixtureKey           string `json:"trigger_fixture_key"`
+	ExpectedErrorCode           string `json:"expected_error_code"`
+	Retryable                   bool   `json:"retryable"`
+	CacheState                  string `json:"cache_state"`
+	FallbackRequired            bool   `json:"fallback_required"`
+	FallbackExplanationRequired bool   `json:"fallback_explanation_required"`
+	Terminal                    bool   `json:"terminal"`
+}
+
+type financeFacadeProviderEdgeFixture struct {
+	ProviderFree          bool                           `json:"provider_free"`
+	LiveNetwork           bool                           `json:"live_network"`
+	RealDependencyImports bool                           `json:"real_dependency_imports"`
+	Dialect               string                         `json:"dialect"`
+	Providers             []financeFacadeEdgeProvider    `json:"providers"`
+	EdgeRows              []financeFacadeProviderEdgeRow `json:"edge_rows"`
+}
+
+type financeFacadeEdgeProvider struct {
+	ProviderID   string                     `json:"provider_id"`
+	Capabilities []string                   `json:"capabilities"`
+	Terms        financeFacadeProviderTerms `json:"terms"`
+}
+
+type financeFacadeProviderTerms struct {
+	TermsRef            string   `json:"terms_ref"`
+	AllowedUses         []string `json:"allowed_uses"`
+	AttributionRequired bool     `json:"attribution_required"`
+	Redistribution      string   `json:"redistribution"`
+	LiveNetwork         bool     `json:"live_network"`
+	CredentialRequired  bool     `json:"credential_required"`
+}
+
+type financeFacadeProviderEdgeRow struct {
+	CaseID     string `json:"case_id"`
+	Category   string `json:"category"`
+	ProviderID string `json:"provider_id"`
+	FixtureKey string `json:"fixture_key"`
+	Operation  string `json:"operation"`
+	CacheState string `json:"cache_state"`
+	Retry      struct {
+		Attempts  int    `json:"attempts"`
+		Retryable bool   `json:"retryable"`
+		Backoff   string `json:"backoff"`
+	} `json:"retry"`
+	ErrorEnvelope struct {
+		OK                bool   `json:"ok"`
+		ErrorCode         string `json:"error_code"`
+		RetryAfterSeconds int    `json:"retry_after_seconds"`
+	} `json:"error_envelope"`
+	Fallback struct {
+		Required         bool     `json:"required"`
+		Attempted        []string `json:"attempted"`
+		SelectedProvider string   `json:"selected_provider"`
+		Explanation      string   `json:"explanation"`
+	} `json:"fallback"`
+	Provenance struct {
+		FixtureKey        string `json:"fixture_key"`
+		SourceURLRedacted bool   `json:"source_url_redacted"`
+		ReplayReady       bool   `json:"replay_ready"`
+	} `json:"provenance"`
 }
 
 func assertFinanceFacadeFunctionMatrix(t *testing.T, base string, matrix []financeFacadeFunctionMatrix) {

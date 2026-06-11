@@ -1,6 +1,6 @@
 // Provider-free FinRobot finance facade live package skeleton.
 // No live provider SDKs, network calls, or credentials are used here.
 
-finance_facade_live_package_summary := "finance_facade_live_package modules=3 providers=5 tables=2 functions=9 policies=3 errors=1 provider_free=true live_network=false imports=false fixtures=12"
+finance_facade_live_package_summary := "finance_facade_live_package modules=3 providers=5 tables=2 functions=9 policies=3 errors=8 provider_free=true live_network=false imports=false fixtures=13 edge_matrix=8"
 
 print(finance_facade_live_package_summary)

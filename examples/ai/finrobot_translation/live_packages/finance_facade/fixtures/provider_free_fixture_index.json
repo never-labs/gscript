@@ -160,6 +160,20 @@
         "retryable": true,
         "fallback_contract": "contracts/provider_fallback_contract.json"
       }
+    },
+    {
+      "fixture_key": "edge:provider_matrix:offline",
+      "capability": "finance.facade.provider.edge_matrix",
+      "path": "fixtures/provider_edge_matrix_fixture.json",
+      "schema": "schemas/provider_edge_matrix_v1.schema.json",
+      "metadata": {
+        "provider": "provider_facade_dialect",
+        "dataset": "provider_edge_cases",
+        "replay_ready": true,
+        "edge_cases": 8,
+        "provider_free": true,
+        "fallback_contract": "contracts/provider_edge_matrix_contract.json"
+      }
     }
   ]
 }
