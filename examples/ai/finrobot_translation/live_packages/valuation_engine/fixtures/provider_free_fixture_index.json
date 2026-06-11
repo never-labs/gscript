@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "valuation:ACME:methods:offline",
+      "capability": "finance.valuation.target_price.synthesize",
+      "path": "fixtures/valuation_output_ACME_fixture.json",
+      "schema": "schemas/valuation_output_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "deterministic_math": true,
+        "hidden_live_data_fetch": false
+      }
+    },
+    {
+      "fixture_key": "valuation:ACME:football_field:offline",
+      "capability": "finance.valuation.football_field.build",
+      "path": "fixtures/football_field_ACME_fixture.json",
+      "schema": "schemas/football_field_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "deterministic_math": true,
+        "hidden_live_data_fetch": false
+      }
+    },
+    {
+      "fixture_key": "valuation:ACME:assumption_audit:offline",
+      "capability": "finance.valuation.assumption_audit",
+      "path": "fixtures/assumption_audit_ACME_fixture.json",
+      "schema": "schemas/assumption_audit_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "deterministic_math": true,
+        "hidden_live_data_fetch": false
+      }
+    },
+    {
+      "fixture_key": "valuation:ACME:tolerance_gates:offline",
+      "capability": "finance.valuation.tolerance_gate.evaluate",
+      "path": "fixtures/tolerance_gates_ACME_fixture.json",
+      "schema": "schemas/tolerance_gate_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "deterministic_math": true,
+        "hidden_live_data_fetch": false
+      }
+    }
+  ]
+}
