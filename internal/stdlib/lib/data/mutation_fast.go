@@ -587,6 +587,37 @@ func rekeyedAfterValueUpdate(keyed KeyedFrame, out Frame, assignments map[Symbol
 	}, nil
 }
 
+// gatherFrameRowsView builds a frame whose columns are lazy index views over
+// the source frame's columns: one shared trusted index array, no dense
+// per-column copies. Frames are immutable values, so the views stay valid for
+// the result's lifetime; dense-copy gathers remain available through
+// Frame.Gather for callers that need detached storage. rows must already be
+// validated in-range and is adopted without copying. Wide-survivor mutations
+// (delete a few rows from a large table) use this to keep the mutation cost
+// proportional to the index, not the surviving table.
+func gatherFrameRowsView(frame Frame, rows []int) (Frame, error) {
+	indexes := make([]int64, len(rows))
+	for i, row := range rows {
+		indexes[i] = int64(row)
+	}
+	return gatherFrameRowsViewI64(frame, indexes)
+}
+
+// gatherFrameRowsViewI64 is gatherFrameRowsView with an adopted (trusted,
+// in-range, caller-owned) int64 row index slice.
+func gatherFrameRowsViewI64(frame Frame, rows []int64) (Frame, error) {
+	indexArray := columnArray[int64]{kind: KindI64, data: rows}
+	cols := make([]Column, 0, len(frame.schema.names))
+	for _, name := range frame.schema.names {
+		cols = append(cols, Column{Name: name, Data: indexedArray{
+			source:  frame.columns[name],
+			indexes: indexArray,
+			len:     len(rows),
+		}})
+	}
+	return newFrameTrusted(cols...)
+}
+
 // DeleteWhereKeyed deletes matching rows from a keyed frame, remapping the
 // existing key index instead of re-keying the whole table.
 func DeleteWhereKeyed(keyed KeyedFrame, where Expr) (KeyedFrame, error) {
@@ -601,38 +632,38 @@ func DeleteWhereKeyed(keyed KeyedFrame, where Expr) (KeyedFrame, error) {
 		return keyed, nil
 	}
 	n := keyed.frame.Len()
-	rowMap := make([]int, n)
-	for i := range rowMap {
-		rowMap[i] = 0
-	}
+	rowMap := make([]int32, n)
 	for _, row := range deleteIndexes {
 		if row < 0 || row >= n {
 			return KeyedFrame{}, fmt.Errorf("delete index %d out of range", row)
 		}
 		rowMap[row] = -1
 	}
-	keep := make([]int, 0, n-len(deleteIndexes))
+	keep := make([]int64, 0, n-len(deleteIndexes))
 	for row := 0; row < n; row++ {
 		if rowMap[row] < 0 {
 			continue
 		}
-		rowMap[row] = len(keep)
-		keep = append(keep, row)
+		rowMap[row] = int32(len(keep))
+		keep = append(keep, int64(row))
 	}
-	out, err := keyed.frame.Gather(keep)
+	out, err := gatherFrameRowsViewI64(keyed.frame, keep)
 	if err != nil {
 		return KeyedFrame{}, err
 	}
+	// Each surviving row belongs to exactly one key, so the remapped per-key
+	// row lists share one flat backing slice instead of one allocation per key.
+	flat := make([]int, 0, len(keep))
 	newRows := make(map[string][]int, keyed.indexKeyCount())
 	keyed.forEachIndexKey(func(key string, rows []int) {
-		kept := make([]int, 0, len(rows))
+		start := len(flat)
 		for _, row := range rows {
 			if nr := rowMap[row]; nr >= 0 {
-				kept = append(kept, nr)
+				flat = append(flat, int(nr))
 			}
 		}
-		if len(kept) > 0 {
-			newRows[key] = kept
+		if len(flat) > start {
+			newRows[key] = flat[start:len(flat):len(flat)]
 		}
 	})
 	return KeyedFrame{
