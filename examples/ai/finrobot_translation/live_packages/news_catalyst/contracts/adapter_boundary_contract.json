@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-news-catalyst-adapter-boundary-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "fixture_hook": "recorded_news_catalyst_adapter_fixture",
+  "boundaries": [
+    {
+      "id": "polymarket",
+      "display_name": "Polymarket",
+      "capability": "finance.retail_sentiment.polymarket.market_snapshot",
+      "fixture_key": "polymarket:market_snapshot:ACME:offline",
+      "adapter_kind": "prediction_market",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads"
+      }
+    },
+    {
+      "id": "x_social",
+      "display_name": "X",
+      "capability": "finance.retail_sentiment.x.mention_snapshot",
+      "fixture_key": "x:mention_snapshot:ACME:offline",
+      "adapter_kind": "social_stream",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads"
+      }
+    },
+    {
+      "id": "reddit",
+      "display_name": "Reddit",
+      "capability": "finance.retail_sentiment.reddit.thread_snapshot",
+      "fixture_key": "reddit:thread_snapshot:ACME:offline",
+      "adapter_kind": "community_thread",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads"
+      }
+    }
+  ]
+}

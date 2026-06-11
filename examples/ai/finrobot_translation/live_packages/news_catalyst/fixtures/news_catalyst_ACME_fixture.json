@@ -1,0 +1,89 @@
+{
+  "fixture_key": "news_catalyst:ACME:2026-06-11",
+  "provider_free": true,
+  "live_network": false,
+  "ticker": "ACME",
+  "as_of": "2026-06-11T16:00:00Z",
+  "news_events": [
+    {
+      "event_id": "news-acme-guidance-001",
+      "headline": "ACME raises full-year margin guidance after supply contract renewal",
+      "source_name": "fixture_financial_wire",
+      "published_at": "2026-06-11T13:15:00Z",
+      "url": "fixture://news/acme/guidance-001",
+      "category": "guidance",
+      "sentiment": "positive",
+      "relevance_score": 0.94,
+      "impact_score": 0.72,
+      "source_rank": 1,
+      "evidence": [
+        "margin guidance raised 150 bps",
+        "renewal extends two-year supply visibility"
+      ]
+    },
+    {
+      "event_id": "news-acme-product-002",
+      "headline": "ACME schedules investor demo for industrial AI product line",
+      "source_name": "fixture_company_release",
+      "published_at": "2026-06-10T21:00:00Z",
+      "url": "fixture://news/acme/product-002",
+      "category": "product",
+      "sentiment": "mixed",
+      "relevance_score": 0.81,
+      "impact_score": 0.28,
+      "source_rank": 2,
+      "evidence": [
+        "new product line expands addressable market",
+        "commercial pricing remains undisclosed"
+      ]
+    }
+  ],
+  "source_rankings": [
+    {
+      "source_name": "fixture_financial_wire",
+      "rank": 1,
+      "trust_score": 0.91,
+      "recency_score": 0.98,
+      "directness_score": 0.83,
+      "rationale": "recent direct coverage with specific guidance figures"
+    },
+    {
+      "source_name": "fixture_company_release",
+      "rank": 2,
+      "trust_score": 0.86,
+      "recency_score": 0.72,
+      "directness_score": 0.95,
+      "rationale": "direct issuer source with lower independent confirmation"
+    }
+  ],
+  "catalysts": [
+    {
+      "catalyst_id": "cat-acme-margin-guidance",
+      "catalyst_type": "margin_expansion",
+      "direction": "positive",
+      "impact_score": 0.68,
+      "time_horizon": "near_term",
+      "confidence": 0.82,
+      "evidence_event_ids": [
+        "news-acme-guidance-001"
+      ]
+    },
+    {
+      "catalyst_id": "cat-acme-product-optionality",
+      "catalyst_type": "product_optionality",
+      "direction": "mixed",
+      "impact_score": 0.22,
+      "time_horizon": "medium_term",
+      "confidence": 0.58,
+      "evidence_event_ids": [
+        "news-acme-product-002"
+      ]
+    }
+  ],
+  "impact_summary": {
+    "overall_direction": "positive",
+    "aggregate_impact_score": 0.55,
+    "primary_category": "guidance",
+    "source_count": 2
+  }
+}
