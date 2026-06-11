@@ -12,19 +12,27 @@ import (
 )
 
 type genericAgentRunnerManifest struct {
-	SchemaVersion               int               `json:"schema_version"`
-	ID                          string            `json:"id"`
-	PackageName                 string            `json:"package_name"`
-	ProviderFree                bool              `json:"provider_free"`
-	LiveNetworkDefault          bool              `json:"live_network_default"`
-	RealDependencyImportDefault bool              `json:"real_dependency_import_default"`
-	SourceExamples              []string          `json:"source_examples"`
-	Entrypoints                 map[string]string `json:"entrypoints"`
-	Schemas                     map[string]string `json:"schemas"`
-	Fixtures                    map[string]string `json:"fixtures"`
-	Capabilities                []string          `json:"capabilities"`
-	DialectBackendShape         string            `json:"dialect_backend_shape"`
-	NoBuiltInGuarantee          struct {
+	SchemaVersion               int    `json:"schema_version"`
+	ID                          string `json:"id"`
+	PackageName                 string `json:"package_name"`
+	ProviderFree                bool   `json:"provider_free"`
+	LiveNetworkDefault          bool   `json:"live_network_default"`
+	RealDependencyImportDefault bool   `json:"real_dependency_import_default"`
+	DefaultPolicy               struct {
+		Mode                        string `json:"mode"`
+		LiveNetwork                 bool   `json:"live_network"`
+		ProviderCredentialsRequired bool   `json:"provider_credentials_required"`
+		RealDependencyImports       bool   `json:"real_dependency_imports"`
+		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
+		FixtureHook                 string `json:"fixture_hook"`
+	} `json:"default_policy"`
+	SourceExamples      []string          `json:"source_examples"`
+	Entrypoints         map[string]string `json:"entrypoints"`
+	Schemas             map[string]string `json:"schemas"`
+	Fixtures            map[string]string `json:"fixtures"`
+	Capabilities        []string          `json:"capabilities"`
+	DialectBackendShape string            `json:"dialect_backend_shape"`
+	NoBuiltInGuarantee  struct {
 		Required  bool   `json:"required"`
 		Statement string `json:"statement"`
 	} `json:"no_built_in_guarantee"`
@@ -43,6 +51,14 @@ func TestGenericAgentRunnerLivePackageManifest(t *testing.T) {
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
 		t.Fatalf("manifest must be provider-free: %#v", manifest)
+	}
+	if manifest.DefaultPolicy.Mode != "fixture_replay" ||
+		manifest.DefaultPolicy.LiveNetwork ||
+		manifest.DefaultPolicy.ProviderCredentialsRequired ||
+		manifest.DefaultPolicy.RealDependencyImports ||
+		!manifest.DefaultPolicy.CleanSkipWithoutDependency ||
+		manifest.DefaultPolicy.FixtureHook != "recorded_generic_agent_runner_fixture" {
+		t.Fatalf("default policy must stay provider-free fixture replay: %#v", manifest.DefaultPolicy)
 	}
 	for _, source := range manifest.SourceExamples {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(source))); err != nil {

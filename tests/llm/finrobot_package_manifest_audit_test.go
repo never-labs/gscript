@@ -191,6 +191,7 @@ func assertFinRobotAuditProviderFree(t *testing.T, path string, manifest map[str
 	if !finrobotLivePackageBoolOrConst(manifest["provider_free"], true) {
 		t.Fatalf("%s provider_free = %#v, want true", path, manifest["provider_free"])
 	}
+	assertFinRobotAuditRecursiveBool(t, path, manifest, "provider_free", true)
 }
 
 func assertFinRobotAuditNetworkDisabled(t *testing.T, path string, manifest map[string]any) {

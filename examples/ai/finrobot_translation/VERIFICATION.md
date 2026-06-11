@@ -43,7 +43,7 @@ No `docs/spec/index.html` generation was run.
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples --json` discovers 78 runnable/checkable FinRobot
+`go run ./cmd/leia examples list --json` discovers 78 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
 The examples gate validated:

@@ -5,6 +5,14 @@
   "provider_free": true,
   "live_network_default": false,
   "real_dependency_import_default": false,
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_agent_runner_fixture"
+  },
   "source_examples": [
     "examples/ai/general_analysis_assistant.leia",
     "examples/ai/general_analysis_assistant.records.json"

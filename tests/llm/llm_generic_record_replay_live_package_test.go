@@ -1,6 +1,7 @@
 package leia_test
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -316,6 +317,59 @@ func TestGenericRecordReplaySchemaAndFixtureIndex(t *testing.T) {
 	}
 }
 
+func TestGenericRecordReplayCanonicalHashContract(t *testing.T) {
+	base := genericRecordReplayLivePackageDir(t)
+
+	var contract struct {
+		DeterministicSummary struct {
+			HashAlgorithm string `json:"hash_algorithm"`
+			StableJSON    bool   `json:"stable_json"`
+		} `json:"deterministic_summary"`
+	}
+	decodeGenericRecordReplayJSON(t, filepath.Join(base, "contracts", "record_replay_contract.json"), &contract)
+	if contract.DeterministicSummary.HashAlgorithm != "sha256" || !contract.DeterministicSummary.StableJSON {
+		t.Fatalf("canonical hash contract must stay sha256 stable JSON: %#v", contract.DeterministicSummary)
+	}
+
+	request := map[string]any{
+		"messages": []any{
+			map[string]any{"role": "system", "content": "Use fixture data only."},
+			map[string]any{"role": "user", "content": "Summarize the row."},
+		},
+		"tools": []any{
+			map[string]any{
+				"name": "fixture.lookup",
+				"schema": map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"symbol": map[string]any{"type": "string"}},
+				},
+			},
+		},
+	}
+	reordered := map[string]any{
+		"tools": request["tools"],
+		"messages": []any{
+			map[string]any{"content": "Use fixture data only.", "role": "system"},
+			map[string]any{"content": "Summarize the row.", "role": "user"},
+		},
+	}
+	reversedMessages := map[string]any{
+		"messages": []any{
+			map[string]any{"role": "user", "content": "Summarize the row."},
+			map[string]any{"role": "system", "content": "Use fixture data only."},
+		},
+		"tools": request["tools"],
+	}
+
+	baseline := genericRecordReplayCanonicalHash(t, request)
+	if got := genericRecordReplayCanonicalHash(t, reordered); got != baseline {
+		t.Fatalf("object key order must not affect canonical request hash: got %s want %s", got, baseline)
+	}
+	if got := genericRecordReplayCanonicalHash(t, reversedMessages); got == baseline {
+		t.Fatalf("array order must participate in canonical request hash")
+	}
+}
+
 func TestGenericRecordReplayStrictOrderedMatching(t *testing.T) {
 	base := genericRecordReplayLivePackageDir(t)
 	index := loadGenericReplayIndex(t, base)
@@ -536,6 +590,16 @@ func decodeGenericRecordReplayJSON(t *testing.T, path string, out any) {
 	if err := json.Unmarshal(data, out); err != nil {
 		t.Fatalf("%s: %v", path, err)
 	}
+}
+
+func genericRecordReplayCanonicalHash(t *testing.T, value any) string {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal canonical value: %v", err)
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("sha256:%x", sum)
 }
 
 func assertGenericRecordReplayPath(t *testing.T, path string) {

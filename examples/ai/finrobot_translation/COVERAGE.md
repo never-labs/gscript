@@ -11,7 +11,7 @@ Baseline:
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 78 runnable/checkable examples discovered by
-  `go run ./cmd/leia examples --json`.
+  `go run ./cmd/leia examples list --json`.
 - Runtime changes in this audit: none.
 
 ## Executive Summary

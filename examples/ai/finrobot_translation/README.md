@@ -17,9 +17,9 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
-Current status: `go run ./cmd/leia examples --json` discovers 78 runnable and
-checkable FinRobot translation examples under this directory. The checked-in
-live-package skeleton surface has 32 directories:
+Current status: `go run ./cmd/leia examples list --json` discovers 78 runnable
+and checkable FinRobot translation examples under this directory. The
+checked-in live-package skeleton surface has 32 directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,

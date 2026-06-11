@@ -185,6 +185,7 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 	for _, capability := range index.RequiredCapabilities {
 		requiredCapabilities[capability] = false
 	}
+	indexedBoundaries := genericAIDialectIndexedProductionBoundaries(t, index)
 	seenShapes := map[string]bool{}
 	for _, shape := range plan.BackendShapes {
 		shape := shape
@@ -210,6 +211,7 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 			assertGenericAIDialectReference(t, root, shape.Fixture, true)
 			assertGenericAIDialectFixtureProviderFree(t, root, shape.Fixture)
 			assertGenericAIDialectBackendShapeGeneric(t, shape)
+			assertGenericAIDialectBackendBoundaryIndexed(t, shape, indexedBoundaries)
 			assertGenericAIDialectBackendPackageBoundary(t, root, shape)
 		})
 	}
@@ -220,6 +222,54 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 		if !covered {
 			t.Fatalf("required capability %q is not covered by backend plan", capability)
 		}
+	}
+}
+
+func genericAIDialectIndexedProductionBoundaries(t *testing.T, index genericAIDialectIndex) map[string]genericAIDialectIndexItem {
+	t.Helper()
+	indexed := map[string]genericAIDialectIndexItem{}
+	for _, entry := range index.Entries {
+		if entry.ProductionPackageBoundary == nil || entry.ProductionPackageBoundary.Status != "checked_in" {
+			continue
+		}
+		packageID := entry.ProductionPackageBoundary.PackageID
+		if packageID == "" {
+			t.Fatalf("%s checked-in production boundary has no package id", entry.Capability)
+		}
+		if previous, ok := indexed[packageID]; ok {
+			previousBoundary := previous.ProductionPackageBoundary
+			if previousBoundary.Directory != entry.ProductionPackageBoundary.Directory ||
+				previousBoundary.RegisteredExample != entry.ProductionPackageBoundary.RegisteredExample ||
+				previousBoundary.ProviderFree != entry.ProductionPackageBoundary.ProviderFree ||
+				previousBoundary.DomainSpecific != entry.ProductionPackageBoundary.DomainSpecific {
+				t.Fatalf("package boundary %q is indexed with conflicting metadata: %#v vs %#v", packageID, *previousBoundary, *entry.ProductionPackageBoundary)
+			}
+			continue
+		}
+		indexed[packageID] = entry
+	}
+	return indexed
+}
+
+func assertGenericAIDialectBackendBoundaryIndexed(t *testing.T, shape genericAIDialectBackendShape, indexed map[string]genericAIDialectIndexItem) {
+	t.Helper()
+	if shape.PackageBoundary == nil {
+		t.Fatalf("%s has no package boundary to compare with index", shape.ShapeID)
+	}
+	boundary := *shape.PackageBoundary
+	entry, ok := indexed[boundary.PackageID]
+	if !ok {
+		t.Fatalf("%s references package boundary %q absent from index production boundaries", shape.ShapeID, boundary.PackageID)
+	}
+	indexBoundary := entry.ProductionPackageBoundary
+	if indexBoundary == nil {
+		t.Fatalf("%s matched index entry %q without production boundary", shape.ShapeID, entry.Capability)
+	}
+	if boundary.Directory != indexBoundary.Directory ||
+		boundary.RegisteredExample != indexBoundary.RegisteredExample ||
+		boundary.ProviderFree != indexBoundary.ProviderFree ||
+		boundary.DomainSpecific != indexBoundary.DomainSpecific {
+		t.Fatalf("%s package boundary diverges from index entry %q: %#v vs %#v", shape.ShapeID, entry.Capability, boundary, *indexBoundary)
 	}
 }
 
