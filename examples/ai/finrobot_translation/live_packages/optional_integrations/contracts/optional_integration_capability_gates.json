@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-optional-integration-capability-gates",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "fixture_hook": "recorded_optional_live_fixture",
+  "gates": [
+    {
+      "id": "fingpt",
+      "capability": "optional.ai.fingpt.forecast",
+      "package_name": "fingpt",
+      "import_name": "fingpt",
+      "fixture_key": "fingpt:forecast:ACME:2026-06-11",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    },
+    {
+      "id": "finrl",
+      "capability": "optional.quant.finrl.strategy",
+      "package_name": "finrl",
+      "import_name": "finrl",
+      "fixture_key": "finrl:strategy:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    },
+    {
+      "id": "finml",
+      "capability": "optional.quant.finml.factor_model",
+      "package_name": "finml",
+      "import_name": "finml",
+      "fixture_key": "finml:factors:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    },
+    {
+      "id": "backtrader",
+      "capability": "optional.quant.backtrader.backtest",
+      "package_name": "backtrader",
+      "import_name": "backtrader",
+      "fixture_key": "backtrader:sma_cross:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    },
+    {
+      "id": "mplfinance",
+      "capability": "optional.chart.mplfinance.render",
+      "package_name": "mplfinance",
+      "import_name": "mplfinance",
+      "fixture_key": "mplfinance:candles:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    },
+    {
+      "id": "openbb",
+      "capability": "optional.data.openbb.market_data",
+      "package_name": "openbb",
+      "import_name": "openbb",
+      "fixture_key": "openbb:market_data:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    },
+    {
+      "id": "ollama",
+      "capability": "optional.llm.ollama.local",
+      "package_name": "ollama",
+      "import_name": "ollama",
+      "fixture_key": "ollama:function_call:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped"
+    }
+  ]
+}
