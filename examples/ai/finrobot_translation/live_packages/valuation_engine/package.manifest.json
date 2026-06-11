@@ -32,20 +32,23 @@
     "smoke": "main.leia",
     "valuation_engine_contract": "contracts/valuation_engine_contract.json",
     "assumption_audit_contract": "contracts/assumption_audit_contract.json",
+    "scenario_contract": "contracts/valuation_scenario_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json"
   },
   "schemas": {
     "valuation_output": "schemas/valuation_output_v1.schema.json",
     "football_field": "schemas/football_field_v1.schema.json",
     "assumption_audit": "schemas/assumption_audit_v1.schema.json",
-    "tolerance_gate": "schemas/tolerance_gate_v1.schema.json"
+    "tolerance_gate": "schemas/tolerance_gate_v1.schema.json",
+    "valuation_scenario": "contracts/valuation_scenario_contract.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "valuation_output": "fixtures/valuation_output_ACME_fixture.json",
     "football_field": "fixtures/football_field_ACME_fixture.json",
     "assumption_audit": "fixtures/assumption_audit_ACME_fixture.json",
-    "tolerance_gates": "fixtures/tolerance_gates_ACME_fixture.json"
+    "tolerance_gates": "fixtures/tolerance_gates_ACME_fixture.json",
+    "scenario_coverage": "fixtures/scenario_coverage_fixture.json"
   },
   "modules": [
     {
@@ -173,6 +176,7 @@
     "manifest and referenced JSON files decode without external dependencies",
     "DCF, EV/EBITDA, P/E, target price synthesis, football-field data, assumption audit, and tolerance gates are represented as provider-free contracts",
     "deterministic fixture math metadata records formulas, currency, period, provenance, and replay-ready status",
+    "bear/base/bull sensitivity, WACC terminal-growth grids, peer outlier rejection, analyst target conflicts, and scenario audit trails are fixture-backed",
     "tolerance gates compare expected and actual fixture values within explicit absolute tolerances",
     "main.leia contains no live provider SDK imports, network execution, q/runtime valuation optimization, or hidden data fetch"
   ],

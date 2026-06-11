@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "valuation_scenario_contract_v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "required_capabilities": [
+    "valuation.scenario.bear_base_bull",
+    "valuation.sensitivity.wacc_terminal_growth_grid",
+    "valuation.peers.outlier_rejection",
+    "valuation.analyst_targets.conflict_resolution",
+    "valuation.audit_trail.scenario_events"
+  ],
+  "required_fields": [
+    "ticker",
+    "valuation_date",
+    "cash_flows",
+    "wacc",
+    "terminal_growth",
+    "diluted_shares_b",
+    "net_debt_b",
+    "peer_multiples",
+    "analyst_targets",
+    "audit_trail"
+  ],
+  "scenario_outputs": [
+    "bear",
+    "base",
+    "bull",
+    "wacc_terminal_growth_grid",
+    "accepted_peer_set",
+    "rejected_peer_outliers",
+    "trimmed_analyst_consensus",
+    "conflict_flags"
+  ],
+  "acceptance_gates": [
+    "Scenario prices must be deterministic and ordered bear < base < bull.",
+    "WACC and terminal-growth sensitivity grid must expose low/base/high cases.",
+    "Peer outliers must be rejected before EV/EBITDA and P/E averages are used.",
+    "Analyst target conflicts must be surfaced instead of silently averaged.",
+    "Audit trail must identify every fixture input, filter, conflict, and synthesis step."
+  ]
+}

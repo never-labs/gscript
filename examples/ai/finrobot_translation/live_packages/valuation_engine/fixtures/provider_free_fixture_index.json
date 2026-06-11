@@ -60,6 +60,24 @@
         "scenario_weighted_target": true,
         "tolerance_metadata": true
       }
+    },
+    {
+      "fixture_key": "valuation_scenario_coverage",
+      "capability": "finance.valuation.scenario.coverage",
+      "path": "fixtures/scenario_coverage_fixture.json",
+      "schema": "contracts/valuation_scenario_contract.json",
+      "metadata": {
+        "replay_ready": true,
+        "deterministic_math": true,
+        "hidden_live_data_fetch": false,
+        "cases": [
+          "bear/base/bull sensitivity",
+          "WACC terminal-growth grid",
+          "peer outlier rejection",
+          "analyst target conflict",
+          "scenario audit trail"
+        ]
+      }
     }
   ]
 }
