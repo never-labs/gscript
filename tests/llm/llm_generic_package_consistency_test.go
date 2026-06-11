@@ -52,6 +52,74 @@ func TestGenericLivePackageConsistency(t *testing.T) {
 	}
 }
 
+func TestGenericLivePackageMatrixMatchesManifestAndDirectories(t *testing.T) {
+	root := repoRoot(t)
+	packagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+	dirIDs := map[string]string{}
+	for _, packageDir := range genericLivePackageDirs(t, packagesRoot) {
+		relDir := filepath.ToSlash(mustRel(t, root, packageDir))
+		dirIDs[filepath.Base(packageDir)] = relDir
+	}
+
+	manifestIDs := map[string]string{}
+	manifest := loadLivePackagePlanManifest(t, root)
+	for _, skeleton := range manifest.LivePackageSkeletons {
+		if !strings.HasPrefix(skeleton.ID, "generic_") {
+			continue
+		}
+		if skeleton.Status != "checked_in_registered_example" {
+			t.Fatalf("%s status = %q", skeleton.ID, skeleton.Status)
+		}
+		if skeleton.RegisteredExample == nil || *skeleton.RegisteredExample == "" {
+			t.Fatalf("%s missing registered_example", skeleton.ID)
+		}
+		manifestIDs[skeleton.ID] = filepath.ToSlash(skeleton.Directory)
+		if _, ok := dirIDs[skeleton.ID]; !ok {
+			t.Fatalf("%s exists in live_package_plan_manifest.json but has no live_packages/generic_* directory", skeleton.ID)
+		}
+	}
+
+	matrix := loadGenericAIPackageMatrix(t, root)
+	if matrix.SchemaVersion != 1 || matrix.MatrixID != "generic-ai-live-package-matrix" {
+		t.Fatalf("unexpected generic package matrix header: %#v", matrix)
+	}
+	if matrix.SourceRoot != "examples/ai/finrobot_translation/live_packages" {
+		t.Fatalf("matrix source_root = %q", matrix.SourceRoot)
+	}
+	matrixIDs := map[string]string{}
+	for _, pkg := range matrix.Packages {
+		if !strings.HasPrefix(pkg.ID, "generic_") {
+			t.Fatalf("matrix package id must stay generic: %#v", pkg)
+		}
+		if !pkg.ProviderFree {
+			t.Fatalf("%s provider_free = false", pkg.ID)
+		}
+		if pkg.PackageDir == "" || pkg.MainLeia == "" || pkg.Manifest == "" || pkg.FixtureIndex == "" || len(pkg.Contracts) == 0 {
+			t.Fatalf("%s has incomplete matrix references: %#v", pkg.ID, pkg)
+		}
+		if pkg.PackageDir != manifestIDs[pkg.ID] {
+			t.Fatalf("%s matrix package_dir = %q, manifest directory = %q", pkg.ID, pkg.PackageDir, manifestIDs[pkg.ID])
+		}
+		assertGenericLivePackageRepoFile(t, root, pkg.PackageDir, pkg.MainLeia)
+		assertGenericLivePackageRepoFile(t, root, pkg.PackageDir, pkg.Manifest)
+		assertGenericLivePackageRepoFile(t, root, pkg.PackageDir, pkg.FixtureIndex)
+		for _, contract := range pkg.Contracts {
+			assertGenericLivePackageRepoFile(t, root, pkg.PackageDir, contract)
+		}
+		packageManifest := readJSONMap(t, filepath.Join(root, filepath.FromSlash(pkg.Manifest)))
+		if got, _ := packageManifest["package_name"].(string); got != pkg.PackageName {
+			t.Fatalf("%s package_name mismatch: matrix %q manifest %q", pkg.ID, pkg.PackageName, got)
+		}
+		if got, _ := packageManifest["provider_free"].(bool); !got {
+			t.Fatalf("%s package manifest provider_free = %#v", pkg.ID, packageManifest["provider_free"])
+		}
+		matrixIDs[pkg.ID] = pkg.PackageDir
+	}
+
+	assertSameStringMap(t, "generic live package directories vs live package manifest", dirIDs, manifestIDs)
+	assertSameStringMap(t, "generic live package manifest vs matrix", manifestIDs, matrixIDs)
+}
+
 func genericLivePackageDirs(t *testing.T, packagesRoot string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(packagesRoot)
@@ -309,6 +377,31 @@ func genericLivePackageContains(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func assertSameStringMap(t *testing.T, label string, want, got map[string]string) {
+	t.Helper()
+	for key, wantValue := range want {
+		if gotValue, ok := got[key]; !ok {
+			t.Fatalf("%s missing %q; got keys %v", label, key, sortedStringMapKeys(got))
+		} else if gotValue != wantValue {
+			t.Fatalf("%s %q = %q, want %q", label, key, gotValue, wantValue)
+		}
+	}
+	for key := range got {
+		if _, ok := want[key]; !ok {
+			t.Fatalf("%s has unexpected %q; want keys %v", label, key, sortedStringMapKeys(want))
+		}
+	}
+}
+
+func sortedStringMapKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func TestGenericLivePackageConsistencyHelpersCompileWithoutRuntimeDeps(t *testing.T) {

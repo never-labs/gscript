@@ -7,10 +7,10 @@ Baseline:
 - Leia branch: `origin/codex/ai-dialect-polish` at `b3b6088d`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 596 files, including 32
+- Current translation directory file count: 597 files, including 32
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
-- Registered examples: 76 runnable/checkable examples discovered by
+- Registered examples: 77 runnable/checkable examples discovered by
   `go run ./cmd/leia examples --json`.
 - Runtime changes in this audit: none.
 
@@ -108,8 +108,8 @@ boundaries.
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 67 `host-vm`, 6 `llm-replay`, 3 `evaluate`, 76 runnable,
-76 checkable.
+Runner summary: 67 `host-vm`, 6 `llm-replay`, 4 `evaluate`, 77 runnable,
+77 checkable.
 
 ## Module Coverage Matrix
 
@@ -199,11 +199,11 @@ mistaken for missing language/runtime support.
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
-| Registered example inventory | 76 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 596 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| Registered example inventory | 77 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
+| File inventory | 597 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 67 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
-| Evaluate-runner examples | 3 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
+| Evaluate-runner examples | 4 `evaluate` examples for equity CLI workflow, web product smoke metadata, and generic workflow orchestration | Complete |
 | Live-package skeletons | 32 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/analyzer_report`, `live_packages/backtest_strategy`, `live_packages/chart_renderer`, `live_packages/coding_notebook`, `live_packages/document_pipeline`, `live_packages/earnings_transcript`, `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`, `live_packages/finance_facade`, `live_packages/finance_normalizers`, `live_packages/generic_agent_runner`, `live_packages/generic_approval_policy`, `live_packages/generic_evaluation_harness`, `live_packages/generic_model_registry`, `live_packages/generic_package_boundary_auditor`, `live_packages/generic_record_replay`, `live_packages/generic_tool_contracts`, `live_packages/generic_trace_events`, `live_packages/generic_turn_runner`, `live_packages/generic_workflow_orchestrator`, `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`, `live_packages/optional_integrations`, `live_packages/product_workflow`, `live_packages/prompt_roles`, `live_packages/report_renderer`, `live_packages/retail_sentiment`, `live_packages/sec_filings`, `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and `live_packages/vendor_adapters`; all 32 include registered `.leia` examples | Complete |
 | Generic AI dialect package boundary | The reusable `live_packages/generic_*` set is checked in as package-owned generic AI surface, not a FinRobot-specific dialect or language/runtime change | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
@@ -212,7 +212,7 @@ mistaken for missing language/runtime support.
 | Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
 Provider-free completion result: complete for the currently registered
-76-example translation slice, including live-package skeleton contracts.
+77-example translation slice, including live-package skeleton contracts.
 Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks
