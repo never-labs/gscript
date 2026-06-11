@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-retail-sentiment-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_hook": "recorded_retail_sentiment_live_fixture",
+  "modules": [
+    {
+      "id": "retail_sentiment_client",
+      "source_module": "retail_sentiment_client.py",
+      "inputs": [
+        "ticker",
+        "as_of",
+        "source_snapshots"
+      ],
+      "outputs": [
+        "sentiment_aggregate",
+        "source_snapshot_refs",
+        "redaction_summary",
+        "stale_snapshot_warning"
+      ],
+      "required_fields": [
+        "aggregate_score",
+        "mention_volume",
+        "platform_weights",
+        "source_terms",
+        "redaction",
+        "stale_snapshot_warning"
+      ]
+    }
+  ],
+  "field_contracts": {
+    "source_snapshot": {
+      "type": "snapshot",
+      "platforms": [
+        "adanos",
+        "reddit",
+        "x_social",
+        "polymarket"
+      ],
+      "required_sections": [
+        "source_terms",
+        "redaction",
+        "metrics",
+        "stale_snapshot_warning"
+      ]
+    },
+    "sentiment_aggregate": {
+      "type": "aggregate",
+      "score_range": [
+        -1,
+        1
+      ],
+      "source_snapshot_refs_required": true,
+      "redaction_summary_required": true
+    },
+    "redaction_policy": {
+      "type": "policy",
+      "forbidden_fields": [
+        "raw_user_handle",
+        "raw_url",
+        "access_token",
+        "cookie",
+        "authorization_header"
+      ]
+    },
+    "source_terms": {
+      "type": "metadata",
+      "required_fields": [
+        "usage",
+        "attribution",
+        "redistribution",
+        "retention_days"
+      ]
+    },
+    "stale_snapshot_warning": {
+      "type": "warning",
+      "trigger": "as_of older than stale_after_days",
+      "required_fields": [
+        "is_stale",
+        "stale_after_days",
+        "message"
+      ]
+    }
+  },
+  "fixtures": [
+    {
+      "fixture_key": "retail_sentiment:sources:ACME:2026-06-11",
+      "path": "fixtures/source_snapshot_ACME_fixture.json",
+      "schema": "schemas/source_snapshot_v1.schema.json",
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "retail_sentiment:aggregate:ACME:2026-06-11",
+      "path": "fixtures/sentiment_aggregate_ACME_fixture.json",
+      "schema": "schemas/sentiment_aggregate_v1.schema.json",
+      "replay_ready": true
+    }
+  ],
+  "acceptance_gates": [
+    "source snapshots cover Adanos, Reddit, X, and Polymarket without live network access",
+    "source terms metadata is retained for each platform snapshot",
+    "redaction removes raw handles, URLs, tokens, cookies, and authorization headers before prompt formatting",
+    "aggregate output links every platform contribution back to source snapshot refs",
+    "stale snapshot warnings are explicit and deterministic in provider-free fixtures"
+  ]
+}

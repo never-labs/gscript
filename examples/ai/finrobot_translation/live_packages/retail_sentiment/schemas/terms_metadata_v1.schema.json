@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/finrobot/retail_sentiment/terms_metadata_v1.schema.json",
+  "title": "FinRobotRetailSentimentTermsMetadataV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "platform",
+    "usage",
+    "attribution",
+    "redistribution",
+    "retention_days"
+  ],
+  "properties": {
+    "platform": {"type": "string", "enum": ["adanos", "reddit", "x_social", "polymarket"]},
+    "usage": {"type": "string"},
+    "attribution": {"type": "string"},
+    "redistribution": {"type": "string"},
+    "retention_days": {"type": "integer", "minimum": 0}
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "fixture_key": "retail_sentiment:sources:ACME:2026-06-11",
+  "provider_free": true,
+  "live_network": false,
+  "ticker": "ACME",
+  "as_of": "2026-06-11T16:00:00Z",
+  "observed_window": {
+    "start": "2026-06-10T16:00:00Z",
+    "end": "2026-06-11T16:00:00Z"
+  },
+  "source_snapshots": [
+    {
+      "source_id": "adanos_acme_offline_001",
+      "platform": "adanos",
+      "fixture_key": "adanos:source_snapshot:ACME:offline",
+      "as_of": "2026-06-11T16:00:00Z",
+      "metrics": {
+        "sentiment_score": 0.28,
+        "mention_volume": 220,
+        "bullish_ratio": 0.56,
+        "bearish_ratio": 0.25,
+        "confidence": 0.52
+      },
+      "redaction": {
+        "policy_id": "retail_sentiment_redaction_v1",
+        "raw_identifiers_removed": true,
+        "raw_urls_removed": true,
+        "secrets_removed": true,
+        "display_handle": "fixture-user-adanos-redacted",
+        "redacted_uri": "fixture://retail_sentiment/adanos/acme"
+      },
+      "source_terms": {
+        "platform": "adanos",
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "retention_days": 0
+      },
+      "stale_snapshot_warning": {
+        "is_stale": true,
+        "stale_after_days": 1,
+        "message": "Provider-free Adanos snapshot is intentionally stale and must be refreshed before live execution is enabled."
+      }
+    },
+    {
+      "source_id": "reddit_acme_offline_001",
+      "platform": "reddit",
+      "fixture_key": "reddit:source_snapshot:ACME:offline",
+      "as_of": "2026-06-11T16:00:00Z",
+      "metrics": {
+        "sentiment_score": 0.18,
+        "mention_volume": 300,
+        "bullish_ratio": 0.49,
+        "bearish_ratio": 0.33,
+        "confidence": 0.57
+      },
+      "redaction": {
+        "policy_id": "retail_sentiment_redaction_v1",
+        "raw_identifiers_removed": true,
+        "raw_urls_removed": true,
+        "secrets_removed": true,
+        "display_handle": "fixture-user-reddit-redacted",
+        "redacted_uri": "fixture://retail_sentiment/reddit/acme"
+      },
+      "source_terms": {
+        "platform": "reddit",
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "retention_days": 0
+      },
+      "stale_snapshot_warning": {
+        "is_stale": true,
+        "stale_after_days": 1,
+        "message": "Provider-free Reddit snapshot is intentionally stale and must be refreshed before live execution is enabled."
+      }
+    },
+    {
+      "source_id": "x_acme_offline_001",
+      "platform": "x_social",
+      "fixture_key": "x:source_snapshot:ACME:offline",
+      "as_of": "2026-06-11T16:00:00Z",
+      "metrics": {
+        "sentiment_score": 0.36,
+        "mention_volume": 1500,
+        "bullish_ratio": 0.61,
+        "bearish_ratio": 0.24,
+        "confidence": 0.64
+      },
+      "redaction": {
+        "policy_id": "retail_sentiment_redaction_v1",
+        "raw_identifiers_removed": true,
+        "raw_urls_removed": true,
+        "secrets_removed": true,
+        "display_handle": "fixture-user-x-redacted",
+        "redacted_uri": "fixture://retail_sentiment/x/acme"
+      },
+      "source_terms": {
+        "platform": "x_social",
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "retention_days": 0
+      },
+      "stale_snapshot_warning": {
+        "is_stale": true,
+        "stale_after_days": 1,
+        "message": "Provider-free X snapshot is intentionally stale and must be refreshed before live execution is enabled."
+      }
+    },
+    {
+      "source_id": "polymarket_acme_offline_001",
+      "platform": "polymarket",
+      "fixture_key": "polymarket:source_snapshot:ACME:offline",
+      "as_of": "2026-06-11T16:00:00Z",
+      "metrics": {
+        "sentiment_score": 0.24,
+        "mention_volume": 40,
+        "bullish_ratio": 0.55,
+        "bearish_ratio": 0.32,
+        "confidence": 0.46
+      },
+      "redaction": {
+        "policy_id": "retail_sentiment_redaction_v1",
+        "raw_identifiers_removed": true,
+        "raw_urls_removed": true,
+        "secrets_removed": true,
+        "display_handle": "fixture-market-polymarket-redacted",
+        "redacted_uri": "fixture://retail_sentiment/polymarket/acme"
+      },
+      "source_terms": {
+        "platform": "polymarket",
+        "usage": "offline-fixture-only",
+        "attribution": "platform terms metadata retained",
+        "redistribution": "do-not-redistribute-live-payloads",
+        "retention_days": 0
+      },
+      "stale_snapshot_warning": {
+        "is_stale": true,
+        "stale_after_days": 1,
+        "message": "Provider-free Polymarket snapshot is intentionally stale and must be refreshed before live execution is enabled."
+      }
+    }
+  ]
+}

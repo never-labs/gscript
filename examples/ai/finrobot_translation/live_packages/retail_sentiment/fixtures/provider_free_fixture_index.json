@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-retail-sentiment-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "retail_sentiment:sources:ACME:2026-06-11",
+      "capability": "finance.retail_sentiment.source_snapshot",
+      "path": "fixtures/source_snapshot_ACME_fixture.json",
+      "schema": "schemas/source_snapshot_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "as_of": "2026-06-11",
+        "replay_ready": true,
+        "platforms": [
+          "adanos",
+          "reddit",
+          "x_social",
+          "polymarket"
+        ],
+        "contains_redaction": true,
+        "contains_source_terms": true,
+        "contains_stale_snapshot_warning": true
+      }
+    },
+    {
+      "fixture_key": "retail_sentiment:aggregate:ACME:2026-06-11",
+      "capability": "finance.retail_sentiment.aggregate",
+      "path": "fixtures/sentiment_aggregate_ACME_fixture.json",
+      "schema": "schemas/sentiment_aggregate_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "as_of": "2026-06-11",
+        "replay_ready": true,
+        "source_snapshot_refs": 4,
+        "contains_redaction_summary": true
+      }
+    },
+    {
+      "fixture_key": "retail_sentiment:redaction_policy:offline",
+      "capability": "finance.retail_sentiment.redact",
+      "path": "fixtures/redaction_policy_fixture.json",
+      "schema": "schemas/redaction_policy_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "raw_identifiers_allowed": false
+      }
+    },
+    {
+      "fixture_key": "retail_sentiment:adapter_clean_skip:offline",
+      "capability": "finance.retail_sentiment.adapter.clean_skip",
+      "path": "fixtures/adapter_clean_skip_fixture.json",
+      "schema": "schemas/adapter_clean_skip_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "clean_skip": true,
+        "live_network": false
+      }
+    }
+  ]
+}
