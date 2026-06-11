@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "findings": [
+    {
+      "finding_id": "capability-policy-denies-live-network",
+      "severity": "error",
+      "rule_id": "capability_policy.live_network.denied",
+      "evidence_path": "contracts/capability_policy.json#/denied_by_default/0",
+      "message": "live network must stay denied for provider-free audit skeletons",
+      "remediation": "Move live network behavior into a provider-specific package with explicit credentials and terms gates.",
+      "provider_free": true
+    },
+    {
+      "finding_id": "missing-boundary-records-present",
+      "severity": "warning",
+      "rule_id": "boundary_records.missing.emitted",
+      "evidence_path": "fixtures/missing_boundary_records_fixture.json#/records",
+      "message": "packages without fixture index, registry, capability policy, or finding artifacts must emit missing boundary records",
+      "remediation": "Add the missing artifact or keep a blocking missing boundary record with owner and remediation.",
+      "provider_free": true
+    }
+  ]
+}

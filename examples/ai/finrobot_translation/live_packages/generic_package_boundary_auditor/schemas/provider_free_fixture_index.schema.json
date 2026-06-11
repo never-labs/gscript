@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generic.provider_free_fixture_index.v1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "fixtures"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "fixture_key",
+          "capability",
+          "path",
+          "schema",
+          "metadata"
+        ]
+      },
+      "minItems": 1
+    }
+  }
+}

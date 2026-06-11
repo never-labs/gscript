@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic-package-boundary:manifest:offline",
+      "capability": "generic.ai.package.boundary.audit.manifest",
+      "path": "fixtures/package_manifest_audit_fixture.json",
+      "schema": "schemas/audit_finding_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "surface": "package_manifest"
+      }
+    },
+    {
+      "fixture_key": "generic-package-boundary:fixture-index:offline",
+      "capability": "generic.ai.package.boundary.audit.fixture_index",
+      "path": "fixtures/fixture_index_audit_fixture.json",
+      "schema": "schemas/audit_finding_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "surface": "fixture_index"
+      }
+    },
+    {
+      "fixture_key": "generic-package-boundary:example-registry:offline",
+      "capability": "generic.ai.package.boundary.audit.example_registry",
+      "path": "fixtures/example_registry_audit_fixture.json",
+      "schema": "schemas/audit_scope_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "surface": "example_registry"
+      }
+    },
+    {
+      "fixture_key": "generic-package-boundary:findings:offline",
+      "capability": "generic.ai.package.boundary.audit.findings",
+      "path": "fixtures/audit_findings_fixture.json",
+      "schema": "schemas/audit_finding_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "surface": "audit_findings"
+      }
+    },
+    {
+      "fixture_key": "generic-package-boundary:missing-boundary-records:offline",
+      "capability": "generic.ai.package.boundary.audit.missing_boundary_records",
+      "path": "fixtures/missing_boundary_records_fixture.json",
+      "schema": "schemas/missing_boundary_record_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "surface": "missing_boundary_records"
+      }
+    }
+  ]
+}

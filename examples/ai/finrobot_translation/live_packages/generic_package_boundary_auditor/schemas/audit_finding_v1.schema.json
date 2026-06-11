@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generic.audit_finding.v1",
+  "type": "object",
+  "required": [
+    "finding_id",
+    "severity",
+    "rule_id",
+    "evidence_path",
+    "message",
+    "remediation",
+    "provider_free"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "remediation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_free": {
+      "const": true
+    }
+  }
+}

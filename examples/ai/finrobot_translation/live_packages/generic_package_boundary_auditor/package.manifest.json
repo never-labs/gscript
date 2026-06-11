@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-package-boundary-audit-live-package",
+  "package_name": "generic.ai.package.boundary.audit",
+  "aliases": [
+    "ai.package.audit"
+  ],
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for package manifest, fixture index, example registry, capability policy, findings, and missing boundary record audits.",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; it audits local package metadata and fixture records only."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_package_boundary_audit_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "capability_policy": "contracts/capability_policy.json",
+    "audit_contract": "contracts/package_boundary_audit_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "audit_finding": "schemas/audit_finding_v1.schema.json",
+    "audit_scope": "schemas/audit_scope_v1.schema.json",
+    "capability_policy": "schemas/capability_policy_v1.schema.json",
+    "fixture_index": "schemas/provider_free_fixture_index.schema.json",
+    "missing_boundary_record": "schemas/missing_boundary_record_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "package_manifest_audit": "fixtures/package_manifest_audit_fixture.json",
+    "fixture_index_audit": "fixtures/fixture_index_audit_fixture.json",
+    "example_registry_audit": "fixtures/example_registry_audit_fixture.json",
+    "audit_findings": "fixtures/audit_findings_fixture.json",
+    "missing_boundary_records": "fixtures/missing_boundary_records_fixture.json"
+  },
+  "audit_targets": [
+    {
+      "id": "package_manifest_audit",
+      "capability": "generic.ai.package.boundary.audit.manifest",
+      "fixture_key": "generic-package-boundary:manifest:offline",
+      "schema": "audit_finding",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "fixture_index_audit",
+      "capability": "generic.ai.package.boundary.audit.fixture_index",
+      "fixture_key": "generic-package-boundary:fixture-index:offline",
+      "schema": "audit_finding",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "example_registry_audit",
+      "capability": "generic.ai.package.boundary.audit.example_registry",
+      "fixture_key": "generic-package-boundary:example-registry:offline",
+      "schema": "audit_finding",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "capability_policy",
+      "capability": "generic.ai.package.boundary.audit.capability_policy",
+      "fixture_key": "generic-package-boundary:capability-policy:offline",
+      "schema": "capability_policy",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "audit_findings",
+      "capability": "generic.ai.package.boundary.audit.findings",
+      "fixture_key": "generic-package-boundary:findings:offline",
+      "schema": "audit_finding",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "missing_boundary_records",
+      "capability": "generic.ai.package.boundary.audit.missing_boundary_records",
+      "fixture_key": "generic-package-boundary:missing-boundary-records:offline",
+      "schema": "missing_boundary_record",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ],
+  "test_gates": [
+    "package manifest audit verifies provider-free defaults, entrypoints, schema references, no credentials, and no built-in guarantee",
+    "fixture index audit verifies every fixture is local, replay-ready, schema-linked, and mapped to a capability",
+    "example registry audit verifies aliases generic.ai.package.boundary.audit and ai.package.audit resolve to the same provider-free skeleton",
+    "capability policy denies live network, provider credentials, and provider SDK imports by default",
+    "audit findings preserve severity, rule id, evidence path, remediation, and provider-free status",
+    "missing boundary records capture package id, missing boundary type, required artifact, owner hint, and blocking status"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide generic AI package boundary audits as built-ins; this skeleton defines the provider-free contract future packages must satisfy."
+  }
+}
