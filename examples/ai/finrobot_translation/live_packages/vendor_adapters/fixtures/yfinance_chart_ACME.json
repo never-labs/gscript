@@ -1,0 +1,54 @@
+{
+  "fixture_key": "yfinance:chart:ACME:1mo",
+  "provider": "yfinance",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "symbol": "ACME",
+    "range": "1mo",
+    "live_network": false
+  },
+  "metadata": {
+    "schema": "schemas/yfinance_chart_v1.schema.json",
+    "provenance": {
+      "source": "synthetic-offline-fixture",
+      "captured_at": "2026-06-11T00:00:00Z",
+      "live_network": false,
+      "redacted": true
+    },
+    "capability": "finance.vendor.yfinance.chart",
+    "rate_limit": {
+      "policy": "metadata-only",
+      "window_seconds": 60,
+      "limit": 120,
+      "retry_after_seconds": 1
+    },
+    "terms": {
+      "usage": "offline-fixture-only",
+      "attribution": "provider terms metadata retained",
+      "redistribution": "do-not-redistribute-live-payloads",
+      "live_network": false
+    }
+  },
+  "payload": {
+    "symbol": "ACME",
+    "currency": "USD",
+    "bars": [
+      {
+        "date": "2026-06-09",
+        "open": 100.1,
+        "high": 102.0,
+        "low": 99.8,
+        "close": 101.4,
+        "volume": 1200000
+      },
+      {
+        "date": "2026-06-10",
+        "open": 101.8,
+        "high": 103.7,
+        "low": 101.2,
+        "close": 103.2,
+        "volume": 980000
+      }
+    ]
+  }
+}

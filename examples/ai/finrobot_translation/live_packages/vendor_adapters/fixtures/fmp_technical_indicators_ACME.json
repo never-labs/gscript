@@ -1,25 +1,26 @@
 {
-  "fixture_key": "finnhub:profile:ACME",
-  "provider": "finnhub",
+  "fixture_key": "fmp:technical_indicators:ACME:daily",
+  "provider": "fmp",
   "captured_at": "2026-06-11T00:00:00Z",
   "request": {
     "symbol": "ACME",
+    "interval": "1day",
     "live_network": false
   },
   "metadata": {
-    "schema": "schemas/finnhub_profile_v1.schema.json",
+    "schema": "schemas/fmp_technical_indicators_v1.schema.json",
     "provenance": {
       "source": "synthetic-offline-fixture",
       "captured_at": "2026-06-11T00:00:00Z",
       "live_network": false,
       "redacted": true
     },
-    "capability": "finance.vendor.finnhub.profile",
+    "capability": "finance.vendor.fmp.technical_indicators",
     "rate_limit": {
       "policy": "metadata-only",
-      "window_seconds": 60,
-      "limit": 60,
-      "retry_after_seconds": 0
+      "window_seconds": 86400,
+      "limit": 300,
+      "retry_after_seconds": 2
     },
     "terms": {
       "usage": "offline-fixture-only",
@@ -29,10 +30,13 @@
     }
   },
   "payload": {
-    "ticker": "ACME",
-    "name": "ACME Corp",
-    "exchange": "XNAS",
-    "industry": "Industrial Automation",
-    "currency": "USD"
+    "symbol": "ACME",
+    "interval": "1day",
+    "indicators": {
+      "sma_20": 101.8,
+      "ema_12": 102.6,
+      "rsi_14": 58.4,
+      "macd": 1.12
+    }
   }
 }

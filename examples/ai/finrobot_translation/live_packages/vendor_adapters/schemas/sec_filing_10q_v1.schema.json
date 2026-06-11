@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RedditSearchFixtureV1",
+  "title": "SECFiling10QFixtureV1",
   "type": "object",
   "required": [
     "fixture_key",
@@ -12,10 +12,10 @@
   ],
   "properties": {
     "fixture_key": {
-      "const": "reddit:search:ACME:sentiment"
+      "const": "sec:filing:ACME:10-Q:2026Q1"
     },
     "provider": {
-      "const": "reddit"
+      "const": "sec"
     },
     "captured_at": {
       "type": "string"
@@ -23,15 +23,19 @@
     "request": {
       "type": "object",
       "required": [
-        "query",
-        "subreddit",
+        "symbol",
+        "form",
+        "fiscal_period",
         "live_network"
       ],
       "properties": {
-        "query": {
+        "symbol": {
           "type": "string"
         },
-        "subreddit": {
+        "form": {
+          "type": "string"
+        },
+        "fiscal_period": {
           "type": "string"
         },
         "live_network": {
@@ -50,10 +54,10 @@
       ],
       "properties": {
         "schema": {
-          "const": "schemas/reddit_search_v1.schema.json"
+          "const": "schemas/sec_filing_10q_v1.schema.json"
         },
         "capability": {
-          "const": "finance.vendor.reddit.search"
+          "const": "finance.vendor.sec.filing.10q"
         },
         "provenance": {
           "type": "object",

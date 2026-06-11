@@ -1,25 +1,25 @@
 {
-  "fixture_key": "finnhub:profile:ACME",
-  "provider": "finnhub",
+  "fixture_key": "yfinance:info:ACME",
+  "provider": "yfinance",
   "captured_at": "2026-06-11T00:00:00Z",
   "request": {
     "symbol": "ACME",
     "live_network": false
   },
   "metadata": {
-    "schema": "schemas/finnhub_profile_v1.schema.json",
+    "schema": "schemas/yfinance_info_v1.schema.json",
     "provenance": {
       "source": "synthetic-offline-fixture",
       "captured_at": "2026-06-11T00:00:00Z",
       "live_network": false,
       "redacted": true
     },
-    "capability": "finance.vendor.finnhub.profile",
+    "capability": "finance.vendor.yfinance.info",
     "rate_limit": {
       "policy": "metadata-only",
       "window_seconds": 60,
-      "limit": 60,
-      "retry_after_seconds": 0
+      "limit": 120,
+      "retry_after_seconds": 1
     },
     "terms": {
       "usage": "offline-fixture-only",
@@ -29,10 +29,11 @@
     }
   },
   "payload": {
-    "ticker": "ACME",
-    "name": "ACME Corp",
-    "exchange": "XNAS",
+    "symbol": "ACME",
+    "short_name": "ACME Corp",
+    "sector": "Industrials",
     "industry": "Industrial Automation",
+    "market_cap": 18400000000,
     "currency": "USD"
   }
 }

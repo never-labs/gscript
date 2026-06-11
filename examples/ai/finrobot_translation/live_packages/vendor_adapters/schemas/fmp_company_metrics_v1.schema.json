@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RedditSearchFixtureV1",
+  "title": "FMPCompanyMetricsFixtureV1",
   "type": "object",
   "required": [
     "fixture_key",
@@ -12,10 +12,10 @@
   ],
   "properties": {
     "fixture_key": {
-      "const": "reddit:search:ACME:sentiment"
+      "const": "fmp:company_metrics:ACME:annual"
     },
     "provider": {
-      "const": "reddit"
+      "const": "fmp"
     },
     "captured_at": {
       "type": "string"
@@ -23,15 +23,15 @@
     "request": {
       "type": "object",
       "required": [
-        "query",
-        "subreddit",
+        "symbol",
+        "period",
         "live_network"
       ],
       "properties": {
-        "query": {
+        "symbol": {
           "type": "string"
         },
-        "subreddit": {
+        "period": {
           "type": "string"
         },
         "live_network": {
@@ -50,10 +50,10 @@
       ],
       "properties": {
         "schema": {
-          "const": "schemas/reddit_search_v1.schema.json"
+          "const": "schemas/fmp_company_metrics_v1.schema.json"
         },
         "capability": {
-          "const": "finance.vendor.reddit.search"
+          "const": "finance.vendor.fmp.company_metrics"
         },
         "provenance": {
           "type": "object",

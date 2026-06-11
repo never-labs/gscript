@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RedditSearchFixtureV1",
+  "title": "FinnhubNewsErrorFixtureV1",
   "type": "object",
   "required": [
     "fixture_key",
@@ -12,10 +12,10 @@
   ],
   "properties": {
     "fixture_key": {
-      "const": "reddit:search:ACME:sentiment"
+      "const": "finnhub:news:error:ACME"
     },
     "provider": {
-      "const": "reddit"
+      "const": "finnhub"
     },
     "captured_at": {
       "type": "string"
@@ -23,15 +23,19 @@
     "request": {
       "type": "object",
       "required": [
-        "query",
-        "subreddit",
+        "symbol",
+        "from",
+        "to",
         "live_network"
       ],
       "properties": {
-        "query": {
+        "symbol": {
           "type": "string"
         },
-        "subreddit": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
           "type": "string"
         },
         "live_network": {
@@ -50,10 +54,10 @@
       ],
       "properties": {
         "schema": {
-          "const": "schemas/reddit_search_v1.schema.json"
+          "const": "schemas/finnhub_news_error_v1.schema.json"
         },
         "capability": {
-          "const": "finance.vendor.reddit.search"
+          "const": "finance.vendor.finnhub.news_error"
         },
         "provenance": {
           "type": "object",

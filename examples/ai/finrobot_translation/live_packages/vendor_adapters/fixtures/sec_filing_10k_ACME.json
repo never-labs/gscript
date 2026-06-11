@@ -1,0 +1,43 @@
+{
+  "fixture_key": "sec:filing:ACME:10-K:2025",
+  "provider": "sec",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "symbol": "ACME",
+    "form": "10-K",
+    "fiscal_year": "2025",
+    "live_network": false
+  },
+  "metadata": {
+    "schema": "schemas/sec_filing_10k_v1.schema.json",
+    "provenance": {
+      "source": "synthetic-offline-fixture",
+      "captured_at": "2026-06-11T00:00:00Z",
+      "live_network": false,
+      "redacted": true
+    },
+    "capability": "finance.vendor.sec.filing.10k",
+    "rate_limit": {
+      "policy": "metadata-only",
+      "window_seconds": 1,
+      "limit": 10,
+      "retry_after_seconds": 1
+    },
+    "terms": {
+      "usage": "offline-fixture-only",
+      "attribution": "SEC fair-access metadata retained",
+      "redistribution": "fixture-only",
+      "live_network": false,
+      "user_agent_required_for_live": true
+    }
+  },
+  "payload": {
+    "cik": "0000000000",
+    "accession": "0000000000-26-000001",
+    "form": "10-K",
+    "filed": "2026-02-20",
+    "sections": {
+      "item_1a": "Risk factors: supply concentration."
+    }
+  }
+}
