@@ -7614,6 +7614,24 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 		}
 		return movingSumSumI64Range(values, width), true, nil
 	}
+	if !average && array.Kind() != KindF64 && array.Kind() != KindF32 {
+		// Null-free integer carriers flatten once and run the identical
+		// sliding-window accumulation over a dense slice, replacing the
+		// per-row integerArrayAt dispatch below. tryBulkI64Values declines
+		// on nulls, so the fallback semantics are unchanged.
+		if values, owned, ok := tryBulkI64Values(array); ok {
+			var window, total int64
+			for row, value := range values {
+				window += value
+				if row >= width {
+					window -= values[row-width]
+				}
+				total += window
+			}
+			bulkI64Release(values, owned)
+			return total, true, nil
+		}
+	}
 	if isDenseIntegerArray(array) {
 		var window int64
 		var totalI int64

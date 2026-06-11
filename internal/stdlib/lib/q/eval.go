@@ -661,6 +661,8 @@ type EvalState struct {
 	applyIndexCache      map[string]qScalarApplyIndexPlan
 	dotApplyCache        map[string]qDotApplyPlan
 	deferScanAssignments map[string]bool
+	assignPool           qAssignPool
+	scriptDepth          int
 }
 
 const qGlobalScriptPlanCacheLimit = 512
@@ -867,6 +869,19 @@ func (s *EvalState) evalScript(src string) (any, error) {
 }
 
 func (s *EvalState) evalScriptPlan(plan qScriptPlan) (any, error) {
+	s.scriptDepth++
+	defer func() { s.scriptDepth-- }()
+	if s.scriptDepth > 1 {
+		s.assignPoolNested()
+		return s.evalScriptPlanBody(plan)
+	}
+	s.assignPoolBegin(&plan)
+	out, err := s.evalScriptPlanBody(plan)
+	s.assignPoolEnd(out, err)
+	return out, err
+}
+
+func (s *EvalState) evalScriptPlanBody(plan qScriptPlan) (any, error) {
 	if plan.executable != nil {
 		if out, handled, err := s.evalQScriptExecutablePlan(plan.executable); err != nil || handled {
 			return out, err
@@ -939,6 +954,10 @@ type qScriptStatement struct {
 	// multi-statement scripts.
 	reduction   numericReductionBinding
 	reductionOK bool
+	// fillsFillChecked/fillsFillPlan memoize the buildQFillsFillPlan
+	// syntactic probe for the pooled `<atom>^fills <name>` assignment route.
+	fillsFillChecked bool
+	fillsFillPlan    *qFillsFillPlan
 }
 
 type qEvalFastPlanKind uint8
@@ -1292,6 +1311,10 @@ func cloneQScriptPipelineDescriptor(in *qScriptPipelineDescriptor) *qScriptPipel
 	if len(in.stringValues) > 0 {
 		out.stringValues = append([]string(nil), in.stringValues...)
 	}
+	if in.whereIndexPlan != nil {
+		plan := cloneQPipelinePlan(*in.whereIndexPlan)
+		out.whereIndexPlan = &plan
+	}
 	return &out
 }
 
@@ -1555,6 +1578,9 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 			}
 		}
 	}
+	if !handled && stmt.assign != "" && s.assignPool.active {
+		v, handled = s.tryEvalAssignPoolFillsFill(stmt, s.resolveAssignmentName(stmt.assign))
+	}
 	if !handled {
 		v, err = s.evalCachedOrString(target, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
 	}
@@ -1562,7 +1588,11 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 		return nil, err
 	}
 	if stmt.assign != "" {
-		s.env[s.resolveAssignmentName(stmt.assign)] = v
+		name := s.resolveAssignmentName(stmt.assign)
+		if s.assignPool.active {
+			v = s.assignPoolMaterialize(name, v)
+		}
+		s.env[name] = v
 	}
 	return v, nil
 }
