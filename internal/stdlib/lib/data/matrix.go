@@ -731,6 +731,9 @@ func MatrixMultiplyNumericSum(left, right Matrix) (float64, bool, error) {
 }
 
 func matrixMultiplyNumericSumBySums(left, right Matrix, leftShape, rightShape []int) (float64, bool, error) {
+	if total, ok := matrixMultiplyNumericSumFlat(left, right, leftShape, rightShape); ok {
+		return total, true, nil
+	}
 	innerLen := leftShape[1]
 	leftColumnSums := make([]float64, innerLen)
 	for row := 0; row < leftShape[0]; row++ {
@@ -761,6 +764,60 @@ func matrixMultiplyNumericSumBySums(left, right Matrix, leftShape, rightShape []
 		total += leftColumnSums[inner] * rightRowSum
 	}
 	return total, true, nil
+}
+
+// matrixMultiplyNumericSumFlat is the flat-slice fast path for
+// matrixMultiplyNumericSumBySums: identical contraction (left column sums,
+// right row sums, dot product) in the identical accumulation order, but over
+// dense []float64 carriers instead of per-cell matrixCellNumeric calls. Any
+// operand whose row-major data cannot flatten losslessly (nulls, non-numeric,
+// short carriers) declines so the boxed route keeps its semantics.
+func matrixMultiplyNumericSumFlat(left, right Matrix, leftShape, rightShape []int) (float64, bool) {
+	leftMatrix, ok := left.(matrixArray)
+	if !ok {
+		return 0, false
+	}
+	rightMatrix, ok := right.(matrixArray)
+	if !ok {
+		return 0, false
+	}
+	leftRows, innerLen := leftShape[0], leftShape[1]
+	rightCols := rightShape[1]
+	leftValues, leftOwned, ok := tryBulkF64Values(leftMatrix.data)
+	if !ok {
+		return 0, false
+	}
+	defer bulkF64Release(leftValues, leftOwned)
+	if len(leftValues) < leftRows*innerLen {
+		return 0, false
+	}
+	rightValues, rightOwned, ok := tryBulkF64Values(rightMatrix.data)
+	if !ok {
+		return 0, false
+	}
+	defer bulkF64Release(rightValues, rightOwned)
+	if len(rightValues) < innerLen*rightCols {
+		return 0, false
+	}
+	leftColumnSums := bulkF64Get(innerLen)
+	defer bulkF64Release(leftColumnSums, true)
+	clear(leftColumnSums)
+	for row := 0; row < leftRows; row++ {
+		rowValues := leftValues[row*innerLen : row*innerLen+innerLen]
+		for inner, value := range rowValues {
+			leftColumnSums[inner] += value
+		}
+	}
+	var total float64
+	for inner := 0; inner < innerLen; inner++ {
+		var rightRowSum float64
+		rowValues := rightValues[inner*rightCols : inner*rightCols+rightCols]
+		for _, value := range rowValues {
+			rightRowSum += value
+		}
+		total += leftColumnSums[inner] * rightRowSum
+	}
+	return total, true
 }
 
 func matrixCellNumeric(matrix Matrix, row, col int) (float64, bool, error) {

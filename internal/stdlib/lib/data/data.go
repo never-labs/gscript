@@ -3445,6 +3445,19 @@ func compareScalarDyadicIndexStats(array i64ScalarDyadicArray, op Op, value any)
 	if !ok {
 		return 0, 0, false, nil
 	}
+	// Flatten the lazy dyadic carrier once and compare over the dense slice:
+	// tryBulkI64ScalarDyadicValues produces exactly the i64At row values, so
+	// count/sum are identical to the per-row walk below.
+	if values, owned, ok := tryBulkI64ScalarDyadicValues(array); ok {
+		for row, item := range values {
+			if boolCompare(op, item == target, compareInt64(item, target)) {
+				count++
+				sum += int64(row)
+			}
+		}
+		bulkI64Release(values, owned)
+		return count, sum, true, nil
+	}
 	for row := 0; row < array.len; row++ {
 		item, ok, err := array.i64At(row)
 		if err != nil || !ok {
