@@ -131,7 +131,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/prompt_roles", "examples/ai/finrobot_translation/live_packages/analyzer_report"],
       "excluded_scope": ["complete prompt library text parity"],
       "source_hash": "sha256:0493728a44c6f6cd9ac37cd0f2f1041160e216825a8b71f72db5940f33f3590d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json", "sha256": "62a9532862633c058256125750629a4eaeb233dbe46cd7964ba8ca54d1789b16"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json", "sha256": "ce3d6b7202a8da3b68908f3ab061a840723e862a9896ac9e149a6dad42bdaf38"}],
       "next_action": "Promote prompt snapshots into versioned package data with drift fixtures."
     },
     {
@@ -241,7 +241,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/retail_sentiment", "examples/ai/finrobot_translation/live_packages/news_catalyst"],
       "excluded_scope": ["live Reddit/PRAW authentication and pagination"],
       "source_hash": "sha256:fd856521c418c2f396e04f7f26191229b89176ab3cc471e1d7c4b5a7997ba3d0",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/retail_sentiment/package.manifest.json", "sha256": "953444223b79080d58eae519c5d3c4889027520eb1dc7a32315dee2d2d9c17d5"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/retail_sentiment/package.manifest.json", "sha256": "8c490f1c27e6e185a41f684531a636eec5e8e8f20596abb06924ca040854d5cb"}],
       "next_action": "Implement retail sentiment live adapters with redaction and source terms metadata."
     },
     {
@@ -318,7 +318,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/analyzer_report"],
       "excluded_scope": ["complete analyzer prompt library"],
       "source_hash": "sha256:4c86ca7913859c6a88cbdd85f4df05703fda133ce733c70db4bf93170a3575f7",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/fixtures/provider_free_fixture_index.json", "sha256": "023e976078b8fc0e0be767073e06d985bac632055eaa5902a4a48479064d15f2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/fixtures/provider_free_fixture_index.json", "sha256": "364ed150ed068bbec95f9fdcad91aec25ec1d440709b4bd2a92606d2c9b47eab"}],
       "next_action": "Add source evidence validation fixtures for each analyzer section."
     },
     {
@@ -340,7 +340,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/coding_notebook"],
       "excluded_scope": ["default Python code execution"],
       "source_hash": "sha256:437d2b20e19e64280953f916e35a3737dcb6cf74d61083b4b7b41409c35e797a",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/coding_notebook/package.manifest.json", "sha256": "fcb69f10681036c58344d3f033ac81daf3f7fd4a47fc6bf5ad886a518218dbbd"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/coding_notebook/package.manifest.json", "sha256": "992f420900461d3d4a658fb57ed105e95118f51a1e5e53d6e8270377f2a610d2"}],
       "next_action": "Keep sandbox execution opt-in with approval, denied-command, and artifact fixtures."
     },
     {
@@ -373,7 +373,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/analyzer_report"],
       "excluded_scope": ["standalone Python text utility package"],
       "source_hash": "sha256:c3a92410f9d0495efca73136671e030483d6d60eaf677f26a784d6a7551ab583",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json", "sha256": "62a9532862633c058256125750629a4eaeb233dbe46cd7964ba8ca54d1789b16"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json", "sha256": "ce3d6b7202a8da3b68908f3ab061a840723e862a9896ac9e149a6dad42bdaf38"}],
       "next_action": "Add reusable text helpers only if future packages need them outside section schemas."
     },
     {
@@ -395,7 +395,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/factor_research"],
       "excluded_scope": ["live factor data provider execution"],
       "source_hash": "sha256:601a82c8e60524e89386b2ef9120169b7e063f2e59f2f48436fb4702f2727795",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/factor_research/package.manifest.json", "sha256": "b881351f769bcdb6e9aa0bdf61ba0d0fcda03fbbe6ed6eabc490c6fbcf3a4a3b"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/factor_research/package.manifest.json", "sha256": "4c298c2cb595e73e2527405dbfd84dd38a9c2cb915792fb30cf0aae9df4f2ce6"}],
       "next_action": "Attach live factor transforms to the factor research package."
     },
     {
@@ -505,7 +505,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline"],
       "excluded_scope": ["full product generated report over live data"],
       "source_hash": "sha256:1feb9b438e3cce6bedadea7ff23d849078f6152de2b8fa40a5f97941b7ecee4b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/package.manifest.json", "sha256": "c8e65769651941660d492586ecd99547a59d6baae3a3f5fd80a5899295fd09ab"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/package.manifest.json", "sha256": "4722bd83981076cea70ffb229e7ab20047dad268b586a50d99eca58f7c0d5222"}],
       "next_action": "Keep product workflow separated from core AI dialect capabilities."
     },
     {
@@ -549,7 +549,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_normalizers", "examples/ai/finrobot_translation/live_packages/valuation_engine", "examples/ai/finrobot_translation/live_packages/news_catalyst", "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"],
       "excluded_scope": ["method-by-method pandas/chart/PDF runtime parity"],
       "source_hash": "sha256:11b270c0518bbb7a8a88d1f4b0661c2717cf75a8259fb47c22c5a65441f3f83b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "bbdd8042a1aa20da993ae0ada44aa2e330218477be2b619aca1111d1a0a36fe1"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "fe0482eca6aefa9bf1dabc0ef5d2d21b4c9d032130b09c050de73ff0a7c651f2"}],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
     },
     {
