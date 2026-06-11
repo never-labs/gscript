@@ -94,6 +94,8 @@
   },
   "auth_redaction": {
     "enabled": true,
+    "fixture": "fixtures/auth_redaction_policy.json",
+    "fixture_key": "vendor_adapters:auth_redaction:offline",
     "secret_value_policy": "never-store-secret-values",
     "credential_required_for_fixture_replay": false,
     "secret_values_present": false,

@@ -51,6 +51,8 @@ type vendorLivePackageManifest struct {
 	} `json:"capability_registry"`
 	AuthRedaction struct {
 		Enabled                            bool     `json:"enabled"`
+		Fixture                            string   `json:"fixture"`
+		FixtureKey                         string   `json:"fixture_key"`
 		SecretValuePolicy                  string   `json:"secret_value_policy"`
 		CredentialRequiredForFixtureReplay bool     `json:"credential_required_for_fixture_replay"`
 		SecretValuesPresent                bool     `json:"secret_values_present"`
@@ -157,6 +159,8 @@ func TestFinRobotVendorLivePackageManifestProviderFree(t *testing.T) {
 		t.Fatalf("capability registry incomplete: %#v", manifest.CapabilityRegistry)
 	}
 	if !manifest.AuthRedaction.Enabled ||
+		manifest.AuthRedaction.Fixture == "" ||
+		manifest.AuthRedaction.FixtureKey != "vendor_adapters:auth_redaction:offline" ||
 		manifest.AuthRedaction.SecretValuePolicy != "never-store-secret-values" ||
 		manifest.AuthRedaction.CredentialRequiredForFixtureReplay ||
 		manifest.AuthRedaction.SecretValuesPresent ||
@@ -430,6 +434,31 @@ func TestFinRobotVendorLivePackageProviderFreeBoundaryFixtures(t *testing.T) {
 	if len(replayIndex.NormalizedErrorExamples) == 0 ||
 		!manifestErrorKind(manifest, replayIndex.NormalizedErrorExamples[0].Kind, replayIndex.NormalizedErrorExamples[0].HTTPStatus) {
 		t.Fatalf("offline replay normalized error example missing taxonomy match: %#v", replayIndex.NormalizedErrorExamples)
+	}
+
+	var authFixture struct {
+		FixtureKey                  string   `json:"fixture_key"`
+		Capability                  string   `json:"capability"`
+		LiveNetwork                 bool     `json:"live_network"`
+		ProviderFree                bool     `json:"provider_free"`
+		SecretValuePolicy           string   `json:"secret_value_policy"`
+		SecretValuesPresent         bool     `json:"secret_values_present"`
+		Replacement                 string   `json:"replacement"`
+		HeadersRedacted             []string `json:"headers_redacted"`
+		QueryParamsRedacted         []string `json:"query_params_redacted"`
+		EnvRefs                     []string `json:"env_refs"`
+		CredentialRequiredForReplay bool     `json:"credential_required_for_replay"`
+	}
+	readVendorLiveJSON(t, filepath.Join(pkgDir, manifest.AuthRedaction.Fixture), &authFixture)
+	if authFixture.FixtureKey != manifest.AuthRedaction.FixtureKey ||
+		authFixture.LiveNetwork ||
+		!authFixture.ProviderFree ||
+		authFixture.SecretValuePolicy != manifest.AuthRedaction.SecretValuePolicy ||
+		authFixture.SecretValuesPresent ||
+		authFixture.Replacement != manifest.AuthRedaction.Replacement ||
+		authFixture.CredentialRequiredForReplay ||
+		!reflect.DeepEqual(authFixture.EnvRefs, manifest.AuthRedaction.EnvRefs) {
+		t.Fatalf("auth redaction fixture incomplete: %#v", authFixture)
 	}
 }
 
