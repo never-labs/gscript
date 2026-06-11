@@ -17,18 +17,20 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
-Current status: `go run ./cmd/leia examples --json` discovers 35 runnable and
+Current status: `go run ./cmd/leia examples --json` discovers 39 runnable and
 checkable FinRobot translation examples under this directory. The checked-in
-live-package skeleton surface has 12 directories:
+live-package skeleton surface has 15 directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
+`live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
 `live_packages/factor_research`, `live_packages/finance_facade`,
 `live_packages/news_catalyst`, `live_packages/optional_integrations`,
 `live_packages/product_workflow`, `live_packages/prompt_roles`,
-`live_packages/tutorial_demo_parity`, and `live_packages/vendor_adapters`.
-Ten of those skeletons provide registered provider-free `.leia` examples;
-`coding_notebook` and `product_workflow` are manifest/contracts/schemas/fixtures
-skeletons covered by dedicated tests and existing workflow/tooling examples.
+`live_packages/report_renderer`, `live_packages/tutorial_demo_parity`, and
+`live_packages/vendor_adapters`. Fourteen of those skeletons provide registered
+provider-free `.leia` examples; `coding_notebook` is a
+manifest/contracts/schemas/fixtures skeleton covered by dedicated tests and the
+existing generated-code tooling example.
 
 ## Scope
 
@@ -95,10 +97,10 @@ Gap categories:
 | `finrobot/data_source/marker_sec_src/*` | PDF-to-markdown and SEC filing conversion tools | Partial | stdlib, external library | P1 | Document pipeline skeleton verifies deterministic markdown chunk expectations, conversion boundaries, and provenance |
 | `finrobot/functional/rag.py`, `ragquery.py` | Generic RAG helpers over files, document chunks, vector stores, and retrieval providers | Partial | AI dialect, stdlib, external library | P0 | Document pipeline and replay tests cover SEC chunks, citations, vector/retriever adapters, and provider-free RAG lookups |
 | `finrobot/functional/analyzer.py` | Finance analysis prompt library and report-section analyzers | Partial | AI dialect, external library | P1 | Analyzer report skeleton checks section schemas, required evidence, source citations, and output envelopes |
-| `finrobot/functional/charting.py` | Chart package examples for stock, share performance, P/E, EPS, and report charts | Partial | stdlib, external library | P1 | Report/chart skeleton validates artifact metadata and deterministic fixture data; image rendering remains package work |
+| `finrobot/functional/charting.py` | Chart package examples for stock, share performance, P/E, EPS, and report charts | Partial | stdlib, external library | P1 | Chart renderer skeleton validates chart specs, render envelopes, source metadata, stale warnings, dimensions/theme, snapshots, and clean skips |
 | `finrobot/functional/coding.py` | Capability-gated file, Python execution, and image-display tools | Partial | AI dialect, stdlib, product layer | P1 | Coding notebook skeleton validates sandbox approval gates, denied commands, stdout/stderr capture, deterministic replay, and file/image artifacts |
-| `finrobot/functional/quantitative.py` | Backtrader/strategy package wrapper | Partial | stdlib, external library | P2 | Backtest fixture skeleton validates inputs, trades, metrics, and deterministic seed behavior |
-| `finrobot/functional/reportlab.py` | Document/report package for annual-report PDF assembly | Partial | stdlib, external library | P1 | Generated report skeleton validates sections, assets, provenance, and disclosure markers |
+| `finrobot/functional/quantitative.py` | Backtrader/strategy package wrapper | Partial | stdlib, external library | P2 | Backtest strategy skeleton validates strategy manifest, data feed, trade ledger, metrics, risk limits, deterministic seed, and optional dependency skips |
+| `finrobot/functional/reportlab.py` | Document/report package for annual-report PDF assembly | Partial | stdlib, external library | P1 | Report renderer skeleton validates HTML/PDF render request, output manifests, page snapshots, warnings, annotations, missing charts, and fixture hashes |
 | `finrobot/functional/text.py` | Generic text utility package | Mapped | stdlib | P2 | Unit tests for length checks and report text constraints |
 | `experiments/investment_group.py` | Multi-agent investment workflow example | Partial | AI dialect, external library | P2 | Offline replay of group roles, tool calls, and final recommendation schema |
 | `experiments/multi_factor_agents.py` | Multi-factor research workflow and data package example | Partial | AI dialect, stdlib, external library | P2 | Fixture data and factor research skeleton validate factor transforms, exposure summaries, optimizer boundaries, and agent outputs |

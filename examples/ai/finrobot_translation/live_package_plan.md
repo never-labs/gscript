@@ -7,14 +7,15 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 35 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. Ten checked-in live-package
-skeletons are registered examples (`analytics_report`, `analyzer_report`,
-`document_pipeline`, `factor_research`, `finance_facade`, `news_catalyst`,
-`optional_integrations`, `prompt_roles`, `tutorial_demo_parity`, and
-`vendor_adapters`); `coding_notebook` and `product_workflow` are
-manifest/contracts/schemas/fixtures skeletons covered by dedicated tests and
-existing workflow/tooling examples.
+Current registered-example status: 39 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. Fourteen checked-in
+live-package skeletons are registered examples (`analytics_report`,
+`analyzer_report`, `backtest_strategy`, `chart_renderer`, `document_pipeline`,
+`factor_research`, `finance_facade`, `news_catalyst`, `optional_integrations`,
+`product_workflow`, `prompt_roles`, `report_renderer`,
+`tutorial_demo_parity`, and `vendor_adapters`); `coding_notebook` is a
+manifest/contracts/schemas/fixtures skeleton covered by dedicated tests and the
+existing generated-code tooling example.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
 | --- | --- | --- | --- | --- |
@@ -22,8 +23,8 @@ existing workflow/tooling examples.
 | `live_packages/factor_research` | `live_packages/factor_research/main.leia` | `leia-finrobot-factor-research` | `packages/finrobot/factor_research` | `contracts/factor_research_contract.json` |
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-normalizers` | `packages/finrobot/normalizers` | `contracts/finance_normalizer_contract.json` |
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-valuation` | `packages/finrobot/valuation` | `contracts/valuation_contract.json` |
-| `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |
-| `live_packages/product_workflow` | Covered through `equity_cli_workflow.leia` and `web_product.leia`; no standalone registered `.leia` file | `leia-finrobot-web-product` | `packages/finrobot/web_product` | `contracts/web_product_contract.json` |
+| `live_packages/report_renderer` | `live_packages/report_renderer/main.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |
+| `live_packages/product_workflow` | `live_packages/product_workflow/main.leia` | `leia-finrobot-web-product` | `packages/finrobot/web_product` | `contracts/web_product_contract.json` |
 | `live_packages/optional_integrations` | `live_packages/optional_integrations/main.leia` | `leia-finrobot-optional-integrations` | `packages/finrobot/optional_integrations` | `contracts/optional_integration_capability_gates.json` |
 | `live_packages/prompt_roles` | `live_packages/prompt_roles/main.leia` | `leia-finrobot-prompt-roles` | `packages/finrobot/prompt_roles` | `contracts/prompt_role_contract.json` |
 | `live_packages/news_catalyst` | `live_packages/news_catalyst/main.leia` | `leia-finrobot-news-catalyst` | `packages/finrobot/news_catalyst` | `contracts/news_catalyst_contract.json` |
@@ -32,6 +33,8 @@ existing workflow/tooling examples.
 | `live_packages/analyzer_report` | `live_packages/analyzer_report/main.leia` | `leia-finrobot-analyzer-report` | `packages/finrobot/analyzer_report` | `contracts/analyzer_report_contract.json` |
 | `live_packages/coding_notebook` | Covered through `generated_code_tooling.leia`; no standalone registered `.leia` file | `leia-finrobot-coding-notebook` | `packages/finrobot/coding_notebook` | `contracts/coding_notebook_contract.json` |
 | `live_packages/tutorial_demo_parity` | `live_packages/tutorial_demo_parity/main.leia` | `leia-finrobot-tutorial-demo-parity` | `packages/finrobot/tutorial_demo_parity` | `contracts/tutorial_demo_parity_contract.json` |
+| `live_packages/chart_renderer` | `live_packages/chart_renderer/main.leia` | `leia-finrobot-chart-renderer` | `packages/finrobot/chart_renderer` | `contracts/chart_renderer_contract.json` |
+| `live_packages/backtest_strategy` | `live_packages/backtest_strategy/main.leia` | `leia-finrobot-backtest-strategy` | `packages/finrobot/backtest_strategy` | `contracts/backtest_strategy_contract.json` |
 
 ## Contract Rules
 

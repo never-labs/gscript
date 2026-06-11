@@ -28,43 +28,47 @@ No `docs/spec/index.html` generation was run.
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 2.556s` |
-| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `35 ok, 0 skipped, 0 failed` |
+| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 2.997s` |
+| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `39 ok, 0 skipped, 0 failed` |
 | Live package plan manifest JSON | `jq empty examples/ai/finrobot_translation/live_package_plan_manifest.json` | Pass |
 | Repo check, no generated docs/editor | `go run ./cmd/leia check --no-docs --no-editor .` | Pass: `fmt: ok`, `lint: ok`, `test: ok`, `manifest: ok`, `examples: ok`; docs/editor skipped |
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples --json` discovers 35 runnable/checkable FinRobot
+`go run ./cmd/leia examples --json` discovers 39 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
 The examples gate validated:
 
-- 27 `host-vm` examples
+- 31 `host-vm` examples
 - 6 `llm-replay` examples
 - 2 `evaluate` examples
-- 10 registered live-package skeleton examples:
+- 14 registered live-package skeleton examples:
   `live_packages/analytics_report/analytics_report.leia`,
   `live_packages/analyzer_report/main.leia`,
+  `live_packages/backtest_strategy/main.leia`,
+  `live_packages/chart_renderer/main.leia`,
   `live_packages/document_pipeline/main.leia`,
   `live_packages/factor_research/main.leia`,
   `live_packages/finance_facade/main.leia`,
   `live_packages/news_catalyst/main.leia`,
   `live_packages/optional_integrations/main.leia`,
+  `live_packages/product_workflow/main.leia`,
   `live_packages/prompt_roles/main.leia`,
+  `live_packages/report_renderer/main.leia`,
   `live_packages/tutorial_demo_parity/main.leia`, and
   `live_packages/vendor_adapters/main.leia`
 
 The checker reported:
 
 ```text
-examples: 35 ok, 0 skipped, 0 failed
+examples: 39 ok, 0 skipped, 0 failed
 ```
 
 The repository check reported:
 
 ```text
-examples: 179 ok, 8 skipped, 0 failed
+examples: 183 ok, 8 skipped, 0 failed
 fmt: ok
 lint: ok
 test: ok
@@ -82,6 +86,12 @@ Current checked-in skeleton directories:
   normalizer, valuation, chart/report artifact, and renderer contracts.
 - `live_packages/analyzer_report`: registered example plus analyzer prompt,
   section schema, evidence rule, citation, and report-envelope contracts.
+- `live_packages/backtest_strategy`: registered example plus strategy manifest,
+  data feed, deterministic seed, trade ledger, metrics, risk-limit, analyzer
+  output, and optional dependency skip contracts.
+- `live_packages/chart_renderer`: registered example plus chart spec, render
+  request/result envelope, source metadata, stale warning, dimensions/theme,
+  snapshot hash, and unsupported renderer clean-skip contracts.
 - `live_packages/coding_notebook`: manifest, contracts, schemas, and fixtures
   for sandbox approval gates, denied commands, stdout/stderr capture,
   deterministic replay, and file/image artifacts.
@@ -100,12 +110,15 @@ Current checked-in skeleton directories:
 - `live_packages/optional_integrations`: registered example plus manifest,
   schemas, fixtures, and clean-skip gates for optional FinGPT, FinRL, FinML,
   Backtrader, mplfinance, OpenBB, and Ollama integrations.
-- `live_packages/product_workflow`: manifest, contracts, schemas, and fixtures;
-  covered through `equity_cli_workflow.leia`, `web_product.leia`, and
-  `tests/llm/finrobot_product_workflow_live_package_test.go`.
+- `live_packages/product_workflow`: registered example plus manifest,
+  contracts, schemas, and fixtures for routes, auth/session, task logs,
+  downloads, DB, UI snapshots, accessibility, and deployment contracts.
 - `live_packages/prompt_roles`: registered example plus prompt catalog, role
   profile versioning, section-agent output schema, TERMINATE convention, and
   source evidence validation contracts.
+- `live_packages/report_renderer`: registered example plus HTML/PDF render
+  request, output manifest, page snapshot metadata, warning, disclosure, source
+  annotation, missing chart handling, and deterministic fixture hash contracts.
 - `live_packages/tutorial_demo_parity`: registered example plus tutorial/demo
   replay records, optional live-provider gates, and notebook-to-Leia conversion
   checks.
@@ -130,7 +143,7 @@ go run ./cmd/leia check --no-docs --no-editor .
 ## Release-Gate Conclusion
 
 The FinRobot documentation status is aligned with the current
-`origin/codex/ai-dialect-polish` surface: 35 registered runnable/checkable
-examples, 190 files in the translation directory, and 12 checked-in
+`origin/codex/ai-dialect-polish` surface: 39 registered runnable/checkable
+examples, 259 files in the translation directory, and 15 checked-in
 provider-free live-package skeleton directories. The validation commands above
 passed without generating `docs/spec/index.html`.

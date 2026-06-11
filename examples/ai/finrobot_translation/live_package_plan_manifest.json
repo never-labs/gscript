@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 35,
-  "translation_directory_file_count": 190,
+  "registered_examples_count": 39,
+  "translation_directory_file_count": 259,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -14,8 +14,7 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/analytics_report/analytics_report.leia",
       "covers_package_ids": [
         "normalizers",
-        "valuation",
-        "report_renderer"
+        "valuation"
       ],
       "status": "checked_in_registered_example"
     },
@@ -88,15 +87,11 @@
     {
       "id": "product_workflow",
       "directory": "examples/ai/finrobot_translation/live_packages/product_workflow",
-      "registered_example": null,
-      "covered_by_examples": [
-        "examples/ai/finrobot_translation/equity_cli_workflow.leia",
-        "examples/ai/finrobot_translation/web_product.leia"
-      ],
+      "registered_example": "examples/ai/finrobot_translation/live_packages/product_workflow/main.leia",
       "covers_package_ids": [
         "web_product"
       ],
-      "status": "checked_in_contracts_schemas_fixtures"
+      "status": "checked_in_registered_example"
     },
     {
       "id": "prompt_roles",
@@ -122,6 +117,33 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/finance_facade/main.leia",
       "covers_package_ids": [
         "finance_facade"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "backtest_strategy",
+      "directory": "examples/ai/finrobot_translation/live_packages/backtest_strategy",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/backtest_strategy/main.leia",
+      "covers_package_ids": [
+        "backtest_strategy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "chart_renderer",
+      "directory": "examples/ai/finrobot_translation/live_packages/chart_renderer",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/chart_renderer/main.leia",
+      "covers_package_ids": [
+        "chart_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "report_renderer",
+      "directory": "examples/ai/finrobot_translation/live_packages/report_renderer",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/report_renderer/main.leia",
+      "covers_package_ids": [
+        "report_renderer"
       ],
       "status": "checked_in_registered_example"
     }
@@ -220,24 +242,30 @@
       "id": "report_renderer",
       "package_name": "leia-finrobot-report-renderer",
       "status": "skeleton_contract_checked_in",
-      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/report_renderer",
       "planned_directory": "packages/finrobot/report_renderer",
       "manifest": "packages/finrobot/report_renderer/package.manifest.json",
       "contract": "packages/finrobot/report_renderer/contracts/report_renderer_contract.json",
       "migration_source": "examples/ai/finrobot_translation/report_contract.leia",
       "capabilities": [
-        "report.render.html",
-        "report.render.pdf",
-        "report.render.chart_spec",
-        "report.render.source_annotations",
-        "report.render.ai_disclosure",
-        "report.render.output_manifest"
+        "report.render.request",
+        "report.render.html.contract",
+        "report.render.pdf.contract",
+        "report.render.output_manifest",
+        "report.render.page_snapshot_metadata",
+        "report.render.table_warning",
+        "report.render.markdown_warning",
+        "report.render.disclosure_annotation",
+        "report.render.source_annotation",
+        "report.render.missing_chart_handling",
+        "report.render.fixture_hash",
+        "report.render.clean_skip"
       ],
       "test_gates": [
-        "artifact contract tests validate HTML, PDF, chart spec, source annotation, AI disclosure, and output manifest schemas",
-        "snapshot tests compare deterministic renderer fixtures without browser network access",
-        "package tests require warnings for stale data, missing source provenance, and unsupported export formats",
-        "renderer extras stay optional so replay report contracts pass without wkhtmltopdf, playwright, plotly, or cloud storage"
+        "report renderer manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert optional renderer dependencies clean-skip",
+        "fixture tests validate HTML/PDF request, output manifest, page snapshot metadata, warnings, disclosures, source annotations, and missing chart handling",
+        "deterministic fixture hash remains stable without invoking a live renderer"
       ],
       "no_built_in_guarantee": true
     },
@@ -517,6 +545,61 @@
         "contract tests run with live_network=false and assert sandbox command/file-write approvals deny by default",
         "fixture tests validate file/image artifact contracts, denied command stdout/stderr capture, and deterministic replay metadata",
         "capability metadata tests keep notebook kernels, generated code execution, file writes, and image display behind explicit approval gates"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "chart_renderer",
+      "package_name": "leia-finrobot-chart-renderer",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/chart_renderer",
+      "planned_directory": "packages/finrobot/chart_renderer",
+      "manifest": "packages/finrobot/chart_renderer/package.manifest.json",
+      "contract": "packages/finrobot/chart_renderer/contracts/chart_renderer_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/report_contract.leia",
+      "capabilities": [
+        "chart.render.spec",
+        "chart.render.request",
+        "chart.render.result",
+        "chart.render.source_metadata",
+        "chart.render.stale_warning",
+        "chart.render.dimensions",
+        "chart.render.theme",
+        "chart.render.snapshot_hash",
+        "chart.render.unsupported_skip"
+      ],
+      "test_gates": [
+        "chart renderer manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert unsupported renderer requests clean-skip",
+        "fixture tests validate chart specs, render request/result envelopes, source metadata, stale-data warnings, dimensions, theme, and snapshot hash",
+        "provider-free tests keep mplfinance, plotting libraries, and renderer imports outside Leia core until explicit package enablement"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "backtest_strategy",
+      "package_name": "leia-finrobot-backtest-strategy",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/backtest_strategy",
+      "planned_directory": "packages/finrobot/backtest_strategy",
+      "manifest": "packages/finrobot/backtest_strategy/package.manifest.json",
+      "contract": "packages/finrobot/backtest_strategy/contracts/backtest_strategy_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+      "capabilities": [
+        "finance.backtest.strategy.manifest",
+        "finance.backtest.data_feed",
+        "finance.backtest.deterministic_seed",
+        "finance.backtest.trade_ledger",
+        "finance.backtest.metrics",
+        "finance.backtest.risk_limits",
+        "finance.backtest.optional_dependency.skip",
+        "finance.backtest.analyzer.output"
+      ],
+      "test_gates": [
+        "backtest strategy manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert Backtrader and pandas imports clean-skip by default",
+        "fixture tests validate strategy, sizer, indicator, analyzer, data feed, deterministic seed, trade ledger, metrics, and risk-limit schemas",
+        "provider-free tests keep strategy execution outside Leia core until the external backtest package is explicitly enabled"
       ],
       "no_built_in_guarantee": true
     }

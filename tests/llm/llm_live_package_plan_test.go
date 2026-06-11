@@ -76,6 +76,8 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		"document_pipeline":     "leia-finrobot-document-pipeline",
 		"news_catalyst":         "leia-finrobot-news-catalyst",
 		"factor_research":       "leia-finrobot-factor-research",
+		"chart_renderer":        "leia-finrobot-chart-renderer",
+		"backtest_strategy":     "leia-finrobot-backtest-strategy",
 	}
 	if len(manifest.Packages) != len(wantPackages) {
 		t.Fatalf("packages = %d, want %d", len(manifest.Packages), len(wantPackages))
@@ -172,6 +174,8 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"document_pipeline":     "finance.document.",
 		"news_catalyst":         "finance.",
 		"factor_research":       "finance.factor_research.",
+		"chart_renderer":        "chart.render.",
+		"backtest_strategy":     "finance.backtest.",
 	}
 	for _, pkg := range manifest.Packages {
 		if len(pkg.Capabilities) < 5 {
