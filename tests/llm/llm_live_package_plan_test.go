@@ -53,11 +53,12 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 	}
 
 	wantPackages := map[string]string{
-		"vendor_adapters": "leia-finrobot-vendor-adapters",
-		"normalizers":     "leia-finrobot-normalizers",
-		"valuation":       "leia-finrobot-valuation",
-		"report_renderer": "leia-finrobot-report-renderer",
-		"web_product":     "leia-finrobot-web-product",
+		"vendor_adapters":       "leia-finrobot-vendor-adapters",
+		"normalizers":           "leia-finrobot-normalizers",
+		"valuation":             "leia-finrobot-valuation",
+		"report_renderer":       "leia-finrobot-report-renderer",
+		"web_product":           "leia-finrobot-web-product",
+		"optional_integrations": "leia-finrobot-optional-integrations",
 	}
 	if len(manifest.Packages) != len(wantPackages) {
 		t.Fatalf("packages = %d, want %d", len(manifest.Packages), len(wantPackages))
@@ -91,7 +92,8 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		if !strings.HasSuffix(pkg.Manifest, "package.manifest.json") {
 			t.Fatalf("%s manifest = %q", pkg.ID, pkg.Manifest)
 		}
-		if !strings.Contains(pkg.Contract, "/contracts/") || !strings.HasSuffix(pkg.Contract, "_contract.json") {
+		if !strings.Contains(pkg.Contract, "/contracts/") ||
+			(!strings.HasSuffix(pkg.Contract, "_contract.json") && !strings.HasSuffix(pkg.Contract, "_gates.json")) {
 			t.Fatalf("%s contract = %q", pkg.ID, pkg.Contract)
 		}
 		if _, err := os.Stat(filepath.Join(root, pkg.MigrationSource)); err != nil {
@@ -103,11 +105,12 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 	manifest := loadLivePackagePlanManifest(t, repoRoot(t))
 	wantCapabilityPrefix := map[string]string{
-		"vendor_adapters": "finance.vendor.",
-		"normalizers":     "finance.normalize.",
-		"valuation":       "finance.valuation.",
-		"report_renderer": "report.render.",
-		"web_product":     "web.",
+		"vendor_adapters":       "finance.vendor.",
+		"normalizers":           "finance.normalize.",
+		"valuation":             "finance.valuation.",
+		"report_renderer":       "report.render.",
+		"web_product":           "web.",
+		"optional_integrations": "integration.optional.",
 	}
 	for _, pkg := range manifest.Packages {
 		if len(pkg.Capabilities) < 5 {

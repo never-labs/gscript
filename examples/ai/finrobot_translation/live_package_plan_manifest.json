@@ -145,6 +145,32 @@
         "accessibility and UI snapshot smoke tests remain provider-free and deterministic in CI"
       ],
       "no_built_in_guarantee": true
+    },
+    {
+      "id": "optional_integrations",
+      "package_name": "leia-finrobot-optional-integrations",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/optional_integrations",
+      "planned_directory": "packages/finrobot/optional_integrations",
+      "manifest": "packages/finrobot/optional_integrations/package.manifest.json",
+      "contract": "packages/finrobot/optional_integrations/contracts/optional_integration_capability_gates.json",
+      "migration_source": "examples/ai/finrobot_translation/optional_integrations.leia",
+      "capabilities": [
+        "integration.optional.fingpt.forecast",
+        "integration.optional.finrl.strategy",
+        "integration.optional.finml.dataset",
+        "integration.optional.backtrader.backtest",
+        "integration.optional.mplfinance.chart",
+        "integration.optional.openbb.data",
+        "integration.optional.ollama.local_model"
+      ],
+      "test_gates": [
+        "optional integration manifests declare clean skip behavior, fixture keys, schemas, and capability gates",
+        "contract tests run with live_network=false and assert absent optional dependencies do not fail provider-free CI",
+        "fixture tests validate FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, and Ollama metadata without imports",
+        "approval policy tests deny live optional integrations unless the matching capability and dependency gate are enabled"
+      ],
+      "no_built_in_guarantee": true
     }
   ],
   "global_test_gates": [
