@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-trace-events-live-package",
+  "package_name": "leia-generic-ai-trace-events",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for generic.ai.trace.events and ai.trace.emit turn, stream, tool, artifact, approval, and replay trace events.",
+  "source_modules": [
+    "examples/ai/finrobot_translation/ai_dialect_index/index.json",
+    "examples/ai/finrobot_translation/ai_dialect_index/backend_plan.json"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; provider SDK traces, hosted telemetry, storage sinks, and model-specific event adapters belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "telemetry_sink_required": false,
+    "clean_skip_without_sink": true,
+    "fixture_hook": "recorded_generic_trace_events_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "trace_events_contract": "contracts/trace_events_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "trace_sequence_fixture": "fixtures/trace_sequence_ACME_fixture.json",
+    "redaction_policy_fixture": "fixtures/redaction_policy_fixture.json"
+  },
+  "schemas": {
+    "trace_event": "schemas/trace_event_v1.schema.json",
+    "trace_sequence": "schemas/trace_sequence_v1.schema.json",
+    "redaction_policy": "schemas/redaction_policy_v1.schema.json",
+    "correlation_ids": "schemas/correlation_ids_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "trace_sequence": "fixtures/trace_sequence_ACME_fixture.json",
+    "redaction_policy": "fixtures/redaction_policy_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.trace.events",
+    "ai.trace.emit",
+    "ai.trace.turn_start",
+    "ai.trace.stream",
+    "ai.trace.tool",
+    "ai.trace.artifact",
+    "ai.trace.approval",
+    "ai.trace.replay",
+    "ai.trace.redaction_policy",
+    "ai.trace.correlation_ids",
+    "ai.trace.sequence_marker",
+    "ai.trace.fixture_replay"
+  ],
+  "event_contracts": [
+    {
+      "event_type": "turn_start",
+      "capability": "ai.trace.turn_start",
+      "required_payload_fields": [
+        "model_alias",
+        "message_count",
+        "tools_declared",
+        "provider_name"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "stream",
+      "capability": "ai.trace.stream",
+      "required_payload_fields": [
+        "chunk_index",
+        "delta_kind",
+        "text_preview",
+        "token_count"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "tool",
+      "capability": "ai.trace.tool",
+      "required_payload_fields": [
+        "tool_call_id",
+        "tool_name",
+        "status",
+        "input_digest",
+        "output_digest"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "artifact",
+      "capability": "ai.trace.artifact",
+      "required_payload_fields": [
+        "artifact_id",
+        "artifact_kind",
+        "media_type",
+        "content_hash"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "approval",
+      "capability": "ai.trace.approval",
+      "required_payload_fields": [
+        "approval_id",
+        "operation",
+        "decision",
+        "policy_id"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "replay",
+      "capability": "ai.trace.replay",
+      "required_payload_fields": [
+        "replay_fixture_key",
+        "matched_event_count",
+        "mismatch_count",
+        "deterministic"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    }
+  ],
+  "sequence_policy": {
+    "marker": "fixture_sequence",
+    "clock": "fixture_monotonic_ms",
+    "start_sequence": 1,
+    "strictly_increasing": true,
+    "dedupe_key_fields": [
+      "trace_id",
+      "event_id",
+      "sequence"
+    ],
+    "terminal_event_types": [
+      "replay"
+    ]
+  },
+  "correlation_policy": {
+    "required_ids": [
+      "trace_id",
+      "run_id",
+      "turn_id",
+      "event_id"
+    ],
+    "optional_ids": [
+      "parent_event_id",
+      "tool_call_id",
+      "artifact_id",
+      "approval_id",
+      "replay_id"
+    ],
+    "format": "stable-provider-free-strings",
+    "provider_request_id_policy": "omitted_or_redacted"
+  },
+  "redaction_policy": {
+    "fixture": "fixtures/redaction_policy_fixture.json",
+    "default_action": "hash_or_drop",
+    "secret_fields": [
+      "api_key",
+      "authorization",
+      "cookie",
+      "provider_request_id",
+      "raw_prompt",
+      "raw_completion"
+    ],
+    "allowed_preview_fields": [
+      "text_preview",
+      "status",
+      "artifact_kind",
+      "decision"
+    ],
+    "hash_algorithm": "sha256"
+  },
+  "replay_contract": {
+    "mode": "deterministic_fixture_replay",
+    "fixture": "fixtures/trace_sequence_ACME_fixture.json",
+    "matching_keys": [
+      "trace_id",
+      "event_id",
+      "sequence",
+      "event_type"
+    ],
+    "mismatch_policy": "fail_closed",
+    "allow_live_sink": false
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "generic.ai.trace.events and ai.trace.emit capabilities are provider-free and fixture-replay only",
+    "turn_start, stream, tool, artifact, approval, and replay event schemas require correlation IDs and a sequence marker",
+    "trace fixture records strictly increasing sequence values using fixture_monotonic_ms",
+    "redaction policy hashes or drops secrets and permits only explicit previews",
+    "provider request IDs and provider names are omitted, generic, or redacted",
+    "fixture replay matches trace_id, event_id, sequence, and event_type without live telemetry sinks"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide hosted telemetry, provider-specific trace exporters, model SDK event streams, or trace storage sinks as built-ins; this package defines provider-free schemas and replay fixtures for future external packages."
+  }
+}

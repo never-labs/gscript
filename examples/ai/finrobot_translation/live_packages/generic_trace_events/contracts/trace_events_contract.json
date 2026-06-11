@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-trace-events-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "capability": "generic.ai.trace.events",
+  "emit_shape": "ai.trace.emit",
+  "required_event_types": [
+    "turn_start",
+    "stream",
+    "tool",
+    "artifact",
+    "approval",
+    "replay"
+  ],
+  "required_event_fields": [
+    "schema_version",
+    "fixture_key",
+    "trace_id",
+    "run_id",
+    "turn_id",
+    "event_id",
+    "event_type",
+    "sequence",
+    "sequence_marker",
+    "correlation",
+    "redaction",
+    "payload",
+    "replay"
+  ],
+  "correlation_id_fields": [
+    "trace_id",
+    "run_id",
+    "turn_id",
+    "event_id",
+    "parent_event_id",
+    "tool_call_id",
+    "artifact_id",
+    "approval_id",
+    "replay_id"
+  ],
+  "sequence_marker": {
+    "name": "fixture_sequence",
+    "clock": "fixture_monotonic_ms",
+    "strictly_increasing": true,
+    "start_sequence": 1
+  },
+  "redaction_contract": {
+    "policy_ref": "fixtures/redaction_policy_fixture.json",
+    "default_action": "hash_or_drop",
+    "hash_algorithm": "sha256",
+    "provider_request_id_policy": "drop",
+    "raw_prompt_policy": "hash",
+    "raw_completion_policy": "hash"
+  },
+  "replay_contract": {
+    "mode": "deterministic_fixture_replay",
+    "fixture": "fixtures/trace_sequence_ACME_fixture.json",
+    "match_keys": [
+      "trace_id",
+      "event_id",
+      "sequence",
+      "event_type"
+    ],
+    "mismatch_policy": "fail_closed",
+    "allow_live_sink": false
+  },
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Trace storage, hosted telemetry export, and provider SDK trace streams are external package responsibilities."
+  }
+}

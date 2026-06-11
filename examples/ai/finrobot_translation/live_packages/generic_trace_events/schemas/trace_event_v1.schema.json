@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/generic_trace_events/trace_event_v1.schema.json",
+  "title": "Generic AI Trace Event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_key",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "trace_id",
+    "run_id",
+    "turn_id",
+    "event_id",
+    "event_type",
+    "capability",
+    "sequence",
+    "sequence_marker",
+    "timestamp_ms",
+    "correlation",
+    "redaction",
+    "payload",
+    "replay"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "enum": [
+        "turn_start",
+        "stream",
+        "tool",
+        "artifact",
+        "approval",
+        "replay"
+      ]
+    },
+    "capability": {
+      "type": "string",
+      "pattern": "^(generic\\.ai\\.trace\\.events|ai\\.trace\\.)"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sequence_marker": {
+      "type": "object",
+      "required": [
+        "name",
+        "clock",
+        "strictly_increasing"
+      ],
+      "properties": {
+        "name": {
+          "const": "fixture_sequence"
+        },
+        "clock": {
+          "const": "fixture_monotonic_ms"
+        },
+        "strictly_increasing": {
+          "const": true
+        }
+      }
+    },
+    "timestamp_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "correlation": {
+      "$ref": "correlation_ids_v1.schema.json"
+    },
+    "redaction": {
+      "type": "object",
+      "required": [
+        "policy_id",
+        "status",
+        "redacted_fields",
+        "hash_algorithm"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "clean",
+            "redacted",
+            "hashed"
+          ]
+        },
+        "redacted_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hash_algorithm": {
+          "const": "sha256"
+        }
+      }
+    },
+    "payload": {
+      "type": "object"
+    },
+    "replay": {
+      "type": "object",
+      "required": [
+        "fixture_key",
+        "deterministic",
+        "live_sink",
+        "match_keys"
+      ],
+      "properties": {
+        "deterministic": {
+          "const": true
+        },
+        "live_sink": {
+          "const": false
+        },
+        "match_keys": {
+          "type": "array",
+          "contains": {
+            "const": "sequence"
+          }
+        }
+      }
+    }
+  }
+}

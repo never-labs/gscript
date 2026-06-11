@@ -1,0 +1,79 @@
+// Provider-free live package skeleton for generic AI trace events.
+//
+// JSON manifest, schemas, contracts, and fixtures are the contract of record.
+// This smoke file mirrors the fixture-only boundary without importing model
+// SDKs, telemetry exporters, trace storage, or provider event streams.
+
+generic_trace_events_live_package := {
+    id: "generic-ai-trace-events-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    telemetry_sink_required: false
+    clean_skip_without_sink: true
+    default_mode: "fixture_replay"
+    capability: "generic.ai.trace.events"
+    emit_shape: "ai.trace.emit"
+    event_types: {"turn_start", "stream", "tool", "artifact", "approval", "replay"}
+    match_keys: {"trace_id", "event_id", "sequence", "event_type"}
+    correlation_ids: {"trace_id", "run_id", "turn_id", "event_id"}
+    optional_correlation_ids: {"parent_event_id", "tool_call_id", "artifact_id", "approval_id", "replay_id"}
+    sequence_marker: {
+        name: "fixture_sequence"
+        clock: "fixture_monotonic_ms"
+        strictly_increasing: true
+        start_sequence: 1
+    }
+    redaction_policy: {
+        policy_id: "generic-trace-redaction-v1"
+        default_action: "hash_or_drop"
+        hash_algorithm: "sha256"
+        provider_request_id_policy: "drop"
+        allowed_preview_fields: {"text_preview", "status", "artifact_kind", "decision", "model_alias", "tool_name"}
+    }
+    replay: {
+        mode: "deterministic_fixture_replay"
+        fixture_key: "generic_trace_events:sequence:ACME:offline"
+        expected_event_count: 6
+        mismatch_policy: "fail_closed"
+        allow_live_sink: false
+    }
+}
+
+func generic_trace_events_contract_ok(pkg) {
+    if pkg == nil {
+        return false
+    }
+    return pkg.provider_free == true &&
+        pkg.live_network == false &&
+        pkg.real_dependency_imports == false &&
+        pkg.telemetry_sink_required == false &&
+        pkg.clean_skip_without_sink == true &&
+        pkg.default_mode == "fixture_replay" &&
+        pkg.capability == "generic.ai.trace.events" &&
+        pkg.emit_shape == "ai.trace.emit" &&
+        #pkg.event_types == 6 &&
+        #pkg.match_keys == 4 &&
+        #pkg.correlation_ids == 4 &&
+        pkg.sequence_marker.name == "fixture_sequence" &&
+        pkg.sequence_marker.clock == "fixture_monotonic_ms" &&
+        pkg.sequence_marker.strictly_increasing == true &&
+        pkg.redaction_policy.default_action == "hash_or_drop" &&
+        pkg.redaction_policy.provider_request_id_policy == "drop" &&
+        pkg.replay.mode == "deterministic_fixture_replay" &&
+        pkg.replay.expected_event_count == 6 &&
+        pkg.replay.allow_live_sink == false
+}
+
+generic_trace_events_contract_valid := generic_trace_events_contract_ok(generic_trace_events_live_package)
+assert(generic_trace_events_contract_valid)
+
+generic_trace_events_live_package_summary := string.format(
+"generic_trace_events_live_package events=%d match_keys=%d provider_free=%s replay=%s",
+#generic_trace_events_live_package.event_types,
+#generic_trace_events_live_package.match_keys,
+tostring(generic_trace_events_live_package.provider_free),
+generic_trace_events_live_package.replay.mode
+)
+
+print(generic_trace_events_live_package_summary)

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-trace-events-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "key": "generic_trace_events:sequence:ACME:offline",
+      "path": "fixtures/trace_sequence_ACME_fixture.json",
+      "schema": "schemas/trace_sequence_v1.schema.json",
+      "description": "Provider-free trace sequence covering turn_start, stream, tool, artifact, approval, and replay events."
+    },
+    {
+      "key": "generic_trace_events:redaction_policy:offline",
+      "path": "fixtures/redaction_policy_fixture.json",
+      "schema": "schemas/redaction_policy_v1.schema.json",
+      "description": "Redaction policy for generic trace event payloads and provider identity fields."
+    }
+  ],
+  "replay_mode": "deterministic_fixture_replay",
+  "allow_live_sink": false
+}
