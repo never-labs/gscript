@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-chart-renderer-unsupported-renderer-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "renderer": "plotly",
+  "requested_capability": "finance.chart_renderer.renderer.plotly",
+  "skip_schema": "schemas/renderer_skip_v1.schema.json",
+  "skip_fixture": "fixtures/unsupported_renderer_clean_skip_fixture.json",
+  "fallback_rules": [
+    "return ok=false with skip=true when the requested renderer is unsupported by the skeleton",
+    "do not import mplfinance, matplotlib, plotly, selenium, browser runtimes, pandas, numpy, requests, or q/runtime",
+    "preserve request_id, renderer, provider_free, live_network=false, and real_dependency_imports=false in the skip envelope",
+    "include a deterministic fixture_key and human-readable unsupported_reason"
+  ],
+  "acceptance_gates": [
+    "unsupported renderer clean-skip is fixture-backed",
+    "skip envelope never requires credentials or network access",
+    "dependency_imported is false for unsupported and optional renderer dependencies"
+  ]
+}

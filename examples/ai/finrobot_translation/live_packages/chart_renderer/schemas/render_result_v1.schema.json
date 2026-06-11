@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/finrobot/chart_renderer/render_result_v1.schema.json",
+  "title": "FinRobot chart render result v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "request_id",
+    "ok",
+    "renderer",
+    "artifact",
+    "dimensions",
+    "theme",
+    "snapshot",
+    "warnings",
+    "source_metadata"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "renderer": {
+      "type": "string"
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "format",
+        "mime_type",
+        "bytes_inline",
+        "storage_uri"
+      ]
+    },
+    "dimensions": {
+      "type": "object"
+    },
+    "theme": {
+      "type": "object"
+    },
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "hash_algorithm",
+        "hash",
+        "fixture_key"
+      ]
+    },
+    "warnings": {
+      "type": "array"
+    },
+    "source_metadata": {
+      "$ref": "source_metadata_v1.schema.json"
+    }
+  }
+}

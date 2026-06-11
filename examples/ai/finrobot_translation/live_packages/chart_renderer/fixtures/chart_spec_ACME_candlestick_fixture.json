@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "chart_id": "chart_ACME_candlestick_2026_06_11",
+  "symbol": "ACME",
+  "chart_type": "candlestick",
+  "series": [
+    {
+      "date": "2026-06-09",
+      "open": 101.2,
+      "high": 104.7,
+      "low": 100.8,
+      "close": 103.6,
+      "volume": 1250000
+    },
+    {
+      "date": "2026-06-10",
+      "open": 103.8,
+      "high": 106.1,
+      "low": 102.9,
+      "close": 105.4,
+      "volume": 1420000
+    },
+    {
+      "date": "2026-06-11",
+      "open": 105.2,
+      "high": 107.0,
+      "low": 104.4,
+      "close": 104.9,
+      "volume": 1385000
+    }
+  ],
+  "indicators": [
+    {
+      "id": "sma_20",
+      "display_name": "SMA 20",
+      "panel": "price",
+      "values": [
+        100.4,
+        101.1,
+        101.9
+      ]
+    },
+    {
+      "id": "volume",
+      "display_name": "Volume",
+      "panel": "volume",
+      "values": [
+        1250000,
+        1420000,
+        1385000
+      ]
+    }
+  ],
+  "dimensions": {
+    "width": 1280,
+    "height": 720,
+    "dpi": 144
+  },
+  "theme": {
+    "name": "finrobot-light",
+    "background": "#ffffff",
+    "foreground": "#1f2937",
+    "grid": "#d1d5db",
+    "up_color": "#16803c",
+    "down_color": "#b42318"
+  },
+  "source_metadata": {
+    "provider_free": true,
+    "live_network": false,
+    "provider": "fixture",
+    "fixture_key": "spec:ACME:candlestick:offline",
+    "captured_at": "2026-06-11T16:00:00Z",
+    "as_of": "2026-06-11",
+    "source_schema": "schemas/chart_spec_v1.schema.json",
+    "source_url_redacted": true,
+    "stale_after_days": 7,
+    "is_stale": true,
+    "replay_ready": true
+  },
+  "stale_data_warning": {
+    "required": true,
+    "warning_code": "STALE_SOURCE_DATA",
+    "message": "Fixture data is intentionally marked stale to verify warning propagation in provider-free chart rendering."
+  }
+}
