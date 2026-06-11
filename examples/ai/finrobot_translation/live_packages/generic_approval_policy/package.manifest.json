@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "generic-ai-approval-policy-live-package",
-  "package_name": "generic.ai.approval.policy",
-  "companion_package_name": "generic.ai.capability.gate",
+  "package_name": "leia-generic-ai-approval-policy",
+  "companion_package_name": "leia-generic-ai-capability-gate",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for generic AI approval policy and capability gate contracts.",
   "provider_free": true,
@@ -10,6 +10,10 @@
   "real_dependency_import_default": false,
   "fixture_root": "fixtures",
   "schema_root": "schemas",
+  "dialect_symbols": [
+    "generic.ai.approval.policy",
+    "generic.ai.capability.gate"
+  ],
   "credentials": {
     "required": [],
     "optional": [],
@@ -77,6 +81,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide provider-specific approval, network, credential, trading, publishing, or execution behavior as built-ins; external packages must satisfy these provider-free capability gates explicitly."
+    "statement": "Leia core does not provide built-in generic AI approval policy or capability gate execution; leia-generic-ai-approval-policy defines the provider-free package boundary."
   }
 }

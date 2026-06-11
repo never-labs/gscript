@@ -15,6 +15,7 @@ type genericTraceEventsManifest struct {
 	SchemaVersion               int      `json:"schema_version"`
 	ID                          string   `json:"id"`
 	PackageName                 string   `json:"package_name"`
+	DialectSymbols              []string `json:"dialect_symbols"`
 	ProviderFree                bool     `json:"provider_free"`
 	LiveNetworkDefault          bool     `json:"live_network_default"`
 	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
@@ -55,8 +56,11 @@ type genericTraceEventsManifest struct {
 		MismatchPolicy string   `json:"mismatch_policy"`
 		AllowLiveSink  bool     `json:"allow_live_sink"`
 	} `json:"replay_contract"`
-	NoBuiltIn map[string]json.RawMessage `json:"no_built_in_guarantee"`
-	TestGates []string                   `json:"test_gates"`
+	NoBuiltInGuarantee struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
+	TestGates []string `json:"test_gates"`
 }
 
 type genericTraceEventsEventContract struct {
@@ -176,6 +180,9 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 	if manifest.PackageName != "leia-generic-ai-trace-events" {
 		t.Fatalf("package name = %q", manifest.PackageName)
 	}
+	if !reflect.DeepEqual(manifest.DialectSymbols, []string{"generic.ai.trace.events", "ai.trace.emit"}) {
+		t.Fatalf("dialect symbols = %#v", manifest.DialectSymbols)
+	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
 		t.Fatalf("provider-free defaults = provider_free:%v live_network:%v imports:%v", manifest.ProviderFree, manifest.LiveNetworkDefault, manifest.RealDependencyImportDefault)
 	}
@@ -200,6 +207,7 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
+		assertGenericTraceEventsEntrypointPath(t, manifest.Entrypoints[key])
 	}
 	for _, key := range []string{"trace_event", "trace_sequence", "redaction_policy", "correlation_ids"} {
 		path := manifest.Schemas[key]
@@ -284,8 +292,11 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		!reflect.DeepEqual(manifest.ReplayContract.MatchingKeys, []string{"trace_id", "event_id", "sequence", "event_type"}) {
 		t.Fatalf("replay contract incomplete: %#v", manifest.ReplayContract)
 	}
-	if len(manifest.NoBuiltIn) == 0 {
-		t.Fatal("missing no_built_in_guarantee")
+	if !manifest.NoBuiltInGuarantee.Required {
+		t.Fatal("generic trace events package must declare no built-in guarantee")
+	}
+	if !strings.Contains(manifest.NoBuiltInGuarantee.Statement, manifest.PackageName) || !strings.Contains(manifest.NoBuiltInGuarantee.Statement, "provider-free package boundary") {
+		t.Fatalf("no built-in guarantee should name package boundary: %q", manifest.NoBuiltInGuarantee.Statement)
 	}
 }
 
@@ -513,6 +524,18 @@ func assertGenericTraceEventsJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeGenericTraceEventsJSONFile(t, path, &value)
+}
+
+func assertGenericTraceEventsEntrypointPath(t *testing.T, path string) {
+	t.Helper()
+	if path == "" || filepath.IsAbs(path) || filepath.Clean(path) != path {
+		t.Fatalf("entrypoint must be a clean relative file path: %q", path)
+	}
+	switch filepath.Ext(path) {
+	case ".json", ".leia":
+	default:
+		t.Fatalf("entrypoint must reference a JSON or Leia file path: %q", path)
+	}
 }
 
 func genericTraceEventsContains(values []string, want string) bool {

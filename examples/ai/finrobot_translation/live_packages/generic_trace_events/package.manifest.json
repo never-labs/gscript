@@ -13,6 +13,10 @@
   "real_dependency_import_default": false,
   "fixture_root": "fixtures",
   "schema_root": "schemas",
+  "dialect_symbols": [
+    "generic.ai.trace.events",
+    "ai.trace.emit"
+  ],
   "credentials": {
     "required": [],
     "optional": [],
@@ -203,6 +207,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide hosted telemetry, provider-specific trace exporters, model SDK event streams, or trace storage sinks as built-ins; this package defines provider-free schemas and replay fixtures for future external packages."
+    "statement": "Leia core does not provide built-in generic AI trace emission, hosted telemetry, or trace storage sinks; leia-generic-ai-trace-events defines the provider-free package boundary."
   }
 }

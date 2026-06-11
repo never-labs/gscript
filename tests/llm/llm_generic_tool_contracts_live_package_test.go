@@ -16,7 +16,7 @@ type genericToolContractsManifest struct {
 	SchemaVersion               int      `json:"schema_version"`
 	ID                          string   `json:"id"`
 	PackageName                 string   `json:"package_name"`
-	DialectExports              []string `json:"dialect_exports"`
+	DialectSymbols              []string `json:"dialect_symbols"`
 	ProviderFree                bool     `json:"provider_free"`
 	LiveNetworkDefault          bool     `json:"live_network_default"`
 	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
@@ -51,7 +51,8 @@ type genericToolContractsManifest struct {
 	} `json:"artifact_ref_policy"`
 	TestGates          []string `json:"test_gates"`
 	NoBuiltInGuarantee struct {
-		Required bool `json:"required"`
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
 	} `json:"no_built_in_guarantee"`
 }
 
@@ -62,11 +63,11 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-tool-contracts-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.PackageName != "leia-finrobot-generic-tool-contracts" {
+	if manifest.PackageName != "leia-generic-ai-tool-contracts" {
 		t.Fatalf("package name = %q", manifest.PackageName)
 	}
-	if !reflect.DeepEqual(manifest.DialectExports, []string{"generic.ai.tool.contract", "ai.tool.invoke"}) {
-		t.Fatalf("dialect exports = %#v", manifest.DialectExports)
+	if !reflect.DeepEqual(manifest.DialectSymbols, []string{"generic.ai.tool.contract", "ai.tool.invoke"}) {
+		t.Fatalf("dialect symbols = %#v", manifest.DialectSymbols)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
 		t.Fatalf("provider-free defaults = provider_free:%v live_network:%v imports:%v", manifest.ProviderFree, manifest.LiveNetworkDefault, manifest.RealDependencyImportDefault)
@@ -94,11 +95,13 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
+		assertGenericToolContractsEntrypointPath(t, manifest.Entrypoints[key])
 		assertGenericToolContractsJSONFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
 	if manifest.Entrypoints["smoke"] != "main.leia" {
 		t.Fatalf("smoke entrypoint = %q, want main.leia", manifest.Entrypoints["smoke"])
 	}
+	assertGenericToolContractsEntrypointPath(t, manifest.Entrypoints["smoke"])
 	if _, err := os.Stat(filepath.Join(base, manifest.Entrypoints["smoke"])); err != nil {
 		t.Fatalf("smoke entrypoint missing: %v", err)
 	}
@@ -150,6 +153,9 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 	}
 	if !manifest.NoBuiltInGuarantee.Required {
 		t.Fatal("generic tool contracts package must declare no built-in guarantee")
+	}
+	if !strings.Contains(manifest.NoBuiltInGuarantee.Statement, manifest.PackageName) || !strings.Contains(manifest.NoBuiltInGuarantee.Statement, "provider-free package boundary") {
+		t.Fatalf("no built-in guarantee should name package boundary: %q", manifest.NoBuiltInGuarantee.Statement)
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
 	for _, want := range []string{"declarative tool schema", "arguments", "capability tags", "approval state", "result envelopes", "normalized errors", "artifact refs"} {
@@ -466,6 +472,18 @@ func assertGenericToolContractsJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeGenericToolContractsJSONFile(t, path, &value)
+}
+
+func assertGenericToolContractsEntrypointPath(t *testing.T, path string) {
+	t.Helper()
+	if path == "" || filepath.IsAbs(path) || filepath.Clean(path) != path {
+		t.Fatalf("entrypoint must be a clean relative file path: %q", path)
+	}
+	switch filepath.Ext(path) {
+	case ".json", ".leia":
+	default:
+		t.Fatalf("entrypoint must reference a JSON or Leia file path: %q", path)
+	}
 }
 
 func decodeGenericToolContractsJSONFile(t *testing.T, path string, out any) {

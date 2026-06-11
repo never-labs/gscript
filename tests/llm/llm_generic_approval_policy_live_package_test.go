@@ -14,13 +14,14 @@ import (
 )
 
 type genericApprovalPolicyManifest struct {
-	SchemaVersion               int    `json:"schema_version"`
-	ID                          string `json:"id"`
-	PackageName                 string `json:"package_name"`
-	CompanionPackageName        string `json:"companion_package_name"`
-	ProviderFree                bool   `json:"provider_free"`
-	LiveNetworkDefault          bool   `json:"live_network_default"`
-	RealDependencyImportDefault bool   `json:"real_dependency_import_default"`
+	SchemaVersion               int      `json:"schema_version"`
+	ID                          string   `json:"id"`
+	PackageName                 string   `json:"package_name"`
+	CompanionPackageName        string   `json:"companion_package_name"`
+	DialectSymbols              []string `json:"dialect_symbols"`
+	ProviderFree                bool     `json:"provider_free"`
+	LiveNetworkDefault          bool     `json:"live_network_default"`
+	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
 	Credentials                 struct {
 		Required          []string `json:"required"`
 		Optional          []string `json:"optional"`
@@ -36,12 +37,16 @@ type genericApprovalPolicyManifest struct {
 		CleanSkipWithoutDependency bool   `json:"clean_skip_without_dependency"`
 		FixtureHook                string `json:"fixture_hook"`
 	} `json:"default_policy"`
-	Entrypoints  map[string]string `json:"entrypoints"`
-	Schemas      map[string]string `json:"schemas"`
-	Fixtures     map[string]string `json:"fixtures"`
-	Capabilities []string          `json:"capabilities"`
-	RiskLevels   []string          `json:"risk_levels"`
-	TestGates    []string          `json:"test_gates"`
+	Entrypoints        map[string]string `json:"entrypoints"`
+	Schemas            map[string]string `json:"schemas"`
+	Fixtures           map[string]string `json:"fixtures"`
+	Capabilities       []string          `json:"capabilities"`
+	RiskLevels         []string          `json:"risk_levels"`
+	TestGates          []string          `json:"test_gates"`
+	NoBuiltInGuarantee struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
 }
 
 type genericApprovalPolicyRiskLevel struct {
@@ -58,8 +63,11 @@ func TestGenericApprovalPolicyLivePackageManifest(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-approval-policy-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.PackageName != "generic.ai.approval.policy" || manifest.CompanionPackageName != "generic.ai.capability.gate" {
+	if manifest.PackageName != "leia-generic-ai-approval-policy" || manifest.CompanionPackageName != "leia-generic-ai-capability-gate" {
 		t.Fatalf("package names = %q / %q", manifest.PackageName, manifest.CompanionPackageName)
+	}
+	if !reflect.DeepEqual(manifest.DialectSymbols, []string{"generic.ai.approval.policy", "generic.ai.capability.gate"}) {
+		t.Fatalf("dialect symbols = %#v", manifest.DialectSymbols)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
 		t.Fatalf("provider-free defaults = provider_free:%v live_network:%v imports:%v", manifest.ProviderFree, manifest.LiveNetworkDefault, manifest.RealDependencyImportDefault)
@@ -84,6 +92,7 @@ func TestGenericApprovalPolicyLivePackageManifest(t *testing.T) {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
+		assertGenericApprovalPolicyEntrypointPath(t, manifest.Entrypoints[key])
 		assertGenericApprovalPolicyJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
 	for _, key := range []string{"capability_vocabulary", "capability_gate", "approval_trace_envelope", "policy_outcome", "clean_skip"} {
@@ -110,6 +119,12 @@ func TestGenericApprovalPolicyLivePackageManifest(t *testing.T) {
 		if !strings.HasPrefix(capability, "generic.ai.capability.") && !strings.HasPrefix(capability, "generic.ai.approval.policy.") {
 			t.Fatalf("capability %q is outside generic AI approval vocabulary", capability)
 		}
+	}
+	if !manifest.NoBuiltInGuarantee.Required {
+		t.Fatal("generic approval policy package must declare no built-in guarantee")
+	}
+	if !strings.Contains(manifest.NoBuiltInGuarantee.Statement, manifest.PackageName) || !strings.Contains(manifest.NoBuiltInGuarantee.Statement, "provider-free package boundary") {
+		t.Fatalf("no built-in guarantee should name package boundary: %q", manifest.NoBuiltInGuarantee.Statement)
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
@@ -484,6 +499,18 @@ func assertGenericApprovalPolicyJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeGenericApprovalPolicyJSONFile(t, path, &value)
+}
+
+func assertGenericApprovalPolicyEntrypointPath(t *testing.T, path string) {
+	t.Helper()
+	if path == "" || filepath.IsAbs(path) || filepath.Clean(path) != path {
+		t.Fatalf("entrypoint must be a clean relative file path: %q", path)
+	}
+	switch filepath.Ext(path) {
+	case ".json", ".leia":
+	default:
+		t.Fatalf("entrypoint must reference a JSON or Leia file path: %q", path)
+	}
 }
 
 func decodeGenericApprovalPolicyJSONFile(t *testing.T, path string, value any) {
