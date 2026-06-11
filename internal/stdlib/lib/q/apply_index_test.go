@@ -125,12 +125,11 @@ func TestQDotApplyPlanCachesCallableArgs(t *testing.T) {
 	if got, err := state.Eval("f:{x+y};.[f;(100;23)]"); err != nil || got != int64(123) {
 		t.Fatalf("warm dot apply = %#v, %v; want 123,nil", got, err)
 	}
-	if len(state.dotApplyCache) == 0 {
-		t.Fatal("dot apply plan cache was not populated")
-	}
-	plan := state.dotApplyCache[".[f;(100;23)]"]
-	if !plan.valid || len(plan.argExprs) != 2 {
-		t.Fatalf("dot apply plan = %#v, want valid two-arg plan", plan)
+	// The compiled apply-form plan claims two-part dot applies ahead of the
+	// per-call string walk (which used to populate state.dotApplyCache).
+	plan := qApplyFormPlanCached(".[f;(100;23)]")
+	if plan.kind != qApplyFormDotApply || len(plan.args) != 2 {
+		t.Fatalf("apply-form plan = %#v, want compiled two-arg dot apply", plan)
 	}
 }
 

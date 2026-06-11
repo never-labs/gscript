@@ -115,11 +115,14 @@ func compiledQStatementExprCached(src string) Expr {
 }
 
 // ClearCompiledStatementCache resets the process-wide compiled statement
-// cache (test support).
+// and apply-form plan caches (test support).
 func ClearCompiledStatementCache() {
 	qGlobalCompiledStatementMu.Lock()
 	qGlobalCompiledStatementCache = make(map[string]Expr, 64)
 	qGlobalCompiledStatementMu.Unlock()
+	qGlobalApplyFormPlanMu.Lock()
+	qGlobalApplyFormPlanCache = make(map[string]*qApplyFormPlan, 64)
+	qGlobalApplyFormPlanMu.Unlock()
 }
 
 func compileQStatementExpr(src string) Expr {
@@ -152,6 +155,31 @@ func qCompiledTreeShadowsFusedProbe(expr Expr) bool {
 			return true
 		}
 		return qCompiledTreeShadowsFusedProbe(x.Arg)
+	case SafeCall:
+		// The compile-time matcher proved the argument syntax matches no
+		// fused string-evaluator probe.
+		return qCompiledTreeShadowsFusedProbe(x.Arg)
+	case FusedCountWhere:
+		if qCompiledTreeShadowsFusedProbe(x.Left) {
+			return true
+		}
+		if x.Right != nil && qCompiledTreeShadowsFusedProbe(x.Right) {
+			return true
+		}
+		return x.Mask != nil && qCompiledTreeShadowsFusedProbe(x.Mask)
+	case FusedCountLen:
+		return qCompiledTreeShadowsFusedProbe(x.Base)
+	case FusedSumUnary:
+		if qCompiledTreeShadowsFusedProbe(x.Input) {
+			return true
+		}
+		return x.Base != nil && qCompiledTreeShadowsFusedProbe(x.Base)
+	case FusedSumFind:
+		return qCompiledTreeShadowsFusedProbe(x.Left) || qCompiledTreeShadowsFusedProbe(x.Right)
+	case FusedSumCastChain:
+		return qCompiledTreeShadowsFusedProbe(x.Value)
+	case ApplyAtExpr:
+		return qCompiledTreeShadowsFusedProbe(x.Left) || qCompiledTreeShadowsFusedProbe(x.Right)
 	case Binary:
 		return qCompiledTreeShadowsFusedProbe(x.Left) || qCompiledTreeShadowsFusedProbe(x.Right)
 	case DyadicWordExpr:
@@ -253,15 +281,37 @@ func compileQEvalExpr(src string, depth int) Expr {
 	if strings.ContainsAny(src, "'{}") {
 		return nil
 	}
-	if idx := strings.IndexAny(src, "/\\"); idx >= 0 {
-		if idx != 1 || (!strings.HasPrefix(src, "+/") && !strings.HasPrefix(src, "+\\")) {
-			return nil
-		}
-		if strings.ContainsAny(src[2:], "/\\") {
+	// '/' and '\' only ever compile as part of a "+/" (sum-over) or "+\"
+	// (running-sum) pair; every other occurrence (adverbs, system commands,
+	// paths, comments) stays on the string evaluator. Pair occurrences in
+	// nested positions recurse through the sum branch, which re-applies this
+	// rule to operands.
+	for idx := 0; idx < len(src); idx++ {
+		if (src[idx] == '/' || src[idx] == '\\') && (idx == 0 || src[idx-1] != '+') {
 			return nil
 		}
 	}
 	if qMayBeApplyIndexForm(src) {
+		// Bracket apply/amend forms and dot-apply stay on the per-call apply
+		// plan layer; the plain top-level `a@b` split compiles, mirroring
+		// evalApplyIndex(qApplyIndexAt, ...).
+		if strings.HasPrefix(src, "@[") || strings.HasPrefix(src, ".[") {
+			return nil
+		}
+		if _, _, ok := splitTopLevelDotApply(src); ok {
+			return nil
+		}
+		if leftExpr, rightExpr, ok := splitTopLevelOperator(src, "@"); ok {
+			left := compileQEvalExpr(leftExpr, depth+1)
+			if left == nil {
+				return nil
+			}
+			right := compileQEvalExpr(rightExpr, depth+1)
+			if right == nil {
+				return nil
+			}
+			return ApplyAtExpr{Left: left, Right: right}
+		}
 		return nil
 	}
 	if _, _, ok := splitTopLevelWord(src, "each"); ok {
@@ -354,11 +404,7 @@ func compileQEvalExpr(src string, depth int) Expr {
 		return Call{Func: "distinct", Arg: arg}
 	}
 	if strings.HasPrefix(src, "+/") {
-		arg := compileQEvalExpr(src[2:], depth+1)
-		if arg == nil {
-			return nil
-		}
-		return Call{Func: "sum", Arg: arg}
+		return compileQSumOverReduction(src[2:], depth)
 	}
 	if strings.HasPrefix(src, "+\\") {
 		arg := compileQEvalExpr(src[2:], depth+1)
@@ -368,8 +414,16 @@ func compileQEvalExpr(src string, depth int) Expr {
 		return Call{Func: "sums", Arg: arg}
 	}
 	// Unary prefix words (count/where/string/... plus flip/enlist/til).
+	// count and sum route through the fused-probe matchers, which bind the
+	// string evaluator's fused kernels at compile time.
 	if space := strings.IndexByte(src, ' '); space > 0 {
 		word := src[:space]
+		switch word {
+		case "count":
+			return compileQCountReduction(src[space+1:], depth)
+		case "sum":
+			return compileQSumWordReduction(src[space+1:], depth)
+		}
 		if qCompilePrefixWords[word] {
 			arg := compileQEvalExpr(src[space+1:], depth+1)
 			if arg == nil {

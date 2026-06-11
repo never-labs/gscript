@@ -11,7 +11,7 @@ import (
 func TestCompileQStatementExprCoverage(t *testing.T) {
 	state := NewEvalState(nil)
 	for _, stmt := range []string{
-		"x:til 64", "f:0.25*x", "m:x mod 7", "s:`short$x",
+		"x:til 64", "f:0.25*x", "m:x mod 7", "s:`short$x", "b:m=1",
 		"syms:8#`AAPL`MSFT`NVDA", "d:`a`b!(1 2;3 4)",
 	} {
 		if _, err := state.evalScript(stmt); err != nil {
@@ -45,6 +45,28 @@ func TestCompileQStatementExprCoverage(t *testing.T) {
 		"5h",
 		"1 2 3?2",
 		"4_x",
+		// Fused-probe families: compiled plan nodes bind the string
+		// evaluator's fused kernels at compile time.
+		"count where b",
+		"count where (m>=1) and m<4",
+		"count where m in 1 2 3",
+		"count where x within 16 32",
+		"count where syms like \"A*\"",
+		"count where x in 1 2 3",
+		"count where null x",
+		"count fills x",
+		"count deltas fills x",
+		"count 10 xrank x",
+		"count upper string syms",
+		"+/x mod 17",
+		"+/x*x",
+		"+/fills x",
+		"+/10 xrank x",
+		"+/0 1 2 3?x",
+		"+/`long$`int$x",
+		"+/sqrt x",
+		"sum x*x",
+		"x@3",
 	}
 	for _, src := range compiled {
 		expr := compiledQStatementExprCached(src)
@@ -75,10 +97,11 @@ func TestCompileQStatementExprCoverage(t *testing.T) {
 		"x each y",
 		"sum v fby g",
 		"\\v",
-		"count where m",
-		"count fills x",
-		"+/x mod 17",
-		"count 10 xrank x",
+		"count sums x",
+		"count flip `a`b!(x;m)",
+		"+/x where m=1",
+		"+/reverse x",
+		"+/deltas x",
 		"first asc x",
 		"set y 5",
 	}

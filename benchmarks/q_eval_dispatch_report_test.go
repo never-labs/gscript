@@ -11,6 +11,61 @@ import (
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
+// qEvalWarmStringPathCeiling is the shrink-only pin on the warm string-path
+// dispatch share: the fraction of warm statement evals still walking the
+// per-call string cascade (string_eval and the string-classified probes).
+// R6-C left this at 7.0%; the compiled fused plan nodes and apply-form plans
+// brought it to 1.7% (21/1207: control flow, adverbs, lambdas, compositions,
+// IPC, fby, and table-literal forms). Lower it when new plan families land;
+// never raise it.
+const qEvalWarmStringPathCeiling = 0.02
+
+// TestQEvalWarmDispatchStringPathCeiling measures the warm dispatch
+// distribution over qEvalVectorCases and pins the string-path share under
+// qEvalWarmStringPathCeiling.
+func TestQEvalWarmDispatchStringPathCeiling(t *testing.T) {
+	var totalStatements, stringPath uint64
+	stringSources := map[string]struct{}{}
+	for _, tc := range qEvalVectorCases {
+		eval := qSessionEvalVectorEval(t)
+		src := tc.expr(qEvalVectorRows)
+		// Cold call builds and caches plans; the warm call is measured.
+		qEvalVectorRun(t, eval, src)
+		stdq.ResetEvalDispatchTrace()
+		stdq.SetEvalDispatchTraceEnabled(true)
+		qEvalVectorRun(t, eval, src)
+		stdq.SetEvalDispatchTraceEnabled(false)
+		for _, entry := range stdq.EvalDispatchTraceSnapshot() {
+			for route, count := range entry.Routes {
+				totalStatements += count
+				if !stdq.IsCompiledEvalDispatchRoute(route) {
+					stringPath += count
+					stringSources[string(route)+" "+entry.Src] = struct{}{}
+				}
+			}
+		}
+		stdq.ResetEvalDispatchTrace()
+	}
+	if totalStatements == 0 {
+		t.Fatal("no warm statement evals recorded")
+	}
+	share := float64(stringPath) / float64(totalStatements)
+	t.Logf("warm string-path share: %d/%d (%.2f%%), ceiling %.2f%%",
+		stringPath, totalStatements, 100*share, 100*qEvalWarmStringPathCeiling)
+	if share > qEvalWarmStringPathCeiling {
+		sources := make([]string, 0, len(stringSources))
+		for src := range stringSources {
+			sources = append(sources, src)
+		}
+		sort.Strings(sources)
+		for _, src := range sources {
+			t.Logf("string-path: %s", src)
+		}
+		t.Fatalf("warm string-path share %.2f%% exceeds the %.2f%% ceiling (%d/%d statements)",
+			100*share, 100*qEvalWarmStringPathCeiling, stringPath, totalStatements)
+	}
+}
+
 // TestQEvalWarmDispatchDistribution reports, for every qEvalVectorCases
 // expression evaluated on a warm session, which statement-level route handled
 // each statement: compiled plans (binding/fast/pipeline/value-expr) versus

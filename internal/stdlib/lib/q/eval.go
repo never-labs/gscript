@@ -1992,6 +1992,19 @@ func (s *EvalState) evalCachedOrString(src string, expr Expr, bindingPlan *qScri
 
 func (s *EvalState) evalCachedOrStringUncached(src string, expr Expr, bindingPlan *qScriptBindingPlan, fastPlan *qEvalFastPlan) (any, error) {
 	if fastPlan == nil || fastPlan.applyIndexState != qEvalSyntaxNo {
+		// Scalar apply plans execute the exact code tryEvalScalarApplyIndexFastPath
+		// (the first apply-walk branch) runs, minus the per-call plan-cache
+		// probe; declines fall into the same walk unchanged.
+		if fastPlan != nil && fastPlan.kind == qEvalFastScalarApplyIndex {
+			if out, handled, err := s.evalQFastPlan(fastPlan); err != nil || handled {
+				recordQEvalDispatch(src, EvalDispatchFastPlan)
+				return out, err
+			}
+		}
+		if out, handled, err := s.evalQApplyFormPlan(src); err != nil || handled {
+			recordQEvalDispatch(src, EvalDispatchApplyIndexPlan)
+			return out, err
+		}
 		if out, handled, err := s.evalApplyIndexForm(src); err != nil || handled {
 			recordQEvalDispatch(src, EvalDispatchApplyIndexString)
 			return out, err
@@ -3475,6 +3488,20 @@ func (s *EvalState) evalValueExpr(expr Expr) (any, error) {
 		return evalValueBinary(x.Op, left, right)
 	case Call:
 		return s.evalValueCall(x)
+	case SafeCall:
+		return s.evalValueCall(Call{Func: x.Func, Arg: x.Arg})
+	case FusedCountWhere:
+		return s.evalFusedCountWhere(x)
+	case FusedCountLen:
+		return s.evalFusedCountLen(x)
+	case FusedSumUnary:
+		return s.evalFusedSumUnary(x)
+	case FusedSumFind:
+		return s.evalFusedSumFind(x)
+	case FusedSumCastChain:
+		return s.evalFusedSumCastChain(x)
+	case ApplyAtExpr:
+		return s.evalApplyAtExpr(x)
 	case Flip:
 		frame, err := lowerStaticFrame(x)
 		if err != nil {
