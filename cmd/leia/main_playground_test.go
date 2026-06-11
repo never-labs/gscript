@@ -1169,6 +1169,10 @@ func TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates(t *testing.T) {
 			requires: "local AI playground profile or LLM replay fixture",
 			snippets: []string{"model {", "tool {", "agent {", "responder("},
 		},
+		"repo-ai-general_agent_workflow": {
+			requires: "local AI playground profile or LLM replay fixture",
+			snippets: []string{"model {", "tool {", "agent {", "output: {", "turn {", "replay_ready"},
+		},
 		"repo-ai-record_replay_trace_project": {
 			requires: "local AI playground profile or LLM replay fixture",
 			snippets: []string{"model {", "turn {", "stream: true", "replay_ready"},

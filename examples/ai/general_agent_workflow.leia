@@ -1,0 +1,62 @@
+// general_agent_workflow.leia - Generic replay-backed AI dialect workflow.
+// Demonstrates: model {}, tool {}, declarative agent {}, structured output, review turn.
+
+model {
+    default: "mock-plan"
+}
+
+search_docs := tool {
+    name: "search_docs"
+    fn: func(query) { return "docs:" .. query .. ":found onboarding checklist", nil }
+    params: {"query"}
+    description: "Search local product documentation."
+}
+
+fetch_ticket := tool {
+    name: "fetch_ticket"
+    fn: func(id) { return "ticket:" .. id .. ":owner=platform", nil }
+    params: {"id"}
+    description: "Fetch local ticket metadata."
+}
+
+planner := agent {
+    name: "workflow_planner"
+    model: "mock-plan"
+    instructions: prompt { role: "system", text: "Create a short implementation workflow from local evidence." }
+    tools: {search_docs, fetch_ticket}
+    params: {"request"}
+    output: {
+        summary: "short plan"
+        owner: "team"
+        steps: {"discover", "build", "verify"}
+        replay_ready: true
+    }
+    max_steps: 1
+}
+
+plan, plan_err := planner("Ship passwordless onboarding")
+assert(plan_err == nil)
+assert(plan.value.summary == "Ship passwordless onboarding in three verified steps.")
+assert(plan.value.owner == "platform")
+assert(plan.value.steps[1] == "discover")
+assert(plan.value.steps[3] == "verify")
+assert(plan.value.replay_ready == true)
+
+review, review_err := turn {
+    model: "mock-review"
+    messages: {
+        llm.system("Review the structured plan for replay readiness."),
+        llm.user(plan.text),
+    }
+}
+assert(review_err == nil)
+assert(review.text == "Plan is replay-friendly: deterministic inputs, local evidence, and explicit verification.")
+
+plan_summary := plan.value.summary
+plan_owner := plan.value.owner
+review_text := review.text
+
+print("summary", plan_summary)
+print("owner", plan_owner)
+print("review", review_text)
+print("ok")
