@@ -944,10 +944,16 @@ func dataArrayRuntimeDense(array stddata.Array) (*DenseArray, bool) {
 	}
 	switch array.Kind() {
 	case stddata.KindI64:
+		// Bulk export avoids boxing every element through Array.At; null
+		// carriers are not bulk-exportable and fall through to the boxed
+		// loop, which rejects them.
+		xs := make([]int64, array.Len())
+		if ok, err := stddata.TryExportI64Copy(array, xs); ok && err == nil {
+			return NewDenseArrayI64(xs), true
+		}
 		if dataArrayHasNull(array) {
 			return nil, false
 		}
-		xs := make([]int64, array.Len())
 		for i := range xs {
 			v, ok := array.At(i)
 			if !ok {
@@ -962,10 +968,13 @@ func dataArrayRuntimeDense(array stddata.Array) (*DenseArray, bool) {
 		}
 		return NewDenseArrayI64(xs), true
 	case stddata.KindF64:
+		xs := make([]float64, array.Len())
+		if ok, err := stddata.TryExportF64Copy(array, xs); ok && err == nil {
+			return NewDenseArrayF64(xs), true
+		}
 		if dataArrayHasNull(array) {
 			return nil, false
 		}
-		xs := make([]float64, array.Len())
 		for i := range xs {
 			v, ok := array.At(i)
 			if !ok {
