@@ -1449,11 +1449,18 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 	}
 	switch array.Kind() {
 	case data.KindI64:
+		// Transfer-owned columns surrender their gathered storage outright:
+		// zero copies between the projection gather and the DenseArray.
+		if xs, ok := data.TryExportI64Adopt(array); ok {
+			return DenseArrayValue(NewDenseArrayI64Owned(xs)), nil
+		}
 		// Bulk typed export for dense carriers skips per-row boxing; the
 		// boxed loop below remains the fallback for null-bearing shapes.
+		// The export buffer is freshly built here, so the DenseArray adopts
+		// it instead of re-copying.
 		if xs := make([]int64, array.Len()); len(xs) == array.Len() {
 			if handled, err := data.TryExportI64Copy(array, xs); err == nil && handled {
-				return DenseArrayValue(NewDenseArrayI64(xs)), nil
+				return DenseArrayValue(NewDenseArrayI64Owned(xs)), nil
 			}
 		}
 		if dataArrayHasNull(array) {
@@ -1471,11 +1478,14 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 			}
 			xs[i] = n
 		}
-		return DenseArrayValue(NewDenseArrayI64(xs)), nil
+		return DenseArrayValue(NewDenseArrayI64Owned(xs)), nil
 	case data.KindF64:
+		if xs, ok := data.TryExportF64Adopt(array); ok {
+			return DenseArrayValue(NewDenseArrayF64Owned(xs)), nil
+		}
 		if xs := make([]float64, array.Len()); len(xs) == array.Len() {
 			if handled, err := data.TryExportF64Copy(array, xs); err == nil && handled {
-				return DenseArrayValue(NewDenseArrayF64(xs)), nil
+				return DenseArrayValue(NewDenseArrayF64Owned(xs)), nil
 			}
 		}
 		if dataArrayHasNull(array) {
@@ -1496,11 +1506,14 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 				return NilValue(), fmt.Errorf("f64 array row %d has %T", i, v)
 			}
 		}
-		return DenseArrayValue(NewDenseArrayF64(xs)), nil
+		return DenseArrayValue(NewDenseArrayF64Owned(xs)), nil
 	case data.KindBool:
+		if xs, ok := data.TryExportBoolAdopt(array); ok {
+			return DenseArrayValue(NewDenseArrayBoolOwned(xs)), nil
+		}
 		if xs := make([]bool, array.Len()); len(xs) == array.Len() {
 			if handled, err := data.TryExportBoolCopy(array, xs); err == nil && handled {
-				return DenseArrayValue(NewDenseArrayBool(xs)), nil
+				return DenseArrayValue(NewDenseArrayBoolOwned(xs)), nil
 			}
 		}
 		if dataArrayHasNull(array) {
@@ -2018,7 +2031,10 @@ func qRunSQL(name string, args qSQLArgsResult) (Value, error) {
 		}
 	}
 	plan, kernelKey := qPrepareSQLPlanForFrameWithKernelKey(args.source, tmpl.plan, frame, bindings, true)
-	out, err := qRunSQLPlanWithKernelKey(args.source, plan, frame, kernelKey)
+	// Exec results are exported to a value exactly once and the frame is
+	// dropped, so the projection may transfer column storage to the export.
+	consume := tmpl.op == stdq.ExecQuery
+	out, err := qRunSQLPlanWithKernelKeyMode(args.source, plan, frame, kernelKey, consume)
 	if err != nil {
 		return NilValue(), fmt.Errorf("%s: exec: %w", name, err)
 	}
@@ -2082,6 +2098,13 @@ func qRunSQLPlan(src string, plan data.QueryPlan, frame data.Frame) (data.Frame,
 }
 
 func qRunSQLPlanWithKernelKey(src string, plan data.QueryPlan, frame data.Frame, kernelKey string) (data.Frame, error) {
+	return qRunSQLPlanWithKernelKeyMode(src, plan, frame, kernelKey, false)
+}
+
+// qRunSQLPlanWithKernelKeyMode executes the plan; consume=true promises the
+// result frame is exported to a value exactly once and dropped, letting the
+// projection transfer column storage to the exporter.
+func qRunSQLPlanWithKernelKeyMode(src string, plan data.QueryPlan, frame data.Frame, kernelKey string, consume bool) (data.Frame, error) {
 	kernel, ok, reason, err := qSQLKernelForFrameWithKey(src, plan, frame, kernelKey)
 	if err != nil {
 		qRecordFallbackReason(qFallbackKernelCompileErr, qKernelReasonCompileError, err.Error())
@@ -2099,6 +2122,9 @@ func qRunSQLPlanWithKernelKey(src string, plan data.QueryPlan, frame data.Frame,
 			data.QueryKernelPlanShape(plan),
 		)
 		kernel = nil
+	}
+	if consume {
+		return data.ExecQueryKernelOrPlanConsume(kernel, plan, frame)
 	}
 	return data.ExecQueryKernelOrPlan(kernel, plan, frame)
 }

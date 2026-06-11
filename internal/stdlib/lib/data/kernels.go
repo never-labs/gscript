@@ -14707,31 +14707,22 @@ func compareBoolIndexes(values []bool, target bool, ok bool, op Op, out []int) (
 	if !ok {
 		return nil, false
 	}
-	// Bool predicates have only two cell outcomes; counting matches first
-	// sizes the index vector exactly instead of paying append regrowth on
-	// low-selectivity filters.
+	// Bool predicates have only two cell outcomes. Index vectors come from
+	// the bulk pool sized to the row count, so the old exact-sizing count
+	// pass would only add a second scan.
 	holdsTrue := boolCompare(op, target, compareBool(true, target))
 	holdsFalse := boolCompare(op, !target, compareBool(false, target))
-	trues := 0
-	for _, v := range values {
-		if v {
-			trues++
+	if !holdsTrue && !holdsFalse {
+		// Callers distinguish nil (unhandled / all rows) from empty.
+		if out == nil {
+			return []int{}, true
 		}
+		return out[:0], true
 	}
-	n := 0
-	if holdsTrue {
-		n += trues
-	}
-	if holdsFalse {
-		n += len(values) - trues
-	}
-	if cap(out) < n {
-		out = make([]int, 0, n)
+	if cap(out) < len(values) {
+		out = bulkIntGet(len(values))
 	} else {
 		out = out[:0]
-	}
-	if n == 0 {
-		return out, true
 	}
 	if holdsTrue && holdsFalse {
 		for i := range values {

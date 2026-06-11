@@ -34,7 +34,7 @@ func typedAndCompareFilterIndexes(frame Frame, expr Logical) ([]int, bool) {
 	}
 	var out []int
 	if count := leaves[0].count; count != nil {
-		out = make([]int, 0, count())
+		out = bulkIntGet(count())
 	} else {
 		out = filterIndexScratch(frame.Len())
 	}

@@ -1966,6 +1966,18 @@ func validateQueryKernelExpr(frame Frame, expr Expr) error {
 }
 
 func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
+	return k.exec(frame, false)
+}
+
+// ExecConsume executes for a caller that consumes the result frame exactly
+// once (a value exporter) and then drops it: freshly materialized projection
+// columns are marked ownership-transferable so the exporter adopts their
+// storage instead of re-copying. See transfer_owned.go.
+func (k *QueryKernel) ExecConsume(frame Frame) (Frame, error) {
+	return k.exec(frame, true)
+}
+
+func (k *QueryKernel) exec(frame Frame, transferOwned bool) (Frame, error) {
 	if k == nil {
 		return Frame{}, fmt.Errorf("query kernel is nil")
 	}
@@ -2016,6 +2028,11 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 		if err != nil {
 			return Frame{}, err
 		}
+		// The where-index vector is consumed entirely inside this call:
+		// every grouped/project/order consumer either iterates it read-only
+		// or copies through Gather, so the transient vector can go back to
+		// the bulk pool once the result frame is materialized.
+		defer bulkIntRelease(indexes)
 	}
 	if len(plan.OrderBy) > 0 && plan.PreProjectOrder {
 		if canLimitBeforeProjection(plan) {
@@ -2040,7 +2057,7 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 	if grouped {
 		out, err = execGrouped(frame, indexes, plan)
 	} else {
-		out, err = execProject(frame, indexes, plan.Select)
+		out, err = execProjectTransfer(frame, indexes, plan.Select, transferOwned && !plan.Distinct && len(plan.OrderBy) == 0)
 	}
 	if err != nil {
 		return Frame{}, err
@@ -2070,6 +2087,16 @@ func ExecQueryKernelOrPlan(kernel *QueryKernel, plan QueryPlan, frame Frame) (Fr
 		return kernel.Exec(frame)
 	}
 	return Exec(frame, plan)
+}
+
+// ExecQueryKernelOrPlanConsume is ExecQueryKernelOrPlan for callers that
+// consume the result frame exactly once and then drop it (value exporters);
+// projection outputs may carry transferable storage. See transfer_owned.go.
+func ExecQueryKernelOrPlanConsume(kernel *QueryKernel, plan QueryPlan, frame Frame) (Frame, error) {
+	if kernel != nil {
+		return kernel.ExecConsume(frame)
+	}
+	return ExecConsume(frame, plan)
 }
 
 func validateQueryKernelSchema(frame Frame, want Schema) error {

@@ -88,9 +88,13 @@ var (
 	New                           = runtime.NewCore
 	NewAppendArrayTable           = runtime.NewAppendArrayTable
 	NewDenseArrayBool             = runtime.NewDenseArrayBool
+	NewDenseArrayBoolOwned        = runtime.NewDenseArrayBoolOwned
 	NewDenseArrayF64              = runtime.NewDenseArrayF64
+	NewDenseArrayF64Owned         = runtime.NewDenseArrayF64Owned
 	NewDenseArrayI64              = runtime.NewDenseArrayI64
+	NewDenseArrayI64Owned         = runtime.NewDenseArrayI64Owned
 	NewDenseArrayString           = runtime.NewDenseArrayString
+	NewDenseArrayStringOwned      = runtime.NewDenseArrayStringOwned
 	NewDenseArrayOfLen            = runtime.NewDenseArrayOfLen
 	NewDenseMatrix                = runtime.NewDenseMatrix
 	NewSoA                        = runtime.NewSoA

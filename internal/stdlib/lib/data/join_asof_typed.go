@@ -68,7 +68,9 @@ func asofMatchIndexesTypedFast(left Frame, leftTime Array, leftPartitionCols []S
 	switch len(leftPartitionCols) {
 	case 0:
 		rows := sortedTimeRows(rightTimes, allIndexes(len(rightTimes)))
-		out := make([]int, len(leftTimes))
+		// Match vectors are transient: AsofJoinOnWithOptions gathers through
+		// them and releases them back to the bulk pool.
+		out := bulkIntGetLen(len(leftTimes))
 		asofMatchAllRowsInto(leftTimes, rows, rightTimes, out)
 		return out, true
 	case 1:
@@ -78,7 +80,7 @@ func asofMatchIndexesTypedFast(left Frame, leftTime Array, leftPartitionCols []S
 			return nil, false
 		}
 		if _, leftRows, resolved, ok := partitionAlignedRows(left, leftPartitionCols[0], leftPart, right, rightPartitionCols[0], rightPart, rightTimes); ok {
-			out := make([]int, len(leftTimes))
+			out := bulkIntGetLen(len(leftTimes))
 			for g, lrows := range leftRows {
 				asofMatchRowsInto(lrows, leftTimes, resolved[g], rightTimes, out)
 			}
@@ -379,7 +381,7 @@ func windowSliceRows(rows []int, times []int64, t int64, bounds windowI64Bounds)
 
 func asofMatchPartitionedTyped[T comparable](leftKeys []T, leftTimes []int64, rightKeys []T, rightTimes []int64) []int {
 	rowsByKey := typedPartitionRows(rightKeys, rightTimes)
-	out := make([]int, len(leftKeys))
+	out := bulkIntGetLen(len(leftKeys))
 	for row, key := range leftKeys {
 		out[row] = asofSearchRows(rowsByKey[key], rightTimes, leftTimes[row])
 	}

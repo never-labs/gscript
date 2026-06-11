@@ -5583,8 +5583,12 @@ func DeleteWhere(frame Frame, where Expr) (Frame, error) {
 	}
 	if len(deleteIndexes) == 0 {
 		// Frames are immutable values; an empty match is a no-op.
+		bulkIntRelease(deleteIndexes)
 		return frame, nil
 	}
+	// The matched-row vector is transient: only its complement survives in
+	// the result views, so it goes back to the bulk pool.
+	defer bulkIntRelease(deleteIndexes)
 	if indexes, ok, err := typedKernels.ComplementSortedIndexes(frame.Len(), deleteIndexes); ok || err != nil {
 		if err != nil {
 			return Frame{}, err
@@ -7576,7 +7580,12 @@ func AsofJoinOnWithOptions(left, right Frame, opts AsofJoinOptions) (Frame, erro
 		leftPartitionCols[i] = key.Left
 	}
 	rightIndexes, matched := asofMatchIndexesTypedFast(left, leftTime, leftPartitionCols, right, rightTime, rightPartitionCols)
-	if !matched {
+	if matched {
+		// The typed match vector is pooled and consumed entirely by the
+		// gathers below (every gather copies), so it goes back to the pool
+		// once the output columns are materialized.
+		defer bulkIntRelease(rightIndexes)
+	} else {
 		rightByPartition, err := typedKernels.SortedRowsByPartition(right, rightTime, rightPartitionCols)
 		if err != nil {
 			return Frame{}, err
@@ -9135,6 +9144,18 @@ func (p QueryPlan) Exec() (Frame, error) {
 }
 
 func Exec(frame Frame, plan QueryPlan) (Frame, error) {
+	return execPlan(frame, plan, false)
+}
+
+// ExecConsume executes the plan for a caller that consumes the result frame
+// exactly once (a value exporter) and then drops it: freshly materialized
+// projection columns are marked ownership-transferable so the exporter can
+// adopt their storage instead of re-copying. See transfer_owned.go.
+func ExecConsume(frame Frame, plan QueryPlan) (Frame, error) {
+	return execPlan(frame, plan, true)
+}
+
+func execPlan(frame Frame, plan QueryPlan, transferOwned bool) (Frame, error) {
 	if frame.Len() < 0 {
 		return Frame{}, fmt.Errorf("query frame is empty")
 	}
@@ -9169,6 +9190,9 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	if err != nil {
 		return Frame{}, err
 	}
+	// The where-index vector is consumed entirely inside this call (see the
+	// matching release in QueryKernel.Exec).
+	defer bulkIntRelease(indexes)
 	projectedOrderBy, projectOrderBeforeProjection := projectedSourceOrderSpecs(plan)
 	if len(plan.OrderBy) > 0 && plan.PreProjectOrder {
 		if canLimitBeforeProjection(plan) {
@@ -9193,7 +9217,7 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 	if len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
 		out, err = execGrouped(frame, indexes, plan)
 	} else {
-		out, err = execProject(frame, indexes, plan.Select)
+		out, err = execProjectTransfer(frame, indexes, plan.Select, transferOwned && !plan.Distinct && len(plan.OrderBy) == 0)
 	}
 	if err != nil {
 		return Frame{}, err
@@ -9768,7 +9792,10 @@ func filterIndexScratch(length int) []int {
 	if capacity > length {
 		capacity = length
 	}
-	return make([]int, 0, capacity)
+	// Pool-backed: index vectors are 64KB-class temporaries whose
+	// allocate/zero/collect churn dominates warm filter paths. Callers that
+	// can prove the vector dies (QueryKernel.Exec) release it back.
+	return bulkIntGet(capacity)
 }
 
 func indexedEqualRows(array Array, value any) ([]int, bool) {
@@ -10131,6 +10158,13 @@ func i64IndexArrayCoversAllRows(indexes Array, rows int) bool {
 }
 
 func execProject(frame Frame, indexes []int, items []SelectItem) (Frame, error) {
+	return execProjectTransfer(frame, indexes, items, false)
+}
+
+// execProjectTransfer projects the selected items; transferOwned marks the
+// freshly gathered ColumnRef outputs as ownership-transferable for a caller
+// that consumes the result frame exactly once (see transfer_owned.go).
+func execProjectTransfer(frame Frame, indexes []int, items []SelectItem, transferOwned bool) (Frame, error) {
 	if len(items) == 0 {
 		items = make([]SelectItem, 0, len(frame.schema.names))
 		for _, name := range frame.schema.names {
@@ -10147,7 +10181,13 @@ func execProject(frame Frame, indexes []int, items []SelectItem) (Frame, error) 
 			if !ok {
 				return Frame{}, fmt.Errorf("unknown column %q", ref.Name)
 			}
-			cols = append(cols, Column{Name: item.Name, Data: col.Gather(indexes)})
+			gathered := col.Gather(indexes)
+			if transferOwned {
+				// Gather always materializes fresh storage, so the marked
+				// column is safe to surrender to a single exporter.
+				gathered = markTransferOwned(unwrapAttributedArray(gathered))
+			}
+			cols = append(cols, Column{Name: item.Name, Data: gathered})
 			continue
 		}
 		if projector, ok := item.Expr.(vectorProjector); ok {
@@ -10266,6 +10306,9 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 	// indexes == nil means "all rows": the kernel skips materializing an
 	// identity index vector for unfiltered grouped queries.
 	allRows := indexes == nil || indexesCoverAllRows(indexes, frame.Len())
+	if out, ok, err := execGroupedFusedNumeric(frame, indexes, allRows, byInputs, aggs); ok || err != nil {
+		return out, err
+	}
 	if index, ok, err := groupIndexForSingleColumn(frame, byInputs); err != nil {
 		return Frame{}, err
 	} else if ok {
