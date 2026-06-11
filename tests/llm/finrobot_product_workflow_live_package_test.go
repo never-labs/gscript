@@ -92,6 +92,7 @@ func TestFinRobotProductWorkflowLivePackageManifestSchemaAndGates(t *testing.T) 
 		"product.workflow.equity_cli.run",
 		"product.workflow.web.route",
 		"product.workflow.web.template_snapshot",
+		"product.workflow.web.accessibility_snapshot_gate",
 		"product.workflow.auth.session",
 		"product.workflow.history.read",
 		"product.workflow.task_log.read",
@@ -455,7 +456,7 @@ func TestFinRobotProductWorkflowLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get product_workflow_live_package_summary: %v", err)
 			}
-			want := "product_workflow_live_package routes=12 auth=5 request_states=8 task_events=5 downloads=4 db_migrations=2 db_tables=9 ui_routes=12 accessibility=9 route_sessions=3 crud_commands=3 artifact_items=4 approvals=4 replay_events=8 gates=6 provider_free=true live_network=false imports=false"
+			want := "product_workflow_live_package routes=12 auth=5 request_states=8 task_events=5 downloads=4 db_migrations=2 db_tables=9 ui_routes=12 accessibility=9 a11y_gate_results=3 route_sessions=3 crud_commands=3 artifact_items=4 approvals=4 replay_events=8 gates=6 provider_free=true live_network=false imports=false"
 			if got != want {
 				t.Fatalf("product_workflow_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -520,6 +521,22 @@ func assertProductWorkflowUISnapshotContract(t *testing.T, base string, webRoute
 			Checks              []string `json:"checks"`
 			SnapshotFixturePath string   `json:"snapshot_fixture_path"`
 		} `json:"accessibility_snapshot_requirements"`
+		AccessibilityGate struct {
+			Capability          string `json:"capability"`
+			Mode                string `json:"mode"`
+			ProviderFree        bool   `json:"provider_free"`
+			RequiresBrowser     bool   `json:"requires_browser"`
+			RequiresLiveNetwork bool   `json:"requires_live_network"`
+			RequiresCredentials bool   `json:"requires_credentials"`
+			Coverage            struct {
+				RequiredRouteSource   string `json:"required_route_source"`
+				RequiredRouteCoverage string `json:"required_route_coverage"`
+				FixturePath           string `json:"fixture_path"`
+			} `json:"coverage"`
+			BlockingViolationLevels []string `json:"blocking_violation_levels"`
+			WaiversAllowed          bool     `json:"waivers_allowed"`
+			FailOn                  []string `json:"fail_on"`
+		} `json:"accessibility_snapshot_gate"`
 		Visual struct {
 			Mode                string `json:"mode"`
 			RequiresBrowser     bool   `json:"requires_browser"`
@@ -573,6 +590,7 @@ func assertProductWorkflowUISnapshotContract(t *testing.T, base string, webRoute
 		}
 	}
 	assertAccessibilitySnapshotRequirements(t, ui.Accessibility)
+	assertAccessibilitySnapshotGate(t, ui.AccessibilityGate)
 	assertVisualRegressionMetadata(t, ui.Visual)
 	assertStaticAssetManifest(t, filepath.Join(base, ui.StaticAssetManifest), templates)
 }
@@ -602,6 +620,47 @@ func assertAccessibilitySnapshotRequirements(t *testing.T, accessibility struct 
 	}
 	if !strings.Contains(accessibility.SnapshotFixturePath, "provider_free_fixture_index.json#") {
 		t.Fatalf("accessibility fixture path must point at provider-free fixture index: %q", accessibility.SnapshotFixturePath)
+	}
+}
+
+func assertAccessibilitySnapshotGate(t *testing.T, gate struct {
+	Capability          string `json:"capability"`
+	Mode                string `json:"mode"`
+	ProviderFree        bool   `json:"provider_free"`
+	RequiresBrowser     bool   `json:"requires_browser"`
+	RequiresLiveNetwork bool   `json:"requires_live_network"`
+	RequiresCredentials bool   `json:"requires_credentials"`
+	Coverage            struct {
+		RequiredRouteSource   string `json:"required_route_source"`
+		RequiredRouteCoverage string `json:"required_route_coverage"`
+		FixturePath           string `json:"fixture_path"`
+	} `json:"coverage"`
+	BlockingViolationLevels []string `json:"blocking_violation_levels"`
+	WaiversAllowed          bool     `json:"waivers_allowed"`
+	FailOn                  []string `json:"fail_on"`
+}) {
+	t.Helper()
+	if gate.Capability != "product.workflow.web.accessibility_snapshot_gate" || gate.Mode != "static_fixture_gate" || !gate.ProviderFree {
+		t.Fatalf("accessibility snapshot gate header = %#v", gate)
+	}
+	if gate.RequiresBrowser || gate.RequiresLiveNetwork || gate.RequiresCredentials || gate.WaiversAllowed {
+		t.Fatalf("accessibility snapshot gate must be provider-free/browserless with no waivers: %#v", gate)
+	}
+	if gate.Coverage.RequiredRouteSource != "route_to_template_mapping" || gate.Coverage.RequiredRouteCoverage != "all_routes" {
+		t.Fatalf("accessibility gate coverage = %#v", gate.Coverage)
+	}
+	if !strings.Contains(gate.Coverage.FixturePath, "provider_free_fixture_index.json#") {
+		t.Fatalf("accessibility gate fixture path must point at provider-free fixture index: %q", gate.Coverage.FixturePath)
+	}
+	for _, want := range []string{"critical", "serious"} {
+		if !contains(gate.BlockingViolationLevels, want) {
+			t.Fatalf("accessibility gate blocking levels missing %q: %#v", want, gate.BlockingViolationLevels)
+		}
+	}
+	for _, want := range []string{"missing_route_snapshot", "missing_main_landmark", "unlabelled_form_control", "browser_required"} {
+		if !contains(gate.FailOn, want) {
+			t.Fatalf("accessibility gate fail_on missing %q: %#v", want, gate.FailOn)
+		}
 	}
 }
 
@@ -1115,6 +1174,13 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 						Checks          []string `json:"checks"`
 						RequiresBrowser bool     `json:"requires_browser"`
 					} `json:"accessibility"`
+					AccessibilityGateResults []struct {
+						Route              string   `json:"route"`
+						TemplateID         string   `json:"template_id"`
+						Decision           string   `json:"decision"`
+						BlockingViolations []string `json:"blocking_violations"`
+						RequiresBrowser    bool     `json:"requires_browser"`
+					} `json:"accessibility_gate_results"`
 					Visual []struct {
 						Route               string `json:"route"`
 						TemplateID          string `json:"template_id"`
@@ -1239,6 +1305,14 @@ func assertProductWorkflowFixtureContracts(t *testing.T, path string) {
 	for _, snapshot := range fixtures.Fixtures.WebProduct.UISnapshots.Accessibility {
 		if snapshot.Route == "" || snapshot.TemplateID == "" || len(snapshot.Checks) == 0 || snapshot.RequiresBrowser {
 			t.Fatalf("accessibility snapshot fixture incomplete or browser-bound: %#v", snapshot)
+		}
+	}
+	if len(fixtures.Fixtures.WebProduct.UISnapshots.AccessibilityGateResults) < 3 {
+		t.Fatalf("accessibility gate result fixtures too shallow: %#v", fixtures.Fixtures.WebProduct.UISnapshots.AccessibilityGateResults)
+	}
+	for _, result := range fixtures.Fixtures.WebProduct.UISnapshots.AccessibilityGateResults {
+		if result.Route == "" || result.TemplateID == "" || result.Decision != "pass" || len(result.BlockingViolations) != 0 || result.RequiresBrowser {
+			t.Fatalf("accessibility gate result fixture must be a browserless pass with no blocking violations: %#v", result)
 		}
 	}
 	for _, snapshot := range fixtures.Fixtures.WebProduct.UISnapshots.Visual {
