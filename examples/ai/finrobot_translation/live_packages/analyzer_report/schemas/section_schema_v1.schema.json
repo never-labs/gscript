@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "section_schema_v1",
+  "type": "object",
+  "required": ["section_id", "title", "summary", "source_refs", "citations", "evidence_validation"],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "section_id": {"enum": ["risk", "thesis", "valuation", "news"]},
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "source_refs": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+    "citations": {"type": "array", "minItems": 2, "items": {"type": "string", "pattern": "^\\[source:[A-Za-z0-9_:-]+\\]$"}},
+    "evidence_validation": {"$ref": "source_evidence_rule_v1.schema.json"}
+  }
+}

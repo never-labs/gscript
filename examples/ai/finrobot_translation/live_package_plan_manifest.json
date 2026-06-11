@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 33,
-  "translation_directory_file_count": 153,
+  "registered_examples_count": 34,
+  "translation_directory_file_count": 173,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -18,6 +18,27 @@
         "report_renderer"
       ],
       "status": "checked_in_registered_example"
+    },
+    {
+      "id": "analyzer_report",
+      "directory": "examples/ai/finrobot_translation/live_packages/analyzer_report",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/analyzer_report/main.leia",
+      "covers_package_ids": [
+        "analyzer_report"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "coding_notebook",
+      "directory": "examples/ai/finrobot_translation/live_packages/coding_notebook",
+      "registered_example": null,
+      "covered_by_examples": [
+        "examples/ai/finrobot_translation/generated_code_tooling.leia"
+      ],
+      "covers_package_ids": [
+        "coding_notebook"
+      ],
+      "status": "checked_in_contracts_schemas_fixtures"
     },
     {
       "id": "factor_research",
@@ -318,6 +339,35 @@
       "no_built_in_guarantee": true
     },
     {
+      "id": "analyzer_report",
+      "package_name": "leia-finrobot-analyzer-report",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analyzer_report",
+      "planned_directory": "packages/finrobot/analyzer_report",
+      "manifest": "packages/finrobot/analyzer_report/package.manifest.json",
+      "contract": "packages/finrobot/analyzer_report/contracts/analyzer_report_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/section_agents.leia",
+      "capabilities": [
+        "finance.analyzer.report.orchestrate",
+        "finance.analyzer.section.schema",
+        "finance.analyzer.prompt.catalog",
+        "finance.analyzer.evidence.enforce",
+        "finance.analyzer.citation.require",
+        "finance.analyzer.output.risk",
+        "finance.analyzer.output.thesis",
+        "finance.analyzer.output.valuation",
+        "finance.analyzer.output.news",
+        "finance.analyzer.expected_sections.replay"
+      ],
+      "test_gates": [
+        "analyzer report manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required data provider or model credentials",
+        "section schema fixtures validate risk, thesis, valuation, and news output envelopes with citations",
+        "source evidence tests reject unresolved refs and require replayable expected sections before live analyzer packages are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
       "id": "factor_research",
       "package_name": "leia-finrobot-factor-research",
       "status": "skeleton_contract_checked_in",
@@ -400,6 +450,35 @@
         "contract tests run with live_network=false and assert provider fallback order remains fixture-only",
         "fixture tests validate market data and fundamental typed table schemas with provenance",
         "error envelope, cache, retry, and rate-limit metadata stay provider-free until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "coding_notebook",
+      "package_name": "leia-finrobot-coding-notebook",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/coding_notebook",
+      "planned_directory": "packages/finrobot/coding_notebook",
+      "manifest": "packages/finrobot/coding_notebook/package.manifest.json",
+      "contract": "packages/finrobot/coding_notebook/contracts/coding_notebook_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/generated_code_tooling.leia",
+      "capabilities": [
+        "coding.notebook.file.read",
+        "coding.notebook.file.write",
+        "coding.notebook.command.execute",
+        "coding.notebook.command.deny",
+        "coding.notebook.stdout.capture",
+        "coding.notebook.stderr.capture",
+        "coding.notebook.image.display",
+        "coding.notebook.artifact.publish",
+        "coding.notebook.replay.deterministic",
+        "coding.notebook.metadata.capability"
+      ],
+      "test_gates": [
+        "coding notebook manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert sandbox command/file-write approvals deny by default",
+        "fixture tests validate file/image artifact contracts, denied command stdout/stderr capture, and deterministic replay metadata",
+        "capability metadata tests keep notebook kernels, generated code execution, file writes, and image display behind explicit approval gates"
       ],
       "no_built_in_guarantee": true
     }

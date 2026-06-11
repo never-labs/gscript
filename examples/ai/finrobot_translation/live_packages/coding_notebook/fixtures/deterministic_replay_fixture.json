@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-coding-notebook-deterministic-replay-fixture",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "replay_seed": "finrobot-coding-notebook-v1",
+  "commands": [
+    {
+      "replay_key": "command:execute:factor-signal-fixture",
+      "operation": "execute_command",
+      "capability": "coding.notebook.command.execute",
+      "command": "python notebooks/strategy.py --fixture ACME",
+      "cwd": "examples/ai/finrobot_translation",
+      "approval": {
+        "approval_id": "approval-fixture-command-execute",
+        "decision": "allow_fixture",
+        "gate": "fixture_command_only",
+        "reason": "fixture command is replayed, not executed"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "signals: PDD=0.18 BABA=0.11",
+        "stderr": "",
+        "duration_ms": 12
+      },
+      "artifact_refs": ["artifact_strategy_py", "artifact_allocation_png"],
+      "deterministic": true
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "artifact_strategy_ipynb",
+      "replay_key": "file:read:notebooks/strategy.ipynb",
+      "path": "notebooks/strategy.ipynb",
+      "media_type": "application/vnd.jupyter",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 2048,
+      "provenance": {
+        "source_module": "finrobot/functional/coding.py",
+        "operation": "read_file",
+        "fixture": true
+      }
+    },
+    {
+      "artifact_id": "artifact_strategy_py",
+      "replay_key": "file:write:artifacts/strategy.py",
+      "path": "artifacts/strategy.py",
+      "media_type": "text/x-python",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "bytes": 512,
+      "provenance": {
+        "source_module": "finrobot/functional/coding.py",
+        "operation": "write_file",
+        "fixture": true
+      }
+    },
+    {
+      "artifact_id": "artifact_allocation_png",
+      "replay_key": "display:image:allocation-chart",
+      "path": "artifacts/allocation.png",
+      "media_type": "image/png",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "bytes": 4096,
+      "provenance": {
+        "source_module": "finrobot/functional/coding.py",
+        "operation": "display_image",
+        "fixture": true
+      }
+    }
+  ],
+  "displays": [
+    {
+      "display_id": "display_allocation_chart",
+      "replay_key": "display:image:allocation-chart",
+      "capability": "coding.notebook.image.display",
+      "artifact_id": "artifact_allocation_png",
+      "path": "artifacts/allocation.png",
+      "media_type": "image/png",
+      "width": 960,
+      "height": 540,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "notebook_cell_id": "cell-allocation-chart",
+      "live_notebook": false
+    }
+  ],
+  "replay_assertions": {
+    "stdout": "signals: PDD=0.18 BABA=0.11",
+    "stderr": "",
+    "exit_code": 0,
+    "artifact_count": 3,
+    "display_count": 1,
+    "live_notebook": false
+  }
+}

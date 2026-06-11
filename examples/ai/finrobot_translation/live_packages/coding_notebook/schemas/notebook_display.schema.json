@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/finrobot/coding_notebook/notebook_display.schema.json",
+  "title": "FinRobot coding notebook display image event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["display_id", "replay_key", "capability", "artifact_id", "path", "media_type", "width", "height", "sha256", "live_notebook"],
+  "properties": {
+    "display_id": {"type": "string"},
+    "replay_key": {"type": "string"},
+    "capability": {"const": "coding.notebook.image.display"},
+    "artifact_id": {"type": "string"},
+    "path": {"type": "string"},
+    "media_type": {"enum": ["image/png", "image/jpeg", "image/svg+xml"]},
+    "width": {"type": "integer", "minimum": 1},
+    "height": {"type": "integer", "minimum": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "notebook_cell_id": {"type": "string"},
+    "live_notebook": {"const": false}
+  }
+}

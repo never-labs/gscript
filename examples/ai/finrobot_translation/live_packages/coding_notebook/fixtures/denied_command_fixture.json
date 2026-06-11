@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-coding-notebook-denied-command-fixture",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "replay_key": "command:deny:notebook-kernel",
+  "operation": "execute_command",
+  "capability": "coding.notebook.command.execute",
+  "command": "python -m ipykernel_launcher -f /tmp/live-kernel.json",
+  "cwd": "examples/ai/finrobot_translation",
+  "approval": {
+    "approval_id": "approval-deny-live-notebook-kernel",
+    "decision": "deny",
+    "gate": "deny_live_notebook_kernel",
+    "reason": "notebook kernel execution is disabled in replay mode"
+  },
+  "result": {
+    "exit_code": 126,
+    "stdout": "",
+    "stderr": "denied: notebook kernel execution is disabled in replay mode",
+    "duration_ms": 0
+  },
+  "artifact_refs": [],
+  "deterministic": true
+}
