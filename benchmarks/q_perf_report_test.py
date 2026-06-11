@@ -29,8 +29,8 @@ BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute-16  100  6000 ns/op  256 B/op
 """
 
 SAMPLE_BRIDGE_HEALTHY = """
-BenchmarkQSessionEvalVectorWarmExecution/BridgeHealthy-16  100  900 ns/op  64 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  3 typed_kernel_attempts/op  3 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  3 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_where_project_reduce
-BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes
+BenchmarkQSessionEvalVectorWarmExecution/BridgeHealthy-16  100  900 ns/op  64 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  3 typed_kernel_attempts/op  3 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  3 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_where_project_reduce  1 runtime_primitive_hits/op  0 runtime_primitive_errors/op
+BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  3 methodjit_vector_runtime_success/op  0 methodjit_vector_runtime_errors/op
 """
 
 SAMPLE_ARRAY_BRIDGE = """
@@ -42,6 +42,23 @@ BenchmarkQEvalPipelineArrayRuntimeBridge/FallbackMixedAny-16   100  9000 ns/op  
 SAMPLE_ARRAY_BRIDGE_HEALTHY = """
 BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range-16       100  1200 ns/op  65648 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
 BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  131184 B/op  2 allocs/op  1 q_array_bridge_bulk_hits/op  0 q_array_bridge_fallbacks/op  0 q_array_bridge_errors/op  8192 q_array_bridge_rows/op
+"""
+
+SAMPLE_BACKEND_ROUTE = """
+BenchmarkRuntimePrimitiveRegistry/DenseArrayGather-16  100  800 ns/op  64 B/op  2 allocs/op  1 runtime_primitive_hits/op  0 runtime_primitive_errors/op
+BenchmarkQFrameVectorMethodJITRoute/FrameVector-16    100  900 ns/op  96 B/op  3 allocs/op  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  3 methodjit_vector_runtime_success/op  1 methodjit_vector_runtime_errors/op
+"""
+
+SAMPLE_QEVAL_FAMILY_COVERAGE = """
+BenchmarkQSessionEvalVectorWarmExecution/ListAdverbScan-16       100  2100 ns/op  128 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_ordinary_list_adverb
+BenchmarkQEvalVectorGoBaseline/ListAdverbScan-16                 100  1900 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalJITScriptWarm/ListAdverbScan-16                    100  1800 ns/op  96 B/op  3 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/TypeMatrixShortNull-16  100  2200 ns/op  128 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/TypeMatrixShortNull-16            100  2000 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op  96 B/op  3 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/ComboNestedAdverb-16    100  2300 ns/op  128 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes
+BenchmarkQEvalVectorGoBaseline/ComboNestedAdverb-16              100  2100 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalJITScriptWarm/ComboNestedAdverb-16                 100  1600 ns/op  96 B/op  3 allocs/op
 """
 
 SAMPLE_JIT_SCRIPT = """
@@ -72,6 +89,10 @@ MILESTONE_CAPS = {
     "max_allocs_op": 128.0,
     "min_runtime_jit_backend_benchmarks": 0,
     "min_runtime_array_bridge_benchmarks": 0,
+    "min_runtime_backend_route_benchmarks": 0,
+    "min_runtime_backend_route_hits_op": 0,
+    "max_runtime_backend_route_errors_op": 0,
+    "min_q_eval_family_cases": 0,
 }
 
 
@@ -179,6 +200,20 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(bridge.q_array_bridge_fallbacks_op, 0)
         self.assertEqual(bridge.q_array_bridge_errors_op, 0)
         self.assertEqual(bridge.q_array_bridge_rows_op, 8192)
+
+    def test_runtime_backend_route_summary_exposes_registry_and_frame_vector_routes(self):
+        rows = report.parse_go_benchmarks(SAMPLE_BACKEND_ROUTE)
+        summary = report.build_runtime_backend_route_summary(rows)
+
+        self.assertEqual(len(summary), 1)
+        routes = summary[0]
+        self.assertEqual(routes.scope, "runtime_primitive_registry_and_frame_vector_routes")
+        self.assertEqual(routes.benchmark_count, 2)
+        self.assertEqual(routes.registry_benchmark_count, 1)
+        self.assertEqual(routes.methodjit_frame_vector_benchmark_count, 1)
+        self.assertEqual(routes.hits_op, 6)
+        self.assertEqual(routes.errors_op, 1)
+        self.assertAlmostEqual(routes.hit_pct, 100 * 6 / 7)
 
     def test_jit_route_summary_aggregates_route_metrics(self):
         rows = report.parse_go_benchmarks(SAMPLE)
@@ -365,6 +400,31 @@ class QPerfReportTest(unittest.TestCase):
         self.assertNotIn(("runtime_contract_jit_backend_benchmarks", "jit_backend"), failed)
         self.assertIn(("runtime_contract_array_bridge_benchmarks", "methodjit_array_bridge"), failed)
         self.assertIn(("runtime_contract_bridge_benchmark_count", "typed_runtime_and_jit_backend"), failed)
+        self.assertIn(("runtime_backend_route_benchmarks", "runtime_primitive_registry_and_frame_vector_routes"), failed)
+        self.assertIn(("runtime_backend_route_hits_op", "runtime_primitive_registry_and_frame_vector_routes"), failed)
+
+    def test_gate_checks_cover_runtime_backend_route_contract(self):
+        rows = report.parse_go_benchmarks(SAMPLE_BACKEND_ROUTE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            min_runtime_typed_primitive_benchmarks=0,
+            min_runtime_jit_backend_benchmarks=0,
+            min_runtime_array_bridge_benchmarks=0,
+            min_runtime_bridge_benchmark_count=0,
+            min_runtime_backend_route_benchmarks=2,
+            min_runtime_backend_route_hits_op=6,
+            max_runtime_backend_route_errors_op=0,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("runtime_backend_route_errors_op", "runtime_primitive_registry_and_frame_vector_routes"), failed)
+        self.assertNotIn(("runtime_backend_route_benchmarks", "runtime_primitive_registry_and_frame_vector_routes"), failed)
+        self.assertNotIn(("runtime_backend_route_hits_op", "runtime_primitive_registry_and_frame_vector_routes"), failed)
 
     def test_gate_checks_pass_runtime_contract_when_all_backend_layers_are_present(self):
         rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY + SAMPLE_ARRAY_BRIDGE_HEALTHY)
@@ -387,6 +447,7 @@ class QPerfReportTest(unittest.TestCase):
             min_q_array_bridge_rows_op=1,
             max_q_array_bridge_avg_allocs_op=2,
             max_q_array_bridge_max_allocs_op=2,
+            min_q_eval_family_cases=0,
         )
         checks = report.build_gate_checks(rows, policy)
 
@@ -396,6 +457,8 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(by_signal["runtime_contract_jit_backend_benchmarks"].value, 1)
         self.assertEqual(by_signal["runtime_contract_array_bridge_benchmarks"].value, 2)
         self.assertEqual(by_signal["q_array_bridge_rows_op"].value, 16384)
+        self.assertEqual(by_signal["runtime_backend_route_benchmarks"].value, 2)
+        self.assertEqual(by_signal["runtime_backend_route_hits_op"].value, 6)
 
     def test_runtime_bridge_efficiency_sample_passes_strict_gate(self):
         rows = report.parse_go_benchmarks(SAMPLE_BRIDGE_HEALTHY + SAMPLE_ARRAY_BRIDGE_HEALTHY)
@@ -415,6 +478,7 @@ class QPerfReportTest(unittest.TestCase):
             min_runtime_bridge_benchmark_count=4,
             max_q_array_bridge_avg_allocs_op=2,
             max_q_array_bridge_max_allocs_op=2,
+            min_q_eval_family_cases=0,
         )
         checks = report.build_gate_checks(rows, policy)
 
@@ -771,6 +835,7 @@ class QPerfReportTest(unittest.TestCase):
             self.assertEqual(payload["gate_policy"]["max_allocs_op"], 128.0)
             self.assertEqual(payload["gate_policy"]["min_runtime_jit_backend_benchmarks"], 0)
             self.assertEqual(payload["gate_policy"]["min_runtime_array_bridge_benchmarks"], 0)
+            self.assertEqual(payload["gate_policy"]["min_runtime_backend_route_benchmarks"], 0)
             self.assertFalse(any(row["status"] == "fail" for row in payload["gate"]))
 
     def test_explicit_cli_flag_wins_over_milestone_caps(self):
@@ -868,6 +933,56 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(categories["where_project_reduce"].avg_allocs_op, 8)
         self.assertEqual(categories["xbar_within"].total_fallback_shapes, 1)
 
+    def test_qeval_family_coverage_requires_go_and_jit_rows_for_breadth_families(self):
+        rows = report.parse_go_benchmarks(SAMPLE_QEVAL_FAMILY_COVERAGE)
+        coverage = {row.family: row for row in report.build_qeval_family_coverage(rows)}
+
+        self.assertEqual(coverage["ordinary_list_adverb"].session_case_count, 1)
+        self.assertEqual(coverage["ordinary_list_adverb"].matched_go_baseline_count, 1)
+        self.assertEqual(coverage["ordinary_list_adverb"].matched_jit_case_count, 1)
+        self.assertEqual(coverage["type_matrix"].matched_jit_case_count, 1)
+        self.assertEqual(coverage["complex_combo"].matched_go_baseline_count, 1)
+
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            min_runtime_typed_primitive_benchmarks=0,
+            min_runtime_jit_backend_benchmarks=0,
+            min_runtime_array_bridge_benchmarks=0,
+            min_runtime_bridge_benchmark_count=0,
+            min_runtime_backend_route_benchmarks=0,
+            min_runtime_backend_route_hits_op=0,
+            min_q_eval_family_cases=1,
+        )
+        checks = report.qeval_family_coverage_gate_checks(rows, policy)
+
+        self.assertFalse(report.gate_failed(checks))
+
+    def test_qeval_family_coverage_gate_fails_when_perf_output_omits_jit_or_go_baseline(self):
+        rows = report.parse_go_benchmarks("""
+BenchmarkQSessionEvalVectorWarmExecution/ListAdverbScan-16       100  2100 ns/op  128 B/op  4 allocs/op  1 q_pipeline_category_ordinary_list_adverb
+BenchmarkQEvalVectorGoBaseline/ListAdverbScan-16                 100  1900 ns/op  0 B/op  0 allocs/op
+BenchmarkQSessionEvalVectorWarmExecution/TypeMatrixShortNull-16  100  2200 ns/op  128 B/op  4 allocs/op
+BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op  96 B/op  3 allocs/op
+""")
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            min_q_eval_family_cases=1,
+        )
+        checks = report.qeval_family_coverage_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("q_eval_family_jit_cases", "ordinary_list_adverb"), failed)
+        self.assertIn(("q_eval_family_go_baseline_cases", "type_matrix"), failed)
+        self.assertIn(("q_eval_family_session_cases", "complex_combo"), failed)
+
     def test_parse_pipeline_fallback_report_logs_top_rows(self):
         rows = report.parse_q_pipeline_fallback_reports(FALLBACK_REPORT_LOG + FALLBACK_REPORT_LOG)
 
@@ -920,7 +1035,9 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("runtime_bridge_efficiency_summary", payload)
             self.assertEqual(payload["runtime_bridge_efficiency_summary"][0]["scope"], "typed_runtime_and_jit_backend")
             self.assertIn("runtime_array_bridge_summary", payload)
+            self.assertIn("runtime_backend_route_summary", payload)
             self.assertIn("pipeline_category_metrics", payload)
+            self.assertIn("q_eval_family_coverage", payload)
             self.assertIn("pipeline_fallback_top", payload)
             self.assertIn("fallback_shape_summary", payload)
             self.assertIn("gate_policy", payload)
@@ -933,6 +1050,8 @@ class QPerfReportTest(unittest.TestCase):
             self.assertIn("Runtime Health Summary", markdown)
             self.assertIn("Runtime Bridge Efficiency", markdown)
             self.assertIn("Runtime Array Bridge Summary", markdown)
+            self.assertIn("Runtime Primitive Registry Routes", markdown)
+            self.assertIn("Ordinary q Family Coverage", markdown)
             self.assertIn("Pipeline Category Metrics", markdown)
             self.assertIn("Pipeline Fallback Top-N", markdown)
 
@@ -945,6 +1064,10 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn("--max-runtime-allocs-per-direct-call", readme)
         self.assertIn("--min-q-array-bridge-bulk-hit-pct", readme)
         self.assertIn("--max-q-array-bridge-fallbacks-op", readme)
+        self.assertIn("--min-runtime-backend-route-benchmarks", readme)
+        self.assertIn("--max-runtime-backend-route-errors-op", readme)
+        self.assertIn("--min-q-eval-family-cases", readme)
+        self.assertIn("Ordinary q Family Coverage", readme)
         self.assertIn("direct bridge", readme)
 
     def test_main_check_returns_nonzero_for_gate_failures(self):

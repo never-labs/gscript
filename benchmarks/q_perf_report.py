@@ -46,6 +46,10 @@ MILESTONE_CAP_KEYS = (
     "max_allocs_op",
     "min_runtime_jit_backend_benchmarks",
     "min_runtime_array_bridge_benchmarks",
+    "min_runtime_backend_route_benchmarks",
+    "min_runtime_backend_route_hits_op",
+    "max_runtime_backend_route_errors_op",
+    "min_q_eval_family_cases",
 )
 MILESTONE_CAP_HELP = (
     "When this flag is omitted, milestone_caps.%s in the ratio baseline JSON "
@@ -82,11 +86,27 @@ QSQL_BENCH = (
 QEVAL_BENCH = (
     "Benchmark("
     "QEvalVector(ResultCacheWarm|Cold|GoBaseline)|"
-    "QSessionEvalVectorWarmExecution"
+    "QSessionEvalVectorWarmExecution|"
+    "QEvalJITScriptWarm"
     ")"
 )
 
 QJIT_BENCH = "BenchmarkQEvalPipeline(NativeExitCallpath|ArrayRuntimeBridge)"
+
+Q_EVAL_FAMILY_DEFS = (
+    (
+        "ordinary_list_adverb",
+        "session rows carrying q_pipeline_category_ordinary_list_adverb",
+    ),
+    (
+        "type_matrix",
+        "TypeMatrix* benchmark cases across typed/null/promotion matrix rows",
+    ),
+    (
+        "complex_combo",
+        "Combo* benchmark cases covering depth, mixed-type, nested-adverb, dict/table, and apply/index combinations",
+    ),
+)
 
 
 @dataclass
@@ -150,6 +170,16 @@ class RuntimeMetricRow:
     q_array_bridge_fallbacks_op: float | None
     q_array_bridge_errors_op: float | None
     q_array_bridge_rows_op: float | None
+    runtime_primitive_hits_op: float | None
+    runtime_primitive_errors_op: float | None
+    frame_runtime_primitive_hits_op: float | None
+    frame_runtime_primitive_errors_op: float | None
+    vector_runtime_primitive_hits_op: float | None
+    vector_runtime_primitive_errors_op: float | None
+    methodjit_frame_runtime_success_op: float | None
+    methodjit_frame_runtime_errors_op: float | None
+    methodjit_vector_runtime_success_op: float | None
+    methodjit_vector_runtime_errors_op: float | None
 
 
 @dataclass
@@ -222,6 +252,18 @@ class RuntimeArrayBridgeRow:
 
 
 @dataclass
+class RuntimeBackendRouteRow:
+    scope: str
+    benchmark_count: int
+    registry_benchmark_count: int
+    methodjit_frame_vector_benchmark_count: int
+    hits_op: float
+    errors_op: float
+    hit_pct: float | None
+    note: str = ""
+
+
+@dataclass
 class PipelineFallbackTopRow:
     category: str
     pipeline_shape: str
@@ -264,6 +306,10 @@ class GatePolicy:
     min_q_array_bridge_rows_op: float = 1.0
     max_q_array_bridge_avg_allocs_op: float = 64.0
     max_q_array_bridge_max_allocs_op: float = 64.0
+    min_runtime_backend_route_benchmarks: int = 1
+    min_runtime_backend_route_hits_op: float = 1.0
+    max_runtime_backend_route_errors_op: float = 0.0
+    min_q_eval_family_cases: int = 1
 
 
 @dataclass
@@ -292,6 +338,19 @@ class QEvalComputeCoverage:
     missing_cold: list[str]
     orphan_go_baseline: list[str]
     untrusted_go_baselines: list[str]
+
+
+@dataclass
+class QEvalFamilyCoverageRow:
+    family: str
+    session_case_count: int
+    go_baseline_case_count: int
+    jit_case_count: int
+    matched_go_baseline_count: int
+    matched_jit_case_count: int
+    missing_go_baseline: list[str]
+    missing_jit_case: list[str]
+    note: str = ""
 
 
 @dataclass
@@ -541,6 +600,16 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 q_array_bridge_fallbacks_op=metrics.get("q_array_bridge_fallbacks/op"),
                 q_array_bridge_errors_op=metrics.get("q_array_bridge_errors/op"),
                 q_array_bridge_rows_op=metrics.get("q_array_bridge_rows/op"),
+                runtime_primitive_hits_op=metrics.get("runtime_primitive_hits/op"),
+                runtime_primitive_errors_op=metrics.get("runtime_primitive_errors/op"),
+                frame_runtime_primitive_hits_op=metrics.get("frame_runtime_primitive_hits/op"),
+                frame_runtime_primitive_errors_op=metrics.get("frame_runtime_primitive_errors/op"),
+                vector_runtime_primitive_hits_op=metrics.get("vector_runtime_primitive_hits/op"),
+                vector_runtime_primitive_errors_op=metrics.get("vector_runtime_primitive_errors/op"),
+                methodjit_frame_runtime_success_op=metrics.get("methodjit_frame_runtime_success/op"),
+                methodjit_frame_runtime_errors_op=metrics.get("methodjit_frame_runtime_errors/op"),
+                methodjit_vector_runtime_success_op=metrics.get("methodjit_vector_runtime_success/op"),
+                methodjit_vector_runtime_errors_op=metrics.get("methodjit_vector_runtime_errors/op"),
             )
         )
     return out
@@ -831,6 +900,70 @@ def build_runtime_array_bridge_summary(rows: dict[str, BenchRow]) -> list[Runtim
     ]
 
 
+def build_runtime_backend_route_summary(rows: dict[str, BenchRow]) -> list[RuntimeBackendRouteRow]:
+    runtime_rows = build_runtime_metric_rows(rows)
+    route_rows = [
+        row
+        for row in runtime_rows
+        if row.runtime_primitive_hits_op is not None
+        or row.runtime_primitive_errors_op is not None
+        or row.frame_runtime_primitive_hits_op is not None
+        or row.frame_runtime_primitive_errors_op is not None
+        or row.vector_runtime_primitive_hits_op is not None
+        or row.vector_runtime_primitive_errors_op is not None
+        or row.methodjit_frame_runtime_success_op is not None
+        or row.methodjit_frame_runtime_errors_op is not None
+        or row.methodjit_vector_runtime_success_op is not None
+        or row.methodjit_vector_runtime_errors_op is not None
+    ]
+    if not route_rows:
+        return []
+    registry_rows = [
+        row
+        for row in route_rows
+        if row.runtime_primitive_hits_op is not None
+        or row.runtime_primitive_errors_op is not None
+        or row.frame_runtime_primitive_hits_op is not None
+        or row.frame_runtime_primitive_errors_op is not None
+        or row.vector_runtime_primitive_hits_op is not None
+        or row.vector_runtime_primitive_errors_op is not None
+    ]
+    frame_vector_rows = [
+        row
+        for row in route_rows
+        if row.methodjit_frame_runtime_success_op is not None
+        or row.methodjit_frame_runtime_errors_op is not None
+        or row.methodjit_vector_runtime_success_op is not None
+        or row.methodjit_vector_runtime_errors_op is not None
+    ]
+    hits = sum(row.runtime_primitive_hits_op or 0.0 for row in route_rows)
+    hits += sum(row.frame_runtime_primitive_hits_op or 0.0 for row in route_rows)
+    hits += sum(row.vector_runtime_primitive_hits_op or 0.0 for row in route_rows)
+    hits += sum(row.methodjit_frame_runtime_success_op or 0.0 for row in route_rows)
+    hits += sum(row.methodjit_vector_runtime_success_op or 0.0 for row in route_rows)
+    errors = sum(row.runtime_primitive_errors_op or 0.0 for row in route_rows)
+    errors += sum(row.frame_runtime_primitive_errors_op or 0.0 for row in route_rows)
+    errors += sum(row.vector_runtime_primitive_errors_op or 0.0 for row in route_rows)
+    errors += sum(row.methodjit_frame_runtime_errors_op or 0.0 for row in route_rows)
+    errors += sum(row.methodjit_vector_runtime_errors_op or 0.0 for row in route_rows)
+    attempts = hits + errors
+    return [
+        RuntimeBackendRouteRow(
+            scope="runtime_primitive_registry_and_frame_vector_routes",
+            benchmark_count=len(route_rows),
+            registry_benchmark_count=len(registry_rows),
+            methodjit_frame_vector_benchmark_count=len(frame_vector_rows),
+            hits_op=hits,
+            errors_op=errors,
+            hit_pct=(100 * hits / attempts) if attempts > 0 else None,
+            note=(
+                "VM primitive registry plus MethodJIT frame/vector typed-runtime route counters; "
+                "presence is a contract that backend route stats did not silently disappear"
+            ),
+        )
+    ]
+
+
 def average(values: list[float]) -> float | None:
     if not values:
         return None
@@ -895,6 +1028,64 @@ def build_qeval_compute_coverage(rows: dict[str, BenchRow]) -> QEvalComputeCover
         orphan_go_baseline=sorted(go - session),
         untrusted_go_baselines=sorted(untrusted_go),
     )
+
+
+def qeval_family_session_cases(rows: dict[str, BenchRow], family: str) -> set[str]:
+    if family == "ordinary_list_adverb":
+        prefix = "BenchmarkQSessionEvalVectorWarmExecution/"
+        metric = "q_pipeline_category_ordinary_list_adverb"
+        return {
+            name.removeprefix(prefix)
+            for name, row in rows.items()
+            if name.startswith(prefix) and row.metrics.get(metric, 0.0) > 0
+        }
+    if family == "type_matrix":
+        return {
+            case
+            for case in qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
+            if case.startswith("TypeMatrix")
+        }
+    if family == "complex_combo":
+        return {
+            case
+            for case in qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
+            if case.startswith("Combo")
+        }
+    return set()
+
+
+def qeval_family_named_cases(rows: dict[str, BenchRow], prefix: str, family: str) -> set[str]:
+    cases = qeval_cases(rows, prefix)
+    if family == "ordinary_list_adverb":
+        session_cases = qeval_family_session_cases(rows, family)
+        return cases & session_cases
+    if family == "type_matrix":
+        return {case for case in cases if case.startswith("TypeMatrix")}
+    if family == "complex_combo":
+        return {case for case in cases if case.startswith("Combo")}
+    return set()
+
+
+def build_qeval_family_coverage(rows: dict[str, BenchRow]) -> list[QEvalFamilyCoverageRow]:
+    out: list[QEvalFamilyCoverageRow] = []
+    for family, note in Q_EVAL_FAMILY_DEFS:
+        session = qeval_family_session_cases(rows, family)
+        go = qeval_family_named_cases(rows, "BenchmarkQEvalVectorGoBaseline", family)
+        jit = qeval_family_named_cases(rows, "BenchmarkQEvalJITScriptWarm", family)
+        out.append(
+            QEvalFamilyCoverageRow(
+                family=family,
+                session_case_count=len(session),
+                go_baseline_case_count=len(go),
+                jit_case_count=len(jit),
+                matched_go_baseline_count=len(session & go),
+                matched_jit_case_count=len(session & jit),
+                missing_go_baseline=sorted(session - go),
+                missing_jit_case=sorted(session - jit),
+                note=note,
+            )
+        )
+    return out
 
 
 def build_qsql_benchmark_coverage(rows: dict[str, BenchRow]) -> QSQLBenchmarkCoverage:
@@ -1637,6 +1828,68 @@ def runtime_array_bridge_gate_checks(rows: dict[str, BenchRow], policy: GatePoli
     return checks
 
 
+def runtime_backend_route_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    summary = build_runtime_backend_route_summary(rows)
+    if not summary:
+        checks.extend(
+            [
+                GateCheck(
+                    signal="runtime_backend_route_benchmarks",
+                    benchmark="runtime_primitive_registry_and_frame_vector_routes",
+                    value=0.0,
+                    threshold=f">= {policy.min_runtime_backend_route_benchmarks:g}",
+                    status="pass" if policy.min_runtime_backend_route_benchmarks <= 0 else "fail",
+                    note=(
+                        "runtime primitive registry or MethodJIT frame/vector route counters must be present "
+                        "so backend statistics cannot silently disappear"
+                    ),
+                ),
+                GateCheck(
+                    signal="runtime_backend_route_hits_op",
+                    benchmark="runtime_primitive_registry_and_frame_vector_routes",
+                    value=0.0,
+                    threshold=f">= {policy.min_runtime_backend_route_hits_op:g}",
+                    status="pass" if policy.min_runtime_backend_route_hits_op <= 0 else "fail",
+                    note="backend route counters are missing",
+                ),
+            ]
+        )
+        return checks
+    for item in summary:
+        checks.append(
+            GateCheck(
+                signal="runtime_backend_route_benchmarks",
+                benchmark=item.scope,
+                value=float(item.benchmark_count),
+                threshold=f">= {policy.min_runtime_backend_route_benchmarks:g}",
+                status="pass" if item.benchmark_count >= policy.min_runtime_backend_route_benchmarks else "fail",
+                note=item.note,
+            )
+        )
+        checks.append(
+            GateCheck(
+                signal="runtime_backend_route_hits_op",
+                benchmark=item.scope,
+                value=item.hits_op,
+                threshold=f">= {policy.min_runtime_backend_route_hits_op:g}",
+                status="pass" if item.hits_op >= policy.min_runtime_backend_route_hits_op else "fail",
+                note=item.note,
+            )
+        )
+        checks.append(
+            GateCheck(
+                signal="runtime_backend_route_errors_op",
+                benchmark=item.scope,
+                value=item.errors_op,
+                threshold=f"<= {policy.max_runtime_backend_route_errors_op:g}",
+                status="pass" if item.errors_op <= policy.max_runtime_backend_route_errors_op else "fail",
+                note=item.note,
+            )
+        )
+    return checks
+
+
 def runtime_metric_contract_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
     checks: list[GateCheck] = []
     observability = {item.layer: item for item in build_runtime_observability_summary(rows)}
@@ -1686,6 +1939,49 @@ def runtime_metric_contract_gate_checks(rows: dict[str, BenchRow], policy: GateP
     return checks
 
 
+def qeval_family_coverage_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    threshold = policy.min_q_eval_family_cases
+    for item in build_qeval_family_coverage(rows):
+        checks.append(
+            GateCheck(
+                signal="q_eval_family_session_cases",
+                benchmark=item.family,
+                value=float(item.session_case_count),
+                threshold=f">= {threshold:g}",
+                status="pass" if item.session_case_count >= threshold else "fail",
+                note=item.note,
+            )
+        )
+        checks.append(
+            GateCheck(
+                signal="q_eval_family_go_baseline_cases",
+                benchmark=item.family,
+                value=float(item.matched_go_baseline_count),
+                threshold=f">= {threshold:g}",
+                status="pass" if item.matched_go_baseline_count >= threshold else "fail",
+                note=(
+                    "same-case hand-written Go baseline rows are required; "
+                    f"missing={', '.join(item.missing_go_baseline[:5]) or 'none'}"
+                ),
+            )
+        )
+        checks.append(
+            GateCheck(
+                signal="q_eval_family_jit_cases",
+                benchmark=item.family,
+                value=float(item.matched_jit_case_count),
+                threshold=f">= {threshold:g}",
+                status="pass" if item.matched_jit_case_count >= threshold else "fail",
+                note=(
+                    "same-case BenchmarkQEvalJITScriptWarm rows are required; "
+                    f"missing={', '.join(item.missing_jit_case[:5]) or 'none'}"
+                ),
+            )
+        )
+    return checks
+
+
 def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_baseline: dict | None = None) -> list[GateCheck]:
     return (
         ratio_gate_checks(rows, policy, ratio_baseline)
@@ -1695,7 +1991,9 @@ def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_basel
         + runtime_health_gate_checks(rows, policy)
         + runtime_bridge_efficiency_gate_checks(rows, policy)
         + runtime_array_bridge_gate_checks(rows, policy)
+        + runtime_backend_route_gate_checks(rows, policy)
         + runtime_metric_contract_gate_checks(rows, policy)
+        + qeval_family_coverage_gate_checks(rows, policy)
     )
 
 
@@ -1784,6 +2082,7 @@ def markdown_report(
     coverage = build_coverage(rows, current_vs_old)
     qsql_coverage = build_qsql_benchmark_coverage(rows)
     qeval_compute = build_qeval_compute_coverage(rows)
+    qeval_family = build_qeval_family_coverage(rows)
     ratios = build_ratios(rows)
     runtime_metrics = build_runtime_metric_rows(rows)
     fallback_shapes = build_fallback_shape_rows(rows)
@@ -1792,6 +2091,7 @@ def markdown_report(
     health = build_runtime_health_summary(rows)
     bridge_efficiency = build_runtime_bridge_efficiency_summary(rows)
     array_bridge = build_runtime_array_bridge_summary(rows)
+    backend_routes = build_runtime_backend_route_summary(rows)
     category_metrics = build_pipeline_category_metric_rows(rows)
     lines = [
         "# q Performance Completeness Report",
@@ -1900,6 +2200,29 @@ def markdown_report(
             lines.extend(f"- `{item}`" for item in items)
         else:
             lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Ordinary q Family Coverage",
+            "",
+            "| Family | Session cases | Go baselines | JIT cases | matched Go | matched JIT | Note |",
+            "|---|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    for item in qeval_family:
+        lines.append(
+            f"| {item.family} | {item.session_case_count} | "
+            f"{item.go_baseline_case_count} | {item.jit_case_count} | "
+            f"{item.matched_go_baseline_count} | {item.matched_jit_case_count} | "
+            f"{item.note} |"
+        )
+    for item in qeval_family:
+        if item.missing_go_baseline:
+            lines.extend(["", f"### Missing Go baselines for {item.family}", ""])
+            lines.extend(f"- `{case}`" for case in item.missing_go_baseline)
+        if item.missing_jit_case:
+            lines.extend(["", f"### Missing JIT rows for {item.family}", ""])
+            lines.extend(f"- `{case}`" for case in item.missing_jit_case)
     lines.extend(
         [
             "",
@@ -2061,6 +2384,28 @@ def markdown_report(
             )
     else:
         lines.append("| missing | 0 | 0 | 0 | 0 | 0 | missing | 0 | missing | missing | no q array bridge metrics parsed |")
+    lines.extend(
+        [
+            "",
+            "## Runtime Primitive Registry Routes",
+            "",
+            "| Scope | Benchmarks | registry benchmarks | MethodJIT frame/vector benchmarks | hits/op | errors/op | hit pct | Note |",
+            "|---|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    if backend_routes:
+        for item in backend_routes:
+            lines.append(
+                f"| {item.scope} | {item.benchmark_count} | "
+                f"{item.registry_benchmark_count} | "
+                f"{item.methodjit_frame_vector_benchmark_count} | "
+                f"{item.hits_op:.3f} | "
+                f"{item.errors_op:.3f} | "
+                f"{format_metric(item.hit_pct, 1)} | "
+                f"{item.note} |"
+            )
+    else:
+        lines.append("| missing | 0 | 0 | 0 | 0 | 0 | missing | no runtime primitive registry or MethodJIT frame/vector route metrics parsed |")
     lines.extend(
         [
             "",
@@ -2243,6 +2588,26 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--min-q-array-bridge-rows-op", type=float, default=1.0)
     parser.add_argument("--max-q-array-bridge-avg-allocs-op", type=float, default=64.0)
     parser.add_argument("--max-q-array-bridge-max-allocs-op", type=float, default=64.0)
+    parser.add_argument(
+        "--min-runtime-backend-route-benchmarks",
+        type=int,
+        default=1,
+        help=(
+            "Minimum benchmarks emitting runtime primitive registry or MethodJIT frame/vector route counters. "
+            + MILESTONE_CAP_HELP % "min_runtime_backend_route_benchmarks"
+        ),
+    )
+    parser.add_argument("--min-runtime-backend-route-hits-op", type=float, default=1.0)
+    parser.add_argument("--max-runtime-backend-route-errors-op", type=float, default=0.0)
+    parser.add_argument(
+        "--min-q-eval-family-cases",
+        type=int,
+        default=1,
+        help=(
+            "Minimum same-family ordinary q rows required for session, Go baseline, and JIT script coverage. "
+            + MILESTONE_CAP_HELP % "min_q_eval_family_cases"
+        ),
+    )
     parser.add_argument("--fallback-top-n", type=int, default=20)
     args = parser.parse_args(argv)
 
@@ -2332,6 +2697,10 @@ def main(argv: list[str]) -> int:
         min_q_array_bridge_rows_op=args.min_q_array_bridge_rows_op,
         max_q_array_bridge_avg_allocs_op=args.max_q_array_bridge_avg_allocs_op,
         max_q_array_bridge_max_allocs_op=args.max_q_array_bridge_max_allocs_op,
+        min_runtime_backend_route_benchmarks=args.min_runtime_backend_route_benchmarks,
+        min_runtime_backend_route_hits_op=args.min_runtime_backend_route_hits_op,
+        max_runtime_backend_route_errors_op=args.max_runtime_backend_route_errors_op,
+        min_q_eval_family_cases=args.min_q_eval_family_cases,
     )
     gate_checks = build_gate_checks(rows, policy, ratio_baseline) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))
@@ -2348,10 +2717,12 @@ def main(argv: list[str]) -> int:
         "runtime_health_summary": [asdict(row) for row in build_runtime_health_summary(rows)],
         "runtime_bridge_efficiency_summary": [asdict(row) for row in build_runtime_bridge_efficiency_summary(rows)],
         "runtime_array_bridge_summary": [asdict(row) for row in build_runtime_array_bridge_summary(rows)],
+        "runtime_backend_route_summary": [asdict(row) for row in build_runtime_backend_route_summary(rows)],
         "pipeline_category_metrics": [asdict(row) for row in build_pipeline_category_metric_rows(rows)],
         "pipeline_fallback_top": [asdict(row) for row in pipeline_fallback_rows],
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
+        "q_eval_family_coverage": [asdict(row) for row in build_qeval_family_coverage(rows)],
         "ratios": [asdict(row) for row in build_ratios(rows)],
         "fallback_shape_summary": [asdict(row) for row in build_fallback_shape_rows(rows)],
         "gate_policy": asdict(policy),
