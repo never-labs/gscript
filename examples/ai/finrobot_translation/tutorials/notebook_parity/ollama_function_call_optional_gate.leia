@@ -1,0 +1,73 @@
+// Provider-free parity smoke for the FinRobot Ollama function-call notebook.
+//
+// The local Ollama service is represented as an optional disabled gate. The
+// default path is fixture replay and must cleanly skip when the service is not
+// present.
+
+ollama_function_call_notebook := {
+    id: "finrobot-tutorial-notebook-ollama-function-call"
+    source_notebooks: {
+        "tutorials_beginner/ollama function call.ipynb",
+    }
+    provider_free: true
+    live_network: false
+    credentials_required: false
+    model_required: false
+    real_dependency_imports: false
+    fixture_key: "tutorial:notebook:ollama_function_call:ACME:provider_free:2026-06-12"
+    optional_gate: {
+        id: "ollama-local-function-call"
+        capability: "optional.llm.ollama.local_function_call"
+        default_enabled: false
+        live_network_default: false
+        dependency_imported: false
+        requires_service: true
+        clean_skip_without_service: true
+        status_without_service: "skipped"
+    }
+    tool_calls: {
+        {id: "get_stock_price" fixture_response: "ACME close 42.10" deterministic: true},
+        {id: "get_company_profile" fixture_response: "ACME provider-free profile" deterministic: true},
+    }
+}
+
+func ollama_tool_call_ok(call) {
+    if call == nil {
+        return false
+    }
+    return call.id != nil && call.fixture_response != nil && call.deterministic == true
+}
+
+ollama_tool_call_count := 0
+for i := 1; i <= #ollama_function_call_notebook.tool_calls; i++ {
+    call := ollama_function_call_notebook.tool_calls[i]
+    assert(ollama_tool_call_ok(call))
+    ollama_tool_call_count = ollama_tool_call_count + 1
+}
+
+gate := ollama_function_call_notebook.optional_gate
+
+assert(ollama_function_call_notebook.provider_free == true)
+assert(ollama_function_call_notebook.live_network == false)
+assert(ollama_function_call_notebook.credentials_required == false)
+assert(ollama_function_call_notebook.model_required == false)
+assert(ollama_function_call_notebook.real_dependency_imports == false)
+assert(gate.default_enabled == false)
+assert(gate.live_network_default == false)
+assert(gate.dependency_imported == false)
+assert(gate.clean_skip_without_service == true)
+assert(gate.status_without_service == "skipped")
+assert(ollama_tool_call_count == 2)
+
+ollama_function_call_notebook_summary := string.format(
+"ollama_function_call_notebook_parity tool_calls=%d provider_free=%s live_network=%s model_required=%s gate_enabled=%s skip=%s fixture=%s",
+ollama_tool_call_count,
+tostring(ollama_function_call_notebook.provider_free),
+tostring(ollama_function_call_notebook.live_network),
+tostring(ollama_function_call_notebook.model_required),
+tostring(gate.default_enabled),
+gate.status_without_service,
+ollama_function_call_notebook.fixture_key
+)
+
+print(ollama_function_call_notebook_summary)
