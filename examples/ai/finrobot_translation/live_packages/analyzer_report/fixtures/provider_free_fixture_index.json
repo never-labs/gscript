@@ -10,42 +10,49 @@
       "capability": "finance.analyzer.prompt.catalog",
       "path": "contracts/analyzer_report_contract.json",
       "schema": "schemas/prompt_catalog_v1.schema.json",
-      "metadata": {"replay_ready": true, "source_module": "finrobot/functional/prompts/finance_analysis.py"}
+      "metadata": {"replay_ready": true, "source_module": "finrobot/functional/prompts/finance_analysis.py", "analyst_role_prompt_envelope": true}
     },
     {
       "fixture_key": "section_schema:risk:v1",
       "capability": "finance.analyzer.output.risk",
       "path": "fixtures/expected_sections_ACME_fixture.json",
       "schema": "schemas/section_schema_v1.schema.json",
-      "metadata": {"replay_ready": true, "section_id": "risk"}
+      "metadata": {"replay_ready": true, "section_id": "risk", "registered_schema": true, "evidence_matrix_row": true, "normalized_citations": true}
     },
     {
       "fixture_key": "section_schema:thesis:v1",
       "capability": "finance.analyzer.output.thesis",
       "path": "fixtures/expected_sections_ACME_fixture.json",
       "schema": "schemas/section_schema_v1.schema.json",
-      "metadata": {"replay_ready": true, "section_id": "thesis"}
+      "metadata": {"replay_ready": true, "section_id": "thesis", "registered_schema": true, "evidence_matrix_row": true, "normalized_citations": true}
     },
     {
       "fixture_key": "section_schema:valuation:v1",
       "capability": "finance.analyzer.output.valuation",
       "path": "fixtures/expected_sections_ACME_fixture.json",
       "schema": "schemas/section_schema_v1.schema.json",
-      "metadata": {"replay_ready": true, "section_id": "valuation"}
+      "metadata": {"replay_ready": true, "section_id": "valuation", "registered_schema": true, "evidence_matrix_row": true, "normalized_citations": true}
     },
     {
       "fixture_key": "section_schema:news:v1",
       "capability": "finance.analyzer.output.news",
       "path": "fixtures/expected_sections_ACME_fixture.json",
       "schema": "schemas/section_schema_v1.schema.json",
-      "metadata": {"replay_ready": true, "section_id": "news"}
+      "metadata": {"replay_ready": true, "section_id": "news", "registered_schema": true, "evidence_matrix_row": true, "normalized_citations": true, "freshness_warnings": true}
     },
     {
       "fixture_key": "analyzer_report:ACME:offline:v1",
       "capability": "finance.analyzer.expected_sections.replay",
       "path": "fixtures/expected_sections_ACME_fixture.json",
       "schema": "schemas/expected_section_v1.schema.json",
-      "metadata": {"replay_ready": true, "deterministic_order": true, "ticker": "ACME"}
+      "metadata": {"replay_ready": true, "deterministic_order": true, "ticker": "ACME", "source_freshness_policy": true}
+    },
+    {
+      "fixture_key": "analyzer_report:ACME:missing-evidence:offline:v1",
+      "capability": "finance.analyzer.evidence.degrade_clean",
+      "path": "fixtures/expected_sections_ACME_fixture.json",
+      "schema": "schemas/source_evidence_rule_v1.schema.json",
+      "metadata": {"replay_ready": true, "deterministic_order": true, "ticker": "ACME", "validated": false, "clean_degradation": true}
     }
   ]
 }

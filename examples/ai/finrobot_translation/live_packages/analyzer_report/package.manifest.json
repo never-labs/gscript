@@ -47,9 +47,15 @@
   "capabilities": [
     "finance.analyzer.report.orchestrate",
     "finance.analyzer.section.schema",
+    "finance.analyzer.section.schema.registry",
     "finance.analyzer.prompt.catalog",
     "finance.analyzer.evidence.enforce",
+    "finance.analyzer.evidence.matrix",
     "finance.analyzer.citation.require",
+    "finance.analyzer.citation.normalize",
+    "finance.analyzer.source.freshness.warn",
+    "finance.analyzer.prompt.analyst_role.envelope",
+    "finance.analyzer.evidence.degrade_clean",
     "finance.analyzer.output.risk",
     "finance.analyzer.output.thesis",
     "finance.analyzer.output.valuation",
@@ -78,6 +84,18 @@
     {"id": "valuation", "title": "Valuation Analysis", "capability": "finance.analyzer.output.valuation", "schema": "section_schema_v1", "min_source_refs": 2, "envelope": "valuation_output_v1"},
     {"id": "news", "title": "Recent News and Catalysts", "capability": "finance.analyzer.output.news", "schema": "section_schema_v1", "min_source_refs": 2, "envelope": "news_output_v1"}
   ],
+  "section_schema_registry": {
+    "capability": "finance.analyzer.section.schema.registry",
+    "schema": "section_schema_v1",
+    "registry_version": "2026-06-11.offline",
+    "deterministic_order": ["risk", "thesis", "valuation", "news"],
+    "sections": [
+      {"section_id": "risk", "fixture_key": "section_schema:risk:v1", "prompt_id": "risk_prompt", "output_envelope": "risk_output_v1", "required_evidence_kinds": ["filing", "fundamental_metric"]},
+      {"section_id": "thesis", "fixture_key": "section_schema:thesis:v1", "prompt_id": "thesis_prompt", "output_envelope": "thesis_output_v1", "required_evidence_kinds": ["earnings_transcript", "fundamental_metric"]},
+      {"section_id": "valuation", "fixture_key": "section_schema:valuation:v1", "prompt_id": "valuation_prompt", "output_envelope": "valuation_output_v1", "required_evidence_kinds": ["fundamental_metric", "earnings_transcript"]},
+      {"section_id": "news", "fixture_key": "section_schema:news:v1", "prompt_id": "news_prompt", "output_envelope": "news_output_v1", "required_evidence_kinds": ["news_event", "earnings_transcript"]}
+    ]
+  },
   "evidence_rules": {
     "capability": "finance.analyzer.evidence.enforce",
     "schema": "source_evidence_rule_v1",
@@ -88,12 +106,63 @@
     "requires_provider_free": true,
     "live_network": false
   },
+  "evidence_requirement_matrix": {
+    "capability": "finance.analyzer.evidence.matrix",
+    "schema": "source_evidence_rule_v1",
+    "minimum_source_refs_per_section": 2,
+    "rows": [
+      {"section_id": "risk", "required_evidence_kinds": ["filing", "fundamental_metric"], "required_fields": ["risk_factors", "severity", "mitigants"], "allow_missing_evidence": false, "clean_degradation_mode": "omit_claim_and_warn"},
+      {"section_id": "thesis", "required_evidence_kinds": ["earnings_transcript", "fundamental_metric"], "required_fields": ["bull_case", "bear_case", "base_case", "investment_view"], "allow_missing_evidence": false, "clean_degradation_mode": "balanced_view_with_warnings"},
+      {"section_id": "valuation", "required_evidence_kinds": ["fundamental_metric", "earnings_transcript"], "required_fields": ["method", "assumptions", "target_price", "sensitivity"], "allow_missing_evidence": false, "clean_degradation_mode": "suppress_target_until_supported"},
+      {"section_id": "news", "required_evidence_kinds": ["news_event", "earnings_transcript"], "required_fields": ["catalysts", "sentiment", "time_horizon", "impact"], "allow_missing_evidence": false, "clean_degradation_mode": "downgrade_to_no_current_catalyst"}
+    ]
+  },
   "citation_requirements": {
     "capability": "finance.analyzer.citation.require",
     "required_fields": ["source_id", "title", "publisher", "published_at", "retrieved_at", "locator", "evidence_hash"],
     "inline_citation_format": "[source:{source_id}]",
+    "normalized_citation_format": "[source:{normalized_source_id}]",
+    "normalization": {
+      "capability": "finance.analyzer.citation.normalize",
+      "source_id_case": "lower_snake",
+      "strip_query_fragments_from_locator": true,
+      "dedupe_repeated_refs": true,
+      "preserve_first_seen_order": true
+    },
     "all_claims_require_source_refs": true,
     "unresolved_refs_allowed": false
+  },
+  "source_freshness_policy": {
+    "capability": "finance.analyzer.source.freshness.warn",
+    "as_of": "2026-06-11",
+    "stale_after_days_by_kind": {
+      "news_event": 7,
+      "price_series": 2,
+      "fundamental_metric": 45,
+      "analyst_estimate": 30,
+      "earnings_transcript": 120,
+      "filing": 180
+    },
+    "warning_level_for_stale_sources": "section_warning",
+    "block_on_stale_source": false
+  },
+  "analyst_role_prompt_envelope": {
+    "capability": "finance.analyzer.prompt.analyst_role.envelope",
+    "role": "equity_research_analyst",
+    "audience": "investment_committee",
+    "tone": "evidence_first_neutral",
+    "must_include": ["section_id", "source_refs", "citations", "evidence_validation", "source_freshness_warnings"],
+    "must_not_include": ["provider_api_keys", "live_model_output", "uncited_material_claims"],
+    "fallback_instruction": "When required evidence is missing, omit unsupported claims and return evidence_validation.validated=false with warnings instead of inventing content."
+  },
+  "missing_evidence_degradation": {
+    "capability": "finance.analyzer.evidence.degrade_clean",
+    "fixture_key": "analyzer_report:ACME:missing-evidence:offline:v1",
+    "mode": "clean_degradation",
+    "provider_free": true,
+    "live_network": false,
+    "expected_validated": false,
+    "required_warning_codes": ["missing_required_source_ref", "claim_omitted_due_to_missing_evidence"]
   },
   "output_envelopes": [
     {"id": "risk_output_v1", "section_id": "risk", "required_fields": ["risk_factors", "severity", "mitigants", "source_refs", "citations"]},
@@ -114,7 +183,8 @@
     "analyzer.py orchestration is represented by fixture replay instead of core runtime integration",
     "section schemas cover risk, thesis, valuation, and news output envelopes",
     "finance analysis prompt catalog requires source evidence and citation rules",
-    "expected sections are replayable in deterministic order with resolved source refs"
+    "expected sections are replayable in deterministic order with resolved source refs",
+    "section registry, evidence matrix, citation normalization, source freshness warnings, analyst prompt envelope, and missing-evidence degradation stay fixture-backed"
   ],
   "no_built_in_guarantee": {
     "required": true,

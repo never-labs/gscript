@@ -26,6 +26,41 @@ analyzer_report_live_package := {
         requires_fixture_key: true
         requires_provider_free: true
     }
+    section_schema_registry: {
+        capability: "finance.analyzer.section.schema.registry"
+        deterministic_order: {"risk", "thesis", "valuation", "news"}
+        registry_version: "2026-06-11.offline"
+    }
+    evidence_requirement_matrix: {
+        capability: "finance.analyzer.evidence.matrix"
+        rows: {
+            {section_id: "risk" required_evidence_kinds: {"filing", "fundamental_metric"} clean_degradation_mode: "omit_claim_and_warn"},
+            {section_id: "thesis" required_evidence_kinds: {"earnings_transcript", "fundamental_metric"} clean_degradation_mode: "balanced_view_with_warnings"},
+            {section_id: "valuation" required_evidence_kinds: {"fundamental_metric", "earnings_transcript"} clean_degradation_mode: "suppress_target_until_supported"},
+            {section_id: "news" required_evidence_kinds: {"news_event", "earnings_transcript"} clean_degradation_mode: "downgrade_to_no_current_catalyst"},
+        }
+    }
+    citation_normalization: {
+        capability: "finance.analyzer.citation.normalize"
+        source_id_case: "lower_snake"
+        dedupe_repeated_refs: true
+        preserve_first_seen_order: true
+    }
+    source_freshness_policy: {
+        capability: "finance.analyzer.source.freshness.warn"
+        warning_level_for_stale_sources: "section_warning"
+        block_on_stale_source: false
+    }
+    analyst_role_prompt_envelope: {
+        capability: "finance.analyzer.prompt.analyst_role.envelope"
+        role: "equity_research_analyst"
+        fallback_instruction: "omit unsupported claims"
+    }
+    missing_evidence_degradation: {
+        capability: "finance.analyzer.evidence.degrade_clean"
+        fixture_key: "analyzer_report:ACME:missing-evidence:offline:v1"
+        expected_validated: false
+    }
     replay: {
         fixture_key: "analyzer_report:ACME:offline:v1"
         deterministic_order: true
@@ -55,6 +90,12 @@ assert(#analyzer_report_live_package.prompt_catalogs == 2)
 assert(analyzer_report_section_count == 4)
 assert(analyzer_report_live_package.evidence_rules.rejects_unresolved_refs == true)
 assert(analyzer_report_live_package.evidence_rules.requires_source_quote_or_metric == true)
+assert(#analyzer_report_live_package.section_schema_registry.deterministic_order == 4)
+assert(#analyzer_report_live_package.evidence_requirement_matrix.rows == 4)
+assert(analyzer_report_live_package.citation_normalization.dedupe_repeated_refs == true)
+assert(analyzer_report_live_package.source_freshness_policy.block_on_stale_source == false)
+assert(analyzer_report_live_package.analyst_role_prompt_envelope.role == "equity_research_analyst")
+assert(analyzer_report_live_package.missing_evidence_degradation.expected_validated == false)
 assert(analyzer_report_live_package.replay.deterministic_order == true)
 assert(#analyzer_report_live_package.replay.expected_section_ids == 4)
 
