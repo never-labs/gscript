@@ -36,6 +36,7 @@ type genericWorkflowOrchestratorManifest struct {
 		FixtureHook                 string `json:"fixture_hook"`
 	} `json:"default_policy"`
 	Entrypoints        map[string]string                  `json:"entrypoints"`
+	DialectEntrypoints map[string]string                  `json:"dialect_entrypoints"`
 	Schemas            map[string]string                  `json:"schemas"`
 	Fixtures           map[string]string                  `json:"fixtures"`
 	WorkflowGraph      genericWorkflowGraphManifest       `json:"workflow_graph"`
@@ -127,13 +128,13 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 	if !reflect.DeepEqual(manifest.SourceModules, wantSources) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
 	}
-	for _, key := range []string{"smoke", "orchestrate", "workflow_graph_contract", "trace_hooks_contract", "fixture_index"} {
+	for _, key := range []string{"smoke", "workflow_graph_contract", "trace_hooks_contract", "fixture_index"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	if manifest.Entrypoints["orchestrate"] != "ai.workflow.orchestrate" {
-		t.Fatalf("orchestrate entrypoint = %q", manifest.Entrypoints["orchestrate"])
+	if manifest.DialectEntrypoints["orchestrate"] != "ai.workflow.orchestrate" {
+		t.Fatalf("orchestrate dialect entrypoint = %q", manifest.DialectEntrypoints["orchestrate"])
 	}
 	for _, key := range []string{"workflow_graph", "stage_io", "handoff_trace", "retry_cache_policy", "workflow_result", "trace_emission_hooks"} {
 		path := manifest.Schemas[key]

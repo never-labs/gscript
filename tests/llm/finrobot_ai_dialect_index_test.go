@@ -44,6 +44,15 @@ type genericAIDialectIndexItem struct {
 		Status    string `json:"status"`
 		Reason    string `json:"reason"`
 	} `json:"missing_production_package_boundary"`
+	ProductionPackageBoundary *struct {
+		Status            string `json:"status"`
+		PackageID         string `json:"package_id"`
+		Directory         string `json:"directory"`
+		RegisteredExample string `json:"registered_example"`
+		ProviderFree      bool   `json:"provider_free"`
+		DomainSpecific    bool   `json:"domain_specific"`
+		Reason            string `json:"reason"`
+	} `json:"production_package_boundary"`
 }
 
 type genericAIDialectBackendPlan struct {
@@ -134,6 +143,7 @@ func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 				entry.MissingProductionPackageBoundary.Reason == "" {
 				t.Fatalf("%s missing production package boundary is incomplete: %#v", entry.Capability, entry.MissingProductionPackageBoundary)
 			}
+			assertGenericAIDialectProductionBoundary(t, root, entry)
 		})
 	}
 
@@ -198,6 +208,31 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 		if !covered {
 			t.Fatalf("required capability %q is not covered by backend plan", capability)
 		}
+	}
+}
+
+func assertGenericAIDialectProductionBoundary(t *testing.T, root string, entry genericAIDialectIndexItem) {
+	t.Helper()
+	if entry.ProductionPackageBoundary == nil {
+		t.Fatalf("%s has no production package boundary status", entry.Capability)
+	}
+	boundary := *entry.ProductionPackageBoundary
+	switch boundary.Status {
+	case "checked_in":
+		if boundary.PackageID == "" || boundary.Directory == "" || boundary.RegisteredExample == "" {
+			t.Fatalf("%s checked-in production boundary is incomplete: %#v", entry.Capability, boundary)
+		}
+		if !boundary.ProviderFree || boundary.DomainSpecific {
+			t.Fatalf("%s production boundary is not generic/provider-free: %#v", entry.Capability, boundary)
+		}
+		assertGenericAIDialectReference(t, root, filepath.ToSlash(filepath.Join(boundary.Directory, "package.manifest.json")), false)
+		assertGenericAIDialectReference(t, root, boundary.RegisteredExample, true)
+	case "pending":
+		if boundary.PackageID == "" || boundary.Reason == "" {
+			t.Fatalf("%s pending production boundary is incomplete: %#v", entry.Capability, boundary)
+		}
+	default:
+		t.Fatalf("%s has unsupported production boundary status %q", entry.Capability, boundary.Status)
 	}
 }
 

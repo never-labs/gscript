@@ -29,7 +29,6 @@
   },
   "entrypoints": {
     "smoke": "main.leia",
-    "orchestrate": "ai.workflow.orchestrate",
     "workflow_graph_contract": "contracts/workflow_graph_contract.json",
     "trace_hooks_contract": "contracts/trace_emission_hooks_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json"
@@ -187,6 +186,8 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide generic AI workflow orchestration providers, model endpoints, queue brokers, storage backends, or trace exporters as built-ins; future packages must satisfy this provider-free contract first."
+  },
+  "dialect_entrypoints": {
+    "orchestrate": "ai.workflow.orchestrate"
   }
 }
-
