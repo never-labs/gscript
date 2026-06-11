@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-policy-parity-case-schema",
+  "provider_free": true,
+  "domain": "approval_capability_policy",
+  "required": [
+    "id",
+    "dimension",
+    "capability",
+    "action",
+    "expected_status",
+    "requires_approval",
+    "default_enabled",
+    "clean_skip",
+    "fixture"
+  ],
+  "canonical_fields": [
+    "id",
+    "source_concept",
+    "dimension",
+    "capability",
+    "action",
+    "expected_status",
+    "policy_class",
+    "requires_approval",
+    "default_enabled",
+    "clean_skip",
+    "fixture"
+  ],
+  "status_values": [
+    "denied",
+    "approved",
+    "clean_skip"
+  ],
+  "additional_properties": false,
+  "missing_required_policy": "reject_case"
+}

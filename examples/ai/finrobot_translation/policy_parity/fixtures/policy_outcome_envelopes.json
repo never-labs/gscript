@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-policy-outcome-envelopes",
+  "provider_free": true,
+  "outcomes": [
+    {
+      "status": "denied",
+      "ok": false,
+      "decision": "deny",
+      "trace_kind": "approval_replay_trace",
+      "policy_default": "deny_high_risk",
+      "side_effect_executed": false
+    },
+    {
+      "status": "approved",
+      "ok": true,
+      "decision": "approve_after_explicit_opt_in",
+      "trace_kind": "approval_replay_trace",
+      "policy_default": "deny_high_risk",
+      "side_effect_executed": false
+    },
+    {
+      "status": "clean_skip",
+      "ok": true,
+      "decision": "skip_without_live_prerequisites",
+      "trace_kind": "policy_clean_skip_trace",
+      "policy_default": "deny_high_risk",
+      "side_effect_executed": false
+    }
+  ]
+}
