@@ -43,6 +43,21 @@
         "deterministic_hash_seed": "finrobot-html-ui-snapshots|ACME|provider-free|2026-06-11|templates-static-professional",
         "deterministic_snapshot_hash": "fc0779b037111b16133371e271f272d08c2ceb4cae6c61329d49d9dfef2e91f6"
       }
+    },
+    {
+      "fixture_key": "ui_snapshot:evaluation:generic:offline",
+      "capability": "ui.snapshot.route_dom_schema",
+      "path": "fixtures/ui_snapshot_evaluation_fixture.json",
+      "schemas": ["schemas/ui_snapshot_evaluation_v1.schema.json"],
+      "metadata": {
+        "replay_ready": true,
+        "browser_required": false,
+        "network_required": false,
+        "route_dom_snapshot_count": 2,
+        "viewport_count": 3,
+        "visual_diff_budget_count": 3,
+        "redaction_required": true
+      }
     }
   ]
 }

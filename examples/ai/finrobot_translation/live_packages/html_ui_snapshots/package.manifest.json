@@ -35,15 +35,23 @@
     "template_inventory": "schemas/template_inventory_v1.schema.json",
     "static_asset_manifest": "schemas/static_asset_manifest_v1.schema.json",
     "snapshot_metadata": "schemas/snapshot_metadata_v1.schema.json",
-    "accessibility_checklist": "schemas/accessibility_checklist_v1.schema.json"
+    "accessibility_checklist": "schemas/accessibility_checklist_v1.schema.json",
+    "ui_snapshot_evaluation": "schemas/ui_snapshot_evaluation_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "template_inventory": "fixtures/template_inventory_fixture.json",
     "snapshot_contract": "fixtures/html_ui_snapshot_ACME_fixture.json",
-    "static_asset_manifest": "fixtures/static_asset_manifest_fixture.json"
+    "static_asset_manifest": "fixtures/static_asset_manifest_fixture.json",
+    "ui_snapshot_evaluation": "fixtures/ui_snapshot_evaluation_fixture.json"
   },
   "capabilities": [
+    "ui.snapshot.route_dom_schema",
+    "ui.snapshot.viewport_matrix",
+    "ui.snapshot.visual_diff_budget",
+    "ui.snapshot.accessibility_summary",
+    "ui.snapshot.artifact_uri_manifest",
+    "ui.snapshot.redaction_policy",
     "finance.html_ui.template_inventory",
     "finance.html_ui.required_sections",
     "finance.html_ui.table_placeholder_contract",
@@ -91,6 +99,7 @@
     "disclosure and source provenance markup hooks are explicit",
     "accessibility checklist is static and browser-free",
     "static asset manifest forbids remote fonts and network assets",
+    "route DOM snapshots, viewport matrix, visual diff budgets, artifact URI manifests, and redaction policies are declared as provider-free UI dialect data",
     "deterministic snapshot hash derives from a stable fixture seed",
     "no browser, network, provider credential, or renderer dependency required"
   ]

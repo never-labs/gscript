@@ -97,14 +97,14 @@ func TestFinRobotHTMLUISnapshotsManifestAndContract(t *testing.T) {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"template_inventory", "static_asset_manifest", "snapshot_metadata", "accessibility_checklist"} {
+	for _, key := range []string{"template_inventory", "static_asset_manifest", "snapshot_metadata", "accessibility_checklist", "ui_snapshot_evaluation"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertHTMLUIJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "template_inventory", "snapshot_contract", "static_asset_manifest"} {
+	for _, key := range []string{"index", "template_inventory", "snapshot_contract", "static_asset_manifest", "ui_snapshot_evaluation"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -112,6 +112,12 @@ func TestFinRobotHTMLUISnapshotsManifestAndContract(t *testing.T) {
 		assertHTMLUIJSONFile(t, filepath.Join(base, path))
 	}
 	for _, want := range []string{
+		"ui.snapshot.route_dom_schema",
+		"ui.snapshot.viewport_matrix",
+		"ui.snapshot.visual_diff_budget",
+		"ui.snapshot.accessibility_summary",
+		"ui.snapshot.artifact_uri_manifest",
+		"ui.snapshot.redaction_policy",
 		"finance.html_ui.template_inventory",
 		"finance.html_ui.required_sections",
 		"finance.html_ui.table_placeholder_contract",
@@ -139,7 +145,7 @@ func TestFinRobotHTMLUISnapshotsManifestAndContract(t *testing.T) {
 		}
 	}
 	gates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"provider-free", "template inventory", "required sections", "table", "chart", "disclosure", "source provenance", "accessibility", "static asset", "deterministic snapshot hash", "no browser"} {
+	for _, want := range []string{"provider-free", "template inventory", "required sections", "table", "chart", "disclosure", "source provenance", "accessibility", "static asset", "route dom", "viewport", "visual diff", "artifact uri", "redaction", "deterministic snapshot hash", "no browser"} {
 		if !strings.Contains(gates, want) {
 			t.Fatalf("test gates missing %q: %s", want, gates)
 		}
@@ -176,10 +182,21 @@ func TestFinRobotHTMLUISnapshotsManifestAndContract(t *testing.T) {
 			InlineOrLocalOnly bool   `json:"inline_or_local_only"`
 			HashAlgorithm     string `json:"hash_algorithm"`
 		} `json:"static_asset_contract"`
+		UISnapshotEvaluationContract struct {
+			DialectScope                 string   `json:"dialect_scope"`
+			RouteDOMSchemaRequired       bool     `json:"route_dom_schema_required"`
+			ViewportMatrixRequired       bool     `json:"viewport_matrix_required"`
+			VisualDiffBudgetRequired     bool     `json:"visual_diff_budget_required"`
+			AccessibilitySummaryRequired bool     `json:"accessibility_summary_required"`
+			ArtifactURIManifestRequired  bool     `json:"artifact_uri_manifest_required"`
+			RedactionPolicyRequired      bool     `json:"redaction_policy_required"`
+			ExternalArtifactFetch        bool     `json:"external_artifact_fetch"`
+			AllowedArtifactURISchemes    []string `json:"allowed_artifact_uri_schemes"`
+		} `json:"ui_snapshot_evaluation_contract"`
 		AcceptanceGates []string `json:"acceptance_gates"`
 	}
 	decodeHTMLUIJSONFile(t, filepath.Join(base, "contracts", "html_ui_snapshot_contract.json"), &contract)
-	if !contract.ProviderFree || contract.LiveNetwork || contract.RequiresBrowser || contract.RequiresCredentials || len(contract.TypedFixtures) != 3 {
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RequiresBrowser || contract.RequiresCredentials || len(contract.TypedFixtures) != 4 {
 		t.Fatalf("contract header/fixtures = %#v", contract)
 	}
 	if !contains(contract.RequiredSectionContract.Sections, "sources") || !contains(contract.RequiredSectionContract.Sections, "disclosures") || len(contract.RequiredSectionContract.Sections) < 8 {
@@ -196,6 +213,19 @@ func TestFinRobotHTMLUISnapshotsManifestAndContract(t *testing.T) {
 	}
 	if contract.StaticAssetContract.ExternalFetch || contract.StaticAssetContract.RemoteFonts || !contract.StaticAssetContract.InlineOrLocalOnly || contract.StaticAssetContract.HashAlgorithm != "sha256" {
 		t.Fatalf("static asset contract must forbid remote dependencies: %#v", contract.StaticAssetContract)
+	}
+	evalContract := contract.UISnapshotEvaluationContract
+	if evalContract.DialectScope != "generic_ui_snapshot_evaluation" ||
+		!evalContract.RouteDOMSchemaRequired ||
+		!evalContract.ViewportMatrixRequired ||
+		!evalContract.VisualDiffBudgetRequired ||
+		!evalContract.AccessibilitySummaryRequired ||
+		!evalContract.ArtifactURIManifestRequired ||
+		!evalContract.RedactionPolicyRequired ||
+		evalContract.ExternalArtifactFetch ||
+		!contains(evalContract.AllowedArtifactURISchemes, "fixture") ||
+		!contains(evalContract.AllowedArtifactURISchemes, "artifact") {
+		t.Fatalf("ui snapshot evaluation contract incomplete: %#v", evalContract)
 	}
 }
 
@@ -286,6 +316,68 @@ func TestFinRobotHTMLUISnapshotsFixtures(t *testing.T) {
 	if fixture.AccessibilityChecklist.Mode != "static_dom_contract" || fixture.AccessibilityChecklist.RequiresBrowser || len(fixture.AccessibilityChecklist.Checks) < 8 {
 		t.Fatalf("accessibility checklist incomplete: %#v", fixture.AccessibilityChecklist)
 	}
+
+	var evaluation htmlUISnapshotEvaluationFixture
+	decodeHTMLUIJSONFile(t, filepath.Join(base, "fixtures", "ui_snapshot_evaluation_fixture.json"), &evaluation)
+	if !evaluation.ProviderFree || evaluation.LiveNetwork || evaluation.RealDependencyImports || evaluation.RequiresBrowser || evaluation.RequiresCredentials || evaluation.DialectScope != "generic_ui_snapshot_evaluation" {
+		t.Fatalf("ui snapshot evaluation fixture must be generic/provider-free: %#v", evaluation)
+	}
+	if len(evaluation.RouteDOMSnapshots) < 2 || len(evaluation.ViewportMatrix) < 3 || len(evaluation.VisualDiffBudgets) < 3 || len(evaluation.AccessibilitySummaries) < 2 {
+		t.Fatalf("ui snapshot evaluation coverage incomplete: %#v", evaluation)
+	}
+	routeIDs := map[string]bool{}
+	for _, route := range evaluation.RouteDOMSnapshots {
+		routeIDs[route.RouteID] = true
+		if route.Route == "" || route.Method == "" || !strings.HasPrefix(route.FixtureURL, "fixture://") || route.DOMSchema.RootSelector == "" {
+			t.Fatalf("route DOM snapshot incomplete: %#v", route)
+		}
+		if len(route.DOMSchema.RequiredLandmarks) == 0 || len(route.DOMSchema.RequiredRegions) == 0 || !contains(route.DOMSchema.StableAttributes, "data-route") {
+			t.Fatalf("route DOM schema must declare landmarks, regions, and stable attrs: %#v", route.DOMSchema)
+		}
+		if len(route.SnapshotRefs) == 0 || len(route.ArtifactRefs) == 0 {
+			t.Fatalf("route DOM snapshot refs incomplete: %#v", route)
+		}
+	}
+	viewportIDs := map[string]bool{}
+	for _, viewport := range evaluation.ViewportMatrix {
+		viewportIDs[viewport.ID] = true
+		if viewport.Width <= 0 || viewport.Height <= 0 || viewport.DeviceScaleFactor <= 0 {
+			t.Fatalf("viewport dimensions invalid: %#v", viewport)
+		}
+	}
+	for _, budget := range evaluation.VisualDiffBudgets {
+		if !routeIDs[budget.RouteID] || !viewportIDs[budget.ViewportID] {
+			t.Fatalf("visual diff budget has unresolved route/viewport: %#v", budget)
+		}
+		if budget.MaxChangedPixelsRatio <= 0 || budget.MaxChangedPixelsRatio > 0.01 || budget.MaxLayoutShiftPX > 2 || budget.TextOverflowAllowed || budget.MissingRegionAllowed {
+			t.Fatalf("visual diff budget too loose: %#v", budget)
+		}
+	}
+	for _, summary := range evaluation.AccessibilitySummaries {
+		if !routeIDs[summary.RouteID] || summary.Mode != "static_dom_summary" || summary.ViolationsAllowed != 0 || summary.ManualReviewRequired || len(summary.RequiredChecks) == 0 {
+			t.Fatalf("accessibility summary incomplete: %#v", summary)
+		}
+	}
+	if evaluation.ArtifactURIManifest.URIPolicy != "fixture_uri_only" || evaluation.ArtifactURIManifest.ExternalFetch || !contains(evaluation.ArtifactURIManifest.AllowedSchemes, "fixture") || !contains(evaluation.ArtifactURIManifest.AllowedSchemes, "artifact") {
+		t.Fatalf("artifact URI manifest must be fixture/artifact only: %#v", evaluation.ArtifactURIManifest)
+	}
+	artifactIDs := map[string]bool{}
+	for _, artifact := range evaluation.ArtifactURIManifest.Artifacts {
+		artifactIDs[artifact.ID] = true
+		if !(strings.HasPrefix(artifact.URI, "artifact://") || strings.HasPrefix(artifact.URI, "fixture://")) || artifact.MediaType == "" || artifact.HashAlgorithm != "sha256" || artifact.Hash == "" {
+			t.Fatalf("artifact URI manifest entry incomplete: %#v", artifact)
+		}
+	}
+	for _, route := range evaluation.RouteDOMSnapshots {
+		for _, ref := range route.ArtifactRefs {
+			if !artifactIDs[ref] {
+				t.Fatalf("route %s unresolved artifact ref %q", route.RouteID, ref)
+			}
+		}
+	}
+	if evaluation.RedactionPolicy.Mode != "deterministic_static_redaction" || !evaluation.RedactionPolicy.AppliesBeforeHashing || evaluation.RedactionPolicy.SecretEnvPatternsAllowed || len(evaluation.RedactionPolicy.Rules) < 3 || len(evaluation.RedactionPolicy.ForbiddenOutputPatterns) == 0 {
+		t.Fatalf("redaction policy incomplete: %#v", evaluation.RedactionPolicy)
+	}
 }
 
 func TestFinRobotHTMLUISnapshotsFixtureIndexAndNoRuntimeImports(t *testing.T) {
@@ -305,7 +397,7 @@ func TestFinRobotHTMLUISnapshotsFixtureIndexAndNoRuntimeImports(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeHTMLUIJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || index.RequiresBrowser || index.RequiresCredentials || len(index.Fixtures) != 3 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || index.RequiresBrowser || index.RequiresCredentials || len(index.Fixtures) != 4 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	for _, fixture := range index.Fixtures {
@@ -377,7 +469,7 @@ func TestFinRobotHTMLUISnapshotsExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get html_ui_snapshots_live_package_summary: %v", err)
 			}
-			want := "html_ui_snapshots_live_package templates=3 sections=8 tables=2 charts=2 a11y=8 assets=4 provider_free=true browser=false"
+			want := "html_ui_snapshots_live_package templates=3 sections=8 tables=2 charts=2 a11y=8 routes=2 viewports=3 diff_budgets=3 artifacts=3 redactions=3 assets=4 provider_free=true browser=false"
 			if got != want {
 				t.Fatalf("html_ui_snapshots_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -395,7 +487,7 @@ func TestFinRobotHTMLUISnapshotsDeterministicOrdering(t *testing.T) {
 		got = append(got, key)
 	}
 	sort.Strings(got)
-	want := []string{"accessibility_checklist", "snapshot_metadata", "static_asset_manifest", "template_inventory"}
+	want := []string{"accessibility_checklist", "snapshot_metadata", "static_asset_manifest", "template_inventory", "ui_snapshot_evaluation"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("schema keys = %#v, want %#v", got, want)
 	}
@@ -521,4 +613,75 @@ type htmlUISnapshotFixture struct {
 			Status   string `json:"status"`
 		} `json:"checks"`
 	} `json:"accessibility_checklist"`
+}
+
+type htmlUISnapshotEvaluationFixture struct {
+	ProviderFree          bool   `json:"provider_free"`
+	LiveNetwork           bool   `json:"live_network"`
+	RealDependencyImports bool   `json:"real_dependency_imports"`
+	RequiresBrowser       bool   `json:"requires_browser"`
+	RequiresCredentials   bool   `json:"requires_credentials"`
+	DialectScope          string `json:"dialect_scope"`
+	RouteDOMSnapshots     []struct {
+		RouteID    string `json:"route_id"`
+		Route      string `json:"route"`
+		Method     string `json:"method"`
+		FixtureURL string `json:"fixture_url"`
+		DOMSchema  struct {
+			RootSelector       string   `json:"root_selector"`
+			RequiredLandmarks  []string `json:"required_landmarks"`
+			RequiredRegions    []string `json:"required_regions"`
+			ForbiddenSelectors []string `json:"forbidden_selectors"`
+			StableAttributes   []string `json:"stable_attributes"`
+		} `json:"dom_schema"`
+		SnapshotRefs []string `json:"snapshot_refs"`
+		ArtifactRefs []string `json:"artifact_refs"`
+	} `json:"route_dom_snapshots"`
+	ViewportMatrix []struct {
+		ID                string `json:"id"`
+		Width             int    `json:"width"`
+		Height            int    `json:"height"`
+		DeviceScaleFactor int    `json:"device_scale_factor"`
+		ColorScheme       string `json:"color_scheme"`
+		ReducedMotion     bool   `json:"reduced_motion"`
+	} `json:"viewport_matrix"`
+	VisualDiffBudgets []struct {
+		RouteID               string  `json:"route_id"`
+		ViewportID            string  `json:"viewport_id"`
+		MaxChangedPixelsRatio float64 `json:"max_changed_pixels_ratio"`
+		MaxLayoutShiftPX      int     `json:"max_layout_shift_px"`
+		TextOverflowAllowed   bool    `json:"text_overflow_allowed"`
+		MissingRegionAllowed  bool    `json:"missing_region_allowed"`
+	} `json:"visual_diff_budgets"`
+	AccessibilitySummaries []struct {
+		RouteID              string   `json:"route_id"`
+		Mode                 string   `json:"mode"`
+		Standards            []string `json:"standards"`
+		RequiredChecks       []string `json:"required_checks"`
+		ViolationsAllowed    int      `json:"violations_allowed"`
+		ManualReviewRequired bool     `json:"manual_review_required"`
+	} `json:"accessibility_summaries"`
+	ArtifactURIManifest struct {
+		URIPolicy      string   `json:"uri_policy"`
+		ExternalFetch  bool     `json:"external_fetch"`
+		AllowedSchemes []string `json:"allowed_schemes"`
+		Artifacts      []struct {
+			ID            string `json:"id"`
+			URI           string `json:"uri"`
+			MediaType     string `json:"media_type"`
+			HashAlgorithm string `json:"hash_algorithm"`
+			Hash          string `json:"hash"`
+		} `json:"artifacts"`
+	} `json:"artifact_uri_manifest"`
+	RedactionPolicy struct {
+		Mode                     string `json:"mode"`
+		AppliesBeforeHashing     bool   `json:"applies_before_hashing"`
+		SecretEnvPatternsAllowed bool   `json:"secret_env_patterns_allowed"`
+		Rules                    []struct {
+			ID           string `json:"id"`
+			PatternClass string `json:"pattern_class"`
+			Replacement  string `json:"replacement"`
+		} `json:"rules"`
+		ForbiddenOutputPatterns []string `json:"forbidden_output_patterns"`
+	} `json:"redaction_policy"`
 }

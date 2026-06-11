@@ -38,6 +38,12 @@ html_ui_snapshots_live_package := {
         "disclosures_rendered",
         "focus_order_static"
     }
+    route_dom_snapshots: {"report_overview", "task_detail"}
+    viewport_matrix: {"mobile_portrait", "tablet_landscape", "desktop_wide"}
+    visual_diff_budgets: {"report_overview_mobile", "report_overview_desktop", "task_detail_tablet"}
+    accessibility_summaries: {"report_overview", "task_detail"}
+    artifact_uri_manifest: {"artifact_report_overview_dom", "artifact_report_overview_png", "artifact_task_detail_dom"}
+    redaction_policies: {"api_keys", "emails", "session_ids"}
     static_assets: {"asset_app_css", "asset_report_css", "asset_app_js", "asset_status_icons"}
     deterministic_snapshot_hash: "fc0779b037111b16133371e271f272d08c2ceb4cae6c61329d49d9dfef2e91f6"
 }
@@ -57,6 +63,12 @@ func html_ui_snapshot_contract_ok(pkg) {
         #pkg.chart_placeholders == 2 &&
         #pkg.markup_hooks == 3 &&
         #pkg.accessibility_checks == 8 &&
+        #pkg.route_dom_snapshots == 2 &&
+        #pkg.viewport_matrix == 3 &&
+        #pkg.visual_diff_budgets == 3 &&
+        #pkg.accessibility_summaries == 2 &&
+        #pkg.artifact_uri_manifest == 3 &&
+        #pkg.redaction_policies == 3 &&
         #pkg.static_assets == 4
 }
 
@@ -64,12 +76,17 @@ html_ui_snapshot_contract_valid := html_ui_snapshot_contract_ok(html_ui_snapshot
 assert(html_ui_snapshot_contract_valid)
 
 html_ui_snapshots_live_package_summary := string.format(
-"html_ui_snapshots_live_package templates=%d sections=%d tables=%d charts=%d a11y=%d assets=%d provider_free=%s browser=%s",
+"html_ui_snapshots_live_package templates=%d sections=%d tables=%d charts=%d a11y=%d routes=%d viewports=%d diff_budgets=%d artifacts=%d redactions=%d assets=%d provider_free=%s browser=%s",
 #html_ui_snapshots_live_package.template_sources,
 #html_ui_snapshots_live_package.required_sections,
 #html_ui_snapshots_live_package.table_placeholders,
 #html_ui_snapshots_live_package.chart_placeholders,
 #html_ui_snapshots_live_package.accessibility_checks,
+#html_ui_snapshots_live_package.route_dom_snapshots,
+#html_ui_snapshots_live_package.viewport_matrix,
+#html_ui_snapshots_live_package.visual_diff_budgets,
+#html_ui_snapshots_live_package.artifact_uri_manifest,
+#html_ui_snapshots_live_package.redaction_policies,
 #html_ui_snapshots_live_package.static_assets,
 tostring(html_ui_snapshots_live_package.provider_free),
 tostring(html_ui_snapshots_live_package.requires_browser)
