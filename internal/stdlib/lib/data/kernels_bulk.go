@@ -1632,7 +1632,9 @@ func MaterializeArray(array Array) Array {
 		columnArray[string], columnArray[Symbol], columnArray[Month], columnArray[Date],
 		columnArray[DateTime], columnArray[Timespan], columnArray[Minute],
 		columnArray[Second], columnArray[Time], columnArray[Timestamp],
-		nullableArray, encodedArray:
+		nullableArray, encodedArray,
+		nullBitmapArray[int8], nullBitmapArray[int16], nullBitmapArray[int32],
+		nullBitmapArray[int64], nullBitmapArray[float32], nullBitmapArray[float64]:
 		return array
 	case tiledArray:
 		if out, ok := tileExpandTyped(a); ok {
@@ -1681,6 +1683,8 @@ func tileExpandTyped(a tiledArray) (Array, bool) {
 		return columnArray[bool]{kind: sc.kind, data: tileExpandSlice(sc.data, a.start, a.len)}, true
 	case columnArray[float64]:
 		return columnArray[float64]{kind: sc.kind, data: tileExpandSlice(sc.data, a.start, a.len)}, true
+	case nullBitmapCarrier:
+		return sc.tileExpand(a.start, a.len), true
 	default:
 		return nil, false
 	}

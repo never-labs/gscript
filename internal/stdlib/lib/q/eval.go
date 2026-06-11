@@ -2808,13 +2808,16 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalCountFby(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
+		// Length-preserving transform chains (count deltas fills x) resolve to
+		// the base vector's length without materializing any transform, so
+		// they run before the sequence primitives that evaluate the operand.
+		if out, handled, err := s.tryEvalCountLengthPreservingTransform(strings.TrimSpace(src[len("count "):])); err != nil || handled {
+			return out, err
+		}
 		if out, handled, err := s.tryEvalCountSequencePrimitive(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalCountReverse(strings.TrimSpace(src[len("count "):])); err != nil || handled {
-			return out, err
-		}
-		if out, handled, err := s.tryEvalCountLengthPreservingTransform(strings.TrimSpace(src[len("count "):])); err != nil || handled {
 			return out, err
 		}
 		if out, handled, err := s.tryEvalCountRunningScan(strings.TrimSpace(src[len("count "):])); err != nil || handled {
@@ -6799,8 +6802,7 @@ func (s *EvalState) tryEvalCountSublist(src string) (any, bool, error) {
 }
 
 func (s *EvalState) tryEvalCountLengthPreservingTransform(src string) (any, bool, error) {
-	src = stripEnclosingParens(strings.TrimSpace(src))
-	for _, transform := range []struct {
+	transforms := []struct {
 		word    string
 		kernel  string
 		kindOK  func(data.Kind) bool
@@ -6812,18 +6814,42 @@ func (s *EvalState) tryEvalCountLengthPreservingTransform(src string) (any, bool
 		{"fills ", "ArrayCountFills", nil, ""},
 		{"deltas ", "ArrayCountDeltas", qKindIsNumeric, "deltas expects a numeric vector"},
 		{"ratios ", "ArrayCountRatios", qKindIsNumeric, "ratios expects a numeric vector"},
-	} {
-		if !strings.HasPrefix(src, transform.word) || !wordBoundary(src, 0, len(strings.TrimSpace(transform.word))) {
-			continue
+	}
+	// Strip the whole chain of length- and numeric-kind-preserving transforms
+	// (count deltas fills x) before evaluating the base, so the inner
+	// transforms are never materialized just to take a count.
+	src = stripEnclosingParens(strings.TrimSpace(src))
+	var applied []int
+	for {
+		matched := false
+		for t, transform := range transforms {
+			if !strings.HasPrefix(src, transform.word) || !wordBoundary(src, 0, len(strings.TrimSpace(transform.word))) {
+				continue
+			}
+			applied = append(applied, t)
+			src = stripEnclosingParens(strings.TrimSpace(src[len(transform.word):]))
+			matched = true
+			break
 		}
-		value, err := s.eval(strings.TrimSpace(src[len(transform.word):]))
-		if err != nil {
-			return nil, true, err
+		if !matched {
+			break
 		}
-		array, ok := value.(data.Array)
-		if !ok {
-			return nil, false, nil
-		}
+	}
+	if len(applied) == 0 {
+		return nil, false, nil
+	}
+	value, err := s.eval(src)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	// Apply kind checks innermost-first; every transform in the table
+	// preserves numeric-ness, so the base kind stands in for each operand.
+	for i := len(applied) - 1; i >= 0; i-- {
+		transform := transforms[applied[i]]
 		shape := "vector-count/" + strings.TrimSpace(transform.word) + "/" + string(array.Kind())
 		if transform.kindOK != nil && !transform.kindOK(array.Kind()) {
 			err := fmt.Errorf("%s", transform.verbErr)
@@ -6831,9 +6857,8 @@ func (s *EvalState) tryEvalCountLengthPreservingTransform(src string) (any, bool
 			return nil, true, err
 		}
 		recordRuntimeKernelProbe(transform.kernel, shape, true, nil)
-		return int64(array.Len()), true, nil
 	}
-	return nil, false, nil
+	return int64(array.Len()), true, nil
 }
 
 func (s *EvalState) tryEvalSumWhereCompare(src string) (any, bool, error) {

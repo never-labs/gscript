@@ -1945,6 +1945,8 @@ func Slice(array Array, start, count int) (Array, error) {
 		return columnArray[Timestamp]{kind: a.kind, data: a.data[start : start+count]}, nil
 	case nullableArray:
 		return nullableArray{kind: a.kind, data: a.data[start : start+count]}, nil
+	case nullBitmapCarrier:
+		return a.subarray(start, count), nil
 	case encodedArray:
 		return encodedArray{kind: a.kind, domain: a.domain, codes: a.codes[start : start+count]}, nil
 	default:
@@ -2719,6 +2721,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok, err := typedCompareScalarDyadicIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok, err := nullBitmapCompareIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	if out, ok, err := typedCompareTiledIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
@@ -2741,6 +2746,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 func TryTypedCompareIndexStatsI64(array Array, op Op, value any) (count, sum int64, handled bool, err error) {
 	if array == nil {
 		return 0, 0, true, fmt.Errorf("compare array is nil")
+	}
+	if count, sum, handled, err := nullBitmapCompareIndexStatsI64(array, op, value); handled || err != nil {
+		return count, sum, handled, err
 	}
 	switch a := array.(type) {
 	case attributedArray:
@@ -2834,6 +2842,9 @@ func TryTypedWithinIndexesI64(array Array, low, high any, highClosed bool) (Arra
 	}
 	low = normalizeScalar(array.Kind(), low)
 	high = normalizeScalar(array.Kind(), high)
+	if out, handled, err := nullBitmapWithinIndexesI64(array, low, high, highClosed); handled || err != nil {
+		return out, handled, err
+	}
 	switch a := array.(type) {
 	case attributedArray:
 		return TryTypedWithinIndexesI64(a.array, low, high, highClosed)
@@ -7697,6 +7708,9 @@ func vectorRatios(values Array) (Array, error) {
 }
 
 func vectorFills(values Array) Array {
+	if out, ok := typedNullBitmapFills(values); ok {
+		return out
+	}
 	if out, ok := typedForwardFillArray(values); ok {
 		return out
 	}
@@ -12256,6 +12270,9 @@ func newNullableArray(kind Kind, values []any) Array {
 }
 
 func nullableArrayWithKind(kind Kind, values []any) (Array, error) {
+	if nullBitmapKindSupported(kind) {
+		return nullBitmapArrayWithKind(kind, values)
+	}
 	out := make([]any, len(values))
 	for i, v := range values {
 		if IsNull(v) {
@@ -13359,6 +13376,8 @@ func takeArray(array Array, n int) Array {
 		return takeColumnArray(a, n)
 	case nullableArray:
 		return nullableArray{kind: a.kind, data: append([]any(nil), a.data[:n]...)}
+	case nullBitmapCarrier:
+		return a.takePrefix(n)
 	default:
 		return array.Gather(allIndexes(n))
 	}
