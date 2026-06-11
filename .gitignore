@@ -22,6 +22,10 @@ __pycache__/
 /benchmark_artifacts/
 /benchmark-results/
 
+# Local Codex/agent worktrees and scratch output
+/.worktrees/
+/cmd/leia/.tmp/
+
 # IDE / editor
 .idea/
 .vscode/
