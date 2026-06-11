@@ -935,6 +935,10 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 // CallFunction calls a Leia function value with the given args.
 // This is a public method for embedding use.
 func (interp *Interpreter) CallFunction(fn Value, args []Value) ([]Value, error) {
+	// Script execution may publish Values beyond any result scan; barrier an
+	// active host ValueScope so script-created roots stay global.
+	bs := PushValueScopeBarrierIfActive()
+	defer bs.Release()
 	interp.resetExecutionBudgets()
 	return interp.callFunction(fn, args)
 }

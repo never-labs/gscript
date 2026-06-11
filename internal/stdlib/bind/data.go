@@ -514,7 +514,11 @@ func dataInstallLazyFrameRows(frame *Table, nrows int) {
 			return NilValue(), false
 		}
 		value := TableValue(row)
-		cache[key] = value
+		// The cache map is invisible to scope keep-scans; skip caching while
+		// a ValueScope is capturing this goroutine's roots.
+		if !HasActiveValueScope() {
+			cache[key] = value
+		}
 		return value, true
 	}
 	rows := NewTable()
@@ -834,7 +838,8 @@ func dataFrameFacadeValueFromLib(frame stddata.Frame) (Value, error) {
 		kinds[name] = string(col.Data.Kind())
 		cols.RawSetString(name, dataColumnValue(col.Data.Kind(), dataArrayFacadeValue(col.Data, dataValueFromAny)))
 	}
-	out := NewTable()
+	// Unshared: carries the frame native payload (see NewUnsharedTable).
+	out := NewUnsharedTable()
 	out.RawSetString(dataFrameMarker, BoolValue(true))
 	out.RawSetString("len", IntValue(int64(frame.Len())))
 	out.RawSetString("columns", TableValue(cols))
@@ -852,7 +857,8 @@ func dataFrameFacadeValueFromLib(frame stddata.Frame) (Value, error) {
 }
 
 func dataArrayFacadeValue(array stddata.Array, convert func(any) Value) Value {
-	out := NewTable()
+	// Unshared: carries the column-array native payload (see NewUnsharedTable).
+	out := NewUnsharedTable()
 	if array == nil {
 		return TableValue(out)
 	}
@@ -877,7 +883,11 @@ func dataArrayFacadeValue(array stddata.Array, convert func(any) Value) Value {
 			}
 		}
 		v := convert(item)
-		cache[key] = v
+		// The cache map is invisible to scope keep-scans; skip caching while
+		// a ValueScope is capturing this goroutine's roots.
+		if !HasActiveValueScope() {
+			cache[key] = v
+		}
 		return v, true
 	})
 	meta := NewTable()

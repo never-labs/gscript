@@ -22,6 +22,27 @@ func NewEmptyTable() *Table {
 	return t
 }
 
+// NewUnsharedTable allocates a Table outside the shared bump slabs.
+//
+// Use it for host-result carrier tables that attach large native payloads
+// (data frames, keyed frames, SoA columns): slab backings are pinned forever
+// by their global slab roots, so a dead slab-allocated carrier would retain
+// its payload for the life of the process. An unshared table is individually
+// rooted at boxing time, which makes it releasable by value scopes and
+// collectible by the Go GC once its roots are gone.
+func NewUnsharedTable() *Table {
+	return &Table{}
+}
+
+// NewUnsharedTableSized is NewUnsharedTable with a string-field capacity hint.
+func NewUnsharedTableSized(hashHint int) *Table {
+	t := &Table{}
+	if hashHint > 0 && hashHint <= smallFieldCap {
+		t.svals = DefaultHeap.AllocValues(0, hashHint)
+	}
+	return t
+}
+
 // NewTableSized creates a table with pre-allocated capacity hints.
 func NewTableSized(arrayHint, hashHint int) *Table {
 	if arrayHint == 0 && hashHint == 0 {

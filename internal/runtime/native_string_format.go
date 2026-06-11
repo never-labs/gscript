@@ -423,6 +423,9 @@ func (p *simpleFormatProgram) cachedResult(n int64) (Value, bool) {
 }
 
 func (p *simpleFormatProgram) storeCachedResult(n int64, v Value) {
+	// The cache is process-global: a value created inside a ValueScope must
+	// not lose its roots when the scope is released.
+	GlobalizeValueRoots(v)
 	p.resultMu.Lock()
 	defer p.resultMu.Unlock()
 	if p.resultCache == nil {

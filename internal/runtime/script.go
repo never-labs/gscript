@@ -156,6 +156,10 @@ func (interp *Interpreter) compileProgram(prog *ast.Program, opts ScriptOptions,
 }
 
 func (interp *Interpreter) execProgramWithOptions(prog *ast.Program, opts ScriptOptions, syncBack func()) ([]Value, error) {
+	// Script execution may publish Values beyond any result scan; barrier an
+	// active host ValueScope so script-created roots stay global.
+	bs := PushValueScopeBarrierIfActive()
+	defer bs.Release()
 	env := opts.Env
 	if env == nil {
 		env = interp.globals

@@ -101,7 +101,11 @@ var (
 	NewSequentialArrayTable       = runtime.NewSequentialArrayTable
 	NewTable                      = runtime.NewTable
 	NewTableSized                 = runtime.NewTableSized
+	NewUnsharedTable              = runtime.NewUnsharedTable
+	NewUnsharedTableSized         = runtime.NewUnsharedTableSized
+	HasActiveValueScope           = runtime.HasActiveValueScope
 	NilValue                      = runtime.NilValue
+	PushValueScope                = runtime.PushValueScope
 	ReadAllWithHostResultLimit    = runtime.ReadAllWithHostResultLimit
 	StringLen                     = runtime.StringLen
 	StringValue                   = runtime.StringValue

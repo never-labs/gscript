@@ -1153,6 +1153,10 @@ func TestQSQLMatrixBenchmarkCasesMatchGoBaseline(t *testing.T) {
 	for _, tc := range qSQLMatrixBenchCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			// Exercise the embedder lifetime discipline: result roots are
+			// scope-captured and released once the checksum is consumed.
+			scope := PushValueScope()
+			defer scope.Release()
 			args := qSQLMatrixEnvArgs(t, qSQLMatrixRows, tc.query)
 			out, err := qRunSQL("q.sql", args)
 			if err != nil {
@@ -1249,11 +1253,16 @@ func BenchmarkQSQLBindMatrixWarm(b *testing.B) {
 			b.ResetTimer()
 			start := time.Now()
 			for i := 0; i < b.N; i++ {
+				// Per-op value scope: the result is dead once the sink is
+				// overwritten, so its roots are released instead of pinning
+				// every result vector for the life of the process.
+				scope := PushValueScope()
 				out, err := qRunSQL("q.sql", args)
 				if err != nil {
 					b.Fatalf("q.sql(%q): %v", tc.query, err)
 				}
 				qSQLBindBenchSink = out
+				scope.Release()
 			}
 			b.StopTimer()
 			qSQLBindBenchReportRows(b, qSQLMatrixRows, start)
@@ -1275,11 +1284,13 @@ func BenchmarkQSQLBindMatrixCold(b *testing.B) {
 			start := time.Now()
 			for i := 0; i < b.N; i++ {
 				qClearCaches()
+				scope := PushValueScope()
 				out, err := qRunSQL("q.sql", args)
 				if err != nil {
 					b.Fatalf("q.sql(%q): %v", tc.query, err)
 				}
 				qSQLBindBenchSink = out
+				scope.Release()
 			}
 			b.StopTimer()
 			qSQLBindBenchReportRows(b, qSQLMatrixRows, start)

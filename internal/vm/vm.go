@@ -1279,6 +1279,11 @@ func cloneTableForChild(parent *runtime.Table) *runtime.Table {
 
 // registerChannelBuiltins adds channel-related builtins to globals.
 func (vm *VM) Execute(proto *FuncProto) ([]runtime.Value, error) {
+	// Script execution can publish Values anywhere (globals, upvalues,
+	// coroutines); if a host ValueScope is active on this goroutine, barrier
+	// it so script-created roots stay in the global append-only log.
+	bs := runtime.PushValueScopeBarrierIfActive()
+	defer bs.Release()
 	cl := &Closure{Proto: proto}
 	vm.frameCount = 0
 	vm.top = 0
@@ -1288,6 +1293,8 @@ func (vm *VM) Execute(proto *FuncProto) ([]runtime.Value, error) {
 
 // CallValue calls a function value with the given arguments (exported for leia wrapper).
 func (vm *VM) CallValue(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	bs := runtime.PushValueScopeBarrierIfActive()
+	defer bs.Release()
 	vm.resetExecutionBudgets()
 	return vm.callValue(fn, args)
 }
@@ -1298,6 +1305,8 @@ func (vm *VM) CallValue(fn runtime.Value, args []runtime.Value) ([]runtime.Value
 // the bytecode interpreter path avoids native trampoline frames in host stacks
 // while preserving JIT for ordinary program execution.
 func (vm *VM) CallValueNoMethodJIT(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	bs := runtime.PushValueScopeBarrierIfActive()
+	defer bs.Release()
 	vm.resetExecutionBudgets()
 	return vm.callValueNoMethodJIT(fn, args)
 }
