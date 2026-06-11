@@ -53,6 +53,15 @@ Rules:
 - Alias cycles are invalid.
 - Secrets should come from environment variables or host-injected providers.
 - Host policy decides whether script-declared provider configs are honored.
+- Provider config fields are `protocol`, `base_url`, `api_key`,
+  `provider_model`, and optional host/provider names. Go hosts receive the
+  normalized shape as `llm.ProviderConfig`.
+- A model alias is a routing name, not a credential boundary. Scripts should
+  keep aliases stable across environments and let the host map them to the
+  actual provider/model through `WithLLMProvider`, `WithLLMProviderFactory`, or
+  environment-backed config.
+- Do not log secrets, copy secret values into traces, or commit replay records
+  made with unredacted provider configuration.
 
 ## Tool Dialect
 
@@ -79,9 +88,44 @@ Tool fields:
 | `params` | Ordered parameter names. |
 | `description` | Provider-visible description. |
 | `requires` | Capability labels for host policy and audit. |
+| `capabilities` | Alias for `requires` in lower-level `llm.tool` option tables. |
+| `schema` | Optional provider/tool input schema metadata. |
+| `result` / `output` | Script-visible success shape for contract inventory and validation. |
+| `error` | Script-visible structured error shape for contract inventory. |
+| `replay_key` | Stable key template for deterministic tool fixtures and audit logs. |
 
 Runtime helpers remain available through `llm.tool`, `llm.toolof`,
-`llm.agent_as_tool`, `llm.dispatch`, `llm.tool_caps`, and `llm.check_tools`.
+`llm.agent_as_tool`, `llm.dispatch`, `llm.tool_caps`, `llm.check_tools`,
+`llm.tool_schema`, `llm.tool_info`, and `llm.validate_tools`.
+
+Tool contracts are metadata for hosts, tests, replay fixtures, and provider
+adapter schemas. They are not authorization by themselves and they do not
+coerce tool return values. Use `llm.validate_tools(tools)` to fail fast when a
+tool list is missing required contract metadata for a workflow:
+
+```leia
+lookup := llm.tool("lookup", func(query) {
+    return {answer: "docs:" .. query}, nil
+}, {
+    params: {"query"}
+    description: "Lookup local documents."
+    capabilities: {"docs.read", "replay.local"}
+    result: {answer: "string"}
+    error: {kind: "validation", message: "string"}
+    replay_key: "lookup:{query}"
+})
+
+info := llm.tool_info({lookup})
+ok, err := llm.validate_tools({lookup})
+```
+
+`llm.tool_info(tool_or_tools)` returns a contract inventory with normalized
+`name`, `kind`, `type`, `description`, `params`, `schema`, `capabilities`,
+`requires`, `result`, `error`, and `replay_key` fields. `llm.tool_schema(...)`
+returns the provider-facing input schema and script-visible result/error
+shapes. Agent-as-tool values report `type: "agent"` and carry
+`trace_contract: "agent_tool.v1"`; their provider-facing input schema describes
+arguments only, not the delegated agent's output shape.
 
 ## Messages And History
 
@@ -238,6 +282,24 @@ agent's output shape as the provider-facing tool input schema. If the delegated
 agent pauses for approval, dispatch returns a structured pending error so the
 host can persist or resume the outer workflow.
 
+Agent-as-tool dispatch also attaches a generic trace contract. A successful
+delegation result may contain `trace` or `tool_trace` with:
+
+| Field | Meaning |
+|---|---|
+| `type` | Node type such as `agent_tool`, `agent`, `workflow`, or `workflow_step`. |
+| `name` | Tool, agent, workflow, or step name. |
+| `status` | Runtime status such as `ok`, `done`, `pending`, `stopped`, or `error`. |
+| `parent` | Lightweight parent reference when nested. |
+| `children` | Ordered nested trace nodes. |
+| `error` | Structured error table when the node failed or paused. |
+| `budget` / `cancel` | Copied budget or cancellation error details when applicable. |
+| `metadata` | Host/script metadata table. |
+
+This trace contract is script-visible result metadata. It complements host
+trace sinks, which receive metadata events such as `turn_start`, `turn_end`,
+`turn_error`, and streaming events.
+
 ## Structured Output
 
 Agents and turns can request structured output with an `output` shape and can
@@ -299,7 +361,7 @@ retrieval workflows:
 
 | Helper | Meaning |
 |---|---|
-| `llm.doc(value, opts)` / `llm.document(value, opts)` | Build a document table with `text` plus optional `id`, `title`, `source`, `tags`, or other metadata. |
+| `llm.doc(value, opts)` / `llm.document(value, opts)` | Build a document table with `text` plus optional `id`, `title`, `source`, `tags`, `sections`, or other metadata. |
 | `llm.collection(docs)` / `llm.docs(docs)` | Build a collection table with `docs` and `count`. |
 | `llm.retrieve(collection, query, opts)` / `llm.search(...)` | Return ranked local matches; `opts.limit` caps results and `opts.label` labels generated context. |
 | `llm.context(matches, opts)` | Build a context message wrapper, default label `Context`. |
@@ -327,6 +389,25 @@ result, err := llm.turn({
     evidence: llm.evidence(ctx.matches, {label: "Runbook evidence"})
 })
 ```
+
+Documents may carry section text and provenance metadata so report or RAG code
+can preserve source identity before prompt assembly:
+
+```leia
+policy_doc := llm.document({
+    id: "policy"
+    title: "Release policy"
+    source: "docs/release.md"
+    sections: {
+        approvals: "Production releases require owner approval."
+        rollback: "Rollback plans must name the on-call."
+    }
+})
+```
+
+The retrieval helpers rank and package only the collection passed to them. A
+host or tool must filter documents before collection construction when access
+control, tenant boundaries, licensing, freshness, or secret handling matter.
 
 ## Workflows
 
@@ -396,7 +477,40 @@ Sections are a convenience for independent report parts. They do not guarantee
 cross-section consistency, automatic citations, or shared hidden memory beyond
 the request fields supplied to each section.
 
-## Budgets, Replay, And Trace
+## Report Artifact Contract
+
+`llm.report_artifact_contract(opts)` returns a generic, offline-verifiable
+contract table for report-producing workflows. It is useful when an agent or
+workflow produces sections, chart plans, source annotations, and artifact
+manifests that another renderer or CI check will validate.
+
+```leia
+contract := llm.report_artifact_contract({
+    name: "release_report"
+    version: "report.v1"
+})
+
+manifest := contract.manifest_template
+section_schema := contract.schemas.report_section
+```
+
+The returned table includes `name`, `version`, `offline_verifiable`,
+`renderer_required`, `schemas`, `manifest_template`, and `required_markers`.
+The schemas cover:
+
+| Schema | Purpose |
+|---|---|
+| `report_section` | Ordered section content with chart/source references and AI disclosure flags. |
+| `chart_spec` | Chart intent plus source references and planned/rendered artifact metadata. |
+| `artifact_manifest` | Report id, generated time, sections, chart specs, artifacts, source annotations, warnings, and disclosure. |
+| `source_annotation` | Source identity, locator, freshness fields, optional license, retrieval time, and evidence hash. |
+
+This helper declares an artifact boundary; it does not render HTML/PDF, fetch
+data, verify citations, or make product-specific report APIs. Scripts should
+validate produced tables with `llm.validate_output` or ordinary assertions and
+leave rendering to explicit code or host tooling.
+
+## Budgets, Policy, Approval, Replay, And Trace
 
 Budgets can be attached to agent config tables or managed with lower-level
 helpers such as `llm.with_budget`. Public dimensions include `turns`, `calls`,
@@ -407,6 +521,27 @@ Budgets gate AI runtime work before or after provider turns and tool dispatch.
 They do not change ordinary expression evaluation outside the helper paths.
 Declarative agents, explicit agents, and direct turns share the same accounting
 when they lower through `llm`.
+
+Policy helpers operate on tool capability labels:
+
+```leia
+policy := llm.policy()
+ok, err := llm.check_policy({search_runbook}, policy)
+```
+
+The default policy is `capability_policy.v1` with `default:
+"deny_high_risk"`. It denies capability classes for trading, portfolio,
+generated-code, network, credential, and publish actions unless an exact
+capability is listed in `allow`. `llm.check_policy(tool_or_tools, policy)`
+returns `(true, nil)` or `(nil, {kind: "policy", capability, class, policy,
+message})`.
+
+Human approval and resume use the lower-level loop helpers. A pending snapshot
+is host-persistable data; `loop.resume(token, approval)` applies an approval
+table such as `{ok: true}` or `{ok: false, reason: "..."}`. Use
+`llm.approval_trace({token, pending, approval, result, policy})` to record a
+portable approval replay trace with `kind: "approval_replay_trace"` and
+`version: "approval_replay.v1"`.
 
 Use host-side record/replay for deterministic tests:
 
@@ -429,6 +564,32 @@ fixtures should not depend on whether the source used shorthand syntax or
 direct helper calls. Trace is for operational visibility and may redact content;
 replay is for deterministic provider behavior and must be strict about request
 matching.
+
+## Evaluation Harness
+
+`evaluate "name" { ... }` declares a regression case discovered by
+`leia evaluate`. The `eval` module is available only while the evaluation
+harness runs the block.
+
+| Function | Meaning |
+|---|---|
+| `eval.case(id, fn)` | Run one named subcase and continue after subcase failures. |
+| `eval.metric(name, value)` | Record bool, number, string, nil, or JSON-like metrics. |
+| `eval.load_jsonl(path)` | Load a JSON Lines corpus relative to the evaluate source. |
+| `eval.skip_if(cond, reason)` | Skip the active subcase when `cond` is truthy. |
+| `eval.fail_if(cond, message)` | Fail the active subcase when `cond` is truthy. |
+| `eval.usage()` | Return current case LLM usage. |
+| `eval.budget(table)` | Fail when current usage exceeds a positive limit. |
+| `eval.judge(options)` | Run a bounded judge turn through `llm.turn(options)`. |
+
+The CLI supports `--list`, `--filter`, `--parallel`, `--format json|text|html`,
+`--output`/`--report`, `--gate`, `--baseline`, `--compare`,
+`--regression-threshold`, `--llm-record`, `--llm-replay`, and
+`--update-golden`. JSON reports preserve case metrics, usage, diagnostics, and
+optional baseline comparison. Boolean metrics become pass-rate summaries;
+numeric metrics become count/mean/min/max summaries; string metrics become
+category counts. LLM fixture modes are intended for deterministic provider
+behavior and may serialize execution even when `--parallel` is set.
 
 ## Live Provider Tests
 
