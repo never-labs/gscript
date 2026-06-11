@@ -74,6 +74,40 @@
         "symbol": "ACME",
         "close": 103.2,
         "source": "fixture",
+        "request": {
+          "dataset": "market_data",
+          "query": {
+            "symbol": "ACME",
+            "asset_class": "equity",
+            "interval": "1d",
+            "adjusted": true
+          }
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.data.openbb.market_data",
+          "fixture_key": "openbb:market_data:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "close": 103.2,
+            "currency": "USD"
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "OPENBB_PAT": "skipped",
+          "OPENBB_DATABASE_URL": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
         "replay_ready": true
       }
     },
