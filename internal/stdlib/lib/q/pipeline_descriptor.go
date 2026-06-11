@@ -717,6 +717,9 @@ func qScriptPipelineDescriptorFromEvalDescriptor(descriptor EvalPipelineDescript
 				binding: buildQScriptBindingPlanForRHS(rhs, nil),
 			})
 		}
+		// Assignments attach after normalization here, so the absorbed-
+		// assignment skip mask must be recomputed against them.
+		out.indexExprAssignmentSkip = qScriptPipelineIndexExprSkippedAssignments(&out)
 	}
 	return out, true
 }

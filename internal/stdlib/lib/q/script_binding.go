@@ -130,7 +130,7 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
 		if err != nil || !ok {
-			return qScriptBindingPlan{}
+			return buildQScriptScalarDyadicCompositionPlan(src)
 		}
 		expr = parsed
 	}
@@ -138,7 +138,82 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 	if plan.kind != qScriptBindingInvalid {
 		return plan
 	}
-	return qScriptBindingPlan{}
+	return buildQScriptScalarDyadicCompositionPlan(src)
+}
+
+// buildQScriptScalarDyadicCompositionPlan plans `<scalar-literal> <op> <group>`
+// and `<group> <op> <scalar-literal>` compositions for the single-character
+// arithmetic verbs, where <group> is one fully parenthesized expression or a
+// plain name and the other operand is a numeric scalar literal. The split
+// position mirrors s.eval's findDyadic scan exactly, and the operand shapes
+// guarantee no earlier special form in the eval cascade (take/drop/cast/dict,
+// adverbs, postfix lookups, statement lists) can claim the source first, so
+// the cached plan evaluates identically to string evaluation.
+func buildQScriptScalarDyadicCompositionPlan(src string) qScriptBindingPlan {
+	src = strings.TrimSpace(src)
+	idx, op, ok := findDyadic(src)
+	if !ok || idx <= 0 || idx+1 >= len(src) {
+		return qScriptBindingPlan{}
+	}
+	switch op {
+	case '+', '-', '*', '%':
+	default:
+		return qScriptBindingPlan{}
+	}
+	left, leftLiteral, ok := qScriptScalarCompositionOperandPlan(strings.TrimSpace(src[:idx]))
+	if !ok {
+		return qScriptBindingPlan{}
+	}
+	right, rightLiteral, ok := qScriptScalarCompositionOperandPlan(strings.TrimSpace(src[idx+1:]))
+	if !ok {
+		return qScriptBindingPlan{}
+	}
+	if !leftLiteral && !rightLiteral {
+		return qScriptBindingPlan{}
+	}
+	return qScriptBindingBinaryPlan(string(op), left, right)
+}
+
+// qScriptCompositionPlainName matches underscore-free identifiers: '_' is
+// also s.eval's top-level drop operator, so names containing it stay on the
+// string-eval path.
+func qScriptCompositionPlainName(src string) bool {
+	if src == "" || !isQIdentStart(src[0]) {
+		return false
+	}
+	for i := 1; i < len(src); i++ {
+		if !isQIdentRest(src[i]) || src[i] == '_' {
+			return false
+		}
+	}
+	return true
+}
+
+func qScriptScalarCompositionOperandPlan(src string) (plan qScriptBindingPlan, literal bool, ok bool) {
+	if src == "" {
+		return qScriptBindingPlan{}, false, false
+	}
+	if value, _, err := parseNumberOrBool(src); err == nil {
+		if _, isNumeric := numeric(value); isNumeric {
+			return qScriptBindingPlan{kind: qScriptBindingLiteral, literal: value}, true, true
+		}
+		return qScriptBindingPlan{}, false, false
+	}
+	if qScriptCompositionPlainName(src) {
+		return qScriptBindingPlan{kind: qScriptBindingName, name: src}, false, true
+	}
+	if len(src) >= 2 && src[0] == '(' && src[len(src)-1] == ')' {
+		inner := stripEnclosingParens(src)
+		if inner == src {
+			return qScriptBindingPlan{}, false, false
+		}
+		groupPlan := buildQScriptBindingPlanForRHS(strings.TrimSpace(inner), nil)
+		if groupPlan.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}, false, false
+		}
+		return groupPlan, false, true
+	}
+	return qScriptBindingPlan{}, false, false
 }
 
 func buildQScriptReshapeBindingPlan(src string) qScriptBindingPlan {

@@ -1897,6 +1897,17 @@ func Slice(array Array, start, count int) (Array, error) {
 		return tiledArray{source: a.source, start: (a.start + start) % a.source.Len(), len: count}, nil
 	case i64RangeArray:
 		return i64RangeArray{start: a.start + int64(start)*a.step, step: a.step, len: count}, nil
+	case i64ScalarDyadicArray:
+		// Slice the source view and keep the scalar-dyadic carrier lazy:
+		// cut/sublist segments stay O(1) and downstream consumers flatten
+		// them through the bulk kernels in one dense pass per segment.
+		if a.source != nil && a.source.Len() == a.len {
+			source, err := Slice(a.source, start, count)
+			if err == nil {
+				return i64ScalarDyadicArray{source: source, op: a.op, scalar: a.scalar, scalarLeft: a.scalarLeft, len: count}, nil
+			}
+		}
+		return Gather(array, contiguousIndexes(start, count))
 	case i64SegmentArray:
 		return sliceI64SegmentArray(a, start, count), nil
 	case f64RangeArray:
@@ -3082,8 +3093,13 @@ func typedCompareScalarDyadicIndexesI64(array Array, op Op, value any) (Array, b
 	if !ok {
 		return nil, false, nil
 	}
+	// Periodic modulo carriers compare to a closed-form index plan (range,
+	// periodic, or segment view) without materializing an index vector.
+	if out, ok, err := i64ScalarDyadicCompareMaskIndexArray(i64ScalarDyadicCompareMask{values: values, op: op, scalar: target}); ok || err != nil {
+		return out, ok, err
+	}
 	if flat, owned, ok := TryBulkI64(values); ok && len(flat) == values.len {
-		out := make([]int64, 0)
+		out := make([]int64, 0, len(flat))
 		for row, item := range flat {
 			if boolCompare(op, item == target, compareInt64(item, target)) {
 				out = append(out, int64(row))
@@ -4972,6 +4988,18 @@ func bucketFloorTyped(array Array, interval any) (Array, bool, error) {
 		}
 		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
 	case i64ScalarDyadicArray:
+		width, err := bucketInt64Interval(KindI64, interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
+	case i64RunningSumArray:
+		width, err := bucketInt64Interval(KindI64, interval)
+		if err != nil {
+			return nil, true, err
+		}
+		return i64BucketArray{source: a, width: width, len: a.Len()}, true, nil
+	case i64ScalarDyadicRunningSumArray:
 		width, err := bucketInt64Interval(KindI64, interval)
 		if err != nil {
 			return nil, true, err
