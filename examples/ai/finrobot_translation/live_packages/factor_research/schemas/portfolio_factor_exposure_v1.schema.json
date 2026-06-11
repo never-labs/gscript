@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "portfolio_factor_exposure_v1",
+  "provider_free_gate": {
+    "network_required": false,
+    "credentials_required": false,
+    "provider_sdks_required": false
+  },
+  "required": [
+    "portfolio_id",
+    "as_of",
+    "holdings",
+    "factor_exposures",
+    "sector_exposures",
+    "risk_limits",
+    "source_refs"
+  ],
+  "factor_exposure_names": [
+    "value",
+    "growth",
+    "momentum",
+    "quality",
+    "volatility",
+    "liquidity",
+    "sentiment",
+    "macro",
+    "composite_score"
+  ],
+  "all_source_refs_must_resolve": true
+}
+
