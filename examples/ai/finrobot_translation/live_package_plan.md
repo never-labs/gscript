@@ -7,7 +7,7 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 52 runnable/checkable FinRobot examples are
+Current registered-example status: 65 runnable/checkable FinRobot examples are
 discovered by `go run ./cmd/leia examples --json`. All 22 checked-in
 live-package skeletons are registered provider-free examples: `analytics_report`,
 `analyzer_report`, `backtest_strategy`, `chart_renderer`, `coding_notebook`,

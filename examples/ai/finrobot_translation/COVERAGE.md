@@ -10,7 +10,7 @@ Baseline:
 - Current translation directory file count: 434 files, including 22
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
-- Registered examples: 52 runnable/checkable examples discovered by
+- Registered examples: 65 runnable/checkable examples discovered by
   `go run ./cmd/leia examples --json`.
 - Runtime changes in this audit: none.
 
@@ -89,8 +89,8 @@ notebook/tutorial parity.
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 43 `host-vm`, 6 `llm-replay`, 3 `evaluate`, 52 runnable,
-52 checkable.
+Runner summary: 56 `host-vm`, 6 `llm-replay`, 3 `evaluate`, 65 runnable,
+65 checkable.
 
 ## Module Coverage Matrix
 
@@ -180,10 +180,10 @@ mistaken for missing language/runtime support.
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
-| Registered example inventory | 52 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
+| Registered example inventory | 65 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
 | File inventory | 434 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
-| Host-VM contract examples | 43 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
+| Host-VM contract examples | 56 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 3 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
 | Live-package skeletons | 22 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/analyzer_report`, `live_packages/backtest_strategy`, `live_packages/chart_renderer`, `live_packages/coding_notebook`, `live_packages/document_pipeline`, `live_packages/earnings_transcript`, `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`, `live_packages/finance_facade`, `live_packages/finance_normalizers`, `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`, `live_packages/optional_integrations`, `live_packages/product_workflow`, `live_packages/prompt_roles`, `live_packages/report_renderer`, `live_packages/retail_sentiment`, `live_packages/sec_filings`, `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and `live_packages/vendor_adapters`; all 22 include registered `.leia` examples | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
@@ -192,7 +192,7 @@ mistaken for missing language/runtime support.
 | Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
 Provider-free completion result: complete for the currently registered
-52-example translation slice, including live-package skeleton contracts.
+65-example translation slice, including live-package skeleton contracts.
 Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks
