@@ -31,6 +31,7 @@
     "fixture_hook": "recorded_coding_notebook_fixture"
   },
   "entrypoints": {
+    "smoke": "main.leia",
     "coding_notebook_contract": "contracts/coding_notebook_contract.json",
     "sandbox_policy_gates": "contracts/sandbox_policy_gates.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json",

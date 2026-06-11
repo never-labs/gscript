@@ -2,12 +2,15 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 type codingNotebookLiveManifest struct {
@@ -97,6 +100,12 @@ func TestFinRobotCodingNotebookLivePackageManifest(t *testing.T) {
 		}
 		assertCodingNotebookJSONFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
+	if manifest.Entrypoints["smoke"] != "main.leia" {
+		t.Fatalf("smoke entrypoint = %q, want main.leia", manifest.Entrypoints["smoke"])
+	}
+	if _, err := os.Stat(filepath.Join(base, manifest.Entrypoints["smoke"])); err != nil {
+		t.Fatalf("smoke entrypoint missing: %v", err)
+	}
 	for _, key := range []string{"sandbox_command", "file_image_artifact", "notebook_display", "capability_metadata"} {
 		if manifest.Schemas[key] == "" {
 			t.Fatalf("missing schema %q", key)
@@ -135,6 +144,69 @@ func TestFinRobotCodingNotebookLivePackageManifest(t *testing.T) {
 	for _, want := range []string{"sandbox", "file", "image", "denied command", "stdout", "stderr", "deterministic replay", "capability metadata"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
+		}
+	}
+}
+
+func TestFinRobotCodingNotebookLivePackageSmokeExecutes(t *testing.T) {
+	base := codingNotebookLivePackageDir(t)
+	manifest := loadCodingNotebookLiveManifest(t, base)
+	mainPath := filepath.Join(base, manifest.Entrypoints["smoke"])
+	if manifest.Entrypoints["smoke"] != "main.leia" {
+		t.Fatalf("smoke entrypoint = %q, want main.leia", manifest.Entrypoints["smoke"])
+	}
+
+	src, err := os.ReadFile(mainPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(src)
+	for _, want := range []string{
+		"coding_notebook_live_package",
+		"sandbox_approvals",
+		"deny_live_notebook_kernel",
+		"denied_command",
+		"stdout",
+		"stderr",
+		"deterministic_replay",
+		"file_image_artifacts",
+		"capability_metadata",
+	} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("main.leia missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"import q", "q/runtime", "ipykernel_launcher -f /tmp/live-kernel.json`", "$`", "$!`"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("main.leia must stay provider-free and avoid host/q runtime execution; found %q", forbidden)
+		}
+	}
+
+	vm := leia.New(leia.WithLibs(leia.LibAll), leia.WithVM())
+	if err := vm.ExecFile(mainPath); err != nil {
+		t.Fatalf("ExecFile main.leia: %v", err)
+	}
+	value, err := vm.Get("coding_notebook_live_package_summary")
+	if err != nil {
+		t.Fatalf("get coding_notebook_live_package_summary: %v", err)
+	}
+	summary := fmt.Sprint(value)
+	for _, want := range []string{
+		"coding_notebook_live_package",
+		"approvals=3",
+		"denied=deny",
+		"stdout=signals: PDD=0.18 BABA=0.11",
+		"stderr=denied: notebook kernel execution is disabled in replay mode",
+		"replay=finrobot-coding-notebook-v1",
+		"artifacts=3",
+		"displays=1",
+		"capabilities=5",
+		"provider_free=true",
+		"live_network=false",
+		"imports=false",
+	} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("summary missing %q: %s", want, summary)
 		}
 	}
 }
