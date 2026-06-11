@@ -197,108 +197,95 @@ Output generation maps to general document/chart/web capabilities:
 - Charts map to a charting package fed by `data` tables.
 - CLI and web-app flows map to `workflow`, `test`, `web`, and package metadata.
 
-## Current Gaps
+## Landing Checklist
 
-Core AI gaps:
+The next FinRobot translation step should treat recent AI dialect polish as the
+baseline and stop listing covered platform work as open gaps.
 
-- `agent` needs first-class custom flows for multi-agent coordination.
-- `agent` needs explicit history, memory, and reset semantics.
-- `tool` needs parameter-schema reflection from ordinary functions.
-- `tool` needs capability declarations that are visible to review tooling.
-- Record/replay needs to cover tool calls, LLM turns, and streaming output.
-- Agent-as-tool composition needs clear error and cancellation behavior.
-- Human approval needs to compose with agents and workflows.
-- Provider/model routing is not yet rich enough to express smart-scheduler-like
-  fallback, scoring, and regional model selection.
+Covered by the current general AI/workflow contracts:
 
-Data and analytics gaps:
+- Workflow coverage: FinRobot single-assistant runs, RAG-assistant runs,
+  leader-directed runs, report pipelines, deterministic test runs, and human
+  input gates map to `agent`, `workflow`, `approve`, `test`, and `evaluate`
+  composition. The open work is not another orchestration dialect.
+- Memory coverage: explicit history, RAG state, reset behavior, bounded context,
+  and retrieval events are covered by `agent` memory contracts, message/history
+  helpers, trace events, and record/replay. Finance packages still choose the
+  backing store and retrieval strategy.
+- Schema coverage: model-facing tool parameters, structured tool errors,
+  expected agent outputs, report-section validation, and provider-free replay
+  fixtures map to `tool` schemas, `output` validation, ordinary schemas/tests,
+  and replay records.
+- Sections coverage: annual-report sections, equity-research sections,
+  disclosure markers, chart/report artifacts, and stale-data checks belong to
+  report/document package metadata consumed by workflows. They are package data,
+  not parser syntax.
+- Handoff coverage: group chat, shadow assistants, planner/executor flows, and
+  nested specialists map to agent-as-tool composition or explicit custom
+  `flow` functions with parent/child traces, cancellation, budget, approval, and
+  structured error propagation.
+- Capability coverage: data fetches, filing downloads, generated code, trading
+  actions, credentials, and high-risk tools are represented as declared
+  capabilities and approval policies visible to host review tooling.
 
-- `data` needs table joins, group-by, time-series windows, rolling metrics, and
-  missing-data handling.
-- Numeric support needs stable vector/matrix operations for forecasting,
-  optimization, sensitivity analysis, and backtesting libraries.
-- Finance data usually arrives as nested JSON, CSV, HTML tables, PDFs, and
-  provider-specific schemas; Leia needs reliable conversion into typed tables.
-- There is no standard provenance model for source, timestamp, provider, and
-  transformation history.
-- There is no built-in charting/report data contract for generated assets.
+Remaining landing work, sorted by ownership:
 
-Web/API/document gaps:
+1. General dialects and contracts
+   - Finish `api` requirements for auth headers, retry, pagination, typed JSON
+     decode, rate-limit metadata, and traceable errors.
+   - Finish `web` requirements for robust download, scrape, generated-asset
+     retrieval, redirect handling, and deterministic replay.
+   - Finish `workflow` requirements for named stages, dependencies, artifacts,
+     approvals, retry policy, report outputs, and failure-on-stale-section
+     hooks.
+   - Finish `evaluate` and `test` fixture conventions for provider-free agent
+     regression tests, recorded tool calls, streaming turns, and nested-agent
+     replay.
+   - Define model-routing policy boundaries for smart-scheduler-like fallback,
+     regional model selection, scoring, and trace-visible provider choice.
+   - Define package metadata for external services, required capabilities,
+     credential scopes, rate-limit declarations, and deployment-specific model
+     aliases.
 
-- `api` needs auth headers, retry, pagination, rate-limit handling, and typed
-  decode paths.
-- `web` needs robust download and scrape behavior for filings, articles, and
-  generated assets.
-- Document parsing needs PDF, HTML table, markdown, and section-extraction
-  libraries.
-- RAG needs a generic retrieval interface that can be backed by local files,
-  vector stores, and provider APIs.
-- Secret management needs a consistent config/env story for local examples,
-  CI, and deployed apps.
+2. Standard library and shared packages
+   - Add table joins, group-by, time-series windows, rolling metrics,
+     missing-data handling, typed CSV/JSON IO, and reliable nested-data to typed
+     table conversion.
+   - Stabilize vector and matrix operations needed by forecasts,
+     optimization, sensitivity analysis, portfolio experiments, and backtesting
+     packages.
+   - Provide provenance metadata conventions for source, timestamp, provider,
+     retrieval URL, trace ID, transformation history, generated section, and
+     chart/report artifact.
+   - Provide generic document interfaces for PDF, HTML table, markdown,
+     section extraction, file download, chunking, and report export.
+   - Provide a generic RAG interface over local files, document chunks, vector
+     stores, and provider-backed retrieval APIs.
+   - Provide chart/report contracts over `data` tables so workflows can validate
+     required sections, artifacts, source annotations, and AI disclosure
+     markers.
+   - Provide config/env/secret conventions that work consistently for local
+     examples, CI, and deployed package hosts.
 
-Workflow, app, and ops gaps:
-
-- `workflow` needs named stages, artifacts, dependencies, approvals, retry, and
-  report outputs.
-- `test` and `evaluate` need fixtures for provider-free regression tests.
-- Web serving, auth, admin endpoints, request logging, and local persistence are
-  app-runtime features, not currently covered by the minimal dialect drafts.
-- Package metadata needs a way to declare external services and required
-  capabilities.
-- Generated reports need validation hooks so missing sections or stale data can
-  fail a workflow.
-
-Safety and compliance gaps:
-
-- Financial analysis needs source provenance, timestamps, disclaimers, and
-  AI-content markers as report-library conventions.
-- Trading, portfolio adjustment, alerting, and code-writing tools need explicit
-  high-risk capabilities and approval gates.
-- Generated code tools must be sandboxed and should not be ordinary finance
-  helpers.
-- Data-provider terms, rate limits, and credential scopes need package-level
-  declarations.
-
-## Priority
-
-P0, required before a FinRobot-like package is credible:
-
-- `model`, `turn`, `tool`, `agent`, and `evaluate` contracts;
-- agent custom flows and agent-as-tool composition;
-- tool schemas, structured errors, capabilities, and approval gates;
-- provider-independent record/replay for turns and tools;
-- `api` with auth, retry, pagination, JSON decode, and rate-limit metadata;
-- `data` tables with joins, group-by, time-series windows, typed CSV/JSON IO,
-  and missing-data handling;
-- package secrets/config conventions;
-- workflow artifacts and deterministic tests.
-
-P1, needed for high-quality equity research automation:
-
-- generic RAG interface;
-- PDF/HTML/markdown document parsing libraries;
-- provenance metadata for source data and generated sections;
-- charting package over `data` tables;
-- report generation to HTML and PDF;
-- schema validation for report sections and generated agent outputs;
-- model routing policies for fallback and task-specific model selection.
-
-P2, useful for production finance apps:
-
-- web app runtime with auth, admin routes, request logging, and persistence;
-- deployment metadata and local-service commands;
-- benchmark/evaluation suites for finance agents;
-- portfolio optimization, backtesting, technical indicators, and multimodal
-  model adapters as installable packages;
-- notebook interop and image display helpers.
-
-P3, research or ecosystem extensions:
-
-- financial model fine-tuning workflows;
-- smart-scheduler scoring research;
-- multilingual/regional finance model packs;
-- trading execution adapters;
-- compliance review packages.
+3. External and domain libraries
+   - Implement Yahoo Finance, Finnhub, Financial Modeling Prep, SEC, earnings
+     call, Reddit, X.com, Polymarket, OpenBB, and other provider adapters as
+     packages with schemas, capabilities, rate limits, cache policy, and terms
+     metadata.
+   - Implement finance-specific normalizers for statements, metrics, ratios,
+     peer tables, SEC filing sections, analyst recommendations, and market data.
+   - Implement DCF, multiples, sensitivity, catalyst, sentiment, technical
+     indicator, portfolio optimization, and backtesting libraries outside the
+     core dialect layer.
+   - Implement chart themes, report templates, section taxonomies, disclosure
+     wording, and house-style prompts as package assets.
+   - Implement FinRobot role profiles, prompt libraries, and workflow presets as
+     package data over general `agent` and `workflow` contracts.
+   - Implement FinGPT, FinRL, FinML, Backtrader, mplfinance, multimodal model,
+     notebook, and image-display integrations as optional packages.
+   - Implement web-app runtime pieces such as OAuth setup, admin routes, request
+     logging, SQLite schemas, local-service commands, deployment scripts, and
+     compliance review packages outside the AI dialect core.
 
 ## Library, Not Dialect
 
