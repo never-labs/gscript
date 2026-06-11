@@ -1,0 +1,67 @@
+[
+  {
+    "Request": {
+      "Model": "mock-translation",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Translate an imperative LLM analysis assistant into Leia dialect composition."
+        },
+        {
+          "Role": "user",
+          "Text": "Rewrite the generic LLM research assistant into Leia."
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "load_source",
+          "Description": "Load a local Python or TypeScript assistant skeleton.",
+          "Params": [
+            "path"
+          ]
+        },
+        {
+          "Name": "search_corpus",
+          "Description": "Search local research notes used by the assistant.",
+          "Params": [
+            "query"
+          ]
+        },
+        {
+          "Name": "build_report",
+          "Description": "Assemble a deterministic analysis report from structured fields.",
+          "Params": [
+            "summary",
+            "workflow"
+          ]
+        }
+      ],
+      "ResponseFormat": {
+        "type": "json_object"
+      }
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "{\"source_style\":\"python_ts\",\"leia_blocks\":[\"model\",\"tool\",\"agent\",\"turn\"],\"workflow\":[\"research\",\"analysis\",\"report\"],\"replay_ready\":true,\"summary\":\"Compose the assistant as local research tools, a structured analysis agent, and a replay-checked report turn.\"}"
+    }
+  },
+  {
+    "Request": {
+      "Model": "mock-report",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Review the Leia translation for offline replay and generic research workflow coverage."
+        },
+        {
+          "Role": "user",
+          "Text": "{\"source_style\":\"python_ts\",\"leia_blocks\":[\"model\",\"tool\",\"agent\",\"turn\"],\"workflow\":[\"research\",\"analysis\",\"report\"],\"replay_ready\":true,\"summary\":\"Compose the assistant as local research tools, a structured analysis agent, and a replay-checked report turn.\"}"
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Translation is replayable: local research evidence, structured analysis output, and deterministic report review."
+    }
+  }
+]

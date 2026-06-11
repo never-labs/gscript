@@ -516,6 +516,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		strings.Contains(example.Path, "/ai/coding_agent_project/"),
 		strings.Contains(example.Path, "/ai/tagged_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/general_agent_workflow.leia"),
+		strings.Contains(example.Path, "/ai/translation_research_assistant.leia"),
 		strings.Contains(example.Path, "/ai/record_replay_trace_project.leia"),
 		strings.Contains(example.Path, "/workflow/support_triage_replay.leia"):
 		if cliExampleCompanionRecordsExist(example.Path) {
