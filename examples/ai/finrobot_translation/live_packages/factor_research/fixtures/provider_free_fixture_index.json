@@ -13,7 +13,10 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "rows": 5
+        "rows": 5,
+        "provenance_id": "market_fixture_acme_universe",
+        "captured_at": "2026-01-02T00:00:00Z",
+        "stale_after_days": 7
       }
     },
     {
@@ -24,7 +27,10 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "transforms": 4
+        "transforms": 4,
+        "provenance_id": "factor_fixture_acme_universe",
+        "captured_at": "2026-01-02T00:00:00Z",
+        "stale_after_days": 7
       }
     },
     {
@@ -35,7 +41,9 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "holdings": 3
+        "holdings": 3,
+        "risk_status": "pass",
+        "optimizer_gate": "portfolio_optimizer_optional_gate"
       }
     },
     {
@@ -46,9 +54,9 @@
       "metadata": {
         "replay_ready": true,
         "provider_free": true,
-        "handoffs": 3
+        "handoffs": 3,
+        "optimizer_gate": "portfolio_optimizer_optional_gate"
       }
     }
   ]
 }
-

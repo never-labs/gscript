@@ -11,8 +11,11 @@
     "as_of",
     "holdings",
     "factor_exposures",
+    "exposure_summary",
     "sector_exposures",
     "risk_limits",
+    "risk_envelope",
+    "optimizer_gate",
     "source_refs"
   ],
   "factor_exposure_names": [
@@ -26,6 +29,12 @@
     "macro",
     "composite_score"
   ],
-  "all_source_refs_must_resolve": true
+  "all_source_refs_must_resolve": true,
+  "risk_envelope_required": [
+    "max_single_name_weight",
+    "max_weighted_volatility",
+    "min_weighted_liquidity",
+    "max_sector_weight",
+    "status"
+  ]
 }
-

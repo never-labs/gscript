@@ -13,6 +13,10 @@
     "capability",
     "fixture_key",
     "schema",
+    "request_owner",
+    "response_owner",
+    "input_contract",
+    "output_contract",
     "live_network",
     "dependency_imported",
     "credential_required",
@@ -20,4 +24,3 @@
   ],
   "clean_skip_without_dependency": true
 }
-

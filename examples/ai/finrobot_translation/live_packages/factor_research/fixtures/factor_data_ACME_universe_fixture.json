@@ -17,10 +17,27 @@
       "id": "factor_fixture_acme_universe",
       "provider": "fixture",
       "replay_key": "factor_data:ACME_UNIVERSE:offline",
+      "captured_at": "2026-01-02T00:00:00Z",
       "source_schema": "factor_data_v1",
-      "license": "example-fixture"
+      "license": "example-fixture",
+      "stale_after_days": 7,
+      "row_count": 5,
+      "source_url_redacted": true,
+      "transform_registry": "factor_transform_registry_v1"
     }
   ],
+  "provenance_summary": {
+    "provider": "fixture",
+    "replay_key": "factor_data:ACME_UNIVERSE:offline",
+    "captured_at": "2026-01-02T00:00:00Z",
+    "stale_after_days": 7,
+    "row_count": 5,
+    "source_refs": [
+      "factor_fixture_acme_universe"
+    ],
+    "transform_registry": "factor_transform_registry_v1",
+    "source_url_redacted": true
+  },
   "rows": [
     {
       "symbol": "AAPL",
@@ -114,4 +131,3 @@
     }
   ]
 }
-

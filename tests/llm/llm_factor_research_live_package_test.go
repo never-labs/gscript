@@ -36,13 +36,15 @@ type factorResearchLiveManifest struct {
 		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
 		FixtureHook                 string `json:"fixture_hook"`
 	} `json:"default_policy"`
-	Entrypoints            map[string]string               `json:"entrypoints"`
-	Schemas                map[string]string               `json:"schemas"`
-	Fixtures               map[string]string               `json:"fixtures"`
-	Modules                []factorResearchModule          `json:"modules"`
-	FactorTransforms       []factorResearchTransform       `json:"factor_transforms"`
-	AgentHandoffBoundaries []factorResearchHandoffBoundary `json:"agent_handoff_boundaries"`
-	TestGates              []string                        `json:"test_gates"`
+	Entrypoints             map[string]string               `json:"entrypoints"`
+	Schemas                 map[string]string               `json:"schemas"`
+	Fixtures                map[string]string               `json:"fixtures"`
+	Modules                 []factorResearchModule          `json:"modules"`
+	FactorTransforms        []factorResearchTransform       `json:"factor_transforms"`
+	FactorTransformRegistry factorResearchTransformRegistry `json:"factor_transform_registry"`
+	AgentHandoffBoundaries  []factorResearchHandoffBoundary `json:"agent_handoff_boundaries"`
+	OptionalOptimizerGate   factorResearchOptimizerGate     `json:"optional_optimizer_gate"`
+	TestGates               []string                        `json:"test_gates"`
 }
 
 type factorResearchModule struct {
@@ -61,16 +63,65 @@ type factorResearchTransform struct {
 	ProviderFree bool           `json:"provider_free"`
 }
 
+type factorResearchTransformRegistry struct {
+	RegistryID            string                                 `json:"registry_id"`
+	ProviderFree          bool                                   `json:"provider_free"`
+	LiveNetwork           bool                                   `json:"live_network"`
+	RealDependencyImports bool                                   `json:"real_dependency_imports"`
+	Ordering              []string                               `json:"ordering"`
+	Entries               []factorResearchTransformRegistryEntry `json:"entries"`
+}
+
+type factorResearchTransformRegistryEntry struct {
+	ID            string   `json:"id"`
+	Deterministic bool     `json:"deterministic"`
+	InputFields   []string `json:"input_fields"`
+	OutputFields  []string `json:"output_fields"`
+	ProvenanceTag string   `json:"provenance_tag"`
+	FailureMode   string   `json:"failure_mode"`
+}
+
 type factorResearchHandoffBoundary struct {
 	ID                 string `json:"id"`
 	DisplayName        string `json:"display_name"`
 	Capability         string `json:"capability"`
 	FixtureKey         string `json:"fixture_key"`
 	Schema             string `json:"schema"`
+	RequestOwner       string `json:"request_owner"`
+	ResponseOwner      string `json:"response_owner"`
+	InputContract      string `json:"input_contract"`
+	OutputContract     string `json:"output_contract"`
 	LiveNetwork        bool   `json:"live_network"`
 	DependencyImported bool   `json:"dependency_imported"`
 	CredentialRequired bool   `json:"credential_required"`
 	CleanSkip          bool   `json:"clean_skip"`
+}
+
+type factorResearchOptimizerGate struct {
+	ID                         string `json:"id"`
+	Capability                 string `json:"capability"`
+	Dependency                 string `json:"dependency"`
+	Required                   bool   `json:"required"`
+	DefaultEnabled             bool   `json:"default_enabled"`
+	ProviderFreeDefault        bool   `json:"provider_free_default"`
+	LiveNetworkDefault         bool   `json:"live_network_default"`
+	CredentialRequiredDefault  bool   `json:"credential_required_default"`
+	CleanSkipWithoutDependency bool   `json:"clean_skip_without_dependency"`
+	SkipStatus                 string `json:"skip_status"`
+	FixtureFallback            string `json:"fixture_fallback"`
+}
+
+type factorResearchFixtureSourceRef struct {
+	ID                string `json:"id"`
+	Provider          string `json:"provider"`
+	ReplayKey         string `json:"replay_key"`
+	CapturedAt        string `json:"captured_at"`
+	SourceSchema      string `json:"source_schema"`
+	License           string `json:"license"`
+	StaleAfterDays    int    `json:"stale_after_days"`
+	RowCount          int    `json:"row_count"`
+	SourceURLRedacted bool   `json:"source_url_redacted"`
+	TransformRegistry string `json:"transform_registry"`
 }
 
 func TestFinRobotFactorResearchLivePackageManifest(t *testing.T) {
@@ -144,7 +195,7 @@ func TestFinRobotFactorResearchLivePackageManifest(t *testing.T) {
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"multi_factor_agents.py", "factor transform", "market data", "factor data", "portfolio factor exposure", "handoff"} {
+	for _, want := range []string{"multi_factor_agents.py", "factor transform", "market data", "factor data", "portfolio factor exposure", "risk envelope", "optimizer gate", "handoff"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -171,6 +222,25 @@ func TestFinRobotFactorResearchTransformsContractsAndFixtures(t *testing.T) {
 		t.Fatalf("transform ids = %#v, want %#v", transformIDs, wantTransforms)
 	}
 
+	registry := manifest.FactorTransformRegistry
+	if registry.RegistryID != "factor_transform_registry_v1" || !registry.ProviderFree || registry.LiveNetwork || registry.RealDependencyImports {
+		t.Fatalf("transform registry provider-free header invalid: %#v", registry)
+	}
+	if !reflect.DeepEqual(registry.Ordering, []string{"winsorize", "zscore", "sector_neutralize", "composite_score"}) {
+		t.Fatalf("transform registry ordering = %#v", registry.Ordering)
+	}
+	var registryIDs []string
+	for _, entry := range registry.Entries {
+		registryIDs = append(registryIDs, entry.ID)
+		if !entry.Deterministic || len(entry.InputFields) == 0 || len(entry.OutputFields) == 0 || !strings.HasPrefix(entry.ProvenanceTag, "transform:") || !strings.HasPrefix(entry.FailureMode, "clean_skip_") {
+			t.Fatalf("transform registry entry incomplete: %#v", entry)
+		}
+	}
+	sort.Strings(registryIDs)
+	if !reflect.DeepEqual(registryIDs, wantTransforms) {
+		t.Fatalf("registry ids = %#v, want %#v", registryIDs, wantTransforms)
+	}
+
 	var contract struct {
 		ProviderFree          bool   `json:"provider_free"`
 		LiveNetwork           bool   `json:"live_network"`
@@ -181,8 +251,28 @@ func TestFinRobotFactorResearchTransformsContractsAndFixtures(t *testing.T) {
 			SourceModule   string   `json:"source_module"`
 			RequiredFields []string `json:"required_fields"`
 		} `json:"modules"`
-		FieldContracts  map[string]any `json:"field_contracts"`
-		AcceptanceGates []string       `json:"acceptance_gates"`
+		FieldContracts            map[string]any `json:"field_contracts"`
+		TransformRegistryContract struct {
+			RegistryID          string   `json:"registry_id"`
+			Ordered             bool     `json:"ordered"`
+			RequiredEntryFields []string `json:"required_entry_fields"`
+			RequiredIDs         []string `json:"required_ids"`
+		} `json:"transform_registry_contract"`
+		FixtureProvenanceContract struct {
+			Provider                 string   `json:"provider"`
+			RequiredFields           []string `json:"required_fields"`
+			RowSourceRefsMustResolve bool     `json:"row_source_refs_must_resolve"`
+			SourceURLRequired        bool     `json:"source_url_required"`
+		} `json:"fixture_provenance_contract"`
+		OptionalOptimizerGate struct {
+			ID                         string `json:"id"`
+			Required                   bool   `json:"required"`
+			DefaultEnabled             bool   `json:"default_enabled"`
+			CleanSkipWithoutDependency bool   `json:"clean_skip_without_dependency"`
+			SkipStatus                 string `json:"skip_status"`
+			FixtureFallback            string `json:"fixture_fallback"`
+		} `json:"optional_optimizer_gate"`
+		AcceptanceGates []string `json:"acceptance_gates"`
 	}
 	decodeFactorResearchJSONFile(t, filepath.Join(base, "contracts", "factor_research_contract.json"), &contract)
 	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || contract.SourceModule != "experiments/multi_factor_agents.py" || len(contract.Modules) != 3 {
@@ -193,8 +283,22 @@ func TestFinRobotFactorResearchTransformsContractsAndFixtures(t *testing.T) {
 			t.Fatalf("missing field contract %q", field)
 		}
 	}
+	if contract.TransformRegistryContract.RegistryID != registry.RegistryID || !contract.TransformRegistryContract.Ordered || !reflect.DeepEqual(contract.TransformRegistryContract.RequiredIDs, registry.Ordering) {
+		t.Fatalf("transform registry contract mismatch: %#v", contract.TransformRegistryContract)
+	}
+	for _, want := range []string{"id", "provider", "replay_key", "captured_at", "source_schema", "license", "stale_after_days", "row_count"} {
+		if !containsFactorResearchString(contract.FixtureProvenanceContract.RequiredFields, want) {
+			t.Fatalf("fixture provenance contract missing %q: %#v", want, contract.FixtureProvenanceContract)
+		}
+	}
+	if contract.FixtureProvenanceContract.Provider != "fixture" || !contract.FixtureProvenanceContract.RowSourceRefsMustResolve || contract.FixtureProvenanceContract.SourceURLRequired {
+		t.Fatalf("fixture provenance policy must be provider-free and resolvable: %#v", contract.FixtureProvenanceContract)
+	}
+	if gate := contract.OptionalOptimizerGate; gate.ID != "portfolio_optimizer_optional_gate" || gate.Required || gate.DefaultEnabled || !gate.CleanSkipWithoutDependency || gate.SkipStatus != "clean_skipped_without_optimizer" || gate.FixtureFallback != "portfolio_exposure:ACME_UNIVERSE:offline" {
+		t.Fatalf("optional optimizer gate contract invalid: %#v", gate)
+	}
 	acceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
-	for _, want := range []string{"multi-factor", "factor transforms", "market data", "portfolio exposure", "clean-skip"} {
+	for _, want := range []string{"multi-factor", "factor transforms", "market data", "portfolio exposure", "risk envelope", "optimizer gate", "clean-skip"} {
 		if !strings.Contains(acceptance, want) {
 			t.Fatalf("acceptance gates missing %q: %s", want, acceptance)
 		}
@@ -223,6 +327,9 @@ func TestFinRobotFactorResearchTransformsContractsAndFixtures(t *testing.T) {
 		if fixture.Metadata["replay_ready"] != true {
 			t.Fatalf("%s replay_ready = %#v", fixture.FixtureKey, fixture.Metadata["replay_ready"])
 		}
+		if !strings.HasPrefix(fixture.Capability, "finance.factor_research.") || fixture.Metadata["provider_free"] != true {
+			t.Fatalf("%s fixture index metadata incomplete: %#v", fixture.FixtureKey, fixture)
+		}
 		assertFactorResearchJSONFile(t, filepath.Join(base, fixture.Path))
 		assertFactorResearchJSONFile(t, filepath.Join(base, fixture.Schema))
 	}
@@ -236,7 +343,7 @@ func TestFinRobotFactorResearchPortfolioExposureAndHandoffBoundaries(t *testing.
 	fixtures := map[string]bool{}
 	for _, boundary := range manifest.AgentHandoffBoundaries {
 		ids = append(ids, boundary.ID)
-		if boundary.ID == "" || boundary.DisplayName == "" || boundary.Capability == "" || boundary.FixtureKey == "" || boundary.Schema == "" {
+		if boundary.ID == "" || boundary.DisplayName == "" || boundary.Capability == "" || boundary.FixtureKey == "" || boundary.Schema == "" || boundary.RequestOwner == "" || boundary.ResponseOwner == "" || boundary.InputContract == "" || boundary.OutputContract == "" {
 			t.Fatalf("handoff boundary metadata incomplete: %#v", boundary)
 		}
 		if boundary.LiveNetwork || boundary.DependencyImported || boundary.CredentialRequired || !boundary.CleanSkip {
@@ -252,6 +359,9 @@ func TestFinRobotFactorResearchPortfolioExposureAndHandoffBoundaries(t *testing.
 	if !reflect.DeepEqual(ids, wantIDs) {
 		t.Fatalf("handoff ids = %#v, want %#v", ids, wantIDs)
 	}
+	if gate := manifest.OptionalOptimizerGate; gate.ID != "portfolio_optimizer_optional_gate" || gate.Required || gate.DefaultEnabled || !gate.ProviderFreeDefault || gate.LiveNetworkDefault || gate.CredentialRequiredDefault || !gate.CleanSkipWithoutDependency || gate.SkipStatus != "clean_skipped_without_optimizer" || gate.FixtureFallback != "portfolio_exposure:ACME_UNIVERSE:offline" {
+		t.Fatalf("manifest optional optimizer gate invalid: %#v", gate)
+	}
 
 	var boundaryContract struct {
 		ProviderFree               bool                            `json:"provider_free"`
@@ -259,10 +369,21 @@ func TestFinRobotFactorResearchPortfolioExposureAndHandoffBoundaries(t *testing.
 		RealDependencyImports      bool                            `json:"real_dependency_imports"`
 		CleanSkipWithoutDependency bool                            `json:"clean_skip_without_dependency"`
 		Boundaries                 []factorResearchHandoffBoundary `json:"boundaries"`
+		OptionalOptimizerGate      struct {
+			ID                         string `json:"id"`
+			Required                   bool   `json:"required"`
+			DefaultEnabled             bool   `json:"default_enabled"`
+			CleanSkipWithoutDependency bool   `json:"clean_skip_without_dependency"`
+			SkipStatus                 string `json:"skip_status"`
+			HandoffID                  string `json:"handoff_id"`
+		} `json:"optional_optimizer_gate"`
 	}
 	decodeFactorResearchJSONFile(t, filepath.Join(base, "contracts", "agent_handoff_boundary_contract.json"), &boundaryContract)
 	if !boundaryContract.ProviderFree || boundaryContract.LiveNetwork || boundaryContract.RealDependencyImports || !boundaryContract.CleanSkipWithoutDependency || len(boundaryContract.Boundaries) != 3 {
 		t.Fatalf("boundary contract = %#v", boundaryContract)
+	}
+	if gate := boundaryContract.OptionalOptimizerGate; gate.ID != "portfolio_optimizer_optional_gate" || gate.Required || gate.DefaultEnabled || !gate.CleanSkipWithoutDependency || gate.SkipStatus != "clean_skipped_without_optimizer" || gate.HandoffID != "portfolio_optimizer" {
+		t.Fatalf("boundary optional optimizer gate invalid: %#v", gate)
 	}
 
 	var exposureFixture struct {
@@ -274,6 +395,14 @@ func TestFinRobotFactorResearchPortfolioExposureAndHandoffBoundaries(t *testing.
 			Weight float64 `json:"weight"`
 		} `json:"holdings"`
 		FactorExposures map[string]float64 `json:"factor_exposures"`
+		ExposureSummary struct {
+			GrossExposure     float64 `json:"gross_exposure"`
+			NetExposure       float64 `json:"net_exposure"`
+			TopFactor         string  `json:"top_factor"`
+			TopFactorExposure float64 `json:"top_factor_exposure"`
+			DominantSector    string  `json:"dominant_sector"`
+			RiskStatus        string  `json:"risk_status"`
+		} `json:"exposure_summary"`
 		SectorExposures []struct {
 			Sector string  `json:"sector"`
 			Weight float64 `json:"weight"`
@@ -284,6 +413,22 @@ func TestFinRobotFactorResearchPortfolioExposureAndHandoffBoundaries(t *testing.
 			Observed float64 `json:"observed"`
 			Status   string  `json:"status"`
 		} `json:"risk_limits"`
+		RiskEnvelope struct {
+			MaxSingleNameWeight   float64  `json:"max_single_name_weight"`
+			MaxWeightedVolatility float64  `json:"max_weighted_volatility"`
+			MinWeightedLiquidity  float64  `json:"min_weighted_liquidity"`
+			MaxSectorWeight       float64  `json:"max_sector_weight"`
+			Status                string   `json:"status"`
+			LimitIDs              []string `json:"limit_ids"`
+		} `json:"risk_envelope"`
+		OptimizerGate struct {
+			ID                  string `json:"id"`
+			DependencyAvailable bool   `json:"dependency_available"`
+			DefaultEnabled      bool   `json:"default_enabled"`
+			CleanSkip           bool   `json:"clean_skip"`
+			Status              string `json:"status"`
+			FixtureFallback     string `json:"fixture_fallback"`
+		} `json:"optimizer_gate"`
 		SourceRefs []string `json:"source_refs"`
 	}
 	decodeFactorResearchJSONFile(t, filepath.Join(base, "fixtures", "portfolio_factor_exposure_fixture.json"), &exposureFixture)
@@ -295,10 +440,19 @@ func TestFinRobotFactorResearchPortfolioExposureAndHandoffBoundaries(t *testing.
 			t.Fatalf("portfolio exposure missing factor %q: %#v", want, exposureFixture.FactorExposures)
 		}
 	}
+	if exposureFixture.ExposureSummary.GrossExposure != 1 || exposureFixture.ExposureSummary.NetExposure != 1 || exposureFixture.ExposureSummary.TopFactor != "quality" || exposureFixture.ExposureSummary.DominantSector != "technology" || exposureFixture.ExposureSummary.RiskStatus != "pass" {
+		t.Fatalf("exposure summary invalid: %#v", exposureFixture.ExposureSummary)
+	}
 	for _, limit := range exposureFixture.RiskLimits {
 		if limit.ID == "" || limit.Status != "pass" {
 			t.Fatalf("risk limit must be explicit and passing in skeleton fixture: %#v", limit)
 		}
+	}
+	if envelope := exposureFixture.RiskEnvelope; envelope.MaxSingleNameWeight <= 0 || envelope.MaxWeightedVolatility <= 0 || envelope.MinWeightedLiquidity <= 0 || envelope.MaxSectorWeight <= 0 || envelope.Status != "pass" || len(envelope.LimitIDs) != len(exposureFixture.RiskLimits) {
+		t.Fatalf("risk envelope invalid: %#v", envelope)
+	}
+	if gate := exposureFixture.OptimizerGate; gate.ID != "portfolio_optimizer_optional_gate" || gate.DependencyAvailable || gate.DefaultEnabled || !gate.CleanSkip || gate.Status != "clean_skipped_without_optimizer" || gate.FixtureFallback != "portfolio_exposure:ACME_UNIVERSE:offline" {
+		t.Fatalf("portfolio optimizer gate invalid: %#v", gate)
 	}
 }
 
@@ -306,9 +460,21 @@ func TestFinRobotFactorResearchFixtureShape(t *testing.T) {
 	base := factorResearchLivePackageDir(t)
 
 	var marketFixture struct {
-		ProviderFree bool `json:"provider_free"`
-		LiveNetwork  bool `json:"live_network"`
-		Rows         []struct {
+		ProviderFree      bool                             `json:"provider_free"`
+		LiveNetwork       bool                             `json:"live_network"`
+		CapturedAt        string                           `json:"captured_at"`
+		StaleAfter        int                              `json:"stale_after_days"`
+		SourceRefs        []factorResearchFixtureSourceRef `json:"source_refs"`
+		ProvenanceSummary struct {
+			Provider          string   `json:"provider"`
+			ReplayKey         string   `json:"replay_key"`
+			CapturedAt        string   `json:"captured_at"`
+			StaleAfterDays    int      `json:"stale_after_days"`
+			RowCount          int      `json:"row_count"`
+			SourceRefs        []string `json:"source_refs"`
+			SourceURLRedacted bool     `json:"source_url_redacted"`
+		} `json:"provenance_summary"`
+		Rows []struct {
 			Symbol    string  `json:"symbol"`
 			AsOf      string  `json:"as_of"`
 			Close     float64 `json:"close"`
@@ -321,17 +487,37 @@ func TestFinRobotFactorResearchFixtureShape(t *testing.T) {
 	if !marketFixture.ProviderFree || marketFixture.LiveNetwork || len(marketFixture.Rows) != 5 {
 		t.Fatalf("market fixture header/count = %#v", marketFixture)
 	}
+	marketRefs := factorResearchSourceRefSet(t, marketFixture.SourceRefs, len(marketFixture.Rows))
+	if marketFixture.CapturedAt == "" || marketFixture.StaleAfter != 7 || marketFixture.ProvenanceSummary.Provider != "fixture" || marketFixture.ProvenanceSummary.RowCount != len(marketFixture.Rows) || !marketFixture.ProvenanceSummary.SourceURLRedacted {
+		t.Fatalf("market provenance summary incomplete: %#v", marketFixture.ProvenanceSummary)
+	}
 	for _, row := range marketFixture.Rows {
 		if row.Symbol == "" || row.AsOf == "" || row.Close <= 0 || row.Volume <= 0 || row.Currency != "USD" || row.SourceRef == "" {
 			t.Fatalf("market row incomplete: %#v", row)
 		}
+		if !marketRefs[row.SourceRef] {
+			t.Fatalf("market row source_ref %q does not resolve", row.SourceRef)
+		}
 	}
 
 	var factorFixture struct {
-		ProviderFree      bool     `json:"provider_free"`
-		LiveNetwork       bool     `json:"live_network"`
-		TransformsApplied []string `json:"transforms_applied"`
-		Rows              []struct {
+		ProviderFree      bool                             `json:"provider_free"`
+		LiveNetwork       bool                             `json:"live_network"`
+		CapturedAt        string                           `json:"captured_at"`
+		StaleAfter        int                              `json:"stale_after_days"`
+		TransformsApplied []string                         `json:"transforms_applied"`
+		SourceRefs        []factorResearchFixtureSourceRef `json:"source_refs"`
+		ProvenanceSummary struct {
+			Provider          string   `json:"provider"`
+			ReplayKey         string   `json:"replay_key"`
+			CapturedAt        string   `json:"captured_at"`
+			StaleAfterDays    int      `json:"stale_after_days"`
+			RowCount          int      `json:"row_count"`
+			SourceRefs        []string `json:"source_refs"`
+			TransformRegistry string   `json:"transform_registry"`
+			SourceURLRedacted bool     `json:"source_url_redacted"`
+		} `json:"provenance_summary"`
+		Rows []struct {
 			Symbol         string             `json:"symbol"`
 			Sector         string             `json:"sector"`
 			Factors        map[string]float64 `json:"factors"`
@@ -344,9 +530,16 @@ func TestFinRobotFactorResearchFixtureShape(t *testing.T) {
 	if !factorFixture.ProviderFree || factorFixture.LiveNetwork || len(factorFixture.Rows) != 5 || len(factorFixture.TransformsApplied) != 4 {
 		t.Fatalf("factor fixture header/count = %#v", factorFixture)
 	}
+	factorRefs := factorResearchSourceRefSet(t, factorFixture.SourceRefs, len(factorFixture.Rows))
+	if factorFixture.CapturedAt == "" || factorFixture.StaleAfter != 7 || factorFixture.ProvenanceSummary.Provider != "fixture" || factorFixture.ProvenanceSummary.RowCount != len(factorFixture.Rows) || factorFixture.ProvenanceSummary.TransformRegistry != "factor_transform_registry_v1" || !factorFixture.ProvenanceSummary.SourceURLRedacted {
+		t.Fatalf("factor provenance summary incomplete: %#v", factorFixture.ProvenanceSummary)
+	}
 	for _, row := range factorFixture.Rows {
 		if row.Symbol == "" || row.Sector == "" || row.SourceRef == "" || row.CompositeScore <= 0 || row.RiskPenalty < 0 {
 			t.Fatalf("factor row incomplete: %#v", row)
+		}
+		if !factorRefs[row.SourceRef] {
+			t.Fatalf("factor row source_ref %q does not resolve", row.SourceRef)
 		}
 		for _, want := range []string{"value", "growth", "momentum", "quality", "volatility", "liquidity", "sentiment", "macro"} {
 			if _, ok := row.Factors[want]; !ok {
@@ -432,6 +625,30 @@ func assertFactorResearchJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	decodeFactorResearchJSONFile(t, path, &value)
+}
+
+func factorResearchSourceRefSet(t *testing.T, refs []factorResearchFixtureSourceRef, wantRows int) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	for _, ref := range refs {
+		if ref.ID == "" || ref.Provider != "fixture" || ref.ReplayKey == "" || ref.CapturedAt == "" || ref.SourceSchema == "" || ref.License == "" || ref.StaleAfterDays <= 0 || ref.RowCount != wantRows || !ref.SourceURLRedacted {
+			t.Fatalf("source ref incomplete: %#v", ref)
+		}
+		out[ref.ID] = true
+	}
+	if len(out) == 0 {
+		t.Fatal("fixture source refs must not be empty")
+	}
+	return out
+}
+
+func containsFactorResearchString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeFactorResearchJSONFile(t *testing.T, path string, value any) {

@@ -30,6 +30,14 @@
     "macro": 0.6133,
     "composite_score": 0.4902
   },
+  "exposure_summary": {
+    "gross_exposure": 1,
+    "net_exposure": 1,
+    "top_factor": "quality",
+    "top_factor_exposure": 0.7833,
+    "dominant_sector": "technology",
+    "risk_status": "pass"
+  },
   "sector_exposures": [
     {
       "sector": "technology",
@@ -56,9 +64,28 @@
       "status": "pass"
     }
   ],
+  "risk_envelope": {
+    "max_single_name_weight": 0.45,
+    "max_weighted_volatility": 0.4,
+    "min_weighted_liquidity": 0.85,
+    "max_sector_weight": 1,
+    "status": "pass",
+    "limit_ids": [
+      "max_single_name_weight",
+      "max_weighted_volatility",
+      "min_weighted_liquidity"
+    ]
+  },
+  "optimizer_gate": {
+    "id": "portfolio_optimizer_optional_gate",
+    "dependency_available": false,
+    "default_enabled": false,
+    "clean_skip": true,
+    "status": "clean_skipped_without_optimizer",
+    "fixture_fallback": "portfolio_exposure:ACME_UNIVERSE:offline"
+  },
   "source_refs": [
     "market_fixture_acme_universe",
     "factor_fixture_acme_universe"
   ]
 }
-

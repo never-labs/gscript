@@ -15,14 +15,16 @@
     "close",
     "volume",
     "currency",
-    "source_ref"
+    "source_ref",
+    "provenance_summary"
   ],
   "provenance_required": [
     "provider",
     "replay_key",
     "captured_at",
     "source_schema",
-    "stale_after_days"
+    "stale_after_days",
+    "row_count",
+    "source_url_redacted"
   ]
 }
-

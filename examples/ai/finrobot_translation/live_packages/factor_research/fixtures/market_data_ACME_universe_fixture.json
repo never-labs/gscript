@@ -11,10 +11,25 @@
       "id": "market_fixture_acme_universe",
       "provider": "fixture",
       "replay_key": "market_data:ACME_UNIVERSE:offline",
+      "captured_at": "2026-01-02T00:00:00Z",
       "source_schema": "market_data_v1",
-      "license": "example-fixture"
+      "license": "example-fixture",
+      "stale_after_days": 7,
+      "row_count": 5,
+      "source_url_redacted": true
     }
   ],
+  "provenance_summary": {
+    "provider": "fixture",
+    "replay_key": "market_data:ACME_UNIVERSE:offline",
+    "captured_at": "2026-01-02T00:00:00Z",
+    "stale_after_days": 7,
+    "row_count": 5,
+    "source_refs": [
+      "market_fixture_acme_universe"
+    ],
+    "source_url_redacted": true
+  },
   "rows": [
     {
       "symbol": "AAPL",
@@ -78,4 +93,3 @@
     }
   ]
 }
-
