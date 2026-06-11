@@ -11,7 +11,7 @@
   "backend_shapes": [
     {
       "shape_id": "ai.model.resolve",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["model"],
       "contract": "Resolve provider-neutral model aliases into replay-safe execution descriptors.",
       "inputs": ["model_alias", "provider_policy", "replay_mode"],
@@ -31,7 +31,7 @@
     },
     {
       "shape_id": "ai.turn.execute",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["turn", "replay"],
       "contract": "Execute or replay a single structured model turn with deterministic usage and error envelopes.",
       "inputs": ["messages", "response_format", "tool_policy", "replay_records"],
@@ -51,7 +51,7 @@
     },
     {
       "shape_id": "ai.tool.invoke",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["tool", "approval", "capability"],
       "contract": "Validate, authorize, invoke, and replay a tool call using a provider-neutral result envelope.",
       "inputs": ["tool_schema", "arguments", "capability_tags", "approval_state"],
@@ -71,7 +71,7 @@
     },
     {
       "shape_id": "ai.agent.run",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["agent", "workflow"],
       "contract": "Run declarative agent loops over turns, tools, memory snapshots, and structured outputs.",
       "inputs": ["agent_config", "initial_state", "tool_registry", "max_steps"],
@@ -91,7 +91,7 @@
     },
     {
       "shape_id": "ai.workflow.orchestrate",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["workflow", "trace"],
       "contract": "Coordinate multi-agent handoffs, stage retries, cache decisions, and trace emission.",
       "inputs": ["workflow_graph", "stage_inputs", "retry_policy", "cache_policy"],
@@ -111,7 +111,7 @@
     },
     {
       "shape_id": "ai.eval.run",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["evaluation", "replay"],
       "contract": "Run provider-free evaluation cases with replayed judges, metrics, findings, and golden gates.",
       "inputs": ["dataset_manifest", "case_inputs", "metric_specs", "judge_records"],
@@ -131,7 +131,7 @@
     },
     {
       "shape_id": "ai.trace.emit",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["trace", "approval", "replay"],
       "contract": "Emit normalized trace events for turns, streams, approvals, tools, artifacts, and replay matching.",
       "inputs": ["event_type", "event_payload", "redaction_policy", "correlation_ids"],
@@ -151,7 +151,7 @@
     },
     {
       "shape_id": "ai.package.audit",
-      "status": "planned",
+      "status": "checked_in_package_boundary",
       "capabilities": ["package-boundary", "capability"],
       "contract": "Audit package manifests, provider-free gates, registered examples, and missing built-in guarantees.",
       "inputs": ["package_manifest", "fixture_index", "example_registry", "capability_policy"],

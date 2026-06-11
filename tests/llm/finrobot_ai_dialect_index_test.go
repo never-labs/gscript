@@ -193,7 +193,7 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 				t.Fatalf("invalid or duplicate backend shape id %q", shape.ShapeID)
 			}
 			seenShapes[shape.ShapeID] = true
-			if shape.Status != "planned" {
+			if shape.Status != "checked_in_package_boundary" {
 				t.Fatalf("%s has unexpected status %q", shape.ShapeID, shape.Status)
 			}
 			if shape.Contract == "" || len(shape.Inputs) == 0 || len(shape.Outputs) == 0 || len(shape.Capabilities) == 0 {
@@ -245,6 +245,8 @@ func assertGenericAIDialectBackendPackageBoundary(t *testing.T, root string, sha
 	assertGenericAIDialectReference(t, root, boundary.RegisteredExample, true)
 	assertGenericAIDialectReference(t, root, boundary.ContractPath, true)
 	assertGenericAIDialectPackageManifestProviderFree(t, root, manifest)
+	assertGenericAIDialectRegisteredExampleProviderFree(t, root, boundary.RegisteredExample)
+	assertGenericAIDialectContractProviderFree(t, root, boundary.ContractPath)
 
 	dirInfo, err := os.Stat(filepath.Join(root, filepath.FromSlash(boundary.Directory)))
 	if err != nil {
@@ -259,6 +261,106 @@ func assertGenericAIDialectBackendPackageBoundary(t *testing.T, root string, sha
 	if got, want := filepath.ToSlash(filepath.Dir(filepath.Dir(boundary.ContractPath))), boundary.Directory; got != want {
 		t.Fatalf("%s contract path %q is outside package directory %q", shape.ShapeID, boundary.ContractPath, boundary.Directory)
 	}
+}
+
+func assertGenericAIDialectContractProviderFree(t *testing.T, root, rel string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("%s: %v", rel, err)
+	}
+	var contract struct {
+		ProviderFree                bool `json:"provider_free"`
+		DomainSpecific              bool `json:"domain_specific"`
+		LiveNetwork                 bool `json:"live_network"`
+		LiveNetworkDefault          bool `json:"live_network_default"`
+		RealDependencyImports       bool `json:"real_dependency_imports"`
+		RealDependencyImportDefault bool `json:"real_dependency_import_default"`
+		LiveModelCalls              bool `json:"live_model_calls"`
+		RequiresCredentials         bool `json:"requires_credentials"`
+		ProviderCredentialsRequired bool `json:"provider_credentials_required"`
+		ProviderSDKsRequired        bool `json:"provider_sdks_required"`
+	}
+	if err := json.Unmarshal(data, &contract); err != nil {
+		t.Fatalf("%s: %v", rel, err)
+	}
+	if !contract.ProviderFree ||
+		contract.DomainSpecific ||
+		contract.LiveNetwork ||
+		contract.LiveNetworkDefault ||
+		contract.RealDependencyImports ||
+		contract.RealDependencyImportDefault ||
+		contract.LiveModelCalls ||
+		contract.RequiresCredentials ||
+		contract.ProviderCredentialsRequired ||
+		contract.ProviderSDKsRequired {
+		t.Fatalf("contract %q is not provider-free: %#v", rel, contract)
+	}
+	assertGenericAIDialectProviderFreeText(t, rel, string(data))
+}
+
+func assertGenericAIDialectRegisteredExampleProviderFree(t *testing.T, root, rel string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("%s: %v", rel, err)
+	}
+	text := string(data)
+	assertGenericAIDialectProviderFreeText(t, rel, text)
+	compact := compactGenericAIDialectText(text)
+	if !strings.Contains(compact, "provider_free:true") && !strings.Contains(compact, "provider_free=true") {
+		t.Fatalf("registered example %q does not declare provider_free true", rel)
+	}
+	if !strings.Contains(compact, "live_network:false") && !strings.Contains(compact, "live_network=false") {
+		t.Fatalf("registered example %q does not declare live_network false", rel)
+	}
+}
+
+func assertGenericAIDialectProviderFreeText(t *testing.T, rel, text string) {
+	t.Helper()
+	compact := compactGenericAIDialectText(text)
+	for _, forbidden := range []string{
+		`"provider_free":false`,
+		"provider_free:false",
+		"provider_free=false",
+		`"live_network":true`,
+		"live_network:true",
+		"live_network=true",
+		`"live_network_default":true`,
+		"live_network_default:true",
+		"live_network_default=true",
+		`"live_model":true`,
+		"live_model:true",
+		"live_model=true",
+		`"live_model_calls":true`,
+		"live_model_calls:true",
+		"live_model_calls=true",
+		`"real_dependency_imports":true`,
+		"real_dependency_imports:true",
+		"real_dependency_imports=true",
+		`"real_dependency_import_default":true`,
+		"real_dependency_import_default:true",
+		"real_dependency_import_default=true",
+		`"requires_credentials":true`,
+		"requires_credentials:true",
+		"requires_credentials=true",
+		`"provider_credentials_required":true`,
+		"provider_credentials_required:true",
+		"provider_credentials_required=true",
+		`"provider_sdks_required":true`,
+		"provider_sdks_required:true",
+		"provider_sdks_required=true",
+	} {
+		if strings.Contains(compact, forbidden) {
+			t.Fatalf("%q contains provider-specific marker %q", rel, forbidden)
+		}
+	}
+}
+
+func compactGenericAIDialectText(text string) string {
+	lower := strings.ToLower(text)
+	replacer := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "")
+	return replacer.Replace(lower)
 }
 
 func assertGenericAIDialectProductionBoundary(t *testing.T, root string, entry genericAIDialectIndexItem) {
