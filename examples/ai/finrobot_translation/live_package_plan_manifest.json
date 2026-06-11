@@ -4,7 +4,44 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation; live external package implementations are not checked in",
+  "registered_examples_count": 27,
+  "translation_directory_file_count": 78,
+  "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
+  "live_package_skeletons": [
+    {
+      "id": "analytics_report",
+      "directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/analytics_report/analytics_report.leia",
+      "covers_package_ids": [
+        "normalizers",
+        "valuation",
+        "report_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "product_workflow",
+      "directory": "examples/ai/finrobot_translation/live_packages/product_workflow",
+      "registered_example": null,
+      "covered_by_examples": [
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+        "examples/ai/finrobot_translation/web_product.leia"
+      ],
+      "covers_package_ids": [
+        "web_product"
+      ],
+      "status": "checked_in_contracts_schemas_fixtures"
+    },
+    {
+      "id": "vendor_adapters",
+      "directory": "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/vendor_adapters/main.leia",
+      "covers_package_ids": [
+        "vendor_adapters"
+      ],
+      "status": "checked_in_registered_example"
+    }
+  ],
   "live_network_default": false,
   "real_dependency_import_default": false,
   "no_built_in_guarantee": {

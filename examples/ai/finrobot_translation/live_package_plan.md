@@ -7,13 +7,19 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-| Skeleton source | Target external package | Target directory | Contract |
-| --- | --- | --- | --- |
-| `vendor_adapters.leia` | `leia-finrobot-vendor-adapters` | `packages/finrobot/vendor_adapters` | `contracts/vendor_adapter_contract.json` |
-| `finance_normalizers.leia` | `leia-finrobot-normalizers` | `packages/finrobot/normalizers` | `contracts/finance_normalizer_contract.json` |
-| `valuation_analytics.leia` | `leia-finrobot-valuation` | `packages/finrobot/valuation` | `contracts/valuation_contract.json` |
-| `report_contract.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |
-| `web_product.leia` | `leia-finrobot-web-product` | `packages/finrobot/web_product` | `contracts/web_product_contract.json` |
+Current registered-example status: 27 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. Two checked-in live-package
+skeletons are registered examples (`analytics_report` and `vendor_adapters`);
+the product workflow skeleton is manifest/contracts/schemas/fixtures only and
+is covered by tests through the existing workflow examples.
+
+| Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
+| --- | --- | --- | --- | --- |
+| `live_packages/vendor_adapters` | `live_packages/vendor_adapters/main.leia` | `leia-finrobot-vendor-adapters` | `packages/finrobot/vendor_adapters` | `contracts/vendor_adapter_contract.json` |
+| `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-normalizers` | `packages/finrobot/normalizers` | `contracts/finance_normalizer_contract.json` |
+| `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-valuation` | `packages/finrobot/valuation` | `contracts/valuation_contract.json` |
+| `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |
+| `live_packages/product_workflow` | Covered through `equity_cli_workflow.leia` and `web_product.leia`; no standalone registered `.leia` file | `leia-finrobot-web-product` | `packages/finrobot/web_product` | `contracts/web_product_contract.json` |
 
 ## Contract Rules
 

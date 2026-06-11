@@ -1,111 +1,63 @@
 # FinRobot Translation Release-Gate Verification
 
-Verification date: 2026-06-11
+Verification date: 2026-06-12
 
-Branch under test: `codex/finrobot-release-gate-verification`
+Branch under test: `codex/finrobot-doc-status-current`
 
 Base branch: `origin/codex/ai-dialect-polish`
 
-Base commit: `e9917e402ba344384bf8fa885022cb42d17ce8d3`
-(`docs: close FinRobot translation gap ledger`)
+Base commit: `b3b6088ddec506d0e74c85b07ac35232dcbd724b`
+(`test: integrate FinRobot live package skeletons`)
 
 Environment:
 
 - macOS Darwin 25.4.0 arm64
 - `go version go1.25.7 darwin/arm64`
 - Worktree:
-  `/Users/jxwr/ai/ai_agent_experiment_gscript/gscript-finrobot-release-gate`
+  `/Users/jxwr/ai/ai_agent_experiment_gscript/gscript-finrobot-docs`
 
 ## Scope
 
-This release-gate pass verifies the AI/FinRobot translation branch without
-changing runtime behavior. The FinRobot translation remains documentation,
-examples, replay fixtures, and gap tracking over the general AI/data/workflow
-surfaces.
+This release-gate pass verifies the FinRobot documentation-status refresh
+without changing runtime behavior. The checked-in FinRobot slice remains
+documentation, examples, replay fixtures, manifests, and provider-free
+live-package skeleton contracts over the general AI/data/workflow surfaces.
+
+No `docs/spec/index.html` generation was run.
 
 ## Results
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 3.496s` |
-| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `25 ok, 0 skipped, 0 failed` |
-| Repo check, no docs | `go run ./cmd/leia check --no-docs .` | Expected external failure: editor smoke drift; fmt/lint/test/manifest/examples pass |
-| Repo check, no docs/editor | `go run ./cmd/leia check --no-docs --no-editor .` | Pass: `fmt: ok`, `lint: ok`, `test: ok`, `manifest: ok`, `examples: ok`; docs/editor skipped |
-| Docs-only confirmation | `go run ./cmd/leia check --no-test --no-editor --no-examples .` | Expected external failure: stale generated spec docs |
+| LLM tests | `go test ./tests/llm -count=1` | Pass: `ok github.com/never-labs/leia/tests/llm 2.470s` |
+| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `27 ok, 0 skipped, 0 failed` |
+| Live package plan manifest JSON | `jq empty examples/ai/finrobot_translation/live_package_plan_manifest.json` | Pass |
+| Repo check, no generated docs/editor | `go run ./cmd/leia check --no-docs --no-editor .` | Pass: `fmt: ok`, `lint: ok`, `test: ok`, `manifest: ok`, `examples: ok`; docs/editor skipped |
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation`
-validated these 25 provider-free examples:
+`go run ./cmd/leia examples --json` discovers 27 runnable/checkable FinRobot
+translation examples under `examples/ai/finrobot_translation`.
 
-- `api_replay`
-- `compliance_policy`
-- `config_secret_example`
-- `core_agents/main`
-- `core_agents/workflow_handoff`
-- `data_normalization`
-- `data_tools`
-- `document_rag`
-- `equity_cli_workflow`
-- `equity_report`
-- `finance_normalizers`
-- `generated_code_tooling`
-- `model_alias_routing_example`
-- `optional_integrations`
-- `quant_experiments/investment_group`
-- `quant_experiments/multi_factor_agents`
-- `quant_experiments/portfolio_optimization`
-- `report_contract`
-- `reporting`
-- `role_profiles`
-- `section_agents`
-- `sensitivity_math`
-- `valuation_analytics`
-- `vendor_adapters`
-- `web_product`
+The examples gate validated:
+
+- 19 `host-vm` examples
+- 6 `llm-replay` examples
+- 2 `evaluate` examples
+- 2 registered live-package skeleton examples:
+  `live_packages/analytics_report/analytics_report.leia` and
+  `live_packages/vendor_adapters/main.leia`
 
 The checker reported:
 
 ```text
-examples: 25 ok, 0 skipped, 0 failed
+examples: 27 ok, 0 skipped, 0 failed
 ```
 
-## Known External Issues
-
-The requested repo gate was run as `go run ./cmd/leia check --no-docs .`.
-It failed only in the editor smoke check because the Emacs module catalog is
-stale relative to the stdlib catalog:
+The repository check reported:
 
 ```text
-editor_smoke.py: Emacs leia--modules drifted from stdlib catalog:
-got [..., 'csv', 'db', ...]
-want [..., 'csv', 'data', 'db', ...]
-```
-
-The same command still reported the FinRobot and full repository examples as
-healthy:
-
-```text
-examples: 169 ok, 8 skipped, 0 failed
-fmt: ok
-lint: ok
-test: ok
-manifest: ok
-docs: skipped
-editor: failed
-examples: ok
-```
-
-To isolate the FinRobot release gate from that unrelated editor drift, the same
-repo check was rerun with editor checks skipped:
-
-```text
-go run ./cmd/leia check --no-docs --no-editor .
-```
-
-That command passed:
-
-```text
+examples: 171 ok, 8 skipped, 0 failed
 fmt: ok
 lint: ok
 test: ok
@@ -115,24 +67,17 @@ editor: skipped
 examples: ok
 ```
 
-A separate docs confirmation run shows the expected generated-docs stale issue:
+## Live-Package Skeleton Status
 
-```text
-go run ./cmd/leia check --no-test --no-editor --no-examples .
-```
+Current checked-in skeleton directories:
 
-It fails before this branch changes any runtime or docs generator code:
-
-```text
-error: docs/spec/index.html is stale; run: python3 scripts/spec_preview.py --output docs/spec/index.html
-fmt: ok
-lint: ok
-test: skipped
-manifest: ok
-docs: failed
-editor: skipped
-examples: skipped
-```
+- `live_packages/analytics_report`: registered example plus manifest/schema for
+  normalizer, valuation, chart/report artifact, and renderer contracts.
+- `live_packages/product_workflow`: manifest, contracts, schemas, and fixtures;
+  covered through `equity_cli_workflow.leia`, `web_product.leia`, and
+  `tests/llm/finrobot_product_workflow_live_package_test.go`.
+- `live_packages/vendor_adapters`: registered example plus manifest, schemas,
+  and fixtures for six provider adapters with network disabled by default.
 
 ## Reproduction
 
@@ -140,24 +85,20 @@ From a clean worktree based on `origin/codex/ai-dialect-polish`:
 
 ```sh
 git fetch origin codex/ai-dialect-polish
-git worktree add -b codex/finrobot-release-gate-verification \
-  ../gscript-finrobot-release-gate origin/codex/ai-dialect-polish
-cd ../gscript-finrobot-release-gate
+git worktree add -b codex/finrobot-doc-status-current \
+  ../gscript-finrobot-docs origin/codex/ai-dialect-polish
+cd ../gscript-finrobot-docs
 
 go test ./tests/llm -count=1
 go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation
-go run ./cmd/leia check --no-docs .
-
-# External-issue isolation checks:
+jq empty examples/ai/finrobot_translation/live_package_plan_manifest.json
 go run ./cmd/leia check --no-docs --no-editor .
-go run ./cmd/leia check --no-test --no-editor --no-examples .
 ```
 
 ## Release-Gate Conclusion
 
-The AI/FinRobot translation examples and LLM tests pass on
-`origin/codex/ai-dialect-polish` at `e9917e40`. The only blocking output from
-the requested repo-level `--no-docs` gate is unrelated editor catalog drift
-(`data` missing from Emacs `leia--modules`). The separately confirmed docs
-failure is a generated `docs/spec/index.html` stale issue and is outside this
-FinRobot runtime-free verification scope.
+The FinRobot documentation status is aligned with the current
+`origin/codex/ai-dialect-polish` surface: 27 registered runnable/checkable
+examples, 78 files in the translation directory, and three checked-in
+provider-free live-package skeleton directories. The validation commands above
+passed without generating `docs/spec/index.html`.
