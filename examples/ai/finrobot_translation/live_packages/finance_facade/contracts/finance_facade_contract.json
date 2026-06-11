@@ -7,7 +7,8 @@
   "clean_skip_without_dependency": true,
   "source_modules": [
     "finrobot/data_source/finance_data.py",
-    "finrobot/data_source/market_data.py"
+    "finrobot/data_source/market_data.py",
+    "finrobot/data_source/market_data_api.py"
   ],
   "modules": [
     {
@@ -33,6 +34,95 @@
         "rows",
         "provenance"
       ]
+    },
+    {
+      "id": "market_data_api",
+      "source_module": "finrobot/data_source/market_data_api.py",
+      "required_fields": [
+        "function_id",
+        "provider",
+        "capability",
+        "symbol",
+        "dataset",
+        "input",
+        "output",
+        "fallback",
+        "provenance"
+      ]
+    }
+  ],
+  "function_matrix": [
+    {
+      "id": "fmp_get_enterprise_value",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.enterprise_value.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fmp_enterprise_value_ACME_fixture.json",
+      "required_output_fields": ["enterprise_value", "market_cap", "total_debt", "cash_and_equivalents", "currency", "period"]
+    },
+    {
+      "id": "fmp_get_ratios_key_metrics",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.ratios_key_metrics.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fmp_key_metrics_ACME_fixture.json",
+      "required_output_fields": ["pe_ratio", "ev_to_ebitda", "gross_margin", "operating_margin", "return_on_equity", "debt_to_equity"]
+    },
+    {
+      "id": "fmp_get_ratings",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.ratings.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fmp_ratings_ACME_fixture.json",
+      "required_output_fields": ["rating", "rating_score", "recommendation", "rating_date"]
+    },
+    {
+      "id": "fmp_get_price_targets",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.targets.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fmp_targets_ACME_fixture.json",
+      "required_output_fields": ["target_low", "target_median", "target_high", "analyst_count", "currency", "as_of"]
+    },
+    {
+      "id": "fmp_get_technical_indicators",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.technical_indicators.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fmp_technical_indicators_ACME_fixture.json",
+      "required_output_fields": ["sma_20", "sma_50", "ema_20", "rsi_14", "macd", "as_of"]
+    },
+    {
+      "id": "fmp_get_company_profile",
+      "provider": "fmp",
+      "capability": "finance.facade.fmp.company_profile.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fmp_company_profile_ACME_fixture.json",
+      "required_output_fields": ["company_name", "exchange", "sector", "industry", "country", "currency"]
+    },
+    {
+      "id": "yfinance_get_company_profile",
+      "provider": "yfinance",
+      "capability": "finance.facade.yfinance.company_profile.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_yfinance_company_profile_ACME_fixture.json",
+      "required_output_fields": ["company_name", "exchange", "sector", "industry", "country", "currency"]
+    },
+    {
+      "id": "yfinance_get_market_cap",
+      "provider": "yfinance",
+      "capability": "finance.facade.yfinance.market_cap.fetch",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_yfinance_market_cap_ACME_fixture.json",
+      "required_output_fields": ["market_cap", "shares_outstanding", "last_price", "currency", "as_of"]
+    },
+    {
+      "id": "resolve_provider_fallback_order",
+      "provider": "facade",
+      "capability": "finance.facade.provider.fallback.resolve",
+      "schema": "schemas/function_fixture_v1.schema.json",
+      "fixture": "fixtures/function_fallback_order_ACME_fixture.json",
+      "required_output_fields": ["ordered_providers", "selected_provider", "reason"]
     }
   ],
   "typed_tables": [
@@ -137,5 +227,7 @@
     "cache, retry, and rate-limit policies produce deterministic fixture replay metadata",
     "every data row carries source_ref provenance and every fixture has replay_ready=true",
     "provider errors are returned through the error envelope contract"
+    ,
+    "market_data_api.py function fixtures cover EV, ratios/key metrics, ratings, targets, technical indicators, company profile, market cap, fallback order, and provider error envelope"
   ]
 }

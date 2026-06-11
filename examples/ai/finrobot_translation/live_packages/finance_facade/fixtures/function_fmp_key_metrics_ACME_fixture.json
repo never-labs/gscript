@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "function_id": "fmp_get_ratios_key_metrics",
+  "source_module": "finrobot/data_source/market_data_api.py",
+  "provider": "fmp",
+  "capability": "finance.facade.fmp.ratios_key_metrics.fetch",
+  "symbol": "ACME",
+  "dataset": "ratios_key_metrics",
+  "input": {
+    "symbol": "ACME",
+    "period": "FY2025"
+  },
+  "output": {
+    "fields": {
+      "pe_ratio": 24.8,
+      "ev_to_ebitda": 12.1,
+      "gross_margin": 0.62,
+      "operating_margin": 0.19,
+      "return_on_equity": 0.18,
+      "debt_to_equity": 0.42,
+      "currency": "USD",
+      "period": "FY2025"
+    },
+    "source_ref": "src_fmp_key_metrics"
+  },
+  "fallback": {
+    "order": [
+      "fmp",
+      "finnhub",
+      "yfinance",
+      "sec",
+      "openbb"
+    ],
+    "selected_provider": "fmp",
+    "attempted": [
+      "fmp"
+    ],
+    "clean_skip_without_dependency": true
+  },
+  "provenance": {
+    "provider": "fmp",
+    "fixture_key": "function:fmp:ratios_key_metrics:ACME:FY2025",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_schema": "function_fixture_v1",
+    "source_url_redacted": true,
+    "stale_after_days": 30,
+    "replay_ready": true
+  }
+}

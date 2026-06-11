@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "function_id": "yfinance_get_company_profile",
+  "source_module": "finrobot/data_source/market_data_api.py",
+  "provider": "yfinance",
+  "capability": "finance.facade.yfinance.company_profile.fetch",
+  "symbol": "ACME",
+  "dataset": "company_profile",
+  "input": {
+    "symbol": "ACME"
+  },
+  "output": {
+    "fields": {
+      "company_name": "ACME Robotics Inc.",
+      "exchange": "NMS",
+      "sector": "Industrials",
+      "industry": "Specialty Industrial Machinery",
+      "country": "United States",
+      "currency": "USD"
+    },
+    "source_ref": "src_yfinance_company_profile"
+  },
+  "fallback": {
+    "order": [
+      "yfinance",
+      "fmp",
+      "finnhub",
+      "openbb"
+    ],
+    "selected_provider": "yfinance",
+    "attempted": [
+      "yfinance"
+    ],
+    "clean_skip_without_dependency": true
+  },
+  "provenance": {
+    "provider": "yfinance",
+    "fixture_key": "function:yfinance:company_profile:ACME",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_schema": "function_fixture_v1",
+    "source_url_redacted": true,
+    "stale_after_days": 30,
+    "replay_ready": true
+  }
+}

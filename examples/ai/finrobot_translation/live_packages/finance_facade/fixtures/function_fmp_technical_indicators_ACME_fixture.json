@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "function_id": "fmp_get_technical_indicators",
+  "source_module": "finrobot/data_source/market_data_api.py",
+  "provider": "fmp",
+  "capability": "finance.facade.fmp.technical_indicators.fetch",
+  "symbol": "ACME",
+  "dataset": "technical_indicators",
+  "input": {
+    "symbol": "ACME",
+    "interval": "daily"
+  },
+  "output": {
+    "fields": {
+      "sma_20": 51.2,
+      "sma_50": 49.8,
+      "ema_20": 51.6,
+      "rsi_14": 58.4,
+      "macd": 1.14,
+      "as_of": "2026-06-11"
+    },
+    "source_ref": "src_fmp_technical_indicators"
+  },
+  "fallback": {
+    "order": [
+      "fmp",
+      "yfinance",
+      "openbb"
+    ],
+    "selected_provider": "fmp",
+    "attempted": [
+      "fmp"
+    ],
+    "clean_skip_without_dependency": true
+  },
+  "provenance": {
+    "provider": "fmp",
+    "fixture_key": "function:fmp:technical_indicators:ACME:daily",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_schema": "function_fixture_v1",
+    "source_url_redacted": true,
+    "stale_after_days": 3,
+    "replay_ready": true
+  }
+}
