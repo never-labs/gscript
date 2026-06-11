@@ -377,6 +377,18 @@ func (b *llmLibBuilder) registerSchemaHelpers() {
 	}
 	b.set("output_schema", outputSchema)
 	b.set("outputSchema", outputSchema)
+	reportArtifactContract := func(args []Value) ([]Value, error) {
+		if len(args) >= 1 && !args[0].IsNil() && !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.report_artifact_contract' (options table expected)")
+		}
+		var opts *Table
+		if len(args) >= 1 && args[0].IsTable() {
+			opts = args[0].Table()
+		}
+		return []Value{llmReportArtifactContractValue(opts)}, nil
+	}
+	b.set("report_artifact_contract", reportArtifactContract)
+	b.set("reportArtifactContract", reportArtifactContract)
 }
 
 func (b *llmLibBuilder) registerValidationHelpers() {
