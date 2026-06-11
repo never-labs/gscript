@@ -19,6 +19,13 @@
     "confidence_envelope_assignment",
     "prompt_contract_output"
   ],
+  "lifecycle_invariants": [
+    "every event mention links to exactly one ingested source",
+    "every canonical event keeps duplicate event ids addressable",
+    "every catalyst cites canonical evidence event ids",
+    "freshness labels never override source trust scores",
+    "prompt output preserves deterministic lifecycle ordering"
+  ],
   "source_ingestion_schema": {
     "required_fields": [
       "source_id",

@@ -210,6 +210,7 @@ func TestFinRobotNewsCatalystDialectContract(t *testing.T) {
 		CapabilityFamily      string   `json:"capability_family"`
 		ReuseTargets          []string `json:"reuse_targets"`
 		EventLifecycle        []string `json:"event_lifecycle"`
+		LifecycleInvariants   []string `json:"lifecycle_invariants"`
 		SourceIngestionSchema struct {
 			RequiredFields     []string `json:"required_fields"`
 			SourceKinds        []string `json:"source_kinds"`
@@ -258,6 +259,12 @@ func TestFinRobotNewsCatalystDialectContract(t *testing.T) {
 	for _, stage := range []string{"raw_source_ingestion", "event_mention_extraction", "canonical_event_dedupe", "catalyst_classification", "confidence_envelope_assignment", "prompt_contract_output"} {
 		if !newsCatalystContainsString(contract.EventLifecycle, stage) {
 			t.Fatalf("dialect contract missing lifecycle stage %q: %#v", stage, contract.EventLifecycle)
+		}
+	}
+	joinedInvariants := strings.ToLower(strings.Join(contract.LifecycleInvariants, " "))
+	for _, want := range []string{"ingested source", "duplicate event ids", "canonical evidence event ids", "source trust", "deterministic lifecycle ordering"} {
+		if !strings.Contains(joinedInvariants, want) {
+			t.Fatalf("dialect lifecycle invariants missing %q: %s", want, joinedInvariants)
 		}
 	}
 	for _, field := range []string{"source_id", "source_kind", "published_at", "observed_at", "headline", "instrument_refs"} {
