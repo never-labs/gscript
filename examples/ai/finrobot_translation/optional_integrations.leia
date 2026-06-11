@@ -1,0 +1,299 @@
+// FR-GAP-018 optional integrations gating fixture.
+//
+// This example does not import or execute any optional package. It records the
+// package manifest, capability gate, clean skip envelope, and replay fixture
+// hook expected by FinRobot-style optional adapters.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+optional_integrations_package := {
+    name: "finrobot_translation.optional_integrations"
+    version: "FR-GAP-018"
+    offline_only: true
+    live_network: false
+    real_dependency_imports: false
+    fixture_hook: "recorded_optional_fixture"
+    integrations: {
+        {
+            id: "fingpt"
+            display_name: "FinGPT"
+            package_name: "fingpt"
+            import_name: "fingpt"
+            adapter_id: "optional.fingpt.forecast"
+            capability: "optional.ai.fingpt.forecast"
+            requires: {"optional.ai.fingpt.forecast", "optional.fixture.replay"}
+            feature: "financial sentiment and forecast tutorial"
+            fixture_key: "fingpt:forecast:ACME:2026-06-11"
+            output_schema: "fingpt_forecast_v1"
+            skip_reason: "optional dependency fingpt is not installed"
+        },
+        {
+            id: "finrl"
+            display_name: "FinRL"
+            package_name: "finrl"
+            import_name: "finrl"
+            adapter_id: "optional.finrl.strategy"
+            capability: "optional.quant.finrl.strategy"
+            requires: {"optional.quant.finrl.strategy", "optional.fixture.replay"}
+            feature: "reinforcement-learning trading strategy tutorial"
+            fixture_key: "finrl:strategy:ACME:offline"
+            output_schema: "finrl_strategy_v1"
+            skip_reason: "optional dependency finrl is not installed"
+        },
+        {
+            id: "finml"
+            display_name: "FinML"
+            package_name: "finml"
+            import_name: "finml"
+            adapter_id: "optional.finml.factor_model"
+            capability: "optional.quant.finml.factor_model"
+            requires: {"optional.quant.finml.factor_model", "optional.fixture.replay"}
+            feature: "factor modeling experiment"
+            fixture_key: "finml:factors:ACME:offline"
+            output_schema: "finml_factor_model_v1"
+            skip_reason: "optional dependency finml is not installed"
+        },
+        {
+            id: "backtrader"
+            display_name: "Backtrader"
+            package_name: "backtrader"
+            import_name: "backtrader"
+            adapter_id: "optional.backtrader.backtest"
+            capability: "optional.quant.backtrader.backtest"
+            requires: {"optional.quant.backtrader.backtest", "optional.fixture.replay"}
+            feature: "SMA crossover backtest"
+            fixture_key: "backtrader:sma_cross:ACME:offline"
+            output_schema: "backtrader_backtest_v1"
+            skip_reason: "optional dependency backtrader is not installed"
+        },
+        {
+            id: "mplfinance"
+            display_name: "mplfinance"
+            package_name: "mplfinance"
+            import_name: "mplfinance"
+            adapter_id: "optional.mplfinance.chart"
+            capability: "optional.chart.mplfinance.render"
+            requires: {"optional.chart.mplfinance.render", "optional.fixture.replay"}
+            feature: "candlestick chart rendering"
+            fixture_key: "mplfinance:candles:ACME:offline"
+            output_schema: "mplfinance_chart_artifact_v1"
+            skip_reason: "optional dependency mplfinance is not installed"
+        },
+        {
+            id: "ollama"
+            display_name: "Ollama"
+            package_name: "ollama"
+            import_name: "ollama"
+            adapter_id: "optional.ollama.local_llm"
+            capability: "optional.llm.ollama.local"
+            requires: {"optional.llm.ollama.local", "optional.fixture.replay"}
+            feature: "local function-calling tutorial"
+            fixture_key: "ollama:function_call:ACME:offline"
+            output_schema: "ollama_function_call_v1"
+            skip_reason: "optional dependency ollama is not installed"
+        },
+        {
+            id: "openbb"
+            display_name: "OpenBB"
+            package_name: "openbb"
+            import_name: "openbb"
+            adapter_id: "optional.openbb.market_data"
+            capability: "optional.data.openbb.market_data"
+            requires: {"optional.data.openbb.market_data", "optional.fixture.replay"}
+            feature: "OpenBB market data tutorial"
+            fixture_key: "openbb:market_data:ACME:offline"
+            output_schema: "openbb_market_data_v1"
+            skip_reason: "optional dependency openbb is not installed"
+        },
+    }
+}
+
+recorded_optional_fixtures := {
+    {fixture_key: "fingpt:forecast:ACME:2026-06-11" integration_id: "fingpt" captured_at: "2026-06-11T00:00:00Z" payload: {symbol: "ACME" horizon: "30d" sentiment: "constructive" replay_ready: true}},
+    {fixture_key: "finrl:strategy:ACME:offline" integration_id: "finrl" captured_at: "2026-06-11T00:00:00Z" payload: {strategy: "ppo_fixture" reward: 0.12 trades: 3 replay_ready: true}},
+    {fixture_key: "finml:factors:ACME:offline" integration_id: "finml" captured_at: "2026-06-11T00:00:00Z" payload: {factors: {"quality", "momentum"} score: 0.71 replay_ready: true}},
+    {fixture_key: "backtrader:sma_cross:ACME:offline" integration_id: "backtrader" captured_at: "2026-06-11T00:00:00Z" payload: {strategy: "sma_cross" sharpe: 1.24 max_drawdown: 0.08 replay_ready: true}},
+    {fixture_key: "mplfinance:candles:ACME:offline" integration_id: "mplfinance" captured_at: "2026-06-11T00:00:00Z" payload: {artifact: "candles.png" renderer: "fixture_only" replay_ready: true}},
+    {fixture_key: "ollama:function_call:ACME:offline" integration_id: "ollama" captured_at: "2026-06-11T00:00:00Z" payload: {model: "llama3-fixture" tool_call: "lookup_symbol" replay_ready: true}},
+    {fixture_key: "openbb:market_data:ACME:offline" integration_id: "openbb" captured_at: "2026-06-11T00:00:00Z" payload: {symbol: "ACME" close: 103.2 source: "fixture" replay_ready: true}},
+}
+
+func optional_manifest(id) {
+    for i := 1; i <= #optional_integrations_package.integrations; i++ {
+        manifest := optional_integrations_package.integrations[i]
+        if manifest.id == id {
+            return manifest
+        }
+    }
+    return nil
+}
+
+func recorded_optional_fixture(key) {
+    for i := 1; i <= #recorded_optional_fixtures; i++ {
+        fixture := recorded_optional_fixtures[i]
+        if fixture.fixture_key == key {
+            return fixture
+        }
+    }
+    return nil
+}
+
+func contains(values, value) {
+    for i := 1; i <= #values; i++ {
+        if values[i] == value {
+            return true
+        }
+    }
+    return false
+}
+
+func has_required_capabilities(required, granted) {
+    for i := 1; i <= #required; i++ {
+        if !contains(granted, required[i]) {
+            return false
+        }
+    }
+    return true
+}
+
+func optional_capability_gate(id, context) {
+    manifest := optional_manifest(id)
+    if manifest == nil {
+        return {status: "denied" reason: "unknown_optional_integration" id: id dependency_imported: false live_network: false fixture: nil}
+    }
+    fixture := recorded_optional_fixture(manifest.fixture_key)
+    if !has_required_capabilities(manifest.requires, context.capabilities) {
+        return {
+            status: "denied"
+            reason: "missing_capability"
+            id: id
+            capability: manifest.capability
+            dependency_imported: false
+            live_network: false
+            fixture: fixture
+        }
+    }
+    if !contains(context.installed_packages, manifest.package_name) {
+        return {
+            status: "skipped"
+            reason: manifest.skip_reason
+            id: id
+            capability: manifest.capability
+            dependency_imported: false
+            live_network: false
+            fixture: fixture
+        }
+    }
+    return {
+        status: "ready"
+        reason: "capability and optional dependency available"
+        id: id
+        capability: manifest.capability
+        dependency_imported: false
+        live_network: false
+        fixture: fixture
+    }
+}
+
+func gate_all_optional_integrations(context) {
+    results := {}
+    for i := 1; i <= #optional_integrations_package.integrations; i++ {
+        manifest := optional_integrations_package.integrations[i]
+        results[i] = optional_capability_gate(manifest.id, context)
+    }
+    return results
+}
+
+optional_tool_fingpt := llm.tool("optional_fingpt_forecast", func(symbol) { return recorded_optional_fixture("fingpt:forecast:" .. symbol .. ":2026-06-11"), nil }, {requires: {"optional.ai.fingpt.forecast", "optional.fixture.replay"}})
+optional_tool_finrl := llm.tool("optional_finrl_strategy", func(symbol) { return recorded_optional_fixture("finrl:strategy:" .. symbol .. ":offline"), nil }, {requires: {"optional.quant.finrl.strategy", "optional.fixture.replay"}})
+optional_tool_finml := llm.tool("optional_finml_factors", func(symbol) { return recorded_optional_fixture("finml:factors:" .. symbol .. ":offline"), nil }, {requires: {"optional.quant.finml.factor_model", "optional.fixture.replay"}})
+optional_tool_backtrader := llm.tool("optional_backtrader_backtest", func(symbol) { return recorded_optional_fixture("backtrader:sma_cross:" .. symbol .. ":offline"), nil }, {requires: {"optional.quant.backtrader.backtest", "optional.fixture.replay"}})
+optional_tool_mplfinance := llm.tool("optional_mplfinance_chart", func(symbol) { return recorded_optional_fixture("mplfinance:candles:" .. symbol .. ":offline"), nil }, {requires: {"optional.chart.mplfinance.render", "optional.fixture.replay"}})
+optional_tool_ollama := llm.tool("optional_ollama_function_call", func(symbol) { return recorded_optional_fixture("ollama:function_call:" .. symbol .. ":offline"), nil }, {requires: {"optional.llm.ollama.local", "optional.fixture.replay"}})
+optional_tool_openbb := llm.tool("optional_openbb_market_data", func(symbol) { return recorded_optional_fixture("openbb:market_data:" .. symbol .. ":offline"), nil }, {requires: {"optional.data.openbb.market_data", "optional.fixture.replay"}})
+
+registered_optional_tools := {
+    optional_tool_fingpt,
+    optional_tool_finrl,
+    optional_tool_finml,
+    optional_tool_backtrader,
+    optional_tool_mplfinance,
+    optional_tool_ollama,
+    optional_tool_openbb,
+}
+
+fixture_capabilities := {
+    "optional.ai.fingpt.forecast",
+    "optional.quant.finrl.strategy",
+    "optional.quant.finml.factor_model",
+    "optional.quant.backtrader.backtest",
+    "optional.chart.mplfinance.render",
+    "optional.llm.ollama.local",
+    "optional.data.openbb.market_data",
+    "optional.fixture.replay",
+}
+
+offline_ci_context := {
+    installed_packages: {}
+    capabilities: fixture_capabilities
+}
+
+ready_fixture_context := {
+    installed_packages: {"mplfinance"}
+    capabilities: fixture_capabilities
+}
+
+denied_context := {
+    installed_packages: {"openbb"}
+    capabilities: {"optional.fixture.replay"}
+}
+
+skip_results := gate_all_optional_integrations(offline_ci_context)
+ready_result := optional_capability_gate("mplfinance", ready_fixture_context)
+denied_result := optional_capability_gate("openbb", denied_context)
+tools_ok, tools_err := llm.check_tools(registered_optional_tools, fixture_capabilities)
+
+skipped_count := 0
+imported_count := 0
+fixture_hook_count := 0
+for i := 1; i <= #skip_results; i++ {
+    result := skip_results[i]
+    if result.status == "skipped" {
+        skipped_count = skipped_count + 1
+    }
+    if result.dependency_imported {
+        imported_count = imported_count + 1
+    }
+    if result.fixture != nil && result.fixture.payload.replay_ready == true {
+        fixture_hook_count = fixture_hook_count + 1
+    }
+}
+
+check("all optional integrations are manifested", #optional_integrations_package.integrations == 7)
+check("all optional fixtures are recorded", #recorded_optional_fixtures == 7)
+check("offline package never imports real dependencies", optional_integrations_package.real_dependency_imports == false)
+check("offline CI skips cleanly", skipped_count == 7)
+check("skip path imports nothing", imported_count == 0)
+check("skip path attaches recorded fixtures", fixture_hook_count == 7)
+check("ready path remains fixture backed", ready_result.status == "ready" && ready_result.dependency_imported == false && ready_result.fixture.payload.renderer == "fixture_only")
+check("denied path reports capability gate", denied_result.status == "denied" && denied_result.reason == "missing_capability")
+check("registered tools expose capabilities", tools_ok == true && tools_err == nil)
+
+optional_integrations_summary := {
+    package_id: optional_integrations_package.name
+    version: optional_integrations_package.version
+    manifest_count: #optional_integrations_package.integrations
+    fixture_count: #recorded_optional_fixtures
+    skipped_count: skipped_count
+    imported_count: imported_count
+    fixture_hook_count: fixture_hook_count
+    ready_status: ready_result.status
+    denied_status: denied_result.status
+    tools_ok: tools_ok
+}
+
+print("optional_integrations manifest=7 skipped=7 fixtures=7 imported=0 ready=mplfinance denied=openbb")
