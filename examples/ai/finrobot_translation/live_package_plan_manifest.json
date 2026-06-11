@@ -4,6 +4,7 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
+  "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation; live external package implementations are not checked in",
   "live_network_default": false,
   "real_dependency_import_default": false,
   "no_built_in_guarantee": {
@@ -21,6 +22,7 @@
     {
       "id": "vendor_adapters",
       "package_name": "leia-finrobot-vendor-adapters",
+      "status": "skeleton_contract_checked_in",
       "planned_directory": "packages/finrobot/vendor_adapters",
       "manifest": "packages/finrobot/vendor_adapters/package.manifest.json",
       "contract": "packages/finrobot/vendor_adapters/contracts/vendor_adapter_contract.json",
@@ -44,6 +46,7 @@
     {
       "id": "normalizers",
       "package_name": "leia-finrobot-normalizers",
+      "status": "skeleton_contract_checked_in",
       "planned_directory": "packages/finrobot/normalizers",
       "manifest": "packages/finrobot/normalizers/package.manifest.json",
       "contract": "packages/finrobot/normalizers/contracts/finance_normalizer_contract.json",
@@ -68,6 +71,7 @@
     {
       "id": "valuation",
       "package_name": "leia-finrobot-valuation",
+      "status": "skeleton_contract_checked_in",
       "planned_directory": "packages/finrobot/valuation",
       "manifest": "packages/finrobot/valuation/package.manifest.json",
       "contract": "packages/finrobot/valuation/contracts/valuation_contract.json",
@@ -91,6 +95,7 @@
     {
       "id": "report_renderer",
       "package_name": "leia-finrobot-report-renderer",
+      "status": "skeleton_contract_checked_in",
       "planned_directory": "packages/finrobot/report_renderer",
       "manifest": "packages/finrobot/report_renderer/package.manifest.json",
       "contract": "packages/finrobot/report_renderer/contracts/report_renderer_contract.json",
@@ -114,6 +119,7 @@
     {
       "id": "web_product",
       "package_name": "leia-finrobot-web-product",
+      "status": "skeleton_contract_checked_in",
       "planned_directory": "packages/finrobot/web_product",
       "manifest": "packages/finrobot/web_product/package.manifest.json",
       "contract": "packages/finrobot/web_product/contracts/web_product_contract.json",
