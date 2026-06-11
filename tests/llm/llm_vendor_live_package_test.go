@@ -118,13 +118,51 @@ func TestFinRobotVendorLivePackageManifestProviderFree(t *testing.T) {
 		capabilities[adapter.Capability] = true
 		fixtures[adapter.FixtureKey] = true
 		assertVendorLiveJSONFile(t, filepath.Join(pkgDir, adapter.Schema))
-		assertFixtureProviderFree(t, filepath.Join(pkgDir, adapter.Fixture), adapter.ID, adapter.FixtureKey)
+		assertFixtureProviderFree(t, filepath.Join(pkgDir, adapter.Fixture), adapter)
 	}
 
 	sort.Strings(ids)
-	wantIDs := []string{"earnings", "finnhub", "fmp", "reddit", "sec", "yfinance"}
+	wantIDs := []string{
+		"earnings_transcript",
+		"finnhub_metrics",
+		"finnhub_news_error",
+		"finnhub_profile",
+		"fmp_company_metrics",
+		"fmp_key_metrics",
+		"fmp_news",
+		"fmp_ratings",
+		"fmp_targets",
+		"fmp_technical_indicators",
+		"reddit_search",
+		"sec_companyfacts",
+		"sec_filing_10k",
+		"sec_filing_10q",
+		"sec_filing_8k",
+		"yfinance_cashflow",
+		"yfinance_chart",
+		"yfinance_dividends",
+		"yfinance_info",
+		"yfinance_recommendations",
+		"yfinance_statements",
+	}
 	if !reflect.DeepEqual(ids, wantIDs) {
 		t.Fatalf("adapter ids = %#v, want %#v", ids, wantIDs)
+	}
+
+	wantProviders := map[string]int{
+		"earnings": 1,
+		"finnhub":  3,
+		"fmp":      6,
+		"reddit":   1,
+		"sec":      4,
+		"yfinance": 6,
+	}
+	gotProviders := map[string]int{}
+	for _, adapter := range manifest.Adapters {
+		gotProviders[adapter.Provider]++
+	}
+	if !reflect.DeepEqual(gotProviders, wantProviders) {
+		t.Fatalf("provider matrix = %#v, want %#v", gotProviders, wantProviders)
 	}
 }
 
@@ -159,7 +197,7 @@ func TestFinRobotVendorLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get vendor_live_package_summary: %v", err)
 			}
-			want := "vendor_live_package adapters=6 provider_free=true live_network=false imports=false redaction=true"
+			want := "vendor_live_package adapters=21 provider_free=true live_network=false imports=false redaction=true"
 			if got != want {
 				t.Fatalf("vendor_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -195,7 +233,33 @@ func assertVendorLiveJSONFile(t *testing.T, path string) {
 	}
 }
 
-func assertFixtureProviderFree(t *testing.T, path, provider, fixtureKey string) {
+func assertFixtureProviderFree(t *testing.T, path string, adapter struct {
+	ID                 string   `json:"id"`
+	DisplayName        string   `json:"display_name"`
+	Provider           string   `json:"provider"`
+	Capability         string   `json:"capability"`
+	CommonCapabilities []string `json:"common_capabilities"`
+	Credential         struct {
+		Required  bool    `json:"required"`
+		SecretRef *string `json:"secret_ref"`
+		Redacted  bool    `json:"redacted"`
+	} `json:"credential"`
+	Schema     string `json:"schema"`
+	Fixture    string `json:"fixture"`
+	FixtureKey string `json:"fixture_key"`
+	RateLimit  struct {
+		Policy            string `json:"policy"`
+		WindowSeconds     int    `json:"window_seconds"`
+		Limit             int    `json:"limit"`
+		RetryAfterSeconds int    `json:"retry_after_seconds"`
+	} `json:"rate_limit"`
+	Terms struct {
+		Usage          string `json:"usage"`
+		Attribution    string `json:"attribution"`
+		Redistribution string `json:"redistribution"`
+		LiveNetwork    bool   `json:"live_network"`
+	} `json:"terms"`
+}) {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -207,11 +271,46 @@ func assertFixtureProviderFree(t *testing.T, path, provider, fixtureKey string) 
 		Request    struct {
 			LiveNetwork bool `json:"live_network"`
 		} `json:"request"`
+		Metadata struct {
+			Schema     string `json:"schema"`
+			Capability string `json:"capability"`
+			Provenance struct {
+				Source      string `json:"source"`
+				CapturedAt  string `json:"captured_at"`
+				LiveNetwork bool   `json:"live_network"`
+				Redacted    bool   `json:"redacted"`
+			} `json:"provenance"`
+			RateLimit struct {
+				Policy            string `json:"policy"`
+				WindowSeconds     int    `json:"window_seconds"`
+				Limit             int    `json:"limit"`
+				RetryAfterSeconds int    `json:"retry_after_seconds"`
+			} `json:"rate_limit"`
+			Terms struct {
+				Usage          string `json:"usage"`
+				Attribution    string `json:"attribution"`
+				Redistribution string `json:"redistribution"`
+				LiveNetwork    bool   `json:"live_network"`
+			} `json:"terms"`
+		} `json:"metadata"`
 	}
 	if err := json.Unmarshal(data, &fixture); err != nil {
 		t.Fatalf("%s is not valid JSON: %v", path, err)
 	}
-	if fixture.FixtureKey != fixtureKey || fixture.Provider != provider || fixture.Request.LiveNetwork {
+	if fixture.FixtureKey != adapter.FixtureKey || fixture.Provider != adapter.Provider || fixture.Request.LiveNetwork {
 		t.Fatalf("fixture must match manifest and disable live network: %#v", fixture)
+	}
+	if fixture.Metadata.Schema != adapter.Schema || fixture.Metadata.Capability != adapter.Capability {
+		t.Fatalf("%s fixture schema/capability metadata mismatch: %#v", adapter.ID, fixture.Metadata)
+	}
+	if fixture.Metadata.Provenance.Source == "" || fixture.Metadata.Provenance.CapturedAt == "" ||
+		fixture.Metadata.Provenance.LiveNetwork || !fixture.Metadata.Provenance.Redacted {
+		t.Fatalf("%s fixture provenance metadata incomplete: %#v", adapter.ID, fixture.Metadata.Provenance)
+	}
+	if !reflect.DeepEqual(fixture.Metadata.RateLimit, adapter.RateLimit) {
+		t.Fatalf("%s fixture rate limit metadata = %#v, want %#v", adapter.ID, fixture.Metadata.RateLimit, adapter.RateLimit)
+	}
+	if !reflect.DeepEqual(fixture.Metadata.Terms, adapter.Terms) {
+		t.Fatalf("%s fixture terms metadata = %#v, want %#v", adapter.ID, fixture.Metadata.Terms, adapter.Terms)
 	}
 }

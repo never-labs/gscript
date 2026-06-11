@@ -1,20 +1,22 @@
 {
-  "fixture_key": "finnhub:profile:ACME",
+  "fixture_key": "finnhub:news:error:ACME",
   "provider": "finnhub",
   "captured_at": "2026-06-11T00:00:00Z",
   "request": {
     "symbol": "ACME",
+    "from": "2026-06-01",
+    "to": "2026-06-10",
     "live_network": false
   },
   "metadata": {
-    "schema": "schemas/finnhub_profile_v1.schema.json",
+    "schema": "schemas/finnhub_news_error_v1.schema.json",
     "provenance": {
       "source": "synthetic-offline-fixture",
       "captured_at": "2026-06-11T00:00:00Z",
       "live_network": false,
       "redacted": true
     },
-    "capability": "finance.vendor.finnhub.profile",
+    "capability": "finance.vendor.finnhub.news_error",
     "rate_limit": {
       "policy": "metadata-only",
       "window_seconds": 60,
@@ -29,10 +31,11 @@
     }
   },
   "payload": {
-    "ticker": "ACME",
-    "name": "ACME Corp",
-    "exchange": "XNAS",
-    "industry": "Industrial Automation",
-    "currency": "USD"
+    "error": {
+      "code": 429,
+      "message": "fixture replay rate limit envelope",
+      "retry_after_seconds": 60
+    },
+    "data": []
   }
 }

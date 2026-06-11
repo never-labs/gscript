@@ -1,20 +1,21 @@
 {
-  "fixture_key": "finnhub:profile:ACME",
+  "fixture_key": "finnhub:metrics:ACME",
   "provider": "finnhub",
   "captured_at": "2026-06-11T00:00:00Z",
   "request": {
     "symbol": "ACME",
+    "metric": "all",
     "live_network": false
   },
   "metadata": {
-    "schema": "schemas/finnhub_profile_v1.schema.json",
+    "schema": "schemas/finnhub_metrics_v1.schema.json",
     "provenance": {
       "source": "synthetic-offline-fixture",
       "captured_at": "2026-06-11T00:00:00Z",
       "live_network": false,
       "redacted": true
     },
-    "capability": "finance.vendor.finnhub.profile",
+    "capability": "finance.vendor.finnhub.metrics",
     "rate_limit": {
       "policy": "metadata-only",
       "window_seconds": 60,
@@ -29,10 +30,12 @@
     }
   },
   "payload": {
-    "ticker": "ACME",
-    "name": "ACME Corp",
-    "exchange": "XNAS",
-    "industry": "Industrial Automation",
-    "currency": "USD"
+    "symbol": "ACME",
+    "metric": {
+      "52WeekHigh": 116.2,
+      "52WeekLow": 82.4,
+      "peNormalizedAnnual": 24.6,
+      "revenueGrowthTTMYoy": 0.11
+    }
   }
 }
