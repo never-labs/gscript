@@ -32,6 +32,14 @@ real provider clients, real document parsers, real chart/HTML/PDF renderers,
 real database/web orchestration, optional integrations, and broader
 notebook/tutorial parity.
 
+The generic AI dialect convergence items are no longer missing or planned
+FinRobot work. They are checked-in package boundaries under
+`live_packages/generic_*`, with manifests, contracts, fixtures, registered
+examples, and tests. These packages define reusable generic AI boundaries for
+model resolution, turns, tools, agents, workflows, evaluation, replay, trace,
+approval, and package auditing; FinRobot is only one consumer of those generic
+boundaries.
+
 ## Registered Example Inventory
 
 | ID | Path | Runner | Coverage role |
@@ -196,6 +204,7 @@ mistaken for missing language/runtime support.
 | Host-VM contract examples | 66 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 3 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
 | Live-package skeletons | 32 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/analyzer_report`, `live_packages/backtest_strategy`, `live_packages/chart_renderer`, `live_packages/coding_notebook`, `live_packages/document_pipeline`, `live_packages/earnings_transcript`, `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`, `live_packages/finance_facade`, `live_packages/finance_normalizers`, `live_packages/generic_agent_runner`, `live_packages/generic_approval_policy`, `live_packages/generic_evaluation_harness`, `live_packages/generic_model_registry`, `live_packages/generic_package_boundary_auditor`, `live_packages/generic_record_replay`, `live_packages/generic_tool_contracts`, `live_packages/generic_trace_events`, `live_packages/generic_turn_runner`, `live_packages/generic_workflow_orchestrator`, `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`, `live_packages/optional_integrations`, `live_packages/product_workflow`, `live_packages/prompt_roles`, `live_packages/report_renderer`, `live_packages/retail_sentiment`, `live_packages/sec_filings`, `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and `live_packages/vendor_adapters`; all 32 include registered `.leia` examples | Complete |
+| Generic AI dialect package boundary | The reusable `live_packages/generic_*` set is checked in as package-owned generic AI surface, not a FinRobot-specific dialect or language/runtime change | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
 | Evaluation harness | `evaluation_harness/manifest.json` inventories replay records, golden checksums, gates, and report metadata | Complete for current registered records |
 | Gap ledger alignment | `GAPS.md` records no open gaps for the provider-free slice; remaining work is package/product implementation | Complete |

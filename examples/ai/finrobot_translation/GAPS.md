@@ -15,7 +15,7 @@ replaces fixtures with vendor integrations is tracked in
 | Category | Meaning for FinRobot translation |
 | --- | --- |
 | `language` | Missing syntax or core language feature. Current audit finds no FinRobot-specific language gap. |
-| `AI dialect` | Missing or incomplete `model`, `turn`, `tool`, `agent`, `workflow`, approval, trace, replay, or capability contract. |
+| `AI dialect` | Missing or incomplete `model`, `turn`, `tool`, `agent`, `workflow`, approval, trace, replay, or capability contract. Current audit finds no open generic AI dialect gap because those boundaries are checked in as reusable `live_packages/generic_*` packages, not FinRobot-only surfaces. |
 | `stdlib` | Missing generic API/web/file/config/data/table/document/chart/report/db support. |
 | `external library` | Missing finance, vendor, model, chart, report, notebook, or backtesting package. |
 | `product layer` | Missing deployment, auth, UI, compliance, logging, operational, or packaging work. |
@@ -46,6 +46,13 @@ implementation work, not missing language or AI dialect surface: promoting the
 checked-in skeleton contracts into live external packages, hardening product UI,
 adding real renderers, and shipping optional provider integrations behind
 capability gates.
+
+The generic AI dialect convergence status is checked-in package boundary, not
+missing or planned. The `live_packages/generic_*` directories define reusable AI
+package contracts for model, turn, tool, agent, workflow, evaluation, replay,
+trace, approval, capability, and package-audit behavior. They are intentionally
+generic AI surfaces that the FinRobot translation consumes; they are not
+FinRobot-specific language features or FinRobot-owned product packages.
 
 ## Translation Slice Gaps
 

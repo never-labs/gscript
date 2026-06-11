@@ -22,6 +22,14 @@ skeleton surface without changing runtime behavior. The checked-in FinRobot slic
 documentation, examples, replay fixtures, manifests, and provider-free
 live-package skeleton contracts over the general AI/data/workflow surfaces.
 
+The generic AI dialect package boundary is included in this verification as
+checked-in package-owned surface, not as a FinRobot-only dialect. The
+`live_packages/generic_*` directories are reusable generic AI package
+boundaries for model, turn, tool, agent, workflow, evaluation, replay, trace,
+approval, and package-audit contracts. They are not missing/planned FinRobot
+items, and they do not require q/runtime, q mainline, or `.external/FinRobot`
+changes.
+
 No `docs/spec/index.html` generation was run.
 
 ## Results
@@ -158,6 +166,11 @@ Current checked-in skeleton directories:
   currency/period, and provenance contracts.
 - `live_packages/vendor_adapters`: registered example plus manifest, schemas,
   and fixtures for six provider adapters with network disabled by default.
+- `live_packages/generic_*`: checked-in generic AI package boundaries for
+  model resolution, single-turn execution, tool contracts, agent loops,
+  workflow orchestration, evaluation, record/replay, trace events, approval
+  policy, and package-boundary auditing. This set is generic AI surface
+  consumed by the FinRobot examples, not FinRobot-specific package work.
 
 ## Reproduction
 
@@ -179,5 +192,7 @@ go run ./cmd/leia check --no-docs --no-editor .
 The FinRobot documentation status is aligned with the current
 `origin/codex/ai-dialect-polish` surface: 75 registered runnable/checkable
 examples, 593 files in the translation directory, and 32 checked-in
-provider-free live-package skeleton directories. The validation commands above
-passed without generating `docs/spec/index.html`.
+provider-free live-package skeleton directories. The generic AI dialect entries
+are documented as checked-in package boundaries rather than missing or planned
+FinRobot-only work. The validation commands above passed without generating
+`docs/spec/index.html`.

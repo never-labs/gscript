@@ -86,6 +86,58 @@ func TestAIDialectPackageBoundaryDocsReferenceExistingPackageDirs(t *testing.T) 
 	}
 }
 
+func TestFinRobotStatusDocsMarkGenericAIDialectAsCheckedInBoundary(t *testing.T) {
+	root := repoRoot(t)
+	docs := []string{
+		filepath.Join("examples", "ai", "finrobot_translation", "COVERAGE.md"),
+		filepath.Join("examples", "ai", "finrobot_translation", "VERIFICATION.md"),
+		filepath.Join("examples", "ai", "finrobot_translation", "GAPS.md"),
+	}
+
+	for _, rel := range docs {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc := strings.ToLower(string(data))
+		for _, required := range []string{
+			"generic ai",
+			"checked-in package boundar",
+			"live_packages/generic_*",
+		} {
+			if !strings.Contains(doc, required) {
+				t.Fatalf("%s must document generic AI checked-in package boundary status; missing %q", rel, required)
+			}
+		}
+		clarifiesGenericScope := false
+		for _, required := range []string{
+			"not finrobot-only",
+			"not a finrobot-only",
+			"not finrobot-specific",
+			"not a finrobot-specific",
+		} {
+			if strings.Contains(doc, required) {
+				clarifiesGenericScope = true
+				break
+			}
+		}
+		if !clarifiesGenericScope {
+			t.Fatalf("%s must clarify the generic AI dialect boundary is not FinRobot-specific", rel)
+		}
+
+		for _, forbidden := range []string{
+			"generic ai dialect convergence status is missing",
+			"generic ai dialect convergence status is planned",
+			"generic ai dialect package boundary is missing",
+			"generic ai dialect package boundary is planned",
+		} {
+			if strings.Contains(doc, forbidden) {
+				t.Fatalf("%s regressed generic AI dialect status with %q", rel, forbidden)
+			}
+		}
+	}
+}
+
 func extractAIDialectBoundaryPackageList(t *testing.T, doc string) string {
 	t.Helper()
 	start := "<!-- ai-dialect-boundary-package-list:start -->"
