@@ -4,14 +4,27 @@
   "type": "object",
   "required": [
     "report_id",
+    "request_id",
     "title",
     "as_of",
+    "render_mode",
+    "renderer_dependency_gate",
     "sections",
     "tables",
     "charts",
     "source_annotations",
     "disclosures",
     "output_formats"
+  ],
+  "render_modes": [
+    "fixture_replay"
+  ],
+  "renderer_dependency_gate_required": [
+    "dependency",
+    "required",
+    "default_enabled",
+    "clean_skip_without_dependency",
+    "skip_status"
   ],
   "formats": [
     "text/html",

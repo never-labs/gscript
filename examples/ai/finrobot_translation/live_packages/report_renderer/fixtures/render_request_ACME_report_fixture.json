@@ -8,10 +8,36 @@
   "clean_skip_without_renderer": true,
   "deterministic_hash_seed": "report_renderer:ACME:2026-06-11:fixture-v1",
   "deterministic_fixture_hash": "1e04d0e6fc7bbd1ec883a92460bf71c34850f5428972490adf03f0b04edf2814",
+  "request_envelope": {
+    "request_id": "render-req-ACME-equity-brief-2026-06-11",
+    "report_id": "ACME-equity-brief-2026-06-11",
+    "render_mode": "fixture_replay",
+    "requested_formats": [
+      "text/html",
+      "application/pdf"
+    ],
+    "renderer_dependency_gate": {
+      "dependency": "external_html_pdf_renderer",
+      "required": false,
+      "default_enabled": false,
+      "clean_skip_without_dependency": true,
+      "skip_status": "clean_skipped_without_renderer"
+    },
+    "artifact_manifest_id": "artifact-manifest-ACME-equity-brief"
+  },
   "render_request": {
     "report_id": "ACME-equity-brief-2026-06-11",
+    "request_id": "render-req-ACME-equity-brief-2026-06-11",
     "title": "ACME Equity Brief",
     "as_of": "2026-06-11",
+    "render_mode": "fixture_replay",
+    "renderer_dependency_gate": {
+      "dependency": "external_html_pdf_renderer",
+      "required": false,
+      "default_enabled": false,
+      "clean_skip_without_dependency": true,
+      "skip_status": "clean_skipped_without_renderer"
+    },
     "output_formats": [
       "text/html",
       "application/pdf"
@@ -106,6 +132,8 @@
   },
   "output_manifest": {
     "report_id": "ACME-equity-brief-2026-06-11",
+    "request_id": "render-req-ACME-equity-brief-2026-06-11",
+    "artifact_manifest_id": "artifact-manifest-ACME-equity-brief",
     "renderer": {
       "id": "provider_free_renderer_stub",
       "dependency_available": false,
@@ -119,6 +147,7 @@
         "uri": "fixture://rendered/ACME-equity-brief.html",
         "status": "specified_not_rendered",
         "content_hash": "sha256:htmlspecifiednotrendered",
+        "hash_algorithm": "sha256",
         "page_snapshot_ids": [
           "snap-html-1"
         ]
@@ -129,6 +158,7 @@
         "uri": "fixture://rendered/ACME-equity-brief.pdf",
         "status": "planned_not_rendered",
         "content_hash": "sha256:pdfplannednotrendered",
+        "hash_algorithm": "sha256",
         "page_snapshot_ids": [
           "snap-pdf-1",
           "snap-pdf-2"
@@ -150,7 +180,9 @@
           "unit": "px"
         },
         "status": "specified_not_rendered",
-        "content_hash": "sha256:snapshothtmlfixture",
+        "hash_seed": "report_renderer:ACME:html:snapshot:1:2026-06-11",
+        "hash_algorithm": "sha256",
+        "content_hash": "sha256:69ad4844628372700f376694655e89b0eff65a794581ad45ebace83e846d3b4f",
         "source_refs": [
           "src-acme-10k",
           "src-acme-model"
@@ -179,7 +211,9 @@
           "unit": "in"
         },
         "status": "planned_not_rendered",
-        "content_hash": "sha256:snapshotpdfpage1fixture",
+        "hash_seed": "report_renderer:ACME:pdf:snapshot:1:2026-06-11",
+        "hash_algorithm": "sha256",
+        "content_hash": "sha256:d1dc3b80fc10d67e34068169be5a4a482280eebae315e47f4e30ebe99c4e0694",
         "source_refs": [
           "src-acme-10k"
         ],
@@ -205,7 +239,9 @@
           "unit": "in"
         },
         "status": "planned_not_rendered",
-        "content_hash": "sha256:snapshotpdfpage2fixture",
+        "hash_seed": "report_renderer:ACME:pdf:snapshot:2:2026-06-11",
+        "hash_algorithm": "sha256",
+        "content_hash": "sha256:8041c06b792a19d8f013386d13bd8d65251355cbd29bdfb5fd967f421dcae885",
         "source_refs": [
           "src-acme-model"
         ],
@@ -288,5 +324,60 @@
       }
     ],
     "deterministic_fixture_hash": "1e04d0e6fc7bbd1ec883a92460bf71c34850f5428972490adf03f0b04edf2814"
+  },
+  "artifact_manifest": {
+    "manifest_id": "artifact-manifest-ACME-equity-brief",
+    "report_id": "ACME-equity-brief-2026-06-11",
+    "request_id": "render-req-ACME-equity-brief-2026-06-11",
+    "hash_algorithm": "sha256",
+    "manifest_hash_seed": "report_renderer:ACME:artifact_manifest:2026-06-11",
+    "manifest_hash": "sha256:102a0d26fa3895b2b773c239f4b5096f6985364e5b4f14be174409a29312a020",
+    "artifacts": [
+      {
+        "artifact_id": "ACME-equity-brief-html",
+        "kind": "html_report",
+        "format": "text/html",
+        "uri": "fixture://rendered/ACME-equity-brief.html",
+        "status": "specified_not_rendered",
+        "content_hash": "sha256:htmlspecifiednotrendered",
+        "hash_algorithm": "sha256"
+      },
+      {
+        "artifact_id": "ACME-equity-brief-pdf",
+        "kind": "pdf_report",
+        "format": "application/pdf",
+        "uri": "fixture://rendered/ACME-equity-brief.pdf",
+        "status": "planned_not_rendered",
+        "content_hash": "sha256:pdfplannednotrendered",
+        "hash_algorithm": "sha256"
+      },
+      {
+        "artifact_id": "snap-html-1",
+        "kind": "page_snapshot",
+        "format": "text/html",
+        "uri": "fixture://snapshots/ACME-equity-brief-html-page-1.json",
+        "status": "specified_not_rendered",
+        "content_hash": "sha256:69ad4844628372700f376694655e89b0eff65a794581ad45ebace83e846d3b4f",
+        "hash_algorithm": "sha256"
+      },
+      {
+        "artifact_id": "snap-pdf-1",
+        "kind": "page_snapshot",
+        "format": "application/pdf",
+        "uri": "fixture://snapshots/ACME-equity-brief-pdf-page-1.json",
+        "status": "planned_not_rendered",
+        "content_hash": "sha256:d1dc3b80fc10d67e34068169be5a4a482280eebae315e47f4e30ebe99c4e0694",
+        "hash_algorithm": "sha256"
+      },
+      {
+        "artifact_id": "snap-pdf-2",
+        "kind": "page_snapshot",
+        "format": "application/pdf",
+        "uri": "fixture://snapshots/ACME-equity-brief-pdf-page-2.json",
+        "status": "planned_not_rendered",
+        "content_hash": "sha256:8041c06b792a19d8f013386d13bd8d65251355cbd29bdfb5fd967f421dcae885",
+        "hash_algorithm": "sha256"
+      }
+    ]
   }
 }

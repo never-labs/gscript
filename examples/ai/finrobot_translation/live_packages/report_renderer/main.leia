@@ -13,7 +13,9 @@ report_renderer_live_package := {
     clean_skip_without_renderer: true
     output_formats: {"text/html", "application/pdf"}
     snapshot_formats: {"text/html", "application/pdf", "image/png"}
+    hash_algorithm: "sha256"
     warning_kinds: {"table_render_warning", "markdown_render_warning", "missing_chart_warning"}
+    artifact_kinds: {"html_report", "pdf_report", "page_snapshot"}
     source_annotations: {"src-acme-10k", "src-acme-model"}
     disclosures: {"disc-ai", "disc-risk"}
     deterministic_fixture_hash: "1e04d0e6fc7bbd1ec883a92460bf71c34850f5428972490adf03f0b04edf2814"
@@ -30,6 +32,8 @@ func report_renderer_contract_ok(pkg) {
         pkg.clean_skip_without_renderer == true &&
         #pkg.output_formats == 2 &&
         #pkg.snapshot_formats == 3 &&
+        pkg.hash_algorithm == "sha256" &&
+        #pkg.artifact_kinds == 3 &&
         #pkg.warning_kinds == 3 &&
         #pkg.source_annotations == 2 &&
         #pkg.disclosures == 2

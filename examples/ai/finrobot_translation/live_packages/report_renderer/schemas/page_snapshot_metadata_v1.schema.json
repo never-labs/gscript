@@ -10,6 +10,8 @@
     "dimensions",
     "status",
     "content_hash",
+    "hash_algorithm",
+    "hash_seed",
     "source_refs",
     "warning_refs",
     "disclosure_refs"

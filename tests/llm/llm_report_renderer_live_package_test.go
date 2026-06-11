@@ -103,7 +103,7 @@ func TestFinRobotReportRendererLivePackageManifestAndContracts(t *testing.T) {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"render_request", "output_manifest", "page_snapshot_metadata", "render_warning", "source_annotation"} {
+	for _, key := range []string{"render_request", "output_manifest", "artifact_manifest", "page_snapshot_metadata", "render_warning", "source_annotation"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
@@ -120,10 +120,13 @@ func TestFinRobotReportRendererLivePackageManifestAndContracts(t *testing.T) {
 
 	for _, want := range []string{
 		"finance.report.render.request",
+		"finance.report.render.request_envelope",
 		"finance.report.render.html.contract",
 		"finance.report.render.pdf.contract",
 		"finance.report.render.output_manifest",
+		"finance.report.render.artifact_manifest",
 		"finance.report.render.page_snapshot_metadata",
+		"finance.report.render.page_snapshot_hash",
 		"finance.report.render.table_warning",
 		"finance.report.render.markdown_warning",
 		"finance.report.render.disclosure_annotation",
@@ -143,12 +146,12 @@ func TestFinRobotReportRendererLivePackageManifestAndContracts(t *testing.T) {
 		if contract.RendererDependencyRequired || !contract.CleanSkip {
 			t.Fatalf("renderer contracts must be clean-skip safe: %#v", contract)
 		}
-		for _, field := range []string{"report_id", "sections", "tables", "charts", "source_annotations", "disclosures", "output_formats"} {
+		for _, field := range []string{"report_id", "request_id", "render_mode", "sections", "tables", "charts", "source_annotations", "disclosures", "output_formats"} {
 			if !contains(contract.RequiredRequestFields, field) {
 				t.Fatalf("%s request contract missing %q", contract.Format, field)
 			}
 		}
-		for _, field := range []string{"artifact_id", "format", "uri", "content_hash", "page_snapshots", "warnings", "source_annotation_checks", "disclosure_checks"} {
+		for _, field := range []string{"artifact_id", "format", "uri", "content_hash", "artifact_manifest_id", "page_snapshots", "warnings", "source_annotation_checks", "disclosure_checks"} {
 			if !contains(contract.RequiredOutputFields, field) {
 				t.Fatalf("%s output contract missing %q", contract.Format, field)
 			}
@@ -198,6 +201,22 @@ func TestFinRobotReportRendererLivePackageFixtureContract(t *testing.T) {
 		t.Fatalf("deterministic fixture hash = seed:%q got:%s fixture:%s manifest:%s", fixture.DeterministicHashSeed, gotHash, fixture.DeterministicFixtureHash, fixture.OutputManifest.DeterministicFixtureHash)
 	}
 
+	if fixture.RequestEnvelope.RequestID == "" ||
+		fixture.RequestEnvelope.ReportID != fixture.RenderRequest.ReportID ||
+		fixture.RequestEnvelope.RenderMode != "fixture_replay" ||
+		!contains(fixture.RequestEnvelope.RequestedFormats, "text/html") ||
+		!contains(fixture.RequestEnvelope.RequestedFormats, "application/pdf") ||
+		fixture.RequestEnvelope.ArtifactManifestID == "" {
+		t.Fatalf("request envelope incomplete: %#v", fixture.RequestEnvelope)
+	}
+	if gate := fixture.RequestEnvelope.RendererDependencyGate; gate.Dependency == "" || gate.Required || gate.DefaultEnabled || !gate.CleanSkipWithoutDependency || gate.SkipStatus != "clean_skipped_without_renderer" {
+		t.Fatalf("renderer dependency gate must stay optional and clean-skip safe: %#v", gate)
+	}
+	if fixture.RenderRequest.RequestID != fixture.RequestEnvelope.RequestID ||
+		fixture.RenderRequest.RenderMode != fixture.RequestEnvelope.RenderMode ||
+		fixture.RenderRequest.RendererDependencyGate != fixture.RequestEnvelope.RendererDependencyGate {
+		t.Fatalf("render request must mirror envelope id/mode/gate: request=%#v envelope=%#v", fixture.RenderRequest, fixture.RequestEnvelope)
+	}
 	if fixture.RenderRequest.ReportID == "" || fixture.RenderRequest.Title == "" || len(fixture.RenderRequest.Sections) < 2 || len(fixture.RenderRequest.Tables) == 0 || len(fixture.RenderRequest.Charts) == 0 {
 		t.Fatalf("render request shape incomplete: %#v", fixture.RenderRequest)
 	}
@@ -222,21 +241,30 @@ func TestFinRobotReportRendererLivePackageFixtureContract(t *testing.T) {
 	formats := map[string]bool{}
 	for _, output := range fixture.OutputManifest.Outputs {
 		formats[output.Format] = true
-		if output.ArtifactID == "" || output.URI == "" || output.ContentHash == "" || len(output.PageSnapshotIDs) == 0 {
+		if output.ArtifactID == "" || output.URI == "" || output.ContentHash == "" || output.HashAlgorithm != "sha256" || len(output.PageSnapshotIDs) == 0 {
 			t.Fatalf("output manifest item incomplete: %#v", output)
 		}
 	}
 	if !formats["text/html"] || !formats["application/pdf"] {
 		t.Fatalf("output manifest missing HTML/PDF outputs: %#v", fixture.OutputManifest.Outputs)
 	}
+	if fixture.OutputManifest.RequestID != fixture.RequestEnvelope.RequestID || fixture.OutputManifest.ArtifactManifestID != fixture.RequestEnvelope.ArtifactManifestID {
+		t.Fatalf("output manifest must link request envelope and artifact manifest: %#v", fixture.OutputManifest)
+	}
 	if fixture.OutputManifest.Renderer.DependencyAvailable || !fixture.OutputManifest.Renderer.CleanSkip || fixture.OutputManifest.Renderer.Status != "clean_skipped_without_renderer" {
 		t.Fatalf("renderer clean skip not represented: %#v", fixture.OutputManifest.Renderer)
 	}
 
+	snapshotHashes := map[string]string{}
 	for _, snapshot := range fixture.OutputManifest.PageSnapshots {
-		if snapshot.ID == "" || snapshot.PageNumber <= 0 || snapshot.Format == "" || snapshot.Status == "" || snapshot.ContentHash == "" {
+		if snapshot.ID == "" || snapshot.PageNumber <= 0 || snapshot.Format == "" || snapshot.Status == "" || snapshot.ContentHash == "" || snapshot.HashAlgorithm != "sha256" || snapshot.HashSeed == "" {
 			t.Fatalf("snapshot metadata incomplete: %#v", snapshot)
 		}
+		hash := sha256.Sum256([]byte(snapshot.HashSeed))
+		if got := "sha256:" + hex.EncodeToString(hash[:]); got != snapshot.ContentHash {
+			t.Fatalf("snapshot %s content hash = %s, want %s from seed %q", snapshot.ID, snapshot.ContentHash, got, snapshot.HashSeed)
+		}
+		snapshotHashes[snapshot.ID] = snapshot.ContentHash
 		if snapshot.Viewport.Width <= 0 || snapshot.Viewport.Height <= 0 || snapshot.Dimensions.Width <= 0 || snapshot.Dimensions.Height <= 0 || snapshot.Dimensions.Unit == "" {
 			t.Fatalf("snapshot dimensions incomplete: %#v", snapshot)
 		}
@@ -286,6 +314,30 @@ func TestFinRobotReportRendererLivePackageFixtureContract(t *testing.T) {
 			t.Fatalf("disclosure check incomplete: %#v", check)
 		}
 	}
+
+	manifestSeedHash := sha256.Sum256([]byte(fixture.ArtifactManifest.ManifestHashSeed))
+	if fixture.ArtifactManifest.ManifestID != fixture.RequestEnvelope.ArtifactManifestID ||
+		fixture.ArtifactManifest.ReportID != fixture.RenderRequest.ReportID ||
+		fixture.ArtifactManifest.RequestID != fixture.RequestEnvelope.RequestID ||
+		fixture.ArtifactManifest.HashAlgorithm != "sha256" ||
+		fixture.ArtifactManifest.ManifestHash != "sha256:"+hex.EncodeToString(manifestSeedHash[:]) {
+		t.Fatalf("artifact manifest header/hash incomplete: %#v", fixture.ArtifactManifest)
+	}
+	artifactKinds := map[string]bool{}
+	for _, artifact := range fixture.ArtifactManifest.Artifacts {
+		artifactKinds[artifact.Kind] = true
+		if artifact.ArtifactID == "" || artifact.Kind == "" || artifact.Format == "" || artifact.URI == "" || artifact.Status == "" || artifact.ContentHash == "" || artifact.HashAlgorithm != "sha256" {
+			t.Fatalf("artifact manifest item incomplete: %#v", artifact)
+		}
+		if strings.HasPrefix(artifact.Kind, "page_snapshot") && snapshotHashes[artifact.ArtifactID] != artifact.ContentHash {
+			t.Fatalf("snapshot artifact %s hash does not match page snapshot metadata", artifact.ArtifactID)
+		}
+	}
+	for _, want := range []string{"html_report", "pdf_report", "page_snapshot"} {
+		if !artifactKinds[want] {
+			t.Fatalf("artifact manifest missing kind %q: %#v", want, artifactKinds)
+		}
+	}
 }
 
 func TestFinRobotReportRendererLivePackageFixtureIndexAndSchemas(t *testing.T) {
@@ -309,11 +361,14 @@ func TestFinRobotReportRendererLivePackageFixtureIndexAndSchemas(t *testing.T) {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	fixture := index.Fixtures[0]
-	if fixture.FixtureKey != "report_renderer:render_request:ACME:offline" || fixture.Capability != "finance.report.render.request" || fixture.Path == "" || len(fixture.Schemas) != 5 {
+	if fixture.FixtureKey != "report_renderer:render_request:ACME:offline" || fixture.Capability != "finance.report.render.request" || fixture.Path == "" || len(fixture.Schemas) != 6 {
 		t.Fatalf("fixture metadata incomplete: %#v", fixture)
 	}
 	if fixture.Metadata["replay_ready"] != true || fixture.Metadata["renderer_clean_skip"] != true {
 		t.Fatalf("fixture metadata should be replay-ready clean-skip: %#v", fixture.Metadata)
+	}
+	if fixture.Metadata["hash_algorithm"] != "sha256" || fixture.Metadata["artifact_manifest_id"] != "artifact-manifest-ACME-equity-brief" {
+		t.Fatalf("fixture metadata missing hash/artifact manifest contract: %#v", fixture.Metadata)
 	}
 	seed, _ := fixture.Metadata["deterministic_hash_seed"].(string)
 	wantHash := sha256.Sum256([]byte(seed))
@@ -418,10 +473,13 @@ type reportRendererFixture struct {
 	DeterministicHashSeed      string `json:"deterministic_hash_seed"`
 	DeterministicFixtureHash   string `json:"deterministic_fixture_hash"`
 	RenderRequest              struct {
-		ReportID      string   `json:"report_id"`
-		Title         string   `json:"title"`
-		OutputFormats []string `json:"output_formats"`
-		Sections      []struct {
+		ReportID               string                       `json:"report_id"`
+		RequestID              string                       `json:"request_id"`
+		Title                  string                       `json:"title"`
+		RenderMode             string                       `json:"render_mode"`
+		RendererDependencyGate reportRendererDependencyGate `json:"renderer_dependency_gate"`
+		OutputFormats          []string                     `json:"output_formats"`
+		Sections               []struct {
 			ID         string   `json:"id"`
 			SourceRefs []string `json:"source_refs"`
 		} `json:"sections"`
@@ -451,8 +509,18 @@ type reportRendererFixture struct {
 			MustRender bool   `json:"must_render"`
 		} `json:"disclosures"`
 	} `json:"render_request"`
+	RequestEnvelope struct {
+		RequestID              string                       `json:"request_id"`
+		ReportID               string                       `json:"report_id"`
+		RenderMode             string                       `json:"render_mode"`
+		RequestedFormats       []string                     `json:"requested_formats"`
+		RendererDependencyGate reportRendererDependencyGate `json:"renderer_dependency_gate"`
+		ArtifactManifestID     string                       `json:"artifact_manifest_id"`
+	} `json:"request_envelope"`
 	OutputManifest struct {
-		Renderer struct {
+		RequestID          string `json:"request_id"`
+		ArtifactManifestID string `json:"artifact_manifest_id"`
+		Renderer           struct {
 			DependencyAvailable bool   `json:"dependency_available"`
 			CleanSkip           bool   `json:"clean_skip"`
 			Status              string `json:"status"`
@@ -462,6 +530,7 @@ type reportRendererFixture struct {
 			Format          string   `json:"format"`
 			URI             string   `json:"uri"`
 			ContentHash     string   `json:"content_hash"`
+			HashAlgorithm   string   `json:"hash_algorithm"`
 			PageSnapshotIDs []string `json:"page_snapshot_ids"`
 		} `json:"outputs"`
 		PageSnapshots []struct {
@@ -479,6 +548,8 @@ type reportRendererFixture struct {
 			} `json:"dimensions"`
 			Status         string   `json:"status"`
 			ContentHash    string   `json:"content_hash"`
+			HashAlgorithm  string   `json:"hash_algorithm"`
+			HashSeed       string   `json:"hash_seed"`
 			SourceRefs     []string `json:"source_refs"`
 			WarningRefs    []string `json:"warning_refs"`
 			DisclosureRefs []string `json:"disclosure_refs"`
@@ -503,6 +574,31 @@ type reportRendererFixture struct {
 		} `json:"disclosure_checks"`
 		DeterministicFixtureHash string `json:"deterministic_fixture_hash"`
 	} `json:"output_manifest"`
+	ArtifactManifest struct {
+		ManifestID       string `json:"manifest_id"`
+		ReportID         string `json:"report_id"`
+		RequestID        string `json:"request_id"`
+		HashAlgorithm    string `json:"hash_algorithm"`
+		ManifestHashSeed string `json:"manifest_hash_seed"`
+		ManifestHash     string `json:"manifest_hash"`
+		Artifacts        []struct {
+			ArtifactID    string `json:"artifact_id"`
+			Kind          string `json:"kind"`
+			Format        string `json:"format"`
+			URI           string `json:"uri"`
+			Status        string `json:"status"`
+			ContentHash   string `json:"content_hash"`
+			HashAlgorithm string `json:"hash_algorithm"`
+		} `json:"artifacts"`
+	} `json:"artifact_manifest"`
+}
+
+type reportRendererDependencyGate struct {
+	Dependency                 string `json:"dependency"`
+	Required                   bool   `json:"required"`
+	DefaultEnabled             bool   `json:"default_enabled"`
+	CleanSkipWithoutDependency bool   `json:"clean_skip_without_dependency"`
+	SkipStatus                 string `json:"skip_status"`
 }
 
 func TestFinRobotReportRendererLivePackageDeterministicOrdering(t *testing.T) {
@@ -513,7 +609,7 @@ func TestFinRobotReportRendererLivePackageDeterministicOrdering(t *testing.T) {
 		got = append(got, key)
 	}
 	sort.Strings(got)
-	want := []string{"output_manifest", "page_snapshot_metadata", "render_request", "render_warning", "source_annotation"}
+	want := []string{"artifact_manifest", "output_manifest", "page_snapshot_metadata", "render_request", "render_warning", "source_annotation"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("schema keys = %#v, want %#v", got, want)
 	}
