@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-approval-policy-live-package",
+  "package_name": "generic.ai.approval.policy",
+  "companion_package_name": "generic.ai.capability.gate",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for generic AI approval policy and capability gate contracts.",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; provider credentials belong only to future provider-specific packages behind explicit capability gates."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "default_decision": "deny",
+    "default_reason": "deny unless an exact capability grant is present",
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_approval_policy_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "approval_policy_contract": "contracts/generic_approval_policy_contract.json",
+    "capability_gate_contract": "contracts/generic_capability_gate_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "policy_outcomes": "fixtures/policy_outcome_matrix_fixture.json",
+    "approval_trace": "fixtures/approval_trace_envelope_fixture.json",
+    "clean_skip": "fixtures/clean_skip_fixture.json"
+  },
+  "schemas": {
+    "capability_vocabulary": "schemas/capability_vocabulary_v1.schema.json",
+    "capability_gate": "schemas/capability_gate_v1.schema.json",
+    "approval_trace_envelope": "schemas/approval_trace_envelope_v1.schema.json",
+    "policy_outcome": "schemas/policy_outcome_v1.schema.json",
+    "clean_skip": "schemas/clean_skip_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "policy_outcomes": "fixtures/policy_outcome_matrix_fixture.json",
+    "approval_trace": "fixtures/approval_trace_envelope_fixture.json",
+    "clean_skip": "fixtures/clean_skip_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.capability.local.read",
+    "generic.ai.capability.network.http",
+    "generic.ai.capability.credential.read",
+    "generic.ai.capability.generated_code.execute",
+    "generic.ai.capability.trading.order_submit",
+    "generic.ai.capability.portfolio.rebalance",
+    "generic.ai.capability.publish.web",
+    "generic.ai.approval.policy.evaluate",
+    "generic.ai.approval.policy.trace",
+    "generic.ai.approval.policy.clean_skip"
+  ],
+  "risk_levels": [
+    "low",
+    "medium",
+    "high",
+    "critical"
+  ],
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "generic.ai.approval.policy denies by default unless an exact capability grant exists",
+    "generic.ai.capability.gate vocabulary is provider-free and contains stable risk levels",
+    "approval trace envelope records request, policy, decision, result, fixture key, and replay metadata",
+    "clean skip semantics return skipped without importing dependencies, network access, or credentials",
+    "policy outcome fixtures cover allow, deny, and clean-skip decisions"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide provider-specific approval, network, credential, trading, publishing, or execution behavior as built-ins; external packages must satisfy these provider-free capability gates explicitly."
+  }
+}

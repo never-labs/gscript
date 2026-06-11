@@ -1,0 +1,66 @@
+// Provider-free smoke surface for generic.ai.approval.policy and
+// generic.ai.capability.gate. This file declares fixture metadata only.
+
+generic_approval_policy_live_package := {
+    id: "generic-ai-approval-policy-live-package"
+    package_name: "generic.ai.approval.policy"
+    companion_package_name: "generic.ai.capability.gate"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    default_policy: {
+        mode: "fixture_replay"
+        default_decision: "deny"
+        clean_skip_without_dependency: true
+    }
+    capabilities: {
+        {id: "local_read" capability: "generic.ai.capability.local.read" risk_level: "low" default_decision: "allow_fixture" requires_approval: false clean_skip: false},
+        {id: "network_http" capability: "generic.ai.capability.network.http" risk_level: "medium" default_decision: "deny" requires_approval: true clean_skip: true},
+        {id: "credential_read" capability: "generic.ai.capability.credential.read" risk_level: "critical" default_decision: "deny" requires_approval: true clean_skip: true},
+        {id: "generated_code_execute" capability: "generic.ai.capability.generated_code.execute" risk_level: "high" default_decision: "deny" requires_approval: true clean_skip: true},
+        {id: "trading_order_submit" capability: "generic.ai.capability.trading.order_submit" risk_level: "critical" default_decision: "deny" requires_approval: true clean_skip: true},
+        {id: "portfolio_rebalance" capability: "generic.ai.capability.portfolio.rebalance" risk_level: "high" default_decision: "deny" requires_approval: true clean_skip: true},
+        {id: "publish_web" capability: "generic.ai.capability.publish.web" risk_level: "medium" default_decision: "deny" requires_approval: true clean_skip: true},
+    }
+}
+
+func generic_capability_gate_ok(gate) {
+    if gate == nil {
+        return false
+    }
+    if generic_approval_policy_live_package.provider_free != true || generic_approval_policy_live_package.live_network != false || generic_approval_policy_live_package.real_dependency_imports != false {
+        return false
+    }
+    if gate.capability == "generic.ai.capability.local.read" {
+        return gate.risk_level == "low" && gate.requires_approval == false
+    }
+    return gate.default_decision == "deny" && gate.requires_approval == true
+}
+
+generic_default_deny_count := 0
+generic_clean_skip_count := 0
+for i := 1; i <= #generic_approval_policy_live_package.capabilities; i++ {
+    gate := generic_approval_policy_live_package.capabilities[i]
+    assert(generic_capability_gate_ok(gate))
+    if gate.default_decision == "deny" {
+        generic_default_deny_count = generic_default_deny_count + 1
+    }
+    if gate.clean_skip {
+        generic_clean_skip_count = generic_clean_skip_count + 1
+    }
+}
+
+assert(generic_default_deny_count == 6)
+assert(generic_clean_skip_count == 6)
+
+generic_approval_policy_summary := string.format(
+"generic_approval_policy capabilities=%d default_deny=%d clean_skip=%d provider_free=%s live_network=%s imports=%s",
+#generic_approval_policy_live_package.capabilities,
+generic_default_deny_count,
+generic_clean_skip_count,
+tostring(generic_approval_policy_live_package.provider_free),
+tostring(generic_approval_policy_live_package.live_network),
+tostring(generic_approval_policy_live_package.real_dependency_imports)
+)
+
+print(generic_approval_policy_summary)

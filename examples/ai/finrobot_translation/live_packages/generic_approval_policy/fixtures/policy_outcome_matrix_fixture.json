@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic.ai.approval.policy:outcome_matrix:v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "default_decision": "deny",
+  "outcomes": [
+    {
+      "id": "allow_local_read_fixture",
+      "capability": "generic.ai.capability.local.read",
+      "risk_level": "low",
+      "requires_approval": false,
+      "grant": "fixture",
+      "decision": "allowed",
+      "result_status": "ok",
+      "reason": "low-risk fixture read is allowed without live provider access"
+    },
+    {
+      "id": "deny_unknown_capability",
+      "capability": "generic.ai.capability.unknown",
+      "risk_level": "critical",
+      "requires_approval": true,
+      "grant": "missing",
+      "decision": "denied",
+      "result_status": "denied",
+      "reason": "unknown capability is denied by default"
+    },
+    {
+      "id": "deny_trading_without_exact_grant",
+      "capability": "generic.ai.capability.trading.order_submit",
+      "risk_level": "critical",
+      "requires_approval": true,
+      "grant": "missing",
+      "decision": "denied",
+      "result_status": "denied",
+      "reason": "critical trading capability requires an exact approval grant"
+    },
+    {
+      "id": "clean_skip_network_absent",
+      "capability": "generic.ai.capability.network.http",
+      "risk_level": "medium",
+      "requires_approval": true,
+      "grant": "missing_dependency",
+      "decision": "skipped",
+      "result_status": "skipped",
+      "reason": "network provider dependency is absent in provider-free mode",
+      "clean_skip": true
+    }
+  ]
+}
