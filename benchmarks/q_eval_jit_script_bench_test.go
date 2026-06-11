@@ -482,8 +482,13 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 	// constant-source session eval call is lowered to OpQEvalSessionEval
 	// (QEvalSessionEvalLoweringPass), so the loop no longer contains a
 	// performance-blocked generic Call. Pin that the lowered route does REAL
-	// per-iteration work in Tier 2 native code: ExitOpExit occurrences (the
-	// session eval op-exit) must scale with the iteration count.
+	// per-iteration work in Tier 2 native code: planned-route session eval
+	// executions (lock-free per-CompiledFunction counters folded into
+	// QKernelExecutionStatsFor) must scale with the iteration count. The
+	// counters are the authoritative per-iteration signal: the slim exit lane
+	// (tiering_exit_fast_q_eval.go) deliberately bypasses the global
+	// ExitStats mutex, so ExitStats().ByExitCode no longer observes these
+	// per-iteration exits.
 	{
 		proto := qEvalJITScriptCompileTop(t, qEvalJITScriptSource(src))
 		globals := vmtest.NewInterpreterGlobals()
@@ -523,7 +528,21 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 				t.Fatalf("settle CallValue(run, %d): %v", iters, err)
 			}
 		}
-		before := tm.ExitStats().ByExitCode["ExitOpExit"]
+		sessionEvalCounts := func() (planned, shell uint64) {
+			for _, stat := range tm.QKernelExecutionStatsFor(runProto) {
+				if stat.Kernel != "QEvalSessionEval" {
+					continue
+				}
+				switch stat.Route {
+				case "session_planned_op_exit":
+					planned += stat.Count
+				case "typed_runtime_op_exit":
+					shell += stat.Count
+				}
+			}
+			return planned, shell
+		}
+		beforePlanned, beforeShell := sessionEvalCounts()
 		results, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(iters)})
 		if err != nil {
 			v.Close()
@@ -537,35 +556,20 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 			v.Close()
 			t.Fatalf("session-route run never entered Tier 2 native code (EnteredTier2=%d)", runProto.EnteredTier2)
 		}
-		opExits := tm.ExitStats().ByExitCode["ExitOpExit"] - before
-		if opExits < minAttempts {
-			v.Close()
-			t.Fatalf("session eval op-exits = %d for %d Tier 2 iterations (< %d); "+
-				"the lowered route is not executing per iteration", opExits, iters, minAttempts)
-		}
-		// Pin the op-exit execution route: the per-iteration work must run
-		// through the planned route (pinned session plan chain), not the
-		// host-eval string shell. Counters accumulate across settle calls, so
-		// the final timed call alone must satisfy the floor.
-		var plannedExecs, shellExecs uint64
-		for _, stat := range tm.QKernelExecutionStatsFor(runProto) {
-			if stat.Kernel != "QEvalSessionEval" {
-				continue
-			}
-			switch stat.Route {
-			case "session_planned_op_exit":
-				plannedExecs += stat.Count
-			case "typed_runtime_op_exit":
-				shellExecs += stat.Count
-			}
-		}
+		// Pin the per-iteration execution route on the final call alone: the
+		// work must run through the planned route (pinned session plan chain,
+		// resolved once per receiver+source), not the host-eval string shell,
+		// and it must scale with the iteration count (no result memoization).
+		afterPlanned, afterShell := sessionEvalCounts()
+		plannedExecs := afterPlanned - beforePlanned
+		shellExecs := afterShell - beforeShell
 		if plannedExecs < minAttempts {
 			v.Close()
 			t.Fatalf("planned session eval executions = %d (shell fallback = %d) for %d Tier 2 iterations (< %d); "+
-				"the session eval op-exit is no longer executing the pinned plan chain", plannedExecs, shellExecs, iters, minAttempts)
+				"the session eval exit is no longer executing the pinned plan chain per iteration", plannedExecs, shellExecs, iters, minAttempts)
 		}
-		t.Logf("Tier 2 session route: %d session eval op-exits over %d iterations (planned route execs: %d, shell execs: %d, tier2 compiled: %d)",
-			opExits, iters, plannedExecs, shellExecs, tm.Tier2Count())
+		t.Logf("Tier 2 session route: %d planned session eval executions over %d iterations (shell execs: %d, tier2 compiled: %d)",
+			plannedExecs, iters, shellExecs, tm.Tier2Count())
 		v.Close()
 	}
 

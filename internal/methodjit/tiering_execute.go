@@ -229,6 +229,23 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			}
 		}
 
+		// Slim exit lane for the per-iteration q session-eval helper: skip the
+		// exit-stat mutex, speculation-profile rebuild, and register resync
+		// that the generic ExitOpExit path pays (none of which this op needs;
+		// see tiering_exit_fast_q_eval.go). Falls through with no side
+		// effects when the lane cannot handle the exit.
+		if ctx.ExitCode == ExitOpExit && Op(ctx.OpExitOp) == OpQEvalSessionEval &&
+			exitCheck == nil && !tm.perfStatsEnabled && !tm.envR154Trace {
+			nextPtr, done, err := tm.fastQEvalSessionEvalOpExit(cf, ctx, regs, base)
+			if done {
+				if err != nil {
+					return nil, fmt.Errorf("tier2: op-exit: %w", err)
+				}
+				codePtr = nextPtr
+				continue
+			}
+		}
+
 		tm.recordTier2Exit(proto, cf, ctx)
 
 		switch ctx.ExitCode {
