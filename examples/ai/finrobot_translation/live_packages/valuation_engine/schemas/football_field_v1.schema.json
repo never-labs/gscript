@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/valuation_engine/football_field_v1.schema.json",
+  "title": "FinRobot Football Field",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "symbol",
+    "currency",
+    "as_of",
+    "ranges",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "as_of": {
+      "type": "string"
+    },
+    "ranges": {
+      "type": "array",
+      "minItems": 3
+    },
+    "provenance": {
+      "type": "object"
+    }
+  }
+}

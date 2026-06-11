@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "symbol": "ACME",
+  "currency": "USD",
+  "as_of": "2026-06-30",
+  "ranges": [
+    {
+      "method": "dcf",
+      "period": "FY2026-FY2030",
+      "low": 39.254436,
+      "base": 43.61604,
+      "high": 47.977644,
+      "provenance_ref": "valuation:ACME:dcf:offline"
+    },
+    {
+      "method": "ev_ebitda",
+      "period": "FY2026E",
+      "low": 45.18,
+      "base": 50.2,
+      "high": 55.22,
+      "provenance_ref": "valuation:ACME:ev_ebitda:offline"
+    },
+    {
+      "method": "pe",
+      "period": "FY2026E",
+      "low": 47.88,
+      "base": 53.2,
+      "high": 58.52,
+      "provenance_ref": "valuation:ACME:pe:offline"
+    },
+    {
+      "method": "target_price_synthesis",
+      "period": "FY2026E",
+      "low": 42.757218,
+      "base": 47.50802,
+      "high": 52.258822,
+      "provenance_ref": "valuation:ACME:synthesis:offline"
+    }
+  ],
+  "provenance": {
+    "provider": "fixture",
+    "fixture_key": "valuation:ACME:football_field:offline",
+    "captured_at": "2026-06-30T00:00:00Z",
+    "source_schema": "schemas/football_field_v1.schema.json",
+    "source_url_redacted": true,
+    "stale_after_days": 0,
+    "replay_ready": true
+  }
+}
