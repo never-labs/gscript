@@ -2907,6 +2907,8 @@ func qTypedNativeDataFramePayload(tbl *Table) (data.Frame, bool, error) {
 	switch native := payload.(type) {
 	case data.Frame:
 		return native, true, nil
+	case *lazySoAFramePayload:
+		return native.frame, true, nil
 	case *SoA:
 		frame, err := qDataFrameFromSoA(native)
 		if err != nil {
@@ -7228,8 +7230,10 @@ func qKeyedFrameToValue(keyed data.KeyedFrame) Value {
 	t := NewTable()
 	t.RawSetString(qKeyedFrameMarker, BoolValue(true))
 	t.RawSetString("keys", qDataSymbolListValue(keyed.Keys()))
-	if rows, err := qRowsFromDataFrame(keyed.Frame()); err == nil {
-		t.RawSetString("frame", TableValue(rows))
+	// The "frame" field uses the lazy frame facade: per-column wrappers and
+	// derived tables are built on first access instead of per keyed result.
+	if frameValue, err := qDataFrameLazyFacadeValue(keyed.Frame()); err == nil {
+		t.RawSetString("frame", frameValue)
 	}
 	setQKeyedFrameNativePayload(t, keyed)
 	return TableValue(t)

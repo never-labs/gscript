@@ -5291,6 +5291,21 @@ func UpdateWhere(frame Frame, where Expr, assignments map[Symbol]Expr) (Frame, e
 	if err != nil {
 		return Frame{}, err
 	}
+	return updateRowsWhere(frame, indexes, assignments)
+}
+
+// updateRowsWhere applies update assignments at the matched row indexes.
+// indexes must be unique, in-range, and ascending; they are borrowed and never
+// mutated, so index-owned row lists may be passed directly.
+func updateRowsWhere(frame Frame, indexes []int, assignments map[Symbol]Expr) (Frame, error) {
+	if len(assignments) == 0 {
+		return Frame{}, fmt.Errorf("update requires at least one assignment")
+	}
+	for name, expr := range assignments {
+		if expr == nil {
+			return Frame{}, fmt.Errorf("update assignment for column %q is nil", name)
+		}
+	}
 	cols := make([]Column, 0, len(frame.schema.names)+len(assignments))
 	for _, name := range frame.schema.names {
 		col := frame.columns[name]
@@ -5512,7 +5527,9 @@ func DeleteWhere(frame Frame, where Expr) (Frame, error) {
 		if err != nil {
 			return Frame{}, err
 		}
-		return frame.Gather(indexes)
+		// Survivors are exposed through lazy index views (one shared index,
+		// no dense per-column copies), mirroring DeleteWhereKeyed.
+		return gatherFrameRowsView(frame, indexes)
 	}
 	deleted := make([]bool, frame.Len())
 	for _, row := range deleteIndexes {
@@ -5524,7 +5541,7 @@ func DeleteWhere(frame Frame, where Expr) (Frame, error) {
 			indexes = append(indexes, row)
 		}
 	}
-	return frame.Gather(indexes)
+	return gatherFrameRowsView(frame, indexes)
 }
 
 func DropColumns(frame Frame, names ...Symbol) (Frame, error) {

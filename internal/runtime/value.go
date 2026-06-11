@@ -654,6 +654,13 @@ func (v Value) NativeFramePayloadInfo() (NativePayloadInfo, bool) {
 	return tbl.NativeFramePayloadInfo()
 }
 
+// NativeFrameSoAProvider lets a native frame payload densify into a runtime
+// SoA on demand. Result facades carry the columnar frame and only pay the
+// dense conversion when a VM/JIT frame route actually touches the payload.
+type NativeFrameSoAProvider interface {
+	NativeFrameSoA() (*SoA, error)
+}
+
 func (v Value) nativeFrameSoA(op string) (*SoA, NativePayloadInfo, bool, error) {
 	if !v.IsTable() {
 		return nil, NativePayloadInfo{}, false, nil
@@ -666,11 +673,17 @@ func (v Value) nativeFrameSoA(op string) (*SoA, NativePayloadInfo, bool, error) 
 	if !ok {
 		return nil, NativePayloadInfo{}, false, nil
 	}
-	frame, ok := payload.(*SoA)
-	if !ok {
-		return nil, NativePayloadInfo{}, true, fmt.Errorf("%s unsupported native frame payload %T", op, payload)
+	if frame, ok := payload.(*SoA); ok {
+		return frame, info, true, nil
 	}
-	return frame, info, true, nil
+	if provider, ok := payload.(NativeFrameSoAProvider); ok {
+		frame, err := provider.NativeFrameSoA()
+		if err != nil {
+			return nil, NativePayloadInfo{}, true, fmt.Errorf("%s unsupported native frame payload: %w", op, err)
+		}
+		return frame, info, true, nil
+	}
+	return nil, NativePayloadInfo{}, true, fmt.Errorf("%s unsupported native frame payload %T", op, payload)
 }
 
 // NativeFrameLen returns the row count for runtime-owned native frame

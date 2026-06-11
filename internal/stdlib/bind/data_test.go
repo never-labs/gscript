@@ -84,8 +84,8 @@ f := data.frame({
 })
 `)
 	frame := interp.GetGlobal("f").Table()
-	if _, ok := frame.NativePayload().(stddata.Frame); !ok {
-		t.Fatalf("data frame native payload = %T, want stddata.Frame", frame.NativePayload())
+	if _, ok := frame.NativePayload().(*lazySoAFramePayload); !ok {
+		t.Fatalf("data frame native payload = %T, want *lazySoAFramePayload", frame.NativePayload())
 	}
 	libFrame, err := dataLibFrameFromTable(frame)
 	if err != nil {
@@ -227,8 +227,8 @@ func TestDataFrameValueFromLibBuildsNativeFacade(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := value.Table()
-	if _, ok := table.NativePayload().(stddata.Frame); !ok {
-		t.Fatalf("native payload = %T, want stddata.Frame", table.NativePayload())
+	if _, ok := table.NativePayload().(*lazySoAFramePayload); !ok {
+		t.Fatalf("native payload = %T, want *lazySoAFramePayload", table.NativePayload())
 	}
 	info, ok := table.NativeFramePayloadInfo()
 	if !ok {

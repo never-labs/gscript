@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
@@ -784,6 +785,8 @@ func dataNativeFramePayload(frame *Table) (stddata.Frame, bool, error) {
 		switch native := payload.(type) {
 		case stddata.Frame:
 			return native, true, nil
+		case *lazySoAFramePayload:
+			return native.frame, true, nil
 		case *SoA:
 			out, err := qDataFrameFromSoA(native)
 			if err != nil {
@@ -886,15 +889,35 @@ func dataArrayFacadeValue(array stddata.Array, convert func(any) Value) Value {
 	return TableValue(out)
 }
 
+// lazySoAFramePayload is a native data-frame payload that densifies into a
+// runtime SoA only when a VM/JIT frame route first touches it. Building the
+// SoA copies every column, which is pure waste for the common case where a
+// query result is only consumed through its columnar frame.
+type lazySoAFramePayload struct {
+	frame stddata.Frame
+	once  sync.Once
+	soa   *SoA
+	err   error
+}
+
+// NativeFrameSoA implements runtime.NativeFrameSoAProvider.
+func (p *lazySoAFramePayload) NativeFrameSoA() (*SoA, error) {
+	p.once.Do(func() {
+		soa, ok := dataFrameRuntimeSoA(p.frame)
+		if !ok {
+			p.err = fmt.Errorf("data frame is not SoA-convertible")
+			return
+		}
+		p.soa = soa
+	})
+	return p.soa, p.err
+}
+
 func setDataFrameNativePayload(table *Table, frame stddata.Frame) {
 	if table == nil {
 		return
 	}
-	payload := any(frame)
-	if soa, ok := dataFrameRuntimeSoA(frame); ok {
-		payload = soa
-	}
-	table.SetNativePayloadWithInfo(payload, NativePayloadInfo{
+	table.SetNativePayloadWithInfo(&lazySoAFramePayload{frame: frame}, NativePayloadInfo{
 		Kind:       NativePayloadDataFrame,
 		Rows:       frame.Len(),
 		Columns:    len(frame.Schema().Names()),
@@ -1342,6 +1365,8 @@ func dataFrameRows(frame *Table) (*Table, error) {
 		switch native := payload.(type) {
 		case stddata.Frame:
 			return dataRowsFromNativeFrame(native)
+		case *lazySoAFramePayload:
+			return dataRowsFromNativeFrame(native.frame)
 		case *SoA:
 			libFrame, err := qDataFrameFromSoA(native)
 			if err != nil {

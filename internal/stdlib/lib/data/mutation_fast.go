@@ -31,6 +31,18 @@ func arrayWithTypedEdits(arr Array, setRows []int, setValues []any, appendValues
 	if anyNullEditValue(setValues) || anyNullEditValue(appendValues) {
 		return arrayWithNullableTypedEdits(arr, setRows, setValues, appendValues)
 	}
+	if len(setRows) == 0 && len(appendValues) > 0 {
+		// Small tail appends against a wide base stay O(delta) through a lazy
+		// tail view instead of dense-copying the whole column per mutation.
+		if out, ok := arrayWithTailAppend(arr, appendValues); ok {
+			return out, true
+		}
+	}
+	if t, ok := arr.(tailFlattener); ok {
+		// Point edits (or oversized appends) on a tail view flatten once and
+		// take the dense edit path.
+		return arrayWithTypedEdits(t.flattenTail(), setRows, setValues, appendValues)
+	}
 	switch a := arr.(type) {
 	case columnArray[bool]:
 		return editColumnArray(a.kind, a.data, convertEditBool, setRows, setValues, appendValues)
@@ -80,6 +92,9 @@ func arrayWithTypedEdits(arr Array, setRows []int, setValues []any, appendValues
 // all-null tail append through the lazy nullTailArray view; everything else
 // falls back to the boxed path.
 func arrayWithNullableTypedEdits(arr Array, setRows []int, setValues []any, appendValues []any) (Array, bool) {
+	if t, ok := arr.(tailFlattener); ok {
+		return arrayWithNullableTypedEdits(t.flattenTail(), setRows, setValues, appendValues)
+	}
 	switch a := arr.(type) {
 	case columnArray[int64]:
 		base := nullBitmapArray[int64]{kind: a.kind, data: a.data, nulls: newNullBitmap(len(a.data))}
@@ -262,6 +277,144 @@ func editColumnArray[T any](kind Kind, data []T, conv func(any) (T, bool), setRo
 	return columnArray[T]{kind: kind, data: out}, true
 }
 
+// --- typed tail-append views -------------------------------------------------
+
+// tailValueArrayMaxTail bounds the lazy tail before a chained append flattens
+// into dense storage, so repeated small inserts amortize to one dense copy per
+// tailValueArrayMaxTail appended rows while reads stay near-dense.
+const tailValueArrayMaxTail = 32
+
+// tailValueArrayMinBase keeps small columns on the dense path, where a full
+// copy is cheaper than the extra view indirection.
+const tailValueArrayMinBase = 64
+
+// tailValueArray is an immutable view of a typed base column plus a small
+// owned tail of appended values. Base storage is shared with the source
+// column (frames are immutable values); the tail is never mutated after
+// construction, so chained appends copy only the tail.
+type tailValueArray[T any] struct {
+	kind Kind
+	base []T
+	tail []T
+}
+
+func (a tailValueArray[T]) Kind() Kind { return a.kind }
+
+func (a tailValueArray[T]) Len() int { return len(a.base) + len(a.tail) }
+
+func (a tailValueArray[T]) At(row int) (any, bool) {
+	if row < 0 || row >= a.Len() {
+		return nil, false
+	}
+	if row < len(a.base) {
+		return a.base[row], true
+	}
+	return a.tail[row-len(a.base)], true
+}
+
+func (a tailValueArray[T]) Values() []any {
+	out := make([]any, 0, a.Len())
+	for _, v := range a.base {
+		out = append(out, v)
+	}
+	for _, v := range a.tail {
+		out = append(out, v)
+	}
+	return out
+}
+
+func (a tailValueArray[T]) Gather(indexes []int) Array {
+	out := make([]T, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.Len() {
+			panic(fmt.Sprintf("data array gather index %d out of range", row))
+		}
+		if row < len(a.base) {
+			out[i] = a.base[row]
+		} else {
+			out[i] = a.tail[row-len(a.base)]
+		}
+	}
+	return columnArray[T]{kind: a.kind, data: out}
+}
+
+// tailFlattener lets generic call sites flatten a tail view into its dense
+// column without enumerating every tailValueArray instantiation.
+type tailFlattener interface {
+	flattenTail() Array
+}
+
+func (a tailValueArray[T]) flattenTail() Array {
+	return columnArray[T]{kind: a.kind, data: a.denseTail()}
+}
+
+func (a tailValueArray[T]) denseTail() []T {
+	out := make([]T, 0, a.Len())
+	out = append(out, a.base...)
+	out = append(out, a.tail...)
+	return out
+}
+
+// arrayWithTailAppend returns a lazy tail view of arr extended with
+// appendValues. ok=false defers to the dense edit path.
+func arrayWithTailAppend(arr Array, appendValues []any) (Array, bool) {
+	if len(appendValues) > tailValueArrayMaxTail {
+		return nil, false
+	}
+	switch a := arr.(type) {
+	case columnArray[bool]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditBool, appendValues)
+	case columnArray[int64]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditI64, appendValues)
+	case columnArray[float64]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditF64, appendValues)
+	case columnArray[string]:
+		if a.kind != KindString {
+			return nil, false
+		}
+		return tailAppendColumn(a.kind, a.data, nil, convertEditString, appendValues)
+	case columnArray[Symbol]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditSymbol, appendValues)
+	case columnArray[Timestamp]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditScalarKind[Timestamp](a.kind), appendValues)
+	case tailValueArray[bool]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditBool, appendValues)
+	case tailValueArray[int64]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditI64, appendValues)
+	case tailValueArray[float64]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditF64, appendValues)
+	case tailValueArray[string]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditString, appendValues)
+	case tailValueArray[Symbol]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditSymbol, appendValues)
+	case tailValueArray[Timestamp]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditScalarKind[Timestamp](a.kind), appendValues)
+	}
+	return nil, false
+}
+
+func tailAppendColumn[T any](kind Kind, base, tail []T, conv func(any) (T, bool), appendValues []any) (Array, bool) {
+	if len(base) < tailValueArrayMinBase {
+		return nil, false
+	}
+	newTail := make([]T, len(tail), len(tail)+len(appendValues))
+	copy(newTail, tail)
+	for _, value := range appendValues {
+		v, ok := conv(value)
+		if !ok {
+			return nil, false
+		}
+		newTail = append(newTail, v)
+	}
+	if len(newTail) > tailValueArrayMaxTail {
+		out := make([]T, 0, len(base)+len(newTail))
+		out = append(out, base...)
+		out = append(out, newTail...)
+		return columnArray[T]{kind: kind, data: out}, true
+	}
+	return tailValueArray[T]{kind: kind, base: base, tail: newTail}, true
+}
+
 func editNullBitmapArrayNullable[T nullBitmapElem](a nullBitmapArray[T], conv func(any) (T, bool), setRows []int, setValues []any, appendValues []any) (Array, bool) {
 	n := len(a.data) + len(appendValues)
 	data := make([]T, len(a.data), n)
@@ -378,6 +531,46 @@ func convertEditScalarKind[T any](kind Kind) func(any) (T, bool) {
 	}
 }
 
+// scatterValuesF64 exports src as float64 values for a typed scatter into a
+// float column, widening integer-carried sources without boxing (mirrors
+// convertEditF64 semantics).
+func scatterValuesF64(src Array, n int) ([]float64, bool) {
+	vals := make([]float64, n)
+	if ok, err := TryExportF64Copy(src, vals); ok && err == nil {
+		return vals, true
+	}
+	ivals := make([]int64, n)
+	if ok, err := TryExportI64Copy(src, ivals); ok && err == nil {
+		for i, v := range ivals {
+			vals[i] = float64(v)
+		}
+		return vals, true
+	}
+	return nil, false
+}
+
+// scatterValuesI64 exports src as int64 values for a typed scatter into an
+// int column, accepting float-carried sources whose values are exactly
+// integral (mirrors convertEditI64/coerceInt64Exact semantics).
+func scatterValuesI64(src Array, n int) ([]int64, bool) {
+	vals := make([]int64, n)
+	if ok, err := TryExportI64Copy(src, vals); ok && err == nil {
+		return vals, true
+	}
+	fvals := make([]float64, n)
+	if ok, err := TryExportF64Copy(src, fvals); ok && err == nil {
+		for i, v := range fvals {
+			n64, ok := coerceInt64Exact(v)
+			if !ok {
+				return nil, false
+			}
+			vals[i] = n64
+		}
+		return vals, true
+	}
+	return nil, false
+}
+
 // arrayScatterArray returns a copy of dst with src[i] assigned at rows[i].
 // src must have exactly len(rows) elements. Common kind pairs scatter through
 // typed slices; anything else converts per element through the typed edit
@@ -391,8 +584,7 @@ func arrayScatterArray(dst Array, rows []int, src Array) (Array, bool) {
 	}
 	switch d := dst.(type) {
 	case columnArray[float64]:
-		vals := make([]float64, len(rows))
-		if ok, err := TryExportF64Copy(src, vals); ok && err == nil {
+		if vals, ok := scatterValuesF64(src, len(rows)); ok {
 			out := make([]float64, len(d.data))
 			copy(out, d.data)
 			for i, row := range rows {
@@ -404,8 +596,7 @@ func arrayScatterArray(dst Array, rows []int, src Array) (Array, bool) {
 			return columnArray[float64]{kind: d.kind, data: out}, true
 		}
 	case columnArray[int64]:
-		vals := make([]int64, len(rows))
-		if ok, err := TryExportI64Copy(src, vals); ok && err == nil {
+		if vals, ok := scatterValuesI64(src, len(rows)); ok {
 			out := make([]int64, len(d.data))
 			copy(out, d.data)
 			for i, row := range rows {
@@ -528,14 +719,90 @@ func (k KeyedFrame) Schema() Schema {
 	return k.frame.Schema()
 }
 
+// keyedWhereIndexRows resolves a where expression that is a pure conjunction
+// of equality comparisons covering exactly the keyed frame's key columns
+// through the existing rowsByKey index instead of a full column scan. The
+// returned rows are shared with the index and must not be mutated. ok=false
+// means the where shape is unsupported and the caller must filter.
+func keyedWhereIndexRows(keyed KeyedFrame, where Expr) ([]int, bool) {
+	if where == nil || len(keyed.keys) == 0 {
+		return nil, false
+	}
+	values := make(map[Symbol]any, len(keyed.keys))
+	if !collectKeyEqualityLiterals(where, values) {
+		return nil, false
+	}
+	if len(values) != len(keyed.keys) {
+		return nil, false
+	}
+	ordered := make([]any, len(keyed.keys))
+	for i, name := range keyed.keys {
+		col, ok := keyed.frame.Column(name)
+		if !ok {
+			return nil, false
+		}
+		switch col.Kind() {
+		case KindF64, KindF32:
+			// Float keys keep comparison semantics (NaN never equal) on the
+			// scan path instead of key-string identity.
+			return nil, false
+		}
+		v, ok := values[name]
+		if !ok {
+			return nil, false
+		}
+		if IsNull(v) {
+			return nil, false
+		}
+		ordered[i] = v
+	}
+	key, err := lookupKey(keyed.frame, keyed.keys, ordered)
+	if err != nil {
+		return nil, false
+	}
+	return keyed.lookupRowsByKey(key), true
+}
+
+// collectKeyEqualityLiterals flattens a pure-`and` tree of column=literal
+// equality leaves into out; any other node shape fails the collection.
+func collectKeyEqualityLiterals(expr Expr, out map[Symbol]any) bool {
+	switch e := expr.(type) {
+	case Logical:
+		if e.Op != "and" {
+			return false
+		}
+		return collectKeyEqualityLiterals(e.Left, out) && collectKeyEqualityLiterals(e.Right, out)
+	case Binary:
+		ref, op, literal, ok := binaryColumnLiteral(e)
+		if !ok || op != OpEQ {
+			return false
+		}
+		if _, dup := out[ref.Name]; dup {
+			return false
+		}
+		out[ref.Name] = literal.Value
+		return true
+	default:
+		return false
+	}
+}
+
 // UpdateWhereKeyed applies UpdateWhere to the keyed frame's backing frame.
 // When no key column is assigned the row->key mapping is unchanged, so the
-// existing key index is reused instead of re-keying the whole table.
+// existing key index is reused instead of re-keying the whole table. A where
+// clause that is key-column equality resolves matched rows through the key
+// index instead of scanning.
 func UpdateWhereKeyed(keyed KeyedFrame, where Expr, assignments map[Symbol]Expr) (KeyedFrame, error) {
 	if len(keyed.keys) == 0 {
 		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
 	}
-	out, err := UpdateWhere(keyed.frame, where, assignments)
+	var out Frame
+	var err error
+	if rows, ok := keyedWhereIndexRows(keyed, where); ok {
+		out, err = updateRowsWhere(keyed.frame, rows, assignments)
+	} else {
+		out, err = UpdateWhere(keyed.frame, where, assignments)
+	}
 	if err != nil {
 		return KeyedFrame{}, err
 	}
@@ -624,9 +891,13 @@ func DeleteWhereKeyed(keyed KeyedFrame, where Expr) (KeyedFrame, error) {
 	if len(keyed.keys) == 0 {
 		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
 	}
-	deleteIndexes, err := filterIndexes(keyed.frame, where)
-	if err != nil {
-		return KeyedFrame{}, err
+	deleteIndexes, ok := keyedWhereIndexRows(keyed, where)
+	if !ok {
+		var err error
+		deleteIndexes, err = filterIndexes(keyed.frame, where)
+		if err != nil {
+			return KeyedFrame{}, err
+		}
 	}
 	if len(deleteIndexes) == 0 {
 		return keyed, nil
