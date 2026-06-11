@@ -87,7 +87,27 @@
           "Value": {
             "completed": true,
             "summary": "Generic local evidence collected for the translated workflow.",
-            "next_speaker": "User_Proxy"
+            "next_speaker": "User_Proxy",
+            "trace": {
+              "name": "Market_Analyst",
+              "type": "agent_tool",
+              "status": "done",
+              "metadata": {},
+              "children": [
+                {
+                  "name": "Market_Analyst",
+                  "type": "agent",
+                  "status": "done",
+                  "parent": {
+                    "name": "Market_Analyst",
+                    "type": "agent_tool",
+                    "status": "done"
+                  },
+                  "metadata": {},
+                  "children": {}
+                }
+              ]
+            }
           }
         }
       ],
