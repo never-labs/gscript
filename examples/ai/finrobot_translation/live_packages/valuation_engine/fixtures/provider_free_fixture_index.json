@@ -47,6 +47,19 @@
         "deterministic_math": true,
         "hidden_live_data_fetch": false
       }
+    },
+    {
+      "fixture_key": "valuation:ACME:scenario_book:offline",
+      "capability": "finance.valuation.scenario_book.build",
+      "path": "fixtures/scenario_book_ACME_fixture.json",
+      "schema": "schemas/scenario_book_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "deterministic_math": true,
+        "hidden_live_data_fetch": false,
+        "scenario_weighted_target": true,
+        "tolerance_metadata": true
+      }
     }
   ]
 }

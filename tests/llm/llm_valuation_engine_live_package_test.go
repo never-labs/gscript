@@ -232,10 +232,12 @@ func TestFinRobotValuationEngineContractsAndFixtureIndex(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeValuationEngineJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 4 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 5 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
+	fixtureKeys := map[string]bool{}
 	for _, fixture := range index.Fixtures {
+		fixtureKeys[fixture.FixtureKey] = true
 		if fixture.FixtureKey == "" || fixture.Capability == "" || fixture.Path == "" || fixture.Schema == "" {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
 		}
@@ -244,6 +246,9 @@ func TestFinRobotValuationEngineContractsAndFixtureIndex(t *testing.T) {
 		}
 		assertValuationEngineJSONFile(t, filepath.Join(base, fixture.Path))
 		assertValuationEngineJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+	if !fixtureKeys["valuation:ACME:scenario_book:offline"] {
+		t.Fatalf("fixture index missing scenario book: %#v", fixtureKeys)
 	}
 }
 
@@ -337,6 +342,109 @@ func TestFinRobotValuationEngineDeterministicFixtureMath(t *testing.T) {
 	assertFloatWithin(t, "weight sum", weightSum, 1.0, 0.000001)
 	targetPrice := dcf.Outputs["price_per_share"]*weights["dcf"] + ev.Outputs["price_per_share"]*weights["ev_ebitda"] + pe.Outputs["price_per_share"]*weights["pe"]
 	assertFloatWithin(t, "target price synthesis", targetPrice, fixture.TargetPriceSynthesis.TargetPrice, 0.000001)
+}
+
+func TestFinRobotValuationEngineScenarioBookFixture(t *testing.T) {
+	base := valuationEngineLivePackageDir(t)
+
+	var book struct {
+		ProviderFree          bool   `json:"provider_free"`
+		LiveNetwork           bool   `json:"live_network"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		Symbol                string `json:"symbol"`
+		Currency              string `json:"currency"`
+		ScenarioDimensions    []struct {
+			ID       string `json:"id"`
+			Unit     string `json:"unit"`
+			Base     any    `json:"base"`
+			LowCase  any    `json:"low_case"`
+			HighCase any    `json:"high_case"`
+		} `json:"scenario_dimensions"`
+		Scenarios []struct {
+			ID            string             `json:"id"`
+			Weight        float64            `json:"weight"`
+			Assumptions   map[string]any     `json:"assumptions"`
+			MethodTargets map[string]float64 `json:"method_targets"`
+			TargetPrice   float64            `json:"target_price"`
+			ProvenanceRef string             `json:"provenance_ref"`
+		} `json:"scenarios"`
+		ScenarioWeightedTarget struct {
+			Formula        string  `json:"formula"`
+			TargetPrice    float64 `json:"target_price"`
+			WeightSum      float64 `json:"weight_sum"`
+			RatingBand     string  `json:"rating_band"`
+			ConflictPolicy string  `json:"conflict_policy"`
+		} `json:"scenario_weighted_target"`
+		ToleranceMetadata struct {
+			AbsoluteTolerance float64           `json:"absolute_tolerance"`
+			RoundedDecimals   int               `json:"rounded_decimals"`
+			DeterministicMath bool              `json:"deterministic_math"`
+			SensitivityUnits  map[string]string `json:"sensitivity_units"`
+		} `json:"tolerance_metadata"`
+		Provenance valuationEngineProvenance `json:"provenance"`
+	}
+	decodeValuationEngineJSONFile(t, filepath.Join(base, "fixtures", "scenario_book_ACME_fixture.json"), &book)
+	if !book.ProviderFree || book.LiveNetwork || book.RealDependencyImports || book.Symbol != "ACME" || book.Currency != "USD" {
+		t.Fatalf("scenario book header = %#v", book)
+	}
+	assertValuationEngineProvenance(t, book.Provenance)
+
+	dimensions := map[string]string{}
+	for _, dimension := range book.ScenarioDimensions {
+		if dimension.ID == "" || dimension.Unit == "" || dimension.Base == nil || dimension.LowCase == nil || dimension.HighCase == nil {
+			t.Fatalf("scenario dimension incomplete: %#v", dimension)
+		}
+		dimensions[dimension.ID] = dimension.Unit
+	}
+	for _, want := range []string{"wacc", "terminal_growth", "revenue_cagr", "ebitda_margin", "peer_outlier_handling", "analyst_target_conflict_reconciliation"} {
+		if dimensions[want] == "" {
+			t.Fatalf("scenario dimensions missing %q: %#v", want, dimensions)
+		}
+	}
+	if dimensions["wacc"] != "ratio" || dimensions["terminal_growth"] != "ratio" || dimensions["revenue_cagr"] != "ratio" || dimensions["ebitda_margin"] != "ratio" {
+		t.Fatalf("numeric sensitivity dimensions must be ratios: %#v", dimensions)
+	}
+
+	requiredAssumptions := []string{"wacc", "terminal_growth", "revenue_cagr", "ebitda_margin", "peer_outlier_handling", "analyst_target_conflict_reconciliation"}
+	requiredMethods := []string{"dcf", "ev_ebitda", "pe", "analyst_reconciled"}
+	var weightSum, weightedTarget float64
+	for _, scenario := range book.Scenarios {
+		if scenario.ID == "" || scenario.Weight <= 0 || scenario.ProvenanceRef == "" || scenario.TargetPrice <= 0 {
+			t.Fatalf("scenario incomplete: %#v", scenario)
+		}
+		for _, assumption := range requiredAssumptions {
+			if _, ok := scenario.Assumptions[assumption]; !ok {
+				t.Fatalf("scenario %q missing assumption %q: %#v", scenario.ID, assumption, scenario.Assumptions)
+			}
+		}
+		if _, ok := scenario.Assumptions["peer_outlier_handling"].(string); !ok {
+			t.Fatalf("scenario %q peer outlier policy must be explicit: %#v", scenario.ID, scenario.Assumptions)
+		}
+		if _, ok := scenario.Assumptions["analyst_target_conflict_reconciliation"].(string); !ok {
+			t.Fatalf("scenario %q analyst conflict policy must be explicit: %#v", scenario.ID, scenario.Assumptions)
+		}
+		for _, method := range requiredMethods {
+			if scenario.MethodTargets[method] <= 0 {
+				t.Fatalf("scenario %q missing positive method target %q: %#v", scenario.ID, method, scenario.MethodTargets)
+			}
+		}
+		weightSum += scenario.Weight
+		weightedTarget += scenario.TargetPrice * scenario.Weight
+	}
+	assertFloatWithin(t, "scenario weight sum", weightSum, book.ScenarioWeightedTarget.WeightSum, book.ToleranceMetadata.AbsoluteTolerance)
+	assertFloatWithin(t, "scenario weight sum one", weightSum, 1.0, book.ToleranceMetadata.AbsoluteTolerance)
+	assertFloatWithin(t, "scenario weighted target", weightedTarget, book.ScenarioWeightedTarget.TargetPrice, book.ToleranceMetadata.AbsoluteTolerance)
+	if !strings.Contains(book.ScenarioWeightedTarget.Formula, "scenario.target_price") || !strings.Contains(book.ScenarioWeightedTarget.ConflictPolicy, "analyst") {
+		t.Fatalf("scenario weighted target metadata incomplete: %#v", book.ScenarioWeightedTarget)
+	}
+	if book.ToleranceMetadata.AbsoluteTolerance <= 0 || book.ToleranceMetadata.RoundedDecimals != 6 || !book.ToleranceMetadata.DeterministicMath {
+		t.Fatalf("tolerance metadata incomplete: %#v", book.ToleranceMetadata)
+	}
+	for _, sensitivity := range []string{"wacc", "terminal_growth", "revenue_cagr", "ebitda_margin"} {
+		if book.ToleranceMetadata.SensitivityUnits[sensitivity] != "ratio" {
+			t.Fatalf("tolerance metadata missing ratio unit for %q: %#v", sensitivity, book.ToleranceMetadata.SensitivityUnits)
+		}
+	}
 }
 
 func TestFinRobotValuationEngineFootballFieldAuditAndToleranceGates(t *testing.T) {
@@ -485,7 +593,7 @@ func TestFinRobotValuationEngineLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get valuation_engine_live_package_summary: %v", err)
 			}
-			want := "valuation_engine_live_package methods=3 synthesis=1 football_field=1 audits=1 gates=5 provider_free=true live_network=false imports=false fixtures=4"
+			want := "valuation_engine_live_package methods=3 synthesis=1 football_field=1 audits=1 gates=5 provider_free=true live_network=false imports=false fixtures=5"
 			if got != want {
 				t.Fatalf("valuation_engine_live_package_summary = %#v, want %#v", got, want)
 			}
