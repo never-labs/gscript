@@ -45,8 +45,13 @@ func parseTemporalToken(text string) (string, string, bool) {
 			return "timestamp", text, true
 		}
 	case strings.Count(text, ".") == 1 && strings.Count(text, ":") == 0:
-		if _, err := parseQMonth(text); err == nil {
-			return "month", text, true
+		// Shape pre-check (4-char year, 2-char month) keeps the rejection
+		// path allocation-free: plain float literals like "2.5" otherwise
+		// build a fmt.Errorf inside parseQMonth on every warm eval.
+		if qMonthTokenShape(text) {
+			if _, err := parseQMonth(text); err == nil {
+				return "month", text, true
+			}
 		}
 	case strings.Count(text, "-") == 2 && strings.Count(text, ":") == 0:
 		if _, err := parseQDate(text); err == nil {
@@ -343,6 +348,19 @@ func parseQMonth(text string) (data.Month, error) {
 		return 0, fmt.Errorf("invalid q month %q", text)
 	}
 	return data.MonthFromMonths(int64(year-1970)*12 + int64(month-1)), nil
+}
+
+// qMonthTokenShape mirrors parseQMonth's structural requirement (a 4-char
+// year part and 2-char month part around a single '.' or '-', optionally
+// suffixed with 'm') so callers can reject non-month tokens without paying
+// parseQMonth's error allocation.
+func qMonthTokenShape(text string) bool {
+	text = normalizeQMonthText(text)
+	sep := strings.IndexByte(text, '.')
+	if sep < 0 {
+		sep = strings.IndexByte(text, '-')
+	}
+	return sep == 4 && len(text) == 7
 }
 
 func normalizeQMonthText(text string) string {

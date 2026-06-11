@@ -81,6 +81,12 @@ type qScriptPipelineDescriptor struct {
 	// indexExprAssignmentSkip[i] marks assignments absorbed into the
 	// vectorized index-expr reducer plan; precomputed at plan-build time.
 	indexExprAssignmentSkip []bool
+	// whereIndexPlanBuilt/whereIndexPlan memoize the purely syntactic
+	// where-compare plan build of the gather-sum-count where-index route
+	// (a per-call string walk plus operand normalization otherwise);
+	// runtime operand evaluation still runs per call.
+	whereIndexPlanBuilt bool
+	whereIndexPlan      *qPipelinePlan
 }
 
 type qScriptPipelineAssignment struct {
@@ -2852,7 +2858,11 @@ func (s *EvalState) evalQScriptIndexExprSumCountPipeline(descriptor *qScriptPipe
 	return total, true, nil
 }
 
-func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScriptPipelineDescriptor, array data.Array) (any, bool, error) {
+// buildQScriptGatherSumCountWhereIndexPlan is the purely syntactic half of
+// evalQScriptGatherSumCountWhereIndexPipeline; the result is memoized on the
+// descriptor so warm statements skip the per-call string walk and operand
+// normalization.
+func buildQScriptGatherSumCountWhereIndexPlan(descriptor *qScriptPipelineDescriptor) *qPipelinePlan {
 	whereExpr := strings.TrimSpace(descriptor.indexBinding)
 	if whereExpr == "" {
 		if maskExpr, ok := directWhereMaskExpr(descriptor.indexExpr); ok {
@@ -2860,18 +2870,27 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 		}
 	}
 	if whereExpr == "" {
-		return nil, false, nil
+		return nil
 	}
 	plan, ok := buildQPipelineWhereComparePlan(whereExpr, qPipelineWhereCompareIndexes, "compare-to-index-count-sum")
-	if !ok {
-		return nil, false, nil
-	}
-	if plan.kind != qPipelineWhereCompareIndexes {
-		return nil, false, nil
+	if !ok || plan.kind != qPipelineWhereCompareIndexes {
+		return nil
 	}
 	plan = qPipelinePlanWithBindingPlans(plan)
+	return &plan
+}
+
+func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScriptPipelineDescriptor, array data.Array) (any, bool, error) {
+	if !descriptor.whereIndexPlanBuilt {
+		descriptor.whereIndexPlanBuilt = true
+		descriptor.whereIndexPlan = buildQScriptGatherSumCountWhereIndexPlan(descriptor)
+	}
+	if descriptor.whereIndexPlan == nil {
+		return nil, false, nil
+	}
+	plan := descriptor.whereIndexPlan
 	if isIdentityI64RangeArray(array) {
-		count, sum, handled, err := s.evalQPipelineWhereCompareIndexStats(&plan)
+		count, sum, handled, err := s.evalQPipelineWhereCompareIndexStats(plan)
 		if err != nil || !handled {
 			return nil, handled, err
 		}
@@ -2881,7 +2900,7 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 		}
 		return out, true, nil
 	}
-	left, right, err := s.evalQPipelineCompareOperands(&plan)
+	left, right, err := s.evalQPipelineCompareOperands(plan)
 	if err != nil {
 		return nil, true, err
 	}
