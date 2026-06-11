@@ -7,9 +7,9 @@ Baseline:
 - Leia branch: `origin/codex/ai-dialect-polish` at `b3b6088d`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 348 files, including 20
+- Current translation directory file count: 366 files, including 20
   provider-free live-package skeleton directories and this audit artifact.
-- Registered examples: 48 runnable/checkable examples discovered by
+- Registered examples: 50 runnable/checkable examples discovered by
   `go run ./cmd/leia examples --json`.
 - Runtime changes in this audit: none.
 
@@ -35,10 +35,12 @@ notebook/tutorial parity.
 
 | ID | Path | Runner | Coverage role |
 | --- | --- | --- | --- |
+| `repo-ai-finrobot_translation-agent_builder_replay` | `agent_builder_replay.leia` | `evaluate` | Provider-free AgentBuilder roster, config save/load, max-round, tool assignment, and trace replay |
 | `repo-ai-finrobot_translation-api_replay` | `api_replay.leia` | `host-vm` | API/web replay substrate, provider metadata, pagination, errors |
 | `repo-ai-finrobot_translation-compliance_policy` | `compliance_policy.leia` | `host-vm` | Safety, approval, capability, publication, network, credential gates |
 | `repo-ai-finrobot_translation-config_secret_example` | `config_secret_example.leia` | `host-vm` | Secret-free config/env handling and redaction |
 | `repo-ai-finrobot_translation-core_agents-main` | `core_agents/main.leia` | `llm-replay` | Role/tool/agent contract fixture |
+| `repo-ai-finrobot_translation-core_agents-workflow_lifecycle` | `core_agents/workflow_lifecycle.leia` | `host-vm` | Provider-free workflow lifecycle fixture for reset, cache, trigger, TERMINATE, nested summary, handoff trace, and max round |
 | `repo-ai-finrobot_translation-core_agents-workflow_handoff` | `core_agents/workflow_handoff.leia` | `llm-replay` | Parent/child workflow handoff and trace fixture |
 | `repo-ai-finrobot_translation-data_normalization` | `data_normalization.leia` | `host-vm` | Typed table and nested JSON normalization |
 | `repo-ai-finrobot_translation-data_tools` | `data_tools.leia` | `host-vm` | Finance tool inventory and provider-free tool outputs |
@@ -84,8 +86,8 @@ notebook/tutorial parity.
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 40 `host-vm`, 6 `llm-replay`, 2 `evaluate`, 48 runnable,
-48 checkable.
+Runner summary: 41 `host-vm`, 6 `llm-replay`, 3 `evaluate`, 50 runnable,
+50 checkable.
 
 ## Module Coverage Matrix
 
@@ -104,7 +106,7 @@ Status key:
 | `README.md`, architecture, Pro pipeline | `README.md`, `GAPS.md`, `equity_report.leia`, `equity_cli_workflow.leia`, this audit | Covered | Workload decomposition, no-runtime-change boundary, provider-free equity report slice | Full Pro parity and live operational deployment |
 | `finrobot/agents/agent_library.py` | `role_profiles.leia`, `core_agents/main.leia` | Covered | Role profiles, tool lists, prompt-style metadata as data | Full role catalog drift tracking against upstream changes |
 | `finrobot/agents/prompts.py`, `finrobot/agents/utils.py` | `role_profiles.leia`, `section_agents.leia`, `core_agents/*.leia` | Partial | Prompt snapshots, role prompts, section output schemas | Complete prompt template library, trigger parsing parity, prompt version package |
-| `finrobot/agents/workflow.py` | `core_agents/workflow_handoff.leia`, `evaluation_harness/manifest.json` | Covered | Provider-free workflow handoff, trace hierarchy, replay records | Mutable AutoGen `GroupChatManager` lifecycle parity, live provider workflow package |
+| `finrobot/agents/workflow.py` | `core_agents/workflow_handoff.leia`, `core_agents/workflow_lifecycle.leia`, `evaluation_harness/manifest.json` | Covered | Provider-free workflow handoff, reset/cache/trigger lifecycle, TERMINATE convention, nested summary, trace hierarchy, replay records | Mutable AutoGen `GroupChatManager` runtime object parity, live provider workflow package |
 | `finrobot/toolkits.py` | `data_tools.leia`, `vendor_adapters.leia`, `live_packages/vendor_adapters/main.leia` | Covered | Generic typed tool descriptors, capabilities, replayable result envelopes, checked-in vendor skeleton schemas and fixtures | AutoGen caller/executor registration parity, live network-backed tool invocations |
 | `finrobot/utils.py`, package init | `config_secret_example.leia`, `model_alias_routing_example.leia`, `package_deploy_manifest.json` | Covered | Config aliases, env/secret diagnostics, package metadata | Complete package bootstrap and install-time config helpers |
 | `finrobot/data_source/yfinance_utils.py` | `vendor_adapters.leia`, `finance_normalizers.leia`, `data_tools.leia`, `live_packages/vendor_adapters/*` | Partial | Yahoo adapter manifest, live-package skeleton fixture, schema, and output contracts | Live yfinance client, price history, dividends, company info, statements, cache/retry behavior |
@@ -175,11 +177,11 @@ mistaken for missing language/runtime support.
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
-| Registered example inventory | 48 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 348 files in the translation directory, including checked-in live-package skeleton directories and these status docs | Complete |
+| Registered example inventory | 50 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
+| File inventory | 366 files in the translation directory, including checked-in live-package skeleton directories and these status docs | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
-| Host-VM contract examples | 40 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
-| Evaluate-runner examples | 2 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
+| Host-VM contract examples | 41 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
+| Evaluate-runner examples | 3 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
 | Live-package skeletons | 20 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/analyzer_report`, `live_packages/backtest_strategy`, `live_packages/chart_renderer`, `live_packages/coding_notebook`, `live_packages/document_pipeline`, `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`, `live_packages/finance_facade`, `live_packages/finance_normalizers`, `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`, `live_packages/optional_integrations`, `live_packages/product_workflow`, `live_packages/prompt_roles`, `live_packages/report_renderer`, `live_packages/retail_sentiment`, `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and `live_packages/vendor_adapters`; all 20 include registered `.leia` examples | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
 | Evaluation harness | `evaluation_harness/manifest.json` inventories replay records, golden checksums, gates, and report metadata | Complete for current registered records |
@@ -187,7 +189,7 @@ mistaken for missing language/runtime support.
 | Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
 Provider-free completion result: complete for the currently registered
-48-example translation slice, including live-package skeleton contracts.
+50-example translation slice, including live-package skeleton contracts.
 Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks

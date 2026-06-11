@@ -35,14 +35,14 @@ No `docs/spec/index.html` generation was run.
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples --json` discovers 48 runnable/checkable FinRobot
+`go run ./cmd/leia examples --json` discovers 50 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
 The examples gate validated:
 
-- 40 `host-vm` examples
+- 41 `host-vm` examples
 - 6 `llm-replay` examples
-- 2 `evaluate` examples
+- 3 `evaluate` examples
 - 20 registered live-package skeleton examples:
   `live_packages/analytics_report/analytics_report.leia`,
   `live_packages/analyzer_report/main.leia`,
@@ -68,13 +68,13 @@ The examples gate validated:
 The checker reported:
 
 ```text
-examples: 48 ok, 0 skipped, 0 failed
+examples: 50 ok, 0 skipped, 0 failed
 ```
 
 The repository check reported:
 
 ```text
-examples: 192 ok, 8 skipped, 0 failed
+examples: 194 ok, 8 skipped, 0 failed
 fmt: ok
 lint: ok
 test: ok
@@ -166,6 +166,6 @@ go run ./cmd/leia check --no-docs --no-editor .
 
 The FinRobot documentation status is aligned with the current
 `origin/codex/ai-dialect-polish` surface: 44 registered runnable/checkable
-examples, 348 files in the translation directory, and 19 checked-in
+examples, 366 files in the translation directory, and 20 checked-in
 provider-free live-package skeleton directories. The validation commands above
 passed without generating `docs/spec/index.html`.
