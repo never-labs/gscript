@@ -14748,14 +14748,28 @@ func (a i64ScalarDyadicArray) Values() []any {
 }
 
 func (a i64ScalarDyadicArray) Gather(indexes []int) Array {
-	// Identity gathers (frame column clones) flatten through the bulk
-	// kernel: one fused loop instead of a carrier-tree walk per row.
-	if len(indexes) == a.len && isIdentityIndexes(indexes) {
+	// Dense-ish gathers (frame column clones, sort permutations) flatten
+	// through the bulk kernel: one fused loop plus an index pass instead of
+	// a carrier-tree walk per row. Sparse gathers (head-N of a long column)
+	// keep the per-row path so they do not pay a full flatten.
+	if len(indexes)*4 >= a.len {
 		if values, owned, ok := tryBulkI64Values(a); ok {
-			if !owned {
-				values = append([]int64(nil), values...)
+			if len(indexes) == a.len && isIdentityIndexes(indexes) {
+				if !owned {
+					values = append([]int64(nil), values...)
+				}
+				return newI64Trusted(values)
 			}
-			return newI64Trusted(values)
+			out := make([]int64, len(indexes))
+			for i, row := range indexes {
+				if row < 0 || row >= len(values) {
+					bulkI64Release(values, owned)
+					panic(fmt.Sprintf("data scalar dyadic gather row %d out of range", row))
+				}
+				out[i] = values[row]
+			}
+			bulkI64Release(values, owned)
+			return newI64Trusted(out)
 		}
 	}
 	out := make([]int64, len(indexes))

@@ -5532,20 +5532,26 @@ func XGroup(frame Frame, keys ...Symbol) (KeyedFrame, error) {
 		}
 	}
 
-	groups := make([][]int, 0)
-	positionByKey := make(map[string]int, frame.Len())
-	for row := 0; row < frame.Len(); row++ {
-		key, err := rowKey(frame, row, keyColumns)
-		if err != nil {
-			return KeyedFrame{}, err
+	var groups [][]int
+	if ids, groupCount, ok := frameRowGroupIDs(frame, keyColumns); ok {
+		// Typed path: reuse the fby group-id kernels instead of building a
+		// quoted string key per row.
+		groups = rowGroupsFromIDs(ids, groupCount)
+	} else {
+		positionByKey := make(map[string]int, frame.Len())
+		for row := 0; row < frame.Len(); row++ {
+			key, err := rowKey(frame, row, keyColumns)
+			if err != nil {
+				return KeyedFrame{}, err
+			}
+			position, ok := positionByKey[key]
+			if !ok {
+				position = len(groups)
+				positionByKey[key] = position
+				groups = append(groups, nil)
+			}
+			groups[position] = append(groups[position], row)
 		}
-		position, ok := positionByKey[key]
-		if !ok {
-			position = len(groups)
-			positionByKey[key] = position
-			groups = append(groups, nil)
-		}
-		groups[position] = append(groups[position], row)
 	}
 
 	cols := make([]Column, 0, len(keyColumns)+len(valueColumns))
@@ -5579,6 +5585,9 @@ func XGroup(frame Frame, keys ...Symbol) (KeyedFrame, error) {
 // Ungroup expands nested array/list columns in a frame. Nested columns in the
 // same source row must have the same length; scalar columns are repeated.
 func Ungroup(frame Frame) (Frame, error) {
+	if out, handled, err := ungroupColumnar(frame); handled {
+		return out, err
+	}
 	names := frame.schema.Names()
 	out := make(map[Symbol][]any, len(names))
 	for _, name := range names {
@@ -11037,10 +11046,18 @@ func orderIndexes(frame Frame, indexes []int, specs []OrderSpec) ([]int, error) 
 		if !ok {
 			return nil, fmt.Errorf("order column %q does not exist", spec.Column)
 		}
-		bound[i] = boundOrderSpec{spec: spec, column: col}
+		// Densify lazy carriers up front: the comparison loop below touches
+		// each bound column O(n log n) times, and MaterializeArray is free
+		// for columns that are already dense.
+		bound[i] = boundOrderSpec{spec: spec, column: MaterializeArray(col)}
 	}
 	if out, ok := orderIndexesBySortedAttribute(indexes, bound); ok {
 		return out, nil
+	}
+	if len(bound) == 1 {
+		if out, ok := orderIndexesTypedSingle(indexes, bound[0]); ok {
+			return out, nil
+		}
 	}
 	out := append([]int(nil), indexes...)
 	sort.SliceStable(out, func(i, j int) bool {
@@ -11073,7 +11090,7 @@ func orderIndexesLimit(frame Frame, indexes []int, specs []OrderSpec, limit int)
 		if !ok {
 			return nil, fmt.Errorf("order column %q does not exist", spec.Column)
 		}
-		bound[i] = boundOrderSpec{spec: spec, column: col}
+		bound[i] = boundOrderSpec{spec: spec, column: MaterializeArray(col)}
 	}
 	if out, ok := orderIndexesBySortedAttribute(indexes, bound); ok {
 		return out[:limit], nil
