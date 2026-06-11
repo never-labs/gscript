@@ -107,6 +107,26 @@
     "docker_run": "docker run --rm -p 8080:8080 -e LEIA_FINROBOT_DATA_DIR=/app/examples/ai/finrobot_translation leia-finrobot-translation",
     "gcloud_deploy": "examples/ai/finrobot_translation/package_deploy_gcloud.sh leia-finrobot-translation us-central1"
   },
+  "server": {
+    "recommended": "gunicorn",
+    "fallback": "python-http.server ThreadingHTTPServer",
+    "module": "package_deploy_run_web_app:main",
+    "bind_env": "PORT",
+    "default_port": "8080",
+    "provider_free": true,
+    "live_network_default": false,
+    "metadata_source": "product_deploy_parity/package_deploy_parity_ledger.json#/server_metadata"
+  },
+  "product_deploy_parity": {
+    "ledger": "product_deploy_parity/package_deploy_parity_ledger.json",
+    "product_workflow_manifest": "live_packages/product_workflow/package.manifest.json",
+    "deployment_gates": "live_packages/product_workflow/contracts/deployment_capability_gates.json",
+    "static_assets": "live_packages/product_workflow/templates/static_asset_manifest.json",
+    "db_migrations": "live_packages/product_workflow/contracts/db_migration_contract.json",
+    "provider_free": true,
+    "live_network_default": false,
+    "clean_skip_default": true
+  },
   "smoke": {
     "provider_free": true,
     "checks": [
@@ -114,7 +134,8 @@
       "setup extras mirror manifest optional_extras",
       "requirements include base package and optional-extra comments",
       "run_web_app exposes check_environment and main",
-      "docker and gcloud commands reference the manifest entry files"
+      "docker and gcloud commands reference the manifest entry files",
+      "product deploy parity ledger covers env, static assets, server metadata, auth/session, db migration, clean skip, and no-network defaults"
     ]
   }
 }
