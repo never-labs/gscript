@@ -2001,11 +2001,22 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 		}
 		return out, nil
 	}
-	indexes, err := filterIndexes(frame, plan.Where)
-	if err != nil {
-		return Frame{}, err
-	}
+	grouped := len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0
 	projectedOrderBy, projectOrderBeforeProjection := projectedSourceOrderSpecs(plan)
+	var indexes []int
+	var err error
+	if grouped && plan.Where == nil &&
+		!(len(plan.OrderBy) > 0 && plan.PreProjectOrder) &&
+		!(len(projectedOrderBy) > 0 && projectOrderBeforeProjection) &&
+		!canLimitBeforeProjection(plan) {
+		// Grouped all-rows queries skip the identity index vector entirely;
+		// execGrouped treats nil indexes as "all rows".
+	} else {
+		indexes, err = filterIndexes(frame, plan.Where)
+		if err != nil {
+			return Frame{}, err
+		}
+	}
 	if len(plan.OrderBy) > 0 && plan.PreProjectOrder {
 		if canLimitBeforeProjection(plan) {
 			indexes, err = orderIndexesLimit(frame, indexes, plan.OrderBy, plan.LimitN)
@@ -2026,7 +2037,7 @@ func (k *QueryKernel) Exec(frame Frame) (Frame, error) {
 		indexes = indexes[:plan.LimitN]
 	}
 	var out Frame
-	if len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
+	if grouped {
 		out, err = execGrouped(frame, indexes, plan)
 	} else {
 		out, err = execProject(frame, indexes, plan.Select)

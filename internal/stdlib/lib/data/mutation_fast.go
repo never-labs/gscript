@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"math"
 )
 
 // Typed copy-on-write mutation kernels.
@@ -30,6 +31,25 @@ func arrayWithTypedEdits(arr Array, setRows []int, setValues []any, appendValues
 	}
 	if anyNullEditValue(setValues) || anyNullEditValue(appendValues) {
 		return arrayWithNullableTypedEdits(arr, setRows, setValues, appendValues)
+	}
+	if len(setRows) == 0 && len(appendValues) > 0 {
+		// Small tail appends against a wide base stay O(delta) through a lazy
+		// tail view instead of dense-copying the whole column per mutation.
+		if out, ok := arrayWithTailAppend(arr, appendValues); ok {
+			return out, true
+		}
+	}
+	if len(appendValues) == 0 && len(setRows) > 0 && len(setRows) <= sparseEditArrayMaxEdits {
+		// A handful of point edits against a wide base stays O(delta) through
+		// a sparse overlay view instead of dense-copying the whole column.
+		if out, ok := arrayWithSparseEdits(arr, setRows, setValues); ok {
+			return out, true
+		}
+	}
+	if t, ok := arr.(tailFlattener); ok {
+		// Point edits (or oversized appends) on a tail view flatten once and
+		// take the dense edit path.
+		return arrayWithTypedEdits(t.flattenTail(), setRows, setValues, appendValues)
 	}
 	switch a := arr.(type) {
 	case columnArray[bool]:
@@ -80,6 +100,9 @@ func arrayWithTypedEdits(arr Array, setRows []int, setValues []any, appendValues
 // all-null tail append through the lazy nullTailArray view; everything else
 // falls back to the boxed path.
 func arrayWithNullableTypedEdits(arr Array, setRows []int, setValues []any, appendValues []any) (Array, bool) {
+	if t, ok := arr.(tailFlattener); ok {
+		return arrayWithNullableTypedEdits(t.flattenTail(), setRows, setValues, appendValues)
+	}
 	switch a := arr.(type) {
 	case columnArray[int64]:
 		base := nullBitmapArray[int64]{kind: a.kind, data: a.data, nulls: newNullBitmap(len(a.data))}
@@ -262,6 +285,297 @@ func editColumnArray[T any](kind Kind, data []T, conv func(any) (T, bool), setRo
 	return columnArray[T]{kind: kind, data: out}, true
 }
 
+// --- typed tail-append views -------------------------------------------------
+
+// tailValueArrayMaxTail bounds the lazy tail before a chained append flattens
+// into dense storage, so repeated small inserts amortize to one dense copy per
+// tailValueArrayMaxTail appended rows while reads stay near-dense.
+const tailValueArrayMaxTail = 32
+
+// tailValueArrayMinBase keeps small columns on the dense path, where a full
+// copy is cheaper than the extra view indirection.
+const tailValueArrayMinBase = 64
+
+// tailValueArray is an immutable view of a typed base column plus a small
+// owned tail of appended values. Base storage is shared with the source
+// column (frames are immutable values); the tail is never mutated after
+// construction, so chained appends copy only the tail.
+type tailValueArray[T any] struct {
+	kind Kind
+	base []T
+	tail []T
+}
+
+func (a tailValueArray[T]) Kind() Kind { return a.kind }
+
+func (a tailValueArray[T]) Len() int { return len(a.base) + len(a.tail) }
+
+func (a tailValueArray[T]) At(row int) (any, bool) {
+	if row < 0 || row >= a.Len() {
+		return nil, false
+	}
+	if row < len(a.base) {
+		return a.base[row], true
+	}
+	return a.tail[row-len(a.base)], true
+}
+
+func (a tailValueArray[T]) Values() []any {
+	out := make([]any, 0, a.Len())
+	for _, v := range a.base {
+		out = append(out, v)
+	}
+	for _, v := range a.tail {
+		out = append(out, v)
+	}
+	return out
+}
+
+func (a tailValueArray[T]) Gather(indexes []int) Array {
+	out := make([]T, len(indexes))
+	for i, row := range indexes {
+		if row < 0 || row >= a.Len() {
+			panic(fmt.Sprintf("data array gather index %d out of range", row))
+		}
+		if row < len(a.base) {
+			out[i] = a.base[row]
+		} else {
+			out[i] = a.tail[row-len(a.base)]
+		}
+	}
+	return columnArray[T]{kind: a.kind, data: out}
+}
+
+// tailFlattener lets generic call sites flatten a tail view into its dense
+// column without enumerating every tailValueArray instantiation.
+type tailFlattener interface {
+	flattenTail() Array
+}
+
+func (a tailValueArray[T]) flattenTail() Array {
+	return columnArray[T]{kind: a.kind, data: a.denseTail()}
+}
+
+func (a tailValueArray[T]) denseTail() []T {
+	out := make([]T, 0, a.Len())
+	out = append(out, a.base...)
+	out = append(out, a.tail...)
+	return out
+}
+
+// arrayWithTailAppend returns a lazy tail view of arr extended with
+// appendValues. ok=false defers to the dense edit path.
+func arrayWithTailAppend(arr Array, appendValues []any) (Array, bool) {
+	if len(appendValues) > tailValueArrayMaxTail {
+		return nil, false
+	}
+	switch a := arr.(type) {
+	case columnArray[bool]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditBool, appendValues)
+	case columnArray[int64]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditI64, appendValues)
+	case columnArray[float64]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditF64, appendValues)
+	case columnArray[string]:
+		if a.kind != KindString {
+			return nil, false
+		}
+		return tailAppendColumn(a.kind, a.data, nil, convertEditString, appendValues)
+	case columnArray[Symbol]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditSymbol, appendValues)
+	case columnArray[Timestamp]:
+		return tailAppendColumn(a.kind, a.data, nil, convertEditScalarKind[Timestamp](a.kind), appendValues)
+	case tailValueArray[bool]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditBool, appendValues)
+	case tailValueArray[int64]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditI64, appendValues)
+	case tailValueArray[float64]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditF64, appendValues)
+	case tailValueArray[string]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditString, appendValues)
+	case tailValueArray[Symbol]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditSymbol, appendValues)
+	case tailValueArray[Timestamp]:
+		return tailAppendColumn(a.kind, a.base, a.tail, convertEditScalarKind[Timestamp](a.kind), appendValues)
+	}
+	return nil, false
+}
+
+// sparseEditArrayMaxEdits bounds the overlay before a chained edit flattens
+// into dense storage; reads scan the overlay linearly, so it must stay tiny.
+const sparseEditArrayMaxEdits = 8
+
+// sparseEditArray is an immutable view of a typed base column with a small
+// overlay of point edits (rows/vals applied in order; later edits win). Base
+// storage is shared with the source column; the overlay is never mutated
+// after construction.
+type sparseEditArray[T any] struct {
+	kind Kind
+	base []T
+	rows []int
+	vals []T
+}
+
+func (a sparseEditArray[T]) Kind() Kind { return a.kind }
+
+func (a sparseEditArray[T]) Len() int { return len(a.base) }
+
+func (a sparseEditArray[T]) At(row int) (any, bool) {
+	if row < 0 || row >= len(a.base) {
+		return nil, false
+	}
+	for i := len(a.rows) - 1; i >= 0; i-- {
+		if a.rows[i] == row {
+			return a.vals[i], true
+		}
+	}
+	return a.base[row], true
+}
+
+func (a sparseEditArray[T]) Values() []any {
+	out := make([]any, len(a.base))
+	for i, v := range a.base {
+		out[i] = v
+	}
+	for i, row := range a.rows {
+		out[row] = a.vals[i]
+	}
+	return out
+}
+
+func (a sparseEditArray[T]) Gather(indexes []int) Array {
+	out := make([]T, len(indexes))
+	for i, row := range indexes {
+		v, ok := a.at(row)
+		if !ok {
+			panic(fmt.Sprintf("data array gather index %d out of range", row))
+		}
+		out[i] = v
+	}
+	return columnArray[T]{kind: a.kind, data: out}
+}
+
+func (a sparseEditArray[T]) at(row int) (T, bool) {
+	var zero T
+	if row < 0 || row >= len(a.base) {
+		return zero, false
+	}
+	for i := len(a.rows) - 1; i >= 0; i-- {
+		if a.rows[i] == row {
+			return a.vals[i], true
+		}
+	}
+	return a.base[row], true
+}
+
+func (a sparseEditArray[T]) flattenTail() Array {
+	return columnArray[T]{kind: a.kind, data: a.dense()}
+}
+
+func (a sparseEditArray[T]) dense() []T {
+	out := make([]T, len(a.base))
+	copy(out, a.base)
+	for i, row := range a.rows {
+		out[row] = a.vals[i]
+	}
+	return out
+}
+
+// exportSparseEdit copies the view into dst (same element type).
+func exportSparseEdit[T any](a sparseEditArray[T], dst []T) {
+	copy(dst, a.base)
+	for i, row := range a.rows {
+		dst[row] = a.vals[i]
+	}
+}
+
+// arrayWithSparseEdits returns a lazy point-edit overlay view of arr.
+// ok=false defers to the dense edit path.
+func arrayWithSparseEdits(arr Array, setRows []int, setValues []any) (Array, bool) {
+	switch a := arr.(type) {
+	case columnArray[bool]:
+		return sparseEditColumn(a.kind, a.data, nil, nil, convertEditBool, setRows, setValues)
+	case columnArray[int64]:
+		return sparseEditColumn(a.kind, a.data, nil, nil, convertEditI64, setRows, setValues)
+	case columnArray[float64]:
+		return sparseEditColumn(a.kind, a.data, nil, nil, convertEditF64, setRows, setValues)
+	case columnArray[string]:
+		if a.kind != KindString {
+			return nil, false
+		}
+		return sparseEditColumn(a.kind, a.data, nil, nil, convertEditString, setRows, setValues)
+	case columnArray[Symbol]:
+		return sparseEditColumn(a.kind, a.data, nil, nil, convertEditSymbol, setRows, setValues)
+	case columnArray[Timestamp]:
+		return sparseEditColumn(a.kind, a.data, nil, nil, convertEditScalarKind[Timestamp](a.kind), setRows, setValues)
+	case sparseEditArray[bool]:
+		return sparseEditColumn(a.kind, a.base, a.rows, a.vals, convertEditBool, setRows, setValues)
+	case sparseEditArray[int64]:
+		return sparseEditColumn(a.kind, a.base, a.rows, a.vals, convertEditI64, setRows, setValues)
+	case sparseEditArray[float64]:
+		return sparseEditColumn(a.kind, a.base, a.rows, a.vals, convertEditF64, setRows, setValues)
+	case sparseEditArray[string]:
+		return sparseEditColumn(a.kind, a.base, a.rows, a.vals, convertEditString, setRows, setValues)
+	case sparseEditArray[Symbol]:
+		return sparseEditColumn(a.kind, a.base, a.rows, a.vals, convertEditSymbol, setRows, setValues)
+	case sparseEditArray[Timestamp]:
+		return sparseEditColumn(a.kind, a.base, a.rows, a.vals, convertEditScalarKind[Timestamp](a.kind), setRows, setValues)
+	}
+	return nil, false
+}
+
+func sparseEditColumn[T any](kind Kind, base []T, rows []int, vals []T, conv func(any) (T, bool), setRows []int, setValues []any) (Array, bool) {
+	if len(base) < tailValueArrayMinBase {
+		return nil, false
+	}
+	newRows := make([]int, len(rows), len(rows)+len(setRows))
+	copy(newRows, rows)
+	newVals := make([]T, len(vals), len(vals)+len(setRows))
+	copy(newVals, vals)
+	for i, row := range setRows {
+		if row < 0 || row >= len(base) {
+			return nil, false
+		}
+		v, ok := conv(setValues[i])
+		if !ok {
+			return nil, false
+		}
+		newRows = append(newRows, row)
+		newVals = append(newVals, v)
+	}
+	if len(newRows) > sparseEditArrayMaxEdits {
+		out := make([]T, len(base))
+		copy(out, base)
+		for i, row := range newRows {
+			out[row] = newVals[i]
+		}
+		return columnArray[T]{kind: kind, data: out}, true
+	}
+	return sparseEditArray[T]{kind: kind, base: base, rows: newRows, vals: newVals}, true
+}
+
+func tailAppendColumn[T any](kind Kind, base, tail []T, conv func(any) (T, bool), appendValues []any) (Array, bool) {
+	if len(base) < tailValueArrayMinBase {
+		return nil, false
+	}
+	newTail := make([]T, len(tail), len(tail)+len(appendValues))
+	copy(newTail, tail)
+	for _, value := range appendValues {
+		v, ok := conv(value)
+		if !ok {
+			return nil, false
+		}
+		newTail = append(newTail, v)
+	}
+	if len(newTail) > tailValueArrayMaxTail {
+		out := make([]T, 0, len(base)+len(newTail))
+		out = append(out, base...)
+		out = append(out, newTail...)
+		return columnArray[T]{kind: kind, data: out}, true
+	}
+	return tailValueArray[T]{kind: kind, base: base, tail: newTail}, true
+}
+
 func editNullBitmapArrayNullable[T nullBitmapElem](a nullBitmapArray[T], conv func(any) (T, bool), setRows []int, setValues []any, appendValues []any) (Array, bool) {
 	n := len(a.data) + len(appendValues)
 	data := make([]T, len(a.data), n)
@@ -378,6 +692,46 @@ func convertEditScalarKind[T any](kind Kind) func(any) (T, bool) {
 	}
 }
 
+// scatterValuesF64 exports src as float64 values for a typed scatter into a
+// float column, widening integer-carried sources without boxing (mirrors
+// convertEditF64 semantics).
+func scatterValuesF64(src Array, n int) ([]float64, bool) {
+	vals := make([]float64, n)
+	if ok, err := TryExportF64Copy(src, vals); ok && err == nil {
+		return vals, true
+	}
+	ivals := make([]int64, n)
+	if ok, err := TryExportI64Copy(src, ivals); ok && err == nil {
+		for i, v := range ivals {
+			vals[i] = float64(v)
+		}
+		return vals, true
+	}
+	return nil, false
+}
+
+// scatterValuesI64 exports src as int64 values for a typed scatter into an
+// int column, accepting float-carried sources whose values are exactly
+// integral (mirrors convertEditI64/coerceInt64Exact semantics).
+func scatterValuesI64(src Array, n int) ([]int64, bool) {
+	vals := make([]int64, n)
+	if ok, err := TryExportI64Copy(src, vals); ok && err == nil {
+		return vals, true
+	}
+	fvals := make([]float64, n)
+	if ok, err := TryExportF64Copy(src, fvals); ok && err == nil {
+		for i, v := range fvals {
+			n64, ok := coerceInt64Exact(v)
+			if !ok {
+				return nil, false
+			}
+			vals[i] = n64
+		}
+		return vals, true
+	}
+	return nil, false
+}
+
 // arrayScatterArray returns a copy of dst with src[i] assigned at rows[i].
 // src must have exactly len(rows) elements. Common kind pairs scatter through
 // typed slices; anything else converts per element through the typed edit
@@ -391,8 +745,7 @@ func arrayScatterArray(dst Array, rows []int, src Array) (Array, bool) {
 	}
 	switch d := dst.(type) {
 	case columnArray[float64]:
-		vals := make([]float64, len(rows))
-		if ok, err := TryExportF64Copy(src, vals); ok && err == nil {
+		if vals, ok := scatterValuesF64(src, len(rows)); ok {
 			out := make([]float64, len(d.data))
 			copy(out, d.data)
 			for i, row := range rows {
@@ -404,8 +757,7 @@ func arrayScatterArray(dst Array, rows []int, src Array) (Array, bool) {
 			return columnArray[float64]{kind: d.kind, data: out}, true
 		}
 	case columnArray[int64]:
-		vals := make([]int64, len(rows))
-		if ok, err := TryExportI64Copy(src, vals); ok && err == nil {
+		if vals, ok := scatterValuesI64(src, len(rows)); ok {
 			out := make([]int64, len(d.data))
 			copy(out, d.data)
 			for i, row := range rows {
@@ -474,8 +826,8 @@ func newSparseColumnArray(n int, rows []int, src Array) (Array, bool) {
 	}
 	switch src.Kind() {
 	case KindF64:
-		vals := make([]float64, len(rows))
-		if ok, err := TryExportF64Copy(src, vals); !ok || err != nil {
+		vals, ok := sparseSourceValuesF64(src)
+		if !ok {
 			return nil, false
 		}
 		data := make([]float64, n)
@@ -489,8 +841,8 @@ func newSparseColumnArray(n int, rows []int, src Array) (Array, bool) {
 		}
 		return nullBitmapArray[float64]{kind: KindF64, data: data, nulls: nulls}, true
 	case KindI64:
-		vals := make([]int64, len(rows))
-		if ok, err := TryExportI64Copy(src, vals); !ok || err != nil {
+		vals, ok := sparseSourceValuesI64(src)
+		if !ok {
 			return nil, false
 		}
 		data := make([]int64, n)
@@ -505,6 +857,31 @@ func newSparseColumnArray(n int, rows []int, src Array) (Array, bool) {
 		return nullBitmapArray[int64]{kind: KindI64, data: data, nulls: nulls}, true
 	}
 	return nil, false
+}
+
+// sparseSourceValuesF64 borrows the dense typed storage of src when it is a
+// plain column (no copy); other carriers export into a fresh slice. The
+// returned slice is read-only.
+func sparseSourceValuesF64(src Array) ([]float64, bool) {
+	if a, ok := src.(columnArray[float64]); ok && a.kind == KindF64 {
+		return a.data, true
+	}
+	vals := make([]float64, src.Len())
+	if ok, err := TryExportF64Copy(src, vals); !ok || err != nil {
+		return nil, false
+	}
+	return vals, true
+}
+
+func sparseSourceValuesI64(src Array) ([]int64, bool) {
+	if a, ok := src.(columnArray[int64]); ok && a.kind == KindI64 {
+		return a.data, true
+	}
+	vals := make([]int64, src.Len())
+	if ok, err := TryExportI64Copy(src, vals); !ok || err != nil {
+		return nil, false
+	}
+	return vals, true
 }
 
 // sharedRowsByKey adopts an existing rowsByKey map. The keyed-frame contract
@@ -528,14 +905,90 @@ func (k KeyedFrame) Schema() Schema {
 	return k.frame.Schema()
 }
 
+// keyedWhereIndexRows resolves a where expression that is a pure conjunction
+// of equality comparisons covering exactly the keyed frame's key columns
+// through the existing rowsByKey index instead of a full column scan. The
+// returned rows are shared with the index and must not be mutated. ok=false
+// means the where shape is unsupported and the caller must filter.
+func keyedWhereIndexRows(keyed KeyedFrame, where Expr) ([]int, bool) {
+	if where == nil || len(keyed.keys) == 0 {
+		return nil, false
+	}
+	values := make(map[Symbol]any, len(keyed.keys))
+	if !collectKeyEqualityLiterals(where, values) {
+		return nil, false
+	}
+	if len(values) != len(keyed.keys) {
+		return nil, false
+	}
+	ordered := make([]any, len(keyed.keys))
+	for i, name := range keyed.keys {
+		col, ok := keyed.frame.Column(name)
+		if !ok {
+			return nil, false
+		}
+		switch col.Kind() {
+		case KindF64, KindF32:
+			// Float keys keep comparison semantics (NaN never equal) on the
+			// scan path instead of key-string identity.
+			return nil, false
+		}
+		v, ok := values[name]
+		if !ok {
+			return nil, false
+		}
+		if IsNull(v) {
+			return nil, false
+		}
+		ordered[i] = v
+	}
+	key, err := lookupKey(keyed.frame, keyed.keys, ordered)
+	if err != nil {
+		return nil, false
+	}
+	return keyed.lookupRowsByKey(key), true
+}
+
+// collectKeyEqualityLiterals flattens a pure-`and` tree of column=literal
+// equality leaves into out; any other node shape fails the collection.
+func collectKeyEqualityLiterals(expr Expr, out map[Symbol]any) bool {
+	switch e := expr.(type) {
+	case Logical:
+		if e.Op != "and" {
+			return false
+		}
+		return collectKeyEqualityLiterals(e.Left, out) && collectKeyEqualityLiterals(e.Right, out)
+	case Binary:
+		ref, op, literal, ok := binaryColumnLiteral(e)
+		if !ok || op != OpEQ {
+			return false
+		}
+		if _, dup := out[ref.Name]; dup {
+			return false
+		}
+		out[ref.Name] = literal.Value
+		return true
+	default:
+		return false
+	}
+}
+
 // UpdateWhereKeyed applies UpdateWhere to the keyed frame's backing frame.
 // When no key column is assigned the row->key mapping is unchanged, so the
-// existing key index is reused instead of re-keying the whole table.
+// existing key index is reused instead of re-keying the whole table. A where
+// clause that is key-column equality resolves matched rows through the key
+// index instead of scanning.
 func UpdateWhereKeyed(keyed KeyedFrame, where Expr, assignments map[Symbol]Expr) (KeyedFrame, error) {
 	if len(keyed.keys) == 0 {
 		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
 	}
-	out, err := UpdateWhere(keyed.frame, where, assignments)
+	var out Frame
+	var err error
+	if rows, ok := keyedWhereIndexRows(keyed, where); ok {
+		out, err = updateRowsWhere(keyed.frame, rows, assignments)
+	} else {
+		out, err = UpdateWhere(keyed.frame, where, assignments)
+	}
 	if err != nil {
 		return KeyedFrame{}, err
 	}
@@ -624,9 +1077,13 @@ func DeleteWhereKeyed(keyed KeyedFrame, where Expr) (KeyedFrame, error) {
 	if len(keyed.keys) == 0 {
 		return KeyedFrame{}, fmt.Errorf("keyed frame is not initialized")
 	}
-	deleteIndexes, err := filterIndexes(keyed.frame, where)
-	if err != nil {
-		return KeyedFrame{}, err
+	deleteIndexes, ok := keyedWhereIndexRows(keyed, where)
+	if !ok {
+		var err error
+		deleteIndexes, err = filterIndexes(keyed.frame, where)
+		if err != nil {
+			return KeyedFrame{}, err
+		}
 	}
 	if len(deleteIndexes) == 0 {
 		return keyed, nil
@@ -695,24 +1152,43 @@ func updateByGroupedTyped(frame Frame, indexes []int, byInputs []groupInput, agg
 	if !ok {
 		return Frame{}, false, nil
 	}
-	states := make([]*groupState, groupCount)
 	for _, row := range indexes {
 		if row < 0 || row >= len(ids) {
 			return Frame{}, false, nil
 		}
-		id := ids[row]
-		state := states[id]
-		if state == nil {
-			state = &groupState{aggs: make([]aggregateState, len(aggs))}
-			for i, agg := range aggs {
-				state.aggs[i].fn = agg.Func
+	}
+	// Box each group result once; matched rows then share the boxed value.
+	results, ok, err := updateGroupedTypedResults(indexes, ids, groupCount, aggs)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	if !ok {
+		states := make([]*groupState, groupCount)
+		for _, row := range indexes {
+			id := ids[row]
+			state := states[id]
+			if state == nil {
+				state = &groupState{aggs: make([]aggregateState, len(aggs))}
+				for i, agg := range aggs {
+					state.aggs[i].fn = agg.Func
+				}
+				states[id] = state
 			}
-			states[id] = state
+			for i := range aggs {
+				if err := accumulateAggregate(&state.aggs[i], aggs[i], frame, row); err != nil {
+					return Frame{}, true, err
+				}
+			}
 		}
+		results = make([][]any, len(aggs))
 		for i := range aggs {
-			if err := accumulateAggregate(&state.aggs[i], aggs[i], frame, row); err != nil {
-				return Frame{}, true, err
+			vals := make([]any, groupCount)
+			for g, state := range states {
+				if state != nil {
+					vals[g] = aggregateResult(state.aggs[i])
+				}
 			}
+			results[i] = vals
 		}
 	}
 	assignmentByName := make(map[Symbol]int, len(assignments))
@@ -721,17 +1197,6 @@ func updateByGroupedTyped(frame Frame, indexes []int, byInputs []groupInput, agg
 			return Frame{}, true, fmt.Errorf("duplicate grouped update assignment for column %q", assign.Name)
 		}
 		assignmentByName[assign.Name] = i
-	}
-	// Box each group result once; matched rows then share the boxed value.
-	results := make([][]any, len(aggs))
-	for i := range aggs {
-		vals := make([]any, groupCount)
-		for g, state := range states {
-			if state != nil {
-				vals[g] = aggregateResult(state.aggs[i])
-			}
-		}
-		results[i] = vals
 	}
 	cols := make([]Column, 0, len(frame.schema.names)+len(assignments))
 	for _, name := range frame.schema.names {
@@ -778,6 +1243,98 @@ func updateByGroupedTyped(frame Frame, indexes []int, byInputs []groupInput, agg
 	}
 	out, err := newFrameTrusted(cols...)
 	return out, true, err
+}
+
+// updateGroupedTypedResults computes per-group update aggregates through the
+// same typed readers the grouped-select path uses (resolveAggNumericFn),
+// mirroring accumulateAggregate/aggregateResult boxed semantics: groups with
+// no matched rows stay nil, empty numeric accumulations produce float64(0).
+// ok=false defers to the boxed groupState loop.
+func updateGroupedTypedResults(indexes []int, ids []int, groupCount int, aggs []aggregateInput) ([][]any, bool, error) {
+	type aggLane struct {
+		fn    func(row int) (float64, bool)
+		sum   []float64
+		sumsq []float64
+		count []int64
+	}
+	lanes := make([]aggLane, len(aggs))
+	for i, agg := range aggs {
+		if agg.Weight != nil {
+			return nil, false, nil
+		}
+		switch agg.Func {
+		case "count":
+		case "sum", "avg", "var", "dev":
+			fn := resolveAggNumericFn(agg)
+			if fn == nil {
+				return nil, false, nil
+			}
+			lanes[i].fn = fn
+			lanes[i].sum = make([]float64, groupCount)
+			if agg.Func == "var" || agg.Func == "dev" {
+				lanes[i].sumsq = make([]float64, groupCount)
+			}
+		default:
+			return nil, false, nil
+		}
+		lanes[i].count = make([]int64, groupCount)
+	}
+	seen := make([]bool, groupCount)
+	for _, row := range indexes {
+		g := ids[row]
+		seen[g] = true
+		for i := range lanes {
+			lane := &lanes[i]
+			if lane.fn == nil {
+				lane.count[g]++
+				continue
+			}
+			v, ok := lane.fn(row)
+			if !ok {
+				continue
+			}
+			lane.sum[g] += v
+			if lane.sumsq != nil {
+				lane.sumsq[g] += v * v
+			}
+			lane.count[g]++
+		}
+	}
+	results := make([][]any, len(aggs))
+	for i, agg := range aggs {
+		lane := &lanes[i]
+		vals := make([]any, groupCount)
+		for g := 0; g < groupCount; g++ {
+			if !seen[g] {
+				continue
+			}
+			switch agg.Func {
+			case "count":
+				vals[g] = lane.count[g]
+			case "sum":
+				vals[g] = lane.sum[g]
+			case "avg":
+				if lane.count[g] == 0 {
+					vals[g] = float64(0)
+				} else {
+					vals[g] = lane.sum[g] / float64(lane.count[g])
+				}
+			case "var", "dev":
+				if lane.count[g] == 0 {
+					vals[g] = float64(0)
+					continue
+				}
+				mean := lane.sum[g] / float64(lane.count[g])
+				v := lane.sumsq[g]/float64(lane.count[g]) - mean*mean
+				if agg.Func == "dev" {
+					v = math.Sqrt(v)
+				}
+				vals[g] = v
+			}
+		}
+		results[i] = vals
+	}
+	return results, true, nil
 }
 
 type keyedTypedAppend struct {

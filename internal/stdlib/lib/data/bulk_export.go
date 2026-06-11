@@ -37,6 +37,13 @@ func TryExportI64Copy(array Array, dst []int64) (bool, error) {
 	case columnArray[int64]:
 		copy(dst, a.data)
 		return true, nil
+	case tailValueArray[int64]:
+		copy(dst, a.base)
+		copy(dst[len(a.base):], a.tail)
+		return true, nil
+	case sparseEditArray[int64]:
+		exportSparseEdit(a, dst)
+		return true, nil
 	case columnArray[int32]:
 		for i, v := range a.data {
 			dst[i] = int64(v)
@@ -174,6 +181,13 @@ func TryExportF64Copy(array Array, dst []float64) (bool, error) {
 	case columnArray[float64]:
 		copy(dst, a.data)
 		return true, nil
+	case tailValueArray[float64]:
+		copy(dst, a.base)
+		copy(dst[len(a.base):], a.tail)
+		return true, nil
+	case sparseEditArray[float64]:
+		exportSparseEdit(a, dst)
+		return true, nil
 	case columnArray[float32]:
 		for i, v := range a.data {
 			dst[i] = float64(v)
@@ -261,6 +275,13 @@ func TryExportBoolCopy(array Array, dst []bool) (bool, error) {
 	case columnArray[bool]:
 		copy(dst, a.data)
 		return true, nil
+	case tailValueArray[bool]:
+		copy(dst, a.base)
+		copy(dst[len(a.base):], a.tail)
+		return true, nil
+	case sparseEditArray[bool]:
+		exportSparseEdit(a, dst)
+		return true, nil
 	case nullableArray:
 		return exportNullableBoolCopy(a, dst)
 	case shiftedArray:
@@ -302,9 +323,32 @@ func TryExportStringCopy(array Array, dst []string) (bool, error) {
 	case columnArray[string]:
 		copy(dst, a.data)
 		return true, nil
+	case tailValueArray[string]:
+		copy(dst, a.base)
+		copy(dst[len(a.base):], a.tail)
+		return true, nil
+	case sparseEditArray[string]:
+		exportSparseEdit(a, dst)
+		return true, nil
 	case columnArray[Symbol]:
 		for i, value := range a.data {
 			dst[i] = string(value)
+		}
+		return true, nil
+	case tailValueArray[Symbol]:
+		for i, value := range a.base {
+			dst[i] = string(value)
+		}
+		for i, value := range a.tail {
+			dst[len(a.base)+i] = string(value)
+		}
+		return true, nil
+	case sparseEditArray[Symbol]:
+		for i, value := range a.base {
+			dst[i] = string(value)
+		}
+		for i, row := range a.rows {
+			dst[row] = string(a.vals[i])
 		}
 		return true, nil
 	case encodedArray:

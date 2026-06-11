@@ -26,8 +26,8 @@ func TestQDataFrameValueKeepsNativeFramePayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := value.Table()
-	if _, ok := table.NativePayload().(data.Frame); !ok {
-		t.Fatalf("q frame native payload = %T, want data.Frame", table.NativePayload())
+	if _, ok := table.NativePayload().(*lazySoAFramePayload); !ok {
+		t.Fatalf("q frame native payload = %T, want *lazySoAFramePayload", table.NativePayload())
 	}
 	info, ok := table.NativeFramePayloadInfo()
 	if !ok {
@@ -62,8 +62,8 @@ func TestQDataFrameValueInstallsRuntimeSoAPayloadForDenseFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := value.Table()
-	if _, ok := table.NativePayload().(*runtime.SoA); !ok {
-		t.Fatalf("q dense frame native payload = %T, want *runtime.SoA", table.NativePayload())
+	if _, ok := table.NativePayload().(*lazySoAFramePayload); !ok {
+		t.Fatalf("q dense frame native payload = %T, want *lazySoAFramePayload", table.NativePayload())
 	}
 	col, handled, err := value.NativeFrameColumn("price")
 	if err != nil {
@@ -97,8 +97,8 @@ func TestQDataFrameValueKeepsDataPayloadForNonRuntimeDenseKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	table := value.Table()
-	if _, ok := table.NativePayload().(data.Frame); !ok {
-		t.Fatalf("q i32 frame native payload = %T, want data.Frame", table.NativePayload())
+	if _, ok := table.NativePayload().(*lazySoAFramePayload); !ok {
+		t.Fatalf("q i32 frame native payload = %T, want *lazySoAFramePayload", table.NativePayload())
 	}
 	roundTrip, err := qDataFrameFromValue(value, "")
 	if err != nil {
@@ -780,8 +780,8 @@ func TestQSQLResultKeepsNativeFrameFacade(t *testing.T) {
 		t.Fatalf("q.sql: %v", err)
 	}
 	table := result.Table()
-	if _, ok := table.NativePayload().(data.Frame); !ok {
-		t.Fatalf("q.sql result native payload = %T, want data.Frame", table.NativePayload())
+	if _, ok := table.NativePayload().(*lazySoAFramePayload); !ok {
+		t.Fatalf("q.sql result native payload = %T, want *lazySoAFramePayload", table.NativePayload())
 	}
 	if got := table.Length(); got != 2 {
 		t.Fatalf("q.sql facade length = %d, want 2", got)

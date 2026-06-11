@@ -1,6 +1,9 @@
 package data
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Typed grouped-aggregate execution over positional row group ids.
 //
@@ -22,6 +25,10 @@ type typedRowIDsAccumulator struct {
 	count    []int64
 	firstRow []int
 	lastRow  []int
+	// bestRow tracks per-group argmin/argmax rows so min/max gather the
+	// source-typed value without boxing; med holds per-group medians.
+	bestRow []int
+	med     []float64
 }
 
 // resolveNumericColumnFn returns a direct typed row reader for dense numeric
@@ -151,9 +158,28 @@ func typedRowIDsAggSupported(agg aggregateInput) bool {
 		return false
 	case "first", "last":
 		return agg.column != nil
+	case "min", "max", "med":
+		if agg.column == nil {
+			return false
+		}
+		switch unwrapAttributedArray(agg.column).(type) {
+		case columnArray[float64], columnArray[int64]:
+			return true
+		default:
+			return false
+		}
 	default:
 		return false
 	}
+}
+
+// groupAggI64Slice exposes a plain dense int64 column's storage for direct
+// aggregation loops.
+func groupAggI64Slice(col Array) ([]int64, bool) {
+	if a, ok := unwrapAttributedArray(col).(columnArray[int64]); ok {
+		return a.data, true
+	}
+	return nil, false
 }
 
 // groupByArrays resolves every by-item to a full-frame Array: bound columns
@@ -388,6 +414,11 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 			}
 		case "last":
 			accs[i].lastRow = make([]int, groupCount)
+		case "min", "max":
+			accs[i].bestRow = make([]int, groupCount)
+			for g := range accs[i].bestRow {
+				accs[i].bestRow[g] = -1
+			}
 		}
 	}
 	rowAt := func(k int) int {
@@ -497,6 +528,77 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 					acc.lastRow[g] = indexes[k]
 				}
 			}
+		case "min", "max":
+			isMin := acc.input.Func == "min"
+			if data, ok := groupAggF64Slice(acc.input.column); ok {
+				for k, g := range gids {
+					row := rowAt(k)
+					best := acc.bestRow[g]
+					if best < 0 {
+						acc.bestRow[g] = row
+						continue
+					}
+					v, bv := data[row], data[best]
+					if (isMin && v < bv) || (!isMin && v > bv) {
+						acc.bestRow[g] = row
+					}
+				}
+				continue
+			}
+			if data, ok := groupAggI64Slice(acc.input.column); ok {
+				for k, g := range gids {
+					row := rowAt(k)
+					best := acc.bestRow[g]
+					if best < 0 {
+						acc.bestRow[g] = row
+						continue
+					}
+					v, bv := data[row], data[best]
+					if (isMin && v < bv) || (!isMin && v > bv) {
+						acc.bestRow[g] = row
+					}
+				}
+				continue
+			}
+			return Frame{}, false, nil
+		case "med":
+			// Bucket every participating value into one flat slice with
+			// per-group extents, then take each group's median in place.
+			counts := make([]int, groupCount)
+			for _, g := range gids {
+				counts[g]++
+			}
+			offsets := make([]int, groupCount+1)
+			for g, c := range counts {
+				offsets[g+1] = offsets[g] + c
+			}
+			flat := make([]float64, len(gids))
+			fill := make([]int, groupCount)
+			copy(fill, offsets[:groupCount])
+			if data, ok := groupAggF64Slice(acc.input.column); ok {
+				for k, g := range gids {
+					flat[fill[g]] = data[rowAt(k)]
+					fill[g]++
+				}
+			} else if data, ok := groupAggI64Slice(acc.input.column); ok {
+				for k, g := range gids {
+					flat[fill[g]] = float64(data[rowAt(k)])
+					fill[g]++
+				}
+			} else {
+				return Frame{}, false, nil
+			}
+			acc.med = make([]float64, groupCount)
+			for g := 0; g < groupCount; g++ {
+				values := flat[offsets[g]:offsets[g+1]]
+				sort.Float64s(values)
+				mid := len(values) / 2
+				if len(values)%2 == 1 {
+					acc.med[g] = values[mid]
+				} else {
+					acc.med[g] = (values[mid-1] + values[mid]) / 2
+				}
+			}
 		}
 	}
 
@@ -544,6 +646,11 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 		case "last":
 			gathered := acc.lastRow[:outGroups]
 			cols = append(cols, Column{Name: agg.Name, Data: agg.column.Gather(gathered)})
+		case "min", "max":
+			gathered := acc.bestRow[:outGroups]
+			cols = append(cols, Column{Name: agg.Name, Data: unwrapAttributedArray(agg.column).Gather(gathered)})
+		case "med":
+			cols = append(cols, Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: acc.med[:outGroups]}})
 		}
 	}
 	out, err := newFrameTrusted(cols...)

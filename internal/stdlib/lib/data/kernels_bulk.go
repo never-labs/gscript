@@ -2124,7 +2124,7 @@ func unionComparable[T comparable](left, right []T) []T {
 func MaterializeFrameColumn(array Array) Array {
 	switch a := array.(type) {
 	case attributedArray:
-		return attributedArray{array: MaterializeFrameColumn(a.array), metadata: a.metadata}
+		return attributedArray{array: MaterializeFrameColumn(a.array), metadata: a.metadata, lazy: a.lazy}
 	case tiledArray:
 		switch a.source.Kind() {
 		case KindSymbol, KindString:
@@ -2147,7 +2147,7 @@ func MaterializeFrameColumn(array Array) Array {
 func MaterializeArray(array Array) Array {
 	switch a := array.(type) {
 	case attributedArray:
-		return attributedArray{array: MaterializeArray(a.array), metadata: a.metadata}
+		return attributedArray{array: MaterializeArray(a.array), metadata: a.metadata, lazy: a.lazy}
 	case columnArray[bool], columnArray[int8], columnArray[int16], columnArray[int32],
 		columnArray[int64], columnArray[uint8], columnArray[uint16], columnArray[uint32],
 		columnArray[uint64], columnArray[float32], columnArray[float64],
