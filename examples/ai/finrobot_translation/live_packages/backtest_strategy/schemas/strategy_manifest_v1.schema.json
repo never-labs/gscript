@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/backtest_strategy/strategy_manifest_v1.schema.json",
+  "title": "FinRobot Backtest Strategy Manifest",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "strategy_id",
+    "strategy_class",
+    "parameters",
+    "indicator_bindings",
+    "sizer_binding",
+    "analyzer_bindings",
+    "deterministic_seed"
+  ],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "real_dependency_imports": {"const": false},
+    "fixture_key": {"type": "string"},
+    "strategy_id": {"type": "string"},
+    "strategy_class": {"type": "string"},
+    "parameters": {"type": "object"},
+    "indicator_bindings": {
+      "type": "array",
+      "items": {"type": "object"},
+      "minItems": 1
+    },
+    "sizer_binding": {"type": "object"},
+    "analyzer_bindings": {
+      "type": "array",
+      "items": {"type": "object"},
+      "minItems": 1
+    },
+    "deterministic_seed": {"type": "string"}
+  }
+}
+

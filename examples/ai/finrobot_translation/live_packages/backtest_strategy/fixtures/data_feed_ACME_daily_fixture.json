@@ -1,0 +1,24 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_key": "data_feed:ACME:daily:offline:v1",
+  "symbol": "ACME",
+  "timeframe": "1d",
+  "timezone": "UTC",
+  "calendar": "XNYS",
+  "currency": "USD",
+  "source_ref": "offline_fixture:ACME:daily:2025-01",
+  "deterministic_seed": "finrobot-backtest-strategy-offline-v1",
+  "rows": [
+    {"timestamp": "2025-01-02T00:00:00Z", "open": 100.00, "high": 101.20, "low": 99.40, "close": 100.80, "volume": 1200000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-03T00:00:00Z", "open": 100.90, "high": 102.10, "low": 100.20, "close": 101.70, "volume": 1180000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-06T00:00:00Z", "open": 101.80, "high": 103.50, "low": 101.10, "close": 103.10, "volume": 1350000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-07T00:00:00Z", "open": 103.00, "high": 104.40, "low": 102.70, "close": 104.00, "volume": 1420000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-08T00:00:00Z", "open": 103.80, "high": 105.20, "low": 103.20, "close": 104.90, "volume": 1500000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-09T00:00:00Z", "open": 104.70, "high": 105.10, "low": 102.90, "close": 103.40, "volume": 1600000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-10T00:00:00Z", "open": 103.20, "high": 104.00, "low": 101.80, "close": 102.10, "volume": 1550000, "provider_free": true, "live_network": false},
+    {"timestamp": "2025-01-13T00:00:00Z", "open": 102.00, "high": 103.60, "low": 101.50, "close": 103.20, "volume": 1480000, "provider_free": true, "live_network": false}
+  ]
+}
+
