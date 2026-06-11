@@ -585,8 +585,7 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver q
 		return data.NewI64Range(0, 1, int(n)), true, nil
 	case "where":
 		if mask, ok := arg.(data.Array); ok && mask.Kind() == data.KindBool {
-			out, handled, err := data.TryTypedWhereMaskI64(mask)
-			out, handled, err = qTypedRuntimeResultReason("ArrayWhere", "mask-to-index/i64", RuntimeFallbackUnsupportedType, out, handled, err)
+			out, handled, err := qEvalWhereMaskI64Primitive(mask)
 			if err != nil || handled {
 				return out, true, err
 			}

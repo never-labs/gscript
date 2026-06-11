@@ -1283,6 +1283,18 @@ func denseArrayIndicesWhere(mask *DenseArray) (*DenseArray, error) {
 	return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
 }
 
+// DenseArrayIndicesWhere converts a typed bool mask to 1-based i64 row indexes.
+// It is the VM-level primitive behind q's where-mask shape and backend lowering.
+func DenseArrayIndicesWhere(mask *DenseArray) (*DenseArray, error) {
+	out, err := denseArrayIndicesWhere(mask)
+	if err != nil {
+		recordRuntimePrimitiveError(RuntimePrimitiveDenseArrayWhereMaskI64)
+		return nil, err
+	}
+	recordRuntimePrimitiveHit(RuntimePrimitiveDenseArrayWhereMaskI64)
+	return out, nil
+}
+
 func denseArrayScatterInto(dst, indices *DenseArray, values Value) error {
 	if dst == nil || indices == nil {
 		return ErrDenseArrayOperand
