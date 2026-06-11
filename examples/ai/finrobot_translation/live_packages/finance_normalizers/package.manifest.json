@@ -195,8 +195,8 @@
   },
   "test_gates": [
     "manifest and referenced JSON files decode without external dependencies",
-    "schemas cover statements, ratios, market, news, SEC, peer, provenance, and normalizer policy",
-    "fixtures declare canonical snake_case fields, stale/missing field policy, and deterministic ordering keys",
+    "schemas cover statements, ratios, market, news, SEC, peer, provenance, normalizer policy, typed normalization boundaries, corporate actions, and validation errors",
+    "fixtures declare canonical snake_case fields, stale/missing field policy, typed unit/currency conversion envelopes, corporate action adjustments, validation error taxonomy, and deterministic ordering keys",
     "provider gate forbids live network access, provider credentials, and provider SDK imports",
     "normalizers remain independent of q/runtime and future live provider packages"
   ],
