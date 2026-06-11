@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-retail-sentiment-prompt-format-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "prompt_sections": [
+    {
+      "id": "source_snapshot_summary",
+      "required_fields": [
+        "source_id",
+        "platform",
+        "as_of",
+        "observed_window",
+        "metrics",
+        "source_terms",
+        "redaction",
+        "stale_snapshot_warning"
+      ]
+    },
+    {
+      "id": "sentiment_aggregate_summary",
+      "required_fields": [
+        "aggregate_score",
+        "mention_volume",
+        "platform_weights",
+        "source_snapshot_refs",
+        "redaction_summary",
+        "stale_snapshot_warning"
+      ]
+    }
+  ],
+  "forbidden_prompt_fields": [
+    "raw_user_handle",
+    "raw_url",
+    "access_token",
+    "cookie",
+    "authorization_header"
+  ],
+  "format_rules": [
+    "render only redacted display handles and redacted fixture URIs",
+    "include source terms metadata next to each platform contribution",
+    "include stale snapshot warning text whenever stale_snapshot_warning.is_stale is true",
+    "omit provider SDK names from prompt instructions except as source metadata labels"
+  ]
+}

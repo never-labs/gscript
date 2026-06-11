@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-retail-sentiment-live-package",
+  "package_name": "leia-finrobot-retail-sentiment",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot retail sentiment source snapshots, aggregate sentiment, redaction, source terms metadata, stale snapshot warnings, and optional adapter clean skips.",
+  "source_modules": [
+    "finrobot_equity/core/src/modules/retail_sentiment_client.py",
+    "FinRobot/functional/analyzers/retail_sentiment.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; Adanos, Reddit, X, Polymarket, and live scraping credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_retail_sentiment_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "retail_sentiment_contract": "contracts/retail_sentiment_contract.json",
+    "prompt_format_contract": "contracts/prompt_format_contract.json",
+    "adapter_clean_skip_contract": "contracts/adapter_clean_skip_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "source_snapshot": "schemas/source_snapshot_v1.schema.json",
+    "sentiment_aggregate": "schemas/sentiment_aggregate_v1.schema.json",
+    "redaction_policy": "schemas/redaction_policy_v1.schema.json",
+    "terms_metadata": "schemas/terms_metadata_v1.schema.json",
+    "adapter_clean_skip": "schemas/adapter_clean_skip_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "source_snapshot": "fixtures/source_snapshot_ACME_fixture.json",
+    "sentiment_aggregate": "fixtures/sentiment_aggregate_ACME_fixture.json",
+    "redaction_policy": "fixtures/redaction_policy_fixture.json",
+    "adapter_clean_skip": "fixtures/adapter_clean_skip_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "retail_sentiment_client",
+      "source_module": "retail_sentiment_client.py",
+      "capabilities": [
+        "finance.retail_sentiment.source_snapshot",
+        "finance.retail_sentiment.platform.aggregate",
+        "finance.retail_sentiment.redact",
+        "finance.retail_sentiment.stale_snapshot.warn"
+      ],
+      "output_schemas": [
+        "source_snapshot",
+        "sentiment_aggregate",
+        "redaction_policy"
+      ]
+    },
+    {
+      "id": "optional_adapter_boundary",
+      "source_module": "provider_specific_retail_sentiment_adapters",
+      "capabilities": [
+        "finance.retail_sentiment.adanos.snapshot",
+        "finance.retail_sentiment.reddit.snapshot",
+        "finance.retail_sentiment.x.snapshot",
+        "finance.retail_sentiment.polymarket.snapshot",
+        "finance.retail_sentiment.adapter.clean_skip"
+      ],
+      "output_schemas": [
+        "source_snapshot",
+        "terms_metadata",
+        "adapter_clean_skip"
+      ]
+    }
+  ],
+  "source_boundaries": [
+    {
+      "id": "adanos",
+      "display_name": "Adanos",
+      "capability": "finance.retail_sentiment.adanos.snapshot",
+      "fixture_key": "adanos:source_snapshot:ACME:offline",
+      "schema": "source_snapshot",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "reddit",
+      "display_name": "Reddit",
+      "capability": "finance.retail_sentiment.reddit.snapshot",
+      "fixture_key": "reddit:source_snapshot:ACME:offline",
+      "schema": "source_snapshot",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "x_social",
+      "display_name": "X",
+      "capability": "finance.retail_sentiment.x.snapshot",
+      "fixture_key": "x:source_snapshot:ACME:offline",
+      "schema": "source_snapshot",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "polymarket",
+      "display_name": "Polymarket",
+      "capability": "finance.retail_sentiment.polymarket.snapshot",
+      "fixture_key": "polymarket:source_snapshot:ACME:offline",
+      "schema": "source_snapshot",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "prompt_contracts": {
+    "source_snapshot_format": "Each source snapshot must provide source_id, platform, as_of, observed_window, source_terms, redaction, stale_snapshot_warning, and metrics before prompt rendering.",
+    "aggregate_format": "Aggregate prompts must include aggregate_score, mention_volume, platform_weights, source_snapshot_refs, redaction_summary, and stale_snapshot_warning.",
+    "forbidden_prompt_fields": [
+      "raw_user_handle",
+      "raw_url",
+      "access_token",
+      "cookie",
+      "authorization_header"
+    ]
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "Adanos, Reddit, X, and Polymarket source snapshots are fixture-backed and clean-skip safe",
+    "source snapshot and aggregate schemas include redaction, terms metadata, and stale snapshot warnings",
+    "prompt-format contracts forbid raw handles, raw URLs, tokens, cookies, and authorization headers",
+    "main.leia contains no q/runtime, provider SDK imports, or network execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot Adanos, Reddit, X, Polymarket, or retail sentiment live clients as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}
