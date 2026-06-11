@@ -20,6 +20,9 @@ package data
 type typedWhereLeaf struct {
 	scan   func(dst []int) []int
 	refine func(rows []int) []int
+	// count, when non-nil, returns the exact scan match count so the caller
+	// can size the index vector once instead of paying append regrowth.
+	count func() int
 }
 
 // typedAndCompareFilterIndexes filters the frame through a pure-`and` tree of
@@ -29,7 +32,12 @@ func typedAndCompareFilterIndexes(frame Frame, expr Logical) ([]int, bool) {
 	if !ok || len(leaves) == 0 {
 		return nil, false
 	}
-	out := filterIndexScratch(frame.Len())
+	var out []int
+	if count := leaves[0].count; count != nil {
+		out = make([]int, 0, count())
+	} else {
+		out = filterIndexScratch(frame.Len())
+	}
 	out = leaves[0].scan(out)
 	for _, leaf := range leaves[1:] {
 		if len(out) == 0 {
@@ -444,6 +452,22 @@ func boolWhereLeaf(values []bool, target bool, op Op) (typedWhereLeaf, bool) {
 	holdsFalse := boolCompare(op, !target, compareBool(false, target))
 	holdsTrue := boolCompare(op, target, compareBool(true, target))
 	return typedWhereLeaf{
+		count: func() int {
+			trues := 0
+			for _, v := range values {
+				if v {
+					trues++
+				}
+			}
+			n := 0
+			if holdsTrue {
+				n += trues
+			}
+			if holdsFalse {
+				n += len(values) - trues
+			}
+			return n
+		},
 		scan: func(dst []int) []int {
 			for row, v := range values {
 				if (v && holdsTrue) || (!v && holdsFalse) {

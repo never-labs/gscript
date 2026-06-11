@@ -665,8 +665,8 @@ func newSparseColumnArray(n int, rows []int, src Array) (Array, bool) {
 	}
 	switch src.Kind() {
 	case KindF64:
-		vals := make([]float64, len(rows))
-		if ok, err := TryExportF64Copy(src, vals); !ok || err != nil {
+		vals, ok := sparseSourceValuesF64(src)
+		if !ok {
 			return nil, false
 		}
 		data := make([]float64, n)
@@ -680,8 +680,8 @@ func newSparseColumnArray(n int, rows []int, src Array) (Array, bool) {
 		}
 		return nullBitmapArray[float64]{kind: KindF64, data: data, nulls: nulls}, true
 	case KindI64:
-		vals := make([]int64, len(rows))
-		if ok, err := TryExportI64Copy(src, vals); !ok || err != nil {
+		vals, ok := sparseSourceValuesI64(src)
+		if !ok {
 			return nil, false
 		}
 		data := make([]int64, n)
@@ -696,6 +696,31 @@ func newSparseColumnArray(n int, rows []int, src Array) (Array, bool) {
 		return nullBitmapArray[int64]{kind: KindI64, data: data, nulls: nulls}, true
 	}
 	return nil, false
+}
+
+// sparseSourceValuesF64 borrows the dense typed storage of src when it is a
+// plain column (no copy); other carriers export into a fresh slice. The
+// returned slice is read-only.
+func sparseSourceValuesF64(src Array) ([]float64, bool) {
+	if a, ok := src.(columnArray[float64]); ok && a.kind == KindF64 {
+		return a.data, true
+	}
+	vals := make([]float64, src.Len())
+	if ok, err := TryExportF64Copy(src, vals); !ok || err != nil {
+		return nil, false
+	}
+	return vals, true
+}
+
+func sparseSourceValuesI64(src Array) ([]int64, bool) {
+	if a, ok := src.(columnArray[int64]); ok && a.kind == KindI64 {
+		return a.data, true
+	}
+	vals := make([]int64, src.Len())
+	if ok, err := TryExportI64Copy(src, vals); !ok || err != nil {
+		return nil, false
+	}
+	return vals, true
 }
 
 // sharedRowsByKey adopts an existing rowsByKey map. The keyed-frame contract
