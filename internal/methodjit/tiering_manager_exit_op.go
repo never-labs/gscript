@@ -518,16 +518,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			return fmt.Errorf("FrameGroupAggregate spec constant is out of range")
 		}
 		cf, _ := tm.tier2CompiledFor(proto)
-		shape := qFrameGroupAggregateRuntimeShapeFromMaskValue(regs[absArg2])
-		out, err := executeFrameGroupAggregateValue(regs[absArg1], regs[absArg2], proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameGroupAggregate(
+			regs[absArg1], regs[absArg2], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			if cf != nil {
-				cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "error", regs[absArg1])
-			}
 			return err
-		}
-		if cf != nil {
-			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "FrameGroupAggregate", shape, "typed_runtime_op_exit", "success", regs[absArg1])
 		}
 		regs[absSlot] = out
 
@@ -548,18 +542,11 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			rhs = regs[absArg2]
 			hasRHS = true
 		}
-		shape := qFrameSelectColumnExecutionShape(cf.QFrameSelectColumnSpecs, int(aux))
-		plan, err := cf.qFrameSelectColumnRuntimePlan(proto.Constants, int(aux), regs[absArg1])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQFrameSelectColumn(
+			proto.Constants, int(aux), regs[absArg1], rhs, hasRHS, qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[absArg1])
 			return err
 		}
-		out, err := executeQFrameSelectColumnPlannedValue(proto.Constants, cf.QFrameSelectColumnSpecs, int(aux), plan, regs[absArg1], rhs, hasRHS)
-		if err != nil {
-			cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "error", regs[absArg1])
-			return err
-		}
-		cf.recordQKernelExecutionForFrame("methodjit_q_frame_runtime", "QFrameSelectColumn", shape, "typed_runtime_op_exit", "success", regs[absArg1])
 		regs[absSlot] = out
 
 	case OpVectorGather:
@@ -631,19 +618,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			return fmt.Errorf("QVectorWhereReduce op-exit out of register range")
 		}
 		cf, _ := tm.tier2CompiledFor(proto)
-		shape := "compare/vector-where/vector-reduce"
-		if cf != nil {
-			shape = cf.qVectorRuntimeKernelShape(int(ctx.OpExitID), shape)
-		}
-		out, err := executeQVectorWhereReduceValue(aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQVectorWhereReduce(
+			int(ctx.OpExitID), aux, regs[tempBase], regs[tempBase+1], regs[tempBase+2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			if cf != nil {
-				cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", shape, "typed_runtime_op_exit", "error")
-			}
 			return err
-		}
-		if cf != nil {
-			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorWhereReduce", shape, "typed_runtime_op_exit", "success")
 		}
 		regs[absSlot] = out
 
@@ -652,15 +630,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			return fmt.Errorf("QVectorGatherReduce op-exit out of register range")
 		}
 		cf, _ := tm.tier2CompiledFor(proto)
-		out, err := executeQVectorGatherReduceValue(aux, regs[absArg1], regs[absArg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQVectorGatherReduce(
+			aux, regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			if cf != nil {
-				cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "error")
-			}
 			return err
-		}
-		if cf != nil {
-			cf.recordQKernelExecution("methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", "typed_runtime_op_exit", "success")
 		}
 		regs[absSlot] = out
 
