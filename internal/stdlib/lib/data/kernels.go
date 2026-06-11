@@ -8963,6 +8963,9 @@ func fbyGroupIDs(groups Array) ([]int, int, error) {
 	case columnArray[int64]:
 		return fbyGroupIDsComparable(g.data)
 	case i64BucketArray:
+		if rowGroups, groupCount, ok := fbyGroupIDsBulkI64(groups); ok {
+			return rowGroups, groupCount, nil
+		}
 		return fbyGroupIDsI64Computed(g)
 	case columnArray[uint8]:
 		return fbyGroupIDsComparable(g.data)
@@ -9014,7 +9017,28 @@ func fbyGroupIDs(groups Array) ([]int, int, error) {
 	return rowGroups, len(groupIDs), nil
 }
 
+// fbyGroupIDsBulkI64 computes group IDs for dense integer group columns by
+// flattening the carrier once and running the comparable (linear-probe /
+// hash) grouper over the flat slice, instead of one interface dispatch and
+// map probe per row over lazy carriers such as xbar bucket chains.
+func fbyGroupIDsBulkI64(groups Array) ([]int, int, bool) {
+	values, owned, ok := tryBulkI64Values(groups)
+	if !ok || len(values) < groups.Len() {
+		bulkI64Release(values, owned)
+		return nil, 0, false
+	}
+	rowGroups, groupCount, err := fbyGroupIDsComparable(values[:groups.Len()])
+	bulkI64Release(values, owned)
+	if err != nil {
+		return nil, 0, false
+	}
+	return rowGroups, groupCount, true
+}
+
 func fbyGroupIDsIntegerArray(groups Array) ([]int, int, error) {
+	if rowGroups, groupCount, ok := fbyGroupIDsBulkI64(groups); ok {
+		return rowGroups, groupCount, nil
+	}
 	rowGroups := make([]int, groups.Len())
 	groupIDs := make(map[int64]int)
 	for row := 0; row < groups.Len(); row++ {

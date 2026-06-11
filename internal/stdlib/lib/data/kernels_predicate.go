@@ -110,6 +110,10 @@ func fusedPredicateWhereIndexArray(mask Array) (Array, bool) {
 		return nil, false
 	}
 	c.foldSingleUseLeafChains(root)
+	if out, ok := c.tryAnalyticWhereIndexes(root); ok {
+		c.releaseOwnedBools()
+		return out, true
+	}
 	sources := make([][]int64, len(c.sources))
 	sourcesOwned := make([]bool, len(c.sources))
 	sourcesF64 := make([][]float64, len(c.sourcesF64))
@@ -1212,7 +1216,7 @@ func (a f64CompareMask) Gather(indexes []int) Array {
 // integer sources so compound where predicates can fuse the range check.
 func lazyWithinMask(array Array, low, high any, highClosed bool) (Array, bool) {
 	switch array.(type) {
-	case i64ScalarDyadicArray, i64RangeArray:
+	case i64ScalarDyadicArray, i64RangeArray, i64BucketArray:
 	default:
 		return nil, false
 	}
