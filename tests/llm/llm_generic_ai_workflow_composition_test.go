@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -65,6 +66,47 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 	for _, forbidden := range []string{"openai", "anthropic", "gemini", "finrobot", "yfinance", "finnhub"} {
 		if strings.Contains(strings.ToLower(data), forbidden) {
 			t.Fatalf("composition example must remain provider-free and domain-neutral; found %q", forbidden)
+		}
+	}
+}
+
+func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
+	root := repoRoot(t)
+	data := readGenericAIWorkflowCompositionExample(t)
+	matrix := loadGenericAIPackageMatrix(t, root)
+	matrixByPackageID := map[string]genericAIPackageRow{}
+	for _, row := range matrix.Packages {
+		matrixByPackageID[strings.ReplaceAll(row.ID, "_", "-")] = row
+	}
+
+	matches := regexp.MustCompile(`package_id:\s*"([^"]+)"`).FindAllStringSubmatch(data, -1)
+	if len(matches) != 10 {
+		t.Fatalf("composition package boundaries = %d, want 10", len(matches))
+	}
+
+	seen := map[string]bool{}
+	for _, match := range matches {
+		packageID := match[1]
+		row, ok := matrixByPackageID[packageID]
+		if !ok {
+			t.Fatalf("composition package_id %q missing from generic package matrix", packageID)
+		}
+		seen[row.ID] = true
+		wantFixtureIndex := filepath.ToSlash(filepath.Join(row.PackageDir, "fixtures", "provider_free_fixture_index.json"))
+		if row.FixtureIndex != wantFixtureIndex {
+			t.Fatalf("%s fixture_index = %q, want %q", row.ID, row.FixtureIndex, wantFixtureIndex)
+		}
+
+		fixtureIndex := readJSONMap(t, filepath.Join(root, filepath.FromSlash(row.FixtureIndex)))
+		if !finrobotLivePackageBoolOrConst(fixtureIndex["provider_free"], true) ||
+			!finrobotLivePackageBoolOrConst(fixtureIndex["live_network"], false) ||
+			!finrobotLivePackageBoolOrConst(fixtureIndex["real_dependency_imports"], false) {
+			t.Fatalf("%s composed fixture index must stay provider-free and offline: %#v", row.ID, fixtureIndex)
+		}
+	}
+	for _, row := range matrix.Packages {
+		if !seen[row.ID] {
+			t.Fatalf("generic package matrix row %q is not represented in workflow composition", row.ID)
 		}
 	}
 }

@@ -73,6 +73,26 @@ func TestFinRobotNonGenericProviderFreeFixtureIndexesStayOffline(t *testing.T) {
 	}
 }
 
+func TestFinRobotLivePackageFixtureIndexesReferenceExistingJSON(t *testing.T) {
+	root := repoRoot(t)
+	livePackagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+
+	for _, relDir := range finrobotLivePackageDirs(t, root, livePackagesRoot) {
+		t.Run(filepath.Base(relDir), func(t *testing.T) {
+			indexPaths := finrobotPackageFixtureIndexPaths(t, root, relDir)
+			if len(indexPaths) == 0 {
+				t.Skip("package does not use provider-free fixture indexes")
+			}
+			pkgDir := filepath.Join(root, filepath.FromSlash(relDir))
+			for _, indexPath := range indexPaths {
+				index := readJSONMap(t, indexPath)
+				assertFinRobotFixtureIndexOfflineFlags(t, filepath.ToSlash(indexPath), index)
+				assertFinRobotFixtureIndexReferences(t, pkgDir, indexPath, index)
+			}
+		})
+	}
+}
+
 func finrobotPackageFixtureIndexPaths(t *testing.T, root, relDir string) []string {
 	t.Helper()
 	var paths []string
@@ -221,6 +241,103 @@ func assertFinRobotFixtureIndexOfflineFlags(t *testing.T, path string, value any
 			assertFinRobotFixtureIndexOfflineFlags(t, path, child)
 		}
 	}
+}
+
+func assertFinRobotFixtureIndexReferences(t *testing.T, pkgDir, indexPath string, value any) {
+	t.Helper()
+	seen := map[string]bool{}
+	assertFinRobotFixtureIndexReferencesValue(t, pkgDir, filepath.Dir(indexPath), filepath.ToSlash(indexPath), "", value, seen)
+}
+
+func assertFinRobotFixtureIndexReferencesValue(t *testing.T, pkgDir, indexDir, indexPath, key string, value any, seen map[string]bool) {
+	t.Helper()
+	switch value := value.(type) {
+	case map[string]any:
+		for childKey, child := range value {
+			assertFinRobotFixtureIndexReferencesValue(t, pkgDir, indexDir, indexPath, childKey, child, seen)
+		}
+	case []any:
+		for _, child := range value {
+			assertFinRobotFixtureIndexReferencesValue(t, pkgDir, indexDir, indexPath, key, child, seen)
+		}
+	case string:
+		if finrobotFixtureIndexPathReferenceKey(key) {
+			assertFinRobotFixtureIndexJSONReference(t, pkgDir, indexDir, indexPath, key, value, seen)
+		}
+		if finrobotFixtureIndexHashReferenceKey(key) && !finrobotFixtureIndexHashReferenceValue(value) {
+			t.Fatalf("%s %s hash reference = %q, want non-empty hash reference", indexPath, key, value)
+		}
+	}
+}
+
+func finrobotFixtureIndexPathReferenceKey(key string) bool {
+	switch key {
+	case "path", "paths", "schema", "schemas", "schema_path", "schema_paths", "record_schema", "records_path", "fixture_path", "fixture_paths", "index", "fixture_index":
+		return true
+	default:
+		return false
+	}
+}
+
+func finrobotFixtureIndexHashReferenceKey(key string) bool {
+	key = strings.ToLower(key)
+	if key == "hash_algorithm" || key == "hash_seed" || key == "deterministic_hash_seed" || key == "hash_input" {
+		return false
+	}
+	return strings.Contains(key, "hash") || strings.Contains(key, "sha256")
+}
+
+func finrobotFixtureIndexHashReferenceValue(value string) bool {
+	value = strings.TrimSpace(value)
+	return value != ""
+}
+
+func assertFinRobotFixtureIndexJSONReference(t *testing.T, pkgDir, indexDir, indexPath, key, ref string, seen map[string]bool) {
+	t.Helper()
+	refPath := strings.TrimSpace(strings.Split(ref, "#")[0])
+	if refPath == "" || strings.HasPrefix(refPath, "http://") || strings.HasPrefix(refPath, "https://") {
+		return
+	}
+	if strings.Contains(refPath, "://") || strings.HasPrefix(refPath, "$") {
+		return
+	}
+	if ext := filepath.Ext(refPath); ext != ".json" {
+		if strings.Contains(key, "schema") {
+			return
+		}
+		t.Fatalf("%s %s = %q, want JSON reference", indexPath, key, ref)
+	}
+	path, ok := finrobotResolveFixtureIndexReference(pkgDir, indexDir, refPath)
+	if !ok {
+		t.Fatalf("%s %s = %q does not resolve under package", indexPath, key, ref)
+	}
+	if seen[path] {
+		return
+	}
+	seen[path] = true
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%s %s = %q: %v", indexPath, key, ref, err)
+	}
+	var decoded any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("%s %s = %q references non-decodable JSON %s: %v", indexPath, key, ref, path, err)
+	}
+}
+
+func finrobotResolveFixtureIndexReference(pkgDir, indexDir, ref string) (string, bool) {
+	if filepath.IsAbs(ref) {
+		info, err := os.Stat(ref)
+		return ref, err == nil && !info.IsDir()
+	}
+	for _, base := range []string{pkgDir, indexDir} {
+		path := filepath.Clean(filepath.Join(base, filepath.FromSlash(ref)))
+		info, err := os.Stat(path)
+		if err == nil && !info.IsDir() {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 func finrobotLivePackageBoolOrConst(value any, want bool) bool {

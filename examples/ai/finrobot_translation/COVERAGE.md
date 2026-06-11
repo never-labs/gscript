@@ -7,11 +7,14 @@ Baseline:
 - Leia branch: `codex/ai-dialect-polish` branch head.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 599 files, including 32
+- Current translation directory file count: 600 files, including 32
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 78 runnable/checkable examples discovered by
   `go run ./cmd/leia examples list --json`.
+- Fixture index normalization: 31 live-package skeletons use
+  `fixtures/provider_free_fixture_index.json`; `live_packages/vendor_adapters`
+  retains its provider-specific `fixtures/offline_replay_index.json`.
 - Runtime changes in this audit: none.
 
 ## Executive Summary
@@ -201,7 +204,7 @@ mistaken for missing language/runtime support.
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
 | Registered example inventory | 78 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 599 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| File inventory | 600 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 67 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 5 `evaluate` examples for equity CLI workflow, web product smoke metadata, generic workflow orchestration, and generic agent-loop composition | Complete |

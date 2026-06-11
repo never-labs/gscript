@@ -14,6 +14,7 @@
     "manifest_entrypoints_exist": true,
     "referenced_artifacts_exist": true,
     "capability_prefixes_match_plan": true,
+    "fixture_index_capabilities_match_manifest_and_plan": true,
     "no_built_in_guarantee": true,
     "registered_example_mapping": true
   },

@@ -1108,12 +1108,12 @@
       "contract": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/contracts/package_boundary_audit_contract.json",
       "migration_source": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
       "capabilities": [
-        "generic.ai.package.boundary.audit",
-        "generic.ai.package.manifest.audit",
-        "generic.ai.fixture.index.audit",
-        "generic.ai.example.registry.audit",
-        "generic.ai.capability.policy.audit",
-        "generic.ai.missing_boundary.records"
+        "generic.ai.package.boundary.audit.manifest",
+        "generic.ai.package.boundary.audit.fixture_index",
+        "generic.ai.package.boundary.audit.example_registry",
+        "generic.ai.package.boundary.audit.capability_policy",
+        "generic.ai.package.boundary.audit.findings",
+        "generic.ai.package.boundary.audit.missing_boundary_records"
       ],
       "test_gates": [
         "provider-free fixture contract parses",

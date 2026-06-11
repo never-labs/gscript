@@ -51,6 +51,7 @@
         "manifest_entrypoints_exist",
         "referenced_artifacts_exist",
         "capability_prefixes_match_plan",
+        "fixture_index_capabilities_match_manifest_and_plan",
         "no_built_in_guarantee",
         "registered_example_mapping"
       ],

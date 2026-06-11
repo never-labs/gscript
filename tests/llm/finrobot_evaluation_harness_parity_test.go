@@ -260,6 +260,7 @@ func TestFinRobotEvaluationHarnessParityRunsGenericAISpecimenProviderFree(t *tes
 		t.Fatalf("case names/subcases = %#v/%#v, want %#v/%#v", caseNames, subcaseIDs, golden.CaseNames, wantSubcases)
 	}
 	assertGoldenMetrics(t, report, golden.Metrics)
+	assertGoldenMetricsHaveSubcaseEvidence(t, report, golden.Metrics)
 }
 
 func TestFinRobotEvaluationHarnessParityFailureEnvelopeForReplayMismatch(t *testing.T) {
@@ -507,6 +508,43 @@ func assertGoldenMetrics(t *testing.T, report finrobotEvaluationHarnessParityRep
 		}
 		if metric.Mean != 0 && actual.Mean != metric.Mean {
 			t.Fatalf("metric %q mean = %v, want %v", metric.Name, actual.Mean, metric.Mean)
+		}
+	}
+}
+
+func assertGoldenMetricsHaveSubcaseEvidence(t *testing.T, report finrobotEvaluationHarnessParityReport, want []struct {
+	Name     string  `json:"name"`
+	Type     string  `json:"type"`
+	Count    int     `json:"count"`
+	PassRate float64 `json:"pass_rate"`
+	Mean     float64 `json:"mean"`
+}) {
+	t.Helper()
+	type metricEvidence struct {
+		Type  string
+		Count int
+	}
+	evidence := map[string]metricEvidence{}
+	for _, c := range report.Cases {
+		for _, subcase := range c.Subcases {
+			for _, metric := range subcase.Metrics {
+				item := evidence[metric.Name]
+				if item.Type != "" && item.Type != metric.Type {
+					t.Fatalf("subcase metric %q has mixed types %q and %q", metric.Name, item.Type, metric.Type)
+				}
+				item.Type = metric.Type
+				item.Count++
+				evidence[metric.Name] = item
+			}
+		}
+	}
+	for _, metric := range want {
+		actual, ok := evidence[metric.Name]
+		if !ok {
+			t.Fatalf("golden metric %q has no subcase evidence in %#v", metric.Name, evidence)
+		}
+		if actual.Type != metric.Type || actual.Count != metric.Count {
+			t.Fatalf("golden metric %q subcase evidence = %#v, want type %q count %d", metric.Name, actual, metric.Type, metric.Count)
 		}
 	}
 }

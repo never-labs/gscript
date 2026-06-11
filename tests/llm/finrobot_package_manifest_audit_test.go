@@ -49,6 +49,7 @@ func TestFinRobotPackageManifestConsistencyAudit(t *testing.T) {
 		"manifest_entrypoints_exist",
 		"referenced_artifacts_exist",
 		"capability_prefixes_match_plan",
+		"fixture_index_capabilities_match_manifest_and_plan",
 		"no_built_in_guarantee",
 		"registered_example_mapping",
 	} {
@@ -103,6 +104,7 @@ func TestFinRobotPackageManifestConsistencyAudit(t *testing.T) {
 			assertFinRobotAuditEntrypoints(t, root, manifestPath, filepath.Dir(manifestPath), manifest)
 			assertFinRobotAuditReferencedArtifacts(t, root, manifestPath, filepath.Dir(manifestPath), manifest)
 			assertFinRobotAuditCapabilities(t, manifestPath, planned.PackageName, planned.Capabilities, manifest)
+			assertFinRobotAuditFixtureIndexCapabilities(t, root, manifestPath, planned.ID, planned.Capabilities, manifest)
 			if registered := registeredExamples[relDir]; registered == "" {
 				t.Fatalf("%s has no registered example mapping", relDir)
 			} else if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(registered))); err != nil {
@@ -383,6 +385,54 @@ func assertFinRobotAuditCapabilities(t *testing.T, manifestPath, packageName str
 	for _, capability := range finrobotAuditCollectCapabilities(manifest) {
 		assertFinRobotAuditNamespacedCapability(t, manifestPath, capability)
 	}
+}
+
+func assertFinRobotAuditFixtureIndexCapabilities(t *testing.T, root, manifestPath, packageID string, plannedCapabilities []string, manifest map[string]any) {
+	t.Helper()
+	if packageID != "generic_package_boundary_auditor" {
+		return
+	}
+	fixtureIndex, ok := finrobotAuditFixtureIndexPath(manifest)
+	if !ok {
+		t.Fatalf("%s package-boundary auditor manifest has no fixture index", manifestPath)
+	}
+	packageDir := filepath.Dir(manifestPath)
+	indexPath := filepath.Join(packageDir, filepath.FromSlash(strings.SplitN(fixtureIndex, "#", 2)[0]))
+	index := readJSONMap(t, indexPath)
+	manifestCapabilities := finrobotAuditStringSet(finrobotAuditCollectCapabilities(manifest))
+	plannedCapabilitySet := finrobotAuditStringSet(plannedCapabilities)
+	for _, capability := range finrobotAuditCollectCapabilities(index) {
+		assertFinRobotAuditNamespacedCapability(t, indexPath, capability)
+		if !manifestCapabilities[capability] {
+			t.Fatalf("%s fixture index capability %q is not declared by %s", indexPath, capability, manifestPath)
+		}
+		if !plannedCapabilitySet[capability] {
+			relIndex := filepath.ToSlash(mustRel(t, root, indexPath))
+			t.Fatalf("%s fixture index capability %q is not declared by live_package_plan_manifest.json", relIndex, capability)
+		}
+	}
+}
+
+func finrobotAuditFixtureIndexPath(manifest map[string]any) (string, bool) {
+	if fixtures, ok := manifest["fixtures"].(map[string]any); ok {
+		if path, ok := fixtures["index"].(string); ok && path != "" {
+			return path, true
+		}
+	}
+	if artifacts, ok := manifest["artifacts"].(map[string]any); ok {
+		if path, ok := artifacts["fixture_index"].(string); ok && path != "" {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func finrobotAuditStringSet(values []string) map[string]bool {
+	result := map[string]bool{}
+	for _, value := range values {
+		result[value] = true
+	}
+	return result
 }
 
 func finrobotAuditCapabilityPrefixes(capabilities []string) []string {

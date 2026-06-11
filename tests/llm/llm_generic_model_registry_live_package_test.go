@@ -347,6 +347,35 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 	} {
 		assertGenericModelRegistryJSONFile(t, filepath.Join(base, rel))
 	}
+	assertGenericModelRegistryFixtureIndexNoSecretGuard(t, base)
+}
+
+func assertGenericModelRegistryFixtureIndexNoSecretGuard(t *testing.T, base string) {
+	t.Helper()
+	var index struct {
+		ProviderFree        bool `json:"provider_free"`
+		LiveNetwork         bool `json:"live_network"`
+		SecretValuesPresent bool `json:"secret_values_present"`
+		Fixtures            []struct {
+			Key                 string         `json:"key"`
+			ProviderFree        bool           `json:"provider_free"`
+			LiveNetwork         bool           `json:"live_network"`
+			SecretValuesPresent bool           `json:"secret_values_present"`
+			Metadata            map[string]any `json:"metadata"`
+		} `json:"fixtures"`
+	}
+	readJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
+	if !index.ProviderFree || index.LiveNetwork || index.SecretValuesPresent {
+		t.Fatalf("fixture index must stay provider-free, offline, and no-secret: %#v", index)
+	}
+	for _, fixture := range index.Fixtures {
+		if fixture.Key == "" || !fixture.ProviderFree || fixture.LiveNetwork || fixture.SecretValuesPresent {
+			t.Fatalf("fixture index entry must stay provider-free, offline, and no-secret: %#v", fixture)
+		}
+		if fixture.Metadata["secret_values_present"] != false {
+			t.Fatalf("%s secret_values_present metadata = %#v, want false", fixture.Key, fixture.Metadata["secret_values_present"])
+		}
+	}
 }
 
 func genericModelRegistryPackageDir(t *testing.T) string {

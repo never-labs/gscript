@@ -193,7 +193,7 @@ go run ./cmd/leia check --no-docs --no-editor --no-examples .
 
 The FinRobot documentation inventory is aligned with the current
 `codex/ai-dialect-polish` surface: 78 registered runnable/checkable
-examples, 599 files in the translation directory, and 32 checked-in
+examples, 600 files in the translation directory, and 32 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
 FinRobot-only work. The recorded validation pass above did not generate

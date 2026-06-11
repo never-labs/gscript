@@ -3,6 +3,7 @@
   "id": "generic-model-registry-provider-free-fixtures",
   "provider_free": true,
   "live_network": false,
+  "secret_values_present": false,
   "fixtures": [
     {
       "key": "model_registry:aliases:v1",
@@ -11,10 +12,12 @@
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false,
+      "secret_values_present": false,
       "metadata": {
         "provider_free": true,
         "live_network": false,
         "real_dependency_imports": false,
+        "secret_values_present": false,
         "replay_ready": true
       }
     },
@@ -25,10 +28,12 @@
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false,
+      "secret_values_present": false,
       "metadata": {
         "provider_free": true,
         "live_network": false,
         "real_dependency_imports": false,
+        "secret_values_present": false,
         "replay_ready": true
       }
     },
@@ -39,10 +44,12 @@
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false,
+      "secret_values_present": false,
       "metadata": {
         "provider_free": true,
         "live_network": false,
         "real_dependency_imports": false,
+        "secret_values_present": false,
         "replay_ready": true
       }
     }
