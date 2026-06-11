@@ -1,0 +1,22 @@
+[
+  {
+    "Request": {
+      "Model": "mock-fast",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Coordinate sentiment, risk, and fundamental analyst groups, then make one investment decision."
+        },
+        {
+          "Role": "user",
+          "Text": "Evaluate PDD on the translated investment-group workflow using only local fixture data."
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Direct llm.turn keeps examples simple."
+    }
+  }
+]
+
