@@ -1,0 +1,47 @@
+{
+  "schema": "single_turn_request_v1",
+  "request_id": "turn-request-acme-summary-001",
+  "model": "fixture-model",
+  "messages": [
+    {"role": "system", "content": "Return concise JSON using the requested schema."},
+    {"role": "user", "content": "Summarize ACME revenue trend from the provided fixture context."}
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "turn_summary",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "required": ["summary", "confidence"],
+        "properties": {
+          "summary": {"type": "string"},
+          "confidence": {"type": "number"}
+        }
+      }
+    }
+  },
+  "temperature": 0,
+  "max_output_tokens": 128,
+  "tools": [
+    {
+      "name": "quote_lookup",
+      "description": "Request-only fixture tool for quote metadata.",
+      "input_schema": {
+        "type": "object",
+        "required": ["symbol"],
+        "properties": {"symbol": {"type": "string"}}
+      }
+    }
+  ],
+  "metadata": {
+    "provider_free": true,
+    "live_network": false
+  },
+  "replay": {
+    "fixture_key": "generic_turn:request:acme_summary:v1",
+    "match_key": "deterministic_request_hash",
+    "request_hash": "sha256:5ce74338ee73b96325f17fbe6e9a756b81f8c2f1f62a81c955d802f1cb5b30bc",
+    "canonicalization": ["exclude_request_id", "preserve_message_order", "sort_object_keys", "include_response_format", "include_tool_declarations"]
+  }
+}

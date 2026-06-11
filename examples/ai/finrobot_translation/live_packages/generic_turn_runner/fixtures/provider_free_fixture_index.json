@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "generic_turn_runner_provider_free_fixture_index",
+  "provider_free": true,
+  "live_network": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic_turn:request:acme_summary:v1",
+      "capability": "generic.ai.turn.request",
+      "path": "fixtures/generic_turn_request_fixture.json",
+      "schema": "single_turn_request_v1",
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false}
+    },
+    {
+      "fixture_key": "generic_turn:execute:acme_summary:v1",
+      "capability": "ai.turn.execute",
+      "path": "fixtures/ai_turn_execute_fixture.json",
+      "schema": "execute_response_envelope_v1",
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false}
+    },
+    {
+      "fixture_key": "generic_turn:tool_request:quote_lookup:v1",
+      "capability": "ai.turn.execute",
+      "path": "fixtures/tool_request_fixture.json",
+      "schema": "tool_request_envelope_v1",
+      "metadata": {"request_only": true, "provider_free": true, "live_network": false}
+    },
+    {
+      "fixture_key": "generic_turn:replay_match:acme_summary:v1",
+      "capability": "ai.turn.execute",
+      "path": "fixtures/replay_record_match_fixture.json",
+      "schema": "replay_record_match_v1",
+      "metadata": {"match_key": "deterministic_request_hash", "provider_free": true, "live_network": false}
+    }
+  ]
+}

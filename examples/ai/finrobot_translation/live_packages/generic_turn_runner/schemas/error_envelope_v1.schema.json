@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "error_envelope_v1",
+  "provider_free": true,
+  "live_network": false,
+  "required": ["code", "message", "retryable", "provider_free"],
+  "codes": ["replay_miss", "schema_mismatch", "tool_request_invalid", "provider_unavailable"],
+  "retry_policy": "fixture-only-no-retry",
+  "additional_properties": false
+}

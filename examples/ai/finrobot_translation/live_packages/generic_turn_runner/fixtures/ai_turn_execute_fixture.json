@@ -1,0 +1,36 @@
+{
+  "schema": "execute_response_envelope_v1",
+  "request_id": "turn-request-acme-summary-001",
+  "status": "ok",
+  "message": {
+    "role": "assistant",
+    "content": "{\"summary\":\"ACME revenue increased in the fixture period while margins stayed stable.\",\"confidence\":0.82}"
+  },
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "turn_summary",
+      "strict": true
+    }
+  },
+  "usage": {
+    "input_tokens": 42,
+    "output_tokens": 18,
+    "total_tokens": 60,
+    "source": "fixture"
+  },
+  "error": {
+    "code": "",
+    "message": "",
+    "retryable": false,
+    "provider_free": true
+  },
+  "tool_requests": [],
+  "replay": {
+    "record_id": "record-generic-turn-acme-summary-001",
+    "fixture_key": "generic_turn:execute:acme_summary:v1",
+    "match_key": "deterministic_request_hash",
+    "matched": true,
+    "request_hash": "sha256:5ce74338ee73b96325f17fbe6e9a756b81f8c2f1f62a81c955d802f1cb5b30bc"
+  }
+}

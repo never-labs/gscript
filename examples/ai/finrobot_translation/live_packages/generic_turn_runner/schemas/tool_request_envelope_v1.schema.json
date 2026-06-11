@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "tool_request_envelope_v1",
+  "provider_free": true,
+  "live_network": false,
+  "required": ["schema", "tool_call_id", "name", "arguments", "status", "replay"],
+  "statuses": ["requested", "validated", "rejected"],
+  "argument_encoding": "json_object",
+  "execution_policy": "request-only-envelope",
+  "live_execution": false,
+  "replay_required": ["fixture_key", "deterministic_tool_hash"],
+  "additional_properties": false
+}

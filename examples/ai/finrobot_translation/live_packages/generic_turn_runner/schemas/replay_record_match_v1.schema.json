@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "replay_record_match_v1",
+  "provider_free": true,
+  "live_network": false,
+  "required": ["schema", "record_id", "fixture_key", "match_key", "request_hash", "request", "response", "match_contract"],
+  "match_key": "deterministic_request_hash",
+  "hash_algorithm": "sha256",
+  "canonicalization": ["exclude_request_id", "preserve_message_order", "sort_object_keys", "include_response_format", "include_tool_declarations"],
+  "miss_behavior": "clean-skip",
+  "match_contract_required": ["match_key", "hash_algorithm", "canonicalization", "miss_behavior", "provider_free", "live_network"],
+  "additional_properties": false
+}
