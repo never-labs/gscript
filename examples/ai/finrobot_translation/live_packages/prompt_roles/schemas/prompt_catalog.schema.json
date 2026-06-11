@@ -16,11 +16,49 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "role_id", "kind", "termination"],
+        "required": ["id", "role_id", "kind", "prompt_snapshot", "delegation_triggers", "termination"],
         "properties": {
           "id": {"type": "string", "minLength": 1},
           "role_id": {"type": "string", "minLength": 1},
           "kind": {"type": "string", "minLength": 1},
+          "prompt_snapshot": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["system", "task", "constraints", "expected_output"],
+            "properties": {
+              "system": {"type": "string", "minLength": 1},
+              "task": {"type": "string", "minLength": 1},
+              "constraints": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+              "expected_output": {"type": "string", "minLength": 1}
+            }
+          },
+          "delegation_triggers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["pattern", "delegate_role_id", "reason", "parse_examples"],
+              "properties": {
+                "pattern": {"type": "string", "minLength": 1},
+                "delegate_role_id": {"type": "string", "minLength": 1},
+                "reason": {"type": "string", "minLength": 1},
+                "parse_examples": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["input", "matched"],
+                    "properties": {
+                      "input": {"type": "string", "minLength": 1},
+                      "matched": {"type": "boolean"},
+                      "delegate_role_id": {"type": "string", "minLength": 1}
+                    }
+                  }
+                }
+              }
+            }
+          },
           "termination": {"const": "TERMINATE"}
         }
       }

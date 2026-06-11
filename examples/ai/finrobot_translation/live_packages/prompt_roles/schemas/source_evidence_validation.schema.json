@@ -3,16 +3,31 @@
   "$id": "https://never-labs.example/schemas/finrobot/prompt_roles/source_evidence_validation.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["provider_free", "live_network", "validated", "unresolved_source_refs", "fixture_keys"],
+  "required": ["provider_free", "live_network", "validated", "minimum_source_refs", "source_refs", "unresolved_source_refs", "fixture_keys", "rules"],
   "properties": {
     "provider_free": {"const": true},
     "live_network": {"const": false},
     "validated": {"type": "boolean"},
+    "minimum_source_refs": {"type": "integer", "minimum": 1},
+    "source_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "unresolved_source_refs": {"type": "array", "items": {"type": "string"}},
     "fixture_keys": {
       "type": "array",
       "minItems": 1,
       "items": {"type": "string", "minLength": 1}
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "passes"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "passes": {"type": "boolean"}
+        }
+      }
     }
   }
 }
