@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/finrobot/optional_integration_gate.schema.json",
+  "title": "FinRobot optional integration capability gate",
+  "type": "object",
+  "required": [
+    "id",
+    "capability",
+    "package_name",
+    "import_name",
+    "fixture_key",
+    "clean_skip",
+    "live_network",
+    "dependency_imported"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "capability": {
+      "type": "string",
+      "pattern": "^optional\\."
+    },
+    "package_name": {
+      "type": "string"
+    },
+    "import_name": {
+      "type": "string"
+    },
+    "fixture_key": {
+      "type": "string"
+    },
+    "clean_skip": {
+      "const": true
+    },
+    "requires_credentials": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "dependency_imported": {
+      "const": false
+    },
+    "status_without_dependency": {
+      "const": "skipped"
+    }
+  },
+  "additionalProperties": true
+}
