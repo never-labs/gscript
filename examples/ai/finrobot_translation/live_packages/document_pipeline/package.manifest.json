@@ -3,7 +3,7 @@
   "id": "finrobot-document-pipeline-live-package",
   "package_name": "leia-finrobot-document-pipeline",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for FinRobot SEC filing retrieval, document conversion, section extraction, RAG chunking, citation provenance, and retriever adapter boundaries.",
+  "description": "Provider-free live package skeleton for FinRobot SEC filing retrieval, document conversion, section extraction, RAG corpus manifests, chunk provenance, vector capability gates, citation consistency, and retriever adapter boundaries.",
   "source_modules": [
     "FinRobot/filings_src/sec_api.py",
     "FinRobot/marker_sec_src/sec_filings_to_markdown.py",
@@ -19,7 +19,7 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No credentials are declared by this skeleton; SEC API, SEC user-agent contact, rate-limit state, Marker, PDF conversion, embedding, vector database, and retriever credentials belong only to future provider-specific packages."
+    "policy": "No credentials are declared by this skeleton; SEC API, SEC user-agent contact, rate-limit state, Marker, PDF conversion, embedding, LangChain, vector database, and retriever credentials belong only to future provider-specific packages."
   },
   "default_policy": {
     "mode": "fixture_replay",
@@ -41,7 +41,8 @@
     "section_extraction": "schemas/section_extraction_v1.schema.json",
     "rag_chunk": "schemas/rag_chunk_v1.schema.json",
     "retriever_query_result": "schemas/retriever_query_result_v1.schema.json",
-    "adapter_boundary": "schemas/adapter_boundary_v1.schema.json"
+    "adapter_boundary": "schemas/adapter_boundary_v1.schema.json",
+    "rag_corpus_manifest": "schemas/rag_corpus_manifest_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
@@ -49,7 +50,8 @@
     "markdown_conversion": "fixtures/sec_markdown_ACME_10k_fixture.json",
     "rag_index": "fixtures/rag_chunks_ACME_10k_fixture.json",
     "retriever_query": "fixtures/retriever_query_ACME_fixture.json",
-    "adapter_boundary": "fixtures/adapter_boundary_fixture.json"
+    "adapter_boundary": "fixtures/adapter_boundary_fixture.json",
+    "rag_corpus_manifest": "fixtures/rag_corpus_manifest_ACME_fixture.json"
   },
   "modules": [
     {
@@ -85,12 +87,14 @@
       "source_module": "functional/rag.py",
       "capabilities": [
         "finance.document.chunk",
+        "finance.document.rag.corpus_manifest",
         "finance.document.citation.link",
-        "finance.document.vector.adapter_matrix",
+        "finance.document.vector.capability_gates",
         "finance.document.vector.adapter"
       ],
       "output_schemas": [
         "rag_chunk",
+        "rag_corpus_manifest",
         "adapter_boundary"
       ]
     },
@@ -99,6 +103,7 @@
       "source_module": "functional/ragquery.py",
       "capabilities": [
         "finance.document.retriever.query",
+        "finance.document.retriever.adapter_boundary",
         "finance.document.retriever.rank",
         "finance.document.answer.citations",
         "finance.document.answer.provenance"
@@ -166,6 +171,17 @@
       "clean_skip": true
     },
     {
+      "id": "vector_store_adapter",
+      "display_name": "Vector store capability gates",
+      "capability": "finance.document.vector_store.capability_gates",
+      "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
       "id": "vector_retriever",
       "display_name": "Vector store and retriever",
       "capability": "finance.document.vector_retriever.query",
@@ -182,11 +198,12 @@
     "provider_free is true and live_network_default is false",
     "required and optional credentials are empty",
     "SEC filing search/fetch, user-agent and rate-limit policy, redirect/cache metadata, HTML/PDF markdown conversion, section extraction, chunk citation provenance, and retriever schemas are present",
-    "SEC client, HTML parser, PDF converter, chunk/citation/vector matrix, embedding, vector store, and retriever boundaries are metadata-only, fixture-backed, and clean-skip safe",
+    "RAG corpus manifest, chunk provenance, citation consistency, and vector capability gates are fixture-backed and deterministic",
+    "SEC client, HTML parser, PDF converter, chunk/citation/vector matrix, embedding, LangChain/vector dependencies, vector store, and retriever boundaries are metadata-only, fixture-backed, and clean-skip safe",
     "main.leia contains no live provider SDK imports, vector database imports, or network execution"
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide FinRobot SEC filing clients, Marker conversion, embedding models, vector stores, or retrievers as built-ins; future external packages must satisfy these provider-free contracts first."
+    "statement": "Leia core does not provide FinRobot SEC filing clients, Marker conversion, embedding models, LangChain chains, vector stores, or retrievers as built-ins; future external packages must satisfy these provider-free contracts first."
   }
 }

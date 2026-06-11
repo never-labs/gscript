@@ -33,14 +33,14 @@ document_pipeline_live_package := {
         {
             id: "rag"
             source_module: "functional/rag.py"
-            capabilities: {"finance.document.chunk", "finance.document.citation.link", "finance.document.vector.adapter_matrix", "finance.document.vector.adapter"}
-            required_fields: {"chunk_id", "text", "section_id", "citation", "provenance", "embedding_ref"}
+            capabilities: {"finance.document.chunk", "finance.document.rag.corpus_manifest", "finance.document.citation.link", "finance.document.vector.capability_gates", "finance.document.vector.adapter"}
+            required_fields: {"chunk_id", "corpus_id", "text", "section_id", "citation", "provenance", "embedding_ref", "vector_store_capabilities"}
         },
         {
             id: "ragquery"
             source_module: "functional/ragquery.py"
-            capabilities: {"finance.document.retriever.query", "finance.document.retriever.rank", "finance.document.answer.citations", "finance.document.answer.provenance"}
-            required_fields: {"query", "answer", "retrieved_chunks", "rank", "score", "citation"}
+            capabilities: {"finance.document.retriever.query", "finance.document.retriever.adapter_boundary", "finance.document.retriever.rank", "finance.document.answer.citations", "finance.document.answer.provenance"}
+            required_fields: {"query", "answer", "retrieved_chunks", "rank", "score", "citation", "retriever_boundaries"}
         },
     }
     adapter_boundaries: {
@@ -49,12 +49,14 @@ document_pipeline_live_package := {
         {id: "pdf_to_markdown_converter" capability: "finance.document.pdf.to_markdown_boundary" fixture_key: "converter:sec_markdown:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
         {id: "chunk_citation_adapter" capability: "finance.document.chunk_citation.vector_matrix" fixture_key: "rag:chunks:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
         {id: "embedding_adapter" capability: "finance.document.embedding.clean_skip" fixture_key: "rag:chunks:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "vector_store_adapter" capability: "finance.document.vector_store.capability_gates" fixture_key: "rag:corpus_manifest:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
         {id: "vector_retriever" capability: "finance.document.vector_retriever.query" fixture_key: "retriever:ragquery:ACME:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
     }
     fixture_keys: {
         "sec:filing_search:ACME:10-K:offline",
         "converter:sec_markdown:ACME:10-K:offline",
         "rag:chunks:ACME:10-K:offline",
+        "rag:corpus_manifest:ACME:10-K:offline",
         "retriever:ragquery:ACME:offline",
         "adapter_boundary:document_pipeline:offline",
     }
@@ -92,8 +94,8 @@ for i := 1; i <= #document_pipeline_live_package.adapter_boundaries; i++ {
 }
 
 assert(document_pipeline_module_count == 4)
-assert(document_pipeline_boundary_count == 6)
-assert(#document_pipeline_live_package.fixture_keys == 5)
+assert(document_pipeline_boundary_count == 7)
+assert(#document_pipeline_live_package.fixture_keys == 6)
 assert(document_pipeline_live_package.default_policy.mode == "fixture_replay")
 assert(document_pipeline_live_package.default_policy.clean_skip_without_dependency == true)
 

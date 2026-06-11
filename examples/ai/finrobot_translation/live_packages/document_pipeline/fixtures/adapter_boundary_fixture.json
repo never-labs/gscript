@@ -110,6 +110,32 @@
       "gap": "Future package must provide embedding model selection and credential handling outside Leia core."
     },
     {
+      "id": "vector_store_adapter",
+      "display_name": "Vector store capability gates",
+      "capability": "finance.document.vector_store.capability_gates",
+      "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Vector store capabilities are expressed as fixture gates without importing LangChain or vector database clients.",
+      "policy": {
+        "required_capabilities": [
+          "similarity_search",
+          "metadata_filter"
+        ],
+        "optional_capabilities": [
+          "persistent_index"
+        ],
+        "optional_dependencies": [
+          "langchain",
+          "vector_store"
+        ],
+        "skip_reason_required": true
+      },
+      "gap": "Future package must provide vector store selection, persistence semantics, metadata filter parity, and dependency clean-skip behavior."
+    },
+    {
       "id": "vector_retriever",
       "display_name": "Vector store and retriever",
       "capability": "finance.document.vector_retriever.query",

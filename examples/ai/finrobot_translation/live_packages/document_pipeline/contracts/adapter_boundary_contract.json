@@ -62,6 +62,17 @@
       "clean_skip": true
     },
     {
+      "id": "vector_store_adapter",
+      "display_name": "Vector store capability gates",
+      "capability": "finance.document.vector_store.capability_gates",
+      "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
       "id": "vector_retriever",
       "display_name": "Vector store and retriever",
       "capability": "finance.document.vector_retriever.query",

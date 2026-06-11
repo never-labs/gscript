@@ -8,9 +8,11 @@
     "provider_free",
     "live_network",
     "document_id",
+    "corpus_manifest",
     "chunk_policy",
     "adapter_matrix",
-    "chunks"
+    "chunks",
+    "vector_store_capabilities"
   ],
   "properties": {
     "schema_version": {
@@ -27,6 +29,15 @@
     },
     "document_id": {
       "type": "string"
+    },
+    "corpus_manifest": {
+      "type": "object",
+      "required": [
+        "corpus_id",
+        "fixture_key",
+        "chunk_count",
+        "citation_consistency_required"
+      ]
     },
     "chunk_policy": {
       "type": "object",
@@ -82,8 +93,11 @@
             "type": "object",
             "required": [
               "accession_number",
+              "source_fixture_key",
               "fixture_key",
-              "converter_fixture_key"
+              "converter_fixture_key",
+              "corpus_id",
+              "source_offsets"
             ]
           },
           "embedding_ref": {
@@ -98,6 +112,17 @@
           }
         }
       }
+    },
+    "vector_store_capabilities": {
+      "type": "object",
+      "required": [
+        "adapter",
+        "capability_gates",
+        "dependency_imported",
+        "credential_required",
+        "live_network",
+        "clean_skip"
+      ]
     }
   }
 }

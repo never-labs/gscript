@@ -3,6 +3,12 @@
   "provider_free": true,
   "live_network": false,
   "document_id": "ACME-2025-10K",
+  "corpus_manifest": {
+    "corpus_id": "ACME-2025-10K-rag-corpus",
+    "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+    "chunk_count": 3,
+    "citation_consistency_required": true
+  },
   "chunk_policy": {
     "max_tokens": 220,
     "overlap_tokens": 40,
@@ -54,9 +60,15 @@
         "end_offset": 131
       },
       "provenance": {
+        "corpus_id": "ACME-2025-10K-rag-corpus",
         "accession_number": "0000000000-26-000001",
+        "source_fixture_key": "sec:filing_search:ACME:10-K:offline",
         "fixture_key": "rag:chunks:ACME:10-K:offline",
-        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline"
+        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+        "source_offsets": {
+          "start_offset": 40,
+          "end_offset": 131
+        }
       },
       "embedding_ref": {
         "adapter": "fixture_vector_index",
@@ -79,9 +91,15 @@
         "end_offset": 242
       },
       "provenance": {
+        "corpus_id": "ACME-2025-10K-rag-corpus",
         "accession_number": "0000000000-26-000001",
+        "source_fixture_key": "sec:filing_search:ACME:10-K:offline",
         "fixture_key": "rag:chunks:ACME:10-K:offline",
-        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline"
+        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+        "source_offsets": {
+          "start_offset": 133,
+          "end_offset": 242
+        }
       },
       "embedding_ref": {
         "adapter": "fixture_vector_index",
@@ -104,9 +122,15 @@
         "end_offset": 374
       },
       "provenance": {
+        "corpus_id": "ACME-2025-10K-rag-corpus",
         "accession_number": "0000000000-26-000001",
+        "source_fixture_key": "sec:filing_search:ACME:10-K:offline",
         "fixture_key": "rag:chunks:ACME:10-K:offline",
-        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline"
+        "converter_fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+        "source_offsets": {
+          "start_offset": 244,
+          "end_offset": 374
+        }
       },
       "embedding_ref": {
         "adapter": "fixture_vector_index",
@@ -116,5 +140,17 @@
         "clean_skip": true
       }
     }
-  ]
+  ],
+  "vector_store_capabilities": {
+    "adapter": "fixture_vector_index",
+    "capability_gates": [
+      "similarity_search",
+      "metadata_filter",
+      "clean_skip_without_persistent_index"
+    ],
+    "dependency_imported": false,
+    "credential_required": false,
+    "live_network": false,
+    "clean_skip": true
+  }
 }

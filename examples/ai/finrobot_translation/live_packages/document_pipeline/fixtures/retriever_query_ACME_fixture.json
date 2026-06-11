@@ -24,6 +24,26 @@
       "clean_skip": true
     }
   },
+  "retriever_boundaries": [
+    {
+      "id": "query_embedding_boundary",
+      "adapter": "fixture_embedding_ref",
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "vector_search_boundary",
+      "adapter": "fixture_vector_index",
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    }
+  ],
   "retrieved_chunks": [
     {
       "chunk_id": "ACME-2025-10K:risk_factors:0001",
@@ -33,7 +53,9 @@
       "citation": {
         "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
         "page": 2,
-        "section_title": "Item 1A. Risk Factors"
+        "section_title": "Item 1A. Risk Factors",
+        "start_offset": 133,
+        "end_offset": 242
       }
     },
     {
@@ -44,7 +66,9 @@
       "citation": {
         "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
         "page": 3,
-        "section_title": "Item 7. Management's Discussion and Analysis"
+        "section_title": "Item 7. Management's Discussion and Analysis",
+        "start_offset": 244,
+        "end_offset": 374
       }
     }
   ],
@@ -52,7 +76,8 @@
     {
       "chunk_id": "ACME-2025-10K:risk_factors:0001",
       "claim": "Supply disruption and customer concentration are operating risks.",
-      "page": 2
+      "page": 2,
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm"
     }
   ],
   "provenance": {

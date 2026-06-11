@@ -58,16 +58,19 @@
       ],
       "outputs": [
         "rag_chunks",
+        "rag_corpus_manifest",
         "citation_map",
         "vector_adapter_payload"
       ],
       "required_fields": [
         "chunk_id",
+        "corpus_id",
         "text",
         "section_id",
         "citation",
         "provenance",
-        "embedding_ref"
+        "embedding_ref",
+        "vector_store_capabilities"
       ]
     },
     {
@@ -76,6 +79,7 @@
       "inputs": [
         "query",
         "retriever_policy",
+        "retriever_boundaries",
         "rag_chunks"
       ],
       "outputs": [
@@ -180,8 +184,29 @@
         "section_id",
         "citation.source_url",
         "citation.page",
-        "provenance.accession_number"
+        "citation.start_offset",
+        "citation.end_offset",
+        "provenance.accession_number",
+        "provenance.source_fixture_key",
+        "provenance.corpus_id"
       ]
+    },
+    "rag_corpus_manifest": {
+      "type": "corpus_manifest",
+      "required": [
+        "corpus_id",
+        "document_id",
+        "source_fixture_keys",
+        "chunk_fixture_key",
+        "retriever_fixture_key",
+        "chunk_ids",
+        "citation_consistency",
+        "vector_store_capabilities",
+        "retriever_boundaries",
+        "optional_dependencies"
+      ],
+      "live_network": false,
+      "dependency_imports": false
     },
     "chunk_citation_vector_adapter_matrix": {
       "type": "adapter_matrix",
@@ -207,10 +232,34 @@
       "live_network": false,
       "credential_required": false
     },
+    "vector_store_capability_gates": {
+      "type": "capability_gate_list",
+      "required_capabilities": [
+        "similarity_search",
+        "metadata_filter"
+      ],
+      "optional_capabilities": [
+        "persistent_index"
+      ],
+      "dependency_imports": false,
+      "live_network": false,
+      "clean_skip_without_dependency": true
+    },
+    "citation_consistency": {
+      "type": "cross_fixture_consistency",
+      "required": [
+        "chunk ids in corpus manifest match chunk fixture",
+        "retrieved chunk ids exist in chunk fixture",
+        "answer citation chunk ids exist in retrieved chunks",
+        "citation source URLs and pages match chunk fixture"
+      ]
+    },
     "embedding_retriever_clean_skip": {
       "type": "clean_skip_boundary",
       "embedding_dependency_imported": false,
       "retriever_dependency_imported": false,
+      "langchain_dependency_imported": false,
+      "vector_dependency_imported": false,
       "fallback_adapter": "fixture_vector_index",
       "skip_reason_required": true
     }
@@ -235,6 +284,12 @@
       "replay_ready": true
     },
     {
+      "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+      "path": "fixtures/rag_corpus_manifest_ACME_fixture.json",
+      "schema": "schemas/rag_corpus_manifest_v1.schema.json",
+      "replay_ready": true
+    },
+    {
       "fixture_key": "retriever:ragquery:ACME:offline",
       "path": "fixtures/retriever_query_ACME_fixture.json",
       "schema": "schemas/retriever_query_result_v1.schema.json",
@@ -245,8 +300,9 @@
     "SEC filing search and fetch metadata includes accession number, CIK, filing date, source URL, user-agent policy, rate-limit policy, redirect chain, cache metadata, and replay provenance",
     "HTML parser and PDF-to-markdown converter boundaries return markdown with page spans, source offsets, and conversion warnings without invoking Marker or network clients",
     "section extraction preserves ordered business, risk factor, and MD&A section identifiers",
-    "RAG chunks include stable chunk ids, citations, source offsets, accession provenance, and a chunk/citation/vector adapter matrix without embedding model calls",
-    "retriever query fixtures include ranked chunks, scores, answer citations, vector adapter metadata, and embedding/retriever clean-skip metadata",
-    "fixture replay succeeds without credentials, live network, SEC clients, Marker, embedding models, or vector database imports"
+    "RAG chunks include stable chunk ids, corpus manifest linkage, citations, source offsets, accession provenance, and a chunk/citation/vector adapter matrix without embedding model calls",
+    "RAG corpus manifest records chunk ids, source fixture keys, citation consistency, retriever adapter boundaries, vector store capability gates, and optional LangChain/vector dependency clean-skip metadata",
+    "retriever query fixtures include ranked chunks, scores, answer citations, vector adapter metadata, retriever boundary references, and embedding/retriever clean-skip metadata",
+    "fixture replay succeeds without credentials, live network, SEC clients, Marker, embedding models, LangChain, or vector database imports"
   ]
 }

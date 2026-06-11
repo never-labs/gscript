@@ -55,6 +55,21 @@
       }
     },
     {
+      "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+      "capability": "finance.document.rag.corpus_manifest",
+      "path": "fixtures/rag_corpus_manifest_ACME_fixture.json",
+      "schema": "schemas/rag_corpus_manifest_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "replay_ready": true,
+        "contains_chunk_ids": true,
+        "contains_citation_consistency": true,
+        "contains_vector_capability_gates": true,
+        "contains_retriever_boundaries": true,
+        "contains_optional_dependency_clean_skip": true
+      }
+    },
+    {
       "fixture_key": "retriever:ragquery:ACME:offline",
       "capability": "finance.document.retriever.query",
       "path": "fixtures/retriever_query_ACME_fixture.json",

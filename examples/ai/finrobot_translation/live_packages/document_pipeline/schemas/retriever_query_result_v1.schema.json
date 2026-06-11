@@ -10,6 +10,7 @@
     "query",
     "answer",
     "retriever",
+    "retriever_boundaries",
     "retrieved_chunks",
     "answer_citations",
     "provenance"
@@ -57,6 +58,22 @@
           "score",
           "section_id",
           "citation"
+        ]
+      }
+    },
+    "retriever_boundaries": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "adapter",
+          "fixture_key",
+          "dependency_imported",
+          "credential_required",
+          "live_network",
+          "clean_skip"
         ]
       }
     },
