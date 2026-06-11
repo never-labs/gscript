@@ -119,19 +119,19 @@ func TestFinRobotValuationEngineLivePackageManifest(t *testing.T) {
 	if !reflect.DeepEqual(manifest.SourceModules, wantSources) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
 	}
-	for _, key := range []string{"smoke", "valuation_engine_contract", "assumption_audit_contract", "fixture_index"} {
+	for _, key := range []string{"smoke", "valuation_engine_contract", "assumption_audit_contract", "scenario_contract", "fixture_index"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"valuation_output", "football_field", "assumption_audit", "tolerance_gate"} {
+	for _, key := range []string{"valuation_output", "football_field", "assumption_audit", "tolerance_gate", "valuation_scenario"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertValuationEngineJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "valuation_output", "football_field", "assumption_audit", "tolerance_gates"} {
+	for _, key := range []string{"index", "valuation_output", "football_field", "assumption_audit", "tolerance_gates", "scenario_coverage"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -165,7 +165,7 @@ func TestFinRobotValuationEngineLivePackageManifest(t *testing.T) {
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"dcf", "ev/ebitda", "p/e", "target price", "football-field", "assumption audit", "tolerance", "hidden data fetch"} {
+	for _, want := range []string{"dcf", "ev/ebitda", "p/e", "target price", "football-field", "assumption audit", "tolerance", "bear/base/bull", "wacc terminal-growth", "peer outlier", "analyst target", "scenario audit", "hidden data fetch"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -232,7 +232,7 @@ func TestFinRobotValuationEngineContractsAndFixtureIndex(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeValuationEngineJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 5 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 6 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	fixtureKeys := map[string]bool{}
@@ -249,6 +249,88 @@ func TestFinRobotValuationEngineContractsAndFixtureIndex(t *testing.T) {
 	}
 	if !fixtureKeys["valuation:ACME:scenario_book:offline"] {
 		t.Fatalf("fixture index missing scenario book: %#v", fixtureKeys)
+	}
+	if !fixtureKeys["valuation_scenario_coverage"] {
+		t.Fatalf("fixture index missing scenario coverage: %#v", fixtureKeys)
+	}
+}
+
+func TestFinRobotValuationEngineScenarioCoverageFixture(t *testing.T) {
+	base := valuationEngineLivePackageDir(t)
+
+	var contract struct {
+		ProviderFree          bool     `json:"provider_free"`
+		LiveNetwork           bool     `json:"live_network"`
+		RealDependencyImports bool     `json:"real_dependency_imports"`
+		RequiredCapabilities  []string `json:"required_capabilities"`
+		RequiredFields        []string `json:"required_fields"`
+		ScenarioOutputs       []string `json:"scenario_outputs"`
+		AcceptanceGates       []string `json:"acceptance_gates"`
+	}
+	decodeValuationEngineJSONFile(t, filepath.Join(base, "contracts", "valuation_scenario_contract.json"), &contract)
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports {
+		t.Fatalf("scenario contract must remain provider-free: %#v", contract)
+	}
+	for _, want := range []string{"valuation.scenario.bear_base_bull", "valuation.sensitivity.wacc_terminal_growth_grid", "valuation.peers.outlier_rejection", "valuation.analyst_targets.conflict_resolution", "valuation.audit_trail.scenario_events"} {
+		if !containsString(contract.RequiredCapabilities, want) {
+			t.Fatalf("missing required capability %q: %#v", want, contract.RequiredCapabilities)
+		}
+	}
+	for _, want := range []string{"bear", "base", "bull", "wacc_terminal_growth_grid", "rejected_peer_outliers", "trimmed_analyst_consensus", "conflict_flags"} {
+		if !containsString(contract.ScenarioOutputs, want) {
+			t.Fatalf("missing scenario output %q: %#v", want, contract.ScenarioOutputs)
+		}
+	}
+	acceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
+	for _, want := range []string{"bear < base < bull", "terminal-growth", "outliers", "conflicts", "audit trail"} {
+		if !strings.Contains(acceptance, want) {
+			t.Fatalf("acceptance gates missing %q: %s", want, acceptance)
+		}
+	}
+
+	var scenarioFixture struct {
+		ProviderFree          bool     `json:"provider_free"`
+		LiveNetwork           bool     `json:"live_network"`
+		RealDependencyImports bool     `json:"real_dependency_imports"`
+		CoverageCases         []string `json:"coverage_cases"`
+		PeerPolicy            struct {
+			AcceptedEVEBITDAMax float64 `json:"accepted_ev_ebitda_max"`
+			AcceptedPEMax       float64 `json:"accepted_pe_max"`
+			OutlierReason       string  `json:"outlier_reason"`
+		} `json:"peer_policy"`
+		AnalystTargetPolicy struct {
+			ConflictThresholdPct float64 `json:"conflict_threshold_pct"`
+			TrimOutliers         bool    `json:"trim_outliers"`
+			OutlierReason        string  `json:"outlier_reason"`
+		} `json:"analyst_target_policy"`
+		ExpectedSummary struct {
+			ScenarioCount    int `json:"scenario_count"`
+			GridCells        int `json:"grid_cells"`
+			AcceptedPeers    int `json:"accepted_peers"`
+			RejectedPeers    int `json:"rejected_peers"`
+			AnalystConflicts int `json:"analyst_conflicts"`
+			AuditEvents      int `json:"audit_events"`
+		} `json:"expected_summary"`
+	}
+	decodeValuationEngineJSONFile(t, filepath.Join(base, "fixtures", "scenario_coverage_fixture.json"), &scenarioFixture)
+	if !scenarioFixture.ProviderFree || scenarioFixture.LiveNetwork || scenarioFixture.RealDependencyImports {
+		t.Fatalf("scenario fixture must remain provider-free: %#v", scenarioFixture)
+	}
+	for _, want := range []string{"bear/base/bull sensitivity", "WACC terminal-growth grid", "peer outlier rejection", "analyst target conflict", "scenario audit trail"} {
+		if !containsString(scenarioFixture.CoverageCases, want) {
+			t.Fatalf("coverage cases missing %q: %#v", want, scenarioFixture.CoverageCases)
+		}
+	}
+	if scenarioFixture.PeerPolicy.AcceptedEVEBITDAMax != 35.0 || scenarioFixture.PeerPolicy.AcceptedPEMax != 50.0 || !strings.Contains(scenarioFixture.PeerPolicy.OutlierReason, "multiple") {
+		t.Fatalf("peer policy = %#v", scenarioFixture.PeerPolicy)
+	}
+	if scenarioFixture.AnalystTargetPolicy.ConflictThresholdPct != 0.35 || !scenarioFixture.AnalystTargetPolicy.TrimOutliers || !strings.Contains(scenarioFixture.AnalystTargetPolicy.OutlierReason, "35 percent") {
+		t.Fatalf("analyst target policy = %#v", scenarioFixture.AnalystTargetPolicy)
+	}
+	if scenarioFixture.ExpectedSummary.ScenarioCount != 3 || scenarioFixture.ExpectedSummary.GridCells != 9 ||
+		scenarioFixture.ExpectedSummary.AcceptedPeers != 4 || scenarioFixture.ExpectedSummary.RejectedPeers != 1 ||
+		scenarioFixture.ExpectedSummary.AnalystConflicts != 1 || scenarioFixture.ExpectedSummary.AuditEvents != 6 {
+		t.Fatalf("expected summary = %#v", scenarioFixture.ExpectedSummary)
 	}
 }
 
@@ -645,6 +727,15 @@ func assertFloatWithin(t *testing.T, name string, actual, expected, tolerance fl
 	if math.Abs(actual-expected) > tolerance {
 		t.Fatalf("%s = %.9f, want %.9f within %.9f", name, actual, expected, tolerance)
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func floatFromAny(t *testing.T, value any) float64 {
