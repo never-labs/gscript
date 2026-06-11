@@ -362,7 +362,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/report_renderer", "examples/ai/finrobot_translation/live_packages/analytics_report"],
       "excluded_scope": ["styled PDF page layout runtime"],
       "source_hash": "sha256:5655f5f5d088b5c18ce62df5492fd53189b43bf205624233ed136f018fb5234f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json", "sha256": "9c5a4e5e9dffdabb45f80db7e3de44bda2167f04776ca0ae488f5f7a0668fda5"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json", "sha256": "7bc5848e0d5e04729cdeeb13fa8e82e4d2b08ac1e52a3d778a2f2543c6669bca"}],
       "next_action": "Promote HTML/PDF renderer contracts into a package with page-level render verification."
     },
     {
@@ -538,7 +538,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/report_renderer"],
       "excluded_scope": ["real PDF generation"],
       "source_hash": "sha256:f7ec7cb9242acb541f264114a1ef93a87e974cd178dd6ae3e511cc394d5af452",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json", "sha256": "9c5a4e5e9dffdabb45f80db7e3de44bda2167f04776ca0ae488f5f7a0668fda5"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json", "sha256": "7bc5848e0d5e04729cdeeb13fa8e82e4d2b08ac1e52a3d778a2f2543c6669bca"}],
       "next_action": "Add PDF renderer visual verification once package implementation exists."
     },
     {
@@ -615,7 +615,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/report_renderer"],
       "excluded_scope": ["large binary sample PDF content is not vendored into audit tests"],
       "source_hash": "sha256:5d64a786c1a6f85e6c61c4ea410f69bc32276ed72cafdfdcc5025fe536191843",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/fixtures/render_request_ACME_report_fixture.json", "sha256": "b8504f802045c0c3a8476b8caa880f2a1a9f72dee1600dcb43978d39942c9204"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/report_renderer/fixtures/render_request_ACME_report_fixture.json", "sha256": "c8a306f6fde19363fdcc410b9c9fb0f73220440a1373c8c8d73f655e447eac97"}],
       "next_action": "Use renderer fixture hashes and page snapshots rather than committing source report binaries."
     },
     {
