@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "contract_id": "generic-ai-tool-contract-v1",
+  "dialect_exports": [
+    "generic.ai.tool.contract",
+    "ai.tool.invoke"
+  ],
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "declarative_tool_schema": true,
+  "argument_validation": {
+    "mode": "json_schema",
+    "required_before_invoke": true,
+    "additional_properties_default": false,
+    "failure_error_kind": "validation",
+    "schema_ref": "schemas/invoke_request_v1.schema.json"
+  },
+  "approval_state": {
+    "required_field": "approval",
+    "default_state": "fixture_only",
+    "allowed_states": [
+      "not_required",
+      "required",
+      "approved",
+      "denied",
+      "expired",
+      "fixture_only"
+    ],
+    "deny_without_explicit_fixture": true
+  },
+  "result_envelope": {
+    "schema_ref": "schemas/result_envelope_v1.schema.json",
+    "required_fields": [
+      "ok",
+      "tool_name",
+      "capability_tags",
+      "approval",
+      "value",
+      "error",
+      "artifact_refs",
+      "replay"
+    ],
+    "success_error_null": true,
+    "failure_value_null": true
+  },
+  "normalized_error": {
+    "schema_ref": "schemas/normalized_error_v1.schema.json",
+    "provider_free": true,
+    "required_fields": [
+      "kind",
+      "message",
+      "field",
+      "retryable",
+      "provider_free"
+    ],
+    "kinds": [
+      "validation",
+      "approval_required",
+      "approval_denied",
+      "capability_unavailable",
+      "tool_not_found",
+      "execution_failed",
+      "artifact_unavailable"
+    ]
+  },
+  "artifact_refs": {
+    "schema_ref": "schemas/artifact_ref_v1.schema.json",
+    "metadata_ref_only": true,
+    "inline_payload_default": false,
+    "required_fields": [
+      "artifact_id",
+      "uri",
+      "media_type",
+      "sha256",
+      "bytes",
+      "provenance",
+      "replay_key"
+    ]
+  },
+  "tools": [
+    {
+      "name": "fixture.lookup",
+      "description": "Provider-free fixture lookup tool used to prove generic tool contracts.",
+      "declarative_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ticker",
+          "horizon"
+        ],
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Z.]{1,10}$"
+          },
+          "horizon": {
+            "type": "string",
+            "enum": [
+              "1d",
+              "1w",
+              "1m"
+            ]
+          }
+        }
+      },
+      "capability_tags": [
+        "generic.ai.tool.contract",
+        "ai.tool.invoke",
+        "ai.tool.schema.declarative",
+        "ai.tool.arguments.validate",
+        "ai.tool.result.envelope",
+        "ai.tool.artifact.refs"
+      ],
+      "approval": {
+        "required": false,
+        "state": "fixture_only",
+        "policy": "not_required_for_fixture_replay"
+      },
+      "result_schema_ref": "schemas/result_envelope_v1.schema.json",
+      "error_schema_ref": "schemas/normalized_error_v1.schema.json",
+      "artifact_schema_ref": "schemas/artifact_ref_v1.schema.json",
+      "fixture_keys": [
+        "generic_tool:invoke:fixture.lookup:ACME:1d:success",
+        "generic_tool:invoke:fixture.lookup:bad-args:validation"
+      ]
+    }
+  ]
+}

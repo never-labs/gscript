@@ -1,0 +1,489 @@
+package leia_test
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
+	"strings"
+	"testing"
+
+	leia "github.com/never-labs/leia"
+)
+
+type genericToolContractsManifest struct {
+	SchemaVersion               int      `json:"schema_version"`
+	ID                          string   `json:"id"`
+	PackageName                 string   `json:"package_name"`
+	DialectExports              []string `json:"dialect_exports"`
+	ProviderFree                bool     `json:"provider_free"`
+	LiveNetworkDefault          bool     `json:"live_network_default"`
+	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
+	Credentials                 struct {
+		Required          []string `json:"required"`
+		Optional          []string `json:"optional"`
+		SecretEnvPatterns []string `json:"secret_env_patterns"`
+		Policy            string   `json:"policy"`
+	} `json:"credentials"`
+	DefaultPolicy struct {
+		Mode                        string `json:"mode"`
+		LiveNetwork                 bool   `json:"live_network"`
+		ProviderCredentialsRequired bool   `json:"provider_credentials_required"`
+		RealDependencyImports       bool   `json:"real_dependency_imports"`
+		ToolExecutionDefault        string `json:"tool_execution_default"`
+		ApprovalDefault             string `json:"approval_default"`
+		ArgumentValidationDefault   string `json:"argument_validation_default"`
+		ArtifactStorageDefault      string `json:"artifact_storage_default"`
+		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
+		FixtureHook                 string `json:"fixture_hook"`
+	} `json:"default_policy"`
+	Entrypoints          map[string]string `json:"entrypoints"`
+	Schemas              map[string]string `json:"schemas"`
+	Fixtures             map[string]string `json:"fixtures"`
+	Capabilities         []string          `json:"capabilities"`
+	ApprovalStates       []string          `json:"approval_states"`
+	NormalizedErrorKinds []string          `json:"normalized_error_kinds"`
+	ArtifactRefPolicy    struct {
+		Mode                 string   `json:"mode"`
+		InlinePayloadDefault bool     `json:"inline_payload_default"`
+		RequiredFields       []string `json:"required_fields"`
+	} `json:"artifact_ref_policy"`
+	TestGates          []string `json:"test_gates"`
+	NoBuiltInGuarantee struct {
+		Required bool `json:"required"`
+	} `json:"no_built_in_guarantee"`
+}
+
+func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
+	base := genericToolContractsLivePackageDir(t)
+	manifest := loadGenericToolContractsManifest(t, base)
+
+	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-tool-contracts-live-package" {
+		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
+	}
+	if manifest.PackageName != "leia-finrobot-generic-tool-contracts" {
+		t.Fatalf("package name = %q", manifest.PackageName)
+	}
+	if !reflect.DeepEqual(manifest.DialectExports, []string{"generic.ai.tool.contract", "ai.tool.invoke"}) {
+		t.Fatalf("dialect exports = %#v", manifest.DialectExports)
+	}
+	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
+		t.Fatalf("provider-free defaults = provider_free:%v live_network:%v imports:%v", manifest.ProviderFree, manifest.LiveNetworkDefault, manifest.RealDependencyImportDefault)
+	}
+	if len(manifest.Credentials.Required) != 0 || len(manifest.Credentials.Optional) != 0 || len(manifest.Credentials.SecretEnvPatterns) != 0 {
+		t.Fatalf("skeleton must not declare credentials: %#v", manifest.Credentials)
+	}
+	if !strings.Contains(manifest.Credentials.Policy, "provider-specific credentials") {
+		t.Fatalf("credential policy should keep providers outside this package: %q", manifest.Credentials.Policy)
+	}
+	if manifest.DefaultPolicy.Mode != "fixture_replay" ||
+		manifest.DefaultPolicy.LiveNetwork ||
+		manifest.DefaultPolicy.ProviderCredentialsRequired ||
+		manifest.DefaultPolicy.RealDependencyImports ||
+		manifest.DefaultPolicy.ToolExecutionDefault != "fixture_only" ||
+		manifest.DefaultPolicy.ApprovalDefault != "deny_without_explicit_fixture" ||
+		manifest.DefaultPolicy.ArgumentValidationDefault != "schema_required" ||
+		manifest.DefaultPolicy.ArtifactStorageDefault != "artifact_ref_only" ||
+		!manifest.DefaultPolicy.CleanSkipWithoutDependency ||
+		manifest.DefaultPolicy.FixtureHook != "recorded_generic_tool_contract_fixture" {
+		t.Fatalf("default policy must stay fixture-only and provider-free: %#v", manifest.DefaultPolicy)
+	}
+
+	for _, key := range []string{"generic_tool_contract", "fixture_index", "invoke_success_fixture", "invoke_validation_error_fixture"} {
+		if manifest.Entrypoints[key] == "" {
+			t.Fatalf("missing entrypoint %q", key)
+		}
+		assertGenericToolContractsJSONFile(t, filepath.Join(base, manifest.Entrypoints[key]))
+	}
+	if manifest.Entrypoints["smoke"] != "main.leia" {
+		t.Fatalf("smoke entrypoint = %q, want main.leia", manifest.Entrypoints["smoke"])
+	}
+	if _, err := os.Stat(filepath.Join(base, manifest.Entrypoints["smoke"])); err != nil {
+		t.Fatalf("smoke entrypoint missing: %v", err)
+	}
+	for _, key := range []string{"tool_contract", "invoke_request", "result_envelope", "normalized_error", "artifact_ref"} {
+		if manifest.Schemas[key] == "" {
+			t.Fatalf("missing schema %q", key)
+		}
+		assertGenericToolContractsJSONFile(t, filepath.Join(base, manifest.Schemas[key]))
+	}
+	for _, key := range []string{"index", "invoke_success", "invoke_validation_error"} {
+		if manifest.Fixtures[key] == "" {
+			t.Fatalf("missing fixture %q", key)
+		}
+		assertGenericToolContractsJSONFile(t, filepath.Join(base, manifest.Fixtures[key]))
+	}
+
+	wantCapabilities := []string{
+		"ai.tool.approval.state",
+		"ai.tool.arguments.validate",
+		"ai.tool.artifact.refs",
+		"ai.tool.capability.tags",
+		"ai.tool.error.normalized",
+		"ai.tool.invoke",
+		"ai.tool.replay.fixture",
+		"ai.tool.result.envelope",
+		"ai.tool.schema.declarative",
+		"generic.ai.tool.contract",
+	}
+	gotCapabilities := append([]string(nil), manifest.Capabilities...)
+	sort.Strings(gotCapabilities)
+	if !reflect.DeepEqual(gotCapabilities, wantCapabilities) {
+		t.Fatalf("capabilities = %#v, want %#v", gotCapabilities, wantCapabilities)
+	}
+	for _, want := range []string{"fixture_only", "approved", "denied", "required"} {
+		if !containsGenericToolContractsString(manifest.ApprovalStates, want) {
+			t.Fatalf("approval states missing %q: %#v", want, manifest.ApprovalStates)
+		}
+	}
+	for _, want := range []string{"validation", "approval_denied", "capability_unavailable", "artifact_unavailable"} {
+		if !containsGenericToolContractsString(manifest.NormalizedErrorKinds, want) {
+			t.Fatalf("normalized errors missing %q: %#v", want, manifest.NormalizedErrorKinds)
+		}
+	}
+	if manifest.ArtifactRefPolicy.Mode != "metadata_ref_only" ||
+		manifest.ArtifactRefPolicy.InlinePayloadDefault ||
+		!containsGenericToolContractsString(manifest.ArtifactRefPolicy.RequiredFields, "artifact_id") ||
+		!containsGenericToolContractsString(manifest.ArtifactRefPolicy.RequiredFields, "replay_key") {
+		t.Fatalf("artifact ref policy incomplete: %#v", manifest.ArtifactRefPolicy)
+	}
+	if !manifest.NoBuiltInGuarantee.Required {
+		t.Fatal("generic tool contracts package must declare no built-in guarantee")
+	}
+	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
+	for _, want := range []string{"declarative tool schema", "arguments", "capability tags", "approval state", "result envelopes", "normalized errors", "artifact refs"} {
+		if !strings.Contains(joinedGates, want) {
+			t.Fatalf("test gates missing %q: %s", want, joinedGates)
+		}
+	}
+}
+
+func TestFinRobotGenericToolContractsContractAndFixtures(t *testing.T) {
+	base := genericToolContractsLivePackageDir(t)
+	var contract struct {
+		DialectExports        []string `json:"dialect_exports"`
+		ProviderFree          bool     `json:"provider_free"`
+		LiveNetwork           bool     `json:"live_network"`
+		RealDependencyImports bool     `json:"real_dependency_imports"`
+		DeclarativeToolSchema bool     `json:"declarative_tool_schema"`
+		ArgumentValidation    struct {
+			Mode                 string `json:"mode"`
+			RequiredBeforeInvoke bool   `json:"required_before_invoke"`
+			FailureErrorKind     string `json:"failure_error_kind"`
+			SchemaRef            string `json:"schema_ref"`
+		} `json:"argument_validation"`
+		ApprovalState struct {
+			RequiredField              string   `json:"required_field"`
+			DefaultState               string   `json:"default_state"`
+			AllowedStates              []string `json:"allowed_states"`
+			DenyWithoutExplicitFixture bool     `json:"deny_without_explicit_fixture"`
+		} `json:"approval_state"`
+		ResultEnvelope struct {
+			SchemaRef        string   `json:"schema_ref"`
+			RequiredFields   []string `json:"required_fields"`
+			SuccessErrorNull bool     `json:"success_error_null"`
+			FailureValueNull bool     `json:"failure_value_null"`
+		} `json:"result_envelope"`
+		NormalizedError struct {
+			SchemaRef      string   `json:"schema_ref"`
+			ProviderFree   bool     `json:"provider_free"`
+			RequiredFields []string `json:"required_fields"`
+			Kinds          []string `json:"kinds"`
+		} `json:"normalized_error"`
+		ArtifactRefs struct {
+			SchemaRef            string   `json:"schema_ref"`
+			MetadataRefOnly      bool     `json:"metadata_ref_only"`
+			InlinePayloadDefault bool     `json:"inline_payload_default"`
+			RequiredFields       []string `json:"required_fields"`
+		} `json:"artifact_refs"`
+		Tools []struct {
+			Name              string   `json:"name"`
+			CapabilityTags    []string `json:"capability_tags"`
+			DeclarativeSchema struct {
+				Type                 string         `json:"type"`
+				AdditionalProperties bool           `json:"additionalProperties"`
+				Required             []string       `json:"required"`
+				Properties           map[string]any `json:"properties"`
+			} `json:"declarative_schema"`
+			Approval struct {
+				Required bool   `json:"required"`
+				State    string `json:"state"`
+				Policy   string `json:"policy"`
+			} `json:"approval"`
+			ResultSchemaRef   string   `json:"result_schema_ref"`
+			ErrorSchemaRef    string   `json:"error_schema_ref"`
+			ArtifactSchemaRef string   `json:"artifact_schema_ref"`
+			FixtureKeys       []string `json:"fixture_keys"`
+		} `json:"tools"`
+	}
+	decodeGenericToolContractsJSONFile(t, filepath.Join(base, "contracts", "generic_tool_contract.json"), &contract)
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || !contract.DeclarativeToolSchema {
+		t.Fatalf("contract header must stay provider-free and declarative: %#v", contract)
+	}
+	if !reflect.DeepEqual(contract.DialectExports, []string{"generic.ai.tool.contract", "ai.tool.invoke"}) {
+		t.Fatalf("contract dialect exports = %#v", contract.DialectExports)
+	}
+	if contract.ArgumentValidation.Mode != "json_schema" ||
+		!contract.ArgumentValidation.RequiredBeforeInvoke ||
+		contract.ArgumentValidation.FailureErrorKind != "validation" ||
+		contract.ArgumentValidation.SchemaRef == "" {
+		t.Fatalf("argument validation contract incomplete: %#v", contract.ArgumentValidation)
+	}
+	if contract.ApprovalState.RequiredField != "approval" ||
+		contract.ApprovalState.DefaultState != "fixture_only" ||
+		!contract.ApprovalState.DenyWithoutExplicitFixture ||
+		!containsGenericToolContractsString(contract.ApprovalState.AllowedStates, "approved") ||
+		!containsGenericToolContractsString(contract.ApprovalState.AllowedStates, "denied") {
+		t.Fatalf("approval state contract incomplete: %#v", contract.ApprovalState)
+	}
+	for _, want := range []string{"ok", "value", "error", "artifact_refs", "replay", "approval"} {
+		if !containsGenericToolContractsString(contract.ResultEnvelope.RequiredFields, want) {
+			t.Fatalf("result envelope missing %q: %#v", want, contract.ResultEnvelope)
+		}
+	}
+	if !contract.ResultEnvelope.SuccessErrorNull || !contract.ResultEnvelope.FailureValueNull {
+		t.Fatalf("result envelope null semantics missing: %#v", contract.ResultEnvelope)
+	}
+	for _, want := range []string{"kind", "message", "field", "retryable", "provider_free"} {
+		if !containsGenericToolContractsString(contract.NormalizedError.RequiredFields, want) {
+			t.Fatalf("normalized error missing %q: %#v", want, contract.NormalizedError)
+		}
+	}
+	if !contract.NormalizedError.ProviderFree || !containsGenericToolContractsString(contract.NormalizedError.Kinds, "validation") {
+		t.Fatalf("normalized error taxonomy incomplete: %#v", contract.NormalizedError)
+	}
+	if !contract.ArtifactRefs.MetadataRefOnly || contract.ArtifactRefs.InlinePayloadDefault {
+		t.Fatalf("artifact ref policy must be metadata-only: %#v", contract.ArtifactRefs)
+	}
+	for _, want := range []string{"artifact_id", "uri", "media_type", "sha256", "bytes", "provenance", "replay_key"} {
+		if !containsGenericToolContractsString(contract.ArtifactRefs.RequiredFields, want) {
+			t.Fatalf("artifact refs missing %q: %#v", want, contract.ArtifactRefs)
+		}
+	}
+	if len(contract.Tools) != 1 {
+		t.Fatalf("tools = %d, want 1", len(contract.Tools))
+	}
+	tool := contract.Tools[0]
+	if tool.Name != "fixture.lookup" ||
+		tool.DeclarativeSchema.Type != "object" ||
+		tool.DeclarativeSchema.AdditionalProperties ||
+		!containsGenericToolContractsString(tool.DeclarativeSchema.Required, "ticker") ||
+		!containsGenericToolContractsString(tool.DeclarativeSchema.Required, "horizon") ||
+		len(tool.DeclarativeSchema.Properties) != 2 {
+		t.Fatalf("tool schema incomplete: %#v", tool)
+	}
+	for _, want := range []string{"generic.ai.tool.contract", "ai.tool.invoke", "ai.tool.arguments.validate", "ai.tool.result.envelope", "ai.tool.artifact.refs"} {
+		if !containsGenericToolContractsString(tool.CapabilityTags, want) {
+			t.Fatalf("tool capability tags missing %q: %#v", want, tool.CapabilityTags)
+		}
+	}
+	if tool.Approval.Required || tool.Approval.State != "fixture_only" || tool.ResultSchemaRef == "" || tool.ErrorSchemaRef == "" || tool.ArtifactSchemaRef == "" || len(tool.FixtureKeys) != 2 {
+		t.Fatalf("tool approval/schema refs incomplete: %#v", tool)
+	}
+
+	assertGenericToolContractsInvokeFixture(t, filepath.Join(base, "fixtures", "invoke_success_fixture.json"), true, "fixture_only", "", 1)
+	assertGenericToolContractsInvokeFixture(t, filepath.Join(base, "fixtures", "invoke_validation_error_fixture.json"), false, "fixture_only", "validation", 0)
+}
+
+func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
+	base := genericToolContractsLivePackageDir(t)
+	var index struct {
+		ProviderFree          bool `json:"provider_free"`
+		LiveNetwork           bool `json:"live_network"`
+		RealDependencyImports bool `json:"real_dependency_imports"`
+		Fixtures              []struct {
+			FixtureKey     string   `json:"fixture_key"`
+			Path           string   `json:"path"`
+			DialectExport  string   `json:"dialect_export"`
+			ToolName       string   `json:"tool_name"`
+			CapabilityTags []string `json:"capability_tags"`
+			ApprovalState  string   `json:"approval_state"`
+			ExpectedOK     bool     `json:"expected_ok"`
+			ReplayReady    bool     `json:"replay_ready"`
+		} `json:"fixtures"`
+	}
+	decodeGenericToolContractsJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
+		t.Fatalf("fixture index header/count = %#v", index)
+	}
+	keys := map[string]bool{}
+	for _, fixture := range index.Fixtures {
+		if fixture.FixtureKey == "" || fixture.Path == "" || fixture.DialectExport != "ai.tool.invoke" || fixture.ToolName != "fixture.lookup" {
+			t.Fatalf("fixture metadata incomplete: %#v", fixture)
+		}
+		if keys[fixture.FixtureKey] {
+			t.Fatalf("duplicate fixture key %q", fixture.FixtureKey)
+		}
+		keys[fixture.FixtureKey] = true
+		if fixture.ApprovalState != "fixture_only" || !fixture.ReplayReady {
+			t.Fatalf("fixture must be replay-ready and fixture-only: %#v", fixture)
+		}
+		assertGenericToolContractsJSONFile(t, filepath.Join(base, fixture.Path))
+	}
+
+	mainPath := filepath.Join(base, "main.leia")
+	sourceBytes, err := os.ReadFile(mainPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(sourceBytes)
+	for _, want := range []string{"generic.ai.tool.contract", "ai.tool.invoke", "declarative_schema", "capability_tags", "approval", "artifact_refs", "validation"} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("main.leia missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"q/runtime", ".external/FinRobot", "import q", "$`", "$!`"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("main.leia must stay provider-free and avoid restricted surfaces; found %q", forbidden)
+		}
+	}
+
+	vm := leia.New(leia.WithLibs(leia.LibAll), leia.WithVM())
+	if err := vm.ExecFile(mainPath); err != nil {
+		t.Fatalf("ExecFile main.leia: %v", err)
+	}
+	value, err := vm.Get("generic_tool_contracts_live_package_summary")
+	if err != nil {
+		t.Fatalf("get generic_tool_contracts_live_package_summary: %v", err)
+	}
+	summary, ok := value.(string)
+	if !ok || !strings.Contains(summary, "provider_free=true") || !strings.Contains(summary, "validation_error=validation") {
+		t.Fatalf("summary = %#v", value)
+	}
+}
+
+func assertGenericToolContractsInvokeFixture(t *testing.T, path string, wantOK bool, wantApproval string, wantErrorKind string, wantArtifacts int) {
+	t.Helper()
+	var fixture struct {
+		Request struct {
+			ToolName       string         `json:"tool_name"`
+			Arguments      map[string]any `json:"arguments"`
+			CapabilityTags []string       `json:"capability_tags"`
+			Approval       struct {
+				State    string `json:"state"`
+				Required bool   `json:"required"`
+			} `json:"approval"`
+			ReplayKey    string `json:"replay_key"`
+			ProviderFree bool   `json:"provider_free"`
+			LiveNetwork  bool   `json:"live_network"`
+		} `json:"request"`
+		Result struct {
+			OK             bool     `json:"ok"`
+			ToolName       string   `json:"tool_name"`
+			CapabilityTags []string `json:"capability_tags"`
+			Approval       struct {
+				State    string `json:"state"`
+				Required bool   `json:"required"`
+			} `json:"approval"`
+			Value any `json:"value"`
+			Error *struct {
+				Kind         string `json:"kind"`
+				Message      string `json:"message"`
+				Field        string `json:"field"`
+				Retryable    bool   `json:"retryable"`
+				ProviderFree bool   `json:"provider_free"`
+			} `json:"error"`
+			ArtifactRefs []struct {
+				ArtifactID string `json:"artifact_id"`
+				URI        string `json:"uri"`
+				MediaType  string `json:"media_type"`
+				SHA256     string `json:"sha256"`
+				Bytes      int    `json:"bytes"`
+				Provenance struct {
+					Source       string `json:"source"`
+					ToolName     string `json:"tool_name"`
+					ProviderFree bool   `json:"provider_free"`
+					LiveNetwork  bool   `json:"live_network"`
+				} `json:"provenance"`
+				ReplayKey string `json:"replay_key"`
+			} `json:"artifact_refs"`
+			Replay struct {
+				Mode          string `json:"mode"`
+				ReplayKey     string `json:"replay_key"`
+				Deterministic bool   `json:"deterministic"`
+				ProviderFree  bool   `json:"provider_free"`
+				LiveNetwork   bool   `json:"live_network"`
+			} `json:"replay"`
+		} `json:"result"`
+	}
+	decodeGenericToolContractsJSONFile(t, path, &fixture)
+	if fixture.Request.ToolName != "fixture.lookup" ||
+		fixture.Request.Approval.State != wantApproval ||
+		fixture.Request.Approval.Required ||
+		!fixture.Request.ProviderFree ||
+		fixture.Request.LiveNetwork ||
+		fixture.Request.ReplayKey == "" ||
+		len(fixture.Request.Arguments) == 0 {
+		t.Fatalf("request envelope incomplete: %#v", fixture.Request)
+	}
+	if fixture.Result.OK != wantOK ||
+		fixture.Result.ToolName != fixture.Request.ToolName ||
+		fixture.Result.Approval.State != wantApproval ||
+		fixture.Result.Approval.Required ||
+		len(fixture.Result.ArtifactRefs) != wantArtifacts ||
+		fixture.Result.Replay.Mode != "fixture_replay" ||
+		fixture.Result.Replay.ReplayKey != fixture.Request.ReplayKey ||
+		!fixture.Result.Replay.Deterministic ||
+		!fixture.Result.Replay.ProviderFree ||
+		fixture.Result.Replay.LiveNetwork {
+		t.Fatalf("result envelope incomplete: %#v", fixture.Result)
+	}
+	if wantOK {
+		if fixture.Result.Error != nil || fixture.Result.Value == nil {
+			t.Fatalf("success envelope value/error = value:%#v error:%#v", fixture.Result.Value, fixture.Result.Error)
+		}
+	} else {
+		if fixture.Result.Value != nil || fixture.Result.Error == nil || fixture.Result.Error.Kind != wantErrorKind ||
+			fixture.Result.Error.Field == "" || fixture.Result.Error.Retryable || !fixture.Result.Error.ProviderFree {
+			t.Fatalf("error envelope incomplete: value:%#v error:%#v", fixture.Result.Value, fixture.Result.Error)
+		}
+	}
+	for _, artifact := range fixture.Result.ArtifactRefs {
+		if artifact.ArtifactID == "" || !strings.HasPrefix(artifact.URI, "artifact://") ||
+			artifact.MediaType == "" || len(artifact.SHA256) != 64 || artifact.Bytes <= 0 ||
+			artifact.Provenance.Source != "fixture_replay" ||
+			!artifact.Provenance.ProviderFree || artifact.Provenance.LiveNetwork ||
+			artifact.ReplayKey == "" {
+			t.Fatalf("artifact ref incomplete: %#v", artifact)
+		}
+	}
+}
+
+func genericToolContractsLivePackageDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation", "live_packages", "generic_tool_contracts")
+}
+
+func loadGenericToolContractsManifest(t *testing.T, base string) genericToolContractsManifest {
+	t.Helper()
+	var manifest genericToolContractsManifest
+	decodeGenericToolContractsJSONFile(t, filepath.Join(base, "package.manifest.json"), &manifest)
+	return manifest
+}
+
+func assertGenericToolContractsJSONFile(t *testing.T, path string) {
+	t.Helper()
+	var value any
+	decodeGenericToolContractsJSONFile(t, path, &value)
+}
+
+func decodeGenericToolContractsJSONFile(t *testing.T, path string, out any) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, out); err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+}
+
+func containsGenericToolContractsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}

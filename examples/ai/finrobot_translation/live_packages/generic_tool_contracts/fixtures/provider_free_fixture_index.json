@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic_tool:invoke:fixture.lookup:ACME:1d:success",
+      "path": "fixtures/invoke_success_fixture.json",
+      "dialect_export": "ai.tool.invoke",
+      "tool_name": "fixture.lookup",
+      "capability_tags": [
+        "generic.ai.tool.contract",
+        "ai.tool.invoke",
+        "ai.tool.result.envelope",
+        "ai.tool.artifact.refs"
+      ],
+      "approval_state": "fixture_only",
+      "expected_ok": true,
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "generic_tool:invoke:fixture.lookup:bad-args:validation",
+      "path": "fixtures/invoke_validation_error_fixture.json",
+      "dialect_export": "ai.tool.invoke",
+      "tool_name": "fixture.lookup",
+      "capability_tags": [
+        "generic.ai.tool.contract",
+        "ai.tool.invoke",
+        "ai.tool.arguments.validate",
+        "ai.tool.error.normalized"
+      ],
+      "approval_state": "fixture_only",
+      "expected_ok": false,
+      "replay_ready": true
+    }
+  ]
+}

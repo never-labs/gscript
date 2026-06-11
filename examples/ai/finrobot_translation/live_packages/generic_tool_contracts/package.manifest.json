@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-generic-tool-contracts-live-package",
+  "package_name": "leia-finrobot-generic-tool-contracts",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for generic.ai.tool.contract and ai.tool.invoke contracts.",
+  "dialect_exports": [
+    "generic.ai.tool.contract",
+    "ai.tool.invoke"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; provider-specific credentials belong only to future adapter packages behind capability and approval gates."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "tool_execution_default": "fixture_only",
+    "approval_default": "deny_without_explicit_fixture",
+    "argument_validation_default": "schema_required",
+    "artifact_storage_default": "artifact_ref_only",
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_tool_contract_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "generic_tool_contract": "contracts/generic_tool_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "invoke_success_fixture": "fixtures/invoke_success_fixture.json",
+    "invoke_validation_error_fixture": "fixtures/invoke_validation_error_fixture.json"
+  },
+  "schemas": {
+    "tool_contract": "schemas/tool_contract_v1.schema.json",
+    "invoke_request": "schemas/invoke_request_v1.schema.json",
+    "result_envelope": "schemas/result_envelope_v1.schema.json",
+    "normalized_error": "schemas/normalized_error_v1.schema.json",
+    "artifact_ref": "schemas/artifact_ref_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "invoke_success": "fixtures/invoke_success_fixture.json",
+    "invoke_validation_error": "fixtures/invoke_validation_error_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.tool.contract",
+    "ai.tool.invoke",
+    "ai.tool.schema.declarative",
+    "ai.tool.arguments.validate",
+    "ai.tool.capability.tags",
+    "ai.tool.approval.state",
+    "ai.tool.result.envelope",
+    "ai.tool.error.normalized",
+    "ai.tool.artifact.refs",
+    "ai.tool.replay.fixture"
+  ],
+  "approval_states": [
+    "not_required",
+    "required",
+    "approved",
+    "denied",
+    "expired",
+    "fixture_only"
+  ],
+  "normalized_error_kinds": [
+    "validation",
+    "approval_required",
+    "approval_denied",
+    "capability_unavailable",
+    "tool_not_found",
+    "execution_failed",
+    "artifact_unavailable"
+  ],
+  "artifact_ref_policy": {
+    "mode": "metadata_ref_only",
+    "inline_payload_default": false,
+    "required_fields": [
+      "artifact_id",
+      "uri",
+      "media_type",
+      "sha256",
+      "bytes",
+      "provenance",
+      "replay_key"
+    ]
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "generic.ai.tool.contract exports declarative tool schema metadata",
+    "ai.tool.invoke request arguments are validated before fixture execution",
+    "capability tags are explicit and provider-neutral",
+    "approval state is represented in both request and result envelopes",
+    "result envelopes separate ok, value, error, artifact_refs, and replay metadata",
+    "normalized errors expose kind, message, field, retryable, and provider_free fields",
+    "artifact refs are metadata-only and never require inline provider payloads",
+    "fixtures cover success and validation error paths with live_network false"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide provider-specific tool execution for this skeleton; future adapter packages must satisfy these schemas, capability tags, approval states, result envelopes, normalized errors, and artifact refs."
+  }
+}
