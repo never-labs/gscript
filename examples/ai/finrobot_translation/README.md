@@ -17,19 +17,20 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
-Current status: `go run ./cmd/leia examples --json` discovers 44 runnable and
+Current status: `go run ./cmd/leia examples --json` discovers 48 runnable and
 checkable FinRobot translation examples under this directory. The checked-in
-live-package skeleton surface has 19 directories:
+live-package skeleton surface has 20 directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
 `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`,
 `live_packages/finance_facade`, `live_packages/finance_normalizers`,
-`live_packages/news_catalyst`, `live_packages/optional_integrations`,
-`live_packages/product_workflow`, `live_packages/prompt_roles`,
-`live_packages/report_renderer`, `live_packages/retail_sentiment`,
-`live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and
-`live_packages/vendor_adapters`. All 19 skeletons provide registered
+`live_packages/html_ui_snapshots`, `live_packages/news_catalyst`,
+`live_packages/optional_integrations`, `live_packages/product_workflow`,
+`live_packages/prompt_roles`, `live_packages/report_renderer`,
+`live_packages/retail_sentiment`, `live_packages/tutorial_demo_parity`,
+`live_packages/valuation_engine`, and `live_packages/vendor_adapters`. All 20
+skeletons provide registered
 provider-free `.leia` examples.
 
 ## Scope
@@ -105,8 +106,8 @@ Gap categories:
 | `experiments/investment_group.py` | Multi-agent investment workflow example | Partial | AI dialect, external library | P2 | Offline replay of group roles, tool calls, and final recommendation schema |
 | `experiments/multi_factor_agents.py` | Multi-factor research workflow and data package example | Partial | AI dialect, stdlib, external library | P2 | Fixture data and factor research skeleton validate factor transforms, exposure summaries, optimizer boundaries, and agent outputs |
 | `experiments/portfolio_optimization.py` | Portfolio optimization package example | Partial | stdlib, external library | P2 | Deterministic optimizer fixture validates constraints, weights, and risk metrics |
-| `tutorials_beginner/*` | Leia example suite for annual reports, FinGPT forecast, RAG QA, Ollama function calling, stock charts | Partial | AI dialect, stdlib, external library | P1 | Tutorial/demo parity skeleton records provider-free replay records, optional live-provider gates, and notebook conversion checks |
-| `tutorials_advanced/*` | Advanced Leia examples for trade strategy, OpenBB, multimodal chart/document analysis, mplfinance, SMA crossover | Partial | AI dialect, stdlib, external library | P2 | Tutorial/demo parity skeleton tracks notebook-to-Leia parity and recorded fixtures for external calls |
+| `tutorials_beginner/*` | Leia example suite for annual reports, FinGPT forecast, RAG QA, Ollama function calling, stock charts | Partial | AI dialect, stdlib, external library | P1 | Tutorial/demo parity plus notebook parity examples cover annual report, RAG earnings/SEC, optional Ollama gate, provider-free replay records, and optional live-provider gates |
+| `tutorials_advanced/*` | Advanced Leia examples for trade strategy, OpenBB, multimodal chart/document analysis, mplfinance, SMA crossover | Partial | AI dialect, stdlib, external library | P2 | Tutorial/demo parity skeleton tracks notebook-to-Leia parity, OpenBB optional gate, and recorded fixtures for external calls |
 | `agent_builder_demo.py`, `test_module.py` | Smoke/demo examples and regression fixtures | Partial | AI dialect, stdlib | P2 | Tutorial/demo parity skeleton covers deterministic smoke contracts and regression fixture expectations |
 | `configs/*`, `OAI_CONFIG_LIST`, `config_api_keys` | Config, model alias, and secret mapping examples | Partial | AI dialect, stdlib, product layer | P0 | Secret-free config fixture checks env lookup, missing-key diagnostics, and trace metadata |
 | `requirements*.txt`, `setup.py`, `Dockerfile`, `deploy*.sh`, `run_web_app.py` | Package/deploy metadata and local service entry points | Partial | product layer, external library | P2 | Packaging smoke test and deployment metadata exist; release packaging and cloud smoke remain external package work |
@@ -124,10 +125,10 @@ Gap categories:
 | `finrobot_equity/core/src/modules/html_renderer.py`, `html_template_professional.py` | HTML report templating package | Open | stdlib, product layer | P1 | Golden HTML snapshots with required sections, tables, charts, disclaimers, and accessibility checks |
 | `finrobot_equity/core/src/modules/pdf_generator.py`, `professional_pdf_report.py` | PDF report package | Partial | stdlib, external library, product layer | P1 | PDF artifact skeleton records page-level contract expectations; rendered PDF output remains package work |
 | `finrobot_equity/core/src/modules/report_structure.py`, `report_data_loader.py`, `common_utils.py` | Report schemas, source annotations, AI disclosure, data loading, and config utilities | Partial | stdlib, product layer | P0 | Schema tests for ordered sections, provenance, disclosure, and config resolution |
-| `finrobot_equity/core/tests/*` | Existing Python tests as source for Leia fixtures | Mapped | AI dialect, stdlib | P1 | Port representative assertions to Leia `test`/`evaluate` fixtures |
+| `finrobot_equity/core/tests/*` | Existing Python tests as source for Leia fixtures | Partial | AI dialect, stdlib | P1 | Python test parity fixtures port representative assertions for financial processor, valuation, report structure, chart/report artifact, and web product state |
 | `finrobot_equity/web_app/main.py`, `admin_routes.py`, `auth.py` | Product web app over workflows, auth, history, logs, and report downloads | Open | stdlib, product layer | P2 | Web route smoke tests with mocked workflow process and auth sessions |
 | `finrobot_equity/web_app/database/*` | SQLite/SQLAlchemy schema and CRUD product package | Open | stdlib, product layer | P2 | DB migration/CRUD fixtures for users, sessions, requests, and reports |
-| `finrobot_equity/web_app/templates/*`, `static/*` | Product UI assets and templates | Open | product layer | P3 | Snapshot/accessibility checks; outside AI dialect translation critical path |
+| `finrobot_equity/web_app/templates/*`, `static/*` | Product UI assets and templates | Partial | product layer | P3 | HTML/UI snapshot skeleton validates template inventory, required sections, placeholders, disclosure/provenance markup, accessibility, static assets, and deterministic hashes |
 
 ## Priority Summary
 

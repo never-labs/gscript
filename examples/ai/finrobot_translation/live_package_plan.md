@@ -7,12 +7,12 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 44 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. All 19 checked-in
+Current registered-example status: 48 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. All 20 checked-in
 live-package skeletons are registered provider-free examples: `analytics_report`,
 `analyzer_report`, `backtest_strategy`, `chart_renderer`, `coding_notebook`,
 `document_pipeline`, `equity_analysis_pipeline`, `factor_research`,
-`finance_facade`, `finance_normalizers`, `news_catalyst`,
+`finance_facade`, `finance_normalizers`, `html_ui_snapshots`, `news_catalyst`,
 `optional_integrations`, `product_workflow`, `prompt_roles`, `report_renderer`,
 `retail_sentiment`, `tutorial_demo_parity`, `valuation_engine`, and
 `vendor_adapters`.
@@ -38,6 +38,7 @@ live-package skeletons are registered provider-free examples: `analytics_report`
 | `live_packages/backtest_strategy` | `live_packages/backtest_strategy/main.leia` | `leia-finrobot-backtest-strategy` | `packages/finrobot/backtest_strategy` | `contracts/backtest_strategy_contract.json` |
 | `live_packages/equity_analysis_pipeline` | `live_packages/equity_analysis_pipeline/main.leia` | `leia-finrobot-equity-analysis-pipeline` | `packages/finrobot/equity_analysis_pipeline` | `contracts/stage_dag_contract.json` |
 | `live_packages/retail_sentiment` | `live_packages/retail_sentiment/main.leia` | `leia-finrobot-retail-sentiment` | `packages/finrobot/retail_sentiment` | `contracts/retail_sentiment_contract.json` |
+| `live_packages/html_ui_snapshots` | `live_packages/html_ui_snapshots/main.leia` | `leia-finrobot-html-ui-snapshots` | `packages/finrobot/html_ui_snapshots` | `contracts/html_ui_snapshot_contract.json` |
 
 ## Contract Rules
 

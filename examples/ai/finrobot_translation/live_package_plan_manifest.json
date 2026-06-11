@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 44,
-  "translation_directory_file_count": 327,
+  "registered_examples_count": 48,
+  "translation_directory_file_count": 348,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -176,6 +176,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/valuation_engine/main.leia",
       "covers_package_ids": [
         "valuation_engine"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "html_ui_snapshots",
+      "directory": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/main.leia",
+      "covers_package_ids": [
+        "html_ui_snapshots"
       ],
       "status": "checked_in_registered_example"
     }
@@ -718,6 +727,35 @@
         "fixture tests cover Adanos, Reddit, X, and Polymarket source snapshots without live adapters",
         "schema tests validate sentiment aggregates, redaction policy, terms metadata, prompt-format contract, and stale snapshot warning",
         "adapter boundary tests clean-skip optional providers and reject raw handles, raw URLs, tokens, cookies, and authorization headers"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "html_ui_snapshots",
+      "package_name": "leia-finrobot-html-ui-snapshots",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots",
+      "planned_directory": "packages/finrobot/html_ui_snapshots",
+      "manifest": "packages/finrobot/html_ui_snapshots/package.manifest.json",
+      "contract": "packages/finrobot/html_ui_snapshots/contracts/html_ui_snapshot_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/web_product.leia",
+      "capabilities": [
+        "ui.template.inventory",
+        "ui.template.required_sections",
+        "ui.template.table_placeholder",
+        "ui.template.chart_placeholder",
+        "ui.template.disclosure_markup",
+        "ui.template.source_provenance_markup",
+        "ui.accessibility.checklist",
+        "ui.static_asset_manifest",
+        "ui.snapshot.deterministic_hash",
+        "ui.snapshot.provider_free"
+      ],
+      "test_gates": [
+        "HTML/UI snapshot manifest and referenced JSON files decode without external dependencies",
+        "fixture tests cover template inventory, required sections, table and chart placeholders, disclosure markup, source provenance markup, accessibility checklist, static assets, and deterministic snapshot hash",
+        "contract tests run with live_network=false and require no browser, network, database, or renderer dependency",
+        "provider-free gates keep visual regression and real browser snapshots outside Leia core until an external package is explicitly enabled"
       ],
       "no_built_in_guarantee": true
     }

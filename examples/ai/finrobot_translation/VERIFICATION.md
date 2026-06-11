@@ -35,15 +35,15 @@ No `docs/spec/index.html` generation was run.
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples --json` discovers 44 runnable/checkable FinRobot
+`go run ./cmd/leia examples --json` discovers 48 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
 The examples gate validated:
 
-- 36 `host-vm` examples
+- 40 `host-vm` examples
 - 6 `llm-replay` examples
 - 2 `evaluate` examples
-- 19 registered live-package skeleton examples:
+- 20 registered live-package skeleton examples:
   `live_packages/analytics_report/analytics_report.leia`,
   `live_packages/analyzer_report/main.leia`,
   `live_packages/backtest_strategy/main.leia`,
@@ -54,26 +54,27 @@ The examples gate validated:
   `live_packages/factor_research/main.leia`,
   `live_packages/finance_facade/main.leia`,
   `live_packages/finance_normalizers/main.leia`,
+  `live_packages/html_ui_snapshots/main.leia`,
   `live_packages/news_catalyst/main.leia`,
   `live_packages/optional_integrations/main.leia`,
   `live_packages/product_workflow/main.leia`,
   `live_packages/prompt_roles/main.leia`,
   `live_packages/report_renderer/main.leia`,
   `live_packages/retail_sentiment/main.leia`,
-  `live_packages/tutorial_demo_parity/main.leia`, and
+  `live_packages/tutorial_demo_parity/main.leia`,
   `live_packages/valuation_engine/main.leia`,
-  `live_packages/vendor_adapters/main.leia`
+  and `live_packages/vendor_adapters/main.leia`
 
 The checker reported:
 
 ```text
-examples: 44 ok, 0 skipped, 0 failed
+examples: 48 ok, 0 skipped, 0 failed
 ```
 
 The repository check reported:
 
 ```text
-examples: 188 ok, 8 skipped, 0 failed
+examples: 192 ok, 8 skipped, 0 failed
 fmt: ok
 lint: ok
 test: ok
@@ -115,6 +116,10 @@ Current checked-in skeleton directories:
 - `live_packages/finance_normalizers`: registered example plus statement,
   ratio, market, news, SEC, peer, provenance, stale/missing field policy, and
   deterministic ordering contracts.
+- `live_packages/html_ui_snapshots`: registered example plus template
+  inventory, required section, table/chart placeholder, disclosure/source
+  provenance markup, accessibility, static asset manifest, deterministic hash,
+  and provider-free snapshot contracts.
 - `live_packages/news_catalyst`: registered example plus manifest, schemas,
   fixtures, news/catalyst contracts, source ranking, retail sentiment, and
   Polymarket/X/Reddit adapter-boundary metadata.
@@ -161,6 +166,6 @@ go run ./cmd/leia check --no-docs --no-editor .
 
 The FinRobot documentation status is aligned with the current
 `origin/codex/ai-dialect-polish` surface: 44 registered runnable/checkable
-examples, 327 files in the translation directory, and 19 checked-in
+examples, 348 files in the translation directory, and 19 checked-in
 provider-free live-package skeleton directories. The validation commands above
 passed without generating `docs/spec/index.html`.

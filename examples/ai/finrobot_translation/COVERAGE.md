@@ -7,9 +7,9 @@ Baseline:
 - Leia branch: `origin/codex/ai-dialect-polish` at `b3b6088d`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 327 files, including 19
+- Current translation directory file count: 348 files, including 20
   provider-free live-package skeleton directories and this audit artifact.
-- Registered examples: 44 runnable/checkable examples discovered by
+- Registered examples: 48 runnable/checkable examples discovered by
   `go run ./cmd/leia examples --json`.
 - Runtime changes in this audit: none.
 
@@ -57,6 +57,7 @@ notebook/tutorial parity.
 | `repo-ai-finrobot_translation-live_packages-factor_research-main` | `live_packages/factor_research/main.leia` | `host-vm` | Checked-in factor research live-package skeleton for factor transforms, market/factor data fixtures, exposures, and agent handoff boundaries |
 | `repo-ai-finrobot_translation-live_packages-finance_facade-main` | `live_packages/finance_facade/main.leia` | `host-vm` | Checked-in finance facade live-package skeleton for provider fallback, typed tables, cache/retry metadata, provenance, and error envelopes |
 | `repo-ai-finrobot_translation-live_packages-finance_normalizers-main` | `live_packages/finance_normalizers/main.leia` | `host-vm` | Checked-in finance normalizers live-package skeleton for statements, ratios, market, news, SEC, peer, provenance, field policy, and deterministic ordering |
+| `repo-ai-finrobot_translation-live_packages-html_ui_snapshots-main` | `live_packages/html_ui_snapshots/main.leia` | `host-vm` | Checked-in HTML/UI snapshot live-package skeleton for template inventory, required sections, table/chart placeholders, disclosure/provenance markup, accessibility, static assets, and deterministic snapshot hashes |
 | `repo-ai-finrobot_translation-live_packages-news_catalyst-main` | `live_packages/news_catalyst/main.leia` | `host-vm` | Checked-in news/catalyst live-package skeleton for news relevance, source ranking, retail sentiment, and adapter boundaries |
 | `repo-ai-finrobot_translation-live_packages-optional_integrations-main` | `live_packages/optional_integrations/main.leia` | `host-vm` | Checked-in optional integrations live-package skeleton for FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, and Ollama gates |
 | `repo-ai-finrobot_translation-live_packages-product_workflow-main` | `live_packages/product_workflow/main.leia` | `host-vm` | Checked-in product workflow live-package smoke for routes, auth/session, task logs, downloads, DB, UI snapshots, accessibility, and deployment contracts |
@@ -76,12 +77,15 @@ notebook/tutorial parity.
 | `repo-ai-finrobot_translation-role_profiles` | `role_profiles.leia` | `host-vm` | FinRobot-style role registry as data |
 | `repo-ai-finrobot_translation-section_agents` | `section_agents.leia` | `host-vm` | Section prompt/output schemas |
 | `repo-ai-finrobot_translation-sensitivity_math` | `sensitivity_math.leia` | `host-vm` | Matrix/sensitivity fixture math |
+| `repo-ai-finrobot_translation-tutorials-notebook_parity-annual_report` | `tutorials/notebook_parity/annual_report.leia` | `host-vm` | Provider-free annual-report notebook parity fixture |
+| `repo-ai-finrobot_translation-tutorials-notebook_parity-ollama_function_call_optional_gate` | `tutorials/notebook_parity/ollama_function_call_optional_gate.leia` | `host-vm` | Provider-free optional Ollama function-call gate fixture |
+| `repo-ai-finrobot_translation-tutorials-notebook_parity-rag_earnings_sec` | `tutorials/notebook_parity/rag_earnings_sec.leia` | `host-vm` | Provider-free RAG earnings/SEC notebook parity fixture |
 | `repo-ai-finrobot_translation-valuation_analytics` | `valuation_analytics.leia` | `host-vm` | DCF, multiples, target synthesis fixture analytics |
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 36 `host-vm`, 6 `llm-replay`, 2 `evaluate`, 44 runnable,
-44 checkable.
+Runner summary: 40 `host-vm`, 6 `llm-replay`, 2 `evaluate`, 48 runnable,
+48 checkable.
 
 ## Module Coverage Matrix
 
@@ -171,19 +175,19 @@ mistaken for missing language/runtime support.
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
-| Registered example inventory | 44 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 327 files in the translation directory, including checked-in live-package skeleton directories and these status docs | Complete |
+| Registered example inventory | 48 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
+| File inventory | 348 files in the translation directory, including checked-in live-package skeleton directories and these status docs | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
-| Host-VM contract examples | 36 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
+| Host-VM contract examples | 40 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 2 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
-| Live-package skeletons | 19 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/analyzer_report`, `live_packages/backtest_strategy`, `live_packages/chart_renderer`, `live_packages/coding_notebook`, `live_packages/document_pipeline`, `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`, `live_packages/finance_facade`, `live_packages/finance_normalizers`, `live_packages/news_catalyst`, `live_packages/optional_integrations`, `live_packages/product_workflow`, `live_packages/prompt_roles`, `live_packages/report_renderer`, `live_packages/retail_sentiment`, `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and `live_packages/vendor_adapters`; all 19 include registered `.leia` examples | Complete |
+| Live-package skeletons | 20 checked-in skeleton directories: `live_packages/analytics_report`, `live_packages/analyzer_report`, `live_packages/backtest_strategy`, `live_packages/chart_renderer`, `live_packages/coding_notebook`, `live_packages/document_pipeline`, `live_packages/equity_analysis_pipeline`, `live_packages/factor_research`, `live_packages/finance_facade`, `live_packages/finance_normalizers`, `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`, `live_packages/optional_integrations`, `live_packages/product_workflow`, `live_packages/prompt_roles`, `live_packages/report_renderer`, `live_packages/retail_sentiment`, `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and `live_packages/vendor_adapters`; all 20 include registered `.leia` examples | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
 | Evaluation harness | `evaluation_harness/manifest.json` inventories replay records, golden checksums, gates, and report metadata | Complete for current registered records |
 | Gap ledger alignment | `GAPS.md` records no open gaps for the provider-free slice; remaining work is package/product implementation | Complete |
 | Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
 Provider-free completion result: complete for the currently registered
-44-example translation slice, including live-package skeleton contracts.
+48-example translation slice, including live-package skeleton contracts.
 Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks
