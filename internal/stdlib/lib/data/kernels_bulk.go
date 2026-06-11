@@ -1617,6 +1617,30 @@ func unionComparable[T comparable](left, right []T) []T {
 	return out
 }
 
+// MaterializeFrameColumn densifies a lazy carrier for frame adoption like
+// MaterializeArray, but keeps cyclic tiled vectors of pointer-kind elements
+// (symbols, strings) intact: the tiled carrier delegates Gather to its typed
+// source and the group-id kernels have a dedicated tiled path, so expanding
+// would only copy one string header per row and put that pointer-heavy dense
+// copy on the GC scan path.
+func MaterializeFrameColumn(array Array) Array {
+	switch a := array.(type) {
+	case attributedArray:
+		return attributedArray{array: MaterializeFrameColumn(a.array), metadata: a.metadata}
+	case tiledArray:
+		switch a.source.Kind() {
+		case KindSymbol, KindString:
+			return array
+		}
+	case i64RangeArray, i64ScalarDyadicArray:
+		// One-shot bulk-flattenable numeric carriers: downstream kernels pull
+		// dense values through the pooled bulk extractor on demand, so frame
+		// adoption does not need to pin a dense copy per column.
+		return array
+	}
+	return MaterializeArray(array)
+}
+
 // MaterializeArray returns a dense representation of array. Dense carriers
 // (typed columns, boxed nullable columns, encoded vectors) return unchanged
 // with zero copies; lazy carriers (ranges, scalar-dyadic chains, tiled

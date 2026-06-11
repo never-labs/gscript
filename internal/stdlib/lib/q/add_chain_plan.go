@@ -49,6 +49,9 @@ const (
 	// qAddChainTermLastCallableScan mirrors tryEvalLastCallableScan
 	// (`last (fn\[init;value])`).
 	qAddChainTermLastCallableScan
+	// qAddChainTermName is a plain binding name: one lookupName per call,
+	// mirroring evalScalarAddChainTerm's terminal s.eval(name) route.
+	qAddChainTermName
 )
 
 // qTermArgPlan caches how a small operand sub-expression resolves: literal,
@@ -297,6 +300,11 @@ func buildQAddChainTermPlan(termSrc string) qAddChainTermPlan {
 			return plan
 		}
 	}
+	if qAddChainBareNameTerm(stripped) {
+		plan.kind = qAddChainTermName
+		plan.name = stripped
+		return plan
+	}
 	if qScalarAddChainTermMayBeScalarIndex(stripped) {
 		if scalar, ok := buildScalarApplyIndexPlan(stripped); ok {
 			plan.kind = qAddChainTermScalarIndex
@@ -506,6 +514,10 @@ func (s *EvalState) evalQAddChainTerm(plan *qAddChainTermPlan) (any, error) {
 	case qAddChainTermCountName:
 		if value, ok := s.lookupName(plan.name); ok {
 			return count(value)
+		}
+	case qAddChainTermName:
+		if value, ok := s.lookupName(plan.name); ok {
+			return value, nil
 		}
 	case qAddChainTermFast:
 		out, handled, err := s.evalQFastPlan(plan.fast)

@@ -1,6 +1,7 @@
 package q
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -6268,7 +6269,29 @@ func isScalarAddChainTerm(src string) bool {
 	if _, _, err := parseNumberOrBool(src); err == nil {
 		return true
 	}
+	if qAddChainBareNameTerm(src) {
+		return true
+	}
 	return false
+}
+
+// qAddChainBareNameTerm reports whether src is a plain binding name usable as
+// an add-chain term: the term route is one lookupName, and verb/constant
+// words stay on their existing routes.
+func qAddChainBareNameTerm(src string) bool {
+	if !isQAssignmentName(src) {
+		return false
+	}
+	if _, ok := qEvalConstantWords[src]; ok {
+		return false
+	}
+	if _, ok := lookupUnaryVerb(src); ok {
+		return false
+	}
+	if _, ok := lookupDyadicVerbFunc(src); ok {
+		return false
+	}
+	return true
 }
 
 func parseCallableOverApplication(src string) (fnSrc, initialSrc, valueSrc string, ok bool) {
@@ -9816,7 +9839,25 @@ func containsInternalDyadicSign(field string) bool {
 	return false
 }
 
+// errNotNumericLiteral is the shared probe error for sources that cannot be
+// numeric literals. Number parsing is used as a per-evaluation probe on
+// identifiers, so the early guard must not allocate a formatted error.
+var errNotNumericLiteral = errors.New("not a numeric literal")
+
 func parseNumberOrBool(src string) (any, bool, error) {
+	if src == "" {
+		return nil, false, errNotNumericLiteral
+	}
+	switch c := src[0]; {
+	case c >= '0' && c <= '9', c == '-', c == '+', c == '.':
+		// Numeric-looking: run the full literal parse below.
+	case src == "true":
+		return true, false, nil
+	case src == "false":
+		return false, false, nil
+	default:
+		return nil, false, errNotNumericLiteral
+	}
 	if strings.HasPrefix(src, "-") || strings.HasPrefix(src, "+") {
 		sign := src[0]
 		body := src[1:]
@@ -10203,6 +10244,20 @@ func dictLookup(v any, key any) (any, error) {
 	d, ok := v.(EvalDict)
 	if !ok {
 		return nil, fmt.Errorf("lookup expects a dictionary")
+	}
+	if sym, ok := key.(data.Symbol); ok && !data.IsNull(sym) {
+		// Scalar symbol probe: a non-null Symbol only ever equalValue-matches
+		// a Symbol entry (DeepEqual is type-strict), so scan with direct
+		// string equality instead of boxed slices plus reflect.DeepEqual.
+		for j, existing := range d.Keys {
+			if s, ok := existing.(data.Symbol); ok && s == sym {
+				if d.Values[j] == nil {
+					return data.NullValue, nil
+				}
+				return d.Values[j], nil
+			}
+		}
+		return data.NullValue, nil
 	}
 	keys, scalar, err := lookupKeys(key)
 	if err != nil {
@@ -11176,7 +11231,7 @@ func flip(v any) (any, error) {
 			}
 			array = data.InferArray(repeated)
 		}
-		cols = append(cols, data.Column{Name: name, Data: data.MaterializeArray(array)})
+		cols = append(cols, data.Column{Name: name, Data: data.MaterializeFrameColumn(array)})
 	}
 	// q-side arrays are immutable value carriers: adopt the densely
 	// materialized columns directly instead of routing every column through
