@@ -4,26 +4,61 @@
   "title": "FinRobot Product Workflow DB Migration",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "provider_free", "live_network", "capability", "migrations"],
+  "required": ["schema_version", "provider_free", "live_network", "capability", "versioning", "migrations"],
   "properties": {
     "schema_version": {"type": "integer", "minimum": 1},
     "provider_free": {"const": true},
     "live_network": {"const": false},
     "capability": {"const": "product.workflow.db.migration.plan"},
+    "versioning": {
+      "type": "object",
+      "required": ["current_version", "schema_table", "ordering", "fixtures"],
+      "properties": {
+        "current_version": {"type": "integer", "minimum": 1},
+        "schema_table": {"const": "schema_versions"},
+        "version_column": {"type": "string"},
+        "migration_id_column": {"type": "string"},
+        "checksum_column": {"type": "string"},
+        "rollback_table": {"const": "schema_rollbacks"},
+        "ordering": {"const": "strictly_increasing_integer"},
+        "fixtures": {
+          "type": "object",
+          "required": ["applied_versions", "rollback_runs"],
+          "properties": {
+            "applied_versions": {"type": "string"},
+            "rollback_runs": {"type": "string"}
+          }
+        }
+      }
+    },
     "migrations": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "direction", "tables", "rollback_required"],
+        "required": ["id", "version", "previous_version", "direction", "tables", "rollback_required", "rollback"],
         "properties": {
           "id": {"type": "string"},
+          "version": {"type": "integer", "minimum": 1},
+          "previous_version": {"type": "integer", "minimum": 0},
           "direction": {"enum": ["up", "down"]},
           "tables": {"type": "array", "minItems": 1},
-          "rollback_required": {"const": true}
+          "rollback_required": {"const": true},
+          "rollback": {
+            "type": "object",
+            "required": ["id", "direction", "from_version", "to_version", "fixture_path"],
+            "properties": {
+              "id": {"type": "string"},
+              "direction": {"const": "down"},
+              "from_version": {"type": "integer", "minimum": 1},
+              "to_version": {"type": "integer", "minimum": 0},
+              "drops_tables": {"type": "array", "items": {"type": "string"}},
+              "removes_columns": {"type": "array", "items": {"type": "string"}},
+              "fixture_path": {"type": "string"}
+            }
+          }
         }
       }
     }
   }
 }
-

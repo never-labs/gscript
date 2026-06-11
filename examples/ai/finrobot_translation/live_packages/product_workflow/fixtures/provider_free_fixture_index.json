@@ -14,7 +14,71 @@
       "session_count": 2,
       "task_log_count": 4,
       "download_count": 4,
-      "crud_ops": ["create", "read", "update", "delete"]
+      "crud_ops": ["create", "read", "update", "delete"],
+      "auth_sessions": [
+        {
+          "id": "sess_user",
+          "user_id": "usr_analyst",
+          "role": "analyst",
+          "state": "authenticated",
+          "csrf_valid": true,
+          "expires_at": "2030-01-01T00:00:00Z"
+        },
+        {
+          "id": "sess_admin",
+          "user_id": "usr_admin",
+          "role": "admin",
+          "state": "authenticated",
+          "csrf_valid": true,
+          "expires_at": "2030-01-01T00:00:00Z"
+        },
+        {
+          "id": "sess_expired",
+          "user_id": "usr_analyst",
+          "role": "analyst",
+          "state": "expired",
+          "csrf_valid": false,
+          "expires_at": "2000-01-01T00:00:00Z"
+        }
+      ],
+      "report_request_lifecycle": [
+        {"request_id": "req_aapl_001", "sequence": 1, "from": "draft", "event": "submit", "to": "queued"},
+        {"request_id": "req_aapl_001", "sequence": 2, "from": "queued", "event": "worker_started", "to": "running"},
+        {"request_id": "req_aapl_001", "sequence": 3, "from": "running", "event": "artifact_manifest_written", "to": "artifact_ready"},
+        {"request_id": "req_aapl_001", "sequence": 4, "from": "artifact_ready", "event": "finalize", "to": "completed"}
+      ],
+      "task_events": [
+        {"id": "evt_001", "task_id": "task_aapl_001", "sequence": 1, "event": "queued"},
+        {"id": "evt_002", "task_id": "task_aapl_001", "sequence": 2, "event": "started"},
+        {"id": "evt_003", "task_id": "task_aapl_001", "sequence": 3, "event": "artifact_planned"},
+        {"id": "evt_004", "task_id": "task_aapl_001", "sequence": 4, "event": "completed"}
+      ],
+      "download_authorization": [
+        {
+          "artifact_id": "artifact_html_report",
+          "session_id": "sess_user",
+          "decision": "allow",
+          "reason": "owner_session_authenticated"
+        },
+        {
+          "artifact_id": "artifact_pdf_report",
+          "session_id": "sess_admin",
+          "decision": "allow",
+          "reason": "admin_session_authenticated"
+        },
+        {
+          "artifact_id": "artifact_manifest_json",
+          "session_id": "sess_expired",
+          "decision": "deny",
+          "reason": "expired_session"
+        },
+        {
+          "artifact_id": "artifact_task_log",
+          "session_id": "sess_other_user",
+          "decision": "deny",
+          "reason": "wrong_owner"
+        }
+      ]
     }
   },
   "db_seed": {
@@ -23,7 +87,49 @@
     "report_requests": ["req_aapl_001"],
     "reports": ["rep_aapl_001"],
     "artifacts": ["artifact_html_report", "artifact_pdf_report", "artifact_manifest_json", "artifact_task_log"],
-    "task_events": ["queued", "started", "artifact_planned", "completed"]
+    "task_events": ["queued", "started", "artifact_planned", "completed"],
+    "schema_versions": [
+      {
+        "version": 1,
+        "migration_id": "001_product_workflow_base",
+        "checksum": "fixture-sha256-001",
+        "applied_at": "2026-01-01T00:00:00Z"
+      },
+      {
+        "version": 2,
+        "migration_id": "002_request_artifact_authorization",
+        "checksum": "fixture-sha256-002",
+        "applied_at": "2026-01-01T00:01:00Z"
+      }
+    ],
+    "schema_rollbacks": [
+      {
+        "id": "rollback_002_to_001",
+        "from_version": 2,
+        "to_version": 1,
+        "migration_id": "002_request_artifact_authorization_down",
+        "checksum": "fixture-sha256-002-down"
+      },
+      {
+        "id": "rollback_001_to_000",
+        "from_version": 1,
+        "to_version": 0,
+        "migration_id": "001_product_workflow_base_down",
+        "checksum": "fixture-sha256-001-down"
+      }
+    ],
+    "rollback_fixtures": {
+      "001_product_workflow_base_down": {
+        "from_version": 1,
+        "to_version": 0,
+        "expected_remaining_tables": []
+      },
+      "002_request_artifact_authorization_down": {
+        "from_version": 2,
+        "to_version": 1,
+        "expected_remaining_tables": ["users", "sessions", "report_requests", "reports", "artifacts", "task_events", "audit_events", "schema_versions", "schema_rollbacks"],
+        "expected_removed_columns": ["report_requests.owner_user_id", "report_requests.state_version", "artifacts.authorized_role", "task_events.sequence"]
+      }
+    }
   }
 }
-

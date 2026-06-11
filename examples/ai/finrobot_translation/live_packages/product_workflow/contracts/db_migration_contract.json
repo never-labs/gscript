@@ -6,9 +6,24 @@
   "capability": "product.workflow.db.migration.plan",
   "migration_engine": "contract_only",
   "schema_table": "schema_versions",
+  "versioning": {
+    "current_version": 2,
+    "schema_table": "schema_versions",
+    "version_column": "version",
+    "migration_id_column": "migration_id",
+    "checksum_column": "checksum",
+    "rollback_table": "schema_rollbacks",
+    "ordering": "strictly_increasing_integer",
+    "fixtures": {
+      "applied_versions": "fixtures/provider_free_fixture_index.json#/db_seed/schema_versions",
+      "rollback_runs": "fixtures/provider_free_fixture_index.json#/db_seed/schema_rollbacks"
+    }
+  },
   "migrations": [
     {
       "id": "001_product_workflow_base",
+      "version": 1,
+      "previous_version": 0,
       "direction": "up",
       "tables": [
         {
@@ -33,7 +48,7 @@
         },
         {
           "name": "task_events",
-          "columns": ["id", "task_id", "event", "level", "message", "created_at"]
+          "columns": ["id", "task_id", "sequence", "event", "level", "message", "created_at"]
         },
         {
           "name": "audit_events",
@@ -41,18 +56,84 @@
         },
         {
           "name": "schema_versions",
-          "columns": ["version", "migration_id", "applied_at"]
+          "columns": ["version", "migration_id", "checksum", "applied_at"]
+        },
+        {
+          "name": "schema_rollbacks",
+          "columns": ["id", "from_version", "to_version", "migration_id", "checksum", "rolled_back_at"]
         }
       ],
       "rollback_required": true,
+      "rollback": {
+        "id": "001_product_workflow_base_down",
+        "direction": "down",
+        "from_version": 1,
+        "to_version": 0,
+        "drops_tables": [
+          "schema_rollbacks",
+          "schema_versions",
+          "audit_events",
+          "task_events",
+          "artifacts",
+          "reports",
+          "report_requests",
+          "sessions",
+          "users"
+        ],
+        "fixture_path": "fixtures/provider_free_fixture_index.json#/db_seed/rollback_fixtures/001_product_workflow_base_down"
+      },
+      "fixture_seed": "fixtures/provider_free_fixture_index.json#/db_seed"
+    },
+    {
+      "id": "002_request_artifact_authorization",
+      "version": 2,
+      "previous_version": 1,
+      "direction": "up",
+      "tables": [
+        {
+          "name": "report_requests",
+          "columns": ["id", "owner_user_id", "status", "state_version", "deleted_at"]
+        },
+        {
+          "name": "artifacts",
+          "columns": ["id", "owner_user_id", "authorized_role", "ready_state", "sha256"]
+        },
+        {
+          "name": "task_events",
+          "columns": ["id", "task_id", "sequence", "event", "created_at"]
+        },
+        {
+          "name": "schema_versions",
+          "columns": ["version", "migration_id", "checksum", "applied_at"]
+        }
+      ],
+      "rollback_required": true,
+      "rollback": {
+        "id": "002_request_artifact_authorization_down",
+        "direction": "down",
+        "from_version": 2,
+        "to_version": 1,
+        "removes_columns": [
+          "report_requests.owner_user_id",
+          "report_requests.state_version",
+          "report_requests.deleted_at",
+          "artifacts.owner_user_id",
+          "artifacts.authorized_role",
+          "artifacts.ready_state",
+          "task_events.sequence"
+        ],
+        "fixture_path": "fixtures/provider_free_fixture_index.json#/db_seed/rollback_fixtures/002_request_artifact_authorization_down"
+      },
       "fixture_seed": "fixtures/provider_free_fixture_index.json#/db_seed"
     }
   ],
   "contract_checks": [
     "all CRUD tables have id columns",
     "task_events preserve append-only history",
+    "task_events sequence is monotonic within each task_id",
     "artifact paths are local fixture paths",
+    "artifact downloads require owner or admin authorization",
+    "schema_versions are strictly increasing and rollback fixtures exist",
     "rollback is declared before live migration support"
   ]
 }
-
