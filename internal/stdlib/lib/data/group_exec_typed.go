@@ -293,7 +293,9 @@ func groupCompactRowIDs(frame Frame, byInputs []groupInput, byArrays []Array, ro
 		useSlate = false
 	}
 
-	gids := make([]int32, n)
+	// gids is fully overwritten below; the slates rely on zero initial state,
+	// so pooled slates are cleared explicitly (alloc+GC saved, memclr kept).
+	gids := bulkI32Get(n)
 	repRows := make([]int, 0, 16)
 	switch {
 	case len(perColumn) == 1 || compositeIDs != nil:
@@ -303,7 +305,8 @@ func groupCompactRowIDs(frame Frame, byInputs []groupInput, byArrays []Array, ro
 			ids = compositeIDs
 			slateSize = rows
 		}
-		slate := make([]int32, slateSize)
+		slate := bulkI32Get(slateSize)
+		clear(slate)
 		if allRows {
 			for row := 0; row < rows; row++ {
 				g := slate[ids[row]]
@@ -325,8 +328,10 @@ func groupCompactRowIDs(frame Frame, byInputs []groupInput, byArrays []Array, ro
 				gids[k] = g - 1
 			}
 		}
+		bulkI32Release(slate)
 	default:
-		slate := make([]int32, domain)
+		slate := bulkI32Get(int(domain))
+		clear(slate)
 		if allRows {
 			for row := 0; row < rows; row++ {
 				key := perColumn[0][row]
@@ -356,6 +361,7 @@ func groupCompactRowIDs(frame Frame, byInputs []groupInput, byArrays []Array, ro
 				gids[k] = g - 1
 			}
 		}
+		bulkI32Release(slate)
 	}
 	return gids, repRows, true
 }
@@ -388,6 +394,10 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 	if !ok {
 		return Frame{}, false, nil
 	}
+	// gids is a transient per-row vector; nothing below retains it (outputs
+	// gather through repRows / accumulator slices), so it goes back to the
+	// bulk pool when this call finishes.
+	defer bulkI32Release(gids)
 	groupCount := len(repRows)
 
 	accs := make([]typedRowIDsAccumulator, len(aggs))

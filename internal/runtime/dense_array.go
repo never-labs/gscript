@@ -77,6 +77,32 @@ func NewDenseArrayString(values []string) *DenseArray {
 	return a
 }
 
+// NewDenseArrayF64Owned adopts values as the array's backing storage without
+// copying. The caller transfers ownership: it must not read or write the
+// slice after the call. Intended for export bridges whose source slice was
+// freshly materialized for this array.
+func NewDenseArrayF64Owned(values []float64) *DenseArray {
+	return &DenseArray{dtype: DenseArrayF64, f64: values}
+}
+
+// NewDenseArrayI64Owned adopts values as the array's backing storage without
+// copying. See NewDenseArrayF64Owned for the ownership contract.
+func NewDenseArrayI64Owned(values []int64) *DenseArray {
+	return &DenseArray{dtype: DenseArrayI64, i64: values}
+}
+
+// NewDenseArrayBoolOwned adopts values as the array's backing storage without
+// copying. See NewDenseArrayF64Owned for the ownership contract.
+func NewDenseArrayBoolOwned(values []bool) *DenseArray {
+	return &DenseArray{dtype: DenseArrayBool, bools: values}
+}
+
+// NewDenseArrayStringOwned adopts values as the array's backing storage
+// without copying. See NewDenseArrayF64Owned for the ownership contract.
+func NewDenseArrayStringOwned(values []string) *DenseArray {
+	return &DenseArray{dtype: DenseArrayString, strings: values}
+}
+
 func NewDenseArrayOfLen(dtype DenseArrayDType, n int) (*DenseArray, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("dense array length must be non-negative")

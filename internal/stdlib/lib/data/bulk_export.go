@@ -15,6 +15,8 @@ func TryExportI64Copy(array Array, dst []int64) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportI64Copy(a.array, dst)
+	case transferOwnedArray:
+		return TryExportI64Copy(a.inner, dst)
 	case indexedArray:
 		for row := range dst {
 			index, ok, err := i64IndexArrayAt(a.indexes, row)
@@ -159,6 +161,8 @@ func TryExportF64Copy(array Array, dst []float64) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportF64Copy(a.array, dst)
+	case transferOwnedArray:
+		return TryExportF64Copy(a.inner, dst)
 	case indexedArray:
 		for row := range dst {
 			index, ok, err := i64IndexArrayAt(a.indexes, row)
@@ -253,6 +257,8 @@ func TryExportBoolCopy(array Array, dst []bool) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportBoolCopy(a.array, dst)
+	case transferOwnedArray:
+		return TryExportBoolCopy(a.inner, dst)
 	case indexedArray:
 		for row := range dst {
 			index, ok, err := i64IndexArrayAt(a.indexes, row)
@@ -304,6 +310,8 @@ func TryExportStringCopy(array Array, dst []string) (bool, error) {
 	switch a := array.(type) {
 	case attributedArray:
 		return TryExportStringCopy(a.array, dst)
+	case transferOwnedArray:
+		return TryExportStringCopy(a.inner, dst)
 	case indexedArray:
 		for row := range dst {
 			index, ok, err := i64IndexArrayAt(a.indexes, row)

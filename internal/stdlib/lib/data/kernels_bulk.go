@@ -31,6 +31,8 @@ const bulkPoolMaxLen = 1 << 21
 var bulkI64Pool = sync.Pool{}
 var bulkF64Pool = sync.Pool{}
 var bulkBoolPool = sync.Pool{}
+var bulkIntPool = sync.Pool{}
+var bulkI32Pool = sync.Pool{}
 
 func bulkI64Get(n int) []int64 {
 	if v := bulkI64Pool.Get(); v != nil {
@@ -81,6 +83,61 @@ func bulkBoolRelease(values []bool, owned bool) {
 		return
 	}
 	bulkBoolPool.Put(values[:0])
+}
+
+// bulkIntGet returns a zero-length []int with capacity at least n for
+// transient row-index vectors (where filters, gather index lists). Contents
+// beyond len are unspecified; callers must append or reslice-and-overwrite.
+func bulkIntGet(n int) []int {
+	if v := bulkIntPool.Get(); v != nil {
+		s := v.([]int)
+		if cap(s) >= n {
+			return s[:0]
+		}
+	}
+	return make([]int, 0, n)
+}
+
+// bulkIntGetLen returns a length-n []int for transient row-index vectors
+// that are fully overwritten by the producer. Contents are unspecified.
+func bulkIntGetLen(n int) []int {
+	if v := bulkIntPool.Get(); v != nil {
+		s := v.([]int)
+		if cap(s) >= n {
+			return s[:n]
+		}
+	}
+	return make([]int, n)
+}
+
+// bulkIntRelease recycles a transient row-index vector. The caller must
+// guarantee nothing still references the slice's backing storage.
+func bulkIntRelease(values []int) {
+	if cap(values) == 0 || cap(values) > bulkPoolMaxLen {
+		return
+	}
+	bulkIntPool.Put(values[:0])
+}
+
+// bulkI32Get returns a length-n []int32 for transient per-row group-id
+// vectors. Contents are unspecified; callers must fully overwrite or clear.
+func bulkI32Get(n int) []int32 {
+	if v := bulkI32Pool.Get(); v != nil {
+		s := v.([]int32)
+		if cap(s) >= n {
+			return s[:n]
+		}
+	}
+	return make([]int32, n)
+}
+
+// bulkI32Release recycles a transient group-id vector. The caller must
+// guarantee nothing still references the slice's backing storage.
+func bulkI32Release(values []int32) {
+	if cap(values) == 0 || cap(values) > bulkPoolMaxLen {
+		return
+	}
+	bulkI32Pool.Put(values[:0])
 }
 
 // TryBulkF64 exposes bulk float64 carrier flattening to sibling runtime

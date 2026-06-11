@@ -500,13 +500,13 @@ func dbColumnValue(values []Value) Value {
 		for i, v := range values {
 			xs[i] = v.Int()
 		}
-		return DenseArrayValue(NewDenseArrayI64(xs))
+		return DenseArrayValue(NewDenseArrayI64Owned(xs))
 	case allNumber:
 		xs := make([]float64, len(values))
 		for i, v := range values {
 			xs[i] = v.Number()
 		}
-		return DenseArrayValue(NewDenseArrayF64(xs))
+		return DenseArrayValue(NewDenseArrayF64Owned(xs))
 	case allBool:
 		out, err := NewDenseArrayOfLen(DenseArrayBool, len(values))
 		if err != nil {

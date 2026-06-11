@@ -1084,12 +1084,19 @@ func DeleteWhereKeyed(keyed KeyedFrame, where Expr) (KeyedFrame, error) {
 		if err != nil {
 			return KeyedFrame{}, err
 		}
+		// Filter-origin match vectors are transient (only rowMap survives);
+		// cached keyed-index rows above are shared and must not be pooled.
+		defer bulkIntRelease(deleteIndexes)
 	}
 	if len(deleteIndexes) == 0 {
 		return keyed, nil
 	}
 	n := keyed.frame.Len()
-	rowMap := make([]int32, n)
+	// rowMap is a transient old-row -> new-row map; only the remapped
+	// per-key row lists survive, so it goes back to the bulk pool.
+	rowMap := bulkI32Get(n)
+	clear(rowMap)
+	defer bulkI32Release(rowMap)
 	for _, row := range deleteIndexes {
 		if row < 0 || row >= n {
 			return KeyedFrame{}, fmt.Errorf("delete index %d out of range", row)
