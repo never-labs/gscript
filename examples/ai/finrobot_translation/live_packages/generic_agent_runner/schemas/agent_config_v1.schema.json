@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "agent_config_v1",
+  "required": [
+    "id",
+    "instructions",
+    "tools",
+    "params",
+    "output",
+    "max_steps",
+    "replay_policy"
+  ],
+  "tool_required": ["name", "capability", "provider_free"],
+  "provider_free": true
+}

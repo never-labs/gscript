@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-agent-runner-live-package",
+  "package_name": "leia-generic-ai-agent-runner",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "source_examples": [
+    "examples/ai/general_analysis_assistant.leia",
+    "examples/ai/general_analysis_assistant.records.json"
+  ],
+  "entrypoints": {
+    "smoke": "main.leia",
+    "contract": "contracts/agent_runner_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "agent_config": "schemas/agent_config_v1.schema.json",
+    "loop_trace": "schemas/loop_trace_v1.schema.json",
+    "structured_output": "schemas/structured_output_v1.schema.json"
+  },
+  "fixtures": {
+    "agent_config": "fixtures/agent_config_fixture.json",
+    "loop_trace": "fixtures/loop_trace_fixture.json",
+    "structured_output": "fixtures/structured_output_fixture.json"
+  },
+  "capabilities": [
+    "ai.agent.config.declarative",
+    "ai.agent.tool_history.replay",
+    "ai.agent.loop_trace.emit",
+    "ai.agent.structured_output.validate",
+    "ai.agent.replay_policy.enforce",
+    "ai.agent.max_steps.guard"
+  ],
+  "test_gates": [
+    "fixture JSON parses without live provider credentials",
+    "contract declares provider-free loop execution boundary",
+    "Leia smoke example executes in interpreter and bytecode modes",
+    "no q runtime, provider SDK, live network, or secret dependency"
+  ],
+  "backend_shape": "ai.agent.run",
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Generic AI agent execution is packaged as a dialect boundary and is not a built-in Leia language feature."
+  }
+}

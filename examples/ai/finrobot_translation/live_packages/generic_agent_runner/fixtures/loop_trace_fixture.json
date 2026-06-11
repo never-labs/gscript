@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "generic_agent_loop_trace_fixture",
+  "provider_free": true,
+  "events": [
+    {"seq": 1, "type": "agent_start", "correlation_id": "agent-run-001"},
+    {"seq": 2, "type": "turn_start", "correlation_id": "turn-001"},
+    {"seq": 3, "type": "tool_request", "correlation_id": "tool-001", "tool": "local_research"},
+    {"seq": 4, "type": "tool_result", "correlation_id": "tool-001", "status": "ok"},
+    {"seq": 5, "type": "turn_end", "correlation_id": "turn-001"},
+    {"seq": 6, "type": "agent_end", "correlation_id": "agent-run-001"}
+  ],
+  "redaction": {
+    "secret_values_present": false,
+    "replacement": "<redacted>"
+  }
+}
