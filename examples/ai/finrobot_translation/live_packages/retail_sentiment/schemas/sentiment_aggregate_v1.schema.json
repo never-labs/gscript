@@ -17,7 +17,8 @@
     "platform_weights",
     "source_snapshot_refs",
     "redaction_summary",
-    "stale_snapshot_warning"
+    "stale_snapshot_warning",
+    "normalization"
   ],
   "properties": {
     "fixture_key": {"type": "string"},
@@ -57,6 +58,33 @@
         "message": {"type": "string"}
       }
     },
-    "normalization": {"type": "object"}
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "dedupe_window_hours",
+        "live_network",
+        "sentiment_scale",
+        "aggregate_sentiment_label",
+        "category_weights"
+      ],
+      "properties": {
+        "method": {"type": "string"},
+        "dedupe_window_hours": {"type": "integer", "minimum": 0},
+        "live_network": {"type": "boolean", "const": false},
+        "sentiment_scale": {"type": "string", "const": "minus_one_to_one"},
+        "aggregate_sentiment_label": {"type": "string", "enum": ["bearish", "neutral", "bullish"]},
+        "category_weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["retail_discussion", "prediction_market"],
+          "properties": {
+            "retail_discussion": {"type": "number", "minimum": 0, "maximum": 1},
+            "prediction_market": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        }
+      }
+    }
   }
 }

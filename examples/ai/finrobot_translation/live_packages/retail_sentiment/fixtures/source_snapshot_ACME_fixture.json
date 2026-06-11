@@ -21,6 +21,21 @@
         "bearish_ratio": 0.25,
         "confidence": 0.52
       },
+      "pagination_metadata": {
+        "pagination_mode": "cursor",
+        "page_size": 100,
+        "page_count": 3,
+        "items_observed": 220,
+        "next_cursor_redacted": "cursor://redacted/adanos/acme/page-3",
+        "raw_cursor_removed": true
+      },
+      "auth_redaction": {
+        "access_token_removed": true,
+        "cookie_removed": true,
+        "authorization_header_removed": true,
+        "secret_material_present": false,
+        "redaction_marker": "auth:redacted:adanos"
+      },
       "redaction": {
         "policy_id": "retail_sentiment_redaction_v1",
         "raw_identifiers_removed": true,
@@ -34,7 +49,17 @@
         "usage": "offline-fixture-only",
         "attribution": "platform terms metadata retained",
         "redistribution": "do-not-redistribute-live-payloads",
-        "retention_days": 0
+        "retention_days": 0,
+        "terms_version": "offline-terms-2026-06",
+        "effective_date": "2026-06-11",
+        "prompt_summary_allowed": true
+      },
+      "normalization": {
+        "sentiment_label": "bullish",
+        "category": "retail_discussion",
+        "category_confidence": 0.71,
+        "score_scale": "minus_one_to_one",
+        "provider_category": "social_alpha"
       },
       "stale_snapshot_warning": {
         "is_stale": true,
@@ -54,6 +79,21 @@
         "bearish_ratio": 0.33,
         "confidence": 0.57
       },
+      "pagination_metadata": {
+        "pagination_mode": "page",
+        "page_size": 100,
+        "page_count": 3,
+        "items_observed": 300,
+        "next_cursor_redacted": "page://redacted/reddit/acme/after-3",
+        "raw_cursor_removed": true
+      },
+      "auth_redaction": {
+        "access_token_removed": true,
+        "cookie_removed": true,
+        "authorization_header_removed": true,
+        "secret_material_present": false,
+        "redaction_marker": "auth:redacted:reddit"
+      },
       "redaction": {
         "policy_id": "retail_sentiment_redaction_v1",
         "raw_identifiers_removed": true,
@@ -67,7 +107,17 @@
         "usage": "offline-fixture-only",
         "attribution": "platform terms metadata retained",
         "redistribution": "do-not-redistribute-live-payloads",
-        "retention_days": 0
+        "retention_days": 0,
+        "terms_version": "offline-terms-2026-06",
+        "effective_date": "2026-06-11",
+        "prompt_summary_allowed": true
+      },
+      "normalization": {
+        "sentiment_label": "neutral",
+        "category": "retail_discussion",
+        "category_confidence": 0.68,
+        "score_scale": "minus_one_to_one",
+        "provider_category": "subreddit_commentary"
       },
       "stale_snapshot_warning": {
         "is_stale": true,
@@ -87,6 +137,21 @@
         "bearish_ratio": 0.24,
         "confidence": 0.64
       },
+      "pagination_metadata": {
+        "pagination_mode": "cursor",
+        "page_size": 500,
+        "page_count": 3,
+        "items_observed": 1500,
+        "next_cursor_redacted": "cursor://redacted/x/acme/page-3",
+        "raw_cursor_removed": true
+      },
+      "auth_redaction": {
+        "access_token_removed": true,
+        "cookie_removed": true,
+        "authorization_header_removed": true,
+        "secret_material_present": false,
+        "redaction_marker": "auth:redacted:x"
+      },
       "redaction": {
         "policy_id": "retail_sentiment_redaction_v1",
         "raw_identifiers_removed": true,
@@ -100,7 +165,17 @@
         "usage": "offline-fixture-only",
         "attribution": "platform terms metadata retained",
         "redistribution": "do-not-redistribute-live-payloads",
-        "retention_days": 0
+        "retention_days": 0,
+        "terms_version": "offline-terms-2026-06",
+        "effective_date": "2026-06-11",
+        "prompt_summary_allowed": true
+      },
+      "normalization": {
+        "sentiment_label": "bullish",
+        "category": "retail_discussion",
+        "category_confidence": 0.74,
+        "score_scale": "minus_one_to_one",
+        "provider_category": "cashtag_stream"
       },
       "stale_snapshot_warning": {
         "is_stale": true,
@@ -120,6 +195,21 @@
         "bearish_ratio": 0.32,
         "confidence": 0.46
       },
+      "pagination_metadata": {
+        "pagination_mode": "window",
+        "page_size": 40,
+        "page_count": 1,
+        "items_observed": 40,
+        "next_cursor_redacted": "window://redacted/polymarket/acme/final",
+        "raw_cursor_removed": true
+      },
+      "auth_redaction": {
+        "access_token_removed": true,
+        "cookie_removed": true,
+        "authorization_header_removed": true,
+        "secret_material_present": false,
+        "redaction_marker": "auth:redacted:polymarket"
+      },
       "redaction": {
         "policy_id": "retail_sentiment_redaction_v1",
         "raw_identifiers_removed": true,
@@ -133,7 +223,17 @@
         "usage": "offline-fixture-only",
         "attribution": "platform terms metadata retained",
         "redistribution": "do-not-redistribute-live-payloads",
-        "retention_days": 0
+        "retention_days": 0,
+        "terms_version": "offline-terms-2026-06",
+        "effective_date": "2026-06-11",
+        "prompt_summary_allowed": true
+      },
+      "normalization": {
+        "sentiment_label": "bullish",
+        "category": "prediction_market",
+        "category_confidence": 0.66,
+        "score_scale": "minus_one_to_one",
+        "provider_category": "market_probability"
       },
       "stale_snapshot_warning": {
         "is_stale": true,

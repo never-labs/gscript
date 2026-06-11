@@ -25,6 +25,9 @@
         "mention_volume",
         "platform_weights",
         "source_terms",
+        "pagination_metadata",
+        "auth_redaction",
+        "normalization",
         "redaction",
         "stale_snapshot_warning"
       ]
@@ -41,6 +44,9 @@
       ],
       "required_sections": [
         "source_terms",
+        "pagination_metadata",
+        "auth_redaction",
+        "normalization",
         "redaction",
         "metrics",
         "stale_snapshot_warning"
@@ -53,7 +59,8 @@
         1
       ],
       "source_snapshot_refs_required": true,
-      "redaction_summary_required": true
+      "redaction_summary_required": true,
+      "normalization_required": true
     },
     "redaction_policy": {
       "type": "policy",
@@ -71,7 +78,39 @@
         "usage",
         "attribution",
         "redistribution",
-        "retention_days"
+        "retention_days",
+        "terms_version",
+        "effective_date",
+        "prompt_summary_allowed"
+      ]
+    },
+    "pagination_metadata": {
+      "type": "metadata",
+      "required_fields": [
+        "pagination_mode",
+        "page_size",
+        "page_count",
+        "items_observed",
+        "next_cursor_redacted",
+        "raw_cursor_removed"
+      ]
+    },
+    "auth_redaction": {
+      "type": "redaction",
+      "required_fields": [
+        "access_token_removed",
+        "cookie_removed",
+        "authorization_header_removed",
+        "secret_material_present",
+        "redaction_marker"
+      ]
+    },
+    "normalization": {
+      "type": "normalization",
+      "required_fields": [
+        "sentiment_label",
+        "category",
+        "score_scale"
       ]
     },
     "stale_snapshot_warning": {
@@ -100,7 +139,10 @@
   ],
   "acceptance_gates": [
     "source snapshots cover Adanos, Reddit, X, and Polymarket without live network access",
+    "source snapshots expose pagination metadata with only redacted cursors",
     "source terms metadata is retained for each platform snapshot",
+    "auth redaction removes access tokens, cookies, and authorization headers before prompt formatting",
+    "sentiment and category normalization use canonical labels across providers",
     "redaction removes raw handles, URLs, tokens, cookies, and authorization headers before prompt formatting",
     "aggregate output links every platform contribution back to source snapshot refs",
     "stale snapshot warnings are explicit and deterministic in provider-free fixtures"

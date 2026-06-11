@@ -128,8 +128,8 @@
     }
   ],
   "prompt_contracts": {
-    "source_snapshot_format": "Each source snapshot must provide source_id, platform, as_of, observed_window, source_terms, redaction, stale_snapshot_warning, and metrics before prompt rendering.",
-    "aggregate_format": "Aggregate prompts must include aggregate_score, mention_volume, platform_weights, source_snapshot_refs, redaction_summary, and stale_snapshot_warning.",
+    "source_snapshot_format": "Each source snapshot must provide source_id, platform, as_of, observed_window, pagination_metadata, auth_redaction, source_terms, normalization, redaction, stale_snapshot_warning, and metrics before prompt rendering.",
+    "aggregate_format": "Aggregate prompts must include aggregate_score, mention_volume, platform_weights, source_snapshot_refs, normalization, redaction_summary, and stale_snapshot_warning.",
     "forbidden_prompt_fields": [
       "raw_user_handle",
       "raw_url",
@@ -142,7 +142,7 @@
     "manifest and referenced JSON files decode without external dependencies",
     "provider_free is true and live_network_default is false",
     "Adanos, Reddit, X, and Polymarket source snapshots are fixture-backed and clean-skip safe",
-    "source snapshot and aggregate schemas include redaction, terms metadata, and stale snapshot warnings",
+    "source snapshot and aggregate schemas include pagination metadata, auth redaction, normalization, redaction, terms metadata, and stale snapshot warnings",
     "prompt-format contracts forbid raw handles, raw URLs, tokens, cookies, and authorization headers",
     "main.leia contains no q/runtime, provider SDK imports, or network execution"
   ],

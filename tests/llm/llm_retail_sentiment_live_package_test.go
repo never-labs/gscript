@@ -138,7 +138,7 @@ func TestFinRobotRetailSentimentLivePackageManifest(t *testing.T) {
 		}
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"adanos", "reddit", "x", "polymarket", "redaction", "terms", "stale", "q/runtime"} {
+	for _, want := range []string{"adanos", "reddit", "x", "polymarket", "pagination", "auth", "normalization", "redaction", "terms", "stale", "q/runtime"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -163,15 +163,47 @@ func TestFinRobotRetailSentimentLivePackageContractsAndFixtures(t *testing.T) {
 	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || len(contract.Modules) != 1 {
 		t.Fatalf("contract header/modules = %#v", contract)
 	}
-	for _, field := range []string{"source_snapshot", "sentiment_aggregate", "redaction_policy", "source_terms", "stale_snapshot_warning"} {
+	for _, field := range []string{"source_snapshot", "sentiment_aggregate", "redaction_policy", "source_terms", "pagination_metadata", "auth_redaction", "normalization", "stale_snapshot_warning"} {
 		if contract.FieldContracts[field] == nil {
 			t.Fatalf("missing field contract %q", field)
 		}
 	}
 	acceptance := strings.ToLower(strings.Join(contract.AcceptanceGates, " "))
-	for _, want := range []string{"adanos", "reddit", "x", "polymarket", "source terms", "redaction", "stale"} {
+	for _, want := range []string{"adanos", "reddit", "x", "polymarket", "pagination", "source terms", "auth redaction", "normalization", "redaction", "stale"} {
 		if !strings.Contains(acceptance, want) {
 			t.Fatalf("acceptance gates missing %q: %s", want, acceptance)
+		}
+	}
+
+	var prompt struct {
+		PromptSections []struct {
+			ID             string   `json:"id"`
+			RequiredFields []string `json:"required_fields"`
+		} `json:"prompt_sections"`
+		PromptEnvelope struct {
+			ID                     string   `json:"id"`
+			RequiredTopLevelFields []string `json:"required_top_level_fields"`
+			RenderOrder            []string `json:"render_order"`
+			ProviderFreeRequired   bool     `json:"provider_free_required"`
+			LiveNetworkRequired    bool     `json:"live_network_required"`
+			RedactedOnly           bool     `json:"redacted_only"`
+		} `json:"prompt_envelope"`
+		ForbiddenPromptFields []string `json:"forbidden_prompt_fields"`
+		FormatRules           []string `json:"format_rules"`
+	}
+	decodeRetailSentimentJSONFile(t, filepath.Join(base, "contracts", "prompt_format_contract.json"), &prompt)
+	if prompt.PromptEnvelope.ID != "retail_sentiment_prompt_envelope_v1" || !prompt.PromptEnvelope.ProviderFreeRequired || prompt.PromptEnvelope.LiveNetworkRequired || !prompt.PromptEnvelope.RedactedOnly {
+		t.Fatalf("prompt envelope provider-free/redacted contract incomplete: %#v", prompt.PromptEnvelope)
+	}
+	for _, want := range []string{"ticker", "as_of", "source_snapshot_summary", "sentiment_aggregate_summary", "redaction_summary", "stale_snapshot_warning"} {
+		if !retailSentimentStringSliceContains(prompt.PromptEnvelope.RequiredTopLevelFields, want) {
+			t.Fatalf("prompt envelope missing top-level field %q: %#v", want, prompt.PromptEnvelope.RequiredTopLevelFields)
+		}
+	}
+	promptRules := strings.ToLower(strings.Join(prompt.FormatRules, " "))
+	for _, want := range []string{"pagination", "redacted cursors", "normalized sentiment", "normalized categories", "auth redaction", "tokens", "cookies", "authorization header"} {
+		if !strings.Contains(promptRules, want) {
+			t.Fatalf("prompt format rules missing %q: %s", want, promptRules)
 		}
 	}
 
@@ -234,6 +266,21 @@ func TestFinRobotRetailSentimentLivePackageSourceSnapshots(t *testing.T) {
 				MentionVolume  int     `json:"mention_volume"`
 				Confidence     float64 `json:"confidence"`
 			} `json:"metrics"`
+			PaginationMetadata struct {
+				PaginationMode     string `json:"pagination_mode"`
+				PageSize           int    `json:"page_size"`
+				PageCount          int    `json:"page_count"`
+				ItemsObserved      int    `json:"items_observed"`
+				NextCursorRedacted string `json:"next_cursor_redacted"`
+				RawCursorRemoved   bool   `json:"raw_cursor_removed"`
+			} `json:"pagination_metadata"`
+			AuthRedaction struct {
+				AccessTokenRemoved         bool   `json:"access_token_removed"`
+				CookieRemoved              bool   `json:"cookie_removed"`
+				AuthorizationHeaderRemoved bool   `json:"authorization_header_removed"`
+				SecretMaterialPresent      bool   `json:"secret_material_present"`
+				RedactionMarker            string `json:"redaction_marker"`
+			} `json:"auth_redaction"`
 			Redaction struct {
 				RawIdentifiersRemoved bool   `json:"raw_identifiers_removed"`
 				RawURLsRemoved        bool   `json:"raw_urls_removed"`
@@ -242,12 +289,22 @@ func TestFinRobotRetailSentimentLivePackageSourceSnapshots(t *testing.T) {
 				RedactedURI           string `json:"redacted_uri"`
 			} `json:"redaction"`
 			SourceTerms struct {
-				Platform       string `json:"platform"`
-				Usage          string `json:"usage"`
-				Attribution    string `json:"attribution"`
-				Redistribution string `json:"redistribution"`
-				RetentionDays  int    `json:"retention_days"`
+				Platform             string `json:"platform"`
+				Usage                string `json:"usage"`
+				Attribution          string `json:"attribution"`
+				Redistribution       string `json:"redistribution"`
+				RetentionDays        int    `json:"retention_days"`
+				TermsVersion         string `json:"terms_version"`
+				EffectiveDate        string `json:"effective_date"`
+				PromptSummaryAllowed bool   `json:"prompt_summary_allowed"`
 			} `json:"source_terms"`
+			Normalization struct {
+				SentimentLabel     string  `json:"sentiment_label"`
+				Category           string  `json:"category"`
+				CategoryConfidence float64 `json:"category_confidence"`
+				ScoreScale         string  `json:"score_scale"`
+				ProviderCategory   string  `json:"provider_category"`
+			} `json:"normalization"`
 			StaleSnapshotWarning struct {
 				IsStale        bool   `json:"is_stale"`
 				StaleAfterDays int    `json:"stale_after_days"`
@@ -260,16 +317,36 @@ func TestFinRobotRetailSentimentLivePackageSourceSnapshots(t *testing.T) {
 		t.Fatalf("source snapshot fixture header/count = %#v", fixture)
 	}
 	platforms := map[string]bool{}
+	categories := map[string]bool{}
+	paginationModes := map[string]bool{}
 	for _, snapshot := range fixture.SourceSnapshots {
 		platforms[snapshot.Platform] = true
+		categories[snapshot.Normalization.Category] = true
+		paginationModes[snapshot.PaginationMetadata.PaginationMode] = true
 		if snapshot.SourceID == "" || snapshot.Metrics.MentionVolume < 0 || snapshot.Metrics.SentimentScore < -1 || snapshot.Metrics.SentimentScore > 1 || snapshot.Metrics.Confidence < 0 {
 			t.Fatalf("source snapshot metrics incomplete: %#v", snapshot)
+		}
+		if snapshot.PaginationMetadata.PageSize <= 0 || snapshot.PaginationMetadata.PageCount <= 0 || snapshot.PaginationMetadata.ItemsObserved <= 0 || snapshot.PaginationMetadata.NextCursorRedacted == "" || !snapshot.PaginationMetadata.RawCursorRemoved {
+			t.Fatalf("pagination metadata incomplete or unsafe: %#v", snapshot)
+		}
+		if strings.Contains(strings.ToLower(snapshot.PaginationMetadata.NextCursorRedacted), "token") || strings.Contains(strings.ToLower(snapshot.PaginationMetadata.NextCursorRedacted), "secret") {
+			t.Fatalf("pagination cursor must be redacted and token-free: %#v", snapshot.PaginationMetadata)
+		}
+		if !snapshot.AuthRedaction.AccessTokenRemoved || !snapshot.AuthRedaction.CookieRemoved || !snapshot.AuthRedaction.AuthorizationHeaderRemoved || snapshot.AuthRedaction.SecretMaterialPresent || snapshot.AuthRedaction.RedactionMarker == "" {
+			t.Fatalf("auth redaction incomplete: %#v", snapshot.AuthRedaction)
 		}
 		if !snapshot.Redaction.RawIdentifiersRemoved || !snapshot.Redaction.RawURLsRemoved || !snapshot.Redaction.SecretsRemoved || snapshot.Redaction.DisplayHandle == "" || snapshot.Redaction.RedactedURI == "" {
 			t.Fatalf("source snapshot redaction incomplete: %#v", snapshot)
 		}
-		if snapshot.SourceTerms.Platform != snapshot.Platform || snapshot.SourceTerms.Usage == "" || snapshot.SourceTerms.Attribution == "" || snapshot.SourceTerms.Redistribution == "" {
+		if snapshot.SourceTerms.Platform != snapshot.Platform || snapshot.SourceTerms.Usage == "" || snapshot.SourceTerms.Attribution == "" || snapshot.SourceTerms.Redistribution == "" || snapshot.SourceTerms.TermsVersion == "" || snapshot.SourceTerms.EffectiveDate == "" || !snapshot.SourceTerms.PromptSummaryAllowed {
 			t.Fatalf("source terms incomplete: %#v", snapshot)
+		}
+		if !retailSentimentStringSliceContains([]string{"bearish", "neutral", "bullish"}, snapshot.Normalization.SentimentLabel) ||
+			!retailSentimentStringSliceContains([]string{"retail_discussion", "prediction_market"}, snapshot.Normalization.Category) ||
+			snapshot.Normalization.CategoryConfidence <= 0 ||
+			snapshot.Normalization.ScoreScale != "minus_one_to_one" ||
+			snapshot.Normalization.ProviderCategory == "" {
+			t.Fatalf("normalization incomplete: %#v", snapshot.Normalization)
 		}
 		if !snapshot.StaleSnapshotWarning.IsStale || snapshot.StaleSnapshotWarning.StaleAfterDays <= 0 || snapshot.StaleSnapshotWarning.Message == "" {
 			t.Fatalf("stale snapshot warning incomplete: %#v", snapshot)
@@ -278,6 +355,16 @@ func TestFinRobotRetailSentimentLivePackageSourceSnapshots(t *testing.T) {
 	for _, want := range wantBoundaryIDs {
 		if !platforms[want] {
 			t.Fatalf("missing platform snapshot %q in %#v", want, platforms)
+		}
+	}
+	for _, want := range []string{"retail_discussion", "prediction_market"} {
+		if !categories[want] {
+			t.Fatalf("missing normalized category %q in %#v", want, categories)
+		}
+	}
+	for _, want := range []string{"cursor", "page", "window"} {
+		if !paginationModes[want] {
+			t.Fatalf("missing pagination mode %q in %#v", want, paginationModes)
 		}
 	}
 }
@@ -303,6 +390,14 @@ func TestFinRobotRetailSentimentLivePackageAggregateAndCleanSkip(t *testing.T) {
 			StaleAfterDays int    `json:"stale_after_days"`
 			Message        string `json:"message"`
 		} `json:"stale_snapshot_warning"`
+		Normalization struct {
+			Method                  string             `json:"method"`
+			DedupeWindowHours       int                `json:"dedupe_window_hours"`
+			LiveNetwork             bool               `json:"live_network"`
+			SentimentScale          string             `json:"sentiment_scale"`
+			AggregateSentimentLabel string             `json:"aggregate_sentiment_label"`
+			CategoryWeights         map[string]float64 `json:"category_weights"`
+		} `json:"normalization"`
 	}
 	decodeRetailSentimentJSONFile(t, filepath.Join(base, "fixtures", "sentiment_aggregate_ACME_fixture.json"), &aggregate)
 	if !aggregate.ProviderFree || aggregate.LiveNetwork || aggregate.MentionVolume == 0 || aggregate.AggregateScore < -1 || aggregate.AggregateScore > 1 {
@@ -321,6 +416,15 @@ func TestFinRobotRetailSentimentLivePackageAggregateAndCleanSkip(t *testing.T) {
 	}
 	if !aggregate.StaleSnapshotWarning.IsStale || aggregate.StaleSnapshotWarning.StaleAfterDays <= 0 || aggregate.StaleSnapshotWarning.Message == "" {
 		t.Fatalf("aggregate stale warning incomplete: %#v", aggregate.StaleSnapshotWarning)
+	}
+	if aggregate.Normalization.Method == "" ||
+		aggregate.Normalization.DedupeWindowHours <= 0 ||
+		aggregate.Normalization.LiveNetwork ||
+		aggregate.Normalization.SentimentScale != "minus_one_to_one" ||
+		!retailSentimentStringSliceContains([]string{"bearish", "neutral", "bullish"}, aggregate.Normalization.AggregateSentimentLabel) ||
+		aggregate.Normalization.CategoryWeights["retail_discussion"] <= 0 ||
+		aggregate.Normalization.CategoryWeights["prediction_market"] <= 0 {
+		t.Fatalf("aggregate normalization incomplete: %#v", aggregate.Normalization)
 	}
 
 	var skip struct {

@@ -21,8 +21,11 @@
           "polymarket"
         ],
         "contains_redaction": true,
+        "contains_auth_redaction": true,
+        "contains_pagination_metadata": true,
         "contains_source_terms": true,
-        "contains_stale_snapshot_warning": true
+        "contains_stale_snapshot_warning": true,
+        "contains_normalization": true
       }
     },
     {
@@ -35,7 +38,9 @@
         "as_of": "2026-06-11",
         "replay_ready": true,
         "source_snapshot_refs": 4,
-        "contains_redaction_summary": true
+        "contains_redaction_summary": true,
+        "contains_category_normalization": true,
+        "contains_sentiment_normalization": true
       }
     },
     {

@@ -36,6 +36,12 @@
   "normalization": {
     "method": "provider_free_volume_weighted_fixture",
     "dedupe_window_hours": 24,
-    "live_network": false
+    "live_network": false,
+    "sentiment_scale": "minus_one_to_one",
+    "aggregate_sentiment_label": "bullish",
+    "category_weights": {
+      "retail_discussion": 0.88,
+      "prediction_market": 0.12
+    }
   }
 }
