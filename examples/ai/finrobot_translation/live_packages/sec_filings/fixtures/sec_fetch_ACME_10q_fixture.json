@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "document_id": "ACME-2026-Q1-10Q",
+  "ticker": "ACME",
+  "cik": "0000000000",
+  "accession_number": "0000000000-26-000010",
+  "form_type": "10-Q",
+  "filing_date": "2026-05-05",
+  "primary_artifact": "acme-20260331-pdf",
+  "user_agent_policy": {
+    "required_for_live": true,
+    "declared_in_fixture": false,
+    "clean_skip_without_user_agent": true
+  },
+  "redirect_chain": [
+    {
+      "from": "https://sec.example.invalid/acme/10q",
+      "to": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/acme-20260331.pdf",
+      "status": 200,
+      "fixture_redirect": true
+    }
+  ],
+  "cache": {
+    "key": "sec:ACME:10-Q:2026Q1:primary",
+    "mode": "fixture_replay",
+    "hit": true,
+    "ttl_seconds": 0
+  },
+  "terms": {
+    "usage": "offline-fixture-only",
+    "attribution": "SEC fair-access metadata retained",
+    "redistribution": "fixture-only",
+    "live_network": false,
+    "user_agent_required_for_live": true
+  },
+  "artifacts": [
+    {
+      "artifact_id": "acme-20260331-pdf",
+      "artifact_type": "sec_pdf",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/acme-20260331.pdf",
+      "mime_type": "application/pdf",
+      "content_sha256": "f2f4ad3bc4aaacme10qpdffixture000000000000000000000000000000000000",
+      "byte_length": 2048,
+      "parser_boundary": {
+        "adapter": "fixture_pdf_reader",
+        "dependency_imported": false,
+        "live_network": false,
+        "clean_skip": true
+      },
+      "provenance": {
+        "fixture_key": "sec:fetch:ACME:10Q:offline",
+        "source": "synthetic-offline-fixture",
+        "captured_at": "2026-06-11T00:00:00Z",
+        "live_network": false,
+        "redacted": true
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "SEC fair-access metadata retained",
+        "redistribution": "fixture-only",
+        "live_network": false
+      }
+    }
+  ],
+  "markdown_preview": "## Part I Item 2. Management Discussion and Analysis\nQuarterly revenue increased with service renewals.\n\n## Part II Item 1A. Risk Factors\nNo material changes to risk factors."
+}

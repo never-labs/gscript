@@ -1,0 +1,112 @@
+// Provider-free live package skeleton for FinRobot SEC filings.
+//
+// The manifest and contracts are the contract of record. This executable
+// mirror keeps the package discoverable by smoke tests without importing or
+// calling SEC clients, parsers, cache backends, or PDF readers.
+
+sec_filings_live_package := {
+    id: "finrobot-sec-filings-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    default_policy: {
+        mode: "fixture_replay"
+        live_network: false
+        provider_credentials_required: false
+        real_dependency_imports: false
+        clean_skip_without_dependency: true
+        fixture_hook: "recorded_sec_filings_live_fixture"
+    }
+    live_gate: {
+        default_enabled: false
+        capability: "finance.document.sec.live_network"
+        env: "LEIA_FINROBOT_SEC_FILINGS_LIVE"
+        requires_user_agent_env: "LEIA_SEC_USER_AGENT"
+        terms_ack_env: "LEIA_SEC_TERMS_ACK"
+        clean_skip_without_capability: true
+    }
+    modules: {
+        {
+            id: "sec_search"
+            source_module: "filings_src/sec_api.py"
+            capabilities: {"finance.document.sec.search", "finance.document.sec.form_filter", "finance.document.sec.redirect.trace", "finance.document.sec.cache.metadata", "finance.document.sec.terms.metadata"}
+            required_fields: {"ticker", "cik", "accession_number", "form_type", "filing_date", "document_url", "redirect_chain", "cache", "terms"}
+        },
+        {
+            id: "sec_fetch"
+            source_module: "filings_src/sec_api.py"
+            capabilities: {"finance.document.sec.fetch", "finance.document.sec.artifact.provenance", "finance.document.sec.html.artifact", "finance.document.sec.pdf.artifact", "finance.document.sec.user_agent.policy"}
+            required_fields: {"document_id", "form_type", "primary_artifact", "artifacts", "redirect_chain", "cache", "user_agent_policy", "terms"}
+        },
+        {
+            id: "section_extraction"
+            source_module: "marker_sec_src/sec_filings_to_markdown.py"
+            capabilities: {"finance.document.sec.section.extract", "finance.document.sec.section.normalize", "finance.document.sec.source_offsets", "finance.document.sec.citation.provenance", "finance.document.sec.html_pdf.boundary"}
+            required_fields: {"document_id", "form_type", "sections", "section_id", "section_title", "source_offsets", "artifact_ref", "provenance"}
+        },
+    }
+    adapter_boundaries: {
+        {id: "sec_company_submissions" capability: "finance.document.sec.search" fixture_key: "sec:search:ACME:10K10Q:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "sec_archive_fetch" capability: "finance.document.sec.fetch" fixture_key: "sec:fetch:ACME:10K10Q:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "html_document_parser" capability: "finance.document.sec.html.parse" fixture_key: "sec:section_extract:ACME:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "pdf_artifact_reader" capability: "finance.document.sec.pdf.read" fixture_key: "sec:fetch:ACME:10Q:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+    }
+    fixture_keys: {
+        "sec:search:ACME:10K10Q:offline",
+        "sec:fetch:ACME:10K:offline",
+        "sec:fetch:ACME:10Q:offline",
+        "sec:section_extract:ACME:offline",
+        "adapter_boundary:sec_filings:offline",
+    }
+}
+
+func sec_filings_module_ok(module) {
+    if module == nil {
+        return false
+    }
+    if sec_filings_live_package.provider_free != true || sec_filings_live_package.live_network != false || sec_filings_live_package.real_dependency_imports != false {
+        return false
+    }
+    return module.id != nil && module.source_module != nil && #module.capabilities >= 5 && #module.required_fields >= 8
+}
+
+func sec_filings_boundary_ok(boundary) {
+    if boundary == nil {
+        return false
+    }
+    return boundary.live_network == false && boundary.dependency_imported == false && boundary.credential_required == false && boundary.clean_skip == true && boundary.capability != nil && boundary.fixture_key != nil
+}
+
+sec_filings_module_count := 0
+for i := 1; i <= #sec_filings_live_package.modules; i++ {
+    module := sec_filings_live_package.modules[i]
+    assert(sec_filings_module_ok(module))
+    sec_filings_module_count = sec_filings_module_count + 1
+}
+
+sec_filings_boundary_count := 0
+for i := 1; i <= #sec_filings_live_package.adapter_boundaries; i++ {
+    boundary := sec_filings_live_package.adapter_boundaries[i]
+    assert(sec_filings_boundary_ok(boundary))
+    sec_filings_boundary_count = sec_filings_boundary_count + 1
+}
+
+assert(sec_filings_module_count == 3)
+assert(sec_filings_boundary_count == 4)
+assert(#sec_filings_live_package.fixture_keys == 5)
+assert(sec_filings_live_package.default_policy.mode == "fixture_replay")
+assert(sec_filings_live_package.live_gate.default_enabled == false)
+assert(sec_filings_live_package.live_gate.clean_skip_without_capability == true)
+
+sec_filings_live_package_summary := string.format(
+"sec_filings_live_package modules=%d adapters=%d provider_free=%s live_network=%s imports=%s fixtures=%d live_gate=%s",
+sec_filings_module_count,
+sec_filings_boundary_count,
+tostring(sec_filings_live_package.provider_free),
+tostring(sec_filings_live_package.live_network),
+tostring(sec_filings_live_package.real_dependency_imports),
+#sec_filings_live_package.fixture_keys,
+tostring(sec_filings_live_package.live_gate.default_enabled)
+)
+
+print(sec_filings_live_package_summary)

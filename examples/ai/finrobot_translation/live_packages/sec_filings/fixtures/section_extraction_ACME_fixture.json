@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "documents": [
+    {
+      "document_id": "ACME-2025-10K",
+      "form_type": "10-K",
+      "artifact_ref": "acme-20251231-html",
+      "artifact_type": "sec_html",
+      "sections": [
+        {
+          "section_id": "business",
+          "section_title": "Item 1. Business",
+          "text": "ACME sells industrial control systems.",
+          "source_offsets": {
+            "start": 18,
+            "end": 58
+          },
+          "citation": {
+            "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+            "page": null,
+            "anchor": "item-1"
+          },
+          "provenance": {
+            "accession_number": "0000000000-26-000001",
+            "fixture_key": "sec:section_extract:ACME:offline",
+            "live_network": false
+          }
+        },
+        {
+          "section_id": "risk_factors",
+          "section_title": "Item 1A. Risk Factors",
+          "text": "Supply concentration may affect margins.",
+          "source_offsets": {
+            "start": 79,
+            "end": 119
+          },
+          "citation": {
+            "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+            "page": null,
+            "anchor": "item-1a"
+          },
+          "provenance": {
+            "accession_number": "0000000000-26-000001",
+            "fixture_key": "sec:section_extract:ACME:offline",
+            "live_network": false
+          }
+        },
+        {
+          "section_id": "mda",
+          "section_title": "Item 7. Management Discussion and Analysis",
+          "text": "Revenue increased due to renewal demand.",
+          "source_offsets": {
+            "start": 171,
+            "end": 210
+          },
+          "citation": {
+            "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+            "page": null,
+            "anchor": "item-7"
+          },
+          "provenance": {
+            "accession_number": "0000000000-26-000001",
+            "fixture_key": "sec:section_extract:ACME:offline",
+            "live_network": false
+          }
+        }
+      ]
+    },
+    {
+      "document_id": "ACME-2026-Q1-10Q",
+      "form_type": "10-Q",
+      "artifact_ref": "acme-20260331-pdf",
+      "artifact_type": "sec_pdf",
+      "sections": [
+        {
+          "section_id": "mda",
+          "section_title": "Part I Item 2. Management Discussion and Analysis",
+          "text": "Quarterly revenue increased with service renewals.",
+          "source_offsets": {
+            "start": 54,
+            "end": 103
+          },
+          "citation": {
+            "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/acme-20260331.pdf",
+            "page": 12,
+            "anchor": null
+          },
+          "provenance": {
+            "accession_number": "0000000000-26-000010",
+            "fixture_key": "sec:section_extract:ACME:offline",
+            "live_network": false
+          }
+        },
+        {
+          "section_id": "risk_factors",
+          "section_title": "Part II Item 1A. Risk Factors",
+          "text": "No material changes to risk factors.",
+          "source_offsets": {
+            "start": 136,
+            "end": 173
+          },
+          "citation": {
+            "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/acme-20260331.pdf",
+            "page": 24,
+            "anchor": null
+          },
+          "provenance": {
+            "accession_number": "0000000000-26-000010",
+            "fixture_key": "sec:section_extract:ACME:offline",
+            "live_network": false
+          }
+        }
+      ]
+    }
+  ]
+}

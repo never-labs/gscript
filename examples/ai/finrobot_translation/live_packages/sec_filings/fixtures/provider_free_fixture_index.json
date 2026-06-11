@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "sec:search:ACME:10K10Q:offline",
+      "capability": "finance.document.sec.search",
+      "path": "fixtures/sec_search_ACME_fixture.json",
+      "schema": "schemas/sec_search_result_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "forms": [
+          "10-K",
+          "10-Q"
+        ],
+        "live_gate_required_for_network": true
+      }
+    },
+    {
+      "fixture_key": "sec:fetch:ACME:10K:offline",
+      "capability": "finance.document.sec.fetch",
+      "path": "fixtures/sec_fetch_ACME_10k_fixture.json",
+      "schema": "schemas/sec_filing_document_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "form_type": "10-K",
+        "artifact_types": [
+          "sec_html"
+        ]
+      }
+    },
+    {
+      "fixture_key": "sec:fetch:ACME:10Q:offline",
+      "capability": "finance.document.sec.fetch",
+      "path": "fixtures/sec_fetch_ACME_10q_fixture.json",
+      "schema": "schemas/sec_filing_document_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "form_type": "10-Q",
+        "artifact_types": [
+          "sec_pdf"
+        ]
+      }
+    },
+    {
+      "fixture_key": "sec:section_extract:ACME:offline",
+      "capability": "finance.document.sec.section.extract",
+      "path": "fixtures/section_extraction_ACME_fixture.json",
+      "schema": "schemas/section_extraction_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "forms": [
+          "10-K",
+          "10-Q"
+        ]
+      }
+    },
+    {
+      "fixture_key": "adapter_boundary:sec_filings:offline",
+      "capability": "finance.document.sec.adapter.boundary",
+      "path": "fixtures/adapter_boundary_fixture.json",
+      "schema": "schemas/adapter_boundary_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "clean_skip": true
+      }
+    }
+  ]
+}

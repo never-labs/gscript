@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-sec-filings-adapter-boundary-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "boundaries": [
+    {
+      "id": "sec_company_submissions",
+      "display_name": "SEC company submissions search",
+      "capability": "finance.document.sec.search",
+      "fixture_key": "sec:search:ACME:10K10Q:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "sec_archive_fetch",
+      "display_name": "SEC archive document fetch",
+      "capability": "finance.document.sec.fetch",
+      "fixture_key": "sec:fetch:ACME:10K10Q:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "html_document_parser",
+      "display_name": "SEC HTML filing parser",
+      "capability": "finance.document.sec.html.parse",
+      "fixture_key": "sec:section_extract:ACME:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "pdf_artifact_reader",
+      "display_name": "SEC PDF artifact reader",
+      "capability": "finance.document.sec.pdf.read",
+      "fixture_key": "sec:fetch:ACME:10Q:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ]
+}

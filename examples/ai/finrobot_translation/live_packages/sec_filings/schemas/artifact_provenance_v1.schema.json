@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SECArtifactProvenanceV1",
+  "type": "object",
+  "required": [
+    "artifact_id",
+    "artifact_type",
+    "source_url",
+    "mime_type",
+    "content_sha256",
+    "provenance",
+    "terms"
+  ],
+  "properties": {
+    "artifact_type": {
+      "enum": [
+        "sec_html",
+        "sec_pdf"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "fixture_key",
+        "source",
+        "captured_at",
+        "live_network",
+        "redacted"
+      ]
+    },
+    "terms": {
+      "type": "object",
+      "required": [
+        "usage",
+        "attribution",
+        "redistribution",
+        "live_network"
+      ]
+    }
+  }
+}
