@@ -4631,6 +4631,65 @@ func TestQSessionEvalFastArg1KeepsWorkspaceState(t *testing.T) {
 	}
 }
 
+// TestQSessionPlannedEvalResolverMatchesEval pins the reserved planned-eval
+// resolver contract MethodJIT's session-eval op-exit depends on: q session
+// tables expose stdq.SessionPlannedEvalField, the resolver returns a
+// per-source executor whose repeated calls execute the same session plan
+// chain as q.session.eval (shared state, no result memoization, identical
+// error wrapping), and session state rebinding stays visible through an
+// already-resolved executor.
+func TestQSessionPlannedEvalResolverMatchesEval(t *testing.T) {
+	session := qSessionValue()
+	eval := session.RawGetString("eval").GoFunction()
+	resolver := session.RawGetString(stdq.SessionPlannedEvalField).GoFunction()
+	if eval == nil || eval.FastArg1 == nil {
+		t.Fatalf("q.session.eval FastArg1 missing: %#v", eval)
+	}
+	if resolver == nil || resolver.FastArg1 == nil {
+		t.Fatalf("q session table %s resolver missing: %#v", stdq.SessionPlannedEvalField, resolver)
+	}
+	if _, err := resolver.FastArg1(IntValue(1)); err == nil {
+		t.Fatal("planned-eval resolver accepted non-string source")
+	}
+
+	if got, err := eval.FastArg1(StringValue("x:41")); err != nil || !got.IsInt() || got.Int() != 41 {
+		t.Fatalf("q.session.eval assignment = %s,%v; want 41,nil", got.String(), err)
+	}
+	handle, err := resolver.FastArg1(StringValue("x+1"))
+	if err != nil {
+		t.Fatalf("planned-eval resolver: %v", err)
+	}
+	exec := handle.GoFunction()
+	if exec == nil || exec.FastArg1 == nil {
+		t.Fatalf("planned-eval resolver returned %s, want FastArg1 executor", handle.String())
+	}
+	for i := 0; i < 3; i++ {
+		got, err := exec.FastArg1(NilValue())
+		if err != nil || !got.IsInt() || got.Int() != 42 {
+			t.Fatalf("planned executor #%d = %s,%v; want 42,nil", i, got.String(), err)
+		}
+	}
+	// Session state rebinding is visible through the pinned executor.
+	if got, err := eval.FastArg1(StringValue("x:100")); err != nil || !got.IsInt() || got.Int() != 100 {
+		t.Fatalf("q.session.eval rebind = %s,%v; want 100,nil", got.String(), err)
+	}
+	if got, err := exec.FastArg1(NilValue()); err != nil || !got.IsInt() || got.Int() != 101 {
+		t.Fatalf("planned executor after rebind = %s,%v; want 101,nil", got.String(), err)
+	}
+	// Executor results match q.session.eval for a multi-statement script too.
+	scriptHandle, err := resolver.FastArg1(StringValue("x:til 8192;idx:where x>=0;+/idx"))
+	if err != nil {
+		t.Fatalf("planned-eval resolver(script): %v", err)
+	}
+	scriptExec := scriptHandle.GoFunction()
+	if scriptExec == nil || scriptExec.FastArg1 == nil {
+		t.Fatalf("planned-eval resolver(script) returned %s, want FastArg1 executor", scriptHandle.String())
+	}
+	if got, err := scriptExec.FastArg1(NilValue()); err != nil || !got.IsInt() || got.Int() != 33550336 {
+		t.Fatalf("planned script executor = %s,%v; want 33550336,nil", got.String(), err)
+	}
+}
+
 func TestQSQLArgs2MatchesTwoArgumentSemantics(t *testing.T) {
 	frame := TableValue(NewTable())
 	source := StringValue("select sym from trades")

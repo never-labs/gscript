@@ -1,8 +1,20 @@
 package q
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 const evalSessionPlanCacheLimit = 512
+
+// SessionPlannedEvalField is the reserved key under which bind layers expose a
+// per-source planned-eval resolver on q session tables. Callers (MethodJIT's
+// constant-source session-eval op-exit) invoke the resolver once per
+// (session, source) pair and then re-execute the returned handle directly,
+// skipping the per-call string-eval shell (TrimSpace + source-string plan
+// cache probe + host eval field lookup) while running the exact same cached
+// plan chain as EvalSession.Eval.
+const SessionPlannedEvalField = "__planned_eval"
 
 // EvalSession is a stateful q evaluator with a source-stable warm plan cache.
 // It keeps q bindings in one EvalState while caching immutable parse/planning
@@ -34,13 +46,55 @@ func (s *EvalSession) Eval(source string) (any, error) {
 		return nil, nil
 	}
 	source = strings.TrimSpace(source)
-	entry := s.plan(source)
+	return s.evalPlanEntry(s.plan(source))
+}
+
+// evalPlanEntry executes one resolved plan entry: predecoded executable
+// pipeline plan first, then the per-statement script plan chain. Plan entries
+// are source-derived and state-independent; all session state binds at
+// execution time, so re-executing a pinned entry is semantically identical to
+// re-resolving the source on every call.
+func (s *EvalSession) evalPlanEntry(entry *evalSessionPlan) (any, error) {
 	if entry != nil && entry.executable.Valid() {
 		if out, handled, err := s.state.ExecuteEvalPipelineExecutablePlanRef(&entry.executable); err != nil || handled {
 			return out, err
 		}
 	}
 	return s.state.evalScriptPlan(entry.script)
+}
+
+// EvalSessionPlanned pins one source's cached plan entry so warm callers can
+// re-execute the plan chain without the per-call resolution shell. The handle
+// has the same execution semantics as EvalSession.Eval(source) for the pinned
+// source — including per-call typed-kernel execution (no result memoization).
+// Like EvalSession itself it is not safe for concurrent use; callers must
+// serialize with the same lock that guards the owning session.
+type EvalSessionPlanned struct {
+	session *EvalSession
+	entry   *evalSessionPlan
+}
+
+// Planned resolves source once and returns a pinned execution handle. The
+// returned handle stays valid for the session's lifetime even if the session
+// plan cache is later reset (the entry pointer is pinned).
+func (s *EvalSession) Planned(source string) *EvalSessionPlanned {
+	if s == nil {
+		return nil
+	}
+	source = strings.TrimSpace(source)
+	entry := s.plan(source)
+	if entry == nil {
+		return nil
+	}
+	return &EvalSessionPlanned{session: s, entry: entry}
+}
+
+// Eval executes the pinned plan chain against the owning session's state.
+func (p *EvalSessionPlanned) Eval() (any, error) {
+	if p == nil || p.session == nil || p.entry == nil {
+		return nil, fmt.Errorf("q: planned session eval handle is empty")
+	}
+	return p.session.evalPlanEntry(p.entry)
 }
 
 func (s *EvalSession) plan(source string) *evalSessionPlan {

@@ -45,9 +45,14 @@
 // constant-source session eval shape `<local from q.session()>.eval(<const
 // string>)` and lowers it during the Tier 2 pipeline to OpQEvalSessionEval
 // (internal/methodjit/q_eval_session_eval.go), a result-producing op-exit
-// that invokes the same session eval host function per iteration — state,
-// plan caching, and error semantics identical to the generic call, with no
-// result memoization (the op has call side effects and is never hoisted).
+// with selective spill. The op-exit handler resolves the session's pinned
+// plan chain once per (site, receiver session) through the reserved
+// stdq.SessionPlannedEvalField resolver and executes it directly on every
+// subsequent iteration (the "planned" route), skipping the per-iteration
+// string-eval shell while keeping state, plan caching, and error semantics
+// identical to the generic call, with no result memoization (the op has call
+// side effects and is never hoisted; every iteration re-executes the typed q
+// kernels).
 // Because the loop's only generic Call disappears in lowering, tier policy
 // keeps these loops Tier 2-eligible (bytecode-level loop-call heuristics
 // are bypassed via protoLoopCallsAreLowerableQSessionEval), and the
@@ -430,7 +435,14 @@ func qEvalJITScriptForcedTier2(t *testing.T, script string, iterations int64) (i
 //     typed q kernel attempts must scale with the iteration count
 //     (>= 0.9 * N), not stay flat as a memoized route would.
 //  2. Forced Tier 2 of the same session-route script: the loop function
-//     actually enters Tier 2 native code (EnteredTier2 flag).
+//     actually enters Tier 2 native code (EnteredTier2 flag), the session
+//     eval op-exit fires per iteration, and the op-exit executes through the
+//     PLANNED route (route "session_planned_op_exit": the pinned session plan
+//     chain resolved once per receiver+source, skipping the per-iteration
+//     string-eval shell) rather than the host-eval shell fallback. The
+//     planned route still performs full per-iteration typed-kernel work — it
+//     runs the same cached plan chain as q.session.eval with no result
+//     memoization, which assertion (1) independently verifies.
 //  3. Pinned counter-example: the bare-q.eval(const) route is memoized and
 //     loop-hoisted (ExitQEvalPipelinePlan fires but kernel attempts stay ~0
 //     for 64 iterations). If this assertion ever fails because attempts start
@@ -531,8 +543,29 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 			t.Fatalf("session eval op-exits = %d for %d Tier 2 iterations (< %d); "+
 				"the lowered route is not executing per iteration", opExits, iters, minAttempts)
 		}
-		t.Logf("Tier 2 session route: %d session eval op-exits over %d iterations (tier2 compiled: %d)",
-			opExits, iters, tm.Tier2Count())
+		// Pin the op-exit execution route: the per-iteration work must run
+		// through the planned route (pinned session plan chain), not the
+		// host-eval string shell. Counters accumulate across settle calls, so
+		// the final timed call alone must satisfy the floor.
+		var plannedExecs, shellExecs uint64
+		for _, stat := range tm.QKernelExecutionStatsFor(runProto) {
+			if stat.Kernel != "QEvalSessionEval" {
+				continue
+			}
+			switch stat.Route {
+			case "session_planned_op_exit":
+				plannedExecs += stat.Count
+			case "typed_runtime_op_exit":
+				shellExecs += stat.Count
+			}
+		}
+		if plannedExecs < minAttempts {
+			v.Close()
+			t.Fatalf("planned session eval executions = %d (shell fallback = %d) for %d Tier 2 iterations (< %d); "+
+				"the session eval op-exit is no longer executing the pinned plan chain", plannedExecs, shellExecs, iters, minAttempts)
+		}
+		t.Logf("Tier 2 session route: %d session eval op-exits over %d iterations (planned route execs: %d, shell execs: %d, tier2 compiled: %d)",
+			opExits, iters, plannedExecs, shellExecs, tm.Tier2Count())
 		v.Close()
 	}
 

@@ -10,11 +10,26 @@ package methodjit
 //
 // The lowered op keeps the *receiver session value* as its single argument and
 // the constant source as Aux (constant pool index). At runtime the op-exit
-// handler fetches the receiver's own "eval" host function and invokes it with
-// the constant source value — exactly what the generic call path does — so
-// session state, q plan caching, and result/error semantics are preserved for
-// every constant source. Unlike OpQEvalPipelinePlan (zero-arg, pure-read,
-// limited to typed-runtime describable sources), this op:
+// handler executes through one of two routes:
+//
+//   - planned (preferred): the first execution per (exit site, receiver
+//     session) resolves the session's pinned plan chain for the constant
+//     source via the reserved stdq.SessionPlannedEvalField resolver that the
+//     bind layer installs on session tables; subsequent iterations execute
+//     the pinned chain directly, skipping the per-iteration string-eval shell
+//     (host eval field lookup + TrimSpace + source-string plan-cache probe)
+//     while running the exact same cached plans against the same EvalState.
+//   - shell (fallback): receivers without the resolver go through the
+//     receiver's own "eval" host function with the constant source value —
+//     exactly what the generic call path does.
+//
+// Both routes preserve session state, q plan caching, and result/error
+// semantics for every constant source, and both re-execute the typed q
+// kernels per iteration (no result memoization). The exit itself is emitted
+// with selective spill (emit_q_eval_session_eval.go): only values live across
+// the exit are spilled/reloaded, mirroring the OpQEvalPipelinePlan native
+// exit. Unlike OpQEvalPipelinePlan (zero-arg, pure-read, limited to
+// typed-runtime describable sources), this op:
 //
 //   - covers any constant q source the session evaluator accepts,
 //   - is effectful (OpSideEffectCall): never hoisted/CSE'd, so a hot loop
@@ -40,12 +55,16 @@ import (
 )
 
 // qEvalSessionEvalExecutionCounters keeps lock-free per-CompiledFunction
-// success/error counters for the q session eval op-exit. The exit fires once
-// per loop iteration, so the hot path must not take the qKernelStats mutex;
+// success/error counters for the q session eval op-exit, split by execution
+// route: planned (pinned session plan chain, no string-eval shell) versus
+// shell (per-call host eval function). The exit fires once per loop
+// iteration, so the hot path must not take the qKernelStats mutex;
 // QKernelExecutionStats folds these counters back into the public stat rows.
 type qEvalSessionEvalExecutionCounters struct {
-	success atomic.Uint64
-	errors  atomic.Uint64
+	success        atomic.Uint64
+	errors         atomic.Uint64
+	plannedSuccess atomic.Uint64
+	plannedErrors  atomic.Uint64
 }
 
 func (cf *CompiledFunction) recordQEvalSessionEvalExecution(err error) {
@@ -59,15 +78,37 @@ func (cf *CompiledFunction) recordQEvalSessionEvalExecution(err error) {
 	cf.QEvalSessionEvalStats.success.Add(1)
 }
 
+func (cf *CompiledFunction) recordQEvalSessionEvalPlannedExecution(err error) {
+	if cf == nil {
+		return
+	}
+	if err != nil {
+		cf.QEvalSessionEvalStats.plannedErrors.Add(1)
+		return
+	}
+	cf.QEvalSessionEvalStats.plannedSuccess.Add(1)
+}
+
 func (cf *CompiledFunction) appendQEvalSessionEvalExecutionStats(out map[qKernelExecutionKey]uint64) {
 	if cf == nil {
 		return
 	}
-	appendQEvalSessionEvalCounter(out, "success", cf.QEvalSessionEvalStats.success.Load())
-	appendQEvalSessionEvalCounter(out, "error", cf.QEvalSessionEvalStats.errors.Load())
+	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRouteShell, "success", cf.QEvalSessionEvalStats.success.Load())
+	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRouteShell, "error", cf.QEvalSessionEvalStats.errors.Load())
+	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRoutePlanned, "success", cf.QEvalSessionEvalStats.plannedSuccess.Load())
+	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRoutePlanned, "error", cf.QEvalSessionEvalStats.plannedErrors.Load())
 }
 
-func appendQEvalSessionEvalCounter(out map[qKernelExecutionKey]uint64, outcome string, count uint64) {
+const (
+	// qEvalSessionEvalRouteShell labels per-iteration executions that went
+	// through the session's host eval function (string-eval shell).
+	qEvalSessionEvalRouteShell = "typed_runtime_op_exit"
+	// qEvalSessionEvalRoutePlanned labels per-iteration executions of the
+	// pinned session plan chain (resolved once per receiver+source).
+	qEvalSessionEvalRoutePlanned = "session_planned_op_exit"
+)
+
+func appendQEvalSessionEvalCounter(out map[qKernelExecutionKey]uint64, route, outcome string, count uint64) {
 	if count == 0 {
 		return
 	}
@@ -76,7 +117,7 @@ func appendQEvalSessionEvalCounter(out map[qKernelExecutionKey]uint64, outcome s
 		kernel:        "QEvalSessionEval",
 		shape:         "q-eval/session-eval",
 		pipelineShape: "unknown",
-		route:         "typed_runtime_op_exit",
+		route:         route,
 		outcome:       outcome,
 		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
 	}] += count
@@ -279,6 +320,137 @@ func qEvalSessionEvalNopDeadEvalFields(fn *Function) {
 			qQueryNop(instr)
 		}
 	}
+}
+
+// qEvalSessionEvalSite memoizes the resolved planned-eval executor for one
+// lowered session-eval op-exit site. Sites are allocated at compile time (one
+// per OpQEvalSessionEval instruction) and updated lock-free at runtime: the
+// loaded pointer is only used when its receiver matches the current receiver
+// table identity, so concurrent executions with different sessions stay
+// correct (they re-resolve and overwrite each other without corruption).
+type qEvalSessionEvalSite struct {
+	planned atomic.Pointer[qEvalSessionEvalPlanned]
+}
+
+// qEvalSessionEvalPlanned binds a resolved planned-eval executor to the
+// receiver session table it was resolved from. exec runs the session's pinned
+// plan chain directly (its Value argument is ignored); it performs the same
+// per-call typed-kernel work, locking, error wrapping, and value conversion
+// as the host eval shell, minus the per-call source resolution.
+type qEvalSessionEvalPlanned struct {
+	receiver *runtime.Table
+	exec     func(runtime.Value) (runtime.Value, error)
+}
+
+// qEvalSessionEvalSiteTable allocates one planned-executor cache per
+// OpQEvalSessionEval instruction in fn, indexed by instruction ID (nil when
+// the op is absent). Slice indexing keeps the per-iteration site probe a
+// bounds check instead of a map lookup, matching the other QEval* id tables.
+func qEvalSessionEvalSiteTable(fn *Function) []*qEvalSessionEvalSite {
+	if fn == nil {
+		return nil
+	}
+	maxID := -1
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr != nil && instr.Op == OpQEvalSessionEval && instr.ID > maxID {
+				maxID = instr.ID
+			}
+		}
+	}
+	if maxID < 0 {
+		return nil
+	}
+	sites := make([]*qEvalSessionEvalSite, maxID+1)
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpQEvalSessionEval {
+				continue
+			}
+			sites[instr.ID] = &qEvalSessionEvalSite{}
+		}
+	}
+	return sites
+}
+
+// qEvalSessionEvalSite returns the planned-executor cache for an
+// OpQEvalSessionEval instruction ID (nil when absent).
+func (cf *CompiledFunction) qEvalSessionEvalSite(instrID int) *qEvalSessionEvalSite {
+	if cf == nil || instrID < 0 || instrID >= len(cf.QEvalSessionEvalSites) {
+		return nil
+	}
+	return cf.QEvalSessionEvalSites[instrID]
+}
+
+// executeQEvalSessionEval is the op-exit entry for OpQEvalSessionEval. It
+// prefers the planned route: the first execution per (site, receiver session)
+// resolves the session's planned-eval handle for the constant source (via the
+// reserved stdq.SessionPlannedEvalField resolver bind installs on session
+// tables) and memoizes it; subsequent iterations execute the pinned plan
+// chain directly, skipping the per-iteration string-eval shell (host eval
+// field lookup + TrimSpace + source-string plan-cache probe). Sessions whose
+// table does not expose the resolver fall back to the host eval shell, whose
+// semantics the planned route matches exactly.
+//
+// Receiver-identity note: the lowering only accepts receivers produced
+// directly by q.session()/q.workspace() in the same function (no phis), and
+// the loop body containing this op cannot rebind the session's eval fields,
+// so resolving the executor once per receiver is semantically equivalent to
+// the shell's per-iteration field lookup.
+func (cf *CompiledFunction) executeQEvalSessionEval(instrID, aux int, receiver runtime.Value) (runtime.Value, error) {
+	var constants []runtime.Value
+	if cf != nil && cf.Proto != nil {
+		constants = cf.Proto.Constants
+	}
+	if cf != nil && receiver.IsTable() {
+		if site := cf.qEvalSessionEvalSite(instrID); site != nil {
+			tbl := receiver.Table()
+			planned := site.planned.Load()
+			if planned == nil || planned.receiver != tbl {
+				if exec, ok := resolveQEvalSessionPlannedExec(tbl, constants, aux); ok {
+					planned = &qEvalSessionEvalPlanned{receiver: tbl, exec: exec}
+					site.planned.Store(planned)
+				} else {
+					planned = nil
+				}
+			}
+			if planned != nil {
+				out, err := planned.exec(runtime.NilValue())
+				cf.recordQEvalSessionEvalPlannedExecution(err)
+				return out, err
+			}
+		}
+	}
+	out, err := executeQEvalSessionEvalValue(constants, aux, receiver)
+	cf.recordQEvalSessionEvalExecution(err)
+	return out, err
+}
+
+// resolveQEvalSessionPlannedExec asks the receiver session table's reserved
+// planned-eval resolver for a direct executor bound to the constant source.
+func resolveQEvalSessionPlannedExec(tbl *runtime.Table, constants []runtime.Value, aux int) (func(runtime.Value) (runtime.Value, error), bool) {
+	if tbl == nil || aux < 0 || aux >= len(constants) || !constants[aux].IsString() {
+		return nil, false
+	}
+	resolver := tbl.RawGetString(stdq.SessionPlannedEvalField).GoFunction()
+	if resolver == nil || resolver.FastArg1 == nil {
+		return nil, false
+	}
+	handle, err := resolver.FastArg1(constants[aux])
+	if err != nil {
+		return nil, false
+	}
+	exec := handle.GoFunction()
+	if exec == nil || exec.FastArg1 == nil {
+		return nil, false
+	}
+	return exec.FastArg1, true
 }
 
 // executeQEvalSessionEvalValue runs one lowered session eval: it loads the
