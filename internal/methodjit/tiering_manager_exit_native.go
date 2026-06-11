@@ -228,18 +228,19 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 	// Otherwise the header is hidden for the duration: direct-call sites
 	// CBZ on it and take the generic op-exit, because SP is then on the
 	// goroutine stack where direct BLR helper calls are invalid.
-	savedHdr, savedHelperCF := ctx.JITStackHdr, ctx.HelperCF
+	savedHdr, savedHelperCF, savedHelperTM := ctx.JITStackHdr, ctx.HelperCF, ctx.HelperTM
 	var altStk *jit.JITStack
 	if tier2AltStackEnabled() {
 		altStk = acquireTier2AltStack()
 	}
 	if altStk != nil {
 		ctx.JITStackHdr = altStk.Hdr()
+		ctx.HelperTM = tm
 		defer releaseTier2AltStack(altStk)
 	} else {
 		ctx.JITStackHdr = 0
 	}
-	defer func() { ctx.JITStackHdr, ctx.HelperCF = savedHdr, savedHelperCF }()
+	defer func() { ctx.JITStackHdr, ctx.HelperCF, ctx.HelperTM = savedHdr, savedHelperCF, savedHelperTM }()
 	tm.recordTier2NativeCalleeExit(proto, cf, ctx)
 	observeTier2NativeCalleeArgShapes(proto, regs, base)
 	codePtr := uintptr(0)
@@ -291,6 +292,9 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 		ctx.HelperErrFlag = 0
 		if err == nil {
 			err = fmt.Errorf("missing helper error")
+		}
+		if Op(ctx.OpExitOp) == OpQEvalPipelinePlan {
+			return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)
 		}
 		return runtime.NilValue(), fmt.Errorf("callee op-exit: %w", err)
 	case ExitOpExit:
@@ -421,6 +425,9 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 			ctx.HelperErrFlag = 0
 			if err == nil {
 				err = fmt.Errorf("missing helper error")
+			}
+			if Op(ctx.OpExitOp) == OpQEvalPipelinePlan {
+				return runtime.NilValue(), fmt.Errorf("callee q eval pipeline exit: %w", err)
 			}
 			return runtime.NilValue(), fmt.Errorf("callee op-exit: %w", err)
 		case ExitOpExit:

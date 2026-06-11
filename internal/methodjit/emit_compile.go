@@ -9,6 +9,7 @@ package methodjit
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/never-labs/leia/internal/jit"
 	"github.com/never-labs/leia/internal/runtime"
@@ -354,6 +355,11 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		ec.initTier2BlockCounters()
 		ec.initTier2CallCounters()
 	}
+	if tier2AltStackEnabled() {
+		// Direct helper-call sites (R5-K/R6-S) embed this cell's address;
+		// the cell receives the CompiledFunction pointer after construction.
+		ec.selfCFCell = new(uintptr)
+	}
 	if exitResumeCheckEnabled() {
 		ec.exitResumeCheck = newExitResumeCheckMetadata()
 	}
@@ -482,7 +488,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	qEvalPipelineNumericResumeOffsets := qEvalPipelineResumeOffsetTable(fn, numericResumeAddrs)
 	qEvalPipelineTerminalReturns := qEvalPipelineTerminalReturnTable(fn)
 	qEvalPipelineDirectReturnID := qEvalPipelineDirectReturnPlanID(fn)
-	return &CompiledFunction{
+	cf := &CompiledFunction{
 		Code:                              cb,
 		Proto:                             fn.Proto,
 		NumSpills:                         alloc.NumSpillSlots,
@@ -535,7 +541,14 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		Tier2BlockCounterMeta:                        ec.tier2BlockCounterMeta,
 		Tier2CallCounters:                            ec.tier2CallCounters,
 		Tier2CallCounterMeta:                         ec.tier2CallCounterMeta,
-	}, nil
+	}
+	if ec.selfCFCell != nil {
+		// Publish the cf pointer to the cell embedded in the emitted direct
+		// helper-call sites, and keep the cell alive alongside the code.
+		*ec.selfCFCell = uintptr(unsafe.Pointer(cf))
+		cf.selfCFCell = ec.selfCFCell
+	}
+	return cf, nil
 }
 
 func validateCompileInputs(fn *Function, alloc *RegAllocation) error {
@@ -692,6 +705,13 @@ type emitContext struct {
 	slotMap      map[int]int // SSA value ID -> home slot index in VM register file
 	nextSlot     int         // next available temp slot
 	labelCounter int         // counter for generating unique labels
+
+	// selfCFCell is the pre-allocated cell that will hold the produced
+	// CompiledFunction's pointer (filled after construction). Direct
+	// helper-call sites embed its address so the helper bridge always
+	// receives the cf of the function that actually contains the site.
+	// Nil when the alternate-stack direct lane is disabled.
+	selfCFCell *uintptr
 
 	// activeRegs tracks which value IDs have their register allocation active
 	// in the current block. Values from other blocks must be loaded from memory.

@@ -212,3 +212,139 @@ added for a controlled comparison. (Pre-existing on main, both modes.)
   on emitted code (no resume entries, no deferredResumes, callee-saved state
   preserved across the call so selective spill sets shrink). The next
   experiment should target one of those, not another coarse-grained op-exit.
+
+## R6-S follow-up: candidate ranking on real workloads + second conversion
+
+This section reports the R6-S application of the prototype to real workloads:
+a data-driven ranking of every JIT→Go transition on the benchmark corpus, the
+conversion of the #2 transition (`ExitQEvalPipelinePlan`) to the direct lane,
+a correctness fix the conversion surfaced in the prototype itself, and the
+measured A/B. All on Apple M4 Max, Go 1.25.7, same binary, flag A/B.
+
+### Transition ranking (frequency × per-call overhead share)
+
+Measured with `benchmarks/profile_exits.py` (CLI `-exit-stats-json`, default
+and `LEIA_TIER2_NO_FILTER=1` modes, all domains), plus a forced-Tier 2 sweep
+of the full q JIT script family (all 482 `qEvalVectorCases` × 64 iterations,
+aggregating `ExitStats` + `QKernelExecutionStats`):
+
+| # | transition | observed frequency | helper cost | exit share | action |
+|---|------------|--------------------|-------------|-----------|--------|
+| 1 | `OpQEvalSessionEval` (slim `ExitOpExit` lane) | exactly 1.000/iteration across all 482 q script cases (30,848 execs / 30,848 iters); the ONLY per-iteration transition in the family | ~305 ns – 6 µs (typed q kernels) | ~10 ns slim lane ⇒ ≤3 % | already converted (R5-K) |
+| 2 | `OpQEvalPipelinePlan` (`ExitQEvalPipelinePlan`) | 1/iteration when the plan is EXECUTABLE (direct `q.eval(const)` loops; pinned by `TestJITAltStackDirectPipelinePlanEngagement`: 64 exits per `run(64)`); 1/Tier 2 entry when heuristic (hoisted/memoized) | ~2.1 µs (`+/til 64`) | ~100–150 ns generic protocol incl. the global exit-stat mutex ⇒ ~5 % | **converted here** |
+| 3 | `ExitCallExit` (generic `Call`) | 1 per `run()` call in the q family (session setup); 2–3 per whole run elsewhere | µs-scale (full VM call) | <1 % | no |
+| 4 | `ExitTableExit` (SetTable/GetField/NewTable) | zero in default mode; only visible under `LEIA_TIER2_NO_FILTER=1` (worst: `table/groupby_nested_agg`, 56 exits in a 0.39 s run) and these are one-shot learning exits that mature recompile feedback | n/a | n/a | no — converting would starve `recordTier2ExitProfile` feedback |
+| 5 | Frame/Vector typed runtime routes (`OpFrame*`, `OpVector*`, `OpQFrameSelectColumn`, `OpQVectorWhereReduce`, …) | **zero** exits across every `.leia` suite (default + no-filter, incl. all `data/q_*` and `soa_*` rows) and the q script family | µs bulk kernels | n/a | no — no frequency, bulk-amortized |
+| 6 | q array bridge (`qEvalPipelineArrayRuntimeValue`, `BenchmarkQEvalPipelineArrayRuntimeBridge`) | not a JIT→Go transition at all — it is a Go→Go conversion inside pipeline helpers (1.2 µs / 8192 rows, bulk) | — | — | not a candidate |
+| 7 | string/table runtime helpers (`Concat`, `StringFormat*`, …) | 1–4 exits per whole benchmark run | — | — | no |
+
+The structural finding: after the R6 native-lowering work the optimizer has
+already eliminated per-iteration exits from every non-q domain (whole
+benchmark runs show single-digit TOTAL exits, all one-shot
+deopt/feedback events). The q runtime helpers are the only per-iteration
+JIT→Go transitions left, and both are in the hundreds-of-ns-to-µs class. The
+tens-of-ns × many-per-iteration helper population the direct lane was built
+for **does not currently exist** on real workloads.
+
+### Conversion 2: `ExitQEvalPipelinePlan` → direct BLR (this change)
+
+Same bridge pattern as the session-eval site, flag-gated, one image correct
+in both modes (CBZ on `ctx.JITStackHdr`):
+
+- `emit_q_eval_pipeline.go`: gated direct block. The dedicated exit protocol
+  never staged `OpExitOp`, so the direct block stages it for bridge dispatch
+  (the generic fallback path ignores it). X0 must hold the stack header at
+  the BLR (thunk ABI), so all descriptor staging happens before the header
+  load.
+- `tier2_alt_stack.go`: bridge case runs the EXACT generic handler
+  (`executeQEvalPipelinePlanExit`, route `typed_runtime_native_exit`) against
+  the live register file reconstructed from `ctx.RegsBase/RegsEnd/Regs`
+  (`helperRegsWindow`); the route name, per-plan counters, and error object
+  are identical to the generic path.
+- **Exit-stat parity**: unlike the session-eval op (which has its own
+  lock-free counters and whose slim lane already skipped `ExitStats`), the
+  generic pipeline exit records an `ExitStats` row per exit, and routing
+  tests pin that signal. The bridge therefore records the same row via
+  `ctx.HelperTM` (new Go-only ExecContext field) before executing — direct
+  mode is diagnostically indistinguishable from the generic protocol. This
+  knowingly retains the global mutex; see "Measurements".
+- **Error semantics**: helper errors exit through `ExitQEvalHelperErr`; the
+  Go loops select the wrap by `ctx.OpExitOp` — pipeline errors keep the
+  exact generic wraps (`"tier2: q eval pipeline exit: %w"` /
+  `"callee q eval pipeline exit: %w"`), session/op errors keep
+  `"tier2: op-exit: %w"` / `"callee op-exit: %w"`.
+- **Terminal-return plans** need no special casing: the generic path's early
+  return is an optimization; the direct lane simply continues into the
+  function's own return sequence and produces the identical result and
+  feedback merge through `ExitNormal`.
+- **resyncRegs** is not replicated: like the session-eval executors, the q
+  pipeline backends are host Go over q runtime state and never re-enter the
+  Leia VM, so the register file cannot move while they run.
+
+### Prototype bug found and fixed: callee-cf confusion (self-cf cells)
+
+`ctx.HelperCF` was published once per native execution with the ENTRY
+function's cf. But the ExecContext is shared across the whole native
+execution, including natively-BLR'd Tier 2 callees — a direct site inside a
+callee would have dispatched against the CALLER's CompiledFunction (wrong
+plan tables, wrong constant pool: silently wrong eval source in the worst
+case). The session-eval prototype site had this latent bug; the pipeline op
+made it reachable in practice (callee pipeline exits are an established path,
+see `resumeNativeTier2CalleeExit`).
+
+Fix: each Tier 2 compilation pre-allocates a **self-cf cell** (`*uintptr`,
+`emit_compile.go`), embeds the cell's address in every direct site, and fills
+the cell with the CompiledFunction pointer after construction. Every direct
+site re-publishes its OWN cf to `ctx.HelperCF` (one load + one indirection +
+one store) immediately before the BLR. The native call sequence keeps
+`ctx.Regs` callee-correct already (stored before/after the BLR), so the
+bridge's register window is consistent with the cf. Pinned by
+`TestJITAltStackDirectHelperCalleeCF` (natively-called `work()` containing
+`q.eval(const)`, exercised in both modes).
+
+### Measurements (R6-S)
+
+Same-binary interleaved flag A/B, 6 rounds × 500 calls, 512 evals/call
+(`benchmarks/jit_alt_stack_direct_test.go`):
+
+| bench (ns/eval) | default (exit protocol) | `LEIA_JIT_ALT_STACK=1` (direct) | direct/eval |
+|---|---|---|---|
+| `BenchmarkQEvalJITSessionEvalLane` | 313.6–323.3 (mean 317.7) | 312.3–318.5 (mean 315.5) | 1.000 |
+| `BenchmarkQEvalJITPipelinePlanLane` | 2112–2157 (mean 2133) | 2112–2207 (mean 2142) | 1.000 |
+
+Session eval: alt ≤ default in 5/6 paired rounds (≈ −0.7 %, at the edge of
+noise). Pipeline plan: paired deltas −23…+51 ns on a 2.1 µs helper —
+**neutral within noise**; the ~100 ns protocol saving is partly returned by
+the retained exit-stat recording (parity requirement) and the ~4 ns direct
+transition, and the remainder is unresolvable against a 2.1 µs helper.
+
+Real rows (CLI, 5 reps/mode, same binary): `q_operator_pipeline`
+0.435/0.434 s, `q_query_rollup` 0.398/0.398 s, `frame_qsql_rollup`
+0.296/0.297 s, `soa_masked_aggregate` 0.186/0.188 s (off/on) — flat, as the
+ranking predicts (these rows have zero Tier 2 exits).
+
+Stress: `TestJITGoHelperCall*` under
+`GOGC=1 GODEBUG=gcstoptheworld=0,asyncpreemptoff=0` and the full
+`TestJITAltStackDirect*` family under `GOGC=1` ×3 — green in both modes.
+Full `internal/jit`, `internal/methodjit`, `internal/stdlib/...`,
+`internal/vm`, `benchmarks` suites green in both modes, including
+`TestQEvalJITScriptRouting` and `TestDiag_ProductionParity_*`.
+
+### R6-S verdict
+
+- **Conversions**: `OpQEvalSessionEval` (R5-K) and `OpQEvalPipelinePlan`
+  (R6-S) both run on the direct lane under the flag, fully engaged
+  (1.000 direct/eval), semantics-exact (results, routes, error wraps,
+  exit-stat diagnostics), and now callee-safe via self-cf cells.
+- **Default-on: NO-GO, reaffirmed with corpus-wide data.** Both converted
+  helpers are dominated by their own kernel cost; every other transition on
+  real workloads is either ~zero-frequency, bulk-amortized, or a feedback
+  mechanism that must keep exiting. There is no measured win to buy with the
+  added mode, and the bar (consistent wins on real rows) is not met.
+- **Keep the flag and the tests.** The mechanism stays validated per Go
+  release by the stress suite. Re-evaluate when a genuinely fine-grained
+  per-element helper route lands (e.g. per-row q kernels instead of bulk
+  columnar kernels, string interning, allocation probes) — that is a
+  prerequisite, not a tuning matter: the ranking shows the helper population
+  the lane was designed for has been optimized out of existence everywhere
+  else.

@@ -120,8 +120,60 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		}
 		*(*runtime.Value)(unsafe.Pointer(ctx.Regs + uintptr(ctx.OpExitSlot)*uintptr(jit.ValueSize))) = out
 		ctx.HelperErrFlag = 0
+	case OpQEvalPipelinePlan:
+		// R6-S: direct lane for the ExitQEvalPipelinePlan protocol. Runs the
+		// exact generic handler (executeQEvalPipelinePlanExit on the
+		// typed_runtime_native_exit route) against the live register file.
+		// The generic path's post-helper resyncRegs is not needed here: like
+		// the session-eval executors, the q pipeline backends are host Go
+		// functions over q runtime state that never call back into the Leia
+		// VM, so the register file cannot be reallocated while they run.
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		// Diagnostic exit-stat parity: the generic executeTier2 path records
+		// every ExitQEvalPipelinePlan before handling it (exit_stats.go);
+		// keep ExitStats observable behavior identical in direct mode.
+		if tm := ctx.HelperTM; tm != nil {
+			savedExit := ctx.ExitCode
+			ctx.ExitCode = ExitQEvalPipelinePlan
+			tm.recordTier2Exit(cf.Proto, cf, ctx)
+			ctx.ExitCode = savedExit
+		}
+		if err := cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteNativeExit); err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		ctx.HelperErrFlag = 0
 	default:
 		ctx.HelperErr = fmt.Errorf("tier2: direct helper: unsupported op %v", Op(ctx.OpExitOp))
 		ctx.HelperErrFlag = 1
 	}
+}
+
+// helperRegsWindow reconstructs the VM register file slice and the frame base
+// from the ExecContext pointers (Regs = &regs[base], RegsBase = &regs[0],
+// RegsEnd = &regs[len]). The pointers are maintained by the Go-side execute
+// loops across every event that can reallocate the file, so they are current
+// whenever native code runs.
+func helperRegsWindow(ctx *ExecContext) ([]runtime.Value, int, bool) {
+	if ctx == nil || ctx.RegsBase == 0 || ctx.RegsEnd <= ctx.RegsBase || ctx.Regs < ctx.RegsBase {
+		return nil, 0, false
+	}
+	n := int((ctx.RegsEnd - ctx.RegsBase) / uintptr(jit.ValueSize))
+	base := int((ctx.Regs - ctx.RegsBase) / uintptr(jit.ValueSize))
+	if n <= 0 || base < 0 || base > n {
+		return nil, 0, false
+	}
+	return unsafe.Slice((*runtime.Value)(unsafe.Pointer(ctx.RegsBase)), n), base, true
 }

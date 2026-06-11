@@ -210,12 +210,22 @@ type ExecContext struct {
 	// fall back to the generic op-exit when zero.
 	JITStackHdr uintptr
 	// HelperCF is the *CompiledFunction executing, for the helper bridge.
+	// The Go side publishes the entry function's cf here; every emitted
+	// direct-call site additionally overwrites it with its OWN compiled
+	// function (via the self-cf cell, see emitDirectHelperSelfCF) right
+	// before the BLR, so sites inside natively-BLR'd callees dispatch with
+	// the callee's cf rather than the entry function's.
 	HelperCF uintptr
 	// HelperErrFlag is set non-zero by the helper bridge when the helper
 	// returned an error; emitted code then exits with ExitQEvalHelperErr.
 	HelperErrFlag int64
 	// HelperErr carries the helper error for ExitQEvalHelperErr.
 	HelperErr error
+	// HelperTM is the TieringManager that started this native execution.
+	// Direct helper bridges use it to keep diagnostic exit-stat recording
+	// identical to the generic exit protocol they replace (Go-only field,
+	// never read from native code).
+	HelperTM *TieringManager
 }
 
 // callExitDescriptor names the shared CALL exit protocol fields stored in
@@ -381,6 +391,7 @@ var (
 	execCtxOffCoroutineNativeMisses  = int(unsafe.Offsetof(ExecContext{}.CoroutineNativeMisses))
 	// JIT alternate-stack direct helper call offsets
 	execCtxOffJITStackHdr   = int(unsafe.Offsetof(ExecContext{}.JITStackHdr))
+	execCtxOffHelperCF      = int(unsafe.Offsetof(ExecContext{}.HelperCF))
 	execCtxOffHelperErrFlag = int(unsafe.Offsetof(ExecContext{}.HelperErrFlag))
 )
 
@@ -440,6 +451,14 @@ type CompiledFunction struct {
 	Proto     *vm.FuncProto  // source function
 	NumSpills int            // stack space needed for spill slots
 	numRegs   int            // total number of VM register slots (including temp slots)
+
+	// selfCFCell backs the direct helper-call sites emitted into Code
+	// (LEIA_JIT_ALT_STACK=1): the cell's address is embedded as an immediate
+	// and holds this CompiledFunction's own pointer, so a site executing
+	// inside a natively-BLR'd callee publishes the CALLEE's cf to the helper
+	// bridge instead of inheriting the entry function's ctx.HelperCF. The
+	// field also keeps the cell alive for as long as the code can run.
+	selfCFCell *uintptr
 
 	// CompileDurationNanos records production Tier 2 compilation latency for
 	// timeline/debug attribution. It is intentionally diagnostic only.
