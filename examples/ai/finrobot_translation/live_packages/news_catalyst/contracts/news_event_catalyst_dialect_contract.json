@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "id": "provider-free-news-event-catalyst-ai-dialect",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "capability_family": "ai.news_event_catalyst",
+  "source_ingestion_schema": {
+    "required_fields": [
+      "source_id",
+      "source_kind",
+      "published_at",
+      "observed_at",
+      "headline",
+      "body_excerpt",
+      "publisher",
+      "url",
+      "language",
+      "instrument_refs"
+    ],
+    "source_kinds": [
+      "wire",
+      "issuer_release",
+      "regulatory_feed",
+      "social_rollup",
+      "blog",
+      "newsletter",
+      "research_note"
+    ],
+    "normalization_rules": [
+      "timestamps are UTC ISO-8601",
+      "instrument_refs preserve ticker and optional exchange",
+      "body_excerpt is trimmed fixture text and never fetched live",
+      "provider_payload is omitted from provider-free fixtures"
+    ]
+  },
+  "event_extraction_fixture": {
+    "fixture_key": "event_extraction:ACME:2026-06-11",
+    "path": "fixtures/event_extraction_ACME_fixture.json",
+    "schema": "schemas/news_event_catalyst_dialect_v1.schema.json",
+    "coverage": [
+      "source ingestion normalization",
+      "event mention extraction",
+      "duplicate cluster selection",
+      "freshness and staleness labels",
+      "source confidence envelope"
+    ]
+  },
+  "catalyst_classification_taxonomy": {
+    "categories": [
+      "earnings",
+      "guidance",
+      "product",
+      "regulatory",
+      "macro",
+      "mna",
+      "litigation",
+      "analyst",
+      "retail_sentiment"
+    ],
+    "catalyst_types": [
+      "margin_expansion",
+      "product_optionality",
+      "regulatory_review",
+      "retail_sentiment_divergence",
+      "earnings_quality",
+      "capital_structure",
+      "demand_shock",
+      "supply_constraint"
+    ],
+    "directions": [
+      "positive",
+      "neutral",
+      "negative",
+      "mixed"
+    ],
+    "time_horizons": [
+      "intraday",
+      "near_term",
+      "medium_term",
+      "long_term"
+    ]
+  },
+  "freshness_staleness_policy": {
+    "as_of_field": "as_of",
+    "fresh_threshold_hours": 24,
+    "stale_threshold_hours": 72,
+    "archive_threshold_hours": 168,
+    "decay_curve": "piecewise_linear",
+    "labels": [
+      "fresh",
+      "aging",
+      "stale",
+      "archival"
+    ],
+    "required_outputs": [
+      "age_hours",
+      "freshness_label",
+      "recency_score",
+      "staleness_reason"
+    ]
+  },
+  "dedupe_source_confidence_envelope": {
+    "dedupe_keys": [
+      "normalized_headline",
+      "canonical_event_subject",
+      "publisher_family",
+      "published_at_bucket"
+    ],
+    "canonical_selection_order": [
+      "highest_source_trust",
+      "highest_directness",
+      "newest_observed_at",
+      "lexicographic_source_id"
+    ],
+    "confidence_components": [
+      "source_trust",
+      "directness",
+      "corroboration",
+      "recency",
+      "extraction_quality"
+    ],
+    "required_outputs": [
+      "dedupe_group_id",
+      "canonical_event_id",
+      "duplicate_event_ids",
+      "confidence_low",
+      "confidence_mid",
+      "confidence_high",
+      "confidence_rationale"
+    ]
+  },
+  "prompt_contract": {
+    "system_role": "provider-free financial news/event/catalyst extraction dialect",
+    "inputs": [
+      "ticker",
+      "as_of",
+      "ingested_sources",
+      "retail_sentiment_snapshot",
+      "financial_context"
+    ],
+    "outputs": [
+      "normalized_sources",
+      "event_mentions",
+      "news_events",
+      "catalysts",
+      "dedupe_groups",
+      "confidence_envelopes"
+    ],
+    "must": [
+      "cite fixture source ids for every extracted event",
+      "separate source freshness from source trust",
+      "classify catalysts using the taxonomy only",
+      "return deterministic ordering for ties",
+      "state when evidence is stale, duplicated, or weakly sourced"
+    ],
+    "must_not": [
+      "call live network",
+      "import provider SDKs",
+      "invent source URLs outside fixture://",
+      "use provider-specific credentials"
+    ]
+  }
+}

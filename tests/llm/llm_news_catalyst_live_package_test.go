@@ -100,19 +100,19 @@ func TestFinRobotNewsCatalystLivePackageManifest(t *testing.T) {
 		t.Fatalf("source modules = %#v, want %#v", manifest.SourceModules, wantSources)
 	}
 
-	for _, key := range []string{"smoke", "news_catalyst_contract", "adapter_boundary_contract", "fixture_index"} {
+	for _, key := range []string{"smoke", "news_catalyst_contract", "news_event_catalyst_dialect_contract", "adapter_boundary_contract", "fixture_index"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 	}
-	for _, key := range []string{"news_event", "source_ranking", "retail_sentiment_snapshot", "catalyst_analysis", "adapter_boundary"} {
+	for _, key := range []string{"news_event_catalyst_dialect", "news_event", "source_ranking", "retail_sentiment_snapshot", "catalyst_analysis", "adapter_boundary"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertNewsCatalystJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "news_catalyst", "retail_sentiment", "adapter_boundary"} {
+	for _, key := range []string{"index", "event_extraction", "news_catalyst", "retail_sentiment", "adapter_boundary"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -134,7 +134,7 @@ func TestFinRobotNewsCatalystLivePackageManifest(t *testing.T) {
 	}
 
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"relevance", "category", "sentiment", "impact", "source ranking", "polymarket", "reddit"} {
+	for _, want := range []string{"source ingestion", "event extraction", "prompt contract", "freshness", "dedupe", "taxonomy", "relevance", "category", "sentiment", "impact", "source ranking", "polymarket", "reddit"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -185,7 +185,7 @@ func TestFinRobotNewsCatalystLivePackageContractsAndFixtures(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeNewsCatalystJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 4 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	for _, fixture := range index.Fixtures {
@@ -197,6 +197,223 @@ func TestFinRobotNewsCatalystLivePackageContractsAndFixtures(t *testing.T) {
 		}
 		assertNewsCatalystJSONFile(t, filepath.Join(base, fixture.Path))
 		assertNewsCatalystJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+}
+
+func TestFinRobotNewsCatalystDialectContract(t *testing.T) {
+	base := newsCatalystLivePackageDir(t)
+
+	var contract struct {
+		ProviderFree          bool   `json:"provider_free"`
+		LiveNetwork           bool   `json:"live_network"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		CapabilityFamily      string `json:"capability_family"`
+		SourceIngestionSchema struct {
+			RequiredFields     []string `json:"required_fields"`
+			SourceKinds        []string `json:"source_kinds"`
+			NormalizationRules []string `json:"normalization_rules"`
+		} `json:"source_ingestion_schema"`
+		EventExtractionFixture struct {
+			FixtureKey string   `json:"fixture_key"`
+			Path       string   `json:"path"`
+			Schema     string   `json:"schema"`
+			Coverage   []string `json:"coverage"`
+		} `json:"event_extraction_fixture"`
+		CatalystClassificationTaxonomy struct {
+			Categories    []string `json:"categories"`
+			CatalystTypes []string `json:"catalyst_types"`
+			Directions    []string `json:"directions"`
+			TimeHorizons  []string `json:"time_horizons"`
+		} `json:"catalyst_classification_taxonomy"`
+		FreshnessStalenessPolicy struct {
+			FreshThresholdHours   float64  `json:"fresh_threshold_hours"`
+			StaleThresholdHours   float64  `json:"stale_threshold_hours"`
+			ArchiveThresholdHours float64  `json:"archive_threshold_hours"`
+			RequiredOutputs       []string `json:"required_outputs"`
+		} `json:"freshness_staleness_policy"`
+		DedupeSourceConfidenceEnvelope struct {
+			DedupeKeys              []string `json:"dedupe_keys"`
+			CanonicalSelectionOrder []string `json:"canonical_selection_order"`
+			ConfidenceComponents    []string `json:"confidence_components"`
+			RequiredOutputs         []string `json:"required_outputs"`
+		} `json:"dedupe_source_confidence_envelope"`
+		PromptContract struct {
+			Inputs  []string `json:"inputs"`
+			Outputs []string `json:"outputs"`
+			Must    []string `json:"must"`
+			MustNot []string `json:"must_not"`
+		} `json:"prompt_contract"`
+	}
+	decodeNewsCatalystJSONFile(t, filepath.Join(base, "contracts", "news_event_catalyst_dialect_contract.json"), &contract)
+	if !contract.ProviderFree || contract.LiveNetwork || contract.RealDependencyImports || contract.CapabilityFamily != "ai.news_event_catalyst" {
+		t.Fatalf("dialect contract header = %#v", contract)
+	}
+	for _, field := range []string{"source_id", "source_kind", "published_at", "observed_at", "headline", "instrument_refs"} {
+		if !newsCatalystContainsString(contract.SourceIngestionSchema.RequiredFields, field) {
+			t.Fatalf("source ingestion schema missing field %q: %#v", field, contract.SourceIngestionSchema.RequiredFields)
+		}
+	}
+	for _, kind := range []string{"wire", "issuer_release", "regulatory_feed", "social_rollup", "blog", "newsletter"} {
+		if !newsCatalystContainsString(contract.SourceIngestionSchema.SourceKinds, kind) {
+			t.Fatalf("source ingestion schema missing source kind %q: %#v", kind, contract.SourceIngestionSchema.SourceKinds)
+		}
+	}
+	if contract.EventExtractionFixture.FixtureKey != "event_extraction:ACME:2026-06-11" {
+		t.Fatalf("event extraction fixture key = %q", contract.EventExtractionFixture.FixtureKey)
+	}
+	assertNewsCatalystJSONFile(t, filepath.Join(base, contract.EventExtractionFixture.Path))
+	assertNewsCatalystJSONFile(t, filepath.Join(base, contract.EventExtractionFixture.Schema))
+
+	for _, category := range []string{"earnings", "guidance", "regulatory", "retail_sentiment"} {
+		if !newsCatalystContainsString(contract.CatalystClassificationTaxonomy.Categories, category) {
+			t.Fatalf("taxonomy missing category %q", category)
+		}
+	}
+	for _, catalystType := range []string{"margin_expansion", "regulatory_review", "retail_sentiment_divergence"} {
+		if !newsCatalystContainsString(contract.CatalystClassificationTaxonomy.CatalystTypes, catalystType) {
+			t.Fatalf("taxonomy missing catalyst type %q", catalystType)
+		}
+	}
+	if !(contract.FreshnessStalenessPolicy.FreshThresholdHours < contract.FreshnessStalenessPolicy.StaleThresholdHours &&
+		contract.FreshnessStalenessPolicy.StaleThresholdHours < contract.FreshnessStalenessPolicy.ArchiveThresholdHours) {
+		t.Fatalf("freshness thresholds must be ordered: %#v", contract.FreshnessStalenessPolicy)
+	}
+	for _, output := range []string{"age_hours", "freshness_label", "recency_score", "staleness_reason"} {
+		if !newsCatalystContainsString(contract.FreshnessStalenessPolicy.RequiredOutputs, output) {
+			t.Fatalf("freshness policy missing output %q", output)
+		}
+	}
+	for _, output := range []string{"dedupe_group_id", "canonical_event_id", "duplicate_event_ids", "confidence_low", "confidence_mid", "confidence_high", "confidence_rationale"} {
+		if !newsCatalystContainsString(contract.DedupeSourceConfidenceEnvelope.RequiredOutputs, output) {
+			t.Fatalf("dedupe/confidence envelope missing output %q", output)
+		}
+	}
+	for _, component := range []string{"source_trust", "directness", "corroboration", "recency", "extraction_quality"} {
+		if !newsCatalystContainsString(contract.DedupeSourceConfidenceEnvelope.ConfidenceComponents, component) {
+			t.Fatalf("confidence envelope missing component %q", component)
+		}
+	}
+	promptMust := strings.ToLower(strings.Join(contract.PromptContract.Must, " "))
+	promptMustNot := strings.ToLower(strings.Join(contract.PromptContract.MustNot, " "))
+	for _, want := range []string{"fixture source ids", "source freshness", "taxonomy", "deterministic"} {
+		if !strings.Contains(promptMust, want) {
+			t.Fatalf("prompt must clauses missing %q: %s", want, promptMust)
+		}
+	}
+	for _, want := range []string{"live network", "provider sdks", "credentials"} {
+		if !strings.Contains(promptMustNot, want) {
+			t.Fatalf("prompt must_not clauses missing %q: %s", want, promptMustNot)
+		}
+	}
+}
+
+func TestFinRobotNewsCatalystEventExtractionFixture(t *testing.T) {
+	base := newsCatalystLivePackageDir(t)
+
+	var fixture struct {
+		ProviderFree    bool   `json:"provider_free"`
+		LiveNetwork     bool   `json:"live_network"`
+		Ticker          string `json:"ticker"`
+		SourceIngestion []struct {
+			SourceID        string   `json:"source_id"`
+			SourceKind      string   `json:"source_kind"`
+			Publisher       string   `json:"publisher"`
+			URL             string   `json:"url"`
+			InstrumentRefs  []string `json:"instrument_refs"`
+			FreshnessLabel  string   `json:"freshness_label"`
+			AgeHours        float64  `json:"age_hours"`
+			StalenessReason string   `json:"staleness_reason"`
+		} `json:"source_ingestion"`
+		EventMentions []struct {
+			MentionID             string  `json:"mention_id"`
+			SourceID              string  `json:"source_id"`
+			CanonicalEventSubject string  `json:"canonical_event_subject"`
+			Category              string  `json:"category"`
+			CatalystType          string  `json:"catalyst_type"`
+			Direction             string  `json:"direction"`
+			ExtractedEventID      string  `json:"extracted_event_id"`
+			ExtractionConfidence  float64 `json:"extraction_confidence"`
+		} `json:"event_mentions"`
+		DedupeGroups []struct {
+			DedupeGroupID            string   `json:"dedupe_group_id"`
+			CanonicalEventID         string   `json:"canonical_event_id"`
+			DuplicateEventIDs        []string `json:"duplicate_event_ids"`
+			CanonicalSelectionReason string   `json:"canonical_selection_reason"`
+		} `json:"dedupe_groups"`
+		ConfidenceEnvelopes []struct {
+			EventID             string  `json:"event_id"`
+			ConfidenceLow       float64 `json:"confidence_low"`
+			ConfidenceMid       float64 `json:"confidence_mid"`
+			ConfidenceHigh      float64 `json:"confidence_high"`
+			SourceTrust         float64 `json:"source_trust"`
+			Directness          float64 `json:"directness"`
+			Corroboration       float64 `json:"corroboration"`
+			Recency             float64 `json:"recency"`
+			ExtractionQuality   float64 `json:"extraction_quality"`
+			ConfidenceRationale string  `json:"confidence_rationale"`
+		} `json:"confidence_envelopes"`
+		PromptContractEval struct {
+			MustPass              bool `json:"must_pass"`
+			MustNotPass           bool `json:"must_not_pass"`
+			DeterministicOrdering bool `json:"deterministic_ordering"`
+			TaxonomyOnly          bool `json:"taxonomy_only"`
+		} `json:"prompt_contract_eval"`
+	}
+	decodeNewsCatalystJSONFile(t, filepath.Join(base, "fixtures", "event_extraction_ACME_fixture.json"), &fixture)
+	if !fixture.ProviderFree || fixture.LiveNetwork || fixture.Ticker != "ACME" || len(fixture.SourceIngestion) < 4 || len(fixture.EventMentions) < 4 {
+		t.Fatalf("event extraction fixture header/counts = %#v", fixture)
+	}
+	sourceIDs := map[string]bool{}
+	hasFresh := false
+	hasStale := false
+	for _, source := range fixture.SourceIngestion {
+		if source.SourceID == "" || source.SourceKind == "" || source.Publisher == "" || !strings.HasPrefix(source.URL, "fixture://") || len(source.InstrumentRefs) == 0 {
+			t.Fatalf("source ingestion record incomplete or provider-backed: %#v", source)
+		}
+		if source.FreshnessLabel == "" || source.StalenessReason == "" || source.AgeHours < 0 {
+			t.Fatalf("source ingestion missing freshness policy output: %#v", source)
+		}
+		sourceIDs[source.SourceID] = true
+		hasFresh = hasFresh || source.FreshnessLabel == "fresh"
+		hasStale = hasStale || source.FreshnessLabel == "stale"
+	}
+	if !hasFresh || !hasStale {
+		t.Fatalf("fixture must include fresh and stale source examples: %#v", fixture.SourceIngestion)
+	}
+	mentionEventIDs := map[string]bool{}
+	for _, mention := range fixture.EventMentions {
+		if !sourceIDs[mention.SourceID] || mention.CanonicalEventSubject == "" || mention.Category == "" || mention.CatalystType == "" || mention.ExtractionConfidence <= 0 {
+			t.Fatalf("event mention missing source link or extraction fields: %#v", mention)
+		}
+		mentionEventIDs[mention.ExtractedEventID] = true
+	}
+	foundGuidanceDedupe := false
+	for _, group := range fixture.DedupeGroups {
+		if group.DedupeGroupID == "" || !mentionEventIDs[group.CanonicalEventID] || group.CanonicalSelectionReason == "" {
+			t.Fatalf("dedupe group incomplete: %#v", group)
+		}
+		for _, eventID := range group.DuplicateEventIDs {
+			if !mentionEventIDs[eventID] {
+				t.Fatalf("dedupe group references unknown duplicate event %q", eventID)
+			}
+		}
+		foundGuidanceDedupe = foundGuidanceDedupe || group.CanonicalEventID == "news-acme-guidance-001" && len(group.DuplicateEventIDs) >= 2
+	}
+	if !foundGuidanceDedupe {
+		t.Fatalf("fixture must canonicalize guidance duplicates: %#v", fixture.DedupeGroups)
+	}
+	for _, envelope := range fixture.ConfidenceEnvelopes {
+		if !mentionEventIDs[envelope.EventID] || envelope.ConfidenceLow > envelope.ConfidenceMid || envelope.ConfidenceMid > envelope.ConfidenceHigh {
+			t.Fatalf("confidence envelope ordering/link invalid: %#v", envelope)
+		}
+		for _, score := range []float64{envelope.SourceTrust, envelope.Directness, envelope.Corroboration, envelope.Recency, envelope.ExtractionQuality} {
+			if score < 0 || score > 1 {
+				t.Fatalf("confidence component out of range: %#v", envelope)
+			}
+		}
+	}
+	if !fixture.PromptContractEval.MustPass || !fixture.PromptContractEval.MustNotPass || !fixture.PromptContractEval.DeterministicOrdering || !fixture.PromptContractEval.TaxonomyOnly {
+		t.Fatalf("prompt contract eval must pass all guardrails: %#v", fixture.PromptContractEval)
 	}
 }
 
@@ -527,7 +744,7 @@ func TestFinRobotNewsCatalystLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get news_catalyst_live_package_summary: %v", err)
 			}
-			want := "news_catalyst_live_package modules=3 adapters=3 provider_free=true live_network=false imports=false fixtures=3"
+			want := "news_catalyst_live_package modules=3 adapters=3 provider_free=true live_network=false imports=false fixtures=4 dialect_capabilities=6"
 			if got != want {
 				t.Fatalf("news_catalyst_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -565,4 +782,13 @@ func decodeNewsCatalystJSONFile(t *testing.T, path string, value any) {
 	if err := json.Unmarshal(data, value); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
+}
+
+func newsCatalystContainsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

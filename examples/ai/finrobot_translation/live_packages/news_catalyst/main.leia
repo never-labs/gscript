@@ -21,13 +21,13 @@ news_catalyst_live_package := {
         {
             id: "news_integrator"
             source_module: "news_integrator.py"
-            capabilities: {"finance.news.fetch.fixture", "finance.news.relevance.score", "finance.news.category.classify", "finance.news.sentiment.score", "finance.news.source.rank"}
+            capabilities: {"ai.news.source.ingest.schema", "ai.news.event.extract", "ai.news.freshness.evaluate", "ai.news.dedupe.confidence.envelope", "finance.news.fetch.fixture", "finance.news.relevance.score", "finance.news.category.classify", "finance.news.sentiment.score", "finance.news.source.rank"}
             required_fields: {"relevance_score", "category", "sentiment", "impact_score", "source_rank"}
         },
         {
             id: "catalyst_analyzer"
             source_module: "catalyst_analyzer.py"
-            capabilities: {"finance.catalyst.detect", "finance.catalyst.impact.score", "finance.catalyst.time_horizon.classify", "finance.catalyst.evidence.link"}
+            capabilities: {"ai.catalyst.classification.taxonomy", "ai.prompt.contract.news_event_catalyst", "finance.catalyst.detect", "finance.catalyst.impact.score", "finance.catalyst.time_horizon.classify", "finance.catalyst.evidence.link"}
             required_fields: {"catalyst_type", "direction", "impact_score", "time_horizon", "evidence_event_ids"}
         },
         {
@@ -43,9 +43,18 @@ news_catalyst_live_package := {
         {id: "reddit" capability: "finance.retail_sentiment.reddit.thread_snapshot" fixture_key: "reddit:thread_snapshot:ACME:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
     }
     fixture_keys: {
+        "event_extraction:ACME:2026-06-11",
         "news_catalyst:ACME:2026-06-11",
         "retail_sentiment:ACME:2026-06-11",
         "adapter_boundary:ACME:offline",
+    }
+    dialect_capabilities: {
+        "ai.news.source.ingest.schema",
+        "ai.news.event.extract",
+        "ai.catalyst.classification.taxonomy",
+        "ai.news.freshness.evaluate",
+        "ai.news.dedupe.confidence.envelope",
+        "ai.prompt.contract.news_event_catalyst",
     }
 }
 
@@ -82,18 +91,20 @@ for i := 1; i <= #news_catalyst_live_package.adapter_boundaries; i++ {
 
 assert(news_catalyst_module_count == 3)
 assert(news_catalyst_boundary_count == 3)
-assert(#news_catalyst_live_package.fixture_keys == 3)
+assert(#news_catalyst_live_package.fixture_keys == 4)
+assert(#news_catalyst_live_package.dialect_capabilities == 6)
 assert(news_catalyst_live_package.default_policy.mode == "fixture_replay")
 assert(news_catalyst_live_package.default_policy.clean_skip_without_dependency == true)
 
 news_catalyst_live_package_summary := string.format(
-"news_catalyst_live_package modules=%d adapters=%d provider_free=%s live_network=%s imports=%s fixtures=%d",
+"news_catalyst_live_package modules=%d adapters=%d provider_free=%s live_network=%s imports=%s fixtures=%d dialect_capabilities=%d",
 news_catalyst_module_count,
 news_catalyst_boundary_count,
 tostring(news_catalyst_live_package.provider_free),
 tostring(news_catalyst_live_package.live_network),
 tostring(news_catalyst_live_package.real_dependency_imports),
-#news_catalyst_live_package.fixture_keys
+#news_catalyst_live_package.fixture_keys,
+#news_catalyst_live_package.dialect_capabilities
 )
 
 print(news_catalyst_live_package_summary)

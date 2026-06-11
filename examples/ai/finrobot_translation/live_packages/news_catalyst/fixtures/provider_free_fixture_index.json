@@ -6,6 +6,22 @@
   "real_dependency_imports": false,
   "fixtures": [
     {
+      "fixture_key": "event_extraction:ACME:2026-06-11",
+      "capability": "ai.news.event.extract",
+      "path": "fixtures/event_extraction_ACME_fixture.json",
+      "schema": "schemas/news_event_catalyst_dialect_v1.schema.json",
+      "metadata": {
+        "ticker": "ACME",
+        "as_of": "2026-06-11",
+        "replay_ready": true,
+        "contains_source_ingestion_schema": true,
+        "contains_freshness_policy_eval": true,
+        "contains_dedupe_groups": true,
+        "contains_confidence_envelopes": true,
+        "contains_prompt_contract_eval": true
+      }
+    },
+    {
       "fixture_key": "news_catalyst:ACME:2026-06-11",
       "capability": "finance.catalyst.detect",
       "path": "fixtures/news_catalyst_ACME_fixture.json",

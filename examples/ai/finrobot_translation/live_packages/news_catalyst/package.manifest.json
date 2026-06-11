@@ -31,10 +31,12 @@
   "entrypoints": {
     "smoke": "main.leia",
     "news_catalyst_contract": "contracts/news_catalyst_contract.json",
+    "news_event_catalyst_dialect_contract": "contracts/news_event_catalyst_dialect_contract.json",
     "adapter_boundary_contract": "contracts/adapter_boundary_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json"
   },
   "schemas": {
+    "news_event_catalyst_dialect": "schemas/news_event_catalyst_dialect_v1.schema.json",
     "news_event": "schemas/news_event_v1.schema.json",
     "source_ranking": "schemas/source_ranking_v1.schema.json",
     "retail_sentiment_snapshot": "schemas/retail_sentiment_snapshot_v1.schema.json",
@@ -43,6 +45,7 @@
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
+    "event_extraction": "fixtures/event_extraction_ACME_fixture.json",
     "news_catalyst": "fixtures/news_catalyst_ACME_fixture.json",
     "retail_sentiment": "fixtures/retail_sentiment_ACME_snapshot.json",
     "adapter_boundary": "fixtures/adapter_boundary_fixture.json"
@@ -52,6 +55,10 @@
       "id": "news_integrator",
       "source_module": "news_integrator.py",
       "capabilities": [
+        "ai.news.source.ingest.schema",
+        "ai.news.event.extract",
+        "ai.news.freshness.evaluate",
+        "ai.news.dedupe.confidence.envelope",
         "finance.news.fetch.fixture",
         "finance.news.relevance.score",
         "finance.news.category.classify",
@@ -67,6 +74,8 @@
       "id": "catalyst_analyzer",
       "source_module": "catalyst_analyzer.py",
       "capabilities": [
+        "ai.catalyst.classification.taxonomy",
+        "ai.prompt.contract.news_event_catalyst",
         "finance.catalyst.detect",
         "finance.catalyst.impact.score",
         "finance.catalyst.time_horizon.classify",
@@ -130,6 +139,10 @@
     "manifest and referenced JSON files decode without external dependencies",
     "provider_free is true and live_network_default is false",
     "required and optional credentials are empty",
+    "source ingestion schema, event extraction fixture, and prompt contract are provider-free",
+    "freshness/staleness policy separates recency decay from source trust",
+    "dedupe/source confidence envelope preserves canonical and duplicate event ids",
+    "catalyst classification taxonomy is reusable across news/event/catalyst prompts",
     "news relevance, category, sentiment, impact, source ranking, and retail sentiment snapshot schemas are present",
     "Polymarket, X, and Reddit adapter boundaries are metadata-only and fixture-backed",
     "main.leia contains no live provider SDK imports or network execution"
