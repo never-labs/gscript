@@ -7,11 +7,12 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 28 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. Three checked-in
+Current registered-example status: 30 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. Five checked-in
 live-package skeletons are registered examples (`analytics_report`,
-`optional_integrations`, and `vendor_adapters`); the product workflow skeleton
-is manifest/contracts/schemas/fixtures only and is covered by tests through the
+`news_catalyst`, `optional_integrations`, `prompt_roles`, and
+`vendor_adapters`); the product workflow skeleton is
+manifest/contracts/schemas/fixtures only and is covered by tests through the
 existing workflow examples.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
@@ -22,6 +23,8 @@ existing workflow examples.
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |
 | `live_packages/product_workflow` | Covered through `equity_cli_workflow.leia` and `web_product.leia`; no standalone registered `.leia` file | `leia-finrobot-web-product` | `packages/finrobot/web_product` | `contracts/web_product_contract.json` |
 | `live_packages/optional_integrations` | `live_packages/optional_integrations/main.leia` | `leia-finrobot-optional-integrations` | `packages/finrobot/optional_integrations` | `contracts/optional_integration_capability_gates.json` |
+| `live_packages/prompt_roles` | `live_packages/prompt_roles/main.leia` | `leia-finrobot-prompt-roles` | `packages/finrobot/prompt_roles` | `contracts/prompt_role_contract.json` |
+| `live_packages/news_catalyst` | `live_packages/news_catalyst/main.leia` | `leia-finrobot-news-catalyst` | `packages/finrobot/news_catalyst` | `contracts/news_catalyst_contract.json` |
 
 ## Contract Rules
 

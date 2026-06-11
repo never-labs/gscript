@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 27,
-  "translation_directory_file_count": 78,
+  "registered_examples_count": 30,
+  "translation_directory_file_count": 110,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -16,6 +16,24 @@
         "normalizers",
         "valuation",
         "report_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "news_catalyst",
+      "directory": "examples/ai/finrobot_translation/live_packages/news_catalyst",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/news_catalyst/main.leia",
+      "covers_package_ids": [
+        "news_catalyst"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "optional_integrations",
+      "directory": "examples/ai/finrobot_translation/live_packages/optional_integrations",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/optional_integrations/main.leia",
+      "covers_package_ids": [
+        "optional_integrations"
       ],
       "status": "checked_in_registered_example"
     },
@@ -31,6 +49,15 @@
         "web_product"
       ],
       "status": "checked_in_contracts_schemas_fixtures"
+    },
+    {
+      "id": "prompt_roles",
+      "directory": "examples/ai/finrobot_translation/live_packages/prompt_roles",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/prompt_roles/main.leia",
+      "covers_package_ids": [
+        "prompt_roles"
+      ],
+      "status": "checked_in_registered_example"
     },
     {
       "id": "vendor_adapters",
@@ -234,6 +261,35 @@
         "contract tests run with live_network=false and assert role profile versions plus TERMINATE convention",
         "section output schema fixture tests validate source evidence references without credentials",
         "provider-free package tests deny external I/O, provider credentials, and external prompt/model SDK imports"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "news_catalyst",
+      "package_name": "leia-finrobot-news-catalyst",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/news_catalyst",
+      "planned_directory": "packages/finrobot/news_catalyst",
+      "manifest": "packages/finrobot/news_catalyst/package.manifest.json",
+      "contract": "packages/finrobot/news_catalyst/contracts/news_catalyst_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.news.fetch.fixture",
+        "finance.news.relevance.score",
+        "finance.news.category.classify",
+        "finance.news.sentiment.score",
+        "finance.news.source.rank",
+        "finance.catalyst.detect",
+        "finance.catalyst.impact.score",
+        "finance.catalyst.time_horizon.classify",
+        "finance.retail_sentiment.snapshot",
+        "finance.retail_sentiment.adapter.boundary"
+      ],
+      "test_gates": [
+        "news catalyst manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required credentials",
+        "fixture tests validate relevance, category, sentiment, impact, source ranking, and retail sentiment snapshots",
+        "adapter boundary tests keep Polymarket, X, and Reddit metadata-only until live packages are explicitly enabled"
       ],
       "no_built_in_guarantee": true
     }

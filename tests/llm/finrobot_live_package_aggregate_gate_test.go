@@ -17,8 +17,6 @@ func TestFinRobotLivePackageAggregateGate(t *testing.T) {
 
 	actualPackageDirs := finrobotLivePackageDirs(t, root, livePackagesRoot)
 	plannedPackageDirs := finrobotLivePackagePlanSkeletonDirs(t, root, plan)
-	plannedPackageDirs = append(plannedPackageDirs, "examples/ai/finrobot_translation/live_packages/news_catalyst")
-	sort.Strings(plannedPackageDirs)
 	if !reflect.DeepEqual(actualPackageDirs, plannedPackageDirs) {
 		t.Fatalf("live package skeleton directories mismatch\ngot  %#v\nwant %#v", actualPackageDirs, plannedPackageDirs)
 	}

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -21,6 +23,13 @@ type livePackagePlanManifest struct {
 		Statement    string   `json:"statement"`
 		CoreBoundary []string `json:"core_boundary"`
 	} `json:"no_built_in_guarantee"`
+	LivePackageSkeletons []struct {
+		ID                string   `json:"id"`
+		Directory         string   `json:"directory"`
+		RegisteredExample *string  `json:"registered_example"`
+		CoversPackageIDs  []string `json:"covers_package_ids"`
+		Status            string   `json:"status"`
+	} `json:"live_package_skeletons"`
 	Packages []struct {
 		ID                 string   `json:"id"`
 		PackageName        string   `json:"package_name"`
@@ -60,6 +69,7 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		"web_product":           "leia-finrobot-web-product",
 		"optional_integrations": "leia-finrobot-optional-integrations",
 		"prompt_roles":          "leia-finrobot-prompt-roles",
+		"news_catalyst":         "leia-finrobot-news-catalyst",
 	}
 	if len(manifest.Packages) != len(wantPackages) {
 		t.Fatalf("packages = %d, want %d", len(manifest.Packages), len(wantPackages))
@@ -101,6 +111,42 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 			t.Fatalf("%s migration source %q: %v", pkg.ID, pkg.MigrationSource, err)
 		}
 	}
+	assertLivePackageSkeletonSummaryMatchesPackages(t, root, manifest)
+}
+
+func assertLivePackageSkeletonSummaryMatchesPackages(t *testing.T, root string, manifest livePackagePlanManifest) {
+	t.Helper()
+	skeletonDirs := map[string]bool{}
+	for _, skeleton := range manifest.LivePackageSkeletons {
+		if skeleton.ID == "" || skeleton.Directory == "" || skeleton.Status == "" || len(skeleton.CoversPackageIDs) == 0 {
+			t.Fatalf("incomplete live_package_skeleton entry: %#v", skeleton)
+		}
+		if _, err := os.Stat(filepath.Join(root, skeleton.Directory)); err != nil {
+			t.Fatalf("live package skeleton directory %s: %v", skeleton.Directory, err)
+		}
+		if skeleton.RegisteredExample != nil {
+			if _, err := os.Stat(filepath.Join(root, *skeleton.RegisteredExample)); err != nil {
+				t.Fatalf("live package registered example %s: %v", *skeleton.RegisteredExample, err)
+			}
+		}
+		skeletonDirs[filepath.ToSlash(skeleton.Directory)] = true
+	}
+	packageDirs := map[string]bool{}
+	for _, pkg := range manifest.Packages {
+		packageDirs[filepath.ToSlash(pkg.SkeletonDirectory)] = true
+	}
+	if !reflect.DeepEqual(sortedKeys(skeletonDirs), sortedKeys(packageDirs)) {
+		t.Fatalf("live_package_skeletons directories = %#v, want package skeleton dirs %#v", sortedKeys(skeletonDirs), sortedKeys(packageDirs))
+	}
+}
+
+func sortedKeys(values map[string]bool) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
@@ -113,6 +159,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"web_product":           "web.",
 		"optional_integrations": "integration.optional.",
 		"prompt_roles":          "prompt.role.",
+		"news_catalyst":         "finance.",
 	}
 	for _, pkg := range manifest.Packages {
 		if len(pkg.Capabilities) < 5 {
