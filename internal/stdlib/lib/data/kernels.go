@@ -8197,10 +8197,30 @@ func fbySumI64RangeTiled(values i64RangeArray, groups Array) (Array, bool, error
 	}
 	sums := make([]int64, groupCount)
 	counts := make([]int64, groupCount)
-	for row := 0; row < values.len; row++ {
-		group := sourceGroups[(start+row)%sourceLen]
-		sums[group] += values.start + int64(row)*values.step
-		counts[group]++
+	// Affine closed form per residue class: rows r in [0, len) with
+	// (start+r) mod sourceLen == j form an arithmetic progression
+	// r0, r0+L, r0+2L, ... so each group's sum over the range carrier
+	// start + r*step reduces to O(sourceLen) work instead of O(len).
+	n := int64(values.len)
+	l := int64(sourceLen)
+	for j := 0; j < sourceLen; j++ {
+		r0 := (int64(j) - int64(start)) % l
+		if r0 < 0 {
+			r0 += l
+		}
+		if r0 >= n {
+			continue
+		}
+		k := (n - 1 - r0) / l // k+1 rows: r0, r0+L, ..., r0+k*L
+		rowSum := (k + 1) * r0
+		if k%2 == 0 {
+			rowSum += (k + 1) * (k / 2) * l
+		} else {
+			rowSum += ((k + 1) / 2) * k * l
+		}
+		group := sourceGroups[j]
+		sums[group] += (k+1)*values.start + values.step*rowSum
+		counts[group] += k + 1
 	}
 	return fbyI64TiledBroadcastArray{sourceGroups: sourceGroups, sums: sums, counts: counts, start: start, sourceLen: sourceLen, len: values.len}, true, nil
 }
@@ -10538,6 +10558,15 @@ func applyI64ArrayScalar(op Op, values Array, scalar int64, scalarLeft bool) (Ar
 	}
 	if op == OpIDiv && (scalarLeft || scalar == 0 || scalar == -1) {
 		return nil, false, nil
+	}
+	// Tiled pushdown: an elementwise scalar dyadic commutes with tiling, so
+	// wrap the (small) tile source instead of the tiled view. Downstream
+	// whole-vector consumers then see a tiledArray and stay on the
+	// O(period) cycle kernels instead of flattening N rows.
+	if tiled, ok := values.(tiledArray); ok && tiled.source.Len() > 0 {
+		if inner, handled, err := applyI64ArrayScalar(op, tiled.source, scalar, scalarLeft); err == nil && handled {
+			return tiledArray{source: inner, start: tiled.start, len: tiled.len}, true, nil
+		}
 	}
 	return i64ScalarDyadicArray{source: values, op: op, scalar: scalar, scalarLeft: scalarLeft, len: values.Len()}, true, nil
 }
@@ -15041,7 +15070,45 @@ func (a notMask) valueAt(row int) (bool, bool, error) {
 	return value == 0, true, nil
 }
 
+// tiledRowOccurrences counts rows r in [0, length) whose tiled source index
+// (start+r) mod sourceLen equals j (the arithmetic-progression closed form
+// shared with the fby residue kernels).
+func tiledRowOccurrences(start, length, sourceLen, j int) int64 {
+	r0 := (j - start) % sourceLen
+	if r0 < 0 {
+		r0 += sourceLen
+	}
+	if r0 >= length {
+		return 0
+	}
+	return int64((length-1-r0)/sourceLen) + 1
+}
+
 func (a notMask) trueCount() (int64, bool, error) {
+	if tiled, ok := a.array.(tiledArray); ok && tiled.source.Len() > 0 {
+		// O(period) cycle count: the mask value is constant per source
+		// index, so count one period and weight by row occurrences.
+		inner := notMask{array: tiled.source}
+		sourceLen := tiled.source.Len()
+		total := int64(0)
+		handled := true
+		for j := 0; j < sourceLen; j++ {
+			value, ok, err := inner.valueAt(j)
+			if err != nil {
+				return 0, true, err
+			}
+			if !ok {
+				handled = false
+				break
+			}
+			if value {
+				total += tiledRowOccurrences(tiled.start, tiled.len, sourceLen, j)
+			}
+		}
+		if handled {
+			return total, true, nil
+		}
+	}
 	if values, owned, ok := tryBulkBoolValues(a); ok {
 		var count int64
 		for _, value := range values {

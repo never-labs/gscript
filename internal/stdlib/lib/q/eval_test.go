@@ -5083,7 +5083,9 @@ func TestEvalGroupFbyTerminalTypedKernels(t *testing.T) {
 		if stat.Kernel == "ArrayFbySum" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenFbySum = true
 		}
-		if stat.Kernel == "ArrayGroupCount" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+		// count group <array> lowers to the distinct-count typed kernel
+		// (group keys are exactly the distinct values).
+		if stat.Kernel == "ArrayDistinctCount" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenGroupCount = true
 		}
 	}
