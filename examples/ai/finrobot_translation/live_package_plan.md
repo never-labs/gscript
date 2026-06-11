@@ -7,17 +7,18 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 30 runnable/checkable FinRobot examples are
-discovered by `go run ./cmd/leia examples --json`. Five checked-in
+Current registered-example status: 31 runnable/checkable FinRobot examples are
+discovered by `go run ./cmd/leia examples --json`. Six checked-in
 live-package skeletons are registered examples (`analytics_report`,
-`news_catalyst`, `optional_integrations`, `prompt_roles`, and
-`vendor_adapters`); the product workflow skeleton is
+`factor_research`, `news_catalyst`, `optional_integrations`, `prompt_roles`,
+and `vendor_adapters`); the product workflow skeleton is
 manifest/contracts/schemas/fixtures only and is covered by tests through the
 existing workflow examples.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
 | --- | --- | --- | --- | --- |
 | `live_packages/vendor_adapters` | `live_packages/vendor_adapters/main.leia` | `leia-finrobot-vendor-adapters` | `packages/finrobot/vendor_adapters` | `contracts/vendor_adapter_contract.json` |
+| `live_packages/factor_research` | `live_packages/factor_research/main.leia` | `leia-finrobot-factor-research` | `packages/finrobot/factor_research` | `contracts/factor_research_contract.json` |
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-normalizers` | `packages/finrobot/normalizers` | `contracts/finance_normalizer_contract.json` |
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-valuation` | `packages/finrobot/valuation` | `contracts/valuation_contract.json` |
 | `live_packages/analytics_report` | `live_packages/analytics_report/analytics_report.leia` | `leia-finrobot-report-renderer` | `packages/finrobot/report_renderer` | `contracts/report_renderer_contract.json` |

@@ -23,11 +23,12 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 30 registered examples plus
-six checked-in live-package skeleton directories:
-`live_packages/analytics_report`, `live_packages/news_catalyst`,
-`live_packages/optional_integrations`, `live_packages/product_workflow`,
-`live_packages/prompt_roles`, and `live_packages/vendor_adapters`.
+directory. The current provider-free surface is 31 registered examples plus
+seven checked-in live-package skeleton directories:
+`live_packages/analytics_report`, `live_packages/factor_research`,
+`live_packages/news_catalyst`, `live_packages/optional_integrations`,
+`live_packages/product_workflow`, `live_packages/prompt_roles`, and
+`live_packages/vendor_adapters`.
 Remaining production work is external package
 implementation work, not missing language or AI dialect surface: promoting the
 checked-in skeleton contracts into live external packages, hardening product UI,

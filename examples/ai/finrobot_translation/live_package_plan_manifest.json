@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 31,
-  "translation_directory_file_count": 124,
+  "translation_directory_file_count": 129,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {

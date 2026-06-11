@@ -17,15 +17,15 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
-Current status: `go run ./cmd/leia examples --json` discovers 30 runnable and
+Current status: `go run ./cmd/leia examples --json` discovers 31 runnable and
 checkable FinRobot translation examples under this directory. The checked-in
-live-package skeleton surface has six directories:
-`live_packages/analytics_report`, `live_packages/news_catalyst`,
-`live_packages/optional_integrations`, `live_packages/product_workflow`,
-`live_packages/prompt_roles`, and `live_packages/vendor_adapters`;
-analytics report, news/catalyst, optional integrations, prompt roles, and
-vendor adapters also provide registered provider-free `.leia` examples, while
-product workflow is a
+live-package skeleton surface has seven directories:
+`live_packages/analytics_report`, `live_packages/factor_research`,
+`live_packages/news_catalyst`, `live_packages/optional_integrations`,
+`live_packages/product_workflow`, `live_packages/prompt_roles`, and
+`live_packages/vendor_adapters`; analytics report, factor research,
+news/catalyst, optional integrations, prompt roles, and vendor adapters also
+provide registered provider-free `.leia` examples, while product workflow is a
 manifest/contracts/schemas/fixtures skeleton for the existing workflow
 examples.
 
