@@ -1,0 +1,67 @@
+[
+  {
+    "Request": {
+      "Model": "mock-analysis",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Act as a generic AI analysis assistant. Use local evidence, separate findings from risks, and return a decision-ready brief."
+        },
+        {
+          "Role": "user",
+          "Text": "Analyze a launch readiness decision for a subscription workflow."
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "load_context",
+          "Description": "Load local metrics and qualitative context for the analysis.",
+          "Params": [
+            "topic"
+          ]
+        },
+        {
+          "Name": "retrieve_policy",
+          "Description": "Retrieve local decision policy for the requested domain.",
+          "Params": [
+            "domain"
+          ]
+        },
+        {
+          "Name": "compare_scenarios",
+          "Description": "Compare baseline and proposed operating scenarios.",
+          "Params": [
+            "base",
+            "proposed"
+          ]
+        }
+      ],
+      "ResponseFormat": {
+        "type": "json_object"
+      }
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "{\"brief\":\"Launch can proceed behind a guarded rollout because activation improves while support risk remains measurable.\",\"evidence\":[\"activation +8%; support contacts +14%; checkout latency +22ms\",\"policy requires owner, rollback, and measurement plan\",\"baseline stable; proposed rollout needs support watch\"],\"findings\":[\"Activation signal is positive\",\"Support load is the main constraint\",\"Latency change is small enough for guarded exposure\"],\"risks\":[\"Support contact growth can hide onboarding defects\",\"Missing rollback owner would make the decision unsafe\"],\"actions\":[\"Assign an owner before rollout\",\"Prepare a rollback checkpoint\",\"Review activation and support deltas after 24 hours\"],\"owner\":\"growth-ops\",\"recommendation\":\"guarded rollout\",\"replay_ready\":true}"
+    }
+  },
+  {
+    "Request": {
+      "Model": "mock-analysis-review",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Review the analysis assistant output for evidence grounding, actionability, and replay determinism."
+        },
+        {
+          "Role": "user",
+          "Text": "{\"brief\":\"Launch can proceed behind a guarded rollout because activation improves while support risk remains measurable.\",\"evidence\":[\"activation +8%; support contacts +14%; checkout latency +22ms\",\"policy requires owner, rollback, and measurement plan\",\"baseline stable; proposed rollout needs support watch\"],\"findings\":[\"Activation signal is positive\",\"Support load is the main constraint\",\"Latency change is small enough for guarded exposure\"],\"risks\":[\"Support contact growth can hide onboarding defects\",\"Missing rollback owner would make the decision unsafe\"],\"actions\":[\"Assign an owner before rollout\",\"Prepare a rollback checkpoint\",\"Review activation and support deltas after 24 hours\"],\"owner\":\"growth-ops\",\"recommendation\":\"guarded rollout\",\"replay_ready\":true}"
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Analysis is replayable and decision-ready: evidence is local, risks are explicit, and actions name owner, rollback, and measurement."
+    }
+  }
+]
