@@ -1453,6 +1453,7 @@ def qeval_case_from_benchmark(name: str) -> str | None:
         "BenchmarkQEvalJITScriptWarm/",
         "BenchmarkQEvalVectorResultCacheWarm/",
         "BenchmarkQEvalVectorCold/",
+        "BenchmarkQSQLBindMatrixWarm/",
     ):
         if name.startswith(prefix):
             return name.removeprefix(prefix)
@@ -1758,6 +1759,7 @@ def ratio_baseline_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ra
         qeval_cases(rows, "BenchmarkQEvalVectorGoBaseline")
         | qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
         | qeval_cases(rows, "BenchmarkQEvalJITScriptWarm")
+        | qeval_cases(rows, "BenchmarkQSQLBindMatrixWarm")
     )
     if known_cases:
         for case in sorted(exceptions):
