@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "symbol": "ACME",
+  "currency": "USD",
+  "as_of": "2026-06-30",
+  "scenario_dimensions": [
+    {
+      "id": "wacc",
+      "label": "WACC sensitivity",
+      "unit": "ratio",
+      "base": 0.09,
+      "low_case": 0.085,
+      "high_case": 0.095
+    },
+    {
+      "id": "terminal_growth",
+      "label": "Terminal growth sensitivity",
+      "unit": "ratio",
+      "base": 0.03,
+      "low_case": 0.025,
+      "high_case": 0.035
+    },
+    {
+      "id": "revenue_cagr",
+      "label": "Revenue CAGR sensitivity",
+      "unit": "ratio",
+      "base": 0.10,
+      "low_case": 0.07,
+      "high_case": 0.13
+    },
+    {
+      "id": "ebitda_margin",
+      "label": "Margin sensitivity",
+      "unit": "ratio",
+      "base": 0.24,
+      "low_case": 0.22,
+      "high_case": 0.26
+    },
+    {
+      "id": "peer_outlier_handling",
+      "label": "Peer outlier handling",
+      "unit": "policy",
+      "base": "winsorize_p10_p90",
+      "low_case": "exclude_top_bottom",
+      "high_case": "include_all_flagged"
+    },
+    {
+      "id": "analyst_target_conflict_reconciliation",
+      "label": "Analyst target conflict reconciliation",
+      "unit": "policy",
+      "base": "median_with_stale_exclusion",
+      "low_case": "bear_case_weighted",
+      "high_case": "bull_case_weighted"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "downside",
+      "weight": 0.25,
+      "assumptions": {
+        "wacc": 0.095,
+        "terminal_growth": 0.025,
+        "revenue_cagr": 0.07,
+        "ebitda_margin": 0.22,
+        "peer_outlier_handling": "exclude_top_bottom",
+        "analyst_target_conflict_reconciliation": "bear_case_weighted"
+      },
+      "method_targets": {
+        "dcf": 34.675,
+        "ev_ebitda": 40.72,
+        "pe": 41.68,
+        "analyst_reconciled": 36.5
+      },
+      "target_price": 38.235976,
+      "provenance_ref": "valuation:ACME:scenario_book:offline"
+    },
+    {
+      "id": "base",
+      "weight": 0.5,
+      "assumptions": {
+        "wacc": 0.09,
+        "terminal_growth": 0.03,
+        "revenue_cagr": 0.10,
+        "ebitda_margin": 0.24,
+        "peer_outlier_handling": "winsorize_p10_p90",
+        "analyst_target_conflict_reconciliation": "median_with_stale_exclusion"
+      },
+      "method_targets": {
+        "dcf": 43.61604,
+        "ev_ebitda": 50.2,
+        "pe": 53.2,
+        "analyst_reconciled": 48.0
+      },
+      "target_price": 47.50802,
+      "provenance_ref": "valuation:ACME:scenario_book:offline"
+    },
+    {
+      "id": "upside",
+      "weight": 0.25,
+      "assumptions": {
+        "wacc": 0.085,
+        "terminal_growth": 0.035,
+        "revenue_cagr": 0.13,
+        "ebitda_margin": 0.26,
+        "peer_outlier_handling": "include_all_flagged",
+        "analyst_target_conflict_reconciliation": "bull_case_weighted"
+      },
+      "method_targets": {
+        "dcf": 54.128,
+        "ev_ebitda": 59.84,
+        "pe": 61.32,
+        "analyst_reconciled": 55.75
+      },
+      "target_price": 56.984128,
+      "provenance_ref": "valuation:ACME:scenario_book:offline"
+    }
+  ],
+  "scenario_weighted_target": {
+    "formula": "sum(scenario.target_price*scenario.weight)",
+    "target_price": 47.559036,
+    "weight_sum": 1.0,
+    "rating_band": "neutral",
+    "conflict_policy": "analyst targets reconcile to scenario-specific analyst_reconciled method target before scenario weighting"
+  },
+  "tolerance_metadata": {
+    "absolute_tolerance": 0.000001,
+    "rounded_decimals": 6,
+    "deterministic_math": true,
+    "sensitivity_units": {
+      "wacc": "ratio",
+      "terminal_growth": "ratio",
+      "revenue_cagr": "ratio",
+      "ebitda_margin": "ratio"
+    }
+  },
+  "provenance": {
+    "provider": "fixture",
+    "fixture_key": "valuation:ACME:scenario_book:offline",
+    "captured_at": "2026-06-30T00:00:00Z",
+    "source_schema": "schemas/scenario_book_v1.schema.json",
+    "source_url_redacted": true,
+    "stale_after_days": 0,
+    "replay_ready": true
+  }
+}
