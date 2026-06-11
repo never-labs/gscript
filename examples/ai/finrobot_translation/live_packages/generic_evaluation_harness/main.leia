@@ -1,0 +1,65 @@
+// Provider-free generic AI evaluation harness skeleton.
+//
+// The JSON manifest and fixtures are the contract of record. This smoke file
+// keeps ai.eval.run provider-free by modeling only checked-in replay data.
+
+generic_evaluation_harness_live_package := {
+    id: "finrobot-generic-evaluation-harness-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    requires_credentials: false
+    dialect_surface: {"generic.ai.evaluation.harness", "ai.eval.run"}
+    dataset_manifests: {"generic-ai-eval-smoke-dataset"}
+    case_inputs: {"case-risk-summary", "case-catalyst-classification"}
+    metric_specs: {"dataset_item_valid", "judge_passed", "answer_chars", "rubric_label", "judge_tokens"}
+    judge_replay_records: {"case:case-risk-summary:judge:1", "case:case-catalyst-classification:judge:1"}
+    finding_kinds: {
+        "dataset_manifest_invalid",
+        "case_input_invalid",
+        "metric_gate_failed",
+        "judge_replay_request_mismatch",
+        "judge_replay_exhausted",
+        "judge_replay_unconsumed"
+    }
+    golden_gates: {"summary_pass_rate_min", "cases_failed_max", "findings_max", "judge_replay_errors_max"}
+    case_result_summaries: {"case-risk-summary", "case-catalyst-classification"}
+}
+
+func generic_evaluation_harness_contract_ok(pkg) {
+    if pkg == nil {
+        return false
+    }
+    return pkg.provider_free == true &&
+        pkg.live_network == false &&
+        pkg.real_dependency_imports == false &&
+        pkg.requires_credentials == false &&
+        #pkg.dialect_surface == 2 &&
+        #pkg.dataset_manifests == 1 &&
+        #pkg.case_inputs == 2 &&
+        #pkg.metric_specs == 5 &&
+        #pkg.judge_replay_records == 2 &&
+        #pkg.finding_kinds == 6 &&
+        #pkg.golden_gates == 4 &&
+        #pkg.case_result_summaries == 2
+}
+
+generic_evaluation_harness_contract_valid := generic_evaluation_harness_contract_ok(generic_evaluation_harness_live_package)
+assert(generic_evaluation_harness_contract_valid)
+
+generic_evaluation_harness_live_package_summary := string.format(
+"generic_evaluation_harness_live_package surfaces=%d datasets=%d cases=%d metrics=%d replay_records=%d finding_kinds=%d golden_gates=%d summaries=%d provider_free=%s live_network=%s imports=%s",
+#generic_evaluation_harness_live_package.dialect_surface,
+#generic_evaluation_harness_live_package.dataset_manifests,
+#generic_evaluation_harness_live_package.case_inputs,
+#generic_evaluation_harness_live_package.metric_specs,
+#generic_evaluation_harness_live_package.judge_replay_records,
+#generic_evaluation_harness_live_package.finding_kinds,
+#generic_evaluation_harness_live_package.golden_gates,
+#generic_evaluation_harness_live_package.case_result_summaries,
+tostring(generic_evaluation_harness_live_package.provider_free),
+tostring(generic_evaluation_harness_live_package.live_network),
+tostring(generic_evaluation_harness_live_package.real_dependency_imports)
+)
+
+print(generic_evaluation_harness_live_package_summary)

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-evaluation-harness-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "dialect_surface": ["generic.ai.evaluation.harness", "ai.eval.run"],
+  "typed_fixtures": [
+    {
+      "id": "dataset_manifest",
+      "schema": "schemas/dataset_manifest_v1.schema.json",
+      "fixture": "fixtures/dataset_manifest_fixture.json",
+      "required_fields": ["dataset_id", "format", "id_field", "required_fields", "case_count"]
+    },
+    {
+      "id": "case_inputs",
+      "schema": "schemas/case_inputs_v1.schema.json",
+      "fixture": "fixtures/case_inputs_fixture.json",
+      "required_fields": ["case_id", "input", "expected", "rubric"]
+    },
+    {
+      "id": "metric_specs",
+      "schema": "schemas/metric_specs_v1.schema.json",
+      "fixture": "fixtures/metric_specs_fixture.json",
+      "required_fields": ["metric_id", "type", "aggregation", "gate"]
+    },
+    {
+      "id": "judge_replay_records",
+      "schema": "schemas/judge_replay_records_v1.schema.json",
+      "fixture": "fixtures/judge_replay_records_fixture.json",
+      "required_fields": ["trace_id", "case_id", "request", "response", "usage"]
+    },
+    {
+      "id": "findings",
+      "schema": "schemas/findings_v1.schema.json",
+      "fixture": "fixtures/findings_fixture.json",
+      "required_fields": ["findings", "finding_kinds"]
+    },
+    {
+      "id": "golden_gates",
+      "schema": "schemas/golden_gates_v1.schema.json",
+      "fixture": "fixtures/golden_gates_fixture.json",
+      "required_fields": ["gate", "summary_pass_rate_min", "cases_failed_max", "findings_max"]
+    },
+    {
+      "id": "case_result_summary",
+      "schema": "schemas/case_result_summary_v1.schema.json",
+      "fixture": "fixtures/case_result_summary_fixture.json",
+      "required_fields": ["status", "summary", "cases", "metrics", "findings"]
+    }
+  ],
+  "dataset_manifest_contract": {
+    "format": "json",
+    "id_field": "case_id",
+    "minimum_cases": 2,
+    "required_case_fields": ["case_id", "input", "expected", "rubric"]
+  },
+  "judge_replay_contract": {
+    "mode": "replay",
+    "allowed_model_prefix": "mock-",
+    "live_provider_calls": false,
+    "network_calls": false,
+    "matched_request_fields": ["model", "messages"],
+    "unmatched_request_finding_kind": "judge_replay_request_mismatch",
+    "exhausted_replay_finding_kind": "judge_replay_exhausted",
+    "unconsumed_replay_finding_kind": "judge_replay_unconsumed"
+  },
+  "golden_gate_contract": {
+    "gate": true,
+    "summary_pass_rate_min": 1,
+    "cases_failed_max": 0,
+    "findings_max": 0,
+    "judge_replay_errors_max": 0
+  },
+  "acceptance_gates": [
+    "all typed fixtures are provider_free=true and live_network=false",
+    "ai.eval.run can be satisfied by checked-in case inputs and judge replay records",
+    "metric specs include boolean, numeric, categorical, token, and cost metrics",
+    "case result summary links each case to a judge trace ref and metric values",
+    "findings fixture declares supported failure kinds even when the golden run has no findings"
+  ]
+}
