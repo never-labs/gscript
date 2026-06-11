@@ -16,23 +16,64 @@ func frameRowGroupIDs(frame Frame, keyColumns []Symbol) ([]int, int, bool) {
 	if len(keyColumns) == 0 || rows == 0 {
 		return nil, 0, false
 	}
-	var combined []int
-	combinedCount := 0
-	for ki, name := range keyColumns {
+	arrays := make([]Array, len(keyColumns))
+	for i, name := range keyColumns {
 		col, ok := frame.Column(name)
 		if !ok {
 			return nil, 0, false
 		}
+		arrays[i] = col
+	}
+	return arraysRowGroupIDs(arrays, rows)
+}
+
+// arraysRowGroupIDs is the array-level core of frameRowGroupIDs: it computes
+// first-appearance-ordered composite group ids for already-resolved key
+// arrays (each of length rows).
+func arraysRowGroupIDs(arrays []Array, rows int) ([]int, int, bool) {
+	if len(arrays) == 0 || rows == 0 {
+		return nil, 0, false
+	}
+	perColumn := make([][]int, len(arrays))
+	counts := make([]int, len(arrays))
+	for i, col := range arrays {
 		ids, count, err := fbyGroupIDs(col)
 		if err != nil || len(ids) != rows {
 			return nil, 0, false
 		}
-		if ki == 0 {
-			combined, combinedCount = ids, count
+		perColumn[i], counts[i] = ids, count
+	}
+	return combineRowGroupIDs(perColumn, counts, rows)
+}
+
+// combineRowGroupIDs folds per-column group ids into composite ids in
+// first-appearance order. Small composite domains use a flat slate; larger
+// ones fall back to a hash map.
+func combineRowGroupIDs(perColumn [][]int, counts []int, rows int) ([]int, int, bool) {
+	combined := perColumn[0]
+	combinedCount := counts[0]
+	for ki := 1; ki < len(perColumn); ki++ {
+		ids, count := perColumn[ki], counts[ki]
+		next := make([]int, rows)
+		if domain := int64(combinedCount) * int64(count); domain > 0 && domain <= int64(rows)*4 && domain <= 1<<22 {
+			// Small composite domain: assign pair ids through a flat
+			// first-appearance slate instead of a hash map.
+			slate := make([]int32, domain)
+			assigned := 0
+			for row := 0; row < rows; row++ {
+				key := combined[row]*count + ids[row]
+				id := slate[key]
+				if id == 0 {
+					assigned++
+					id = int32(assigned)
+					slate[key] = id
+				}
+				next[row] = int(id) - 1
+			}
+			combined, combinedCount = next, assigned
 			continue
 		}
 		pairIDs := make(map[int64]int, combinedCount)
-		next := make([]int, rows)
 		for row := 0; row < rows; row++ {
 			key := int64(combined[row])*int64(count) + int64(ids[row])
 			id, seen := pairIDs[key]

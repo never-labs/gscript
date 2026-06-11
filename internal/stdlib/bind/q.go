@@ -1449,6 +1449,13 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 	}
 	switch array.Kind() {
 	case data.KindI64:
+		// Bulk typed export for dense carriers skips per-row boxing; the
+		// boxed loop below remains the fallback for null-bearing shapes.
+		if xs := make([]int64, array.Len()); len(xs) == array.Len() {
+			if handled, err := data.TryExportI64Copy(array, xs); err == nil && handled {
+				return DenseArrayValue(NewDenseArrayI64(xs)), nil
+			}
+		}
 		if dataArrayHasNull(array) {
 			return qEvalGenericArrayTable(array)
 		}
@@ -1466,6 +1473,11 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 		}
 		return DenseArrayValue(NewDenseArrayI64(xs)), nil
 	case data.KindF64:
+		if xs := make([]float64, array.Len()); len(xs) == array.Len() {
+			if handled, err := data.TryExportF64Copy(array, xs); err == nil && handled {
+				return DenseArrayValue(NewDenseArrayF64(xs)), nil
+			}
+		}
 		if dataArrayHasNull(array) {
 			return qEvalGenericArrayTable(array)
 		}
@@ -1486,6 +1498,11 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 		}
 		return DenseArrayValue(NewDenseArrayF64(xs)), nil
 	case data.KindBool:
+		if xs := make([]bool, array.Len()); len(xs) == array.Len() {
+			if handled, err := data.TryExportBoolCopy(array, xs); err == nil && handled {
+				return DenseArrayValue(NewDenseArrayBool(xs)), nil
+			}
+		}
 		if dataArrayHasNull(array) {
 			return qEvalGenericArrayTable(array)
 		}
@@ -1508,6 +1525,11 @@ func qEvalArrayValue(array data.Array) (Value, error) {
 		}
 		return DenseArrayValue(out), nil
 	case data.KindSymbol:
+		if keys := make([]string, array.Len()); len(keys) == array.Len() {
+			if handled, err := data.TryExportStringCopy(array, keys); err == nil && handled {
+				return qSymbolListValue(keys), nil
+			}
+		}
 		if dataArrayHasNull(array) {
 			return qEvalGenericArrayTable(array)
 		}
@@ -8285,7 +8307,7 @@ func qAnyValuesFromVector(v Value) ([]any, error) {
 }
 
 func qDataFrameValue(frame data.Frame) (Value, error) {
-	return qDataFrameFacadeValue(frame)
+	return qDataFrameLazyFacadeValue(frame)
 }
 
 func qDataFrameResultValue(frame data.Frame) (Value, error) {
@@ -8413,26 +8435,47 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 	out.RawSetString("type", StringValue("data_frame"))
 	out.RawSetString("nrows", IntValue(int64(frame.Len())))
 	out.RawSetString("ncols", IntValue(int64(len(names))))
-	kindMap := make(map[string]string, len(kindNames))
-	for i, name := range kindNames {
-		kindMap[name] = kindValues[i]
-	}
-	out.RawSetString("column_names", TableValue(dataColumnNamesTable(kindNames)))
-	out.RawSetString("column_kinds", TableValue(dataColumnKindsTable(kindNames, kindMap)))
-	out.RawSetString("schema", TableValue(dataSchemaTable(kindNames, kindMap)))
 	rowGetter := qLazyDataFrameRowGetter(frame)
 	if rowGetter != nil {
 		out.SetLazyIntGetter(frame.Len(), rowGetter)
 	}
 
-	var columns Value
-	var shape Value
-	var rowFn Value
-	var gatherFn Value
-	var rowsValue Value
+	var kindMap map[string]string
+	kinds := func() map[string]string {
+		if kindMap == nil {
+			kindMap = make(map[string]string, len(kindNames))
+			for i, name := range kindNames {
+				kindMap[name] = kindValues[i]
+			}
+		}
+		return kindMap
+	}
+	columns := NilValue()
+	shape := NilValue()
+	rowFn := NilValue()
+	gatherFn := NilValue()
+	rowsValue := NilValue()
+	columnNames := NilValue()
+	columnKinds := NilValue()
+	schemaValue := NilValue()
 	var columnValues map[string]Value
 	out.SetLazyStringGetter(func(key string) (Value, bool) {
 		switch key {
+		case "column_names":
+			if columnNames.IsNil() {
+				columnNames = TableValue(dataColumnNamesTable(kindNames))
+			}
+			return columnNames, true
+		case "column_kinds":
+			if columnKinds.IsNil() {
+				columnKinds = TableValue(dataColumnKindsTable(kindNames, kinds()))
+			}
+			return columnKinds, true
+		case "schema":
+			if schemaValue.IsNil() {
+				schemaValue = TableValue(dataSchemaTable(kindNames, kinds()))
+			}
+			return schemaValue, true
 		case "columns", "data":
 			if columns.IsNil() {
 				cols := NewTable()
@@ -8496,7 +8539,7 @@ func qDataFrameLazyFacadeValue(frame data.Frame) (Value, error) {
 		}
 		return NilValue(), false
 	})
-	setDataFrameNativeFramePayload(out, frame)
+	setDataFrameNativePayload(out, frame)
 	return TableValue(out), nil
 }
 
