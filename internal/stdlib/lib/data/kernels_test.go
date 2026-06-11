@@ -1989,6 +1989,142 @@ func TestQueryKernelPlanShapeClassifiesCompositePaths(t *testing.T) {
 	}
 }
 
+func TestDescribeQueryKernelPlanExposesCarrierKeysAndCache(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA"})},
+		Column{Name: "qty", Data: NewI32([]int32{10, 20, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{100, 80, 210, 190})},
+	)
+	plan := QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(20)}},
+		Select: []SelectItem{{
+			Name: "notional",
+			Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}},
+		}},
+		LimitN: -1,
+	}
+
+	described, ok, err := DescribeQueryKernelPlan("select-notional", frame, plan)
+	if err != nil || !ok {
+		t.Fatalf("DescribeQueryKernelPlan = ok %v err %v; want described plan", ok, err)
+	}
+	if described.Shape != QueryKernelPlanShape(plan) || described.PipelineShape != QueryKernelPlanPipelineShape(plan) {
+		t.Fatalf("described shapes = %q/%q, want %q/%q", described.Shape, described.PipelineShape, QueryKernelPlanShape(plan), QueryKernelPlanPipelineShape(plan))
+	}
+	if described.Fingerprint != QueryKernelPlanFingerprint(plan) {
+		t.Fatalf("described fingerprint = %q, want %q", described.Fingerprint, QueryKernelPlanFingerprint(plan))
+	}
+	if described.CacheKey != QueryKernelCacheKey("select-notional", frame, plan) {
+		t.Fatalf("described cache key = %q, want query kernel cache key", described.CacheKey)
+	}
+	if !described.Carrier.Filter.Handled || described.Carrier.Filter.Family != "index" || described.Carrier.Filter.Ops != "i64_index" {
+		t.Fatalf("filter carrier = %+v, want handled i64 index carrier", described.Carrier.Filter)
+	}
+	if !described.Carrier.Projection.Handled || described.Carrier.Projection.Family != "typed_expr" || described.Carrier.Projection.Ops != "typed_binary:1" {
+		t.Fatalf("projection carrier = %+v, want handled typed expression carrier", described.Carrier.Projection)
+	}
+	if described.Carrier.Group.Handled {
+		t.Fatalf("group carrier = %+v, want absent group carrier", described.Carrier.Group)
+	}
+	filterParts, ok := ParseSchemaStableCacheKey(described.Carrier.Filter.Key)
+	if !ok || filterParts.Namespace != "select-notional" || filterParts.Kind != "carrier:filter" ||
+		filterParts.SchemaHash != frame.SchemaFingerprint() || len(filterParts.Extra) != 1 || filterParts.Extra[0] != described.Fingerprint {
+		t.Fatalf("filter carrier key parts = %+v ok %v, want namespace/stage/schema/fingerprint", filterParts, ok)
+	}
+
+	changedLiteral := plan
+	changedLiteral.Where = Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int32(30)}}
+	changed, ok, err := DescribeQueryKernelPlan("select-notional", frame, changedLiteral)
+	if err != nil || !ok {
+		t.Fatalf("DescribeQueryKernelPlan changed literal = ok %v err %v", ok, err)
+	}
+	if changed.Shape != described.Shape || changed.PipelineShape != described.PipelineShape {
+		t.Fatalf("changed literal shapes = %q/%q, want stable %q/%q", changed.Shape, changed.PipelineShape, described.Shape, described.PipelineShape)
+	}
+	if changed.CacheKey == described.CacheKey || changed.Carrier.Filter.Key == described.Carrier.Filter.Key {
+		t.Fatalf("changed literal did not split cache keys: kernel %q/%q carrier %q/%q", described.CacheKey, changed.CacheKey, described.Carrier.Filter.Key, changed.Carrier.Filter.Key)
+	}
+}
+
+func TestDescribeQueryKernelPlanConnectsGroupedCarrier(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: WithArrayAttribute(NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}), ArrayAttributeGrouped)},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30, 40, 50})},
+		Column{Name: "px", Data: NewF64([]float64{100, 80, 210, 190, 70})},
+	)
+	plan := QueryPlan{
+		By: []Symbol{"sym"},
+		Aggregates: []Aggregate{
+			{Name: "n", Func: "count"},
+			{Name: "qty_sum", Func: "sum", Expr: ColumnRef{Name: "qty"}},
+			{Name: "max_px", Func: "max", Expr: ColumnRef{Name: "px"}},
+		},
+		LimitN: -1,
+	}
+
+	described, ok, err := DescribeQueryKernelPlan("rollup", frame, plan)
+	if err != nil || !ok {
+		t.Fatalf("DescribeQueryKernelPlan = ok %v err %v; want grouped carrier plan", ok, err)
+	}
+	if !described.Carrier.Filter.Handled || described.Carrier.Filter.Ops != "i64_range_all" {
+		t.Fatalf("filter carrier = %+v, want all-row i64 range carrier", described.Carrier.Filter)
+	}
+	if !described.Carrier.Group.Handled || described.Carrier.Group.Family != "key_columns" || described.Carrier.Group.Ops != "column_load:1" {
+		t.Fatalf("group carrier = %+v, want handled key column carrier", described.Carrier.Group)
+	}
+	if described.Pipeline.AggregateFamily != "column_reduce" {
+		t.Fatalf("aggregate family = %q, want column_reduce", described.Pipeline.AggregateFamily)
+	}
+}
+
+func TestTypedCarrierExecutionHelperMatchesKernel(t *testing.T) {
+	frame := mustFrame(t,
+		Column{Name: "sym", Data: NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA"})},
+		Column{Name: "qty", Data: NewI64([]int64{10, 20, 30, 40})},
+		Column{Name: "px", Data: NewF64([]float64{100, 80, 210, 190})},
+	)
+	plan := QueryPlan{
+		Where: Binary{Op: OpGE, Left: ColumnRef{Name: "qty"}, Right: Literal{Value: int64(20)}},
+		Select: []SelectItem{{
+			Name: "notional",
+			Expr: Binary{Op: OpMul, Left: ColumnRef{Name: "qty"}, Right: ColumnRef{Name: "px"}},
+		}},
+		LimitN: -1,
+	}
+	described, ok, err := DescribeQueryKernelPlan("exec", frame, plan)
+	if err != nil || !ok {
+		t.Fatalf("DescribeQueryKernelPlan = ok %v err %v", ok, err)
+	}
+	carrierOut, handled, err := TryExecuteQueryKernelTypedCarrier(frame, plan, described.Carrier)
+	if err != nil || !handled {
+		t.Fatalf("TryExecuteQueryKernelTypedCarrier = handled %v err %v", handled, err)
+	}
+	kernel, ok, err := CompileQueryKernel(frame, plan)
+	if err != nil || !ok {
+		t.Fatalf("CompileQueryKernel = ok %v err %v", ok, err)
+	}
+	kernelOut, err := kernel.Exec(frame)
+	if err != nil {
+		t.Fatalf("kernel Exec returned error: %v", err)
+	}
+	if carrierOut.Len() != kernelOut.Len() {
+		t.Fatalf("carrier output len = %d, want kernel len %d", carrierOut.Len(), kernelOut.Len())
+	}
+	for row := 0; row < carrierOut.Len(); row++ {
+		got, err := carrierOut.Row(row)
+		if err != nil {
+			t.Fatalf("carrier row %d returned error: %v", row, err)
+		}
+		want, err := kernelOut.Row(row)
+		if err != nil {
+			t.Fatalf("kernel row %d returned error: %v", row, err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("carrier row %d = %v, want kernel row %v", row, got, want)
+		}
+	}
+}
+
 func TestNumericAtTypedNullableAndBoundary(t *testing.T) {
 	n, ok, err := typedKernels.NumericAt(NewI64([]int64{-2, 4}), 0)
 	if err != nil {

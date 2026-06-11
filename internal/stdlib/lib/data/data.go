@@ -8674,35 +8674,19 @@ func Exec(frame Frame, plan QueryPlan) (Frame, error) {
 }
 
 func execTypedFilterProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
-	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
-		len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
-		return Frame{}, false, nil
-	}
-	indexes, ok, err := typedFilterIndexArray(frame, plan.Where)
+	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
 	if err != nil || !ok {
 		return Frame{}, ok, err
 	}
-	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
-	return out, true, err
+	return TryExecuteQueryKernelTypedCarrier(frame, plan, described.Carrier)
 }
 
 func execTypedGroupedProjectionProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
-	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
-		len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
-		return Frame{}, false, nil
-	}
-	if len(plan.By) == 0 && len(plan.ByExprs) == 0 {
-		return Frame{}, false, nil
-	}
-	if selectItemsNeedGroupedRows(plan.Select) {
-		return Frame{}, false, nil
-	}
-	indexes, ok, err := typedFilterIndexArray(frame, plan.Where)
+	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
 	if err != nil || !ok {
 		return Frame{}, ok, err
 	}
-	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
-	return out, true, err
+	return TryExecuteQueryKernelGroupedProjectionCarrier(frame, plan, described.Carrier)
 }
 
 func canLimitBeforeProjection(plan QueryPlan) bool {

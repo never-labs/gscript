@@ -598,15 +598,16 @@ func writeQueryKernelFloatFingerprint(b *strings.Builder, value float64, bitSize
 // frames with a stable schema. Unsupported shapes return ok=false so callers
 // can fall back to QueryPlan.Exec without changing semantics.
 func CompileQueryKernel(frame Frame, plan QueryPlan) (*QueryKernel, bool, error) {
-	ok, reason := QueryKernelSupportReason(plan)
-	if !ok {
-		return nil, false, nil
+	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	_, reason := QueryKernelSupportReason(plan)
+	if reason == "" {
+		reason = "data query kernel supported"
 	}
 	compiled := cloneQueryKernelPlan(plan)
 	compiled.Source = Frame{}
-	if err := validateQueryKernelFrame(frame, compiled); err != nil {
-		return nil, true, err
-	}
 	if frameReason := queryKernelFrameReason(frame, compiled); frameReason != "" {
 		reason = frameReason
 	}
@@ -614,8 +615,8 @@ func CompileQueryKernel(frame Frame, plan QueryPlan) (*QueryKernel, bool, error)
 		plan:          compiled,
 		schema:        frame.Schema(),
 		reason:        reason,
-		shape:         QueryKernelPlanShape(compiled),
-		pipelineShape: QueryKernelPlanPipelineShape(compiled),
+		shape:         described.Shape,
+		pipelineShape: described.PipelineShape,
 	}, true, nil
 }
 
