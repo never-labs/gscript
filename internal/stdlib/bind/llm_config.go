@@ -77,6 +77,35 @@ func BuildLLMConfigLib(options ...llmConfigOptions) *Table {
 		return []Value{NilValue(), NilValue()}, nil
 	})
 
+	set("aliases", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'config.aliases' (table expected)")
+		}
+		aliases := llmConfigCopy(args[0].Table())
+		if err := llmValidateModelAliases(aliases); err != nil {
+			return []Value{NilValue(), llmErrorValue("config", err.Error())}, nil
+		}
+		return []Value{TableValue(aliases), NilValue()}, nil
+	})
+
+	set("route", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'config.route' (model alias table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'config.route' (table expected)")
+			}
+			opts = args[1].Table()
+		}
+		decision, errValue := llmModelAliasRoute(args[0].Table(), opts)
+		if !errValue.IsNil() {
+			return []Value{NilValue(), errValue}, nil
+		}
+		return []Value{TableValue(decision), NilValue()}, nil
+	})
+
 	set("resolve", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'config.resolve' (table expected)")
