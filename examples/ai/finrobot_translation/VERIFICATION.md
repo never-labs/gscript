@@ -168,6 +168,6 @@ go run ./cmd/leia check --no-docs --no-editor .
 
 The FinRobot documentation status is aligned with the current
 `origin/codex/ai-dialect-polish` surface: 65 registered runnable/checkable
-examples, 434 files in the translation directory, and 22 checked-in
+examples, 445 files in the translation directory, and 22 checked-in
 provider-free live-package skeleton directories. The validation commands above
 passed without generating `docs/spec/index.html`.
