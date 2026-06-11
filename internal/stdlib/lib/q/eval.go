@@ -2758,6 +2758,12 @@ func (s *EvalState) eval(src string) (any, error) {
 		if out, handled, err := s.tryEvalTypedMovingWindowSum(right); err != nil || handled {
 			return out, err
 		}
+		if out, handled, err := s.tryEvalFindSum(right); err != nil || handled {
+			return out, err
+		}
+		if out, handled, err := s.tryEvalCastChainSum(right); err != nil || handled {
+			return out, err
+		}
 		v, err := s.eval(right)
 		if err != nil {
 			return nil, err
@@ -6261,10 +6267,13 @@ func isScalarAddChainTerm(src string) bool {
 	if _, ok := buildScalarApplyIndexPlan(src); ok {
 		return true
 	}
-	for _, word := range []string{"sum", "prd", "avg", "min", "max", "first", "last", "count"} {
+	for _, word := range []string{"sum", "prd", "avg", "min", "max", "first", "last", "count", "med", "var", "dev", "svar", "sdev"} {
 		if strings.HasPrefix(src, word) && wordBoundary(src, 0, len(word)) && strings.TrimSpace(src[len(word):]) != "" {
 			return true
 		}
+	}
+	if _, _, _, ok := qAddChainDyadicWordApplyTerm(src); ok {
+		return true
 	}
 	if _, _, err := parseNumberOrBool(src); err == nil {
 		return true
@@ -11789,6 +11798,25 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	case ra != nil:
 		n = ra.Len()
 	}
+	// left/right word verbs are elementwise operand selectors: with matching
+	// shapes the result is the selected operand itself (each row of the
+	// generic loop returns that operand's element unchanged), so alias it
+	// instead of rebuilding a boxed copy row by row. Scalar-broadcast and
+	// length-1 shapes keep the generic route.
+	if op == 'L' || op == 'R' {
+		if la != nil && ra != nil && la.Len() == ra.Len() {
+			if op == 'L' {
+				return la, nil
+			}
+			return ra, nil
+		}
+		if op == 'L' && la != nil && ra == nil {
+			return la, nil
+		}
+		if op == 'R' && ra != nil && la == nil {
+			return ra, nil
+		}
+	}
 	if out, handled, err := qTryTiledCycleVectorDyadic(op, left, right, la, ra); err != nil || handled {
 		if err != nil {
 			return nil, err
@@ -12696,6 +12724,12 @@ func devValue(v any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return devFromVariance(variance)
+}
+
+// devFromVariance is devValue's tail after the variance computation, shared
+// with the add-chain var+dev pairing so both routes produce identical bits.
+func devFromVariance(variance any) (any, error) {
 	if data.IsNull(variance) {
 		return data.NullValue, nil
 	}
@@ -12713,6 +12747,23 @@ func medValue(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return nil, fmt.Errorf("med expects a numeric vector")
+	}
+	// Range fast path: an affine walk is already sorted (ascending for
+	// step>=0, descending otherwise), so the median indexes are closed-form.
+	// The selected values are exactly the float64 conversions the sort-based
+	// route below would place at mid-1/mid, and the even-count midpoint uses
+	// the same (a+b)/2 expression, so results are bit-identical.
+	if start, step, n, ok := data.I64RangeView(array); ok && n > 0 {
+		at := func(i int) float64 { return float64(start + int64(i)*step) }
+		mid := n / 2
+		lo, hi := mid-1, mid
+		if step < 0 {
+			lo, hi = n-1-(mid-1), n-1-mid
+		}
+		if n%2 == 1 {
+			return at(hi), nil
+		}
+		return (at(lo) + at(hi)) / 2, nil
 	}
 	if bulk, owned, ok := data.TryBulkF64(array); ok {
 		values := bulk
@@ -12768,6 +12819,21 @@ func numericAggregateStats(name string, v any) (float64, float64, int, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return 0, 0, 0, fmt.Errorf("%s expects a numeric vector", name)
+	}
+	// Range fast path: stream the affine walk without materializing it. The
+	// float64 conversions and accumulation order match the bulk-flatten loop
+	// below bit for bit.
+	if start, step, count, ok := data.I64RangeView(array); ok {
+		total := float64(0)
+		sumsq := float64(0)
+		value := start
+		for i := 0; i < count; i++ {
+			n := float64(value)
+			total += n
+			sumsq += n * n
+			value += step
+		}
+		return total, sumsq, count, nil
 	}
 	if values, owned, ok := data.TryBulkF64(array); ok {
 		total := float64(0)
@@ -12827,6 +12893,26 @@ func wavg(weights, values any) (any, error) {
 		length = valueArray.Len()
 	}
 	if weightIsArray && valueIsArray {
+		// Range-range fast path: stream both affine walks; same per-row
+		// products and accumulation order as the bulk loop below.
+		if wStart, wStep, wLen, ok := data.I64RangeView(weightArray); ok {
+			if vStart, vStep, vLen, ok := data.I64RangeView(valueArray); ok && vLen == wLen {
+				total := float64(0)
+				denom := float64(0)
+				wv, vv := wStart, vStart
+				for i := 0; i < wLen; i++ {
+					w := float64(wv)
+					total += w * float64(vv)
+					denom += w
+					wv += wStep
+					vv += vStep
+				}
+				if denom == 0 {
+					return data.NullValue, nil
+				}
+				return total / denom, nil
+			}
+		}
 		if weightBulk, weightOwned, ok := data.TryBulkF64(weightArray); ok {
 			if valueBulk, valueOwned, ok := data.TryBulkF64(valueArray); ok && len(valueBulk) == len(weightBulk) {
 				total := float64(0)
@@ -14291,6 +14377,97 @@ func boolValue(v any) (bool, error) {
 	default:
 		return false, fmt.Errorf("boolean operation expects bool or numeric values")
 	}
+}
+
+// splitLeadingTickCast splits a leading `word$ cast prefix off src.
+func splitLeadingTickCast(src string) (word, rest string, ok bool) {
+	if len(src) < 3 || src[0] != '`' {
+		return "", "", false
+	}
+	i := 1
+	for i < len(src) && (src[i] >= 'a' && src[i] <= 'z') {
+		i++
+	}
+	if i == 1 || i >= len(src) || src[i] != '$' {
+		return "", "", false
+	}
+	return src[1:i], strings.TrimSpace(src[i+1:]), true
+}
+
+// tryEvalCastChainSum fuses +/`k_n$...`k_1$<expr> integer cast chains into a
+// single pass through data.TryTypedIntCastChainSum, skipping the per-cast
+// column materializations. Declines (non-integer kinds, out-of-range rows,
+// non-array values) keep the staged cast-then-sum route unchanged.
+func (s *EvalState) tryEvalCastChainSum(src string) (any, bool, error) {
+	var kinds []data.Kind
+	rest := src
+	for {
+		word, after, ok := splitLeadingTickCast(rest)
+		if !ok {
+			break
+		}
+		kind, ok := qCastKindFromTypeText(word)
+		if !ok {
+			return nil, false, nil
+		}
+		kinds = append(kinds, kind)
+		rest = after
+	}
+	if len(kinds) < 2 || rest == "" {
+		return nil, false, nil
+	}
+	// kinds were collected outermost-first; the kernel applies innermost-first.
+	for i, j := 0, len(kinds)-1; i < j; i, j = i+1, j-1 {
+		kinds[i], kinds[j] = kinds[j], kinds[i]
+	}
+	value, err := s.eval(rest)
+	if err != nil {
+		return nil, false, nil
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled := data.TryTypedIntCastChainSum(kinds, array)
+	recordRuntimeKernelProbe("ArrayIntCastChainSum", "vector-reduce/cast-chain-sum/"+string(array.Kind()), handled, nil)
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
+}
+
+// tryEvalFindSum fuses +/domain?query into a single pass through
+// data.TryTypedFindI64Sum, skipping the index-vector materialization the
+// staged find-then-sum route pays. Non-array operands and kernel declines
+// keep the staged route (the find cascade re-evaluates the expression).
+func (s *EvalState) tryEvalFindSum(src string) (any, bool, error) {
+	leftExpr, rightExpr, ok := splitTopLevelOperator(src, "?")
+	if !ok {
+		return nil, false, nil
+	}
+	left, err := s.eval(leftExpr)
+	if err != nil {
+		return nil, false, nil
+	}
+	domainArray, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	right, err := s.eval(rightExpr)
+	if err != nil {
+		return nil, false, nil
+	}
+	queryArray, ok := right.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled := data.TryTypedFindI64Sum(domainArray, queryArray)
+	shape := "vector-reduce/find-sum/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
+	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
 }
 
 func findValue(left, right any) (any, error) {

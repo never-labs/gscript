@@ -8103,6 +8103,17 @@ func (a i64FillArray) sum() int64 {
 	if total, ok := i64FilledSum(a.source, a.fill); ok {
 		return total
 	}
+	// Bulk fast path: the i64FillArray flatten applies the exact valueAt
+	// fill/value selection per row, so summing the dense slice in row order
+	// is bit-identical to the boxed loop below.
+	if values, owned, ok := tryBulkI64Values(a); ok {
+		var total int64
+		for _, v := range values {
+			total += v
+		}
+		bulkI64Release(values, owned)
+		return total
+	}
 	var total int64
 	for row := 0; row < a.Len(); row++ {
 		value, ok, err := a.valueAt(row)

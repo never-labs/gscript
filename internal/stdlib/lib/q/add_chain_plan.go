@@ -52,6 +52,11 @@ const (
 	// qAddChainTermName is a plain binding name: one lookupName per call,
 	// mirroring evalScalarAddChainTerm's terminal s.eval(name) route.
 	qAddChainTermName
+	// qAddChainTermDyadicApply is a `<verb>[a;b]` application of a dyadic
+	// stats word (wavg/wsum/cov/scov/cor). It calls the same function the
+	// s.eval bracket-application terminal reaches, with the argument parse
+	// cached.
+	qAddChainTermDyadicApply
 )
 
 // qTermArgPlan caches how a small operand sub-expression resolves: literal,
@@ -138,6 +143,10 @@ type qAddChainTermPlan struct {
 	literal     any
 	name        string
 	reducer     func(any) (any, error)
+	reducerWord string
+	dyadicFn    func(any, any) (any, error)
+	dyadicLeft  qTermArgPlan
+	dyadicRight qTermArgPlan
 	scalarIndex qScalarApplyIndexPlan
 	fast        *qEvalFastPlan
 	over        qCallableApplicationPlan
@@ -324,10 +333,18 @@ func buildQAddChainTermPlan(termSrc string) qAddChainTermPlan {
 		plan.fast = &sub
 		return plan
 	}
-	if reducer, name, ok := qAddChainReducerNameTerm(stripped); ok {
+	if reducer, word, name, ok := qAddChainReducerNameTerm(stripped); ok {
 		plan.kind = qAddChainTermReducerName
 		plan.reducer = reducer
+		plan.reducerWord = word
 		plan.name = name
+		return plan
+	}
+	if fn, leftArg, rightArg, ok := qAddChainDyadicWordApplyTerm(stripped); ok {
+		plan.kind = qAddChainTermDyadicApply
+		plan.dyadicFn = fn
+		plan.dyadicLeft = buildQTermArgPlan(leftArg)
+		plan.dyadicRight = buildQTermArgPlan(rightArg)
 		return plan
 	}
 	if lastPlan, ok := buildQLastHeadTermPlan(stripped); ok {
@@ -340,13 +357,13 @@ func buildQAddChainTermPlan(termSrc string) qAddChainTermPlan {
 // the unary reducer verbs evalScalarAddChainTerm accepts. The reducer
 // functions are the same terminals s.eval reaches for these shapes (the
 // `+/` branch's sum and the unary word prefix table).
-func qAddChainReducerNameTerm(src string) (func(any) (any, error), string, bool) {
+func qAddChainReducerNameTerm(src string) (func(any) (any, error), string, string, bool) {
 	if strings.HasPrefix(src, "+/") {
 		name := strings.TrimSpace(src[len("+/"):])
 		if isQAssignmentName(name) {
-			return sum, name, true
+			return sum, "sum", name, true
 		}
-		return nil, "", false
+		return nil, "", "", false
 	}
 	for _, spec := range []struct {
 		word string
@@ -359,17 +376,66 @@ func qAddChainReducerNameTerm(src string) (func(any) (any, error), string, bool)
 		{"max", maxValue},
 		{"first", first},
 		{"last", last},
+		{"var", varValue},
+		{"dev", devValue},
+		{"svar", svarValue},
+		{"sdev", sdevValue},
+		{"med", medValue},
 	} {
 		if !strings.HasPrefix(src, spec.word) || !wordBoundary(src, 0, len(spec.word)) {
 			continue
 		}
 		name := strings.TrimSpace(src[len(spec.word):])
 		if isQAssignmentName(name) {
-			return spec.fn, name, true
+			return spec.fn, spec.word, name, true
 		}
-		return nil, "", false
+		return nil, "", "", false
 	}
-	return nil, "", false
+	return nil, "", "", false
+}
+
+// qAddChainDyadicWordApplyTerm recognizes `<verb>[a;b]` applications of the
+// dyadic stats words. The functions are the same terminals the s.eval
+// bracket-application route reaches through qDyadicWordOps; argument parsing
+// stays conservative (one top-level `;`, no nesting) so anything else keeps
+// the per-call eval route.
+func qAddChainDyadicWordApplyTerm(src string) (func(any, any) (any, error), string, string, bool) {
+	if !strings.HasSuffix(src, "]") {
+		return nil, "", "", false
+	}
+	open := strings.IndexByte(src, '[')
+	if open <= 0 {
+		return nil, "", "", false
+	}
+	var fn func(any, any) (any, error)
+	switch src[:open] {
+	case "wavg":
+		fn = wavg
+	case "wsum":
+		fn = wsumValue
+	case "cov":
+		fn = covValue
+	case "scov":
+		fn = scovValue
+	case "cor":
+		fn = corValue
+	default:
+		return nil, "", "", false
+	}
+	inner := src[open+1 : len(src)-1]
+	if strings.ContainsAny(inner, "[](){}\"`") {
+		return nil, "", "", false
+	}
+	parts := strings.Split(inner, ";")
+	if len(parts) != 2 {
+		return nil, "", "", false
+	}
+	left := strings.TrimSpace(parts[0])
+	right := strings.TrimSpace(parts[1])
+	if left == "" || right == "" {
+		return nil, "", "", false
+	}
+	return fn, left, right, true
 }
 
 var qLastScanWordSpecs = []struct {
@@ -466,6 +532,32 @@ func (s *EvalState) evalQAddChainPlan(terms []qAddChainTermPlan) (any, bool, err
 		return err
 	}
 	for i := 0; i < len(terms); {
+		// var+dev over the same binding share one moments pass: dev is
+		// sqrt(var) by definition (devValue computes exactly
+		// math.Sqrt(varValue(x))), so both term values are bit-identical to
+		// their independent evaluation.
+		if i+1 < len(terms) && terms[i].kind == qAddChainTermReducerName && terms[i].reducerWord == "var" &&
+			terms[i+1].kind == qAddChainTermReducerName && terms[i+1].reducerWord == "dev" &&
+			terms[i+1].name == terms[i].name {
+			if value, ok := s.lookupName(terms[i].name); ok && !isCallable(value) {
+				variance, err := varValue(value)
+				if err != nil {
+					return nil, true, err
+				}
+				if err := fold(variance); err != nil {
+					return nil, true, err
+				}
+				deviation, err := devFromVariance(variance)
+				if err != nil {
+					return nil, true, err
+				}
+				if err := fold(deviation); err != nil {
+					return nil, true, err
+				}
+				i += 2
+				continue
+			}
+		}
 		if bundle := terms[i].monadBundle; bundle != nil {
 			values, handled, err := s.evalQMonadSumBundlePlan(bundle)
 			if err != nil {
@@ -531,6 +623,16 @@ func (s *EvalState) evalQAddChainTerm(plan *qAddChainTermPlan) (any, error) {
 		if value, ok := s.lookupName(plan.name); ok && !isCallable(value) {
 			return plan.reducer(value)
 		}
+	case qAddChainTermDyadicApply:
+		left, err := s.evalQTermArg(&plan.dyadicLeft)
+		if err != nil {
+			return nil, err
+		}
+		right, err := s.evalQTermArg(&plan.dyadicRight)
+		if err != nil {
+			return nil, err
+		}
+		return plan.dyadicFn(left, right)
 	case qAddChainTermLastScanWord:
 		out, handled, err := s.evalQLastScanWordPlan(plan)
 		if err != nil {
@@ -634,8 +736,8 @@ func buildQSingleTermFastPlan(src string) (qAddChainTermPlan, bool) {
 		}
 		return qAddChainTermPlan{}, false
 	}
-	if reducer, name, ok := qAddChainReducerNameTerm(src); ok {
-		return qAddChainTermPlan{kind: qAddChainTermReducerName, src: src, reducer: reducer, name: name}, true
+	if reducer, word, name, ok := qAddChainReducerNameTerm(src); ok {
+		return qAddChainTermPlan{kind: qAddChainTermReducerName, src: src, reducer: reducer, reducerWord: word, name: name}, true
 	}
 	return qAddChainTermPlan{}, false
 }

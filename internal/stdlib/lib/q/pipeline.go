@@ -1606,6 +1606,9 @@ func (s *EvalState) evalQPipelineSumUnaryPrimitive(plan *qPipelinePlan) (any, bo
 	if op == "" {
 		op = strings.TrimPrefix(plan.stableShape(), "vector-reduce/sum-unary-")
 	}
+	if out, handled, err := s.tryEvalQPipelineSumMonadChain(plan, op); err != nil || handled {
+		return out, handled, err
+	}
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
 	if err != nil {
 		return nil, true, err
@@ -1621,6 +1624,63 @@ func (s *EvalState) evalQPipelineSumUnaryPrimitive(plan *qPipelinePlan) (any, bo
 		fallbackReason: RuntimeFallbackUnsupportedType,
 		call: func() (any, bool, error) {
 			return data.TryTypedQNumericUnarySum(op, array)
+		},
+	})
+}
+
+// tryEvalQPipelineSumMonadChain fuses +/op_k ... op_1 [deltas] <expr> into a
+// single source pass through data.TryTypedQNumericUnaryChainSum. The chain is
+// re-derived from the plan strings per call (cheap prefix splits); a kernel
+// decline falls through to the staged per-stage route unchanged.
+func (s *EvalState) tryEvalQPipelineSumMonadChain(plan *qPipelinePlan, op string) (any, bool, error) {
+	ops := []string{op}
+	rest := plan.reductionInput
+	for {
+		next, arg, ok := splitLeadingNumericUnary(rest)
+		if !ok || arg == "" {
+			break
+		}
+		ops = append(ops, next)
+		rest = arg
+	}
+	deltas := false
+	if strings.HasPrefix(rest, "deltas") && len(rest) > len("deltas") && isSpace(rest[len("deltas")]) {
+		arg := strings.TrimSpace(rest[len("deltas"):])
+		if arg != "" {
+			deltas = true
+			rest = arg
+		}
+	}
+	if len(ops) < 2 && !deltas {
+		return nil, false, nil
+	}
+	// ops were collected outermost-first; the kernel applies innermost-first.
+	for i, j := 0, len(ops)-1; i < j; i, j = i+1, j-1 {
+		ops[i], ops[j] = ops[j], ops[i]
+	}
+	kernel, ok := data.NewQNumericUnaryChainSumPlan(ops, deltas)
+	if !ok {
+		return nil, false, nil
+	}
+	value, err := s.eval(rest)
+	if err != nil {
+		return nil, true, err
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	shape := "vector-reduce/chain-sum/" + strings.Join(ops, "-")
+	if deltas {
+		shape += "/deltas"
+	}
+	shape += "/" + string(array.Kind())
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayNumericUnaryChainSum",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedQNumericUnaryChainSumPlanned(kernel, array)
 		},
 	})
 }

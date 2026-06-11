@@ -154,6 +154,30 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		return out, true, true
 	case i64ScalarDyadicArray:
 		return tryBulkI64ScalarDyadicValues(a)
+	case i64FillArray:
+		// scalar ^ shifted/plain sources flatten in one pass: in-range rows
+		// take the source value, out-of-range (shift-created null) rows take
+		// the fill — exactly i64FillArray.valueAt per row. Sources with
+		// stored nulls decline the inner flatten and keep the boxed route.
+		if shifted, isShifted := a.source.(shiftedArray); isShifted {
+			source, sourceOwned, ok := tryBulkI64Values(shifted.source)
+			if !ok {
+				return nil, false, false
+			}
+			n := shifted.Len()
+			out := bulkI64Get(n)
+			for i := range out {
+				sourceRow := i + shifted.offset
+				if sourceRow < 0 || sourceRow >= len(source) {
+					out[i] = a.fill
+				} else {
+					out[i] = source[sourceRow]
+				}
+			}
+			bulkI64Release(source, sourceOwned)
+			return out, true, true
+		}
+		return tryBulkI64Values(a.source)
 	case i64RunningSumArray:
 		// Streaming scan producer: one dense prefix-sum pass instead of a
 		// closed-form evaluation per row. Wrapping int64 addition matches the
@@ -366,6 +390,24 @@ func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) 
 	case i64DyadicStepsFail:
 		return nil, false, false
 	}
+	// Range bases fuse the source walk with the innermost step in a single
+	// pass: same int64 walk tryBulkI64Values would materialize, same step
+	// expression applyI64ScalarDyadicStep applies, so results are identical
+	// without the intermediate source buffer.
+	if r, isRange := unwrapAttributedArray(base).(i64RangeArray); isRange && r.len >= length && stepCount >= 1 {
+		out := bulkI64Get(length)
+		if applyI64ScalarDyadicStepRange(steps[stepCount-1], r.start, r.step, out) {
+			for i := stepCount - 2; i >= 0; i-- {
+				if !applyI64ScalarDyadicStep(steps[i], out, out) {
+					bulkI64Release(out, true)
+					return nil, false, false
+				}
+			}
+			return out, true, true
+		}
+		bulkI64Release(out, true)
+		return nil, false, false
+	}
 	source, sourceOwned, ok := tryBulkI64Values(base)
 	if !ok || len(source) < length {
 		bulkI64Release(source, sourceOwned)
@@ -386,6 +428,96 @@ func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) 
 	}
 	bulkI64Release(source, sourceOwned)
 	return out, true, true
+}
+
+// qModPow2Mask reports the AND mask for a positive power-of-two modulus.
+func qModPow2Mask(m int64) (int64, bool) {
+	if m > 0 && m&(m-1) == 0 {
+		return m - 1, true
+	}
+	return 0, false
+}
+
+// applyI64ScalarDyadicStepRange applies one step over a generated affine
+// walk (start + i*step), mirroring applyI64ScalarDyadicStep over the slice
+// tryBulkI64Values would produce for the range.
+func applyI64ScalarDyadicStepRange(step i64ScalarDyadicStep, start, stride int64, out []int64) bool {
+	v := start
+	switch step.op {
+	case OpAdd:
+		for i := range out {
+			out[i] = v + step.scalar
+			v += stride
+		}
+	case OpSub:
+		if step.scalarLeft {
+			for i := range out {
+				out[i] = step.scalar - v
+				v += stride
+			}
+		} else {
+			for i := range out {
+				out[i] = v - step.scalar
+				v += stride
+			}
+		}
+	case OpMul:
+		for i := range out {
+			out[i] = v * step.scalar
+			v += stride
+		}
+	case OpMod:
+		if step.scalarLeft {
+			for i := range out {
+				if v == 0 {
+					return false
+				}
+				out[i] = qModInt64(step.scalar, v)
+				v += stride
+			}
+		} else {
+			if step.scalar == 0 {
+				return false
+			}
+			if mask, ok := qModPow2Mask(step.scalar); ok {
+				for i := range out {
+					if v >= 0 {
+						out[i] = v & mask
+					} else {
+						out[i] = qModInt64(v, step.scalar)
+					}
+					v += stride
+				}
+				return true
+			}
+			for i := range out {
+				out[i] = qModInt64(v, step.scalar)
+				v += stride
+			}
+		}
+	case OpIDiv:
+		const minInt64 = -1 << 63
+		if step.scalarLeft {
+			for i := range out {
+				if v == 0 || (step.scalar == minInt64 && v == -1) {
+					return false
+				}
+				out[i] = floorDivInt64(step.scalar, v)
+				v += stride
+			}
+		} else {
+			if step.scalar == 0 || step.scalar == -1 {
+				return false
+			}
+			for i := range out {
+				out[i] = floorDivInt64(v, step.scalar)
+				v += stride
+			}
+		}
+	default:
+		return false
+	}
+	return true
 }
 
 func applyI64ScalarDyadicStep(step i64ScalarDyadicStep, source, out []int64) bool {
@@ -419,6 +551,20 @@ func applyI64ScalarDyadicStep(step i64ScalarDyadicStep, source, out []int64) boo
 		} else {
 			if step.scalar == 0 {
 				return false
+			}
+			if mask, ok := qModPow2Mask(step.scalar); ok {
+				// Floored modulo by a positive power of two is a bitwise AND
+				// in two's complement for non-negative values; negative
+				// values keep the exact qModInt64 route so flattened rows
+				// stay bit-identical to per-row At evaluation.
+				for i, v := range source {
+					if v >= 0 {
+						out[i] = v & mask
+					} else {
+						out[i] = qModInt64(v, step.scalar)
+					}
+				}
+				return true
 			}
 			for i, v := range source {
 				out[i] = qModInt64(v, step.scalar)
@@ -505,6 +651,17 @@ func tryBulkF64Values(array Array) (values []float64, owned bool, ok bool) {
 		out := bulkF64Get(a.len)
 		for i := range out {
 			out[i] = a.start + float64(i)*a.step
+		}
+		return out, true, true
+	case i64RangeArray:
+		// Direct one-pass conversion: float64 of the same int64 walk the
+		// generic tryBulkI64Values flatten would produce, skipping the
+		// intermediate []int64 buffer.
+		out := bulkF64Get(a.len)
+		value := a.start
+		for i := range out {
+			out[i] = float64(value)
+			value += a.step
 		}
 		return out, true, true
 	case f64NumericDyadicArray:
@@ -620,6 +777,15 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 		bulkF64Release(source, sourceOwned)
 		return out, true, true
 	case f64DyadicProducer:
+		// Scalar-operand fusion: a broadcast scalar side skips its dense
+		// materialization pass; integer-backed left operands additionally
+		// fuse the float64 conversion into the op pass. Element values are
+		// the same expressions the staged passes compute, in the same order.
+		if rp, scalarRight := p.right.(f64ScalarProducer); scalarRight {
+			if out, handled, ok := bulkF64FusedScalarRightDyadic(p, rp.value); ok {
+				return out, handled, handled
+			}
+		}
 		left, leftOwned, ok := tryBulkF64ProducerValues(p.left)
 		if !ok || len(left) < p.len {
 			bulkF64Release(left, leftOwned)
@@ -657,6 +823,75 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 	}
 }
 
+// bulkF64FusedScalarRightDyadic evaluates left <op> scalar without
+// materializing the broadcast scalar side. ok=false sends the caller to the
+// generic two-operand flatten; handled=false propagates a flatten failure.
+// Integer-backed left producers fuse float64(iv) <op> scalar in one pass —
+// identical per-element values to the staged convert-then-op passes.
+func bulkF64FusedScalarRightDyadic(p f64DyadicProducer, scalar float64) ([]float64, bool, bool) {
+	switch p.op {
+	case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv):
+	default:
+		return nil, false, false
+	}
+	if li, isIntDyadic := p.left.(f64I64ScalarDyadicProducer); isIntDyadic {
+		ivs, ivsOwned, ok := tryBulkI64Values(li.values)
+		if !ok || len(ivs) < p.len {
+			bulkI64Release(ivs, ivsOwned)
+			return nil, false, true
+		}
+		ivs = ivs[:p.len]
+		out := bulkF64Get(p.len)
+		switch p.op {
+		case string(OpAdd):
+			for i, iv := range ivs {
+				out[i] = float64(iv) + scalar
+			}
+		case string(OpSub):
+			for i, iv := range ivs {
+				out[i] = float64(iv) - scalar
+			}
+		case string(OpMul):
+			for i, iv := range ivs {
+				out[i] = float64(iv) * scalar
+			}
+		case string(OpDiv):
+			for i, iv := range ivs {
+				out[i] = float64(iv) / scalar
+			}
+		}
+		bulkI64Release(ivs, ivsOwned)
+		return out, true, true
+	}
+	left, leftOwned, ok := tryBulkF64ProducerValues(p.left)
+	if !ok || len(left) < p.len {
+		bulkF64Release(left, leftOwned)
+		return nil, false, true
+	}
+	left = left[:p.len]
+	out := bulkF64Get(p.len)
+	switch p.op {
+	case string(OpAdd):
+		for i, v := range left {
+			out[i] = v + scalar
+		}
+	case string(OpSub):
+		for i, v := range left {
+			out[i] = v - scalar
+		}
+	case string(OpMul):
+		for i, v := range left {
+			out[i] = v * scalar
+		}
+	case string(OpDiv):
+		for i, v := range left {
+			out[i] = v / scalar
+		}
+	}
+	bulkF64Release(left, leftOwned)
+	return out, true, true
+}
+
 func applyBulkF64Dyadic(op string, apply f64DyadicFunc, left, right, out []float64) bool {
 	switch op {
 	case string(OpAdd):
@@ -690,6 +925,53 @@ func tryBulkF64NumericDyadicValues(a f64NumericDyadicArray) ([]float64, bool) {
 	apply, applyOK := numericDyadicFloatFunc(a.op)
 	if !applyOK {
 		return nil, false
+	}
+	// Integer-array (op) float-scalar trees fuse the int64 flatten, the
+	// float64 conversion, and the scalar op into one pass. Element values
+	// are float64(iv) <op> scalar — exactly what the staged flatten
+	// (convert pass, then scalar pass) computes.
+	if la, isArray := a.left.(Array); isArray && a.right != nil {
+		if _, rightIsArray := a.right.(Array); !rightIsArray && !IsNull(a.right) {
+			switch la.Kind() {
+			case KindI64, KindI32, KindI16, KindI8:
+				if rs, rok := numeric(a.right); rok {
+					var fused bool
+					switch a.op {
+					case string(OpAdd), string(OpSub), string(OpMul), string(OpDiv):
+						fused = true
+					}
+					if fused && la.Len() >= a.len {
+						if ivs, ivsOwned, ok := tryBulkI64Values(la); ok {
+							if len(ivs) >= a.len {
+								ivs = ivs[:a.len]
+								out := bulkF64Get(a.len)
+								switch a.op {
+								case string(OpAdd):
+									for i, iv := range ivs {
+										out[i] = float64(iv) + rs
+									}
+								case string(OpSub):
+									for i, iv := range ivs {
+										out[i] = float64(iv) - rs
+									}
+								case string(OpMul):
+									for i, iv := range ivs {
+										out[i] = float64(iv) * rs
+									}
+								case string(OpDiv):
+									for i, iv := range ivs {
+										out[i] = float64(iv) / rs
+									}
+								}
+								bulkI64Release(ivs, ivsOwned)
+								return out, true
+							}
+							bulkI64Release(ivs, ivsOwned)
+						}
+					}
+				}
+			}
+		}
 	}
 	leftValues, leftOwned, leftScalar, leftIsScalar, ok := bulkF64Operand(a.left, a.len)
 	if !ok {
@@ -1460,7 +1742,18 @@ func TryTypedFindI64(domain, query Array) (Array, bool) {
 	}
 	miss := int64(len(domainValues))
 	out := make([]int64, len(queryValues))
-	if len(domainValues) <= 8 {
+	if table, minValue, ok := findI64DenseTable(domainValues); ok {
+		span := int64(len(table))
+		for i, v := range queryValues {
+			index := miss
+			if offset := v - minValue; offset >= 0 && offset < span {
+				if hit := table[offset]; hit >= 0 {
+					index = hit
+				}
+			}
+			out[i] = index
+		}
+	} else if len(domainValues) <= 8 {
 		for i, v := range queryValues {
 			index := miss
 			for j, candidate := range domainValues {
@@ -1487,6 +1780,100 @@ func TryTypedFindI64(domain, query Array) (Array, bool) {
 	bulkI64Release(domainValues, domainOwned)
 	bulkI64Release(queryValues, queryOwned)
 	return newI64Trusted(out), true
+}
+
+// findI64DenseTable builds a value→first-index table for small-span integer
+// find domains (first occurrence wins, mirroring the linear scan). -1 marks
+// absent values. ok=false when the domain is empty, too large, or too
+// sparse to justify a table.
+func findI64DenseTable(domainValues []int64) ([]int64, int64, bool) {
+	const maxDomain = 64
+	const maxSpan = 1024
+	if len(domainValues) == 0 || len(domainValues) > maxDomain {
+		return nil, 0, false
+	}
+	minValue, maxValue := domainValues[0], domainValues[0]
+	for _, v := range domainValues[1:] {
+		if v < minValue {
+			minValue = v
+		}
+		if v > maxValue {
+			maxValue = v
+		}
+	}
+	span := maxValue - minValue + 1
+	if span <= 0 || span > maxSpan {
+		return nil, 0, false
+	}
+	table := make([]int64, span)
+	for i := range table {
+		table[i] = -1
+	}
+	for j := len(domainValues) - 1; j >= 0; j-- {
+		table[domainValues[j]-minValue] = int64(j)
+	}
+	return table, minValue, true
+}
+
+// TryTypedFindI64Sum reduces +/domain?query without materializing the index
+// vector. Per-element indexes are exactly TryTypedFindI64's (first matching
+// domain index, count[domain] on miss) and the sum accumulates wrapping
+// int64 in row order, matching the staged find-then-sum route bit for bit.
+// Empty queries decline so the staged route keeps its empty-sum semantics.
+func TryTypedFindI64Sum(domain, query Array) (int64, bool) {
+	if domain == nil || query == nil {
+		return 0, false
+	}
+	domainValues, domainOwned, ok := tryBulkI64Values(domain)
+	if !ok {
+		return 0, false
+	}
+	queryValues, queryOwned, ok := tryBulkI64Values(query)
+	if !ok || len(queryValues) == 0 {
+		bulkI64Release(domainValues, domainOwned)
+		bulkI64Release(queryValues, queryOwned)
+		return 0, false
+	}
+	miss := int64(len(domainValues))
+	var sum int64
+	if table, minValue, ok := findI64DenseTable(domainValues); ok {
+		span := int64(len(table))
+		for _, v := range queryValues {
+			index := miss
+			if offset := v - minValue; offset >= 0 && offset < span {
+				if hit := table[offset]; hit >= 0 {
+					index = hit
+				}
+			}
+			sum += index
+		}
+	} else if len(domainValues) <= 8 {
+		for _, v := range queryValues {
+			index := miss
+			for j, candidate := range domainValues {
+				if candidate == v {
+					index = int64(j)
+					break
+				}
+			}
+			sum += index
+		}
+	} else {
+		lookup := make(map[int64]int64, len(domainValues))
+		for j := len(domainValues) - 1; j >= 0; j-- {
+			lookup[domainValues[j]] = int64(j)
+		}
+		for _, v := range queryValues {
+			index, found := lookup[v]
+			if !found {
+				index = miss
+			}
+			sum += index
+		}
+	}
+	bulkI64Release(domainValues, domainOwned)
+	bulkI64Release(queryValues, queryOwned)
+	return sum, true
 }
 
 // TryTypedSetOpIndexes returns left-side row indexes for the q set verbs
