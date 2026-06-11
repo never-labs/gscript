@@ -499,6 +499,19 @@ func cliExampleModuleRoot(path string) (string, bool) {
 
 func applyCLIExampleRunner(example *cliExample) {
 	switch {
+	case cliExampleIsFinRobotTranslation(example.Path):
+		example.Runnable = true
+		example.Checkable = true
+		example.Requires = ""
+		switch {
+		case cliExampleCompanionRecordsExist(example.Path):
+			example.Runner = "llm-replay"
+		case cliExampleHasEvaluateBlock(example.Path):
+			example.Runner = "evaluate"
+		default:
+			example.Runner = "host-vm"
+		}
+		return
 	case strings.Contains(example.Path, "/evaluate/"):
 		if cliExampleCompanionRecordsExist(example.Path) {
 			example.Runnable = true
@@ -514,7 +527,6 @@ func applyCLIExampleRunner(example *cliExample) {
 		return
 	case strings.Contains(example.Path, "/ai/coding_agent_replay.leia"),
 		strings.Contains(example.Path, "/ai/coding_agent_project/"),
-		strings.Contains(example.Path, "/ai/finrobot_translation/"),
 		strings.Contains(example.Path, "/ai/tagged_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/general_agent_workflow.leia"),
 		strings.Contains(example.Path, "/ai/general_analysis_assistant.leia"),
@@ -530,11 +542,7 @@ func applyCLIExampleRunner(example *cliExample) {
 		}
 		example.Runnable = true
 		example.Checkable = true
-		if strings.Contains(example.Path, "/ai/finrobot_translation/") {
-			example.Runner = "host-vm"
-		} else {
-			example.Runner = "llm-mock"
-		}
+		example.Runner = "llm-mock"
 		example.Requires = ""
 		return
 	case strings.Contains(example.Path, "/macos/package_managed/"),
@@ -593,6 +601,24 @@ func applyCLIExampleRunner(example *cliExample) {
 	if example.Runner == "" {
 		example.Runner = "playground"
 	}
+}
+
+func cliExampleIsFinRobotTranslation(path string) bool {
+	return strings.Contains(filepath.ToSlash(path), "/ai/finrobot_translation/")
+}
+
+func cliExampleHasEvaluateBlock(path string) bool {
+	fullPath := filepath.Join(filepath.Dir(playgroundExamplesRoot()), filepath.FromSlash(path))
+	src, err := os.ReadFile(fullPath)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(src), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "evaluate ") {
+			return true
+		}
+	}
+	return false
 }
 
 func runCLIExampleRunner(example cliExample, path string, maxSteps int64, stdout, stderr io.Writer) int {

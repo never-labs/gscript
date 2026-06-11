@@ -138,6 +138,41 @@ func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) 
 	}
 }
 
+func TestExamplesCommandDiscoversAllFinRobotTranslationExamples(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	examples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered := make(map[string]cliExample, len(examples))
+	for _, example := range examples {
+		discovered[example.Path] = example
+	}
+
+	expected, err := finRobotTranslationExamplePaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expected) == 0 {
+		t.Fatal("no FinRobot translation examples found")
+	}
+
+	for _, path := range expected {
+		t.Run(path, func(t *testing.T) {
+			example, ok := discovered[path]
+			if !ok {
+				t.Fatalf("examples CLI must discover FinRobot translation example %s", path)
+			}
+			if !example.Runnable || !example.Checkable || example.Requires != "" {
+				t.Fatalf("%s metadata = %#v, want runnable checkable example with no skip reason", path, example)
+			}
+			if want := expectedFinRobotTranslationRunner(root, path); example.Runner != want {
+				t.Fatalf("%s runner = %q, want %q", path, example.Runner, want)
+			}
+		})
+	}
+}
+
 func TestExamplesCommandVerifiesPackageManagedProjects(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
 	examples, err := cliRepositoryExamples()
@@ -296,6 +331,50 @@ func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExamplesCommandFinRobotTranslationSelectorChecksEveryExample(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	expected, err := finRobotTranslationExamplePaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedByID := make(map[string]bool, len(expected))
+	for _, path := range expected {
+		expectedByID[strings.TrimSuffix(strings.ReplaceAll(strings.TrimPrefix(path, "examples/"), "/", "-"), ".leia")] = true
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--json", "--jobs=4", "--timeout=20s", "ai/finrobot_translation"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var payload struct {
+		SchemaVersion int                     `json:"schema_version"`
+		OK            bool                    `json:"ok"`
+		Runnable      int                     `json:"runnable"`
+		Skipped       int                     `json:"skipped"`
+		Failed        int                     `json:"failed"`
+		Results       []cliExampleCheckResult `json:"results"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid examples check JSON: %v\n%s", err, stdout.String())
+	}
+	if payload.SchemaVersion != 1 || !payload.OK || payload.Runnable != len(expected) || payload.Skipped != 0 || payload.Failed != 0 {
+		t.Fatalf("unexpected FinRobot examples check payload: %#v", payload)
+	}
+	if len(payload.Results) != len(expected) {
+		t.Fatalf("FinRobot examples check results = %d, want %d", len(payload.Results), len(expected))
+	}
+	for _, result := range payload.Results {
+		id := strings.TrimPrefix(result.ID, "repo-")
+		if !expectedByID[id] {
+			t.Fatalf("FinRobot selector returned unexpected example %s (%s)", result.ID, result.Path)
+		}
+		if result.Status == "skipped" {
+			t.Fatalf("FinRobot example %s unexpectedly skipped: %s", result.ID, result.Requires)
+		}
 	}
 }
 
@@ -479,6 +558,46 @@ func documentedExamplesCheckSelectors(command []string) []string {
 		selectors = append(selectors, token)
 	}
 	return selectors
+}
+
+func finRobotTranslationExamplePaths(root string) ([]string, error) {
+	var paths []string
+	base := filepath.Join(root, "examples", "ai", "finrobot_translation")
+	err := filepath.WalkDir(base, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".leia" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		paths = append(paths, filepath.ToSlash(rel))
+		return nil
+	})
+	sort.Strings(paths)
+	return paths, err
+}
+
+func expectedFinRobotTranslationRunner(root, path string) string {
+	sourcePath := filepath.Join(root, filepath.FromSlash(path))
+	if info, err := os.Stat(strings.TrimSuffix(sourcePath, filepath.Ext(sourcePath)) + ".records.json"); err == nil && !info.IsDir() {
+		return "llm-replay"
+	}
+	src, err := os.ReadFile(sourcePath)
+	if err == nil {
+		for _, line := range strings.Split(string(src), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "evaluate ") {
+				return "evaluate"
+			}
+		}
+	}
+	return "host-vm"
 }
 
 func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T) {
