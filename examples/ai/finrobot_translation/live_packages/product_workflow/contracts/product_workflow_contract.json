@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-product-workflow-contract",
+  "provider_free": true,
+  "live_network": false,
+  "workflows": {
+    "equity_cli": {
+      "capability": "product.workflow.equity_cli.run",
+      "source_example": "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+      "stages": [
+        "load_cli_config",
+        "load_recorded_inputs",
+        "normalize_financial_tables",
+        "generate_section_text",
+        "plan_report_artifacts",
+        "validate_stale_sections",
+        "finalize_report_output"
+      ],
+      "contracts": [
+        "retry_policy",
+        "stale_section_failure_hook",
+        "artifact_manifest",
+        "source_annotations",
+        "deterministic_task_history"
+      ],
+      "outputs": [
+        "html_report_path",
+        "pdf_report_path",
+        "artifact_manifest_path",
+        "task_history"
+      ]
+    },
+    "web_product": {
+      "capability": "product.workflow.web.route",
+      "source_example": "examples/ai/finrobot_translation/web_product.leia",
+      "routes": [
+        "home",
+        "login",
+        "oauth_callback",
+        "logout",
+        "reports_index",
+        "report_detail",
+        "report_download",
+        "submit_equity_request",
+        "task_status",
+        "admin_dashboard",
+        "admin_users",
+        "admin_task_log"
+      ],
+      "contracts": [
+        "auth_session",
+        "report_history",
+        "task_log",
+        "download_manifest",
+        "crud_fixture",
+        "db_migration"
+      ]
+    }
+  },
+  "auth_session": {
+    "capability": "product.workflow.auth.session",
+    "mode": "fixture",
+    "session_cookie": "finrobot_session",
+    "csrf_required": true,
+    "roles": [
+      "analyst",
+      "admin"
+    ],
+    "denied_cases": [
+      "missing_session",
+      "disabled_user",
+      "expired_oauth_state",
+      "requires_admin"
+    ]
+  },
+  "history": {
+    "capability": "product.workflow.history.read",
+    "entities": [
+      "report_requests",
+      "reports",
+      "artifacts",
+      "audit_events"
+    ],
+    "deterministic_order": "created_at,id"
+  },
+  "task_log": {
+    "capability": "product.workflow.task_log.read",
+    "format": "jsonl",
+    "events": [
+      "queued",
+      "started",
+      "artifact_planned",
+      "completed",
+      "failed"
+    ],
+    "redaction": "no secrets exist in fixture mode"
+  },
+  "download": {
+    "capability": "product.workflow.download.artifact",
+    "artifacts": [
+      "html",
+      "pdf",
+      "artifact_manifest",
+      "task_log"
+    ],
+    "remote_object_fetch": false
+  },
+  "crud": {
+    "capability": "product.workflow.crud.report_request",
+    "operations": [
+      "create",
+      "read",
+      "update",
+      "delete"
+    ],
+    "tables": [
+      "users",
+      "sessions",
+      "report_requests",
+      "reports",
+      "artifacts",
+      "task_events",
+      "audit_events"
+    ]
+  }
+}
+

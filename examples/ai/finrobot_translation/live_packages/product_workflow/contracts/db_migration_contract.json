@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-product-workflow-db-migration-contract",
+  "provider_free": true,
+  "live_network": false,
+  "capability": "product.workflow.db.migration.plan",
+  "migration_engine": "contract_only",
+  "schema_table": "schema_versions",
+  "migrations": [
+    {
+      "id": "001_product_workflow_base",
+      "direction": "up",
+      "tables": [
+        {
+          "name": "users",
+          "columns": ["id", "email", "role", "active", "oauth_subject", "created_at", "updated_at"]
+        },
+        {
+          "name": "sessions",
+          "columns": ["id", "user_id", "csrf_hash", "expires_at", "created_at", "revoked_at"]
+        },
+        {
+          "name": "report_requests",
+          "columns": ["id", "user_id", "ticker", "status", "task_id", "created_at", "updated_at"]
+        },
+        {
+          "name": "reports",
+          "columns": ["id", "request_id", "ticker", "status", "artifact_manifest_id", "created_at"]
+        },
+        {
+          "name": "artifacts",
+          "columns": ["id", "report_id", "kind", "media_type", "path", "sha256", "created_at"]
+        },
+        {
+          "name": "task_events",
+          "columns": ["id", "task_id", "event", "level", "message", "created_at"]
+        },
+        {
+          "name": "audit_events",
+          "columns": ["id", "actor_user_id", "action", "entity_type", "entity_id", "created_at"]
+        },
+        {
+          "name": "schema_versions",
+          "columns": ["version", "migration_id", "applied_at"]
+        }
+      ],
+      "rollback_required": true,
+      "fixture_seed": "fixtures/provider_free_fixture_index.json#/db_seed"
+    }
+  ],
+  "contract_checks": [
+    "all CRUD tables have id columns",
+    "task_events preserve append-only history",
+    "artifact paths are local fixture paths",
+    "rollback is declared before live migration support"
+  ]
+}
+
