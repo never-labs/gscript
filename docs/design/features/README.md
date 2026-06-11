@@ -22,6 +22,7 @@ contracts are reviewed.
 | [Shell and Host Automation](shell-and-host-automation.md) | Shell ergonomics, commands, glob, paths, env/cwd scopes. |
 | [Go-Style Imports](go-style-imports.md) | Import declarations and module naming, replacing Lua-like `require` as the primary style. |
 | [AI Dialects](ai-dialects.md) | LLM/agent/model/tool/evaluate as official dialects over the existing AI runtime. |
+| [AI Dialect Architecture Contract](ai-dialect-architecture-contract.md) | Boundary, composition, FinRobot migration, and trace/replay/performance contract for the general AI dialect layer. |
 | [FinRobot Translation Gap Audit](finrobot-translation-gap-audit.md) | Finance-agent workload audit mapped to general Leia dialects, stdlib, and package boundaries. |
 | [Composition Features](composition-features.md) | Pipeline, `try`, destructuring, optional chaining, comprehensions, match, using. |
 | [AI Coding Features](ai-coding-features.md) | Plan, patch, code query, record/replay, approval, transactions. |
