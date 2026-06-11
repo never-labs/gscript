@@ -23,6 +23,7 @@
       "approval_id",
       "workflow_run_id",
       "workflow_step_id",
+      "agent_run_id",
       "replay_session_id",
       "parent_event_id"
     ]
@@ -42,6 +43,11 @@
       "source_id": "generic_ai_workflow_composition",
       "surface": "provider_free_tool_turn_replay_fixtures",
       "covers": ["turn", "tool", "replay"]
+    },
+    {
+      "source_id": "generic_agent_loop_composition",
+      "surface": "provider_free_agent_turn_tool_trace_fixture",
+      "covers": ["agent", "turn", "tool", "trace"]
     }
   ],
   "events": [
@@ -144,6 +150,43 @@
         "workflow_run_id": "workflow-run-generic-1",
         "replay_session_id": "replay-session-generic-1",
         "parent_event_id": "evt-tool-result-1"
+      }
+    },
+    {
+      "trace_id": "trace-generic-agent-loop-1",
+      "event_id": "evt-agent-start-1",
+      "event_type": "agent_start",
+      "timestamp_ms": 1070,
+      "sequence": 8,
+      "status": "started",
+      "correlation": {
+        "agent_run_id": "agent-run-generic-1"
+      }
+    },
+    {
+      "trace_id": "trace-generic-agent-loop-1",
+      "event_id": "evt-agent-turn-tool-1",
+      "event_type": "agent_turn_tool_dispatch",
+      "timestamp_ms": 1080,
+      "sequence": 9,
+      "status": "ok",
+      "correlation": {
+        "agent_run_id": "agent-run-generic-1",
+        "turn_id": "turn-generic-agent-1",
+        "tool_call_id": "tool-call-generic-agent-1",
+        "parent_event_id": "evt-agent-start-1"
+      }
+    },
+    {
+      "trace_id": "trace-generic-agent-loop-1",
+      "event_id": "evt-agent-done-1",
+      "event_type": "agent_done",
+      "timestamp_ms": 1090,
+      "sequence": 10,
+      "status": "ok",
+      "correlation": {
+        "agent_run_id": "agent-run-generic-1",
+        "parent_event_id": "evt-agent-turn-tool-1"
       }
     }
   ]

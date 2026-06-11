@@ -74,6 +74,7 @@ func TestGenericTraceEventsUnifiedEnvelopeCoversWorkflowCompositionCorrelations(
 	})
 	assertGenericTraceSchemaFields(t, doc.TraceEnvelopeSchema.CorrelationIDFields, []string{
 		"approval_id",
+		"agent_run_id",
 		"parent_event_id",
 		"replay_session_id",
 		"tool_call_id",
@@ -90,6 +91,14 @@ func TestGenericTraceEventsUnifiedEnvelopeCoversWorkflowCompositionCorrelations(
 		"approval_replay_trace": {"approval_id", "tool_call_id", "workflow_run_id", "workflow_step_id", "replay_session_id"},
 		"workflow_step":         {"workflow_run_id", "workflow_step_id", "parent_event_id"},
 		"replay_record_matched": {"turn_id", "tool_call_id", "workflow_run_id", "replay_session_id", "parent_event_id"},
+		"agent_start":           {"agent_run_id"},
+		"agent_turn_tool_dispatch": {
+			"agent_run_id",
+			"turn_id",
+			"tool_call_id",
+			"parent_event_id",
+		},
+		"agent_done": {"agent_run_id", "parent_event_id"},
 	}
 	seenTypes := map[string]bool{}
 	seenIDs := map[string]bool{}
@@ -154,6 +163,7 @@ func assertGenericTraceSourceCoverage(t *testing.T, doc genericTraceEnvelopeFixt
 		"generic_trace_events":            {"approval", "replay", "tool", "turn", "workflow"},
 		"generic_workflow_orchestration":  {"approval", "workflow"},
 		"generic_ai_workflow_composition": {"replay", "tool", "turn"},
+		"generic_agent_loop_composition":  {"agent", "tool", "trace", "turn"},
 	}
 	got := map[string][]string{}
 	for _, coverage := range doc.SourceCoverage {
