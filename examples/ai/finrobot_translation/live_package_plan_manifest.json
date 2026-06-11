@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 30,
-  "translation_directory_file_count": 110,
+  "registered_examples_count": 31,
+  "translation_directory_file_count": 124,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -16,6 +16,15 @@
         "normalizers",
         "valuation",
         "report_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "factor_research",
+      "directory": "examples/ai/finrobot_translation/live_packages/factor_research",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/factor_research/main.leia",
+      "covers_package_ids": [
+        "factor_research"
       ],
       "status": "checked_in_registered_example"
     },
@@ -261,6 +270,35 @@
         "contract tests run with live_network=false and assert role profile versions plus TERMINATE convention",
         "section output schema fixture tests validate source evidence references without credentials",
         "provider-free package tests deny external I/O, provider credentials, and external prompt/model SDK imports"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "factor_research",
+      "package_name": "leia-finrobot-factor-research",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/factor_research",
+      "planned_directory": "packages/finrobot/factor_research",
+      "manifest": "packages/finrobot/factor_research/package.manifest.json",
+      "contract": "packages/finrobot/factor_research/contracts/factor_research_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.leia",
+      "capabilities": [
+        "finance.factor_research.agent.orchestrate",
+        "finance.factor_research.data.market_panel",
+        "finance.factor_research.data.factor_panel",
+        "finance.factor_research.transform.winsorize",
+        "finance.factor_research.transform.zscore",
+        "finance.factor_research.transform.neutralize",
+        "finance.factor_research.transform.composite",
+        "finance.factor_research.exposure.calculate",
+        "finance.factor_research.exposure.risk.limit",
+        "finance.factor_research.handoff.boundary"
+      ],
+      "test_gates": [
+        "factor research manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required market data or optimizer credentials",
+        "fixture tests validate market data, factor data, factor transforms, and portfolio factor exposure schemas",
+        "agent handoff boundary tests keep provider, market data, factor data, and optimizer calls metadata-only until live packages are explicitly enabled"
       ],
       "no_built_in_guarantee": true
     },

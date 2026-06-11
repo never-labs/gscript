@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "agent_handoff_boundary_v1",
+  "provider_free_gate": {
+    "network_required": false,
+    "credentials_required": false,
+    "provider_sdks_required": false
+  },
+  "required": [
+    "handoff_id",
+    "from_agent",
+    "to_agent",
+    "capability",
+    "fixture_key",
+    "schema",
+    "live_network",
+    "dependency_imported",
+    "credential_required",
+    "clean_skip"
+  ],
+  "clean_skip_without_dependency": true
+}
+

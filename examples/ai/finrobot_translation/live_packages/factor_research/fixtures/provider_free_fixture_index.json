@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-factor-research-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "market_data:ACME_UNIVERSE:offline",
+      "capability": "finance.factor_research.data.market_panel",
+      "path": "fixtures/market_data_ACME_universe_fixture.json",
+      "schema": "schemas/market_data_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "rows": 5
+      }
+    },
+    {
+      "fixture_key": "factor_data:ACME_UNIVERSE:offline",
+      "capability": "finance.factor_research.data.factor_panel",
+      "path": "fixtures/factor_data_ACME_universe_fixture.json",
+      "schema": "schemas/factor_data_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "transforms": 4
+      }
+    },
+    {
+      "fixture_key": "portfolio_exposure:ACME_UNIVERSE:offline",
+      "capability": "finance.factor_research.optimizer.factor_exposure",
+      "path": "fixtures/portfolio_factor_exposure_fixture.json",
+      "schema": "schemas/portfolio_factor_exposure_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "holdings": 3
+      }
+    },
+    {
+      "fixture_key": "agent_handoff:factor_research:offline",
+      "capability": "finance.factor_research.handoff.boundary",
+      "path": "fixtures/agent_handoff_boundary_fixture.json",
+      "schema": "schemas/agent_handoff_boundary_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "handoffs": 3
+      }
+    }
+  ]
+}
+

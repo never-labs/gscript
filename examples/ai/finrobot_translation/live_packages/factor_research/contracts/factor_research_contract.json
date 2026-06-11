@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-factor-research-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "source_module": "experiments/multi_factor_agents.py",
+  "modules": [
+    {
+      "id": "multi_factor_agents",
+      "source_module": "experiments/multi_factor_agents.py",
+      "required_fields": [
+        "request_id",
+        "universe_id",
+        "factor_panel",
+        "ranked_candidates",
+        "portfolio_factor_exposure",
+        "agent_handoff_boundary"
+      ]
+    },
+    {
+      "id": "factor_transforms",
+      "source_module": "factor_transforms.py",
+      "required_fields": [
+        "transform_id",
+        "input_schema",
+        "output_schema",
+        "parameters",
+        "provenance"
+      ]
+    },
+    {
+      "id": "portfolio_factor_exposure",
+      "source_module": "portfolio_factor_exposure.py",
+      "required_fields": [
+        "portfolio_id",
+        "factor_exposures",
+        "sector_exposures",
+        "risk_limits",
+        "source_refs"
+      ]
+    }
+  ],
+  "field_contracts": {
+    "market_data": {
+      "required": [
+        "symbol",
+        "as_of",
+        "close",
+        "volume",
+        "currency",
+        "source_ref"
+      ],
+      "stale_data_warning_required": true
+    },
+    "factor_data": {
+      "required_factors": [
+        "value",
+        "growth",
+        "momentum",
+        "quality",
+        "volatility",
+        "liquidity",
+        "sentiment",
+        "macro"
+      ],
+      "transform_ids": [
+        "winsorize",
+        "zscore",
+        "sector_neutralize",
+        "composite_score"
+      ]
+    },
+    "portfolio_factor_exposure": {
+      "required": [
+        "portfolio_id",
+        "as_of",
+        "factor_exposures",
+        "sector_exposures",
+        "risk_limits",
+        "source_refs"
+      ],
+      "all_source_refs_must_resolve": true
+    },
+    "agent_handoff_boundary": {
+      "required": [
+        "handoff_id",
+        "from_agent",
+        "to_agent",
+        "capability",
+        "fixture_key",
+        "schema",
+        "clean_skip"
+      ],
+      "provider_free_required": true
+    }
+  },
+  "acceptance_gates": [
+    "multi-factor agent orchestration remains fixture replay only",
+    "factor transforms are deterministic and declare parameters",
+    "market data and factor data carry as_of, stale_after, provider, replay_key, and source_ref provenance",
+    "portfolio exposure results include factor vectors, sector rollups, risk limits, and resolvable source refs",
+    "agent handoff boundaries clean-skip when live providers, credentials, or optimizer dependencies are absent"
+  ]
+}
+
