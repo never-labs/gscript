@@ -208,6 +208,34 @@
         "approval policy tests deny live optional integrations unless the matching capability and dependency gate are enabled"
       ],
       "no_built_in_guarantee": true
+    },
+    {
+      "id": "prompt_roles",
+      "package_name": "leia-finrobot-prompt-roles",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/prompt_roles",
+      "planned_directory": "packages/finrobot/prompt_roles",
+      "manifest": "packages/finrobot/prompt_roles/package.manifest.json",
+      "contract": "packages/finrobot/prompt_roles/contracts/prompt_role_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/role_profiles.leia",
+      "capabilities": [
+        "prompt.role.catalog.agent_library",
+        "prompt.role.catalog.prompts",
+        "prompt.role.catalog.utils",
+        "prompt.role.catalog.text_generator_agents",
+        "prompt.role.catalog.equity_agents",
+        "prompt.role.profile.version",
+        "prompt.role.section.output_schema",
+        "prompt.role.termination.convention",
+        "prompt.role.evidence.validation"
+      ],
+      "test_gates": [
+        "prompt catalog fixture tests cover agent_library, prompts, utils, text_generator_agents, and equity_agents without live model calls",
+        "contract tests run with live_network=false and assert role profile versions plus TERMINATE convention",
+        "section output schema fixture tests validate source evidence references without credentials",
+        "provider-free package tests deny external I/O, provider credentials, and external prompt/model SDK imports"
+      ],
+      "no_built_in_guarantee": true
     }
   ],
   "global_test_gates": [

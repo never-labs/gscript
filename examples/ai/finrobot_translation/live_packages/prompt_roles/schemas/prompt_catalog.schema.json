@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/prompt_roles/prompt_catalog.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "source_path", "version", "fixture_key", "capability", "entries"],
+  "properties": {
+    "id": {"enum": ["agent_library", "prompts", "utils", "text_generator_agents", "equity_agents"]},
+    "source_path": {"type": "string", "pattern": "^FinRobot\\."},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "fixture_key": {"type": "string", "pattern": "^prompt_catalog:"},
+    "capability": {"type": "string", "pattern": "^prompt\\.role\\.catalog\\."},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "role_id", "kind", "termination"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "role_id": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "minLength": 1},
+          "termination": {"const": "TERMINATE"}
+        }
+      }
+    }
+  }
+}

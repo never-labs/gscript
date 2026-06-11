@@ -59,6 +59,7 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		"report_renderer":       "leia-finrobot-report-renderer",
 		"web_product":           "leia-finrobot-web-product",
 		"optional_integrations": "leia-finrobot-optional-integrations",
+		"prompt_roles":          "leia-finrobot-prompt-roles",
 	}
 	if len(manifest.Packages) != len(wantPackages) {
 		t.Fatalf("packages = %d, want %d", len(manifest.Packages), len(wantPackages))
@@ -111,6 +112,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"report_renderer":       "report.render.",
 		"web_product":           "web.",
 		"optional_integrations": "integration.optional.",
+		"prompt_roles":          "prompt.role.",
 	}
 	for _, pkg := range manifest.Packages {
 		if len(pkg.Capabilities) < 5 {

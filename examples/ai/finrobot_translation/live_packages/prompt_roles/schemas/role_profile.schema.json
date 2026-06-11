@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/prompt_roles/role_profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "status", "source_catalog", "output_schema", "termination"],
+  "properties": {
+    "id": {"enum": ["Market_Analyst", "Expert_Investor", "Data_Analyst", "Report_Section_Writer"]},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["fixture_locked", "deprecated", "candidate"]},
+    "source_catalog": {"enum": ["agent_library", "text_generator_agents"]},
+    "output_schema": {"enum": ["role_handoff_v1", "section_agent_output_v1"]},
+    "termination": {"const": "TERMINATE"}
+  }
+}
