@@ -482,6 +482,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		}
 		return runAgentConfig(args[0].Table())
 	})
+	registerLLMSectionHelpers(t, runAgentConfig)
 
 	set("agent", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsFunction() {
