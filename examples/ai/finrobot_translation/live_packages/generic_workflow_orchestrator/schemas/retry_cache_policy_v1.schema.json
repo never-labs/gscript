@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowRetryCachePolicyV1",
+  "type": "object",
+  "required": [
+    "retry_policy",
+    "cache_policy"
+  ],
+  "properties": {
+    "retry_policy": {
+      "type": "object"
+    },
+    "cache_policy": {
+      "type": "object"
+    }
+  }
+}
+

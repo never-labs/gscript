@@ -1,0 +1,60 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "workflow_id": "generic_orchestration_graph_v1",
+  "run_id": "run_generic_orchestration_fixture_001",
+  "stage_io": [
+    {
+      "stage_id": "plan",
+      "input_ref": "workflow_request",
+      "input_shape": {
+        "topic": "offline workflow replay",
+        "requested_outputs": [
+          "summary",
+          "trace"
+        ]
+      },
+      "output_ref": "planned_stage_batch",
+      "output_shape": {
+        "planned_stage_ids": [
+          "execute",
+          "handoff",
+          "finalize"
+        ]
+      },
+      "status": "completed",
+      "fixture_key": "generic_workflow:stage:plan:offline",
+      "attempt": 1,
+      "max_attempts": 1,
+      "cache_key": "run_generic_orchestration_fixture_001:plan",
+      "cache_state": "miss",
+      "trace_event_id": "evt_plan_completed"
+    },
+    {
+      "stage_id": "execute",
+      "input_ref": "planned_stage_batch",
+      "input_shape": {
+        "planned_stage_ids": [
+          "execute",
+          "handoff",
+          "finalize"
+        ]
+      },
+      "output_ref": "execution_outputs",
+      "output_shape": {
+        "items": [
+          "offline_summary",
+          "offline_artifact_manifest"
+        ]
+      },
+      "status": "completed",
+      "fixture_key": "generic_workflow:stage:execute:offline",
+      "attempt": 1,
+      "max_attempts": 1,
+      "cache_key": "run_generic_orchestration_fixture_001:execute",
+      "cache_state": "hit",
+      "trace_event_id": "evt_execute_completed"
+    }
+  ]
+}
+

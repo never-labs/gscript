@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowTraceEmissionHooksV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "hooks"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "hooks": {
+      "type": "array"
+    }
+  }
+}
+

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowHandoffTraceV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "handoffs"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "handoffs": {
+      "type": "array"
+    }
+  }
+}
+

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowResultV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "workflow_id",
+    "run_id",
+    "status",
+    "stage_results",
+    "trace_refs"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "workflow_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "stage_results": {
+      "type": "array"
+    },
+    "trace_refs": {
+      "type": "array"
+    }
+  }
+}
+

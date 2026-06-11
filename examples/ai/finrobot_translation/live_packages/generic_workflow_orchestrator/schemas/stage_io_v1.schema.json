@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowStageIOV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "stage_io"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "stage_io": {
+      "type": "array"
+    }
+  }
+}
+

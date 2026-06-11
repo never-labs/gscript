@@ -1,0 +1,33 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "workflow_id": "generic_orchestration_graph_v1",
+  "run_id": "run_generic_orchestration_fixture_001",
+  "handoffs": [
+    {
+      "from_stage": "plan",
+      "to_stage": "execute",
+      "payload_ref": "planned_stage_batch",
+      "payload_schema": "stage_io",
+      "status": "accepted",
+      "trace_event_id": "evt_handoff_plan_execute"
+    },
+    {
+      "from_stage": "execute",
+      "to_stage": "handoff",
+      "payload_ref": "execution_outputs",
+      "payload_schema": "stage_io",
+      "status": "accepted",
+      "trace_event_id": "evt_handoff_execute_handoff"
+    },
+    {
+      "from_stage": "handoff",
+      "to_stage": "finalize",
+      "payload_ref": "handoff_trace",
+      "payload_schema": "handoff_trace",
+      "status": "accepted",
+      "trace_event_id": "evt_handoff_handoff_finalize"
+    }
+  ]
+}
+
