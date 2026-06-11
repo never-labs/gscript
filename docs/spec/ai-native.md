@@ -61,10 +61,13 @@ dispatch, tracing, and replay paths.
 Lower-level AI helpers such as `llm.workflow`, `llm.step`, `llm.doc`,
 `llm.collection`, `llm.retrieve`, `llm.context`, `llm.evidence`, `llm.schema`,
 `llm.output_schema`, `llm.schema_info`, `llm.handoff`, `llm.delegate`, and
-`llm.sections` are part of the same runtime layer. They are ordinary functions
-that return ordinary tables, callables, or `(value, err)` pairs. They must not
-introduce separate prompt memory, provider bypasses, hidden network access,
-global document stores, or a second orchestration engine.
+`llm.sections`, `llm.tool_info`, `llm.tool_schema`, `llm.validate_tools`,
+`llm.policy`, `llm.check_policy`, `llm.approval_trace`, and
+`llm.report_artifact_contract` are part of the same runtime layer. They are
+ordinary functions that return ordinary tables, callables, or `(value, err)`
+pairs. They must not introduce separate prompt memory, provider bypasses,
+hidden network access, global document stores, hidden approval stores, report
+renderers, or a second orchestration engine.
 
 This stable lowering is observable without a live provider. A tagged tool must
 preserve helper-visible capability metadata:
@@ -114,6 +117,13 @@ Source code must not embed API keys as string literals. Credentials belong in
 environment variables, host-provided configuration, or a host-owned provider
 factory. Hosts decide whether script-declared provider configuration is
 honored.
+
+The normalized host provider configuration shape is `llm.ProviderConfig` with
+`Name`, `Protocol`, `BaseURL`, `APIKey`, `ProviderModel`, and `Provider`
+fields. Script model aliases are stable routing names. They must not be treated
+as secret scopes, authorization grants, or guarantees that a specific remote
+provider will be used. A host may ignore, rewrite, or reject script-declared
+provider configuration according to policy.
 
 ## Messages And History
 
@@ -187,6 +197,28 @@ The tool function should return `(value, nil)` on success or `(nil, err)` on a
 recoverable tool failure. Tool descriptors may be placed in `tools` lists,
 passed to `llm.dispatch`, inspected with `llm.tool_caps`, or generated from
 ordinary functions with lower-level helpers.
+
+Tool descriptors may also carry contract metadata for validation, inventory,
+and replay:
+
+| Field | Meaning |
+|---|---|
+| `capabilities` | Lower-level option-table alias for `requires`. |
+| `schema` | Optional tool input schema metadata. |
+| `result` / `output` | Script-visible success shape. |
+| `error` | Script-visible structured error shape. |
+| `replay_key` | Stable key template for deterministic fixture lookup. |
+
+`llm.tool_schema(tool_or_tools)` and `llm.tool_info(tool_or_tools)` must expose
+normalized contract tables without executing tool functions. `llm.validate_tools`
+must return `(true, nil)` when every supplied tool has the required contract
+metadata for contract-checked workflows and `(nil, err)` when metadata is
+missing or invalid. The error must be structured and include at least
+`kind: "validation"` plus the failing `tool` and `field` when known.
+
+Tool contracts are advisory metadata. They must not authorize side effects,
+coerce return values, or hide runtime tool errors. Host policy, capability
+checks, and explicit validation remain separate steps.
 
 ## Turns
 
@@ -361,6 +393,25 @@ the tool input schema. If a nested agent returns a pending approval result, tool
 dispatch must surface a structured pending error instead of converting it to
 ordinary tool text.
 
+Agent-as-tool wrappers must expose `trace_contract: "agent_tool.v1"` and must
+attach generic trace nodes to successful or structured-error results when
+available. Trace nodes are ordinary tables with:
+
+| Field | Meaning |
+|---|---|
+| `type` | Node kind such as `agent_tool`, `agent`, `workflow`, or `workflow_step`. |
+| `name` | Node name. |
+| `status` | Node status. |
+| `parent` | Optional parent reference. |
+| `children` | Ordered child trace nodes. |
+| `error` | Structured error table, if any. |
+| `budget` | Budget error copy when the node failed on budget. |
+| `cancel` | Cancellation error copy when the node was cancelled. |
+| `metadata` | Metadata table. |
+
+This result-level trace contract is distinct from host trace sinks. It must not
+require prompt text or tool result text to be present.
+
 ## Output Validation
 
 Agents and turns may request structured output through request fields such as
@@ -394,6 +445,11 @@ are ordinary tables with ordered `docs` and `count`. Retrieval returns local
 matches according to the runtime helper's ranking rules and options such as
 `limit` and `label`.
 
+Document metadata may include `id`, `title`, `source`, `tags`, `sections`, and
+additional script fields. Section maps are ordinary source text fields used by
+retrieval and report assembly helpers; they do not create a global document
+index or hidden memory.
+
 `llm.context` and `llm.evidence` create message wrappers. When a turn, agent, or
 section request contains `context` or `evidence`, the runtime appends the
 corresponding normalized messages before the provider request. These helpers
@@ -419,6 +475,29 @@ generation is a convenience for independent report parts; it does not guarantee
 cross-section consistency, automatic citations, hidden shared memory, or a
 document rendering pipeline.
 
+## Report Artifact Contracts
+
+`llm.report_artifact_contract(opts)` returns an ordinary contract table for
+report-producing workflows. The helper must accept an optional options table
+with `name` and `version` string fields and return a table containing:
+
+| Field | Meaning |
+|---|---|
+| `name` | Contract name. |
+| `version` | Contract version. |
+| `offline_verifiable` | Boolean indicating that the contract can be checked without a live provider. |
+| `renderer_required` | Boolean indicating whether the contract itself requires rendering. |
+| `schemas` | Tables for report sections, chart specs, artifact manifests, and source annotations. |
+| `manifest_template` | Starting manifest table with contract/version metadata. |
+| `required_markers` | Ordered marker names expected in report outputs or manifests. |
+
+The schemas define generic report data boundaries: ordered sections, chart
+intent, artifact metadata, source annotations, freshness warnings, and AI
+disclosure. The helper must not render reports, fetch data, verify citations,
+or encode a product-specific API. Generated report data remains ordinary Leia
+tables and should be validated with `llm.validate_output`, schemas, or ordinary
+assertions.
+
 ## Budgets, Cancellation, And Approval
 
 Budgets may be attached to agent or turn option tables and may also be enforced
@@ -439,6 +518,27 @@ recoverable error when possible.
 Human approval and pause/resume state are runtime features of the `llm` helper
 layer. Dialect syntax must preserve those hooks by lowering through the helper
 layer instead of bypassing it.
+
+`llm.policy(opts)` returns a capability policy table with `kind:
+"capability_policy"`, `version: "capability_policy.v1"`, `default:
+"deny_high_risk"`, `deny`, and optional `allow`. The default denied capability
+classes are `trading`, `portfolio`, `generated-code`, `network`, `credential`,
+and `publish`. `llm.check_policy(tool_or_tools, policy)` must inspect tool
+capability labels and return `(true, nil)` or `(nil, err)`. A denied error must
+have `kind: "policy"` and include the denied `capability`, denied `class`, and
+policy version when known.
+
+Policy checks are runtime gates over declared capabilities. They are not
+credential management, sandboxing, network enforcement, or proof that a tool
+body is harmless. Hosts must still enforce real resource boundaries.
+
+`llm.approval_trace(table)` returns a portable approval replay table with
+`kind: "approval_replay_trace"` and `version: "approval_replay.v1"`. It may
+copy `token`, `pending`, `approval`, `result`, and `policy` fields from the
+input. If the approval contains `ok: true`, the derived decision status is
+`approved`; otherwise it is `denied` and may include `reason`. Approval traces
+are audit/replay data. They must not by themselves resume execution or mutate a
+host approval store.
 
 ## Trace, Record, And Replay
 
@@ -497,6 +597,15 @@ Evaluation reports preserve raw metrics on each case and include top-level
 metric summaries. Boolean metrics are summarized as pass rates. Numeric metrics
 are summarized as count, mean, min, and max. String metrics are summarized as
 category counts. Skipped subcases do not contribute to metric summaries.
+
+The `leia evaluate` CLI may render reports as JSON, text, or HTML; list cases
+without executing them; filter selected cases; record, replay, or update LLM
+replay fixtures; compare against a baseline; and run in gate mode. JSON is the
+stable exchange format for baselines and comparisons. Fixture replay must use
+normalized provider requests after dialect lowering and must fail on request
+mismatch, exhausted fixtures, or leftover unconsumed turns. Evaluation harness
+functions are available only while evaluate blocks run under the harness and
+must not become ordinary runtime globals.
 
 ## Capability Checks
 

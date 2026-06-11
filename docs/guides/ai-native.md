@@ -38,6 +38,24 @@ model {
 Never put API keys in source. Use environment variables or host-injected
 providers.
 
+For portable scripts, keep aliases generic and put provider details behind
+environment variables or host configuration:
+
+```leia
+model {
+    default: "fast"
+    fast: {
+        protocol: "anthropic_compatible"
+        base_url: os.getenv("LEIA_LLM_BASE_URL")
+        api_key: os.getenv("LEIA_LLM_API_KEY")
+        provider_model: os.getenv("LEIA_LLM_MODEL")
+    }
+}
+```
+
+Aliases route requests; they are not permission grants. A host can accept,
+rewrite, or reject script-declared provider configs.
+
 ## One Turn
 
 `turn { ... }` performs exactly one request. It returns `(result, err)` and does
@@ -87,6 +105,28 @@ lookup_runbook := tool {
 Omit `requires` for pure local tools when the host policy allows that.
 Capability-aware hosts can inspect tool metadata before exposing it to a
 provider.
+
+For reusable tools, include the full contract so tests, hosts, and replay
+fixtures can inspect the tool without executing it:
+
+```leia
+lookup_runbook := llm.tool("lookup_runbook", func(service) {
+    return {service: service, steps: {"check metrics", "restart if needed"}}, nil
+}, {
+    params: {"service"}
+    description: "Look up a local runbook."
+    capabilities: {"docs.read", "replay.local"}
+    result: {service: "string", steps: {"string"}}
+    error: {kind: "validation", message: "string"}
+    replay_key: "lookup_runbook:{service}"
+})
+
+info := llm.tool_info({lookup_runbook})
+ok, err := llm.validate_tools({lookup_runbook})
+```
+
+`llm.tool_schema` and `llm.tool_info` are inventory helpers. They do not call
+the tool and they do not authorize side effects.
 
 ## Agents
 
@@ -261,6 +301,16 @@ delegate_review := llm.delegate(reviewer, {
 Delegation is still tool dispatch. The supervisor sees a tool result or a
 structured pending/error result; there is no hidden parallel agent runtime.
 
+Delegated results can carry `trace_contract: "agent_tool.v1"` metadata. Use it
+to audit composition without reading provider prompts:
+
+```leia
+contract_name := delegate_review.trace_contract
+```
+
+Trace nodes use ordinary tables with `type`, `name`, `status`, `parent`,
+`children`, `error`, `budget`, `cancel`, and `metadata`.
+
 ## Retrieval Context
 
 Use `llm.doc`, `llm.collection`, and `llm.retrieve` for small local evidence
@@ -294,6 +344,25 @@ result, err := llm.turn({
 matches. They are useful for prompt assembly, not for access control or durable
 memory. Put only source text into the collection that the current request is
 allowed to send to the provider.
+
+Documents can also hold named sections and provenance fields for report or RAG
+pipelines:
+
+```leia
+policy_doc := llm.document({
+    id: "release_policy"
+    title: "Release policy"
+    source: "docs/release.md"
+    sections: {
+        approval: "Production releases require owner approval."
+        rollback: "Rollback plans must name the on-call."
+    }
+    tags: {"release", "operations"}
+})
+```
+
+The helper only packages local data. Filter secrets, tenant-specific content,
+licensed text, and stale sources before building the collection.
 
 ## Workflows
 
@@ -370,6 +439,31 @@ add prompts, evidence, and output shapes. The helper returns ordered
 prove that sections agree with each other, so validate cross-section invariants
 in ordinary Leia code when that matters.
 
+## Report Artifacts
+
+Use `llm.report_artifact_contract` when an AI workflow produces a report-shaped
+artifact that should be checked offline before rendering or publishing.
+
+```leia
+contract := llm.report_artifact_contract({
+    name: "release_report"
+    version: "report.v1"
+})
+
+section_schema := contract.schemas.report_section
+manifest := contract.manifest_template
+manifest.report_id = "release-2026-06"
+manifest.report_sections = {"summary", "risk"}
+manifest.source_annotations = {}
+manifest.ai_disclosure = "AI-assisted draft reviewed by owner."
+```
+
+The contract covers section records, chart plans, artifact manifests, source
+annotations, freshness warnings, and AI disclosure. It does not render HTML or
+PDF and it does not fetch or verify sources. Validate the tables you produce
+with `llm.validate_output` or normal assertions before handing them to a
+renderer.
+
 ## Budgets, Replay, And Trace
 
 Attach budgets to agent config tables or use lower-level helpers such as
@@ -379,6 +473,21 @@ promise money accounting as a stable script-level budget.
 Budget dimensions are runtime controls such as turns, tool calls, tokens, and
 time. They gate provider and tool work in the AI helper layer; they are not a
 general language statement and do not change normal expression evaluation.
+
+Use policy checks before exposing high-risk tools:
+
+```leia
+policy := llm.policy()
+ok, err := llm.check_policy({lookup_runbook}, policy)
+if err != nil {
+    return nil, err
+}
+```
+
+The default policy denies declared capability classes such as network,
+credential, publish, generated-code, trading, and portfolio actions unless the
+exact capability is allowed. Policy metadata is a runtime gate; the host still
+owns real sandboxing, credentials, network access, and approval storage.
 
 Record and replay are host-side:
 
@@ -408,6 +517,55 @@ resume it through the matching `loop.resume` helper. Keep this at the helper
 layer for now: tagged `agent` and `turn` syntax lowers through the same runtime
 so future review policies do not bypass provider, tool, budget, trace, or
 replay controls.
+
+When you persist a human decision, record a portable approval trace:
+
+```leia
+trace := llm.approval_trace({
+    token: token
+    pending: pending
+    approval: {ok: false, reason: "owner rejected publish"}
+    result: denied
+    policy: policy
+})
+```
+
+The trace is audit data. Resuming execution still happens through the matching
+loop resume helper and host-owned state.
+
+## Evaluation Harness
+
+Use `evaluate` blocks for regression suites that should run through
+`leia evaluate`, not during ordinary script execution.
+
+```leia
+evaluate "answer corpus" {
+    rows := eval.load_jsonl("answer_cases.jsonl")
+    for _, row := range rows {
+        eval.case(row.id, func() {
+            result, err := support(row.question)
+            eval.fail_if(err != nil, "agent failed")
+            eval.metric("correct", result.text == row.expected)
+            eval.metric("chars", #result.text)
+            eval.budget({turns: 2, tokens: 2000})
+        })
+    }
+}
+```
+
+Useful CLI modes:
+
+```bash
+leia evaluate --list examples/evaluate
+leia evaluate --format=json --output report.json examples/evaluate
+leia evaluate --llm-replay testdata/turns.json examples/evaluate
+leia evaluate --baseline baseline.json --gate examples/evaluate
+```
+
+JSON reports are the baseline/comparison format. Replay fixtures match
+normalized provider requests after dialect lowering, so changing from
+`llm.turn` to `turn { ... }` should not require a new fixture unless the actual
+request changes.
 
 ## Live-provider examples
 
