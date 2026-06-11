@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "fixture_key": "python_parity:chart_report_artifact:ACME:offline",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "renderer_dependency_required": false,
+  "clean_skip_without_renderer": true,
+  "source_python_tests": [
+    "finrobot_equity/core/tests/test_chart_renderer.py",
+    "finrobot_equity/core/tests/test_report_artifacts.py"
+  ],
+  "ticker": "ACME",
+  "chart_artifact": {
+    "chart_id": "ACME-candlestick-2026-06-11",
+    "kind": "candlestick",
+    "format": "svg",
+    "mime_type": "image/svg+xml",
+    "width": 1280,
+    "height": 720,
+    "snapshot_hash": "1d7b2a0a74d79d1c8cfab39e89c9d9b73e8cfe9656e8f2d3b4c6a7e9f1023456",
+    "source_refs": ["src-market-bars"],
+    "status": "specified_not_rendered"
+  },
+  "report_artifacts": [
+    {
+      "artifact_id": "ACME-equity-brief-html",
+      "format": "text/html",
+      "uri": "fixture://rendered/ACME-equity-brief.html",
+      "content_hash": "sha256:htmlspecifiednotrendered",
+      "status": "specified_not_rendered"
+    },
+    {
+      "artifact_id": "ACME-equity-brief-pdf",
+      "format": "application/pdf",
+      "uri": "fixture://rendered/ACME-equity-brief.pdf",
+      "content_hash": "sha256:pdfplannednotrendered",
+      "status": "planned_not_rendered"
+    }
+  ],
+  "assertion_intent": {
+    "chart_dimensions_positive": true,
+    "chart_snapshot_hash_required": true,
+    "html_and_pdf_outputs_required": true,
+    "missing_renderer_is_clean_skip": true,
+    "artifact_uris_are_fixture_scoped": true
+  },
+  "provenance": {
+    "provider": "fixture",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_url_redacted": true,
+    "replay_ready": true
+  }
+}
