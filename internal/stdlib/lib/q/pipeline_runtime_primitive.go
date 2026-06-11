@@ -21,6 +21,11 @@ var qRuntimeArrayGatherI64Primitive = qRuntimePrimitiveDescriptor{
 }
 
 func qEvalArrayGatherI64Primitive(array, indexes data.Array) (data.Array, bool, error) {
+	if out, handled, err := data.TryProjectByI64IndexArray(array, indexes); handled || err != nil {
+		shape := qRuntimeArrayPrimitiveShape(qRuntimeArrayGatherI64Primitive, array, indexes)
+		recordRuntimeKernelProbeReason(qRuntimeArrayGatherI64Primitive.kernel, shape, handled, err, qRuntimeArrayGatherI64Primitive.fallbackReason)
+		return out, handled, err
+	}
 	out, handled, err := data.TryGatherByI64IndexArray(array, indexes)
 	shape := qRuntimeArrayPrimitiveShape(qRuntimeArrayGatherI64Primitive, array, indexes)
 	recordRuntimeKernelProbeReason(qRuntimeArrayGatherI64Primitive.kernel, shape, handled, err, qRuntimeArrayGatherI64Primitive.fallbackReason)
