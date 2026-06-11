@@ -57,6 +57,9 @@ func (s *EvalSession) Eval(source string) (any, error) {
 func (s *EvalSession) evalPlanEntry(entry *evalSessionPlan) (any, error) {
 	if entry != nil && entry.executable.Valid() {
 		if out, handled, err := s.state.ExecuteEvalPipelineExecutablePlanRef(&entry.executable); err != nil || handled {
+			if handled && err == nil {
+				recordQEvalDispatch(entry.source, EvalDispatchPipelineBackend)
+			}
 			return out, err
 		}
 	}
