@@ -98,7 +98,7 @@
       "target_packages": [],
       "excluded_scope": [],
       "source_hash": "sha256:04c3646d58a5c0ec5c5139c0f6c510cae5241002114f5de7a0aa4dfd38e6c2ad",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "1ab4953a03e4e9298f844f3c6f0bc7d060a72a09bf75c8963f19c936c1acdf9e"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "b69743bd49341e07e91659a51eac9892b92c841012c4079d5fc5ec7a0245a3f8"}],
       "next_action": "Refresh coverage prose when upstream README changes product or package scope."
     },
     {
@@ -549,7 +549,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_normalizers", "examples/ai/finrobot_translation/live_packages/valuation_engine", "examples/ai/finrobot_translation/live_packages/news_catalyst", "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"],
       "excluded_scope": ["method-by-method pandas/chart/PDF runtime parity"],
       "source_hash": "sha256:11b270c0518bbb7a8a88d1f4b0661c2717cf75a8259fb47c22c5a65441f3f83b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "334706f4ce774509264307aa214734973a2edc89d46ca0866ec35d1535f9e529"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "d80f20494d5cb62bea710ac33a3d66b8e4ecffb1040b3d220a7fc6f295ee9626"}],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
     },
     {
@@ -626,7 +626,7 @@
       "target_packages": [],
       "excluded_scope": ["logo/image branding assets are not AI dialect behavior"],
       "source_hash": "sha256:c992550027fdbbb5a3b8b12f3d5e65294946f294cd357d71771d468cf44c5c0d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "1ab4953a03e4e9298f844f3c6f0bc7d060a72a09bf75c8963f19c936c1acdf9e"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/README.md", "sha256": "b69743bd49341e07e91659a51eac9892b92c841012c4079d5fc5ec7a0245a3f8"}],
       "next_action": "Only add asset snapshots when UI/product visual parity requires them."
     }
   ]
