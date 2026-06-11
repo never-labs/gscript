@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "finrobot-generic-turn-runner-live-package",
-  "package_name": "leia-finrobot-generic-turn-runner",
+  "package_name": "leia-generic-ai-turn-runner",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for generic AI single-turn request and execution envelopes.",
   "source_mode": "fixture-contract",
@@ -61,7 +61,7 @@
     "q/runtime"
   ],
   "request_contract": {
-    "capability": "generic.ai.turn.request",
+    "dialect_capability": "generic.ai.turn.request",
     "schema": "single_turn_request_v1",
     "turn_model": "single_turn",
     "required_fields": [
@@ -85,7 +85,7 @@
     "provider_free": true
   },
   "execute_contract": {
-    "capability": "ai.turn.execute",
+    "dialect_capability": "ai.turn.execute",
     "schema": "execute_response_envelope_v1",
     "response_envelope_fields": [
       "status",
@@ -153,6 +153,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide generic AI provider execution as a built-in; this package declares provider-free request, execution, tool, and replay contracts only."
+    "statement": "Leia core does not provide generic AI provider execution as a built-in; leia-generic-ai-turn-runner declares provider-free request, execution, tool, and replay contracts only."
   }
 }

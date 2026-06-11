@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
   "id": "generic-ai-model-registry",
+  "package_name": "leia-generic-ai-model-registry",
   "package": "example.com/leia/examples/ai/finrobot-translation/live-packages/generic-model-registry",
   "version": "0.1.0-provider-free-skeleton",
-  "capability_id": "generic.ai.model.registry",
+  "dialect_capability_id": "generic.ai.model.registry",
   "provider_free": true,
   "domain_specific": false,
   "live_network": false,
@@ -14,7 +15,7 @@
   "contract_root": "contracts",
   "source_index_entry": {
     "index": "examples/ai/finrobot_translation/ai_dialect_index/index.json",
-    "capability_id": "generic.ai.model.registry",
+    "dialect_capability_id": "generic.ai.model.registry",
     "missing_boundary_package_id": "generic-ai-model-registry",
     "resolved_boundary": "provider-free live package skeleton"
   },
@@ -29,6 +30,12 @@
     "execution_descriptor": "schemas/execution_descriptor_v1.schema.json",
     "redaction_policy": "schemas/redaction_policy_v1.schema.json"
   },
+  "capabilities": [
+    "generic.ai.model.registry",
+    "generic.ai.model.alias.resolve",
+    "generic.ai.model.descriptor.replay",
+    "generic.ai.model.redaction.policy"
+  ],
   "default_policy": {
     "mode": "fixture_replay",
     "provider_policy": "provider-free",

@@ -23,7 +23,11 @@ type genericAgentRunnerManifest struct {
 	Schemas                     map[string]string `json:"schemas"`
 	Fixtures                    map[string]string `json:"fixtures"`
 	Capabilities                []string          `json:"capabilities"`
-	BackendShape                string            `json:"backend_shape"`
+	DialectBackendShape         string            `json:"dialect_backend_shape"`
+	NoBuiltInGuarantee          struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
 }
 
 func TestGenericAgentRunnerLivePackageManifest(t *testing.T) {
@@ -34,8 +38,8 @@ func TestGenericAgentRunnerLivePackageManifest(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-agent-runner-live-package" {
 		t.Fatalf("manifest header = %#v", manifest)
 	}
-	if manifest.PackageName != "leia-generic-ai-agent-runner" || manifest.BackendShape != "ai.agent.run" {
-		t.Fatalf("manifest package/backend = %q/%q", manifest.PackageName, manifest.BackendShape)
+	if manifest.PackageName != "leia-generic-ai-agent-runner" || manifest.DialectBackendShape != "ai.agent.run" {
+		t.Fatalf("manifest package/backend = %q/%q", manifest.PackageName, manifest.DialectBackendShape)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
 		t.Fatalf("manifest must be provider-free: %#v", manifest)
@@ -63,6 +67,10 @@ func TestGenericAgentRunnerLivePackageManifest(t *testing.T) {
 		if !contains(manifest.Capabilities, want) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
+	}
+	if !manifest.NoBuiltInGuarantee.Required ||
+		!strings.Contains(manifest.NoBuiltInGuarantee.Statement, manifest.PackageName) {
+		t.Fatalf("no_built_in_guarantee inconsistent: %#v", manifest.NoBuiltInGuarantee)
 	}
 }
 

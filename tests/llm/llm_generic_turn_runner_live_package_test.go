@@ -38,7 +38,7 @@ type genericTurnRunnerManifest struct {
 		TestRule             string   `json:"test_rule"`
 	} `json:"provider_gate"`
 	RequestContract struct {
-		Capability          string   `json:"capability"`
+		DialectCapability   string   `json:"dialect_capability"`
 		Schema              string   `json:"schema"`
 		TurnModel           string   `json:"turn_model"`
 		RequiredFields      []string `json:"required_fields"`
@@ -47,7 +47,7 @@ type genericTurnRunnerManifest struct {
 		ProviderFree        bool     `json:"provider_free"`
 	} `json:"request_contract"`
 	ExecuteContract struct {
-		Capability             string   `json:"capability"`
+		DialectCapability      string   `json:"dialect_capability"`
 		Schema                 string   `json:"schema"`
 		ResponseEnvelopeFields []string `json:"response_envelope_fields"`
 		UsageFields            []string `json:"usage_fields"`
@@ -69,6 +69,10 @@ type genericTurnRunnerManifest struct {
 		ProviderCredentialsRequired bool     `json:"provider_credentials_required"`
 		LiveNetwork                 bool     `json:"live_network"`
 	} `json:"replay_match_contract"`
+	NoBuiltInGuarantee struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
 }
 
 func TestGenericTurnRunnerManifestContracts(t *testing.T) {
@@ -78,7 +82,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-turn-runner-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.PackageName != "leia-finrobot-generic-turn-runner" {
+	if manifest.PackageName != "leia-generic-ai-turn-runner" {
 		t.Fatalf("package_name = %q", manifest.PackageName)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault {
@@ -102,7 +106,11 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
 	}
-	if manifest.RequestContract.Capability != "generic.ai.turn.request" ||
+	if !manifest.NoBuiltInGuarantee.Required ||
+		!strings.Contains(manifest.NoBuiltInGuarantee.Statement, "generic AI provider execution") {
+		t.Fatalf("no_built_in_guarantee inconsistent: %#v", manifest.NoBuiltInGuarantee)
+	}
+	if manifest.RequestContract.DialectCapability != "generic.ai.turn.request" ||
 		manifest.RequestContract.Schema != "single_turn_request_v1" ||
 		manifest.RequestContract.TurnModel != "single_turn" ||
 		!manifest.RequestContract.ProviderFree {
@@ -123,7 +131,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 			t.Fatalf("response_format modes missing %q: %#v", want, manifest.RequestContract.ResponseFormatModes)
 		}
 	}
-	if manifest.ExecuteContract.Capability != "ai.turn.execute" ||
+	if manifest.ExecuteContract.DialectCapability != "ai.turn.execute" ||
 		manifest.ExecuteContract.Schema != "execute_response_envelope_v1" ||
 		!manifest.ExecuteContract.ProviderFree {
 		t.Fatalf("execute contract incomplete: %#v", manifest.ExecuteContract)

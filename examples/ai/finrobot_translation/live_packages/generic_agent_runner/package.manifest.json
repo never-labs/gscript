@@ -38,7 +38,7 @@
     "Leia smoke example executes in interpreter and bytecode modes",
     "no q runtime, provider SDK, live network, or secret dependency"
   ],
-  "backend_shape": "ai.agent.run",
+  "dialect_backend_shape": "ai.agent.run",
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide built-in generic AI agent execution; leia-generic-ai-agent-runner defines the provider-free package boundary."

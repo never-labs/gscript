@@ -11,9 +11,10 @@ import (
 type genericModelRegistryManifest struct {
 	SchemaVersion         int    `json:"schema_version"`
 	ID                    string `json:"id"`
+	PackageName           string `json:"package_name"`
 	Package               string `json:"package"`
 	Version               string `json:"version"`
-	CapabilityID          string `json:"capability_id"`
+	DialectCapabilityID   string `json:"dialect_capability_id"`
 	ProviderFree          bool   `json:"provider_free"`
 	DomainSpecific        bool   `json:"domain_specific"`
 	LiveNetwork           bool   `json:"live_network"`
@@ -24,12 +25,13 @@ type genericModelRegistryManifest struct {
 	ContractRoot          string `json:"contract_root"`
 	SourceIndexEntry      struct {
 		Index                    string `json:"index"`
-		CapabilityID             string `json:"capability_id"`
+		DialectCapabilityID      string `json:"dialect_capability_id"`
 		MissingBoundaryPackageID string `json:"missing_boundary_package_id"`
 		ResolvedBoundary         string `json:"resolved_boundary"`
 	} `json:"source_index_entry"`
 	Entrypoints   map[string]string `json:"entrypoints"`
 	Schemas       map[string]string `json:"schemas"`
+	Capabilities  []string          `json:"capabilities"`
 	DefaultPolicy struct {
 		Mode                        string `json:"mode"`
 		ProviderPolicy              string `json:"provider_policy"`
@@ -82,7 +84,11 @@ type genericModelRegistryManifest struct {
 		CapabilityFlags             []string `json:"capability_flags"`
 		RedactionPolicyRef          string   `json:"redaction_policy_ref"`
 	} `json:"execution_descriptors"`
-	TestGates []string `json:"test_gates"`
+	TestGates          []string `json:"test_gates"`
+	NoBuiltInGuarantee struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
 }
 
 func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
@@ -92,17 +98,34 @@ func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-model-registry" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if manifest.CapabilityID != "generic.ai.model.registry" || manifest.DomainSpecific {
+	if manifest.PackageName != "leia-generic-ai-model-registry" {
+		t.Fatalf("package_name = %q", manifest.PackageName)
+	}
+	if manifest.DialectCapabilityID != "generic.ai.model.registry" || manifest.DomainSpecific {
 		t.Fatalf("capability boundary is not generic model registry: %#v", manifest)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetwork || manifest.RealDependencyImports || manifest.LiveModelCalls {
 		t.Fatalf("provider-free defaults broken: provider_free=%v live_network=%v imports=%v live_model_calls=%v", manifest.ProviderFree, manifest.LiveNetwork, manifest.RealDependencyImports, manifest.LiveModelCalls)
 	}
 	if manifest.SourceIndexEntry.Index == "" ||
-		manifest.SourceIndexEntry.CapabilityID != "generic.ai.model.registry" ||
+		manifest.SourceIndexEntry.DialectCapabilityID != "generic.ai.model.registry" ||
 		manifest.SourceIndexEntry.MissingBoundaryPackageID != "generic-ai-model-registry" ||
 		!strings.Contains(manifest.SourceIndexEntry.ResolvedBoundary, "provider-free") {
 		t.Fatalf("source index mapping incomplete: %#v", manifest.SourceIndexEntry)
+	}
+	for _, want := range []string{
+		"generic.ai.model.registry",
+		"generic.ai.model.alias.resolve",
+		"generic.ai.model.descriptor.replay",
+		"generic.ai.model.redaction.policy",
+	} {
+		if !contains(manifest.Capabilities, want) {
+			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
+		}
+	}
+	if !manifest.NoBuiltInGuarantee.Required ||
+		!strings.Contains(manifest.NoBuiltInGuarantee.Statement, manifest.PackageName) {
+		t.Fatalf("no_built_in_guarantee inconsistent: %#v", manifest.NoBuiltInGuarantee)
 	}
 	for _, rel := range []string{
 		manifest.Entrypoints["main"],
