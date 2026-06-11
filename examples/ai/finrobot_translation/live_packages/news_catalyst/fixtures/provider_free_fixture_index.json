@@ -15,7 +15,16 @@
         "as_of": "2026-06-11",
         "replay_ready": true,
         "contains_news_relevance": true,
-        "contains_source_ranking": true
+        "contains_source_ranking": true,
+        "calibration_coverage": [
+          "conflicting_news",
+          "recency_decay",
+          "source_trust",
+          "earnings_guidance_regulatory_category_conflict",
+          "retail_sentiment_conflict",
+          "expected_ranking_output",
+          "explainable_score_components"
+        ]
       }
     },
     {
@@ -27,6 +36,7 @@
         "ticker": "ACME",
         "as_of": "2026-06-11",
         "replay_ready": true,
+        "contains_conflicting_platform_sentiment": true,
         "platforms": [
           "polymarket",
           "x_social",
