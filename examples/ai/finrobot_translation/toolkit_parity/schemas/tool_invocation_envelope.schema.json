@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "generic_ai_tool_invocation_envelope_v1",
+  "provider_free": true,
+  "domain": "generic_ai_tool_dialect",
+  "description": "Provider-free envelope for advertising and invoking an AI tool.",
+  "required": [
+    "tool_name",
+    "caller_id",
+    "executor_id",
+    "capability_ids",
+    "arguments"
+  ],
+  "canonical_fields": [
+    "tool_name",
+    "description",
+    "caller_id",
+    "executor_id",
+    "capability_ids",
+    "input_schema",
+    "arguments",
+    "output_adapter",
+    "registration_source"
+  ],
+  "field_types": {
+    "tool_name": "string",
+    "description": "string",
+    "caller_id": "string",
+    "executor_id": "string",
+    "capability_ids": "array<string>",
+    "input_schema": "object",
+    "arguments": "object",
+    "output_adapter": "string",
+    "registration_source": "string"
+  },
+  "additional_properties": false,
+  "missing_required_policy": "reject_invocation",
+  "capability_policy": "capability_ids must be declared by the registry entry before execution"
+}

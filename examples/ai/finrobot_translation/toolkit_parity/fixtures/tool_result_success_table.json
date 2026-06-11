@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "tool_name": "sample_table_tool",
+  "output_format": "table",
+  "content": "symbol  fiscal_year  revenue\nACME    2026         125.4",
+  "table": {
+    "columns": [
+      "symbol",
+      "fiscal_year",
+      "revenue"
+    ],
+    "rows": [
+      {
+        "symbol": "ACME",
+        "fiscal_year": 2026,
+        "revenue": 125.4
+      }
+    ]
+  },
+  "provenance": {
+    "adapter": "table",
+    "source_behavior": "DataFrame.to_string",
+    "provider_free": true
+  }
+}
