@@ -39,7 +39,8 @@
     "source_evidence_validation": "schemas/source_evidence_validation.schema.json"
   },
   "fixtures": {
-    "index": "fixtures/provider_free_fixture_index.json"
+    "index": "fixtures/provider_free_fixture_index.json",
+    "prompt_template_drift_corpus": "fixtures/prompt_template_drift_corpus.json"
   },
   "capabilities": [
     "prompt.role.catalog.agent_library",
@@ -50,7 +51,8 @@
     "prompt.role.profile.version",
     "prompt.role.section.output_schema",
     "prompt.role.termination.convention",
-    "prompt.role.evidence.validation"
+    "prompt.role.evidence.validation",
+    "prompt.role.template.drift_corpus"
   ],
   "prompt_catalogs": [
     {
@@ -129,7 +131,8 @@
     "required and optional credentials are empty",
     "fixture contract covers agent_library, prompts, utils, text_generator_agents, and equity_agents prompt catalogs",
     "role profiles declare semantic versions and TERMINATE completion convention",
-    "section agent output schema and source evidence validation fixtures are provider-free"
+    "section agent output schema and source evidence validation fixtures are provider-free",
+    "prompt template drift corpus covers trigger parsing, template snapshots, response shape drift, source evidence, and TERMINATE literal drift"
   ],
   "no_built_in_guarantee": {
     "required": true,

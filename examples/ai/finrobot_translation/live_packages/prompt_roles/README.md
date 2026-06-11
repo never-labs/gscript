@@ -5,6 +5,9 @@ migration work. It covers prompt catalogs from `agent_library`, `prompts`,
 `utils`, `text_generator_agents`, and `equity_agents`; role profile versioning;
 section-agent output shape; the `TERMINATE` completion convention; and source
 evidence validation.
+It also includes a provider-free prompt/template drift corpus for trigger
+parsing, role and section template snapshots, response-shape drift, evidence
+validator cases, and `TERMINATE` convention drift.
 
 The package is intentionally fixture-only:
 

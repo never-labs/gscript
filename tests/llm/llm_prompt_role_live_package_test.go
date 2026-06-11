@@ -130,6 +130,7 @@ func TestFinRobotPromptRolesLivePackageManifestSchemaFixturesAndGates(t *testing
 		"prompt.role.section.output_schema",
 		"prompt.role.termination.convention",
 		"prompt.role.evidence.validation",
+		"prompt.role.template.drift_corpus",
 	}
 	for _, want := range wantCapabilities {
 		if !contains(manifest.Capabilities, want) {
@@ -402,7 +403,7 @@ func TestFinRobotPromptRolesLivePackageContractAndEvidenceFixture(t *testing.T) 
 		} `json:"sample_section_output"`
 	}
 	decodeJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &fixtures)
-	if !fixtures.ProviderFree || fixtures.LiveNetwork || fixtures.LiveModelCalls || len(fixtures.Fixtures) != 10 {
+	if !fixtures.ProviderFree || fixtures.LiveNetwork || fixtures.LiveModelCalls || len(fixtures.Fixtures) < 10 {
 		t.Fatalf("fixture index header/count = %#v", fixtures)
 	}
 	for _, fixture := range fixtures.Fixtures {

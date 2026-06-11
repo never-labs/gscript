@@ -75,6 +75,20 @@
       "schema": "delegation_trigger_examples_v1",
       "path": "fixtures/provider_free_fixture_index.json#/delegation_trigger_parse_examples",
       "metadata": {"case_count": 4, "replay_ready": true}
+    },
+    {
+      "fixture_key": "prompt_template_drift:corpus:v1",
+      "capability": "prompt.role.template.drift_corpus",
+      "schema": "prompt_template_drift_corpus_v1",
+      "path": "fixtures/prompt_template_drift_corpus.json",
+      "metadata": {
+        "trigger_cases": 4,
+        "template_snapshots": 3,
+        "response_drift_cases": 4,
+        "evidence_cases": 4,
+        "termination_cases": 6,
+        "replay_ready": true
+      }
     }
   ],
   "delegation_trigger_parse_examples": [
