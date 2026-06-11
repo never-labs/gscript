@@ -164,7 +164,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/vendor_adapters", "examples/ai/finrobot_translation/live_packages/finance_facade"],
       "excluded_scope": ["AutoGen caller/executor registration side effects"],
       "source_hash": "sha256:79a5c67d9c44b49fdb4b21e7d9fd678e6c9e17cce4b12c642d28911e5553458f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json", "sha256": "b7f682225bc0b871ca72c9b0308c46d8ced4d8d3b028e9ea9ae5bd0b1fc3789e"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json", "sha256": "a20a21119ff7f926bcea89cf42f29b520682b6db4ebab59b5c7df6117d8c6374"}],
       "next_action": "Implement live tool invocation only inside provider packages with explicit capabilities."
     },
     {
@@ -494,7 +494,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
       "excluded_scope": ["starting a live web server"],
       "source_hash": "sha256:fc79b4e0a0cff13e8e80a65d0a952e3a7a7c460263e4b179f3343597d28e1abf",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "ae7e80021b3b78582b53430758b6a13d915615c46a8e96af6453a10451f925a9"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "1350264a5f97bc2c8a300bc7faf70501d8deab970562d97a0217ca562fad4bb9"}],
       "next_action": "Promote route/auth/task workflow into the product workflow package."
     },
     {
@@ -516,7 +516,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/analytics_report", "examples/ai/finrobot_translation/live_packages/report_renderer"],
       "excluded_scope": ["live report assembly side effects"],
       "source_hash": "sha256:a7c46876da3c7dbf34f2396112bec7bf9b3ebf7b51a2c60b15065b424c15186d",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json", "sha256": "65a0ce8c54d0e90ca97a95b1e0ba03a391ae7bb43516757d1646e9ed5a5ef1ce"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json", "sha256": "d12e05f29e888b254d6041a658f086689bec76f479141c6fe9c317fe03388450"}],
       "next_action": "Implement report assembly in a package after renderer and chart packages are ready."
     },
     {
@@ -549,7 +549,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/finance_normalizers", "examples/ai/finrobot_translation/live_packages/valuation_engine", "examples/ai/finrobot_translation/live_packages/news_catalyst", "examples/ai/finrobot_translation/live_packages/html_ui_snapshots"],
       "excluded_scope": ["method-by-method pandas/chart/PDF runtime parity"],
       "source_hash": "sha256:11b270c0518bbb7a8a88d1f4b0661c2717cf75a8259fb47c22c5a65441f3f83b",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "fe0482eca6aefa9bf1dabc0ef5d2d21b4c9d032130b09c050de73ff0a7c651f2"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_package_plan_manifest.json", "sha256": "d13bb12c303fb90be18c533a47e941c4452287fdb514d19f3aadb0842febed70"}],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
     },
     {
@@ -571,7 +571,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/product_workflow"],
       "excluded_scope": ["real FastAPI/Flask server, auth, background workers"],
       "source_hash": "sha256:6937cfa273da7ee648af548fa34dc1349e8dc62f5558f74bc11e66cc846e8767",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "ae7e80021b3b78582b53430758b6a13d915615c46a8e96af6453a10451f925a9"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json", "sha256": "1350264a5f97bc2c8a300bc7faf70501d8deab970562d97a0217ca562fad4bb9"}],
       "next_action": "Implement product workflow package with route, auth, task, log, and download gates."
     },
     {
@@ -593,7 +593,7 @@
       "target_packages": ["examples/ai/finrobot_translation/live_packages/html_ui_snapshots", "examples/ai/finrobot_translation/live_packages/product_workflow"],
       "excluded_scope": ["full rendered template visual parity"],
       "source_hash": "sha256:b842b78c9cc263837c6067036ca0ec6c47f97c44cb562ed4918f5b89a7f1623f",
-      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/package.manifest.json", "sha256": "25e069b28423abda302ba71ddaf660afbc97592e9f251408b057827e5ca0fc42"}],
+      "fixture_hashes": [{"path": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/package.manifest.json", "sha256": "a0b91a3c8e79381704c66137d0ec6d3e60aa154cdcc943af977c51b6e1c5ad46"}],
       "next_action": "Add rendered page snapshots and accessibility assertions in the UI snapshot package."
     },
     {

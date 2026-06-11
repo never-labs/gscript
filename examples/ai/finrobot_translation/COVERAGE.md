@@ -7,7 +7,7 @@ Baseline:
 - Leia branch: `origin/codex/ai-dialect-polish` at `b3b6088d`.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 448 files, including 22
+- Current translation directory file count: 463 files, including 22
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 65 runnable/checkable examples discovered by
@@ -181,7 +181,7 @@ mistaken for missing language/runtime support.
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
 | Registered example inventory | 65 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 448 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| File inventory | 463 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 56 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 3 `evaluate` examples for equity CLI workflow and web product smoke metadata | Complete |
