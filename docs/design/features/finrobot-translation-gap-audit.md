@@ -15,6 +15,13 @@ Sources reviewed:
   https://github.com/AI4Finance-Foundation/FinRobot
 - FinRobot paper, arXiv 2405.14767:
   https://arxiv.org/abs/2405.14767
+- Local audit source: `.external/FinRobot`, including `finrobot`,
+  `finrobot_equity`, experiments, tutorials, deployment scripts, and tests.
+
+Detailed working ledgers live in:
+
+- `examples/ai/finrobot_translation/README.md`
+- `examples/ai/finrobot_translation/GAPS.md`
 
 ## FinRobot Feature Inventory
 
@@ -143,6 +150,61 @@ Coding and notebook tools:
 - execute Python cells in IPython;
 - display generated images;
 - beginner and advanced Jupyter tutorials.
+
+## Full Module Ledger
+
+The full module-by-module translation ledger is maintained in
+`examples/ai/finrobot_translation/README.md`. The ledger records, for every
+reviewed FinRobot module, its Leia translation target, current completion
+status, gap categories, priority, and validation method.
+
+Audit coverage:
+
+| Area | Reviewed modules | Leia target | Current status | Top gap classes |
+| --- | --- | --- | --- | --- |
+| Core agent roles and workflows | `finrobot/agents/agent_library.py`, `workflow.py`, `prompts.py`, `utils.py` | Role data, generic `agent`, agent-as-tool composition, `workflow`, trace, replay, approval gates | Partial | AI dialect, stdlib |
+| Tool registration | `finrobot/toolkits.py` plus function/class toolkit configs | Typed `tool` declarations with schemas, capabilities, structured errors, output adapters, replay keys | Partial | AI dialect, stdlib |
+| Market and filing data sources | `yfinance_utils.py`, `finnhub_utils.py`, `fmp_utils.py`, `sec_utils.py`, `finance_data.py`, `filings_src/*` | External provider packages over `api`, `web`, JSON/CSV/table, file, document, and provenance APIs | Open | stdlib, external library |
+| Text, RAG, coding, charting, quantitative, and report helpers | `finrobot/functional/*` | Generic RAG/document/chart/report/code-exec packages plus finance prompt/report assets | Partial/Open | AI dialect, stdlib, external library, product layer |
+| Experiments and tutorials | `experiments/*`, `tutorials_beginner/*`, `tutorials_advanced/*`, demos/tests | Replay-backed Leia examples with optional live-provider gates | Open | AI dialect, stdlib, external library |
+| Config, packaging, and deployment | `configs/*`, `OAI_CONFIG_LIST`, `config_api_keys`, `requirements*.txt`, `setup.py`, `Dockerfile`, `deploy*.sh`, `run_web_app.py` | Config/env/secret examples, package metadata, optional deployment/product docs | Partial/Open | AI dialect, stdlib, product layer |
+| Equity product pipeline | `finrobot_equity/README.md`, `core/src/generate_financial_analysis.py`, `create_equity_report.py`, `generate_pdf_report.py` | Named workflow stages for fetch, normalize, forecast, AI section generation, chart/report artifacts, evaluate/replay | Open | AI dialect, stdlib, external library, product layer |
+| Equity analytics modules | `market_data_api.py`, `financial_data_processor.py`, `valuation_engine.py`, `sensitivity_analyzer.py`, `catalyst_analyzer.py`, `news_integrator.py`, `retail_sentiment_client.py` | Finance data, valuation, sensitivity, catalyst, sentiment, news, and vendor adapter packages | Open | stdlib, external library |
+| Equity AI section agents | `text_generator_agents.py`, `enhanced_text_generator.py`, `equity_agents/*` | Section-specific `agent` package data with output schemas and replay records | Partial | AI dialect, external library |
+| Equity charts and reports | `chart_generator.py`, `enhanced_chart_generator.py`, `html_renderer.py`, `html_template_professional.py`, `pdf_generator.py`, `professional_pdf_report.py`, `report_structure.py`, `report_data_loader.py`, `common_utils.py` | Chart/report/document packages with provenance, required sections, stale-data checks, and AI disclosure markers | Open/Partial | stdlib, external library, product layer |
+| Equity web app | `finrobot_equity/web_app/*` | Product package for FastAPI routes, auth, admin, logs, SQLite CRUD, report history/downloads, templates/static assets | Open | stdlib, product layer |
+
+Current completion status means translation audit status, not executable runtime
+support. No runtime support is added by this audit.
+
+## Gap Ledger
+
+The actionable gap backlog is maintained in
+`examples/ai/finrobot_translation/GAPS.md`.
+
+Priority summary:
+
+- P0: typed tools, trace/replay, config/secrets, API/web fixtures, typed data
+  tables, SEC/document parsing, RAG, report artifacts, equity pipeline
+  workflow, safety approvals, and provider-free evaluation.
+- P1: model routing policy, valuation/sensitivity/chart/report packages,
+  section agents, generated-code tooling, and substantial tutorial parity.
+- P2: optional providers, advanced experiments, Backtrader/mplfinance/OpenBB,
+  deployment, web app product flows, and packaging.
+- P3: UI/static asset parity after product workflow parity exists.
+
+Validation strategy:
+
+- every P0 row must have a provider-free replay fixture;
+- every external provider adapter must have recorded success, failure,
+  rate-limit/auth, and schema-mismatch fixtures;
+- every report/chart artifact must carry source, timestamp, provider,
+  transformation history, artifact ID, AI-generated-section marker where
+  applicable, and required-section validation;
+- every high-risk operation, including trading, portfolio changes, generated
+  code execution, network calls, credentials, and report publication, must be
+  declared through capabilities and approval policy;
+- live-provider tests remain optional and capability-gated.
 
 ## Leia Mapping
 
