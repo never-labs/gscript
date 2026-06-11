@@ -1,6 +1,7 @@
 package q
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -243,5 +244,33 @@ func TestQApplyIndexScalarFastPathRecordsRuntimeStats(t *testing.T) {
 	}
 	if typedArrayScalarHits != 2 {
 		t.Fatalf("typed array scalar hits=%d; stats=%#v", typedArrayScalarHits, RuntimeKernelExecutionStats())
+	}
+}
+
+func TestQArrayIndexVectorProjectsCarrierThroughRuntimePrimitive(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	values := data.NewEncodedSymbols([]data.Symbol{"AAPL", "MSFT", "NVDA", "AAPL"})
+	indexes := data.NewI64([]int64{3, 0, 2})
+	out, handled, err := qEvalArrayGatherI64Primitive(values, indexes)
+	if err != nil || !handled {
+		t.Fatalf("qEvalArrayGatherI64Primitive handled=%v err=%v", handled, err)
+	}
+	if _, ok := data.EncodedCodesOf(out); !ok {
+		t.Fatalf("carrier project returned %T, want encoded carrier", out)
+	}
+	if got, want := out.Values(), []any{data.Symbol("AAPL"), data.Symbol("AAPL"), data.Symbol("NVDA")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("projected values = %#v, want %#v", got, want)
+	}
+
+	seen := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayGatherI64Indexes" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && strings.HasPrefix(stat.Shape, "gather/symbol/i64") {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("missing ArrayGatherI64Indexes typed hit: %#v", RuntimeKernelExecutionStats())
 	}
 }
