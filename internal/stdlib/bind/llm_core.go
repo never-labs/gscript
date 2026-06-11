@@ -254,6 +254,34 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 	}
 	set("tool_schema", toolSchema)
 	set("toolSchema", toolSchema)
+	schemaValue := func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.schema' (schema spec expected)")
+		}
+		return []Value{llmSchemaValue(args[0])}, nil
+	}
+	set("schema", schemaValue)
+	set("schema_info", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.schema_info' (schema spec expected)")
+		}
+		return []Value{llmSchemaInfoValue(args[0])}, nil
+	})
+	set("schemaInfo", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.schemaInfo' (schema spec expected)")
+		}
+		return []Value{llmSchemaInfoValue(args[0])}, nil
+	})
+	outputSchema := func(args []Value) ([]Value, error) {
+		v, err := llmOutputSchemaValue(args)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}
+	set("output_schema", outputSchema)
+	set("outputSchema", outputSchema)
 
 	set("check_tools", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsTable() || !args[1].IsTable() {
@@ -412,12 +440,16 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			value = JSONGoToValue(raw)
 		}
 		if !schema.IsTable() {
-			return []Value{BoolValue(false), StringValue("schema must be a table example")}, nil
+			return []Value{BoolValue(false), StringValue("schema must be a table example or JSON schema")}, nil
 		}
 		if !value.IsTable() {
 			return []Value{BoolValue(false), StringValue("value must decode to a table")}, nil
 		}
-		if msg := llmValidateStructuredOutputShape(schema.Table(), value.Table()); msg != "" {
+		if llmLooksLikeJSONSchema(schema) {
+			if msg := llmValidateStructuredOutputSchema(llmSchemaValue(schema), value, ""); msg != "" {
+				return []Value{BoolValue(false), StringValue(msg)}, nil
+			}
+		} else if msg := llmValidateStructuredOutputShape(schema.Table(), value.Table()); msg != "" {
 			return []Value{BoolValue(false), StringValue(msg)}, nil
 		}
 		return []Value{BoolValue(true), StringValue("")}, nil
