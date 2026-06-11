@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-equity-analysis-pipeline-stage-dag-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "source_module": "finrobot_equity/core/src/generate_financial_analysis.py",
+  "stages": [
+    {
+      "id": "fetch",
+      "depends_on": [],
+      "required_fields": [
+        "ticker",
+        "as_of",
+        "periods",
+        "data_requests",
+        "source_policy"
+      ],
+      "output_fixture": "fixtures/pipeline_input_ACME_fixture.json"
+    },
+    {
+      "id": "normalize",
+      "depends_on": [
+        "fetch"
+      ],
+      "required_fields": [
+        "typed_columns",
+        "rows",
+        "metric_aliases",
+        "quality_checks",
+        "provenance"
+      ],
+      "output_fixture": "fixtures/normalized_financials_ACME_fixture.json"
+    },
+    {
+      "id": "forecast",
+      "depends_on": [
+        "normalize"
+      ],
+      "required_fields": [
+        "forecast_periods",
+        "assumptions",
+        "forecast_rows",
+        "valuation_summary",
+        "provenance"
+      ],
+      "output_fixture": "fixtures/forecast_ACME_fixture.json"
+    },
+    {
+      "id": "section_agents",
+      "depends_on": [
+        "forecast"
+      ],
+      "required_fields": [
+        "agent_roles",
+        "handoff_payloads",
+        "ordered_sections",
+        "evidence_refs",
+        "terminate_convention"
+      ],
+      "output_fixture": "fixtures/section_agent_handoff_ACME_fixture.json"
+    },
+    {
+      "id": "artifact_plan",
+      "depends_on": [
+        "section_agents"
+      ],
+      "required_fields": [
+        "report_id",
+        "artifacts",
+        "source_refs",
+        "trace_refs",
+        "disclosures"
+      ],
+      "output_fixture": "fixtures/artifact_manifest_ACME_fixture.json"
+    }
+  ],
+  "dag_edges": [
+    [
+      "fetch",
+      "normalize"
+    ],
+    [
+      "normalize",
+      "forecast"
+    ],
+    [
+      "forecast",
+      "section_agents"
+    ],
+    [
+      "section_agents",
+      "artifact_plan"
+    ]
+  ],
+  "trace_contract": {
+    "schema": "schemas/provider_free_trace_v1.schema.json",
+    "fixture": "fixtures/provider_free_trace_ACME_fixture.json",
+    "required_fields": [
+      "run_id",
+      "stage_events",
+      "provider_free",
+      "live_network",
+      "real_dependency_imports",
+      "artifact_refs"
+    ]
+  },
+  "acceptance_gates": [
+    "stage DAG preserves fetch to normalize to forecast to section_agents to artifact_plan ordering",
+    "all stage outputs are backed by offline fixtures and schemas",
+    "provider-free trace records every stage with live_network=false and real_dependency_imports=false",
+    "artifact plan references forecast and section-agent outputs without rendering or storage side effects"
+  ]
+}

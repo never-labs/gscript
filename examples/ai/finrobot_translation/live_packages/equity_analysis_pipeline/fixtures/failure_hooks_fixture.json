@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "fixture_key": "equity_pipeline:failure_hooks:offline",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "hooks": [
+    {
+      "id": "fetch_provider_unavailable",
+      "stage_id": "fetch",
+      "trigger": "provider_dependency_missing",
+      "fallback_action": "use_recorded_fixture",
+      "status": "clean_skipped_without_provider",
+      "trace_event_id": "evt-fetch-skip"
+    },
+    {
+      "id": "normalization_missing_metric",
+      "stage_id": "normalize",
+      "trigger": "required_metric_absent",
+      "fallback_action": "emit_quality_warning",
+      "status": "completed_with_warning",
+      "trace_event_id": "evt-normalize-warning"
+    },
+    {
+      "id": "forecast_assumption_gap",
+      "stage_id": "forecast",
+      "trigger": "assumption_not_supplied",
+      "fallback_action": "use_default_assumption_fixture",
+      "status": "completed_with_warning",
+      "trace_event_id": "evt-forecast-default"
+    },
+    {
+      "id": "artifact_renderer_missing",
+      "stage_id": "artifact_plan",
+      "trigger": "renderer_dependency_missing",
+      "fallback_action": "plan_artifact_without_rendering",
+      "status": "planned_not_rendered",
+      "trace_event_id": "evt-artifact-plan"
+    }
+  ]
+}

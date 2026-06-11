@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/equity_analysis_pipeline/normalized_financials_v1.schema.json",
+  "title": "FinRobot Equity Analysis Normalized Financials",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_key",
+    "provider_free",
+    "live_network",
+    "ticker",
+    "typed_columns",
+    "metric_aliases",
+    "rows",
+    "quality_checks",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "ticker": {
+      "type": "string"
+    },
+    "typed_columns": {
+      "type": "object"
+    },
+    "metric_aliases": {
+      "type": "object"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1
+    },
+    "quality_checks": {
+      "type": "array"
+    },
+    "provenance": {
+      "type": "object"
+    }
+  }
+}
