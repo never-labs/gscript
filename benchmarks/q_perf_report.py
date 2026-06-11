@@ -286,6 +286,43 @@ class PipelineCategoryMetricRow:
 
 
 @dataclass
+class QEvalCaseDiagnosticRow:
+    case: str
+    go_baseline_ns_op: float | None
+    go_baseline_allocs_op: float | None
+    trusted_go_baseline: bool
+    session_ns_op: float | None
+    session_allocs_op: float | None
+    session_go_ratio: float | None
+    result_cache_warm_ns_op: float | None
+    result_cache_allocs_op: float | None
+    result_cache_warm_session_ratio: float | None
+    cold_ns_op: float | None
+    cold_allocs_op: float | None
+    cold_session_ratio: float | None
+    jit_warm_ns_op: float | None
+    jit_warm_allocs_op: float | None
+    jit_go_ratio: float | None
+    vm_warm_ns_op: float | None
+    vm_warm_allocs_op: float | None
+    vm_go_ratio: float | None
+    typed_hit_pct: float | None
+    typed_attempts_op: float | None
+    typed_hits_op: float | None
+    typed_fallbacks_op: float | None
+    typed_errors_op: float | None
+    typed_pipeline_shapes: float | None
+    typed_pipeline_fallback_shapes: float | None
+    jit_direct_return_op: float | None
+    jit_native_exit_op: float | None
+    jit_op_exit_op: float | None
+    jit_backend_slow_route_pct: float | None
+    jit_kernel_errors_op: float | None
+    primary_pressure: str
+    note: str = ""
+
+
+@dataclass
 class GatePolicy:
     max_leia_go_ratio: float
     min_typed_hit_pct: float
@@ -996,6 +1033,168 @@ def build_pipeline_category_metric_rows(rows: dict[str, BenchRow]) -> list[Pipel
     return out
 
 
+def row_metric(rows: dict[str, BenchRow], name: str, metric: str) -> float | None:
+    row = rows.get(name)
+    if row is None:
+        return None
+    return row.metrics.get(metric)
+
+
+def row_ns(rows: dict[str, BenchRow], name: str) -> float | None:
+    row = rows.get(name)
+    if row is None:
+        return None
+    return row.ns_op
+
+
+def safe_ratio_value(numerator: float | None, denominator: float | None) -> float | None:
+    if numerator is None or denominator in (None, 0):
+        return None
+    return numerator / denominator
+
+
+def classify_qeval_pressure(
+    *,
+    trusted_go: bool,
+    go_ns: float | None,
+    session_ns: float | None,
+    cold_session_ratio: float | None,
+    typed_fallbacks: float | None,
+    typed_errors: float | None,
+    typed_fallback_shapes: float | None,
+    session_allocs: float | None,
+    jit_ratio: float | None,
+    jit_slow_route_pct: float | None,
+    jit_errors: float | None,
+) -> str:
+    if go_ns is None:
+        return "missing_go_baseline"
+    if not trusted_go:
+        return "untrusted_go_baseline"
+    if session_ns is None:
+        return "missing_session_warm"
+    if (typed_errors or 0.0) > 0:
+        return "typed_errors"
+    if (typed_fallbacks or 0.0) > 0 or (typed_fallback_shapes or 0.0) > 0:
+        return "typed_fallback"
+    if (jit_errors or 0.0) > 0:
+        return "jit_backend_errors"
+    if (jit_slow_route_pct or 0.0) > 0:
+        return "jit_slow_route"
+    if session_allocs is not None and session_allocs > 64:
+        return "alloc_pressure"
+    if cold_session_ratio is None:
+        return "missing_cold"
+    if cold_session_ratio > 2.0:
+        return "cold_start_pressure"
+    if jit_ratio is None:
+        return "missing_jit_warm"
+    return "healthy_or_ratio_only"
+
+
+def qeval_diagnostic_note(row: QEvalCaseDiagnosticRow) -> str:
+    parts = [row.primary_pressure]
+    if row.session_go_ratio is not None:
+        parts.append(f"session/go={row.session_go_ratio:.3f}x")
+    if row.jit_go_ratio is not None:
+        parts.append(f"jit/go={row.jit_go_ratio:.3f}x")
+    if row.cold_session_ratio is not None:
+        parts.append(f"cold/session={row.cold_session_ratio:.3f}x")
+    if row.typed_hit_pct is not None:
+        parts.append(f"typed_hit={row.typed_hit_pct:.1f}%")
+    if row.typed_fallbacks_op is not None:
+        parts.append(f"typed_fallbacks/op={row.typed_fallbacks_op:.3f}")
+    if row.jit_backend_slow_route_pct is not None:
+        parts.append(f"jit_slow_route={row.jit_backend_slow_route_pct:.1f}%")
+    if row.session_allocs_op is not None:
+        parts.append(f"session_allocs/op={row.session_allocs_op:.0f}")
+    return "; ".join(parts)
+
+
+def build_qeval_case_diagnostics(rows: dict[str, BenchRow]) -> list[QEvalCaseDiagnosticRow]:
+    cases = sorted(
+        qeval_cases(rows, "BenchmarkQSessionEvalVectorWarmExecution")
+        | qeval_cases(rows, "BenchmarkQEvalVectorGoBaseline")
+        | qeval_cases(rows, "BenchmarkQEvalVectorResultCacheWarm")
+        | qeval_cases(rows, "BenchmarkQEvalVectorCold")
+        | qeval_cases(rows, "BenchmarkQEvalJITScriptWarm")
+        | qeval_cases(rows, "BenchmarkQEvalVMScriptWarm")
+    )
+    out: list[QEvalCaseDiagnosticRow] = []
+    for case in cases:
+        session = f"BenchmarkQSessionEvalVectorWarmExecution/{case}"
+        go = f"BenchmarkQEvalVectorGoBaseline/{case}"
+        warm = f"BenchmarkQEvalVectorResultCacheWarm/{case}"
+        cold = f"BenchmarkQEvalVectorCold/{case}"
+        jit = f"BenchmarkQEvalJITScriptWarm/{case}"
+        vm = f"BenchmarkQEvalVMScriptWarm/{case}"
+        go_ns = row_ns(rows, go)
+        session_ns = row_ns(rows, session)
+        cold_ratio = safe_ratio_value(row_ns(rows, cold), session_ns)
+        jit_direct = row_metric(rows, jit, "jit_typed_direct_return/op")
+        jit_native = row_metric(rows, jit, "jit_typed_native_exit/op")
+        jit_op_exit = row_metric(rows, jit, "jit_typed_op_exit/op")
+        jit_route_total = (jit_direct or 0.0) + (jit_native or 0.0) + (jit_op_exit or 0.0)
+        jit_slow_route_pct = None
+        if jit_route_total > 0:
+            jit_slow_route_pct = 100 * ((jit_native or 0.0) + (jit_op_exit or 0.0)) / jit_route_total
+        typed_fallbacks = row_metric(rows, session, "typed_kernel_fallbacks/op")
+        typed_errors = row_metric(rows, session, "typed_kernel_errors/op")
+        typed_fallback_shapes = row_metric(rows, session, "typed_pipeline_fallback_shapes")
+        trusted_go = go_ns is not None and go_ns >= MIN_TRUSTED_GO_BASELINE_NS
+        jit_ratio = safe_ratio_value(row_ns(rows, jit), go_ns) if trusted_go else None
+        row = QEvalCaseDiagnosticRow(
+            case=case,
+            go_baseline_ns_op=go_ns,
+            go_baseline_allocs_op=row_metric(rows, go, "allocs/op"),
+            trusted_go_baseline=trusted_go,
+            session_ns_op=session_ns,
+            session_allocs_op=row_metric(rows, session, "allocs/op"),
+            session_go_ratio=safe_ratio_value(session_ns, go_ns) if trusted_go else None,
+            result_cache_warm_ns_op=row_ns(rows, warm),
+            result_cache_allocs_op=row_metric(rows, warm, "allocs/op"),
+            result_cache_warm_session_ratio=safe_ratio_value(row_ns(rows, warm), session_ns),
+            cold_ns_op=row_ns(rows, cold),
+            cold_allocs_op=row_metric(rows, cold, "allocs/op"),
+            cold_session_ratio=cold_ratio,
+            jit_warm_ns_op=row_ns(rows, jit),
+            jit_warm_allocs_op=row_metric(rows, jit, "allocs/op"),
+            jit_go_ratio=jit_ratio,
+            vm_warm_ns_op=row_ns(rows, vm),
+            vm_warm_allocs_op=row_metric(rows, vm, "allocs/op"),
+            vm_go_ratio=safe_ratio_value(row_ns(rows, vm), go_ns) if trusted_go else None,
+            typed_hit_pct=row_metric(rows, session, "typed_kernel_hit_pct"),
+            typed_attempts_op=row_metric(rows, session, "typed_kernel_attempts/op"),
+            typed_hits_op=row_metric(rows, session, "typed_kernel_hits/op"),
+            typed_fallbacks_op=typed_fallbacks,
+            typed_errors_op=typed_errors,
+            typed_pipeline_shapes=row_metric(rows, session, "typed_pipeline_shapes"),
+            typed_pipeline_fallback_shapes=typed_fallback_shapes,
+            jit_direct_return_op=jit_direct,
+            jit_native_exit_op=jit_native,
+            jit_op_exit_op=jit_op_exit,
+            jit_backend_slow_route_pct=jit_slow_route_pct,
+            jit_kernel_errors_op=row_metric(rows, jit, "jit_typed_kernel_errors/op"),
+            primary_pressure="",
+        )
+        row.primary_pressure = classify_qeval_pressure(
+            trusted_go=trusted_go,
+            go_ns=go_ns,
+            session_ns=session_ns,
+            cold_session_ratio=cold_ratio,
+            typed_fallbacks=typed_fallbacks,
+            typed_errors=typed_errors,
+            typed_fallback_shapes=typed_fallback_shapes,
+            session_allocs=row.session_allocs_op,
+            jit_ratio=jit_ratio,
+            jit_slow_route_pct=jit_slow_route_pct,
+            jit_errors=row.jit_kernel_errors_op,
+        )
+        row.note = qeval_diagnostic_note(row)
+        out.append(row)
+    return out
+
+
 def qeval_cases(rows: dict[str, BenchRow], prefix: str) -> set[str]:
     marker = prefix + "/"
     return {name.removeprefix(marker) for name in rows if name.startswith(marker)}
@@ -1224,15 +1423,26 @@ def qeval_case_from_benchmark(name: str) -> str | None:
     for prefix in (
         "BenchmarkQSessionEvalVectorWarmExecution/",
         "BenchmarkQEvalJITScriptWarm/",
+        "BenchmarkQEvalVectorResultCacheWarm/",
+        "BenchmarkQEvalVectorCold/",
     ):
         if name.startswith(prefix):
             return name.removeprefix(prefix)
     return None
 
 
+def qeval_diagnostic_notes(rows: dict[str, BenchRow]) -> dict[str, str]:
+    return {row.case: row.note for row in build_qeval_case_diagnostics(rows)}
+
+
+def append_note(*parts: str) -> str:
+    return "; ".join(part for part in parts if part)
+
+
 def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_baseline: dict | None = None) -> list[GateCheck]:
     checks: list[GateCheck] = []
     exceptions = (ratio_baseline or {}).get("exceptions") or {}
+    diagnostics = qeval_diagnostic_notes(rows)
     for item in build_ratios(rows):
         if "Go" not in item.denominator:
             continue
@@ -1268,7 +1478,7 @@ def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_basel
                     value=None,
                     threshold=f"<= {cap:g}",
                     status="skip",
-                    note=item.note or "missing or untrusted denominator",
+                    note=append_note(item.note or "missing or untrusted denominator", diagnostics.get(case or "")),
                 )
             )
             continue
@@ -1279,7 +1489,7 @@ def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_basel
                 value=item.ratio,
                 threshold=f"<= {cap:g}",
                 status="pass" if item.ratio <= cap else "fail",
-                note=item.note,
+                note=append_note(item.note, diagnostics.get(case or "")),
             )
         )
     return checks
@@ -1541,7 +1751,10 @@ def ratio_baseline_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ra
 
 def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[GateCheck]:
     checks: list[GateCheck] = []
+    diagnostics = qeval_diagnostic_notes(rows)
     for item in build_runtime_metric_rows(rows):
+        case = qeval_case_from_benchmark(item.benchmark)
+        note = diagnostics.get(case or "")
         if item.typed_kernel_hit_pct is not None:
             checks.append(
                 GateCheck(
@@ -1550,6 +1763,7 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     value=item.typed_kernel_hit_pct,
                     threshold=f">= {policy.min_typed_hit_pct:g}",
                     status="pass" if item.typed_kernel_hit_pct >= policy.min_typed_hit_pct else "fail",
+                    note=note,
                 )
             )
         fallback_value = item.typed_kernel_fallbacks_op
@@ -1563,6 +1777,7 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     value=fallback_value,
                     threshold=f"<= {policy.max_typed_fallbacks_op:g}",
                     status="pass" if fallback_value <= policy.max_typed_fallbacks_op else "fail",
+                    note=note,
                 )
             )
         if item.typed_pipeline_fallback_shapes is not None:
@@ -1573,6 +1788,7 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     value=item.typed_pipeline_fallback_shapes,
                     threshold=f"<= {policy.max_pipeline_fallback_shapes:g}",
                     status="pass" if item.typed_pipeline_fallback_shapes <= policy.max_pipeline_fallback_shapes else "fail",
+                    note=note,
                 )
             )
         if item.allocs_op is not None:
@@ -1583,6 +1799,7 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     value=item.allocs_op,
                     threshold=f"<= {policy.max_allocs_op:g}",
                     status="pass" if item.allocs_op <= policy.max_allocs_op else "fail",
+                    note=note,
                 )
             )
         if item.jit_typed_kernel_errors_op is not None:
@@ -1593,6 +1810,7 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     value=item.jit_typed_kernel_errors_op,
                     threshold=f"<= {policy.max_jit_typed_errors_op:g}",
                     status="pass" if item.jit_typed_kernel_errors_op <= policy.max_jit_typed_errors_op else "fail",
+                    note=note,
                 )
             )
     return checks
@@ -2084,6 +2302,7 @@ def markdown_report(
     qeval_compute = build_qeval_compute_coverage(rows)
     qeval_family = build_qeval_family_coverage(rows)
     ratios = build_ratios(rows)
+    qeval_diagnostics = build_qeval_case_diagnostics(rows)
     runtime_metrics = build_runtime_metric_rows(rows)
     fallback_shapes = build_fallback_shape_rows(rows)
     jit_routes = build_jit_route_summary(rows)
@@ -2239,6 +2458,38 @@ def markdown_report(
             f"| {item.scenario} | {item.numerator} | {item.denominator} | "
             f"{format_float(item.ratio)} | {item.note} |"
         )
+    lines.extend(
+        [
+            "",
+            "## q.eval Case Diagnostics",
+            "",
+            "One row per ordinary q case, joining Leia warm/cold/JIT, Go baseline, typed runtime route, JIT route, and allocation signals.",
+            "",
+            "| Case | Pressure | Go ns/op | Session ns/op | Session/Go | Cold/Session | JIT ns/op | JIT/Go | Typed hit pct | typed fallbacks/op | pipeline fallback shapes | JIT direct/op | JIT slow route pct | session allocs/op | JIT allocs/op | Note |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    if qeval_diagnostics:
+        for item in qeval_diagnostics:
+            lines.append(
+                f"| {item.case} | {item.primary_pressure} | "
+                f"{format_metric(item.go_baseline_ns_op, 0)} | "
+                f"{format_metric(item.session_ns_op, 0)} | "
+                f"{format_float(item.session_go_ratio)} | "
+                f"{format_float(item.cold_session_ratio)} | "
+                f"{format_metric(item.jit_warm_ns_op, 0)} | "
+                f"{format_float(item.jit_go_ratio)} | "
+                f"{format_metric(item.typed_hit_pct, 1)} | "
+                f"{format_metric(item.typed_fallbacks_op, 3)} | "
+                f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} | "
+                f"{format_metric(item.jit_direct_return_op, 3)} | "
+                f"{format_metric(item.jit_backend_slow_route_pct, 1)} | "
+                f"{format_metric(item.session_allocs_op, 0)} | "
+                f"{format_metric(item.jit_warm_allocs_op, 0)} | "
+                f"{item.note} |"
+            )
+    else:
+        lines.append("| missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | no q.eval rows parsed |")
     lines.extend(
         [
             "",
@@ -2723,6 +2974,7 @@ def main(argv: list[str]) -> int:
         "qsql_benchmark_coverage": asdict(build_qsql_benchmark_coverage(rows)),
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "q_eval_family_coverage": [asdict(row) for row in build_qeval_family_coverage(rows)],
+        "q_eval_case_diagnostics": [asdict(row) for row in build_qeval_case_diagnostics(rows)],
         "ratios": [asdict(row) for row in build_ratios(rows)],
         "fallback_shape_summary": [asdict(row) for row in build_fallback_shape_rows(rows)],
         "gate_policy": asdict(policy),

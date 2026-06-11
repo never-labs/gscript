@@ -317,6 +317,9 @@ class QPerfReportTest(unittest.TestCase):
         self.assertIn(("pipeline_fallback_shapes", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
         self.assertIn(("allocs_op", "BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"), failed)
         self.assertTrue(report.gate_failed(checks))
+        notes = {check.benchmark: check.note for check in checks if check.status == "fail"}
+        self.assertIn("typed_fallback", notes["BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"])
+        self.assertIn("session/go=9.000x", notes["BenchmarkQSessionEvalVectorWarmExecution/FallbackShape"])
 
     def test_gate_checks_cover_jit_backend_errors_and_slow_routes(self):
         rows = report.parse_go_benchmarks(SAMPLE_JIT_SLOW_ROUTE)
@@ -521,6 +524,36 @@ class QPerfReportTest(unittest.TestCase):
         scenarios = [row.scenario for row in report.build_ratios(rows)]
 
         self.assertFalse(any("script warm vs Go" in scenario for scenario in scenarios))
+
+    def test_qeval_case_diagnostics_join_warm_cold_go_jit_route_and_allocs(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)
+        diagnostics = {row.case: row for row in report.build_qeval_case_diagnostics(rows)}
+
+        mask = diagnostics["MaskWhere"]
+        self.assertEqual(mask.go_baseline_ns_op, 1000)
+        self.assertEqual(mask.session_ns_op, 2000)
+        self.assertEqual(mask.session_go_ratio, 2.0)
+        self.assertEqual(mask.result_cache_warm_session_ratio, 0.25)
+        self.assertEqual(mask.cold_session_ratio, 1.25)
+        self.assertEqual(mask.jit_warm_ns_op, 1500)
+        self.assertEqual(mask.jit_go_ratio, 1.5)
+        self.assertEqual(mask.vm_go_ratio, 4.0)
+        self.assertEqual(mask.typed_hit_pct, 100)
+        self.assertEqual(mask.typed_fallbacks_op, 0)
+        self.assertEqual(mask.session_allocs_op, 8)
+        self.assertEqual(mask.jit_warm_allocs_op, 4)
+        self.assertEqual(mask.primary_pressure, "healthy_or_ratio_only")
+        self.assertIn("session/go=2.000x", mask.note)
+
+    def test_qeval_case_diagnostics_classify_jit_slow_route(self):
+        sample = SAMPLE + """
+BenchmarkQEvalJITScriptWarm/MaskWhere-16  100  1800 ns/op  96 B/op  3 allocs/op  1 jit_typed_direct_return/op  2 jit_typed_native_exit/op  1 jit_typed_op_exit/op  0 jit_typed_kernel_errors/op
+"""
+        rows = report.parse_go_benchmarks(sample)
+        diagnostics = {row.case: row for row in report.build_qeval_case_diagnostics(rows)}
+
+        self.assertEqual(diagnostics["MaskWhere"].primary_pressure, "jit_slow_route")
+        self.assertEqual(diagnostics["MaskWhere"].jit_backend_slow_route_pct, 75)
 
     def test_gate_checks_gate_jit_script_family_but_never_vm(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)
@@ -1025,6 +1058,8 @@ BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op
             self.assertIn("BenchmarkQEvalVectorResultCacheWarm/MaskWhere", payload["benchmarks"])
             self.assertIn("qsql_benchmark_coverage", payload)
             self.assertEqual(payload["current_vs_old"][0]["ratio"], 0.5)
+            self.assertIn("q_eval_case_diagnostics", payload)
+            self.assertEqual(payload["q_eval_case_diagnostics"][0]["case"], "MaskWhere")
             self.assertIn("runtime_metrics", payload)
             self.assertIn("jit_route_summary", payload)
             self.assertEqual(payload["jit_route_summary"][0]["route"], "direct_return")
@@ -1045,6 +1080,7 @@ BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op
             self.assertIn("q Performance Completeness Report", markdown)
             self.assertIn("Current vs Old Leia", markdown)
             self.assertIn("Gate Summary", markdown)
+            self.assertIn("q.eval Case Diagnostics", markdown)
             self.assertIn("JIT Typed Runtime Routes", markdown)
             self.assertIn("Runtime Observability Summary", markdown)
             self.assertIn("Runtime Health Summary", markdown)
@@ -1067,6 +1103,8 @@ BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op
         self.assertIn("--min-runtime-backend-route-benchmarks", readme)
         self.assertIn("--max-runtime-backend-route-errors-op", readme)
         self.assertIn("--min-q-eval-family-cases", readme)
+        self.assertIn("q.eval Case Diagnostics", readme)
+        self.assertIn("Pressure", readme)
         self.assertIn("Ordinary q Family Coverage", readme)
         self.assertIn("direct bridge", readme)
 

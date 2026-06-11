@@ -217,6 +217,15 @@ The report writes `benchmarks/data/q_perf_report_latest.md` and
 warm/cold ratios, typed kernel hit/fallback counters, allocation metrics, and
 fallback shape summary rows.
 
+The `q.eval Case Diagnostics` section is the first stop for runtime/JIT backend
+triage. It joins each ordinary q case across `BenchmarkQSessionEvalVectorWarmExecution`,
+`BenchmarkQEvalVectorGoBaseline`, result-cache warm, cold, `BenchmarkQEvalJITScriptWarm`,
+and optional VM script rows. The `Pressure` column classifies the likely issue
+as missing or untrusted Go baseline, cold-start pressure, typed fallback/error,
+JIT backend slow route/error, allocation pressure, or ratio-only pressure. Gate
+failures for Leia-vs-Go, typed hit/fallback, pipeline fallback, JIT errors, and
+`allocs/op` include the same diagnostic note in both Markdown and JSON output.
+
 Use `--check` to turn the same report into a performance gate:
 
 ```bash
