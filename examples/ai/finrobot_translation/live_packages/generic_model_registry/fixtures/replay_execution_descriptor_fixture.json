@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-registry-execution-descriptors-fixture",
+  "provider_free": true,
+  "live_network": false,
+  "descriptors": [
+    {
+      "descriptor_ref": "model_registry:descriptor:fixture_analyst:v1",
+      "model_alias": "fixture_analyst",
+      "provider": "fixture-replay",
+      "provider_model": "generic-fixture-analyst-v1",
+      "mode": "deterministic_fixture_replay",
+      "fixture_key": "model_registry:turn:analyst:ACME:v1",
+      "replay_safe": true,
+      "provider_credentials_required": false,
+      "secret_values_present": false,
+      "temperature": 0,
+      "capability_flags": [
+        "model_alias_registry",
+        "provider_policy",
+        "replay_safe_execution_descriptor",
+        "redaction_policy",
+        "structured_output",
+        "tool_calling"
+      ],
+      "redaction_policy_ref": "generic-model-registry-redaction-v1"
+    },
+    {
+      "descriptor_ref": "model_registry:descriptor:fixture_reviewer:v1",
+      "model_alias": "fixture_reviewer",
+      "provider": "fixture-replay",
+      "provider_model": "generic-fixture-reviewer-v1",
+      "mode": "deterministic_fixture_replay",
+      "fixture_key": "model_registry:turn:reviewer:ACME:v1",
+      "replay_safe": true,
+      "provider_credentials_required": false,
+      "secret_values_present": false,
+      "temperature": 0,
+      "capability_flags": [
+        "model_alias_registry",
+        "provider_policy",
+        "replay_safe_execution_descriptor",
+        "redaction_policy",
+        "structured_output"
+      ],
+      "redaction_policy_ref": "generic-model-registry-redaction-v1"
+    }
+  ]
+}
+

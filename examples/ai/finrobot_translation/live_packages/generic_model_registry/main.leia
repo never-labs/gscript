@@ -1,0 +1,58 @@
+// Provider-free live package skeleton for generic.ai.model.registry.
+//
+// The JSON manifest is the contract of record. This mirror keeps the package
+// discoverable without importing provider SDKs or calling live models.
+
+generic_model_registry_package := {
+    id: "generic-ai-model-registry"
+    capability_id: "generic.ai.model.registry"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    default_policy: {
+        mode: "fixture_replay"
+        provider_policy: "provider-free"
+        provider_credentials_required: false
+        replay_miss_behavior: "clean-skip"
+    }
+    provider_policy: {
+        allow_named_providers: false
+        descriptor_provider: "fixture-replay"
+        live_model_calls: false
+    }
+    capability_flags: {
+        model_alias_registry: true
+        provider_policy: true
+        replay_safe_execution_descriptor: true
+        redaction_policy: true
+        structured_output: true
+        tool_calling: true
+        streaming: false
+        vision: false
+        live_network: false
+        provider_credentials: false
+    }
+    redaction_policy: {
+        id: "generic-model-registry-redaction-v1"
+        enabled: true
+        replacement: "<redacted>"
+        secret_value_policy: "never-store-secret-values"
+        secret_values_present: false
+    }
+    alias_registry: {
+        {alias: "default" target: "analyst" kind: "alias"},
+        {alias: "analyst" target: "fixture_analyst" kind: "alias"},
+        {alias: "reviewer" target: "fixture_reviewer" kind: "alias"},
+        {alias: "fixture_analyst" kind: "descriptor" descriptor_ref: "model_registry:descriptor:fixture_analyst:v1"},
+        {alias: "fixture_reviewer" kind: "descriptor" descriptor_ref: "model_registry:descriptor:fixture_reviewer:v1"},
+    }
+}
+
+func generic_model_registry_provider_free() {
+    return generic_model_registry_package.provider_free == true &&
+        generic_model_registry_package.live_network == false &&
+        generic_model_registry_package.real_dependency_imports == false &&
+        generic_model_registry_package.live_model_calls == false
+}
+

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-registry-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "fixtures": [
+    {
+      "key": "model_registry:aliases:v1",
+      "path": "fixtures/model_alias_registry_fixture.json",
+      "schema": "schemas/model_alias_registry_v1.schema.json"
+    },
+    {
+      "key": "model_registry:descriptor:fixture_analyst:v1",
+      "path": "fixtures/replay_execution_descriptor_fixture.json",
+      "schema": "schemas/execution_descriptor_v1.schema.json"
+    },
+    {
+      "key": "model_registry:redaction:v1",
+      "path": "fixtures/redaction_policy_fixture.json",
+      "schema": "schemas/redaction_policy_v1.schema.json"
+    }
+  ]
+}
+

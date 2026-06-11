@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-registry-redaction-v1",
+  "provider_free": true,
+  "enabled": true,
+  "replacement": "<redacted>",
+  "secret_value_policy": "never-store-secret-values",
+  "secret_values_present": false,
+  "redact_fields": [
+    "api_key",
+    "authorization",
+    "credential",
+    "secret",
+    "token"
+  ],
+  "env_ref_patterns": [
+    "env:*_API_KEY",
+    "env:*_TOKEN",
+    "env:OPENAI_API_KEY",
+    "env:ANTHROPIC_API_KEY"
+  ]
+}
+
