@@ -219,22 +219,8 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		if opts.IsTable() && opts.Table().RawGetString("name").IsString() {
 			name = opts.Table().RawGetString("name").Str()
 		}
-		if name == "" {
-			name = "agent"
-		}
-		wrapper := FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
-			results, err := call(agent, llmAgentCallArgs(meta, callArgs))
-			if err != nil {
-				return nil, err
-			}
-			if len(results) >= 2 && !results[1].IsNil() {
-				return []Value{NilValue(), results[1]}, nil
-			}
-			if len(results) == 0 {
-				return []Value{NilValue(), NilValue()}, nil
-			}
-			return []Value{llmAgentToolResultValue(results[0]), NilValue()}, nil
-		}})
+		name = llmAgentToolName(agent, llmAgentMetadata{Name: name}, "agent")
+		wrapper := llmAgentToolWrapper(call, agent, meta, name)
 		tool := newToolValue(name, wrapper, opts)
 		if tt := tool.Table(); tt != nil {
 			tt.RawSetString("__llm_agent_tool", BoolValue(true))
@@ -249,6 +235,8 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 	}
 	set("toolof", agentAsTool)
 	set("agent_as_tool", agentAsTool)
+	set("handoff", agentAsTool)
+	set("delegate", agentAsTool)
 
 	set("tool_caps", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
