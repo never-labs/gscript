@@ -19,7 +19,6 @@ external adapters.
 
 | ID | Gap | Category | Affected FinRobot modules | Priority | Validation |
 | --- | --- | --- | --- | --- | --- |
-| FR-GAP-001 | Typed tool contracts need stable schemas, capability declarations, result envelopes, structured errors, and replay keys. | AI dialect | `finrobot/toolkits.py`, all `data_source/*`, `functional/*`, equity modules | P0 | Tool inventory fixture fails if any tool lacks schema, capability, error type, or replay identity |
 | FR-GAP-002 | Agent-as-tool and nested-agent workflows need parent/child traces, cancellation, budget, max-turn, approval, and structured error propagation. | AI dialect | `finrobot/agents/workflow.py`, `experiments/*`, `equity_agents/*` | P0 | Replay fixtures for single, RAG, group-chat, leader, and handoff workflows assert trace hierarchy |
 | FR-GAP-003 | Provider-free replay must cover `turn`, tool, API/web, file, process, clock, chart/report artifacts, and nested agents. | AI dialect, stdlib | tutorials, experiments, equity pipeline, web process runner | P0 | CI replay run executes no network/model calls and fails on missing or ambiguous events |
 | FR-GAP-004 | Model aliases and scheduler-style routing need trace-visible provider choice and deterministic replay behavior. | AI dialect | `configs/*`, `OAI_CONFIG_LIST`, `agent_library.py`, workflow classes | P1 | Config fixture records selected alias/provider/model per turn and replays the same routing decision |
@@ -91,6 +90,7 @@ external adapters.
 | Item | Decision | Validation |
 | --- | --- | --- |
 | FinRobot-specific parser syntax | Not needed. FinRobot maps to general AI, data, web/API, document, chart, report, workflow, and package capabilities. | Translation review rejects new parser keywords for `finrobot`, `ticker`, `sec`, `trading`, valuation, or report-section concepts. |
+| FR-GAP-001 typed tool contracts | Implemented generically for `llm.tool` and agent-as-tool contracts via `llm.tool_info` and `llm.validate_tools`, exporting schema, capabilities, result, error, and replay key metadata. | `tests/llm/llm_tool_contract_test.go` asserts inventory export, validation failures, and provider-schema compatibility for agent-as-tool. |
 | Finance vendors as built-ins | Not needed. Vendors belong in external packages with capabilities, credentials, schemas, rate-limit metadata, and terms metadata. | Vendor package manifests declare capabilities and replay fixtures. |
 | Role profiles as language concepts | Not needed. Roles are package data consumed by generic `agent` declarations. | Role registry snapshot is data-only and uses no parser changes. |
 

@@ -258,6 +258,15 @@ func (b *llmLibBuilder) registerToolHelpers() {
 	}
 	b.set("tool_schema", toolSchema)
 	b.set("toolSchema", toolSchema)
+
+	toolInfo := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.tool_info' (tool or tools table expected)")
+		}
+		return []Value{llmToolInfoValue(args[0])}, nil
+	}
+	b.set("tool_info", toolInfo)
+	b.set("toolInfo", toolInfo)
 }
 
 func (b *llmLibBuilder) registerToolCheckHelper() {
@@ -270,6 +279,17 @@ func (b *llmLibBuilder) registerToolCheckHelper() {
 		}
 		return []Value{BoolValue(true), NilValue()}, nil
 	})
+	validateTools := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.validate_tools' (tools table expected)")
+		}
+		if err := llmValidateToolContracts(args[0].Table()); !err.IsNil() {
+			return []Value{NilValue(), err}, nil
+		}
+		return []Value{BoolValue(true), NilValue()}, nil
+	}
+	b.set("validate_tools", validateTools)
+	b.set("validateTools", validateTools)
 }
 
 func llmNewToolValue(name string, fn Value, opts Value) Value {
@@ -278,13 +298,22 @@ func llmNewToolValue(name string, fn Value, opts Value) Value {
 	var requires Value
 	var schema Value
 	var output Value
+	var result Value
+	var errorSpec Value
+	var replayKey Value
 	if opts.IsTable() {
 		optTable := opts.Table()
 		desc = optTable.RawGetString("description").Str()
 		params = optTable.RawGetString("params")
 		requires = optTable.RawGetString("requires")
+		if requires.IsNil() {
+			requires = optTable.RawGetString("capabilities")
+		}
 		schema = optTable.RawGetString("schema")
 		output = optTable.RawGetString("output")
+		result = optTable.RawGetString("result")
+		errorSpec = optTable.RawGetString("error")
+		replayKey = optTable.RawGetString("replay_key")
 	}
 	tool := NewTable()
 	tool.RawSetString("__llm_tool", BoolValue(true))
@@ -296,12 +325,25 @@ func llmNewToolValue(name string, fn Value, opts Value) Value {
 	}
 	if requires.IsTable() {
 		tool.RawSetString("requires", requires)
+		tool.RawSetString("capabilities", requires)
 	}
 	if !schema.IsNil() {
 		tool.RawSetString("schema", schema)
 	}
 	if !output.IsNil() {
 		tool.RawSetString("output", output)
+	}
+	if !result.IsNil() {
+		tool.RawSetString("result", result)
+		if output.IsNil() {
+			tool.RawSetString("output", result)
+		}
+	}
+	if !errorSpec.IsNil() {
+		tool.RawSetString("error", errorSpec)
+	}
+	if !replayKey.IsNil() {
+		tool.RawSetString("replay_key", replayKey)
 	}
 	return TableValue(tool)
 }
