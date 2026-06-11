@@ -1,6 +1,10 @@
 package bind
 
-import stdlibllm "github.com/never-labs/leia/internal/stdlib/lib/llm"
+import (
+	"strings"
+
+	stdlibllm "github.com/never-labs/leia/internal/stdlib/lib/llm"
+)
 
 func llmToolsFromValue(v Value) []LLMTool {
 	if !v.IsTable() {
@@ -19,10 +23,120 @@ func llmToolsFromValue(v Value) []LLMTool {
 			Description: tt.RawGetString("description").Str(),
 			Params:      llmStringSliceFromValue(tt.RawGetString("params")),
 			Requires:    llmStringSliceFromValue(tt.RawGetString("requires")),
-			Schema:      llmAnyFromValue(tt.RawGetString("schema")),
+			Schema:      llmToolProviderSchema(tt),
 		})
 	}
 	return out
+}
+
+func llmToolProviderSchema(tool *Table) any {
+	if tool == nil {
+		return nil
+	}
+	if schema := tool.RawGetString("schema"); !schema.IsNil() {
+		return llmAnyFromValue(schema)
+	}
+	if llmToolIsAgentTool(tool) {
+		return nil
+	}
+	hasOutputMetadata := !tool.RawGetString("output").IsNil()
+	if params := llmStringSliceFromValue(tool.RawGetString("params")); hasOutputMetadata && len(params) > 0 {
+		return llmAnyFromValue(llmToolParamsSchemaValue(params))
+	}
+	if output := tool.RawGetString("output"); !output.IsNil() {
+		return llmAnyFromValue(output)
+	}
+	return nil
+}
+
+func llmToolIsAgentTool(tool *Table) bool {
+	if tool == nil {
+		return false
+	}
+	if tool.RawGetString("__llm_agent_tool").Bool() {
+		return true
+	}
+	if fn := tool.RawGetString("fn").GoFunction(); fn != nil {
+		return strings.HasPrefix(fn.Name, "llm.agent_as_tool.")
+	}
+	return false
+}
+
+func llmToolParamsSchemaValue(params []string) Value {
+	schema := NewTable()
+	schema.RawSetString("type", StringValue("object"))
+	props := NewTable()
+	required := NewSequentialArrayTable(len(params))
+	for i, name := range params {
+		prop := NewTable()
+		prop.RawSetString("type", StringValue("string"))
+		props.RawSetString(name, TableValue(prop))
+		required.RawSet(IntValue(int64(i+1)), StringValue(name))
+	}
+	schema.RawSetString("properties", TableValue(props))
+	schema.RawSetString("required", TableValue(required))
+	return TableValue(schema)
+}
+
+func llmToolSchemaValue(v Value) Value {
+	if !v.IsTable() {
+		return NilValue()
+	}
+	t := v.Table()
+	if llmLooksLikeToolTable(t) {
+		return TableValue(llmSingleToolSchemaTable(t))
+	}
+	out := NewTable()
+	for i := 1; i <= t.Length(); i++ {
+		tv := t.RawGet(IntValue(int64(i)))
+		if !tv.IsTable() || !llmLooksLikeToolTable(tv.Table()) {
+			continue
+		}
+		out.RawSet(IntValue(int64(out.Length()+1)), TableValue(llmSingleToolSchemaTable(tv.Table())))
+	}
+	return TableValue(out)
+}
+
+func llmLooksLikeToolTable(t *Table) bool {
+	if t == nil {
+		return false
+	}
+	return t.RawGetString("__llm_tool").Bool() || !t.RawGetString("name").IsNil() || !t.RawGetString("fn").IsNil()
+}
+
+func llmSingleToolSchemaTable(tool *Table) *Table {
+	out := NewTable()
+	out.RawSetString("name", StringValue(tool.RawGetString("name").Str()))
+	out.RawSetString("description", StringValue(tool.RawGetString("description").Str()))
+	if params := tool.RawGetString("params"); params.IsTable() {
+		out.RawSetString("params", llmCloneValue(params))
+	}
+	if requires := tool.RawGetString("requires"); requires.IsTable() {
+		out.RawSetString("requires", llmCloneValue(requires))
+	}
+	if schema := tool.RawGetString("schema"); !schema.IsNil() {
+		out.RawSetString("schema", llmCloneValue(schema))
+	} else if params := llmStringSliceFromValue(tool.RawGetString("params")); len(params) > 0 {
+		out.RawSetString("schema", llmToolParamsSchemaValue(params))
+	} else if output := tool.RawGetString("output"); !output.IsNil() {
+		out.RawSetString("schema", llmCloneValue(output))
+	}
+	if output := tool.RawGetString("output"); !output.IsNil() {
+		out.RawSetString("output", llmCloneValue(output))
+	}
+	return out
+}
+
+func llmCloneValue(v Value) Value {
+	if !v.IsTable() {
+		return v
+	}
+	src := v.Table()
+	out := NewTable()
+	for _, key := range src.PairsKeysSnapshot() {
+		out.RawSet(key, llmCloneValue(src.RawGet(key)))
+	}
+	return TableValue(out)
 }
 
 func llmToolCallFromTable(t *Table) LLMToolCall {
