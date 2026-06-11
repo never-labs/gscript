@@ -117,7 +117,7 @@ func TestFinRobotVendorLivePackageManifestProviderFree(t *testing.T) {
 		}
 		capabilities[adapter.Capability] = true
 		fixtures[adapter.FixtureKey] = true
-		assertJSONFile(t, filepath.Join(pkgDir, adapter.Schema))
+		assertVendorLiveJSONFile(t, filepath.Join(pkgDir, adapter.Schema))
 		assertFixtureProviderFree(t, filepath.Join(pkgDir, adapter.Fixture), adapter.ID, adapter.FixtureKey)
 	}
 
@@ -183,7 +183,7 @@ func loadVendorLivePackageManifest(t *testing.T, pkgDir string) vendorLivePackag
 	return manifest
 }
 
-func assertJSONFile(t *testing.T, path string) {
+func assertVendorLiveJSONFile(t *testing.T, path string) {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {

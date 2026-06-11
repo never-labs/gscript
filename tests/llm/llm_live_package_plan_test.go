@@ -24,6 +24,8 @@ type livePackagePlanManifest struct {
 	Packages []struct {
 		ID                 string   `json:"id"`
 		PackageName        string   `json:"package_name"`
+		Status             string   `json:"status"`
+		SkeletonDirectory  string   `json:"skeleton_directory"`
 		PlannedDirectory   string   `json:"planned_directory"`
 		Manifest           string   `json:"manifest"`
 		Contract           string   `json:"contract"`
@@ -76,6 +78,15 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		}
 		if !strings.HasPrefix(pkg.PlannedDirectory, "packages/finrobot/") {
 			t.Fatalf("%s planned_directory = %q", pkg.ID, pkg.PlannedDirectory)
+		}
+		if pkg.Status != "skeleton_contract_checked_in" {
+			t.Fatalf("%s status = %q, want skeleton_contract_checked_in", pkg.ID, pkg.Status)
+		}
+		if pkg.SkeletonDirectory == "" {
+			t.Fatalf("%s missing skeleton_directory", pkg.ID)
+		}
+		if _, err := os.Stat(filepath.Join(root, pkg.SkeletonDirectory)); err != nil {
+			t.Fatalf("%s skeleton_directory %q: %v", pkg.ID, pkg.SkeletonDirectory, err)
 		}
 		if !strings.HasSuffix(pkg.Manifest, "package.manifest.json") {
 			t.Fatalf("%s manifest = %q", pkg.ID, pkg.Manifest)
