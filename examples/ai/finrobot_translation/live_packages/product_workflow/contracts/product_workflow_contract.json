@@ -62,6 +62,54 @@
     "mode": "fixture",
     "session_cookie": "finrobot_session",
     "csrf_required": true,
+    "lifecycle": {
+      "states": [
+        "anonymous",
+        "oauth_state_issued",
+        "authenticated",
+        "session_refreshed",
+        "expired",
+        "revoked"
+      ],
+      "initial_state": "anonymous",
+      "terminal_states": [
+        "expired",
+        "revoked"
+      ],
+      "transitions": [
+        {
+          "from": "anonymous",
+          "event": "login_started",
+          "to": "oauth_state_issued",
+          "writes": ["audit_events"]
+        },
+        {
+          "from": "oauth_state_issued",
+          "event": "oauth_callback_validated",
+          "to": "authenticated",
+          "writes": ["sessions", "audit_events"]
+        },
+        {
+          "from": "authenticated",
+          "event": "csrf_validated",
+          "to": "session_refreshed",
+          "writes": ["sessions"]
+        },
+        {
+          "from": "session_refreshed",
+          "event": "ttl_elapsed",
+          "to": "expired",
+          "writes": ["sessions", "audit_events"]
+        },
+        {
+          "from": "authenticated",
+          "event": "logout_requested",
+          "to": "revoked",
+          "writes": ["sessions", "audit_events"]
+        }
+      ],
+      "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/auth_sessions"
+    },
     "roles": [
       "analyst",
       "admin"
@@ -72,6 +120,79 @@
       "expired_oauth_state",
       "requires_admin"
     ]
+  },
+  "report_request_state_machine": {
+    "capability": "product.workflow.crud.report_request",
+    "table": "report_requests",
+    "states": [
+      "draft",
+      "queued",
+      "running",
+      "artifact_ready",
+      "completed",
+      "failed",
+      "cancelled",
+      "deleted"
+    ],
+    "initial_state": "draft",
+    "terminal_states": [
+      "completed",
+      "failed",
+      "cancelled",
+      "deleted"
+    ],
+    "transitions": [
+      {
+        "from": "draft",
+        "event": "submit",
+        "to": "queued",
+        "requires_role": "analyst",
+        "writes": ["report_requests", "task_events", "audit_events"]
+      },
+      {
+        "from": "queued",
+        "event": "worker_started",
+        "to": "running",
+        "requires_role": "system_fixture",
+        "writes": ["report_requests", "task_events"]
+      },
+      {
+        "from": "running",
+        "event": "artifact_manifest_written",
+        "to": "artifact_ready",
+        "requires_role": "system_fixture",
+        "writes": ["reports", "artifacts", "task_events"]
+      },
+      {
+        "from": "artifact_ready",
+        "event": "finalize",
+        "to": "completed",
+        "requires_role": "system_fixture",
+        "writes": ["report_requests", "reports", "task_events", "audit_events"]
+      },
+      {
+        "from": "running",
+        "event": "fail",
+        "to": "failed",
+        "requires_role": "system_fixture",
+        "writes": ["report_requests", "task_events", "audit_events"]
+      },
+      {
+        "from": "queued",
+        "event": "cancel",
+        "to": "cancelled",
+        "requires_role": "analyst",
+        "writes": ["report_requests", "task_events", "audit_events"]
+      },
+      {
+        "from": "draft",
+        "event": "delete",
+        "to": "deleted",
+        "requires_role": "analyst",
+        "writes": ["report_requests", "audit_events"]
+      }
+    ],
+    "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/report_request_lifecycle"
   },
   "history": {
     "capability": "product.workflow.history.read",
@@ -86,6 +207,14 @@
   "task_log": {
     "capability": "product.workflow.task_log.read",
     "format": "jsonl",
+    "ordering": {
+      "key": ["task_id", "sequence"],
+      "sequence_column": "sequence",
+      "monotonic_per_task": true,
+      "tie_breaker": "id",
+      "clock": "fixture_logical_clock",
+      "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/task_events"
+    },
     "events": [
       "queued",
       "started",
@@ -103,6 +232,21 @@
       "artifact_manifest",
       "task_log"
     ],
+    "authorization": {
+      "mode": "owner_or_admin",
+      "requires_session_state": "authenticated",
+      "requires_artifact_state": "completed",
+      "denied_cases": [
+        "missing_session",
+        "expired_session",
+        "wrong_owner",
+        "disabled_user",
+        "artifact_not_ready",
+        "artifact_sha_mismatch"
+      ],
+      "audit_event": "artifact_download_authorized",
+      "fixture_path": "fixtures/provider_free_fixture_index.json#/fixtures/web_product/download_authorization"
+    },
     "remote_object_fetch": false
   },
   "crud": {
@@ -124,4 +268,3 @@
     ]
   }
 }
-
