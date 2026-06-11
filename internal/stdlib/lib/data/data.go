@@ -9318,6 +9318,9 @@ func projectedSourceOrderSpecs(plan QueryPlan) ([]OrderSpec, bool) {
 }
 
 func filterIndexes(frame Frame, where Expr) ([]int, error) {
+	if where == nil {
+		return allIndexes(frame.Len()), nil
+	}
 	if indexes, ok, err := fastFilterIndexes(frame, where); ok || err != nil {
 		return indexes, err
 	}
@@ -10260,18 +10263,26 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 			aggs[i].weightColumn = col
 		}
 	}
+	// indexes == nil means "all rows": the kernel skips materializing an
+	// identity index vector for unfiltered grouped queries.
+	allRows := indexes == nil || indexesCoverAllRows(indexes, frame.Len())
 	if index, ok, err := groupIndexForSingleColumn(frame, byInputs); err != nil {
 		return Frame{}, err
 	} else if ok {
-		if indexesCoverAllRows(indexes, byInputs[0].column.Len()) {
+		if allRows && byInputs[0].column.Len() == frame.Len() {
 			return execGroupedFromArrayIndex(frame, byInputs, aggs, index)
 		}
-		if out, ok, err := execGroupedFromFilteredArrayIndex(frame, byInputs, aggs, index, indexes); ok || err != nil {
-			return out, err
+		if indexes != nil {
+			if out, ok, err := execGroupedFromFilteredArrayIndex(frame, byInputs, aggs, index, indexes); ok || err != nil {
+				return out, err
+			}
 		}
 	}
-	if out, ok, err := execGroupedTypedRowIDs(frame, indexes, false, byInputs, aggs); ok || err != nil {
+	if out, ok, err := execGroupedTypedRowIDs(frame, indexes, allRows, byInputs, aggs); ok || err != nil {
 		return out, err
+	}
+	if indexes == nil {
+		indexes = allIndexes(frame.Len())
 	}
 	groups := map[string]*groupState{}
 	order := make([]string, 0)

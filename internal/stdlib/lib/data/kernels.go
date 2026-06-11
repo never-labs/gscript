@@ -15186,7 +15186,46 @@ func (a f64NumericDyadicArray) Values() []any {
 	return out
 }
 
+// dyadicDenseF64Reader returns a direct float64 row reader for dense numeric
+// column producers; nil defers to the generic producer call chain.
+func dyadicDenseF64Reader(p f64NumericProducer) (func(int) float64, bool) {
+	switch v := p.(type) {
+	case f64F64ColumnProducer:
+		data := v.data
+		return func(row int) float64 { return data[row] }, true
+	case f64I64ColumnProducer:
+		data := v.data
+		return func(row int) float64 { return float64(data[row]) }, true
+	case f64I32ColumnProducer:
+		data := v.data
+		return func(row int) float64 { return float64(data[row]) }, true
+	case f64F32ColumnProducer:
+		data := v.data
+		return func(row int) float64 { return float64(data[row]) }, true
+	default:
+		return nil, false
+	}
+}
+
 func (a f64NumericDyadicArray) Gather(indexes []int) Array {
+	// Dense column-vs-column dyadics gather through one fused loop (two
+	// direct slice reads plus the op) instead of three producer calls with
+	// bool/error plumbing per row.
+	if p := a.bound.producer; p.apply != nil && p.len == a.len {
+		if lf, lok := dyadicDenseF64Reader(p.left); lok {
+			if rf, rok := dyadicDenseF64Reader(p.right); rok {
+				apply := p.apply
+				fused := make([]float64, len(indexes))
+				for i, row := range indexes {
+					if row < 0 || row >= a.len {
+						panic(fmt.Sprintf("data f64 dyadic gather row %d out of range", row))
+					}
+					fused[i] = apply(lf(row), rf(row))
+				}
+				return newF64Trusted(fused)
+			}
+		}
+	}
 	out := make([]float64, len(indexes))
 	var nullable []any
 	for i, row := range indexes {
