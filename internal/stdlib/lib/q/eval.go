@@ -118,12 +118,13 @@ type RuntimeKernelExecutionStat struct {
 }
 
 type runtimeKernelExecutionKey struct {
-	source     string
-	kernel     string
-	shape      string
-	route      string
-	outcome    string
-	reasonCode string
+	source        string
+	kernel        string
+	shape         string
+	pipelineShape string
+	route         string
+	outcome       string
+	reasonCode    string
 }
 
 type runtimeKernelExecutionCounter struct {
@@ -164,14 +165,21 @@ func recordRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
 }
 
 func recordRuntimeExecution(source, kernel, shape, route, outcome, reasonCode string) {
+	recordRuntimeExecutionWithPipelineShape(source, kernel, shape, "", route, outcome, reasonCode)
+}
+
+func recordRuntimeExecutionWithPipelineShape(source, kernel, shape, pipelineShape, route, outcome, reasonCode string) {
 	reasonCode = normalizeRuntimeKernelReasonCode(outcome, reasonCode)
+	shape = normalizeRuntimeStatField(shape, "unknown")
+	pipelineShape = normalizeRuntimeStatField(pipelineShape, qRuntimeKernelPipelineShape(kernel, shape))
 	key := runtimeKernelExecutionKey{
-		source:     normalizeRuntimeStatField(source, "q_eval_runtime"),
-		kernel:     normalizeRuntimeStatField(kernel, "unknown"),
-		shape:      normalizeRuntimeStatField(shape, "unknown"),
-		route:      normalizeRuntimeStatField(route, "runtime_primitive"),
-		outcome:    normalizeRuntimeStatField(outcome, "unknown"),
-		reasonCode: normalizeRuntimeStatField(reasonCode, outcome),
+		source:        normalizeRuntimeStatField(source, "q_eval_runtime"),
+		kernel:        normalizeRuntimeStatField(kernel, "unknown"),
+		shape:         shape,
+		pipelineShape: pipelineShape,
+		route:         normalizeRuntimeStatField(route, "runtime_primitive"),
+		outcome:       normalizeRuntimeStatField(outcome, "unknown"),
+		reasonCode:    normalizeRuntimeStatField(reasonCode, outcome),
 	}
 	if key.reasonCode == "" {
 		key.reasonCode = key.outcome
@@ -392,7 +400,7 @@ func registerRuntimeKernelCounterLocked(key runtimeKernelExecutionKey) *runtimeK
 	}
 	counter := &runtimeKernelExecutionCounter{
 		key:           key,
-		pipelineShape: qRuntimeKernelPipelineShape(key.kernel, key.shape),
+		pipelineShape: normalizeRuntimeStatField(key.pipelineShape, qRuntimeKernelPipelineShape(key.kernel, key.shape)),
 	}
 	runtimeKernelStats[key] = counter
 	runtimeKernelStatCounters = append(runtimeKernelStatCounters, counter)
@@ -411,6 +419,7 @@ func runtimeKernelCountersSnapshot() []*runtimeKernelExecutionCounter {
 func runtimeKernelCounterCacheIndex(key runtimeKernelExecutionKey) uintptr {
 	hash := runtimeKernelStringHash(key.kernel)
 	hash = hash*33 + runtimeKernelStringHash(key.shape)
+	hash = hash*33 + runtimeKernelStringHash(key.pipelineShape)
 	hash = hash*33 + runtimeKernelStringHash(key.outcome)
 	hash = hash*33 + runtimeKernelStringHash(key.reasonCode)
 	hash = hash*33 + runtimeKernelStringHash(key.source)
