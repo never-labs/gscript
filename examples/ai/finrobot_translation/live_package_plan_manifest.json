@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-live-external-package-plan",
+  "base_package": "leia-finrobot-translation",
+  "source_mode": "replay-slice",
+  "target_mode": "live-external-packages",
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in finance vendors, valuation formulas, report renderers, or web product services; live behavior must ship as external packages behind capability gates.",
+    "core_boundary": [
+      "composition",
+      "capability contracts",
+      "trace and replay metadata",
+      "approval policy",
+      "provider-free test gates"
+    ]
+  },
+  "packages": [
+    {
+      "id": "vendor_adapters",
+      "package_name": "leia-finrobot-vendor-adapters",
+      "planned_directory": "packages/finrobot/vendor_adapters",
+      "manifest": "packages/finrobot/vendor_adapters/package.manifest.json",
+      "contract": "packages/finrobot/vendor_adapters/contracts/vendor_adapter_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/vendor_adapters.leia",
+      "capabilities": [
+        "finance.vendor.yahoo.chart",
+        "finance.vendor.finnhub.profile",
+        "finance.vendor.fmp.key_metrics",
+        "finance.vendor.sec.filing",
+        "finance.vendor.earnings.transcript",
+        "finance.vendor.reddit.search"
+      ],
+      "test_gates": [
+        "manifest declares every live provider capability, credential env var, rate-limit policy, terms metadata, and replay fixture key",
+        "contract tests run with live_network=false and assert clean skips when optional provider credentials are absent",
+        "fixture replay tests validate response schema compatibility without importing yfinance, Finnhub, FMP, SEC, earnings, or Reddit clients",
+        "approval policy tests deny external network calls unless the matching provider capability is granted"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "normalizers",
+      "package_name": "leia-finrobot-normalizers",
+      "planned_directory": "packages/finrobot/normalizers",
+      "manifest": "packages/finrobot/normalizers/package.manifest.json",
+      "contract": "packages/finrobot/normalizers/contracts/finance_normalizer_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.normalize.market_price_bar",
+        "finance.normalize.fundamental_metric_row",
+        "finance.normalize.sec_section",
+        "finance.normalize.earnings_segment",
+        "finance.normalize.social_sentiment_record",
+        "finance.normalize.analyst_recommendation",
+        "finance.normalize.provenance"
+      ],
+      "test_gates": [
+        "schema tests preserve provider, replay_key, captured_at, source_schema, stale_after_days, and missing_field provenance",
+        "golden fixture tests reject unknown financial fields and stale market rows without calling live providers",
+        "package contract tests require deterministic output ordering across interpreter and bytecode replay runs",
+        "normalizer package remains installable without vendor adapter extras"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "valuation",
+      "package_name": "leia-finrobot-valuation",
+      "planned_directory": "packages/finrobot/valuation",
+      "manifest": "packages/finrobot/valuation/package.manifest.json",
+      "contract": "packages/finrobot/valuation/contracts/valuation_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/valuation_analytics.leia",
+      "capabilities": [
+        "finance.valuation.dcf",
+        "finance.valuation.ev_ebitda",
+        "finance.valuation.pe_multiple",
+        "finance.valuation.target_price_synthesis",
+        "finance.valuation.sensitivity_matrix",
+        "finance.valuation.assumption_audit"
+      ],
+      "test_gates": [
+        "offline fixture tests pin DCF, EV/EBITDA, P/E, target-price synthesis, and sensitivity outputs to tolerances",
+        "contract tests require explicit assumptions, currency, period, source provenance, and stale-data warnings",
+        "package tests reject hidden live data fetches and require all input tables to arrive through declared capabilities",
+        "numerical gates define acceptable tolerance drift before any live package replaces replay math"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "report_renderer",
+      "package_name": "leia-finrobot-report-renderer",
+      "planned_directory": "packages/finrobot/report_renderer",
+      "manifest": "packages/finrobot/report_renderer/package.manifest.json",
+      "contract": "packages/finrobot/report_renderer/contracts/report_renderer_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/report_contract.leia",
+      "capabilities": [
+        "report.render.html",
+        "report.render.pdf",
+        "report.render.chart_spec",
+        "report.render.source_annotations",
+        "report.render.ai_disclosure",
+        "report.render.output_manifest"
+      ],
+      "test_gates": [
+        "artifact contract tests validate HTML, PDF, chart spec, source annotation, AI disclosure, and output manifest schemas",
+        "snapshot tests compare deterministic renderer fixtures without browser network access",
+        "package tests require warnings for stale data, missing source provenance, and unsupported export formats",
+        "renderer extras stay optional so replay report contracts pass without wkhtmltopdf, playwright, plotly, or cloud storage"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "web_product",
+      "package_name": "leia-finrobot-web-product",
+      "planned_directory": "packages/finrobot/web_product",
+      "manifest": "packages/finrobot/web_product/package.manifest.json",
+      "contract": "packages/finrobot/web_product/contracts/web_product_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/web_product.leia",
+      "capabilities": [
+        "web.route.report",
+        "web.auth.session",
+        "web.background_task.log",
+        "web.artifact.download",
+        "web.crud.fixture_state",
+        "web.ui.snapshot",
+        "web.accessibility.checklist"
+      ],
+      "test_gates": [
+        "route parity tests cover replay UI paths and fail when live-only routes bypass fixtures",
+        "auth/session and background task logs are fixture-backed unless explicit product credentials are configured",
+        "download contract tests validate artifact manifests rather than fetching remote objects",
+        "accessibility and UI snapshot smoke tests remain provider-free and deterministic in CI"
+      ],
+      "no_built_in_guarantee": true
+    }
+  ],
+  "global_test_gates": [
+    "no test in this plan may perform real network I/O",
+    "live package manifests must default live_network to false",
+    "optional provider credentials must be redacted and absent-safe",
+    "each package must declare capabilities before it can replace a replay fixture",
+    "the replay slice remains the golden contract until the corresponding package contract passes"
+  ]
+}
