@@ -41,3 +41,20 @@
 - SEC filing download/render/PDF conversion/cache behavior is reduced to replay metadata plus section text evidence; no HTML parsing, PDF generation, marker conversion, or SEC section classifier is included.
 - Earnings-call transcript parsing is represented as pre-split speaker segments; retry behavior, date correction, and LangChain `Document` interoperability remain out of scope.
 - Toolkit registration is translated as a `register_data_toolkit()` list of `llm.tool` values, not AutoGen caller/executor registration or class-method decoration.
+
+## Equity Report
+
+- Live FMP/market/news/retail-sentiment API access is represented by local
+  fixtures so the Leia workflow can replay offline.
+- Pandas dataframe transformations, CSV persistence, and chart generation are
+  summarized as normalized fixture tools rather than translated as runtime data
+  processing.
+- Professional HTML, legacy page rendering, and PDF generation are outside this
+  workflow because the task scope is the replayable AI report pipeline, not the
+  renderer stack.
+- FinRobot's optional enhanced modules such as sensitivity heatmaps, technical
+  indicators, valuation waterfall charts, and retail sentiment details are
+  represented as structured summaries only.
+- The source agents reference web search for leadership, competitors, and
+  valuation context; the Leia translation uses replay fixtures instead to avoid
+  network dependence.
