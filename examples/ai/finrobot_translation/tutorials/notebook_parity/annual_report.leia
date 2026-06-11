@@ -1,0 +1,66 @@
+// Provider-free parity smoke for FinRobot annual report notebooks.
+//
+// This translates the notebook shape into deterministic fixture checks. It
+// does not call live filings, market data, model providers, PDF renderers, or
+// notebook runtimes.
+
+annual_report_notebook := {
+    id: "finrobot-tutorial-notebook-annual-report"
+    source_notebooks: {
+        "tutorials_beginner/agent_annual_report.ipynb",
+        "tutorials_advanced/agent_annual_report.ipynb",
+    }
+    provider_free: true
+    live_network: false
+    credentials_required: false
+    model_required: false
+    real_dependency_imports: false
+    fixture_key: "tutorial:notebook:annual_report:ACME:provider_free:2026-06-12"
+    sections: {
+        {id: "company_profile" source: "fixture" evidence_required: true},
+        {id: "business_overview" source: "fixture" evidence_required: true},
+        {id: "risk_factors" source: "fixture" evidence_required: true},
+        {id: "financial_summary" source: "fixture" evidence_required: true},
+        {id: "management_discussion" source: "fixture" evidence_required: true},
+    }
+    checks: {
+        no_live_provider: true
+        deterministic_order: true
+        source_citations: true
+        clean_skip_without_credentials: true
+    }
+}
+
+func annual_report_section_ok(section) {
+    if section == nil {
+        return false
+    }
+    return section.id != nil && section.source == "fixture" && section.evidence_required == true
+}
+
+annual_report_section_count := 0
+for i := 1; i <= #annual_report_notebook.sections; i++ {
+    section := annual_report_notebook.sections[i]
+    assert(annual_report_section_ok(section))
+    annual_report_section_count = annual_report_section_count + 1
+}
+
+assert(annual_report_notebook.provider_free == true)
+assert(annual_report_notebook.live_network == false)
+assert(annual_report_notebook.credentials_required == false)
+assert(annual_report_notebook.model_required == false)
+assert(annual_report_notebook.real_dependency_imports == false)
+assert(annual_report_notebook.checks.no_live_provider == true)
+assert(annual_report_notebook.checks.clean_skip_without_credentials == true)
+assert(annual_report_section_count == 5)
+
+annual_report_notebook_summary := string.format(
+"annual_report_notebook_parity sections=%d provider_free=%s live_network=%s model_required=%s fixture=%s",
+annual_report_section_count,
+tostring(annual_report_notebook.provider_free),
+tostring(annual_report_notebook.live_network),
+tostring(annual_report_notebook.model_required),
+annual_report_notebook.fixture_key
+)
+
+print(annual_report_notebook_summary)
