@@ -367,7 +367,9 @@ licensed text, and stale sources before building the collection.
 ## Workflows
 
 Use `llm.workflow` when you want a deterministic sequence of named steps that
-can mix agents, direct turns, and normal Leia code.
+can mix agents, direct turns, and normal Leia code. Use `llm.stage` when the
+same step also needs workflow-graph metadata such as dependencies, capability
+labels, and input/output refs.
 
 ```leia
 writer := llm.agent("writer", func(topic) {
@@ -401,6 +403,26 @@ result, err := mocked.run("release notes")
 
 Workflow helpers sequence work inside one script run. They are not a durable
 queue, retry engine, or parallel scheduler.
+
+When a package needs an explicit orchestration contract, wrap ordered stages
+with `llm.workflow_graph`. The graph helper validates that `depends_on` and
+`edges` reference known earlier stages, exposes `graph` metadata, and still
+runs through the same sequential workflow engine.
+
+```leia
+graph := llm.workflow_graph({
+    workflow_id: "research-flow"
+    stages: {
+        llm.stage("plan", plan_fn, {output_ref: "plan_result"})
+        llm.stage("final", final_fn, {
+            depends_on: {"plan"}
+            input_ref: "plan_result"
+        })
+    }
+    edges: {{from: "plan", to: "final"}}
+})
+result, err := graph.run("release notes")
+```
 
 ## Sections
 

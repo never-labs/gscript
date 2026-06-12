@@ -58,16 +58,17 @@ calls. For example, a tool created with `tool { ... }` and a tool created with
 `llm.tool(...)` must go through the same tool validation, capability metadata,
 dispatch, tracing, and replay paths.
 
-Lower-level AI helpers such as `llm.workflow`, `llm.step`, `llm.doc`,
-`llm.collection`, `llm.retrieve`, `llm.context`, `llm.evidence`, `llm.schema`,
-`llm.output_schema`, `llm.schema_info`, `llm.handoff`, `llm.delegate`, and
-`llm.sections`, `llm.tool_info`, `llm.tool_schema`, `llm.validate_tools`,
-`llm.policy`, `llm.check_policy`, `llm.approval_trace`, and
-`llm.report_artifact_contract` are part of the same runtime layer. They are
-ordinary functions that return ordinary tables, callables, or `(value, err)`
-pairs. They must not introduce separate prompt memory, provider bypasses,
-hidden network access, global document stores, hidden approval stores, report
-renderers, or a second orchestration engine.
+Lower-level AI helpers such as `llm.workflow`, `llm.step`, `llm.stage`,
+`llm.workflow_graph`, `llm.doc`, `llm.collection`, `llm.retrieve`,
+`llm.context`, `llm.evidence`, `llm.schema`, `llm.output_schema`,
+`llm.schema_info`, `llm.handoff`, `llm.delegate`, and `llm.sections`,
+`llm.tool_info`, `llm.tool_schema`, `llm.validate_tools`, `llm.policy`,
+`llm.check_policy`, `llm.approval_trace`, and `llm.report_artifact_contract`
+are part of the same runtime layer. They are ordinary functions that return
+ordinary tables, callables, or `(value, err)` pairs. They must not introduce
+separate prompt memory, provider bypasses, hidden network access, global
+document stores, hidden approval stores, report renderers, or a second
+orchestration engine.
 
 This stable lowering is observable without a live provider. A tagged tool must
 preserve helper-visible capability metadata:
@@ -348,9 +349,9 @@ incident := llm.agent("incident", incident_config, incident_flow, {
 ## Workflow Helpers
 
 `llm.workflow(steps)` creates a sequential workflow value from `llm.step(name,
-fn, opts)` tables or plain functions. The workflow exposes `run(input, opts)`
-and `mock(fixtures)`. A step may call `llm.turn`, call an agent, dispatch
-tools, or perform non-AI work.
+fn, opts)`, `llm.stage(name, fn, opts)`, or plain functions. The workflow
+exposes `run(input, opts)` and `mock(fixtures)`. A step may call `llm.turn`,
+call an agent, dispatch tools, or perform non-AI work.
 
 Workflow execution is deterministic except for the operations performed inside
 steps. Each step receives a context table with `input`, `initial_input`,
@@ -359,6 +360,16 @@ ordered step results and a name-indexed context table, feeds the prior step's
 text or value to the next step, and returns a final workflow result plus an
 error value when a step fails. Mock fixtures replace matching steps for tests
 and examples.
+
+`llm.stage` has the same execution semantics as `llm.step`, but marks the
+value as a stage and preserves stage-oriented metadata in `opts`, such as
+`depends_on`, `input_ref`, `output_ref`, `input_schema`, `output_schema`,
+`capability`, and `fixture_key`.
+
+`llm.workflow_graph(config)` wraps the same runner with a static graph
+contract. It accepts ordered `stages` and optional `edges`, validates that
+dependencies and edges reference known earlier stages, exposes graph metadata,
+and then executes sequentially in the supplied order.
 
 These helpers are sequencing helpers, not durable orchestration. They do not
 imply parallelism, retry policy, persistence, transactions, approval storage, or
