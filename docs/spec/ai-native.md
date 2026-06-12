@@ -352,6 +352,24 @@ Custom flows that need auditable tool evidence should also use
 `llm.tool_outcome` and `llm.tool_outcome_event` rather than placing raw tool
 inputs or outputs in trace payloads.
 
+Custom flows that need resumable or auditable agent state should project state
+explicitly through `llm.agent_state_checkpoint(state, opts)`. The checkpoint is
+a provider-free, ref-only table with `kind: "agent_state_checkpoint"`,
+`schema_version: 1`, `version: "agent_state_checkpoint.v1"`, identifiers such
+as `agent_run_id`, `session_id`, `state_version`, and `turn_id`, ref tables such
+as `input_refs`, `output_refs`, and `memory_refs`, deterministic
+`checkpoint_key` and `cache_key` values, a `resume_token`, redaction metadata,
+and trace correlation fields. `llm.agent_state_checkpoint_event(checkpoint,
+opts)` projects the checkpoint into the generic trace event shape;
+`llm.agent_state_checkpoint_trace_event` is an equivalent explicit trace-named
+alias.
+
+Agent state checkpoints are observational metadata. They must not persist state,
+perform provider I/O, import live dependencies, or copy raw prompts, raw
+provider completions, raw input/output values, credentials, tokens, cookies, or
+API keys into the checkpoint payload. Durable storage, locking, and resume
+execution remain host or application responsibilities.
+
 For complex flows that need exact control over metadata or call parameters,
 scripts may use the lower-level helper directly:
 

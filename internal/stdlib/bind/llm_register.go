@@ -84,6 +84,7 @@ func (b *llmLibBuilder) register() {
 	b.registerToolOutcomeHelpers()
 	b.registerSchemaHelpers()
 	b.registerToolCheckHelper()
+	b.registerAgentStateCheckpointHelpers()
 	b.registerPolicyHelpers()
 	b.registerApprovalHelpers()
 	b.registerBudgetOutcomeHelpers()

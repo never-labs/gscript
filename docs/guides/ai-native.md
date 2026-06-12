@@ -533,6 +533,30 @@ event := llm.tool_outcome_event(outcome, {trace_id: "tool-review"})
 The outcome records tool identity, result/error status, arg names, result refs,
 and redaction flags without copying raw args or raw result values.
 
+Longer custom flows can checkpoint resumable state with the same ref-only trace
+pattern:
+
+```leia
+checkpoint := llm.agent_state_checkpoint({
+    agent_run_id: "agent-run-42"
+    session_id: "session-7"
+    state_version: 3
+    input_refs: {llm.doc("input", "memory://input/42", {kind: "ref"})}
+    output_refs: {llm.doc("draft", "memory://draft/42", {kind: "ref"})}
+}, {
+    workflow_run_id: "run-42"
+    workflow_step_id: "draft"
+})
+event := llm.agent_state_checkpoint_event(checkpoint, {
+    trace_id: "state-review"
+})
+```
+
+The checkpoint records identity, refs, deterministic checkpoint/cache keys,
+resume token, redaction flags, and correlation fields. It is not a durable
+state store and it does not copy raw prompts, raw inputs, raw outputs, or
+credentials.
+
 Use policy checks before exposing high-risk tools:
 
 ```leia

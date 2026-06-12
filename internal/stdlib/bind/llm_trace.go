@@ -163,6 +163,26 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	b.set("toolOutcomeEvent", toolOutcomeEvent)
 	b.set("tool_outcome_trace_event", toolOutcomeEvent)
 	b.set("toolOutcomeTraceEvent", toolOutcomeEvent)
+
+	agentStateCheckpointEvent := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.agent_state_checkpoint_event' (agent state checkpoint table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.agent_state_checkpoint_event' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmAgentStateCheckpointTraceEventValue(args[0].Table(), opts))}, nil
+	}
+	b.set("agent_state_checkpoint_event", agentStateCheckpointEvent)
+	b.set("agentStateCheckpointEvent", agentStateCheckpointEvent)
+	b.set("agent_state_checkpoint_trace_event", agentStateCheckpointEvent)
+	b.set("agentStateCheckpointTraceEvent", agentStateCheckpointEvent)
+	b.set("state_checkpoint_event", agentStateCheckpointEvent)
+	b.set("stateCheckpointEvent", agentStateCheckpointEvent)
 }
 
 func llmTraceEventValue(src *Table) *Table {
@@ -806,6 +826,124 @@ func llmToolOutcomeCopyCorrelation(outcome, src *Table) {
 			src.RawSetString("correlation_id", llmCloneValue(value))
 		}
 	}
+}
+
+func llmAgentStateCheckpointTraceEventValue(checkpoint, opts *Table) *Table {
+	src := NewTable()
+	for _, key := range opts.PairsKeysSnapshot() {
+		src.RawSet(key, llmCloneValue(opts.RawGet(key)))
+	}
+	status := llmTraceString(checkpoint, "status", "checkpointed")
+	src.RawSetString("event_type", StringValue(llmTraceString(opts, "event_type", "agent_state_checkpoint")))
+	src.RawSetString("status", StringValue(llmTraceString(opts, "status", status)))
+	src.RawSetString("provider_free", BoolValue(llmTraceBool(opts, "provider_free", true)))
+	src.RawSetString("live_network", BoolValue(llmTraceBool(opts, "live_network", false)))
+	src.RawSetString("live_model", BoolValue(llmTraceBool(opts, "live_model", false)))
+	src.RawSetString("credentials_required", BoolValue(llmTraceBool(opts, "credentials_required", false)))
+	src.RawSetString("real_dependency_imports", BoolValue(llmTraceBool(opts, "real_dependency_imports", false)))
+	llmAgentStateCheckpointCopyCorrelation(checkpoint, src)
+	if replay := llmAgentStateCheckpointReplayValue(checkpoint, opts); replay.IsTable() {
+		src.RawSetString("replay", replay)
+	}
+
+	payload := NewTable()
+	for _, field := range []string{
+		"kind",
+		"schema_version",
+		"version",
+		"status",
+		"result_status",
+		"agent_run_id",
+		"session_id",
+		"state_version",
+		"checkpoint_key",
+		"cache_key",
+		"resume_token",
+		"operation",
+		"component",
+	} {
+		if value := checkpoint.RawGetString(field); !value.IsNil() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	for _, field := range []string{"input_refs", "output_refs", "memory_refs", "checkpoint", "trace_correlation"} {
+		if value := checkpoint.RawGetString(field); value.IsTable() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if redaction := checkpoint.RawGetString("redaction"); redaction.IsTable() {
+		src.RawSetString("redaction", llmCloneValue(redaction))
+	}
+	src.RawSetString("payload", TableValue(payload))
+	return llmTraceEventValue(src)
+}
+
+func llmAgentStateCheckpointCopyCorrelation(checkpoint, src *Table) {
+	correlation := NewTable()
+	copiedCorrelation := false
+	if existing := src.RawGetString("correlation"); existing.IsTable() {
+		correlation = llmCloneValue(existing).Table()
+		copiedCorrelation = true
+	}
+	if existing := checkpoint.RawGetString("trace_correlation"); existing.IsTable() {
+		llmCopyTable(correlation, existing.Table(), true)
+		copiedCorrelation = true
+	}
+	if copiedCorrelation {
+		src.RawSetString("correlation", TableValue(correlation))
+	}
+	for _, field := range []string{
+		"workflow_run_id",
+		"workflow_step_id",
+		"agent_run_id",
+		"turn_id",
+		"replay_session_id",
+		"correlation_id",
+		"parent_event_id",
+		"session_id",
+		"state_version",
+		"checkpoint_key",
+	} {
+		if src.RawGetString(field).IsNil() {
+			if value := checkpoint.RawGetString(field); !value.IsNil() {
+				src.RawSetString(field, llmCloneValue(value))
+			}
+		}
+	}
+	if src.RawGetString("correlation_id").IsNil() {
+		if value := checkpoint.RawGetString("checkpoint_key"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		} else if value := checkpoint.RawGetString("session_id"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		}
+	}
+}
+
+func llmAgentStateCheckpointReplayValue(checkpoint, opts *Table) Value {
+	replay := NewTable()
+	if existing := opts.RawGetString("replay"); existing.IsTable() {
+		replay = llmCloneValue(existing).Table()
+	}
+	replay.RawSetString("provider_free", BoolValue(true))
+	replay.RawSetString("deterministic", BoolValue(true))
+	replay.RawSetString("created_from_provider", BoolValue(false))
+	replay.RawSetString("mode", StringValue(llmTraceString(replay, "mode", "fixture_replay")))
+	if replay.RawGetString("replay_key").IsNil() {
+		if key := checkpoint.RawGetString("checkpoint_key"); !key.IsNil() {
+			replay.RawSetString("replay_key", llmCloneValue(key))
+		}
+	}
+	if replay.RawGetString("request_hash").IsNil() {
+		if key := checkpoint.RawGetString("checkpoint_key"); !key.IsNil() {
+			replay.RawSetString("request_hash", llmCloneValue(key))
+		}
+	}
+	if replay.RawGetString("cache_key").IsNil() {
+		if key := checkpoint.RawGetString("cache_key"); !key.IsNil() {
+			replay.RawSetString("cache_key", llmCloneValue(key))
+		}
+	}
+	return TableValue(replay)
 }
 
 func llmTraceSummaryValue(input *Table) *Table {
