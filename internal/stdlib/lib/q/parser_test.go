@@ -34,7 +34,7 @@ func TestParseSelectWhere(t *testing.T) {
 }
 
 func TestParseQSQLLogicalSymbolOperators(t *testing.T) {
-	query := mustParse(t, "select sym from trades where price>100 & size>10 | flagged")
+	query := mustParse(t, "select sym from trades where ((price>100)&(size>10))|flagged")
 
 	where, ok := query.Where.(Binary)
 	if !ok || where.Op != "|" {
@@ -178,7 +178,7 @@ func TestParseOrderByComputedProjectionDefaultName(t *testing.T) {
 }
 
 func TestParsePercentDivideExpressions(t *testing.T) {
-	query := mustParse(t, "select ratio:a%b,spread:(price-arrival)*10000%arrival from trades where price%qty>10 order by price%qty desc")
+	query := mustParse(t, "select ratio:a%b,spread:((price-arrival)*10000)%arrival from trades where (price%qty)>10 order by price%qty desc")
 	if len(query.Columns) != 2 {
 		t.Fatalf("columns = %#v", query.Columns)
 	}
@@ -2336,7 +2336,7 @@ func TestLowerTimeSeriesProjectionCallsToDataExpressions(t *testing.T) {
 		t.Fatalf("prefix expr = %#v, want prev vector transform", prefix.Plan.Select[0].Expr)
 	}
 
-	absProjection, err := Lower(mustParse(t, "select abs_qty:abs signed_qty from trades where abs signed_qty>20 order by abs signed_qty desc"))
+	absProjection, err := Lower(mustParse(t, "select abs_qty:abs signed_qty from trades where (abs signed_qty)>20 order by abs signed_qty desc"))
 	if err != nil {
 		t.Fatalf("Lower abs returned error: %v", err)
 	}
@@ -2419,7 +2419,7 @@ func TestLowerTimeSeriesProjectionCallsToDataExpressions(t *testing.T) {
 }
 
 func TestLowerPercentDivideToDataOpDiv(t *testing.T) {
-	query := mustParse(t, "select ratio:price%qty from trades where price%qty>10 order by price%qty desc")
+	query := mustParse(t, "select ratio:price%qty from trades where (price%qty)>10 order by price%qty desc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower failed: %v", err)
@@ -2444,7 +2444,7 @@ func TestLowerPercentDivideToDataOpDiv(t *testing.T) {
 		t.Fatalf("order hidden expr = %#v, want OpDiv", lowered.Plan.Select[1].Expr)
 	}
 
-	update := mustParse(t, "update ratio:price%qty from trades where price%qty>10")
+	update := mustParse(t, "update ratio:price%qty from trades where (price%qty)>10")
 	loweredUpdate, err := Lower(update)
 	if err != nil {
 		t.Fatalf("Lower update failed: %v", err)
@@ -2527,7 +2527,7 @@ func TestLoweredGroupedAnalyticsProjectionExecutesByGroup(t *testing.T) {
 }
 
 func TestLoweredTimeSeriesVectorWhereAndOrderExecute(t *testing.T) {
-	query := mustParse(t, "select sym,price,p:prev price,d:deltas price from trades where deltas price>0 order by deltas price desc")
+	query := mustParse(t, "select sym,price,p:prev price,d:deltas price from trades where (deltas price)>0 order by deltas price desc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower returned error: %v", err)
@@ -2549,7 +2549,7 @@ func TestLoweredTimeSeriesVectorWhereAndOrderExecute(t *testing.T) {
 }
 
 func TestLoweredAbsProjectionWhereAndOrderExecute(t *testing.T) {
-	query := mustParse(t, "select sym,abs_qty:abs signed_qty from trades where abs signed_qty>20 order by abs signed_qty desc")
+	query := mustParse(t, "select sym,abs_qty:abs signed_qty from trades where (abs signed_qty)>20 order by abs signed_qty desc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower returned error: %v", err)
@@ -2572,7 +2572,7 @@ func TestLoweredAbsProjectionWhereAndOrderExecute(t *testing.T) {
 }
 
 func TestLoweredNumericUnaryProjectionWhereAndOrderExecute(t *testing.T) {
-	query := mustParse(t, "select sym,neg_qty:neg signed_qty,root_qty:sqrt qty,log_qty:log qty,exp_qty:exp qty,inv_qty:reciprocal qty from trades where sqrt qty>=3 order by neg signed_qty asc")
+	query := mustParse(t, "select sym,neg_qty:neg signed_qty,root_qty:sqrt qty,log_qty:log qty,exp_qty:exp qty,inv_qty:reciprocal qty from trades where (sqrt qty)>=3 order by neg signed_qty asc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower returned error: %v", err)
@@ -2604,7 +2604,7 @@ func TestLoweredNumericUnaryProjectionWhereAndOrderExecute(t *testing.T) {
 }
 
 func TestLoweredTrigUnaryProjectionWhereAndOrderExecute(t *testing.T) {
-	query := mustParse(t, "select sym,s:sin theta,c:cos theta,t:tan theta,a:asin ratio,ac:acos ratio,at:atan theta from trades where cos theta>0 order by sin theta desc")
+	query := mustParse(t, "select sym,s:sin theta,c:cos theta,t:tan theta,a:asin ratio,ac:acos ratio,at:atan theta from trades where (cos theta)>0 order by sin theta desc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower returned error: %v", err)
@@ -2638,7 +2638,7 @@ func TestLoweredTrigUnaryProjectionWhereAndOrderExecute(t *testing.T) {
 }
 
 func TestLoweredRoundingUnaryProjectionWhereAndOrderExecute(t *testing.T) {
-	query := mustParse(t, "select sym,dir:signum signed_qty,floor_qty:floor qty,ceil_qty:ceiling qty from trades where ceiling qty>=10 order by floor qty desc")
+	query := mustParse(t, "select sym,dir:signum signed_qty,floor_qty:floor qty,ceil_qty:ceiling qty from trades where (ceiling qty)>=10 order by floor qty desc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower returned error: %v", err)
@@ -2911,7 +2911,7 @@ func TestLoweredQSQLLogicalSymbolOperatorsExecute(t *testing.T) {
 		data.NewColumn("low_battery", []any{false, false, true, false}),
 	)
 
-	selected, err := Lower(mustParse(t, "select sym,keep:flagged|low_battery from trades where price>100 & size>10 | flagged order by sym asc"))
+	selected, err := Lower(mustParse(t, "select sym,keep:flagged|low_battery from trades where ((price>100)&(size>10))|flagged order by sym asc"))
 	if err != nil {
 		t.Fatalf("Lower select returned error: %v", err)
 	}
@@ -2926,7 +2926,7 @@ func TestLoweredQSQLLogicalSymbolOperatorsExecute(t *testing.T) {
 	assertQColumnValues(t, out, "sym", []any{data.Symbol("AAPL"), data.Symbol("MSFT")})
 	assertQColumnValues(t, out, "keep", []any{false, true})
 
-	updated, err := Lower(mustParse(t, "update keep:flagged|low_battery from trades where price>100 & size>10 | flagged"))
+	updated, err := Lower(mustParse(t, "update keep:flagged|low_battery from trades where ((price>100)&(size>10))|flagged"))
 	if err != nil {
 		t.Fatalf("Lower update returned error: %v", err)
 	}
