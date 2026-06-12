@@ -219,6 +219,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"generic_data_provider_boundary":       "generic.ai.",
 		"generic_document_rag_pipeline":        "generic.ai.",
 		"generic_evidence_report_artifacts":    "generic.ai.",
+		"generic_evidence_verification":        "generic.ai.",
 		"generic_evaluation_harness":           "generic.ai.evaluation.harness.",
 		"generic_event_intelligence_boundary":  "generic.ai.",
 		"generic_memory_store":                 "generic.ai.memory.",

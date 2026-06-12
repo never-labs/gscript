@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 98,
-  "translation_directory_file_count": 813,
+  "registered_examples_count": 99,
+  "translation_directory_file_count": 826,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -212,6 +212,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
       "covers_package_ids": [
         "generic_evidence_report_artifacts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_evidence_verification",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "covers_package_ids": [
+        "generic_evidence_verification"
       ],
       "status": "checked_in_registered_example"
     },
@@ -1144,6 +1153,36 @@
         "contract JSON declares generic evidence/report/artifact backend boundary",
         "registered example executes provider-free",
         "no renderer, browser, provider credentials, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_evidence_verification",
+      "package_name": "leia-generic-ai-evidence-verification",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "planned_directory": "packages/generic_ai/evidence_verification",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/contracts/generic_evidence_verification_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "capabilities": [
+        "generic.ai.evidence.verify",
+        "generic.ai.evidence.claim_record",
+        "generic.ai.evidence.source_ref",
+        "generic.ai.evidence.citation_ref",
+        "generic.ai.evidence.requirement_matrix",
+        "generic.ai.evidence.citation_normalize",
+        "generic.ai.evidence.freshness_check",
+        "generic.ai.evidence.unresolved_ref",
+        "generic.ai.evidence.quality_summary",
+        "generic.ai.evidence.clean_degradation"
+      ],
+      "test_gates": [
+        "evidence verification contract claim records, source refs, and citation refs decode without provider calls",
+        "citation normalization preserves first-seen deterministic order and reports unresolved refs",
+        "freshness checks emit warnings from fixture timestamps without live network access",
+        "missing required evidence produces clean degradation actions instead of invented claims",
+        "evidence quality summaries are deterministic provider-free fixture data"
       ],
       "no_built_in_guarantee": true
     },

@@ -4,7 +4,7 @@
 // model, model-io, document-rag, prompt-role, memory, turn, agent-state, tool,
 // tool-registry, optional-adapter, data-provider, data-normalization,
 // transcript-pipeline, analytical-model, event-intelligence, strategy-backtest,
-// coding-workspace, planning, agent, workflow, chart-render, evidence-report,
+// coding-workspace, planning, agent, workflow, chart-render, evidence-verification, evidence-report,
 // report-render, product-app, ui-snapshot, eval, replay, trace, approval,
 // and package-audit. It intentionally declares no
 // provider SDK, network call, credential, or domain adapter.
@@ -35,6 +35,7 @@ package_boundaries := {
     {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "generic.ai.package.boundary.audit" provider_free: true live_network: false},
     {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "ai.workflow.orchestrate.provider_free" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
     {role: "chart-render" package_id: "generic-chart-render-contracts" capability: "generic.ai.chart.render.contracts" entrypoint: "ai.chart.render_contracts" provider_free: true live_network: false},
+    {role: "evidence-verification" package_id: "generic-evidence-verification" capability: "generic.ai.evidence.verify" entrypoint: "ai.evidence.verify" provider_free: true live_network: false},
     {role: "evidence-report" package_id: "generic-evidence-report-artifacts" capability: "generic.ai.evidence.report.artifacts" entrypoint: "ai.evidence.report_artifacts" provider_free: true live_network: false},
     {role: "report-render" package_id: "generic-report-render-contracts" capability: "generic.ai.report.render.contracts" entrypoint: "ai.report.render_contracts" provider_free: true live_network: false},
     {role: "product-app" package_id: "generic-product-app-boundary" capability: "generic.ai.product_app.boundary" entrypoint: "ai.product_app.boundary" provider_free: true live_network: false},
@@ -68,7 +69,8 @@ composition_edges := {
     {from: "planning" to: "workflow" handoff: "plan graph and dependency evidence"},
     {from: "package-audit" to: "workflow" handoff: "provider-free boundary gate"},
     {from: "chart-render" to: "evidence-report" handoff: "chart render artifacts and source metadata"},
-    {from: "workflow" to: "evidence-report" handoff: "source-bound report artifacts and evidence envelopes"},
+    {from: "workflow" to: "evidence-verification" handoff: "claim records, source annotations, citation refs, and evidence policy"},
+    {from: "evidence-verification" to: "evidence-report" handoff: "verified citations, freshness warnings, unresolved refs, and degradation actions"},
     {from: "evidence-report" to: "report-render" handoff: "report render requests and artifact manifests"},
     {from: "workflow" to: "product-app" handoff: "route, session, task, artifact, and CRUD product shell"},
     {from: "evidence-report" to: "ui-snapshot" handoff: "artifact URI manifest and snapshot metadata"},
@@ -82,7 +84,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "model-io", "agent-state", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "analytical-model", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "model-io", "agent-state", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "analytical-model", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-verification", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -108,8 +110,8 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 30 &&
-        #workflow_contract.edges == 29 &&
+    return #workflow_contract.composition == 31 &&
+        #workflow_contract.edges == 30 &&
         role_present("model") &&
         role_present("model-io") &&
         role_present("agent-state") &&
@@ -131,6 +133,7 @@ func connected_native_surfaces() {
         role_present("agent") &&
         role_present("workflow") &&
         role_present("chart-render") &&
+        role_present("evidence-verification") &&
         role_present("evidence-report") &&
         role_present("report-render") &&
         role_present("product-app") &&

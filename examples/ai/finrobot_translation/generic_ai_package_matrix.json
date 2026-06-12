@@ -319,6 +319,32 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_evidence_verification",
+      "package_name": "leia-generic-ai-evidence-verification",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "capability": "generic.ai.evidence.verify",
+      "capabilities": [
+        "generic.ai.evidence.verify",
+        "generic.ai.evidence.claim_record",
+        "generic.ai.evidence.source_ref",
+        "generic.ai.evidence.citation_ref",
+        "generic.ai.evidence.requirement_matrix",
+        "generic.ai.evidence.citation_normalize",
+        "generic.ai.evidence.freshness_check",
+        "generic.ai.evidence.unresolved_ref",
+        "generic.ai.evidence.quality_summary",
+        "generic.ai.evidence.clean_degradation"
+      ],
+      "backend_shape": "ai.evidence.verify",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/contracts/generic_evidence_verification_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_memory_store",
       "package_name": "leia-generic-ai-memory-store",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_memory_store",

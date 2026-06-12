@@ -7,12 +7,12 @@ Baseline:
 - Leia branch: `codex/ai-dialect-polish` branch head.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 813 files, including 52
+- Current translation directory file count: 826 files, including 53
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
-- Registered examples: 98 runnable/checkable examples discovered by
+- Registered examples: 99 runnable/checkable examples discovered by
   `go run ./cmd/leia examples list --json`.
-- Fixture index normalization: 51 live-package skeletons use
+- Fixture index normalization: 52 live-package skeletons use
   `fixtures/provider_free_fixture_index.json`; `live_packages/vendor_adapters`
   retains its provider-specific `fixtures/offline_replay_index.json`.
 - Runtime changes in this audit: none.
@@ -44,7 +44,7 @@ notebook/tutorial parity.
 The generic AI dialect convergence items are no longer missing or planned
 FinRobot work. They are checked-in package boundaries under
 `live_packages/generic_*`, with manifests, contracts, fixtures, registered
-examples, and tests. Current inventory finds 30 registered generic live-package
+examples, and tests. Current inventory finds 31 registered generic live-package
 examples covering model resolution, model IO envelopes, coding workspaces,
 data provider boundaries, document RAG, event intelligence boundaries, strategy simulation boundaries, evidence/report artifacts, report render
 contracts, UI snapshot evaluation, chart render
@@ -61,16 +61,16 @@ The following read-only inventory commands were run from this worktree on
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `813` files |
-| `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `98` examples: `87` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
-| `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `52` live-package skeleton directories |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `826` files |
+| `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `99` examples: `88` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
+| `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `53` live-package skeleton directories |
 | `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `50` provider-free fixture indexes |
-| `go run ./cmd/leia examples list --json` filtered to `/live_packages/generic_` | `30` registered generic AI live-package examples |
+| `go run ./cmd/leia examples list --json` filtered to `/live_packages/generic_` | `31` registered generic AI live-package examples |
 | Same example inventory filtered to top-level `generic_*.leia` examples | `3` registered generic AI composition examples |
 | Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
 | `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 
-This refresh updated the file-inventory count to 813 `rg --files` inventory files. The registered
+This refresh updated the file-inventory count to 826 `rg --files` inventory files. The registered
 example, runner, live-package, generic live-package, and tutorial runnable
 counts now include the generic strategy backtest contracts package.
 
@@ -116,6 +116,7 @@ counts now include the generic strategy backtest contracts package.
 | `repo-ai-finrobot_translation-live_packages-generic_document_rag_pipeline-main` | `live_packages/generic_document_rag_pipeline/main.leia` | `host-vm` | Checked-in generic document RAG skeleton for document conversion, section extraction, chunk provenance, corpus manifests, retrieval citations, and adapter clean skips |
 | `repo-ai-finrobot_translation-live_packages-generic_event_intelligence_boundary-main` | `live_packages/generic_event_intelligence_boundary/main.leia` | `host-vm` | Checked-in generic event intelligence boundary skeleton for source snapshots, event extraction, taxonomies, freshness, dedupe/source confidence, relevance, sentiment, impact, prompt contracts, and adapter clean skips |
 | `repo-ai-finrobot_translation-live_packages-generic_evidence_report_artifacts-main` | `live_packages/generic_evidence_report_artifacts/main.leia` | `host-vm` | Checked-in generic evidence/report/artifact skeleton for source annotations, citation envelopes, report outlines, render manifests, snapshot metadata, stale warnings, accessibility checks, and renderer clean skips |
+| `repo-ai-finrobot_translation-live_packages-generic_evidence_verification-main` | `live_packages/generic_evidence_verification/main.leia` | `host-vm` | Checked-in generic evidence verification skeleton for claim records, source refs, citation normalization, freshness warnings, unresolved refs, quality summaries, and clean degradation |
 | `repo-ai-finrobot_translation-live_packages-generic_evaluation_harness-main` | `live_packages/generic_evaluation_harness/main.leia` | `host-vm` | Checked-in generic AI evaluation harness skeleton for datasets, cases, metrics, replayed judges, findings, and golden gates |
 | `repo-ai-finrobot_translation-live_packages-generic_strategy_backtest_contracts-main` | `live_packages/generic_strategy_backtest_contracts/main.leia` | `host-vm` | Checked-in generic strategy simulation contracts skeleton for strategy manifests, observation feeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, deterministic seeds, and engine clean skips |
 | `repo-ai-finrobot_translation-live_packages-generic_memory_store-main` | `live_packages/generic_memory_store/main.leia` | `host-vm` | Checked-in generic AI memory store skeleton for namespace policy, memory item provenance, deterministic retrieval ranking, context windows, and clean-skip adapter boundaries |
@@ -176,8 +177,8 @@ counts now include the generic strategy backtest contracts package.
 | `repo-ai-finrobot_translation-vendor_adapters` | `vendor_adapters.leia` | `host-vm` | Vendor adapter package skeleton contracts |
 | `repo-ai-finrobot_translation-web_product` | `web_product.leia` | `evaluate` | Web route/auth/task/download/CRUD smoke metadata |
 
-Runner summary: 87 `host-vm`, 6 `llm-replay`, 5 `evaluate`, 98 runnable,
-98 checkable.
+Runner summary: 88 `host-vm`, 6 `llm-replay`, 5 `evaluate`, 99 runnable,
+99 checkable.
 
 ## Module Coverage Matrix
 
@@ -267,12 +268,12 @@ mistaken for missing language/runtime support.
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
-| Registered example inventory | 98 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 813 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| Registered example inventory | 99 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
+| File inventory | 826 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
-| Host-VM contract examples | 87 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
+| Host-VM contract examples | 88 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 5 `evaluate` examples for equity CLI workflow, web product smoke metadata, generic workflow orchestration, and generic agent-loop composition | Complete |
-| Live-package skeletons | 52 checked-in skeleton directories, including 30 reusable `live_packages/generic_*` AI boundaries and 22 FinRobot/finance package boundaries; all 52 include registered `.leia` examples | Complete |
+| Live-package skeletons | 53 checked-in skeleton directories, including 31 reusable `live_packages/generic_*` AI boundaries and 22 FinRobot/finance package boundaries; all 53 include registered `.leia` examples | Complete |
 | Generic AI dialect package boundary | The reusable `live_packages/generic_*` set is checked in as package-owned generic AI surface, not a FinRobot-specific dialect or language/runtime change | Complete |
 | Provider independence | Examples use fixtures, replay records, manifests, and optional capability gates instead of live credentials | Complete |
 | Evaluation harness | `evaluation_harness/manifest.json` inventories replay records, golden checksums, gates, and report metadata | Complete for current registered records |
@@ -280,7 +281,7 @@ mistaken for missing language/runtime support.
 | Production parity | Live provider clients, renderers, DB/web orchestration, optional integrations, and full notebooks beyond the skeleton contracts | Not complete by design |
 
 Provider-free completion result: complete for the currently registered
-98-example translation slice, including live-package skeleton contracts.
+99-example translation slice, including live-package skeleton contracts.
 Production/live-package parity result: incomplete by design.
 
 ## Next-Phase Live-Package Tasks

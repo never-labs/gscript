@@ -49,6 +49,11 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 			allowCapabilityID: true,
 		},
 		{
+			dir:               "generic_evidence_verification",
+			packageName:       "leia-generic-ai-evidence-verification",
+			allowCapabilityID: true,
+		},
+		{
 			dir:               "generic_coding_workspace",
 			packageName:       "leia-generic-ai-coding-workspace",
 			allowCapabilityID: true,

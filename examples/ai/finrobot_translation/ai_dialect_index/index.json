@@ -34,6 +34,7 @@
     "evaluation",
     "event-intelligence",
     "evidence-report-artifacts",
+    "evidence-verification",
     "memory",
     "model",
     "model-io",
@@ -475,6 +476,38 @@
         "package_id": "generic-ai-evidence-report-artifacts",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "evidence-verification",
+      "capability_id": "generic.ai.evidence.verify",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "evidence.verify",
+        "evidence.claim_record",
+        "evidence.source_ref",
+        "evidence.citation_ref",
+        "evidence.freshness_check",
+        "evidence.clean_degradation"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_evidence_verification.source.txt",
+      "test": "tests/llm/llm_generic_evidence_verification_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_evidence_verification_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-evidence-verification",
+        "boundary": "provider-free claim/source/citation verification, freshness warning, unresolved-ref, quality-summary, and clean-degradation contracts",
+        "status": "resolved",
+        "reason": "evidence verification policy was duplicated across analyzer, report, and renderer packages before being promoted to a reusable generic boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-evidence-verification",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic:evidence_verification:offline",
+  "package_boundary_id": "generic-ai-evidence-verification",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "policy": {
+    "policy_id": "evidence-policy-offline-v1",
+    "provider_free": true,
+    "live_network": false,
+    "minimum_source_refs_per_claim": 1,
+    "reject_unresolved_refs": true,
+    "requires_source_quote_or_metric": true,
+    "allowed_evidence_kinds": ["document", "metric", "event", "transcript"],
+    "freshness_policy": {
+      "as_of": "2026-06-12",
+      "warning_level_for_stale_sources": "review",
+      "block_on_stale_source": false,
+      "stale_after_days_by_kind": {
+        "document": 180,
+        "metric": 30,
+        "event": 7,
+        "transcript": 120
+      }
+    },
+    "citation_normalization": {
+      "source_id_case": "lower_snake",
+      "strip_query_fragments_from_locator": true,
+      "dedupe_repeated_refs": true,
+      "preserve_first_seen_order": true
+    }
+  },
+  "requirement_matrix": {
+    "matrix_id": "generic-evidence-requirements-v1",
+    "provider_free": true,
+    "live_network": false,
+    "rows": [
+      {
+        "claim_kind": "status_summary",
+        "required_evidence_kinds": ["document", "metric"],
+        "required_fields": ["claim_id", "summary", "source_refs", "citation_refs"],
+        "allow_missing_evidence": false,
+        "clean_degradation_mode": "omit_claim_and_warn"
+      },
+      {
+        "claim_kind": "event_summary",
+        "required_evidence_kinds": ["event", "transcript"],
+        "required_fields": ["claim_id", "summary", "source_refs", "citation_refs"],
+        "allow_missing_evidence": false,
+        "clean_degradation_mode": "defer_until_supported"
+      }
+    ]
+  },
+  "source_annotations": [
+    {
+      "source_id": "source_doc_overview",
+      "kind": "document",
+      "title": "Overview fixture source",
+      "locator": "fixture://evidence/sources/overview",
+      "observed_at": "2026-06-01T00:00:00Z",
+      "retrieved_at": "2026-06-12T00:00:00Z",
+      "evidence_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "provider_free": true
+    },
+    {
+      "source_id": "source_metric_delivery",
+      "kind": "metric",
+      "title": "Delivery metric fixture",
+      "locator": "fixture://evidence/sources/delivery?run=local",
+      "observed_at": "2026-06-10T00:00:00Z",
+      "retrieved_at": "2026-06-12T00:00:00Z",
+      "evidence_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "provider_free": true
+    },
+    {
+      "source_id": "source_event_review",
+      "kind": "event",
+      "title": "Review event fixture",
+      "locator": "fixture://evidence/sources/review-event",
+      "observed_at": "2026-06-11T00:00:00Z",
+      "retrieved_at": "2026-06-12T00:00:00Z",
+      "evidence_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "provider_free": true
+    },
+    {
+      "source_id": "source_transcript_old",
+      "kind": "transcript",
+      "title": "Archived transcript fixture",
+      "locator": "fixture://evidence/sources/archive-transcript",
+      "observed_at": "2025-12-01T00:00:00Z",
+      "retrieved_at": "2026-06-12T00:00:00Z",
+      "evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "provider_free": true
+    }
+  ],
+  "claim_records": [
+    {
+      "claim_id": "claim-status-001",
+      "claim_kind": "status_summary",
+      "summary": "The fixture workflow has a current status summary.",
+      "source_refs": ["source_doc_overview", "source_metric_delivery"],
+      "citation_refs": ["source_doc_overview", "source_metric_delivery"],
+      "allow_missing_evidence": false
+    },
+    {
+      "claim_id": "claim-event-001",
+      "claim_kind": "event_summary",
+      "summary": "The fixture review event has supporting evidence.",
+      "source_refs": ["source_event_review", "source_transcript_old"],
+      "citation_refs": ["source_event_review", "source_transcript_old"],
+      "allow_missing_evidence": false
+    },
+    {
+      "claim_id": "claim-missing-001",
+      "claim_kind": "event_summary",
+      "summary": "This claim intentionally references one missing source.",
+      "source_refs": ["source_event_review", "source_missing_ref"],
+      "citation_refs": ["source_event_review", "source_missing_ref"],
+      "allow_missing_evidence": false
+    }
+  ],
+  "normalized_citations": [
+    {"claim_id": "claim-status-001", "source_id": "source_doc_overview", "normalized_source_id": "source_doc_overview", "locator": "fixture://evidence/sources/overview", "first_seen_order": 1, "resolved": true},
+    {"claim_id": "claim-status-001", "source_id": "source_metric_delivery", "normalized_source_id": "source_metric_delivery", "locator": "fixture://evidence/sources/delivery", "first_seen_order": 2, "resolved": true},
+    {"claim_id": "claim-event-001", "source_id": "source_event_review", "normalized_source_id": "source_event_review", "locator": "fixture://evidence/sources/review-event", "first_seen_order": 3, "resolved": true},
+    {"claim_id": "claim-event-001", "source_id": "source_transcript_old", "normalized_source_id": "source_transcript_old", "locator": "fixture://evidence/sources/archive-transcript", "first_seen_order": 4, "resolved": true}
+  ],
+  "resolved_refs": [
+    "source_doc_overview",
+    "source_metric_delivery",
+    "source_event_review",
+    "source_transcript_old"
+  ],
+  "freshness_warnings": [
+    {
+      "warning_id": "freshness-warning-transcript-old",
+      "source_id": "source_transcript_old",
+      "kind": "transcript",
+      "observed_at": "2025-12-01T00:00:00Z",
+      "stale_after_days": 120,
+      "warning_level": "review"
+    }
+  ],
+  "unresolved_refs": [
+    {
+      "claim_id": "claim-missing-001",
+      "source_id": "source_missing_ref",
+      "reason": "source annotation is absent from fixture"
+    }
+  ],
+  "unsupported_claims": [
+    {
+      "claim_id": "claim-missing-001",
+      "reason": "source annotation is absent from fixture",
+      "action": "omit_claim_and_warn"
+    }
+  ],
+  "verification_results": [
+    {
+      "claim_id": "claim-status-001",
+      "status": "verified",
+      "resolved_source_refs": ["source_doc_overview", "source_metric_delivery"],
+      "unresolved_refs": [],
+      "freshness_warning_refs": [],
+      "action": "include_claim"
+    },
+    {
+      "claim_id": "claim-event-001",
+      "status": "verified_with_warning",
+      "resolved_source_refs": ["source_event_review", "source_transcript_old"],
+      "unresolved_refs": [],
+      "freshness_warning_refs": ["freshness-warning-transcript-old"],
+      "action": "include_claim_with_warning"
+    },
+    {
+      "claim_id": "claim-missing-001",
+      "status": "degraded",
+      "resolved_source_refs": ["source_event_review"],
+      "unresolved_refs": ["source_missing_ref"],
+      "freshness_warning_refs": [],
+      "action": "omit_claim_and_warn"
+    }
+  ],
+  "evidence_quality_summary": {
+    "claims_total": 3,
+    "claims_verified": 2,
+    "claims_degraded": 1,
+    "sources_total": 4,
+    "normalized_citations_total": 4,
+    "unresolved_refs_total": 1,
+    "freshness_warnings_total": 1,
+    "provider_free": true
+  },
+  "clean_degradation_actions": [
+    {
+      "action_id": "degrade-claim-missing-001",
+      "claim_id": "claim-missing-001",
+      "mode": "omit_claim_and_warn",
+      "reason": "required source ref is unresolved",
+      "provider_free": true,
+      "live_network": false,
+      "invented_claim_allowed": false,
+      "warning_refs": ["unresolved:source_missing_ref"]
+    }
+  ]
+}

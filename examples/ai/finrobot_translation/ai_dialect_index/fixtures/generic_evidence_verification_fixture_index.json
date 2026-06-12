@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "id": "generic-evidence-verification-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "package_boundary": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+  "fixtures": [
+    {
+      "fixture_key": "generic:evidence_verification:offline",
+      "capability": "generic.ai.evidence.verify",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/evidence_verification_fixture.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/schemas/evidence_verification_result_v1.schema.json"
+    },
+    {
+      "fixture_key": "generic:evidence_verification:clean_degradation",
+      "capability": "generic.ai.evidence.clean_degradation",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/evidence_missing_refs_clean_degradation_fixture.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/schemas/evidence_degradation_action_v1.schema.json"
+    }
+  ]
+}

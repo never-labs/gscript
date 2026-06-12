@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-evidence-verification/evidence-requirement-matrix-v1.schema.json",
+  "title": "Generic Evidence Requirement Matrix",
+  "type": "object",
+  "required": [
+    "matrix_id",
+    "provider_free",
+    "live_network",
+    "rows"
+  ],
+  "properties": {
+    "matrix_id": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "claim_kind",
+          "required_evidence_kinds",
+          "required_fields",
+          "allow_missing_evidence",
+          "clean_degradation_mode"
+        ],
+        "properties": {
+          "claim_kind": {"type": "string"},
+          "required_evidence_kinds": {"type": "array", "items": {"type": "string"}},
+          "required_fields": {"type": "array", "items": {"type": "string"}},
+          "allow_missing_evidence": {"type": "boolean"},
+          "clean_degradation_mode": {"type": "string"}
+        }
+      }
+    }
+  }
+}
