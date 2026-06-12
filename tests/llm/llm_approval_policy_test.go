@@ -50,6 +50,14 @@ _, generated_err := llm.check_policy({run_generated}, policy)
 _, portfolio_err := llm.check_policy({rebalance}, policy)
 allow_network := llm.policy({allow: {"network.http"}})
 network_ok, network_allow_err := llm.check_policy({call_network}, allow_network)
+local_outcome := llm.policy_outcome({local_read}, policy)
+network_outcome := llm.policy_outcome({call_network}, policy, {approval_required: true})
+allowed_network_outcome := llm.policy_outcome({call_network}, allow_network)
+clean_skip_outcome := llm.policy_outcome({call_network}, policy, {
+    clean_skip: true
+    reason: "network disabled by host"
+    dependency: "live_network"
+})
 
 pending := {id: "call_approval_1", tool: "send_order", args: {id: "order-1"}}
 token := loop.snapshot({msg.user("submit order")}, pending)
@@ -102,6 +110,32 @@ generated_class := generated_err.class
 portfolio_class := portfolio_err.class
 network_allow_status := network_ok
 network_allow_err_is_nil := network_allow_err == nil
+local_outcome_status := local_outcome.status
+local_outcome_result_status := local_outcome.result_status
+local_outcome_ok := local_outcome.ok
+local_outcome_allowed := local_outcome.allowed
+local_outcome_capability := local_outcome.capabilities[1]
+network_outcome_status := network_outcome.status
+network_outcome_result_status := network_outcome.result_status
+network_outcome_ok := network_outcome.ok
+network_outcome_denied := network_outcome.denied
+network_outcome_capability := network_outcome.capability
+network_outcome_class := network_outcome.class
+network_outcome_policy := network_outcome.policy
+network_outcome_approval_required := network_outcome.approval_required
+network_outcome_side_effect_allowed := network_outcome.side_effect_allowed
+network_outcome_error_kind := network_outcome.error.kind
+allowed_network_outcome_status := allowed_network_outcome.status
+allowed_network_outcome_result_status := allowed_network_outcome.result_status
+allowed_network_outcome_ok := allowed_network_outcome.ok
+clean_skip_outcome_status := clean_skip_outcome.status
+clean_skip_outcome_result_status := clean_skip_outcome.result_status
+clean_skip_outcome_ok := clean_skip_outcome.ok
+clean_skip_outcome_clean_skip := clean_skip_outcome.clean_skip
+clean_skip_outcome_allowed := clean_skip_outcome.allowed
+clean_skip_outcome_reason := clean_skip_outcome.reason
+clean_skip_outcome_dependency := clean_skip_outcome.dependency
+clean_skip_outcome_side_effect_allowed := clean_skip_outcome.side_effect_allowed
 trace_kind := replay_trace.kind
 trace_policy_default := replay_trace.policy.default
 trace_decision := replay_trace.decision.status
@@ -135,45 +169,71 @@ approved_event_approval_id := approved_event.correlation.approval_id
 				t.Fatalf("Exec: %v", err)
 			}
 			for name, want := range map[string]interface{}{
-				"ok_status":                    true,
-				"ok_err_is_nil":                true,
-				"trading_class":                "trading",
-				"publish_class":                "publish",
-				"network_class":                "network",
-				"credential_class":             "credential",
-				"generated_class":              "generated-code",
-				"portfolio_class":              "portfolio",
-				"network_allow_status":         true,
-				"network_allow_err_is_nil":     true,
-				"trace_kind":                   "approval_replay_trace",
-				"trace_policy_default":         "deny_high_risk",
-				"trace_decision":               "denied",
-				"trace_reason":                 "default high-risk action denied",
-				"trace_result_status":          "denied",
-				"trace_pending_tool":           "send_order",
-				"event_type":                   "approval_replay_trace",
-				"event_status":                 "denied",
-				"event_decision":               "denied",
-				"event_reason":                 "default high-risk action denied",
-				"event_operation":              "send_order",
-				"event_policy_default":         "deny_high_risk",
-				"event_result_status":          "denied",
-				"event_approval_id":            "approval-1",
-				"event_tool_call_id":           "call_approval_1",
-				"event_workflow_run_id":        "wf-approval",
-				"event_workflow_step_id":       "step-approval",
-				"event_provider_free":          true,
-				"event_live_network":           false,
-				"event_secret_values":          false,
-				"event_raw_args_nil":           true,
-				"event_raw_token_nil":          true,
-				"event_raw_result_nil":         true,
-				"approval_gate_ok":             true,
-				"approval_gate_status":         "ok",
-				"approved_event_status":        "approved",
-				"approved_event_decision":      "approved",
-				"approved_event_result_status": "approved",
-				"approved_event_approval_id":   "approval-2",
+				"ok_status":                              true,
+				"ok_err_is_nil":                          true,
+				"trading_class":                          "trading",
+				"publish_class":                          "publish",
+				"network_class":                          "network",
+				"credential_class":                       "credential",
+				"generated_class":                        "generated-code",
+				"portfolio_class":                        "portfolio",
+				"network_allow_status":                   true,
+				"network_allow_err_is_nil":               true,
+				"local_outcome_status":                   "allowed",
+				"local_outcome_result_status":            "ok",
+				"local_outcome_ok":                       true,
+				"local_outcome_allowed":                  true,
+				"local_outcome_capability":               "local.read",
+				"network_outcome_status":                 "denied",
+				"network_outcome_result_status":          "denied",
+				"network_outcome_ok":                     false,
+				"network_outcome_denied":                 true,
+				"network_outcome_capability":             "network.http",
+				"network_outcome_class":                  "network",
+				"network_outcome_policy":                 "capability_policy.v1",
+				"network_outcome_approval_required":      true,
+				"network_outcome_side_effect_allowed":    false,
+				"network_outcome_error_kind":             "policy",
+				"allowed_network_outcome_status":         "allowed",
+				"allowed_network_outcome_result_status":  "ok",
+				"allowed_network_outcome_ok":             true,
+				"clean_skip_outcome_status":              "clean_skip",
+				"clean_skip_outcome_result_status":       "skipped",
+				"clean_skip_outcome_ok":                  true,
+				"clean_skip_outcome_clean_skip":          true,
+				"clean_skip_outcome_allowed":             false,
+				"clean_skip_outcome_reason":              "network disabled by host",
+				"clean_skip_outcome_dependency":          "live_network",
+				"clean_skip_outcome_side_effect_allowed": false,
+				"trace_kind":                             "approval_replay_trace",
+				"trace_policy_default":                   "deny_high_risk",
+				"trace_decision":                         "denied",
+				"trace_reason":                           "default high-risk action denied",
+				"trace_result_status":                    "denied",
+				"trace_pending_tool":                     "send_order",
+				"event_type":                             "approval_replay_trace",
+				"event_status":                           "denied",
+				"event_decision":                         "denied",
+				"event_reason":                           "default high-risk action denied",
+				"event_operation":                        "send_order",
+				"event_policy_default":                   "deny_high_risk",
+				"event_result_status":                    "denied",
+				"event_approval_id":                      "approval-1",
+				"event_tool_call_id":                     "call_approval_1",
+				"event_workflow_run_id":                  "wf-approval",
+				"event_workflow_step_id":                 "step-approval",
+				"event_provider_free":                    true,
+				"event_live_network":                     false,
+				"event_secret_values":                    false,
+				"event_raw_args_nil":                     true,
+				"event_raw_token_nil":                    true,
+				"event_raw_result_nil":                   true,
+				"approval_gate_ok":                       true,
+				"approval_gate_status":                   "ok",
+				"approved_event_status":                  "approved",
+				"approved_event_decision":                "approved",
+				"approved_event_result_status":           "approved",
+				"approved_event_approval_id":             "approval-2",
 			} {
 				got, _ := vm.Get(name)
 				if got != want {

@@ -570,6 +570,13 @@ capability is listed in `allow`. `llm.check_policy(tool_or_tools, policy)`
 returns `(true, nil)` or `(nil, {kind: "policy", capability, class, policy,
 message})`.
 
+Use `llm.policy_outcome(tool_or_tools, policy, opts)` when scripts need a
+portable decision table instead of tuple-style control flow. It returns
+`kind: "policy_outcome"`, `status`, `result_status`, `capabilities`,
+`allowed`, `denied`, `clean_skip`, `approval_required`, and
+`side_effect_allowed`. Passing `{clean_skip: true, reason, dependency}` records
+a skipped host/dependency gate without granting the requested capability.
+
 Human approval and resume use the lower-level loop helpers. A pending snapshot
 is host-persistable data; `loop.resume(token, approval)` applies an approval
 table such as `{ok: true}` or `{ok: false, reason: "..."}`. Use

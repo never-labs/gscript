@@ -507,12 +507,15 @@ ok, err := llm.check_policy({lookup_runbook}, policy)
 if err != nil {
     return nil, err
 }
+outcome := llm.policy_outcome({lookup_runbook}, policy)
 ```
 
 The default policy denies declared capability classes such as network,
 credential, publish, generated-code, trading, and portfolio actions unless the
 exact capability is allowed. Policy metadata is a runtime gate; the host still
 owns real sandboxing, credentials, network access, and approval storage.
+Use `llm.policy_outcome` when a workflow needs to log, trace, or branch on a
+portable decision table instead of returning a policy error immediately.
 
 Record and replay are host-side:
 

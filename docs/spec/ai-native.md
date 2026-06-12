@@ -544,6 +544,14 @@ capability labels and return `(true, nil)` or `(nil, err)`. A denied error must
 have `kind: "policy"` and include the denied `capability`, denied `class`, and
 policy version when known.
 
+`llm.policy_outcome(tool_or_tools, policy, opts)` returns the same policy
+decision as a non-throwing table with `kind: "policy_outcome"`,
+`version: "policy_outcome.v1"`, `status`, `result_status`, `capabilities`,
+policy metadata, and booleans such as `allowed`, `denied`, `clean_skip`,
+`approval_required`, and `side_effect_allowed`. `opts.clean_skip` represents
+a host or dependency gate that skipped execution without granting the
+capability.
+
 Policy checks are runtime gates over declared capabilities. They are not
 credential management, sandboxing, network enforcement, or proof that a tool
 body is harmless. Hosts must still enforce real resource boundaries.
