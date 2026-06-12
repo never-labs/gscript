@@ -643,6 +643,24 @@ func foldQConstExpr(expr Expr) (any, bool) {
 	case TypedNull:
 		return data.NullForKind(data.Kind(x.Kind)), true
 	case Vector:
+		if len(x.Items) > 1 {
+			if _, ok := x.Items[0].(String); ok {
+				// String-headed juxtaposition with an all-numeric tail is
+				// canonical q string indexing ("hello" 1 -> "e"), claimed at
+				// evaluation time by evalJuxtaposedIndexVector; do not fold
+				// it into a generic list.
+				allNumbers := true
+				for _, item := range x.Items[1:] {
+					if _, ok := item.(Number); !ok {
+						allNumbers = false
+						break
+					}
+				}
+				if allNumbers {
+					return nil, false
+				}
+			}
+		}
 		values := make([]any, len(x.Items))
 		for i, item := range x.Items {
 			value, ok := foldQConstExpr(item)

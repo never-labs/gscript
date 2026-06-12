@@ -51,16 +51,16 @@ match	max 0N 0N	0N
 # ---- empty-vector identities ----
 match	sum 0#0	0
 match	sum til 0	0
-gap	min til 0	0W	0N	empty-vector reducer identities: min () should be 0W, not null
-gap	max til 0	-0W	0N	empty-vector reducer identities: max () should be -0W
-gap	prd til 0	1	0N	empty-vector reducer identities: prd () should be 1
+match	min til 0	0W
+match	max til 0	-0W
+match	prd til 0	1
 match	avg til 0	0n
-gap	min 0#0.0	0w	0N	empty-vector reducer identities: float min () should be 0w
-gap	sum ()	0	0N	empty-vector reducer identities: sum () should be 0
+match	min 0#0.0	0w
+match	sum ()	0
 match	(&/)[til 0]	0W
 match	(|/)[til 0]	-0W
-gap	(+/)[til 0]	0	0N	empty-vector reducer identities for derived +/
-gap	(*/)[til 0]	1	0N	empty-vector reducer identities for derived */
+match	(+/)[til 0]	0
+match	(*/)[til 0]	1
 match	count ()	0
 match	all ()	1b
 match	any ()	0b
@@ -144,20 +144,20 @@ match	5_1 2 3	til 0
 match	0_1 2 3	1 2 3
 match	2 3#til 6	(0 1 2;3 4 5)
 match	2 3#1 2	(1 2 1;2 1 2)
-gap	0N 2#til 6	(0 1;2 3;4 5)	ERROR:reshape	null reshape dimension should be computed from the other one
-gap	2 0N#til 6	(0 1 2;3 4 5)	ERROR:reshape	null reshape dimension should be computed from the other one
-gap	2 cut 1 2 3 4 5	(1 2;3 4;1#5)	enlist 3 4 5	atom cut should chunk by size, Leia cuts at index instead
+match	0N 2#til 6	(0 1;2 3;4 5)
+match	2 0N#til 6	(0 1 2;3 4 5)
+match	2 cut 1 2 3 4 5	(1 2;3 4;1#5)
 match	0 2 cut til 5	(0 1;2 3 4)
 match	2 sublist 1 2 3	1 2
-gap	10 sublist 1 2	1 2	10#1 2	sublist must not overtake, Leia cycles like take
+match	10 sublist 1 2	1 2
 match	-2 sublist 1 2 3	2 3
 match	1 2 sublist til 10	1 2
-gap	enlist 1	1#1	value `a!1	enlist should return a typed one-item vector, Leia returns a generic list
+match	enlist 1	1#1
 match	reverse 1 2 3	3 2 1
 match	1 rotate 1 2 3	2 3 1
 match	-1 rotate 1 2 3	3 1 2
 match	raze (1 2;3 4)	1 2 3 4
-gap	raze ()	()		empty raze yields a null-kind empty instead of ()
+match	raze ()	()
 match	flip (1 2;3 4)	(1 3;2 4)
 # ---- join (,) ----
 match	1 2,3	1 2 3
@@ -181,14 +181,14 @@ match	`a,`b`c	`a`b`c
 match	(0#1),1 2 3	1 2 3
 match	count ([] a:1 2),([] a:3 4)	4
 # ---- indexing out of bounds -> nulls ----
-gap	(1 2 3)@5	0N	ERROR:out of range	index out of bounds should return 0N, Leia errors
-gap	(1 2 3)@-1	0N	ERROR	negative index should return 0N, Leia errors
-gap	(1 2 3)@0N	0N	ERROR	null index should return 0N, Leia errors
-gap	(1.5 2.5)@7	0n	ERROR:out of range	index out of bounds should return float null
+match	(1 2 3)@5	0N
+match	(1 2 3)@-1	0N
+match	(1 2 3)@0N	0N
+match	(1.5 2.5)@7	0n
 match	(1 2 3)@1 2	2 3
 match	(2 3#til 6) . 1 2	5
 match	x:10 20 30;x[1]	20
-gap	x:10 20 30;x 1	20	(10 20 30;1)	juxtaposed name indexing builds a list instead of indexing
+match	x:10 20 30;x 1	20
 match	x:(1 2;3 4);x . (1;0)	3
 match	x:(1 2;3 4);x[1;0]	3
 # ---- dict operations ----
@@ -291,11 +291,11 @@ match	reverse ""	""
 deviation	lower `ABC	`abc	"abc"	symbol case ops return strings
 deviation	upper `ab	`AB	"AB"	symbol case ops return strings
 deviation	raze string `ab`cd	"abcd"	("ab";"cd")	strings are atoms, not char lists, so raze does not concatenate
-deviation	"abc" 1	"b"	ERROR	strings are atoms: no char type, no string indexing by juxtaposition
-deviation	("ab")@5	" "	ERROR:out of range	strings are atoms: no char fill on out-of-range index
+match	"abc" 1	"b"
+match	("ab")@5	" "
 gap	5$"ab"	"ab   "	ERROR:q cast	pad ($ with int left) not implemented
 gap	-5$"ab"	"   ab"	ERROR:q cast	pad ($ with int left) not implemented
-gap	1 "hello"	"e"		juxtaposed string indexing panics today (concurrent fix in flight)
+deviation	1 "hello"	1	ERROR:mixed-type vector literal	canonical q applies an int atom to a string as a write to console handle 1 (prints, returns the handle); Leia rejects mixed juxtaposition with a parse error
 # ---- numeric encode / decode ----
 gap	2 vs 10	1 0 1 0	ERROR	numeric vs (base encode) not implemented
 gap	2 sv 1 0 1 0	10	ERROR	numeric sv (base decode) not implemented

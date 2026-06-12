@@ -946,9 +946,9 @@ type qScriptStatement struct {
 	// and the rhs plans below are still populated.
 	idxAssignName  string
 	idxAssignIndex string
-	valueExpr   Expr
-	bindingPlan qScriptBindingPlan
-	fastPlan    qEvalFastPlan
+	valueExpr      Expr
+	bindingPlan    qScriptBindingPlan
+	fastPlan       qEvalFastPlan
 	// compareIndexChecked/compareIndexPlan memoize the
 	// tryEvalCompareIndexStatsAssignment plan build (a per-call string walk
 	// otherwise); the runtime operand evaluation and kind checks still run
@@ -3065,7 +3065,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return data.NewAny([]any{v}), nil
+		return enlist(v)
 	}
 	if strings.HasPrefix(src, "til ") {
 		return s.evalTil(strings.TrimSpace(src[len("til "):]))
@@ -3259,7 +3259,7 @@ func (s *EvalState) eval(src string) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			return data.NewAny([]any{right}), nil
+			return enlist(right)
 		}
 		left, err := s.eval(strings.TrimSpace(src[:idx]))
 		if err != nil {
@@ -3478,6 +3478,67 @@ func (s *EvalState) eval(src string) (any, error) {
 	return parseAtomOrVector(src)
 }
 
+// evalJuxtaposedIndexVector applies canonical q juxtaposition when a bound
+// container is followed by numeric literals: `x:10 20 30;x 1` indexes x
+// (-> 20, same as x[1]) and `"hello" 1` indexes the string (-> "e") instead
+// of building a generic list. Only Ident/String heads with all-Number tails
+// are claimed; every other juxtaposed shape keeps its historic semantics.
+func (s *EvalState) evalJuxtaposedIndexVector(x Vector) (any, bool, error) {
+	if !qJuxtaposedIndexVectorShape(x) {
+		return nil, false, nil
+	}
+	values := make([]any, len(x.Items))
+	for i, item := range x.Items {
+		value, err := s.evalValueExpr(item)
+		if err != nil {
+			return nil, false, nil
+		}
+		values[i] = value
+	}
+	return qJuxtaposedIndexVectorValue(values)
+}
+
+// qJuxtaposedIndexVectorShape reports the static juxtaposed-index shape: an
+// Ident or String head followed by Number literals only.
+func qJuxtaposedIndexVectorShape(x Vector) bool {
+	if len(x.Items) < 2 {
+		return false
+	}
+	switch x.Items[0].(type) {
+	case Ident, String:
+	default:
+		return false
+	}
+	for _, item := range x.Items[1:] {
+		if _, ok := item.(Number); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// qJuxtaposedIndexVectorValue indexes values[0] with the numeric tail when
+// the head is a container; indexed=false defers to list construction.
+func qJuxtaposedIndexVectorValue(values []any) (out any, indexed bool, err error) {
+	switch values[0].(type) {
+	case data.Array, string:
+	default:
+		return nil, false, nil
+	}
+	var index any
+	if len(values) == 2 {
+		index = values[1]
+	} else {
+		vector, err := evalValueVector(values[1:])
+		if err != nil {
+			return nil, false, nil
+		}
+		index = vector
+	}
+	out, err = indexValue(values[0], index)
+	return out, true, err
+}
+
 func (s *EvalState) evalNameVector(src string) (any, bool, error) {
 	parts := splitTopLevelFields(src)
 	if len(parts) < 2 {
@@ -3638,6 +3699,9 @@ func (s *EvalState) evalValueExpr(expr Expr) (any, error) {
 		}
 		return evalValueVector(values)
 	case Vector:
+		if out, handled, err := s.evalJuxtaposedIndexVector(x); handled || err != nil {
+			return out, err
+		}
 		values := make([]any, len(x.Items))
 		for i, item := range x.Items {
 			value, err := s.evalValueExpr(item)
@@ -3741,7 +3805,7 @@ func (s *EvalState) evalValueCall(expr Call) (any, error) {
 		}
 		return data.NewI64Range(0, 1, int(n)), nil
 	case "enlist":
-		return data.NewAny([]any{arg}), nil
+		return enlist(arg)
 	case "flip":
 		return flip(arg)
 	case "value":
@@ -5855,7 +5919,13 @@ func (s *EvalState) sequenceTransformExpr(src string) (string, []int, string, bo
 	if err != nil {
 		return "", nil, "", true, err
 	}
-	return data.SequenceTransformSublist, indexes, rightExpr, true, nil
+	// q's one-argument sublist clamps (no overtake); the data layer's
+	// one-argument sublist step is take, so encode start/count instead.
+	converted, ok := qSublistTransformArgs(indexes)
+	if !ok {
+		return "", nil, "", false, nil
+	}
+	return data.SequenceTransformSublist, converted, rightExpr, true, nil
 }
 
 func (s *EvalState) tryEvalSortIndexSum(src string) (any, bool, error) {
@@ -7321,13 +7391,19 @@ func (s *EvalState) tryEvalCountCut(src string) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	indexes, err := qIntegerIndexes("cut", left)
-	if err != nil {
-		return nil, true, err
-	}
 	right, err := s.eval(rightExpr)
 	if err != nil {
 		return nil, true, err
+	}
+	indexes, atom, err := qAtomCutStarts(left, right)
+	if err != nil {
+		return nil, true, err
+	}
+	if !atom {
+		indexes, err = qIntegerIndexes("cut", left)
+		if err != nil {
+			return nil, true, err
+		}
 	}
 	out, err := data.CutCount(indexes, right)
 	shape := "cut-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
@@ -7367,7 +7443,7 @@ func (s *EvalState) tryEvalCountSublist(src string) (any, bool, error) {
 	var out int64
 	switch len(args) {
 	case 1:
-		out = qTakeCount(args[0], right)
+		out = qSublistTakeCount(args[0], right)
 	case 2:
 		out, err = data.SublistCount(args[0], args[1], right)
 	default:
@@ -10516,7 +10592,7 @@ func applyOver(op byte, initial any, v any) (any, error) {
 		if initial != nil {
 			return initial, nil
 		}
-		if identity, ok := qMinMaxReduceIdentity(op, v); ok {
+		if identity, ok := qReduceIdentity(op, v); ok {
 			return identity, nil
 		}
 		return data.NullValue, nil
@@ -10537,18 +10613,57 @@ func applyOver(op byte, initial any, v any) (any, error) {
 	return acc, nil
 }
 
-// qMinMaxReduceIdentity yields the canonical empty-vector identities for the
-// derived min/max reducers: `&/()` is the positive infinity of the element
-// type (0W, 0w, 1b) and `|/()` the negative one (-0W, -0w, 0b).
-func qMinMaxReduceIdentity(op byte, v any) (any, bool) {
-	if op != '&' && op != '|' {
-		return nil, false
-	}
+// qReduceIdentity yields the canonical empty-vector identities for the
+// derived reducers: `&/()` is the positive infinity of the element type
+// (0W, 0w, 1b) and `|/()` the negative one (-0W, -0w, 0b); `+/()` is the
+// element type's zero and `*/()` its one (canonical (+/)[til 0] -> 0,
+// (*/)[til 0] -> 1).
+func qReduceIdentity(op byte, v any) (any, bool) {
 	kind := data.Kind("")
 	if array, ok := v.(data.Array); ok {
 		kind = array.Kind()
 	}
-	wantMax := op == '|'
+	switch op {
+	case '&', '|':
+		return qMinMaxIdentityForKind(op == '|', kind)
+	case '+':
+		return qSumIdentityForKind(kind), true
+	case '*':
+		return qProductIdentityForKind(kind), true
+	default:
+		return nil, false
+	}
+}
+
+// qSumIdentityForKind is the canonical empty-sum identity: the element
+// domain's zero (long 0 for integer and untyped vectors, the float zero for
+// float vectors), matching what the typed sum kernels produce for empty
+// typed inputs.
+func qSumIdentityForKind(kind data.Kind) any {
+	switch kind {
+	case data.KindF32:
+		return float32(0)
+	case data.KindF64:
+		return float64(0)
+	default:
+		return int64(0)
+	}
+}
+
+// qProductIdentityForKind is the canonical empty-product identity: the
+// element domain's one.
+func qProductIdentityForKind(kind data.Kind) any {
+	switch kind {
+	case data.KindF32:
+		return float32(1)
+	case data.KindF64:
+		return float64(1)
+	default:
+		return int64(1)
+	}
+}
+
+func qMinMaxIdentityForKind(wantMax bool, kind data.Kind) (any, bool) {
 	switch kind {
 	case data.KindBool:
 		return !wantMax, true
@@ -10836,12 +10951,18 @@ func looksLikeLiteralVector(src string) bool {
 	if len(fields) <= 1 {
 		return false
 	}
-	for _, field := range fields {
+	for i, field := range fields {
 		if strings.HasPrefix(field, "\"") {
 			if _, err := strconv.Unquote(field); err != nil {
 				return false
 			}
 			continue
+		}
+		if i > 0 && strings.HasPrefix(fields[0], "\"") {
+			// String-headed juxtaposition with a non-string tail is
+			// canonical q string indexing ("hello" 1 -> "e"), not a literal
+			// vector; let the parsed-value route claim it.
+			return false
 		}
 		if containsInternalDyadicSign(field) {
 			return false
@@ -11326,58 +11447,152 @@ func indexValue(v any, index any) (any, error) {
 		}
 		return keyedTableLookup(keyed, index)
 	}
-	if array, ok := v.(data.Array); ok {
-		if indexArray, ok := index.(data.Array); ok && indexArray.Len() != 1 {
-			out, handled, err := qEvalArrayGatherI64Primitive(array, indexArray)
-			if err != nil {
-				return nil, err
-			}
-			if handled {
-				return out, nil
-			}
-		}
-	}
-	indexes, scalar, err := indexInts(index)
-	if err != nil {
-		return nil, err
-	}
 	switch x := v.(type) {
 	case data.Array:
-		if scalar {
-			if row, handled, err := data.TryRowArrayIndex(x, indexes[0]); err != nil || handled {
-				shape := "matrix-row/" + string(x.Kind()) + "/" + qRuntimeCardinalityShape(rowArrayLen(row))
-				recordRuntimeKernelProbe("ArrayMatrixRowIndex", shape, handled, err)
-				if err != nil {
-					return nil, err
-				}
-				return row, nil
-			}
-			item, ok := x.At(indexes[0])
-			if !ok {
-				return nil, fmt.Errorf("index %d out of range", indexes[0])
-			}
-			return item, nil
-		}
-		return data.Gather(x, indexes)
+		return arrayReadIndexValue(x, index)
 	case string:
-		runes := []rune(x)
-		if scalar {
-			if indexes[0] < 0 || indexes[0] >= len(runes) {
-				return nil, fmt.Errorf("index %d out of range", indexes[0])
-			}
-			return string(runes[indexes[0]]), nil
-		}
-		out := make([]string, len(indexes))
-		for i, index := range indexes {
-			if index < 0 || index >= len(runes) {
-				return nil, fmt.Errorf("index %d out of range", index)
-			}
-			out[i] = string(runes[index])
-		}
-		return data.NewString(out), nil
+		return stringReadIndexValue(x, index)
 	default:
 		return nil, fmt.Errorf("index expects a vector, string, or dictionary")
 	}
+}
+
+// qReadIndexRows converts a read-path index (integer atom, null atom, or
+// integer vector possibly containing nulls) into row numbers. Null indexes
+// map to -1, which the read path treats like any other out-of-range row and
+// null-fills (canonical q: (1 2 3)@5 -> 0N, @-1 -> 0N, @0N -> 0N). Non-integer
+// indexes keep erroring; assignment/amend targets do not use this path.
+func qReadIndexRows(index any) (rows []int64, scalar bool, err error) {
+	switch x := index.(type) {
+	case int64:
+		return []int64{x}, true, nil
+	case int32:
+		return []int64{int64(x)}, true, nil
+	case int16:
+		return []int64{int64(x)}, true, nil
+	}
+	if data.IsNull(index) {
+		if kind, ok := data.NullKind(index); ok {
+			switch kind {
+			case data.KindI16, data.KindI32, data.KindI64, data.KindNull, data.Kind(""):
+			default:
+				return nil, false, fmt.Errorf("index must be an integer or integer vector")
+			}
+		}
+		return []int64{-1}, true, nil
+	}
+	array, ok := index.(data.Array)
+	if !ok {
+		return nil, false, fmt.Errorf("index must be an integer or integer vector")
+	}
+	switch array.Kind() {
+	case data.KindI16, data.KindI32, data.KindI64, data.KindNull:
+	default:
+		return nil, false, fmt.Errorf("index vector must contain integers")
+	}
+	rows = make([]int64, array.Len())
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok || data.IsNull(item) {
+			rows[i] = -1
+			continue
+		}
+		n, ok := integerValue(item)
+		if !ok {
+			return nil, false, fmt.Errorf("index vector must contain integers")
+		}
+		rows[i] = n
+	}
+	// A one-row index vector keeps yielding an atom, mirroring the historic
+	// indexInts contract shared by every eval route.
+	return rows, len(rows) == 1, nil
+}
+
+// arrayReadIndexValue is the read path for vector@index: out-of-range,
+// negative, and null indexes null-fill instead of erroring (canonical q;
+// amend/assignment targets keep their index errors).
+func arrayReadIndexValue(array data.Array, index any) (any, error) {
+	if indexArray, ok := index.(data.Array); ok && indexArray.Len() != 1 {
+		out, handled, err := qEvalArrayGatherI64Primitive(array, indexArray)
+		if handled && err == nil {
+			return out, nil
+		}
+		// Out-of-range or null rows: fall through to the null-filling path.
+	}
+	rows, scalar, err := qReadIndexRows(index)
+	if err != nil {
+		return nil, err
+	}
+	length := int64(array.Len())
+	if scalar {
+		row := rows[0]
+		if row < 0 || row >= length {
+			return data.NullValue, nil
+		}
+		if rowArr, handled, err := data.TryRowArrayIndex(array, int(row)); err == nil && handled {
+			shape := "matrix-row/" + string(array.Kind()) + "/" + qRuntimeCardinalityShape(rowArrayLen(rowArr))
+			recordRuntimeKernelProbe("ArrayMatrixRowIndex", shape, true, nil)
+			return rowArr, nil
+		}
+		item, ok := array.At(int(row))
+		if !ok {
+			return data.NullValue, nil
+		}
+		return item, nil
+	}
+	allValid := true
+	for _, row := range rows {
+		if row < 0 || row >= length {
+			allValid = false
+			break
+		}
+	}
+	if allValid {
+		indexes := make([]int, len(rows))
+		for i, row := range rows {
+			indexes[i] = int(row)
+		}
+		return data.Gather(array, indexes)
+	}
+	out := make([]any, len(rows))
+	for i, row := range rows {
+		if row < 0 || row >= length {
+			out[i] = data.NullValue
+			continue
+		}
+		item, ok := array.At(int(row))
+		if !ok {
+			out[i] = data.NullValue
+			continue
+		}
+		out[i] = item
+	}
+	return inferQArray(out, array.Kind()), nil
+}
+
+// stringReadIndexValue indexes a string on the read path: out-of-range,
+// negative, and null indexes fill with the char null " " (canonical q
+// "abc" 5 -> " ").
+func stringReadIndexValue(s string, index any) (any, error) {
+	rows, scalar, err := qReadIndexRows(index)
+	if err != nil {
+		return nil, err
+	}
+	runes := []rune(s)
+	charAt := func(row int64) string {
+		if row < 0 || row >= int64(len(runes)) {
+			return " "
+		}
+		return string(runes[row])
+	}
+	if scalar {
+		return charAt(rows[0]), nil
+	}
+	out := make([]string, len(rows))
+	for i, row := range rows {
+		out[i] = charAt(row)
+	}
+	return data.NewString(out), nil
 }
 
 func rowArrayLen(row data.Array) int {
@@ -12273,7 +12488,7 @@ func flip(v any) (any, error) {
 }
 
 func reshapeValue(shapeValue, value any) (any, error) {
-	shape, err := qReshapeShape(shapeValue)
+	shape, nullDim, err := qReshapeShape(shapeValue)
 	if err != nil {
 		return nil, err
 	}
@@ -12289,6 +12504,33 @@ func reshapeValue(shapeValue, value any) (any, error) {
 		source = data.NewString(chars)
 	default:
 		source = inferQArray([]any{x}, qKindOfValue(x))
+	}
+	if nullDim >= 0 {
+		// Canonical null reshape dimension: 0N k#x chunks x into k-sized
+		// rows and n 0N#x into n rows of ceil(count/n), exactly atom-cut
+		// semantics (the last row may be short when the count does not
+		// divide).
+		if len(shape) != 2 {
+			return nil, fmt.Errorf("reshape supports a null dimension only in two-dimensional shapes")
+		}
+		size := 0
+		if nullDim == 0 {
+			size = shape[1]
+		} else {
+			rows := shape[0]
+			if rows <= 0 {
+				return nil, fmt.Errorf("reshape dimension 0 must be positive with a null dimension 1")
+			}
+			size = (source.Len() + rows - 1) / rows
+		}
+		if size <= 0 {
+			return nil, fmt.Errorf("reshape null dimension needs a positive companion dimension")
+		}
+		starts := make([]int, 0, (source.Len()+size-1)/size)
+		for i := 0; i < source.Len(); i += size {
+			starts = append(starts, i)
+		}
+		return data.Cut(starts, source)
 	}
 	return data.ReshapeArray(shape, source)
 }
@@ -12322,34 +12564,45 @@ func matrixInverseValue(value any) (any, error) {
 	return data.MatrixInverseNumeric(matrix)
 }
 
-func qReshapeShape(value any) ([]int, error) {
+// qReshapeShape parses the reshape dimensions. nullDim is the position of a
+// single null dimension (0N 2#x / 2 0N#x compute it from the other one), or
+// -1 when every dimension is concrete.
+func qReshapeShape(value any) ([]int, int, error) {
 	array, ok := value.(data.Array)
 	if !ok {
 		n, ok := integerValue(value)
 		if !ok || int64(int(n)) != n {
-			return nil, fmt.Errorf("# left operand must be an integer count")
+			return nil, -1, fmt.Errorf("# left operand must be an integer count")
 		}
-		return []int{int(n)}, nil
+		return []int{int(n)}, -1, nil
 	}
 	if array.Len() == 0 {
-		return nil, fmt.Errorf("reshape expects at least one dimension")
+		return nil, -1, fmt.Errorf("reshape expects at least one dimension")
 	}
 	out := make([]int, array.Len())
+	nullDim := -1
 	for i := 0; i < array.Len(); i++ {
 		item, ok := array.At(i)
 		if !ok {
-			return nil, fmt.Errorf("reshape dimension row %d out of range", i)
+			return nil, -1, fmt.Errorf("reshape dimension row %d out of range", i)
+		}
+		if data.IsNull(item) {
+			if nullDim >= 0 {
+				return nil, -1, fmt.Errorf("reshape allows at most one null dimension")
+			}
+			nullDim = i
+			continue
 		}
 		n, ok := integerValue(item)
 		if !ok || int64(int(n)) != n {
-			return nil, fmt.Errorf("reshape dimension %d must be an integer", i)
+			return nil, -1, fmt.Errorf("reshape dimension %d must be an integer", i)
 		}
 		if n < 0 {
-			return nil, fmt.Errorf("reshape dimension %d must be non-negative", i)
+			return nil, -1, fmt.Errorf("reshape dimension %d must be non-negative", i)
 		}
 		out[i] = int(n)
 	}
-	return out, nil
+	return out, nullDim, nil
 }
 
 func qMatrixValue(value any) (data.Matrix, bool, error) {
@@ -13719,6 +13972,18 @@ func count(v any) (any, error) {
 }
 
 func enlist(v any) (any, error) {
+	// Canonical enlist on an atom yields a typed one-item vector
+	// (enlist 1 ~ 1#1); containers keep the generic one-item list.
+	switch v.(type) {
+	case data.Array, string, EvalDict, data.Frame, data.KeyedFrame:
+		return data.NewAny([]any{v}), nil
+	}
+	if isCallable(v) {
+		return data.NewAny([]any{v}), nil
+	}
+	if kind := qKindOfValue(v); kind != "" && kind != data.KindNull && kind != data.KindAny {
+		return inferQArray([]any{v}, kind), nil
+	}
 	return data.NewAny([]any{v}), nil
 }
 
@@ -13891,7 +14156,9 @@ func sum(v any) (any, error) {
 		return nil, fmt.Errorf("sum expects a numeric vector")
 	}
 	if array.Len() == 0 {
-		return data.NullValue, nil
+		// Canonical empty-sum identity: sum () -> 0 (typed kernels return
+		// the same zero for empty typed vectors).
+		return qSumIdentityForKind(array.Kind()), nil
 	}
 	shape := "vector-reduce/sum/" + string(array.Kind())
 	out, handled, err := data.TryTypedNumericSum(array)
@@ -14249,7 +14516,8 @@ func prd(v any) (any, error) {
 		return nil, fmt.Errorf("prd expects a numeric vector")
 	}
 	if array.Len() == 0 {
-		return data.NullValue, nil
+		// Canonical empty-product identity: prd () -> 1.
+		return qProductIdentityForKind(array.Kind()), nil
 	}
 	shape := "vector-reduce/product/" + string(array.Kind())
 	out, handled, err := data.TryTypedNumericProduct(array)
@@ -15243,6 +15511,14 @@ func extrema(v any, wantMax bool) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil
+	}
+	if array.Len() == 0 {
+		// Canonical empty-vector identities: min () -> 0W, max () -> -0W
+		// (per element type), matching the derived &/ |/ reducers. All-null
+		// non-empty vectors still reduce to null below.
+		if identity, ok := qMinMaxIdentityForKind(wantMax, array.Kind()); ok {
+			return identity, nil
+		}
 	}
 	if value, handled, has, err := data.TryTypedMinMax(array, wantMax); err != nil || handled {
 		kernel := "ArrayMin"
@@ -16744,6 +17020,10 @@ func fills(v any) (any, error) {
 }
 
 func raze(v any) (any, error) {
+	if array, ok := v.(data.Array); ok && array.Len() == 0 {
+		// Canonical raze of an empty list is the list itself: raze () -> ().
+		return v, nil
+	}
 	if flattened, handled, err := data.FlattenNestedArray(v); err != nil || handled {
 		if err != nil {
 			return nil, err

@@ -54,11 +54,60 @@ func parseQBoolLiteral(src string) (any, bool, error) {
 }
 
 func qCutValue(left, right any) (any, error) {
+	if starts, atom, err := qAtomCutStarts(left, right); atom {
+		if err != nil {
+			return nil, err
+		}
+		return data.Cut(starts, right)
+	}
 	indexes, err := qIntegerIndexes("cut", left)
 	if err != nil {
 		return nil, err
 	}
 	return data.Cut(indexes, right)
+}
+
+// qAtomCutStarts implements canonical atom cut: `n cut x` chunks x into
+// n-sized pieces (2 cut 1 2 3 4 5 -> (1 2;3 4;,5)), equivalent to cutting at
+// 0, n, 2n, ... Vector-left cut keeps its cut-at-indexes semantics.
+func qAtomCutStarts(left, right any) (starts []int, atom bool, err error) {
+	if _, isArray := left.(data.Array); isArray {
+		return nil, false, nil
+	}
+	n, ok := integerValue(left)
+	if !ok || int64(int(n)) != n {
+		return nil, false, nil
+	}
+	if n <= 0 {
+		return nil, true, fmt.Errorf("cut chunk size must be a positive integer")
+	}
+	length, ok := qSequenceLengthOf(right)
+	if !ok {
+		return nil, true, fmt.Errorf("cut expects a list or string")
+	}
+	starts = make([]int, 0, (length+int(n)-1)/int(n))
+	for i := 0; i < length; i += int(n) {
+		starts = append(starts, i)
+	}
+	return starts, true, nil
+}
+
+// qSequenceLengthOf reports the element count of list-like values.
+func qSequenceLengthOf(v any) (int, bool) {
+	switch x := v.(type) {
+	case data.Array:
+		return x.Len(), true
+	case string:
+		return len([]rune(x)), true
+	case data.Frame:
+		return x.Len(), true
+	case data.KeyedFrame:
+		return x.Frame().Len(), true
+	case EvalDict:
+		return len(x.Keys), true
+	default:
+		return 0, false
+	}
 }
 
 func qSublistValue(left, right any) (any, error) {
@@ -68,11 +117,61 @@ func qSublistValue(left, right any) (any, error) {
 	}
 	switch len(args) {
 	case 1:
-		return take(args[0], right)
+		return qSublistTake(args[0], right)
 	case 2:
 		return data.Sublist(args[0], args[1], right)
 	default:
 		return nil, fmt.Errorf("sublist expects count or start count")
+	}
+}
+
+// qSublistTake is the canonical one-argument sublist: at most |n| items from
+// the front (n>=0) or back (n<0) WITHOUT cycling — sublist never overtakes
+// (10 sublist 1 2 -> 1 2), unlike take (#).
+func qSublistTake(n int, v any) (any, error) {
+	if length, ok := qSequenceLengthOf(v); ok {
+		if n >= 0 {
+			if n > length {
+				n = length
+			}
+		} else if -n > length {
+			n = -length
+		}
+	}
+	return take(n, v)
+}
+
+// qSublistTakeCount is the row count qSublistTake would produce.
+func qSublistTakeCount(n int, v any) int64 {
+	if length, ok := qSequenceLengthOf(v); ok {
+		if n < 0 {
+			n = -n
+		}
+		if n > length {
+			n = length
+		}
+		return int64(n)
+	}
+	return qTakeCount(n, v)
+}
+
+// qSublistTransformArgs converts q sublist arguments to the data sequence
+// layer's clamping start/count form. The data layer's one-argument sublist
+// step is take (used by `n#x` pipelines, which cycle); q's one-argument
+// sublist clamps instead, so it must be encoded as start 0/count n. Negative
+// one-argument sublist (take from the back) is not expressible; callers fall
+// back to the generic route.
+func qSublistTransformArgs(args []int) ([]int, bool) {
+	switch len(args) {
+	case 1:
+		if args[0] < 0 {
+			return nil, false
+		}
+		return []int{0, args[0]}, true
+	case 2:
+		return args, true
+	default:
+		return nil, false
 	}
 }
 

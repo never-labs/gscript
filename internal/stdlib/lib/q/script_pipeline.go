@@ -487,8 +487,14 @@ func qScriptPipelineSequenceTransformStep(src string) (data.SequenceTransformSte
 		if !ok || len(args) == 0 || len(args) > 2 || strings.TrimSpace(right) == "" {
 			return data.SequenceTransformStep{}, "", false
 		}
-		step := data.SequenceTransformStep{Transform: data.SequenceTransformSublist, ArgCount: len(args)}
-		copy(step.Args[:], args)
+		// q's one-argument sublist clamps (no overtake); the data layer's
+		// one-argument sublist step is take (#), so encode start/count.
+		converted, ok := qSublistTransformArgs(args)
+		if !ok {
+			return data.SequenceTransformStep{}, "", false
+		}
+		step := data.SequenceTransformStep{Transform: data.SequenceTransformSublist, ArgCount: len(converted)}
+		copy(step.Args[:], converted)
 		return step, strings.TrimSpace(right), true
 	}
 	return data.SequenceTransformStep{}, "", false
@@ -1920,7 +1926,9 @@ func (s *EvalState) evalQScriptMatrixRowSumCountPipeline(descriptor *qScriptPipe
 	}
 	indexes, scalar, err := indexInts(indexValue)
 	if err != nil {
-		return nil, true, err
+		// Negative/null indexes: fall back to the generic read path, which
+		// null-fills out-of-range reads.
+		return nil, false, nil
 	}
 	if !scalar || len(indexes) != 1 {
 		return nil, false, nil
@@ -1998,11 +2006,11 @@ func (s *EvalState) evalQScriptTransposedReshapedMatrixRowsSumCountPipeline(desc
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	matrixShape, err := qReshapeShape(shapeValue)
+	matrixShape, nullDim, err := qReshapeShape(shapeValue)
 	if err != nil {
 		return nil, true, err
 	}
-	if len(matrixShape) != 2 {
+	if nullDim >= 0 || len(matrixShape) != 2 {
 		return nil, false, nil
 	}
 	sourceValue, handled, err := s.evalQScriptBindingPlanWithResolver(reshapeAssignment.binding.right, resolver)
@@ -2053,11 +2061,11 @@ func (s *EvalState) evalQScriptReshapedMatrixRowSumCount(plan *qScriptBindingPla
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	shape, err := qReshapeShape(shapeValue)
+	shape, nullDim, err := qReshapeShape(shapeValue)
 	if err != nil {
 		return nil, true, err
 	}
-	if len(shape) != 2 {
+	if nullDim >= 0 || len(shape) != 2 {
 		return nil, false, nil
 	}
 	sourceValue, handled, err := s.evalQScriptBindingPlan(plan.right)
@@ -2200,11 +2208,11 @@ func (s *EvalState) evalQScriptReshapedMatrixCellPlusCount(plan *qScriptBindingP
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	shape, err := qReshapeShape(shapeValue)
+	shape, nullDim, err := qReshapeShape(shapeValue)
 	if err != nil {
 		return nil, true, err
 	}
-	if len(shape) != 2 {
+	if nullDim >= 0 || len(shape) != 2 {
 		return nil, false, nil
 	}
 	sourceValue, handled, err := s.evalQScriptBindingPlan(plan.right)
@@ -2227,7 +2235,9 @@ func (s *EvalState) evalQScriptScalarIndexPlan(plan *qScriptBindingPlan) (int, b
 	}
 	indexes, scalar, err := indexInts(value)
 	if err != nil {
-		return 0, true, err
+		// Negative/null indexes: fall back to the generic read path, which
+		// null-fills out-of-range reads.
+		return 0, false, nil
 	}
 	if !scalar || len(indexes) != 1 {
 		return 0, false, nil

@@ -1,6 +1,7 @@
 package q
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -1508,34 +1509,56 @@ func (s *EvalState) evalQPipelineApplyGatherIndex(plan *qPipelinePlan) (any, boo
 		return nil, true, err
 	}
 	indexes, scalar, err := indexInts(indexValue)
-	if err != nil {
-		return nil, true, err
-	}
-	if scalar || len(indexes) == 0 {
+	if err == nil && (scalar || len(indexes) == 0) {
 		return nil, false, nil
 	}
-	if array, ok := target.(data.Array); ok {
-		shape := "gather-at/" + string(array.Kind()) + "/" + qRuntimeCardinalityShape(len(indexes))
-		recordRuntimeKernelExecution("ArrayGatherIndex", shape, "attempt", "attempt")
-		// Array.Gather panics on out-of-range rows; validate up front with
-		// the boxed gather route's error (validateI64IndexArray) so both
-		// eval routes surface the identical index error.
-		length := array.Len()
-		for i, row := range indexes {
-			if row < 0 || row >= length {
-				recordRuntimeKernelExecution("ArrayGatherIndex", shape, "error", "runtime_error")
-				return nil, true, fmt.Errorf("index vector row %d value %d outside length %d", i, row, length)
+	if err == nil {
+		if array, ok := target.(data.Array); ok {
+			shape := "gather-at/" + string(array.Kind()) + "/" + qRuntimeCardinalityShape(len(indexes))
+			recordRuntimeKernelExecution("ArrayGatherIndex", shape, "attempt", "attempt")
+			// Array.Gather panics on out-of-range rows; validate up front and
+			// route out-of-range reads through the generic null-filling read
+			// path (arrayReadIndexValue) so both eval routes agree.
+			length := array.Len()
+			inRange := true
+			for _, row := range indexes {
+				if row < 0 || row >= length {
+					inRange = false
+					break
+				}
 			}
+			if inRange {
+				out := array.Gather(indexes)
+				recordRuntimeKernelExecution("ArrayGatherIndex", shape, "hit", "typed_gather_index")
+				return out, true, nil
+			}
+			recordRuntimeKernelExecution("ArrayGatherIndex", shape, "fallback", "out_of_range_null_fill")
 		}
-		out := array.Gather(indexes)
-		recordRuntimeKernelExecution("ArrayGatherIndex", shape, "hit", "typed_gather_index")
-		return out, true, nil
+	}
+	if err != nil && scalarOrVectorIndexFallbackEligible(target) {
+		// Negative or null indexes: defer to the null-filling read path.
+		err = nil
+	}
+	if err != nil {
+		return nil, true, err
 	}
 	out, err := s.applyOrIndexValue(qApplyIndexAt, target, indexValue)
 	if err != nil {
 		return nil, true, err
 	}
 	return out, true, nil
+}
+
+// scalarOrVectorIndexFallbackEligible reports whether a read-path index
+// error from the strict indexInts parse should fall back to the generic
+// null-filling read route (vectors and strings) instead of erroring.
+func scalarOrVectorIndexFallbackEligible(target any) bool {
+	switch target.(type) {
+	case data.Array, string:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, bool, error) {
@@ -1547,13 +1570,21 @@ func (s *EvalState) evalQPipelineApplyScalarIndex(plan *qPipelinePlan) (any, boo
 	if err != nil {
 		return nil, true, err
 	}
-	indexes, scalar, err := indexInts(indexValue)
-	if err != nil {
-		return nil, true, err
-	}
 	mode := qApplyIndexAt
 	if plan.compareOp == "dot" {
 		mode = qApplyIndexDot
+	}
+	indexes, scalar, err := indexInts(indexValue)
+	if err != nil {
+		if !scalarOrVectorIndexFallbackEligible(target) {
+			return nil, true, err
+		}
+		// Negative or null indexes: defer to the null-filling read path.
+		out, err := s.applyOrIndexValue(mode, target, indexValue)
+		if err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
 	}
 	if !scalar || len(indexes) != 1 {
 		indexPlan := qScalarApplyIndexPlan{
@@ -1597,6 +1628,9 @@ func (s *EvalState) evalQPipelineSumSequenceTransform(plan *qPipelinePlan) (any,
 	}
 	args, err := s.evalQPipelineSequenceTransformArgs(plan, left, leftOK)
 	if err != nil {
+		if errors.Is(err, errQSublistGenericFallback) {
+			return nil, false, nil
+		}
 		return nil, true, err
 	}
 	value, err := s.evalQPipelinePlannedExpr(plan.reductionInput, &plan.reductionPlan)
@@ -1771,11 +1805,26 @@ func (s *EvalState) evalQPipelineSequenceTransformArgs(plan *qPipelinePlan, left
 		if !leftOK {
 			return nil, fmt.Errorf("sublist expects integer indexes")
 		}
-		return qIntegerIndexes("sublist", left)
+		args, err := qIntegerIndexes("sublist", left)
+		if err != nil {
+			return nil, err
+		}
+		// q's one-argument sublist clamps (no overtake); the data layer's
+		// one-argument sublist step is take, so encode start/count instead.
+		converted, ok := qSublistTransformArgs(args)
+		if !ok {
+			return nil, errQSublistGenericFallback
+		}
+		return converted, nil
 	default:
 		return nil, nil
 	}
 }
+
+// errQSublistGenericFallback signals that a sublist pipeline claim must defer
+// to the generic route (negative one-argument sublist takes from the back,
+// which the start/count transform form cannot express).
+var errQSublistGenericFallback = errors.New("sublist pipeline fallback")
 
 func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error) {
 	if out, handled, err := s.tryEvalQPipelineMatrixOpSumRaze(plan.reductionInput); err != nil || handled {
@@ -2865,13 +2914,19 @@ func (s *EvalState) evalQPipelineCountSequencePrimitive(plan *qPipelinePlan) (an
 		if err != nil {
 			return nil, true, err
 		}
-		indexes, err := qIntegerIndexes("cut", left)
-		if err != nil {
-			return nil, true, err
-		}
 		right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
 		if err != nil {
 			return nil, true, err
+		}
+		indexes, atom, err := qAtomCutStarts(left, right)
+		if err != nil {
+			return nil, true, err
+		}
+		if !atom {
+			indexes, err = qIntegerIndexes("cut", left)
+			if err != nil {
+				return nil, true, err
+			}
 		}
 		out, err := data.CutCount(indexes, right)
 		shape := "cut-count/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
@@ -2896,7 +2951,7 @@ func (s *EvalState) evalQPipelineCountSequencePrimitive(plan *qPipelinePlan) (an
 		var out int64
 		switch len(args) {
 		case 1:
-			out = qTakeCount(args[0], right)
+			out = qSublistTakeCount(args[0], right)
 		case 2:
 			out, err = data.SublistCount(args[0], args[1], right)
 		default:

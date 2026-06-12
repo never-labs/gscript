@@ -37,10 +37,15 @@ import (
 // Shrink-only ratchets: counts may go down (promotions) but never up without
 // an explicit, reviewed bump.
 const (
-	canonicalQGapMax = 44
+	// Shrunk 44 -> 20: the edge-semantics basket promoted the empty-reducer
+	// identities, read-path indexing nulls, juxtaposed name/string indexing,
+	// and the reshape/cut/sublist/enlist/raze list edges to match.
+	canonicalQGapMax = 20
 	// Reviewed bump 30 -> 32: the parse-tree spelling deviations (verbs are
-	// symbol names, not function atoms; see value_eval_parse.go).
-	canonicalQDeviationMax = 32
+	// symbol names, not function atoms; see value_eval_parse.go). Shrunk to
+	// 31: the string-indexing deviations now match canonical; 1 "hello" is
+	// re-documented as a console-handle write deviation.
+	canonicalQDeviationMax = 31
 	canonicalQEntryMin     = 300
 )
 
