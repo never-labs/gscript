@@ -664,6 +664,9 @@ type EvalState struct {
 	deferScanAssignments map[string]bool
 	assignPool           qAssignPool
 	scriptDepth          int
+	// valueDepth guards the session-aware value/eval verbs against
+	// self-referential recursion (a:"value a";value a); see value_eval_parse.go.
+	valueDepth int
 	// rng backs the nondeterministic roll/deal (`x?y`) and `rand` verbs.
 	// It is lazily seeded with qDefaultRandSeed so a fresh session is
 	// reproducible (q's \S analog: a fixed default seed, settable later);
@@ -2738,7 +2741,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		return s.evalCallableAdverb(callable, "'", right)
 	}
 	if funcs, ok := parseUnaryComposition(src); ok {
-		return qComposition{funcs: funcs}, nil
+		return qComposition{funcs: s.bindStatefulUnaryFns(funcs)}, nil
 	}
 	if callableExpr, adverb, rightExpr, ok := s.findCallablePostfixAdverb(src); ok {
 		callable, err := s.eval(callableExpr)
@@ -2902,7 +2905,7 @@ func (s *EvalState) eval(src string) (any, error) {
 	if fn, ok := lookupDyadicVerbFunc(src); ok {
 		return qDyadicFunction{name: strings.TrimSpace(src), fn: fn}, nil
 	}
-	if fn, ok := lookupUnaryVerb(src); ok {
+	if fn, ok := s.unaryVerbFunc(src); ok {
 		return qUnaryFunction{name: strings.TrimSpace(src), fn: fn}, nil
 	}
 	if expr, ok := findAdverb(src); ok {
@@ -3013,7 +3016,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"raze ", raze},
 		{"keys ", keys},
 		{"key ", keys},
-		{"value ", value},
+		{"value ", s.valueVerb},
+		{"eval ", s.evalTreeVerb},
+		{"parse ", qParseVerb},
 		{"cols ", cols},
 		{"meta ", meta},
 		{"attr ", attrValue},
@@ -3438,7 +3443,7 @@ func (s *EvalState) evalValueExpr(expr Expr) (any, error) {
 		if fn, ok := lookupDyadicVerbFunc(x.Name); ok {
 			return qDyadicFunction{name: x.Name, fn: fn}, nil
 		}
-		if fn, ok := lookupUnaryVerb(x.Name); ok {
+		if fn, ok := s.unaryVerbFunc(x.Name); ok {
 			return qUnaryFunction{name: x.Name, fn: fn}, nil
 		}
 		return nil, unsupportedEvalValueExpr{expr: expr}
@@ -3611,6 +3616,26 @@ func (s *EvalState) evalValueCall(expr Call) (any, error) {
 		return data.NewAny([]any{arg}), nil
 	case "flip":
 		return flip(arg)
+	case "value":
+		// Symbol dereference is a read-only env probe and stays on the
+		// compiled route; string and parse-tree evaluation are stateful
+		// (arbitrary source against the live session) and decline so the
+		// string evaluator is the single execution route — the same pattern
+		// roll/deal use to keep the dual-route differential side-effect free.
+		switch x := arg.(type) {
+		case data.Symbol:
+			return s.valueSymbolDeref(x)
+		case string:
+			return nil, unsupportedEvalValueExpr{expr: expr}
+		case data.Array:
+			if qIsParseTreeList(x) {
+				return nil, unsupportedEvalValueExpr{expr: expr}
+			}
+		}
+	case "eval":
+		// Parse-tree evaluation can reach value-of-string through a tree;
+		// session-route only (see the value case above).
+		return nil, unsupportedEvalValueExpr{expr: expr}
 	}
 	if fn, ok := lookupUnaryVerb(expr.Func); ok {
 		return fn(arg)
@@ -4840,7 +4865,7 @@ func qPrefixExprTakesSymbolArgument(left string) bool {
 		first = fields[0]
 	}
 	switch first {
-	case "flip", "enlist", "keys", "key", "value", "cols", "meta", "attr", "type", "count",
+	case "flip", "enlist", "keys", "key", "value", "eval", "parse", "cols", "meta", "attr", "type", "count",
 		"where", "domain", "codes", "lookup", "hopen", "hsym", "system",
 		"group", "string", "not", "iasc", "idesc", "rank", "asc", "desc", "min", "max",
 		"sum", "avg", "sums", "prds", "mins", "maxs", "avgs", "distinct", "reverse", "prior", "prev", "next", "deltas", "fills", "differ",
@@ -5454,7 +5479,7 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	if expr.left == "" {
 		switch expr.adverb {
 		case "'":
-			return applyEachUnary(expr.verb, right)
+			return s.applyEachUnary(expr.verb, right)
 		case "':":
 			if op, _, ok := lookupDyadicVerb(expr.verb); ok {
 				return applyEachPrior(op, nil, right)
@@ -5472,7 +5497,7 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 			if _, ok := lookupDyadicVerbFunc(expr.verb); ok {
 				return nil, fmt.Errorf("%s cannot be used with over", expr.verb)
 			}
-			if fn, ok := lookupUnaryVerb(expr.verb); ok {
+			if fn, ok := s.unaryVerbFunc(expr.verb); ok {
 				// Monadic verb with over is q's converge iterator.
 				return s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: fn}, nil, right, false)
 			}
@@ -5483,7 +5508,7 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 				if _, ok := lookupDyadicVerbFunc(expr.verb); ok {
 					return nil, fmt.Errorf("%s cannot be used with scan", expr.verb)
 				}
-				if fn, ok := lookupUnaryVerb(expr.verb); ok {
+				if fn, ok := s.unaryVerbFunc(expr.verb); ok {
 					// Monadic verb with scan is converge collecting intermediates.
 					return s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: fn}, nil, right, true)
 				}
@@ -5502,12 +5527,12 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	fn, hasDyadicFunc := lookupDyadicVerbFunc(expr.verb)
 	if !hasDyadicFunc {
 		if expr.adverb == "/" || expr.adverb == "\\" {
-			if unary, ok := lookupUnaryVerb(expr.verb); ok {
+			if unary, ok := s.unaryVerbFunc(expr.verb); ok {
 				// A bare builtin verb word on the left is prefix application
 				// to the derived verb (`count next/x` = count (next/x)), not
 				// a seed: canonical q seeds are nouns or function literals.
 				if leftName := strings.TrimSpace(expr.left); isQBareName(leftName) && qIsBuiltinVerbName(leftName) {
-					if outer, ok := lookupUnaryVerb(leftName); ok {
+					if outer, ok := s.unaryVerbFunc(leftName); ok {
 						iterated, err := s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: unary}, nil, right, expr.adverb == "\\")
 						if err != nil {
 							return nil, err
@@ -8396,6 +8421,8 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 		return keys, true
 	case "value":
 		return value, true
+	case "parse":
+		return qParseVerb, true
 	case "cols":
 		return cols, true
 	case "meta":
@@ -10036,8 +10063,8 @@ func (s *EvalState) applyEachPriorCallable(fn any, initial any, v any) (any, err
 	return inferQArray(out, qKindOfValue(initial), qKindOfValue(v)), nil
 }
 
-func applyEachUnary(verb string, v any) (any, error) {
-	fn, ok := lookupUnaryVerb(verb)
+func (s *EvalState) applyEachUnary(verb string, v any) (any, error) {
+	fn, ok := s.unaryVerbFunc(verb)
 	if !ok {
 		return nil, fmt.Errorf("%s cannot be used monadically with each", verb)
 	}
@@ -14505,6 +14532,14 @@ func keys(v any) (any, error) {
 	}
 }
 
+// value is the stateless slice of the `value` verb (dict/enum/attributed/
+// keyed dispatch plus atom identity). The session-dependent cases — string
+// source evaluation, symbol dereference, parse-tree evaluation — live in
+// (*EvalState).valueVerb (value_eval_parse.go); every dispatch route with a
+// session in scope goes through it, so the errors below only surface from a
+// route that cannot see the env (and never silently pass the input through).
+// KNOWN GAP: canonical q value on a lambda returns its metadata list; this
+// dialect returns the lambda unchanged (default case).
 func value(v any) (any, error) {
 	switch x := v.(type) {
 	case qAttributedVector:
@@ -14515,6 +14550,10 @@ func value(v any) (any, error) {
 		return data.NewAny(x.Values), nil
 	case data.KeyedFrame:
 		return x.ValueFrame()
+	case string:
+		return nil, fmt.Errorf("value: evaluating a source string requires the session evaluator")
+	case data.Symbol:
+		return nil, fmt.Errorf("value: dereferencing a symbol requires the session evaluator")
 	default:
 		return v, nil
 	}

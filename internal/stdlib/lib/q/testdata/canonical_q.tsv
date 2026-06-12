@@ -388,7 +388,20 @@ match	wavg[1 1;3 4]	3.5
 match	any 0 0 1b	1b
 match	all 1 1 0b	0b
 match	value 42	42
-gap	value "1+2"	3	"1+2"	value on a string should evaluate it
+match	value "1+2"	3
+# ---- value / eval / parse evaluation verbs ----
+match	a:5;value `a	5
+match	value `undefined	ERROR:undefined
+match	value "x:9;x*2"	18
+match	value "x:9";x	9
+match	eval 42	42
+match	eval parse "2*3+1"	8
+match	value parse "1+2"	3
+match	eval parse "deltas sums til 5"	0 1 2 3 4
+match	x:"3*4";1+value x	13
+deviation	parse "7 mod 3"	(mod;7;3)	(`mod;7;3)	parse trees spell verbs as symbol names; canonical q returns function atoms in head position
+deviation	eval (`mod;(`mod;17;10);3)	ERROR:mod	1	tree verbs are symbols resolved against the verb registries; canonical q signals 'mod for an unbound symbol head
+match	eval parse "`a`b!1 2"	`a`b!1 2
 gap	0N!42	42		display verb 0N! missing, parses as dict instead
 deviation	(sum;10 20 30 40) fby `a`a`b`b	30 30 70 70	ERROR:aggregate	fby is spelled agg vec fby group, canonical tuple form unsupported
 deviation	sum 1 2 3 4 fby `a`a`b`b	ERROR	3 3 7 7	fby dialect form: canonical q rejects a bare vector left of fby

@@ -87,6 +87,12 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 		}
 		return qScriptBindingPlan{kind: qScriptBindingVector, items: items}
 	case Call:
+		// value/eval are session-routed (value of a string evaluates source
+		// against the live env); the binding executor's stateless unary
+		// terminal must not claim them (see value_eval_parse.go).
+		if x.Func == "value" || x.Func == "eval" {
+			return qScriptBindingPlan{}
+		}
 		arg := buildQScriptBindingPlan(x.Arg)
 		if arg.kind == qScriptBindingInvalid {
 			return qScriptBindingPlan{}
@@ -174,6 +180,10 @@ func buildQScriptBindingPlanFromCompiled(expr Expr) qScriptBindingPlan {
 		return qScriptBindingPlan{kind: qScriptBindingLiteral, literal: x.Value}
 	case Call:
 		if qFusedReducerWords[x.Func] && x.Func != "where" && !qCompiledLeafExpr(x.Arg) {
+			return qScriptBindingPlan{}
+		}
+		// value/eval are session-routed; see buildQScriptBindingPlan.
+		if x.Func == "value" || x.Func == "eval" {
 			return qScriptBindingPlan{}
 		}
 		arg := buildQScriptBindingPlanFromCompiled(x.Arg)

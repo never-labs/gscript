@@ -288,12 +288,21 @@ func qEvalFuzzInputSafe(src string) bool {
 		"while", "do[", // unbounded / long loops
 		"rand", "roll", "deal", // nondeterministic
 		"hopen", "read0", "read1", "system", "exit", // IPC / process
-		"`:",  // file handles
-		".z.", // clock / environment
+		"eval", // parse-tree eval can reach value-of-string (stateful) through a tree
+		"`:",   // file handles
+		".z.",  // clock / environment
 	} {
 		if strings.Contains(lower, banned) {
 			return false
 		}
+	}
+	// value of a STRING evaluates it as q source against the live session
+	// (assignments inside mutate it); the differential evaluates statements
+	// more than once, so any statement that could route a string into value
+	// is out of scope (mirrors the roll/deal exclusion). value over
+	// dicts/enums/symbols stays in scope.
+	if strings.Contains(lower, "value") && strings.Contains(src, `"`) {
+		return false
 	}
 	// `?` is roll/deal for atom-int lefts (nondeterministic once supported);
 	// only the ?[c;t;f] conditional form stays in scope.

@@ -47,10 +47,11 @@ type qVerbProps struct {
 
 // Synthetic form names for non-word table entries.
 const (
-	qVerbNameRoll          = "?"   // dyadic ? : roll/deal (atom LHS), find (vector LHS)
-	qVerbNameSystemCommand = "\\"  // \x system commands
-	qVerbNameFileHandle    = "`:"  // file-handle symbol literals
-	qVerbNameClock         = ".z." // .z namespace reads
+	qVerbNameRoll          = "?"              // dyadic ? : roll/deal (atom LHS), find (vector LHS)
+	qVerbNameSystemCommand = "\\"             // \x system commands
+	qVerbNameFileHandle    = "`:"             // file-handle symbol literals
+	qVerbNameClock         = ".z."            // .z namespace reads
+	qVerbNameValueSession  = "value(session)" // session-routed value applications (see below)
 )
 
 // qVerbMetadataExceptions lists every name that is not a plain deterministic
@@ -71,6 +72,17 @@ var qVerbMetadataExceptions = map[string]qVerbProps{
 	"system":               {Stateful: true, marker: "system "},
 	qVerbNameSystemCommand: {Stateful: true},
 	qVerbNameFileHandle:    {Stateful: true, marker: qVerbNameFileHandle},
+	// value/eval are stateful-capable: value of a string evaluates arbitrary
+	// q source against the live session (assignments mutate it), value of a
+	// symbol reads the workspace, and eval of a parse tree can reach both
+	// through a tree, so those shapes must not enter any memo layer. value
+	// over a LITERAL dict/enum operand (`a`b!1 2, `sym$`A`B) is pure and
+	// stays deterministic; the structural scan in qSourceVerbFlags
+	// (qScanMentionsSessionValueVerb) tells the shapes apart, mirroring how
+	// the dyadic `?` roll scan works. eval is always session-routed. parse
+	// (string -> tree) is pure and keeps the deterministic default.
+	qVerbNameValueSession: {Stateful: true},
+	"eval":                {Stateful: true, marker: "eval"},
 	// Clock: per-call environment reads.
 	qVerbNameClock: {ReadsClock: true, marker: qVerbNameClock},
 }
@@ -95,7 +107,7 @@ var qDispatchVerbNames = []string{
 	// lookupUnaryVerb
 	"count", "enlist", "type", "string", "lower", "upper", "trim",
 	"ltrim", "rtrim", "distinct", "first", "last", "keys", "key",
-	"value", "cols", "meta", "attr", "codes", "domain", "group",
+	"value", "parse", "cols", "meta", "attr", "codes", "domain", "group",
 	"ungroup", "raze", "avg", "var", "dev", "svar", "sdev", "med",
 	"prd", "reverse", "prior", "prev", "next", "deltas", "fills",
 	"differ", "ratios", "asc", "desc", "iasc", "idesc", "rank", "neg",
@@ -197,6 +209,9 @@ func qSourceVerbFlags(src string) qVerbProps {
 	if qScanMentionsRandomVerb(scan) {
 		flags.Random = true
 	}
+	if qScanMentionsSessionValueVerb(scan) {
+		flags = qVerbFlagsUnion(flags, qVerbMetadata(qVerbNameValueSession))
+	}
 	return flags
 }
 
@@ -215,6 +230,61 @@ func qVerbFlagsUnion(a, b qVerbProps) qVerbProps {
 // distinct; the textual scan cannot know whether a name LHS is an integer
 // atom, so vector-LHS find expressions are also (safely) excluded from
 // memoization.
+// qScanMentionsSessionValueVerb reports whether the (literal-blanked) scan
+// text may apply `value` to a session-dependent operand: a string (evaluated
+// as q source against the live env), a symbol (workspace read), a parse tree,
+// or any name/expression that could carry one of those at runtime. The only
+// shape left deterministic is prefix `value` over a LITERAL dict or enum
+// operand (`a`b!1 2, `sym$`A`B): symbol-list literal followed by ! or $.
+// String literals are blanked before scanning, so a string operand presents
+// as blank text and stays (correctly) session-flagged by the default.
+func qScanMentionsSessionValueVerb(scan string) bool {
+	for i := 0; i < len(scan); i++ {
+		ch := scan[i]
+		if ch == '`' {
+			i = qSymbolLiteralEnd(scan, i) - 1
+			continue
+		}
+		if !isQIdentStart(ch) {
+			continue
+		}
+		start := i
+		j := i
+		for j < len(scan) && isQIdentByte(scan[j]) {
+			j++
+		}
+		word := scan[start:j]
+		i = j - 1
+		if start > 0 && isQIdentByte(scan[start-1]) {
+			continue
+		}
+		if word != "value" {
+			continue
+		}
+		if !qValueOperandIsLiteralDictOrEnum(scan[j:]) {
+			return true
+		}
+	}
+	return false
+}
+
+// qValueOperandIsLiteralDictOrEnum reports whether the text after a `value`
+// token starts with a literal dict (`a`b!...) or enum/cast (`dom$...)
+// operand — the deterministic value shapes.
+func qValueOperandIsLiteralDictOrEnum(rest string) bool {
+	k := 0
+	for k < len(rest) && isQWhitespace(rest[k]) {
+		k++
+	}
+	if k >= len(rest) || rest[k] != '`' {
+		return false
+	}
+	for k < len(rest) && rest[k] == '`' {
+		k = qSymbolLiteralEnd(rest, k)
+	}
+	return k < len(rest) && (rest[k] == '!' || rest[k] == '$')
+}
+
 func qScanMentionsRandomVerb(scan string) bool {
 	for i := 0; i < len(scan); i++ {
 		ch := scan[i]
