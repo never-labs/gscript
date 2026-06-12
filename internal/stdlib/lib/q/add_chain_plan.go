@@ -182,6 +182,9 @@ func buildQAddChainPlan(src string) []qAddChainTermPlan {
 	if len(terms) < 2 {
 		return nil
 	}
+	if addChainHeadShadowsCanonical(terms[0]) {
+		return nil
+	}
 	for _, term := range terms {
 		if !isScalarAddChainTerm(term) {
 			return nil

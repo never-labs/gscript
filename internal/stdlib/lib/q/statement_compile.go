@@ -517,11 +517,12 @@ func compileQEvalExpr(src string, depth int) Expr {
 		}
 		return Const{Value: value}
 	}
-	// Symbol-character arithmetic splits, in the findDyadic tier order.
-	for _, tier := range []string{"=<>", "+-", "*%", "&|", "^"} {
-		if idx := findTopLevel(src, tier); idx >= 0 {
-			return compileQBinarySplit(string(src[idx]), src[:idx], src[idx+1:], depth)
-		}
+	// Symbol-character arithmetic splits. Canonical q has no precedence among
+	// the dyadic verbs and evaluates right-to-left, so we split at the single
+	// LEFTMOST top-level operator (mirroring findDyadic): the leftmost verb is
+	// the outermost operation and the rest is its right argument.
+	if idx := findTopLevel(src, "=<>+-*%&|^"); idx >= 0 {
+		return compileQBinarySplit(string(src[idx]), src[:idx], src[idx+1:], depth)
 	}
 	// Symbol literals and symbol lists.
 	if strings.HasPrefix(src, "`") {

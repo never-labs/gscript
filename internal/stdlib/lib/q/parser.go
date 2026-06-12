@@ -692,7 +692,9 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 				break
 			}
 			p.next()
-			right, err := p.parseExpr(prec + 1)
+			// Right-associative: recurse with the same minimum precedence so a
+			// following same-level operator is grabbed into the right operand.
+			right, err := p.parseExpr(prec)
 			if err != nil {
 				return nil, err
 			}
@@ -707,13 +709,11 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 			break
 		}
 		p.next()
-		// `#` is right-associative as in q: 3#0#1 is 3#(0#1) (take from the
-		// empty list), not (3#0)#1 (a reshape).
-		nextMin := prec + 1
-		if tok.text == "#" {
-			nextMin = prec
-		}
-		right, err := p.parseExpr(nextMin)
+		// All q symbol operators are right-associative (no precedence among
+		// them): recurse with the same minimum precedence so the rest of the
+		// expression to the right becomes this verb's right argument. `#` was
+		// already right-associative for the same reason (3#0#1 is 3#(0#1)).
+		right, err := p.parseExpr(prec)
 		if err != nil {
 			return nil, err
 		}
@@ -831,7 +831,11 @@ func (p *parser) parsePrimary() (Expr, error) {
 	case tokenIdent:
 		p.next()
 		if qPrefixFunction(tok.text) && p.canStartCallArg() {
-			arg, err := p.parseExpr(11)
+			// Canonical q: a prefix (unary) verb takes everything to its right
+			// as its argument. `sum price*size` is sum(price*size), not
+			// (sum price)*size. Parse the argument at minimum precedence so the
+			// trailing dyadic verbs fold into the prefix verb's right argument.
+			arg, err := p.parseExpr(0)
 			if err != nil {
 				return nil, err
 			}
@@ -1213,25 +1217,20 @@ func isClauseKeyword(name string) bool {
 
 func precedence(op string) int {
 	switch op {
-	case "or", "|":
-		return 2
-	case "and", "&":
-		return 3
-	// mod/div mirror the string evaluator's word-dyadic split: looser than
-	// compare/in (`x mod 4=1` is x mod (4=1), q's right-grab) but tighter
-	// than and/or so predicate conjunctions split first.
-	case "mod", "div":
-		return 5
-	case "in", "within":
+	// Canonical kdb+/q: there is NO operator precedence among the dyadic
+	// symbol/word verbs and evaluation is strict right-to-left. They all share
+	// a single precedence level and associate right-to-left, so `2*3+1` is
+	// 2*(3+1)=8, `10-4-2` is 10-(4-2)=8, and `8%2%2` is 8%(2%2)=8f. The
+	// right-associativity is realized in parseExpr by recursing with the same
+	// minimum precedence (not prec+1) on the right operand.
+	case "or", "|", "and", "&", "mod", "div", "in", "within",
+		"=", "<", ">", "<=", ">=", "<>", "*", "/", "%", "+", "-":
 		return 10
-	case "*", "/", "%":
-		return 30
+	// `#` (take/reshape) keeps a distinct, tighter level: R9 made same-operator
+	// `#` chains right-associative (3#0#1 is 3#(0#1)), and the take-prefix /
+	// reshape recognizers depend on `#` binding before the arithmetic verbs.
 	case "#":
 		return 25
-	case "+", "-":
-		return 20
-	case "=", "<", ">", "<=", ">=", "<>":
-		return 10
 	default:
 		return -1
 	}

@@ -606,10 +606,12 @@ var qEvalKnownDivergenceRepresentatives = []string{
 	"min trim `a",
 	"(2)<=(raze `a`a`b)",
 	"x:((til 96) mod 5)%10;(+/asin x)+(+/acos x)+(+/atan x)",
-	"til +/0",                // string route rejects nested derived-verb arguments
-	"til 000xxz:#A00000000",  // leaf-parser vs probe error message mismatch
-	"0$00#A",                 // enum-cast vs probe error message mismatch
-	"(0)+first 0<0",          // routes split comparison vs word juxtaposition differently
+	"til +/0",               // string route rejects nested derived-verb arguments
+	"til 000xxz:#A00000000", // leaf-parser vs probe error message mismatch
+	"0$00#A",                // enum-cast vs probe error message mismatch
+	// "(0)+first 0<0" was reconciled by the canonical right-to-left split
+	// (q!: no operator precedence): both routes now split at the leftmost
+	// top-level verb, so the routes agree. Removed (shrink-only ratchet).
 	"count@where 0",          // string route rejects verb@application shapes
 	"x:();s:x;last%x",        // glued operator/word tokenisation divergence
 	"x:til 0;sum 0 rotate x", // aggregate empty-identity differs between routes

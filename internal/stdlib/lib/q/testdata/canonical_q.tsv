@@ -351,10 +351,10 @@ match	mmu[2 2#1 2 3 4f;2 2#5 6 7 8f]	(19 22f;43 50f)
 match	inv 2 2#1 0 0 1f	(1 0f;0 1f)
 gap	sum (1 2;3 4)	4 6	ERROR	columnar sum over a list of vectors missing
 # ---- right-to-left evaluation order ----
-deviation	2*3+4	14	10	left-assoc operators: Leia evaluates left to right
-deviation	10-3-2	9	5	left-assoc operators: Leia evaluates left to right
+match	2*3+4	14
+match	10-3-2	9
 match	2+3*4	14
-deviation	8%4%2	4f	1f	left-assoc operators: Leia evaluates left to right
+match	8%4%2	4f
 # ---- fuzzer findings (2026-06) ----
 match	(0%0)~0%0	1b
 match	count~count	1b

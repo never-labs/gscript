@@ -5242,12 +5242,32 @@ func isQNumericSignStart(ch byte) bool {
 }
 
 func findDyadic(src string) (int, byte, bool) {
-	for _, ops := range []string{"=<>", "+-", "*%", "&|", "^"} {
-		if idx := findTopLevel(src, ops); idx >= 0 {
-			return idx, src[idx], true
-		}
+	// Canonical kdb+/q: no precedence among the dyadic symbol verbs and strict
+	// right-to-left evaluation. Splitting at the LEFTMOST top-level operator
+	// makes the leftmost verb the outermost operation and the rest of the
+	// expression its right argument (evaluated recursively, again leftmost),
+	// which is exactly q's right-associative grouping. `2*3+1` splits at `*`
+	// into 2*(3+1)=8; `10-4-2` splits at the first `-` into 10-(4-2)=8.
+	if idx := findTopLevel(src, "=<>+-*%&|^"); idx >= 0 {
+		return idx, src[idx], true
 	}
 	return 0, 0, false
+}
+
+// addChainHeadShadowsCanonical reports whether the head term of a top-level
+// `+`-split chain itself contains a top-level dyadic verb to the LEFT of the
+// first `+`. When it does, that verb — not the `+` — is the canonical leftmost
+// (outermost) operation, so the left-associative add-chain accumulation would
+// diverge from q's right-to-left grouping (`2 times 3+1` is 2 times (3+1), not
+// (2 times 3)+1). Such chains must fall through to the leftmost-verb splitters.
+func addChainHeadShadowsCanonical(head string) bool {
+	if _, _, ok := findDyadic(head); ok {
+		return true
+	}
+	if _, _, _, ok := splitTopLevelDyadicWordMap(head, qDyadicWordOps); ok {
+		return true
+	}
+	return false
 }
 
 type adverbExpr struct {
@@ -6217,6 +6237,9 @@ func (s *EvalState) tryEvalSumFby(src string) (any, bool, error) {
 func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 	terms := splitTopLevelPlusChain(src)
 	if len(terms) < 2 {
+		return nil, false, nil
+	}
+	if addChainHeadShadowsCanonical(terms[0]) {
 		return nil, false, nil
 	}
 	for _, term := range terms {
