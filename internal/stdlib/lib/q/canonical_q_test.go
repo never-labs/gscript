@@ -45,8 +45,15 @@ const (
 	// returns int) are reclassified from gap to deviation — the dialect
 	// promotes all ints to long by documented design, so introducing 32-bit
 	// returns there would contradict the dialect-wide promotion rule.
-	canonicalQDeviationMax = 35
-	canonicalQEntryMin     = 300
+	// Shrink 35 -> 28: six one-off divergences canonicalized (value-of-dict
+	// typed values, symbol upper/lower, console handle write 1 "x", failed
+	// string casts return null, canonical tuple-form fby).
+	canonicalQDeviationMax = 28
+	// Raised 300 -> 598 with the R15 breadth expansion (149 new entries:
+	// verb edge inputs, temporal corners, keyed-table ops, adverb matrices,
+	// string/pattern ops, take/drop/cut, find/within/bin, join corners,
+	// mixed-radix sv/vs, functional amend, casts, eval/parse round trips).
+	canonicalQEntryMin = 598
 )
 
 type canonicalQEntry struct {
