@@ -51,6 +51,36 @@
         "real_dependency_imports": false,
         "replay_ready": true
       }
+    },
+    {
+      "fixture_key": "generic_tool:projection:registry_descriptor:tool_contract:v1",
+      "path": "fixtures/registry_descriptor_to_tool_contract_projection_fixture.json",
+      "schema": "schemas/tool_contract_projection_v1.schema.json",
+      "dialect_export": "generic.ai.tool.contract.project_registry_descriptor",
+      "tool_name": "registry_descriptor_projection",
+      "capability_tags": [
+        "generic.ai.tool.contract",
+        "generic.ai.tool.contract.project_registry_descriptor",
+        "ai.tool.schema.declarative",
+        "ai.tool.approval.state",
+        "ai.tool.result.envelope",
+        "ai.tool.error.normalized",
+        "ai.tool.replay.fixture"
+      ],
+      "approval_state": "fixture_only",
+      "expected_ok": true,
+      "replay_ready": true,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "source_package": "generic_tool_registry",
+        "projection_kind": "registry_descriptor_to_tool_contract"
+      }
     }
   ]
 }

@@ -56,7 +56,7 @@ contracts, and fixtures for its boundary.
 - chart-render: `examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts`
 - memory: `examples/ai/finrobot_translation/live_packages/generic_memory_store`
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
-- tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
+- tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts` (includes registry descriptor projection into generic tool contracts)
 - tool-registry: `examples/ai/finrobot_translation/live_packages/generic_tool_registry`
 - optional-adapter: `examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary`
 - coding-workspace: `examples/ai/finrobot_translation/live_packages/generic_coding_workspace`

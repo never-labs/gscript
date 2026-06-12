@@ -1504,6 +1504,7 @@
       "migration_source": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
       "capabilities": [
         "generic.ai.tool.contract",
+        "generic.ai.tool.contract.project_registry_descriptor",
         "generic.ai.tool.invoke",
         "generic.ai.tool.argument_validation",
         "generic.ai.tool.result_envelope",
@@ -1512,6 +1513,7 @@
       ],
       "test_gates": [
         "provider-free fixture contract parses",
+        "registry descriptor projection fixture maps registry declarations into generic tool contracts",
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"

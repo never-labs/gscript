@@ -3,7 +3,7 @@
   "id": "finrobot-generic-tool-contracts-live-package",
   "package_name": "leia-generic-ai-tool-contracts",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for generic.ai.tool.contract and ai.tool.invoke contracts.",
+  "description": "Provider-free live package skeleton for generic.ai.tool.contract, ai.tool.invoke, and registry descriptor projection contracts.",
   "dialect_symbols": [
     "generic.ai.tool.contract",
     "ai.tool.invoke"
@@ -36,22 +36,26 @@
     "generic_tool_contract": "contracts/generic_tool_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json",
     "invoke_success_fixture": "fixtures/invoke_success_fixture.json",
-    "invoke_validation_error_fixture": "fixtures/invoke_validation_error_fixture.json"
+    "invoke_validation_error_fixture": "fixtures/invoke_validation_error_fixture.json",
+    "registry_descriptor_projection_fixture": "fixtures/registry_descriptor_to_tool_contract_projection_fixture.json"
   },
   "schemas": {
     "tool_contract": "schemas/tool_contract_v1.schema.json",
     "invoke_request": "schemas/invoke_request_v1.schema.json",
     "result_envelope": "schemas/result_envelope_v1.schema.json",
     "normalized_error": "schemas/normalized_error_v1.schema.json",
-    "artifact_ref": "schemas/artifact_ref_v1.schema.json"
+    "artifact_ref": "schemas/artifact_ref_v1.schema.json",
+    "tool_contract_projection": "schemas/tool_contract_projection_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "invoke_success": "fixtures/invoke_success_fixture.json",
-    "invoke_validation_error": "fixtures/invoke_validation_error_fixture.json"
+    "invoke_validation_error": "fixtures/invoke_validation_error_fixture.json",
+    "registry_descriptor_projection": "fixtures/registry_descriptor_to_tool_contract_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.tool.contract",
+    "generic.ai.tool.contract.project_registry_descriptor",
     "ai.tool.invoke",
     "ai.tool.schema.declarative",
     "ai.tool.arguments.validate",
@@ -101,7 +105,8 @@
     "result envelopes separate ok, value, error, artifact_refs, and replay metadata",
     "normalized errors expose kind, message, field, retryable, and provider_free fields",
     "artifact refs are metadata-only and never require inline provider payloads",
-    "fixtures cover success and validation error paths with live_network false"
+    "fixtures cover success and validation error paths with live_network false",
+    "registry descriptors project into tool contracts, invoke requests, result envelopes, and approval states without provider calls"
   ],
   "no_built_in_guarantee": {
     "required": true,

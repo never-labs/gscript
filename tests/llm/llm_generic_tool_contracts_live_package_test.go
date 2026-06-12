@@ -91,7 +91,7 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 		t.Fatalf("default policy must stay fixture-only and provider-free: %#v", manifest.DefaultPolicy)
 	}
 
-	for _, key := range []string{"generic_tool_contract", "fixture_index", "invoke_success_fixture", "invoke_validation_error_fixture"} {
+	for _, key := range []string{"generic_tool_contract", "fixture_index", "invoke_success_fixture", "invoke_validation_error_fixture", "registry_descriptor_projection_fixture"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
@@ -105,13 +105,13 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(base, manifest.Entrypoints["smoke"])); err != nil {
 		t.Fatalf("smoke entrypoint missing: %v", err)
 	}
-	for _, key := range []string{"tool_contract", "invoke_request", "result_envelope", "normalized_error", "artifact_ref"} {
+	for _, key := range []string{"tool_contract", "invoke_request", "result_envelope", "normalized_error", "artifact_ref", "tool_contract_projection"} {
 		if manifest.Schemas[key] == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericToolContractsJSONFile(t, filepath.Join(base, manifest.Schemas[key]))
 	}
-	for _, key := range []string{"index", "invoke_success", "invoke_validation_error"} {
+	for _, key := range []string{"index", "invoke_success", "invoke_validation_error", "registry_descriptor_projection"} {
 		if manifest.Fixtures[key] == "" {
 			t.Fatalf("missing fixture %q", key)
 		}
@@ -129,6 +129,7 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 		"ai.tool.result.envelope",
 		"ai.tool.schema.declarative",
 		"generic.ai.tool.contract",
+		"generic.ai.tool.contract.project_registry_descriptor",
 	}
 	gotCapabilities := append([]string(nil), manifest.Capabilities...)
 	sort.Strings(gotCapabilities)
@@ -158,7 +159,7 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 		t.Fatalf("no built-in guarantee should name package boundary: %q", manifest.NoBuiltInGuarantee.Statement)
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"declarative tool schema", "arguments", "capability tags", "approval state", "result envelopes", "normalized errors", "artifact refs"} {
+	for _, want := range []string{"declarative tool schema", "arguments", "capability tags", "approval state", "result envelopes", "normalized errors", "artifact refs", "registry descriptors project"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -313,6 +314,7 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		Fixtures              []struct {
 			FixtureKey            string   `json:"fixture_key"`
 			Path                  string   `json:"path"`
+			Schema                string   `json:"schema"`
 			DialectExport         string   `json:"dialect_export"`
 			ToolName              string   `json:"tool_name"`
 			CapabilityTags        []string `json:"capability_tags"`
@@ -325,14 +327,29 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeGenericToolContractsJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	keys := map[string]bool{}
 	coveredOutcomes := map[bool]bool{}
+	coveredProjection := false
 	for _, fixture := range index.Fixtures {
-		if fixture.FixtureKey == "" || fixture.Path == "" || fixture.DialectExport != "ai.tool.invoke" || fixture.ToolName != "fixture.lookup" {
+		if fixture.FixtureKey == "" || fixture.Path == "" || fixture.DialectExport == "" || fixture.ToolName == "" {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
+		}
+		switch fixture.FixtureKey {
+		case "generic_tool:projection:registry_descriptor:tool_contract:v1":
+			if fixture.DialectExport != "generic.ai.tool.contract.project_registry_descriptor" ||
+				fixture.ToolName != "registry_descriptor_projection" ||
+				fixture.Schema != "schemas/tool_contract_projection_v1.schema.json" {
+				t.Fatalf("projection fixture metadata incomplete: %#v", fixture)
+			}
+			coveredProjection = true
+		default:
+			if fixture.DialectExport != "ai.tool.invoke" || fixture.ToolName != "fixture.lookup" || fixture.Schema != "" {
+				t.Fatalf("invoke fixture metadata incomplete: %#v", fixture)
+			}
+			coveredOutcomes[fixture.ExpectedOK] = true
 		}
 		assertGenericToolContractsRefString(t, "fixture key", fixture.FixtureKey, "generic_tool:")
 		assertGenericToolContractsCapabilityTags(t, fixture.CapabilityTags)
@@ -340,7 +357,6 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 			t.Fatalf("duplicate fixture key %q", fixture.FixtureKey)
 		}
 		keys[fixture.FixtureKey] = true
-		coveredOutcomes[fixture.ExpectedOK] = true
 		if fixture.ApprovalState != "fixture_only" || !fixture.ReplayReady {
 			t.Fatalf("fixture must be replay-ready and fixture-only: %#v", fixture)
 		}
@@ -349,8 +365,8 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		}
 		assertGenericToolContractsJSONFile(t, filepath.Join(base, fixture.Path))
 	}
-	if !coveredOutcomes[true] || !coveredOutcomes[false] {
-		t.Fatalf("fixture index must cover success and validation error paths: %#v", keys)
+	if !coveredOutcomes[true] || !coveredOutcomes[false] || !coveredProjection {
+		t.Fatalf("fixture index must cover success, validation error, and registry projection paths: %#v", keys)
 	}
 
 	mainPath := filepath.Join(base, "main.leia")
@@ -359,7 +375,7 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(sourceBytes)
-	for _, want := range []string{"generic.ai.tool.contract", "ai.tool.invoke", "declarative_schema", "capability_tags", "approval", "artifact_refs", "validation"} {
+	for _, want := range []string{"generic.ai.tool.contract", "ai.tool.invoke", "generic.ai.tool.contract.project_registry_descriptor", "declarative_schema", "capability_tags", "approval", "artifact_refs", "validation"} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("main.leia missing %q", want)
 		}
@@ -379,8 +395,208 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		t.Fatalf("get generic_tool_contracts_live_package_summary: %v", err)
 	}
 	summary, ok := value.(string)
-	if !ok || !strings.Contains(summary, "provider_free=true") || !strings.Contains(summary, "validation_error=validation") {
+	if !ok || !strings.Contains(summary, "provider_free=true") || !strings.Contains(summary, "validation_error=validation") || !strings.Contains(summary, "projected_tools=2") {
 		t.Fatalf("summary = %#v", value)
+	}
+}
+
+func TestGenericToolRegistryProjectsDescriptorToGenericToolContracts(t *testing.T) {
+	contractsBase := genericToolContractsLivePackageDir(t)
+	registryBase := genericToolRegistryDir(t)
+	readOnly := loadGenericToolRegistryFixture(t, filepath.Join(registryBase, "fixtures", "tool_registry_replay_trace_fixture.json"))
+	denied := loadGenericToolRegistryFixture(t, filepath.Join(registryBase, "fixtures", "approval_edge_fixture.json"))
+
+	var projection struct {
+		SchemaVersion        int    `json:"schema_version"`
+		FixtureKey           string `json:"fixture_key"`
+		ProjectionKind       string `json:"projection_kind"`
+		ProviderFree         bool   `json:"provider_free"`
+		LiveNetwork          bool   `json:"live_network"`
+		RealDependencyImport bool   `json:"real_dependency_imports"`
+		SourceFixtureRefs    struct {
+			RegistryReadOnly        string `json:"registry_read_only"`
+			RegistryEffectfulDenied string `json:"registry_effectful_denied"`
+			ToolContract            string `json:"tool_contract"`
+		} `json:"source_fixture_refs"`
+		DescriptorProjections []struct {
+			SourceDescriptor struct {
+				ToolName         string   `json:"tool_name"`
+				Effect           string   `json:"effect"`
+				ApprovalPolicy   string   `json:"approval_policy"`
+				CapabilityIDs    []string `json:"capability_ids"`
+				InputRequired    []string `json:"input_required"`
+				OutputRequired   []string `json:"output_required"`
+				SourceFixtureKey string   `json:"source_fixture_key"`
+			} `json:"source_descriptor"`
+			ProjectedToolContract struct {
+				Name              string `json:"name"`
+				Description       string `json:"description"`
+				DeclarativeSchema struct {
+					Type                 string   `json:"type"`
+					Required             []string `json:"required"`
+					AdditionalProperties bool     `json:"additionalProperties"`
+				} `json:"declarative_schema"`
+				CapabilityTags []string `json:"capability_tags"`
+				Approval       struct {
+					Required bool   `json:"required"`
+					State    string `json:"state"`
+					Policy   string `json:"policy"`
+				} `json:"approval"`
+				ResultSchemaRef   string `json:"result_schema_ref"`
+				ErrorSchemaRef    string `json:"error_schema_ref"`
+				ArtifactSchemaRef string `json:"artifact_schema_ref"`
+			} `json:"projected_tool_contract"`
+			ProjectedInvokeRequest struct {
+				ToolName       string   `json:"tool_name"`
+				CapabilityTags []string `json:"capability_tags"`
+				Approval       struct {
+					Required bool   `json:"required"`
+					State    string `json:"state"`
+					Policy   string `json:"policy"`
+				} `json:"approval"`
+				ReplayKey string `json:"replay_key"`
+			} `json:"projected_invoke_request"`
+			ProjectedResultEnvelope struct {
+				OK       bool   `json:"ok"`
+				ToolName string `json:"tool_name"`
+				Approval struct {
+					Required bool   `json:"required"`
+					State    string `json:"state"`
+					Policy   string `json:"policy"`
+				} `json:"approval"`
+				Error *struct {
+					Kind         string `json:"kind"`
+					Field        string `json:"field"`
+					Retryable    bool   `json:"retryable"`
+					ProviderFree bool   `json:"provider_free"`
+				} `json:"error"`
+				Replay struct {
+					ReplayKey    string `json:"replay_key"`
+					ProviderFree bool   `json:"provider_free"`
+					LiveNetwork  bool   `json:"live_network"`
+				} `json:"replay"`
+			} `json:"projected_result_envelope"`
+			CapabilityMap []struct {
+				Source string `json:"source"`
+				Target string `json:"target"`
+			} `json:"capability_map"`
+			FieldMap []struct {
+				Source string `json:"source"`
+				Target string `json:"target"`
+			} `json:"field_map"`
+			ApprovalMap struct {
+				SourcePolicy       string `json:"source_policy"`
+				SourceRequired     bool   `json:"source_required"`
+				SourceDecision     string `json:"source_decision"`
+				ProjectedRequired  bool   `json:"projected_required"`
+				ProjectedState     string `json:"projected_state"`
+				ProjectedErrorKind string `json:"projected_error_kind"`
+			} `json:"approval_map"`
+		} `json:"descriptor_projections"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeGenericToolContractsJSONFile(t, filepath.Join(contractsBase, "fixtures", "registry_descriptor_to_tool_contract_projection_fixture.json"), &projection)
+
+	if projection.SchemaVersion != 1 ||
+		projection.FixtureKey != "generic_tool:projection:registry_descriptor:tool_contract:v1" ||
+		projection.ProjectionKind != "registry_descriptor_to_tool_contract" ||
+		!projection.ProviderFree || projection.LiveNetwork || projection.RealDependencyImport ||
+		projection.SourceFixtureRefs.RegistryReadOnly == "" ||
+		projection.SourceFixtureRefs.RegistryEffectfulDenied == "" ||
+		projection.SourceFixtureRefs.ToolContract == "" ||
+		len(projection.DescriptorProjections) != 2 {
+		t.Fatalf("projection header incomplete: %#v", projection)
+	}
+	for assertion, ok := range projection.ProjectionAssertions {
+		if !ok {
+			t.Fatalf("projection assertion %q is false", assertion)
+		}
+	}
+
+	projectionsByTool := map[string]int{}
+	for i, descriptorProjection := range projection.DescriptorProjections {
+		toolName := descriptorProjection.SourceDescriptor.ToolName
+		projectionsByTool[toolName] = i
+		if toolName == "" ||
+			descriptorProjection.ProjectedToolContract.Name != toolName ||
+			descriptorProjection.ProjectedInvokeRequest.ToolName != toolName ||
+			descriptorProjection.ProjectedResultEnvelope.ToolName != toolName {
+			t.Fatalf("tool name not preserved through projection: %#v", descriptorProjection)
+		}
+		if descriptorProjection.ProjectedToolContract.DeclarativeSchema.Type != "object" ||
+			descriptorProjection.ProjectedToolContract.DeclarativeSchema.AdditionalProperties ||
+			!reflect.DeepEqual(descriptorProjection.ProjectedToolContract.DeclarativeSchema.Required, descriptorProjection.SourceDescriptor.InputRequired) {
+			t.Fatalf("declarative schema not projected from input schema: %#v", descriptorProjection.ProjectedToolContract.DeclarativeSchema)
+		}
+		for _, ref := range []string{
+			descriptorProjection.ProjectedToolContract.ResultSchemaRef,
+			descriptorProjection.ProjectedToolContract.ErrorSchemaRef,
+			descriptorProjection.ProjectedToolContract.ArtifactSchemaRef,
+		} {
+			assertGenericToolContractsSchemaRef(t, ref)
+		}
+		assertGenericToolContractsCapabilityTags(t, descriptorProjection.ProjectedToolContract.CapabilityTags)
+		assertGenericToolContractsCapabilityTags(t, descriptorProjection.ProjectedInvokeRequest.CapabilityTags)
+		if !genericToolContractsMappingContains(descriptorProjection.FieldMap, "descriptor.tool_name", "projected_tool_contract.name") ||
+			!genericToolContractsMappingContains(descriptorProjection.FieldMap, "descriptor.input_schema", "projected_tool_contract.declarative_schema") {
+			t.Fatalf("projection field map incomplete: %#v", descriptorProjection.FieldMap)
+		}
+	}
+
+	readOnlyProjection := projection.DescriptorProjections[projectionsByTool[readOnly.Descriptor.ToolName]]
+	readOnlyInputRequired := genericToolContractsSchemaRequired(t, readOnly.Descriptor.InputSchema)
+	if readOnlyProjection.SourceDescriptor.ToolName != readOnly.Descriptor.ToolName ||
+		readOnlyProjection.SourceDescriptor.Effect != readOnly.Descriptor.Effect ||
+		readOnlyProjection.SourceDescriptor.ApprovalPolicy != readOnly.Descriptor.ApprovalPolicy ||
+		!reflect.DeepEqual(readOnlyProjection.SourceDescriptor.CapabilityIDs, readOnly.Descriptor.CapabilityIDs) ||
+		!reflect.DeepEqual(readOnlyProjection.SourceDescriptor.InputRequired, readOnlyInputRequired) ||
+		readOnlyProjection.SourceDescriptor.SourceFixtureKey != readOnly.Trace.Provenance.FixtureKey ||
+		readOnlyProjection.ProjectedInvokeRequest.ReplayKey != readOnly.Trace.Provenance.FixtureKey ||
+		readOnlyProjection.ProjectedResultEnvelope.Replay.ReplayKey != readOnly.Trace.Provenance.FixtureKey {
+		t.Fatalf("read-only registry fixture not projected faithfully: %#v", readOnlyProjection.SourceDescriptor)
+	}
+	if readOnly.Trace.Approval.Required ||
+		readOnlyProjection.ProjectedToolContract.Approval.Required ||
+		readOnlyProjection.ProjectedResultEnvelope.Approval.Required ||
+		readOnlyProjection.ProjectedResultEnvelope.Error != nil ||
+		!readOnlyProjection.ProjectedResultEnvelope.OK ||
+		!readOnlyProjection.ProjectedResultEnvelope.Replay.ProviderFree ||
+		readOnlyProjection.ProjectedResultEnvelope.Replay.LiveNetwork ||
+		!genericToolContractsMappingContains(readOnlyProjection.CapabilityMap, "generic.tool.registry.validate_schema", "ai.tool.schema.declarative") {
+		t.Fatalf("read-only projection approval/replay semantics invalid: %#v", readOnlyProjection)
+	}
+
+	deniedProjection := projection.DescriptorProjections[projectionsByTool[denied.Descriptor.ToolName]]
+	deniedInputRequired := genericToolContractsSchemaRequired(t, denied.Descriptor.InputSchema)
+	if deniedProjection.SourceDescriptor.ToolName != denied.Descriptor.ToolName ||
+		deniedProjection.SourceDescriptor.Effect != denied.Descriptor.Effect ||
+		deniedProjection.SourceDescriptor.ApprovalPolicy != denied.Descriptor.ApprovalPolicy ||
+		!reflect.DeepEqual(deniedProjection.SourceDescriptor.CapabilityIDs, denied.Descriptor.CapabilityIDs) ||
+		!reflect.DeepEqual(deniedProjection.SourceDescriptor.InputRequired, deniedInputRequired) ||
+		deniedProjection.SourceDescriptor.SourceFixtureKey != denied.Trace.Provenance.FixtureKey ||
+		deniedProjection.ProjectedInvokeRequest.ReplayKey != denied.Trace.Provenance.FixtureKey ||
+		deniedProjection.ProjectedResultEnvelope.Replay.ReplayKey != denied.Trace.Provenance.FixtureKey {
+		t.Fatalf("effectful denied registry fixture not projected faithfully: %#v", deniedProjection.SourceDescriptor)
+	}
+	if !denied.Trace.Approval.Required ||
+		denied.Trace.Approval.Decision != "deny" ||
+		!deniedProjection.ProjectedToolContract.Approval.Required ||
+		deniedProjection.ProjectedToolContract.Approval.State != "denied" ||
+		!deniedProjection.ProjectedInvokeRequest.Approval.Required ||
+		deniedProjection.ProjectedInvokeRequest.Approval.State != "required" ||
+		deniedProjection.ProjectedResultEnvelope.OK ||
+		deniedProjection.ProjectedResultEnvelope.Error == nil ||
+		deniedProjection.ProjectedResultEnvelope.Error.Kind != "approval_denied" ||
+		deniedProjection.ProjectedResultEnvelope.Error.Retryable ||
+		!deniedProjection.ProjectedResultEnvelope.Error.ProviderFree ||
+		!deniedProjection.ProjectedResultEnvelope.Replay.ProviderFree ||
+		deniedProjection.ProjectedResultEnvelope.Replay.LiveNetwork ||
+		deniedProjection.ApprovalMap.SourceDecision != denied.Trace.Approval.Decision ||
+		deniedProjection.ApprovalMap.ProjectedErrorKind != "approval_denied" ||
+		denied.Trace.Result.Metadata["clean_skip"] != true ||
+		denied.Trace.Result.Metadata["executed"] != false ||
+		!genericToolContractsMappingContains(deniedProjection.CapabilityMap, "generic.tool.approval.edge", "ai.tool.approval.state") {
+		t.Fatalf("effectful denied projection approval/error semantics invalid: %#v", deniedProjection)
 	}
 }
 
@@ -568,6 +784,35 @@ func assertGenericToolContractsRefString(t *testing.T, label, value, prefix stri
 		t.Fatalf("%s must be explainable and start with %q: %q", label, prefix, value)
 	}
 	assertGenericToolContractsProviderFreeString(t, label, value)
+}
+
+func genericToolContractsMappingContains(mappings []struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+}, source, target string) bool {
+	for _, mapping := range mappings {
+		if mapping.Source == source && mapping.Target == target {
+			return true
+		}
+	}
+	return false
+}
+
+func genericToolContractsSchemaRequired(t *testing.T, schema map[string]any) []string {
+	t.Helper()
+	raw, ok := schema["required"].([]any)
+	if !ok {
+		t.Fatalf("schema required must be a JSON array: %#v", schema["required"])
+	}
+	required := make([]string, 0, len(raw))
+	for _, value := range raw {
+		item, ok := value.(string)
+		if !ok {
+			t.Fatalf("schema required item must be a string: %#v", value)
+		}
+		required = append(required, item)
+	}
+	return required
 }
 
 func assertGenericToolContractsProviderFreeString(t *testing.T, label, value string) {

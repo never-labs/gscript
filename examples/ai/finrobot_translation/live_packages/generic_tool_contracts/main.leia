@@ -10,6 +10,7 @@ generic_tool_contracts_live_package := {
     live_network: false
     real_dependency_imports: false
     dialect_exports: {"generic.ai.tool.contract", "ai.tool.invoke"}
+    projection_exports: {"generic.ai.tool.contract.project_registry_descriptor"}
     default_policy: {
         mode: "fixture_replay"
         tool_execution_default: "fixture_only"
@@ -82,6 +83,45 @@ generic_tool_contracts_live_package := {
             live_network: false
         }
     }
+    registry_descriptor_projection: {
+        projection_kind: "registry_descriptor_to_tool_contract"
+        source_fixtures: {
+            "generic_tool:invocation:trace:v1",
+            "generic_tool:approval:denied:v1"
+        }
+        projected_tools: {
+            {
+                name: "summarize_rows"
+                source_effect: "read_only"
+                declarative_schema: {required: {"rows"} additional_properties: false}
+                capability_tags: {
+                    "generic.ai.tool.contract",
+                    "generic.ai.tool.contract.project_registry_descriptor",
+                    "ai.tool.schema.declarative",
+                    "ai.tool.replay.fixture"
+                }
+                approval: {required: false state: "fixture_only"}
+                replay_key: "generic_tool:invocation:trace:v1"
+            },
+            {
+                name: "publish_artifact"
+                source_effect: "effectful"
+                declarative_schema: {required: {"artifact_id"} additional_properties: false}
+                capability_tags: {
+                    "generic.ai.tool.contract",
+                    "generic.ai.tool.contract.project_registry_descriptor",
+                    "ai.tool.approval.state",
+                    "ai.tool.error.normalized",
+                    "ai.tool.replay.fixture"
+                }
+                approval: {required: true state: "denied"}
+                replay_key: "generic_tool:approval:denied:v1"
+                error_kind: "approval_denied"
+            },
+        }
+        provider_free: true
+        live_network: false
+    }
 }
 
 func generic_tool_contracts_provider_free_ok(pkg) {
@@ -125,17 +165,35 @@ func generic_tool_contracts_validation_error_ok(result) {
         result.replay.provider_free == true
 }
 
+func generic_tool_contracts_projection_ok(projection) {
+    if projection == nil {
+        return false
+    }
+    return projection.provider_free == true &&
+        projection.live_network == false &&
+        projection.projection_kind == "registry_descriptor_to_tool_contract" &&
+        #projection.projected_tools == 2 &&
+        projection.projected_tools[1].name == "summarize_rows" &&
+        projection.projected_tools[1].approval.required == false &&
+        projection.projected_tools[2].name == "publish_artifact" &&
+        projection.projected_tools[2].approval.state == "denied" &&
+        projection.projected_tools[2].error_kind == "approval_denied"
+}
+
 assert(generic_tool_contracts_provider_free_ok(generic_tool_contracts_live_package))
 assert(generic_tool_contracts_success_ok(generic_tool_contracts_live_package.invoke_success))
 assert(generic_tool_contracts_validation_error_ok(generic_tool_contracts_live_package.invoke_validation_error))
+assert(generic_tool_contracts_projection_ok(generic_tool_contracts_live_package.registry_descriptor_projection))
 
 generic_tool_contracts_live_package_summary := string.format(
-"generic_tool_contracts dialect_exports=%d provider_free=%s live_network=%s success_artifacts=%d validation_error=%s",
+"generic_tool_contracts dialect_exports=%d projection_exports=%d provider_free=%s live_network=%s success_artifacts=%d validation_error=%s projected_tools=%d",
 #generic_tool_contracts_live_package.dialect_exports,
+#generic_tool_contracts_live_package.projection_exports,
 tostring(generic_tool_contracts_live_package.provider_free),
 tostring(generic_tool_contracts_live_package.live_network),
 #generic_tool_contracts_live_package.invoke_success.artifact_refs,
-generic_tool_contracts_live_package.invoke_validation_error.error.kind
+generic_tool_contracts_live_package.invoke_validation_error.error.kind,
+#generic_tool_contracts_live_package.registry_descriptor_projection.projected_tools
 )
 
 print(generic_tool_contracts_live_package_summary)

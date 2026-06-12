@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "leia://generic-ai/tool-contracts/tool-contract-projection-v1",
+  "title": "Generic AI Tool Contract Projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_key",
+    "projection_kind",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "source_fixture_refs",
+    "descriptor_projections",
+    "projection_assertions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "fixture_key": {
+      "type": "string",
+      "pattern": "^generic_tool:projection:"
+    },
+    "projection_kind": {
+      "const": "registry_descriptor_to_tool_contract"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "source_fixture_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_read_only",
+        "registry_effectful_denied",
+        "tool_contract"
+      ],
+      "properties": {
+        "registry_read_only": {
+          "type": "string"
+        },
+        "registry_effectful_denied": {
+          "type": "string"
+        },
+        "tool_contract": {
+          "type": "string"
+        }
+      }
+    },
+    "descriptor_projections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/descriptor_projection"
+      }
+    },
+    "projection_assertions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    }
+  },
+  "$defs": {
+    "descriptor_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_descriptor",
+        "projected_tool_contract",
+        "projected_invoke_request",
+        "projected_result_envelope",
+        "capability_map",
+        "field_map",
+        "approval_map"
+      ],
+      "properties": {
+        "source_descriptor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool_name",
+            "effect",
+            "approval_policy",
+            "capability_ids",
+            "input_required",
+            "output_required",
+            "source_fixture_key"
+          ],
+          "properties": {
+            "tool_name": {
+              "type": "string"
+            },
+            "effect": {
+              "type": "string"
+            },
+            "approval_policy": {
+              "type": "string"
+            },
+            "capability_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "input_required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "output_required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "source_fixture_key": {
+              "type": "string"
+            }
+          }
+        },
+        "projected_tool_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "description",
+            "declarative_schema",
+            "capability_tags",
+            "approval",
+            "result_schema_ref",
+            "error_schema_ref",
+            "artifact_schema_ref"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "declarative_schema": {
+              "type": "object"
+            },
+            "capability_tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "approval": {
+              "$ref": "#/$defs/approval"
+            },
+            "result_schema_ref": {
+              "type": "string"
+            },
+            "error_schema_ref": {
+              "type": "string"
+            },
+            "artifact_schema_ref": {
+              "type": "string"
+            }
+          }
+        },
+        "projected_invoke_request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool_name",
+            "capability_tags",
+            "approval",
+            "replay_key"
+          ],
+          "properties": {
+            "tool_name": {
+              "type": "string"
+            },
+            "capability_tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "approval": {
+              "$ref": "#/$defs/approval"
+            },
+            "replay_key": {
+              "type": "string"
+            }
+          }
+        },
+        "projected_result_envelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ok",
+            "tool_name",
+            "approval",
+            "error",
+            "replay"
+          ],
+          "properties": {
+            "ok": {
+              "type": "boolean"
+            },
+            "tool_name": {
+              "type": "string"
+            },
+            "approval": {
+              "$ref": "#/$defs/approval"
+            },
+            "error": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "replay": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "replay_key",
+                "provider_free",
+                "live_network"
+              ],
+              "properties": {
+                "replay_key": {
+                  "type": "string"
+                },
+                "provider_free": {
+                  "const": true
+                },
+                "live_network": {
+                  "const": false
+                }
+              }
+            }
+          }
+        },
+        "capability_map": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mapping"
+          }
+        },
+        "field_map": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mapping"
+          }
+        },
+        "approval_map": {
+          "type": "object"
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "state"
+      ],
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "state": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "target"
+      ],
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

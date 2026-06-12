@@ -620,6 +620,7 @@
       "capability": "ai.tool.invoke",
       "capabilities": [
         "generic.ai.tool.contract",
+        "generic.ai.tool.contract.project_registry_descriptor",
         "ai.tool.invoke",
         "ai.tool.schema.declarative",
         "ai.tool.arguments.validate",
@@ -636,6 +637,9 @@
       "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/registry_descriptor_to_tool_contract_projection_fixture.json"
       ],
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
     },
