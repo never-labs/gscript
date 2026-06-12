@@ -11,7 +11,10 @@
     "event_type": {"type": "string"},
     "delta": {"type": "string"},
     "status": {"type": "string"},
-    "usage_delta": {"type": "object"}
+    "usage_delta": {
+      "type": "object",
+      "required": ["output_tokens"]
+    }
   },
   "additionalProperties": true
 }

@@ -33,6 +33,7 @@ type genericModelIOEnvelopeManifest struct {
 		Statement string `json:"statement"`
 	} `json:"no_built_in_guarantee"`
 	Contracts map[string]string `json:"contracts"`
+	Schemas   map[string]string `json:"schemas"`
 	Fixtures  map[string]string `json:"fixtures"`
 }
 
@@ -134,6 +135,33 @@ func TestGenericModelIOEnvelopeManifestContractFixtureClosedLoop(t *testing.T) {
 	assertGenericModelIOEnvelopeContract(t, manifest, contract)
 	assertGenericModelIOEnvelopeFixture(t, contract, fixture)
 	assertGenericModelIOEnvelopeNoSecrets(t, base)
+}
+
+func TestGenericModelIOEnvelopeSchemaRequiredFields(t *testing.T) {
+	root := repoRoot(t)
+	base := filepath.Join(root, filepath.FromSlash(genericModelIOEnvelopeRoot))
+
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "model_request_envelope.schema.json"), []string{"envelope_version", "turn_id", "model", "messages", "tools", "response_format", "metadata", "redaction"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_request_envelope.schema.json"), []string{"properties", "metadata"}, []string{"trace_id", "replay_session_id", "adapter_identity", "provider_free"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_request_envelope.schema.json"), []string{"properties", "redaction"}, []string{"applied", "secret_values_present", "redacted_fields"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "model_stream_chunk.schema.json"), []string{"chunk_id", "turn_id", "sequence", "event_type", "delta", "status", "usage_delta"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_stream_chunk.schema.json"), []string{"properties", "usage_delta"}, []string{"output_tokens"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "model_response_envelope.schema.json"), []string{"envelope_version", "turn_id", "status", "text", "tool_calls", "finish_reason", "usage", "metadata", "redaction"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_response_envelope.schema.json"), []string{"properties", "usage"}, []string{"input_tokens", "output_tokens", "total_tokens", "cost", "currency", "latency_ms"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_response_envelope.schema.json"), []string{"properties", "metadata"}, []string{"trace_id", "replay_session_id", "adapter_identity", "provider_free"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_response_envelope.schema.json"), []string{"properties", "redaction"}, []string{"applied", "secret_values_present", "redacted_fields"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "provider_free_replay_fixture.schema.json"), []string{"schema_version", "id", "provider_free", "domain_specific", "live_network", "live_model", "credentials_required", "replay", "records"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "provider_free_replay_fixture.schema.json"), []string{"properties", "replay"}, []string{"replay_session_id", "mode", "strict_ordered_match", "adapter_identity"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "provider_free_replay_fixture.schema.json"), []string{"properties", "records", "items"}, []string{"request", "stream_chunks", "response"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"schema_version", "id", "projection_kind", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model", "credentials_required", "real_dependency_imports", "source_fixture_refs", "identity_policy", "alias_resolution_mappings", "request_projection", "redaction_projection", "replay_projection", "projection_assertions"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "source_fixture_refs"}, []string{"model_alias_registry", "replay_execution_descriptor", "redaction_policy", "model_io_replay", "turn_request"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "identity_policy"}, []string{"model_aliases_are_resolved_before_projection", "model_io_turn_id_and_turn_request_id_are_not_assumed_equal", "model_names_are_canonicalized_per_target_envelope", "request_hash_source", "normalization_policy"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "alias_resolution_mappings", "items"}, []string{"requested_alias", "resolution_path", "resolved_descriptor_ref", "model_io_model", "turn_request_model"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "request_projection"}, []string{"requested_alias", "resolved_descriptor_ref", "descriptor_fixture_key", "descriptor_mode", "model_io_turn_id", "turn_request_id", "turn_correlation_id", "trace_id", "replay_session_id", "adapter_identity", "response_format_projection", "tool_projection", "provider_free", "live_network", "live_model"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "request_projection", "properties", "response_format_projection"}, []string{"model_io_type", "turn_runner_type", "schema_projection_required"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "request_projection", "properties", "tool_projection"}, []string{"descriptor_tool_calling", "model_io_tool_count", "turn_runner_tool_count", "tool_declarations_projected_by_turn_runner"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "redaction_projection"}, []string{"redaction_policy_ref", "model_registry_redact_fields", "model_io_redacted_fields", "turn_runner_secret_env_patterns", "replacement", "secret_values_present", "raw_prompt_stored", "raw_completion_stored"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "replay_projection"}, []string{"model_registry_replay_safe", "model_io_mode", "model_io_strict_ordered_match", "turn_runner_match_key", "turn_runner_request_hash", "request_hash_preserved_to_execute_response", "provider_free", "live_network", "credentials_required"})
 }
 
 func assertGenericModelIOEnvelopeBoundary(t *testing.T, manifest genericModelIOEnvelopeManifest) {
@@ -361,6 +389,7 @@ func TestGenericModelIOEnvelopeRegistryTurnProjection(t *testing.T) {
 			Capability string         `json:"capability"`
 			Path       string         `json:"path"`
 			Schema     string         `json:"schema"`
+			SchemaRef  string         `json:"schema_ref"`
 			Metadata   map[string]any `json:"metadata"`
 		} `json:"fixtures"`
 	}
@@ -368,14 +397,34 @@ func TestGenericModelIOEnvelopeRegistryTurnProjection(t *testing.T) {
 	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
 		t.Fatalf("fixture index header/count mismatch: %#v", index)
 	}
+	replayEntry := index.Fixtures[0]
+	if replayEntry.FixtureKey != "generic_model_io:provider_free_replay:v1" ||
+		replayEntry.Capability != "generic.ai.model.io.provider_free_replay" ||
+		replayEntry.Path != manifest.Fixtures["provider_free_replay"] ||
+		replayEntry.Schema != manifest.Schemas["provider_free_replay_fixture"] ||
+		replayEntry.SchemaRef != manifest.Schemas["provider_free_replay_fixture"] ||
+		replayEntry.Metadata["replay_ready"] != true ||
+		replayEntry.Metadata["adapter_identity"] != "generic-model-io-envelope-adapter" {
+		t.Fatalf("provider-free replay fixture index entry mismatch: %#v", replayEntry)
+	}
+	assertGenericModelIOEnvelopeJSONPath(t, base, replayEntry.Path)
+	assertGenericModelIOEnvelopeJSONPath(t, base, replayEntry.Schema)
+	assertGenericModelIOEnvelopeJSONPath(t, base, replayEntry.SchemaRef)
 	projectionEntry := index.Fixtures[1]
 	if projectionEntry.FixtureKey != "generic_model_io:registry_turn_projection:v1" ||
 		projectionEntry.Capability != "generic.ai.model.io.registry_turn_projection" ||
 		projectionEntry.Path != manifest.Fixtures["registry_turn_projection"] ||
+		projectionEntry.Schema != manifest.Schemas["registry_turn_projection"] ||
+		projectionEntry.SchemaRef != manifest.Schemas["registry_turn_projection"] ||
 		projectionEntry.Metadata["alias_mappings"] != float64(2) ||
-		projectionEntry.Metadata["request_mappings"] != float64(1) {
+		projectionEntry.Metadata["request_mappings"] != float64(1) ||
+		projectionEntry.Metadata["redaction_mappings"] != float64(2) ||
+		projectionEntry.Metadata["replay_ready"] != true {
 		t.Fatalf("projection fixture index entry mismatch: %#v", projectionEntry)
 	}
+	assertGenericModelIOEnvelopeJSONPath(t, base, projectionEntry.Path)
+	assertGenericModelIOEnvelopeJSONPath(t, base, projectionEntry.Schema)
+	assertGenericModelIOEnvelopeJSONPath(t, base, projectionEntry.SchemaRef)
 
 	var projection struct {
 		SchemaVersion         int               `json:"schema_version"`
@@ -519,6 +568,15 @@ func decodeGenericModelIOEnvelopeJSON(t *testing.T, path string, out any) {
 	if err := json.Unmarshal(data, out); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
+}
+
+func assertGenericModelIOEnvelopeJSONPath(t *testing.T, base, rel string) {
+	t.Helper()
+	if rel == "" || filepath.IsAbs(rel) || strings.Contains(filepath.ToSlash(rel), "../") {
+		t.Fatalf("invalid model IO package-relative path %q", rel)
+	}
+	var decoded any
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, filepath.FromSlash(rel)), &decoded)
 }
 
 func assertGenericModelIOStringSet(t *testing.T, label string, got, want []string) {

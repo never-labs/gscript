@@ -11,8 +11,14 @@
     "messages": {"type": "array", "items": {"type": "object"}},
     "tools": {"type": "array", "items": {"type": "object"}},
     "response_format": {"type": "object"},
-    "metadata": {"type": "object"},
-    "redaction": {"type": "object"}
+    "metadata": {
+      "type": "object",
+      "required": ["trace_id", "replay_session_id", "adapter_identity", "provider_free"]
+    },
+    "redaction": {
+      "type": "object",
+      "required": ["applied", "secret_values_present", "redacted_fields"]
+    }
   },
   "additionalProperties": true
 }

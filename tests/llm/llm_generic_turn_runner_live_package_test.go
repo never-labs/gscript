@@ -201,7 +201,15 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 		}
 		assertGenericTurnRunnerJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
-	for _, key := range []string{"turn_request", "execute_response", "tool_request", "replay_record", "error", "memory_context_turn_projection"} {
+	expectedSchemaIDs := map[string]string{
+		"turn_request":                   "single_turn_request_v1",
+		"execute_response":               "execute_response_envelope_v1",
+		"tool_request":                   "tool_request_envelope_v1",
+		"replay_record":                  "replay_record_match_v1",
+		"error":                          "error_envelope_v1",
+		"memory_context_turn_projection": "memory_context_turn_projection_v1",
+	}
+	for key, wantID := range expectedSchemaIDs {
 		if manifest.Schemas[key] == "" {
 			t.Fatalf("missing schema %q", key)
 		}
@@ -213,7 +221,7 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 			Required      []string `json:"required"`
 		}
 		decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, manifest.Schemas[key]), &schema)
-		if schema.SchemaVersion != 1 || schema.ID == "" || !schema.ProviderFree || schema.LiveNetwork {
+		if schema.SchemaVersion != 1 || schema.ID != wantID || !schema.ProviderFree || schema.LiveNetwork {
 			t.Fatalf("%s schema header invalid: %#v", key, schema)
 		}
 		if len(schema.Required) == 0 {
@@ -257,35 +265,48 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 	}
 
 	var fixtureIndex struct {
-		ProviderFree bool             `json:"provider_free"`
-		LiveNetwork  bool             `json:"live_network"`
-		Fixtures     []map[string]any `json:"fixtures"`
+		ProviderFree          bool             `json:"provider_free"`
+		LiveNetwork           bool             `json:"live_network"`
+		RealDependencyImports bool             `json:"real_dependency_imports"`
+		Fixtures              []map[string]any `json:"fixtures"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &fixtureIndex)
-	if !fixtureIndex.ProviderFree || fixtureIndex.LiveNetwork {
+	if !fixtureIndex.ProviderFree || fixtureIndex.LiveNetwork || fixtureIndex.RealDependencyImports {
 		t.Fatalf("fixture index must stay provider-free/offline: %#v", fixtureIndex)
 	}
-	wantSchemas := map[string]bool{
-		"single_turn_request_v1":            false,
-		"execute_response_envelope_v1":      false,
-		"tool_request_envelope_v1":          false,
-		"replay_record_match_v1":            false,
-		"error_envelope_v1":                 false,
-		"memory_context_turn_projection_v1": false,
+	wantSchemas := map[string]string{
+		"single_turn_request_v1":            manifest.Fixtures["turn_request"],
+		"execute_response_envelope_v1":      manifest.Fixtures["execute_response"],
+		"tool_request_envelope_v1":          manifest.Fixtures["tool_request"],
+		"replay_record_match_v1":            manifest.Fixtures["replay_record"],
+		"error_envelope_v1":                 manifest.Fixtures["error"],
+		"memory_context_turn_projection_v1": manifest.Fixtures["memory_context_turn_projection"],
+	}
+	seenSchemas := map[string]bool{}
+	if len(fixtureIndex.Fixtures) != len(wantSchemas) {
+		t.Fatalf("fixture index entries = %d, want %d", len(fixtureIndex.Fixtures), len(wantSchemas))
 	}
 	for _, fixture := range fixtureIndex.Fixtures {
 		schema, _ := fixture["schema"].(string)
-		if _, ok := wantSchemas[schema]; !ok {
-			continue
+		wantPath, ok := wantSchemas[schema]
+		if !ok {
+			t.Fatalf("fixture index contains unexpected schema %q: %#v", schema, fixture)
 		}
-		wantSchemas[schema] = true
+		if seenSchemas[schema] {
+			t.Fatalf("fixture index repeats schema %q: %#v", schema, fixtureIndex.Fixtures)
+		}
+		seenSchemas[schema] = true
+		path, _ := fixture["path"].(string)
+		if path != wantPath {
+			t.Fatalf("fixture index path for schema %q = %q, want %q", schema, path, wantPath)
+		}
 		requireGenericTurnRunnerGuardEvidence(t, "fixture index "+schema, fixture, "corr-generic-turn-acme-summary-001", "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba")
 		metadata, _ := fixture["metadata"].(map[string]any)
 		requireGenericTurnRunnerGuardEvidence(t, "fixture index metadata "+schema, metadata, "corr-generic-turn-acme-summary-001", "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba")
-		assertGenericTurnRunnerJSONFile(t, filepath.Join(base, fixture["path"].(string)))
+		assertGenericTurnRunnerJSONFile(t, filepath.Join(base, path))
 	}
-	for schema, seen := range wantSchemas {
-		if !seen {
+	for schema := range wantSchemas {
+		if !seenSchemas[schema] {
 			t.Fatalf("fixture index does not cover core envelope schema %q: %#v", schema, fixtureIndex.Fixtures)
 		}
 	}
@@ -536,6 +557,33 @@ func TestGenericTurnRunnerSmokeAndNoProviderDependencies(t *testing.T) {
 	if got != want {
 		t.Fatalf("summary = %#v, want %#v", got, want)
 	}
+	summary := genericTurnRunnerSummaryFields(t, got.(string))
+	if summary["provider_free"] != "true" ||
+		summary["live_network"] != "false" ||
+		summary["capabilities"] != "3" ||
+		summary["schemas"] != "6" ||
+		summary["fixtures"] != "6" ||
+		summary["replay_match"] != manifest.ReplayMatchContract.MatchKey ||
+		summary["memory_context_projection"] != "true" {
+		t.Fatalf("summary fields do not match expected contract: %#v", summary)
+	}
+	if (summary["provider_free"] == "true") != manifest.ProviderFree ||
+		(summary["live_network"] == "true") != manifest.LiveNetworkDefault ||
+		summary["capabilities"] != "3" ||
+		len(manifest.Capabilities) != 3 ||
+		len(manifest.Schemas) != 6 ||
+		manifest.Schemas["memory_context_turn_projection"] == "" ||
+		manifest.Fixtures["memory_context_turn_projection"] == "" ||
+		manifest.MemoryContextProjectionContract.DialectCapability == "" {
+		t.Fatalf("summary is not aligned with manifest: summary=%#v manifest=%#v", summary, manifest)
+	}
+	var summaryIndex struct {
+		Fixtures []any `json:"fixtures"`
+	}
+	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &summaryIndex)
+	if len(summaryIndex.Fixtures) != 6 || summary["fixtures"] != "6" {
+		t.Fatalf("summary fixture count does not match fixture index: summary=%#v index=%#v", summary, summaryIndex)
+	}
 
 	var files []string
 	for _, rel := range manifest.Entrypoints {
@@ -606,6 +654,23 @@ func decodeGenericTurnRunnerJSONFile(t *testing.T, path string, out any) {
 	if err := json.Unmarshal(data, out); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
+}
+
+func genericTurnRunnerSummaryFields(t *testing.T, summary string) map[string]string {
+	t.Helper()
+	fields := strings.Fields(summary)
+	if len(fields) == 0 || fields[0] != "generic_turn_runner_live_package" {
+		t.Fatalf("unexpected turn runner summary prefix: %q", summary)
+	}
+	out := map[string]string{}
+	for _, field := range fields[1:] {
+		parts := strings.SplitN(field, "=", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			t.Fatalf("invalid turn runner summary field %q in %q", field, summary)
+		}
+		out[parts[0]] = parts[1]
+	}
+	return out
 }
 
 func requireGenericTurnRunnerGuardEvidence(t *testing.T, name string, got map[string]any, wantCorrelationID, wantRequestHash string) {
