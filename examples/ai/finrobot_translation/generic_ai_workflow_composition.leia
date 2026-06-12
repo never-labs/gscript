@@ -3,7 +3,7 @@
 // This is a thin Leia-native composition over the generic package boundaries:
 // model, model-io, document-rag, prompt-role, memory, turn, tool,
 // tool-registry, optional-adapter, data-provider, data-normalization,
-// transcript-pipeline, event-intelligence, strategy-backtest,
+// transcript-pipeline, analytical-model, event-intelligence, strategy-backtest,
 // coding-workspace, planning, agent, workflow, chart-render, evidence-report,
 // report-render, product-app, ui-snapshot, eval, replay, trace, approval,
 // and package-audit. It intentionally declares no
@@ -23,6 +23,7 @@ package_boundaries := {
     {role: "optional-adapter" package_id: "generic-optional-adapter-boundary" capability: "generic.ai.optional_adapter.boundary" entrypoint: "ai.optional_adapter.boundary" provider_free: true live_network: false},
     {role: "data-provider" package_id: "generic-data-provider-boundary" capability: "generic.ai.data_provider.boundary" entrypoint: "ai.data_provider.boundary" provider_free: true live_network: false},
     {role: "data-normalization" package_id: "generic-data-normalization-contracts" capability: "generic.ai.data_normalization.contracts" entrypoint: "ai.data_normalization.contracts" provider_free: true live_network: false},
+    {role: "analytical-model" package_id: "generic-analytical-model-contracts" capability: "generic.ai.analytical_model.contracts" entrypoint: "ai.analytical_model.contracts" provider_free: true live_network: false},
     {role: "transcript-pipeline" package_id: "generic-transcript-pipeline" capability: "generic.ai.transcript.pipeline" entrypoint: "ai.transcript.pipeline" provider_free: true live_network: false},
     {role: "event-intelligence" package_id: "generic-event-intelligence-boundary" capability: "generic.ai.event_intelligence.boundary" entrypoint: "ai.event_intelligence.boundary" provider_free: true live_network: false},
     {role: "strategy-backtest" package_id: "generic-strategy-backtest-contracts" capability: "generic.ai.strategy.backtest.contracts" entrypoint: "ai.strategy.backtest_contracts" provider_free: true live_network: false},
@@ -57,6 +58,7 @@ composition_edges := {
     {from: "optional-adapter" to: "tool" handoff: "optional dependency gate and clean-skip envelope"},
     {from: "data-provider" to: "tool" handoff: "provider request and response envelopes"},
     {from: "data-provider" to: "data-normalization" handoff: "source records and provider provenance"},
+    {from: "data-normalization" to: "analytical-model" handoff: "normalized rows, provenance, and validation envelopes"},
     {from: "transcript-pipeline" to: "document-rag" handoff: "normalized segments and turn-aware transcript chunks"},
     {from: "data-provider" to: "event-intelligence" handoff: "source snapshots and provider provenance"},
     {from: "data-provider" to: "strategy-backtest" handoff: "observation feed and provider provenance"},
@@ -78,7 +80,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "analytical-model", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -104,8 +106,8 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 28 &&
-        #workflow_contract.edges == 27 &&
+    return #workflow_contract.composition == 29 &&
+        #workflow_contract.edges == 28 &&
         role_present("model") &&
         role_present("model-io") &&
         role_present("document-rag") &&
@@ -117,6 +119,7 @@ func connected_native_surfaces() {
         role_present("optional-adapter") &&
         role_present("data-provider") &&
         role_present("data-normalization") &&
+        role_present("analytical-model") &&
         role_present("transcript-pipeline") &&
         role_present("event-intelligence") &&
         role_present("strategy-backtest") &&

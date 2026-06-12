@@ -43,6 +43,43 @@
       }
     },
     {
+      "shape_id": "ai.analytical_model.contracts",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "analytical-model-contracts",
+        "data-normalization-contracts",
+        "trace",
+        "optional-adapter"
+      ],
+      "contract": "Normalize provider-free analytical model assumptions, scenario books, sensitivity grids, method output rows, synthesis-ready provenance, tolerance gates, audit events, and adapter clean skips.",
+      "inputs": [
+        "normalized_rows",
+        "assumption_set",
+        "scenario_book",
+        "tolerance_policy"
+      ],
+      "outputs": [
+        "method_outputs",
+        "scenario_outputs",
+        "sensitivity_grid",
+        "tolerance_gates",
+        "audit_events",
+        "adapter_clean_skips"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_analytical_model_contracts.source.txt",
+      "test": "tests/llm/llm_generic_analytical_model_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_analytical_model_contracts_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-analytical-model-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/contracts/generic_analytical_model_contracts_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.chart.render_contracts",
       "status": "checked_in_package_boundary",
       "capabilities": [

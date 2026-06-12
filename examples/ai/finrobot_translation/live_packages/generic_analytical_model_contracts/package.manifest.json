@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "id": "generic-analytical-model-contracts",
+  "package_name": "leia-generic-ai-analytical-model-contracts",
+  "package_boundary_id": "generic-ai-analytical-model-contracts",
+  "capability_id": "generic.ai.analytical_model.contracts",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for assumption sets, scenario books, forecast rows, sensitivity axes, tolerance gates, audit trails, and adapter clean-skip contracts.",
+  "source_modules": [
+    "generic.analytical_model.contracts",
+    "generic.analytical_model.assumptions",
+    "generic.analytical_model.tolerance_gates",
+    "generic.analytical_model.audit"
+  ],
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; live assumption providers, remote optimization services, and external simulation engines belong only to provider-specific adapter packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_analytical_model_contracts_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "generic_analytical_model_contracts_contract": "contracts/generic_analytical_model_contracts_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_analytical_model_contracts_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json"
+  },
+  "schemas": {
+    "scenario_book": "schemas/scenario_book_v1.schema.json",
+    "forecast_result": "schemas/forecast_result_v1.schema.json",
+    "tolerance_gate": "schemas/tolerance_gate_v1.schema.json",
+    "clean_skip": "schemas/forecast_clean_skip_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "scenario_book": "fixtures/scenario_book_fixture.json",
+    "forecast_result": "fixtures/forecast_result_fixture.json",
+    "tolerance_gates": "fixtures/tolerance_gates_fixture.json",
+    "clean_skip": "fixtures/forecast_clean_skip_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "scenario_book",
+      "source_module": "generic.analytical_model.assumptions",
+      "capabilities": [
+        "generic.ai.analytical_model.scenario.book",
+        "generic.ai.analytical_model.assumption.audit",
+        "generic.ai.analytical_model.sensitivity.grid"
+      ],
+      "output_schemas": [
+        "scenario_book"
+      ]
+    },
+    {
+      "id": "forecast_result",
+      "source_module": "generic.analytical_model.contracts",
+      "capabilities": [
+        "generic.ai.analytical_model.method.output",
+        "generic.ai.analytical_model.provenance.attach",
+        "generic.ai.analytical_model.contracts"
+      ],
+      "output_schemas": [
+        "forecast_result"
+      ]
+    },
+    {
+      "id": "tolerance_gate",
+      "source_module": "generic.analytical_model.tolerance_gates",
+      "capabilities": [
+        "generic.ai.analytical_model.tolerance_gate.evaluate",
+        "generic.ai.analytical_model.assumption.audit"
+      ],
+      "output_schemas": [
+        "tolerance_gate"
+      ]
+    },
+    {
+      "id": "adapter_boundary",
+      "source_module": "generic.analytical_model.audit",
+      "capabilities": [
+        "generic.ai.analytical_model.clean_skip"
+      ],
+      "output_schemas": [
+        "clean_skip"
+      ]
+    }
+  ],
+  "capabilities": [
+    "generic.ai.analytical_model.contracts",
+    "generic.ai.analytical_model.scenario.book",
+    "generic.ai.analytical_model.assumption.audit",
+    "generic.ai.analytical_model.sensitivity.grid",
+    "generic.ai.analytical_model.method.output",
+    "generic.ai.analytical_model.provenance.attach",
+    "generic.ai.analytical_model.tolerance_gate.evaluate",
+    "generic.ai.analytical_model.clean_skip"
+  ],
+  "blocked_imports": [
+    "requests",
+    "httpx",
+    "urllib",
+    "aiohttp",
+    "scipy",
+    "statsmodels",
+    "sklearn",
+    "pandas",
+    "numpy"
+  ],
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "provider_sdks_required": false,
+    "test_rule": "package tests must pass with fixtures only, no credentials, no provider SDK imports, and no network I/O"
+  },
+  "field_canonicalization": {
+    "case": "snake_case",
+    "scenario": "scenario_id, label, weight, assumption_refs, and provenance remain explicit",
+    "assumption": "assumption_id, measure, value, unit, period_key, confidence, and source_ref are stable fields",
+    "forecast": "forecast rows carry subject_id, scenario_id, period_key, measure, value, unit, and transform notes",
+    "tolerance": "expected_value, actual_value, absolute_tolerance, status, and audit_event_ref stay explicit",
+    "audit": "audit events preserve source_ref, source_hash, transform id, and replay seed"
+  },
+  "deterministic_ordering": {
+    "scenarios": [
+      "scenario_id"
+    ],
+    "forecast_rows": [
+      "subject_id",
+      "scenario_id",
+      "period_key",
+      "measure"
+    ],
+    "tolerance_gates": [
+      "gate_id"
+    ],
+    "audit_events": [
+      "event_index"
+    ]
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "scenario book fixtures declare assumption sets, scenario weights, sensitivity axes, provenance, and deterministic ordering",
+    "forecast result fixtures carry rows, units, periods, scenario references, and transform notes",
+    "tolerance gates compare expected and actual fixture values within explicit absolute tolerances",
+    "optional assumption provider and simulation adapters clean-skip without imports or credentials",
+    "analytical model contracts remain independent of host runtime internals and future provider packages"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide leia-generic-ai-analytical-model-contracts as a built-in assumption provider, simulation engine, tolerance evaluator, or package boundary; this package declares provider-free schemas and fixtures only."
+  }
+}

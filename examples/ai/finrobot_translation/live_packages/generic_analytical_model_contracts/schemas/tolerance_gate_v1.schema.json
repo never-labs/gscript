@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "leia://generic-ai/forecast/tolerance-gate/v1",
+  "title": "Generic forecast tolerance gate",
+  "type": "object",
+  "required": ["provider_free", "live_network", "fixture_key", "scenario_book_id", "tolerance_gates", "summary"],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "fixture_key": {"type": "string"},
+    "scenario_book_id": {"type": "string"},
+    "tolerance_gates": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"}
+  },
+  "additionalProperties": true
+}

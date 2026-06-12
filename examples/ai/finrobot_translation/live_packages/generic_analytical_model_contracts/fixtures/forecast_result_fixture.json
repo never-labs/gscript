@@ -1,0 +1,23 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "fixture_key": "forecast_result:subject_alpha:offline:v1",
+  "scenario_book_id": "scenario-book-alpha-v1",
+  "forecast_rows": [
+    {"subject_id": "subject-alpha", "scenario_id": "scenario-low", "period_key": "period-001", "measure": "output", "value": 101.0, "unit": "unit", "transform_notes": ["scenario_adjustment"]},
+    {"subject_id": "subject-alpha", "scenario_id": "scenario-low", "period_key": "period-002", "measure": "output", "value": 104.03, "unit": "unit", "transform_notes": ["scenario_adjustment"]},
+    {"subject_id": "subject-alpha", "scenario_id": "scenario-base", "period_key": "period-001", "measure": "output", "value": 102.0, "unit": "unit", "transform_notes": ["base_assumption"]},
+    {"subject_id": "subject-alpha", "scenario_id": "scenario-base", "period_key": "period-002", "measure": "output", "value": 106.08, "unit": "unit", "transform_notes": ["base_assumption"]},
+    {"subject_id": "subject-alpha", "scenario_id": "scenario-high", "period_key": "period-001", "measure": "output", "value": 103.0, "unit": "unit", "transform_notes": ["scenario_adjustment"]},
+    {"subject_id": "subject-alpha", "scenario_id": "scenario-high", "period_key": "period-002", "measure": "output", "value": 108.15, "unit": "unit", "transform_notes": ["scenario_adjustment"]}
+  ],
+  "provenance": [
+    {"source_ref": "fixture://forecast/alpha", "source_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "replay_seed": "forecast-alpha-v1"}
+  ],
+  "audit_events": [
+    {"event_index": 1, "event_type": "assumption_loaded", "source_ref": "fixture://assumptions/alpha"},
+    {"event_index": 2, "event_type": "scenario_applied", "scenario_id": "scenario-low"},
+    {"event_index": 3, "event_type": "scenario_applied", "scenario_id": "scenario-base"},
+    {"event_index": 4, "event_type": "scenario_applied", "scenario_id": "scenario-high"}
+  ]
+}

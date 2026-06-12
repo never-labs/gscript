@@ -1,0 +1,8 @@
+// Generic analytical model contracts example source.
+// Declares assumption sets, scenario books, forecast rows, sensitivity axes,
+// tolerance gates, audit trails, and clean skips without external engines,
+// source SDK imports, or live network access.
+
+capability generic.ai.analytical_model.contracts
+entrypoint ai.analytical_model.contracts
+fixture examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json

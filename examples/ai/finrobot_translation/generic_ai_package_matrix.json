@@ -27,6 +27,30 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_analytical_model_contracts",
+      "package_name": "leia-generic-ai-analytical-model-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "capability": "generic.ai.analytical_model.contracts",
+      "capabilities": [
+        "generic.ai.analytical_model.contracts",
+        "generic.ai.analytical_model.method.output",
+        "generic.ai.analytical_model.assumption.audit",
+        "generic.ai.analytical_model.scenario.book",
+        "generic.ai.analytical_model.sensitivity.grid",
+        "generic.ai.analytical_model.tolerance_gate.evaluate",
+        "generic.ai.analytical_model.provenance.attach",
+        "generic.ai.analytical_model.clean_skip"
+      ],
+      "backend_shape": "ai.analytical_model.contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/contracts/generic_analytical_model_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_approval_policy",
       "package_name": "leia-generic-ai-approval-policy",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",

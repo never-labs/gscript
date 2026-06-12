@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "generic-analytical-model-contracts-index-fixture",
+  "package_id": "generic-analytical-model-contracts",
+  "provider_free": true,
+  "live_network": false,
+  "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json",
+  "fixtures": [
+    "scenario_book:subject_alpha:offline:v1",
+    "forecast_result:subject_alpha:offline:v1",
+    "tolerance_gates:subject_alpha:offline:v1",
+    "forecast_clean_skip:offline:v1"
+  ]
+}

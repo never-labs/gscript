@@ -22,6 +22,7 @@
   },
   "required_capabilities": [
     "agent",
+    "analytical-model-contracts",
     "approval",
     "capability",
     "chart-render",
@@ -78,6 +79,39 @@
         "package_id": "generic-agent-runner",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "analytical-model-contracts",
+      "capability_id": "generic.ai.analytical_model.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "method_output",
+        "assumption_audit",
+        "scenario_book",
+        "sensitivity_grid",
+        "tolerance_gate",
+        "provenance",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_analytical_model_contracts.source.txt",
+      "test": "tests/llm/llm_generic_analytical_model_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_analytical_model_contracts_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-analytical-model-contracts",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "analytical model behavior was promoted into a generic provider-free package boundary for assumption audit, scenario books, sensitivity grids, method outputs, tolerance gates, provenance, and clean skips"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-analytical-model-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

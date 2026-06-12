@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 96,
-  "translation_directory_file_count": 785,
+  "registered_examples_count": 97,
+  "translation_directory_file_count": 800,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -113,6 +113,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
       "covers_package_ids": [
         "generic_agent_runner"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_analytical_model_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_analytical_model_contracts"
       ],
       "status": "checked_in_registered_example"
     },
@@ -803,6 +812,34 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_analytical_model_contracts",
+      "package_name": "leia-generic-ai-analytical-model-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "planned_directory": "packages/generic_ai/analytical_model_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/contracts/generic_analytical_model_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_analytical_model_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.analytical_model.contracts",
+        "generic.ai.analytical_model.method.output",
+        "generic.ai.analytical_model.assumption.audit",
+        "generic.ai.analytical_model.scenario.book",
+        "generic.ai.analytical_model.sensitivity.grid",
+        "generic.ai.analytical_model.tolerance_gate.evaluate",
+        "generic.ai.analytical_model.provenance.attach",
+        "generic.ai.analytical_model.clean_skip"
+      ],
+      "test_gates": [
+        "scenario book, method output, tolerance gate, and clean-skip contract fixtures decode without numeric engine imports",
+        "assumption audit, sensitivity grid, provenance, and deterministic ordering fixtures remain provider-free and replayable",
+        "method output fixtures carry scenario references, units, periods, transform notes, and audit events",
+        "tolerance fixtures compare expected and actual values within explicit absolute tolerances",
+        "registered example executes without host runtime internals, live network, or live model calls"
       ],
       "no_built_in_guarantee": true
     },
