@@ -77,6 +77,10 @@ Complex applications are built by combining these packages along explicit data
 contracts instead of embedding orchestration in user scripts. The packages are
 orthogonal and layered:
 
+The machine-readable composition graph is checked in at
+`examples/ai/finrobot_translation/ai_dialect_index/package_composition_edges.json`
+and is validated against the Leia composition example and package matrix.
+
 - model resolves a provider-neutral alias into replay-safe execution
   descriptors, policy flags, and redaction rules.
 - model-io owns request, stream chunk, response, usage, replay correlation, and

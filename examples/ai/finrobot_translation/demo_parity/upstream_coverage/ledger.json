@@ -129,7 +129,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
-          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+          "sha256": "c322cf666e89f3b9bdeeb2f02262b3d3abce9a53896b83a01d6b93d021e12a2a"
         }
       ],
       "next_action": "Add an optional AutoGen package gate if dynamic builder execution becomes a supported external dependency."
@@ -199,7 +199,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
-          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+          "sha256": "c322cf666e89f3b9bdeeb2f02262b3d3abce9a53896b83a01d6b93d021e12a2a"
         }
       ],
       "next_action": "Keep lifecycle helpers modeled as generic agent/workflow contracts."
@@ -222,7 +222,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
-          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+          "sha256": "c322cf666e89f3b9bdeeb2f02262b3d3abce9a53896b83a01d6b93d021e12a2a"
         }
       ],
       "next_action": "Use replayed workflow traces for offline parity and package live workflow orchestration separately."
@@ -527,7 +527,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
-          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+          "sha256": "c322cf666e89f3b9bdeeb2f02262b3d3abce9a53896b83a01d6b93d021e12a2a"
         }
       ],
       "next_action": "Package vector-store adapters separately while preserving provider-free RAG fixtures."
@@ -712,7 +712,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
-          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+          "sha256": "c322cf666e89f3b9bdeeb2f02262b3d3abce9a53896b83a01d6b93d021e12a2a"
         }
       ],
       "next_action": "Keep committee workflow covered by replay records until live package execution lands."
@@ -1010,7 +1010,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
-          "sha256": "ff448c3c318fe7f3ed03b5c420245a4c0b9cf791f30c2309d7c745acb45c9d63"
+          "sha256": "c322cf666e89f3b9bdeeb2f02262b3d3abce9a53896b83a01d6b93d021e12a2a"
         }
       ],
       "next_action": "Wire stage DAG package to section-agent prompt/version package."
@@ -1061,7 +1061,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
-          "sha256": "04959b5db6b68b46889a1d40aa9efdf03b7faef436e2d8e094b07ae2fa872d54"
+          "sha256": "87cf9adfbdf985e7b307314ad48d7246eec39a7965c67c327c057a44c1339b60"
         }
       ],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."

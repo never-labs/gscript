@@ -130,9 +130,14 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		if !strings.HasSuffix(pkg.Manifest, "package.manifest.json") {
 			t.Fatalf("%s manifest = %q", pkg.ID, pkg.Manifest)
 		}
-		if !strings.Contains(pkg.Contract, "/contracts/") ||
-			(!strings.HasSuffix(pkg.Contract, "_contract.json") && !strings.HasSuffix(pkg.Contract, "_gates.json")) {
+		if _, err := os.Stat(filepath.Join(root, pkg.Manifest)); err != nil {
+			t.Fatalf("%s manifest %q: %v", pkg.ID, pkg.Manifest, err)
+		}
+		if !livePackagePlanContractPathShape(pkg.Contract) {
 			t.Fatalf("%s contract = %q", pkg.ID, pkg.Contract)
+		}
+		if _, err := os.Stat(filepath.Join(root, pkg.Contract)); err != nil {
+			t.Fatalf("%s contract %q: %v", pkg.ID, pkg.Contract, err)
 		}
 		if _, err := os.Stat(filepath.Join(root, pkg.MigrationSource)); err != nil {
 			t.Fatalf("%s migration source %q: %v", pkg.ID, pkg.MigrationSource, err)
@@ -147,6 +152,14 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 		}
 	}
 	assertLivePackageSkeletonSummaryMatchesPackages(t, root, manifest)
+}
+
+func livePackagePlanContractPathShape(path string) bool {
+	if strings.Contains(path, "/contracts/") &&
+		(strings.HasSuffix(path, "_contract.json") || strings.HasSuffix(path, "_gates.json") || strings.HasSuffix(path, "capability_gates.json")) {
+		return true
+	}
+	return strings.HasSuffix(path, "package.schema.json") || strings.HasSuffix(path, "package.manifest.json")
 }
 
 func assertLivePackageSkeletonSummaryMatchesPackages(t *testing.T, root string, manifest livePackagePlanManifest) {

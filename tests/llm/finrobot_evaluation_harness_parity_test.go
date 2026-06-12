@@ -29,18 +29,26 @@ type finrobotEvaluationHarnessParityManifest struct {
 		TestHardcodingPolicy string   `json:"test_hardcoding_policy"`
 		DialectSurface       []string `json:"dialect_surface"`
 		CapabilitySpecimen   struct {
-			ID                string   `json:"id"`
-			SourcePath        string   `json:"source_path"`
-			DatasetPath       string   `json:"dataset_path"`
-			ReplayRecordsPath string   `json:"replay_records_path"`
-			SourceSHA256      string   `json:"source_sha256"`
-			DatasetSHA256     string   `json:"dataset_sha256"`
-			ReplaySHA256      string   `json:"replay_records_sha256"`
-			TurnCount         int      `json:"turn_count"`
-			Models            []string `json:"models"`
-			DatasetRows       int      `json:"dataset_rows"`
-			SubcaseIDs        []string `json:"subcase_ids"`
-			GoldenReport      struct {
+			ID                    string   `json:"id"`
+			SourcePath            string   `json:"source_path"`
+			DatasetPath           string   `json:"dataset_path"`
+			ReplayRecordsPath     string   `json:"replay_records_path"`
+			SourceSHA256          string   `json:"source_sha256"`
+			DatasetSHA256         string   `json:"dataset_sha256"`
+			ReplaySHA256          string   `json:"replay_records_sha256"`
+			TurnCount             int      `json:"turn_count"`
+			Models                []string `json:"models"`
+			DatasetRows           int      `json:"dataset_rows"`
+			SubcaseIDs            []string `json:"subcase_ids"`
+			SourceMaterialization struct {
+				Required              bool   `json:"required"`
+				InputExtension        string `json:"input_extension"`
+				MaterializedExtension string `json:"materialized_extension"`
+				MaterializedFilename  string `json:"materialized_filename"`
+				DatasetCopyRequired   bool   `json:"dataset_copy_required"`
+				Reason                string `json:"reason"`
+			} `json:"source_materialization"`
+			GoldenReport struct {
 				Status           string   `json:"status"`
 				EvaluateBlocks   int      `json:"evaluate_blocks"`
 				CasesPassed      int      `json:"cases_passed"`
@@ -223,8 +231,21 @@ func TestFinRobotEvaluationHarnessParityDeclaresGenericAICapability(t *testing.T
 		t.Fatalf("provider-free model stub = %#v", manifest.ProviderFreeModelStub)
 	}
 	if !manifest.CIReport.ProviderFree || manifest.HarnessID == "" || manifest.FixtureVersion == "" ||
-		!strings.Contains(manifest.CIReport.Command, "--replay") {
+		!strings.Contains(manifest.CIReport.Command, "--replay") ||
+		!strings.Contains(manifest.CIReport.Command, "${MATERIALIZED_SOURCE}") ||
+		strings.Contains(manifest.CIReport.Command, " ${SOURCE}") {
 		t.Fatalf("offline CI report/fixture marker = harness %q fixture %q ci %#v", manifest.HarnessID, manifest.FixtureVersion, manifest.CIReport)
+	}
+	materialization := capability.CapabilitySpecimen.SourceMaterialization
+	if !materialization.Required ||
+		materialization.InputExtension != ".source.txt" ||
+		materialization.MaterializedExtension != ".leia" ||
+		materialization.MaterializedFilename == "" ||
+		!materialization.DatasetCopyRequired ||
+		!strings.HasSuffix(capability.CapabilitySpecimen.SourcePath, materialization.InputExtension) ||
+		!strings.HasSuffix(materialization.MaterializedFilename, materialization.MaterializedExtension) ||
+		!strings.Contains(strings.ToLower(materialization.Reason), "materialized") {
+		t.Fatalf("source materialization contract incomplete: %#v", materialization)
 	}
 	assertFileSHA256(t, filepath.Join(root, capability.CapabilitySpecimen.SourcePath), capability.CapabilitySpecimen.SourceSHA256)
 	assertFileSHA256(t, filepath.Join(root, capability.CapabilitySpecimen.DatasetPath), capability.CapabilitySpecimen.DatasetSHA256)

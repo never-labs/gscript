@@ -7,7 +7,7 @@
     "format": "json",
     "gate": true,
     "provider_free": true,
-    "command_template": "leia evaluate --gate --report ${REPORT} --replay ${REPLAY_RECORDS} ${SOURCE}"
+    "command_template": "leia evaluate --gate --report ${REPORT} --replay ${REPLAY_RECORDS} ${MATERIALIZED_SOURCE}"
   },
   "ai_evaluation_capability": {
     "id": "ai-evaluation-dialect-provider-free-v1",
@@ -35,9 +35,14 @@
       "dataset_sha256": "495328590fb3fb8844b861ded85215da853774f139e000db30c5cd8ada216882",
       "replay_records_sha256": "e6bb2f4b0c16303c759aa294663c9f40000a8a046e3f510c0a4f20613c3a01f5",
       "turn_count": 1,
-      "models": ["mock-ai-eval-judge"],
+      "models": [
+        "mock-ai-eval-judge"
+      ],
       "dataset_rows": 2,
-      "subcase_ids": ["judge-deterministic-replay", "manifest-threshold-gate"],
+      "subcase_ids": [
+        "judge-deterministic-replay",
+        "manifest-threshold-gate"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 1,
@@ -47,17 +52,66 @@
         "llm_loaded_turns": 1,
         "llm_replayed_turns": 1,
         "llm_turns": 1,
-        "case_names": ["generic ai evaluation dialect specimen"],
+        "case_names": [
+          "generic ai evaluation dialect specimen"
+        ],
         "metrics": [
-          {"name": "dataset_item_valid", "type": "bool", "count": 2, "pass_rate": 1.0},
-          {"name": "judge_passed", "type": "bool", "count": 2, "pass_rate": 1.0},
-          {"name": "answer_chars", "type": "number", "count": 2, "mean": 64.0},
-          {"name": "rubric_label", "type": "string", "count": 2},
-          {"name": "judge_cost", "type": "number", "count": 1, "mean": 0.004},
-          {"name": "judge_input_tokens", "type": "number", "count": 1, "mean": 4.0},
-          {"name": "judge_output_tokens", "type": "number", "count": 1, "mean": 3.0},
-          {"name": "judge_tokens", "type": "number", "count": 1, "mean": 7.0}
+          {
+            "name": "dataset_item_valid",
+            "type": "bool",
+            "count": 2,
+            "pass_rate": 1.0
+          },
+          {
+            "name": "judge_passed",
+            "type": "bool",
+            "count": 2,
+            "pass_rate": 1.0
+          },
+          {
+            "name": "answer_chars",
+            "type": "number",
+            "count": 2,
+            "mean": 64.0
+          },
+          {
+            "name": "rubric_label",
+            "type": "string",
+            "count": 2
+          },
+          {
+            "name": "judge_cost",
+            "type": "number",
+            "count": 1,
+            "mean": 0.004
+          },
+          {
+            "name": "judge_input_tokens",
+            "type": "number",
+            "count": 1,
+            "mean": 4.0
+          },
+          {
+            "name": "judge_output_tokens",
+            "type": "number",
+            "count": 1,
+            "mean": 3.0
+          },
+          {
+            "name": "judge_tokens",
+            "type": "number",
+            "count": 1,
+            "mean": 7.0
+          }
         ]
+      },
+      "source_materialization": {
+        "required": true,
+        "input_extension": ".source.txt",
+        "materialized_extension": ".leia",
+        "materialized_filename": "generic_ai_evaluation.leia",
+        "dataset_copy_required": true,
+        "reason": "The checked-in specimen is stored as text fixture content and must be materialized into a temporary Leia source file beside the dataset fixture before evaluation."
       }
     }
   },
@@ -65,47 +119,149 @@
     "id": "generic_binary_judge_v1",
     "purpose": "Score any AI output against a rubric using replay-backed eval.judge.",
     "request_contract": {
-      "required_fields": ["model", "messages"],
+      "required_fields": [
+        "model",
+        "messages"
+      ],
       "default_max_tokens": 200,
-      "default_budget": {"turns": 1, "tokens": 512},
-      "message_roles": ["system", "user"]
+      "default_budget": {
+        "turns": 1,
+        "tokens": 512
+      },
+      "message_roles": [
+        "system",
+        "user"
+      ]
     },
     "response_contract": {
-      "accepted_text_values": ["pass", "fail"],
-      "usage_metrics": ["judge_cost", "judge_input_tokens", "judge_output_tokens", "judge_tokens"],
+      "accepted_text_values": [
+        "pass",
+        "fail"
+      ],
+      "usage_metrics": [
+        "judge_cost",
+        "judge_input_tokens",
+        "judge_output_tokens",
+        "judge_tokens"
+      ],
       "failure_finding_kind": "llm_replay_mismatch"
     }
   },
   "metric_registry": [
-    {"name": "dataset_item_valid", "type": "bool", "aggregation": "pass_rate", "golden_min": 1.0},
-    {"name": "judge_passed", "type": "bool", "aggregation": "pass_rate", "golden_min": 1.0},
-    {"name": "answer_chars", "type": "number", "aggregation": "mean_min_max", "golden_min": 1.0},
-    {"name": "rubric_label", "type": "string", "aggregation": "value_counts"},
-    {"name": "judge_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 16.0},
-    {"name": "judge_input_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 512.0},
-    {"name": "judge_output_tokens", "type": "number", "aggregation": "mean_min_max", "golden_max": 200.0},
-    {"name": "judge_cost", "type": "number", "aggregation": "mean_min_max", "golden_max": 0.02}
+    {
+      "name": "dataset_item_valid",
+      "type": "bool",
+      "aggregation": "pass_rate",
+      "golden_min": 1.0
+    },
+    {
+      "name": "judge_passed",
+      "type": "bool",
+      "aggregation": "pass_rate",
+      "golden_min": 1.0
+    },
+    {
+      "name": "answer_chars",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_min": 1.0
+    },
+    {
+      "name": "rubric_label",
+      "type": "string",
+      "aggregation": "value_counts"
+    },
+    {
+      "name": "judge_tokens",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 16.0
+    },
+    {
+      "name": "judge_input_tokens",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 512.0
+    },
+    {
+      "name": "judge_output_tokens",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 200.0
+    },
+    {
+      "name": "judge_cost",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 0.02
+    }
   ],
   "dataset_manifest": {
     "format": "jsonl",
     "id_field": "id",
-    "required_fields": ["id", "input", "answer", "rubric", "rubric_label", "needs_judge", "expected_judgment"],
+    "required_fields": [
+      "id",
+      "input",
+      "answer",
+      "rubric",
+      "rubric_label",
+      "needs_judge",
+      "expected_judgment"
+    ],
     "minimum_rows": 2,
     "row_policy": "stable_ordered_fixture"
   },
   "record_replay_matching": {
     "mode": "strict_ordered",
-    "matched_request_fields": ["model", "messages.role", "messages.text", "max_tokens", "tools", "stream"],
+    "matched_request_fields": [
+      "model",
+      "messages.role",
+      "messages.text",
+      "max_tokens",
+      "tools",
+      "stream"
+    ],
     "unmatched_request_finding_kind": "llm_replay_mismatch",
     "exhausted_replay_finding_kind": "llm_replay_exhausted",
     "unconsumed_replay_finding_kind": "llm_replay_unconsumed",
-    "failure_details": ["expected", "actual", "case_id", "case_name"]
+    "failure_details": [
+      "expected",
+      "actual",
+      "case_id",
+      "case_name"
+    ]
   },
   "scoring_trace": {
-    "report_fields": ["schema_version", "status", "summary", "llm", "cases", "metrics", "findings"],
-    "case_fields": ["case_id", "name", "source_path", "status", "llm", "subcases", "assertions"],
-    "llm_case_fields": ["trace_ref", "turns", "input_tokens", "output_tokens", "cost"],
-    "subcase_fields": ["case_id", "status", "metrics"],
+    "report_fields": [
+      "schema_version",
+      "status",
+      "summary",
+      "llm",
+      "cases",
+      "metrics",
+      "findings"
+    ],
+    "case_fields": [
+      "case_id",
+      "name",
+      "source_path",
+      "status",
+      "llm",
+      "subcases",
+      "assertions"
+    ],
+    "llm_case_fields": [
+      "trace_ref",
+      "turns",
+      "input_tokens",
+      "output_tokens",
+      "cost"
+    ],
+    "subcase_fields": [
+      "case_id",
+      "status",
+      "metrics"
+    ],
     "finding_policy": "empty_on_success_structured_on_failure"
   },
   "provider_free_model_stub": {
@@ -113,13 +269,32 @@
     "provider_env_policy": "ignored",
     "live_provider_calls": false,
     "network_calls": false,
-    "stub_modes": ["replay"]
+    "stub_modes": [
+      "replay"
+    ]
   },
   "failure_envelope": {
     "status_on_failure": "failed",
-    "finding_kinds": ["llm_replay_mismatch", "llm_replay_exhausted", "llm_replay_unconsumed", "evaluate_regression", "evaluate_metric_regression"],
-    "required_fields": ["kind", "severity", "message", "path"],
-    "details_required_for": ["llm_replay_mismatch", "llm_replay_exhausted", "llm_replay_unconsumed", "evaluate_regression", "evaluate_metric_regression"],
+    "finding_kinds": [
+      "llm_replay_mismatch",
+      "llm_replay_exhausted",
+      "llm_replay_unconsumed",
+      "evaluate_regression",
+      "evaluate_metric_regression"
+    ],
+    "required_fields": [
+      "kind",
+      "severity",
+      "message",
+      "path"
+    ],
+    "details_required_for": [
+      "llm_replay_mismatch",
+      "llm_replay_exhausted",
+      "llm_replay_unconsumed",
+      "evaluate_regression",
+      "evaluate_metric_regression"
+    ],
     "details_policy": "machine_readable"
   },
   "golden_threshold_gates": {
@@ -129,9 +304,21 @@
     "findings_max": 0,
     "regression_threshold": 0.0,
     "metric_thresholds": [
-      {"name": "dataset_item_valid", "type": "bool", "pass_rate_min": 1.0},
-      {"name": "judge_passed", "type": "bool", "pass_rate_min": 1.0},
-      {"name": "judge_tokens", "type": "number", "mean_max": 16.0}
+      {
+        "name": "dataset_item_valid",
+        "type": "bool",
+        "pass_rate_min": 1.0
+      },
+      {
+        "name": "judge_passed",
+        "type": "bool",
+        "pass_rate_min": 1.0
+      },
+      {
+        "name": "judge_tokens",
+        "type": "number",
+        "mean_max": 16.0
+      }
     ]
   },
   "records_inventory": [
@@ -144,7 +331,10 @@
       "source_records_sha256": "175945fc031f63f2fce5322565be41cc93c988a27531ba4fcb7f1fa553e5bfa3",
       "replay_records_sha256": "175945fc031f63f2fce5322565be41cc93c988a27531ba4fcb7f1fa553e5bfa3",
       "turn_count": 2,
-      "models": ["mock-finrobot-core", "mock-finrobot-review"],
+      "models": [
+        "mock-finrobot-core",
+        "mock-finrobot-review"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 2,
@@ -169,7 +359,10 @@
       "source_records_sha256": "b144488bde3b9bdffbd64876743f1ebd9232956aaaf25920ec90681a080ee660",
       "replay_records_sha256": "b144488bde3b9bdffbd64876743f1ebd9232956aaaf25920ec90681a080ee660",
       "turn_count": 3,
-      "models": ["mock-employee", "mock-leader"],
+      "models": [
+        "mock-employee",
+        "mock-leader"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 2,
@@ -194,7 +387,10 @@
       "source_records_sha256": "d108ebc8ca2d1fc83b16c601d2eae04be4443e77627aed26b9c8db775423d9b1",
       "replay_records_sha256": "d108ebc8ca2d1fc83b16c601d2eae04be4443e77627aed26b9c8db775423d9b1",
       "turn_count": 5,
-      "models": ["mock-finrobot-equity", "mock-finrobot-report-review"],
+      "models": [
+        "mock-finrobot-equity",
+        "mock-finrobot-report-review"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 1,
@@ -204,7 +400,9 @@
         "llm_loaded_turns": 5,
         "llm_replayed_turns": 5,
         "llm_turns": 5,
-        "case_names": ["finrobot equity report replay"]
+        "case_names": [
+          "finrobot equity report replay"
+        ]
       }
     },
     {
@@ -216,7 +414,9 @@
       "source_records_sha256": "c62fab49c671ba913ed15cbb3f4b6536835a454c14f519f380fd3f6725298e75",
       "replay_records_sha256": "c62fab49c671ba913ed15cbb3f4b6536835a454c14f519f380fd3f6725298e75",
       "turn_count": 1,
-      "models": ["mock-fast"],
+      "models": [
+        "mock-fast"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 1,
@@ -226,7 +426,9 @@
         "llm_loaded_turns": 1,
         "llm_replayed_turns": 1,
         "llm_turns": 1,
-        "case_names": ["FinRobot investment group replay"]
+        "case_names": [
+          "FinRobot investment group replay"
+        ]
       }
     },
     {
@@ -238,7 +440,9 @@
       "source_records_sha256": "4c60f3da875a2ca9123d8a7bf5fbf7c9938157015f6261e882245421f2b83a6b",
       "replay_records_sha256": "4c60f3da875a2ca9123d8a7bf5fbf7c9938157015f6261e882245421f2b83a6b",
       "turn_count": 1,
-      "models": ["mock-fast"],
+      "models": [
+        "mock-fast"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 1,
@@ -248,7 +452,9 @@
         "llm_loaded_turns": 1,
         "llm_replayed_turns": 1,
         "llm_turns": 1,
-        "case_names": ["FinRobot multi-factor agents replay"]
+        "case_names": [
+          "FinRobot multi-factor agents replay"
+        ]
       }
     },
     {
@@ -260,7 +466,9 @@
       "source_records_sha256": "1b03a3f1f7a494f92d1956e5e60d62cbaba4bcf925b48e0dbd68827f81c6080f",
       "replay_records_sha256": "1b03a3f1f7a494f92d1956e5e60d62cbaba4bcf925b48e0dbd68827f81c6080f",
       "turn_count": 1,
-      "models": ["mock-fast"],
+      "models": [
+        "mock-fast"
+      ],
       "golden_report": {
         "status": "ok",
         "evaluate_blocks": 1,
@@ -270,7 +478,9 @@
         "llm_loaded_turns": 1,
         "llm_replayed_turns": 1,
         "llm_turns": 1,
-        "case_names": ["FinRobot portfolio optimization replay"]
+        "case_names": [
+          "FinRobot portfolio optimization replay"
+        ]
       }
     }
   ]

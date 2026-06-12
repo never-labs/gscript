@@ -238,6 +238,107 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	assertGenericAIWorkflowCompositionBoundaryOrder(t, boundaries, "replay", "trace", "approval", "package-audit")
 }
 
+func TestGenericAIWorkflowCompositionEdgesContractMatchesExampleAndMatrix(t *testing.T) {
+	root := repoRoot(t)
+	data := readGenericAIWorkflowCompositionExample(t)
+	matrix := loadGenericAIPackageMatrix(t, root)
+	contract := loadGenericAIWorkflowCompositionEdgesContract(t, root)
+	if contract.SchemaVersion != 1 ||
+		contract.ID != "generic-ai-package-composition-edges" ||
+		contract.SourceExample != "examples/ai/finrobot_translation/generic_ai_workflow_composition.leia" ||
+		contract.Matrix != "examples/ai/finrobot_translation/generic_ai_package_matrix.json" ||
+		!contract.ProviderFree ||
+		contract.LiveNetwork ||
+		contract.RealDependencyImports {
+		t.Fatalf("composition edge contract header drifted: %#v", contract)
+	}
+
+	exampleBoundaries := parseGenericAIWorkflowCompositionBoundaries(t, data)
+	exampleEdges := parseGenericAIWorkflowCompositionEdges(t, data)
+	if contract.BoundaryCount != len(exampleBoundaries) || len(contract.Boundaries) != len(exampleBoundaries) {
+		t.Fatalf("contract boundary count = %d/%d, want %d", contract.BoundaryCount, len(contract.Boundaries), len(exampleBoundaries))
+	}
+	if contract.EdgeCount != len(exampleEdges) || len(contract.Edges) != len(exampleEdges) {
+		t.Fatalf("contract edge count = %d/%d, want %d", contract.EdgeCount, len(contract.Edges), len(exampleEdges))
+	}
+
+	matrixByID := map[string]genericAIPackageRow{}
+	for _, row := range matrix.Packages {
+		matrixByID[row.ID] = row
+	}
+	exampleBoundaryByRole := map[string]genericAIWorkflowCompositionBoundary{}
+	for _, boundary := range exampleBoundaries {
+		exampleBoundaryByRole[boundary.Role] = boundary
+	}
+	contractBoundaryByRole := map[string]genericAIWorkflowCompositionContractBoundary{}
+	for _, boundary := range contract.Boundaries {
+		if contractBoundaryByRole[boundary.Role].Role != "" {
+			t.Fatalf("duplicate contract boundary role %q", boundary.Role)
+		}
+		contractBoundaryByRole[boundary.Role] = boundary
+		exampleBoundary, ok := exampleBoundaryByRole[boundary.Role]
+		if !ok {
+			t.Fatalf("contract boundary role %q missing from Leia composition", boundary.Role)
+		}
+		if boundary.PackageID != exampleBoundary.PackageID ||
+			boundary.Capability != exampleBoundary.Capability ||
+			boundary.BackendShape != exampleBoundary.Entrypoint ||
+			!boundary.ProviderFree ||
+			boundary.LiveNetwork {
+			t.Fatalf("contract boundary diverges from example: contract=%#v example=%#v", boundary, exampleBoundary)
+		}
+		row, ok := matrixByID[boundary.MatrixID]
+		if !ok {
+			t.Fatalf("contract boundary matrix_id %q missing from package matrix", boundary.MatrixID)
+		}
+		if boundary.PackageID != strings.ReplaceAll(row.ID, "_", "-") ||
+			boundary.PackageName != row.PackageName ||
+			boundary.PackageDir != row.PackageDir ||
+			boundary.ManifestRef != row.Manifest ||
+			boundary.FixtureIndexRef != row.FixtureIndex {
+			t.Fatalf("contract boundary diverges from matrix: contract=%#v matrix=%#v", boundary, row)
+		}
+		assertGenericAIWorkflowCompositionRootPath(t, root, boundary.ManifestRef)
+		assertGenericAIWorkflowCompositionRootPath(t, root, boundary.FixtureIndexRef)
+	}
+
+	exampleEdgeSet := map[string]bool{}
+	for _, edge := range exampleEdges {
+		exampleEdgeSet[edge.From+"->"+edge.To] = true
+	}
+	for _, edge := range contract.Edges {
+		key := edge.FromRole + "->" + edge.ToRole
+		if !exampleEdgeSet[key] {
+			t.Fatalf("contract edge %s missing from Leia composition", key)
+		}
+		fromBoundary, fromOK := contractBoundaryByRole[edge.FromRole]
+		toBoundary, toOK := contractBoundaryByRole[edge.ToRole]
+		if !fromOK || !toOK {
+			t.Fatalf("contract edge has unresolved roles: %#v", edge)
+		}
+		if edge.FromPackageID != fromBoundary.PackageID ||
+			edge.ToPackageID != toBoundary.PackageID ||
+			edge.Handoff == "" ||
+			!edge.ProviderFree ||
+			edge.LiveNetwork ||
+			edge.RealDependencyImports {
+			t.Fatalf("contract edge boundary fields invalid: edge=%#v from=%#v to=%#v", edge, fromBoundary, toBoundary)
+		}
+		if len(edge.ContractRefs) == 0 && len(edge.FixtureRefs) == 0 {
+			t.Fatalf("contract edge %s has no machine-readable refs", key)
+		}
+		for _, ref := range append(append([]string{}, edge.ContractRefs...), edge.FixtureRefs...) {
+			assertGenericAIWorkflowCompositionRootPath(t, root, ref)
+			if !strings.HasPrefix(ref, toBoundary.PackageDir+"/") {
+				t.Fatalf("edge %s ref %q must stay under target package dir %q", key, ref, toBoundary.PackageDir)
+			}
+			if !strings.Contains(ref, "/contracts/") && !strings.Contains(ref, "/fixtures/") {
+				t.Fatalf("edge %s ref %q must point to contracts or fixtures", key, ref)
+			}
+		}
+	}
+}
+
 func genericAIWorkflowCompositionExpectedEdges(boundaries int) int {
 	return boundaries + 1
 }
@@ -302,6 +403,47 @@ type genericAIWorkflowCompositionEdge struct {
 	To   string
 }
 
+type genericAIWorkflowCompositionEdgesContract struct {
+	SchemaVersion         int                                            `json:"schema_version"`
+	ID                    string                                         `json:"id"`
+	SourceExample         string                                         `json:"source_example"`
+	Matrix                string                                         `json:"matrix"`
+	ProviderFree          bool                                           `json:"provider_free"`
+	LiveNetwork           bool                                           `json:"live_network"`
+	RealDependencyImports bool                                           `json:"real_dependency_imports"`
+	BoundaryCount         int                                            `json:"boundary_count"`
+	EdgeCount             int                                            `json:"edge_count"`
+	Boundaries            []genericAIWorkflowCompositionContractBoundary `json:"boundaries"`
+	Edges                 []genericAIWorkflowCompositionContractEdge     `json:"edges"`
+}
+
+type genericAIWorkflowCompositionContractBoundary struct {
+	Role            string `json:"role"`
+	PackageID       string `json:"package_id"`
+	MatrixID        string `json:"matrix_id"`
+	PackageName     string `json:"package_name"`
+	PackageDir      string `json:"package_dir"`
+	Capability      string `json:"capability"`
+	BackendShape    string `json:"backend_shape"`
+	ProviderFree    bool   `json:"provider_free"`
+	LiveNetwork     bool   `json:"live_network"`
+	ManifestRef     string `json:"manifest_ref"`
+	FixtureIndexRef string `json:"fixture_index_ref"`
+}
+
+type genericAIWorkflowCompositionContractEdge struct {
+	FromRole              string   `json:"from_role"`
+	ToRole                string   `json:"to_role"`
+	FromPackageID         string   `json:"from_package_id"`
+	ToPackageID           string   `json:"to_package_id"`
+	Handoff               string   `json:"handoff"`
+	ProviderFree          bool     `json:"provider_free"`
+	LiveNetwork           bool     `json:"live_network"`
+	RealDependencyImports bool     `json:"real_dependency_imports"`
+	ContractRefs          []string `json:"contract_refs"`
+	FixtureRefs           []string `json:"fixture_refs"`
+}
+
 func parseGenericAIWorkflowCompositionBoundaries(t *testing.T, data string) []genericAIWorkflowCompositionBoundary {
 	t.Helper()
 	matches := regexp.MustCompile(`\{role:\s*"([^"]+)"\s+package_id:\s*"([^"]+)"\s+capability:\s*"([^"]+)"\s+entrypoint:\s*"([^"]+)"`).FindAllStringSubmatch(data, -1)
@@ -325,6 +467,23 @@ func parseGenericAIWorkflowCompositionEdges(t *testing.T, data string) []generic
 		edges = append(edges, genericAIWorkflowCompositionEdge{From: match[1], To: match[2]})
 	}
 	return edges
+}
+
+func loadGenericAIWorkflowCompositionEdgesContract(t *testing.T, root string) genericAIWorkflowCompositionEdgesContract {
+	t.Helper()
+	var contract genericAIWorkflowCompositionEdgesContract
+	readJSONFile(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "ai_dialect_index", "package_composition_edges.json"), &contract)
+	return contract
+}
+
+func assertGenericAIWorkflowCompositionRootPath(t *testing.T, root, rel string) {
+	t.Helper()
+	if rel == "" || filepath.IsAbs(rel) || strings.Contains(filepath.ToSlash(rel), "../") {
+		t.Fatalf("invalid root-relative composition path %q", rel)
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
+		t.Fatalf("composition path %q: %v", rel, err)
+	}
 }
 
 func genericAIWorkflowCompositionValueContainsCapability(value any, capability string) bool {

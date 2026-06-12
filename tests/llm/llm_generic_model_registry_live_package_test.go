@@ -620,53 +620,20 @@ func TestGenericModelRegistryFixtureIndexManifestAlignment(t *testing.T) {
 func TestGenericModelRegistryMainSmokeOutput(t *testing.T) {
 	base := genericModelRegistryPackageDir(t)
 	manifest := loadGenericModelRegistryManifest(t, base)
-	want := "generic_model_registry_live_package capability=generic.ai.model.registry capabilities=6 schemas=4 fixtures=4 provider_free=true live_network=false imports=false live_provider_gate=true routing_guard=true"
-
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(filepath.Join(base, manifest.Entrypoints["main"])); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_model_registry_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_model_registry_live_package_summary: %v", err)
-			}
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-			summary := genericModelRegistrySummaryFields(t, got.(string))
-			if summary["capability"] != manifest.DialectCapabilityID ||
-				summary["capabilities"] != fmt.Sprint(len(manifest.Capabilities)) ||
-				summary["schemas"] != fmt.Sprint(len(manifest.Schemas)) ||
-				summary["fixtures"] != "4" ||
-				(summary["provider_free"] == "true") != manifest.ProviderFree ||
-				(summary["live_network"] == "true") != manifest.LiveNetwork ||
-				(summary["imports"] == "true") != manifest.RealDependencyImports ||
-				(summary["live_provider_gate"] == "true") != manifest.CapabilityFlags["live_provider_gate"] ||
-				(summary["routing_guard"] == "true") != genericModelRegistryContains(manifest.Capabilities, "generic.ai.model.routing.guard") {
-				t.Fatalf("summary does not align with manifest: summary=%#v manifest=%#v", summary, manifest)
-			}
-		})
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, filepath.Join(base, manifest.Entrypoints["main"]), "generic_model_registry_live_package_summary", "generic_model_registry_live_package", leia.LibString) {
+		summary := result.Fields
+		requireFinRobotSummaryFields(t, summary, "capability", "capabilities", "schemas", "fixtures", "provider_free", "live_network", "imports", "live_provider_gate", "routing_guard")
+		if summary["capability"] != manifest.DialectCapabilityID ||
+			summary["capabilities"] != fmt.Sprint(len(manifest.Capabilities)) ||
+			summary["schemas"] != fmt.Sprint(len(manifest.Schemas)) ||
+			summary["fixtures"] != "4" ||
+			(summary["provider_free"] == "true") != manifest.ProviderFree ||
+			(summary["live_network"] == "true") != manifest.LiveNetwork ||
+			(summary["imports"] == "true") != manifest.RealDependencyImports ||
+			(summary["live_provider_gate"] == "true") != manifest.CapabilityFlags["live_provider_gate"] ||
+			(summary["routing_guard"] == "true") != genericModelRegistryContains(manifest.Capabilities, "generic.ai.model.routing.guard") {
+			t.Fatalf("summary does not align with manifest: summary=%#v manifest=%#v", summary, manifest)
+		}
 	}
 }
 
@@ -843,23 +810,6 @@ func assertGenericModelRegistryNestedSchemaRequired(t *testing.T, path string, o
 			t.Fatalf("%s path %v required missing %q: %#v", path, objectPath, field, required)
 		}
 	}
-}
-
-func genericModelRegistrySummaryFields(t *testing.T, value string) map[string]string {
-	t.Helper()
-	fields := strings.Fields(value)
-	if len(fields) == 0 || fields[0] != "generic_model_registry_live_package" {
-		t.Fatalf("unexpected summary prefix: %q", value)
-	}
-	result := map[string]string{}
-	for _, field := range fields[1:] {
-		parts := strings.SplitN(field, "=", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			t.Fatalf("malformed summary field %q in %q", field, value)
-		}
-		result[parts[0]] = parts[1]
-	}
-	return result
 }
 
 func genericModelRegistryRepoRoot(t *testing.T) string {

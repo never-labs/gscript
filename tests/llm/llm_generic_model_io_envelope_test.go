@@ -2,7 +2,6 @@ package leia_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -177,73 +176,35 @@ func TestGenericModelIOEnvelopeMainExecutableSmoke(t *testing.T) {
 	var manifest genericModelIOEnvelopeManifest
 	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "package.manifest.json"), &manifest)
 
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_model_io_envelope_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_model_io_envelope_live_package_summary: %v", err)
-			}
-			summary, ok := got.(string)
-			if !ok {
-				t.Fatalf("summary = %T %#v, want string", got, got)
-			}
-			if len(prints) != 1 || prints[0] != summary {
-				t.Fatalf("prints = %#v, want one summary print %q", prints, summary)
-			}
-			fields := genericModelIOEnvelopeSummaryFields(t, summary)
-			if fields["adapter"] != fixture.Replay.AdapterIdentity ||
-				!genericModelIOEnvelopePositiveCount(fields["capabilities"]) ||
-				fields["request"] == "" ||
-				fields["stream"] == "" ||
-				fields["response"] == "" ||
-				(fields["provider_free"] == "true") != manifest.ProviderFree ||
-				(fields["live_network"] == "true") != manifest.LiveNetworkDefault ||
-				(fields["imports"] == "true") != manifest.RealImportsDefault {
-				t.Fatalf("summary does not align with package boundary: summary=%#v manifest=%#v fixture=%#v", fields, manifest, fixture.Replay)
-			}
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_model_io_envelope_live_package_summary", "generic_model_io_envelope_live_package", leia.LibString, "generic_model_io_envelope_live_package") {
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "adapter", "capabilities", "request", "stream", "response", "provider_free", "live_network", "imports")
+		if fields["adapter"] != fixture.Replay.AdapterIdentity ||
+			!finrobotSummaryPositiveCount(fields["capabilities"]) ||
+			(fields["provider_free"] == "true") != manifest.ProviderFree ||
+			(fields["live_network"] == "true") != manifest.LiveNetworkDefault ||
+			(fields["imports"] == "true") != manifest.RealImportsDefault {
+			t.Fatalf("summary does not align with package boundary: summary=%#v manifest=%#v fixture=%#v", fields, manifest, fixture.Replay)
+		}
 
-			global, err := vm.Get("generic_model_io_envelope_live_package")
-			if err != nil {
-				t.Fatalf("Get generic_model_io_envelope_live_package: %v", err)
-			}
-			pkg, ok := global.(map[string]any)
-			if !ok {
-				t.Fatalf("generic_model_io_envelope_live_package = %T %#v, want map", global, global)
-			}
-			if pkg["id"] == "" ||
-				pkg["package_name"] == "" ||
-				pkg["adapter_identity"] != fixture.Replay.AdapterIdentity ||
-				pkg["request_envelope"] != fields["request"] ||
-				pkg["stream_chunk_envelope"] != fields["stream"] ||
-				pkg["response_envelope"] != fields["response"] ||
-				pkg["provider_free"] != true ||
-				pkg["live_network"] != false ||
-				pkg["real_dependency_imports"] != false {
-				t.Fatalf("global package output mismatch: %#v", pkg)
-			}
+		global := result.Globals["generic_model_io_envelope_live_package"]
+		pkg, ok := global.(map[string]any)
+		if !ok {
+			t.Fatalf("generic_model_io_envelope_live_package = %T %#v, want map", global, global)
+		}
+		if pkg["id"] == "" ||
+			pkg["package_name"] == "" ||
+			pkg["adapter_identity"] != fixture.Replay.AdapterIdentity ||
+			pkg["request_envelope"] != fields["request"] ||
+			pkg["stream_chunk_envelope"] != fields["stream"] ||
+			pkg["response_envelope"] != fields["response"] ||
+			pkg["provider_free"] != true ||
+			pkg["live_network"] != false ||
+			pkg["real_dependency_imports"] != false {
+			t.Fatalf("global package output mismatch: %#v", pkg)
+		}
 
-			assertGenericModelIOEnvelopeSmokeReplayRedaction(t, fixture)
-		})
+		assertGenericModelIOEnvelopeSmokeReplayRedaction(t, fixture)
 	}
 }
 
@@ -703,28 +664,6 @@ func assertGenericModelIOStringSet(t *testing.T, label string, got, want []strin
 	}
 }
 
-func genericModelIOEnvelopeSummaryFields(t *testing.T, value string) map[string]string {
-	t.Helper()
-	fields := strings.Fields(value)
-	if len(fields) == 0 || fields[0] != "generic_model_io_envelope_live_package" {
-		t.Fatalf("unexpected summary prefix: %q", value)
-	}
-	result := map[string]string{}
-	for _, field := range fields[1:] {
-		parts := strings.SplitN(field, "=", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			t.Fatalf("malformed summary field %q in %q", field, value)
-		}
-		result[parts[0]] = parts[1]
-	}
-	for _, key := range []string{"adapter", "capabilities", "request", "stream", "response", "provider_free", "live_network", "imports"} {
-		if result[key] == "" {
-			t.Fatalf("summary field %q missing in %#v", key, result)
-		}
-	}
-	return result
-}
-
 func genericModelIOEnvelopeSHA256Ref(value string) bool {
 	const prefix = "sha256:"
 	if !strings.HasPrefix(value, prefix) || len(value) != len(prefix)+64 {
@@ -736,16 +675,4 @@ func genericModelIOEnvelopeSHA256Ref(value string) bool {
 		}
 	}
 	return true
-}
-
-func genericModelIOEnvelopePositiveCount(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, r := range value {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return value != "0"
 }

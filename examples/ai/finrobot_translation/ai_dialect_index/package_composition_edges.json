@@ -1,0 +1,935 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-package-composition-edges",
+  "source_example": "examples/ai/finrobot_translation/generic_ai_workflow_composition.leia",
+  "matrix": "examples/ai/finrobot_translation/generic_ai_package_matrix.json",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "boundary_count": 31,
+  "edge_count": 32,
+  "boundaries": [
+    {
+      "role": "model",
+      "package_id": "generic-model-registry",
+      "matrix_id": "generic_model_registry",
+      "package_name": "leia-generic-ai-model-registry",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+      "capability": "generic.ai.model.registry",
+      "backend_shape": "generic.ai.model.registry",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "model-io",
+      "package_id": "generic-model-io-envelope",
+      "matrix_id": "generic_model_io_envelope",
+      "package_name": "leia-generic-ai-model-io-envelope",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "capability": "generic.ai.model.io.envelope",
+      "backend_shape": "ai.model.io.envelope",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "document-rag",
+      "package_id": "generic-document-rag-pipeline",
+      "matrix_id": "generic_document_rag_pipeline",
+      "package_name": "leia-generic-ai-document-rag-pipeline",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "capability": "generic.ai.document.rag",
+      "backend_shape": "ai.document.rag_pipeline",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "prompt-role",
+      "package_id": "generic-prompt-role-catalog",
+      "matrix_id": "generic_prompt_role_catalog",
+      "package_name": "leia-generic-ai-prompt-role-catalog",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "capability": "generic.ai.prompt.role.catalog",
+      "backend_shape": "ai.prompt.role_catalog",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "memory",
+      "package_id": "generic-memory-store",
+      "matrix_id": "generic_memory_store",
+      "package_name": "leia-generic-ai-memory-store",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "capability": "generic.ai.memory.store",
+      "backend_shape": "ai.memory.store",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "replay",
+      "package_id": "generic-record-replay",
+      "matrix_id": "generic_record_replay",
+      "package_name": "leia-generic-ai-record-replay",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
+      "capability": "generic.ai.record.capture",
+      "backend_shape": "generic.ai.record.replay.fixture",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_record_replay/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "trace",
+      "package_id": "generic-trace-events",
+      "matrix_id": "generic_trace_events",
+      "package_name": "leia-generic-ai-trace-events",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+      "capability": "generic.ai.trace.events",
+      "backend_shape": "ai.trace.emit",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "approval",
+      "package_id": "generic-approval-policy",
+      "matrix_id": "generic_approval_policy",
+      "package_name": "leia-generic-ai-approval-policy",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+      "capability": "generic.ai.approval.policy.evaluate",
+      "backend_shape": "generic.ai.approval.policy.evaluate",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "tool",
+      "package_id": "generic-tool-contracts",
+      "matrix_id": "generic_tool_contracts",
+      "package_name": "leia-generic-ai-tool-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+      "capability": "ai.tool.invoke",
+      "backend_shape": "ai.tool.invoke",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "tool-registry",
+      "package_id": "generic-tool-registry",
+      "matrix_id": "generic_tool_registry",
+      "package_name": "leia-generic-ai-tool-registry",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+      "capability": "generic.tool.registry.declare",
+      "backend_shape": "ai.tool.registry",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "optional-adapter",
+      "package_id": "generic-optional-adapter-boundary",
+      "matrix_id": "generic_optional_adapter_boundary",
+      "package_name": "leia-generic-ai-optional-adapter-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "capability": "generic.ai.optional_adapter.boundary",
+      "backend_shape": "ai.optional_adapter.boundary",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "data-provider",
+      "package_id": "generic-data-provider-boundary",
+      "matrix_id": "generic_data_provider_boundary",
+      "package_name": "leia-generic-ai-data-provider-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "capability": "generic.ai.data_provider.boundary",
+      "backend_shape": "ai.data_provider.boundary",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "data-normalization",
+      "package_id": "generic-data-normalization-contracts",
+      "matrix_id": "generic_data_normalization_contracts",
+      "package_name": "leia-generic-ai-data-normalization-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "capability": "generic.ai.data_normalization.contracts",
+      "backend_shape": "ai.data_normalization.contracts",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "analytical-model",
+      "package_id": "generic-analytical-model-contracts",
+      "matrix_id": "generic_analytical_model_contracts",
+      "package_name": "leia-generic-ai-analytical-model-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "capability": "generic.ai.analytical_model.contracts",
+      "backend_shape": "ai.analytical_model.contracts",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "transcript-pipeline",
+      "package_id": "generic-transcript-pipeline",
+      "matrix_id": "generic_transcript_pipeline",
+      "package_name": "leia-generic-ai-transcript-pipeline",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+      "capability": "generic.ai.transcript.pipeline",
+      "backend_shape": "ai.transcript.pipeline",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "event-intelligence",
+      "package_id": "generic-event-intelligence-boundary",
+      "matrix_id": "generic_event_intelligence_boundary",
+      "package_name": "leia-generic-ai-event-intelligence-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "capability": "generic.ai.event_intelligence.boundary",
+      "backend_shape": "ai.event_intelligence.boundary",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "strategy-backtest",
+      "package_id": "generic-strategy-backtest-contracts",
+      "matrix_id": "generic_strategy_backtest_contracts",
+      "package_name": "leia-generic-ai-strategy-backtest-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "capability": "generic.ai.strategy.backtest.contracts",
+      "backend_shape": "ai.strategy.backtest_contracts",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "coding-workspace",
+      "package_id": "generic-coding-workspace",
+      "matrix_id": "generic_coding_workspace",
+      "package_name": "leia-generic-ai-coding-workspace",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "capability": "generic.ai.coding_workspace",
+      "backend_shape": "ai.coding_workspace",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "turn",
+      "package_id": "generic-turn-runner",
+      "matrix_id": "generic_turn_runner",
+      "package_name": "leia-generic-ai-turn-runner",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+      "capability": "ai.turn.execute",
+      "backend_shape": "ai.turn.execute",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "agent-state",
+      "package_id": "generic-agent-state-store",
+      "matrix_id": "generic_agent_state_store",
+      "package_name": "leia-generic-ai-agent-state-store",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+      "capability": "generic.ai.agent_state.store",
+      "backend_shape": "ai.agent_state.store",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "agent",
+      "package_id": "generic-agent-runner",
+      "matrix_id": "generic_agent_runner",
+      "package_name": "leia-generic-ai-agent-runner",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+      "capability": "ai.agent.config.declarative",
+      "backend_shape": "ai.agent.run",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "planning",
+      "package_id": "generic-planning-graph",
+      "matrix_id": "generic_planning_graph",
+      "package_name": "leia-generic-ai-planning-graph",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+      "capability": "generic.planning.graph.define",
+      "backend_shape": "ai.workflow.plan_graph",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "package-audit",
+      "package_id": "generic-package-boundary-auditor",
+      "matrix_id": "generic_package_boundary_auditor",
+      "package_name": "leia-generic-ai-package-boundary-auditor",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+      "capability": "generic.ai.package.boundary.audit.manifest",
+      "backend_shape": "generic.ai.package.boundary.audit",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "workflow",
+      "package_id": "generic-workflow-orchestrator",
+      "matrix_id": "generic_workflow_orchestrator",
+      "package_name": "leia-generic-ai-workflow-orchestrator",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+      "capability": "ai.workflow.orchestrate.provider_free",
+      "backend_shape": "ai.workflow.orchestrate",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "chart-render",
+      "package_id": "generic-chart-render-contracts",
+      "matrix_id": "generic_chart_render_contracts",
+      "package_name": "leia-generic-ai-chart-render-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+      "capability": "generic.ai.chart.render.contracts",
+      "backend_shape": "ai.chart.render_contracts",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "evidence-verification",
+      "package_id": "generic-evidence-verification",
+      "matrix_id": "generic_evidence_verification",
+      "package_name": "leia-generic-ai-evidence-verification",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "capability": "generic.ai.evidence.verify",
+      "backend_shape": "ai.evidence.verify",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "evidence-report",
+      "package_id": "generic-evidence-report-artifacts",
+      "matrix_id": "generic_evidence_report_artifacts",
+      "package_name": "leia-generic-ai-evidence-report-artifacts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+      "capability": "generic.ai.evidence.report.artifacts",
+      "backend_shape": "ai.evidence.report_artifacts",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "report-render",
+      "package_id": "generic-report-render-contracts",
+      "matrix_id": "generic_report_render_contracts",
+      "package_name": "leia-generic-ai-report-render-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "capability": "generic.ai.report.render.contracts",
+      "backend_shape": "ai.report.render_contracts",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "product-app",
+      "package_id": "generic-product-app-boundary",
+      "matrix_id": "generic_product_app_boundary",
+      "package_name": "leia-generic-ai-product-app-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+      "capability": "generic.ai.product_app.boundary",
+      "backend_shape": "ai.product_app.boundary",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "ui-snapshot",
+      "package_id": "generic-ui-snapshot-evaluator",
+      "matrix_id": "generic_ui_snapshot_evaluator",
+      "package_name": "leia-generic-ai-ui-snapshot-evaluator",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "capability": "generic.ai.ui.snapshot.evaluator",
+      "backend_shape": "ai.ui.snapshot_evaluator",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "role": "eval",
+      "package_id": "generic-evaluation-harness",
+      "matrix_id": "generic_evaluation_harness",
+      "package_name": "leia-generic-ai-evaluation-harness",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+      "capability": "ai.eval.run.provider_free",
+      "backend_shape": "ai.eval.run",
+      "provider_free": true,
+      "live_network": false,
+      "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
+    }
+  ],
+  "edges": [
+    {
+      "from_role": "model",
+      "to_role": "model-io",
+      "from_package_id": "generic-model-registry",
+      "to_package_id": "generic-model-io-envelope",
+      "handoff": "resolved model descriptor",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "document-rag",
+      "to_role": "memory",
+      "from_package_id": "generic-document-rag-pipeline",
+      "to_package_id": "generic-memory-store",
+      "handoff": "retrieval evidence and cited context chunks",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_memory_store/contracts/generic_memory_store_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "memory",
+      "to_role": "turn",
+      "from_package_id": "generic-memory-store",
+      "to_package_id": "generic-turn-runner",
+      "handoff": "retrieved context window",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "model-io",
+      "to_role": "turn",
+      "from_package_id": "generic-model-io-envelope",
+      "to_package_id": "generic-turn-runner",
+      "handoff": "request, stream, response, usage, and redaction envelopes",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "turn",
+      "to_role": "agent-state",
+      "from_package_id": "generic-turn-runner",
+      "to_package_id": "generic-agent-state-store",
+      "handoff": "redacted input refs, output refs, trace correlation, and checkpoint material",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/contracts/generic_agent_state_store_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "agent-state",
+      "to_role": "trace",
+      "from_package_id": "generic-agent-state-store",
+      "to_package_id": "generic-trace-events",
+      "handoff": "checkpoint/resume trace replay projection",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_trace_events/contracts/trace_events_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "agent-state",
+      "to_role": "replay",
+      "from_package_id": "generic-agent-state-store",
+      "to_package_id": "generic-record-replay",
+      "handoff": "state version, checkpoint key, cache key, and resume token replay match material",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_record_replay/contracts/record_replay_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_record_replay/contracts/strict_ordered_matching_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "agent-state",
+      "to_role": "agent",
+      "from_package_id": "generic-agent-state-store",
+      "to_package_id": "generic-agent-runner",
+      "handoff": "resumable state snapshot, resume token, and checkpoint key",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/contracts/agent_runner_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "prompt-role",
+      "to_role": "agent",
+      "from_package_id": "generic-prompt-role-catalog",
+      "to_package_id": "generic-agent-runner",
+      "handoff": "role profile, prompt template, and output schema",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/contracts/agent_runner_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "tool",
+      "to_role": "turn",
+      "from_package_id": "generic-tool-contracts",
+      "to_package_id": "generic-turn-runner",
+      "handoff": "declarative tool schema",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "agent",
+      "to_role": "workflow",
+      "from_package_id": "generic-agent-runner",
+      "to_package_id": "generic-workflow-orchestrator",
+      "handoff": "agent result and loop trace",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/trace_emission_hooks_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "workflow",
+      "to_role": "eval",
+      "from_package_id": "generic-workflow-orchestrator",
+      "to_package_id": "generic-evaluation-harness",
+      "handoff": "workflow result fixture",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/contracts/evaluation_harness_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "replay",
+      "to_role": "turn",
+      "from_package_id": "generic-record-replay",
+      "to_package_id": "generic-turn-runner",
+      "handoff": "strict ordered record match",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "trace",
+      "to_role": "workflow",
+      "from_package_id": "generic-trace-events",
+      "to_package_id": "generic-workflow-orchestrator",
+      "handoff": "correlated events",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/trace_emission_hooks_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "approval",
+      "to_role": "tool",
+      "from_package_id": "generic-approval-policy",
+      "to_package_id": "generic-tool-contracts",
+      "handoff": "capability decision",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "tool-registry",
+      "to_role": "tool",
+      "from_package_id": "generic-tool-registry",
+      "to_package_id": "generic-tool-contracts",
+      "handoff": "validated tool descriptor",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "optional-adapter",
+      "to_role": "tool",
+      "from_package_id": "generic-optional-adapter-boundary",
+      "to_package_id": "generic-tool-contracts",
+      "handoff": "optional dependency gate and clean-skip envelope",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "data-provider",
+      "to_role": "tool",
+      "from_package_id": "generic-data-provider-boundary",
+      "to_package_id": "generic-tool-contracts",
+      "handoff": "provider request and response envelopes",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "data-provider",
+      "to_role": "data-normalization",
+      "from_package_id": "generic-data-provider-boundary",
+      "to_package_id": "generic-data-normalization-contracts",
+      "handoff": "source records and provider provenance",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/contracts/generic_data_normalization_contracts_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "data-normalization",
+      "to_role": "analytical-model",
+      "from_package_id": "generic-data-normalization-contracts",
+      "to_package_id": "generic-analytical-model-contracts",
+      "handoff": "normalized rows, provenance, and validation envelopes",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/contracts/generic_analytical_model_contracts_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "transcript-pipeline",
+      "to_role": "document-rag",
+      "from_package_id": "generic-transcript-pipeline",
+      "to_package_id": "generic-document-rag-pipeline",
+      "handoff": "normalized segments and turn-aware transcript chunks",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/contracts/generic_document_rag_pipeline_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "data-provider",
+      "to_role": "event-intelligence",
+      "from_package_id": "generic-data-provider-boundary",
+      "to_package_id": "generic-event-intelligence-boundary",
+      "handoff": "source snapshots and provider provenance",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/contracts/generic_event_intelligence_boundary_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "data-provider",
+      "to_role": "strategy-backtest",
+      "from_package_id": "generic-data-provider-boundary",
+      "to_package_id": "generic-strategy-backtest-contracts",
+      "handoff": "observation feed and provider provenance",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "approval",
+      "to_role": "coding-workspace",
+      "from_package_id": "generic-approval-policy",
+      "to_package_id": "generic-coding-workspace",
+      "handoff": "execution and file-write capability decision",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/contracts/generic_coding_workspace_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "planning",
+      "to_role": "workflow",
+      "from_package_id": "generic-planning-graph",
+      "to_package_id": "generic-workflow-orchestrator",
+      "handoff": "plan graph and dependency evidence",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/trace_emission_hooks_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "package-audit",
+      "to_role": "workflow",
+      "from_package_id": "generic-package-boundary-auditor",
+      "to_package_id": "generic-workflow-orchestrator",
+      "handoff": "provider-free boundary gate",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/trace_emission_hooks_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "chart-render",
+      "to_role": "evidence-report",
+      "from_package_id": "generic-chart-render-contracts",
+      "to_package_id": "generic-evidence-report-artifacts",
+      "handoff": "chart render artifacts and source metadata",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "workflow",
+      "to_role": "evidence-verification",
+      "from_package_id": "generic-workflow-orchestrator",
+      "to_package_id": "generic-evidence-verification",
+      "handoff": "claim records, source annotations, citation refs, and evidence policy",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/contracts/generic_evidence_verification_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "evidence-verification",
+      "to_role": "evidence-report",
+      "from_package_id": "generic-evidence-verification",
+      "to_package_id": "generic-evidence-report-artifacts",
+      "handoff": "verified citations, freshness warnings, unresolved refs, and degradation actions",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "evidence-report",
+      "to_role": "report-render",
+      "from_package_id": "generic-evidence-report-artifacts",
+      "to_package_id": "generic-report-render-contracts",
+      "handoff": "report render requests and artifact manifests",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/contracts/generic_report_render_contracts_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "workflow",
+      "to_role": "product-app",
+      "from_package_id": "generic-workflow-orchestrator",
+      "to_package_id": "generic-product-app-boundary",
+      "handoff": "route, session, task, artifact, and CRUD product shell",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/contracts/generic_product_app_boundary_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json"
+      ]
+    },
+    {
+      "from_role": "evidence-report",
+      "to_role": "ui-snapshot",
+      "from_package_id": "generic-evidence-report-artifacts",
+      "to_package_id": "generic-ui-snapshot-evaluator",
+      "handoff": "artifact URI manifest and snapshot metadata",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "contract_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/contracts/generic_ui_snapshot_evaluator_contract.json"
+      ],
+      "fixture_refs": [
+        "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json"
+      ]
+    }
+  ]
+}
