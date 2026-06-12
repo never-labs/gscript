@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 99,
-  "translation_directory_file_count": 856,
+  "translation_directory_file_count": 858,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -853,6 +853,7 @@
         "generic.ai.agent_state.output_ref",
         "generic.ai.agent_state.trace_correlation",
         "generic.ai.agent_state.trace_replay_projection",
+        "generic.ai.agent_state.memory_context_projection",
         "generic.ai.agent_state.cache_key",
         "generic.ai.agent_state.redaction",
         "generic.ai.agent_state.clean_skip"
@@ -863,6 +864,7 @@
         "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads",
         "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
         "trace replay projection maps checkpoint snapshots to deterministic trace and replay correlation events",
+        "memory context projection maps ranked memory refs into resumable snapshots without copying raw memory text",
         "checkpoint and cache keys are deterministic sha256 values that exclude raw inputs, raw outputs, and secret-shaped fields",
         "adapter boundaries clean-skip when durable state dependencies are absent"
       ],

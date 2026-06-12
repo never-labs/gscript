@@ -62,6 +62,7 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		"generic.ai.agent_state.output_ref",
 		"generic.ai.agent_state.trace_correlation",
 		"generic.ai.agent_state.trace_replay_projection",
+		"generic.ai.agent_state.memory_context_projection",
 		"generic.ai.agent_state.cache_key",
 		"generic.ai.agent_state.redaction",
 		"generic.ai.agent_state.clean_skip",
@@ -112,6 +113,17 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 			SecretValuesAllowed        bool     `json:"secret_values_allowed"`
 			DeterministicOrderRequired bool     `json:"deterministic_order_required"`
 		} `json:"trace_replay_projection_contract"`
+		MemoryContextProjectionContract struct {
+			SourcePackage              string   `json:"source_package"`
+			SourceFixture              string   `json:"source_fixture"`
+			Target                     string   `json:"target"`
+			TargetCapability           string   `json:"target_capability"`
+			RequiredSourceFields       []string `json:"required_source_fields"`
+			RequiredTargetFields       []string `json:"required_target_fields"`
+			RawMemoryTextAllowed       bool     `json:"raw_memory_text_allowed"`
+			SecretValuesAllowed        bool     `json:"secret_values_allowed"`
+			DeterministicOrderRequired bool     `json:"deterministic_order_required"`
+		} `json:"memory_context_projection_contract"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Contracts["contract"]), &contract)
 	if contract.SchemaVersion != 1 || contract.PackageBoundaryID != manifest.PackageBoundaryID ||
@@ -158,6 +170,24 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 			t.Fatalf("trace replay match fields missing %q: %#v", want, contract.TraceReplayProjectionContract.ReplayMatchFields)
 		}
 	}
+	if contract.MemoryContextProjectionContract.SourcePackage != "generic_memory_store" ||
+		contract.MemoryContextProjectionContract.Target != "state_snapshots" ||
+		contract.MemoryContextProjectionContract.TargetCapability != "generic.ai.agent_state.memory_context_projection" ||
+		contract.MemoryContextProjectionContract.RawMemoryTextAllowed ||
+		contract.MemoryContextProjectionContract.SecretValuesAllowed ||
+		!contract.MemoryContextProjectionContract.DeterministicOrderRequired {
+		t.Fatalf("memory context projection contract drifted: %#v", contract.MemoryContextProjectionContract)
+	}
+	for _, want := range []string{"retrieval_results.memory_id", "retrieval_results.rank", "retrieval_results.context_ref", "context_window.included_memory_ids", "provenance.fixture_key"} {
+		if !genericLivePackageContains(contract.MemoryContextProjectionContract.RequiredSourceFields, want) {
+			t.Fatalf("memory context source field missing %q: %#v", want, contract.MemoryContextProjectionContract.RequiredSourceFields)
+		}
+	}
+	for _, want := range []string{"agent_run_id", "session_id", "state_version", "checkpoint_key", "memory_id", "context_ref", "input_ref_id"} {
+		if !genericLivePackageContains(contract.MemoryContextProjectionContract.RequiredTargetFields, want) {
+			t.Fatalf("memory context target field missing %q: %#v", want, contract.MemoryContextProjectionContract.RequiredTargetFields)
+		}
+	}
 
 	var index struct {
 		ProviderFree          bool `json:"provider_free"`
@@ -172,7 +202,7 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		} `json:"fixtures"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 4 {
 		t.Fatalf("fixture index header/count mismatch: %#v", index)
 	}
 	if index.Fixtures[0].FixtureKey != "generic:agent_state_store:offline" ||
@@ -194,6 +224,13 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		index.Fixtures[2].Metadata["raw_payloads_allowed"] != false {
 		t.Fatalf("trace replay projection fixture index entry mismatch: %#v", index.Fixtures[2])
 	}
+	if index.Fixtures[3].FixtureKey != "generic:agent_state_store:memory_context_projection" ||
+		index.Fixtures[3].Capability != "generic.ai.agent_state.memory_context_projection" ||
+		index.Fixtures[3].Path != manifest.Fixtures["memory_context_projection"] ||
+		index.Fixtures[3].Schema != manifest.Schemas["memory_context_projection"] ||
+		index.Fixtures[3].Metadata["raw_memory_text_allowed"] != false {
+		t.Fatalf("memory context projection fixture index entry mismatch: %#v", index.Fixtures[3])
+	}
 }
 
 func TestGenericAgentStateStoreLivePackageFixtureShape(t *testing.T) {
@@ -214,6 +251,7 @@ func TestGenericAgentStateStoreLivePackageSchemaRequiredFields(t *testing.T) {
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "trace_correlation_v1.schema.json"), []string{"trace_id", "event_id", "parent_event_id", "agent_run_id", "session_id", "turn_id", "checkpoint_key"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "redaction_audit_v1.schema.json"), []string{"enabled", "secret_values_present", "raw_prompt_stored", "raw_completion_stored", "redacted_fields", "placeholder", "credential_refs"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "trace_replay_projection_v1.schema.json"), []string{"schema_version", "id", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model", "credentials_required", "real_dependency_imports", "depends_on_q_runtime", "source_fixture", "projection_kind", "raw_payloads_allowed", "secret_values_allowed", "projected_events", "replay_assertions"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "memory_context_projection_v1.schema.json"), []string{"schema_version", "id", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model", "credentials_required", "real_dependency_imports", "depends_on_q_runtime", "source_fixture_refs", "projection_kind", "raw_memory_text_allowed", "secret_values_allowed", "context_mappings", "snapshot_context_windows", "projection_assertions"})
 }
 
 func TestGenericAgentStateStoreTraceReplayProjection(t *testing.T) {
@@ -306,6 +344,138 @@ func TestGenericAgentStateStoreTraceReplayProjection(t *testing.T) {
 	}
 }
 
+func TestGenericAgentStateStoreMemoryContextProjection(t *testing.T) {
+	base := genericAgentStateStorePackageDir(t)
+	root := repoRoot(t)
+	source := loadGenericMemoryStoreFixture(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_memory_store", "fixtures", "generic_memory_store_fixture.json"))
+	target := loadGenericAgentStateCheckpointFixtureFromPath(t, filepath.Join(base, "fixtures", "agent_state_snapshot_fixture.json"))
+
+	var projection struct {
+		SchemaVersion         int    `json:"schema_version"`
+		ID                    string `json:"id"`
+		PackageBoundaryID     string `json:"package_boundary_id"`
+		ProviderFree          bool   `json:"provider_free"`
+		DomainSpecific        bool   `json:"domain_specific"`
+		LiveNetwork           bool   `json:"live_network"`
+		LiveModel             bool   `json:"live_model"`
+		CredentialsRequired   bool   `json:"credentials_required"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		DependsOnQRuntime     bool   `json:"depends_on_q_runtime"`
+		SourceFixtureRefs     struct {
+			MemoryStore        string `json:"memory_store"`
+			AgentStateSnapshot string `json:"agent_state_snapshot"`
+		} `json:"source_fixture_refs"`
+		ProjectionKind       string `json:"projection_kind"`
+		RawMemoryTextAllowed bool   `json:"raw_memory_text_allowed"`
+		SecretValuesAllowed  bool   `json:"secret_values_allowed"`
+		ContextMappings      []struct {
+			MemoryID            string  `json:"memory_id"`
+			Rank                int     `json:"rank"`
+			Score               float64 `json:"score"`
+			ContextRef          string  `json:"context_ref"`
+			SourceFixtureKey    string  `json:"source_fixture_key"`
+			TargetAgentRunID    string  `json:"target_agent_run_id"`
+			TargetSessionID     string  `json:"target_session_id"`
+			TargetStateVersion  int     `json:"target_state_version"`
+			TargetCheckpointKey string  `json:"target_checkpoint_key"`
+			TargetInputRefID    string  `json:"target_input_ref_id"`
+			ProjectionPolicy    string  `json:"projection_policy"`
+		} `json:"context_mappings"`
+		SnapshotContextWindows []struct {
+			AgentRunID            string   `json:"agent_run_id"`
+			SessionID             string   `json:"session_id"`
+			StateVersion          int      `json:"state_version"`
+			CheckpointKey         string   `json:"checkpoint_key"`
+			ContextWindowStrategy string   `json:"context_window_strategy"`
+			IncludedMemoryIDs     []string `json:"included_memory_ids"`
+			ContextRefs           []string `json:"context_refs"`
+			DeterministicOrder    bool     `json:"deterministic_order"`
+			RawMemoryTextStored   bool     `json:"raw_memory_text_stored"`
+		} `json:"snapshot_context_windows"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "memory_context_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.ID != "generic-agent-state-memory-context-projection-fixture" ||
+		projection.PackageBoundaryID != "generic-ai-agent-state-store" ||
+		projection.ProjectionKind != "memory_context_to_agent_state_projection" ||
+		projection.SourceFixtureRefs.MemoryStore == "" ||
+		projection.SourceFixtureRefs.AgentStateSnapshot == "" {
+		t.Fatalf("unexpected memory context projection header: %#v", projection)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork || projection.LiveModel ||
+		projection.CredentialsRequired || projection.RealDependencyImports || projection.DependsOnQRuntime ||
+		projection.RawMemoryTextAllowed || projection.SecretValuesAllowed {
+		t.Fatalf("memory context projection must stay provider-free and ref-only: %#v", projection)
+	}
+	if len(projection.ContextMappings) != len(source.RetrievalResults) {
+		t.Fatalf("context mapping count = %d, want %d", len(projection.ContextMappings), len(source.RetrievalResults))
+	}
+
+	memoryItems := map[string]bool{}
+	for _, item := range source.MemoryItems {
+		memoryItems[item.MemoryID] = true
+	}
+	retrievalByMemory := map[string]struct {
+		Rank       int
+		Score      float64
+		ContextRef string
+	}{}
+	for _, result := range source.RetrievalResults {
+		retrievalByMemory[result.MemoryID] = struct {
+			Rank       int
+			Score      float64
+			ContextRef string
+		}{Rank: result.Rank, Score: result.Score, ContextRef: result.ContextRef}
+	}
+	snapshots := map[string]bool{}
+	inputRefs := map[string]bool{}
+	for _, snapshot := range target.StateSnapshots {
+		key := fmt.Sprintf("%s/%s/%d/%s", snapshot.AgentRunID, snapshot.SessionID, snapshot.StateVersion, snapshot.Checkpoint.CheckpointKey)
+		snapshots[key] = true
+		for _, ref := range snapshot.InputRefs {
+			inputRefs[ref.RefID] = true
+		}
+	}
+
+	lastRank := 0
+	for _, mapping := range projection.ContextMappings {
+		retrieval, ok := retrievalByMemory[mapping.MemoryID]
+		if !ok || !memoryItems[mapping.MemoryID] {
+			t.Fatalf("mapping references unknown memory result: %#v", mapping)
+		}
+		if mapping.Rank <= lastRank || mapping.Rank != retrieval.Rank ||
+			mapping.Score != retrieval.Score ||
+			mapping.ContextRef != retrieval.ContextRef ||
+			mapping.SourceFixtureKey != source.Provenance.FixtureKey ||
+			mapping.ProjectionPolicy != "memory_ref_only" {
+			t.Fatalf("mapping does not preserve deterministic retrieval refs: mapping=%#v retrieval=%#v", mapping, retrieval)
+		}
+		lastRank = mapping.Rank
+		snapshotKey := fmt.Sprintf("%s/%s/%d/%s", mapping.TargetAgentRunID, mapping.TargetSessionID, mapping.TargetStateVersion, mapping.TargetCheckpointKey)
+		if !snapshots[snapshotKey] {
+			t.Fatalf("mapping target snapshot does not resolve: %#v", mapping)
+		}
+		if !inputRefs[mapping.TargetInputRefID] {
+			t.Fatalf("mapping target input ref does not resolve: %#v", mapping)
+		}
+	}
+	if len(projection.SnapshotContextWindows) != 1 {
+		t.Fatalf("snapshot context windows = %d, want 1", len(projection.SnapshotContextWindows))
+	}
+	window := projection.SnapshotContextWindows[0]
+	if !window.DeterministicOrder || window.RawMemoryTextStored ||
+		window.ContextWindowStrategy != source.ContextWindow.Strategy ||
+		!sameStringSet(window.IncludedMemoryIDs, source.ContextWindow.IncludedMemoryIDs) {
+		t.Fatalf("snapshot context window does not match source context window: window=%#v source=%#v", window, source.ContextWindow)
+	}
+	for _, want := range []string{"projection_is_provider_free", "source_memory_store_is_ref_only", "raw_memory_text_absent", "secret_values_absent", "context_refs_match_retrieval_results", "included_memory_ids_match_context_window", "target_snapshot_identity_resolves", "target_input_ref_resolves", "deterministic_order_preserved"} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("memory context projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
+}
+
 func TestGenericAgentStateStoreLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericAgentStateStorePackageDir(t), "main.leia")
 	for _, tc := range []struct {
@@ -334,7 +504,7 @@ func TestGenericAgentStateStoreLivePackageExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get generic_agent_state_store_live_package_summary: %v", err)
 			}
-			want := "generic_agent_state_store_live_package capability=generic.ai.agent_state.store fixture=generic:agent_state_store:offline snapshots=2 checkpoint=sha256 provider_free=true live_network=false imports=false"
+			want := "generic_agent_state_store_live_package capability=generic.ai.agent_state.store fixture=generic:agent_state_store:offline snapshots=2 checkpoint=sha256 memory_context_projections=1 provider_free=true live_network=false imports=false"
 			if got != want {
 				t.Fatalf("summary = %#v, want %#v", got, want)
 			}
@@ -355,6 +525,23 @@ func loadGenericAgentStateCheckpointFixtureFromPath(t *testing.T, path string) g
 	var doc genericAgentStateCheckpointDoc
 	decodeGenericAgentStateJSONFile(t, path, &doc)
 	return doc
+}
+
+func sameStringSet(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	seen := map[string]int{}
+	for _, value := range got {
+		seen[value]++
+	}
+	for _, value := range want {
+		if seen[value] == 0 {
+			return false
+		}
+		seen[value]--
+	}
+	return true
 }
 
 func assertGenericAgentStateSnapshots(t *testing.T, doc genericAgentStateCheckpointDoc) {

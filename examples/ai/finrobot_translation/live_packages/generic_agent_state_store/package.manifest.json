@@ -5,7 +5,7 @@
   "package_boundary_id": "generic-ai-agent-state-store",
   "capability_id": "generic.ai.agent_state.store",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free generic AI agent state store package for session snapshots, resumable checkpoints, redacted input/output refs, trace correlation, deterministic cache keys, and clean-skip adapter boundaries.",
+  "description": "Provider-free generic AI agent state store package for session snapshots, resumable checkpoints, redacted input/output refs, trace correlation, deterministic cache keys, memory context projection, and clean-skip adapter boundaries.",
   "provider_free": true,
   "domain_specific": false,
   "live_network_default": false,
@@ -27,7 +27,8 @@
     "checkpoint": "schemas/checkpoint_v1.schema.json",
     "trace_correlation": "schemas/trace_correlation_v1.schema.json",
     "redaction_audit": "schemas/redaction_audit_v1.schema.json",
-    "trace_replay_projection": "schemas/trace_replay_projection_v1.schema.json"
+    "trace_replay_projection": "schemas/trace_replay_projection_v1.schema.json",
+    "memory_context_projection": "schemas/memory_context_projection_v1.schema.json"
   },
   "contracts": {
     "contract": "contracts/generic_agent_state_store_contract.json"
@@ -36,7 +37,8 @@
     "index": "fixtures/provider_free_fixture_index.json",
     "agent_state_snapshot": "fixtures/agent_state_snapshot_fixture.json",
     "checkpoint_clean_skip": "fixtures/checkpoint_clean_skip_fixture.json",
-    "trace_replay_projection": "fixtures/trace_replay_projection_fixture.json"
+    "trace_replay_projection": "fixtures/trace_replay_projection_fixture.json",
+    "memory_context_projection": "fixtures/memory_context_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.agent_state.store",
@@ -47,6 +49,7 @@
     "generic.ai.agent_state.output_ref",
     "generic.ai.agent_state.trace_correlation",
     "generic.ai.agent_state.trace_replay_projection",
+    "generic.ai.agent_state.memory_context_projection",
     "generic.ai.agent_state.cache_key",
     "generic.ai.agent_state.redaction",
     "generic.ai.agent_state.clean_skip"
@@ -59,6 +62,7 @@
     "state_ref",
     "trace_correlation",
     "trace_replay_projection",
+    "memory_context_projection",
     "redaction_audit",
     "adapter_boundaries"
   ],
@@ -78,11 +82,12 @@
     "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads",
     "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
     "trace replay projection maps checkpoint snapshots to deterministic trace and replay correlation events",
+    "memory context projection maps ranked memory refs into resumable snapshots without copying raw memory text",
     "checkpoint and cache keys are deterministic sha256 values that exclude raw inputs, raw outputs, and secret-shaped fields",
     "adapter boundaries clean-skip when durable state dependencies are absent"
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide built-in leia-generic-ai-agent-state-store handling; this provider-free package boundary owns resumable agent state, checkpoints, redacted refs, trace correlation, and clean-skip contracts."
+    "statement": "Leia core does not provide built-in leia-generic-ai-agent-state-store handling; this provider-free package boundary owns resumable agent state, checkpoints, redacted refs, trace correlation, memory context projection, and clean-skip contracts."
   }
 }

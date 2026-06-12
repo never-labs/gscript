@@ -44,6 +44,7 @@
         "generic.ai.agent_state.output_ref",
         "generic.ai.agent_state.trace_correlation",
         "generic.ai.agent_state.trace_replay_projection",
+        "generic.ai.agent_state.memory_context_projection",
         "generic.ai.agent_state.cache_key",
         "generic.ai.agent_state.redaction",
         "generic.ai.agent_state.clean_skip"
@@ -55,7 +56,10 @@
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/contracts/generic_agent_state_store_contract.json"
       ],
-      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json"
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/memory_context_projection_fixture.json"
+      ]
     },
     {
       "id": "generic_analytical_model_contracts",

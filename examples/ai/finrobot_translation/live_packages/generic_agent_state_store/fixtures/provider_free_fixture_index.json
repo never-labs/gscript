@@ -55,6 +55,25 @@
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "generic:agent_state_store:memory_context_projection",
+      "capability": "generic.ai.agent_state.memory_context_projection",
+      "path": "fixtures/memory_context_projection_fixture.json",
+      "schema": "schemas/memory_context_projection_v1.schema.json",
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+        "target_fixture": "fixtures/agent_state_snapshot_fixture.json",
+        "projected_context_refs": 2,
+        "raw_memory_text_allowed": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

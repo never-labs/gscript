@@ -18,6 +18,7 @@
     "generic.ai.agent_state.output_ref",
     "generic.ai.agent_state.trace_correlation",
     "generic.ai.agent_state.trace_replay_projection",
+    "generic.ai.agent_state.memory_context_projection",
     "generic.ai.agent_state.cache_key",
     "generic.ai.agent_state.redaction",
     "generic.ai.agent_state.clean_skip"
@@ -102,6 +103,31 @@
     "secret_values_allowed": false,
     "deterministic_order_required": true
   },
+  "memory_context_projection_contract": {
+    "source_package": "generic_memory_store",
+    "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+    "target": "state_snapshots",
+    "target_capability": "generic.ai.agent_state.memory_context_projection",
+    "required_source_fields": [
+      "retrieval_results.memory_id",
+      "retrieval_results.rank",
+      "retrieval_results.context_ref",
+      "context_window.included_memory_ids",
+      "provenance.fixture_key"
+    ],
+    "required_target_fields": [
+      "agent_run_id",
+      "session_id",
+      "state_version",
+      "checkpoint_key",
+      "memory_id",
+      "context_ref",
+      "input_ref_id"
+    ],
+    "raw_memory_text_allowed": false,
+    "secret_values_allowed": false,
+    "deterministic_order_required": true
+  },
   "redaction_contract": {
     "enabled": true,
     "secret_values_present": false,
@@ -130,6 +156,7 @@
     "input_refs and output_refs carry stable ids, digests, media types, and redacted summaries instead of raw payloads",
     "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
     "state trace replay projection emits deterministic checkpoint/resume events without raw payloads or secrets",
+    "memory context projection links ranked memory refs to resumable state snapshots without copying raw memory text",
     "cache_key and checkpoint_key are deterministic sha256 values and exclude raw input, raw output, and secret-bearing fields",
     "redaction metadata proves secret_values_present=false and uses placeholders for credential-shaped fields",
     "missing durable state adapters produce clean-skip envelopes instead of importing dependencies"
