@@ -111,6 +111,7 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		"generic.ai.evaluation.harness.findings",
 		"generic.ai.evaluation.harness.golden_gates",
 		"generic.ai.evaluation.harness.case_result_summary",
+		"generic.ai.evaluation.harness.agent_run_projection",
 		"ai.eval.run.provider_free",
 		"ai.eval.run.fixture_replay",
 		"ai.eval.run.golden_gate",
@@ -125,7 +126,7 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		}
 		assertGenericEvaluationJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
-	for _, key := range []string{"dataset_manifest", "case_inputs", "metric_specs", "judge_replay_records", "findings", "golden_gates", "case_result_summary"} {
+	for _, key := range []string{"dataset_manifest", "case_inputs", "metric_specs", "judge_replay_records", "findings", "golden_gates", "case_result_summary", "agent_run_evaluation_projection"} {
 		if manifest.Schemas[key] == "" || manifest.Fixtures[key] == "" {
 			t.Fatalf("missing schema/fixture for %q: schemas=%#v fixtures=%#v", key, manifest.Schemas, manifest.Fixtures)
 		}
@@ -148,7 +149,7 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		}
 		boundaryIDs[boundary.ID] = true
 	}
-	for _, want := range []string{"dataset_manifest", "case_inputs", "metric_specs", "judge_replay_records", "findings", "golden_gates", "case_result_summary"} {
+	for _, want := range []string{"dataset_manifest", "case_inputs", "metric_specs", "judge_replay_records", "findings", "golden_gates", "case_result_summary", "agent_run_evaluation_projection"} {
 		if !boundaryIDs[want] {
 			t.Fatalf("artifact boundaries missing %q: %#v", want, manifest.ArtifactBoundaries)
 		}
@@ -162,7 +163,7 @@ func TestFinRobotGenericEvaluationHarnessManifest(t *testing.T) {
 		t.Fatalf("no-built-in guarantee missing package name: %#v", manifest.NoBuiltIn)
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"generic.ai.evaluation.harness", "ai.eval.run", "dataset manifest", "case inputs", "metric specs", "judge replay records", "findings", "golden gates", "case result summary", "provider-free"} {
+	for _, want := range []string{"generic.ai.evaluation.harness", "ai.eval.run", "dataset manifest", "case inputs", "metric specs", "judge replay records", "findings", "golden gates", "case result summary", "agent-run projection", "provider-free"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -529,7 +530,7 @@ func TestFinRobotGenericEvaluationHarnessFixtureIndexAndNoRuntimeImports(t *test
 		} `json:"fixtures"`
 	}
 	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || index.RequiresCredentials || len(index.Fixtures) != 7 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || index.RequiresCredentials || len(index.Fixtures) != 8 {
 		t.Fatalf("fixture index header = %#v", index)
 	}
 	indexCapabilities := map[string]bool{}
@@ -557,6 +558,7 @@ func TestFinRobotGenericEvaluationHarnessFixtureIndexAndNoRuntimeImports(t *test
 		"generic.ai.evaluation.harness.findings",
 		"generic.ai.evaluation.harness.golden_gates",
 		"generic.ai.evaluation.harness.case_result_summary",
+		"generic.ai.evaluation.harness.agent_run_projection",
 	} {
 		if !indexCapabilities[want] {
 			t.Fatalf("fixture index missing capability %q: %#v", want, index.Fixtures)
@@ -600,6 +602,263 @@ func TestFinRobotGenericEvaluationHarnessFixtureIndexAndNoRuntimeImports(t *test
 	}
 }
 
+func TestFinRobotGenericEvaluationHarnessAgentRunProjection(t *testing.T) {
+	root := repoRoot(t)
+	base := genericEvaluationHarnessLivePackageDir(t)
+
+	var projection struct {
+		SchemaVersion        int    `json:"schema_version"`
+		FixtureKey           string `json:"fixture_key"`
+		ProjectionKind       string `json:"projection_kind"`
+		ProviderFree         bool   `json:"provider_free"`
+		LiveNetwork          bool   `json:"live_network"`
+		RealDependencyImport bool   `json:"real_dependency_imports"`
+		SourceFixtureRefs    struct {
+			AgentToolContractProjection  string `json:"agent_tool_contract_projection"`
+			AgentLoopTrace               string `json:"agent_loop_trace"`
+			RecordReplayOrderedRecords   string `json:"record_replay_ordered_records"`
+			RecordReplayMatchingRequests string `json:"record_replay_matching_requests"`
+			TraceEnvelope                string `json:"trace_envelope"`
+			CaseResultSummary            string `json:"case_result_summary"`
+			GoldenGates                  string `json:"golden_gates"`
+		} `json:"source_fixture_refs"`
+		RunIdentityMappings []struct {
+			SourcePackage   string `json:"source_package"`
+			SourceIdentity  string `json:"source_identity"`
+			TargetDatasetID string `json:"target_dataset_id"`
+			TargetCaseID    string `json:"target_case_id"`
+			IdentityPolicy  string `json:"identity_policy"`
+			ProviderFree    bool   `json:"provider_free"`
+		} `json:"run_identity_mappings"`
+		ReplayRecordMappings []struct {
+			RecordID           string   `json:"record_id"`
+			ReplayKey          string   `json:"replay_key"`
+			Operation          string   `json:"operation"`
+			Capability         string   `json:"capability"`
+			RequestHashRef     string   `json:"request_hash_ref"`
+			TargetCaseID       string   `json:"target_case_id"`
+			ProjectedMetricIDs []string `json:"projected_metric_ids"`
+			ProviderFree       bool     `json:"provider_free"`
+		} `json:"replay_record_mappings"`
+		TraceEventMappings []struct {
+			SourceTraceID       string `json:"source_trace_id"`
+			SourceEventType     string `json:"source_event_type"`
+			TargetCaseID        string `json:"target_case_id"`
+			TargetJudgeTraceRef string `json:"target_judge_trace_ref"`
+			ProjectionPolicy    string `json:"projection_policy"`
+			ProviderFree        bool   `json:"provider_free"`
+		} `json:"trace_event_mappings"`
+		CaseResultMappings []struct {
+			TargetCaseID            string `json:"target_case_id"`
+			SourceToolHistoryStatus string `json:"source_tool_history_status"`
+			SourceReplayKey         string `json:"source_replay_key"`
+			TargetStatus            string `json:"target_status"`
+			TargetJudgeTraceRef     string `json:"target_judge_trace_ref"`
+			AssertionsProjected     int    `json:"assertions_projected"`
+			FindingCount            int    `json:"finding_count"`
+		} `json:"case_result_mappings"`
+		GoldenGateProjection struct {
+			SourceSummaryStatus string  `json:"source_summary_status"`
+			TargetGate          bool    `json:"target_gate"`
+			TargetPassRate      float64 `json:"target_pass_rate"`
+			CasesFailed         int     `json:"cases_failed"`
+			Findings            int     `json:"findings"`
+			JudgeReplayErrors   int     `json:"judge_replay_errors"`
+			ProviderFree        bool    `json:"provider_free"`
+		} `json:"golden_gate_projection"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "agent_run_evaluation_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.FixtureKey != "generic_eval:agent_run_projection:offline:v1" ||
+		projection.ProjectionKind != "agent_run_to_evaluation_harness_projection" ||
+		!projection.ProviderFree || projection.LiveNetwork || projection.RealDependencyImport ||
+		projection.SourceFixtureRefs.AgentToolContractProjection == "" ||
+		projection.SourceFixtureRefs.RecordReplayOrderedRecords == "" ||
+		projection.SourceFixtureRefs.TraceEnvelope == "" ||
+		projection.SourceFixtureRefs.CaseResultSummary == "" ||
+		projection.SourceFixtureRefs.GoldenGates == "" {
+		t.Fatalf("agent run projection header/source refs incomplete: %#v", projection)
+	}
+
+	var agentProjection struct {
+		FixtureKey          string `json:"fixture_key"`
+		ProviderFree        bool   `json:"provider_free"`
+		ToolHistoryMappings []struct {
+			AgentStatus string `json:"agent_status"`
+			ResultRef   string `json:"result_ref"`
+		} `json:"tool_history_mappings"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_agent_runner", "fixtures", "tool_contract_agent_projection_fixture.json"), &agentProjection)
+	var agentLoopTrace struct {
+		ID           string `json:"id"`
+		ProviderFree bool   `json:"provider_free"`
+		Events       []struct {
+			Type string `json:"type"`
+		} `json:"events"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_agent_runner", "fixtures", "loop_trace_fixture.json"), &agentLoopTrace)
+	var records struct {
+		FixtureID    string `json:"fixture_id"`
+		ProviderFree bool   `json:"provider_free"`
+		Records      []struct {
+			RecordID    string `json:"record_id"`
+			ReplayKey   string `json:"replay_key"`
+			Operation   string `json:"operation"`
+			Capability  string `json:"capability"`
+			RequestHash string `json:"request_hash"`
+		} `json:"records"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_record_replay", "fixtures", "ordered_records_fixture.json"), &records)
+	var matching struct {
+		Requests []struct {
+			ReplayKey   string `json:"replay_key"`
+			Operation   string `json:"operation"`
+			Capability  string `json:"capability"`
+			RequestHash string `json:"request_hash"`
+		} `json:"requests"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_record_replay", "fixtures", "matching_requests_fixture.json"), &matching)
+	var trace struct {
+		ProviderFree bool `json:"provider_free"`
+		Events       []struct {
+			TraceID   string `json:"trace_id"`
+			EventType string `json:"event_type"`
+		} `json:"events"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_trace_events", "fixtures", "trace_envelope_fixture.json"), &trace)
+	var summary struct {
+		ProviderFree bool   `json:"provider_free"`
+		Status       string `json:"status"`
+		Summary      struct {
+			CasesFailed       int     `json:"cases_failed"`
+			PassRate          float64 `json:"pass_rate"`
+			JudgeReplayErrors int     `json:"judge_replay_errors"`
+		} `json:"summary"`
+		Cases []struct {
+			CaseID        string `json:"case_id"`
+			Status        string `json:"status"`
+			JudgeTraceRef string `json:"judge_trace_ref"`
+			Assertions    int    `json:"assertions"`
+		} `json:"cases"`
+		Findings []any `json:"findings"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "case_result_summary_fixture.json"), &summary)
+	var golden struct {
+		ProviderFree         bool    `json:"provider_free"`
+		Gate                 bool    `json:"gate"`
+		SummaryPassRateMin   float64 `json:"summary_pass_rate_min"`
+		CasesFailedMax       int     `json:"cases_failed_max"`
+		FindingsMax          int     `json:"findings_max"`
+		JudgeReplayErrorsMax int     `json:"judge_replay_errors_max"`
+	}
+	decodeGenericEvaluationJSONFile(t, filepath.Join(base, "fixtures", "golden_gates_fixture.json"), &golden)
+
+	caseIDs := map[string]struct {
+		status     string
+		trace      string
+		assertions int
+	}{}
+	for _, item := range summary.Cases {
+		caseIDs[item.CaseID] = struct {
+			status     string
+			trace      string
+			assertions int
+		}{status: item.Status, trace: item.JudgeTraceRef, assertions: item.Assertions}
+	}
+	agentStatuses := map[string]bool{}
+	for _, item := range agentProjection.ToolHistoryMappings {
+		agentStatuses[item.AgentStatus+":"+item.ResultRef] = true
+	}
+	recordByID := map[string]struct {
+		replayKey   string
+		operation   string
+		capability  string
+		requestHash string
+	}{}
+	for _, record := range records.Records {
+		recordByID[record.RecordID] = struct {
+			replayKey   string
+			operation   string
+			capability  string
+			requestHash string
+		}{replayKey: record.ReplayKey, operation: record.Operation, capability: record.Capability, requestHash: record.RequestHash}
+	}
+	matchingKeys := map[string]bool{}
+	for _, request := range matching.Requests {
+		matchingKeys[request.ReplayKey+"|"+request.RequestHash] = true
+	}
+	traceEvents := map[string]bool{}
+	for _, event := range trace.Events {
+		traceEvents[event.TraceID+"|"+event.EventType] = true
+	}
+
+	for _, mapping := range projection.RunIdentityMappings {
+		if _, ok := caseIDs[mapping.TargetCaseID]; !ok ||
+			mapping.TargetDatasetID != "generic-ai-eval-smoke-dataset" ||
+			!strings.Contains(mapping.IdentityPolicy, "no_id_equality") ||
+			!mapping.ProviderFree {
+			t.Fatalf("run identity mapping does not resolve to eval case: %#v", mapping)
+		}
+		if mapping.SourcePackage == "generic_agent_runner" && mapping.SourceIdentity != agentLoopTrace.ID {
+			t.Fatalf("agent run identity does not resolve to loop trace id: %#v", mapping)
+		}
+		if mapping.SourcePackage == "generic_record_replay" && mapping.SourceIdentity != records.FixtureID {
+			t.Fatalf("record replay identity does not resolve to fixture id: %#v", mapping)
+		}
+	}
+	for _, mapping := range projection.ReplayRecordMappings {
+		record, ok := recordByID[mapping.RecordID]
+		if !ok ||
+			mapping.ReplayKey != record.replayKey ||
+			mapping.Operation != record.operation ||
+			mapping.Capability != record.capability ||
+			mapping.RequestHashRef != record.requestHash ||
+			!matchingKeys[mapping.ReplayKey+"|"+mapping.RequestHashRef] ||
+			!mapping.ProviderFree ||
+			len(mapping.ProjectedMetricIDs) == 0 {
+			t.Fatalf("replay record mapping does not resolve to ordered/matching replay data: %#v", mapping)
+		}
+		if _, ok := caseIDs[mapping.TargetCaseID]; !ok {
+			t.Fatalf("replay record target case missing: %#v", mapping)
+		}
+	}
+	for _, mapping := range projection.TraceEventMappings {
+		if !traceEvents[mapping.SourceTraceID+"|"+mapping.SourceEventType] ||
+			caseIDs[mapping.TargetCaseID].trace != mapping.TargetJudgeTraceRef ||
+			mapping.ProjectionPolicy != "trace_event_ref_only" ||
+			!mapping.ProviderFree {
+			t.Fatalf("trace event mapping invalid or redefines trace payload: %#v", mapping)
+		}
+	}
+	for _, mapping := range projection.CaseResultMappings {
+		item, ok := caseIDs[mapping.TargetCaseID]
+		if !ok ||
+			item.status != mapping.TargetStatus ||
+			item.trace != mapping.TargetJudgeTraceRef ||
+			item.assertions != mapping.AssertionsProjected ||
+			mapping.FindingCount != 0 ||
+			!agentStatuses[mapping.SourceToolHistoryStatus+":"+mapping.SourceReplayKey] {
+			t.Fatalf("case result mapping does not resolve to source agent history and eval summary: %#v", mapping)
+		}
+	}
+	if projection.GoldenGateProjection.SourceSummaryStatus != summary.Status ||
+		projection.GoldenGateProjection.TargetGate != golden.Gate ||
+		projection.GoldenGateProjection.TargetPassRate != summary.Summary.PassRate ||
+		projection.GoldenGateProjection.CasesFailed != summary.Summary.CasesFailed ||
+		projection.GoldenGateProjection.Findings != len(summary.Findings) ||
+		projection.GoldenGateProjection.JudgeReplayErrors != summary.Summary.JudgeReplayErrors ||
+		!projection.GoldenGateProjection.ProviderFree ||
+		!golden.ProviderFree {
+		t.Fatalf("golden gate projection does not resolve to eval summary/gates: %#v", projection.GoldenGateProjection)
+	}
+	for _, want := range []string{"agent_run_projects_to_eval_cases", "record_replay_keys_are_kept_distinct_from_trace_ids", "trace_events_are_referenced_not_redefined", "tool_history_status_projects_to_case_status", "denied_tool_history_can_project_to_passed_policy_case", "golden_gate_uses_eval_summary_not_source_trace_status", "provider_free_boundary_preserved", "live_network_absent", "real_dependency_imports_absent"} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("agent run projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
+}
+
 func TestFinRobotGenericEvaluationHarnessExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericEvaluationHarnessLivePackageDir(t), "main.leia")
 	for _, tc := range []struct {
@@ -628,7 +887,7 @@ func TestFinRobotGenericEvaluationHarnessExecutableSkeleton(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get generic_evaluation_harness_live_package_summary: %v", err)
 			}
-			want := "generic_evaluation_harness_live_package surfaces=2 datasets=1 cases=2 metrics=5 replay_records=2 finding_kinds=6 golden_gates=4 summaries=2 provider_free=true live_network=false imports=false"
+			want := "generic_evaluation_harness_live_package surfaces=2 datasets=1 cases=2 metrics=5 replay_records=2 finding_kinds=6 golden_gates=4 summaries=2 agent_run_projections=1 provider_free=true live_network=false imports=false"
 			if got != want {
 				t.Fatalf("generic_evaluation_harness_live_package_summary = %#v, want %#v", got, want)
 			}
@@ -646,7 +905,7 @@ func TestFinRobotGenericEvaluationHarnessDeterministicOrdering(t *testing.T) {
 		schemaKeys = append(schemaKeys, key)
 	}
 	sort.Strings(schemaKeys)
-	wantSchemas := []string{"case_inputs", "case_result_summary", "dataset_manifest", "findings", "golden_gates", "judge_replay_records", "metric_specs"}
+	wantSchemas := []string{"agent_run_evaluation_projection", "case_inputs", "case_result_summary", "dataset_manifest", "findings", "golden_gates", "judge_replay_records", "metric_specs"}
 	if !reflect.DeepEqual(schemaKeys, wantSchemas) {
 		t.Fatalf("schema keys = %#v, want %#v", schemaKeys, wantSchemas)
 	}
@@ -655,7 +914,7 @@ func TestFinRobotGenericEvaluationHarnessDeterministicOrdering(t *testing.T) {
 		fixtureKeys = append(fixtureKeys, key)
 	}
 	sort.Strings(fixtureKeys)
-	wantFixtures := []string{"case_inputs", "case_result_summary", "dataset_manifest", "findings", "golden_gates", "index", "judge_replay_records", "metric_specs"}
+	wantFixtures := []string{"agent_run_evaluation_projection", "case_inputs", "case_result_summary", "dataset_manifest", "findings", "golden_gates", "index", "judge_replay_records", "metric_specs"}
 	if !reflect.DeepEqual(fixtureKeys, wantFixtures) {
 		t.Fatalf("fixture keys = %#v, want %#v", fixtureKeys, wantFixtures)
 	}

@@ -3,7 +3,7 @@
   "id": "generic-ai-evaluation-harness-live-package",
   "package_name": "leia-generic-ai-evaluation-harness",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for generic.ai.evaluation.harness and ai.eval.run with manifest-driven datasets, case inputs, metrics, judge replay records, findings, golden gates, and case result summaries.",
+  "description": "Provider-free live package skeleton for generic.ai.evaluation.harness and ai.eval.run with manifest-driven datasets, case inputs, metrics, judge replay records, findings, golden gates, case result summaries, and agent-run projection fixtures.",
   "provider_free": true,
   "live_network_default": false,
   "real_dependency_import_default": false,
@@ -27,7 +27,8 @@
   "entrypoints": {
     "smoke": "main.leia",
     "evaluation_harness_contract": "contracts/evaluation_harness_contract.json",
-    "fixture_index": "fixtures/provider_free_fixture_index.json"
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "agent_run_evaluation_projection": "fixtures/agent_run_evaluation_projection_fixture.json"
   },
   "schemas": {
     "dataset_manifest": "schemas/dataset_manifest_v1.schema.json",
@@ -36,7 +37,8 @@
     "judge_replay_records": "schemas/judge_replay_records_v1.schema.json",
     "findings": "schemas/findings_v1.schema.json",
     "golden_gates": "schemas/golden_gates_v1.schema.json",
-    "case_result_summary": "schemas/case_result_summary_v1.schema.json"
+    "case_result_summary": "schemas/case_result_summary_v1.schema.json",
+    "agent_run_evaluation_projection": "schemas/agent_run_evaluation_projection_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
@@ -46,7 +48,8 @@
     "judge_replay_records": "fixtures/judge_replay_records_fixture.json",
     "findings": "fixtures/findings_fixture.json",
     "golden_gates": "fixtures/golden_gates_fixture.json",
-    "case_result_summary": "fixtures/case_result_summary_fixture.json"
+    "case_result_summary": "fixtures/case_result_summary_fixture.json",
+    "agent_run_evaluation_projection": "fixtures/agent_run_evaluation_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.evaluation.harness.dataset_manifest",
@@ -56,6 +59,7 @@
     "generic.ai.evaluation.harness.findings",
     "generic.ai.evaluation.harness.golden_gates",
     "generic.ai.evaluation.harness.case_result_summary",
+    "generic.ai.evaluation.harness.agent_run_projection",
     "ai.eval.run.provider_free",
     "ai.eval.run.fixture_replay",
     "ai.eval.run.golden_gate"
@@ -127,6 +131,14 @@
       "fixture": "case_result_summary",
       "provider_free": true,
       "live_network": false
+    },
+    {
+      "id": "agent_run_evaluation_projection",
+      "capability": "generic.ai.evaluation.harness.agent_run_projection",
+      "schema": "agent_run_evaluation_projection",
+      "fixture": "agent_run_evaluation_projection",
+      "provider_free": true,
+      "live_network": false
     }
   ],
   "golden_gate": {
@@ -143,7 +155,8 @@
     "fixture index is manifest-driven and does not require live network, credentials, provider SDKs, or real dependency imports",
     "judge replay records use deterministic mock model ids and forbid live provider calls",
     "golden gate requires pass_rate=1, cases_failed=0, findings=0, and judge replay errors=0",
-    "case result summary records per-case metrics, judge trace refs, assertion counts, and aggregate report totals"
+    "case result summary records per-case metrics, judge trace refs, assertion counts, and aggregate report totals",
+    "agent-run projection maps provider-free agent, replay, and trace references into evaluation case results without redefining replay or trace schemas"
   ],
   "no_built_in_guarantee": {
     "required": true,

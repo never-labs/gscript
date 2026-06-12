@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 99,
-  "translation_directory_file_count": 826,
+  "translation_directory_file_count": 856,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -1084,13 +1084,16 @@
         "generic.ai.evaluation.harness.dataset_manifest",
         "generic.ai.evaluation.harness.case_inputs",
         "generic.ai.evaluation.harness.metric_specs",
-        "generic.ai.evaluation.harness.judge_replay",
+        "generic.ai.evaluation.harness.judge_replay_records",
         "generic.ai.evaluation.harness.findings",
-        "generic.ai.evaluation.harness.golden_gates"
+        "generic.ai.evaluation.harness.golden_gates",
+        "generic.ai.evaluation.harness.case_result_summary",
+        "generic.ai.evaluation.harness.agent_run_projection"
       ],
       "test_gates": [
         "provider-free fixture contract parses",
         "contract JSON declares generic AI backend boundary",
+        "agent-run projection maps provider-free agent, replay, and trace references into evaluation case results",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
       ],

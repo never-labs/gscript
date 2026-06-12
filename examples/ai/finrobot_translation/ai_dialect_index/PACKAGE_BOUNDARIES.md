@@ -64,7 +64,7 @@ contracts, and fixtures for its boundary.
 - planning: `examples/ai/finrobot_translation/live_packages/generic_planning_graph`
 - workflow: `examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator`
 - product-app: `examples/ai/finrobot_translation/live_packages/generic_product_app_boundary`
-- eval: `examples/ai/finrobot_translation/live_packages/generic_evaluation_harness`
+- eval: `examples/ai/finrobot_translation/live_packages/generic_evaluation_harness` (includes agent-run-to-evaluation projection)
 - replay: `examples/ai/finrobot_translation/live_packages/generic_record_replay`
 - trace: `examples/ai/finrobot_translation/live_packages/generic_trace_events`
 - approval: `examples/ai/finrobot_translation/live_packages/generic_approval_policy`
@@ -190,7 +190,7 @@ language or specializing the dialect for one application domain.
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |
 | Coding workspace | `generic_coding_workspace`, `generic_approval_policy`, `generic_tool_contracts`, `generic_record_replay` | Command envelopes, stdout/stderr captures, generated artifacts, notebook display metadata, cleanup intent, and sandbox clean skips are package-owned fixtures behind explicit approval gates. |
 | Trace | `generic_trace_events`, `generic_workflow_orchestrator`, `generic_agent_runner` | Runtime actions emit metadata-only event envelopes with correlation IDs, redaction policy, replay markers, and artifact references. |
-| Evaluation | `generic_evaluation_harness` | Evaluation cases consume replay records, metric specs, judge fixtures, and golden gates; they do not call live judges by default. |
+| Evaluation | `generic_evaluation_harness`, `generic_agent_runner`, `generic_record_replay`, `generic_trace_events` | Evaluation cases consume replay records, metric specs, judge fixtures, trace refs, agent-run projections, and golden gates; they do not call live judges by default. |
 | Record/replay | `generic_record_replay` | Record files define ordered matching, mismatch findings, unconsumed-record checks, usage snapshots, and portable fixtures shared by turns, tools, approvals, trace, and evaluation. |
 | Package audit | `generic_package_boundary_auditor` | Audits prove manifests, fixtures, examples, provider-free flags, and documented package directories are present before the dialect is treated as stable. |
 

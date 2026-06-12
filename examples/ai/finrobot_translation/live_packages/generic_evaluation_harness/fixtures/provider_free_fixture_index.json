@@ -145,6 +145,29 @@
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "generic_eval:agent_run_projection:offline:v1",
+      "capability": "generic.ai.evaluation.harness.agent_run_projection",
+      "path": "fixtures/agent_run_evaluation_projection_fixture.json",
+      "schemas": [
+        "schemas/agent_run_evaluation_projection_v1.schema.json"
+      ],
+      "metadata": {
+        "replay_ready": true,
+        "run_identity_mappings": 2,
+        "replay_record_mappings": 2,
+        "trace_event_mappings": 2,
+        "case_result_mappings": 2,
+        "network_required": false,
+        "live_provider_calls": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

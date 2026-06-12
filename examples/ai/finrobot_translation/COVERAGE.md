@@ -7,7 +7,7 @@ Baseline:
 - Leia branch: `codex/ai-dialect-polish` branch head.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 854 files, including 53
+- Current translation directory file count: 856 files, including 53
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 99 runnable/checkable examples discovered by
@@ -61,16 +61,16 @@ The following read-only inventory commands were run from this worktree on
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `854` files |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `856` files |
 | `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `99` examples: `88` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
 | `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `53` live-package skeleton directories |
-| `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `50` provider-free fixture indexes |
+| `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `52` provider-free fixture indexes |
 | `go run ./cmd/leia examples list --json` filtered to `/live_packages/generic_` | `31` registered generic AI live-package examples |
 | Same example inventory filtered to top-level `generic_*.leia` examples | `3` registered generic AI composition examples |
 | Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
 | `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 
-This refresh updated the file-inventory count to 854 `rg --files` inventory files. The registered
+This refresh updated the file-inventory count to 856 `rg --files` inventory files. The registered
 example, runner, live-package, generic live-package, and tutorial runnable
 counts now include the generic strategy backtest contracts package.
 
@@ -117,7 +117,7 @@ counts now include the generic strategy backtest contracts package.
 | `repo-ai-finrobot_translation-live_packages-generic_event_intelligence_boundary-main` | `live_packages/generic_event_intelligence_boundary/main.leia` | `host-vm` | Checked-in generic event intelligence boundary skeleton for source snapshots, event extraction, taxonomies, freshness, dedupe/source confidence, relevance, sentiment, impact, prompt contracts, and adapter clean skips |
 | `repo-ai-finrobot_translation-live_packages-generic_evidence_report_artifacts-main` | `live_packages/generic_evidence_report_artifacts/main.leia` | `host-vm` | Checked-in generic evidence/report/artifact skeleton for source annotations, citation envelopes, report outlines, render manifests, snapshot metadata, stale warnings, accessibility checks, and renderer clean skips |
 | `repo-ai-finrobot_translation-live_packages-generic_evidence_verification-main` | `live_packages/generic_evidence_verification/main.leia` | `host-vm` | Checked-in generic evidence verification skeleton for document RAG evidence projection, claim records, source refs, citation normalization, freshness warnings, unresolved refs, quality summaries, and clean degradation |
-| `repo-ai-finrobot_translation-live_packages-generic_evaluation_harness-main` | `live_packages/generic_evaluation_harness/main.leia` | `host-vm` | Checked-in generic AI evaluation harness skeleton for datasets, cases, metrics, replayed judges, findings, and golden gates |
+| `repo-ai-finrobot_translation-live_packages-generic_evaluation_harness-main` | `live_packages/generic_evaluation_harness/main.leia` | `host-vm` | Checked-in generic AI evaluation harness skeleton for datasets, cases, metrics, replayed judges, findings, golden gates, case summaries, and agent-run projection |
 | `repo-ai-finrobot_translation-live_packages-generic_strategy_backtest_contracts-main` | `live_packages/generic_strategy_backtest_contracts/main.leia` | `host-vm` | Checked-in generic strategy simulation contracts skeleton for strategy manifests, observation feeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, deterministic seeds, and engine clean skips |
 | `repo-ai-finrobot_translation-live_packages-generic_memory_store-main` | `live_packages/generic_memory_store/main.leia` | `host-vm` | Checked-in generic AI memory store skeleton for namespace policy, memory item provenance, deterministic retrieval ranking, context windows, and clean-skip adapter boundaries |
 | `repo-ai-finrobot_translation-live_packages-generic_model_io_envelope-main` | `live_packages/generic_model_io_envelope/main.leia` | `host-vm` | Checked-in generic AI model IO envelope skeleton for request, stream chunk, response, usage, replay correlation, and redaction contracts |
@@ -269,7 +269,7 @@ mistaken for missing language/runtime support.
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
 | Registered example inventory | 99 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 854 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| File inventory | 856 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 88 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 5 `evaluate` examples for equity CLI workflow, web product smoke metadata, generic workflow orchestration, and generic agent-loop composition | Complete |
