@@ -65,6 +65,7 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		"generic.ai.artifact.accessibility_checklist",
 		"generic.ai.render.request",
 		"generic.ai.render.output_manifest",
+		"generic.ai.evidence.report.render_projection",
 		"generic.ai.render.clean_skip",
 	} {
 		if !genericLivePackageContains(manifest.Capabilities, want) {
@@ -94,7 +95,7 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		contract.LiveModelCalls || contract.RealDependencyImports || contract.RequiresCredentials || contract.ProviderSDKsRequired {
 		t.Fatalf("contract boundary mismatch: %#v", contract)
 	}
-	for _, want := range []string{"source_annotations", "citation_envelopes", "section_dependency_dag", "artifact_manifest", "render_manifest", "snapshot_metadata", "stale_data_policy", "accessibility_checklist"} {
+	for _, want := range []string{"source_annotations", "citation_envelopes", "section_dependency_dag", "artifact_manifest", "render_manifest", "verification_render_projection", "snapshot_metadata", "stale_data_policy", "accessibility_checklist"} {
 		if contract.FieldContracts[want] == "" {
 			t.Fatalf("contract field_contracts missing %q: %#v", want, contract.FieldContracts)
 		}
@@ -113,7 +114,7 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		} `json:"fixtures"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 1 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
 		t.Fatalf("fixture index header/count mismatch: %#v", index)
 	}
 	fixture := index.Fixtures[0]
@@ -123,6 +124,16 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		fixture.Schema != manifest.Schemas["evidence_report_artifacts"] ||
 		fixture.Metadata["replay_ready"] != true {
 		t.Fatalf("fixture index entry mismatch: %#v", fixture)
+	}
+	projection := index.Fixtures[1]
+	if projection.FixtureKey != "generic:evidence_report_artifacts:verification_render_projection" ||
+		projection.Capability != "generic.ai.evidence.report.render_projection" ||
+		projection.Path != manifest.Fixtures["verification_render_projection"] ||
+		projection.Schema != manifest.Schemas["verification_render_projection"] ||
+		projection.Metadata["replay_ready"] != true ||
+		projection.Metadata["source_mappings"] != float64(4) ||
+		projection.Metadata["render_request_mappings"] != float64(2) {
+		t.Fatalf("projection fixture index entry mismatch: %#v", projection)
 	}
 }
 
@@ -226,6 +237,154 @@ func TestGenericEvidenceReportArtifactsLivePackageSchemaRequiredFields(t *testin
 	assertDocumentPipelineNestedSchemaRequired(t, schema, []string{"properties", "source_annotations", "items"}, []string{"id", "title", "kind", "locator", "as_of", "stale_after", "stale", "license", "retrieved_at", "evidence_hash"})
 	assertDocumentPipelineNestedSchemaRequired(t, schema, []string{"properties", "citation_envelopes", "items"}, []string{"id", "claim_id", "source_refs", "citation_refs", "evidence_quality", "provider_free", "unresolved_refs"})
 	assertDocumentPipelineNestedSchemaRequired(t, schema, []string{"properties", "snapshot_metadata", "items"}, []string{"snapshot_id", "format", "viewport", "dimensions", "status", "content_hash", "hash_algorithm", "source_refs", "warning_refs", "disclosure_refs"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "verification_render_projection_v1.schema.json"), []string{"schema_version", "id", "projection_kind", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model_calls", "real_dependency_imports", "source_fixture_refs", "canonical_report_id", "identity_policy", "source_mappings", "citation_mappings", "warning_mappings", "artifact_mappings", "render_request_mappings", "projection_assertions"})
+}
+
+func TestGenericEvidenceReportArtifactsVerificationRenderProjection(t *testing.T) {
+	base := genericEvidenceReportArtifactsPackageDir(t)
+	report := loadGenericEvidenceReportArtifactsFixture(t, filepath.Join(base, "fixtures", "generic_evidence_report_artifacts_fixture.json"))
+	var projection struct {
+		SchemaVersion         int    `json:"schema_version"`
+		ID                    string `json:"id"`
+		ProjectionKind        string `json:"projection_kind"`
+		PackageBoundaryID     string `json:"package_boundary_id"`
+		ProviderFree          bool   `json:"provider_free"`
+		DomainSpecific        bool   `json:"domain_specific"`
+		LiveNetwork           bool   `json:"live_network"`
+		LiveModelCalls        bool   `json:"live_model_calls"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		SourceFixtureRefs     struct {
+			EvidenceVerification   string `json:"evidence_verification"`
+			EvidenceReportArtifact string `json:"evidence_report_artifacts"`
+			ReportRenderContracts  string `json:"report_render_contracts"`
+		} `json:"source_fixture_refs"`
+		CanonicalReportID string `json:"canonical_report_id"`
+		IdentityPolicy    struct {
+			SourceIDsAreNotAssumedEqual        bool   `json:"source_ids_are_not_assumed_equal"`
+			CitationIDsAreNotAssumedEqual      bool   `json:"citation_ids_are_not_assumed_equal"`
+			RenderRequestIDsAreNotAssumedEqual bool   `json:"render_request_ids_are_not_assumed_equal"`
+			NormalizationPolicy                string `json:"normalization_policy"`
+		} `json:"identity_policy"`
+		SourceMappings []struct {
+			VerificationSourceID string   `json:"verification_source_id"`
+			ReportSourceID       string   `json:"report_source_id"`
+			SnapshotRefs         []string `json:"snapshot_refs"`
+			EvidenceHashPreserve bool     `json:"evidence_hash_preserved"`
+		} `json:"source_mappings"`
+		CitationMappings []struct {
+			ClaimID                  string   `json:"claim_id"`
+			VerificationStatus       string   `json:"verification_status"`
+			ReportCitationEnvelopeID string   `json:"report_citation_envelope_id"`
+			RenderAnnotationRefs     []string `json:"render_annotation_refs"`
+			ProjectedAction          string   `json:"projected_action"`
+		} `json:"citation_mappings"`
+		WarningMappings []struct {
+			VerificationWarningRef string `json:"verification_warning_ref"`
+			ReportWarningRef       string `json:"report_warning_ref"`
+			RenderWarningRef       string `json:"render_warning_ref"`
+			Severity               string `json:"severity"`
+		} `json:"warning_mappings"`
+		ArtifactMappings []struct {
+			ReportArtifactID  string `json:"report_artifact_id"`
+			RenderArtifactID  string `json:"render_artifact_id"`
+			OutputManifestRef string `json:"output_manifest_ref"`
+			URIPolicy         string `json:"uri_policy"`
+			RemoteFetch       bool   `json:"remote_fetch"`
+		} `json:"artifact_mappings"`
+		RenderRequestMappings []struct {
+			ReportRenderRequestID   string `json:"report_render_request_id"`
+			RenderContractRequestID string `json:"render_contract_request_id"`
+			Format                  string `json:"format"`
+			CleanSkip               bool   `json:"clean_skip"`
+			ProviderFree            bool   `json:"provider_free"`
+		} `json:"render_request_mappings"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "verification_render_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.ID != "generic-evidence-verification-render-projection-fixture" ||
+		projection.ProjectionKind != "evidence_verification_to_report_render_projection" ||
+		projection.PackageBoundaryID != "generic-ai-evidence-report-artifacts" {
+		t.Fatalf("unexpected projection identity: %#v", projection)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork ||
+		projection.LiveModelCalls || projection.RealDependencyImports {
+		t.Fatalf("projection must stay provider-free/offline: %#v", projection)
+	}
+	if projection.SourceFixtureRefs.EvidenceVerification == "" ||
+		projection.SourceFixtureRefs.EvidenceReportArtifact == "" ||
+		projection.SourceFixtureRefs.ReportRenderContracts == "" ||
+		projection.CanonicalReportID != "generic-report" {
+		t.Fatalf("projection source refs incomplete: %#v", projection.SourceFixtureRefs)
+	}
+	if !projection.IdentityPolicy.SourceIDsAreNotAssumedEqual ||
+		!projection.IdentityPolicy.CitationIDsAreNotAssumedEqual ||
+		!projection.IdentityPolicy.RenderRequestIDsAreNotAssumedEqual {
+		t.Fatalf("projection must not assume cross-package ID equality: %#v", projection.IdentityPolicy)
+	}
+	reportSourceIDs := map[string]bool{}
+	for _, source := range report.SourceAnnotations {
+		reportSourceIDs[source.ID] = true
+	}
+	reportSnapshotIDs := map[string]bool{}
+	for _, snapshot := range report.SnapshotMetadata {
+		reportSnapshotIDs[snapshot.SnapshotID] = true
+	}
+	for _, mapping := range projection.SourceMappings {
+		if mapping.VerificationSourceID == "" || !reportSourceIDs[mapping.ReportSourceID] || !mapping.EvidenceHashPreserve {
+			t.Fatalf("source mapping does not resolve: %#v", mapping)
+		}
+		for _, ref := range mapping.SnapshotRefs {
+			if !reportSnapshotIDs[ref] {
+				t.Fatalf("source mapping snapshot ref %q does not resolve: %#v", ref, mapping)
+			}
+		}
+	}
+	reportCitationIDs := map[string]bool{}
+	for _, citation := range report.CitationEnvelopes {
+		reportCitationIDs[citation.ID] = true
+	}
+	for _, mapping := range projection.CitationMappings {
+		if mapping.ClaimID == "" || mapping.VerificationStatus == "" || mapping.ProjectedAction == "" {
+			t.Fatalf("citation mapping incomplete: %#v", mapping)
+		}
+		if mapping.ReportCitationEnvelopeID != "partial:generic-report" && !reportCitationIDs[mapping.ReportCitationEnvelopeID] {
+			t.Fatalf("citation mapping envelope does not resolve: %#v", mapping)
+		}
+	}
+	reportWarningIDs := map[string]bool{}
+	for _, warning := range report.Warnings {
+		reportWarningIDs[warning.ID] = true
+	}
+	for _, mapping := range projection.WarningMappings {
+		if mapping.VerificationWarningRef == "" || !reportWarningIDs[mapping.ReportWarningRef] || mapping.RenderWarningRef == "" {
+			t.Fatalf("warning mapping does not resolve: %#v", mapping)
+		}
+	}
+	reportArtifactIDs := map[string]bool{}
+	for _, artifact := range report.ArtifactManifest.Artifacts {
+		reportArtifactIDs[artifact.ArtifactID] = true
+	}
+	for _, mapping := range projection.ArtifactMappings {
+		if !reportArtifactIDs[mapping.ReportArtifactID] || mapping.RenderArtifactID == "" ||
+			mapping.OutputManifestRef == "" || mapping.URIPolicy != "artifact_uri_only" || mapping.RemoteFetch {
+			t.Fatalf("artifact mapping invalid: %#v", mapping)
+		}
+	}
+	if len(projection.RenderRequestMappings) != 2 {
+		t.Fatalf("render request mappings = %d, want 2", len(projection.RenderRequestMappings))
+	}
+	for _, mapping := range projection.RenderRequestMappings {
+		if mapping.ReportRenderRequestID != report.RenderRequest.RequestID ||
+			mapping.RenderContractRequestID == "" || mapping.Format == "" || !mapping.ProviderFree {
+			t.Fatalf("render request mapping invalid: %#v", mapping)
+		}
+	}
+	for _, want := range []string{"all_verified_claims_project_to_citation_or_warning", "all_report_artifacts_project_to_render_artifacts", "all_render_outputs_use_artifact_uri_only", "warning_refs_preserved_across_packages", "raw_provider_payloads_absent", "live_network_absent", "real_dependency_imports_absent"} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
 }
 
 func TestGenericEvidenceReportArtifactsLivePackageExecutableSkeleton(t *testing.T) {
@@ -310,6 +469,7 @@ type genericEvidenceReportArtifactsFixture struct {
 		Status string `json:"status"`
 	} `json:"render_manifest"`
 	RenderRequest struct {
+		RequestID              string `json:"request_id"`
 		RendererDependencyGate struct {
 			DependencyImported bool `json:"dependency_imported"`
 			CredentialRequired bool `json:"credential_required"`

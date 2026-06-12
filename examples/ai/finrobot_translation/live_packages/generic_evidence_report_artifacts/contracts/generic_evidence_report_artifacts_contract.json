@@ -28,6 +28,7 @@
     "generic.ai.render.request",
     "generic.ai.render.output_manifest",
     "generic.ai.render.warning",
+    "generic.ai.evidence.report.render_projection",
     "generic.ai.render.clean_skip"
   ],
   "modules": {
@@ -50,6 +51,11 @@
       "inputs": ["render_request", "renderer_dependency_gate"],
       "outputs": ["output_manifest", "render_warnings", "clean_skip"],
       "required_fields": ["request_id", "output_formats", "renderer_dependency_gate", "warnings", "status"]
+    },
+    "verification_render_projection": {
+      "inputs": ["evidence_verification_results", "evidence_report_artifacts", "report_render_contracts"],
+      "outputs": ["source_mappings", "citation_mappings", "warning_mappings", "artifact_mappings", "render_request_mappings"],
+      "required_fields": ["projection_id", "source_fixture_refs", "canonical_report_id", "source_mappings", "citation_mappings", "warning_mappings", "artifact_mappings", "render_request_mappings"]
     }
   },
   "field_contracts": {
@@ -58,6 +64,7 @@
     "section_dependency_dag": "report section dependencies are explicit, acyclic fixture data",
     "artifact_manifest": "artifact outputs declare kind, format, URI, status, hash algorithm, and warning refs",
     "render_manifest": "planned render outputs are provider-free and may clean-skip without renderer dependencies",
+    "verification_render_projection": "verification results project into report artifacts and render requests with explicit canonical IDs and no source ID equality assumption",
     "snapshot_metadata": "snapshot records include viewport, dimensions, content hash, source refs, warning refs, and disclosure refs",
     "stale_data_policy": "stale source warnings name source refs and propagate to snapshots",
     "accessibility_checklist": "accessibility assertions are fixture-level checklist rows, not live browser automation"

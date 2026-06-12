@@ -308,6 +308,7 @@
         "generic.ai.render.request",
         "generic.ai.render.output_manifest",
         "generic.ai.render.warning",
+        "generic.ai.evidence.report.render_projection",
         "generic.ai.render.clean_skip"
       ],
       "backend_shape": "ai.evidence.report_artifacts",

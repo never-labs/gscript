@@ -22,14 +22,16 @@
     "fixture_index": "fixtures/provider_free_fixture_index.json"
   },
   "schemas": {
-    "evidence_report_artifacts": "schemas/generic_evidence_report_artifacts_v1.schema.json"
+    "evidence_report_artifacts": "schemas/generic_evidence_report_artifacts_v1.schema.json",
+    "verification_render_projection": "schemas/verification_render_projection_v1.schema.json"
   },
   "contracts": {
     "contract": "contracts/generic_evidence_report_artifacts_contract.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
-    "evidence_report_artifacts": "fixtures/generic_evidence_report_artifacts_fixture.json"
+    "evidence_report_artifacts": "fixtures/generic_evidence_report_artifacts_fixture.json",
+    "verification_render_projection": "fixtures/verification_render_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.evidence.report.artifacts",
@@ -47,6 +49,7 @@
     "generic.ai.render.request",
     "generic.ai.render.output_manifest",
     "generic.ai.render.warning",
+    "generic.ai.evidence.report.render_projection",
     "generic.ai.render.clean_skip"
   ],
   "capability_surfaces": [
@@ -57,6 +60,7 @@
     "style_profile_policy",
     "artifact_manifest",
     "render_manifest",
+    "verification_render_projection",
     "snapshot_metadata",
     "accessibility_checklist",
     "stale_data_policy",
@@ -77,6 +81,7 @@
     "evidence source annotations and citation envelopes resolve without provider calls",
     "report outline and section dependency DAG remain domain-neutral and provider-free",
     "artifact and render manifests declare planned outputs without invoking renderers",
+    "verification-to-render projection preserves explicit source, citation, warning, artifact, and render request mappings",
     "snapshot metadata, stale warnings, and accessibility checks are deterministic fixtures",
     "renderer absence produces clean-skip metadata instead of failure"
   ],
