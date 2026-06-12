@@ -105,6 +105,24 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	b.set("policyOutcomeEvent", policyOutcomeEvent)
 	b.set("policy_outcome_trace_event", policyOutcomeEvent)
 	b.set("policyOutcomeTraceEvent", policyOutcomeEvent)
+
+	budgetOutcomeEvent := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.budget_outcome_event' (budget outcome table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.budget_outcome_event' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmBudgetOutcomeTraceEventValue(args[0].Table(), opts))}, nil
+	}
+	b.set("budget_outcome_event", budgetOutcomeEvent)
+	b.set("budgetOutcomeEvent", budgetOutcomeEvent)
+	b.set("budget_outcome_trace_event", budgetOutcomeEvent)
+	b.set("budgetOutcomeTraceEvent", budgetOutcomeEvent)
 }
 
 func llmTraceEventValue(src *Table) *Table {
@@ -543,6 +561,69 @@ func llmPolicyOutcomeCopyCorrelation(outcome, src *Table) {
 			if !first.IsNil() {
 				src.RawSetString("correlation_id", llmCloneValue(first))
 			}
+		}
+	}
+}
+
+func llmBudgetOutcomeTraceEventValue(outcome, opts *Table) *Table {
+	src := NewTable()
+	for _, key := range opts.PairsKeysSnapshot() {
+		src.RawSet(key, llmCloneValue(opts.RawGet(key)))
+	}
+	status := llmTraceString(outcome, "status", "ok")
+	src.RawSetString("event_type", StringValue(llmTraceString(opts, "event_type", "budget_outcome")))
+	src.RawSetString("status", StringValue(llmTraceString(opts, "status", status)))
+	src.RawSetString("provider_free", BoolValue(llmTraceBool(opts, "provider_free", true)))
+	src.RawSetString("live_network", BoolValue(llmTraceBool(opts, "live_network", false)))
+	src.RawSetString("live_model", BoolValue(llmTraceBool(opts, "live_model", false)))
+	src.RawSetString("credentials_required", BoolValue(llmTraceBool(opts, "credentials_required", false)))
+	src.RawSetString("real_dependency_imports", BoolValue(llmTraceBool(opts, "real_dependency_imports", false)))
+	llmBudgetOutcomeCopyCorrelation(outcome, src)
+
+	payload := NewTable()
+	for _, field := range []string{
+		"kind",
+		"version",
+		"source_kind",
+		"status",
+		"result_status",
+		"dimension",
+		"limit",
+		"used",
+		"message",
+		"ok",
+		"blocked",
+		"operation",
+		"component",
+	} {
+		if value := outcome.RawGetString(field); !value.IsNil() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	src.RawSetString("payload", TableValue(payload))
+	return llmTraceEventValue(src)
+}
+
+func llmBudgetOutcomeCopyCorrelation(outcome, src *Table) {
+	for _, field := range []string{
+		"workflow_run_id",
+		"workflow_step_id",
+		"agent_run_id",
+		"turn_id",
+		"tool_call_id",
+		"correlation_id",
+	} {
+		if src.RawGetString(field).IsNil() {
+			if value := outcome.RawGetString(field); !value.IsNil() {
+				src.RawSetString(field, llmCloneValue(value))
+			}
+		}
+	}
+	if src.RawGetString("correlation_id").IsNil() {
+		if value := outcome.RawGetString("dimension"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		} else if value := outcome.RawGetString("source_kind"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
 		}
 	}
 }

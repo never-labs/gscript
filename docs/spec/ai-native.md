@@ -559,6 +559,16 @@ alias for callers that prefer explicit trace naming. The default event type is
 capabilities, dependency skip metadata, and correlation IDs, but must not clone
 executable tool values or raw error tables into the event payload.
 
+`llm.budget_outcome(err, opts)` projects a budget or deadline error table into
+a portable, non-throwing outcome with `kind: "budget_outcome"`, `version:
+"budget_outcome.v1"`, `source_kind`, `status`, `result_status`, `ok`,
+`blocked`, and safe fields such as `dimension`, `limit`, `used`, and
+`message`. `llm.budget_outcome_event(outcome, opts)` projects that result into
+the generic trace event shape; `llm.budget_outcome_trace_event` is an
+equivalent explicit trace-named alias. These helpers are observational only:
+they do not reserve budget, mutate accounting, call providers, or promise money
+accounting.
+
 Policy checks are runtime gates over declared capabilities. They are not
 credential management, sandboxing, network enforcement, or proof that a tool
 body is harmless. Hosts must still enforce real resource boundaries.

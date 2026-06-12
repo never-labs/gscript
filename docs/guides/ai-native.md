@@ -499,6 +499,17 @@ Budget dimensions are runtime controls such as turns, tool calls, tokens, and
 time. They gate provider and tool work in the AI helper layer; they are not a
 general language statement and do not change normal expression evaluation.
 
+For traceable budget gates, project errors explicitly:
+
+```leia
+outcome := llm.budget_outcome(err, {workflow_run_id: "run-42"})
+event := llm.budget_outcome_event(outcome, {trace_id: "budget-review"})
+```
+
+`llm.budget_outcome_trace_event` is the explicit trace-named alias. These
+helpers only build portable tables; they do not reserve budget, change
+accounting, or call providers.
+
 Use policy checks before exposing high-risk tools:
 
 ```leia
