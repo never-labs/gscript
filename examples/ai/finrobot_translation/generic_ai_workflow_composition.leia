@@ -49,6 +49,8 @@ composition_edges := {
     {from: "memory" to: "turn" handoff: "retrieved context window"},
     {from: "model-io" to: "turn" handoff: "request, stream, response, usage, and redaction envelopes"},
     {from: "turn" to: "agent-state" handoff: "redacted input refs, output refs, trace correlation, and checkpoint material"},
+    {from: "agent-state" to: "trace" handoff: "checkpoint/resume trace replay projection"},
+    {from: "agent-state" to: "replay" handoff: "state version, checkpoint key, cache key, and resume token replay match material"},
     {from: "agent-state" to: "agent" handoff: "resumable state snapshot, resume token, and checkpoint key"},
     {from: "prompt-role" to: "agent" handoff: "role profile, prompt template, and output schema"},
     {from: "tool" to: "turn" handoff: "declarative tool schema"},
@@ -111,7 +113,7 @@ func provider_free_boundaries() {
 
 func connected_native_surfaces() {
     return #workflow_contract.composition == 31 &&
-        #workflow_contract.edges == 30 &&
+        #workflow_contract.edges == 32 &&
         role_present("model") &&
         role_present("model-io") &&
         role_present("agent-state") &&

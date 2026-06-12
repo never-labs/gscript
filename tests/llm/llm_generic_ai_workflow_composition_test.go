@@ -17,7 +17,7 @@ func TestGenericAIWorkflowCompositionExampleExecutes(t *testing.T) {
 	root := repoRoot(t)
 	matrix := loadGenericAIPackageMatrix(t, root)
 	wantBoundaries := len(matrix.Packages)
-	wantEdges := wantBoundaries - 1
+	wantEdges := genericAIWorkflowCompositionExpectedEdges(wantBoundaries)
 
 	vm := leia.New(leia.WithLibs(leia.LibString))
 	path := filepath.Join(root, "examples", "ai", "finrobot_translation", "generic_ai_workflow_composition.leia")
@@ -185,7 +185,7 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 
 	edges := parseGenericAIWorkflowCompositionEdges(t, data)
-	wantEdges := len(boundaries) - 1
+	wantEdges := genericAIWorkflowCompositionExpectedEdges(len(boundaries))
 	if len(edges) != wantEdges {
 		t.Fatalf("composition edges = %d, want %d", len(edges), wantEdges)
 	}
@@ -213,6 +213,8 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 		"model->model-io",
 		"model-io->turn",
 		"turn->agent-state",
+		"agent-state->trace",
+		"agent-state->replay",
 		"agent-state->agent",
 		"memory->turn",
 		"prompt-role->agent",
@@ -234,6 +236,10 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 	assertGenericAIWorkflowCompositionBoundaryOrder(t, boundaries, "approval", "tool", "turn", "agent-state", "agent", "workflow", "eval")
 	assertGenericAIWorkflowCompositionBoundaryOrder(t, boundaries, "replay", "trace", "approval", "package-audit")
+}
+
+func genericAIWorkflowCompositionExpectedEdges(boundaries int) int {
+	return boundaries + 1
 }
 
 func TestGenericAIWorkflowCompositionExampleIsDiscoverableAndCheckable(t *testing.T) {
