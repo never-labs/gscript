@@ -540,6 +540,24 @@ evidence identity, redaction flags, and correlation fields without copying raw
 evidence text or snippets. It is not a citation verifier or source permission
 boundary.
 
+Model calls can be summarized with the same provider-free metadata discipline:
+
+```leia
+envelope := llm.model_io_envelope({
+    model: "fast"
+    request: {messages: {llm.user("Summarize ACME.")}}
+    response: {
+        finish_reason: "stop"
+        usage: {prompt_tokens: 8 completion_tokens: 5}
+    }
+}, {capability: "generic.ai.turn"})
+```
+
+The envelope keeps routing, message/tool counts, usage, schema hints, refs, and
+redaction metadata. It does not call the model or store raw prompts,
+messages, completions, or secrets. `llm.model_call_envelope` and
+`llm.turn_envelope` are aliases for packages that prefer call-oriented names.
+
 Tool dispatch can use the same trace-safe pattern:
 
 ```leia
