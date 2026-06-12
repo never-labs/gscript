@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 00;(+/x max 00 0)")

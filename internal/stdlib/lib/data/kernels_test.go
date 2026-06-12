@@ -4247,7 +4247,12 @@ func TestTypedDyadicBroadcastPromotionAndNullPropagation(t *testing.T) {
 		t.Fatalf("Dyadic nullable values = %v, want %v", got, want)
 	}
 
-	if _, ok, err := typedKernels.Dyadic(OpAdd, NewI64([]int64{1, 2}), NewI64([]int64{1})); err == nil || !ok {
+	// A 1-element side is broadcastable under q vector rules; the typed
+	// kernel declines so the generic route broadcasts.
+	if _, ok, err := typedKernels.Dyadic(OpAdd, NewI64([]int64{1, 2}), NewI64([]int64{1})); err != nil || ok {
+		t.Fatalf("Dyadic broadcastable mismatch err = %v, ok %v; want decline", err, ok)
+	}
+	if _, ok, err := typedKernels.Dyadic(OpAdd, NewI64([]int64{1, 2}), NewI64([]int64{1, 2, 3})); err == nil || !ok {
 		t.Fatalf("Dyadic length mismatch err = %v, ok %v; want handled error", err, ok)
 	}
 }
@@ -4263,7 +4268,10 @@ func TestTypedDyadicSymbolAndTemporalComparisons(t *testing.T) {
 	if got, want := applied.(Array).Values(), []any{true, false, false}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedDyadic values = %v, want %v", got, want)
 	}
-	if _, handled, err := TryTypedDyadic(OpLT, NewI64([]int64{1, 2}), NewI64([]int64{1})); err == nil || !handled {
+	if _, handled, err := TryTypedDyadic(OpLT, NewI64([]int64{1, 2}), NewI64([]int64{1})); err != nil || handled {
+		t.Fatalf("TryTypedDyadic broadcastable mismatch err = %v handled = %v, want decline", err, handled)
+	}
+	if _, handled, err := TryTypedDyadic(OpLT, NewI64([]int64{1, 2}), NewI64([]int64{1, 2, 3})); err == nil || !handled {
 		t.Fatalf("TryTypedDyadic mismatch err = %v handled = %v, want handled mismatch error", err, handled)
 	}
 

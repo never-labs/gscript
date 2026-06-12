@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 0;sum 0 rotate,x")

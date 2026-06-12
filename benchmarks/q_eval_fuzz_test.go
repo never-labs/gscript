@@ -236,16 +236,25 @@ func (g *qgen) statement() string {
 // qEvalTwoVerbPattern matches statements containing two registered verb
 // names (built from the generator's registry-pinned verb lists plus til).
 var qEvalTwoVerbPattern = sync.OnceValue(func() *regexp.Regexp {
-	// "and"/"or" are registered word dyadics the generator spells only
-	// through bindings, so list them here: a word dyadic whose operand is a
-	// word-verb application ((0 or wsum 0)) hits the same acceptance
-	// divergence as any other two-verb chain.
 	names := append([]string{"til", "xexp", "xlog", "wsum", "wavg", "ema", "msum", "cor", "cov", "scov", "mdev", "and", "or"}, qgenUnaryVerbs...)
 	names = append(names, qgenScalarLeftWordVerbs...)
 	names = append(names, qgenPairWordVerbs...)
 	alt := strings.Join(names, "|")
 	return regexp.MustCompile(`\b(` + alt + `)\b[^;]*\b(` + alt + `)\b`)
 })
+
+var qEvalVerbWordPattern = regexp.MustCompile(`[A-Za-z]\w*`)
+
+// qEvalAnyVerbWord reports whether any identifier in stmt is a registered
+// verb name.
+func qEvalAnyVerbWord(stmt string) bool {
+	for _, word := range qEvalVerbWordPattern.FindAllString(stmt, -1) {
+		if qEvalRegisteredVerbName(word) {
+			return true
+		}
+	}
+	return false
+}
 
 // qEvalHeadIdentifier returns the leading identifier when the statement is
 // an identifier juxtaposed to something else (e.g. "m 000" -> "m").
@@ -281,30 +290,9 @@ func qEvalRegisteredVerbName(name string) bool {
 	return qEvalRegisteredVerbSet()[strings.ToLower(name)]
 }
 
-var qEvalVerbWordPattern = regexp.MustCompile(`[A-Za-z]\w*`)
-
-// qEvalAnyVerbWord reports whether any identifier in stmt is a registered
-// verb name.
-func qEvalAnyVerbWord(stmt string) bool {
-	for _, word := range qEvalVerbWordPattern.FindAllString(stmt, -1) {
-		if qEvalRegisteredVerbName(word) {
-			return true
-		}
-	}
-	return false
-}
-
 var (
-	qEvalNameTakePattern    = regexp.MustCompile(`([A-Za-z_]\w*|\))\s*#`)
-	qEvalArithTakePattern   = regexp.MustCompile(`[+*%^&|-][0-9 ]*#`)
-	qEvalWordApplication    = regexp.MustCompile(`[a-z]{2,}\s`)
-	qEvalStringJuxtaposed   = regexp.MustCompile(`"\s*[0-9]|[0-9]\s*"`)
-	qEvalGluedOpWord        = regexp.MustCompile(`[A-Za-z][%^_#,!.<>=*+&|-]|[%^_#,!.<>=*+&|-][A-Za-z]`)
-	qEvalRealSuffixPattern  = regexp.MustCompile(`\d[eih]($|[^0-9.])`)
-	qEvalTrailingDotPattern = regexp.MustCompile(`\d\.($|[^0-9])`)
-	// Month-literal shape (YYYY.MM) not extended to a date (no third
-	// component): 0000.01, 2024.01.
-	qEvalMonthLiteralPattern = regexp.MustCompile(`\d{3,4}\.\d\d($|[^0-9.])`)
+	qEvalNameTakePattern  = regexp.MustCompile(`([A-Za-z_]\w*|\))\s*#`)
+	qEvalArithTakePattern = regexp.MustCompile(`[+*%^&|-][0-9 ]*#`)
 	// }/[x] or }\[x] with a single bracket argument (no top-level ;).
 	qEvalLambdaConvergePattern = regexp.MustCompile(`\}\s*[/\\]\s*\[[^;\]]*\]`)
 	// Word verb followed by / or \ (group/s, group /s, reverse\x): monadic
@@ -503,142 +491,40 @@ func qEvalFuzzLambdaRecursionRisk(src string) bool {
 // fuzzer guards the fixes.
 var qEvalKnownCrashers = map[string]string{}
 
-// qEvalKnownDivergenceStatement pins a discovered divergence CLASS awaiting a
+// qEvalKnownDivergenceRecord pins discovered divergence CLASSES awaiting a
 // production fix (shrink-only; TestQEvalKnownDivergencesStillDiverge demands
-// removal once fixed):
+// removal once fixed).
 //
-// FINDING (this fuzzer): statements applying verbs to symbol operands can
-// diverge between the compiled route and the string evaluator, because the
-// string evaluator mis-probes `verb `sym...` shapes as name indexing and
-// fails with "index must be an integer..." class errors while the compiled
-// route binds the verb. Examples: med `sym (different error messages),
-// (2)<=(raze `a`a`b), 4 mcount (var `a`a`b). (min trim `a was reconciled:
-// trim on symbols is now a type error on both routes.)
-//
-// Mismatching statements containing a symbol literal are therefore skipped
-// (counted, not failed) until the class is fixed; everything else must match.
-// FINDING (this fuzzer): chained float-function reductions are not
-// bit-identical between the compiled route and the string evaluator (the two
-// associate additions differently), e.g.
-// x:((til 96) mod 5)%10;(+/asin x)+(+/acos x)+(+/atan x) differs in the last
-// ULPs at 96 rows while matching at the benchmark row count. Mismatching
-// statements that combine a reduction with float math are skipped until the
-// routes are made order-identical (or the oracle gains a ULP tolerance).
-var qEvalFloatMathTokens = []string{
-	"asin", "acos", "atan", "sin", "cos", "tan", "exp", "log", "sqrt", "xexp",
-	"avg", "var", "dev", "med", "%",
-}
-
-// FINDING (this fuzzer): the string evaluator's probe cascade rejects some
-// nested derived-verb (adverb) arguments that the statement compiler accepts,
-// e.g. til +/0: compiled returns til 0, the string route fails with "not a
-// numeric literal". At runtime the compiled route therefore silently extends
-// the language. Mismatching statements containing an adverb form are skipped
-// until acceptance is reconciled.
-var qEvalAdverbTokens = []string{"/", "\\", "':", "each", "@"}
-
-// FINDING (this fuzzer): on malformed or oddly-typed operands the compiled
-// route surfaces its own error messages (invalid number "000xxz:", "q enum
-// cast expects a symbol domain", ...) while the string evaluator reports its
-// probe-cascade error ("not a numeric literal", ...), violating the
-// identical-error contract. Error-message mismatches are skipped here so the
-// fuzzer hard-fails only on VALUE divergences and panics; strict message
-// equality remains enforced by TestQErrorRouteDifferential over the curated
-// error corpus.
+// All R14 acceptance-divergence classes were reconciled in production:
+//   - verb-on-symbol-operand probes (med `sym): the string evaluator's
+//     postfix-symbol-lookup branches now APPLY callables instead of indexing
+//     them, matching the compiled route's IndexExpr dispatch.
+//   - nested derived-verb arguments (til +/0) and word-verb lefts on adverb
+//     forms: evalAdverb applies bare builtin prefix-verb words to the derived
+//     expression (canonical right-to-left), mirroring prefix-word compilation.
+//   - verb@application (count@where 0), nested verb applications
+//     (2 rotate where 0 1 1), word-dyadic-over-word-application
+//     ((0 or wsum 0)): the runtime-primitive pipeline plan now yields to every
+//     earlier cascade claim and to the LEFTMOST dyadic word split.
+//   - glued operator/word tokenisation (last%x): the first/last elementwise
+//     probe declines when the operator glues directly onto the word.
+//   - string-literal juxtaposition (""0 where 0): the script binding plan no
+//     longer constant-folds juxtaposed-index vectors into generic lists.
+//   - month-literal and trailing-dot tokenisation (0000.01+0, 0000.+1 0):
+//     the scalar add-chain declines temporal-shaped terms and
+//     looksLikeTemporalVector no longer claims operator-glued fields.
+//   - sized-suffix promotion (0-0e): applyDyadic carries the same
+//     typed-zero-minus shortcut as the compiled route (IEEE +0 preserved).
+//   - empty-list broadcast (()+x): qScriptPipelinePlusTerms keeps `()` terms
+//     so plans that cannot represent them decline.
+//   - list items with verb applications ((count 0;9)+(0)): the add-chain
+//     declines parenthesized expression LISTS as scalar terms.
+//   - float chain association: the scalar add-chain accumulates
+//     right-to-left (a+(b+c)), bit-identical to the compiled Binary split.
+//   - captured-env lambda self-match: matchValue compares closure
+//     environments by identity, so a binding matches itself.
 func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src string) bool {
 	stmt := record.Statement
-	if strings.Contains(stmt, "`") {
-		return true
-	}
-	if record.CompiledErr != nil {
-		return true
-	}
-	// FINDING (this fuzzer): compiled and string routes split compound
-	// unparenthesized expressions differently when a comparison operator
-	// meets a prefix word-verb juxtaposition: (0)+first 0<0 compiles as
-	// ((0)+first 0)<0 -> 0b but string-evaluates as (0)+(first 0<0) -> type
-	// error. Mismatching statements combining a comparison with a word
-	// application are skipped until the split order is reconciled.
-	if strings.ContainsAny(stmt, "<>=~$") && qEvalWordApplication.MatchString(stmt) {
-		return true
-	}
-	for _, token := range qEvalAdverbTokens {
-		if strings.Contains(stmt, token) {
-			return true
-		}
-	}
-	// FINDING (this fuzzer): symbol operators glued directly onto word verbs
-	// (last%x, m mod.10, ...) are accepted by the compiled route but rejected
-	// (or split differently) by the string evaluator's probes, e.g.
-	// x:();last%x compiles to an empty result while the string route fails
-	// with "empty q expression". Skipped on mismatch until tokenisation is
-	// reconciled.
-	if qEvalGluedOpWord.MatchString(stmt) {
-		return true
-	}
-	// FINDING (this fuzzer): the juxtaposed-indexing claim (R14) widened the
-	// compiled route's acceptance of string-literal juxtaposition shapes
-	// (""0 where 0 compiles to an indexing application; the string route
-	// rejects). Skipped on mismatch until acceptance is reconciled.
-	if qEvalStringJuxtaposed.MatchString(stmt) {
-		return true
-	}
-	// FINDING (this fuzzer): the same acceptance divergence hits nested verb
-	// applications as word-verb operands: 2 rotate where 0 1 1 evaluates
-	// through the compiled route but the string evaluator rejects the nested
-	// application ("not a numeric literal"). Mismatching statements chaining
-	// two registered verbs are skipped until acceptance is reconciled.
-	if qEvalTwoVerbPattern().MatchString(stmt) {
-		return true
-	}
-	// FINDING (this fuzzer): a bare name statement returning a lambda that
-	// captured an environment mismatches against itself: matchValue keeps
-	// closures conservatively unmatched (envs can be self-referential), e.g.
-	// x:til 00;A00:where (0 mod 000)00;f:{(000[0])00000000};f. Bare-identifier
-	// statements are skipped on mismatch until the oracle compares closures
-	// structurally.
-	if regexp.MustCompile(`^[A-Za-z]\w*$`).MatchString(strings.Trim(stmt, "() \t")) {
-		return true
-	}
-	// FINDING (this fuzzer): arithmetic with sized-suffix literals (e real,
-	// i int, h short) promotes differently between routes: 0-0e is
-	// float64(-0) via the compiled route and float32(0) via the string
-	// evaluator; 0-0i diverges the same way, and the divergent value flows
-	// through bindings (qv:0e;(qv)-(qv)). Mismatches anywhere in an input
-	// with a sized-suffix literal are skipped until promotion is unified.
-	if qEvalRealSuffixPattern.MatchString(src) {
-		return true
-	}
-	// FINDING (this fuzzer): trailing-dot float literals glued to an operator
-	// (0000.+1 0) tokenize differently between the routes. Skipped on
-	// mismatch until tokenisation is reconciled.
-	if qEvalTrailingDotPattern.MatchString(stmt) {
-		return true
-	}
-	// FINDING (this fuzzer): month literals inside arithmetic (0000.01+0,
-	// 2024.01+0) tokenize differently between the routes: the compiled route
-	// parses the YYYY.MM month literal (canonical q), while the string
-	// evaluator's arithmetic split reads it as a float. Skipped on mismatch
-	// until the string route's month tokenisation is reconciled.
-	if qEvalMonthLiteralPattern.MatchString(stmt) {
-		return true
-	}
-	// FINDING (this fuzzer): chained arithmetic over an empty list loses the
-	// empty broadcast on the string route: ()+("J"$"0")+("I"$"0") is () via
-	// the compiled route but the atom 0 via the string evaluator. Mismatching
-	// statements containing an empty-list literal are skipped until empty
-	// broadcasting is unified.
-	if strings.Contains(stmt, "()") {
-		return true
-	}
-	// FINDING (this fuzzer): parenthesized list literals whose items contain
-	// verb applications are split differently by the two routes:
-	// (count 0;9)+(0) is 1 9 via the compiled route (list of items, then +)
-	// but 2 via the string evaluator (count applied to the rest). Mismatching
-	// statements with semicolon list items naming a verb are skipped.
-	if strings.Contains(stmt, ";") && qEvalAnyVerbWord(stmt) {
-		return true
-	}
 	// KNOWN GAP (canonical-q harness): juxtaposed name indexing (m 0 with m a
 	// bound vector) builds a list on the string route instead of indexing,
 	// and the routes disagree on compound shapes. Mismatching statements
@@ -646,49 +532,97 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 	if head := qEvalHeadIdentifier(stmt); head != "" && !qEvalRegisteredVerbName(head) {
 		return true
 	}
-	hasReduction := strings.Contains(stmt, "/") || strings.Contains(stmt, "sum") || strings.Contains(stmt, "prd")
-	if !hasReduction {
-		return false
+	// FINDING (this fuzzer): cast statements with a bare-name cast domain
+	// spell the cast target differently in the two routes' error text
+	// (`("J"$"0")+(B $"")$(0"")` is `q cast B: ...` on the string route and
+	// "q cast `B: ..." on the compiled route; `(count c$...)!...` hits the
+	// same family). Mismatching cast statements whose compiled error carries
+	// the backtick bare-cast spelling are skipped until the bare-cast-name
+	// sourceText spelling is unified across routes.
+	if record.CompiledErr != nil && strings.Contains(stmt, "$") &&
+		strings.Contains(record.CompiledErr.Error(), "q cast `") {
+		return true
 	}
-	for _, token := range qEvalFloatMathTokens {
-		if strings.Contains(stmt, token) {
-			return true
-		}
+	// FINDING (this fuzzer): an empty string literal GLUED to a word or
+	// digit (`count ""where 0<>0`) still splits differently between the
+	// routes (the R14 string-juxtaposition family's error-message variant).
+	// Skipped on mismatch until glued string-literal tokenisation is
+	// reconciled.
+	if qEvalGluedEmptyStringPattern.MatchString(stmt) {
+		return true
+	}
+	// FINDING (this fuzzer): named bracket calls of registered verbs with
+	// missing arguments ((ssr[""])) project on one route and signal an
+	// arity error on the other. Skipped on mismatch until bracket-call
+	// projection semantics are reconciled.
+	if qEvalNamedBracketCallPattern.MatchString(stmt) {
+		return true
+	}
+	// PARTIALLY RECONCILED (this run): parenthesized list items naming a
+	// verb. `(count 0;9)+(0)` was reconciled (the add-chain declines list
+	// terms); bare-verb items (`+/(0;xexp 0)`) still evaluate differently.
+	// Skipped on mismatch until list-item verb handling is aligned.
+	if strings.Contains(stmt, ";") && qEvalAnyVerbWord(stmt) {
+		return true
+	}
+	// PARTIALLY RECONCILED (this run): trailing-dot float literals glued to
+	// an operator. `0000.+1 0` was reconciled (looksLikeTemporalVector no
+	// longer claims operator-glued fields); the chained spelling `0+0000.+1`
+	// still splits differently. Skipped on mismatch until trailing-dot
+	// tokenisation is fully aligned.
+	if qEvalTrailingDotPattern.MatchString(stmt) {
+		return true
+	}
+	// PARTIALLY RECONCILED (this run): symbol-literal statements. The R14
+	// verb-on-symbol-operand representatives (med `sym, (2)<=(raze `a`a`b))
+	// were reconciled in production (the postfix-symbol-lookup branches now
+	// apply callables); glued symbol tokenisation corners (+/,00`_) still
+	// diverge. Skipped on mismatch until symbol lexing is fully aligned.
+	if strings.Contains(stmt, "`") {
+		return true
+	}
+	// PARTIALLY RECONCILED (this run): two-verb chains. The pinned R14
+	// representatives (2 rotate where 0 1 1, (0 or wsum 0), count@where 0,
+	// til +/0) were reconciled in production (pipeline/probe yields landed);
+	// other chains over NON-NUMERIC operands still diverge in fused-kernel
+	// error text (x:`0 0;sum 1 rotate x). Skipped on mismatch until the
+	// remaining fused reducer error paths are aligned.
+	if qEvalTwoVerbPattern().MatchString(stmt) {
+		return true
+	}
+	// PARTIALLY RECONCILED (this run): symbol operators glued directly onto
+	// word verbs. The spellings `last%x`, `0:in+/0`, `00000 except+/0` were
+	// reconciled (probe yields landed in production); other glued spellings
+	// (`sum 0 rotate,x`) still split differently. Skipped on mismatch until
+	// the remaining glued tokenisation is reconciled.
+	if qEvalGluedOpWordPattern.MatchString(stmt) {
+		return true
 	}
 	return false
 }
 
-// qEvalKnownDivergenceRepresentatives must KEEP diverging while the class
-// above is allowlisted; once any stops, the guard demands shrinking the
-// allowlist (and promoting the class back to hard-failure).
+var (
+	qEvalNamedBracketCallPattern = regexp.MustCompile(`[A-Za-z]\w*\[`)
+	qEvalGluedEmptyStringPattern = regexp.MustCompile(`""[A-Za-z0-9]|[A-Za-z0-9]""`)
+	qEvalGluedOpWordPattern      = regexp.MustCompile(`[A-Za-z][%^_#,!.<>=*+&|-]|[%^_#,!.<>=*+&|-][A-Za-z]`)
+	qEvalTrailingDotPattern      = regexp.MustCompile(`\d\.($|[^0-9])`)
+)
+
+// qEvalKnownDivergenceRepresentatives must KEEP diverging while the classes
+// above are allowlisted; once any stops, the guard demands shrinking the
+// allowlist (and promoting the class back to hard-failure). All R14-pinned
+// representatives were reconciled (see qEvalKnownDivergenceRecord); the
+// remaining entries are post-R14 findings awaiting a production fix.
 var qEvalKnownDivergenceRepresentatives = []string{
-	"med `sym",
-	// "min trim `a" was reconciled by rejecting symbols in the trim family
-	// at the data layer (both routes now signal the same type error, and the
-	// canonical-q harness pins the ERROR). Removed (shrink-only ratchet).
-	"(2)<=(raze `a`a`b)",
-	"x:((til 96) mod 5)%10;(+/asin x)+(+/acos x)+(+/atan x)",
-	"til +/0",               // string route rejects nested derived-verb arguments
-	"til 000xxz:#A00000000", // leaf-parser vs probe error message mismatch
-	"0$00#A",                // enum-cast vs probe error message mismatch
-	// "(0)+first 0<0" was reconciled by the canonical right-to-left split
-	// (q!: no operator precedence): both routes now split at the leftmost
-	// top-level verb, so the routes agree. Removed (shrink-only ratchet).
-	"count@where 0",   // string route rejects verb@application shapes
-	"x:();s:x;last%x", // glued operator/word tokenisation divergence
-	`""0 where 0`,     // string-literal juxtaposition acceptance (compiled indexes, string route rejects)
-	// "x:til 0;sum 0 rotate x" was reconciled by the canonical empty-reducer
-	// identities (sum/prd/min/max () now return 0/1/0W/-0W on every route).
-	// Removed (shrink-only ratchet).
-	"2 rotate where 0 1 1",   // string route rejects nested verb applications
-	"(0 or wsum 0)",          // word dyadic over a word application: string route rejects
-	`()+("J"$"0")+("I"$"0")`, // empty-list broadcast lost on the string route
-	"(count 0;9)+(0)",        // list items with verb applications split differently
-	"0-0e",                   // sized-suffix promotion differs between routes
-	"0000.+1 0",              // trailing-dot literal tokenisation differs
-	"0000.01+0",              // month literal in arithmetic tokenises as a float on the string route
-	"+000.01+0",              // 3-digit month-shape with leading flip, same tokenisation family
-	"x:til 00;A00:where (0 mod 000)00;f:{(000[0])00000000};f", // captured-env lambda not self-comparable
+	`("J"$"0")+(B $"")$(0"")`, // bare-cast-name domain spelling differs in cast error text
+	"(count c$000 00 00000000000)!(Coun!A000000000000000)!su! raz! 00000000", // same spelling family via dict-bang
+	`x:0;count ""where 0<>0`, // glued empty-string juxtaposition splits differently
+	"x:til 0;sum 0 rotate,x", // glued ,-join after a word verb splits differently
+	"x:`0 0;sum 1 rotate x",  // two-verb chain over non-numeric operands: fused error text differs
+	"+/,00`_",                // glued symbol-literal tokenisation differs
+	"0+0000.+1",              // trailing-dot literal in a + chain splits differently
+	"+/(0;xexp 0)",           // bare-verb list item evaluates differently across routes
+	`(ssr[""])`,              // named bracket-call arity/projection handling differs
 }
 
 func TestQEvalKnownDivergencesStillDiverge(t *testing.T) {

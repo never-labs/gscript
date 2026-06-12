@@ -1,0 +1,2 @@
+go test fuzz v1
+string("syms:1#`0;0 where syms<0")

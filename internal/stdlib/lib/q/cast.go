@@ -264,12 +264,18 @@ func qTypedCastPrimitiveValue(target qCastTarget, value any) (any, bool, error) 
 	if array, ok := value.(data.Array); ok {
 		if target.kind == data.KindString {
 			out, handled, err := data.TryTypedStringCast(array)
-			if err != nil || handled {
-				return out, handled, err
+			if err != nil {
+				return nil, handled, fmt.Errorf("q cast %s: %w", target.sourceText, err)
+			}
+			if handled {
+				return out, handled, nil
 			}
 		}
 		if out, handled, err := data.TryTypedCast(target.kind, array); err != nil || handled {
-			return out, handled, err
+			if err != nil {
+				return nil, handled, fmt.Errorf("q cast %s: %w", target.sourceText, err)
+			}
+			return out, handled, nil
 		}
 		if target.kind != data.KindSymbol && target.kind != data.KindString {
 			return nil, false, nil
@@ -282,13 +288,15 @@ func qTypedCastPrimitiveValue(target qCastTarget, value any) (any, bool, error) 
 			}
 			converted, err := castScalarValue(target.kind, item)
 			if err != nil {
-				return nil, true, err
+				// Same wrapping castValue applies: the typed kernel must
+				// surface error text identical to the generic cast route.
+				return nil, true, fmt.Errorf("q cast %s value %d: %w", target.sourceText, i+1, err)
 			}
 			values[i] = converted
 		}
 		column, err := data.NewColumnWithKind("_", target.kind, values)
 		if err != nil {
-			return nil, true, err
+			return nil, true, fmt.Errorf("q cast %s: %w", target.sourceText, err)
 		}
 		return column.Data, true, nil
 	}
@@ -298,7 +306,10 @@ func qTypedCastPrimitiveValue(target qCastTarget, value any) (any, bool, error) 
 		data.KindU8, data.KindU16, data.KindU32, data.KindU64,
 		data.KindF32, data.KindF64:
 		out, err := castScalarValue(target.kind, value)
-		return out, true, err
+		if err != nil {
+			return nil, true, fmt.Errorf("q cast %s: %w", target.sourceText, err)
+		}
+		return out, true, nil
 	default:
 		return nil, false, nil
 	}

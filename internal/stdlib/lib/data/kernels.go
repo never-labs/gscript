@@ -1468,7 +1468,9 @@ func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
 			return nil, false, nil
 		}
 		if leftArray.Len() != rightArray.Len() && leftArray.Len() != 1 && rightArray.Len() != 1 {
-			return nil, true, fmt.Errorf("logical length mismatch")
+			// Same error text the generic vector dyadic raises, so typed and
+			// generic logical routes fail identically.
+			return nil, true, fmt.Errorf("vector length mismatch")
 		}
 		length = leftArray.Len()
 		if rightArray.Len() > length {
@@ -3349,8 +3351,9 @@ func newF64DyadicScalarReducer(op string, scalar float64, scalarLeft bool) (f64D
 				return value * value
 			}}, true
 		case 1:
-			return f64DyadicScalarReducer{apply: func(float64) float64 {
-				return 1
+			// x xexp 1 is x (the exponent is 1), not the constant 1.
+			return f64DyadicScalarReducer{apply: func(value float64) float64 {
+				return value
 			}}, true
 		case 0:
 			return f64DyadicScalarReducer{apply: func(float64) float64 {
@@ -4174,7 +4177,9 @@ func TryTypedDyadicMinMaxSum(left, right any, wantMax bool) (any, bool, error) {
 		case rightArray.Len() == 1:
 			length = leftArray.Len()
 		default:
-			return nil, true, fmt.Errorf("typed dyadic min/max sum length mismatch: %d != %d", leftArray.Len(), rightArray.Len())
+			// Same error text the generic vector dyadic raises, so fused and
+			// generic routes fail identically on mismatched operands.
+			return nil, true, fmt.Errorf("vector length mismatch")
 		}
 	case leftIsArray:
 		length = leftArray.Len()
@@ -4190,18 +4195,25 @@ func TryTypedDyadicMinMaxSum(left, right any, wantMax bool) (any, bool, error) {
 		}
 		var sum int64
 		for row := 0; row < length; row++ {
-			lv, ok, err := integerMinMaxOperandAt(left, row, length)
+			lv, lok, err := integerMinMaxOperandAt(left, row, length)
 			if err != nil {
 				return nil, true, err
 			}
-			if !ok {
+			rv, rok, err := integerMinMaxOperandAt(right, row, length)
+			if err != nil {
+				return nil, true, err
+			}
+			// q min/max null rule: a null yields the OTHER operand (the
+			// generic minDyadic/maxDyadic behavior); both-null rows skip.
+			if !lok && !rok {
 				continue
 			}
-			rv, ok, err := integerMinMaxOperandAt(right, row, length)
-			if err != nil {
-				return nil, true, err
+			if !lok {
+				sum += rv
+				continue
 			}
-			if !ok {
+			if !rok {
+				sum += lv
 				continue
 			}
 			if wantMax {
@@ -4217,18 +4229,24 @@ func TryTypedDyadicMinMaxSum(left, right any, wantMax bool) (any, bool, error) {
 	}
 	var sum float64
 	for row := 0; row < length; row++ {
-		lv, ok, err := numericMinMaxOperandAt(left, row, length)
+		lv, lok, err := numericMinMaxOperandAt(left, row, length)
 		if err != nil {
 			return nil, true, err
 		}
-		if !ok {
+		rv, rok, err := numericMinMaxOperandAt(right, row, length)
+		if err != nil {
+			return nil, true, err
+		}
+		// Null rule: see the integer loop above.
+		if !lok && !rok {
 			continue
 		}
-		rv, ok, err := numericMinMaxOperandAt(right, row, length)
-		if err != nil {
-			return nil, true, err
+		if !lok {
+			sum += rv
+			continue
 		}
-		if !ok {
+		if !rok {
+			sum += lv
 			continue
 		}
 		if wantMax {
@@ -4669,7 +4687,14 @@ func (typedKernelRegistry) Dyadic(op Op, left, right any) (any, bool, error) {
 	switch {
 	case leftIsArray && rightIsArray:
 		if leftArray.Len() != rightArray.Len() {
-			return nil, true, fmt.Errorf("typed dyadic kernel length mismatch: %d != %d", leftArray.Len(), rightArray.Len())
+			if leftArray.Len() == 1 || rightArray.Len() == 1 {
+				// q vector rules broadcast a 1-element side; the typed
+				// kernels do not implement that, so decline to the generic
+				// route instead of erroring.
+				return nil, false, nil
+			}
+			// Same error text the generic vector dyadic raises.
+			return nil, true, fmt.Errorf("vector length mismatch")
 		}
 		length = leftArray.Len()
 	case leftIsArray:

@@ -1,0 +1,2 @@
+go test fuzz v1
+string("(count 00000 except+/0)")
