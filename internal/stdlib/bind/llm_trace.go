@@ -87,6 +87,24 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	}
 	b.set("approval_trace_event", approvalTraceEvent)
 	b.set("approvalTraceEvent", approvalTraceEvent)
+
+	policyOutcomeEvent := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.policy_outcome_event' (policy outcome table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.policy_outcome_event' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmPolicyOutcomeTraceEventValue(args[0].Table(), opts))}, nil
+	}
+	b.set("policy_outcome_event", policyOutcomeEvent)
+	b.set("policyOutcomeEvent", policyOutcomeEvent)
+	b.set("policy_outcome_trace_event", policyOutcomeEvent)
+	b.set("policyOutcomeTraceEvent", policyOutcomeEvent)
 }
 
 func llmTraceEventValue(src *Table) *Table {
@@ -443,6 +461,90 @@ func llmApprovalTraceRequestTable(trace *Table) *Table {
 		return request.Table()
 	}
 	return nil
+}
+
+func llmPolicyOutcomeTraceEventValue(outcome, opts *Table) *Table {
+	src := NewTable()
+	for _, key := range opts.PairsKeysSnapshot() {
+		src.RawSet(key, llmCloneValue(opts.RawGet(key)))
+	}
+	status := llmTraceString(outcome, "status", "allowed")
+	src.RawSetString("event_type", StringValue(llmTraceString(opts, "event_type", "policy_outcome")))
+	src.RawSetString("status", StringValue(llmTraceString(opts, "status", status)))
+	src.RawSetString("provider_free", BoolValue(llmTraceBool(opts, "provider_free", true)))
+	src.RawSetString("live_network", BoolValue(llmTraceBool(opts, "live_network", false)))
+	src.RawSetString("live_model", BoolValue(llmTraceBool(opts, "live_model", false)))
+	src.RawSetString("credentials_required", BoolValue(llmTraceBool(opts, "credentials_required", false)))
+	src.RawSetString("real_dependency_imports", BoolValue(llmTraceBool(opts, "real_dependency_imports", false)))
+	llmPolicyOutcomeCopyCorrelation(outcome, src)
+
+	payload := NewTable()
+	for _, field := range []string{
+		"kind",
+		"version",
+		"status",
+		"result_status",
+		"capability",
+		"class",
+		"policy",
+		"policy_kind",
+		"policy_version",
+		"policy_default",
+		"allowed",
+		"denied",
+		"clean_skip",
+		"approval_required",
+		"side_effect_allowed",
+		"reason",
+		"dependency",
+	} {
+		if value := outcome.RawGetString(field); !value.IsNil() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if capabilities := outcome.RawGetString("capabilities"); capabilities.IsTable() {
+		payload.RawSetString("capabilities", llmCloneValue(capabilities))
+		if payload.RawGetString("capability").IsNil() {
+			first := capabilities.Table().RawGet(IntValue(1))
+			if !first.IsNil() {
+				payload.RawSetString("capability", llmCloneValue(first))
+			}
+		}
+	}
+	if message := outcome.RawGetString("message"); message.IsString() && message.Str() != "" {
+		payload.RawSetString("message", StringValue("policy outcome"))
+	}
+	src.RawSetString("payload", TableValue(payload))
+	return llmTraceEventValue(src)
+}
+
+func llmPolicyOutcomeCopyCorrelation(outcome, src *Table) {
+	for _, field := range []string{
+		"workflow_run_id",
+		"workflow_step_id",
+		"agent_run_id",
+		"turn_id",
+		"tool_call_id",
+		"approval_id",
+		"replay_session_id",
+		"correlation_id",
+	} {
+		if src.RawGetString(field).IsNil() {
+			if value := outcome.RawGetString(field); !value.IsNil() {
+				src.RawSetString(field, llmCloneValue(value))
+			}
+		}
+	}
+	if src.RawGetString("correlation_id").IsNil() {
+		if value := outcome.RawGetString("capability"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		} else if capabilities := outcome.RawGetString("capabilities"); capabilities.IsTable() {
+			first := capabilities.Table().RawGet(IntValue(1))
+			if !first.IsNil() {
+				src.RawSetString("correlation_id", llmCloneValue(first))
+			}
+		}
+	}
 }
 
 func llmTraceSummaryValue(input *Table) *Table {

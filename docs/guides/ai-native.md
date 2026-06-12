@@ -508,6 +508,10 @@ if err != nil {
     return nil, err
 }
 outcome := llm.policy_outcome({lookup_runbook}, policy)
+event := llm.policy_outcome_event(outcome, {
+    trace_id: "policy-review"
+    workflow_run_id: "run-42"
+})
 ```
 
 The default policy denies declared capability classes such as network,
@@ -516,6 +520,9 @@ exact capability is allowed. Policy metadata is a runtime gate; the host still
 owns real sandboxing, credentials, network access, and approval storage.
 Use `llm.policy_outcome` when a workflow needs to log, trace, or branch on a
 portable decision table instead of returning a policy error immediately.
+Use `llm.policy_outcome_event` or its explicit alias
+`llm.policy_outcome_trace_event` when that decision should join the same trace
+envelope as model, tool, replay, approval, and workflow events.
 
 Record and replay are host-side:
 

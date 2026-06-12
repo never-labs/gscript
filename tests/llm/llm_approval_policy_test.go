@@ -58,6 +58,33 @@ clean_skip_outcome := llm.policy_outcome({call_network}, policy, {
     reason: "network disabled by host"
     dependency: "live_network"
 })
+local_policy_event := llm.policy_outcome_event(local_outcome, {
+    trace_id: "trace-policy"
+    sequence: 1
+    workflow_run_id: "wf-policy"
+    workflow_step_id: "step-local"
+})
+network_policy_event := llm.policy_outcome_event(network_outcome, {
+    trace_id: "trace-policy"
+    sequence: 2
+    workflow_run_id: "wf-policy"
+    workflow_step_id: "step-network"
+})
+clean_skip_policy_event := llm.policy_outcome_trace_event(clean_skip_outcome, {
+    trace_id: "trace-policy"
+    sequence: 3
+    workflow_run_id: "wf-policy"
+    workflow_step_id: "step-skip"
+})
+policy_envelope := llm.trace_envelope({local_policy_event, network_policy_event, clean_skip_policy_event}, {
+    trace_id: "trace-policy"
+})
+policy_gate := llm.trace_assert(policy_envelope, {
+    require_provider_free: true
+    deny_live_network: true
+    required_event_types: {"policy_outcome"}
+    require_correlation_fields: {"workflow_run_id", "workflow_step_id", "correlation_id"}
+})
 
 pending := {id: "call_approval_1", tool: "send_order", args: {id: "order-1"}}
 token := loop.snapshot({msg.user("submit order")}, pending)
@@ -136,6 +163,22 @@ clean_skip_outcome_allowed := clean_skip_outcome.allowed
 clean_skip_outcome_reason := clean_skip_outcome.reason
 clean_skip_outcome_dependency := clean_skip_outcome.dependency
 clean_skip_outcome_side_effect_allowed := clean_skip_outcome.side_effect_allowed
+local_policy_event_type := local_policy_event.event_type
+local_policy_event_status := local_policy_event.status
+local_policy_event_capability := local_policy_event.payload.capability
+local_policy_event_policy_default := local_policy_event.payload.policy_default
+network_policy_event_status := network_policy_event.status
+network_policy_event_result_status := network_policy_event.payload.result_status
+network_policy_event_class := network_policy_event.payload.class
+network_policy_event_message := network_policy_event.payload.message
+network_policy_event_error_nil := network_policy_event.payload.error == nil
+clean_skip_policy_event_status := clean_skip_policy_event.status
+clean_skip_policy_event_result_status := clean_skip_policy_event.payload.result_status
+clean_skip_policy_event_reason := clean_skip_policy_event.payload.reason
+clean_skip_policy_event_dependency := clean_skip_policy_event.payload.dependency
+policy_summary_events := llm.trace_summary(policy_envelope).events
+policy_gate_ok := policy_gate.ok
+policy_gate_status := policy_gate.status
 trace_kind := replay_trace.kind
 trace_policy_default := replay_trace.policy.default
 trace_decision := replay_trace.decision.status
@@ -205,6 +248,22 @@ approved_event_approval_id := approved_event.correlation.approval_id
 				"clean_skip_outcome_reason":              "network disabled by host",
 				"clean_skip_outcome_dependency":          "live_network",
 				"clean_skip_outcome_side_effect_allowed": false,
+				"local_policy_event_type":                "policy_outcome",
+				"local_policy_event_status":              "allowed",
+				"local_policy_event_capability":          "local.read",
+				"local_policy_event_policy_default":      "deny_high_risk",
+				"network_policy_event_status":            "denied",
+				"network_policy_event_result_status":     "denied",
+				"network_policy_event_class":             "network",
+				"network_policy_event_message":           "policy outcome",
+				"network_policy_event_error_nil":         true,
+				"clean_skip_policy_event_status":         "clean_skip",
+				"clean_skip_policy_event_result_status":  "skipped",
+				"clean_skip_policy_event_reason":         "network disabled by host",
+				"clean_skip_policy_event_dependency":     "live_network",
+				"policy_summary_events":                  int64(3),
+				"policy_gate_ok":                         true,
+				"policy_gate_status":                     "ok",
 				"trace_kind":                             "approval_replay_trace",
 				"trace_policy_default":                   "deny_high_risk",
 				"trace_decision":                         "denied",
