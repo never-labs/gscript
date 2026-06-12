@@ -41,6 +41,18 @@ func (a providerAdapter) StreamTurn(ctx context.Context, req runtime.LLMTurnRequ
 	return RuntimeTurnResult(res), err
 }
 
+func (a providerAdapter) LastLLMReplayMatch() (runtime.LLMReplayMatch, bool) {
+	replay, ok := a.provider.(llm.ReplayMatchProvider)
+	if !ok {
+		return runtime.LLMReplayMatch{}, false
+	}
+	match, ok := replay.LastReplayMatch()
+	if !ok {
+		return runtime.LLMReplayMatch{}, false
+	}
+	return RuntimeReplayMatch(match), true
+}
+
 func TraceAdapter(sink llm.TraceSink) runtime.LLMTraceSink {
 	if sink == nil {
 		return nil
@@ -264,6 +276,18 @@ func RuntimeTurnUsage(usage llm.TurnUsage) runtime.LLMTurnUsage {
 	}
 }
 
+func RuntimeReplayMatch(match llm.ReplayMatch) runtime.LLMReplayMatch {
+	return runtime.LLMReplayMatch{
+		Turn:            match.Turn,
+		ReplayKey:       match.ReplayKey,
+		RequestHash:     match.RequestHash,
+		ResponseHash:    match.ResponseHash,
+		ReplayMode:      match.ReplayMode,
+		ReplaySessionID: match.ReplaySessionID,
+		ProviderFree:    match.ProviderFree,
+	}
+}
+
 func PublicTraceEvent(event runtime.LLMTraceEvent) llm.TraceEvent {
 	return llm.TraceEvent{
 		TraceID:         event.TraceID,
@@ -386,6 +410,14 @@ func (p recordingProvider) StreamTurn(ctx context.Context, req llm.TurnRequest, 
 		p.sink(record)
 	}
 	return res, err
+}
+
+func (p recordingProvider) LastReplayMatch() (llm.ReplayMatch, bool) {
+	replay, ok := p.provider.(llm.ReplayMatchProvider)
+	if !ok {
+		return llm.ReplayMatch{}, false
+	}
+	return replay.LastReplayMatch()
 }
 
 func cloneLLMRequest(req llm.TurnRequest) llm.TurnRequest {

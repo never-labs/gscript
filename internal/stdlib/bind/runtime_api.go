@@ -3,35 +3,37 @@ package bind
 import "github.com/never-labs/leia/internal/runtime"
 
 type (
-	DenseArray           = runtime.DenseArray
-	DenseArrayBinaryOp   = runtime.DenseArrayBinaryOp
-	DenseArrayDType      = runtime.DenseArrayDType
-	Channel              = runtime.Channel
-	Interpreter          = runtime.Interpreter
-	GoFunction           = runtime.GoFunction
-	LLMMessage           = runtime.LLMMessage
-	LLMProvider          = runtime.LLMProvider
-	LLMProviderConfig    = runtime.LLMProviderConfig
-	LLMProviderFactory   = runtime.LLMProviderFactory
-	LLMStreamEvent       = runtime.LLMStreamEvent
-	LLMStreamSink        = runtime.LLMStreamSink
-	LLMStreamingProvider = runtime.LLMStreamingProvider
-	LLMTool              = runtime.LLMTool
-	LLMToolCall          = runtime.LLMToolCall
-	LLMTraceEvent        = runtime.LLMTraceEvent
-	LLMTraceSink         = runtime.LLMTraceSink
-	LLMTurnRequest       = runtime.LLMTurnRequest
-	LLMTurnResult        = runtime.LLMTurnResult
-	LLMTurnUsage         = runtime.LLMTurnUsage
-	NativePayloadInfo    = runtime.NativePayloadInfo
-	NativePayloadKind    = runtime.NativePayloadKind
-	ScriptFunctionCaller = runtime.ScriptFunctionCaller
-	SoA                  = runtime.SoA
-	SoAAffinePlan        = runtime.SoAAffinePlan
-	SoAAffineTerm        = runtime.SoAAffineTerm
-	SoAShapeSnapshot     = runtime.SoAShapeSnapshot
-	Table                = runtime.Table
-	Value                = runtime.Value
+	DenseArray             = runtime.DenseArray
+	DenseArrayBinaryOp     = runtime.DenseArrayBinaryOp
+	DenseArrayDType        = runtime.DenseArrayDType
+	Channel                = runtime.Channel
+	Interpreter            = runtime.Interpreter
+	GoFunction             = runtime.GoFunction
+	LLMMessage             = runtime.LLMMessage
+	LLMProvider            = runtime.LLMProvider
+	LLMProviderConfig      = runtime.LLMProviderConfig
+	LLMProviderFactory     = runtime.LLMProviderFactory
+	LLMReplayMatch         = runtime.LLMReplayMatch
+	LLMReplayMatchProvider = runtime.LLMReplayMatchProvider
+	LLMStreamEvent         = runtime.LLMStreamEvent
+	LLMStreamSink          = runtime.LLMStreamSink
+	LLMStreamingProvider   = runtime.LLMStreamingProvider
+	LLMTool                = runtime.LLMTool
+	LLMToolCall            = runtime.LLMToolCall
+	LLMTraceEvent          = runtime.LLMTraceEvent
+	LLMTraceSink           = runtime.LLMTraceSink
+	LLMTurnRequest         = runtime.LLMTurnRequest
+	LLMTurnResult          = runtime.LLMTurnResult
+	LLMTurnUsage           = runtime.LLMTurnUsage
+	NativePayloadInfo      = runtime.NativePayloadInfo
+	NativePayloadKind      = runtime.NativePayloadKind
+	ScriptFunctionCaller   = runtime.ScriptFunctionCaller
+	SoA                    = runtime.SoA
+	SoAAffinePlan          = runtime.SoAAffinePlan
+	SoAAffineTerm          = runtime.SoAAffineTerm
+	SoAShapeSnapshot       = runtime.SoAShapeSnapshot
+	Table                  = runtime.Table
+	Value                  = runtime.Value
 )
 
 const (

@@ -1177,8 +1177,6 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 	interp.SetModule("eval", evalModule)
 	if run != nil {
 		if run.replayProvider != nil {
-			run.replayMonitor.SetTraceSink(trace.Record)
-			defer run.replayMonitor.ClearTraceSink()
 			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayMonitor))
 		}
 		if run.recorder != nil {
@@ -1383,7 +1381,6 @@ type replayMonitor struct {
 	sessionID string
 	mu        sync.Mutex
 	active    replayCaseRef
-	trace     func(runtime.LLMTraceEvent)
 	errors    []replayError
 }
 
@@ -1402,8 +1399,6 @@ func (m *replayMonitor) Turn(ctx context.Context, req llm.TurnRequest) (llm.Turn
 			m.errors = append(m.errors, replayError{err: err, item: m.active})
 			m.mu.Unlock()
 		}
-	} else {
-		m.recordMatched(req, res)
 	}
 	return res, err
 }
@@ -1418,8 +1413,6 @@ func (m *replayMonitor) StreamTurn(ctx context.Context, req llm.TurnRequest, sin
 			m.errors = append(m.errors, replayError{err: err, item: m.active})
 			m.mu.Unlock()
 		}
-	} else {
-		m.recordMatched(req, res)
 	}
 	return res, err
 }
@@ -1442,52 +1435,16 @@ func (m *replayMonitor) ClearActiveCase() {
 	m.active = replayCaseRef{}
 }
 
-func (m *replayMonitor) SetTraceSink(trace func(runtime.LLMTraceEvent)) {
+func (m *replayMonitor) LastReplayMatch() (llm.ReplayMatch, bool) {
 	if m == nil {
-		return
+		return llm.ReplayMatch{}, false
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.trace = trace
-}
-
-func (m *replayMonitor) ClearTraceSink() {
-	if m == nil {
-		return
+	match, ok := m.provider.LastReplayMatch()
+	if !ok {
+		return llm.ReplayMatch{}, false
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.trace = nil
-}
-
-func (m *replayMonitor) recordMatched(req llm.TurnRequest, res llm.TurnResult) {
-	if m == nil {
-		return
-	}
-	turn := m.provider.Consumed() - 1
-	if turn < 0 {
-		turn = 0
-	}
-	event := runtime.LLMTraceEvent{
-		Type:            "replay_record_matched",
-		Model:           req.Model,
-		Status:          "matched",
-		TurnID:          fmt.Sprintf("turn:%d", turn),
-		ReplaySessionID: m.sessionID,
-		ReplayKey:       fmt.Sprintf("turn:%d", turn),
-		RequestHash:     replayValueHash(req),
-		ResponseHash:    replayValueHash(res),
-		ReplayMode:      "fixture_replay",
-		ProviderFree:    true,
-		MessageCount:    len(req.Messages),
-		ToolCount:       len(req.Tools),
-	}
-	m.mu.Lock()
-	trace := m.trace
-	m.mu.Unlock()
-	if trace != nil {
-		trace(event)
-	}
+	match.ReplaySessionID = m.sessionID
+	return match, true
 }
 
 func (m *replayMonitor) Findings() []Finding {
