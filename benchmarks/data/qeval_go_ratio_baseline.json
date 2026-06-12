@@ -1946,6 +1946,7 @@
     "max_allocs_op": 1800000.0,
     "max_leia_go_ratio": 7,
     "max_leia_jit_go_ratio": 7,
+    "max_leia_realdata_go_ratio": 60,
     "max_pipeline_fallback_shapes": 20.0,
     "max_typed_fallbacks_op": 50.0,
     "min_runtime_array_bridge_benchmarks": 0,
@@ -1953,6 +1954,59 @@
     "min_runtime_backend_route_hits_op": 0,
     "min_runtime_jit_backend_benchmarks": 0,
     "min_typed_hit_pct": 8.0
+  },
+  "realdata_cases": {
+    "FbyZipfSym1024": {
+      "realdata_go_ratio": 13.921
+    },
+    "FillsMsumNull40": {
+      "realdata_go_ratio": 3.1111
+    },
+    "GatherSum1M": {
+      "realdata_go_ratio": 0.8793
+    },
+    "IascDropGatherRandom1M": {
+      "realdata_go_ratio": 0.0754
+    },
+    "IascDropGatherRandom8K": {
+      "realdata_go_ratio": 0.1826
+    },
+    "IascZipfDuplicates": {
+      "realdata_go_ratio": 0.5796
+    },
+    "MavgSumDenseRandom": {
+      "realdata_go_ratio": 1.3557
+    },
+    "PlanThrash600Sources": {
+      "realdata_go_ratio": 6.166
+    },
+    "QSQLAsofJoin64Sym": {
+      "realdata_go_ratio": 0.7799
+    },
+    "QSQLSumBySym256": {
+      "realdata_go_ratio": 5.1412
+    },
+    "TiledPeriod5000Count": {
+      "realdata_go_ratio": 1.5501
+    },
+    "TinyVector8Rows": {
+      "realdata_go_ratio": null
+    },
+    "WhereChainAnd4Mid": {
+      "realdata_go_ratio": 17.3737
+    },
+    "WhereChainAnd4Sel0p01": {
+      "realdata_go_ratio": 52.0002
+    },
+    "WhereChainAnd4Sel99": {
+      "realdata_go_ratio": 40.4745
+    },
+    "XbarNaNInfCountWhere": {
+      "realdata_go_ratio": 2.8865
+    },
+    "Xrank10Weighted": {
+      "realdata_go_ratio": 2.4382
+    }
   },
   "schema_version": 1
 }

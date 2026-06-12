@@ -32,6 +32,15 @@ RATIO_BASELINE_FAMILIES = (
 )
 MIN_FAMILY_GEOMEAN_TRUSTED_COVERAGE = 0.5
 
+# Real-data annex: env-injected dense columns (benchmarks/
+# q_eval_realdata_bench_test.go). The synthetic 483-case suite builds data
+# in-q, so lazy carriers and closed forms can absorb the work; the annex pins
+# real dense-kernel cost. Its ratio family (realdata_go_ratio) is reported and
+# ratcheted SEPARATELY from the synthetic families so the two stories stay
+# side by side instead of averaging each other out.
+REALDATA_WARM_PREFIX = "BenchmarkQEvalRealDataWarm"
+REALDATA_GO_PREFIX = "BenchmarkQEvalRealDataGoBaseline"
+
 # Hard-cap thresholds that may be sourced from `milestone_caps` in the ratio
 # baseline JSON. When the matching CLI flag is left at its argparse default,
 # the milestone value overrides the default; an explicitly provided CLI flag
@@ -40,6 +49,7 @@ MIN_FAMILY_GEOMEAN_TRUSTED_COVERAGE = 0.5
 MILESTONE_CAP_KEYS = (
     "max_leia_go_ratio",
     "max_leia_jit_go_ratio",
+    "max_leia_realdata_go_ratio",
     "min_typed_hit_pct",
     "max_typed_fallbacks_op",
     "max_pipeline_fallback_shapes",
@@ -90,7 +100,8 @@ QEVAL_BENCH = (
     "Benchmark("
     "QEvalVector(ResultCacheWarm|Cold|GoBaseline)|"
     "QSessionEvalVectorWarmExecution|"
-    "QEvalJITScriptWarm"
+    "QEvalJITScriptWarm|"
+    "QEvalRealData(Warm|GoBaseline)"
     ")"
 )
 
@@ -333,6 +344,7 @@ class GatePolicy:
     max_pipeline_fallback_shapes: float
     max_allocs_op: float
     max_leia_jit_go_ratio: float = 5.0
+    max_leia_realdata_go_ratio: float = 60.0
     max_jit_typed_errors_op: float = 0.0
     max_jit_backend_slow_route_pct: float = 0.0
     min_runtime_direct_bridge_share_pct: float = 95.0
@@ -1524,6 +1536,133 @@ def ratio_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_basel
     return checks
 
 
+@dataclass
+class QEvalRealDataRow:
+    case: str
+    warm_ns_op: float | None
+    warm_allocs_op: float | None
+    go_ns_op: float | None
+    trusted_go_baseline: bool
+    realdata_go_ratio: float | None
+    note: str = ""
+
+
+def build_qeval_realdata_rows(rows: dict[str, BenchRow]) -> list[QEvalRealDataRow]:
+    cases = sorted(qeval_cases(rows, REALDATA_WARM_PREFIX) | qeval_cases(rows, REALDATA_GO_PREFIX))
+    out: list[QEvalRealDataRow] = []
+    for case in cases:
+        warm = f"{REALDATA_WARM_PREFIX}/{case}"
+        go = f"{REALDATA_GO_PREFIX}/{case}"
+        go_ns = row_ns(rows, go)
+        trusted = go_ns is not None and go_ns >= MIN_TRUSTED_GO_BASELINE_NS
+        ratio_value, note = trusted_qeval_go_ratio(rows, warm, go)
+        out.append(
+            QEvalRealDataRow(
+                case=case,
+                warm_ns_op=row_ns(rows, warm),
+                warm_allocs_op=row_metric(rows, warm, "allocs/op"),
+                go_ns_op=go_ns,
+                trusted_go_baseline=trusted,
+                realdata_go_ratio=ratio_value,
+                note=note if ratio_value is None else "env-injected dense columns; closed forms cannot fire",
+            )
+        )
+    return out
+
+
+def realdata_trusted_geomean(rows: dict[str, BenchRow]) -> tuple[float | None, int, int]:
+    """Geomean over trusted realdata_go_ratio cases: (value, trusted, total).
+
+    Reported in its own section and NEVER folded into the synthetic family
+    geomeans: the point of the annex is to keep the synthetic warm-dispatch
+    story and the real-data kernel story side by side.
+    """
+    items = build_qeval_realdata_rows(rows)
+    trusted = [item.realdata_go_ratio for item in items if item.realdata_go_ratio is not None and item.realdata_go_ratio > 0]
+    if not trusted:
+        return None, 0, len(items)
+    return geomean(trusted), len(trusted), len(items)
+
+
+def collect_realdata_baseline_cases(rows: dict[str, BenchRow], existing: dict | None = None) -> dict[str, dict[str, float | None]]:
+    existing_cases = (existing or {}).get("realdata_cases") or {}
+    warm = qeval_cases(rows, REALDATA_WARM_PREFIX)
+    go = qeval_cases(rows, REALDATA_GO_PREFIX)
+    if not warm or not go:
+        # Bench input without annex rows must not wipe the captured realdata
+        # ratchet; preserve the existing entries unchanged.
+        return existing_cases
+    cases: dict[str, dict[str, float | None]] = {}
+    for case in sorted(warm & go):
+        value, _ = trusted_qeval_go_ratio(rows, f"{REALDATA_WARM_PREFIX}/{case}", f"{REALDATA_GO_PREFIX}/{case}")
+        cases[case] = {"realdata_go_ratio": round(value, 4) if value is not None else None}
+    return cases
+
+
+def realdata_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_baseline: dict | None) -> list[GateCheck]:
+    checks: list[GateCheck] = []
+    warm_cases = sorted(qeval_cases(rows, REALDATA_WARM_PREFIX))
+    if not warm_cases:
+        return checks
+    baseline_cases = (ratio_baseline or {}).get("realdata_cases") or {}
+    tolerance = RATIO_BASELINE_REGRESSION_TOLERANCE
+    for case in warm_cases:
+        numerator = f"{REALDATA_WARM_PREFIX}/{case}"
+        denominator = f"{REALDATA_GO_PREFIX}/{case}"
+        current, note = trusted_qeval_go_ratio(rows, numerator, denominator)
+        cap = policy.max_leia_realdata_go_ratio
+        if current is None:
+            checks.append(
+                GateCheck(
+                    signal="leia_realdata_go_ratio",
+                    benchmark=numerator,
+                    value=None,
+                    threshold=f"<= {cap:g}",
+                    status="skip",
+                    note=note or "missing or untrusted Go baseline",
+                )
+            )
+            continue
+        checks.append(
+            GateCheck(
+                signal="leia_realdata_go_ratio",
+                benchmark=numerator,
+                value=current,
+                threshold=f"<= {cap:g}",
+                status="pass" if current <= cap else "fail",
+                note="real-data annex hard cap",
+            )
+        )
+        if ratio_baseline is None:
+            continue
+        entry = baseline_cases.get(case) or {}
+        baseline_value = entry.get("realdata_go_ratio")
+        if baseline_value is None:
+            checks.append(
+                GateCheck(
+                    signal="realdata_go_ratio_regression",
+                    benchmark=numerator,
+                    value=current,
+                    threshold="no baseline entry",
+                    status="pass",
+                    note="case not in realdata baseline yet; it will be captured at the next --update-ratio-baseline",
+                )
+            )
+            continue
+        limit = baseline_value * tolerance
+        checks.append(
+            GateCheck(
+                signal="realdata_go_ratio_regression",
+                benchmark=numerator,
+                value=current,
+                threshold=f"<= {limit:.4f}",
+                status="pass" if current <= limit else "fail",
+                note=f"baseline realdata_go_ratio {baseline_value:g} * tolerance {tolerance:g}",
+            )
+        )
+    return checks
+
+
 def load_ratio_baseline(path: Path) -> dict | None:
     if not path.exists():
         return None
@@ -1561,6 +1700,7 @@ def build_ratio_baseline_payload(rows: dict[str, BenchRow], existing: dict | Non
         "captured": date.today().isoformat(),
         "max_untrusted_go_baselines": count_untrusted_go_baselines(rows),
         "cases": collect_ratio_baseline_cases(rows),
+        "realdata_cases": collect_realdata_baseline_cases(rows, existing),
         "family_targets": existing.get("family_targets") or {},
         "exceptions": existing.get("exceptions") or {},
         "milestone_caps": existing.get("milestone_caps") or {},
@@ -1783,6 +1923,12 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
     checks: list[GateCheck] = []
     diagnostics = qeval_diagnostic_notes(rows)
     for item in build_runtime_metric_rows(rows):
+        if item.benchmark.startswith((REALDATA_WARM_PREFIX + "/", REALDATA_GO_PREFIX + "/")):
+            # The real-data annex is gated by its own family
+            # (leia_realdata_go_ratio + realdata_go_ratio_regression); the
+            # synthetic allocs/op cap does not apply to env-injected dense
+            # workloads or their hand-written Go baselines.
+            continue
         case = qeval_case_from_benchmark(item.benchmark)
         note = diagnostics.get(case or "")
         if item.typed_kernel_hit_pct is not None:
@@ -2234,6 +2380,7 @@ def build_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy, ratio_basel
     return (
         ratio_gate_checks(rows, policy, ratio_baseline)
         + ratio_baseline_gate_checks(rows, policy, ratio_baseline)
+        + realdata_gate_checks(rows, policy, ratio_baseline)
         + runtime_gate_checks(rows, policy)
         + observability_gate_checks(rows, policy)
         + runtime_health_gate_checks(rows, policy)
@@ -2488,6 +2635,35 @@ def markdown_report(
             f"| {item.scenario} | {item.numerator} | {item.denominator} | "
             f"{format_float(item.ratio)} | {item.note} |"
         )
+    realdata_rows = build_qeval_realdata_rows(rows)
+    if realdata_rows:
+        realdata_geo, realdata_trusted, realdata_total = realdata_trusted_geomean(rows)
+        lines.extend(
+            [
+                "",
+                "## Real-Data Annex (env-injected dense columns)",
+                "",
+                "Data is injected via the eval environment as dense Go-built columns, so",
+                "const-memo and lazy-carrier closed forms cannot fire. This family measures",
+                "real-data kernel quality and is reported separately from the synthetic",
+                "suite geomeans (the synthetic suite measures warm dispatch and lazy-carrier",
+                "regression; mixing the two would hide both signals).",
+                "",
+                f"Trusted realdata geomean: {format_float(realdata_geo)} over {realdata_trusted}/{realdata_total} cases (separate family; not folded into synthetic geomeans).",
+                "",
+                "| Case | Warm ns/op | Go ns/op | Warm/Go | warm allocs/op | Note |",
+                "|---|---:|---:|---:|---:|---|",
+            ]
+        )
+        for item in realdata_rows:
+            lines.append(
+                f"| {item.case} | "
+                f"{format_metric(item.warm_ns_op, 0)} | "
+                f"{format_metric(item.go_ns_op, 0)} | "
+                f"{format_float(item.realdata_go_ratio)} | "
+                f"{format_metric(item.warm_allocs_op, 0)} | "
+                f"{item.note} |"
+            )
     lines.extend(
         [
             "",
@@ -2806,6 +2982,16 @@ def main(argv: list[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--max-leia-realdata-go-ratio",
+        type=float,
+        default=60.0,
+        help=(
+            "Hard cap for BenchmarkQEvalRealDataWarm vs BenchmarkQEvalRealDataGoBaseline ratios "
+            "(real-data annex; gated separately from synthetic families). "
+            + MILESTONE_CAP_HELP % "max_leia_realdata_go_ratio"
+        ),
+    )
+    parser.add_argument(
         "--ratio-baseline",
         type=Path,
         default=DEFAULT_RATIO_BASELINE_PATH,
@@ -2961,6 +3147,7 @@ def main(argv: list[str]) -> int:
     policy = GatePolicy(
         max_leia_go_ratio=args.max_leia_go_ratio,
         max_leia_jit_go_ratio=args.max_leia_jit_go_ratio,
+        max_leia_realdata_go_ratio=args.max_leia_realdata_go_ratio,
         min_typed_hit_pct=args.min_typed_hit_pct,
         max_typed_fallbacks_op=args.max_typed_fallbacks_op,
         max_pipeline_fallback_shapes=args.max_pipeline_fallback_shapes,
@@ -3005,6 +3192,7 @@ def main(argv: list[str]) -> int:
         "q_eval_compute_coverage": asdict(build_qeval_compute_coverage(rows)),
         "q_eval_family_coverage": [asdict(row) for row in build_qeval_family_coverage(rows)],
         "q_eval_case_diagnostics": [asdict(row) for row in build_qeval_case_diagnostics(rows)],
+        "q_eval_realdata": [asdict(row) for row in build_qeval_realdata_rows(rows)],
         "ratios": [asdict(row) for row in build_ratios(rows)],
         "fallback_shape_summary": [asdict(row) for row in build_fallback_shape_rows(rows)],
         "gate_policy": asdict(policy),

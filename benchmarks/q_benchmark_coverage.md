@@ -235,6 +235,46 @@ dimensions from the previous round remain in place; see the qSQL rows in
 `benchmarks/q_performance_suite.sh` output for the join/mutation/cache
 coverage that now exists.
 
+## Synthetic-Structure Caveat and the Real-Data Annex
+
+An adversarial generality audit (2026-06) found that **all 483 `q.eval` bench
+cases build their data in-q**: every vector is either til-affine (`til N`
+plus arithmetic) or `N#pattern`-periodic. That structure is exactly what the
+lazy carriers and closed-form kernels (range/segment/periodic analytics,
+take/drop/rotate algebra, constant memoization) are built to absorb, so the
+synthetic ratios systematically overstate kernel quality on external data:
+the same shapes measured over env-injected dense Go columns came in at
+roughly 0.2-12.6x Go where the synthetic rows reported 0.003-1.8x. The
+audit also surfaced two dense fallbacks the synthetic suite could not see
+(per-row boxed dispatch for dense `mavg` reductions, and a comparison-sort
+route for dense random `iasc`), both since fixed.
+
+The two suites therefore measure different things, and both are kept:
+
+- The **483-case synthetic suite** is a warm-dispatch and lazy-carrier
+  regression harness. It pins plan-cache behavior, typed-kernel routing, and
+  the closed-form algebra. Its ratios answer "did dispatch or a carrier
+  regress?", not "how fast is Leia on real columns?".
+- The **real-data annex** (`benchmarks/q_eval_realdata_bench_test.go`,
+  `BenchmarkQEvalRealData(Warm|GoBaseline)`) injects fixed-seed random data
+  through the eval environment as dense Go-built columns, so const-memo and
+  lazy-carrier closed forms cannot fire. Every case has a hand-written
+  `//go:noinline`, row-scaled Go baseline over the same dense slices, and
+  `TestQEvalRealDataMatchesGoBaseline` checksum-verifies q against Go at two
+  row counts. It covers selective where-chains, gathers, null-laden moving
+  windows, dense sorts (random/Zipf/1M), fby and group-by over realistic
+  symbol distributions, asof joins on sorted-random timestamps, xrank/xbar
+  with NaN/Inf, an over-cap periodic tile (period 5000 > the 4096 analytic
+  cap), tiny 8-row vectors, and a 600-source plan-cache thrash case.
+
+The annex reports through its own `realdata_go_ratio` family in
+`q_perf_report.py` ("Real-Data Annex" section), with per-case ratios captured
+under `realdata_cases` in `qeval_go_ratio_baseline.json`, a separate hard cap
+(`milestone_caps.max_leia_realdata_go_ratio`), and the same 1.15x
+no-regression ratchet. The realdata geomean is **never folded into the
+synthetic geomeans**: the point is to report the synthetic story and the
+real-data story side by side.
+
 ## Known Gaps
 
 | Gap | Why it matters |

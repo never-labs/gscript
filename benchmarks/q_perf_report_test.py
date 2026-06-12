@@ -102,6 +102,16 @@ MILESTONE_CAPS = {
 }
 
 
+SAMPLE_REALDATA = """
+BenchmarkQEvalRealDataWarm/GatherSum1M-16          100  9800 ns/op  2048 B/op  14 allocs/op
+BenchmarkQEvalRealDataGoBaseline/GatherSum1M-16    100  10000 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalRealDataWarm/WhereChainAnd4Mid-16        100  40000 ns/op  4096 B/op  59 allocs/op
+BenchmarkQEvalRealDataGoBaseline/WhereChainAnd4Mid-16  100  2000 ns/op  0 B/op  0 allocs/op
+BenchmarkQEvalRealDataWarm/TinyVector8Rows-16          100  1800 ns/op  512 B/op  19 allocs/op
+BenchmarkQEvalRealDataGoBaseline/TinyVector8Rows-16    100  7 ns/op  0 B/op  0 allocs/op
+"""
+
+
 def make_ratio_baseline(**overrides):
     baseline = {
         "schema_version": 1,
@@ -804,6 +814,144 @@ BenchmarkQEvalJITScriptWarm/MaskWhere-16  100  1800 ns/op  96 B/op  3 allocs/op 
 
             self.assertEqual(code, 0)
             self.assertEqual(baseline_path.read_text(), first_text)
+
+    def test_realdata_rows_form_separate_family_with_geomean(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_REALDATA)
+        items = report.build_qeval_realdata_rows(rows)
+        by_case = {item.case: item for item in items}
+        self.assertEqual(set(by_case), {"GatherSum1M", "WhereChainAnd4Mid", "TinyVector8Rows"})
+        self.assertAlmostEqual(by_case["GatherSum1M"].realdata_go_ratio, 0.98)
+        self.assertAlmostEqual(by_case["WhereChainAnd4Mid"].realdata_go_ratio, 20.0)
+        # 7 ns/op Go baseline is below the trust threshold: correctness-only.
+        self.assertIsNone(by_case["TinyVector8Rows"].realdata_go_ratio)
+        self.assertFalse(by_case["TinyVector8Rows"].trusted_go_baseline)
+        geo, trusted, total = report.realdata_trusted_geomean(rows)
+        self.assertEqual((trusted, total), (2, 3))
+        self.assertAlmostEqual(geo, (0.98 * 20.0) ** 0.5, places=6)
+        # The realdata family never leaks into the synthetic baseline cases.
+        self.assertNotIn("GatherSum1M", report.collect_ratio_baseline_cases(rows))
+
+    def test_realdata_gate_checks_hard_cap_and_ratchet(self):
+        rows = report.parse_go_benchmarks(SAMPLE_REALDATA)
+        baseline = make_ratio_baseline(
+            realdata_cases={
+                "GatherSum1M": {"realdata_go_ratio": 1.0},
+                "WhereChainAnd4Mid": {"realdata_go_ratio": 10.0},
+            }
+        )
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            max_leia_realdata_go_ratio=60.0,
+        )
+        checks = report.realdata_gate_checks(rows, policy, baseline)
+        regression = {check.benchmark: check for check in checks if check.signal == "realdata_go_ratio_regression"}
+        hard_cap = {check.benchmark: check for check in checks if check.signal == "leia_realdata_go_ratio"}
+
+        gather = regression["BenchmarkQEvalRealDataWarm/GatherSum1M"]
+        self.assertEqual(gather.status, "pass")  # 0.98 <= 1.0 * 1.15
+        chain = regression["BenchmarkQEvalRealDataWarm/WhereChainAnd4Mid"]
+        self.assertEqual(chain.status, "fail")  # 20.0 > 10.0 * 1.15
+        self.assertEqual(chain.value, 20.0)
+        # Untrusted Go baseline never produces a ratchet row, only a skip.
+        self.assertNotIn("BenchmarkQEvalRealDataWarm/TinyVector8Rows", regression)
+        tiny = hard_cap["BenchmarkQEvalRealDataWarm/TinyVector8Rows"]
+        self.assertEqual(tiny.status, "skip")
+        self.assertEqual(hard_cap["BenchmarkQEvalRealDataWarm/WhereChainAnd4Mid"].status, "pass")
+
+    def test_realdata_gate_checks_hard_cap_fail_and_missing_baseline_entry(self):
+        rows = report.parse_go_benchmarks(SAMPLE_REALDATA)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            max_leia_realdata_go_ratio=10.0,
+        )
+        checks = report.realdata_gate_checks(rows, policy, make_ratio_baseline())
+        hard_cap = {check.benchmark: check for check in checks if check.signal == "leia_realdata_go_ratio"}
+        self.assertEqual(hard_cap["BenchmarkQEvalRealDataWarm/WhereChainAnd4Mid"].status, "fail")
+        self.assertEqual(hard_cap["BenchmarkQEvalRealDataWarm/GatherSum1M"].status, "pass")
+        regression = {check.benchmark: check for check in checks if check.signal == "realdata_go_ratio_regression"}
+        gather = regression["BenchmarkQEvalRealDataWarm/GatherSum1M"]
+        self.assertEqual(gather.status, "pass")
+        self.assertIn("--update-ratio-baseline", gather.note)
+
+    def test_update_ratio_baseline_captures_and_preserves_realdata_cases(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE + SAMPLE_REALDATA)
+            baseline_path = td_path / "qeval_go_ratio_baseline.json"
+            baseline_path.write_text(json.dumps(make_ratio_baseline()))
+            argv = [
+                "--from-output", str(out),
+                "--json", str(td_path / "report.json"),
+                "--markdown", str(td_path / "report.md"),
+                "--ratio-baseline", str(baseline_path),
+                "--update-ratio-baseline",
+            ]
+
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main(argv)
+
+            self.assertEqual(code, 0)
+            payload = json.loads(baseline_path.read_text())
+            self.assertEqual(
+                payload["realdata_cases"]["GatherSum1M"], {"realdata_go_ratio": 0.98}
+            )
+            self.assertEqual(
+                payload["realdata_cases"]["WhereChainAnd4Mid"], {"realdata_go_ratio": 20.0}
+            )
+            self.assertEqual(
+                payload["realdata_cases"]["TinyVector8Rows"], {"realdata_go_ratio": None}
+            )
+            # realdata cases never bleed into the synthetic per-case map
+            self.assertNotIn("GatherSum1M", payload["cases"])
+
+            # an update from synthetic-only output must preserve the captured
+            # realdata ratchet untouched
+            out.write_text(SAMPLE)
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main(argv)
+            self.assertEqual(code, 0)
+            payload = json.loads(baseline_path.read_text())
+            self.assertEqual(
+                payload["realdata_cases"]["GatherSum1M"], {"realdata_go_ratio": 0.98}
+            )
+
+    def test_milestone_cap_overrides_realdata_hard_cap(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "bench.txt"
+            out.write_text(SAMPLE_REALDATA)
+            baseline_path = td_path / "baseline.json"
+            baseline_path.write_text(
+                json.dumps(make_ratio_baseline(milestone_caps={"max_leia_realdata_go_ratio": 15.0}))
+            )
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = report.main([
+                    "--from-output", str(out),
+                    "--json", str(td_path / "report.json"),
+                    "--markdown", str(td_path / "report.md"),
+                    "--ratio-baseline", str(baseline_path),
+                    "--check",
+                ])
+            self.assertEqual(code, 2)
+            payload = json.loads((td_path / "report.json").read_text())
+            self.assertEqual(payload["gate_policy"]["max_leia_realdata_go_ratio"], 15.0)
+            fails = [
+                row["benchmark"]
+                for row in payload["gate"]
+                if row["signal"] == "leia_realdata_go_ratio" and row["status"] == "fail"
+            ]
+            self.assertEqual(fails, ["BenchmarkQEvalRealDataWarm/WhereChainAnd4Mid"])
+            realdata_section = payload["q_eval_realdata"]
+            self.assertEqual(len(realdata_section), 3)
 
     def test_update_ratio_baseline_requires_qeval_bench_input(self):
         with tempfile.TemporaryDirectory() as td:
