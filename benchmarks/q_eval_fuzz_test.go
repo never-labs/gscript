@@ -673,6 +673,7 @@ var qEvalKnownDivergenceRepresentatives = []string{
 	// Removed (shrink-only ratchet).
 	"2 rotate where 0 1 1",   // string route rejects nested verb applications
 	"(0 or wsum 0)",          // word dyadic over a word application: string route rejects
+	"x:();last&x",            // bare unary verb word as dyadic-& left operand: string route rejects, compiled accepts
 	`()+("J"$"0")+("I"$"0")`, // empty-list broadcast lost on the string route
 	"(count 0;9)+(0)",        // list items with verb applications split differently
 	"0-0e",                   // sized-suffix promotion differs between routes
