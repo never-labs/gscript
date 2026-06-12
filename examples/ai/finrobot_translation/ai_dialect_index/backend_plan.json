@@ -43,6 +43,40 @@
       }
     },
     {
+      "shape_id": "ai.chart.render_contracts",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "chart-render",
+        "evidence-report-artifacts",
+        "ui-snapshot"
+      ],
+      "contract": "Normalize provider-free chart specs, recipe semantic matrices, render request/result envelopes, source metadata, deterministic snapshot hashes, and unsupported renderer clean skips.",
+      "inputs": [
+        "chart_spec",
+        "recipe_matrix",
+        "render_request",
+        "renderer_dependency_gate"
+      ],
+      "outputs": [
+        "render_result",
+        "source_metadata",
+        "snapshot_hash",
+        "renderer_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_chart_render_contracts.source.txt",
+      "test": "tests/llm/llm_generic_chart_render_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_chart_render_contracts_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-chart-render-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/contracts/generic_chart_render_contracts_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.coding_workspace",
       "status": "checked_in_package_boundary",
       "capabilities": [

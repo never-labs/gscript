@@ -1,0 +1,40 @@
+generic_chart_render_contracts_live_package := {
+    id: "generic-chart-render-contracts"
+    package_name: "leia-generic-ai-chart-render-contracts"
+    capability: "generic.ai.chart.render.contracts"
+    entrypoint: "ai.chart.render_contracts"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    chart_specs: 2
+    recipes: 3
+    render_requests: 2
+    render_results: 2
+    renderer_skips: 1
+    clean_skip_adapters: 2
+}
+
+assert(generic_chart_render_contracts_live_package.provider_free)
+assert(!generic_chart_render_contracts_live_package.live_network)
+assert(!generic_chart_render_contracts_live_package.real_dependency_imports)
+assert(!generic_chart_render_contracts_live_package.live_model_calls)
+assert(generic_chart_render_contracts_live_package.chart_specs == 2)
+assert(generic_chart_render_contracts_live_package.render_results == 2)
+
+generic_chart_render_contracts_live_package_summary := string.format(
+"generic_chart_render_contracts_live_package capability=%s entrypoint=%s specs=%d recipes=%d requests=%d results=%d skips=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_chart_render_contracts_live_package.capability,
+generic_chart_render_contracts_live_package.entrypoint,
+generic_chart_render_contracts_live_package.chart_specs,
+generic_chart_render_contracts_live_package.recipes,
+generic_chart_render_contracts_live_package.render_requests,
+generic_chart_render_contracts_live_package.render_results,
+generic_chart_render_contracts_live_package.renderer_skips,
+generic_chart_render_contracts_live_package.clean_skip_adapters,
+tostring(generic_chart_render_contracts_live_package.provider_free),
+tostring(generic_chart_render_contracts_live_package.live_network),
+tostring(generic_chart_render_contracts_live_package.real_dependency_imports),
+tostring(generic_chart_render_contracts_live_package.live_model_calls))
+
+print(generic_chart_render_contracts_live_package_summary)

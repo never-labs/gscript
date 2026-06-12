@@ -24,6 +24,7 @@
     "agent",
     "approval",
     "capability",
+    "chart-render",
     "coding-workspace",
     "document-rag",
     "evaluation",
@@ -130,6 +131,39 @@
         "package_id": "generic-approval-policy",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "chart-render",
+      "capability_id": "generic.ai.chart.render.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "chart.spec",
+        "chart.recipe_matrix",
+        "chart.render_request",
+        "chart.render_result",
+        "chart.source_metadata",
+        "chart.snapshot_hash",
+        "chart.renderer_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_chart_render_contracts.source.txt",
+      "test": "tests/llm/llm_generic_chart_render_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_chart_render_contracts_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-chart-render-contracts",
+        "boundary": "provider-free chart specs, recipe semantic matrices, render request/result envelopes, source metadata, deterministic snapshot hashes, and unsupported renderer clean skips",
+        "status": "resolved",
+        "reason": "chart rendering behavior was promoted from domain renderers into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-chart-render-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
       }
@@ -296,35 +330,6 @@
       }
     },
     {
-      "capability": "model",
-      "capability_id": "generic.ai.model.registry",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "model",
-        "model.default",
-        "provider_model_alias"
-      ],
-      "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_dialect_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-model-registry",
-        "boundary": "model alias registry with provider-free replay defaults",
-        "status": "resolved",
-        "reason": "model alias behavior was promoted from examples and tests into the generic_model_registry provider-free package boundary"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-model-registry",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
       "capability": "model-io",
       "capability_id": "generic.ai.model.io.envelope",
       "provider_free": true,
@@ -352,6 +357,35 @@
         "package_id": "generic-model-io-envelope",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "model",
+      "capability_id": "generic.ai.model.registry",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "model",
+        "model.default",
+        "provider_model_alias"
+      ],
+      "example": "examples/ai/general_agent_workflow.leia",
+      "test": "tests/llm/llm_ai_dialect_test.go",
+      "fixture": "examples/ai/general_agent_workflow.records.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-model-registry",
+        "boundary": "model alias registry with provider-free replay defaults",
+        "status": "resolved",
+        "reason": "model alias behavior was promoted from examples and tests into the generic_model_registry provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

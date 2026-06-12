@@ -17,9 +17,9 @@ Verification gates are listed in `VERIFICATION.md`. Production live-package
 work is tracked separately in `live_package_plan.md` and
 `live_package_plan_manifest.json`.
 
-Current status: `go run ./cmd/leia examples list --json` discovers 87 runnable
+Current status: `go run ./cmd/leia examples list --json` discovers 88 runnable
 and checkable FinRobot translation examples under this directory. The
-checked-in live-package skeleton surface has 41 directories:
+checked-in live-package skeleton surface has 42 directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
@@ -27,6 +27,7 @@ checked-in live-package skeleton surface has 41 directories:
 `live_packages/factor_research`, `live_packages/finance_facade`,
 `live_packages/finance_normalizers`, `live_packages/generic_agent_runner`,
 `live_packages/generic_approval_policy`,
+`live_packages/generic_chart_render_contracts`,
 `live_packages/generic_coding_workspace`,
 `live_packages/generic_evaluation_harness`,
 `live_packages/generic_document_rag_pipeline`,
@@ -46,7 +47,7 @@ checked-in live-package skeleton surface has 41 directories:
 `live_packages/prompt_roles`, `live_packages/report_renderer`,
 `live_packages/retail_sentiment`, `live_packages/sec_filings`,
 `live_packages/tutorial_demo_parity`, `live_packages/valuation_engine`, and
-`live_packages/vendor_adapters`. All 41 skeletons provide registered
+`live_packages/vendor_adapters`. All 42 skeletons provide registered
 provider-free `.leia` examples. The `generic_*` skeletons are reusable generic
 AI package boundaries consumed by this translation; they are not
 FinRobot-specific language features.

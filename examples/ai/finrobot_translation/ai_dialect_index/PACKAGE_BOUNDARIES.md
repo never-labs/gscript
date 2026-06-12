@@ -44,6 +44,7 @@ contracts, and fixtures for its boundary.
 - prompt-role: `examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog`
 - evidence-report-artifacts: `examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts`
 - ui-snapshot: `examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator`
+- chart-render: `examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts`
 - memory: `examples/ai/finrobot_translation/live_packages/generic_memory_store`
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
 - tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
@@ -82,6 +83,9 @@ orthogonal and layered:
 - ui-snapshot owns route DOM schemas, viewport matrices, visual diff budgets,
   accessibility summaries, artifact URI manifests, redaction policy, static
   asset policy, and browser clean-skip envelopes.
+- chart-render owns chart specs, recipe semantic matrices, render requests and
+  results, source metadata, deterministic snapshot hashes, and unsupported
+  renderer clean-skip envelopes.
 - memory owns namespace policy, memory items, deterministic retrieval ranking,
   context windows, provenance, and provider-free adapter boundaries.
 - turn consumes model descriptors, structured messages, tool-call envelopes,
@@ -125,6 +129,7 @@ language or specializing the dialect for one application domain.
 | Document RAG | `generic_document_rag_pipeline`, `generic_memory_store` | Document conversion, sections, chunks, citations, retrieval results, and adapter clean-skip boundaries are generic package data; domain adapters provide source documents outside the core language. |
 | Prompt and role catalogs | `generic_prompt_role_catalog`, `generic_agent_runner`, `generic_workflow_orchestrator` | Prompt templates, role profiles, output schemas, delegation triggers, evidence validation, and termination conventions are package-owned fixtures and contracts, not built-in language syntax. |
 | Evidence/report artifacts | `generic_evidence_report_artifacts`, `generic_document_rag_pipeline`, `generic_workflow_orchestrator`, `generic_trace_events` | Source annotations, citation envelopes, section DAGs, render manifests, snapshots, stale warnings, accessibility checks, and clean-skip renderer gates are package data shared by workflows, traces, replay, and reporting packages. |
+| Chart rendering | `generic_chart_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Chart specs, recipe matrices, render envelopes, source metadata, and deterministic snapshot hashes are produced by chart-render; evidence-report consumes chart artifacts; UI snapshot evaluates rendered routes and accessibility without owning chart semantics. |
 | UI snapshot evaluation | `generic_ui_snapshot_evaluator`, `generic_evidence_report_artifacts`, `generic_trace_events` | Route DOM schemas, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean-skip metadata stay generic UI package data rather than product-specific web code. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |

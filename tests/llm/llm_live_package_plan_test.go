@@ -211,6 +211,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"sec_filings":                       "finance.document.sec.",
 		"generic_agent_runner":              "ai.agent.",
 		"generic_approval_policy":           "generic.ai.",
+		"generic_chart_render_contracts":    "generic.ai.",
 		"generic_coding_workspace":          "generic.ai.",
 		"generic_document_rag_pipeline":     "generic.ai.",
 		"generic_evidence_report_artifacts": "generic.ai.",

@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 87,
-  "translation_directory_file_count": 677,
+  "registered_examples_count": 88,
+  "translation_directory_file_count": 685,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -122,6 +122,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
       "covers_package_ids": [
         "generic_approval_policy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_chart_render_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_chart_render_contracts"
       ],
       "status": "checked_in_registered_example"
     },
@@ -747,6 +756,35 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_chart_render_contracts",
+      "package_name": "leia-generic-ai-chart-render-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+      "planned_directory": "packages/generic_ai/chart_render_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/contracts/generic_chart_render_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_chart_render_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.chart.render.contracts",
+        "generic.ai.chart.spec",
+        "generic.ai.chart.recipe.matrix",
+        "generic.ai.chart.render.request",
+        "generic.ai.chart.render.result",
+        "generic.ai.chart.source.metadata",
+        "generic.ai.chart.snapshot.hash",
+        "generic.ai.chart.renderer.clean_skip",
+        "generic.ai.chart.unsupported_renderer"
+      ],
+      "test_gates": [
+        "chart spec and recipe matrix contract fixtures decode without renderer dependencies",
+        "render request/result contract envelopes are deterministic provider-free fixture data",
+        "source metadata contract is redacted and replay-ready",
+        "snapshot hash contract values are deterministic fixture values",
+        "unsupported renderer contract paths produce clean-skip envelopes"
       ],
       "no_built_in_guarantee": true
     },
