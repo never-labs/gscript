@@ -34,6 +34,22 @@
         "real_dependency_imports": false,
         "replay_ready": true
       }
+    },
+    {
+      "key": "generic_trace_events:envelope:workflow_agent:offline",
+      "path": "fixtures/trace_envelope_fixture.json",
+      "schema": "schemas/trace_envelope_v1.schema.json",
+      "description": "Provider-free unified trace envelope covering turn, tool, approval, workflow, replay, and agent correlations.",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "envelope_ready": true
+      }
     }
   ],
   "replay_mode": "deterministic_fixture_replay",

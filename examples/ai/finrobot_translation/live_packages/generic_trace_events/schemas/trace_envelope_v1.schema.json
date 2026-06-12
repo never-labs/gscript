@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/generic_trace_events/trace_envelope_v1.schema.json",
+  "title": "Generic AI Trace Envelope",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "package_boundary_id",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "trace_envelope_schema",
+    "source_coverage",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "domain_specific": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "live_model": {
+      "const": false
+    },
+    "credentials_required": {
+      "const": false
+    },
+    "trace_envelope_schema": {
+      "type": "object",
+      "required": [
+        "name",
+        "required_fields",
+        "correlation_id_fields"
+      ]
+    },
+    "source_coverage": {
+      "type": "array",
+      "minItems": 1
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "event_id",
+          "event_type",
+          "timestamp_ms",
+          "sequence",
+          "status",
+          "correlation"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timestamp_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "correlation": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -3,10 +3,11 @@
   "id": "generic-ai-trace-events-live-package",
   "package_name": "leia-generic-ai-trace-events",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for generic.ai.trace.events and ai.trace.emit turn, stream, tool, artifact, approval, and replay trace events.",
+  "description": "Provider-free live package skeleton for generic.ai.trace.events and ai.trace.emit turn, stream, tool, artifact, approval, replay, workflow, and agent trace event envelopes.",
   "source_modules": [
     "examples/ai/finrobot_translation/ai_dialect_index/index.json",
-    "examples/ai/finrobot_translation/ai_dialect_index/backend_plan.json"
+    "examples/ai/finrobot_translation/ai_dialect_index/backend_plan.json",
+    "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_trace_envelope_fixture.json"
   ],
   "provider_free": true,
   "live_network_default": false,
@@ -37,18 +38,21 @@
     "trace_events_contract": "contracts/trace_events_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json",
     "trace_sequence_fixture": "fixtures/trace_sequence_ACME_fixture.json",
-    "redaction_policy_fixture": "fixtures/redaction_policy_fixture.json"
+    "redaction_policy_fixture": "fixtures/redaction_policy_fixture.json",
+    "trace_envelope_fixture": "fixtures/trace_envelope_fixture.json"
   },
   "schemas": {
     "trace_event": "schemas/trace_event_v1.schema.json",
     "trace_sequence": "schemas/trace_sequence_v1.schema.json",
     "redaction_policy": "schemas/redaction_policy_v1.schema.json",
-    "correlation_ids": "schemas/correlation_ids_v1.schema.json"
+    "correlation_ids": "schemas/correlation_ids_v1.schema.json",
+    "trace_envelope": "schemas/trace_envelope_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "trace_sequence": "fixtures/trace_sequence_ACME_fixture.json",
-    "redaction_policy": "fixtures/redaction_policy_fixture.json"
+    "redaction_policy": "fixtures/redaction_policy_fixture.json",
+    "trace_envelope": "fixtures/trace_envelope_fixture.json"
   },
   "capabilities": [
     "generic.ai.trace.events",
@@ -62,7 +66,18 @@
     "ai.trace.redaction_policy",
     "ai.trace.correlation_ids",
     "ai.trace.sequence_marker",
-    "ai.trace.fixture_replay"
+    "ai.trace.fixture_replay",
+    "ai.trace.envelope",
+    "ai.trace.turn_end",
+    "ai.trace.tool_call",
+    "ai.trace.tool_result",
+    "ai.trace.workflow_step",
+    "ai.trace.replay_record_matched",
+    "ai.trace.agent_start",
+    "ai.trace.agent_turn_tool_dispatch",
+    "ai.trace.agent_done",
+    "ai.trace.workflow_correlation",
+    "ai.trace.agent_correlation"
   ],
   "event_contracts": [
     {
@@ -131,6 +146,98 @@
         "deterministic"
       ],
       "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "turn_end",
+      "capability": "ai.trace.turn_end",
+      "required_payload_fields": [
+        "status",
+        "message_count",
+        "output_digest"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "tool_call",
+      "capability": "ai.trace.tool_call",
+      "required_payload_fields": [
+        "tool_call_id",
+        "tool_name",
+        "status",
+        "input_digest"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "tool_result",
+      "capability": "ai.trace.tool_result",
+      "required_payload_fields": [
+        "tool_call_id",
+        "tool_name",
+        "status",
+        "output_digest"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "approval_replay_trace",
+      "capability": "ai.trace.approval",
+      "required_payload_fields": [
+        "approval_id",
+        "tool_call_id",
+        "decision",
+        "policy_id"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "workflow_step",
+      "capability": "ai.trace.workflow_step",
+      "required_payload_fields": [
+        "workflow_run_id",
+        "workflow_step_id",
+        "status"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "replay_record_matched",
+      "capability": "ai.trace.replay_record_matched",
+      "required_payload_fields": [
+        "replay_session_id",
+        "matched_event_id",
+        "deterministic"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "agent_start",
+      "capability": "ai.trace.agent_start",
+      "required_payload_fields": [
+        "agent_run_id",
+        "status"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "agent_turn_tool_dispatch",
+      "capability": "ai.trace.agent_turn_tool_dispatch",
+      "required_payload_fields": [
+        "agent_run_id",
+        "turn_id",
+        "tool_call_id",
+        "status"
+      ],
+      "provider_name_policy": "generic_or_redacted"
+    },
+    {
+      "event_type": "agent_done",
+      "capability": "ai.trace.agent_done",
+      "required_payload_fields": [
+        "agent_run_id",
+        "status"
+      ],
+      "provider_name_policy": "generic_or_redacted"
     }
   ],
   "sequence_policy": {
@@ -159,7 +266,11 @@
       "tool_call_id",
       "artifact_id",
       "approval_id",
-      "replay_id"
+      "replay_id",
+      "workflow_run_id",
+      "workflow_step_id",
+      "agent_run_id",
+      "replay_session_id"
     ],
     "format": "stable-provider-free-strings",
     "provider_request_id_policy": "omitted_or_redacted"
@@ -203,7 +314,9 @@
     "trace fixture records strictly increasing sequence values using fixture_monotonic_ms",
     "redaction policy hashes or drops secrets and permits only explicit previews",
     "provider request IDs and provider names are omitted, generic, or redacted",
-    "fixture replay matches trace_id, event_id, sequence, and event_type without live telemetry sinks"
+    "fixture replay matches trace_id, event_id, sequence, and event_type without live telemetry sinks",
+    "trace envelope fixture covers turn, tool, approval, workflow, replay, and agent correlation IDs under the generic trace events package boundary",
+    "workflow and agent trace envelope event types remain provider-free and live-network disabled"
   ],
   "no_built_in_guarantee": {
     "required": true,

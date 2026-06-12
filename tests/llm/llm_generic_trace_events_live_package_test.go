@@ -120,6 +120,17 @@ type genericTraceEventsContract struct {
 		MismatchPolicy string   `json:"mismatch_policy"`
 		AllowLiveSink  bool     `json:"allow_live_sink"`
 	} `json:"replay_contract"`
+	TraceEnvelopeContract struct {
+		Schema                      string   `json:"schema"`
+		Fixture                     string   `json:"fixture"`
+		RequiredFields              []string `json:"required_fields"`
+		RequiredCorrelationIDFields []string `json:"required_correlation_id_fields"`
+		CoveredSurfaces             []string `json:"covered_surfaces"`
+		ProviderFree                bool     `json:"provider_free"`
+		LiveNetwork                 bool     `json:"live_network"`
+		LiveModel                   bool     `json:"live_model"`
+		CredentialsRequired         bool     `json:"credentials_required"`
+	} `json:"trace_envelope_contract"`
 }
 
 type genericTraceEventsSequenceFixture struct {
@@ -239,20 +250,20 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		manifest.DefaultPolicy.FixtureHook != "recorded_generic_trace_events_fixture" {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
-	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture"} {
+	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 		assertGenericTraceEventsEntrypointPath(t, manifest.Entrypoints[key])
 	}
-	for _, key := range []string{"trace_event", "trace_sequence", "redaction_policy", "correlation_ids"} {
+	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "redaction_policy", "correlation_ids"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericTraceEventsJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "trace_sequence", "redaction_policy"} {
+	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "redaction_policy"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -270,6 +281,17 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		"ai.trace.artifact",
 		"ai.trace.approval",
 		"ai.trace.replay",
+		"ai.trace.envelope",
+		"ai.trace.turn_end",
+		"ai.trace.tool_call",
+		"ai.trace.tool_result",
+		"ai.trace.workflow_step",
+		"ai.trace.replay_record_matched",
+		"ai.trace.agent_start",
+		"ai.trace.agent_turn_tool_dispatch",
+		"ai.trace.agent_done",
+		"ai.trace.workflow_correlation",
+		"ai.trace.agent_correlation",
 		"ai.trace.redaction_policy",
 		"ai.trace.correlation_ids",
 		"ai.trace.sequence_marker",
@@ -293,7 +315,7 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 			t.Fatalf("%s has no payload contract", contract.EventType)
 		}
 	}
-	for _, eventType := range []string{"turn_start", "stream", "tool", "artifact", "approval", "replay"} {
+	for _, eventType := range []string{"turn_start", "stream", "tool", "artifact", "approval", "replay", "turn_end", "tool_call", "tool_result", "approval_replay_trace", "workflow_step", "replay_record_matched", "agent_start", "agent_turn_tool_dispatch", "agent_done"} {
 		if contracts[eventType].EventType == "" {
 			t.Fatalf("missing event contract %q", eventType)
 		}
@@ -310,6 +332,11 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 	for _, want := range []string{"trace_id", "run_id", "turn_id", "event_id"} {
 		if !genericTraceEventsContains(manifest.CorrelationPolicy.RequiredIDs, want) {
 			t.Fatalf("correlation required IDs missing %q: %#v", want, manifest.CorrelationPolicy)
+		}
+	}
+	for _, want := range []string{"workflow_run_id", "workflow_step_id", "agent_run_id", "replay_session_id"} {
+		if !genericTraceEventsContains(manifest.CorrelationPolicy.OptionalIDs, want) {
+			t.Fatalf("correlation optional IDs missing %q: %#v", want, manifest.CorrelationPolicy)
 		}
 	}
 	if manifest.CorrelationPolicy.ProviderRequestIDPolicy != "omitted_or_redacted" {
@@ -376,6 +403,86 @@ func TestGenericTraceEventsFixtureReplaySequence(t *testing.T) {
 		fixture.ReplayAssertions.AllowLiveSink ||
 		!reflect.DeepEqual(fixture.ReplayAssertions.MatchKeys, []string{"trace_id", "event_id", "sequence", "event_type"}) {
 		t.Fatalf("replay assertions incomplete: %#v", fixture.ReplayAssertions)
+	}
+}
+
+func TestGenericTraceEventsPackageLocalUnifiedEnvelope(t *testing.T) {
+	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
+	contract := loadGenericTraceEventsContract(t, base)
+	var fixture genericTraceEnvelopeFixtureDoc
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "trace_envelope_fixture.json"), &fixture)
+
+	if manifest.Fixtures["trace_envelope"] != contract.TraceEnvelopeContract.Fixture ||
+		manifest.Schemas["trace_envelope"] != contract.TraceEnvelopeContract.Schema {
+		t.Fatalf("trace envelope manifest/contract disconnected: fixture=%q/%q schema=%q/%q",
+			manifest.Fixtures["trace_envelope"], contract.TraceEnvelopeContract.Fixture,
+			manifest.Schemas["trace_envelope"], contract.TraceEnvelopeContract.Schema)
+	}
+	if fixture.SchemaVersion != 1 ||
+		fixture.ID != "generic-ai-trace-envelope-fixture" ||
+		fixture.PackageBoundaryID != "generic-ai-trace-events" ||
+		!fixture.ProviderFree ||
+		fixture.DomainSpecific ||
+		fixture.LiveNetwork ||
+		fixture.LiveModel ||
+		fixture.CredentialsRequired {
+		t.Fatalf("trace envelope fixture header is not generic/provider-free: %#v", fixture)
+	}
+	if !contract.TraceEnvelopeContract.ProviderFree ||
+		contract.TraceEnvelopeContract.LiveNetwork ||
+		contract.TraceEnvelopeContract.LiveModel ||
+		contract.TraceEnvelopeContract.CredentialsRequired {
+		t.Fatalf("trace envelope contract must stay provider-free/offline: %#v", contract.TraceEnvelopeContract)
+	}
+	assertGenericTraceEventsSameStrings(t, "trace envelope fields", fixture.TraceEnvelopeSchema.RequiredFields, contract.TraceEnvelopeContract.RequiredFields)
+	assertGenericTraceEventsSameStrings(t, "trace envelope correlation ids", fixture.TraceEnvelopeSchema.CorrelationIDFields, contract.TraceEnvelopeContract.RequiredCorrelationIDFields)
+	assertGenericTraceEventsSameStrings(t, "trace envelope surfaces", contract.TraceEnvelopeContract.CoveredSurfaces, []string{"turn", "tool", "approval", "workflow", "replay", "agent"})
+
+	wantByEventType := map[string][]string{
+		"turn_start":               {"turn_id", "workflow_run_id", "replay_session_id"},
+		"turn_end":                 {"turn_id", "workflow_run_id", "replay_session_id", "parent_event_id"},
+		"tool_call":                {"turn_id", "tool_call_id", "workflow_run_id", "workflow_step_id", "replay_session_id"},
+		"tool_result":              {"turn_id", "tool_call_id", "workflow_run_id", "workflow_step_id", "replay_session_id", "parent_event_id"},
+		"approval_replay_trace":    {"approval_id", "tool_call_id", "workflow_run_id", "workflow_step_id", "replay_session_id"},
+		"workflow_step":            {"workflow_run_id", "workflow_step_id", "parent_event_id"},
+		"replay_record_matched":    {"turn_id", "tool_call_id", "workflow_run_id", "replay_session_id", "parent_event_id"},
+		"agent_start":              {"agent_run_id"},
+		"agent_turn_tool_dispatch": {"agent_run_id", "turn_id", "tool_call_id", "parent_event_id"},
+		"agent_done":               {"agent_run_id", "parent_event_id"},
+	}
+	seenTypes := map[string]bool{}
+	seenIDs := map[string]bool{}
+	lastSequence := 0
+	lastTimestamp := int64(0)
+	for _, event := range fixture.Events {
+		if event.TraceID == "" || event.EventID == "" || event.EventType == "" || event.TimestampMS == 0 || event.Sequence == 0 || event.Status == "" {
+			t.Fatalf("trace envelope event missing required fields: %#v", event)
+		}
+		if seenIDs[event.EventID] {
+			t.Fatalf("duplicate trace envelope event id %q", event.EventID)
+		}
+		seenIDs[event.EventID] = true
+		if event.Sequence <= lastSequence || event.TimestampMS < lastTimestamp {
+			t.Fatalf("trace envelope is not stably ordered: %#v after seq=%d ts=%d", event, lastSequence, lastTimestamp)
+		}
+		lastSequence = event.Sequence
+		lastTimestamp = event.TimestampMS
+		wantCorrelation, ok := wantByEventType[event.EventType]
+		if !ok {
+			t.Fatalf("unexpected trace envelope event type %q", event.EventType)
+		}
+		for _, field := range wantCorrelation {
+			if event.Correlation[field] == "" {
+				t.Fatalf("%s missing correlation id %q: %#v", event.EventID, field, event.Correlation)
+			}
+		}
+		seenTypes[event.EventType] = true
+	}
+	for eventType := range wantByEventType {
+		if !seenTypes[eventType] {
+			t.Fatalf("missing trace envelope event type %q; got %v", eventType, sortedGenericTraceKeys(seenTypes))
+		}
 	}
 }
 
@@ -740,10 +847,12 @@ func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
 		"contracts/trace_events_contract.json",
 		"fixtures/provider_free_fixture_index.json",
 		"fixtures/redaction_policy_fixture.json",
+		"fixtures/trace_envelope_fixture.json",
 		"fixtures/trace_sequence_ACME_fixture.json",
 		"schemas/correlation_ids_v1.schema.json",
 		"schemas/redaction_policy_v1.schema.json",
 		"schemas/trace_event_v1.schema.json",
+		"schemas/trace_envelope_v1.schema.json",
 		"schemas/trace_sequence_v1.schema.json",
 	} {
 		data, err := os.ReadFile(filepath.Join(base, filepath.FromSlash(rel)))

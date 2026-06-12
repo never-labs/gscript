@@ -15,9 +15,22 @@ generic_trace_events_live_package := {
     capability: "generic.ai.trace.events"
     emit_shape: "ai.trace.emit"
     event_types: {"turn_start", "stream", "tool", "artifact", "approval", "replay"}
+    envelope_event_types: {
+        "turn_start",
+        "turn_end",
+        "tool_call",
+        "tool_result",
+        "approval_replay_trace",
+        "workflow_step",
+        "replay_record_matched",
+        "agent_start",
+        "agent_turn_tool_dispatch",
+        "agent_done"
+    }
     match_keys: {"trace_id", "event_id", "sequence", "event_type"}
     correlation_ids: {"trace_id", "run_id", "turn_id", "event_id"}
-    optional_correlation_ids: {"parent_event_id", "tool_call_id", "artifact_id", "approval_id", "replay_id"}
+    envelope_correlation_ids: {"turn_id", "tool_call_id", "approval_id", "workflow_run_id", "workflow_step_id", "agent_run_id", "replay_session_id", "parent_event_id"}
+    optional_correlation_ids: {"parent_event_id", "tool_call_id", "artifact_id", "approval_id", "replay_id", "workflow_run_id", "workflow_step_id", "agent_run_id", "replay_session_id"}
     sequence_marker: {
         name: "fixture_sequence"
         clock: "fixture_monotonic_ms"
@@ -35,6 +48,8 @@ generic_trace_events_live_package := {
         mode: "deterministic_fixture_replay"
         fixture_key: "generic_trace_events:sequence:ACME:offline"
         expected_event_count: 6
+        envelope_fixture_key: "generic_trace_events:envelope:workflow_agent:offline"
+        expected_envelope_event_count: 10
         mismatch_policy: "fail_closed"
         allow_live_sink: false
     }
@@ -53,8 +68,10 @@ func generic_trace_events_contract_ok(pkg) {
         pkg.capability == "generic.ai.trace.events" &&
         pkg.emit_shape == "ai.trace.emit" &&
         #pkg.event_types == 6 &&
+        #pkg.envelope_event_types == 10 &&
         #pkg.match_keys == 4 &&
         #pkg.correlation_ids == 4 &&
+        #pkg.envelope_correlation_ids == 8 &&
         pkg.sequence_marker.name == "fixture_sequence" &&
         pkg.sequence_marker.clock == "fixture_monotonic_ms" &&
         pkg.sequence_marker.strictly_increasing == true &&
@@ -62,6 +79,7 @@ func generic_trace_events_contract_ok(pkg) {
         pkg.redaction_policy.provider_request_id_policy == "drop" &&
         pkg.replay.mode == "deterministic_fixture_replay" &&
         pkg.replay.expected_event_count == 6 &&
+        pkg.replay.expected_envelope_event_count == 10 &&
         pkg.replay.allow_live_sink == false
 }
 
@@ -69,8 +87,9 @@ generic_trace_events_contract_valid := generic_trace_events_contract_ok(generic_
 assert(generic_trace_events_contract_valid)
 
 generic_trace_events_live_package_summary := string.format(
-"generic_trace_events_live_package events=%d match_keys=%d provider_free=%s replay=%s",
+"generic_trace_events_live_package events=%d envelope_events=%d match_keys=%d provider_free=%s replay=%s",
 #generic_trace_events_live_package.event_types,
+#generic_trace_events_live_package.envelope_event_types,
 #generic_trace_events_live_package.match_keys,
 tostring(generic_trace_events_live_package.provider_free),
 generic_trace_events_live_package.replay.mode

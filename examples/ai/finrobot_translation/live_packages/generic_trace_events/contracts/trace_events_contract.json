@@ -12,7 +12,16 @@
     "tool",
     "artifact",
     "approval",
-    "replay"
+    "replay",
+    "turn_end",
+    "tool_call",
+    "tool_result",
+    "approval_replay_trace",
+    "workflow_step",
+    "replay_record_matched",
+    "agent_start",
+    "agent_turn_tool_dispatch",
+    "agent_done"
   ],
   "required_event_fields": [
     "schema_version",
@@ -43,7 +52,11 @@
     "tool_call_id",
     "artifact_id",
     "approval_id",
-    "replay_id"
+    "replay_id",
+    "workflow_run_id",
+    "workflow_step_id",
+    "agent_run_id",
+    "replay_session_id"
   ],
   "sequence_marker": {
     "name": "fixture_sequence",
@@ -74,5 +87,39 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Trace storage, hosted telemetry export, and provider SDK trace streams are external package responsibilities."
+  },
+  "trace_envelope_contract": {
+    "schema": "schemas/trace_envelope_v1.schema.json",
+    "fixture": "fixtures/trace_envelope_fixture.json",
+    "required_fields": [
+      "trace_id",
+      "event_id",
+      "event_type",
+      "timestamp_ms",
+      "sequence",
+      "correlation"
+    ],
+    "required_correlation_id_fields": [
+      "turn_id",
+      "tool_call_id",
+      "approval_id",
+      "workflow_run_id",
+      "workflow_step_id",
+      "agent_run_id",
+      "replay_session_id",
+      "parent_event_id"
+    ],
+    "covered_surfaces": [
+      "turn",
+      "tool",
+      "approval",
+      "workflow",
+      "replay",
+      "agent"
+    ],
+    "provider_free": true,
+    "live_network": false,
+    "live_model": false,
+    "credentials_required": false
   }
 }
