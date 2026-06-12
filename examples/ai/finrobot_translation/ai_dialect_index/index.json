@@ -29,6 +29,7 @@
     "data-provider",
     "document-rag",
     "evaluation",
+    "event-intelligence",
     "evidence-report-artifacts",
     "memory",
     "model",
@@ -301,6 +302,41 @@
         "package_id": "generic-evaluation-harness",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "event-intelligence",
+      "capability_id": "generic.ai.event_intelligence.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "event.source_snapshot",
+        "event.extraction",
+        "event.taxonomy",
+        "event.freshness_policy",
+        "event.dedupe_confidence",
+        "event.relevance_score",
+        "event.sentiment_impact",
+        "event.prompt_contract",
+        "event.adapter_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_event_intelligence_boundary.source.txt",
+      "test": "tests/llm/llm_generic_event_intelligence_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_event_intelligence_boundary_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-event-intelligence-boundary",
+        "boundary": "provider-free event source snapshots, event extraction, taxonomies, freshness policy, dedupe/source confidence, relevance scoring, sentiment and impact labels, prompt contracts, and adapter clean skips",
+        "status": "resolved",
+        "reason": "event intelligence behavior was promoted from application-specific news/catalyst metadata into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-event-intelligence-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

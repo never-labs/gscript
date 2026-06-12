@@ -227,6 +227,43 @@
       }
     },
     {
+      "shape_id": "ai.event_intelligence.boundary",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "event-intelligence",
+        "data-provider",
+        "optional-adapter",
+        "trace"
+      ],
+      "contract": "Normalize provider-free event source snapshots, event extraction, taxonomies, freshness policy, dedupe/source confidence, relevance scoring, sentiment and impact labels, prompt contracts, and adapter clean skips.",
+      "inputs": [
+        "source_snapshots",
+        "taxonomy",
+        "freshness_policy",
+        "prompt_contract",
+        "redaction_policy"
+      ],
+      "outputs": [
+        "event_records",
+        "dedupe_confidence",
+        "relevance_scores",
+        "sentiment_impact",
+        "adapter_clean_skips"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_event_intelligence_boundary.source.txt",
+      "test": "tests/llm/llm_generic_event_intelligence_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_event_intelligence_boundary_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-event-intelligence-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/contracts/generic_event_intelligence_boundary_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.evidence.report_artifacts",
       "status": "checked_in_package_boundary",
       "capabilities": [

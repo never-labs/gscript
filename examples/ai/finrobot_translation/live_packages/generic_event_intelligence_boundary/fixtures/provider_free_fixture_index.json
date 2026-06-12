@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "generic-event-intelligence-boundary-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:event_intelligence:offline",
+      "capability": "generic.ai.event_intelligence.boundary",
+      "path": "fixtures/event_intelligence_boundary_fixture.json",
+      "schema": "schemas/generic_event_intelligence_boundary_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "sources": 2,
+        "events": 2,
+        "taxonomies": 1,
+        "freshness_policies": 1,
+        "dedupe_groups": 2,
+        "relevance_scores": 2,
+        "sentiment_impact": 2,
+        "prompt_contracts": 1,
+        "clean_skip": true
+      }
+    }
+  ]
+}

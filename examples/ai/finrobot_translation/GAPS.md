@@ -23,8 +23,8 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 92 registered examples plus
-46 checked-in live-package skeleton directories:
+directory. The current provider-free surface is 93 registered examples plus
+47 checked-in live-package skeleton directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
@@ -36,6 +36,7 @@ directory. The current provider-free surface is 92 registered examples plus
 `live_packages/generic_coding_workspace`,
 `live_packages/generic_data_provider_boundary`,
 `live_packages/generic_document_rag_pipeline`,
+`live_packages/generic_event_intelligence_boundary`,
 `live_packages/generic_evidence_report_artifacts`,
 `live_packages/generic_evaluation_harness`, `live_packages/generic_memory_store`,
 `live_packages/generic_model_io_envelope`,
@@ -64,7 +65,7 @@ capability gates.
 The generic AI dialect convergence status is checked-in package boundary, not
 missing or planned. The `live_packages/generic_*` directories define reusable AI
 package contracts for model, model IO envelopes, coding workspaces, document
-RAG, data provider boundaries, evidence/report artifacts, UI snapshot evaluation, chart render contracts,
+RAG, data provider boundaries, event intelligence boundaries, evidence/report artifacts, UI snapshot evaluation, chart render contracts,
 report render contracts,
 optional adapter boundaries, prompt/role catalogs, memory stores, turn, tool, agent, workflow, evaluation, replay, trace,
 product app boundaries,
@@ -73,7 +74,7 @@ generic AI surfaces that the FinRobot translation consumes; they are not
 FinRobot-specific language features or FinRobot-owned product packages.
 
 The 2026-06-12 documentation semantic-guard refresh used read-only inventory to
-confirm 20 registered `live_packages/generic_*` examples and three top-level
+confirm 25 registered `live_packages/generic_*` examples and three top-level
 generic composition examples. It also rechecked approval/model/workflow/trace/eval
 wording in the coverage, verification, and gap documents. That guard keeps
 generic AI dialect capability in the closed/non-gap bucket unless a future

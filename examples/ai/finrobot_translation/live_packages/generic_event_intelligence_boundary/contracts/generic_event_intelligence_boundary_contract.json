@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-event-intelligence-boundary",
+  "package_name": "generic.ai.event_intelligence.boundary",
+  "entrypoint": "ai.event_intelligence.boundary",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.event_intelligence.boundary",
+    "generic.ai.event.source_snapshot",
+    "generic.ai.event.extraction",
+    "generic.ai.event.taxonomy",
+    "generic.ai.event.freshness_policy",
+    "generic.ai.event.dedupe_confidence",
+    "generic.ai.event.relevance_score",
+    "generic.ai.event.sentiment_impact",
+    "generic.ai.event.prompt_contract",
+    "generic.ai.event.adapter_clean_skip"
+  ],
+  "modules": {
+    "source": {
+      "inputs": [
+        "source_descriptor",
+        "snapshot_policy",
+        "redaction_policy"
+      ],
+      "outputs": [
+        "source_snapshot",
+        "terms_metadata",
+        "adapter_boundary"
+      ],
+      "required_fields": [
+        "source_id",
+        "source_type",
+        "fixture_key",
+        "captured_at",
+        "redaction_policy",
+        "live_network"
+      ]
+    },
+    "extraction": {
+      "inputs": [
+        "source_snapshot",
+        "taxonomy",
+        "prompt_contract"
+      ],
+      "outputs": [
+        "event_records",
+        "dedupe_groups",
+        "confidence_scores"
+      ],
+      "required_fields": [
+        "event_id",
+        "source_refs",
+        "category",
+        "summary",
+        "confidence",
+        "freshness"
+      ]
+    },
+    "scoring": {
+      "inputs": [
+        "event_record",
+        "freshness_policy",
+        "impact_policy"
+      ],
+      "outputs": [
+        "relevance_score",
+        "sentiment_label",
+        "impact_label"
+      ],
+      "required_fields": [
+        "event_id",
+        "relevance",
+        "sentiment",
+        "impact",
+        "explanation"
+      ]
+    }
+  },
+  "field_contracts": {
+    "source_snapshots": "source snapshots declare source id, type, fixture key, capture time, redaction policy, and terms metadata without importing source providers",
+    "event_extractions": "event extractions normalize event id, source refs, category, summary, confidence, and freshness state",
+    "taxonomy": "taxonomy maps provider-neutral event categories, severity labels, and impact dimensions",
+    "freshness_policy": "freshness policy separates recency decay, stale warnings, and source trust",
+    "dedupe_confidence": "dedupe/source confidence records canonical ids, duplicate ids, source trust, and confidence values",
+    "relevance_scores": "relevance scores are deterministic fixture values with explanations",
+    "sentiment_impact": "sentiment and impact labels are provider-neutral and domain-neutral",
+    "prompt_contracts": "prompt contracts define allowed fields, redaction rules, and forbidden raw credentials or raw URLs",
+    "adapter_clean_skip": "adapter boundaries clean-skip when source SDKs, credentials, or live network are absent"
+  }
+}

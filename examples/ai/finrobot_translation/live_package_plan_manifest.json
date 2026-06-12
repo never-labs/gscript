@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 92,
-  "translation_directory_file_count": 725,
+  "registered_examples_count": 93,
+  "translation_directory_file_count": 735,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -167,6 +167,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
       "covers_package_ids": [
         "generic_evaluation_harness"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_event_intelligence_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_event_intelligence_boundary"
       ],
       "status": "checked_in_registered_example"
     },
@@ -935,6 +944,36 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_event_intelligence_boundary",
+      "package_name": "leia-generic-ai-event-intelligence-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "planned_directory": "packages/generic_ai/event_intelligence_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/contracts/generic_event_intelligence_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_event_intelligence_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.event_intelligence.boundary",
+        "generic.ai.event.source_snapshot",
+        "generic.ai.event.extraction",
+        "generic.ai.event.taxonomy",
+        "generic.ai.event.freshness_policy",
+        "generic.ai.event.dedupe_confidence",
+        "generic.ai.event.relevance_score",
+        "generic.ai.event.sentiment_impact",
+        "generic.ai.event.prompt_contract",
+        "generic.ai.event.adapter_clean_skip"
+      ],
+      "test_gates": [
+        "event source snapshot contract fixtures decode without provider SDK imports",
+        "event extraction and taxonomy contract fixtures remain domain-neutral",
+        "freshness, dedupe, relevance, sentiment, and impact contract fixtures are deterministic",
+        "prompt contract fixtures forbid raw credentials, raw URLs, and unredacted handles",
+        "adapter boundary fixtures clean-skip when providers, credentials, or live network are absent"
       ],
       "no_built_in_guarantee": true
     },

@@ -2,9 +2,10 @@
 //
 // This is a thin Leia-native composition over the generic package boundaries:
 // model, model-io, document-rag, prompt-role, memory, turn, tool,
-// tool-registry, optional-adapter, data-provider, coding-workspace, planning,
-// agent, workflow, chart-render, evidence-report, report-render, product-app,
-// ui-snapshot, eval, replay, trace, approval, and package-audit. It intentionally declares no
+// tool-registry, optional-adapter, data-provider, event-intelligence,
+// coding-workspace, planning, agent, workflow, chart-render, evidence-report,
+// report-render, product-app, ui-snapshot, eval, replay, trace, approval,
+// and package-audit. It intentionally declares no
 // provider SDK, network call, credential, or domain adapter.
 
 package_boundaries := {
@@ -20,6 +21,7 @@ package_boundaries := {
     {role: "tool-registry" package_id: "generic-tool-registry" capability: "generic.tool.registry.declare" entrypoint: "ai.tool.registry" provider_free: true live_network: false},
     {role: "optional-adapter" package_id: "generic-optional-adapter-boundary" capability: "generic.ai.optional_adapter.boundary" entrypoint: "ai.optional_adapter.boundary" provider_free: true live_network: false},
     {role: "data-provider" package_id: "generic-data-provider-boundary" capability: "generic.ai.data_provider.boundary" entrypoint: "ai.data_provider.boundary" provider_free: true live_network: false},
+    {role: "event-intelligence" package_id: "generic-event-intelligence-boundary" capability: "generic.ai.event_intelligence.boundary" entrypoint: "ai.event_intelligence.boundary" provider_free: true live_network: false},
     {role: "coding-workspace" package_id: "generic-coding-workspace" capability: "generic.ai.coding_workspace" entrypoint: "ai.coding_workspace" provider_free: true live_network: false},
     {role: "turn" package_id: "generic-turn-runner" capability: "ai.turn.execute" entrypoint: "ai.turn.execute" provider_free: true live_network: false},
     {role: "agent" package_id: "generic-agent-runner" capability: "ai.agent.config.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
@@ -50,6 +52,7 @@ composition_edges := {
     {from: "tool-registry" to: "tool" handoff: "validated tool descriptor"},
     {from: "optional-adapter" to: "tool" handoff: "optional dependency gate and clean-skip envelope"},
     {from: "data-provider" to: "tool" handoff: "provider request and response envelopes"},
+    {from: "data-provider" to: "event-intelligence" handoff: "source snapshots and provider provenance"},
     {from: "approval" to: "coding-workspace" handoff: "execution and file-write capability decision"},
     {from: "planning" to: "workflow" handoff: "plan graph and dependency evidence"},
     {from: "package-audit" to: "workflow" handoff: "provider-free boundary gate"},
@@ -68,7 +71,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "event-intelligence", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -94,8 +97,8 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 24 &&
-        #workflow_contract.edges == 23 &&
+    return #workflow_contract.composition == 25 &&
+        #workflow_contract.edges == 24 &&
         role_present("model") &&
         role_present("model-io") &&
         role_present("document-rag") &&
@@ -106,6 +109,7 @@ func connected_native_surfaces() {
         role_present("tool-registry") &&
         role_present("optional-adapter") &&
         role_present("data-provider") &&
+        role_present("event-intelligence") &&
         role_present("coding-workspace") &&
         role_present("planning") &&
         role_present("agent") &&

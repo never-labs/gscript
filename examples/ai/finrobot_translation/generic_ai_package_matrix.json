@@ -184,6 +184,32 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_event_intelligence_boundary",
+      "package_name": "leia-generic-ai-event-intelligence-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "capability": "generic.ai.event_intelligence.boundary",
+      "capabilities": [
+        "generic.ai.event_intelligence.boundary",
+        "generic.ai.event.source_snapshot",
+        "generic.ai.event.extraction",
+        "generic.ai.event.taxonomy",
+        "generic.ai.event.freshness_policy",
+        "generic.ai.event.dedupe_confidence",
+        "generic.ai.event.relevance_score",
+        "generic.ai.event.sentiment_impact",
+        "generic.ai.event.prompt_contract",
+        "generic.ai.event.adapter_clean_skip"
+      ],
+      "backend_shape": "ai.event_intelligence.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/contracts/generic_event_intelligence_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_evidence_report_artifacts",
       "package_name": "leia-generic-ai-evidence-report-artifacts",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",

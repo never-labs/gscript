@@ -82,11 +82,15 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 			"66 runnable",
 			"22 checked-in",
 			"22 directories",
+			"20 registered `live_packages/generic_*` examples",
+			"42 checked-in",
 			"451 files",
 			"597 files",
 			"630 files",
 			"633 files",
 			"635 files",
+			"685 files",
+			"`88` examples",
 			"32 live-package skeletons use",
 		} {
 			if strings.Contains(text, stale) {
