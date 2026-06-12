@@ -184,5 +184,54 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide generic AI provider execution as a built-in; leia-generic-ai-turn-runner defines the provider-free package boundary for request, execution, tool, and replay contracts."
-  }
+  },
+  "dialect_capability_id": "ai.turn.execute",
+  "dialect_backend_shape": "ai.turn.execute",
+  "dialect_aliases": [
+    {
+      "id": "ai.turn.execute",
+      "target": "ai.turn.execute",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "ai.turn.execute",
+  "capability_aliases": [
+    {
+      "alias": "ai.turn.execute",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.turn.request",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

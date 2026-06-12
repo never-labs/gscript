@@ -11,6 +11,8 @@ import (
 func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 	root := repoRoot(t)
 	matrix := loadGenericAIPackageMatrix(t, root)
+	index := loadGenericAIDialectIndex(t, root)
+	backendPlan := loadGenericAIDialectBackendPlan(t, root)
 	if len(matrix.Packages) == 0 {
 		t.Fatal("generic AI package matrix is empty")
 	}
@@ -37,6 +39,14 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 				t.Fatalf("capabilities %#v do not include matrix capability %q", capabilities, row.Capability)
 			}
 
+			var canonicalCapabilityID string
+			if err := json.Unmarshal(manifest["canonical_capability_id"], &canonicalCapabilityID); err != nil {
+				t.Fatalf("canonical_capability_id: %v", err)
+			}
+			if canonicalCapabilityID != row.Capability {
+				t.Fatalf("canonical_capability_id = %q, want matrix capability %q", canonicalCapabilityID, row.Capability)
+			}
+
 			var entrypoints map[string]string
 			if err := json.Unmarshal(manifest["entrypoints"], &entrypoints); err != nil {
 				t.Fatalf("entrypoints must map names to file paths only: %v", err)
@@ -61,33 +71,134 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 				t.Fatalf("no_built_in_guarantee must be required and name %q: %#v", packageName, guarantee)
 			}
 
-			for _, key := range []string{"capability_id", "dialect_capability_id"} {
-				if raw, ok := manifest[key]; ok {
-					var got string
-					if err := json.Unmarshal(raw, &got); err != nil {
-						t.Fatalf("%s: %v", key, err)
-					}
-					if got != row.Capability {
-						t.Fatalf("%s = %q, want matrix capability %q", key, got, row.Capability)
-					}
-				}
+			var dialectCapabilityID string
+			if err := json.Unmarshal(manifest["dialect_capability_id"], &dialectCapabilityID); err != nil {
+				t.Fatalf("dialect_capability_id: %v", err)
 			}
-			if raw, ok := manifest["dialect_backend_shape"]; ok {
+			if dialectCapabilityID != row.Capability {
+				t.Fatalf("dialect_capability_id = %q, want matrix capability %q", dialectCapabilityID, row.Capability)
+			}
+			if raw, ok := manifest["capability_id"]; ok {
 				var got string
 				if err := json.Unmarshal(raw, &got); err != nil {
-					t.Fatalf("dialect_backend_shape: %v", err)
+					t.Fatalf("capability_id: %v", err)
 				}
-				if got != row.BackendShape {
-					t.Fatalf("dialect_backend_shape = %q, want matrix backend_shape %q", got, row.BackendShape)
+				if got != row.Capability {
+					t.Fatalf("capability_id = %q, want matrix capability %q", got, row.Capability)
 				}
+			}
+			var dialectBackendShape string
+			if err := json.Unmarshal(manifest["dialect_backend_shape"], &dialectBackendShape); err != nil {
+				t.Fatalf("dialect_backend_shape: %v", err)
+			}
+			if dialectBackendShape != row.BackendShape {
+				t.Fatalf("dialect_backend_shape = %q, want matrix backend_shape %q", dialectBackendShape, row.BackendShape)
 			}
 			for _, oldKey := range []string{"backend_shape"} {
 				if _, ok := manifest[oldKey]; ok {
 					t.Fatalf("old dialect symbol field %q must use a dialect_* name", oldKey)
 				}
 			}
+
+			var aliases []genericAIDialectAlias
+			if err := json.Unmarshal(manifest["capability_aliases"], &aliases); err != nil {
+				t.Fatalf("capability_aliases: %v", err)
+			}
+			expectedAliases := genericManifestConvergenceExpectedAliases(row.PackageDir, index, backendPlan)
+			if len(expectedAliases) == 0 {
+				t.Fatalf("no expected aliases from index/backend plan for %s", row.PackageDir)
+			}
+			for _, expected := range expectedAliases {
+				if !genericManifestConvergenceCapabilityAliasContains(aliases, expected) {
+					t.Fatalf("capability_aliases missing %#v in %#v", expected, aliases)
+				}
+			}
+			for _, alias := range aliases {
+				if alias.Alias == "" || alias.TargetCapabilityID == "" || alias.AliasKind == "" || alias.Scope == "" || alias.Status != "active" {
+					t.Fatalf("incomplete capability alias: %#v", alias)
+				}
+				if alias.TargetCapabilityID != row.Capability {
+					t.Fatalf("capability alias target = %q, want matrix capability %q", alias.TargetCapabilityID, row.Capability)
+				}
+			}
+			var rawAliases []map[string]json.RawMessage
+			if err := json.Unmarshal(manifest["capability_aliases"], &rawAliases); err != nil {
+				t.Fatalf("capability_aliases raw: %v", err)
+			}
+			for _, alias := range rawAliases {
+				for _, forbidden := range []string{"capability", "capabilities"} {
+					if _, ok := alias[forbidden]; ok {
+						t.Fatalf("capability_aliases must not use recursive audit key %q: %#v", forbidden, alias)
+					}
+				}
+			}
+
+			var dialectAliases []struct {
+				ID     string `json:"id"`
+				Target string `json:"target"`
+				Scope  string `json:"scope"`
+				Source string `json:"source"`
+				Status string `json:"status"`
+			}
+			if err := json.Unmarshal(manifest["dialect_aliases"], &dialectAliases); err != nil {
+				t.Fatalf("dialect_aliases: %v", err)
+			}
+			if !genericManifestConvergenceAliasContains(dialectAliases, row.BackendShape, row.Capability) {
+				t.Fatalf("dialect_aliases must map backend shape %q to capability %q: %#v", row.BackendShape, row.Capability, dialectAliases)
+			}
+			for _, alias := range dialectAliases {
+				if alias.ID == "" || alias.Target == "" || alias.Scope != "package" || alias.Source == "" || alias.Status != "active" {
+					t.Fatalf("incomplete dialect alias: %#v", alias)
+				}
+				if alias.Target != row.Capability {
+					t.Fatalf("dialect alias target = %q, want matrix capability %q", alias.Target, row.Capability)
+				}
+			}
 		})
 	}
+}
+
+func genericManifestConvergenceExpectedAliases(packageDir string, index genericAIDialectIndex, backendPlan genericAIDialectBackendPlan) []genericAIDialectAlias {
+	var aliases []genericAIDialectAlias
+	for _, entry := range index.Entries {
+		if entry.ProductionPackageBoundary != nil && entry.ProductionPackageBoundary.Directory == packageDir {
+			aliases = append(aliases, entry.CapabilityAliases...)
+		}
+	}
+	for _, shape := range backendPlan.BackendShapes {
+		if shape.PackageBoundary != nil && shape.PackageBoundary.Directory == packageDir {
+			aliases = append(aliases, shape.CapabilityAliases...)
+		}
+	}
+	return aliases
+}
+
+func genericManifestConvergenceCapabilityAliasContains(aliases []genericAIDialectAlias, want genericAIDialectAlias) bool {
+	for _, alias := range aliases {
+		if alias.Alias == want.Alias &&
+			alias.TargetCapabilityID == want.TargetCapabilityID &&
+			alias.AliasKind == want.AliasKind &&
+			alias.Scope == want.Scope &&
+			alias.Status == want.Status {
+			return true
+		}
+	}
+	return false
+}
+
+func genericManifestConvergenceAliasContains(aliases []struct {
+	ID     string `json:"id"`
+	Target string `json:"target"`
+	Scope  string `json:"scope"`
+	Source string `json:"source"`
+	Status string `json:"status"`
+}, id, target string) bool {
+	for _, alias := range aliases {
+		if alias.ID == id && alias.Target == target && alias.Status == "active" {
+			return true
+		}
+	}
+	return false
 }
 
 func genericManifestConvergenceContains(values []string, want string) bool {

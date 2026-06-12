@@ -91,5 +91,68 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-model-io-envelope; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.ai.model.io.envelope",
+  "dialect_backend_shape": "ai.model.io.envelope",
+  "dialect_aliases": [
+    {
+      "id": "ai.model.io.envelope",
+      "target": "generic.ai.model.io.envelope",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.model.io.envelope",
+  "capability_aliases": [
+    {
+      "alias": "ai.model.io.envelope",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.model.io.envelope",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "model",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "model-io",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "model-io",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

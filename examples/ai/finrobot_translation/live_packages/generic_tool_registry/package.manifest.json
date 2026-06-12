@@ -100,5 +100,47 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide leia-generic-ai-tool-registry as a built-in; this provider-free package boundary must be satisfied by future external packages before live tool registry implementations are enabled."
-  }
+  },
+  "dialect_capability_id": "generic.tool.registry.declare",
+  "dialect_backend_shape": "ai.tool.registry",
+  "dialect_aliases": [
+    {
+      "id": "ai.tool.registry",
+      "target": "generic.tool.registry.declare",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.tool.registry.declare",
+  "capability_aliases": [
+    {
+      "alias": "ai.tool.registry",
+      "target_capability_id": "generic.tool.registry.declare",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.tool.registry",
+      "target_capability_id": "generic.tool.registry.declare",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "generic.tool.registry.declare",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "generic.tool.registry.declare",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

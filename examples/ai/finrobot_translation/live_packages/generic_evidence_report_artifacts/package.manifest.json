@@ -103,5 +103,61 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-evidence-report-artifacts; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.ai.evidence.report.artifacts",
+  "dialect_backend_shape": "ai.evidence.report_artifacts",
+  "dialect_aliases": [
+    {
+      "id": "ai.evidence.report_artifacts",
+      "target": "generic.ai.evidence.report.artifacts",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.evidence.report.artifacts",
+  "capability_aliases": [
+    {
+      "alias": "ai.evidence.report_artifacts",
+      "target_capability_id": "generic.ai.evidence.report.artifacts",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-report-artifacts",
+      "target_capability_id": "generic.ai.evidence.report.artifacts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-report-artifacts",
+      "target_capability_id": "generic.ai.evidence.report.artifacts",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.evidence.report.artifacts",
+      "target_capability_id": "generic.ai.evidence.report.artifacts",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.evidence.report.artifacts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "generic.ai.evidence.report.artifacts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

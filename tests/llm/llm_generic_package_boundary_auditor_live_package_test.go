@@ -14,14 +14,14 @@ import (
 )
 
 type genericPackageBoundaryAuditorManifest struct {
-	SchemaVersion               int      `json:"schema_version"`
-	ID                          string   `json:"id"`
-	PackageName                 string   `json:"package_name"`
-	DialectAliases              []string `json:"dialect_aliases"`
-	DialectSurface              []string `json:"dialect_surface"`
-	ProviderFree                bool     `json:"provider_free"`
-	LiveNetworkDefault          bool     `json:"live_network_default"`
-	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
+	SchemaVersion               int                                         `json:"schema_version"`
+	ID                          string                                      `json:"id"`
+	PackageName                 string                                      `json:"package_name"`
+	DialectAliases              []genericPackageBoundaryAuditorDialectAlias `json:"dialect_aliases"`
+	DialectSurface              []string                                    `json:"dialect_surface"`
+	ProviderFree                bool                                        `json:"provider_free"`
+	LiveNetworkDefault          bool                                        `json:"live_network_default"`
+	RealDependencyImportDefault bool                                        `json:"real_dependency_import_default"`
 	Credentials                 struct {
 		Required          []string `json:"required"`
 		Optional          []string `json:"optional"`
@@ -58,6 +58,14 @@ type genericPackageBoundaryAuditorTarget struct {
 	RealDependencyImports bool   `json:"real_dependency_imports"`
 }
 
+type genericPackageBoundaryAuditorDialectAlias struct {
+	ID     string `json:"id"`
+	Target string `json:"target"`
+	Scope  string `json:"scope"`
+	Source string `json:"source"`
+	Status string `json:"status"`
+}
+
 func TestGenericPackageBoundaryAuditorLivePackageManifest(t *testing.T) {
 	base := genericPackageBoundaryAuditorDir(t)
 	manifest := loadGenericPackageBoundaryAuditorManifest(t, base)
@@ -68,7 +76,7 @@ func TestGenericPackageBoundaryAuditorLivePackageManifest(t *testing.T) {
 	if manifest.PackageName != "leia-generic-ai-package-boundary-auditor" {
 		t.Fatalf("package name = %q", manifest.PackageName)
 	}
-	if !reflect.DeepEqual(manifest.DialectAliases, []string{"ai.package.audit"}) {
+	if !genericPackageBoundaryAuditorDialectAliasContains(manifest.DialectAliases, "ai.package.audit", "generic.ai.package.boundary.audit.manifest") {
 		t.Fatalf("dialect aliases = %#v", manifest.DialectAliases)
 	}
 	for _, want := range []string{"generic.ai.package.boundary.audit", "ai.package.audit"} {
@@ -440,6 +448,15 @@ func decodeGenericPackageBoundaryAuditorJSONFile(t *testing.T, path string, valu
 func genericPackageBoundaryAuditorContains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func genericPackageBoundaryAuditorDialectAliasContains(aliases []genericPackageBoundaryAuditorDialectAlias, id, target string) bool {
+	for _, alias := range aliases {
+		if alias.ID == id && alias.Target == target && alias.Scope == "package" && alias.Status == "active" {
 			return true
 		}
 	}

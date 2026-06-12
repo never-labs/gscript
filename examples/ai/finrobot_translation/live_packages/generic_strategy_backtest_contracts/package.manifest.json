@@ -304,5 +304,68 @@
     "generic.ai.strategy.backtest.metric_summary.collect",
     "generic.ai.strategy.backtest.constraint_limits.enforce",
     "generic.ai.strategy.backtest.engine.clean_skip"
+  ],
+  "dialect_capability_id": "generic.ai.strategy.backtest.contracts",
+  "dialect_backend_shape": "ai.strategy.backtest_contracts",
+  "dialect_aliases": [
+    {
+      "id": "ai.strategy.backtest_contracts",
+      "target": "generic.ai.strategy.backtest.contracts",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.strategy.backtest.contracts",
+  "capability_aliases": [
+    {
+      "alias": "ai.strategy.backtest_contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "data-provider",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.strategy.backtest.contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "strategy-backtest-contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "strategy-backtest-contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
   ]
 }

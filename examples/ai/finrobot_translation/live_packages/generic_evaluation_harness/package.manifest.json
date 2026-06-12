@@ -165,5 +165,54 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide built-in generic AI evaluation execution; leia-generic-ai-evaluation-harness defines the provider-free package boundary."
-  }
+  },
+  "dialect_capability_id": "ai.eval.run.provider_free",
+  "dialect_backend_shape": "ai.eval.run",
+  "dialect_aliases": [
+    {
+      "id": "ai.eval.run",
+      "target": "ai.eval.run.provider_free",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "ai.eval.run.provider_free",
+  "capability_aliases": [
+    {
+      "alias": "ai.eval.run",
+      "target_capability_id": "ai.eval.run.provider_free",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evaluation",
+      "target_capability_id": "ai.eval.run.provider_free",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evaluation",
+      "target_capability_id": "ai.eval.run.provider_free",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.evaluation.harness",
+      "target_capability_id": "ai.eval.run.provider_free",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "ai.eval.run.provider_free",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

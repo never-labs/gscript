@@ -251,5 +251,46 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-model-registry; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_backend_shape": "ai.model.resolve",
+  "dialect_aliases": [
+    {
+      "id": "ai.model.resolve",
+      "target": "generic.ai.model.registry",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.model.registry",
+  "capability_aliases": [
+    {
+      "alias": "ai.model.resolve",
+      "target_capability_id": "generic.ai.model.registry",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.model.registry",
+      "target_capability_id": "generic.ai.model.registry",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "model",
+      "target_capability_id": "generic.ai.model.registry",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "model",
+      "target_capability_id": "generic.ai.model.registry",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

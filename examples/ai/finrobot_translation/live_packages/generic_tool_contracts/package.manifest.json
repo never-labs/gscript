@@ -115,5 +115,61 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide built-in generic AI tool invocation; leia-generic-ai-tool-contracts defines the provider-free package boundary."
-  }
+  },
+  "dialect_capability_id": "ai.tool.invoke",
+  "dialect_backend_shape": "ai.tool.invoke",
+  "dialect_aliases": [
+    {
+      "id": "ai.tool.invoke",
+      "target": "ai.tool.invoke",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "ai.tool.invoke",
+  "capability_aliases": [
+    {
+      "alias": "ai.tool.invoke",
+      "target_capability_id": "ai.tool.invoke",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "approval",
+      "target_capability_id": "ai.tool.invoke",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "capability",
+      "target_capability_id": "ai.tool.invoke",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.tool.contract",
+      "target_capability_id": "ai.tool.invoke",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "ai.tool.invoke",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "ai.tool.invoke",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

@@ -3,7 +3,13 @@
   "id": "generic-ai-package-boundary-audit-live-package",
   "package_name": "leia-generic-ai-package-boundary-auditor",
   "dialect_aliases": [
-    "ai.package.audit"
+    {
+      "id": "ai.package.audit",
+      "target": "generic.ai.package.boundary.audit.manifest",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
   ],
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for package manifest, fixture index, example registry, capability policy, findings, and missing boundary record audits.",
@@ -130,5 +136,45 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide generic AI package boundary audits as built-ins; leia-generic-ai-package-boundary-auditor defines the provider-free package boundary."
-  }
+  },
+  "dialect_capability_id": "generic.ai.package.boundary.audit.manifest",
+  "dialect_backend_shape": "ai.package.audit",
+  "canonical_capability_id": "generic.ai.package.boundary.audit.manifest",
+  "capability_aliases": [
+    {
+      "alias": "ai.package.audit",
+      "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "capability",
+      "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.package.boundary.audit",
+      "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "package-boundary",
+      "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "package-boundary",
+      "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

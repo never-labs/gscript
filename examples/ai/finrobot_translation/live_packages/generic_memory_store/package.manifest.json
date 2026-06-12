@@ -78,5 +78,54 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-memory-store; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.ai.memory.store",
+  "dialect_backend_shape": "ai.memory.store",
+  "dialect_aliases": [
+    {
+      "id": "ai.memory.store",
+      "target": "generic.ai.memory.store",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.memory.store",
+  "capability_aliases": [
+    {
+      "alias": "ai.memory.store",
+      "target_capability_id": "generic.ai.memory.store",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.memory.store",
+      "target_capability_id": "generic.ai.memory.store",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "memory",
+      "target_capability_id": "generic.ai.memory.store",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "memory",
+      "target_capability_id": "generic.ai.memory.store",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.memory.store",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

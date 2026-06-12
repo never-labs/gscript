@@ -85,5 +85,61 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-optional-adapter-boundary; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.ai.optional_adapter.boundary",
+  "dialect_backend_shape": "ai.optional_adapter.boundary",
+  "dialect_aliases": [
+    {
+      "id": "ai.optional_adapter.boundary",
+      "target": "generic.ai.optional_adapter.boundary",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.optional_adapter.boundary",
+  "capability_aliases": [
+    {
+      "alias": "ai.optional_adapter.boundary",
+      "target_capability_id": "generic.ai.optional_adapter.boundary",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "approval",
+      "target_capability_id": "generic.ai.optional_adapter.boundary",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.optional_adapter.boundary",
+      "target_capability_id": "generic.ai.optional_adapter.boundary",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.optional_adapter.boundary",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.optional_adapter.boundary",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "generic.ai.optional_adapter.boundary",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

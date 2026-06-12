@@ -82,5 +82,61 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-chart-render-contracts; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.ai.chart.render.contracts",
+  "dialect_backend_shape": "ai.chart.render_contracts",
+  "dialect_aliases": [
+    {
+      "id": "ai.chart.render_contracts",
+      "target": "generic.ai.chart.render.contracts",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.chart.render.contracts",
+  "capability_aliases": [
+    {
+      "alias": "ai.chart.render_contracts",
+      "target_capability_id": "generic.ai.chart.render.contracts",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "chart-render",
+      "target_capability_id": "generic.ai.chart.render.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "chart-render",
+      "target_capability_id": "generic.ai.chart.render.contracts",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-report-artifacts",
+      "target_capability_id": "generic.ai.chart.render.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.chart.render.contracts",
+      "target_capability_id": "generic.ai.chart.render.contracts",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "ui-snapshot",
+      "target_capability_id": "generic.ai.chart.render.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

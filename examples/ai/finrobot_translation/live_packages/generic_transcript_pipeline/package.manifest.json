@@ -220,5 +220,68 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide leia-generic-ai-transcript-pipeline as a built-in transcript vendor, speech processor, cleaner, or package boundary; this package declares provider-free schemas and fixtures only."
-  }
+  },
+  "dialect_capability_id": "generic.ai.transcript.pipeline",
+  "dialect_backend_shape": "ai.transcript.pipeline",
+  "dialect_aliases": [
+    {
+      "id": "ai.transcript.pipeline",
+      "target": "generic.ai.transcript.pipeline",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.transcript.pipeline",
+  "capability_aliases": [
+    {
+      "alias": "ai.transcript.pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "document-rag",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.transcript.pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "memory",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "transcript-pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "transcript-pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

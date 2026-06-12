@@ -63,5 +63,47 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-planning-graph; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.planning.graph.define",
+  "dialect_backend_shape": "ai.workflow.plan_graph",
+  "dialect_aliases": [
+    {
+      "id": "ai.workflow.plan_graph",
+      "target": "generic.planning.graph.define",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.planning.graph.define",
+  "capability_aliases": [
+    {
+      "alias": "ai.workflow.plan_graph",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.workflow.planning_graph",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }

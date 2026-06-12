@@ -86,5 +86,82 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide built-in generic AI approval policy or capability gate execution; leia-generic-ai-approval-policy defines the provider-free package boundary."
-  }
+  },
+  "dialect_capability_id": "generic.ai.approval.policy.evaluate",
+  "dialect_backend_shape": "generic.ai.approval.policy.evaluate",
+  "dialect_aliases": [
+    {
+      "id": "generic.ai.approval.policy.evaluate",
+      "target": "generic.ai.approval.policy.evaluate",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.approval.policy.evaluate",
+  "capability_aliases": [
+    {
+      "alias": "approval",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "approval",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "capability",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "capability",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.approval.policy",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.approval.policy.evaluate",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.capability.gate",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "generic.ai.approval.policy.evaluate",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

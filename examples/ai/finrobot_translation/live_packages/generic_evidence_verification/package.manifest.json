@@ -94,5 +94,75 @@
     "secret_refs": [],
     "provider_credentials_required": false,
     "policy": "No credentials are declared by leia-generic-ai-evidence-verification; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
-  }
+  },
+  "dialect_capability_id": "generic.ai.evidence.verify",
+  "dialect_backend_shape": "ai.evidence.verify",
+  "dialect_aliases": [
+    {
+      "id": "ai.evidence.verify",
+      "target": "generic.ai.evidence.verify",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.evidence.verify",
+  "capability_aliases": [
+    {
+      "alias": "ai.evidence.verify",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "document-rag",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "event-intelligence",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-report-artifacts",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-verification",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-verification",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.evidence.verify",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "report-render",
+      "target_capability_id": "generic.ai.evidence.verify",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

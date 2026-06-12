@@ -173,5 +173,68 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide leia-generic-ai-analytical-model-contracts as a built-in assumption provider, simulation engine, tolerance evaluator, or package boundary; this package declares provider-free schemas and fixtures only."
-  }
+  },
+  "dialect_capability_id": "generic.ai.analytical_model.contracts",
+  "dialect_backend_shape": "ai.analytical_model.contracts",
+  "dialect_aliases": [
+    {
+      "id": "ai.analytical_model.contracts",
+      "target": "generic.ai.analytical_model.contracts",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.analytical_model.contracts",
+  "capability_aliases": [
+    {
+      "alias": "ai.analytical_model.contracts",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "analytical-model-contracts",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "analytical-model-contracts",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "data-normalization-contracts",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.analytical_model.contracts",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.analytical_model.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

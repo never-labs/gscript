@@ -82,5 +82,75 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide provider-backed record/replay storage, model clients, or network capture as built-ins; leia-generic-ai-record-replay defines the provider-free package boundary."
-  }
+  },
+  "dialect_capability_id": "generic.ai.record.capture",
+  "dialect_backend_shape": "generic.ai.record.replay.fixture",
+  "dialect_aliases": [
+    {
+      "id": "generic.ai.record.replay.fixture",
+      "target": "generic.ai.record.capture",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.record.capture",
+  "capability_aliases": [
+    {
+      "alias": "evaluation",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.record.replay",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.record.replay.fixture",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "generic.ai.record.capture",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
 }

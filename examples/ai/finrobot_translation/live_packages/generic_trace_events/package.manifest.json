@@ -350,5 +350,61 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide built-in generic AI trace emission, hosted telemetry, or trace storage sinks; leia-generic-ai-trace-events defines the provider-free package boundary."
-  }
+  },
+  "dialect_capability_id": "generic.ai.trace.events",
+  "dialect_backend_shape": "ai.trace.emit",
+  "dialect_aliases": [
+    {
+      "id": "ai.trace.emit",
+      "target": "generic.ai.trace.events",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.trace.events",
+  "capability_aliases": [
+    {
+      "alias": "ai.trace.emit",
+      "target_capability_id": "generic.ai.trace.events",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "approval",
+      "target_capability_id": "generic.ai.trace.events",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.trace.events",
+      "target_capability_id": "generic.ai.trace.events",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.trace.events",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.trace.events",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.trace.events",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
 }
