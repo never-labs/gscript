@@ -235,3 +235,104 @@ envelope_event_sequence := envelope.events[1].sequence
 		})
 	}
 }
+
+func TestLLMTraceSummaryAndAssertHelpers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+start := llm.trace_event({
+    trace_id: "trace-summary"
+    event_id: "event-1"
+    event_type: "turn_start"
+    sequence: 1
+    timestamp_ms: 100
+    status: "ok"
+    turn_id: "turn-1"
+    replay_session_id: "session-1"
+    replay_key: "turn:1"
+})
+done := llm.trace_event({
+    trace_id: "trace-summary"
+    event_id: "event-2"
+    event_type: "turn_end"
+    sequence: 2
+    timestamp_ms: 110
+    status: "error"
+    turn_id: "turn-1"
+    replay_session_id: "session-1"
+    replay_key: "turn:1"
+})
+envelope := llm.trace_envelope({start, done}, {
+    trace_id: "trace-summary"
+    provider_free: true
+    live_network: false
+    live_model: false
+})
+summary := llm.trace_summary(envelope)
+check := llm.trace_assert(envelope, {
+    require_provider_free: true
+    deny_live_network: true
+    deny_live_model: true
+    required_event_types: {"turn_start", "turn_end"}
+    require_correlation_fields: {"turn_id", "replay_session_id"}
+})
+bad := llm.trace_assert(envelope, {
+    required_event_types: {"tool_call"}
+    require_correlation_fields: {"tool_call_id"}
+})
+
+event_count := summary.events
+first_type := summary.event_types[1]
+second_type := summary.event_types[2]
+ok_count := summary.status_counts.ok
+error_count := summary.status_counts.error
+replay_key := summary.replay_keys[1]
+missing_correlation := summary.missing_correlation
+sequence_gaps := summary.sequence_gaps
+non_monotonic := summary.non_monotonic_timestamps
+check_ok := check.ok
+check_status := check.status
+bad_ok := bad.ok
+bad_status := bad.status
+bad_findings := #bad.findings
+bad_first_kind := bad.findings[1].kind
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"event_count":         int64(2),
+				"first_type":          "turn_start",
+				"second_type":         "turn_end",
+				"ok_count":            int64(1),
+				"error_count":         int64(1),
+				"replay_key":          "turn:1",
+				"missing_correlation": int64(0),
+				"sequence_gaps":       int64(0),
+				"non_monotonic":       int64(0),
+				"check_ok":            true,
+				"check_status":        "ok",
+				"bad_ok":              false,
+				"bad_status":          "failed",
+				"bad_findings":        int64(3),
+				"bad_first_kind":      "generic.ai.trace.missing_event_type",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}

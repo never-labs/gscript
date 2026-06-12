@@ -601,6 +601,11 @@ normalizes one record, fills `operation`, `capability`, `request_hash`,
 strict ordered matcher used by `llm.replay_index`. `fixture.replay(request,
 replay_key)` matches a normalized turn request and returns replay options for
 `llm.turn`.
+`llm.trace_summary(envelope_or_events)` returns deterministic trace counts,
+event types, replay keys, and ordering diagnostics. `llm.trace_assert(input,
+opts)` turns those checks into `{ok, status, summary, findings}` without
+contacting a provider, so replay and workflow packages can gate trace evidence
+with ordinary assertions.
 
 ```leia
 record, err := llm.replay_record({
@@ -615,6 +620,19 @@ result, err := llm.turn({
     model: "fast"
     messages: {llm.user("hello")}
     replay: replay
+})
+event := llm.trace_event({
+    trace_id: "unit-trace"
+    event_type: "turn_end"
+    replay_key: "turn:1"
+    request_hash: replay.request_hash
+    response_hash: replay.response_hash
+})
+trace := llm.trace_envelope({event}, {trace_id: "unit-trace"})
+gate := llm.trace_assert(trace, {
+    require_provider_free: true
+    deny_live_network: true
+    required_event_types: {"turn_end"}
 })
 ```
 
