@@ -1138,7 +1138,8 @@ func (a castI64Array) i64At(row int) (int64, bool, error) {
 	if err != nil || !ok {
 		return 0, ok, err
 	}
-	return int64(value), true, nil
+	// Canonical q integer casts round half-to-even.
+	return int64(math.RoundToEven(value)), true, nil
 }
 
 func (a castI64Array) At(row int) (any, bool) {

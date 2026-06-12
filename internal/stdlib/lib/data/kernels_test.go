@@ -94,15 +94,15 @@ func TestNumericAnalyticsStatsWindows(t *testing.T) {
 		t.Fatalf("NumericArrayStdDev = %#v,%v,%v, want 1,true,nil", stddev, handled, err)
 	}
 	wsum, handled, err := NumericWeightedSum(NewI64([]int64{1, 2, 3}), NewI64([]int64{10, 20, 30}))
-	if err != nil || !handled || wsum != 140.0 {
+	if err != nil || !handled || wsum != int64(140) {
 		t.Fatalf("NumericWeightedSum = %#v,%v,%v, want 140,true,nil", wsum, handled, err)
 	}
 	wsum, handled, err = NumericWeightedSum(int64(2), NewI64([]int64{10, 20, 30}))
-	if err != nil || !handled || wsum != 120.0 {
+	if err != nil || !handled || wsum != int64(120) {
 		t.Fatalf("NumericWeightedSum scalar broadcast = %#v,%v,%v, want 120,true,nil", wsum, handled, err)
 	}
 	wsum, handled, err = NumericWeightedSum(NewColumn("w", []any{int64(1), NullValue, int64(3)}).Data, NewI64([]int64{10, 20, 30}))
-	if err != nil || !handled || wsum != 100.0 {
+	if err != nil || !handled || wsum != int64(100) {
 		t.Fatalf("NumericWeightedSum nullable = %#v,%v,%v, want 100,true,nil", wsum, handled, err)
 	}
 	if _, handled, err := NumericWeightedSum(NewString([]string{"a"}), NewI64([]int64{1})); err != nil || handled {
@@ -414,7 +414,8 @@ func TestTryTypedCastIntegerArrays(t *testing.T) {
 	if !handled {
 		t.Fatal("TryTypedCast i64 f64 did not handle numeric array")
 	}
-	if got, want := longs.Values(), []any{int64(1), int64(-2), int64(3)}; !reflect.DeepEqual(got, want) {
+	// Canonical q integer casts round half-to-even.
+	if got, want := longs.Values(), []any{int64(2), int64(-3), int64(3)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedCast i64 f64 values = %#v, want %#v", got, want)
 	}
 
@@ -425,7 +426,8 @@ func TestTryTypedCastIntegerArrays(t *testing.T) {
 	if !handled {
 		t.Fatal("TryTypedCast i32 f32 did not handle numeric array")
 	}
-	if got, want := ints.Values(), []any{int32(1), int32(-3)}; !reflect.DeepEqual(got, want) {
+	// Canonical q integer casts round half-to-even.
+	if got, want := ints.Values(), []any{int32(1), int32(-4)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("TryTypedCast i32 f32 values = %#v, want %#v", got, want)
 	}
 

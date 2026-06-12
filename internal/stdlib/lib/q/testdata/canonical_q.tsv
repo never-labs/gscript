@@ -368,8 +368,8 @@ deviation	type "ab"	10h	10	long-promotion design applied to type: codes agree wi
 deviation	type ()	0h	0	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
 # ---- casts ----
 match	`float$1	1f
-deviation	`long$2.7	3	2	float-to-integer casts truncate toward zero uniformly across scalar, vector-kernel, and JIT tiers; canonical rounds half-to-even — convergence deferred (multi-tier kernel change), not a design endorsement
-deviation	`long$-2.7	-3	-2	float-to-integer casts truncate toward zero uniformly across scalar, vector-kernel, and JIT tiers; canonical rounds half-to-even — convergence deferred (multi-tier kernel change), not a design endorsement
+match	`long$2.7	3
+match	`long$-2.7	-3
 match	"J"$"42"	42
 match	"F"$"1.5"	1.5
 deviation	`boolean$2	1b	ERROR	boolean-is-logical design: only 0 and 1 cast to boolean; canonical q maps any nonzero number to 1b
@@ -661,3 +661,27 @@ match	cor[1 2;3 4]	1f
 match	eval parse "reverse til 3"	2 1 0
 match	value parse "2 xexp 3"	8f
 match	eval parse "(1;2;3)"	1 2 3
+
+# ---- R16 closing batch: key/keys split, keyed lookup dicts, compound indexed
+# ---- amend, paren derived-each juxtaposition, boolean string, wsum kinds,
+# ---- dyadic-verb juxtaposition arity, round-half-even casts ----
+match	(key 1!([] s:`a`b;v:1 2))~([] s:`a`b)	1b
+match	keys 1!([] s:`a`b;v:1 2)	enlist `s
+match	key 1 2 3	`long
+match	key 1.5 2.5	`float
+match	((1!([] s:`a`b;v:1 2;w:10 20))[`a])~`v`w!1 10	1b
+match	((1!([] s:`a`b;v:1 2))[`zz])~(enlist `v)!enlist 0N	1b
+match	d:`a`b!1 2; d[`a]+:5; d	`a`b!6 2
+match	v:1 2 3; v[0]+:1; v	2 2 3
+match	v:1 2 3; v[0 2]+:10; v	11 2 13
+match	(count') (1 2;3 4 5)	2 3
+match	string 1b	"1"
+match	string 0b	"0"
+match	1 2 wsum 3 4	11
+match	2 wsum 3 4	14
+match	1 2.0 wsum 3 4	11f
+deviation	msum 2 1 0N 3	msum[2 1 0N 3]	ERROR:expected 2 arguments	no-projection design: juxtaposing a dyadic word verb onto a single noun is an arity error where canonical q builds the projection msum[2 1 0N 3]; the bracket and infix spellings (msum[2;x], 2 msum x) are the supported forms
+deviation	not 0N	0b	1b	null-is-falsy design: the single untyped null is falsy under the dialect's Lua-style truthiness, so not 0N is 1b; canonical q not is 0=x and the null long is nonzero, giving 0b
+match	`long$2.5	2
+match	`long$3.5	4
+match	`int$-3.7	-4i

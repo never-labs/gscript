@@ -171,6 +171,50 @@ func qCastKindFromTypeText(text string) (data.Kind, bool) {
 	}
 }
 
+// qTypeNameForKind is the inverse of qCastKindFromTypeText for typed vector
+// kinds: the canonical type-name symbol `key` reports for a typed vector.
+// Generic (any/null) kinds report false so callers can signal a type error.
+func qTypeNameForKind(kind data.Kind) (data.Symbol, bool) {
+	switch kind {
+	case data.KindBool:
+		return "boolean", true
+	case data.KindU8:
+		return "byte", true
+	case data.KindI16:
+		return "short", true
+	case data.KindI32:
+		return "int", true
+	case data.KindI64:
+		return "long", true
+	case data.KindF32:
+		return "real", true
+	case data.KindF64:
+		return "float", true
+	case data.KindSymbol:
+		return "symbol", true
+	case data.KindString:
+		return "char", true
+	case data.KindMonth:
+		return "month", true
+	case data.KindDate:
+		return "date", true
+	case data.KindDateTime:
+		return "datetime", true
+	case data.KindTimespan:
+		return "timespan", true
+	case data.KindMinute:
+		return "minute", true
+	case data.KindSecond:
+		return "second", true
+	case data.KindTime:
+		return "time", true
+	case data.KindTimestamp:
+		return "timestamp", true
+	default:
+		return "", false
+	}
+}
+
 func qCastKindFromTypeCode(code int) (data.Kind, bool) {
 	if code < 0 {
 		code = -code
@@ -457,7 +501,9 @@ func qCastTruncatedFloatInteger(value float64) (int64, bool) {
 	if math.IsNaN(value) || math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
 		return 0, false
 	}
-	return int64(value), true
+	// Canonical q float-to-integer casts round half-to-even (`long$2.7 is 3,
+	// `long$2.5 is 2), matching the vector and lazy cast kernels.
+	return int64(math.RoundToEven(value)), true
 }
 
 // castScalarStringValue parses text for a string-to-value cast. Canonical q

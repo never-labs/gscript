@@ -27,10 +27,11 @@ func TestQGapValidationConditionalsApplyIndexAndCasts(t *testing.T) {
 	assertEvalValue(t, "\"I\"$\"42\"", int32(42))
 	assertEvalValue(t, "`long$\"42\"", int64(42))
 	assertEvalValue(t, "`int$\"42\"", int32(42))
-	assertEvalValue(t, "`long$3.7", int64(3))
-	assertEvalValue(t, "`int$-3.7", int32(-3))
-	assertEvalArray(t, "`long$1.2 2.8 -3.7", data.KindI64, []any{int64(1), int64(2), int64(-3)})
-	assertEvalArray(t, "`int$1.2 -2.8 3.0", data.KindI32, []any{int32(1), int32(-2), int32(3)})
+	// Canonical q integer casts round half-to-even.
+	assertEvalValue(t, "`long$3.7", int64(4))
+	assertEvalValue(t, "`int$-3.7", int32(-4))
+	assertEvalArray(t, "`long$1.2 2.8 -3.7", data.KindI64, []any{int64(1), int64(3), int64(-4)})
+	assertEvalArray(t, "`int$1.2 -2.8 3.0", data.KindI32, []any{int32(1), int32(-3), int32(3)})
 }
 
 func TestQGapValidationBooleanVectorLiterals(t *testing.T) {

@@ -347,7 +347,8 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		}
 		out := bulkI64Get(len(source))
 		for i, v := range source {
-			out[i] = int64(v)
+			// Canonical q integer casts round half-to-even.
+			out[i] = int64(math.RoundToEven(v))
 		}
 		bulkF64Release(source, sourceOwned)
 		return out, true, true
@@ -951,7 +952,8 @@ func tryBulkF64Values(array Array) (values []float64, owned bool, ok bool) {
 		}
 		out := bulkF64Get(len(source))
 		for i, v := range source {
-			out[i] = float64(int64(v))
+			// Canonical q integer casts round half-to-even.
+			out[i] = float64(int64(math.RoundToEven(v)))
 		}
 		bulkF64Release(source, sourceOwned)
 		return out, true, true
@@ -1080,7 +1082,8 @@ func tryBulkF64ProducerValues(producer f64NumericProducer) ([]float64, bool, boo
 		}
 		out := bulkF64Get(len(source))
 		for i, v := range source {
-			out[i] = float64(int64(v))
+			// Canonical q integer casts round half-to-even.
+			out[i] = float64(int64(math.RoundToEven(v)))
 		}
 		bulkF64Release(source, sourceOwned)
 		return out, true, true

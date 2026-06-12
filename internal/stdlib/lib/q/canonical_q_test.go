@@ -48,12 +48,21 @@ const (
 	// Shrink 35 -> 28: six one-off divergences canonicalized (value-of-dict
 	// typed values, symbol upper/lower, console handle write 1 "x", failed
 	// string casts return null, canonical tuple-form fby).
+	// R16 holds at 28: the two float-to-integer truncation deviations
+	// converged to canonical round-half-even (promoted to match), while two
+	// reviewed design deviations were encoded: dyadic-verb juxtaposition is
+	// an arity error (no projections, canonical builds msum[x]) and not 0N
+	// is 1b (null-is-falsy Lua truthiness, canonical 0=0N is 0b).
 	canonicalQDeviationMax = 28
 	// Raised 300 -> 598 with the R15 breadth expansion (149 new entries:
 	// verb edge inputs, temporal corners, keyed-table ops, adverb matrices,
 	// string/pattern ops, take/drop/cut, find/within/bin, join corners,
 	// mixed-radix sv/vs, functional amend, casts, eval/parse round trips).
-	canonicalQEntryMin = 598
+	// Raised 598 -> 618 with the R16 closing batch (key/keys split, keyed
+	// lookup value-row dicts, compound indexed amend, paren derived-each
+	// juxtaposition, boolean string, wsum kind preservation, half-even
+	// integer casts).
+	canonicalQEntryMin = 618
 )
 
 type canonicalQEntry struct {
