@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 01;A0:where!(not (x in 00))")

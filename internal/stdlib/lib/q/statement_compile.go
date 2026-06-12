@@ -77,6 +77,10 @@ func (NameVectorExpr) exprNode() {}
 
 const qCompileMaxDepth = 48
 
+// qDifferentialMatchBudget bounds the per-statement comparison work in
+// EvalScriptCompiledDifferential.
+const qDifferentialMatchBudget = 1 << 22
+
 var (
 	qGlobalCompiledStatementMu    sync.Mutex
 	qGlobalCompiledStatementCache = map[string]Expr{}
@@ -677,7 +681,11 @@ func (s *EvalState) EvalScriptCompiledDifferential(src string) ([]EvalCompiledDi
 			case compiledErr == nil:
 				record.Compiled = true
 				stringValue, stringErr := s.eval(target)
-				record.Match = stringErr == nil && matchValue(compiledValue, stringValue)
+				// Bounded comparison: astronomically large lazy values (a
+				// fuzzer can build multi-hundred-million element views) give
+				// up after the budget instead of walking every element.
+				budget := qDifferentialMatchBudget
+				record.Match = stringErr == nil && matchValueBudget(compiledValue, stringValue, &budget)
 			case isUnsupportedEvalValueExpr(compiledErr):
 				// Falls back to the string evaluator at runtime; nothing
 				// surfaces to users.

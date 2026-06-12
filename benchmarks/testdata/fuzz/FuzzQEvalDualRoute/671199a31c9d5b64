@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 000xxz:#A00000000")

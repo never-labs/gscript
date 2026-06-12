@@ -16110,8 +16110,87 @@ func equalComparableValue(left, right any) bool {
 }
 
 func matchValue(left, right any) bool {
+	// Effectively unlimited budget: the ~ verb keeps exact semantics.
+	budget := math.MaxInt
+	return matchValueBudget(left, right, &budget)
+}
+
+// matchValueBudget is matchValue with a comparison-work budget. When the
+// budget is exhausted the comparison gives up and reports a match: callers
+// that bound the budget (the compiled/string differential oracle) prefer a
+// rare false-negative on astronomically large lazy values over an unbounded
+// element walk.
+func matchValueBudget(left, right any, budget *int) bool {
+	*budget--
+	if *budget < 0 {
+		return true
+	}
 	if data.IsNull(left) || data.IsNull(right) {
 		return data.IsNull(left) && data.IsNull(right)
+	}
+	// q match treats NaN as matching NaN: (0%0)~0%0 is 1b in canonical q.
+	// reflect.DeepEqual would report false (NaN != NaN), which also poisons
+	// the compiled/string differential oracle whenever both routes produce
+	// the same NaN.
+	if lf, lok := left.(float64); lok {
+		if rf, rok := right.(float64); rok && math.IsNaN(lf) && math.IsNaN(rf) {
+			return true
+		}
+	}
+	if lf, lok := left.(float32); lok {
+		if rf, rok := right.(float32); rok && lf != lf && rf != rf {
+			return true
+		}
+	}
+	// q match treats identical callables as matching: count~count and
+	// {x+1}~{x+1} are 1b in canonical q, and callables can appear inside
+	// lists and dict keys/values. reflect.DeepEqual on func-typed fields is
+	// always false, which would also poison the compiled/string differential
+	// oracle whenever both routes produce the same callable.
+	switch l := left.(type) {
+	case qUnaryFunction:
+		r, ok := right.(qUnaryFunction)
+		return ok && l.name == r.name
+	case qDyadicFunction:
+		r, ok := right.(qDyadicFunction)
+		return ok && l.name == r.name
+	case qAdverbFunction:
+		r, ok := right.(qAdverbFunction)
+		return ok && l == r
+	case qLambda:
+		// Lambdas match on identical source text; closures with captured
+		// environments stay conservatively unmatched (envs can be
+		// self-referential, so recursing into them is not safe).
+		r, ok := right.(qLambda)
+		return ok && l.body == r.body && l.namespace == r.namespace && len(l.env) == 0 && len(r.env) == 0
+	case qComposition:
+		r, ok := right.(qComposition)
+		if !ok || len(l.funcs) != len(r.funcs) {
+			return false
+		}
+		for i := range l.funcs {
+			if l.funcs[i].name != r.funcs[i].name {
+				return false
+			}
+		}
+		return true
+	case qCallableAdverb:
+		r, ok := right.(qCallableAdverb)
+		return ok && l.adverb == r.adverb && matchValueBudget(l.fn, r.fn, budget)
+	case qProjection:
+		r, ok := right.(qProjection)
+		if !ok || len(l.args) != len(r.args) || !matchValueBudget(l.fn, r.fn, budget) {
+			return false
+		}
+		for i := range l.args {
+			if l.args[i].missing != r.args[i].missing {
+				return false
+			}
+			if !l.args[i].missing && !matchValueBudget(l.args[i].value, r.args[i].value, budget) {
+				return false
+			}
+		}
+		return true
 	}
 	leftEnum, leftIsEnum := left.(qEnumVector)
 	rightEnum, rightIsEnum := right.(qEnumVector)
@@ -16129,9 +16208,12 @@ func matchValue(left, right any) bool {
 			return false
 		}
 		for i := 0; i < leftArray.Len(); i++ {
+			if *budget < 0 {
+				return true
+			}
 			leftItem, leftOK := leftArray.At(i)
 			rightItem, rightOK := rightArray.At(i)
-			if !leftOK || !rightOK || !matchValue(leftItem, rightItem) {
+			if !leftOK || !rightOK || !matchValueBudget(leftItem, rightItem, budget) {
 				return false
 			}
 		}
@@ -16144,7 +16226,7 @@ func matchValue(left, right any) bool {
 			return false
 		}
 		for i := range leftDict.Keys {
-			if !matchValue(leftDict.Keys[i], rightDict.Keys[i]) || !matchValue(leftDict.Values[i], rightDict.Values[i]) {
+			if !matchValueBudget(leftDict.Keys[i], rightDict.Keys[i], budget) || !matchValueBudget(leftDict.Values[i], rightDict.Values[i], budget) {
 				return false
 			}
 		}

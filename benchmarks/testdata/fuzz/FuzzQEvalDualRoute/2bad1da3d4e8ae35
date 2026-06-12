@@ -1,0 +1,2 @@
+go test fuzz v1
+string("m:mod 0;where m^0W")

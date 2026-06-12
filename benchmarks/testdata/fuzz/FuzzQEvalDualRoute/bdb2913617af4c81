@@ -1,0 +1,2 @@
+go test fuzz v1
+string("m:2 2#til 00;row:m 000;000000000")

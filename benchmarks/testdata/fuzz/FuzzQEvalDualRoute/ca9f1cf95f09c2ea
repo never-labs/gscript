@@ -1,0 +1,2 @@
+go test fuzz v1
+string("til 0W wsum 0")

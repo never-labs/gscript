@@ -1,0 +1,2 @@
+go test fuzz v1
+string("px:100*((til 70) mod 10);A0:0#((til 00) mod 00);A00:000`0000000000000000000;idx:where px>0000;A000:(000+(idx mod 10))*2# idx")

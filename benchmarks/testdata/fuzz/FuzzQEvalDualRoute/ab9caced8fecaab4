@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:(til 01);A:0 mod 0 xexp 0")

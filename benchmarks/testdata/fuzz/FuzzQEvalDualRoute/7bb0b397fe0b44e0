@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 96;m:x mod.10;idx:where!(00&0) and m<0#+0000")

@@ -1,0 +1,2 @@
+go test fuzz v1
+string("qv:rank til 1;()&(qv)")

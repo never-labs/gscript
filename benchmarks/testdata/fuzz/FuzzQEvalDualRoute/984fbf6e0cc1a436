@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 6;a:(x;reverse x+32#x);(+/raze a)")
