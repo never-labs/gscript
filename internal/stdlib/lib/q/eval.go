@@ -12236,7 +12236,8 @@ func applyDyadic(op byte, left, right any) (any, error) {
 		case 'M':
 			return maxDyadic(left, right)
 		case '+', '-', '*', '%', 'r', 'd':
-			if !hasTypedNullKind(left) && !hasTypedNullKind(right) {
+			if !hasTypedNullKind(left) && !hasTypedNullKind(right) &&
+				temporalKindOfValue(left) == "" && temporalKindOfValue(right) == "" {
 				return data.NullValue, nil
 			}
 			return data.NullForKind(qDyadicResultKind(op, left, right)), nil
@@ -12269,6 +12270,9 @@ func applyDyadic(op byte, left, right any) (any, error) {
 	}
 	if op == '^' {
 		return right, nil
+	}
+	if out, handled, err := applyTemporalDyadic(op, left, right); handled || err != nil {
+		return out, err
 	}
 	ln, lok := numeric(left)
 	rn, rok := numeric(right)
@@ -12864,6 +12868,29 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 			}
 		}
 	}
+	if op == '+' || op == '-' {
+		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
+		if err != nil {
+			return nil, err
+		}
+		if canUse && qVectorDyadicHasTemporalOperand(typedLeft, typedRight) {
+			dataOp := data.OpAdd
+			if op == '-' {
+				dataOp = data.OpSub
+			}
+			shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+			typed, handled, err := data.TryTypedTemporalDyadic(dataOp, typedLeft, typedRight)
+			out, handled, err := qTypedRuntimeResult("ArrayDyadicArithmetic", shape, any(typed), handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				if array, ok := out.(data.Array); ok {
+					return array, nil
+				}
+			}
+		}
+	}
 	if dataOp, ok := qDataArithmeticOp(op); ok {
 		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
@@ -13173,6 +13200,19 @@ func qVectorDyadicCanUseTypedArithmetic(left, right any) bool {
 	return qTypedArithmeticOperandOK(left) && qTypedArithmeticOperandOK(right)
 }
 
+// qVectorDyadicHasTemporalOperand reports whether either broadcast operand
+// carries a temporal kind, gating the kind-preserving temporal dyadic kernel.
+func qVectorDyadicHasTemporalOperand(left, right any) bool {
+	return qVectorDyadicOperandIsTemporal(left) || qVectorDyadicOperandIsTemporal(right)
+}
+
+func qVectorDyadicOperandIsTemporal(value any) bool {
+	if array, ok := value.(data.Array); ok {
+		return data.IsTemporalKind(array.Kind())
+	}
+	return temporalKindOfValue(value) != ""
+}
+
 func qTypedArithmeticOperandOK(value any) bool {
 	if array, ok := value.(data.Array); ok {
 		return qKindIsNumeric(array.Kind())
@@ -13302,6 +13342,9 @@ func qDyadicResultKind(op byte, left, right any) data.Kind {
 	case '+', '-', '*', 'r', 'd':
 		leftKind := qKindOfValue(left)
 		rightKind := qKindOfValue(right)
+		if kind, ok := temporalDyadicResultKind(op, leftKind, rightKind); ok {
+			return kind
+		}
 		if qKindIsNumeric(leftKind) || qKindIsNumeric(rightKind) {
 			kind, ok := mergeQResultKinds(leftKind, rightKind)
 			if ok {

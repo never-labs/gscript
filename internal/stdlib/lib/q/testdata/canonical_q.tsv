@@ -306,11 +306,34 @@ match	2024.01.01 within 2023.12.31 2024.06.30	1b
 match	12:00<13:00	1b
 match	12:30:00>12:29:59	1b
 match	2024.01.01=2024.01.01	1b
-gap	2024.01.01+1	2024.01.02	ERROR:numeric operands	temporal arithmetic (date plus days) missing
-gap	2024.01.02-2024.01.01	1i	ERROR:numeric operands	temporal difference missing
-gap	2024.05m+1	2024.06m	ERROR:numeric operands	temporal arithmetic (month plus months) missing
-gap	`mm$2024.05.01	5i	ERROR	temporal component cast `mm missing
-gap	`year$2024.05.01	2024i	ERROR	temporal component cast `year missing
+match	2024.01.01+1	2024.01.02
+gap	2024.01.02-2024.01.01	1i	1	temporal difference works but returns long; canonical returns int (width-only gap)
+match	(2024.01.02-2024.01.01)=1	1b
+match	2024.05m+1	2024.06m
+gap	`mm$2024.05.01	5i	5	temporal accessor cast works but returns long; canonical returns int (width-only gap)
+match	(`mm$2024.05.01)=5	1b
+gap	`year$2024.05.01	2024i	2024	temporal accessor cast works but returns long; canonical returns int (width-only gap)
+match	(`year$2024.05.01)=2024	1b
+match	2024.01.31+1	2024.02.01
+match	1+2024.01.31	2024.02.01
+match	(2024.03.01-2024.02.28)=2	1b
+match	12:30+30	13:00
+match	12:30:00+30	12:30:30
+match	12:00:00.000+1	12:00:00.001
+match	2024.05m-1	2024.04m
+match	13:00-12:15	00:45
+match	2024.01.02D00:00:00-2024.01.01D00:00:00	1D00:00:00
+match	2024.01.01D00:00:00+1000000000	2024.01.01D00:00:01
+match	2024.01.01+12:00:00.000	2024.01.01D12:00:00
+match	2024.01.01D12:00:00+0D00:30:00	2024.01.01D12:30:00
+match	0Nd+1	0Nd
+match	0Wd>2024.01.01	1b
+match	2024.01.01 2024.01.02+1	2024.01.02 2024.01.03
+match	(`dd$2024.05.09)=9	1b
+match	`month$2024.05.09	2024.05m
+match	(`hh$12:34:56)=12	1b
+match	`minute$12:34:56	12:34
+match	`week$2024.06.12	2024.06.10
 # ---- conditionals and control flow ----
 match	$[1b;`a;`b]	`a
 match	$[0;1;2]	2
