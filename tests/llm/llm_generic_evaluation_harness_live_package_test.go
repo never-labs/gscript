@@ -2,7 +2,6 @@ package leia_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -861,40 +860,11 @@ func TestFinRobotGenericEvaluationHarnessAgentRunProjection(t *testing.T) {
 
 func TestFinRobotGenericEvaluationHarnessExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericEvaluationHarnessLivePackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_evaluation_harness_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_evaluation_harness_live_package_summary: %v", err)
-			}
-			want := "generic_evaluation_harness_live_package surfaces=2 datasets=1 cases=2 metrics=5 replay_records=2 finding_kinds=6 golden_gates=4 summaries=2 agent_run_projections=1 provider_free=true live_network=false imports=false"
-			if got != want {
-				t.Fatalf("generic_evaluation_harness_live_package_summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_evaluation_harness_live_package surfaces=2 datasets=1 cases=2 metrics=5 replay_records=2 finding_kinds=6 golden_gates=4 summaries=2 agent_run_projections=1 provider_free=true live_network=false imports=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_evaluation_harness_live_package_summary", "generic_evaluation_harness_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("generic_evaluation_harness_live_package_summary = %#v, want %#v", result.Summary, want)
+		}
 	}
 }
 

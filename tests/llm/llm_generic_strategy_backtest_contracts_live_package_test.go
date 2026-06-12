@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,40 +129,11 @@ func TestGenericStrategyBacktestContractsLivePackageSchemaRequiredFields(t *test
 
 func TestGenericStrategyBacktestContractsLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericStrategyBacktestContractsPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_strategy_backtest_contracts_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get summary: %v", err)
-			}
-			want := "generic_strategy_backtest_contracts_live_package capability=generic.ai.strategy.backtest.contracts entrypoint=ai.strategy.backtest_contracts strategies=1 observation_feeds=1 seeds=1 ledgers=1 allocation_series=1 performance=1 metric_summary=1 constraint_limits=4 clean_skip=3 provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_strategy_backtest_contracts_live_package capability=generic.ai.strategy.backtest.contracts entrypoint=ai.strategy.backtest_contracts strategies=1 observation_feeds=1 seeds=1 ledgers=1 allocation_series=1 performance=1 metric_summary=1 constraint_limits=4 clean_skip=3 provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_strategy_backtest_contracts_live_package_summary", "generic_strategy_backtest_contracts_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
 	}
 }
 

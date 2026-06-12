@@ -2,7 +2,6 @@ package leia_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -909,42 +908,11 @@ func TestGenericWorkflowOrchestratorLivePackageNoLiveImports(t *testing.T) {
 
 func TestGenericWorkflowOrchestratorLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericWorkflowOrchestratorLivePackageDir(t), "main.leia")
-
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_workflow_orchestrator_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_workflow_orchestrator_live_package_summary: %v", err)
-			}
-			want := "generic_workflow_orchestrator_live_package package=generic.ai.workflow.orchestration entrypoint=ai.workflow.orchestrate stages=4 fixtures=6 schemas=7 provider_free=true live_network=false imports=false graph=true stage_io=true planning_projection=true handoff_trace=true retry_cache=true workflow_result=true trace_hooks=true"
-			if got != want {
-				t.Fatalf("generic_workflow_orchestrator_live_package_summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_workflow_orchestrator_live_package package=generic.ai.workflow.orchestration entrypoint=ai.workflow.orchestrate stages=4 fixtures=6 schemas=7 provider_free=true live_network=false imports=false graph=true stage_io=true planning_projection=true handoff_trace=true retry_cache=true workflow_result=true trace_hooks=true"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_workflow_orchestrator_live_package_summary", "generic_workflow_orchestrator_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("generic_workflow_orchestrator_live_package_summary = %#v, want %#v", result.Summary, want)
+		}
 	}
 }
 

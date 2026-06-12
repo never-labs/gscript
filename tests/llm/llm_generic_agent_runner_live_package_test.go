@@ -2,7 +2,6 @@ package leia_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,39 +166,10 @@ func TestGenericAgentRunnerLivePackageContractsAndFixtures(t *testing.T) {
 func TestGenericAgentRunnerLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation", "live_packages", "generic_agent_runner", "main.leia")
 	want := "generic_agent_runner_live_package backend=ai.agent.run tools=2 max_steps=4 trace_events=6 output_fields=3 capabilities=7 tool_contract_projections=1 provider_free=true live_network=false imports=false"
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_agent_runner_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get summary: %v", err)
-			}
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_agent_runner_live_package_summary", "generic_agent_runner_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
 	}
 }
 

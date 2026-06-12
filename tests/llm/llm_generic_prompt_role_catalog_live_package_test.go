@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -204,40 +203,26 @@ func TestGenericPromptRoleCatalogLivePackageSchemaRequiredFields(t *testing.T) {
 
 func TestGenericPromptRoleCatalogLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericPromptRoleCatalogPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_prompt_role_catalog_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_prompt_role_catalog_live_package_summary: %v", err)
-			}
-			want := "generic_prompt_role_catalog_live_package capability=generic.ai.prompt.role.catalog entrypoint=ai.prompt.role_catalog roles=3 templates=3 delegation=4 evidence=3 termination=COMPLETE provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_prompt_role_catalog_live_package capability=generic.ai.prompt.role.catalog entrypoint=ai.prompt.role_catalog roles=3 templates=3 delegation=4 evidence=3 termination=COMPLETE provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_prompt_role_catalog_live_package_summary", "generic_prompt_role_catalog_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "capability", "entrypoint", "roles", "templates", "delegation", "evidence", "termination", "provider_free", "live_network", "imports", "model_calls")
+		if fields["capability"] != "generic.ai.prompt.role.catalog" ||
+			fields["entrypoint"] != "ai.prompt.role_catalog" ||
+			fields["roles"] != "3" ||
+			fields["templates"] != "3" ||
+			fields["delegation"] != "4" ||
+			fields["evidence"] != "3" ||
+			fields["termination"] != "COMPLETE" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" ||
+			fields["model_calls"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

@@ -292,6 +292,7 @@ func TestGenericAIWorkflowCompositionEdgesContractMatchesExampleAndMatrix(t *tes
 			t.Fatalf("contract boundary matrix_id %q missing from package matrix", boundary.MatrixID)
 		}
 		if boundary.PackageID != strings.ReplaceAll(row.ID, "_", "-") ||
+			boundary.PackageBoundaryID != genericAIWorkflowCompositionPackageBoundaryID(row) ||
 			boundary.PackageName != row.PackageName ||
 			boundary.PackageDir != row.PackageDir ||
 			boundary.ManifestRef != row.Manifest ||
@@ -318,6 +319,8 @@ func TestGenericAIWorkflowCompositionEdgesContractMatchesExampleAndMatrix(t *tes
 		}
 		if edge.FromPackageID != fromBoundary.PackageID ||
 			edge.ToPackageID != toBoundary.PackageID ||
+			edge.FromPackageBoundaryID != fromBoundary.PackageBoundaryID ||
+			edge.ToPackageBoundaryID != toBoundary.PackageBoundaryID ||
 			edge.Handoff == "" ||
 			!edge.ProviderFree ||
 			edge.LiveNetwork ||
@@ -418,17 +421,18 @@ type genericAIWorkflowCompositionEdgesContract struct {
 }
 
 type genericAIWorkflowCompositionContractBoundary struct {
-	Role            string `json:"role"`
-	PackageID       string `json:"package_id"`
-	MatrixID        string `json:"matrix_id"`
-	PackageName     string `json:"package_name"`
-	PackageDir      string `json:"package_dir"`
-	Capability      string `json:"capability"`
-	BackendShape    string `json:"backend_shape"`
-	ProviderFree    bool   `json:"provider_free"`
-	LiveNetwork     bool   `json:"live_network"`
-	ManifestRef     string `json:"manifest_ref"`
-	FixtureIndexRef string `json:"fixture_index_ref"`
+	Role              string `json:"role"`
+	PackageID         string `json:"package_id"`
+	PackageBoundaryID string `json:"package_boundary_id"`
+	MatrixID          string `json:"matrix_id"`
+	PackageName       string `json:"package_name"`
+	PackageDir        string `json:"package_dir"`
+	Capability        string `json:"capability"`
+	BackendShape      string `json:"backend_shape"`
+	ProviderFree      bool   `json:"provider_free"`
+	LiveNetwork       bool   `json:"live_network"`
+	ManifestRef       string `json:"manifest_ref"`
+	FixtureIndexRef   string `json:"fixture_index_ref"`
 }
 
 type genericAIWorkflowCompositionContractEdge struct {
@@ -436,12 +440,18 @@ type genericAIWorkflowCompositionContractEdge struct {
 	ToRole                string   `json:"to_role"`
 	FromPackageID         string   `json:"from_package_id"`
 	ToPackageID           string   `json:"to_package_id"`
+	FromPackageBoundaryID string   `json:"from_package_boundary_id"`
+	ToPackageBoundaryID   string   `json:"to_package_boundary_id"`
 	Handoff               string   `json:"handoff"`
 	ProviderFree          bool     `json:"provider_free"`
 	LiveNetwork           bool     `json:"live_network"`
 	RealDependencyImports bool     `json:"real_dependency_imports"`
 	ContractRefs          []string `json:"contract_refs"`
 	FixtureRefs           []string `json:"fixture_refs"`
+}
+
+func genericAIWorkflowCompositionPackageBoundaryID(row genericAIPackageRow) string {
+	return strings.TrimPrefix(row.PackageName, "leia-")
 }
 
 func parseGenericAIWorkflowCompositionBoundaries(t *testing.T, data string) []genericAIWorkflowCompositionBoundary {

@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -386,40 +385,31 @@ func TestGenericProductAppBoundaryWorkflowProjection(t *testing.T) {
 
 func TestGenericProductAppBoundaryLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericProductAppBoundaryPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_product_app_boundary_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get summary: %v", err)
-			}
-			want := "generic_product_app_boundary_live_package capability=generic.ai.product_app.boundary entrypoint=ai.product_app.boundary routes=3 sessions=2 tasks=2 downloads=2 crud=3 migrations=1 deployments=2 approvals=2 clean_skip=3 workflow_projections=1 provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_product_app_boundary_live_package capability=generic.ai.product_app.boundary entrypoint=ai.product_app.boundary routes=3 sessions=2 tasks=2 downloads=2 crud=3 migrations=1 deployments=2 approvals=2 clean_skip=3 workflow_projections=1 provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_product_app_boundary_live_package_summary", "generic_product_app_boundary_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "capability", "entrypoint", "routes", "sessions", "tasks", "downloads", "crud", "migrations", "deployments", "approvals", "clean_skip", "workflow_projections", "provider_free", "live_network", "imports", "model_calls")
+		if fields["capability"] != "generic.ai.product_app.boundary" ||
+			fields["entrypoint"] != "ai.product_app.boundary" ||
+			fields["routes"] != "3" ||
+			fields["sessions"] != "2" ||
+			fields["tasks"] != "2" ||
+			fields["downloads"] != "2" ||
+			fields["crud"] != "3" ||
+			fields["migrations"] != "1" ||
+			fields["deployments"] != "2" ||
+			fields["approvals"] != "2" ||
+			fields["clean_skip"] != "3" ||
+			fields["workflow_projections"] != "1" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" ||
+			fields["model_calls"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

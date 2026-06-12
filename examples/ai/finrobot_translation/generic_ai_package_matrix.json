@@ -425,7 +425,7 @@
         "generic.ai.model.routing.guard",
         "generic.ai.model.live_provider_gate"
       ],
-      "backend_shape": "generic.ai.model.registry",
+      "backend_shape": "ai.model.resolve",
       "provider_free": true,
       "main_leia": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
       "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
@@ -472,7 +472,7 @@
         "generic.ai.package.boundary.audit.findings",
         "generic.ai.package.boundary.audit.missing_boundary_records"
       ],
-      "backend_shape": "generic.ai.package.boundary.audit",
+      "backend_shape": "ai.package.audit",
       "provider_free": true,
       "main_leia": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
       "manifest": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",

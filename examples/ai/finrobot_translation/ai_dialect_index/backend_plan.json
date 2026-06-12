@@ -821,7 +821,7 @@
       ],
       "example": "examples/ai/coding_agent_replay.leia",
       "test": "tests/llm/llm_generic_tool_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
       "package_boundary": {
         "status": "checked_in",
         "package_id": "generic-tool-contracts",
@@ -1037,7 +1037,7 @@
       ],
       "example": "examples/ai/general_agent_workflow.leia",
       "test": "tests/llm/llm_generic_workflow_orchestrator_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
+      "fixture": "examples/ai/general_agent_workflow.records.json",
       "package_boundary": {
         "status": "checked_in",
         "package_id": "generic-workflow-orchestrator",

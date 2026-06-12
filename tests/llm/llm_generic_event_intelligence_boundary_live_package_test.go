@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,40 +162,30 @@ func TestGenericEventIntelligenceBoundaryLivePackageSchemaRequiredFields(t *test
 
 func TestGenericEventIntelligenceBoundaryLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericEventIntelligenceBoundaryPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_event_intelligence_boundary_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get summary: %v", err)
-			}
-			want := "generic_event_intelligence_boundary_live_package capability=generic.ai.event_intelligence.boundary entrypoint=ai.event_intelligence.boundary sources=2 events=2 taxonomies=1 freshness=1 dedupe=2 relevance=2 sentiment_impact=2 prompts=1 clean_skip=2 provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_event_intelligence_boundary_live_package capability=generic.ai.event_intelligence.boundary entrypoint=ai.event_intelligence.boundary sources=2 events=2 taxonomies=1 freshness=1 dedupe=2 relevance=2 sentiment_impact=2 prompts=1 clean_skip=2 provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_event_intelligence_boundary_live_package_summary", "generic_event_intelligence_boundary_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "capability", "entrypoint", "sources", "events", "taxonomies", "freshness", "dedupe", "relevance", "sentiment_impact", "prompts", "clean_skip", "provider_free", "live_network", "imports", "model_calls")
+		if fields["capability"] != "generic.ai.event_intelligence.boundary" ||
+			fields["entrypoint"] != "ai.event_intelligence.boundary" ||
+			fields["sources"] != "2" ||
+			fields["events"] != "2" ||
+			fields["taxonomies"] != "1" ||
+			fields["freshness"] != "1" ||
+			fields["dedupe"] != "2" ||
+			fields["relevance"] != "2" ||
+			fields["sentiment_impact"] != "2" ||
+			fields["prompts"] != "1" ||
+			fields["clean_skip"] != "2" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" ||
+			fields["model_calls"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

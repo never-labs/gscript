@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -172,40 +171,11 @@ func TestGenericDataProviderBoundaryLivePackageSchemaRequiredFields(t *testing.T
 
 func TestGenericDataProviderBoundaryLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericDataProviderBoundaryPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_data_provider_boundary_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get summary: %v", err)
-			}
-			want := "generic_data_provider_boundary_live_package capability=generic.ai.data_provider.boundary entrypoint=ai.data_provider.boundary providers=3 requests=3 responses=3 pagination=2 rate_limits=2 redactions=2 policies=2 provenance=3 errors=1 clean_skip=3 provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_data_provider_boundary_live_package capability=generic.ai.data_provider.boundary entrypoint=ai.data_provider.boundary providers=3 requests=3 responses=3 pagination=2 rate_limits=2 redactions=2 policies=2 provenance=3 errors=1 clean_skip=3 provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_data_provider_boundary_live_package_summary", "generic_data_provider_boundary_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
 	}
 }
 

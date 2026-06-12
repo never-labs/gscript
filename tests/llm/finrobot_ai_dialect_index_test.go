@@ -745,9 +745,16 @@ func assertGenericAIDialectFixtureProviderFree(t *testing.T, root, rel string) {
 func assertGenericAIDialectNoLivePackageReference(t *testing.T, entry genericAIDialectIndexItem) {
 	t.Helper()
 	for _, rel := range []string{entry.Example, entry.Test, entry.Fixture} {
-		if strings.Contains(filepath.ToSlash(rel), "/live_packages/") {
-			t.Fatalf("%s references live_packages path %q", entry.Capability, rel)
+		rel = filepath.ToSlash(rel)
+		if !strings.Contains(rel, "/live_packages/") {
+			continue
 		}
+		if entry.ProductionPackageBoundary != nil &&
+			entry.ProductionPackageBoundary.Status == "checked_in" &&
+			strings.HasPrefix(rel, filepath.ToSlash(entry.ProductionPackageBoundary.Directory)+"/") {
+			continue
+		}
+		t.Fatalf("%s references live_packages path %q without a checked-in package boundary", entry.Capability, rel)
 	}
 }
 

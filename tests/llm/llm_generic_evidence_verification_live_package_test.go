@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -395,40 +394,29 @@ func TestGenericEvidenceVerificationDocumentRAGProjection(t *testing.T) {
 
 func TestGenericEvidenceVerificationLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericEvidenceVerificationPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_evidence_verification_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_evidence_verification_live_package_summary: %v", err)
-			}
-			want := "generic_evidence_verification_live_package capability=generic.ai.evidence.verify entrypoint=ai.evidence.verify rag_projections=1 claims=3 sources=4 citations=4 results=3 freshness_warnings=1 unresolved=1 clean_degradation=1 provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_evidence_verification_live_package capability=generic.ai.evidence.verify entrypoint=ai.evidence.verify rag_projections=1 claims=3 sources=4 citations=4 results=3 freshness_warnings=1 unresolved=1 clean_degradation=1 provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_evidence_verification_live_package_summary", "generic_evidence_verification_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "capability", "entrypoint", "rag_projections", "claims", "sources", "citations", "results", "freshness_warnings", "unresolved", "clean_degradation", "provider_free", "live_network", "imports", "model_calls")
+		if fields["capability"] != "generic.ai.evidence.verify" ||
+			fields["entrypoint"] != "ai.evidence.verify" ||
+			fields["rag_projections"] != "1" ||
+			fields["claims"] != "3" ||
+			fields["sources"] != "4" ||
+			fields["citations"] != "4" ||
+			fields["results"] != "3" ||
+			fields["freshness_warnings"] != "1" ||
+			fields["unresolved"] != "1" ||
+			fields["clean_degradation"] != "1" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" ||
+			fields["model_calls"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

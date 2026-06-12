@@ -163,9 +163,9 @@
         "loop.resume",
         "llm.approval_trace"
       ],
-      "example": "examples/ai/finrobot_translation/compliance_policy.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
       "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-approval-policy",
         "boundary": "capability-based approval decisions, clean skips, and replay trace envelopes",
@@ -193,9 +193,9 @@
         "default_deny",
         "clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/compliance_policy.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
       "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-capability-gates",
         "boundary": "capability vocabulary, default-deny policy, approval evidence, and clean-skip semantics",
@@ -758,9 +758,9 @@
         "recorded_turn",
         "strict_ordered_match"
       ],
-      "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_generic_record_replay_live_package_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+      "test": "tests/llm/llm_generic_record_replay_evaluation_evidence_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-record-replay",
         "boundary": "record schema, replay matching, mismatch findings, and unconsumed record handling",

@@ -16,11 +16,12 @@
       "package_name": "leia-generic-ai-model-registry",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
       "capability": "generic.ai.model.registry",
-      "backend_shape": "generic.ai.model.registry",
+      "backend_shape": "ai.model.resolve",
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-model-registry"
     },
     {
       "role": "model-io",
@@ -33,7 +34,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-model-io-envelope"
     },
     {
       "role": "document-rag",
@@ -46,7 +48,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-document-rag-pipeline"
     },
     {
       "role": "prompt-role",
@@ -59,7 +62,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-prompt-role-catalog"
     },
     {
       "role": "memory",
@@ -72,7 +76,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-memory-store"
     },
     {
       "role": "replay",
@@ -85,7 +90,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_record_replay/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-record-replay"
     },
     {
       "role": "trace",
@@ -98,7 +104,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-trace-events"
     },
     {
       "role": "approval",
@@ -111,7 +118,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-approval-policy"
     },
     {
       "role": "tool",
@@ -124,7 +132,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-tool-contracts"
     },
     {
       "role": "tool-registry",
@@ -137,7 +146,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-tool-registry"
     },
     {
       "role": "optional-adapter",
@@ -150,7 +160,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-optional-adapter-boundary"
     },
     {
       "role": "data-provider",
@@ -163,7 +174,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-data-provider-boundary"
     },
     {
       "role": "data-normalization",
@@ -176,7 +188,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-data-normalization-contracts"
     },
     {
       "role": "analytical-model",
@@ -189,7 +202,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-analytical-model-contracts"
     },
     {
       "role": "transcript-pipeline",
@@ -202,7 +216,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-transcript-pipeline"
     },
     {
       "role": "event-intelligence",
@@ -215,7 +230,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-event-intelligence-boundary"
     },
     {
       "role": "strategy-backtest",
@@ -228,7 +244,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-strategy-backtest-contracts"
     },
     {
       "role": "coding-workspace",
@@ -241,7 +258,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-coding-workspace"
     },
     {
       "role": "turn",
@@ -254,7 +272,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-turn-runner"
     },
     {
       "role": "agent-state",
@@ -267,7 +286,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-agent-state-store"
     },
     {
       "role": "agent",
@@ -280,7 +300,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-agent-runner"
     },
     {
       "role": "planning",
@@ -293,7 +314,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-planning-graph"
     },
     {
       "role": "package-audit",
@@ -302,11 +324,12 @@
       "package_name": "leia-generic-ai-package-boundary-auditor",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
       "capability": "generic.ai.package.boundary.audit.manifest",
-      "backend_shape": "generic.ai.package.boundary.audit",
+      "backend_shape": "ai.package.audit",
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-package-boundary-auditor"
     },
     {
       "role": "workflow",
@@ -319,7 +342,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-workflow-orchestrator"
     },
     {
       "role": "chart-render",
@@ -332,7 +356,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-chart-render-contracts"
     },
     {
       "role": "evidence-verification",
@@ -345,7 +370,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-evidence-verification"
     },
     {
       "role": "evidence-report",
@@ -358,7 +384,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-evidence-report-artifacts"
     },
     {
       "role": "report-render",
@@ -371,7 +398,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-report-render-contracts"
     },
     {
       "role": "product-app",
@@ -384,7 +412,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-product-app-boundary"
     },
     {
       "role": "ui-snapshot",
@@ -397,7 +426,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-ui-snapshot-evaluator"
     },
     {
       "role": "eval",
@@ -410,7 +440,8 @@
       "provider_free": true,
       "live_network": false,
       "manifest_ref": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
-      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
+      "fixture_index_ref": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json",
+      "package_boundary_id": "generic-ai-evaluation-harness"
     }
   ],
   "edges": [
@@ -428,7 +459,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-model-registry",
+      "to_package_boundary_id": "generic-ai-model-io-envelope"
     },
     {
       "from_role": "document-rag",
@@ -444,7 +477,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-document-rag-pipeline",
+      "to_package_boundary_id": "generic-ai-memory-store"
     },
     {
       "from_role": "memory",
@@ -460,7 +495,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-memory-store",
+      "to_package_boundary_id": "generic-ai-turn-runner"
     },
     {
       "from_role": "model-io",
@@ -476,7 +513,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-model-io-envelope",
+      "to_package_boundary_id": "generic-ai-turn-runner"
     },
     {
       "from_role": "turn",
@@ -492,7 +531,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-turn-runner",
+      "to_package_boundary_id": "generic-ai-agent-state-store"
     },
     {
       "from_role": "agent-state",
@@ -508,7 +549,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-agent-state-store",
+      "to_package_boundary_id": "generic-ai-trace-events"
     },
     {
       "from_role": "agent-state",
@@ -525,7 +568,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-agent-state-store",
+      "to_package_boundary_id": "generic-ai-record-replay"
     },
     {
       "from_role": "agent-state",
@@ -541,7 +586,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-agent-state-store",
+      "to_package_boundary_id": "generic-ai-agent-runner"
     },
     {
       "from_role": "prompt-role",
@@ -557,7 +604,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-prompt-role-catalog",
+      "to_package_boundary_id": "generic-ai-agent-runner"
     },
     {
       "from_role": "tool",
@@ -573,7 +622,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-tool-contracts",
+      "to_package_boundary_id": "generic-ai-turn-runner"
     },
     {
       "from_role": "agent",
@@ -590,7 +641,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-agent-runner",
+      "to_package_boundary_id": "generic-ai-workflow-orchestrator"
     },
     {
       "from_role": "workflow",
@@ -606,7 +659,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-workflow-orchestrator",
+      "to_package_boundary_id": "generic-ai-evaluation-harness"
     },
     {
       "from_role": "replay",
@@ -622,7 +677,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-record-replay",
+      "to_package_boundary_id": "generic-ai-turn-runner"
     },
     {
       "from_role": "trace",
@@ -639,7 +696,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-trace-events",
+      "to_package_boundary_id": "generic-ai-workflow-orchestrator"
     },
     {
       "from_role": "approval",
@@ -655,7 +714,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-approval-policy",
+      "to_package_boundary_id": "generic-ai-tool-contracts"
     },
     {
       "from_role": "tool-registry",
@@ -671,7 +732,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-tool-registry",
+      "to_package_boundary_id": "generic-ai-tool-contracts"
     },
     {
       "from_role": "optional-adapter",
@@ -687,7 +750,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-optional-adapter-boundary",
+      "to_package_boundary_id": "generic-ai-tool-contracts"
     },
     {
       "from_role": "data-provider",
@@ -703,7 +768,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-data-provider-boundary",
+      "to_package_boundary_id": "generic-ai-tool-contracts"
     },
     {
       "from_role": "data-provider",
@@ -719,7 +786,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-data-provider-boundary",
+      "to_package_boundary_id": "generic-ai-data-normalization-contracts"
     },
     {
       "from_role": "data-normalization",
@@ -735,7 +804,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-data-normalization-contracts",
+      "to_package_boundary_id": "generic-ai-analytical-model-contracts"
     },
     {
       "from_role": "transcript-pipeline",
@@ -751,7 +822,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-transcript-pipeline",
+      "to_package_boundary_id": "generic-ai-document-rag-pipeline"
     },
     {
       "from_role": "data-provider",
@@ -767,7 +840,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-data-provider-boundary",
+      "to_package_boundary_id": "generic-ai-event-intelligence-boundary"
     },
     {
       "from_role": "data-provider",
@@ -783,7 +858,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-data-provider-boundary",
+      "to_package_boundary_id": "generic-ai-strategy-backtest-contracts"
     },
     {
       "from_role": "approval",
@@ -799,7 +876,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-approval-policy",
+      "to_package_boundary_id": "generic-ai-coding-workspace"
     },
     {
       "from_role": "planning",
@@ -816,7 +895,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-planning-graph",
+      "to_package_boundary_id": "generic-ai-workflow-orchestrator"
     },
     {
       "from_role": "package-audit",
@@ -833,7 +914,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-package-boundary-auditor",
+      "to_package_boundary_id": "generic-ai-workflow-orchestrator"
     },
     {
       "from_role": "chart-render",
@@ -849,7 +932,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-chart-render-contracts",
+      "to_package_boundary_id": "generic-ai-evidence-report-artifacts"
     },
     {
       "from_role": "workflow",
@@ -865,7 +950,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-workflow-orchestrator",
+      "to_package_boundary_id": "generic-ai-evidence-verification"
     },
     {
       "from_role": "evidence-verification",
@@ -881,7 +968,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-evidence-verification",
+      "to_package_boundary_id": "generic-ai-evidence-report-artifacts"
     },
     {
       "from_role": "evidence-report",
@@ -897,7 +986,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-evidence-report-artifacts",
+      "to_package_boundary_id": "generic-ai-report-render-contracts"
     },
     {
       "from_role": "workflow",
@@ -913,7 +1004,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-workflow-orchestrator",
+      "to_package_boundary_id": "generic-ai-product-app-boundary"
     },
     {
       "from_role": "evidence-report",
@@ -929,7 +1022,9 @@
       ],
       "fixture_refs": [
         "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json"
-      ]
+      ],
+      "from_package_boundary_id": "generic-ai-evidence-report-artifacts",
+      "to_package_boundary_id": "generic-ai-ui-snapshot-evaluator"
     }
   ]
 }

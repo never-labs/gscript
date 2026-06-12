@@ -10,7 +10,7 @@
 // provider SDK, network call, credential, or domain adapter.
 
 package_boundaries := {
-    {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "generic.ai.model.registry" provider_free: true live_network: false},
+    {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "ai.model.resolve" provider_free: true live_network: false},
     {role: "model-io" package_id: "generic-model-io-envelope" capability: "generic.ai.model.io.envelope" entrypoint: "ai.model.io.envelope" provider_free: true live_network: false},
     {role: "document-rag" package_id: "generic-document-rag-pipeline" capability: "generic.ai.document.rag" entrypoint: "ai.document.rag_pipeline" provider_free: true live_network: false},
     {role: "prompt-role" package_id: "generic-prompt-role-catalog" capability: "generic.ai.prompt.role.catalog" entrypoint: "ai.prompt.role_catalog" provider_free: true live_network: false},
@@ -32,7 +32,7 @@ package_boundaries := {
     {role: "agent-state" package_id: "generic-agent-state-store" capability: "generic.ai.agent_state.store" entrypoint: "ai.agent_state.store" provider_free: true live_network: false},
     {role: "agent" package_id: "generic-agent-runner" capability: "ai.agent.config.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
     {role: "planning" package_id: "generic-planning-graph" capability: "generic.planning.graph.define" entrypoint: "ai.workflow.plan_graph" provider_free: true live_network: false},
-    {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "generic.ai.package.boundary.audit" provider_free: true live_network: false},
+    {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "ai.package.audit" provider_free: true live_network: false},
     {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "ai.workflow.orchestrate.provider_free" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
     {role: "chart-render" package_id: "generic-chart-render-contracts" capability: "generic.ai.chart.render.contracts" entrypoint: "ai.chart.render_contracts" provider_free: true live_network: false},
     {role: "evidence-verification" package_id: "generic-evidence-verification" capability: "generic.ai.evidence.verify" entrypoint: "ai.evidence.verify" provider_free: true live_network: false},
