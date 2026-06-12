@@ -16,7 +16,11 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No credentials are declared by this skeleton; provider adapters, model endpoints, storage backends, queue brokers, and tracing sinks belong only to future provider-specific packages."
+    "policy": "No credentials are declared by this skeleton; provider adapters, model endpoints, storage backends, queue brokers, and tracing sinks belong only to future provider-specific packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
   },
   "default_policy": {
     "mode": "fixture_replay",

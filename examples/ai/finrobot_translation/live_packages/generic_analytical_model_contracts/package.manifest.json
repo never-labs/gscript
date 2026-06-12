@@ -25,7 +25,11 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No credentials are declared by this skeleton; live assumption providers, remote optimization services, and external simulation engines belong only to provider-specific adapter packages."
+    "policy": "No credentials are declared by this skeleton; live assumption providers, remote optimization services, and external simulation engines belong only to provider-specific adapter packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
   },
   "default_policy": {
     "mode": "fixture_replay",

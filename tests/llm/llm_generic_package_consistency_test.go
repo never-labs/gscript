@@ -226,16 +226,22 @@ func assertGenericLivePackageNoProviderCredentialDefaults(t *testing.T, manifest
 	}
 	credentials, ok := manifest["credentials"].(map[string]any)
 	if !ok {
-		return
+		t.Fatalf("%s missing credentials object", manifestPath)
 	}
-	for _, key := range []string{"required_env", "optional_env", "secret_env_patterns", "secret_refs"} {
+	for _, key := range []string{"required", "optional", "required_env", "optional_env", "secret_env_patterns", "secret_refs"} {
 		values, ok := credentials[key].([]any)
-		if ok && len(values) != 0 {
+		if !ok {
+			t.Fatalf("%s credentials.%s missing or not an array: %#v", manifestPath, key, credentials[key])
+		}
+		if len(values) != 0 {
 			t.Fatalf("%s credentials.%s = %#v, want empty provider-free gate", manifestPath, key, values)
 		}
 	}
-	if required, ok := credentials["required"].(bool); ok && required {
-		t.Fatalf("%s credentials.required = true, want false", manifestPath)
+	if !finrobotLivePackageBoolOrConst(credentials["provider_credentials_required"], false) {
+		t.Fatalf("%s credentials.provider_credentials_required = %#v, want false", manifestPath, credentials["provider_credentials_required"])
+	}
+	if policy, _ := credentials["policy"].(string); policy == "" {
+		t.Fatalf("%s credentials.policy must document provider-free credential handling", manifestPath)
 	}
 }
 

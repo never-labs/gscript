@@ -247,21 +247,11 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 }
 
 func genericAIDialectRequiresSmokeCoverage(capabilityID string) bool {
-	switch capabilityID {
-	case "generic.ai.model.io.envelope", "generic.ai.tool.registry":
-		return true
-	default:
-		return false
-	}
+	return capabilityID != ""
 }
 
 func genericAIDialectRequiresSmokeCoveragePackage(packageID string) bool {
-	switch packageID {
-	case "generic-model-io-envelope", "generic-tool-registry":
-		return true
-	default:
-		return false
-	}
+	return packageID != ""
 }
 
 func assertGenericAIDialectSmokeCoverage(t *testing.T, root, owner, indexedTest, boundaryDirectory string, smoke *genericAIDialectSmokeCoverage) {

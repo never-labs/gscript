@@ -83,6 +83,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_agent_state_store_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericAgentStateStoreLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "agent state store contract fixture decodes without provider SDKs, live databases, credentials, or network access",
+          "state_version is monotonic and resume_token derives from checkpoint_key",
+          "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads"
+        ]
       }
     },
     {
@@ -115,6 +126,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_agent_runner_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericAgentRunnerLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "fixture JSON parses without live provider credentials",
+          "contract declares provider-free loop execution boundary",
+          "tool contract projection maps replayable tool contracts into agent tools, tool history, and loop trace ownership"
+        ]
       }
     },
     {
@@ -148,6 +170,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_analytical_model_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericAnalyticalModelContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "scenario book fixtures declare assumption sets, scenario weights, sensitivity axes, provenance, and deterministic ordering",
+          "forecast result fixtures carry rows, units, periods, scenario references, and transform notes"
+        ]
       }
     },
     {
@@ -179,6 +212,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericApprovalPolicySmokeLeia",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "generic.ai.approval.policy denies by default unless an exact capability grant exists"
+        ]
       }
     },
     {
@@ -209,6 +253,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericApprovalPolicySmokeLeia",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "generic.ai.approval.policy denies by default unless an exact capability grant exists"
+        ]
       }
     },
     {
@@ -242,6 +297,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_chart_render_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericChartRenderContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "chart spec and recipe matrix contract fixtures decode without renderer dependencies",
+          "render request/result contract envelopes are deterministic provider-free fixture data",
+          "source metadata contract is redacted and replay-ready"
+        ]
       }
     },
     {
@@ -276,6 +342,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_coding_workspace_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericCodingWorkspaceLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "sandbox command envelopes decode without executing host commands",
+          "approval gates default to deny for execution and writes",
+          "stdout and stderr captures are explicit replay fields"
+        ]
       }
     },
     {
@@ -311,6 +388,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_data_normalization_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericDataNormalizationContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "schema mapping, field policy, missing policy, stale policy, type coercion, and unit transform contract fixtures decode",
+          "provider response projection maps source envelopes, provenance refs, clean skips, and replay keys into normalized rows and validation records"
+        ]
       }
     },
     {
@@ -347,6 +435,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_data_provider_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericDataProviderBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "data provider registry contract fixtures decode without provider SDK imports",
+          "request and response envelope contract fixtures remain provider-free and replayable",
+          "pagination and rate-limit contract fixtures are metadata-only and deterministic"
+        ]
       }
     },
     {
@@ -379,6 +478,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_document_rag_pipeline_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericDocumentRAGPipelineLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "document conversion and section extraction fixtures decode without provider SDKs or live network",
+          "RAG chunk provenance and corpus manifest stay domain-neutral and provider-free",
+          "retrieval result citations resolve to known chunk identifiers"
+        ]
       }
     },
     {
@@ -410,6 +520,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_evaluation_harness_live_package_test.go",
+        "command": "go test ./tests/llm -run TestFinRobotGenericEvaluationHarnessExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "generic.ai.evaluation.harness and ai.eval.run surfaces are declared as provider-free live package skeleton capabilities",
+          "dataset manifest, case inputs, metric specs, judge replay records, findings, golden gates, and case result summary fixtures are all checked in",
+          "fixture index is manifest-driven and does not require live network, credentials, provider SDKs, or real dependency imports"
+        ]
       }
     },
     {
@@ -445,6 +566,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_event_intelligence_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericEventIntelligenceBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "event source snapshot contract fixtures decode without provider SDK imports",
+          "event extraction and taxonomy contract fixtures remain domain-neutral",
+          "freshness, dedupe, relevance, sentiment, and impact contract fixtures are deterministic"
+        ]
       }
     },
     {
@@ -478,6 +610,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_evidence_report_artifacts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericEvidenceReportArtifactsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "evidence source annotations and citation envelopes resolve without provider calls",
+          "report outline and section dependency DAG remain domain-neutral and provider-free",
+          "artifact and render manifests declare planned outputs without invoking renderers"
+        ]
       }
     },
     {
@@ -510,6 +653,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_evidence_verification_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericEvidenceVerificationLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "document RAG answer citations project into claim records, source annotations, and normalized citation refs without assuming IDs are shared across packages",
+          "claim records, source refs, and citation refs decode without provider calls",
+          "citation normalization preserves first-seen deterministic order and reports unresolved refs"
+        ]
       }
     },
     {
@@ -541,6 +695,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_memory_store_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericMemoryStoreLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "memory store contract fixture decodes without Redis, Postgres, vector databases, embedding models, or managed memory providers",
+          "namespace policy and retrieval policy are provider-free and credential-free",
+          "retrieval ranking and context window order are deterministic fixture data"
+        ]
       }
     },
     {
@@ -566,9 +731,9 @@
         "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
         "manifest_gate_field": "test_gates",
         "gate_terms": [
-          "request",
-          "replay",
-          "redaction"
+          "request, stream chunk, and response envelopes decode without provider SDKs",
+          "provider-free replay records preserve turn and adapter correlation",
+          "model registry aliases and replay descriptors project into provider-free model IO and turn request envelopes"
         ]
       },
       "missing_production_package_boundary": {
@@ -613,6 +778,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_model_registry_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericModelRegistryMainSmokeOutput",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "provider_free",
+          "no live network",
+          "no provider credentials"
+        ]
       }
     },
     {
@@ -647,6 +823,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_optional_adapter_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericOptionalAdapterBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "optional adapter registry contract fixtures decode without importing optional dependencies",
+          "dependency gate contract fixtures clean-skip when packages, credentials, or live network are absent",
+          "adapter result envelope contract fixtures expose status, capability, fixture_key, data, and metadata"
+        ]
       }
     },
     {
@@ -677,6 +864,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_package_boundary_auditor_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericPackageBoundaryAuditorExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "package manifest audit verifies provider-free defaults, entrypoints, schema references, no credentials, and no built-in guarantee",
+          "fixture index audit verifies every fixture is local, replay-ready, schema-linked, and mapped to a capability",
+          "example registry audit verifies aliases generic.ai.package.boundary.audit and ai.package.audit resolve to the same provider-free skeleton"
+        ]
       }
     },
     {
@@ -712,6 +910,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_product_app_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericProductAppBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "product app route contract fixtures decode without web framework dependencies",
+          "workflow projection maps provider-free workflow results into product task, route, and artifact refs",
+          "session and task-log contract fixtures remain provider-free and credential-free"
+        ]
       }
     },
     {
@@ -745,6 +954,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_prompt_role_catalog_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericPromptRoleCatalogLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "prompt catalog and role profile fixtures decode without provider SDKs or live model calls",
+          "role profile versions and prompt template snapshots remain domain-neutral and provider-free",
+          "delegation trigger parse examples resolve to declared role ids"
+        ]
       }
     },
     {
@@ -774,6 +994,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_record_replay_evaluation_evidence_test.go",
+        "command": "go test ./tests/llm -run TestGenericRecordReplayReportIsEvaluationCaseEvidence",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_record_replay/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true, domain_specific is false, and live_network_default is false",
+          "record schema requires record_id, sequence, replay_key, operation, capability, request_hash, response_hash, request, response, provider_free, and recorded_at"
+        ]
       }
     },
     {
@@ -809,6 +1040,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_report_render_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericReportRenderContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "report render request contract fixtures decode without renderer dependencies",
+          "request and result envelope contract fixtures remain provider-free and replayable",
+          "output and artifact manifest contract fixtures use artifact URIs only"
+        ]
       }
     },
     {
@@ -843,6 +1085,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericStrategyBacktestContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "generic.strategy_backtest.run, strategy, allocation_policy, feature, and evaluator boundaries are represented without q runtime or live provider imports",
+          "strategy manifest fixture validates strategy, allocation_policy, feature, evaluator bindings and deterministic seed"
+        ]
       }
     },
     {
@@ -874,6 +1127,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_tool_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestFinRobotGenericToolContractsFixtureIndexAndSmoke",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "generic.ai.tool.contract exports declarative tool schema metadata",
+          "ai.tool.invoke request arguments are validated before fixture execution"
+        ]
       }
     },
     {
@@ -897,9 +1161,9 @@
         "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
         "manifest_gate_field": "test_gates",
         "gate_terms": [
-          "manifest",
-          "descriptor",
-          "approval"
+          "manifest, contract, schemas, and fixtures decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "required and optional credentials are empty"
         ]
       },
       "missing_production_package_boundary": {
@@ -945,6 +1209,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_trace_events_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericTraceEventsMainLeiaSmoke",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "generic.ai.trace.events and ai.trace.emit capabilities are provider-free and fixture-replay only"
+        ]
       }
     },
     {
@@ -977,6 +1252,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_transcript_pipeline_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericTranscriptPipelineLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "fixtures prove speaker normalization, event-time correction, turn ordering, and segment provenance",
+          "chunk fixtures preserve segment boundaries, deterministic order, and max token-estimate budget"
+        ]
       }
     },
     {
@@ -1007,6 +1293,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_turn_runner_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericTurnRunnerSmokeAndNoProviderDependencies",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "single-turn request schema carries messages, response_format, usage-free request metadata, and replay key material",
+          "ai.turn.execute response envelope carries message, response_format, usage, error, tool request, and replay metadata",
+          "tool request envelope is request-only and provider-free"
+        ]
       }
     },
     {
@@ -1042,6 +1339,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_ui_snapshot_evaluator_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericUISnapshotEvaluatorLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "route DOM snapshot fixtures decode without launching a browser",
+          "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
+          "viewport matrix and visual diff budgets are deterministic fixture data"
+        ]
       }
     },
     {
@@ -1072,6 +1380,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_workflow_orchestrator_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericWorkflowOrchestratorLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "generic.ai.workflow.orchestration is represented as a provider-free live package skeleton",
+          "ai.workflow.orchestrate entrypoint has a deterministic workflow graph",
+          "stage inputs and outputs are explicit and schema-addressed"
+        ]
       }
     },
     {
@@ -1104,6 +1423,17 @@
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
         "provider_free": true,
         "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_planning_graph_contract_test.go",
+        "command": "go test ./tests/llm -run TestGenericPlanningGraphMainLeiaSmokeExecutes",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "plan nodes declare generic node_type and do not encode provider or domain-specific semantics",
+          "dependencies form an acyclic graph with explicit branch and merge edges",
+          "retry metadata is deterministic fixture evidence, not provider behavior"
+        ]
       }
     }
   ]

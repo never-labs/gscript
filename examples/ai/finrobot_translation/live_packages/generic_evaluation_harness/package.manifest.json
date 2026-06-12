@@ -14,7 +14,11 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No provider credentials are declared by this skeleton; judge models are represented by checked-in replay records or deterministic mock stubs only."
+    "policy": "No provider credentials are declared by this skeleton; judge models are represented by checked-in replay records or deterministic mock stubs only.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
   },
   "default_policy": {
     "mode": "fixture_replay",

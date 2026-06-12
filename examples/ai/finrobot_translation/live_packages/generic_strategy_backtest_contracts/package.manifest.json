@@ -26,7 +26,11 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No credentials are declared by this skeleton; generic strategy engines, data providers, visualization engines, and credentialed adapters belong only to future provider-specific packages."
+    "policy": "No credentials are declared by this skeleton; generic strategy engines, data providers, visualization engines, and credentialed adapters belong only to future provider-specific packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
   },
   "default_policy": {
     "mode": "fixture_replay",

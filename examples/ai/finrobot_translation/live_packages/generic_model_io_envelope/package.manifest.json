@@ -81,5 +81,15 @@
   "real_dependency_imports": false,
   "contracts": {
     "model_io_envelope": "contracts/model_io_envelope_contract.json"
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-model-io-envelope; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
   }
 }

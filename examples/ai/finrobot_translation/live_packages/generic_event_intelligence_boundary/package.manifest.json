@@ -77,5 +77,15 @@
   "no_built_in_guarantee": {
     "required": true,
     "statement": "Leia core does not provide built-in leia-generic-ai-event-intelligence-boundary source adapters, social feeds, event classifiers, live providers, credentials, or network clients; this provider-free package boundary owns source snapshot, event extraction, taxonomy, freshness, dedupe, relevance, sentiment, impact, prompt, and adapter clean-skip contracts."
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-event-intelligence-boundary; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
   }
 }

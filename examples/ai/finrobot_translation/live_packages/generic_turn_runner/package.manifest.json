@@ -15,7 +15,11 @@
     "required": [],
     "optional": [],
     "secret_env_patterns": [],
-    "policy": "No provider credentials are declared by this skeleton; provider-specific model adapters belong in future packages."
+    "policy": "No provider credentials are declared by this skeleton; provider-specific model adapters belong in future packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
   },
   "default_policy": {
     "mode": "fixture_replay",
