@@ -6595,6 +6595,20 @@ func TestEvalSignalAndUntrappedErrors(t *testing.T) {
 	assertEvalErrorContains(t, "@[{x};1;2;3]", "amend function is not callable")
 }
 
+// TestEvalFunctionalFormCorpus seeds the mechanically-extracted corpora
+// (parser fuzz seeds, error-route differential) with functional qSQL forms;
+// behavioral coverage lives in functional_query_test.go.
+func TestEvalFunctionalFormCorpus(t *testing.T) {
+	assertEvalValue(t, "t:([] a:1 2 3;b:10 20 30); r:?[t;enlist (>;`a;1);0b;()]; count r", int64(2))
+	assertEvalValue(t, "?[([] b:10 20 30);();();(sum;`b)]", int64(60))
+	assertEvalValue(t, "t:([] a:1 2 3); ![`t;();0b;(enlist `a)!enlist (*;`a;10)]; last t[`a]", int64(30))
+	assertEvalValue(t, "count ![([] a:1 2 3;b:10 20 30);();0b;enlist `b]", int64(3))
+	assertEvalErrorContains(t, "?[1;2;3;4]", "expects a table or table name")
+	assertEvalErrorContains(t, "![`nosuchtable;();0b;enlist `a]", "is not bound to a table")
+	assertEvalErrorContains(t, "?[([] a:1 2);1b;0b;()]", "constraint spec must be a list of parse trees")
+	assertEvalErrorContains(t, "![([] a:1 2;b:3 4);enlist (>;`a;1);0b;enlist `b]", "cannot specify both row constraints and columns")
+}
+
 func TestFillsPropagatesLastNonNullValue(t *testing.T) {
 	got, err := fills(data.NewColumn("x", []any{nil, int64(10), nil, nil, int64(20)}).Data)
 	if err != nil {

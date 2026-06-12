@@ -420,3 +420,24 @@ match	@[{'x};"boom";{x}]	"boom"
 match	@[{@[{'x};x;{("inner";x)}]};"deep";{("outer";x)}]	("inner";"deep")
 match	@[{@[{'x};x;{'x}]};"sig";{("outer";x)}]	("outer";"sig")
 match	@[10 20 30;1;{x*10}]	10 200 30
+
+# ---- functional qSQL ?[t;c;b;a] / ![t;c;b;a] ----
+# Constraint spelling: canonical operator-atom parse trees like (>;`a;1)
+# construct naturally (bare operators evaluate to function atoms). The
+# canonical empty-symbol-list spelling 0#` does not parse; `$() (equivalent
+# canonical spelling) is used for the delete-rows form.
+match	?[([] a:1 2 3;b:10 20 30);enlist (>;`a;1);0b;()]	([] a:2 3;b:20 30)
+match	?[([] a:1 2 3 4;b:10 20 30 40);((>;`a;1);(<;`a;4));0b;()]	([] a:2 3;b:20 30)
+match	?[([] a:1 2 3);enlist (<=;`a;2);0b;()]	([] a:1 2)
+match	?[([] s:`x`y`z;b:1 2 3);enlist (in;`s;`x`z);0b;()]	([] s:`x`z;b:1 3)
+match	?[([] s:`x`y`x;b:1 2 3);enlist (=;`s;enlist `x);0b;()]	([] s:`x`x;b:1 3)
+match	?[([] a:1 2 3);();();`a]	1 2 3
+match	?[([] b:10 20 30);();();(sum;`b)]	60
+match	?[([] a:1 2 3 4);();0b;();2]	([] a:1 2)
+match	![([] a:1 2 3;b:10 20 30);enlist (>;`a;1);0b;(enlist `b)!enlist (*;`b;2)]	([] a:1 2 3;b:10 40 60)
+match	![([] a:1 2 3;b:10 20 30);();0b;enlist `b]	([] a:1 2 3)
+match	![([] a:1 2 3;b:10 20 30);enlist (>;`a;1);0b;`$()]	1#([] a:1 2 3;b:10 20 30)
+match	t:([] a:1 2 3); ![`t;();0b;(enlist `a)!enlist (*;`a;10)]	`t
+match	t:([] a:1 2 3); ![`t;();0b;(enlist `a)!enlist (*;`a;10)]; t	([] a:10 20 30)
+gap	?[([] a:1 2 3;b:10 20 30);();0b;(enlist `c)!enlist (+;`a;`b)]	([] c:11 22 33)	([] c:11 22 33f)	computed integer projections widen to float in the columnar engine
+gap	?[([] s:`x`y`x;b:10 20 30);();(enlist `s)!enlist `s;(enlist `t)!enlist (sum;`b)]	([s:`x`y] t:40 20)	([s:`x`y] t:40 20f)	grouped sum over longs widens to float in the columnar engine
