@@ -556,6 +556,14 @@ They do not change ordinary expression evaluation outside the helper paths.
 Declarative agents, explicit agents, and direct turns share the same accounting
 when they lower through `llm`.
 
+Use `llm.budget_outcome(err, opts)` to turn a budget or deadline error into a
+portable table with `kind: "budget_outcome"`, `source_kind`, `status`,
+`result_status`, `blocked`, and safe budget fields such as `dimension`,
+`limit`, `used`, and `message`. Use `llm.budget_outcome_event(outcome, opts)`
+or `llm.budget_outcome_trace_event` to add that result to a generic trace
+envelope. These helpers are provider-free projections; they do not consume
+budget, mutate accounting, or provide stable money accounting.
+
 Policy helpers operate on tool capability labels:
 
 ```leia

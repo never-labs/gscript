@@ -33,6 +33,9 @@ result, err := loop.react({
 })
 err_kind := err.kind
 err_dimension := err.dimension
+err_message := err.message
+err_limit := err.limit
+err_used := err.used
 
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -41,6 +44,12 @@ err_dimension := err.dimension
 	dimension, _ := vm.Get("err_dimension")
 	if kind != "budget" || dimension != "tokens" {
 		t.Fatalf("err kind=%#v dimension=%#v", kind, dimension)
+	}
+	message, _ := vm.Get("err_message")
+	limit, _ := vm.Get("err_limit")
+	used, _ := vm.Get("err_used")
+	if message != "llm budget exceeded: tokens" || limit != int64(5) || used != int64(5) {
+		t.Fatalf("err message=%#v limit=%#v used=%#v", message, limit, used)
 	}
 }
 
@@ -65,6 +74,9 @@ result, err := loop.react({
 })
 err_kind := err.kind
 err_dimension := err.dimension
+err_message := err.message
+err_limit_missing := err.limit == nil
+err_used_missing := err.used == nil
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
 	}
@@ -72,6 +84,12 @@ err_dimension := err.dimension
 	dimension, _ := vm.Get("err_dimension")
 	if kind != "budget" || dimension != "calls" {
 		t.Fatalf("err kind=%#v dimension=%#v", kind, dimension)
+	}
+	message, _ := vm.Get("err_message")
+	limitMissing, _ := vm.Get("err_limit_missing")
+	usedMissing, _ := vm.Get("err_used_missing")
+	if message != "llm budget exceeded: calls" || limitMissing != true || usedMissing != true {
+		t.Fatalf("err message=%#v limit_missing=%#v used_missing=%#v", message, limitMissing, usedMissing)
 	}
 }
 
