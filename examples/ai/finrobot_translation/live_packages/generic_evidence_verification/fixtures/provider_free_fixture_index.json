@@ -6,6 +6,24 @@
   "real_dependency_imports": false,
   "fixtures": [
     {
+      "fixture_key": "generic:evidence_verification:document_rag_projection",
+      "capability": "generic.ai.evidence.document_rag_projection",
+      "path": "fixtures/document_rag_evidence_projection_fixture.json",
+      "schema": "schemas/document_rag_evidence_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "projected_claims": 1,
+        "projected_sources": 2,
+        "projected_citations": 1
+      }
+    },
+    {
       "fixture_key": "generic:evidence_verification:offline",
       "capability": "generic.ai.evidence.verify",
       "path": "fixtures/evidence_verification_fixture.json",

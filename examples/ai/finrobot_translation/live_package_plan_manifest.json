@@ -1172,6 +1172,7 @@
       "migration_source": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
       "capabilities": [
         "generic.ai.evidence.verify",
+        "generic.ai.evidence.document_rag_projection",
         "generic.ai.evidence.claim_record",
         "generic.ai.evidence.source_ref",
         "generic.ai.evidence.citation_ref",

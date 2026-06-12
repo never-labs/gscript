@@ -328,6 +328,7 @@
       "capability": "generic.ai.evidence.verify",
       "capabilities": [
         "generic.ai.evidence.verify",
+        "generic.ai.evidence.document_rag_projection",
         "generic.ai.evidence.claim_record",
         "generic.ai.evidence.source_ref",
         "generic.ai.evidence.citation_ref",

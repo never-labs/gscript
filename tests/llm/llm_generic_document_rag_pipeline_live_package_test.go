@@ -277,7 +277,8 @@ type genericDocumentRAGPipelineFixture struct {
 		Text       string `json:"text"`
 		TokenCount int    `json:"token_count"`
 		Citation   struct {
-			SourceRef string `json:"source_ref"`
+			SourceRef    string `json:"source_ref"`
+			SectionTitle string `json:"section_title"`
 		} `json:"citation"`
 		Provenance struct {
 			CorpusID          string `json:"corpus_id"`
@@ -299,6 +300,7 @@ type genericDocumentRAGPipelineFixture struct {
 	} `json:"retrieved_chunks"`
 	AnswerCitations []struct {
 		ChunkID string `json:"chunk_id"`
+		Claim   string `json:"claim"`
 	} `json:"answer_citations"`
 	AdapterBoundaries []struct {
 		ID                 string `json:"id"`

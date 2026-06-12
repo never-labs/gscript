@@ -16,6 +16,7 @@
   "depends_on_q_runtime": false,
   "capabilities": [
     "generic.ai.evidence.verify",
+    "generic.ai.evidence.document_rag_projection",
     "generic.ai.evidence.claim_record",
     "generic.ai.evidence.source_ref",
     "generic.ai.evidence.citation_ref",
@@ -97,6 +98,7 @@
     }
   },
   "field_contracts": {
+    "document_rag_evidence_projection": "document RAG retrieved chunks and answer citations project into claim records, source annotations, normalized citation refs, and projection assertions",
     "claim_records": "claim records include claim_id, claim_kind, required_evidence_kinds, source_refs, citation_refs, and allow_missing_evidence",
     "source_annotations": "source annotations include source_id, kind, locator, observed_at, retrieved_at, evidence_hash, and provider_free",
     "citation_refs": "citation refs must resolve to source annotations or appear in unresolved_refs",
@@ -107,6 +109,7 @@
   },
   "acceptance_gates": [
     "all checked refs either resolve to source annotations or appear in unresolved_refs",
+    "document RAG answer citations resolve to source chunks before becoming evidence claims",
     "claims with insufficient required evidence produce clean_degradation_actions",
     "freshness warnings name stale source refs and do not block unless policy says so",
     "normalized citations preserve deterministic first-seen order",

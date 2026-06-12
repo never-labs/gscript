@@ -7,6 +7,12 @@
   "package_boundary": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
   "fixtures": [
     {
+      "fixture_key": "generic:evidence_verification:document_rag_projection",
+      "capability": "generic.ai.evidence.document_rag_projection",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/document_rag_evidence_projection_fixture.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/schemas/document_rag_evidence_projection_v1.schema.json"
+    },
+    {
       "fixture_key": "generic:evidence_verification:offline",
       "capability": "generic.ai.evidence.verify",
       "path": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/evidence_verification_fixture.json",

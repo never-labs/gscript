@@ -428,7 +428,7 @@
         "evidence-report-artifacts",
         "report-render"
       ],
-      "contract": "Normalize provider-free claim records, source refs, citation normalization, freshness warnings, unresolved refs, quality summaries, and clean degradation actions before evidence/report artifacts are rendered.",
+      "contract": "Normalize provider-free document RAG evidence projection, claim records, source refs, citation normalization, freshness warnings, unresolved refs, quality summaries, and clean degradation actions before evidence/report artifacts are rendered.",
       "inputs": [
         "claim_records",
         "source_annotations",
@@ -439,6 +439,7 @@
         "citation_normalization_policy"
       ],
       "outputs": [
+        "document_rag_evidence_projection",
         "verification_results",
         "resolved_refs",
         "unresolved_refs",

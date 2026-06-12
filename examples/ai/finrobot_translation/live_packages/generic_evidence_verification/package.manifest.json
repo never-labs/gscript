@@ -5,7 +5,7 @@
   "package_boundary_id": "generic-ai-evidence-verification",
   "capability_id": "generic.ai.evidence.verify",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free generic AI evidence verification package for claim records, source refs, citation normalization, freshness warnings, unresolved refs, quality summaries, and clean degradation actions.",
+  "description": "Provider-free generic AI evidence verification package for document RAG evidence projection, claim records, source refs, citation normalization, freshness warnings, unresolved refs, quality summaries, and clean degradation actions.",
   "provider_free": true,
   "domain_specific": false,
   "live_network_default": false,
@@ -25,6 +25,7 @@
     "evidence_policy": "schemas/evidence_policy_v1.schema.json",
     "evidence_requirement_matrix": "schemas/evidence_requirement_matrix_v1.schema.json",
     "citation_normalization": "schemas/citation_normalization_v1.schema.json",
+    "document_rag_evidence_projection": "schemas/document_rag_evidence_projection_v1.schema.json",
     "evidence_verification_result": "schemas/evidence_verification_result_v1.schema.json",
     "evidence_degradation_action": "schemas/evidence_degradation_action_v1.schema.json"
   },
@@ -33,11 +34,13 @@
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
+    "document_rag_evidence_projection": "fixtures/document_rag_evidence_projection_fixture.json",
     "evidence_verification": "fixtures/evidence_verification_fixture.json",
     "missing_refs_clean_degradation": "fixtures/evidence_missing_refs_clean_degradation_fixture.json"
   },
   "capabilities": [
     "generic.ai.evidence.verify",
+    "generic.ai.evidence.document_rag_projection",
     "generic.ai.evidence.claim_record",
     "generic.ai.evidence.source_ref",
     "generic.ai.evidence.citation_ref",
@@ -50,6 +53,7 @@
   ],
   "capability_surfaces": [
     "claim_records",
+    "document_rag_evidence_projection",
     "source_annotations",
     "citation_refs",
     "evidence_policy",
@@ -70,6 +74,7 @@
     "fixture_hook": "recorded_generic_evidence_verification_fixture"
   },
   "test_gates": [
+    "document RAG answer citations project into claim records, source annotations, and normalized citation refs without assuming IDs are shared across packages",
     "claim records, source refs, and citation refs decode without provider calls",
     "citation normalization preserves first-seen deterministic order and reports unresolved refs",
     "freshness checks emit warnings from fixture timestamps without live network access",

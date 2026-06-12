@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic:evidence_verification:document_rag_projection",
+  "projection_kind": "document_rag_to_evidence_verification_projection",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "source_package_boundary_id": "generic-ai-document-rag-pipeline",
+  "target_package_boundary_id": "generic-ai-evidence-verification",
+  "source_fixture_refs": {
+    "document_rag_pipeline": "../generic_document_rag_pipeline/fixtures/generic_document_rag_pipeline_fixture.json",
+    "evidence_verification": "fixtures/evidence_verification_fixture.json"
+  },
+  "projected_claim_records": [
+    {
+      "claim_id": "rag-claim-operating-risks",
+      "claim_kind": "retrieved_answer_claim",
+      "claim_text": "Supplier delay and demand concentration are operating risks.",
+      "source_refs": [
+        "rag-source-generic-doc-001-risks"
+      ],
+      "citation_refs": [
+        "rag-citation-generic-doc-001-risks-0001"
+      ],
+      "source_chunk_ids": [
+        "generic-doc-001:risks:0001"
+      ],
+      "allow_missing_evidence": false
+    }
+  ],
+  "projected_source_annotations": [
+    {
+      "source_id": "rag-source-generic-doc-001-risks",
+      "kind": "document_chunk",
+      "locator": "fixture://generic/documents/generic-doc-001#section=Risks",
+      "source_ref": "fixture://generic/documents/generic-doc-001",
+      "chunk_id": "generic-doc-001:risks:0001",
+      "section_id": "risks",
+      "section_title": "Risks",
+      "first_seen_order": 1,
+      "retrieved_rank": 1,
+      "provider_free": true
+    },
+    {
+      "source_id": "rag-source-generic-doc-001-outlook",
+      "kind": "document_chunk",
+      "locator": "fixture://generic/documents/generic-doc-001#section=Outlook",
+      "source_ref": "fixture://generic/documents/generic-doc-001",
+      "chunk_id": "generic-doc-001:outlook:0001",
+      "section_id": "outlook",
+      "section_title": "Outlook",
+      "first_seen_order": 2,
+      "retrieved_rank": 2,
+      "provider_free": true
+    }
+  ],
+  "projected_normalized_citations": [
+    {
+      "claim_id": "rag-claim-operating-risks",
+      "source_id": "rag-source-generic-doc-001-risks",
+      "citation_id": "rag-citation-generic-doc-001-risks-0001",
+      "chunk_id": "generic-doc-001:risks:0001",
+      "normalized_source_id": "rag-source-generic-doc-001-risks",
+      "first_seen_order": 1,
+      "resolved": true
+    }
+  ],
+  "projection_map": [
+    {
+      "answer_citation_chunk_id": "generic-doc-001:risks:0001",
+      "retrieved_chunk_rank": 1,
+      "projected_claim_id": "rag-claim-operating-risks",
+      "projected_source_id": "rag-source-generic-doc-001-risks",
+      "projected_citation_id": "rag-citation-generic-doc-001-risks-0001",
+      "source_ids_are_not_assumed_equal": true
+    }
+  ],
+  "projection_assertions": {
+    "all_answer_citations_resolve_to_chunks": true,
+    "all_answer_citations_resolve_to_retrieved_chunks": true,
+    "all_projected_claim_refs_resolve_to_projected_sources": true,
+    "all_projected_citation_refs_resolve_to_projected_citations": true,
+    "chunk_ids_are_not_assumed_equal_to_source_ids": true,
+    "projection_is_provider_free": true
+  }
+}

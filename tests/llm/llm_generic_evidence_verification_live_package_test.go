@@ -55,6 +55,7 @@ func TestGenericEvidenceVerificationLivePackageContractFixtureClosedLoop(t *test
 	}
 	for _, want := range []string{
 		"generic.ai.evidence.verify",
+		"generic.ai.evidence.document_rag_projection",
 		"generic.ai.evidence.claim_record",
 		"generic.ai.evidence.source_ref",
 		"generic.ai.evidence.citation_ref",
@@ -94,7 +95,7 @@ func TestGenericEvidenceVerificationLivePackageContractFixtureClosedLoop(t *test
 		contract.ProviderSDKsRequired || contract.DependsOnQRuntime {
 		t.Fatalf("contract boundary mismatch: %#v", contract)
 	}
-	for _, want := range []string{"claim_records", "source_annotations", "citation_refs", "requirement_matrix", "citation_normalization", "freshness_policy", "clean_degradation"} {
+	for _, want := range []string{"document_rag_evidence_projection", "claim_records", "source_annotations", "citation_refs", "requirement_matrix", "citation_normalization", "freshness_policy", "clean_degradation"} {
 		if contract.FieldContracts[want] == "" {
 			t.Fatalf("contract field_contracts missing %q: %#v", want, contract.FieldContracts)
 		}
@@ -116,12 +117,19 @@ func TestGenericEvidenceVerificationLivePackageContractFixtureClosedLoop(t *test
 		} `json:"fixtures"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
 		t.Fatalf("fixture index header/count mismatch: %#v", index)
 	}
+	seenFixtures := map[string]bool{}
 	for _, fixture := range index.Fixtures {
 		if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports || fixture.Path == "" || fixture.Schema == "" {
 			t.Fatalf("fixture index entry is not provider-free/offline: %#v", fixture)
+		}
+		seenFixtures[fixture.FixtureKey] = true
+	}
+	for _, want := range []string{"generic:evidence_verification:document_rag_projection", "generic:evidence_verification:offline", "generic:evidence_verification:clean_degradation"} {
+		if !seenFixtures[want] {
+			t.Fatalf("fixture index missing %q: %#v", want, seenFixtures)
 		}
 	}
 }
@@ -205,8 +213,182 @@ func TestGenericEvidenceVerificationLivePackageSchemaRequiredFields(t *testing.T
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "evidence_policy_v1.schema.json"), []string{"policy_id", "provider_free", "live_network", "minimum_source_refs_per_claim", "reject_unresolved_refs", "requires_source_quote_or_metric", "allowed_evidence_kinds", "freshness_policy", "citation_normalization"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "evidence_requirement_matrix_v1.schema.json"), []string{"matrix_id", "provider_free", "live_network", "rows"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "citation_normalization_v1.schema.json"), []string{"normalization_id", "provider_free", "live_network", "source_id_case", "strip_query_fragments_from_locator", "dedupe_repeated_refs", "preserve_first_seen_order", "normalized_citations"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "document_rag_evidence_projection_v1.schema.json"), []string{"schema_version", "fixture_key", "projection_kind", "provider_free", "domain_specific", "live_network", "live_model_calls", "real_dependency_imports", "source_package_boundary_id", "target_package_boundary_id", "source_fixture_refs", "projected_claim_records", "projected_source_annotations", "projected_normalized_citations", "projection_map", "projection_assertions"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "evidence_verification_result_v1.schema.json"), []string{"schema_version", "fixture_key", "provider_free", "live_network", "real_dependency_imports", "live_model_calls", "policy", "requirement_matrix", "claim_records", "source_annotations", "normalized_citations", "freshness_warnings", "resolved_refs", "unresolved_refs", "unsupported_claims", "verification_results", "evidence_quality_summary", "clean_degradation_actions"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "evidence_degradation_action_v1.schema.json"), []string{"action_id", "claim_id", "mode", "reason", "provider_free", "live_network", "invented_claim_allowed", "warning_refs"})
+}
+
+func TestGenericEvidenceVerificationDocumentRAGProjection(t *testing.T) {
+	root := repoRoot(t)
+	base := genericEvidenceVerificationPackageDir(t)
+	ragFixture := loadGenericDocumentRAGPipelineFixture(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_document_rag_pipeline", "fixtures", "generic_document_rag_pipeline_fixture.json"))
+
+	var projection struct {
+		SchemaVersion           int               `json:"schema_version"`
+		FixtureKey              string            `json:"fixture_key"`
+		ProjectionKind          string            `json:"projection_kind"`
+		ProviderFree            bool              `json:"provider_free"`
+		DomainSpecific          bool              `json:"domain_specific"`
+		LiveNetwork             bool              `json:"live_network"`
+		LiveModelCalls          bool              `json:"live_model_calls"`
+		RealDependencyImports   bool              `json:"real_dependency_imports"`
+		SourcePackageBoundaryID string            `json:"source_package_boundary_id"`
+		TargetPackageBoundaryID string            `json:"target_package_boundary_id"`
+		SourceFixtureRefs       map[string]string `json:"source_fixture_refs"`
+		ProjectedClaimRecords   []struct {
+			ClaimID              string   `json:"claim_id"`
+			ClaimKind            string   `json:"claim_kind"`
+			ClaimText            string   `json:"claim_text"`
+			SourceRefs           []string `json:"source_refs"`
+			CitationRefs         []string `json:"citation_refs"`
+			SourceChunkIDs       []string `json:"source_chunk_ids"`
+			AllowMissingEvidence bool     `json:"allow_missing_evidence"`
+		} `json:"projected_claim_records"`
+		ProjectedSourceAnnotations []struct {
+			SourceID       string `json:"source_id"`
+			Kind           string `json:"kind"`
+			Locator        string `json:"locator"`
+			SourceRef      string `json:"source_ref"`
+			ChunkID        string `json:"chunk_id"`
+			SectionID      string `json:"section_id"`
+			SectionTitle   string `json:"section_title"`
+			FirstSeenOrder int    `json:"first_seen_order"`
+			RetrievedRank  int    `json:"retrieved_rank"`
+			ProviderFree   bool   `json:"provider_free"`
+		} `json:"projected_source_annotations"`
+		ProjectedNormalizedCitations []struct {
+			ClaimID            string `json:"claim_id"`
+			SourceID           string `json:"source_id"`
+			CitationID         string `json:"citation_id"`
+			ChunkID            string `json:"chunk_id"`
+			NormalizedSourceID string `json:"normalized_source_id"`
+			FirstSeenOrder     int    `json:"first_seen_order"`
+			Resolved           bool   `json:"resolved"`
+		} `json:"projected_normalized_citations"`
+		ProjectionMap []struct {
+			AnswerCitationChunkID       string `json:"answer_citation_chunk_id"`
+			RetrievedChunkRank          int    `json:"retrieved_chunk_rank"`
+			ProjectedClaimID            string `json:"projected_claim_id"`
+			ProjectedSourceID           string `json:"projected_source_id"`
+			ProjectedCitationID         string `json:"projected_citation_id"`
+			SourceIDsAreNotAssumedEqual bool   `json:"source_ids_are_not_assumed_equal"`
+		} `json:"projection_map"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "document_rag_evidence_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.FixtureKey != "generic:evidence_verification:document_rag_projection" ||
+		projection.ProjectionKind != "document_rag_to_evidence_verification_projection" ||
+		!projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork ||
+		projection.LiveModelCalls || projection.RealDependencyImports ||
+		projection.SourcePackageBoundaryID != "generic-ai-document-rag-pipeline" ||
+		projection.TargetPackageBoundaryID != "generic-ai-evidence-verification" {
+		t.Fatalf("projection header/provider boundary mismatch: %#v", projection)
+	}
+	if projection.SourceFixtureRefs["document_rag_pipeline"] == "" || projection.SourceFixtureRefs["evidence_verification"] == "" {
+		t.Fatalf("projection source fixture refs incomplete: %#v", projection.SourceFixtureRefs)
+	}
+
+	chunks := map[string]struct {
+		sourceRef    string
+		sectionID    string
+		sectionTitle string
+	}{}
+	for _, chunk := range ragFixture.Chunks {
+		chunks[chunk.ChunkID] = struct {
+			sourceRef    string
+			sectionID    string
+			sectionTitle string
+		}{sourceRef: chunk.Citation.SourceRef, sectionID: chunk.SectionID, sectionTitle: chunk.Citation.SectionTitle}
+	}
+	retrieved := map[string]int{}
+	for _, chunk := range ragFixture.RetrievedChunks {
+		retrieved[chunk.ChunkID] = chunk.Rank
+	}
+	answerCitationClaims := map[string]string{}
+	for _, citation := range ragFixture.AnswerCitations {
+		if chunks[citation.ChunkID].sourceRef == "" || retrieved[citation.ChunkID] == 0 {
+			t.Fatalf("RAG answer citation chunk does not resolve to chunk and retrieval: %#v", citation)
+		}
+		answerCitationClaims[citation.ChunkID] = citation.Claim
+	}
+
+	sourceIDs := map[string]struct {
+		chunkID string
+	}{}
+	for _, source := range projection.ProjectedSourceAnnotations {
+		chunk := chunks[source.ChunkID]
+		if source.SourceID == "" || source.Kind != "document_chunk" || source.Locator == "" ||
+			chunk.sourceRef == "" || source.SourceRef != chunk.sourceRef ||
+			source.SectionID != chunk.sectionID || source.SectionTitle != chunk.sectionTitle ||
+			source.RetrievedRank != retrieved[source.ChunkID] || !source.ProviderFree {
+			t.Fatalf("projected source does not resolve to RAG chunk/retrieval: source=%#v chunk=%#v retrieved=%#v", source, chunk, retrieved)
+		}
+		sourceIDs[source.SourceID] = struct {
+			chunkID string
+		}{chunkID: source.ChunkID}
+	}
+	citationIDs := map[string]struct {
+		claimID  string
+		sourceID string
+		chunkID  string
+	}{}
+	for _, citation := range projection.ProjectedNormalizedCitations {
+		if citation.CitationID == "" || citation.ClaimID == "" || sourceIDs[citation.SourceID].chunkID == "" ||
+			citation.NormalizedSourceID != citation.SourceID || !citation.Resolved ||
+			citation.FirstSeenOrder == 0 || chunks[citation.ChunkID].sourceRef == "" {
+			t.Fatalf("projected citation does not resolve to projected source/RAG chunk: %#v", citation)
+		}
+		citationIDs[citation.CitationID] = struct {
+			claimID  string
+			sourceID string
+			chunkID  string
+		}{claimID: citation.ClaimID, sourceID: citation.SourceID, chunkID: citation.ChunkID}
+	}
+	for _, claim := range projection.ProjectedClaimRecords {
+		if claim.ClaimID == "" || claim.ClaimKind == "" || claim.ClaimText == "" ||
+			len(claim.SourceRefs) == 0 || len(claim.CitationRefs) == 0 || len(claim.SourceChunkIDs) == 0 ||
+			claim.AllowMissingEvidence {
+			t.Fatalf("projected claim incomplete: %#v", claim)
+		}
+		for _, chunkID := range claim.SourceChunkIDs {
+			if answerCitationClaims[chunkID] == "" {
+				t.Fatalf("projected claim source chunk %q is not an answer citation", chunkID)
+			}
+		}
+		for _, sourceID := range claim.SourceRefs {
+			if sourceIDs[sourceID].chunkID == "" {
+				t.Fatalf("projected claim source ref %q does not resolve", sourceID)
+			}
+		}
+		for _, citationID := range claim.CitationRefs {
+			citation := citationIDs[citationID]
+			if citation.claimID != claim.ClaimID || citation.sourceID == "" {
+				t.Fatalf("projected claim citation ref %q does not resolve to claim %q: %#v", citationID, claim.ClaimID, citation)
+			}
+		}
+	}
+	for _, mapping := range projection.ProjectionMap {
+		if answerCitationClaims[mapping.AnswerCitationChunkID] == "" ||
+			retrieved[mapping.AnswerCitationChunkID] != mapping.RetrievedChunkRank ||
+			sourceIDs[mapping.ProjectedSourceID].chunkID != mapping.AnswerCitationChunkID ||
+			citationIDs[mapping.ProjectedCitationID].claimID != mapping.ProjectedClaimID ||
+			!mapping.SourceIDsAreNotAssumedEqual {
+			t.Fatalf("projection map does not close over RAG/evidence refs: %#v", mapping)
+		}
+	}
+	for _, want := range []string{
+		"all_answer_citations_resolve_to_chunks",
+		"all_answer_citations_resolve_to_retrieved_chunks",
+		"all_projected_claim_refs_resolve_to_projected_sources",
+		"all_projected_citation_refs_resolve_to_projected_citations",
+		"chunk_ids_are_not_assumed_equal_to_source_ids",
+		"projection_is_provider_free",
+	} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
 }
 
 func TestGenericEvidenceVerificationLivePackageExecutableSkeleton(t *testing.T) {
@@ -237,7 +419,7 @@ func TestGenericEvidenceVerificationLivePackageExecutableSkeleton(t *testing.T) 
 			if err != nil {
 				t.Fatalf("Get generic_evidence_verification_live_package_summary: %v", err)
 			}
-			want := "generic_evidence_verification_live_package capability=generic.ai.evidence.verify entrypoint=ai.evidence.verify claims=3 sources=4 citations=4 results=3 freshness_warnings=1 unresolved=1 clean_degradation=1 provider_free=true live_network=false imports=false model_calls=false"
+			want := "generic_evidence_verification_live_package capability=generic.ai.evidence.verify entrypoint=ai.evidence.verify rag_projections=1 claims=3 sources=4 citations=4 results=3 freshness_warnings=1 unresolved=1 clean_degradation=1 provider_free=true live_network=false imports=false model_calls=false"
 			if got != want {
 				t.Fatalf("summary = %#v, want %#v", got, want)
 			}
