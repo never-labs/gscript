@@ -133,6 +133,187 @@ text := result.text
 	}
 }
 
+func TestLLMReplayTraceEmitsRecordMatchedForTurn(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			records := []llm.Record{{
+				Request: llm.TurnRequest{
+					Model:    "mock-fast",
+					Messages: []llm.Message{{Role: "user", Text: "hello replay trace"}},
+				},
+				Result: llm.TurnResult{
+					Status: "final_answer",
+					Text:   "trace matched",
+					Usage:  llm.TurnUsage{InputTokens: 2, OutputTokens: 3},
+				},
+			}}
+			var events []llm.TraceEvent
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMReplay(records),
+				leia.WithLLMTrace(func(event llm.TraceEvent) {
+					events = append(events, event)
+				}),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello replay trace")},
+})
+text := result.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			text, _ := vm.Get("text")
+			if text != "trace matched" {
+				t.Fatalf("text = %#v", text)
+			}
+			gotTypes := llmTraceEventTypes(events)
+			wantTypes := []string{"turn_start", "replay_record_matched", "turn_end"}
+			if !equalStrings(gotTypes, wantTypes) {
+				t.Fatalf("event types = %#v, want %#v; events=%#v", gotTypes, wantTypes, events)
+			}
+			matched := events[1]
+			if matched.Model != "mock-fast" ||
+				matched.Status != "matched" ||
+				matched.TurnID != "turn:0" ||
+				matched.ReplayKey != "turn:0" ||
+				matched.RequestHash == "" ||
+				matched.ResponseHash == "" ||
+				matched.ReplayMode != "fixture_replay" ||
+				!matched.ProviderFree ||
+				matched.MessageCount != 1 ||
+				matched.ToolCount != 0 ||
+				matched.Usage.OutputTokens != 3 {
+				t.Fatalf("replay_record_matched = %#v", matched)
+			}
+		})
+	}
+}
+
+func TestLLMReplayTraceEmitsRecordMatchedForStream(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record := llm.Record{
+				Request: llm.TurnRequest{
+					Model:    "mock-fast",
+					Messages: []llm.Message{{Role: "user", Text: "hello stream replay trace"}},
+					Stream:   true,
+				},
+				Result: llm.TurnResult{
+					Status: "final_answer",
+					Text:   "hello stream",
+					Usage:  llm.TurnUsage{InputTokens: 1, OutputTokens: 3},
+				},
+				StreamEvents: []llm.StreamEvent{
+					{Type: "token", Token: "hello", Text: "hello"},
+					{Type: "token", Token: " ", Text: " "},
+					{Type: "token", Token: "stream", Text: "stream"},
+				},
+			}
+			var events []llm.TraceEvent
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMReplay([]llm.Record{record}),
+				leia.WithLLMTrace(func(event llm.TraceEvent) {
+					events = append(events, event)
+				}),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			if err := vm.Exec(`
+streamed := ""
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello stream replay trace")},
+    stream: true,
+    on_stream: func(event) {
+        streamed = streamed .. event.token
+    },
+})
+text := result.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			text, _ := vm.Get("text")
+			streamed, _ := vm.Get("streamed")
+			if text != "hello stream" || streamed != "hello stream" {
+				t.Fatalf("text=%#v streamed=%#v", text, streamed)
+			}
+			gotTypes := llmTraceEventTypes(events)
+			wantTypes := []string{"turn_start", "turn_stream", "turn_stream", "turn_stream", "replay_record_matched", "turn_end"}
+			if !equalStrings(gotTypes, wantTypes) {
+				t.Fatalf("event types = %#v, want %#v; events=%#v", gotTypes, wantTypes, events)
+			}
+			matchedCount := 0
+			for _, event := range events {
+				if event.Type == "replay_record_matched" {
+					matchedCount++
+					if event.ReplayKey != "turn:0" || event.ReplayMode != "fixture_replay" || !event.ProviderFree {
+						t.Fatalf("stream replay match metadata = %#v", event)
+					}
+				}
+			}
+			if matchedCount != 1 {
+				t.Fatalf("matchedCount = %d, events=%#v", matchedCount, events)
+			}
+		})
+	}
+}
+
+func TestLLMReplayTraceDoesNotEmitRecordMatchedForMismatch(t *testing.T) {
+	records := []llm.Record{{
+		Request: llm.TurnRequest{
+			Model:    "mock-fast",
+			Messages: []llm.Message{{Role: "user", Text: "expected"}},
+		},
+		Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
+	}}
+	var events []llm.TraceEvent
+	vm := leia.New(
+		leia.WithLibs(leia.LibString|leia.LibLLM),
+		leia.WithLLMReplay(records),
+		leia.WithLLMTrace(func(event llm.TraceEvent) {
+			events = append(events, event)
+		}),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("actual")},
+})
+kind := err.kind
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	kind, _ := vm.Get("kind")
+	if kind != "provider" {
+		t.Fatalf("kind = %#v", kind)
+	}
+	gotTypes := llmTraceEventTypes(events)
+	wantTypes := []string{"turn_start", "turn_error"}
+	if !equalStrings(gotTypes, wantTypes) {
+		t.Fatalf("event types = %#v, want %#v; events=%#v", gotTypes, wantTypes, events)
+	}
+	for _, event := range events {
+		if event.Type == "replay_record_matched" {
+			t.Fatalf("unexpected replay_record_matched event: %#v", event)
+		}
+	}
+}
+
 func TestLLMReplaySynthesizesStreamEventForOldFixtures(t *testing.T) {
 	record := llm.Record{
 		Request: llm.TurnRequest{
@@ -154,6 +335,26 @@ func TestLLMReplaySynthesizesStreamEventForOldFixtures(t *testing.T) {
 	if res.Text != "legacy stream" || len(tokens) != 1 || tokens[0] != "legacy stream" {
 		t.Fatalf("res=%#v tokens=%#v, want synthesized legacy token", res, tokens)
 	}
+}
+
+func llmTraceEventTypes(events []llm.TraceEvent) []string {
+	out := make([]string, len(events))
+	for i := range events {
+		out[i] = events[i].Type
+	}
+	return out
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestLLMRecorderHelper(t *testing.T) {
