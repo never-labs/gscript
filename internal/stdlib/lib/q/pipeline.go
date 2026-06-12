@@ -1910,6 +1910,13 @@ func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error)
 // leaves array elements behind (any element is itself a generic list with
 // array elements): those shapes broadcast under sum instead of reducing.
 func qSumRazeLeavesNestedArrays(array data.Array) bool {
+	// Rectangular matrix views with typed scalar cells (flip/reshape results)
+	// flatten fully after ONE raze level by construction: skip the O(rows)
+	// walk, which would otherwise allocate a row view per At plus shape/row
+	// copies per Kind probe on every evaluation.
+	if kind, ok := data.MatrixCellKind(array); ok && kind != data.KindAny && kind != data.KindNull {
+		return false
+	}
 	for row := 0; row < array.Len(); row++ {
 		item, ok := array.At(row)
 		if !ok {
@@ -1919,7 +1926,7 @@ func qSumRazeLeavesNestedArrays(array data.Array) bool {
 		if !isArray {
 			continue
 		}
-		if inner.Kind() != data.KindAny && inner.Kind() != data.KindNull {
+		if kind := inner.Kind(); kind != data.KindAny && kind != data.KindNull {
 			continue
 		}
 		for innerRow := 0; innerRow < inner.Len(); innerRow++ {
