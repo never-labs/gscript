@@ -468,6 +468,10 @@ result, err := graph.run("topic")
 The graph helper is intentionally conservative: it validates and records graph
 shape, but it does not perform DAG scheduling, parallel execution, retries,
 persistence, or hidden provider calls.
+Stage metadata fields such as `capability`, `fixture_key`, `input_ref`,
+`output_ref`, `input_schema`, `output_schema`, and `depends_on` are also copied
+into each executed step's `trace.metadata`, so replay trace events and workflow
+trace nodes can be correlated without inspecting raw step inputs or outputs.
 
 ## Section Generation
 

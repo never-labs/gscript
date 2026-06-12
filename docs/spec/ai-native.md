@@ -370,6 +370,10 @@ value as a stage and preserves stage-oriented metadata in `opts`, such as
 contract. It accepts ordered `stages` and optional `edges`, validates that
 dependencies and edges reference known earlier stages, exposes graph metadata,
 and then executes sequentially in the supplied order.
+Stage metadata that is useful for replay and audit evidence, including
+`capability`, `fixture_key`, `input_ref`, `output_ref`, `input_schema`,
+`output_schema`, and `depends_on`, is preserved in graph metadata and in each
+executed step's `trace.metadata`.
 
 These helpers are sequencing helpers, not durable orchestration. They do not
 imply parallelism, retry policy, persistence, transactions, approval storage, or
