@@ -492,6 +492,11 @@ func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, err
 		return nil, false, nil
 	case data.Array:
 		shape := qScalarApplyIndexShape(mode, string(x.Kind()))
+		if row < 0 || row >= x.Len() {
+			// Canonical q read-path indexing null-fills out-of-range rows
+			// instead of erroring (see arrayReadIndexValue).
+			return data.NullValue, true, nil
+		}
 		value, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 			kernel:         "ArrayScalarIndex",
 			shape:          shape,
@@ -508,7 +513,7 @@ func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, err
 		}
 		value, ok := x.At(row)
 		if !ok {
-			return nil, true, fmt.Errorf("index %d out of range", row)
+			return data.NullValue, true, nil
 		}
 		return value, true, nil
 	case string:
@@ -516,9 +521,10 @@ func scalarIndexValue(mode qApplyIndexMode, target any, row int) (any, bool, err
 		recordRuntimeKernelExecution("StringScalarIndex", shape, "attempt", "attempt")
 		runes := []rune(x)
 		if row < 0 || row >= len(runes) {
-			err := fmt.Errorf("index %d out of range", row)
-			recordRuntimeKernelExecution("StringScalarIndex", shape, "error", "runtime_error")
-			return nil, true, err
+			// Canonical q fills out-of-range string reads with the char
+			// null " " (see stringReadIndexValue).
+			recordRuntimeKernelExecution("StringScalarIndex", shape, "hit", "typed_scalar_index")
+			return " ", true, nil
 		}
 		recordRuntimeKernelExecution("StringScalarIndex", shape, "hit", "typed_scalar_index")
 		return string(runes[row]), true, nil

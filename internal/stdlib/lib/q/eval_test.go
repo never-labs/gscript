@@ -1260,7 +1260,7 @@ func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
 	}
 	if d.sequenceValueExpr != "x" ||
 		qScriptPipelineSequenceTransformName(d.sequenceSteps) != "rotate.reverse.sublist" ||
-		encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps) != "rotate:17|reverse|sublist:128" ||
+		encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps) != "rotate:17|reverse|sublist:0,128" ||
 		encodeQScriptPipelineNames(d.sequenceBindings) != "r\x1fy" {
 		t.Fatalf("sequence chain descriptor = base %q steps %#v names %#v", d.sequenceValueExpr, d.sequenceSteps, d.sequenceBindings)
 	}
@@ -1272,7 +1272,7 @@ func TestQScriptPipelinePlannerDescribesSequenceEdgeReduce(t *testing.T) {
 		t.Fatalf("DescribeEvalPipeline(%q) did not recognize sequence edge pipeline", src)
 	}
 	if descriptor.SequenceValueExpr != "x" ||
-		descriptor.SequenceTransformChain != "rotate:17|reverse|sublist:128" ||
+		descriptor.SequenceTransformChain != "rotate:17|reverse|sublist:0,128" ||
 		descriptor.SequenceTransformNames != "r\x1fy" ||
 		descriptor.ShapeTransform != "rotate.reverse.sublist" {
 		t.Fatalf("eval descriptor sequence chain = %#v", descriptor)
@@ -1295,7 +1295,7 @@ func TestQScriptPipelinePlannerDescribesSequenceSumCountReduce(t *testing.T) {
 	}
 	if d.sequenceValueExpr != "x" ||
 		qScriptPipelineSequenceTransformName(d.sequenceSteps) != "drop.sublist.sublist" ||
-		encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps) != "drop:128|sublist:1024|sublist:512" ||
+		encodeQScriptPipelineSequenceTransformSteps(d.sequenceSteps) != "drop:128|sublist:1024|sublist:0,512" ||
 		encodeQScriptPipelineNames(d.sequenceBindings) != "y\x1fz" {
 		t.Fatalf("sequence sum-count descriptor = base %q steps %#v names %#v", d.sequenceValueExpr, d.sequenceSteps, d.sequenceBindings)
 	}
@@ -4246,7 +4246,8 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	assertEvalValue(t, "count ()", int64(0))
 	assertEvalValue(t, "count `a`b!10 20", int64(2))
 	assertEvalValue(t, "sum 10 20 30", int64(60))
-	assertEvalValue(t, "sum ()", data.NullValue)
+	// Canonical empty-sum identity: sum () -> 0.
+	assertEvalValue(t, "sum ()", int64(0))
 	assertEvalValue(t, "avg 10 20 30", 20.0)
 	assertEvalValue(t, "avg ()", data.NullValue)
 	assertEvalValue(t, "var 10 20 30", 66.66666666666669)
@@ -4256,8 +4257,9 @@ func TestEvalCountSumSumsTakeWhereAndPlusAdverbs(t *testing.T) {
 	assertEvalValue(t, "prd 2 3 4", int64(24))
 	assertEvalValue(t, "min 10 5 30", int64(5))
 	assertEvalValue(t, "max 10 5 30", int64(30))
-	assertEvalValue(t, "min ()", data.NullValue)
-	assertEvalValue(t, "max ()", data.NullValue)
+	// Canonical empty-extrema identities: min () -> 0W, max () -> -0W.
+	assertEvalValue(t, "min ()", int64(math.MaxInt64))
+	assertEvalValue(t, "max ()", -int64(math.MaxInt64))
 	assertEvalValue(t, "first 10 20 30", int64(10))
 	assertEvalValue(t, "last 10 20 30", int64(30))
 	assertEvalValue(t, "first ()", data.NullValue)
@@ -5548,7 +5550,8 @@ func TestEvalEnlistAndRaze(t *testing.T) {
 	assertEvalArray(t, "count' enlist' 1 2 3", data.KindI64, []any{int64(1), int64(1), int64(1)})
 	assertEvalArray(t, "raze (1 2;3 4;5)", data.KindI64, []any{int64(1), int64(2), int64(3), int64(4), int64(5)})
 	assertEvalArray(t, "raze (`AAPL`MSFT;`NVDA)", data.KindSymbol, []any{data.Symbol("AAPL"), data.Symbol("MSFT"), data.Symbol("NVDA")})
-	assertEvalArray(t, "raze ()", data.KindNull, nil)
+	// Canonical raze of an empty list is the list itself: raze () -> ().
+	assertEvalArray(t, "raze ()", data.KindAny, []any{})
 	assertEvalValue(t, "raze 42", int64(42))
 	assertEvalValue(t, "count enlist 10 20 30", int64(1))
 }
@@ -5894,7 +5897,8 @@ func TestEvalEachLeftAndEachRightAdverbs(t *testing.T) {
 }
 
 func TestEvalOverAndScanAdverbs(t *testing.T) {
-	assertEvalValue(t, "+/()", data.NullValue)
+	// Canonical empty-fold identity: (+/)() -> 0.
+	assertEvalValue(t, "+/()", int64(0))
 	assertEvalArray(t, "+\\()", data.KindI64, []any{})
 	assertEvalValue(t, "10+/()", int64(10))
 	assertEvalArray(t, "10+\\()", data.KindNull, nil)

@@ -236,7 +236,11 @@ func (g *qgen) statement() string {
 // qEvalTwoVerbPattern matches statements containing two registered verb
 // names (built from the generator's registry-pinned verb lists plus til).
 var qEvalTwoVerbPattern = sync.OnceValue(func() *regexp.Regexp {
-	names := append([]string{"til", "xexp", "xlog", "wsum", "wavg", "ema", "msum", "cor", "cov", "scov", "mdev"}, qgenUnaryVerbs...)
+	// "and"/"or" are registered word dyadics the generator spells only
+	// through bindings, so list them here: a word dyadic whose operand is a
+	// word-verb application ((0 or wsum 0)) hits the same acceptance
+	// divergence as any other two-verb chain.
+	names := append([]string{"til", "xexp", "xlog", "wsum", "wavg", "ema", "msum", "cor", "cov", "scov", "mdev", "and", "or"}, qgenUnaryVerbs...)
 	names = append(names, qgenScalarLeftWordVerbs...)
 	names = append(names, qgenPairWordVerbs...)
 	alt := strings.Join(names, "|")
@@ -295,7 +299,6 @@ var (
 	qEvalArithTakePattern   = regexp.MustCompile(`[+*%^&|-][0-9 ]*#`)
 	qEvalWordApplication    = regexp.MustCompile(`[a-z]{2,}\s`)
 	qEvalGluedOpWord        = regexp.MustCompile(`[A-Za-z][%^_#,!.<>=*+-]|[%^_#,!.<>=*+-][A-Za-z]`)
-	qEvalAggregateWord      = regexp.MustCompile(`\b(sum|prd|min|max|avg|med|var|dev|sums|prds|mins|maxs|avgs|all|any|wsum|wavg)\b`)
 	qEvalRealSuffixPattern  = regexp.MustCompile(`\d[eih]($|[^0-9.])`)
 	qEvalTrailingDotPattern = regexp.MustCompile(`\d\.($|[^0-9])`)
 	// Month-literal shape (YYYY.MM) not extended to a date (no third
@@ -572,14 +575,6 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 	if qEvalGluedOpWord.MatchString(stmt) {
 		return true
 	}
-	// FINDING (this fuzzer): aggregate empty-vector identities differ BETWEEN
-	// ROUTES: x:til 0;sum 0 rotate x returns 0N through the compiled route
-	// but 0 through the string evaluator's fused sum probes. Mismatching
-	// aggregate statements are skipped until the identity is unified (see
-	// also the empty-vector gap entries in the canonical-q harness).
-	if qEvalAggregateWord.MatchString(stmt) {
-		return true
-	}
 	// FINDING (this fuzzer): the same acceptance divergence hits nested verb
 	// applications as word-verb operands: 2 rotate where 0 1 1 evaluates
 	// through the compiled route but the string evaluator rejects the nested
@@ -671,10 +666,13 @@ var qEvalKnownDivergenceRepresentatives = []string{
 	// "(0)+first 0<0" was reconciled by the canonical right-to-left split
 	// (q!: no operator precedence): both routes now split at the leftmost
 	// top-level verb, so the routes agree. Removed (shrink-only ratchet).
-	"count@where 0",          // string route rejects verb@application shapes
-	"x:();s:x;last%x",        // glued operator/word tokenisation divergence
-	"x:til 0;sum 0 rotate x", // aggregate empty-identity differs between routes
+	"count@where 0",   // string route rejects verb@application shapes
+	"x:();s:x;last%x", // glued operator/word tokenisation divergence
+	// "x:til 0;sum 0 rotate x" was reconciled by the canonical empty-reducer
+	// identities (sum/prd/min/max () now return 0/1/0W/-0W on every route).
+	// Removed (shrink-only ratchet).
 	"2 rotate where 0 1 1",   // string route rejects nested verb applications
+	"(0 or wsum 0)",          // word dyadic over a word application: string route rejects
 	`()+("J"$"0")+("I"$"0")`, // empty-list broadcast lost on the string route
 	"(count 0;9)+(0)",        // list items with verb applications split differently
 	"0-0e",                   // sized-suffix promotion differs between routes

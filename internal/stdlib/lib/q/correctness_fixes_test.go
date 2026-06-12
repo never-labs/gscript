@@ -78,9 +78,10 @@ func TestMixedLiteralVectorIsParseErrorNotPanic(t *testing.T) {
 			t.Errorf("Eval(%q) error = %v, want mixed-type vector literal error", src, err)
 		}
 	}
-	// String-first mixed vectors keep their dedicated error.
-	if _, err := Eval(`"a" 1`); err == nil {
-		t.Errorf("Eval(%q) succeeded, want error", `"a" 1`)
+	// String-headed juxtaposition is canonical string indexing: "a" 1 reads
+	// past the end and fills with the char null " " (see canonical_q.tsv).
+	if got, err := Eval(`"a" 1`); err != nil || got != " " {
+		t.Errorf("Eval(%q) = %#v, %v; want \" \"", `"a" 1`, got, err)
 	}
 }
 
@@ -741,12 +742,25 @@ func TestReshapeFromEmptyFills(t *testing.T) {
 	assertBothRoutes(t, "m:2 2#til 0;m . 0")
 }
 
-// TestGatherIndexBoundsError pins vector indexing over short/empty bases: a
-// q index error (identical on both routes) instead of a Gather panic.
+// TestGatherIndexBoundsError pins vector indexing over short/empty bases:
+// canonical q read-path indexing null-fills out-of-range rows (identical on
+// both routes) instead of erroring or panicking in Gather.
 func TestGatherIndexBoundsError(t *testing.T) {
-	assertEvalErrorContains(t, "m:0#0;(m@0 0)", "outside length 0")
-	assertEvalErrorContains(t, "m:0 0#0;(m@0 0)", "outside length 0")
-	assertEvalErrorContains(t, "(til 3)@4 5", "outside length 3")
+	assertBothRoutesValue(t, "all null m@0 0", "m:0#0;all null (m@0 0)", true)
+	assertBothRoutesValue(t, "(til 3)@4 5 nulls", "all null ((til 3)@4 5)", true)
+	assertBothRoutesValue(t, "count m@0 0", "m:0#0;count (m@0 0)", int64(2))
+}
+
+func assertBothRoutesValue(t *testing.T, label, src string, want any) {
+	t.Helper()
+	got, err := Eval(src)
+	if err != nil {
+		t.Fatalf("%s: Eval(%q) error: %v", label, src, err)
+	}
+	if got != want {
+		t.Fatalf("%s: Eval(%q) = %#v, want %#v", label, src, got, want)
+	}
+	assertBothRoutes(t, src)
 }
 
 // TestEmptyOperandLogicalBroadcast pins logical &/| between an empty list

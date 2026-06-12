@@ -31,6 +31,10 @@ type qScriptBindingPlan struct {
 	cacheable      bool
 	cached         bool
 	cache          any
+	// juxtaposedIndex marks an Ident/String-headed vector with an all-Number
+	// tail: canonical q juxtaposition indexes when the head resolves to a
+	// container (x 1 -> x[1]), mirroring evalJuxtaposedIndexVector.
+	juxtaposedIndex bool
 }
 
 type qScriptBindingNameResolver func(name string) (*qScriptBindingPlan, bool, error)
@@ -85,7 +89,7 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 			}
 			return qScriptBindingPlan{kind: qScriptBindingLiteral, literal: value}
 		}
-		return qScriptBindingPlan{kind: qScriptBindingVector, items: items}
+		return qScriptBindingPlan{kind: qScriptBindingVector, items: items, juxtaposedIndex: qJuxtaposedIndexVectorShape(x)}
 	case Call:
 		// value/eval are session-routed (value of a string evaluates source
 		// against the live env); the binding executor's stateless unary
@@ -520,6 +524,11 @@ func (s *EvalState) evalQScriptBindingPlanWithResolver(plan *qScriptBindingPlan,
 				return nil, handled, err
 			}
 			values[i] = value
+		}
+		if plan.juxtaposedIndex {
+			if out, indexed, err := qJuxtaposedIndexVectorValue(values); indexed || err != nil {
+				return out, true, err
+			}
 		}
 		out, err := evalValueVector(values)
 		value, handled = out, true
