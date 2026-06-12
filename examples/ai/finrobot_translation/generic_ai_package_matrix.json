@@ -80,6 +80,29 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_model_io_envelope",
+      "package_name": "leia-generic-ai-model-io-envelope",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "capability": "generic.ai.model.io.envelope",
+      "capabilities": [
+        "generic.ai.model.io.envelope",
+        "generic.ai.model.io.request_envelope",
+        "generic.ai.model.io.response_envelope",
+        "generic.ai.model.io.stream_chunks",
+        "generic.ai.model.io.provider_free_replay",
+        "generic.ai.model.io.usage_cost_metadata",
+        "generic.ai.model.io.redaction"
+      ],
+      "backend_shape": "ai.model.io.envelope",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_model_registry",
       "package_name": "leia-generic-ai-model-registry",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_registry",

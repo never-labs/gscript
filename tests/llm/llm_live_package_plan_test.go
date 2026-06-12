@@ -111,7 +111,9 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 				t.Fatalf("%s missing %s", pkg.ID, label)
 			}
 		}
-		if !strings.HasPrefix(pkg.PlannedDirectory, "packages/finrobot/") && !strings.HasPrefix(pkg.PlannedDirectory, "packages/ai/") {
+		if !strings.HasPrefix(pkg.PlannedDirectory, "packages/finrobot/") &&
+			!strings.HasPrefix(pkg.PlannedDirectory, "packages/ai/") &&
+			!strings.HasPrefix(pkg.PlannedDirectory, "packages/generic_ai/") {
 			t.Fatalf("%s planned_directory = %q", pkg.ID, pkg.PlannedDirectory)
 		}
 		if pkg.Status != "skeleton_contract_checked_in" {
@@ -208,10 +210,13 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"generic_agent_runner":             "ai.agent.",
 		"generic_approval_policy":          "generic.ai.",
 		"generic_evaluation_harness":       "generic.ai.evaluation.harness.",
+		"generic_model_io_envelope":        "generic.ai.model.io.",
 		"generic_model_registry":           "generic.ai.model.",
 		"generic_package_boundary_auditor": "generic.ai.",
+		"generic_planning_graph":           "generic.planning.",
 		"generic_record_replay":            "generic.ai.",
 		"generic_tool_contracts":           "generic.ai.tool.",
+		"generic_tool_registry":            "generic.tool.",
 		"generic_trace_events":             "generic.ai.trace.",
 		"generic_turn_runner":              "generic.ai.turn.",
 		"generic_workflow_orchestrator":    "generic.ai.workflow.",

@@ -2,6 +2,7 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +14,13 @@ import (
 )
 
 func TestGenericAIWorkflowCompositionExampleExecutes(t *testing.T) {
+	root := repoRoot(t)
+	matrix := loadGenericAIPackageMatrix(t, root)
+	wantBoundaries := len(matrix.Packages)
+	wantEdges := wantBoundaries - 1
+
 	vm := leia.New(leia.WithLibs(leia.LibString))
-	path := genericAIWorkflowCompositionExamplePath(t)
+	path := filepath.Join(root, "examples", "ai", "finrobot_translation", "generic_ai_workflow_composition.leia")
 	if err := vm.ExecFile(path); err != nil {
 		t.Fatalf("ExecFile: %v", err)
 	}
@@ -23,15 +29,16 @@ func TestGenericAIWorkflowCompositionExampleExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("composition_summary: %v", err)
 	}
-	if summary != "generic-ai-workflow-composition boundaries=12 edges=11 provider_free=true" {
-		t.Fatalf("composition_summary = %#v", summary)
+	wantSummary := fmt.Sprintf("generic-ai-workflow-composition boundaries=%d edges=%d provider_free=true", wantBoundaries, wantEdges)
+	if summary != wantSummary {
+		t.Fatalf("composition_summary = %#v, want %#v", summary, wantSummary)
 	}
 	count, err := vm.Get("package_boundary_count")
 	if err != nil {
 		t.Fatalf("package_boundary_count: %v", err)
 	}
-	if count != int64(12) {
-		t.Fatalf("package_boundary_count = %#v, want 12", count)
+	if count != int64(wantBoundaries) {
+		t.Fatalf("package_boundary_count = %#v, want %d", count, wantBoundaries)
 	}
 }
 
@@ -39,6 +46,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 	data := readGenericAIWorkflowCompositionExample(t)
 	for _, want := range []string{
 		`role: "model"`,
+		`role: "model-io"`,
 		`role: "turn"`,
 		`role: "tool"`,
 		`role: "tool-registry"`,
@@ -51,6 +59,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "approval"`,
 		`role: "package-audit"`,
 		`package_id: "generic-model-registry"`,
+		`package_id: "generic-model-io-envelope"`,
 		`package_id: "generic-turn-runner"`,
 		`package_id: "generic-tool-contracts"`,
 		`package_id: "generic-tool-registry"`,
@@ -84,8 +93,8 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 
 	boundaries := parseGenericAIWorkflowCompositionBoundaries(t, data)
-	if len(boundaries) != 12 {
-		t.Fatalf("composition package boundaries = %d, want 12", len(boundaries))
+	if len(boundaries) != len(matrix.Packages) {
+		t.Fatalf("composition package boundaries = %d, want %d", len(boundaries), len(matrix.Packages))
 	}
 
 	roles := map[string]genericAIWorkflowCompositionBoundary{}
@@ -140,8 +149,9 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 
 	edges := parseGenericAIWorkflowCompositionEdges(t, data)
-	if len(edges) != 11 {
-		t.Fatalf("composition edges = %d, want 11", len(edges))
+	wantEdges := len(boundaries) - 1
+	if len(edges) != wantEdges {
+		t.Fatalf("composition edges = %d, want %d", len(edges), wantEdges)
 	}
 	seenEdges := map[string]bool{}
 	for _, edge := range edges {
@@ -155,6 +165,8 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	}
 	for _, want := range []string{
 		"approval->tool",
+		"model->model-io",
+		"model-io->turn",
 		"tool->turn",
 		"replay->turn",
 		"trace->workflow",

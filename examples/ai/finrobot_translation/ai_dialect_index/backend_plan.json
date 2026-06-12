@@ -76,6 +76,43 @@
       }
     },
     {
+      "shape_id": "ai.model.io.envelope",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "model",
+        "model-io",
+        "turn",
+        "replay"
+      ],
+      "contract": "Normalize provider-free model request, stream chunk, response, usage, replay, and redaction envelopes.",
+      "inputs": [
+        "model_descriptor",
+        "turn_messages",
+        "tool_descriptors",
+        "response_format",
+        "redaction_policy"
+      ],
+      "outputs": [
+        "request_envelope",
+        "stream_chunks",
+        "response_envelope",
+        "usage_cost_metadata",
+        "replay_correlation"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_generic_model_io_envelope_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-io-envelope",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.model.resolve",
       "status": "checked_in_package_boundary",
       "capabilities": [

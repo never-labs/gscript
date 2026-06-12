@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "generic-model-io-envelope-contract",
-  "package_boundary_id": "generic-ai-turn-runner",
+  "package_boundary_id": "generic-ai-model-io-envelope",
   "provider_free": true,
   "domain_specific": false,
   "live_network": false,

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/provider_free_model_io_replay_fixture.schema.json",
+  "title": "generic provider-free model IO replay fixture",
+  "type": "object",
+  "required": ["schema_version", "id", "provider_free", "domain_specific", "live_network", "live_model", "credentials_required", "replay", "records"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "id": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "domain_specific": {"type": "boolean", "const": false},
+    "live_network": {"type": "boolean", "const": false},
+    "live_model": {"type": "boolean", "const": false},
+    "credentials_required": {"type": "boolean", "const": false},
+    "replay": {
+      "type": "object",
+      "required": ["replay_session_id", "mode", "strict_ordered_match", "adapter_identity"],
+      "properties": {
+        "replay_session_id": {"type": "string"},
+        "mode": {"type": "string", "const": "provider-free"},
+        "strict_ordered_match": {"type": "boolean", "const": true},
+        "adapter_identity": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["request", "stream_chunks", "response"],
+        "properties": {
+          "request": {"$ref": "model_request_envelope.schema.json"},
+          "stream_chunks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "model_stream_chunk.schema.json"}
+          },
+          "response": {"$ref": "model_response_envelope.schema.json"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

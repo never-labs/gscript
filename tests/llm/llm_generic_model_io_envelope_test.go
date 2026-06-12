@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const genericModelIOEnvelopeRoot = "tests/llm/testdata/generic_model_io_envelope"
+const genericModelIOEnvelopeRoot = "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope"
 
 type genericModelIOEnvelopeManifest struct {
 	SchemaVersion       int      `json:"schema_version"`
@@ -19,10 +19,13 @@ type genericModelIOEnvelopeManifest struct {
 	ProviderFree        bool     `json:"provider_free"`
 	DomainSpecific      bool     `json:"domain_specific"`
 	LiveNetwork         bool     `json:"live_network"`
+	LiveNetworkDefault  bool     `json:"live_network_default"`
 	LiveModel           bool     `json:"live_model"`
+	LiveModelDefault    bool     `json:"live_model_default"`
 	CredentialsRequired bool     `json:"credentials_required"`
 	DependsOnQRuntime   bool     `json:"depends_on_q_runtime"`
 	RealImports         bool     `json:"real_dependency_imports"`
+	RealImportsDefault  bool     `json:"real_dependency_import_default"`
 	CapabilitySurfaces  []string `json:"capability_surfaces"`
 	NoBuiltInGuarantee  struct {
 		Required  bool   `json:"required"`
@@ -107,7 +110,7 @@ func TestGenericModelIOEnvelopeManifestContractFixtureClosedLoop(t *testing.T) {
 	base := filepath.Join(root, filepath.FromSlash(genericModelIOEnvelopeRoot))
 
 	var manifest genericModelIOEnvelopeManifest
-	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "manifest.json"), &manifest)
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "package.manifest.json"), &manifest)
 	assertGenericModelIOEnvelopeBoundary(t, manifest)
 
 	contractPath := filepath.Join(base, filepath.FromSlash(manifest.Contracts["model_io_envelope"]))
@@ -126,21 +129,25 @@ func assertGenericModelIOEnvelopeBoundary(t *testing.T, manifest genericModelIOE
 	t.Helper()
 	if manifest.SchemaVersion != 1 ||
 		manifest.ID != "generic-model-io-envelope" ||
-		manifest.PackageBoundaryID != "generic-ai-turn-runner" ||
-		manifest.CapabilityID != "generic.ai.turn.request" {
+		manifest.PackageBoundaryID != "generic-ai-model-io-envelope" ||
+		manifest.CapabilityID != "generic.ai.model.io.envelope" {
 		t.Fatalf("unexpected manifest identity: %#v", manifest)
 	}
-	if !manifest.ProviderFree || manifest.DomainSpecific || manifest.LiveNetwork || manifest.LiveModel ||
-		manifest.CredentialsRequired || manifest.DependsOnQRuntime || manifest.RealImports {
+	if !manifest.ProviderFree || manifest.DomainSpecific || manifest.LiveNetwork || manifest.LiveNetworkDefault || manifest.LiveModel || manifest.LiveModelDefault ||
+		manifest.CredentialsRequired || manifest.DependsOnQRuntime || manifest.RealImports || manifest.RealImportsDefault {
 		t.Fatalf("manifest must stay provider-free/local/generic: %#v", manifest)
 	}
-	if !manifest.NoBuiltInGuarantee.Required || !strings.Contains(strings.ToLower(manifest.NoBuiltInGuarantee.Statement), "does not provide built-in") {
+	statement := strings.ToLower(manifest.NoBuiltInGuarantee.Statement)
+	if !manifest.NoBuiltInGuarantee.Required || !strings.Contains(statement, "does not provide") || !strings.Contains(statement, "built-in") {
 		t.Fatalf("manifest missing no built-in boundary: %#v", manifest.NoBuiltInGuarantee)
 	}
 	assertGenericModelIOStringSet(t, "capability surfaces", manifest.CapabilitySurfaces, []string{
-		"messages",
-		"response_format",
-		"turn",
+		"model_io",
+		"provider_free_replay",
+		"redaction",
+		"request_envelope",
+		"response_envelope",
+		"stream_chunk",
 		"usage",
 	})
 	if manifest.Contracts["model_io_envelope"] == "" || manifest.Fixtures["provider_free_replay"] == "" {
@@ -279,7 +286,7 @@ func assertGenericModelIOEnvelopeFixture(t *testing.T, contract genericModelIOEn
 func assertGenericModelIOEnvelopeNoSecrets(t *testing.T, base string) {
 	t.Helper()
 	entries := []string{
-		filepath.Join(base, "manifest.json"),
+		filepath.Join(base, "package.manifest.json"),
 		filepath.Join(base, "contracts", "model_io_envelope_contract.json"),
 		filepath.Join(base, "fixtures", "provider_free_replay_fixture.json"),
 	}

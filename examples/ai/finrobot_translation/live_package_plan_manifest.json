@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 78,
-  "translation_directory_file_count": 600,
+  "registered_examples_count": 82,
+  "translation_directory_file_count": 630,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -131,6 +131,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
       "covers_package_ids": [
         "generic_evaluation_harness"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_model_io_envelope",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+      "covers_package_ids": [
+        "generic_model_io_envelope"
       ],
       "status": "checked_in_registered_example"
     },
@@ -709,6 +718,32 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_model_io_envelope",
+      "package_name": "leia-generic-ai-model-io-envelope",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "planned_directory": "packages/generic_ai/model_io_envelope",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json",
+      "migration_source": "examples/ai/coding_agent_replay.records.json",
+      "capabilities": [
+        "generic.ai.model.io.envelope",
+        "generic.ai.model.io.request_envelope",
+        "generic.ai.model.io.response_envelope",
+        "generic.ai.model.io.stream_chunks",
+        "generic.ai.model.io.provider_free_replay",
+        "generic.ai.model.io.usage_cost_metadata",
+        "generic.ai.model.io.redaction"
+      ],
+      "test_gates": [
+        "fixture replay decodes request, stream chunk, and response envelope contracts",
+        "contract gates prove usage/cost metadata and redaction fields are explicit",
+        "provider-free fixture asserts no live network or credential requirement",
+        "composition gate links model registry output to turn runner input through model IO envelope contracts"
       ],
       "no_built_in_guarantee": true
     },

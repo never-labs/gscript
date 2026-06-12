@@ -7,13 +7,13 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 81 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples list --json`. All 34
+Current registered-example status: 82 runnable/checkable FinRobot translation
+examples are discovered by `go run ./cmd/leia examples list --json`. All 35
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI
-model, turn, tool, agent, workflow, evaluation, replay, trace, approval, and
-package-audit boundaries consumed by the translation.
+model, model IO, turn, tool, agent, workflow, evaluation, replay, trace,
+approval, and package-audit boundaries consumed by the translation.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
 | --- | --- | --- | --- | --- |
@@ -40,6 +40,7 @@ package-audit boundaries consumed by the translation.
 | `live_packages/earnings_transcript` | `live_packages/earnings_transcript/main.leia` | `leia-finrobot-earnings-transcript` | `packages/finrobot/earnings_transcript` | `contracts/earnings_transcript_contract.json` |
 | `live_packages/sec_filings` | `live_packages/sec_filings/main.leia` | `leia-finrobot-sec-filings` | `packages/finrobot/sec_filings` | `contracts/sec_filings_contract.json` |
 | `live_packages/generic_model_registry` | `live_packages/generic_model_registry/main.leia` | `leia-generic-ai-model-registry` | `packages/generic_ai/model_registry` | `contracts/model_registry_contract.json` |
+| `live_packages/generic_model_io_envelope` | `live_packages/generic_model_io_envelope/main.leia` | `leia-generic-ai-model-io-envelope` | `packages/generic_ai/model_io_envelope` | `contracts/model_io_envelope_contract.json` |
 | `live_packages/generic_turn_runner` | `live_packages/generic_turn_runner/main.leia` | `leia-generic-ai-turn-runner` | `packages/generic_ai/turn_runner` | `contracts/generic_turn_runner_contract.json` |
 | `live_packages/generic_tool_contracts` | `live_packages/generic_tool_contracts/main.leia` | `leia-generic-ai-tool-contracts` | `packages/generic_ai/tool_contracts` | `contracts/generic_tool_contract.json` |
 | `live_packages/generic_tool_registry` | `live_packages/generic_tool_registry/main.leia` | `leia-generic-ai-tool-registry` | `packages/generic_ai/tool_registry` | `contracts/tool_registry_contract.json` |

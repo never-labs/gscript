@@ -23,6 +23,7 @@
   "required_capabilities": [
     "model",
     "turn",
+    "model-io",
     "tool",
     "agent",
     "workflow",
@@ -183,6 +184,38 @@
         "package_id": "generic-model-registry",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "model-io",
+      "capability_id": "generic.ai.model.io.envelope",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "model.io.request",
+        "model.io.stream_chunk",
+        "model.io.response",
+        "model.io.usage",
+        "model.io.redaction",
+        "llm.replay"
+      ],
+      "example": "examples/ai/coding_agent_replay.leia",
+      "test": "tests/llm/llm_generic_model_io_envelope_test.go",
+      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-model-io-envelope",
+        "boundary": "provider-free request, stream chunk, response, usage, and redaction envelopes between model registry and turn execution",
+        "status": "missing",
+        "reason": "model IO envelope behavior was fixture-backed before being promoted to a reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-io-envelope",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

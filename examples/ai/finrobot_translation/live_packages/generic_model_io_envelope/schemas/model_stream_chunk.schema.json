@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/model_stream_chunk.schema.json",
+  "title": "generic model stream chunk",
+  "type": "object",
+  "required": ["chunk_id", "turn_id", "sequence", "event_type", "delta", "status", "usage_delta"],
+  "properties": {
+    "chunk_id": {"type": "string"},
+    "turn_id": {"type": "string"},
+    "sequence": {"type": "integer"},
+    "event_type": {"type": "string"},
+    "delta": {"type": "string"},
+    "status": {"type": "string"},
+    "usage_delta": {"type": "object"}
+  },
+  "additionalProperties": true
+}

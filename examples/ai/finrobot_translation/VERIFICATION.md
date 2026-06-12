@@ -25,7 +25,7 @@ live-package skeleton contracts over the general AI/data/workflow surfaces.
 The generic AI dialect package boundary is included in this verification as
 checked-in package-owned surface, not as a FinRobot-only dialect. The
 `live_packages/generic_*` directories are reusable generic AI package
-boundaries for model, turn, tool, agent, workflow, evaluation, replay, trace,
+boundaries for model, model IO envelopes, turn, tool, agent, workflow, evaluation, replay, trace,
 approval, and package-audit contracts. They are not missing/planned FinRobot
 items, and they do not require q/runtime, q mainline, or `.external/FinRobot`
 changes.
@@ -42,7 +42,7 @@ workflow-composition, and evaluation-harness guard updates.
 | Gate | Command | Result |
 | --- | --- | --- |
 | LLM/bind/CLI tests | `go test ./tests/llm ./internal/stdlib/bind ./cmd/leia -count=1` | Pass |
-| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `78 ok, 0 skipped, 0 failed` |
+| FinRobot examples | `go run ./cmd/leia examples check --jobs=6 examples/ai/finrobot_translation` | Pass: `82 ok, 0 skipped, 0 failed` |
 | Upstream coverage ledger hashes | local SHA-256 check over `fixture_hashes` | Pass |
 | Repo check, no generated docs/editor/examples | `go run ./cmd/leia check --no-docs --no-editor --no-examples .` | Pass: `fmt: ok`, `lint: ok`, `test: ok`, `manifest: ok`; docs/editor/examples skipped |
 
@@ -53,26 +53,26 @@ Inventory and semantic-guard commands run on 2026-06-12 from
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `601` files |
-| `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `78` examples |
-| Same example inventory grouped by runner | `67` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
-| Same example inventory filtered to `/live_packages/` | `35` registered live-package examples |
-| Same example inventory filtered to `/live_packages/generic_` | `12` registered generic AI live-package examples |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `630` files |
+| `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `82` examples |
+| Same example inventory grouped by runner | `71` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
+| Same example inventory filtered to `/live_packages/` | `36` registered live-package examples, including nested document-pipeline generic memory smoke |
+| Same example inventory filtered to `/live_packages/generic_` | `13` registered generic AI live-package examples |
 | Same example inventory filtered to top-level `generic_*.leia` examples | `3` registered generic AI composition examples |
 | Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
-| `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `34` live-package skeleton directories |
-| `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `31` provider-free fixture indexes |
+| `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `35` live-package skeleton directories |
+| `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `32` provider-free fixture indexes |
 | `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 | `rg -n "approval\|model\|workflow\|trace\|eval\|semantic guard\|semantic-guard\|guard" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed approval/model/workflow/trace/eval coverage is recorded as checked-in generic AI surface |
 
 The inventory confirms the documented registered-example, runner,
 live-package, generic live-package, and tutorial runnable counts are current.
-The file-inventory count was refreshed from 601 tracked files to 621 working-tree files. `AI_DIALECT_GAPS.md` is
+The file-inventory count was refreshed to 630 `rg --files` inventory files. `AI_DIALECT_GAPS.md` is
 absent in this worktree, so no AI-dialect gap document required updates.
 
 Semantic guard note: the recent generic AI boundary guard state is reflected
 here as checked-in package-owned surface, not as planned FinRobot work. The
-generic model, turn, tool, agent, workflow, evaluation, replay, trace, approval,
+generic model, model IO envelope, turn, tool, agent, workflow, evaluation, replay, trace, approval,
 and package-audit boundaries have registered live-package examples, and the
 top-level generic composition examples include workflow orchestration coverage.
 Verification language should treat those items as inventoried coverage unless a
@@ -84,15 +84,15 @@ and the upstream coverage ledger hash check.
 
 ## FinRobot Example Coverage
 
-`go run ./cmd/leia examples list --json` discovers 81 runnable/checkable FinRobot
+`go run ./cmd/leia examples list --json` discovers 82 runnable/checkable FinRobot
 translation examples under `examples/ai/finrobot_translation`.
 
 The current examples gate validated:
 
-- 70 `host-vm` examples
+- 71 `host-vm` examples
 - 6 `llm-replay` examples
 - 5 `evaluate` examples
-- 34 top-level live-package skeleton examples:
+- 35 top-level live-package skeleton examples:
   `live_packages/analytics_report/analytics_report.leia`,
   `live_packages/analyzer_report/main.leia`,
   `live_packages/backtest_strategy/main.leia`,
@@ -107,6 +107,7 @@ The current examples gate validated:
   `live_packages/generic_agent_runner/main.leia`,
   `live_packages/generic_approval_policy/main.leia`,
   `live_packages/generic_evaluation_harness/main.leia`,
+  `live_packages/generic_model_io_envelope/main.leia`,
   `live_packages/generic_model_registry/main.leia`,
   `live_packages/generic_package_boundary_auditor/main.leia`,
   `live_packages/generic_planning_graph/main.leia`,
@@ -131,7 +132,7 @@ The current examples gate validated:
 The checker reported:
 
 ```text
-examples: 78 ok, 0 skipped, 0 failed
+examples: 82 ok, 0 skipped, 0 failed
 ```
 
 The repository check reported:
@@ -209,7 +210,7 @@ Current checked-in skeleton directories:
 - `live_packages/vendor_adapters`: registered example plus manifest, schemas,
   and fixtures for six provider adapters with network disabled by default.
 - `live_packages/generic_*`: checked-in generic AI package boundaries for
-  model resolution, single-turn execution, tool contracts, agent loops,
+  model resolution, model IO envelopes, single-turn execution, tool contracts, agent loops,
   workflow orchestration, evaluation, record/replay, trace events, approval
   policy, and package-boundary auditing. This set is generic AI surface
   consumed by the FinRobot examples, not FinRobot-specific package work.
@@ -232,8 +233,8 @@ go run ./cmd/leia check --no-docs --no-editor --no-examples .
 ## Release-Gate Conclusion
 
 The FinRobot documentation inventory is aligned with the current
-`codex/ai-dialect-polish` surface: 81 registered runnable/checkable
-examples, 621 files in the translation directory, and 34 checked-in
+`codex/ai-dialect-polish` surface: 82 registered runnable/checkable
+examples, 630 files in the translation directory, and 35 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
 FinRobot-only work. The current validation pass above did not generate
