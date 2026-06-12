@@ -652,6 +652,7 @@ func llmTraceAssertValue(input, opts *Table) *Table {
 			}
 		}
 	}
+	llmTraceAssertStatusCounts(summary, findings, opts)
 	llmTraceAssertPayloadFields(events, findings, opts)
 	llmTraceAssertRedaction(events, findings, opts)
 	out := NewTable()
@@ -664,6 +665,44 @@ func llmTraceAssertValue(input, opts *Table) *Table {
 	out.RawSetString("summary", TableValue(summary))
 	out.RawSetString("findings", TableValue(findings))
 	return out
+}
+
+func llmTraceAssertStatusCounts(summary, findings, opts *Table) {
+	statusCounts := summary.RawGetString("status_counts")
+	llmTraceAssertStatusCountBounds(findings, statusCounts, opts.RawGetString("require_status_counts"), true)
+	limit := opts.RawGetString("limit_status_counts")
+	if !limit.IsTable() {
+		limit = opts.RawGetString("max_status_counts")
+	}
+	llmTraceAssertStatusCountBounds(findings, statusCounts, limit, false)
+}
+
+func llmTraceAssertStatusCountBounds(findings *Table, statusCounts Value, spec Value, minimum bool) {
+	if !spec.IsTable() {
+		return
+	}
+	var counts *Table
+	if statusCounts.IsTable() {
+		counts = statusCounts.Table()
+	} else {
+		counts = NewTable()
+	}
+	for _, key := range spec.Table().PairsKeysSnapshot() {
+		wantValue := spec.Table().RawGet(key)
+		if !wantValue.IsNumber() && !wantValue.IsInt() {
+			continue
+		}
+		status := key.Str()
+		want := wantValue.Int()
+		got := llmTraceInt64(counts, status, 0)
+		if minimum {
+			if got < want {
+				llmTraceAppendFinding(findings, "generic.ai.trace.status_count_below_min", fmt.Sprintf("trace status %q count %d below required %d", status, got, want))
+			}
+		} else if got > want {
+			llmTraceAppendFinding(findings, "generic.ai.trace.status_count_above_limit", fmt.Sprintf("trace status %q count %d above limit %d", status, got, want))
+		}
+	}
 }
 
 func llmTraceAssertPayloadFields(events, findings, opts *Table) {
