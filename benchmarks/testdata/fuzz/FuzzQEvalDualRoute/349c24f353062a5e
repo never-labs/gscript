@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 1;A:reverse ;(+/+/A 0 bin 0)")

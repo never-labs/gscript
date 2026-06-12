@@ -10581,7 +10581,16 @@ func newQIterateClock() qIterateClock {
 }
 
 func (c qIterateClock) exceeded(iter int64) bool {
-	return iter&1023 == 1023 && time.Since(c.start) > c.budget
+	// Exponentially-growing iterates (converge of {x,x}) blow up within the
+	// first few dozen iterations, so check densely early and cheaply later.
+	if iter < 1024 {
+		if iter&7 != 7 {
+			return false
+		}
+	} else if iter&1023 != 1023 {
+		return false
+	}
+	return time.Since(c.start) > c.budget
 }
 
 // applyIterateOver implements the canonical q monadic-f iterate family:
