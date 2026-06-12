@@ -44,6 +44,11 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 			allowCapabilityID: true,
 		},
 		{
+			dir:               "generic_data_normalization_contracts",
+			packageName:       "leia-generic-ai-data-normalization-contracts",
+			allowCapabilityID: true,
+		},
+		{
 			dir:               "generic_chart_render_contracts",
 			packageName:       "leia-generic-ai-chart-render-contracts",
 			allowCapabilityID: true,

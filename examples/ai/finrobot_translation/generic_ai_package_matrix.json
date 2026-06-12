@@ -107,6 +107,33 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_data_normalization_contracts",
+      "package_name": "leia-generic-ai-data-normalization-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "capability": "generic.ai.data_normalization.contracts",
+      "capabilities": [
+        "generic.ai.data_normalization.contracts",
+        "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.field_policy",
+        "generic.ai.data_normalization.missing_policy",
+        "generic.ai.data_normalization.stale_policy",
+        "generic.ai.data_normalization.type_coercion",
+        "generic.ai.data_normalization.unit_transform",
+        "generic.ai.data_normalization.provenance",
+        "generic.ai.data_normalization.validation_error",
+        "generic.ai.data_normalization.deterministic_order",
+        "generic.ai.data_normalization.adapter_clean_skip"
+      ],
+      "backend_shape": "ai.data_normalization.contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/contracts/generic_data_normalization_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_data_provider_boundary",
       "package_name": "leia-generic-ai-data-provider-boundary",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",

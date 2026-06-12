@@ -1,0 +1,48 @@
+generic_data_normalization_contracts_live_package := {
+    id: "generic-data-normalization-contracts"
+    package_name: "leia-generic-ai-data-normalization-contracts"
+    capability: "generic.ai.data_normalization.contracts"
+    entrypoint: "ai.data_normalization.contracts"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    schema_mappings: 2
+    field_policies: 3
+    missing_policies: 2
+    stale_policies: 2
+    type_coercions: 3
+    unit_transforms: 2
+    normalized_rows: 4
+    provenance_records: 4
+    validation_errors: 2
+    clean_skip_adapters: 2
+}
+
+assert(generic_data_normalization_contracts_live_package.provider_free)
+assert(!generic_data_normalization_contracts_live_package.live_network)
+assert(!generic_data_normalization_contracts_live_package.real_dependency_imports)
+assert(!generic_data_normalization_contracts_live_package.live_model_calls)
+assert(generic_data_normalization_contracts_live_package.normalized_rows == 4)
+assert(generic_data_normalization_contracts_live_package.validation_errors == 2)
+
+generic_data_normalization_contracts_live_package_summary := string.format(
+"generic_data_normalization_contracts_live_package capability=%s entrypoint=%s mappings=%d field_policies=%d missing=%d stale=%d coercions=%d unit_transforms=%d rows=%d provenance=%d validation_errors=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_data_normalization_contracts_live_package.capability,
+generic_data_normalization_contracts_live_package.entrypoint,
+generic_data_normalization_contracts_live_package.schema_mappings,
+generic_data_normalization_contracts_live_package.field_policies,
+generic_data_normalization_contracts_live_package.missing_policies,
+generic_data_normalization_contracts_live_package.stale_policies,
+generic_data_normalization_contracts_live_package.type_coercions,
+generic_data_normalization_contracts_live_package.unit_transforms,
+generic_data_normalization_contracts_live_package.normalized_rows,
+generic_data_normalization_contracts_live_package.provenance_records,
+generic_data_normalization_contracts_live_package.validation_errors,
+generic_data_normalization_contracts_live_package.clean_skip_adapters,
+tostring(generic_data_normalization_contracts_live_package.provider_free),
+tostring(generic_data_normalization_contracts_live_package.live_network),
+tostring(generic_data_normalization_contracts_live_package.real_dependency_imports),
+tostring(generic_data_normalization_contracts_live_package.live_model_calls))
+
+print(generic_data_normalization_contracts_live_package_summary)

@@ -7,8 +7,8 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 95 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples list --json`. All 49
+Current registered-example status: 96 runnable/checkable FinRobot translation
+examples are discovered by `go run ./cmd/leia examples list --json`. All 50
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI
@@ -49,6 +49,7 @@ consumed by the translation.
 | `live_packages/generic_tool_contracts` | `live_packages/generic_tool_contracts/main.leia` | `leia-generic-ai-tool-contracts` | `packages/generic_ai/tool_contracts` | `contracts/generic_tool_contract.json` |
 | `live_packages/generic_tool_registry` | `live_packages/generic_tool_registry/main.leia` | `leia-generic-ai-tool-registry` | `packages/generic_ai/tool_registry` | `contracts/tool_registry_contract.json` |
 | `live_packages/generic_coding_workspace` | `live_packages/generic_coding_workspace/main.leia` | `leia-generic-ai-coding-workspace` | `packages/generic_ai/coding_workspace` | `contracts/generic_coding_workspace_contract.json` |
+| `live_packages/generic_data_normalization_contracts` | `live_packages/generic_data_normalization_contracts/main.leia` | `leia-generic-ai-data-normalization-contracts` | `packages/generic_ai/data_normalization_contracts` | `contracts/generic_data_normalization_contracts_contract.json` |
 | `live_packages/generic_data_provider_boundary` | `live_packages/generic_data_provider_boundary/main.leia` | `leia-generic-ai-data-provider-boundary` | `packages/generic_ai/data_provider_boundary` | `contracts/generic_data_provider_boundary_contract.json` |
 | `live_packages/generic_agent_runner` | `live_packages/generic_agent_runner/main.leia` | `leia-generic-ai-agent-runner` | `packages/generic_ai/agent_runner` | `contracts/agent_runner_contract.json` |
 | `live_packages/generic_planning_graph` | `live_packages/generic_planning_graph/main.leia` | `leia-generic-ai-planning-graph` | `packages/generic_ai/planning_graph` | `contracts/planning_graph_contract.json` |

@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 95,
-  "translation_directory_file_count": 770,
+  "registered_examples_count": 96,
+  "translation_directory_file_count": 785,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -140,6 +140,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
       "covers_package_ids": [
         "generic_coding_workspace"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_data_normalization_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_data_normalization_contracts"
       ],
       "status": "checked_in_registered_example"
     },
@@ -879,6 +888,37 @@
         "contract JSON declares generic coding workspace artifact backend boundary",
         "registered example executes provider-free",
         "no command execution host, notebook kernel, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_data_normalization_contracts",
+      "package_name": "leia-generic-ai-data-normalization-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "planned_directory": "packages/generic_ai/data_normalization_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/contracts/generic_data_normalization_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_normalization_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.data_normalization.contracts",
+        "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.field_policy",
+        "generic.ai.data_normalization.missing_policy",
+        "generic.ai.data_normalization.stale_policy",
+        "generic.ai.data_normalization.type_coercion",
+        "generic.ai.data_normalization.unit_transform",
+        "generic.ai.data_normalization.provenance",
+        "generic.ai.data_normalization.validation_error",
+        "generic.ai.data_normalization.deterministic_order",
+        "generic.ai.data_normalization.adapter_clean_skip"
+      ],
+      "test_gates": [
+        "schema mapping, normalized row, validation, and clean-skip contract fixtures decode without source adapter imports",
+        "field policy, missing policy, stale policy, type coercion, and unit transform fixtures remain provider-free and replayable",
+        "normalized row fixtures carry deterministic ordering, provenance records, missing reasons, and transform notes",
+        "validation fixtures classify missing optional values and stale observations without live services",
+        "registered example executes without host runtime internals, live network, or live model calls"
       ],
       "no_built_in_guarantee": true
     },

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "leia://generic-ai/data-normalization/normalized-rows/v1",
+  "title": "Generic normalized rows",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "dataset_id",
+    "mapping_id",
+    "rows",
+    "provenance"
+  ],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "fixture_key": {"type": "string"},
+    "dataset_id": {"type": "string"},
+    "mapping_id": {"type": "string"},
+    "rows": {"type": "array", "items": {"type": "object"}},
+    "provenance": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

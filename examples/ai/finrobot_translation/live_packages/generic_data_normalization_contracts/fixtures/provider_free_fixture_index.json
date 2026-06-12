@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "generic-data-normalization-contracts-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "normalization_mapping:observations:offline:v1",
+      "path": "fixtures/normalization_mapping_fixture.json",
+      "schema": "schemas/normalization_mapping_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false}
+    },
+    {
+      "fixture_key": "normalized_rows:observations:offline:v1",
+      "path": "fixtures/normalized_rows_fixture.json",
+      "schema": "schemas/normalized_rows_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false}
+    },
+    {
+      "fixture_key": "normalization_validation:observations:offline:v1",
+      "path": "fixtures/normalization_validation_fixture.json",
+      "schema": "schemas/normalization_validation_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false}
+    },
+    {
+      "fixture_key": "normalization_clean_skip:offline:v1",
+      "path": "fixtures/normalization_clean_skip_fixture.json",
+      "schema": "schemas/normalization_clean_skip_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false}
+    }
+  ]
+}

@@ -115,6 +115,43 @@
       }
     },
     {
+      "shape_id": "ai.data_normalization.contracts",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "data-normalization-contracts",
+        "data-provider",
+        "optional-adapter",
+        "trace"
+      ],
+      "contract": "Normalize provider-free schema mappings, field policies, missing and stale value handling, type coercions, unit transforms, provenance records, validation envelopes, deterministic ordering, and adapter clean skips.",
+      "inputs": [
+        "source_records",
+        "schema_mapping",
+        "field_policy",
+        "freshness_policy",
+        "unit_transform_policy"
+      ],
+      "outputs": [
+        "normalized_rows",
+        "provenance_records",
+        "validation_errors",
+        "quality_summary",
+        "adapter_clean_skips"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_normalization_contracts.source.txt",
+      "test": "tests/llm/llm_generic_data_normalization_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_data_normalization_contracts_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-data-normalization-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/contracts/generic_data_normalization_contracts_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.data_provider.boundary",
       "status": "checked_in_package_boundary",
       "capabilities": [
