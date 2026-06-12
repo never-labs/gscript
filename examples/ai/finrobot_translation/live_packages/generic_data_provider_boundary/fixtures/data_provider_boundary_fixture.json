@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "requires_credentials": false,
+  "provider_registry": [
+    {
+      "provider_id": "provider:catalog",
+      "capability": "generic.ai.data_provider.registry",
+      "fixture_key": "fixture:provider:catalog:list",
+      "schema_ref": "schema:catalog-list",
+      "auth_policy": "none",
+      "live_network": false,
+      "terms_metadata": {
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true
+      }
+    },
+    {
+      "provider_id": "provider:documents",
+      "capability": "generic.ai.data_provider.request_envelope",
+      "fixture_key": "fixture:provider:documents:search",
+      "schema_ref": "schema:document-search",
+      "auth_policy": "redacted_optional",
+      "live_network": false,
+      "terms_metadata": {
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true
+      }
+    },
+    {
+      "provider_id": "provider:events",
+      "capability": "generic.ai.data_provider.response_envelope",
+      "fixture_key": "fixture:provider:events:stream",
+      "schema_ref": "schema:event-stream",
+      "auth_policy": "redacted_optional",
+      "live_network": false,
+      "terms_metadata": {
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true
+      }
+    }
+  ],
+  "request_envelopes": [
+    {
+      "request_id": "request:catalog:list",
+      "provider_id": "provider:catalog",
+      "operation": "list",
+      "query": {
+        "dataset": "catalog"
+      },
+      "fixture_key": "fixture:provider:catalog:list",
+      "replay_key": "sha256:catalog-list-request",
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "request_id": "request:documents:search",
+      "provider_id": "provider:documents",
+      "operation": "search",
+      "query": {
+        "dataset": "documents",
+        "text": "example"
+      },
+      "fixture_key": "fixture:provider:documents:search",
+      "replay_key": "sha256:documents-search-request",
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "request_id": "request:events:stream",
+      "provider_id": "provider:events",
+      "operation": "stream",
+      "query": {
+        "dataset": "events",
+        "cursor": "start"
+      },
+      "fixture_key": "fixture:provider:events:stream",
+      "replay_key": "sha256:events-stream-request",
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ],
+  "response_envelopes": [
+    {
+      "request_id": "request:catalog:list",
+      "status": "ok",
+      "data": {
+        "rows": 2
+      },
+      "metadata": {
+        "provider_id": "provider:catalog",
+        "fixture_key": "fixture:provider:catalog:list",
+        "replay_ready": true
+      },
+      "provenance_ref": "provenance:catalog:list",
+      "error": null
+    },
+    {
+      "request_id": "request:documents:search",
+      "status": "ok",
+      "data": {
+        "rows": 1
+      },
+      "metadata": {
+        "provider_id": "provider:documents",
+        "fixture_key": "fixture:provider:documents:search",
+        "replay_ready": true
+      },
+      "provenance_ref": "provenance:documents:search",
+      "error": null
+    },
+    {
+      "request_id": "request:events:stream",
+      "status": "skipped",
+      "data": null,
+      "metadata": {
+        "provider_id": "provider:events",
+        "fixture_key": "fixture:provider:events:stream",
+        "replay_ready": true
+      },
+      "provenance_ref": "provenance:events:stream",
+      "error": {
+        "error_id": "error:network-disabled",
+        "kind": "clean_skip",
+        "retryable": false,
+        "clean_skip": true
+      }
+    }
+  ],
+  "pagination": [
+    {
+      "request_id": "request:catalog:list",
+      "cursor_field": "page_token",
+      "next_cursor": null,
+      "page_size": 2,
+      "deterministic_order": true
+    },
+    {
+      "request_id": "request:events:stream",
+      "cursor_field": "cursor",
+      "next_cursor": "fixture-cursor-2",
+      "page_size": 1,
+      "deterministic_order": true
+    }
+  ],
+  "rate_limits": [
+    {
+      "provider_id": "provider:catalog",
+      "quota_window": "fixture",
+      "retry_after_ms": 0,
+      "throttled": false
+    },
+    {
+      "provider_id": "provider:events",
+      "quota_window": "fixture",
+      "retry_after_ms": 0,
+      "throttled": false
+    }
+  ],
+  "auth_redaction": [
+    {
+      "provider_id": "provider:documents",
+      "status": "redacted",
+      "secret_values_present": false,
+      "redacted_fields": [
+        "api_key",
+        "access_token",
+        "authorization"
+      ]
+    },
+    {
+      "provider_id": "provider:events",
+      "status": "redacted",
+      "secret_values_present": false,
+      "redacted_fields": [
+        "api_key",
+        "access_token",
+        "authorization"
+      ]
+    }
+  ],
+  "cache_retry_policy": [
+    {
+      "provider_id": "provider:catalog",
+      "cache_ttl_seconds": 3600,
+      "retryable": false,
+      "max_attempts": 1,
+      "deterministic_backoff": true
+    },
+    {
+      "provider_id": "provider:events",
+      "cache_ttl_seconds": 0,
+      "retryable": false,
+      "max_attempts": 1,
+      "deterministic_backoff": true
+    }
+  ],
+  "provenance": [
+    {
+      "provenance_id": "provenance:catalog:list",
+      "fixture_key": "fixture:provider:catalog:list",
+      "captured_at": "2026-06-12T00:00:00Z",
+      "as_of": "2026-06-12",
+      "source_schema": "generic-catalog-v1",
+      "replay_ready": true
+    },
+    {
+      "provenance_id": "provenance:documents:search",
+      "fixture_key": "fixture:provider:documents:search",
+      "captured_at": "2026-06-12T00:00:00Z",
+      "as_of": "2026-06-12",
+      "source_schema": "generic-document-search-v1",
+      "replay_ready": true
+    },
+    {
+      "provenance_id": "provenance:events:stream",
+      "fixture_key": "fixture:provider:events:stream",
+      "captured_at": "2026-06-12T00:00:00Z",
+      "as_of": "2026-06-12",
+      "source_schema": "generic-event-stream-v1",
+      "replay_ready": true
+    }
+  ],
+  "error_envelopes": [
+    {
+      "error_id": "error:network-disabled",
+      "request_id": "request:events:stream",
+      "kind": "clean_skip",
+      "message": "live network is disabled in provider-free fixture mode",
+      "retryable": false,
+      "clean_skip": true
+    }
+  ],
+  "adapter_boundaries": [
+    {
+      "id": "provider-sdk",
+      "capability": "generic.ai.data_provider.clean_skip",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "credential",
+      "capability": "generic.ai.data_provider.auth_redaction",
+      "dependency_imported": false,
+      "credential_required": true,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "network-client",
+      "capability": "generic.ai.data_provider.request_envelope",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    }
+  ]
+}

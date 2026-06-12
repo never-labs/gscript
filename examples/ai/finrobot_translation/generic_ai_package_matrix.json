@@ -107,6 +107,33 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_data_provider_boundary",
+      "package_name": "leia-generic-ai-data-provider-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "capability": "generic.ai.data_provider.boundary",
+      "capabilities": [
+        "generic.ai.data_provider.boundary",
+        "generic.ai.data_provider.registry",
+        "generic.ai.data_provider.request_envelope",
+        "generic.ai.data_provider.response_envelope",
+        "generic.ai.data_provider.pagination",
+        "generic.ai.data_provider.rate_limit",
+        "generic.ai.data_provider.auth_redaction",
+        "generic.ai.data_provider.cache_retry_policy",
+        "generic.ai.data_provider.provenance",
+        "generic.ai.data_provider.error_envelope",
+        "generic.ai.data_provider.clean_skip"
+      ],
+      "backend_shape": "ai.data_provider.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/contracts/generic_data_provider_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_document_rag_pipeline",
       "package_name": "leia-generic-ai-document-rag-pipeline",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",

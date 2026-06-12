@@ -115,6 +115,47 @@
       }
     },
     {
+      "shape_id": "ai.data_provider.boundary",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "data-provider",
+        "optional-adapter",
+        "approval",
+        "tool"
+      ],
+      "contract": "Normalize provider-free data provider registries, request/response envelopes, pagination, rate-limit metadata, auth redaction, cache/retry policy, provenance, error envelopes, and clean skips.",
+      "inputs": [
+        "provider_descriptor",
+        "request_query",
+        "pagination_cursor",
+        "cache_policy",
+        "fixture_key"
+      ],
+      "outputs": [
+        "provider_registry_entry",
+        "request_envelope",
+        "response_envelope",
+        "pagination_metadata",
+        "rate_limit_metadata",
+        "auth_redaction",
+        "provenance",
+        "error_envelope",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_provider_boundary.source.txt",
+      "test": "tests/llm/llm_generic_data_provider_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_data_provider_boundary_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-data-provider-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/contracts/generic_data_provider_boundary_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.document.rag_pipeline",
       "status": "checked_in_package_boundary",
       "capabilities": [

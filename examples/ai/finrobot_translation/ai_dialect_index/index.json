@@ -26,6 +26,7 @@
     "capability",
     "chart-render",
     "coding-workspace",
+    "data-provider",
     "document-rag",
     "evaluation",
     "evidence-report-artifacts",
@@ -200,6 +201,42 @@
         "package_id": "generic-ai-coding-workspace",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "data-provider",
+      "capability_id": "generic.ai.data_provider.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "data_provider.registry",
+        "data_provider.request_envelope",
+        "data_provider.response_envelope",
+        "data_provider.pagination",
+        "data_provider.rate_limit",
+        "data_provider.auth_redaction",
+        "data_provider.cache_retry_policy",
+        "data_provider.provenance",
+        "data_provider.error_envelope",
+        "data_provider.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_provider_boundary.source.txt",
+      "test": "tests/llm/llm_generic_data_provider_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_data_provider_boundary_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-data-provider-boundary",
+        "boundary": "provider-free data provider registry, request/response envelopes, pagination, rate-limit metadata, auth redaction, cache/retry policy, provenance, error envelopes, and clean skips",
+        "status": "resolved",
+        "reason": "data provider behavior was promoted from domain-specific vendor adapters into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-data-provider-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

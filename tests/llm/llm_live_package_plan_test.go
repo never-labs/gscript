@@ -213,6 +213,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"generic_approval_policy":           "generic.ai.",
 		"generic_chart_render_contracts":    "generic.ai.",
 		"generic_coding_workspace":          "generic.ai.",
+		"generic_data_provider_boundary":    "generic.ai.",
 		"generic_document_rag_pipeline":     "generic.ai.",
 		"generic_evidence_report_artifacts": "generic.ai.",
 		"generic_evaluation_harness":        "generic.ai.evaluation.harness.",

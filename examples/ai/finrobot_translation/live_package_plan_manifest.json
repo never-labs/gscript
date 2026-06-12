@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 90,
-  "translation_directory_file_count": 705,
+  "registered_examples_count": 91,
+  "translation_directory_file_count": 715,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -140,6 +140,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
       "covers_package_ids": [
         "generic_coding_workspace"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_data_provider_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_data_provider_boundary"
       ],
       "status": "checked_in_registered_example"
     },
@@ -834,6 +843,37 @@
         "contract JSON declares generic coding workspace artifact backend boundary",
         "registered example executes provider-free",
         "no command execution host, notebook kernel, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_data_provider_boundary",
+      "package_name": "leia-generic-ai-data-provider-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "planned_directory": "packages/generic_ai/data_provider_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/contracts/generic_data_provider_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_provider_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.data_provider.boundary",
+        "generic.ai.data_provider.registry",
+        "generic.ai.data_provider.request_envelope",
+        "generic.ai.data_provider.response_envelope",
+        "generic.ai.data_provider.pagination",
+        "generic.ai.data_provider.rate_limit",
+        "generic.ai.data_provider.auth_redaction",
+        "generic.ai.data_provider.cache_retry_policy",
+        "generic.ai.data_provider.provenance",
+        "generic.ai.data_provider.error_envelope",
+        "generic.ai.data_provider.clean_skip"
+      ],
+      "test_gates": [
+        "data provider registry contract fixtures decode without provider SDK imports",
+        "request and response envelope contract fixtures remain provider-free and replayable",
+        "pagination and rate-limit contract fixtures are metadata-only and deterministic",
+        "auth redaction and provenance contract fixtures never expose secret values",
+        "error envelope and clean-skip contract fixtures cover disabled network and absent credential states"
       ],
       "no_built_in_guarantee": true
     },

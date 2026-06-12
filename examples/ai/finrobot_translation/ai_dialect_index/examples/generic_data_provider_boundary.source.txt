@@ -1,0 +1,8 @@
+// Generic data provider boundary example source.
+// Declares provider registry, request/response envelopes, pagination, rate
+// limits, auth redaction, cache/retry, provenance, errors, and clean skips
+// without importing provider SDKs or using live network access.
+
+capability generic.ai.data_provider.boundary
+entrypoint ai.data_provider.boundary
+fixture examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/data_provider_boundary_fixture.json

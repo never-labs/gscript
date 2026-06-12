@@ -41,6 +41,7 @@ contracts, and fixtures for its boundary.
 - model: `examples/ai/finrobot_translation/live_packages/generic_model_registry`
 - model-io: `examples/ai/finrobot_translation/live_packages/generic_model_io_envelope`
 - document-rag: `examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline`
+- data-provider: `examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary`
 - prompt-role: `examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog`
 - evidence-report-artifacts: `examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts`
 - ui-snapshot: `examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator`
@@ -75,6 +76,9 @@ orthogonal and layered:
 - document-rag owns document conversion, section extraction, chunk provenance,
   corpus manifests, retrieval results, citation consistency, and provider-free
   adapter boundaries.
+- data-provider owns provider registries, request and response envelopes,
+  pagination, rate-limit metadata, auth redaction, cache/retry policy,
+  provenance, normalized error envelopes, and clean skips.
 - prompt-role owns prompt catalogs, role profile versions, prompt template
   snapshots, delegation triggers, output schemas, evidence validation, and
   termination conventions.
@@ -135,6 +139,7 @@ language or specializing the dialect for one application domain.
 | --- | --- | --- |
 | Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_memory_store`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, memory, and workflow graphs; packages own validation, envelopes, context windows, loop semantics, and stage I/O. |
 | Document RAG | `generic_document_rag_pipeline`, `generic_memory_store` | Document conversion, sections, chunks, citations, retrieval results, and adapter clean-skip boundaries are generic package data; domain adapters provide source documents outside the core language. |
+| Data providers | `generic_data_provider_boundary`, `generic_optional_adapter_boundary`, `generic_approval_policy` | Provider registries, request/response envelopes, pagination, rate limits, auth redaction, cache/retry policy, provenance, errors, and clean skips are package-owned data access contracts rather than domain-specific vendor syntax. |
 | Prompt and role catalogs | `generic_prompt_role_catalog`, `generic_agent_runner`, `generic_workflow_orchestrator` | Prompt templates, role profiles, output schemas, delegation triggers, evidence validation, and termination conventions are package-owned fixtures and contracts, not built-in language syntax. |
 | Evidence/report artifacts | `generic_evidence_report_artifacts`, `generic_document_rag_pipeline`, `generic_workflow_orchestrator`, `generic_trace_events` | Source annotations, citation envelopes, section DAGs, render manifests, snapshots, stale warnings, accessibility checks, and clean-skip renderer gates are package data shared by workflows, traces, replay, and reporting packages. |
 | Chart rendering | `generic_chart_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Chart specs, recipe matrices, render envelopes, source metadata, and deterministic snapshot hashes are produced by chart-render; evidence-report consumes chart artifacts; UI snapshot evaluates rendered routes and accessibility without owning chart semantics. |
