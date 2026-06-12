@@ -34,6 +34,7 @@
     "model-io",
     "optional-adapter",
     "package-boundary",
+    "product-app",
     "prompt-role-catalog",
     "replay",
     "tool",
@@ -451,6 +452,41 @@
         "package_id": "generic-package-boundary-auditor",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "product-app",
+      "capability_id": "generic.ai.product_app.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "product_app.route_contract",
+        "product_app.session_contract",
+        "product_app.task_log",
+        "product_app.artifact_download",
+        "product_app.crud_fixture_state",
+        "product_app.db_migration_plan",
+        "product_app.deployment_target",
+        "product_app.approval_boundary",
+        "product_app.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_product_app_boundary.source.txt",
+      "test": "tests/llm/llm_generic_product_app_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_product_app_boundary_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-product-app-boundary",
+        "boundary": "provider-free product app route contracts, sessions, task logs, artifact downloads, CRUD fixture state, database migration plans, deployment targets, approval boundaries, and clean skips",
+        "status": "resolved",
+        "reason": "product application shell behavior was promoted from application-specific workflow metadata into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-product-app-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

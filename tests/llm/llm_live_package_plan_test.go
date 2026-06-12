@@ -223,6 +223,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"generic_package_boundary_auditor":  "generic.ai.",
 		"generic_planning_graph":            "generic.planning.",
 		"generic_prompt_role_catalog":       "generic.ai.",
+		"generic_product_app_boundary":      "generic.ai.",
 		"generic_record_replay":             "generic.ai.",
 		"generic_tool_contracts":            "generic.ai.tool.",
 		"generic_tool_registry":             "generic.tool.",

@@ -54,6 +54,7 @@ contracts, and fixtures for its boundary.
 - agent: `examples/ai/finrobot_translation/live_packages/generic_agent_runner`
 - planning: `examples/ai/finrobot_translation/live_packages/generic_planning_graph`
 - workflow: `examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator`
+- product-app: `examples/ai/finrobot_translation/live_packages/generic_product_app_boundary`
 - eval: `examples/ai/finrobot_translation/live_packages/generic_evaluation_harness`
 - replay: `examples/ai/finrobot_translation/live_packages/generic_record_replay`
 - trace: `examples/ai/finrobot_translation/live_packages/generic_trace_events`
@@ -108,6 +109,9 @@ orthogonal and layered:
   branch/merge joins, and trace evidence before workflow execution.
 - workflow coordinates multiple agents or stages, handoffs, retries, cache
   policy, artifact plans, and trace hooks.
+- product-app owns route contracts, sessions, task logs, artifact downloads,
+  CRUD fixture state, migration plans, deployment targets, approval boundaries,
+  and clean skips for turning workflow output into a provider-free application shell.
 - approval applies policy decisions before tool calls, workflow actions, and
   capability-gated operations.
 - trace emits normalized metadata events for turns, streams, tools, approvals,
@@ -137,6 +141,7 @@ language or specializing the dialect for one application domain.
 | UI snapshot evaluation | `generic_ui_snapshot_evaluator`, `generic_evidence_report_artifacts`, `generic_trace_events` | Route DOM schemas, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean-skip metadata stay generic UI package data rather than product-specific web code. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
 | Optional adapters | `generic_optional_adapter_boundary`, `generic_approval_policy`, `generic_tool_contracts` | Optional package imports, missing credentials, disabled network, version metadata, terms metadata, and adapter result envelopes are normalized into provider-free clean skips before tool execution. |
+| Product app shell | `generic_product_app_boundary`, `generic_workflow_orchestrator`, `generic_ui_snapshot_evaluator`, `generic_approval_policy` | Routes, sessions, task logs, artifact downloads, CRUD fixture state, migration plans, deployment targets, approval boundaries, and clean skips are product package data rather than built-in language or framework behavior. |
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |
 | Coding workspace | `generic_coding_workspace`, `generic_approval_policy`, `generic_tool_contracts`, `generic_record_replay` | Command envelopes, stdout/stderr captures, generated artifacts, notebook display metadata, cleanup intent, and sandbox clean skips are package-owned fixtures behind explicit approval gates. |
 | Trace | `generic_trace_events`, `generic_workflow_orchestrator`, `generic_agent_runner` | Runtime actions emit metadata-only event envelopes with correlation IDs, redaction policy, replay markers, and artifact references. |

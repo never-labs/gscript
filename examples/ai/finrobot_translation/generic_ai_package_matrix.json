@@ -327,6 +327,32 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_product_app_boundary",
+      "package_name": "leia-generic-ai-product-app-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+      "capability": "generic.ai.product_app.boundary",
+      "capabilities": [
+        "generic.ai.product_app.boundary",
+        "generic.ai.product_app.route_contract",
+        "generic.ai.product_app.session_contract",
+        "generic.ai.product_app.task_log",
+        "generic.ai.product_app.artifact_download",
+        "generic.ai.product_app.crud_fixture_state",
+        "generic.ai.product_app.db_migration_plan",
+        "generic.ai.product_app.deployment_target",
+        "generic.ai.product_app.approval_boundary",
+        "generic.ai.product_app.clean_skip"
+      ],
+      "backend_shape": "ai.product_app.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/contracts/generic_product_app_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_prompt_role_catalog",
       "package_name": "leia-generic-ai-prompt-role-catalog",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",

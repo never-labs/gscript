@@ -54,6 +54,11 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 			allowCapabilityID: true,
 		},
 		{
+			dir:               "generic_product_app_boundary",
+			packageName:       "leia-generic-ai-product-app-boundary",
+			allowCapabilityID: true,
+		},
+		{
 			dir:               "generic_ui_snapshot_evaluator",
 			packageName:       "leia-generic-ai-ui-snapshot-evaluator",
 			allowCapabilityID: true,

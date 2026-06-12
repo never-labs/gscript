@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "generic-product-app-boundary-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:product_app_boundary:offline",
+      "capability": "generic.ai.product_app.boundary",
+      "path": "fixtures/product_app_boundary_fixture.json",
+      "schema": "schemas/generic_product_app_boundary_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "routes": 3,
+        "sessions": 2,
+        "tasks": 2,
+        "downloads": 2,
+        "crud_ops": 3,
+        "migrations": 1,
+        "deployments": 2,
+        "approvals": 2,
+        "clean_skip": true
+      }
+    }
+  ]
+}

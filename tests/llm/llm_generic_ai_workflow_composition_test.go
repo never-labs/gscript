@@ -60,6 +60,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "workflow"`,
 		`role: "chart-render"`,
 		`role: "evidence-report"`,
+		`role: "product-app"`,
 		`role: "ui-snapshot"`,
 		`role: "eval"`,
 		`role: "replay"`,
@@ -81,6 +82,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`package_id: "generic-workflow-orchestrator"`,
 		`package_id: "generic-chart-render-contracts"`,
 		`package_id: "generic-evidence-report-artifacts"`,
+		`package_id: "generic-product-app-boundary"`,
 		`package_id: "generic-ui-snapshot-evaluator"`,
 		`package_id: "generic-evaluation-harness"`,
 		`package_id: "generic-record-replay"`,
@@ -194,6 +196,7 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 		"agent->workflow",
 		"chart-render->evidence-report",
 		"workflow->evidence-report",
+		"workflow->product-app",
 		"evidence-report->ui-snapshot",
 		"workflow->eval",
 	} {

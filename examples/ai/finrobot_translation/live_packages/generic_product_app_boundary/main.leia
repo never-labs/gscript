@@ -1,0 +1,46 @@
+generic_product_app_boundary_live_package := {
+    id: "generic-product-app-boundary"
+    package_name: "leia-generic-ai-product-app-boundary"
+    capability: "generic.ai.product_app.boundary"
+    entrypoint: "ai.product_app.boundary"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    routes: 3
+    sessions: 2
+    tasks: 2
+    downloads: 2
+    crud_ops: 3
+    migrations: 1
+    deployments: 2
+    approvals: 2
+    clean_skip_adapters: 3
+}
+
+assert(generic_product_app_boundary_live_package.provider_free)
+assert(!generic_product_app_boundary_live_package.live_network)
+assert(!generic_product_app_boundary_live_package.real_dependency_imports)
+assert(!generic_product_app_boundary_live_package.live_model_calls)
+assert(generic_product_app_boundary_live_package.routes == 3)
+assert(generic_product_app_boundary_live_package.crud_ops == 3)
+
+generic_product_app_boundary_live_package_summary := string.format(
+"generic_product_app_boundary_live_package capability=%s entrypoint=%s routes=%d sessions=%d tasks=%d downloads=%d crud=%d migrations=%d deployments=%d approvals=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_product_app_boundary_live_package.capability,
+generic_product_app_boundary_live_package.entrypoint,
+generic_product_app_boundary_live_package.routes,
+generic_product_app_boundary_live_package.sessions,
+generic_product_app_boundary_live_package.tasks,
+generic_product_app_boundary_live_package.downloads,
+generic_product_app_boundary_live_package.crud_ops,
+generic_product_app_boundary_live_package.migrations,
+generic_product_app_boundary_live_package.deployments,
+generic_product_app_boundary_live_package.approvals,
+generic_product_app_boundary_live_package.clean_skip_adapters,
+tostring(generic_product_app_boundary_live_package.provider_free),
+tostring(generic_product_app_boundary_live_package.live_network),
+tostring(generic_product_app_boundary_live_package.real_dependency_imports),
+tostring(generic_product_app_boundary_live_package.live_model_calls))
+
+print(generic_product_app_boundary_live_package_summary)

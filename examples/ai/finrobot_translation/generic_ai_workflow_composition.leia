@@ -3,8 +3,8 @@
 // This is a thin Leia-native composition over the generic package boundaries:
 // model, model-io, document-rag, prompt-role, memory, turn, tool,
 // tool-registry, optional-adapter, coding-workspace, planning, agent, workflow,
-// chart-render, evidence-report, ui-snapshot, eval, replay, trace, approval,
-// and package-audit. It intentionally declares no
+// chart-render, evidence-report, product-app, ui-snapshot, eval, replay, trace,
+// approval, and package-audit. It intentionally declares no
 // provider SDK, network call, credential, or domain adapter.
 
 package_boundaries := {
@@ -27,6 +27,7 @@ package_boundaries := {
     {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "ai.workflow.orchestrate.provider_free" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
     {role: "chart-render" package_id: "generic-chart-render-contracts" capability: "generic.ai.chart.render.contracts" entrypoint: "ai.chart.render_contracts" provider_free: true live_network: false},
     {role: "evidence-report" package_id: "generic-evidence-report-artifacts" capability: "generic.ai.evidence.report.artifacts" entrypoint: "ai.evidence.report_artifacts" provider_free: true live_network: false},
+    {role: "product-app" package_id: "generic-product-app-boundary" capability: "generic.ai.product_app.boundary" entrypoint: "ai.product_app.boundary" provider_free: true live_network: false},
     {role: "ui-snapshot" package_id: "generic-ui-snapshot-evaluator" capability: "generic.ai.ui.snapshot.evaluator" entrypoint: "ai.ui.snapshot_evaluator" provider_free: true live_network: false},
     {role: "eval" package_id: "generic-evaluation-harness" capability: "ai.eval.run.provider_free" entrypoint: "ai.eval.run" provider_free: true live_network: false},
 }
@@ -51,6 +52,7 @@ composition_edges := {
     {from: "package-audit" to: "workflow" handoff: "provider-free boundary gate"},
     {from: "chart-render" to: "evidence-report" handoff: "chart render artifacts and source metadata"},
     {from: "workflow" to: "evidence-report" handoff: "source-bound report artifacts and evidence envelopes"},
+    {from: "workflow" to: "product-app" handoff: "route, session, task, artifact, and CRUD product shell"},
     {from: "evidence-report" to: "ui-snapshot" handoff: "artifact URI manifest and snapshot metadata"},
 }
 
@@ -62,7 +64,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -88,8 +90,8 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 21 &&
-        #workflow_contract.edges == 20 &&
+    return #workflow_contract.composition == 22 &&
+        #workflow_contract.edges == 21 &&
         role_present("model") &&
         role_present("model-io") &&
         role_present("document-rag") &&
@@ -105,6 +107,7 @@ func connected_native_surfaces() {
         role_present("workflow") &&
         role_present("chart-render") &&
         role_present("evidence-report") &&
+        role_present("product-app") &&
         role_present("ui-snapshot") &&
         role_present("eval") &&
         role_present("replay") &&

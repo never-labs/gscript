@@ -1,0 +1,8 @@
+// Generic product app boundary example source.
+// Declares route, session, task-log, artifact download, CRUD fixture-state,
+// migration, deployment, approval, and clean-skip contracts without importing
+// a web framework, database client, artifact store, or deployment runtime.
+
+capability generic.ai.product_app.boundary
+entrypoint ai.product_app.boundary
+fixture examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/product_app_boundary_fixture.json
