@@ -137,7 +137,7 @@ match	-2#1 2 3	2 3
 match	-5#1 2 3	2 3 1 2 3
 match	0#1 2 3	til 0
 match	3#0#1	0 0 0
-gap	2#`a`b`c!1 2 3	`a`b!1 2	{(x;x)}[`a`b`c!1 2 3]	take on dict should keep first n entries, Leia cycles the dict as an item
+match	2#`a`b`c!1 2 3	`a`b!1 2
 match	1_1 2 3	2 3
 match	-1_1 2 3	1 2
 match	5_1 2 3	til 0
@@ -190,7 +190,7 @@ match	(2 3#til 6) . 1 2	5
 match	x:10 20 30;x[1]	20
 gap	x:10 20 30;x 1	20	(10 20 30;1)	juxtaposed name indexing builds a list instead of indexing
 match	x:(1 2;3 4);x . (1;0)	3
-gap	x:(1 2;3 4);x[1;0]	3	ERROR	multi-axis bracket indexing on names unsupported
+match	x:(1 2;3 4);x[1;0]	3
 # ---- dict operations ----
 match	(`a`b!1 2)`a	1
 match	(`a`b!1 2)`c	0N
@@ -201,13 +201,13 @@ match	(`a`b!1 2)?2	`b
 match	(`a`b!1 2)?99	`$""
 match	(`a`a!1 2)`a	1
 match	count `a`b!1 2	2
-gap	(`a`b!1 2)+`b`c!10 20	`a`b`c!1 12 20	ERROR	dict key-union arithmetic absent
-gap	(`a`b!1 2)=`a`b!1 3	`a`b!10b		dict = compares per key now, but the string evaluator splits ! after = in the unparenthesized form
+match	(`a`b!1 2)+`b`c!10 20	`a`b`c!1 12 20
+match	(`a`b!1 2)=`a`b!1 3	`a`b!10b
 match	(`a`b!1 2)=(`a`b!1 3)	`a`b!10b
 gap	reverse `a`b!1 2	`b`a!2 1	`a`b!1 2	reverse on dict should reverse both keys and values
-gap	where `a`b`c!1 0 2	`a`c`c	ERROR	where on dict should replicate keys by count
-gap	d:`a`b!1 2;d[`c]:3;d	`a`b`c!1 2 3	ERROR	dict element upsert assignment unsupported
-gap	d:`a`b!1 2;d[`a]:9;d	`a`b!9 2	ERROR	dict element assignment unsupported
+match	where `a`b`c!1 0 2	`a`c`c
+match	d:`a`b!1 2;d[`c]:3;d	`a`b`c!1 2 3
+match	d:`a`b!1 2;d[`a]:9;d	`a`b!9 2
 match	group 1 2 1	1 2!(0 2;1#1)
 match	group `a`b`a	`a`b!(0 2;1#1)
 match	cols ([] a:1 2; b:3 4)	`a`b
@@ -420,3 +420,26 @@ match	@[{'x};"boom";{x}]	"boom"
 match	@[{@[{'x};x;{("inner";x)}]};"deep";{("outer";x)}]	("inner";"deep")
 match	@[{@[{'x};x;{'x}]};"sig";{("outer";x)}]	("outer";"sig")
 match	@[10 20 30;1;{x*10}]	10 200 30
+# ---- indexed assignment, table row indexing, dict arithmetic (R13) ----
+match	v:1 2 3;v[1]:99;v	1 99 3
+match	x:1 2 3;x[0 1]:10 20;x	10 20 3
+match	m:(1 2;3 4);m[0;1]:9;m	(1 9;3 4)
+match	t:([] a:1 2 3);t[`a]:7 8 9;t	([] a:7 8 9)
+match	t:([] a:1 2 3);t[`b]:10 20 30;t	([] a:1 2 3;b:10 20 30)
+match	t:([] a:1 2 3;b:10 20 30);t[1]	`a`b!2 20
+match	t:([] a:1 2 3);t[0 2]	([] a:1 3)
+match	t:([] a:1 2 3;b:10 20 30);t[1;`b]	20
+match	t:([] a:1 2 3;b:10 20 30);t . (1;`b)	20
+match	t:([] a:1 2 3;b:10 20 30);t @ 2	`a`b!3 30
+match	(`a`b!1 2)-`b`c!10 20	`a`b`c!1 -8 -20
+match	(`a`b!1 2)*`b`c!10 20	`a`b`c!1 20 20
+match	(`a`b!1 2)+10	`a`b!11 12
+match	(`a`b!1 2)+10 20	`a`b!11 22
+match	sum `a`b!1 2	3
+match	max `a`b!1 2	2
+match	neg `a`b!1 2	`a`b!-1 -2
+match	where `a`b!2 1	`a`a`b
+match	`a`b#`a`b`c!1 2 3	`a`b!1 2
+match	`a _ `a`b`c!1 2 3	`b`c!2 3
+match	1 _ `a`b`c!1 2 3	`b`c!2 3
+match	(`a`b`c!1 2 3) _ `b	`a`c!1 3

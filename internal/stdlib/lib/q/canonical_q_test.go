@@ -37,7 +37,7 @@ import (
 // Shrink-only ratchets: counts may go down (promotions) but never up without
 // an explicit, reviewed bump.
 const (
-	canonicalQGapMax       = 51
+	canonicalQGapMax       = 44
 	canonicalQDeviationMax = 30
 	canonicalQEntryMin     = 300
 )
