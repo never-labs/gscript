@@ -96,11 +96,12 @@ var qgenPairWordVerbs = []string{
 }
 
 var qgenSymbolOps = []string{
-	"+", "-", "*", "%", "=", "<", ">", "<=", ">=", "<>", "&", "|", "~", "^",
+	"+", "-", "*", "%", "=", "<", ">", "<=", ">=", "<>", "&", "|", "~", "^", ",",
 }
 
-// Over/scan-friendly symbol verbs.
-var qgenReduceOps = []string{"+", "*", "&", "|", "-"}
+// Over/scan-friendly symbol verbs. `,/` is the raze-equivalent fold and `,\`
+// the running-join scan; both terminate and are deterministic.
+var qgenReduceOps = []string{"+", "*", "&", "|", "-", ","}
 
 var qgenLambdas = []string{
 	"{x+1}", "{x*x}", "{2*x}", "{neg x}", "{x>0}", "{x+y}", "{x*y}", "{y-x}",

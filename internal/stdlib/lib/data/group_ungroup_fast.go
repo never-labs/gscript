@@ -227,6 +227,13 @@ func concatNestedParts(parts []nestedRowValue, total int) (Array, bool) {
 		}
 		arrays[i] = a
 	}
+	return concatTypedArrays(arrays, total)
+}
+
+// concatTypedArrays concatenates same-carrier typed arrays into one dense
+// typed column without boxing. Inputs must already be materialized and
+// attribute-stripped.
+func concatTypedArrays(arrays []Array, total int) (Array, bool) {
 	switch arrays[0].(type) {
 	case columnArray[bool]:
 		return concatColumnArrays[bool](arrays, total)

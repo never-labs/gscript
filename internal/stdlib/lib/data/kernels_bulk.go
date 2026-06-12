@@ -2222,6 +2222,26 @@ func distinctIndexesComparable[T comparable](rows []T) []int {
 	return out
 }
 
+// TryTypedConcat returns the q `,` (join) concatenation of two same-kind
+// typed arrays as one dense typed column, without boxing the elements. Lazy
+// carriers (ranges, tiles, cast views) are densified first; arrays whose
+// materialized carriers are not the same columnArray type (or whose kinds
+// differ) decline so the caller's boxed fallback keeps the semantics.
+func TryTypedConcat(left, right Array) (Array, bool) {
+	l := MaterializeArray(left)
+	if attributed, ok := l.(attributedArray); ok {
+		l = attributed.array
+	}
+	r := MaterializeArray(right)
+	if attributed, ok := r.(attributedArray); ok {
+		r = attributed.array
+	}
+	if l.Kind() != r.Kind() {
+		return nil, false
+	}
+	return concatTypedArrays([]Array{l, r}, l.Len()+r.Len())
+}
+
 // TryTypedUnion returns the q union of two same-kind typed arrays: left
 // values deduplicated in first-occurrence order followed by unseen right
 // values, with one map instead of O((n+m)^2) boxed DeepEqual scans.
