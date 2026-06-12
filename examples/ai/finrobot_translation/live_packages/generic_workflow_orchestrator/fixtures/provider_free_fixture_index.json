@@ -96,6 +96,12 @@
     {
       "fixture_key": "generic_workflow:trace_hooks:offline",
       "capability": "generic.ai.workflow.orchestration.trace_hooks",
+      "capability_scope": "aggregate",
+      "capability_aliases": [
+        "generic.ai.workflow.orchestration.trace.workflow_started",
+        "generic.ai.workflow.orchestration.trace.stage_completed",
+        "generic.ai.workflow.orchestration.trace.workflow_completed"
+      ],
       "path": "fixtures/trace_emission_hooks_fixture.json",
       "schema": "schemas/trace_emission_hooks_v1.schema.json",
       "metadata": {

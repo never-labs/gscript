@@ -7,6 +7,8 @@
   "fixtures": [
     {
       "key": "generic_trace_events:sequence:ACME:offline",
+      "fixture_key": "generic_trace_events:sequence:ACME:offline",
+      "capability": "generic.ai.trace.events",
       "path": "fixtures/trace_sequence_ACME_fixture.json",
       "schema": "schemas/trace_sequence_v1.schema.json",
       "description": "Provider-free trace sequence covering turn_start, stream, tool, artifact, approval, and replay events.",
@@ -22,6 +24,8 @@
     },
     {
       "key": "generic_trace_events:redaction_policy:offline",
+      "fixture_key": "generic_trace_events:redaction_policy:offline",
+      "capability": "ai.trace.redaction_policy",
       "path": "fixtures/redaction_policy_fixture.json",
       "schema": "schemas/redaction_policy_v1.schema.json",
       "description": "Redaction policy for generic trace event payloads and provider identity fields.",
@@ -37,6 +41,8 @@
     },
     {
       "key": "generic_trace_events:envelope:workflow_agent:offline",
+      "fixture_key": "generic_trace_events:envelope:workflow_agent:offline",
+      "capability": "ai.trace.envelope",
       "path": "fixtures/trace_envelope_fixture.json",
       "schema": "schemas/trace_envelope_v1.schema.json",
       "description": "Provider-free unified trace envelope covering turn, tool, approval, workflow, replay, and agent correlations.",
@@ -53,6 +59,8 @@
     },
     {
       "key": "generic_trace_events:projection:approval_trace:deny_order:offline",
+      "fixture_key": "generic_trace_events:projection:approval_trace:deny_order:offline",
+      "capability": "ai.trace.approval_projection",
       "path": "fixtures/approval_trace_projection_fixture.json",
       "schema": "schemas/approval_trace_projection_v1.schema.json",
       "description": "Provider-free projection from generic approval policy trace envelopes into ai.trace.approval trace events.",
@@ -72,6 +80,8 @@
     },
     {
       "key": "generic_trace_events:projection:tool_invocation:summarize_rows:offline",
+      "fixture_key": "generic_trace_events:projection:tool_invocation:summarize_rows:offline",
+      "capability": "ai.trace.tool_invocation_projection",
       "path": "fixtures/tool_invocation_projection_fixture.json",
       "schema": "schemas/tool_invocation_projection_v1.schema.json",
       "description": "Provider-free projection from generic tool registry invocation traces into ai.trace.tool events.",
@@ -91,6 +101,8 @@
     },
     {
       "key": "generic_trace_events:projection:model_turn_replay:offline",
+      "fixture_key": "generic_trace_events:projection:model_turn_replay:offline",
+      "capability": "ai.trace.model_turn_replay_projection",
       "path": "fixtures/model_turn_replay_trace_projection_fixture.json",
       "schema": "schemas/model_turn_replay_trace_projection_v1.schema.json",
       "description": "Provider-free projection from model IO, turn execution, turn replay match, and record replay fixtures into trace envelope events.",
@@ -111,6 +123,8 @@
     },
     {
       "key": "generic_trace_events:composition:tool_approval_result:offline",
+      "fixture_key": "generic_trace_events:composition:tool_approval_result:offline",
+      "capability": "ai.trace.tool_approval_result_composition",
       "path": "fixtures/tool_approval_result_composition_fixture.json",
       "schema": "schemas/tool_approval_result_composition_v1.schema.json",
       "description": "Provider-free composition linking generic tool registry, approval policy, trace events, and tool contract result envelope evidence.",
