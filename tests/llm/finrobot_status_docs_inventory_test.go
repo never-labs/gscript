@@ -94,10 +94,16 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 			"`88` examples",
 			"`93` examples",
 			"93 runnable",
+			"`94` examples",
+			"94 runnable",
 			"47 checked-in",
 			"47 directories",
+			"48 checked-in",
+			"48 directories",
 			"25 registered `live_packages/generic_*` examples",
+			"26 registered `live_packages/generic_*` examples",
 			"32 live-package skeletons use",
+			"755 files",
 		} {
 			if strings.Contains(text, stale) {
 				t.Fatalf("%s still contains stale inventory phrase %q", rel, stale)

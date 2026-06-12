@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "generic-transcript-pipeline-optional-dependency-contract",
+  "package_id": "generic-transcript-pipeline",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "optional_adapters": [
+    {
+      "adapter": "speech_to_text",
+      "default_enabled": false,
+      "clean_skip_code": "speech_adapter_unavailable"
+    },
+    {
+      "adapter": "speaker_diarization",
+      "default_enabled": false,
+      "clean_skip_code": "diarization_adapter_unavailable"
+    },
+    {
+      "adapter": "remote_source_fetch",
+      "default_enabled": false,
+      "clean_skip_code": "source_fetch_adapter_unavailable"
+    }
+  ],
+  "test_rule": "Provider-free tests assert every optional adapter resolves to a clean skip when dependencies or credentials are absent."
+}

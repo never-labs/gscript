@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "id": "generic-transcript-pipeline-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "transcript_source:session_alpha:offline:v1",
+      "path": "fixtures/transcript_source_envelope_fixture.json",
+      "schema": "schemas/transcript_source_envelope_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    },
+    {
+      "fixture_key": "transcript_segments:session_alpha:offline:v1",
+      "path": "fixtures/transcript_segments_fixture.json",
+      "schema": "schemas/transcript_segment_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    },
+    {
+      "fixture_key": "transcript_chunks:session_alpha:offline:v1",
+      "path": "fixtures/transcript_chunks_fixture.json",
+      "schema": "schemas/transcript_chunk_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    },
+    {
+      "fixture_key": "transcript_clean_skip:offline:v1",
+      "path": "fixtures/transcript_clean_skip_fixture.json",
+      "schema": "schemas/transcript_clean_skip_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      }
+    }
+  ]
+}

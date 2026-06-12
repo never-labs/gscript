@@ -30,7 +30,6 @@
     "document-rag",
     "evaluation",
     "event-intelligence",
-    "strategy-backtest-contracts",
     "evidence-report-artifacts",
     "memory",
     "model",
@@ -41,8 +40,10 @@
     "prompt-role-catalog",
     "replay",
     "report-render",
+    "strategy-backtest-contracts",
     "tool",
     "trace",
+    "transcript-pipeline",
     "turn",
     "ui-snapshot",
     "workflow"
@@ -343,40 +344,6 @@
       }
     },
     {
-      "capability": "strategy-backtest-contracts",
-      "capability_id": "generic.ai.strategy.backtest.contracts",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "strategy.manifest",
-        "strategy.observation_feed",
-        "strategy.execution_ledger",
-        "strategy.allocation_series",
-        "strategy.performance_series",
-        "strategy.metric_summary",
-        "strategy.constraint_limits",
-        "strategy.engine_clean_skip"
-      ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
-      "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_strategy_backtest_contracts_fixture_index.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-strategy-backtest-contracts",
-        "boundary": "provider-free strategy simulation manifests, observation feeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, deterministic seeds, and optional engine clean skips",
-        "status": "resolved",
-        "reason": "strategy simulation and backtest behavior is represented as reusable package contracts rather than built-in language or project-specific runtime behavior"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-ai-strategy-backtest-contracts",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
       "capability": "evidence-report-artifacts",
       "capability_id": "generic.ai.evidence.report.artifacts",
       "provider_free": true,
@@ -441,6 +408,35 @@
       }
     },
     {
+      "capability": "model",
+      "capability_id": "generic.ai.model.registry",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "model",
+        "model.default",
+        "provider_model_alias"
+      ],
+      "example": "examples/ai/general_agent_workflow.leia",
+      "test": "tests/llm/llm_ai_dialect_test.go",
+      "fixture": "examples/ai/general_agent_workflow.records.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-model-registry",
+        "boundary": "model alias registry with provider-free replay defaults",
+        "status": "resolved",
+        "reason": "model alias behavior was promoted from examples and tests into the generic_model_registry provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "capability": "model-io",
       "capability_id": "generic.ai.model.io.envelope",
       "provider_free": true,
@@ -468,35 +464,6 @@
         "package_id": "generic-model-io-envelope",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
-        "provider_free": true,
-        "domain_specific": false
-      }
-    },
-    {
-      "capability": "model",
-      "capability_id": "generic.ai.model.registry",
-      "provider_free": true,
-      "domain_specific": false,
-      "finrobot_specific_syntax_assumption": false,
-      "dialect_surface": [
-        "model",
-        "model.default",
-        "provider_model_alias"
-      ],
-      "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_dialect_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
-      "missing_production_package_boundary": {
-        "package_id": "generic-ai-model-registry",
-        "boundary": "model alias registry with provider-free replay defaults",
-        "status": "resolved",
-        "reason": "model alias behavior was promoted from examples and tests into the generic_model_registry provider-free package boundary"
-      },
-      "production_package_boundary": {
-        "status": "checked_in",
-        "package_id": "generic-model-registry",
-        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
-        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
         "provider_free": true,
         "domain_specific": false
       }
@@ -698,6 +665,40 @@
       }
     },
     {
+      "capability": "strategy-backtest-contracts",
+      "capability_id": "generic.ai.strategy.backtest.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "strategy.manifest",
+        "strategy.observation_feed",
+        "strategy.execution_ledger",
+        "strategy.allocation_series",
+        "strategy.performance_series",
+        "strategy.metric_summary",
+        "strategy.constraint_limits",
+        "strategy.engine_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
+      "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_strategy_backtest_contracts_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-strategy-backtest-contracts",
+        "boundary": "provider-free strategy simulation manifests, observation feeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, deterministic seeds, and optional engine clean skips",
+        "status": "resolved",
+        "reason": "strategy simulation and backtest behavior is represented as reusable package contracts rather than built-in language or project-specific runtime behavior"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-strategy-backtest-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "capability": "tool",
       "capability_id": "generic.ai.tool.contract",
       "provider_free": true,
@@ -784,6 +785,38 @@
         "package_id": "generic-trace-events",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "transcript-pipeline",
+      "capability_id": "generic.ai.transcript.pipeline",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "transcript_source",
+        "speaker",
+        "segment",
+        "event_time_policy",
+        "chunk",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_transcript_pipeline.source.txt",
+      "test": "tests/llm/llm_generic_transcript_pipeline_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_transcript_pipeline_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-transcript-pipeline",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "transcript handling was promoted into a generic provider-free package boundary for source envelopes, speaker normalization, segment provenance, event-time correction, chunking, and clean skips"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-transcript-pipeline",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

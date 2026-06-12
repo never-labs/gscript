@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "leia://generic-ai/transcript/source-envelope/v1",
+  "title": "Generic transcript source envelope",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "source_id",
+    "source_ref",
+    "source_type",
+    "event_id",
+    "event_time",
+    "language",
+    "timezone",
+    "raw_turns"
+  ],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "fixture_key": {"type": "string"},
+    "source_id": {"type": "string"},
+    "source_ref": {"type": "string"},
+    "source_type": {"type": "string"},
+    "event_id": {"type": "string"},
+    "event_time": {"type": "string"},
+    "language": {"type": "string"},
+    "timezone": {"type": "string"},
+    "captured_at": {"type": "string"},
+    "event_time_policy": {"type": "object"},
+    "raw_turns": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

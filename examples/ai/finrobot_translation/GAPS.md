@@ -23,8 +23,8 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 94 registered examples plus
-48 checked-in live-package skeleton directories:
+directory. The current provider-free surface is 95 registered examples plus
+49 checked-in live-package skeleton directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
@@ -49,7 +49,8 @@ directory. The current provider-free surface is 94 registered examples plus
 `live_packages/generic_strategy_backtest_contracts`,
 `live_packages/generic_tool_contracts`,
 `live_packages/generic_tool_registry`, `live_packages/generic_trace_events`,
-`live_packages/generic_turn_runner`, `live_packages/generic_ui_snapshot_evaluator`,
+`live_packages/generic_transcript_pipeline`, `live_packages/generic_turn_runner`,
+`live_packages/generic_ui_snapshot_evaluator`,
 `live_packages/generic_workflow_orchestrator`,
 `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`,
 `live_packages/optional_integrations`, `live_packages/product_workflow`,
@@ -75,7 +76,7 @@ generic AI surfaces that the FinRobot translation consumes; they are not
 FinRobot-specific language features or FinRobot-owned product packages.
 
 The 2026-06-12 documentation semantic-guard refresh used read-only inventory to
-confirm 26 registered `live_packages/generic_*` examples and three top-level
+confirm 27 registered `live_packages/generic_*` examples and three top-level
 generic composition examples. It also rechecked approval/model/workflow/trace/eval
 wording in the coverage, verification, and gap documents. That guard keeps
 generic AI dialect capability in the closed/non-gap bucket unless a future

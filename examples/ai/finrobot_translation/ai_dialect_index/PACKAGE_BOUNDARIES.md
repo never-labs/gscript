@@ -42,6 +42,7 @@ contracts, and fixtures for its boundary.
 - model-io: `examples/ai/finrobot_translation/live_packages/generic_model_io_envelope`
 - document-rag: `examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline`
 - data-provider: `examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary`
+- transcript-pipeline: `examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline`
 - event-intelligence: `examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary`
 - strategy-backtest-contracts: `examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts`
 - prompt-role: `examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog`
@@ -82,6 +83,9 @@ orthogonal and layered:
 - data-provider owns provider registries, request and response envelopes,
   pagination, rate-limit metadata, auth redaction, cache/retry policy,
   provenance, normalized error envelopes, and clean skips.
+- transcript-pipeline owns source envelopes, speaker normalization, stable
+  segments, event-time policy correction, turn-aware chunks, provenance, and
+  adapter clean skips for long conversation material.
 - event-intelligence owns source snapshots, event extraction, taxonomies,
   freshness policy, dedupe/source confidence, relevance scoring,
   sentiment/impact labels, prompt contracts, and adapter clean skips.
@@ -152,6 +156,7 @@ language or specializing the dialect for one application domain.
 | Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_memory_store`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, memory, and workflow graphs; packages own validation, envelopes, context windows, loop semantics, and stage I/O. |
 | Document RAG | `generic_document_rag_pipeline`, `generic_memory_store` | Document conversion, sections, chunks, citations, retrieval results, and adapter clean-skip boundaries are generic package data; domain adapters provide source documents outside the core language. |
 | Data providers | `generic_data_provider_boundary`, `generic_optional_adapter_boundary`, `generic_approval_policy` | Provider registries, request/response envelopes, pagination, rate limits, auth redaction, cache/retry policy, provenance, errors, and clean skips are package-owned data access contracts rather than domain-specific vendor syntax. |
+| Transcript pipeline | `generic_transcript_pipeline`, `generic_document_rag_pipeline`, `generic_optional_adapter_boundary` | Source envelopes, speaker aliases, ordered transcript segments, event-time policy corrections, turn-aware chunks, provenance, and adapter clean skips are reusable package contracts for long conversation material rather than application-specific transcript syntax. |
 | Event intelligence | `generic_event_intelligence_boundary`, `generic_data_provider_boundary`, `generic_trace_events` | Source snapshots, extracted events, taxonomies, freshness, dedupe/source confidence, relevance, sentiment/impact, prompt constraints, and adapter clean skips are provider-free package contracts rather than domain-specific news syntax. |
 | Strategy simulation | `generic_strategy_backtest_contracts`, `generic_data_provider_boundary`, `generic_optional_adapter_boundary`, `generic_trace_events` | Strategy manifests, observation feeds, deterministic seeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, and engine clean skips are provider-free package contracts rather than built-in simulation syntax. |
 | Prompt and role catalogs | `generic_prompt_role_catalog`, `generic_agent_runner`, `generic_workflow_orchestrator` | Prompt templates, role profiles, output schemas, delegation triggers, evidence validation, and termination conventions are package-owned fixtures and contracts, not built-in language syntax. |

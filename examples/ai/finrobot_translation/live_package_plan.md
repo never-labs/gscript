@@ -7,8 +7,8 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 94 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples list --json`. All 48
+Current registered-example status: 95 runnable/checkable FinRobot translation
+examples are discovered by `go run ./cmd/leia examples list --json`. All 49
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI
@@ -66,6 +66,7 @@ consumed by the translation.
 | `live_packages/generic_document_rag_pipeline` | `live_packages/generic_document_rag_pipeline/main.leia` | `leia-generic-ai-document-rag-pipeline` | `packages/generic_ai/document_rag_pipeline` | `contracts/generic_document_rag_pipeline_contract.json` |
 | `live_packages/generic_event_intelligence_boundary` | `live_packages/generic_event_intelligence_boundary/main.leia` | `leia-generic-ai-event-intelligence-boundary` | `packages/generic_ai/event_intelligence_boundary` | `contracts/generic_event_intelligence_boundary_contract.json` |
 | `live_packages/generic_strategy_backtest_contracts` | `live_packages/generic_strategy_backtest_contracts/main.leia` | `leia-generic-ai-strategy-backtest-contracts` | `packages/generic_ai/strategy_backtest_contracts` | `contracts/generic_strategy_backtest_contracts_contract.json` |
+| `live_packages/generic_transcript_pipeline` | `live_packages/generic_transcript_pipeline/main.leia` | `leia-generic-ai-transcript-pipeline` | `packages/generic_ai/transcript_pipeline` | `contracts/generic_transcript_pipeline_contract.json` |
 | `live_packages/generic_ui_snapshot_evaluator` | `live_packages/generic_ui_snapshot_evaluator/main.leia` | `leia-generic-ai-ui-snapshot-evaluator` | `packages/generic_ai/ui_snapshot_evaluator` | `contracts/generic_ui_snapshot_evaluator_contract.json` |
 | `live_packages/generic_package_boundary_auditor` | `live_packages/generic_package_boundary_auditor/main.leia` | `leia-generic-ai-package-boundary-auditor` | `packages/generic_ai/package_boundary_auditor` | `contracts/package_boundary_audit_contract.json` |
 

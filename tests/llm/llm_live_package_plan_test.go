@@ -229,6 +229,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"generic_record_replay":               "generic.ai.",
 		"generic_report_render_contracts":     "generic.ai.",
 		"generic_strategy_backtest_contracts": "generic.ai.",
+		"generic_transcript_pipeline":        "generic.ai.",
 		"generic_tool_contracts":              "generic.ai.tool.",
 		"generic_tool_registry":               "generic.tool.",
 		"generic_trace_events":                "generic.ai.trace.",

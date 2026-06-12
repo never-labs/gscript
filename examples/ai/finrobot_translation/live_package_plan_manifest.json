@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 94,
-  "translation_directory_file_count": 755,
+  "registered_examples_count": 95,
+  "translation_directory_file_count": 770,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -180,15 +180,6 @@
       "status": "checked_in_registered_example"
     },
     {
-      "id": "generic_strategy_backtest_contracts",
-      "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
-      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
-      "covers_package_ids": [
-        "generic_strategy_backtest_contracts"
-      ],
-      "status": "checked_in_registered_example"
-    },
-    {
       "id": "generic_evidence_report_artifacts",
       "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
@@ -288,6 +279,15 @@
       "status": "checked_in_registered_example"
     },
     {
+      "id": "generic_strategy_backtest_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_strategy_backtest_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
       "id": "generic_tool_contracts",
       "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
@@ -311,6 +311,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
       "covers_package_ids": [
         "generic_trace_events"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_transcript_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
+      "covers_package_ids": [
+        "generic_transcript_pipeline"
       ],
       "status": "checked_in_registered_example"
     },
@@ -987,35 +996,6 @@
       "no_built_in_guarantee": true
     },
     {
-      "id": "generic_strategy_backtest_contracts",
-      "package_name": "leia-generic-ai-strategy-backtest-contracts",
-      "status": "skeleton_contract_checked_in",
-      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
-      "planned_directory": "packages/generic_ai/strategy_backtest_contracts",
-      "manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
-      "contract": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json",
-      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
-      "capabilities": [
-        "generic.ai.strategy.backtest.contracts",
-        "generic.ai.strategy.backtest.strategy.bind",
-        "generic.ai.strategy.backtest.observation_feed.bind",
-        "generic.ai.strategy.backtest.execution_ledger",
-        "generic.ai.strategy.backtest.allocation_series",
-        "generic.ai.strategy.backtest.performance.series",
-        "generic.ai.strategy.backtest.metric_summary.collect",
-        "generic.ai.strategy.backtest.constraint_limits.enforce",
-        "generic.ai.strategy.backtest.engine.clean_skip"
-      ],
-      "test_gates": [
-        "strategy manifest and deterministic seed contract fixtures decode without engine imports",
-        "observation feed and execution ledger fixtures remain provider-free and replayable",
-        "allocation series, performance series, metric summary, and constraint limit fixtures are deterministic",
-        "optional engine, visualizer, and data-provider adapter boundaries clean-skip without imports or credentials",
-        "registered example executes without q runtime, live network, or live model calls"
-      ],
-      "no_built_in_guarantee": true
-    },
-    {
       "id": "generic_evidence_report_artifacts",
       "package_name": "leia-generic-ai-evidence-report-artifacts",
       "status": "skeleton_contract_checked_in",
@@ -1321,6 +1301,35 @@
       "no_built_in_guarantee": true
     },
     {
+      "id": "generic_strategy_backtest_contracts",
+      "package_name": "leia-generic-ai-strategy-backtest-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "planned_directory": "packages/generic_ai/strategy_backtest_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.strategy.backtest.contracts",
+        "generic.ai.strategy.backtest.strategy.bind",
+        "generic.ai.strategy.backtest.observation_feed.bind",
+        "generic.ai.strategy.backtest.execution_ledger",
+        "generic.ai.strategy.backtest.allocation_series",
+        "generic.ai.strategy.backtest.performance.series",
+        "generic.ai.strategy.backtest.metric_summary.collect",
+        "generic.ai.strategy.backtest.constraint_limits.enforce",
+        "generic.ai.strategy.backtest.engine.clean_skip"
+      ],
+      "test_gates": [
+        "strategy manifest and deterministic seed contract fixtures decode without engine imports",
+        "observation feed and execution ledger fixtures remain provider-free and replayable",
+        "allocation series, performance series, metric summary, and constraint limit fixtures are deterministic",
+        "optional engine, visualizer, and data-provider adapter boundaries clean-skip without imports or credentials",
+        "registered example executes without q runtime, live network, or live model calls"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
       "id": "generic_tool_contracts",
       "package_name": "leia-generic-ai-tool-contracts",
       "status": "skeleton_contract_checked_in",
@@ -1391,6 +1400,40 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_transcript_pipeline",
+      "package_name": "leia-generic-ai-transcript-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+      "planned_directory": "packages/generic_ai/transcript_pipeline",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/contracts/generic_transcript_pipeline_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_transcript_pipeline.source.txt",
+      "capabilities": [
+        "generic.ai.transcript.pipeline",
+        "generic.ai.transcript.source_envelope",
+        "generic.ai.transcript.speaker.normalize",
+        "generic.ai.transcript.speaker.alias",
+        "generic.ai.transcript.speaker.role",
+        "generic.ai.transcript.segment.normalize",
+        "generic.ai.transcript.turn.order",
+        "generic.ai.transcript.offset.provenance",
+        "generic.ai.transcript.event_time.correct",
+        "generic.ai.transcript.chunk",
+        "generic.ai.transcript.chunk.boundary_preserve",
+        "generic.ai.transcript.chunk.token_budget",
+        "generic.ai.transcript.provenance",
+        "generic.ai.transcript.adapter.clean_skip"
+      ],
+      "test_gates": [
+        "source envelope, segment, chunk, and clean-skip contract fixtures decode without speech provider imports",
+        "speaker normalization, event-time correction, turn ordering, and segment provenance remain fixture replayable",
+        "chunk fixtures preserve turn boundaries, deterministic order, overlap, and token budgets",
+        "speech, diarization, cleaner, and remote-source adapters clean-skip without imports or credentials",
+        "registered example executes without q runtime, live network, or live model calls"
       ],
       "no_built_in_guarantee": true
     },
