@@ -257,13 +257,16 @@ var (
 	qEvalNameTakePattern    = regexp.MustCompile(`([A-Za-z_]\w*|\))\s*#`)
 	qEvalArithTakePattern   = regexp.MustCompile(`[+*%^&|-][0-9 ]*#`)
 	qEvalWordApplication    = regexp.MustCompile(`[a-z]{2,}\s`)
-	qEvalBoolWordPattern    = regexp.MustCompile(`(?i)(and|or|not)`)
 	qEvalGluedOpWord        = regexp.MustCompile(`[A-Za-z][%^_#,!.<>=*+-]|[%^_#,!.<>=*+-][A-Za-z]`)
 	qEvalAggregateWord      = regexp.MustCompile(`\b(sum|prd|min|max|avg|med|var|dev|sums|prds|mins|maxs|avgs|all|any|wsum|wavg)\b`)
 	qEvalRealSuffixPattern  = regexp.MustCompile(`\d[eih]($|[^0-9.])`)
 	qEvalTrailingDotPattern = regexp.MustCompile(`\d\.($|[^0-9])`)
 	// }/[x] or }\[x] with a single bracket argument (no top-level ;).
 	qEvalLambdaConvergePattern = regexp.MustCompile(`\}\s*[/\\]\s*\[[^;\]]*\]`)
+	// Word verb followed by / or \ (group/s, group /s, reverse\x): monadic
+	// over/scan is converge, and non-contracting verbs (group) alternate
+	// forever.
+	qEvalWordConvergePattern = regexp.MustCompile(`[A-Za-z]\w*\s*[/\\]`)
 )
 
 func qEvalFuzzInputSafe(src string) bool {
@@ -321,11 +324,16 @@ func qEvalFuzzInputSafe(src string) bool {
 	if qEvalLambdaConvergePattern.MatchString(src) && !strings.Contains(src, "y") {
 		return false
 	}
-	// Long-infinity literals feed endless loops (where 0W replicates 9e18
-	// times, til 0W builds a 9e18 lazy range that any reducer then walks) or
-	// makeslice panics (see qEvalKnownCrashers). 0W value semantics are
-	// pinned by the canonical-q harness; the differential keeps it out of
-	// scope.
+	// Word-verb over/scan (group/s) is converge with the verb monadic;
+	// non-contracting verbs alternate forever (group of a dict regroups).
+	if qEvalWordConvergePattern.MatchString(src) {
+		return false
+	}
+	// Long-infinity literals feed endless lazy walks (til 0W builds a 9e18
+	// lazy range that any reducer then walks, 0W#x tiles 9e18 rows). The
+	// eager replication panics (where 0W) are fixed with list-limit errors,
+	// but the lazy-walk hazard remains and 0W value semantics are pinned by
+	// the canonical-q harness; the differential keeps it out of scope.
 	if strings.Contains(src, "0W") {
 		return false
 	}
@@ -435,27 +443,12 @@ func qEvalFuzzLambdaRecursionRisk(src string) bool {
 // The list is shrink-only: TestQEvalKnownCrashersStillCrash demands an
 // entry's removal the moment the crash is fixed, after which the fuzzer
 // guards the fix.
-var qEvalKnownCrashers = map[string]string{
-	// FINDING (this fuzzer): <> (and = ) on dicts or callables reaches a Go
-	// == on uncomparable types and panics.
-	"(`a`b!1 2)<>`a`b!1 2": "comparing uncomparable type",
-	"qv:neg;(qv)<>(qv)":    "comparing uncomparable type",
-	// FINDING (this fuzzer): where on a long-infinity replication count
-	// overflows makeslice.
-	"flip where 0W": "makeslice: len out of range",
-	// FINDING (this fuzzer): lazy views defer bounds checks to
-	// materialization, where they surface as runtime panics instead of index
-	// errors: logical/not masks, array/matrix gathers, and matrix indexing
-	// over empty bases all panic with "... out of range".
-	"x:til 96;m:x mod.10;idx:where!(00&0) and m<0#+0000": "out of range",
-	"x:til 01;A0:where!(not (x in 00))":                  "out of range",
-	"m:0 0#0;(m@0 00)":                                   "out of range",
-	// FINDING (this fuzzer): logical & between an empty list and a vector
-	// divides by the empty operand's length during broadcast.
-	"qv:rank til 1;()&(qv)":            "integer divide by zero",
-	"m:2 2#til 00;row:m . 0;(%!row)!0": "out of range",
-	"m:0#0;(m@0 0)":                    "out of range",
-}
+// All previously pinned crashers are fixed (dict/callable <>/= equality,
+// where-on-0W makeslice overflow, lazy-view bounds deferred to
+// materialization, and empty-operand logical broadcast); their regression
+// tests live in internal/stdlib/lib/q/correctness_fixes_test.go and the
+// fuzzer guards the fixes.
+var qEvalKnownCrashers = map[string]string{}
 
 // qEvalKnownDivergenceStatement pins a discovered divergence CLASS awaiting a
 // production fix (shrink-only; TestQEvalKnownDivergencesStillDiverge demands
@@ -521,14 +514,6 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 			return true
 		}
 	}
-	// FINDING (this fuzzer): boolean-logical (&, |, and, or) results are lazy
-	// boolLogicalMask views; two structurally identical masks produced by the
-	// two routes do not compare equal through matchValue (e.g.
-	// px:00*((til 01) mod 010);A0:0And (px in 0)). Skipped on mismatch until
-	// mask comparison (or eager materialization in the oracle) is fixed.
-	if strings.ContainsAny(stmt, "&|") || qEvalBoolWordPattern.MatchString(stmt) {
-		return true
-	}
 	// FINDING (this fuzzer): symbol operators glued directly onto word verbs
 	// (last%x, m mod.10, ...) are accepted by the compiled route but rejected
 	// (or split differently) by the string evaluator's probes, e.g.
@@ -554,29 +539,22 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 	if qEvalTwoVerbPattern().MatchString(stmt) {
 		return true
 	}
-	// KNOWN GAP (canonical-q harness, 3#0#1 family) plus comparator artifact:
-	// take/reshape can produce lazy n-dimensional views over empty bases
-	// (1 17#0#0, (000+(idx mod 10))*2# idx) that are identical on both
-	// routes yet not comparable through matchValue (At fails on the empty
-	// base), and those views flow into later statements through bindings.
-	// Mismatches anywhere in an input containing take/reshape are skipped;
-	// the canonical-q harness pins take/drop/reshape value semantics.
-	if strings.Contains(src, "#") {
-		return true
-	}
-	// FINDING (this fuzzer): lazy views over empty bases (m:1 1#til 0;m) are
-	// not reliably comparable, so a bare name statement returning such a
-	// view mismatches against itself. Bare-identifier statements are skipped
-	// on mismatch.
+	// FINDING (this fuzzer): a bare name statement returning a lambda that
+	// captured an environment mismatches against itself: matchValue keeps
+	// closures conservatively unmatched (envs can be self-referential), e.g.
+	// x:til 00;A00:where (0 mod 000)00;f:{(000[0])00000000};f. Bare-identifier
+	// statements are skipped on mismatch until the oracle compares closures
+	// structurally.
 	if regexp.MustCompile(`^[A-Za-z]\w*$`).MatchString(strings.Trim(stmt, "() \t")) {
 		return true
 	}
 	// FINDING (this fuzzer): arithmetic with sized-suffix literals (e real,
 	// i int, h short) promotes differently between routes: 0-0e is
 	// float64(-0) via the compiled route and float32(0) via the string
-	// evaluator; 0-0i diverges the same way. Mismatching statements with a
-	// sized-suffix literal are skipped until promotion is unified.
-	if qEvalRealSuffixPattern.MatchString(stmt) {
+	// evaluator; 0-0i diverges the same way, and the divergent value flows
+	// through bindings (qv:0e;(qv)-(qv)). Mismatches anywhere in an input
+	// with a sized-suffix literal are skipped until promotion is unified.
+	if qEvalRealSuffixPattern.MatchString(src) {
 		return true
 	}
 	// FINDING (this fuzzer): trailing-dot float literals glued to an operator
@@ -628,24 +606,19 @@ var qEvalKnownDivergenceRepresentatives = []string{
 	"min trim `a",
 	"(2)<=(raze `a`a`b)",
 	"x:((til 96) mod 5)%10;(+/asin x)+(+/acos x)+(+/atan x)",
-	"til +/0",               // string route rejects nested derived-verb arguments
-	"til 000xxz:#A00000000", // leaf-parser vs probe error message mismatch
-	"0$00#A",                // enum-cast vs probe error message mismatch
-	"(0)+first 0<0",         // routes split comparison vs word juxtaposition differently
-	"count@where 0",         // string route rejects verb@application shapes
-	"px:00*((til 01) mod 010);A0:0And (px in 0)", // lazy bool mask comparison artifact
-	"x:();s:x;last%x",               // glued operator/word tokenisation divergence
-	"x:til 0;sum 0 rotate x",        // aggregate empty-identity differs between routes
-	"2 rotate where 0 1 1",          // string route rejects nested verb applications
-	"m:2 2#til 00;row:m 000",        // juxtaposed name indexing diverges between routes
-	"1 17#0#0",                      // reshape over zero-take empties diverges between routes
-	"m:1 1#til 0;A:m",               // lazy empty view not self-comparable through the oracle
-	`()+("J"$"0")+("I"$"0")`,        // empty-list broadcast lost on the string route
-	"x:til 1;m:0;(000)And((x)in 0)", // lazy bool mask comparison artifact (glued And)
-	"(count 0;9)+(0)",               // list items with verb applications split differently
-	"0-0e",                          // sized-suffix promotion differs between routes
-	"0000.+1 0",                     // trailing-dot literal tokenisation differs
-	"1 17#0#0",                      // lazy empty reshape comparator artifact
+	"til +/0",                // string route rejects nested derived-verb arguments
+	"til 000xxz:#A00000000",  // leaf-parser vs probe error message mismatch
+	"0$00#A",                 // enum-cast vs probe error message mismatch
+	"(0)+first 0<0",          // routes split comparison vs word juxtaposition differently
+	"count@where 0",          // string route rejects verb@application shapes
+	"x:();s:x;last%x",        // glued operator/word tokenisation divergence
+	"x:til 0;sum 0 rotate x", // aggregate empty-identity differs between routes
+	"2 rotate where 0 1 1",   // string route rejects nested verb applications
+	`()+("J"$"0")+("I"$"0")`, // empty-list broadcast lost on the string route
+	"(count 0;9)+(0)",        // list items with verb applications split differently
+	"0-0e",                   // sized-suffix promotion differs between routes
+	"0000.+1 0",              // trailing-dot literal tokenisation differs
+	"x:til 00;A00:where (0 mod 000)00;f:{(000[0])00000000};f", // captured-env lambda not self-comparable
 }
 
 func TestQEvalKnownDivergencesStillDiverge(t *testing.T) {

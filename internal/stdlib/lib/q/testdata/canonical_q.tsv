@@ -180,7 +180,8 @@ match	(`a`b!1 2)?99	`$""
 match	(`a`a!1 2)`a	1
 match	count `a`b!1 2	2
 gap	(`a`b!1 2)+`b`c!10 20	`a`b`c!1 12 20	ERROR	dict key-union arithmetic absent
-gap	(`a`b!1 2)=`a`b!1 3	`a`b!10b		dict equality should compare values per key into a bool dict
+gap	(`a`b!1 2)=`a`b!1 3	`a`b!10b		dict = compares per key now, but the string evaluator splits ! after = in the unparenthesized form
+match	(`a`b!1 2)=(`a`b!1 3)	`a`b!10b
 gap	reverse `a`b!1 2	`b`a!2 1	`a`b!1 2	reverse on dict should reverse both keys and values
 gap	where `a`b`c!1 0 2	`a`c`c	ERROR	where on dict should replicate keys by count
 gap	d:`a`b!1 2;d[`c]:3;d	`a`b`c!1 2 3	ERROR	dict element upsert assignment unsupported
@@ -358,7 +359,7 @@ deviation	8%4%2	4f	1f	left-assoc operators: Leia evaluates left to right
 match	(0%0)~0%0	1b
 match	count~count	1b
 match	{x+1}~{x+1}	1b
-gap	(`a`b!1 2)<>`a`b!1 2	`a`b!00b		dict <> panics today (comparing uncomparable type q.EvalDict, fuzzer finding)
+match	(`a`b!1 2)<>`a`b!1 2	`a`b!00b
 gap	min trim `a	ERROR	"a"	trim on a symbol atom should be a type error; compiled route returns a string (fuzzer finding)
 # ---- date rendering ----
 deviation	string 2024.01.05	"2024.01.05"	"2024-01-05"	ISO date strings: string of a date uses dashes

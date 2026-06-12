@@ -12056,6 +12056,11 @@ func applyDyadic(op byte, left, right any) (any, error) {
 	if op == '~' {
 		return matchValue(left, right), nil
 	}
+	if op == '=' {
+		if out, handled, err := equalsDictOrCallable(left, right); handled || err != nil {
+			return out, err
+		}
+	}
 	la, lok := left.(data.Array)
 	ra, rok := right.(data.Array)
 	if lok || rok {
@@ -12293,7 +12298,102 @@ func maxDyadic(left, right any) (any, error) {
 	return right, nil
 }
 
+// equalsDictOrCallable handles q `=` (and the `<>` complement through
+// invertBoolResult) over operands the scalar/vector kernels cannot compare:
+// dictionaries and callables are uncomparable Go types, so reaching the
+// kernels' interface == panics ("comparing uncomparable type").
+//
+//   - dict = dict is the canonical per-key comparison: a dict of booleans
+//     over the union of the keys (left key order first, then unseen right
+//     keys). Keys present on one side only compare against null and yield 0b,
+//     mirroring 1=0N.
+//   - dict = atom broadcasts the atom over the dict values, keeping the keys.
+//   - callable = callable is match-style identity (the same rule ~ uses).
+//
+// Dict-vs-vector and callable-vs-non-callable stay unhandled so the existing
+// dispatch keeps its errors/fallbacks.
+func equalsDictOrCallable(left, right any) (any, bool, error) {
+	leftDict, leftIsDict := left.(EvalDict)
+	rightDict, rightIsDict := right.(EvalDict)
+	switch {
+	case leftIsDict && rightIsDict:
+		out, err := dictEqualsDict(leftDict, rightDict)
+		return out, true, err
+	case leftIsDict:
+		if _, isArray := right.(data.Array); isArray {
+			return nil, false, nil
+		}
+		out, err := dictEqualsAtom(leftDict, right)
+		return out, true, err
+	case rightIsDict:
+		if _, isArray := left.(data.Array); isArray {
+			return nil, false, nil
+		}
+		out, err := dictEqualsAtom(rightDict, left)
+		return out, true, err
+	}
+	if isCallable(left) && isCallable(right) {
+		return matchValue(left, right), true, nil
+	}
+	return nil, false, nil
+}
+
+func dictEqualsDict(left, right EvalDict) (EvalDict, error) {
+	keys := make([]any, 0, len(left.Keys))
+	values := make([]any, 0, len(left.Keys))
+	for i, key := range left.Keys {
+		keys = append(keys, key)
+		j, found := dictKeyIndex(right, key)
+		if !found {
+			values = append(values, false)
+			continue
+		}
+		eq, err := applyDyadic('=', left.Values[i], right.Values[j])
+		if err != nil {
+			return EvalDict{}, err
+		}
+		values = append(values, eq)
+	}
+	for _, key := range right.Keys {
+		if _, found := dictKeyIndex(left, key); found {
+			continue
+		}
+		keys = append(keys, key)
+		values = append(values, false)
+	}
+	return EvalDict{Keys: keys, Values: values}, nil
+}
+
+func dictEqualsAtom(d EvalDict, scalar any) (EvalDict, error) {
+	values := make([]any, len(d.Values))
+	for i, value := range d.Values {
+		eq, err := applyDyadic('=', value, scalar)
+		if err != nil {
+			return EvalDict{}, err
+		}
+		values[i] = eq
+	}
+	return EvalDict{Keys: append([]any(nil), d.Keys...), Values: values}, nil
+}
+
+func dictKeyIndex(d EvalDict, key any) (int, bool) {
+	for i, existing := range d.Keys {
+		if equalValue(existing, key) {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 func applyCompositeDyadic(op string, left, right any) (any, error) {
+	if op == "<>" {
+		if out, handled, err := equalsDictOrCallable(left, right); handled || err != nil {
+			if err != nil {
+				return nil, err
+			}
+			return invertBoolResult(out)
+		}
+	}
 	if dataOp, ok := qDataCompositeComparisonOp(op); ok {
 		la, lok := left.(data.Array)
 		ra, rok := right.(data.Array)
@@ -12337,6 +12437,16 @@ func invertBoolResult(v any) (any, error) {
 	switch x := v.(type) {
 	case bool:
 		return !x, nil
+	case EvalDict:
+		values := make([]any, len(x.Values))
+		for i, value := range x.Values {
+			inverted, err := invertBoolResult(value)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = inverted
+		}
+		return EvalDict{Keys: x.Keys, Values: values}, nil
 	case data.Array:
 		if x.Kind() != data.KindBool {
 			return nil, fmt.Errorf("composite comparison produced non-bool vector")
@@ -14641,6 +14751,12 @@ func extrema(v any, wantMax bool) (any, error) {
 	return best, nil
 }
 
+// qMaxListLength caps eagerly allocated replication results (where on
+// integer counts, take from empty lists): kdb+ errors ('limit/'wsfull) once a
+// list outgrows the workspace, and counts near 0W otherwise overflow Go's
+// makeslice ("len out of range" panic).
+const qMaxListLength = math.MaxInt32
+
 func where(v any) (any, error) {
 	array, ok := v.(data.Array)
 	if !ok {
@@ -14656,6 +14772,9 @@ func where(v any) (any, error) {
 		}
 		if n < 0 {
 			return nil, fmt.Errorf("where expects non-negative integer counts")
+		}
+		if n > qMaxListLength {
+			return nil, fmt.Errorf("where count %d exceeds the %d list limit", n, int64(qMaxListLength))
 		}
 		return data.NewI64(make([]int64, n)), nil
 	}
@@ -14678,6 +14797,7 @@ func where(v any) (any, error) {
 		return data.NewI64(out), nil
 	}
 	var out []int64
+	total := int64(0)
 	for i, value := range array.Values() {
 		if data.IsNull(value) {
 			continue
@@ -14689,6 +14809,10 @@ func where(v any) (any, error) {
 		if n < 0 {
 			return nil, fmt.Errorf("where expects non-negative integer counts")
 		}
+		if n > qMaxListLength-total {
+			return nil, fmt.Errorf("where count %d exceeds the %d list limit", n, int64(qMaxListLength))
+		}
+		total += n
 		for j := int64(0); j < n; j++ {
 			out = append(out, int64(i))
 		}
@@ -16174,6 +16298,11 @@ func takeFromEmptyArray(kind data.Kind, n int) (any, error) {
 	count := n
 	if count < 0 {
 		count = -count
+	}
+	if count > qMaxListLength {
+		// The fill below allocates eagerly; counts near 0W would overflow
+		// makeslice (see qMaxListLength).
+		return nil, fmt.Errorf("take count %d exceeds the %d list limit", count, int64(qMaxListLength))
 	}
 	fill := qTakeFillForKind(kind)
 	values := make([]any, count)

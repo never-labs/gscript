@@ -1474,6 +1474,14 @@ func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
 		if rightArray.Len() > length {
 			length = rightArray.Len()
 		}
+		// Empty-operand broadcast: ()&x follows the same rule as the len-1
+		// broadcast above — the broadcastable side stretches to the other
+		// side's length, so the result over an empty operand is empty
+		// (mismatched non-broadcastable lengths errored above). Without this
+		// the mask would cycle row%0 at materialization.
+		if leftArray.Len() == 0 || rightArray.Len() == 0 {
+			length = 0
+		}
 	case leftIsArray:
 		if leftArray.Kind() != KindBool {
 			return nil, false, nil
@@ -15599,6 +15607,19 @@ func (a i64ScalarDyadicRunningSumArray) At(row int) (any, bool) {
 }
 
 func (a i64ScalarDyadicRunningSumArray) Values() []any {
+	// Dense single pass first: flatten the dyadic source once and prefix-sum,
+	// covering op/scalar shapes the closed-form range sums decline (e.g.
+	// negative-modulus mod) in O(n) instead of per-row prefix walks.
+	if values, owned, ok := tryBulkI64Values(a.source); ok && len(values) >= a.Len() {
+		out := make([]any, a.Len())
+		var acc int64
+		for row := range out {
+			acc += values[row]
+			out[row] = acc
+		}
+		bulkI64Release(values, owned)
+		return out
+	}
 	out := make([]any, a.Len())
 	for row := range out {
 		value, ok, err := a.i64At(row)
@@ -15626,7 +15647,22 @@ func (a i64ScalarDyadicRunningSumArray) i64At(row int) (int64, bool, error) {
 	if row < 0 || row >= a.source.len {
 		return 0, false, fmt.Errorf("running sum row %d out of range", row)
 	}
-	return i64ScalarDyadicRangeSumI64(a.source, 0, row+1)
+	value, handled, err := i64ScalarDyadicRangeSumI64(a.source, 0, row+1)
+	if handled || err != nil {
+		return value, handled, err
+	}
+	// The closed-form range sums decline some op/scalar shapes (e.g.
+	// negative-modulus mod): accumulate the prefix directly so the decline
+	// never surfaces as an out-of-range panic at materialization.
+	var acc int64
+	for i := 0; i <= row; i++ {
+		v, ok, err := a.source.i64At(i)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		acc += v
+	}
+	return acc, true, nil
 }
 
 func i64ScalarDyadicRunningSumSum(array i64ScalarDyadicRunningSumArray) (int64, bool, error) {
@@ -16240,6 +16276,9 @@ func (a boolLogicalMask) Gather(indexes []int) Array {
 func (a boolLogicalMask) valueAt(row int) (bool, bool, error) {
 	left := a.leftScalar
 	if !a.leftIsScalar {
+		if a.left.Len() == 0 {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
 		value, ok, err := boolArrayAt(a.left, row%a.left.Len())
 		if err != nil || !ok {
 			return false, ok, err
@@ -16248,6 +16287,9 @@ func (a boolLogicalMask) valueAt(row int) (bool, bool, error) {
 	}
 	right := a.rightScalar
 	if !a.rightIsScalar {
+		if a.right.Len() == 0 {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
 		value, ok, err := boolArrayAt(a.right, row%a.right.Len())
 		if err != nil || !ok {
 			return false, ok, err
@@ -16617,7 +16659,22 @@ func boolArrayAt(array Array, row int) (bool, bool, error) {
 		}
 		return out, true, nil
 	default:
-		return false, false, nil
+		// Generic fallback for lazy bool carriers without a dedicated case
+		// (membership masks, float compare masks, ...): route through At so
+		// composed masks (not/&/|) over them materialize instead of
+		// translating the unknown type into an out-of-range panic.
+		if array.Kind() != KindBool {
+			return false, false, nil
+		}
+		value, ok := array.At(row)
+		if !ok {
+			return false, true, fmt.Errorf("logical row %d out of range", row)
+		}
+		out, isBool := value.(bool)
+		if !isBool {
+			return false, false, nil
+		}
+		return out, true, nil
 	}
 }
 

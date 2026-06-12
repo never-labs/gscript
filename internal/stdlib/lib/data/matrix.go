@@ -69,7 +69,17 @@ func ReshapeArray(shape []int, source Array) (Array, error) {
 		if dim < 0 {
 			return nil, fmt.Errorf("reshape dimension %d must be non-negative", dim)
 		}
+		if dim > 0 && total > math.MaxInt/dim {
+			return nil, fmt.Errorf("reshape dimensions overflow the maximum list length")
+		}
 		total *= dim
+	}
+	if source.Len() == 0 && total > 0 {
+		// Canonical q take/reshape from an empty list fills with the source
+		// type's zero (3#0#1 -> 0 0 0). Reshape shares the rule so matrix
+		// views are never built over a base shorter than their shape, which
+		// would defer out-of-range panics to materialization.
+		source = reshapeEmptyFillSource(source.Kind())
 	}
 	values, err := TakeRepeat(source, total)
 	if err != nil {
@@ -82,6 +92,32 @@ func ReshapeArray(shape []int, source Array) (Array, error) {
 		return matrixArray{shape: dims, data: values}, nil
 	}
 	return ndArrayView{shape: dims, data: values}, nil
+}
+
+// reshapeEmptyFillSource is the one-element cycle source used when reshaping
+// an empty list: TakeRepeat tiles it lazily, so the fill costs O(1) however
+// large the shape. Kinds without an obvious zero fill with null.
+func reshapeEmptyFillSource(kind Kind) Array {
+	switch kind {
+	case KindBool:
+		return NewBool([]bool{false})
+	case KindI16:
+		return NewI16([]int16{0})
+	case KindI32:
+		return NewI32([]int32{0})
+	case KindI64:
+		return NewI64([]int64{0})
+	case KindF32:
+		return NewF32([]float32{0})
+	case KindF64:
+		return NewF64([]float64{0})
+	case KindSymbol:
+		return NewSymbols([]string{""})
+	case KindString:
+		return NewString([]string{""})
+	default:
+		return NewAny([]any{NullValue})
+	}
 }
 
 // TransposeMatrix returns a view over a rectangular matrix/list-of-lists value.
