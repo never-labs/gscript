@@ -2626,6 +2626,13 @@ func (s *EvalState) eval(src string) (any, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty q expression")
 	}
+	if src[0] == '\'' {
+		// Signal form 'x (trap_signal.go). Unclaimed '-prefixed statements
+		// keep their pre-existing cascade errors.
+		if handled, err := s.evalSignalForm(src); handled {
+			return nil, err
+		}
+	}
 	if out, ok, err := s.evalConditionalSpecialForm(src); ok || err != nil {
 		return out, err
 	}
@@ -5119,7 +5126,7 @@ func isQIdentRest(ch byte) bool {
 
 func isQSymbolDelimiter(ch byte) bool {
 	switch ch {
-	case ' ', '\t', '\n', '\r', '(', ')', '[', ']', ';', ',', '!', '+', '-', '/', '=', '<', '>', '#', '$':
+	case ' ', '\t', '\n', '\r', '(', ')', '[', ']', '{', '}', ';', ',', '!', '+', '-', '/', '=', '<', '>', '#', '$':
 		return true
 	default:
 		return false

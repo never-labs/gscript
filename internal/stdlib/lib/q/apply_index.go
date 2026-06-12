@@ -72,11 +72,16 @@ func (s *EvalState) evalAtApplyOrAmend(src string) (any, bool, error) {
 		}
 		out, err := indexValue(target, index)
 		return out, true, err
+	case 3:
+		// Trap @[f;x;e] when the first argument is callable, unary amend
+		// @[v;i;f] when it is data (see trap_signal.go).
+		out, err := s.evalAtTripleForm(parts)
+		return out, true, err
 	case 4:
 		out, err := s.evalAmend(src)
 		return out, true, err
 	default:
-		return nil, true, fmt.Errorf("at apply expects @[fn;arg], @[collection;index], or @[collection;index;op;value]")
+		return nil, true, fmt.Errorf("at apply expects @[fn;arg], @[collection;index], @[fn;arg;trap], or @[collection;index;op;value]")
 	}
 }
 
@@ -98,11 +103,16 @@ func (s *EvalState) evalDotApplyOrAmend(src string) (any, bool, error) {
 		}
 		out, err := s.applyCallable(fn, args)
 		return out, true, err
+	case 3:
+		// Trap .[f;args;e] when the first argument is callable, unary deep
+		// amend .[d;path;f] when it is data (see trap_signal.go).
+		out, err := s.evalDotTripleForm(parts)
+		return out, true, err
 	case 4:
 		out, err := s.evalDotAmend(src)
 		return out, true, err
 	default:
-		return nil, true, fmt.Errorf("dot apply expects .[fn;args] or .[dict;path;op;value]")
+		return nil, true, fmt.Errorf("dot apply expects .[fn;args], .[fn;args;trap], or .[dict;path;op;value]")
 	}
 }
 

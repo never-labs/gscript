@@ -6580,6 +6580,21 @@ func TestEvalFirstLastDyadicAvoidsWholeVector(t *testing.T) {
 	assertEvalErrorContains(t, "first 1 2 3+10 20", "vector length mismatch")
 }
 
+// TestEvalSignalAndUntrappedErrors feeds the error-route differential corpus
+// (extracted mechanically from assertEvalErrorContains literals): signal
+// errors and untrapped trap-adjacent failures must agree across the compiled
+// and string routes and stay stable on warm repeats.
+func TestEvalSignalAndUntrappedErrors(t *testing.T) {
+	assertEvalErrorContains(t, "'\"err\"", "err")
+	assertEvalErrorContains(t, "'`oops", "oops")
+	assertEvalErrorContains(t, "e:\"bad input\";'e", "bad input")
+	assertEvalErrorContains(t, "e:42;'e", "signal expects a string or symbol")
+	assertEvalErrorContains(t, "f:{$[x<0;'\"neg\";x*2]};f[-1]", "neg")
+	assertEvalErrorContains(t, "@[{'x};\"deep\";{'x}]", "deep")
+	assertEvalErrorContains(t, "@[10 20 30;1;2]", "amend function is not callable")
+	assertEvalErrorContains(t, "@[{x};1;2;3]", "amend function is not callable")
+}
+
 func TestFillsPropagatesLastNonNullValue(t *testing.T) {
 	got, err := fills(data.NewColumn("x", []any{nil, int64(10), nil, nil, int64(20)}).Data)
 	if err != nil {

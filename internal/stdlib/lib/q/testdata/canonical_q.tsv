@@ -369,3 +369,15 @@ match	(`a`b!1 2)<>`a`b!1 2	`a`b!00b
 gap	min trim `a	ERROR	"a"	trim on a symbol atom should be a type error; compiled route returns a string (fuzzer finding)
 # ---- date rendering ----
 deviation	string 2024.01.05	"2024.01.05"	"2024-01-05"	ISO date strings: string of a date uses dashes
+# ---- error trap & signal ----
+match	@[{x+1};1;`oops]	2
+match	@[{'x};"boom";{("caught";x)}]	("caught";"boom")
+match	@[{1+`a};0;{`caught}]	`caught
+match	.[{x+y};(1;2);`e]	3
+match	.[{x+y};(1;`a);`e]	`e
+match	'`oops	ERROR:oops
+match	'"err"	ERROR:err
+match	@[{'x};"boom";{x}]	"boom"
+match	@[{@[{'x};x;{("inner";x)}]};"deep";{("outer";x)}]	("inner";"deep")
+match	@[{@[{'x};x;{'x}]};"sig";{("outer";x)}]	("outer";"sig")
+match	@[10 20 30;1;{x*10}]	10 200 30
