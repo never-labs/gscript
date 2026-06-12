@@ -2857,6 +2857,15 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return s.evalCallableAdverb(callable, "'", right)
 	}
+	if out, handled, err := s.evalWordAdverbInfix(src); handled || err != nil {
+		return out, err
+	}
+	if out, handled, err := s.evalNamedAdverbBracketCall(src); handled || err != nil {
+		return out, err
+	}
+	if out, handled, err := s.evalParenDerivedVerbJuxtaposed(src); handled || err != nil {
+		return out, err
+	}
 	if funcs, ok := parseUnaryComposition(src); ok {
 		return qComposition{funcs: s.bindStatefulUnaryFns(funcs)}, nil
 	}
@@ -2977,7 +2986,7 @@ func (s *EvalState) eval(src string) (any, error) {
 	if strings.HasPrefix(src, "hopen ") {
 		return s.evalHopen(strings.TrimSpace(src[len("hopen "):]))
 	}
-	if strings.HasPrefix(src, "+/") {
+	if strings.HasPrefix(src, "+/") && !strings.HasPrefix(src, "+//") {
 		right := strings.TrimSpace(src[2:])
 		if right == "" {
 			return qAdverbFunction{verb: "+", adverb: "/"}, nil
@@ -5095,6 +5104,12 @@ func qCanReceivePostfixIndex(collection string) bool {
 	if collection == "" {
 		return false
 	}
+	// Derived verbs (`+/`, `-':`, `,//`) must claim before the dyadic-infix
+	// rejection: findDyadic sees the leading operator and would misread the
+	// bracket call `+/[x]` as a malformed infix expression.
+	if _, ok := parseDyadicAdverbFunction(collection); ok {
+		return true
+	}
 	if _, _, ok := findDyadic(collection); ok {
 		return false
 	}
@@ -5105,9 +5120,6 @@ func qCanReceivePostfixIndex(collection string) bool {
 		return true
 	}
 	if _, ok := lookupDyadicVerbFunc(collection); ok {
-		return true
-	}
-	if _, ok := parseDyadicAdverbFunction(collection); ok {
 		return true
 	}
 	if qCanReceivePostfixCallableAdverbIndex(collection) {
@@ -5317,7 +5329,7 @@ func parseDyadicAdverbFunction(src string) (qAdverbFunction, bool) {
 	if enclosed(src, '(', ')') {
 		body = strings.TrimSpace(src[1 : len(src)-1])
 	}
-	for _, adverb := range []string{"':", "\\:", "/:", "'", "/", "\\"} {
+	for _, adverb := range []string{"':", "\\:", "/:", "'", "//", "/", "\\"} {
 		if strings.HasSuffix(body, adverb) {
 			verb := strings.TrimSpace(body[:len(body)-len(adverb)])
 			if verb == "" {
@@ -5568,6 +5580,9 @@ func findAdverb(src string) (adverbExpr, bool) {
 			adverb = "/:"
 		case strings.HasPrefix(src[i:], "':"):
 			adverb = "':"
+		case strings.HasPrefix(src[i:], "//"):
+			// Composed over-of-over: `,//x` is converge of the raze fold.
+			adverb = "//"
 		case src[i] == '/':
 			adverb = "/"
 		case src[i] == '\\':
@@ -5688,6 +5703,15 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 				return nil, fmt.Errorf("%s cannot be used with scan", expr.verb)
 			}
 			return applyScan(op, nil, right)
+		case "//":
+			// Composed over-of-over: f// is (f/)/ — the derived fold f/ is
+			// monadic, so the outer over is q's converge iterator (`,//x`
+			// razes nested lists to depth).
+			op, _, ok := lookupDyadicVerb(expr.verb)
+			if !ok {
+				return nil, fmt.Errorf("%s cannot be used with over-over", expr.verb)
+			}
+			return convergeOverOp(op, right)
 		default:
 			return nil, fmt.Errorf("%s requires a left operand", expr.adverb)
 		}
@@ -9083,6 +9107,11 @@ func applyAdverbFunction(fn qAdverbFunction, args []any) (any, error) {
 				return applyEachPrior(op, nil, args[0])
 			}
 			return applyEachPriorFunc(dyad, nil, args[0])
+		case "//":
+			if !hasDyadicOp {
+				return nil, fmt.Errorf("%s cannot be used with over-over", fn.verb)
+			}
+			return convergeOverOp(op, args[0])
 		case "'":
 			return nil, fmt.Errorf("adverb function each expected 2 arguments, got 1")
 		case "\\:", "/:":
@@ -9711,6 +9740,116 @@ func (s *EvalState) evalCallableAdverb(fn any, adverb string, right any) (any, e
 	}
 }
 
+// qWordAdverbs maps the word spellings of the iteration adverbs to their
+// symbol forms: `f over x` = f/x, `f scan x` = f\x, `f prior x` = f':x
+// (`each` rides its own handler with hard errors, matching its history).
+var qWordAdverbs = []struct {
+	word   string
+	adverb string
+}{
+	{"over", "/"},
+	{"scan", "\\"},
+	{"prior", "':"},
+}
+
+// evalWordAdverbInfix evaluates `f over x` / `f scan x` / `f prior x` where f
+// is any callable expression (verb in parens, lambda, bound name). Statements
+// whose left side is not callable fall through to the rest of the cascade.
+func (s *EvalState) evalWordAdverbInfix(src string) (any, bool, error) {
+	for _, wa := range qWordAdverbs {
+		callableExpr, rightExpr, ok := splitTopLevelWord(src, wa.word)
+		if !ok {
+			continue
+		}
+		callable, err := s.eval(callableExpr)
+		if err != nil || !isCallable(callable) {
+			continue
+		}
+		right, err := s.eval(rightExpr)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := s.evalCallableAdverb(callable, wa.adverb, right)
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
+// qNamedAdverbWords are the bracket-call spellings each[f;x], over[f;x],
+// scan[f;x], prior[f;x].
+var qNamedAdverbWords = map[string]string{
+	"each":  "'",
+	"over":  "/",
+	"scan":  "\\",
+	"prior": "':",
+}
+
+// evalNamedAdverbBracketCall evaluates the named adverb call forms
+// each[f;x] / over[f;x] / scan[f;x] / prior[f;x].
+func (s *EvalState) evalNamedAdverbBracketCall(src string) (any, bool, error) {
+	open := strings.IndexByte(src, '[')
+	if open <= 0 || !strings.HasSuffix(src, "]") {
+		return nil, false, nil
+	}
+	name := strings.TrimSpace(src[:open])
+	adverb, ok := qNamedAdverbWords[name]
+	if !ok || !enclosed(src[open:], '[', ']') {
+		return nil, false, nil
+	}
+	args := splitQBracketFormArgs(strings.TrimSpace(src[open+1 : len(src)-1]))
+	if len(args) != 2 {
+		return nil, false, nil
+	}
+	fn, err := s.eval(strings.TrimSpace(args[0]))
+	if err != nil {
+		return nil, true, err
+	}
+	if !isCallable(fn) {
+		return nil, true, fmt.Errorf("%s[f;x] first argument is not callable", name)
+	}
+	right, err := s.eval(strings.TrimSpace(args[1]))
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := s.evalCallableAdverb(fn, adverb, right)
+	return out, true, err
+}
+
+// evalParenDerivedVerbJuxtaposed evaluates a parenthesized derived verb
+// juxtaposed onto its operand: `(+/)x`, `(+/) til 5`, `(,/)x`, `(+\)x`,
+// `(,//)x`. Bracket calls `(+/)[x]` ride the postfix-index path; this
+// handler covers the noun-juxtaposition spelling.
+func (s *EvalState) evalParenDerivedVerbJuxtaposed(src string) (any, bool, error) {
+	if !strings.HasPrefix(src, "(") {
+		return nil, false, nil
+	}
+	end := findMatchingDelimiter(src, 0, '(', ')')
+	if end <= 0 || end == len(src)-1 {
+		return nil, false, nil
+	}
+	fn, ok := parseDyadicAdverbFunction(src[:end+1])
+	if !ok {
+		return nil, false, nil
+	}
+	rest := strings.TrimSpace(src[end+1:])
+	if rest == "" || !qDerivedVerbJuxtapositionLead(rest[0]) {
+		return nil, false, nil
+	}
+	right, err := s.eval(rest)
+	if err != nil {
+		return nil, true, err
+	}
+	out, err := s.applyCallable(fn, []any{right})
+	return out, true, err
+}
+
+// qDerivedVerbJuxtapositionLead reports whether ch can begin the operand of a
+// juxtaposed derived verb. Leading infix operator characters fall through so
+// the derived verb can still serve as the left operand of an infix form.
+func qDerivedVerbJuxtapositionLead(ch byte) bool {
+	return isQIdentStart(ch) || (ch >= '0' && ch <= '9') || ch == '(' || ch == '`' || ch == '"' || ch == '.'
+}
+
 func adverbName(adverb string) string {
 	switch adverb {
 	case "/":
@@ -9759,6 +9898,11 @@ func (s *EvalState) applyEachCallable(fn any, v any) (any, error) {
 	items, err := vectorValues(v)
 	if err != nil {
 		return s.applyCallable(fn, []any{v})
+	}
+	if len(items) == 0 && !isTypedEmptyAdverbSource(v) {
+		// Canonical empty-each: f each () is () (the generic empty list),
+		// not a null-kind empty.
+		return data.NewAny(nil), nil
 	}
 	out := make([]any, len(items))
 	if isCountDistinctCallable(fn) {
@@ -9846,26 +9990,9 @@ func isUnaryOnlyCallable(fn any) bool {
 	}
 }
 
+// applyEachLeftCallable: canonical q each-left iterates the LEFT operand,
+// applying f(item, whole-right) per left item.
 func (s *EvalState) applyEachLeftCallable(fn any, left any, right any) (any, error) {
-	items, err := vectorValues(right)
-	if err != nil {
-		return s.applyCallable(fn, []any{left, right})
-	}
-	out := make([]any, len(items))
-	for i, item := range items {
-		value, err := s.applyCallable(fn, []any{left, item})
-		if err != nil {
-			return nil, err
-		}
-		out[i] = value
-	}
-	if len(out) == 0 && !isTypedEmptyAdverbSource(right) {
-		return inferQArray(out), nil
-	}
-	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
-}
-
-func (s *EvalState) applyEachRightCallable(fn any, left any, right any) (any, error) {
 	items, err := vectorValues(left)
 	if err != nil {
 		return s.applyCallable(fn, []any{left, right})
@@ -9879,6 +10006,27 @@ func (s *EvalState) applyEachRightCallable(fn any, left any, right any) (any, er
 		out[i] = value
 	}
 	if len(out) == 0 && !isTypedEmptyAdverbSource(left) {
+		return inferQArray(out), nil
+	}
+	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
+}
+
+// applyEachRightCallable: canonical q each-right iterates the RIGHT operand,
+// applying f(whole-left, item) per right item.
+func (s *EvalState) applyEachRightCallable(fn any, left any, right any) (any, error) {
+	items, err := vectorValues(right)
+	if err != nil {
+		return s.applyCallable(fn, []any{left, right})
+	}
+	out := make([]any, len(items))
+	for i, item := range items {
+		value, err := s.applyCallable(fn, []any{left, item})
+		if err != nil {
+			return nil, err
+		}
+		out[i] = value
+	}
+	if len(out) == 0 && !isTypedEmptyAdverbSource(right) {
 		return inferQArray(out), nil
 	}
 	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
@@ -10314,6 +10462,12 @@ func tryApplyTypedAdverbDyadic(op byte, adverb string, left, right any) (any, bo
 	if !lok && !rok {
 		return nil, false, nil
 	}
+	// Each-left/each-right over two vector operands build a row per item of
+	// the iterated side (canonical q), which plain broadcast arithmetic does
+	// not represent: fall through to the generic row builder.
+	if (adverb == "\\:" || adverb == "/:") && lok && rok {
+		return nil, false, nil
+	}
 	shape := qAdverbArithmeticShape(adverb, op, left, right, la, ra)
 	if adverb == "'" && lok && rok && la.Len() != ra.Len() {
 		err := fmt.Errorf("each length mismatch")
@@ -10444,33 +10598,9 @@ func applyEachLeft(op byte, left, right any) (any, error) {
 	return applyEachLeftFunc(dyadicVerbFunc(op), left, right)
 }
 
+// applyEachLeftFunc: canonical q each-left `x f\:y` applies f between each
+// item of the LEFT operand and the whole right operand.
 func applyEachLeftFunc(fn func(any, any) (any, error), left, right any) (any, error) {
-	items, err := vectorValues(right)
-	if err != nil {
-		return fn(left, right)
-	}
-	out := make([]any, len(items))
-	for i, item := range items {
-		value, err := fn(left, item)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = value
-	}
-	if len(out) == 0 && !isTypedEmptyAdverbSource(right) {
-		return inferQArray(out), nil
-	}
-	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
-}
-
-func applyEachRight(op byte, left, right any) (any, error) {
-	if out, handled, err := tryApplyTypedAdverbDyadic(op, "/:", left, right); err != nil || handled {
-		return out, err
-	}
-	return applyEachRightFunc(dyadicVerbFunc(op), left, right)
-}
-
-func applyEachRightFunc(fn func(any, any) (any, error), left, right any) (any, error) {
 	items, err := vectorValues(left)
 	if err != nil {
 		return fn(left, right)
@@ -10489,6 +10619,34 @@ func applyEachRightFunc(fn func(any, any) (any, error), left, right any) (any, e
 	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
 }
 
+func applyEachRight(op byte, left, right any) (any, error) {
+	if out, handled, err := tryApplyTypedAdverbDyadic(op, "/:", left, right); err != nil || handled {
+		return out, err
+	}
+	return applyEachRightFunc(dyadicVerbFunc(op), left, right)
+}
+
+// applyEachRightFunc: canonical q each-right `x f/:y` applies f between the
+// whole left operand and each item of the RIGHT operand.
+func applyEachRightFunc(fn func(any, any) (any, error), left, right any) (any, error) {
+	items, err := vectorValues(right)
+	if err != nil {
+		return fn(left, right)
+	}
+	out := make([]any, len(items))
+	for i, item := range items {
+		value, err := fn(left, item)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = value
+	}
+	if len(out) == 0 && !isTypedEmptyAdverbSource(right) {
+		return inferQArray(out), nil
+	}
+	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
+}
+
 func isTypedEmptyAdverbSource(v any) bool {
 	array, ok := v.(data.Array)
 	if !ok || array.Len() != 0 {
@@ -10496,6 +10654,31 @@ func isTypedEmptyAdverbSource(v any) bool {
 	}
 	kind := array.Kind()
 	return kind != "" && kind != data.KindNull && kind != data.KindAny
+}
+
+// convergeOverOp implements the composed adverb `f//x` = (f/)/x for builtin
+// dyadic ops: the derived fold f/ is applied repeatedly until the value stops
+// changing (q's converge iterator). `,//x` is the canonical deep raze.
+func convergeOverOp(op byte, v any) (any, error) {
+	prev := v
+	clock := newQIterateClock()
+	for iter := 0; ; iter++ {
+		if iter >= qIterateLimit || clock.exceeded(int64(iter)) {
+			return nil, fmt.Errorf("converge did not terminate within %d iterations", iter)
+		}
+		next, err := applyOver(op, nil, prev)
+		if err != nil {
+			return nil, err
+		}
+		if matchValue(next, prev) {
+			return prev, nil
+		}
+		if iter > 0 && matchValue(next, v) {
+			// Cycle back to the original argument.
+			return next, nil
+		}
+		prev = next
+	}
 }
 
 func applyOver(op byte, initial any, v any) (any, error) {

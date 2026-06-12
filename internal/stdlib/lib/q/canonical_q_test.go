@@ -37,7 +37,9 @@ import (
 // Shrink-only ratchets: counts may go down (promotions) but never up without
 // an explicit, reviewed bump.
 const (
-	canonicalQGapMax = 44
+	// Lowered 44 -> 41: the adverb completion round promoted the each-left/
+	// each-right vector-operand rows and the empty-each () propagation.
+	canonicalQGapMax = 41
 	// Reviewed bump 30 -> 32: the parse-tree spelling deviations (verbs are
 	// symbol names, not function atoms; see value_eval_parse.go).
 	canonicalQDeviationMax = 32

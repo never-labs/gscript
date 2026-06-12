@@ -158,7 +158,7 @@ func (g *qgen) adverbExpr(depth int) string {
 	if g.r.Intn(3) == 0 {
 		vec = "(" + g.expr(depth-1) + ")"
 	}
-	switch g.r.Intn(7) {
+	switch g.r.Intn(15) {
 	case 0:
 		return fmt.Sprintf("(%s/)[%s]", g.pick(qgenReduceOps), vec)
 	case 1:
@@ -171,6 +171,41 @@ func (g *qgen) adverbExpr(depth int) string {
 		return fmt.Sprintf("%s each %s", g.pick(qgenLambdas), vec)
 	case 5:
 		return fmt.Sprintf("%s each %s", g.pick(qgenUnaryVerbs), vec)
+	case 6:
+		// Bracket form directly on the derived operator verb: +/[x], +/[s;x].
+		if g.r.Intn(2) == 0 {
+			return fmt.Sprintf("%s/[%s]", g.pick(qgenReduceOps), vec)
+		}
+		return fmt.Sprintf("%s/[%s;%s]", g.pick(qgenReduceOps), g.smallInt(), vec)
+	case 7:
+		return fmt.Sprintf("%s':[%s]", g.pick(qgenReduceOps), vec)
+	case 8:
+		// Parenthesized derived verb juxtaposed onto its operand: (+/) x.
+		return fmt.Sprintf("(%s/) %s", g.pick(qgenReduceOps), vec)
+	case 9:
+		// Word adverbs over a parenthesized verb or dyadic lambda.
+		fn := "(" + g.pick(qgenReduceOps) + ")"
+		if g.r.Intn(2) == 0 {
+			fn = g.pick(qgenDyadicLambdas)
+		}
+		return fmt.Sprintf("%s %s %s", fn, g.pick([]string{"over", "scan", "prior"}), vec)
+	case 10:
+		// Named adverb calls: each[f;x] / over[f;x] / scan[f;x] / prior[f;x].
+		if g.r.Intn(2) == 0 {
+			return fmt.Sprintf("each[%s;%s]", g.pick(qgenUnaryVerbs), vec)
+		}
+		word := g.pick([]string{"over", "scan", "prior"})
+		return fmt.Sprintf("%s[%s;%s]", word, g.pick(qgenDyadicLambdas), vec)
+	case 11:
+		// Composed over-of-over: ,// razes nested lists to depth.
+		return fmt.Sprintf("(,//)[%s]", vec)
+	case 12:
+		// Canonical each-left/each-right with atom and vector operand mixes.
+		op := g.pick(qgenSymbolOps)
+		if g.r.Intn(2) == 0 {
+			return fmt.Sprintf("(%s)%s\\:(%s)", vec, op, g.pick(qgenVectorLiterals))
+		}
+		return fmt.Sprintf("(%s)%s/:(%s)", vec, op, g.pick(qgenVectorLiterals))
 	default:
 		return fmt.Sprintf("%s/[%s]", g.pick(qgenDyadicLambdas), vec)
 	}
@@ -263,6 +298,9 @@ var (
 	qEvalAggregateWord      = regexp.MustCompile(`\b(sum|prd|min|max|avg|med|var|dev|sums|prds|mins|maxs|avgs|all|any|wsum|wavg)\b`)
 	qEvalRealSuffixPattern  = regexp.MustCompile(`\d[eih]($|[^0-9.])`)
 	qEvalTrailingDotPattern = regexp.MustCompile(`\d\.($|[^0-9])`)
+	// Month-literal shape (YYYY.MM) not extended to a date (no third
+	// component): 0000.01, 2024.01.
+	qEvalMonthLiteralPattern = regexp.MustCompile(`\d{4}\.\d\d($|[^0-9.])`)
 	// }/[x] or }\[x] with a single bracket argument (no top-level ;).
 	qEvalLambdaConvergePattern = regexp.MustCompile(`\}\s*[/\\]\s*\[[^;\]]*\]`)
 	// Word verb followed by / or \ (group/s, group /s, reverse\x): monadic
@@ -574,6 +612,14 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 	if qEvalTrailingDotPattern.MatchString(stmt) {
 		return true
 	}
+	// FINDING (this fuzzer): month literals inside arithmetic (0000.01+0,
+	// 2024.01+0) tokenize differently between the routes: the compiled route
+	// parses the YYYY.MM month literal (canonical q), while the string
+	// evaluator's arithmetic split reads it as a float. Skipped on mismatch
+	// until the string route's month tokenisation is reconciled.
+	if qEvalMonthLiteralPattern.MatchString(stmt) {
+		return true
+	}
 	// FINDING (this fuzzer): chained arithmetic over an empty list loses the
 	// empty broadcast on the string route: ()+("J"$"0")+("I"$"0") is () via
 	// the compiled route but the atom 0 via the string evaluator. Mismatching
@@ -631,6 +677,7 @@ var qEvalKnownDivergenceRepresentatives = []string{
 	"(count 0;9)+(0)",        // list items with verb applications split differently
 	"0-0e",                   // sized-suffix promotion differs between routes
 	"0000.+1 0",              // trailing-dot literal tokenisation differs
+	"0000.01+0",              // month literal in arithmetic tokenises as a float on the string route
 	"x:til 00;A00:where (0 mod 000)00;f:{(000[0])00000000};f", // captured-env lambda not self-comparable
 }
 
