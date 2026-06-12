@@ -121,6 +121,34 @@
       "no_secret": true,
       "correlation_id": "corr-generic-turn-acme-summary-001",
       "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
+    },
+    {
+      "fixture_key": "generic_turn:memory_context_projection:offline:v1",
+      "capability": "generic.ai.turn.memory_context_projection",
+      "path": "fixtures/memory_context_turn_projection_fixture.json",
+      "schema": "memory_context_turn_projection_v1",
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "credentials_required": false,
+        "no_secret": true,
+        "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+        "target_fixture": "fixtures/generic_turn_request_fixture.json",
+        "projected_messages": 1,
+        "context_refs": 2,
+        "raw_memory_text_allowed": false,
+        "correlation_id": "corr-generic-turn-acme-summary-001",
+        "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "credentials_required": false,
+      "no_secret": true,
+      "correlation_id": "corr-generic-turn-acme-summary-001",
+      "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
     }
   ],
   "real_dependency_imports": false

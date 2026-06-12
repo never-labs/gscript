@@ -23,6 +23,15 @@
       "requires_replay_match": true,
       "requires_correlation_id": true,
       "requires_no_secret_evidence": true
+    },
+    {
+      "name": "generic.ai.turn.memory_context_projection",
+      "schema": "memory_context_turn_projection_v1",
+      "requires_source_memory_refs": true,
+      "requires_target_turn_request": true,
+      "requires_context_message": true,
+      "requires_no_raw_memory_text": true,
+      "requires_no_secret_evidence": true
     }
   ],
   "message_contract": {
@@ -60,6 +69,19 @@
     "miss_behavior": "clean-skip",
     "provider_free": true,
     "live_network": false
+  },
+  "memory_context_projection_contract": {
+    "source_package": "generic_memory_store",
+    "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+    "target_fixture": "fixtures/generic_turn_request_fixture.json",
+    "target_field": "messages",
+    "projection_policy": "context_ref_message",
+    "required_source_fields": ["context_window.included_memory_ids", "retrieval_results.memory_id", "retrieval_results.context_ref", "provenance.fixture_key"],
+    "required_target_fields": ["request_id", "correlation_id", "message.role", "message.content", "message.metadata.context_refs"],
+    "raw_memory_text_allowed": false,
+    "secret_values_allowed": false,
+    "deterministic_order_required": true,
+    "provider_free": true
   },
   "semantic_guard_contract": {
     "stable_request_hash": true,

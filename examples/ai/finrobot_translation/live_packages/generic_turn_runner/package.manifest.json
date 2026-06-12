@@ -3,7 +3,7 @@
   "id": "finrobot-generic-turn-runner-live-package",
   "package_name": "leia-generic-ai-turn-runner",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for generic AI single-turn request and execution envelopes.",
+  "description": "Provider-free live package skeleton for generic AI single-turn request, memory context projection, and execution envelopes.",
   "source_mode": "fixture-contract",
   "target_mode": "live-package-skeleton",
   "provider_free": true,
@@ -35,7 +35,8 @@
     "execute_response": "schemas/execute_response_envelope_v1.schema.json",
     "tool_request": "schemas/tool_request_envelope_v1.schema.json",
     "replay_record": "schemas/replay_record_match_v1.schema.json",
-    "error": "schemas/error_envelope_v1.schema.json"
+    "error": "schemas/error_envelope_v1.schema.json",
+    "memory_context_turn_projection": "schemas/memory_context_turn_projection_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
@@ -43,11 +44,13 @@
     "execute_response": "fixtures/ai_turn_execute_fixture.json",
     "tool_request": "fixtures/tool_request_fixture.json",
     "replay_record": "fixtures/replay_record_match_fixture.json",
-    "error": "fixtures/error_envelope_fixture.json"
+    "error": "fixtures/error_envelope_fixture.json",
+    "memory_context_turn_projection": "fixtures/memory_context_turn_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.turn.request",
-    "ai.turn.execute"
+    "ai.turn.execute",
+    "generic.ai.turn.memory_context_projection"
   ],
   "blocked_imports": [
     "openai",
@@ -148,6 +151,17 @@
     "provider_credentials_required": false,
     "live_network": false
   },
+  "memory_context_projection_contract": {
+    "dialect_capability": "generic.ai.turn.memory_context_projection",
+    "source_package": "generic_memory_store",
+    "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+    "target_fixture": "fixtures/generic_turn_request_fixture.json",
+    "target_field": "messages",
+    "projection_policy": "context_ref_message",
+    "raw_memory_text_allowed": false,
+    "secret_values_allowed": false,
+    "deterministic_order_required": true
+  },
   "provider_gate": {
     "allow_network": false,
     "required_credentials": [],
@@ -159,6 +173,7 @@
     "single-turn request schema carries messages, response_format, usage-free request metadata, and replay key material",
     "ai.turn.execute response envelope carries message, response_format, usage, error, tool request, and replay metadata",
     "tool request envelope is request-only and provider-free",
+    "memory context projection maps ranked memory context refs into deterministic turn messages without raw memory text",
     "replay record match contract is deterministic, provider-free, and clean-skips on misses",
     "turn request, tool request, replay match, execute response, and error envelope carry stable request hash, correlation id, offline provider-free state, and no-secret evidence"
   ],

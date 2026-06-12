@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 99,
-  "translation_directory_file_count": 858,
+  "translation_directory_file_count": 860,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -1627,11 +1627,13 @@
         "generic.ai.turn.response_envelope",
         "generic.ai.turn.tool_request",
         "generic.ai.turn.replay_match",
-        "generic.ai.turn.error_envelope"
+        "generic.ai.turn.error_envelope",
+        "generic.ai.turn.memory_context_projection"
       ],
       "test_gates": [
         "provider-free fixture contract parses",
         "contract JSON declares generic AI backend boundary",
+        "memory context projection maps provider-free memory refs into deterministic turn request messages",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
       ],

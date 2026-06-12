@@ -762,7 +762,8 @@
       "capability": "ai.turn.execute",
       "capabilities": [
         "generic.ai.turn.request",
-        "ai.turn.execute"
+        "ai.turn.execute",
+        "generic.ai.turn.memory_context_projection"
       ],
       "backend_shape": "ai.turn.execute",
       "provider_free": true,
@@ -771,7 +772,10 @@
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json"
       ],
-      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/memory_context_turn_projection_fixture.json"
+      ]
     },
     {
       "id": "generic_ui_snapshot_evaluator",

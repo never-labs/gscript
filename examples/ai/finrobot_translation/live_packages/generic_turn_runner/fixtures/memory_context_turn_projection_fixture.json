@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic_turn:memory_context_projection:offline:v1",
+  "projection_kind": "memory_context_to_turn_request_projection",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "credentials_required": false,
+  "raw_memory_text_allowed": false,
+  "secret_values_allowed": false,
+  "source_fixture_refs": {
+    "memory_store": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+    "turn_request": "fixtures/generic_turn_request_fixture.json"
+  },
+  "target_request": {
+    "request_id": "turn-request-acme-summary-001",
+    "correlation_id": "corr-generic-turn-acme-summary-001",
+    "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+    "target_field": "messages"
+  },
+  "projected_messages": [
+    {
+      "role": "system",
+      "content": "Use ranked memory context refs ctx:generic:handoff:0001 and ctx:generic:constraint:0001; resolve content from provider-free memory fixtures only.",
+      "metadata": {
+        "message_kind": "memory_context_refs",
+        "source_fixture_key": "generic:memory_store:offline",
+        "context_window_strategy": "ranked_memory_items",
+        "included_memory_ids": [
+          "mem:runbook:handoff:0001",
+          "mem:risk:constraint:0001"
+        ],
+        "context_refs": [
+          "ctx:generic:handoff:0001",
+          "ctx:generic:constraint:0001"
+        ],
+        "raw_memory_text_stored": false,
+        "secret_values_present": false,
+        "deterministic_order": true
+      }
+    }
+  ],
+  "context_ref_mappings": [
+    {
+      "memory_id": "mem:runbook:handoff:0001",
+      "rank": 1,
+      "context_ref": "ctx:generic:handoff:0001",
+      "target_message_index": 0,
+      "projection_policy": "context_ref_only"
+    },
+    {
+      "memory_id": "mem:risk:constraint:0001",
+      "rank": 2,
+      "context_ref": "ctx:generic:constraint:0001",
+      "target_message_index": 0,
+      "projection_policy": "context_ref_only"
+    }
+  ],
+  "projection_assertions": {
+    "projection_is_provider_free": true,
+    "turn_request_identity_resolves": true,
+    "context_refs_match_memory_retrieval_results": true,
+    "included_memory_ids_match_context_window": true,
+    "message_order_is_deterministic": true,
+    "raw_memory_text_absent": true,
+    "secret_values_absent": true
+  }
+}

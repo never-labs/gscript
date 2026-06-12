@@ -69,6 +69,17 @@ type genericTurnRunnerManifest struct {
 		ProviderCredentialsRequired bool     `json:"provider_credentials_required"`
 		LiveNetwork                 bool     `json:"live_network"`
 	} `json:"replay_match_contract"`
+	MemoryContextProjectionContract struct {
+		DialectCapability          string `json:"dialect_capability"`
+		SourcePackage              string `json:"source_package"`
+		SourceFixture              string `json:"source_fixture"`
+		TargetFixture              string `json:"target_fixture"`
+		TargetField                string `json:"target_field"`
+		ProjectionPolicy           string `json:"projection_policy"`
+		RawMemoryTextAllowed       bool   `json:"raw_memory_text_allowed"`
+		SecretValuesAllowed        bool   `json:"secret_values_allowed"`
+		DeterministicOrderRequired bool   `json:"deterministic_order_required"`
+	} `json:"memory_context_projection_contract"`
 	NoBuiltInGuarantee struct {
 		Required  bool   `json:"required"`
 		Statement string `json:"statement"`
@@ -101,7 +112,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 		len(manifest.ProviderGate.OptionalCredentials) != 0 {
 		t.Fatalf("provider gate must stay closed: %#v", manifest.ProviderGate)
 	}
-	for _, want := range []string{"generic.ai.turn.request", "ai.turn.execute"} {
+	for _, want := range []string{"generic.ai.turn.request", "ai.turn.execute", "generic.ai.turn.memory_context_projection"} {
 		if !contains(manifest.Capabilities, want) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
@@ -169,6 +180,15 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 			t.Fatalf("replay canonicalization missing %q: %#v", want, manifest.ReplayMatchContract.Canonicalization)
 		}
 	}
+	if manifest.MemoryContextProjectionContract.DialectCapability != "generic.ai.turn.memory_context_projection" ||
+		manifest.MemoryContextProjectionContract.SourcePackage != "generic_memory_store" ||
+		manifest.MemoryContextProjectionContract.TargetField != "messages" ||
+		manifest.MemoryContextProjectionContract.ProjectionPolicy != "context_ref_message" ||
+		manifest.MemoryContextProjectionContract.RawMemoryTextAllowed ||
+		manifest.MemoryContextProjectionContract.SecretValuesAllowed ||
+		!manifest.MemoryContextProjectionContract.DeterministicOrderRequired {
+		t.Fatalf("memory context projection contract incomplete: %#v", manifest.MemoryContextProjectionContract)
+	}
 }
 
 func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
@@ -181,7 +201,7 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 		}
 		assertGenericTurnRunnerJSONOrLeiaFile(t, filepath.Join(base, manifest.Entrypoints[key]))
 	}
-	for _, key := range []string{"turn_request", "execute_response", "tool_request", "replay_record", "error"} {
+	for _, key := range []string{"turn_request", "execute_response", "tool_request", "replay_record", "error", "memory_context_turn_projection"} {
 		if manifest.Schemas[key] == "" {
 			t.Fatalf("missing schema %q", key)
 		}
@@ -200,7 +220,7 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 			t.Fatalf("%s schema lacks required fields", key)
 		}
 	}
-	for _, key := range []string{"index", "turn_request", "execute_response", "tool_request", "replay_record", "error"} {
+	for _, key := range []string{"index", "turn_request", "execute_response", "tool_request", "replay_record", "error", "memory_context_turn_projection"} {
 		if manifest.Fixtures[key] == "" {
 			t.Fatalf("missing fixture %q", key)
 		}
@@ -208,26 +228,28 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 	}
 
 	var contract struct {
-		ProviderFree              bool           `json:"provider_free"`
-		LiveNetwork               bool           `json:"live_network"`
-		MessageContract           map[string]any `json:"message_contract"`
-		ResponseFormatContract    map[string]any `json:"response_format_contract"`
-		UsageContract             map[string]any `json:"usage_contract"`
-		ErrorContract             map[string]any `json:"error_contract"`
-		ToolRequestContract       map[string]any `json:"tool_request_contract"`
-		ReplayRecordMatchContract map[string]any `json:"replay_record_match_contract"`
+		ProviderFree                    bool           `json:"provider_free"`
+		LiveNetwork                     bool           `json:"live_network"`
+		MessageContract                 map[string]any `json:"message_contract"`
+		ResponseFormatContract          map[string]any `json:"response_format_contract"`
+		UsageContract                   map[string]any `json:"usage_contract"`
+		ErrorContract                   map[string]any `json:"error_contract"`
+		ToolRequestContract             map[string]any `json:"tool_request_contract"`
+		ReplayRecordMatchContract       map[string]any `json:"replay_record_match_contract"`
+		MemoryContextProjectionContract map[string]any `json:"memory_context_projection_contract"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, manifest.Entrypoints["contract"]), &contract)
 	if !contract.ProviderFree || contract.LiveNetwork {
 		t.Fatalf("contract must stay provider-free/offline: %#v", contract)
 	}
 	for name, section := range map[string]map[string]any{
-		"message_contract":             contract.MessageContract,
-		"response_format_contract":     contract.ResponseFormatContract,
-		"usage_contract":               contract.UsageContract,
-		"error_contract":               contract.ErrorContract,
-		"tool_request_contract":        contract.ToolRequestContract,
-		"replay_record_match_contract": contract.ReplayRecordMatchContract,
+		"message_contract":                   contract.MessageContract,
+		"response_format_contract":           contract.ResponseFormatContract,
+		"usage_contract":                     contract.UsageContract,
+		"error_contract":                     contract.ErrorContract,
+		"tool_request_contract":              contract.ToolRequestContract,
+		"replay_record_match_contract":       contract.ReplayRecordMatchContract,
+		"memory_context_projection_contract": contract.MemoryContextProjectionContract,
 	} {
 		if section["provider_free"] != true {
 			t.Fatalf("%s must declare provider_free: %#v", name, section)
@@ -244,11 +266,12 @@ func TestGenericTurnRunnerSchemasFixturesAndContract(t *testing.T) {
 		t.Fatalf("fixture index must stay provider-free/offline: %#v", fixtureIndex)
 	}
 	wantSchemas := map[string]bool{
-		"single_turn_request_v1":       false,
-		"execute_response_envelope_v1": false,
-		"tool_request_envelope_v1":     false,
-		"replay_record_match_v1":       false,
-		"error_envelope_v1":            false,
+		"single_turn_request_v1":            false,
+		"execute_response_envelope_v1":      false,
+		"tool_request_envelope_v1":          false,
+		"replay_record_match_v1":            false,
+		"error_envelope_v1":                 false,
+		"memory_context_turn_projection_v1": false,
 	}
 	for _, fixture := range fixtureIndex.Fixtures {
 		schema, _ := fixture["schema"].(string)
@@ -372,6 +395,131 @@ func TestGenericTurnRunnerEnvelopeFixtures(t *testing.T) {
 	requireGenericTurnRunnerGuardEvidence(t, "error fixture", errorEnvelope, request.CorrelationID, requestHash)
 }
 
+func TestGenericTurnRunnerMemoryContextProjection(t *testing.T) {
+	base := genericTurnRunnerPackageDir(t)
+	root := repoRoot(t)
+	memory := loadGenericMemoryStoreFixture(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_memory_store", "fixtures", "generic_memory_store_fixture.json"))
+
+	var request struct {
+		RequestID     string           `json:"request_id"`
+		CorrelationID string           `json:"correlation_id"`
+		Messages      []map[string]any `json:"messages"`
+		Replay        map[string]any   `json:"replay"`
+	}
+	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "generic_turn_request_fixture.json"), &request)
+
+	var projection struct {
+		SchemaVersion         int    `json:"schema_version"`
+		FixtureKey            string `json:"fixture_key"`
+		ProjectionKind        string `json:"projection_kind"`
+		ProviderFree          bool   `json:"provider_free"`
+		LiveNetwork           bool   `json:"live_network"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		CredentialsRequired   bool   `json:"credentials_required"`
+		RawMemoryTextAllowed  bool   `json:"raw_memory_text_allowed"`
+		SecretValuesAllowed   bool   `json:"secret_values_allowed"`
+		SourceFixtureRefs     struct {
+			MemoryStore string `json:"memory_store"`
+			TurnRequest string `json:"turn_request"`
+		} `json:"source_fixture_refs"`
+		TargetRequest struct {
+			RequestID     string `json:"request_id"`
+			CorrelationID string `json:"correlation_id"`
+			RequestHash   string `json:"request_hash"`
+			TargetField   string `json:"target_field"`
+		} `json:"target_request"`
+		ProjectedMessages []struct {
+			Role     string `json:"role"`
+			Content  string `json:"content"`
+			Metadata struct {
+				MessageKind           string   `json:"message_kind"`
+				SourceFixtureKey      string   `json:"source_fixture_key"`
+				ContextWindowStrategy string   `json:"context_window_strategy"`
+				IncludedMemoryIDs     []string `json:"included_memory_ids"`
+				ContextRefs           []string `json:"context_refs"`
+				RawMemoryTextStored   bool     `json:"raw_memory_text_stored"`
+				SecretValuesPresent   bool     `json:"secret_values_present"`
+				DeterministicOrder    bool     `json:"deterministic_order"`
+			} `json:"metadata"`
+		} `json:"projected_messages"`
+		ContextRefMappings []struct {
+			MemoryID           string `json:"memory_id"`
+			Rank               int    `json:"rank"`
+			ContextRef         string `json:"context_ref"`
+			TargetMessageIndex int    `json:"target_message_index"`
+			ProjectionPolicy   string `json:"projection_policy"`
+		} `json:"context_ref_mappings"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, "fixtures", "memory_context_turn_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.FixtureKey != "generic_turn:memory_context_projection:offline:v1" ||
+		projection.ProjectionKind != "memory_context_to_turn_request_projection" ||
+		projection.SourceFixtureRefs.MemoryStore == "" ||
+		projection.SourceFixtureRefs.TurnRequest == "" {
+		t.Fatalf("projection header/source refs invalid: %#v", projection)
+	}
+	if !projection.ProviderFree || projection.LiveNetwork || projection.RealDependencyImports ||
+		projection.CredentialsRequired || projection.RawMemoryTextAllowed || projection.SecretValuesAllowed {
+		t.Fatalf("projection must stay provider-free/offline: %#v", projection)
+	}
+	requestHash, _ := request.Replay["request_hash"].(string)
+	if projection.TargetRequest.RequestID != request.RequestID ||
+		projection.TargetRequest.CorrelationID != request.CorrelationID ||
+		projection.TargetRequest.RequestHash != requestHash ||
+		projection.TargetRequest.TargetField != "messages" {
+		t.Fatalf("projection target request does not resolve: projection=%#v request=%#v", projection.TargetRequest, request)
+	}
+	if len(projection.ProjectedMessages) != 1 {
+		t.Fatalf("projected messages = %d, want 1", len(projection.ProjectedMessages))
+	}
+	message := projection.ProjectedMessages[0]
+	if message.Role != "system" ||
+		message.Metadata.MessageKind != "memory_context_refs" ||
+		message.Metadata.SourceFixtureKey != memory.Provenance.FixtureKey ||
+		message.Metadata.ContextWindowStrategy != memory.ContextWindow.Strategy ||
+		message.Metadata.RawMemoryTextStored ||
+		message.Metadata.SecretValuesPresent ||
+		!message.Metadata.DeterministicOrder ||
+		!sameStringSet(message.Metadata.IncludedMemoryIDs, memory.ContextWindow.IncludedMemoryIDs) {
+		t.Fatalf("projected memory context message invalid: %#v", message)
+	}
+	for _, item := range memory.MemoryItems {
+		if strings.Contains(message.Content, item.Text) {
+			t.Fatalf("projected message copied raw memory text %q: %#v", item.MemoryID, message)
+		}
+	}
+
+	retrievalByMemory := map[string]struct {
+		Rank       int
+		ContextRef string
+	}{}
+	for _, result := range memory.RetrievalResults {
+		retrievalByMemory[result.MemoryID] = struct {
+			Rank       int
+			ContextRef string
+		}{Rank: result.Rank, ContextRef: result.ContextRef}
+	}
+	lastRank := 0
+	for _, mapping := range projection.ContextRefMappings {
+		retrieval, ok := retrievalByMemory[mapping.MemoryID]
+		if !ok ||
+			mapping.Rank <= lastRank ||
+			mapping.Rank != retrieval.Rank ||
+			mapping.ContextRef != retrieval.ContextRef ||
+			mapping.TargetMessageIndex != 0 ||
+			mapping.ProjectionPolicy != "context_ref_only" {
+			t.Fatalf("context ref mapping invalid: mapping=%#v retrieval=%#v", mapping, retrieval)
+		}
+		lastRank = mapping.Rank
+	}
+	for _, want := range []string{"projection_is_provider_free", "turn_request_identity_resolves", "context_refs_match_memory_retrieval_results", "included_memory_ids_match_context_window", "message_order_is_deterministic", "raw_memory_text_absent", "secret_values_absent"} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
+}
+
 func TestGenericTurnRunnerSmokeAndNoProviderDependencies(t *testing.T) {
 	base := genericTurnRunnerPackageDir(t)
 	manifest := loadGenericTurnRunnerManifest(t, base)
@@ -384,7 +532,7 @@ func TestGenericTurnRunnerSmokeAndNoProviderDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get summary: %v", err)
 	}
-	want := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=2 schemas=5 fixtures=5 replay_match=deterministic_request_hash"
+	want := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=3 schemas=6 fixtures=6 replay_match=deterministic_request_hash memory_context_projection=true"
 	if got != want {
 		t.Fatalf("summary = %#v, want %#v", got, want)
 	}
