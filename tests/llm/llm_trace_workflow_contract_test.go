@@ -146,3 +146,92 @@ child_parent_name := value.trace.children[1].parent.name
 		})
 	}
 }
+
+func TestLLMTraceEventEnvelopeHelpers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+event := llm.trace_event({
+    trace_id: "trace-1"
+    event_id: "event-2"
+    event_type: "tool_call"
+    sequence: 2
+    timestamp_ms: 12345
+    status: "ok"
+    turn_id: "turn-1"
+    tool_call_id: "call-1"
+    workflow_run_id: "wf-1"
+    replay_session_id: "session-1"
+    replay_key: "turn:1"
+    request_hash: "sha256:req"
+    response_hash: "sha256:res"
+    capability: "generic.tool.invoke"
+    payload: {
+        tool_name: "lookup"
+        args_schema: "redacted"
+    }
+})
+envelope := llm.trace_envelope({event}, {
+    trace_id: "trace-1"
+    kind: "generic_ai_trace_envelope"
+})
+
+event_schema := event.schema_version
+event_type := event.event_type
+event_type_alias := event.type
+event_provider_free := event.provider_free
+event_live_network := event.live_network
+event_correlation_trace := event.correlation.trace_id
+event_correlation_tool := event.correlation.tool_call_id
+event_replay_mode := event.replay.mode
+event_replay_key := event.replay.replay_key
+event_payload_tool := event.payload.tool_name
+event_redaction_secret := event.redaction.secret_values_present
+envelope_kind := envelope.kind
+envelope_trace := envelope.trace_id
+envelope_provider_free := envelope.provider_free
+envelope_events := #envelope.events
+envelope_event_id := envelope.events[1].event_id
+envelope_event_sequence := envelope.events[1].sequence
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"event_schema":            int64(1),
+				"event_type":              "tool_call",
+				"event_type_alias":        "tool_call",
+				"event_provider_free":     true,
+				"event_live_network":      false,
+				"event_correlation_trace": "trace-1",
+				"event_correlation_tool":  "call-1",
+				"event_replay_mode":       "fixture_replay",
+				"event_replay_key":        "turn:1",
+				"event_payload_tool":      "lookup",
+				"event_redaction_secret":  false,
+				"envelope_kind":           "generic_ai_trace_envelope",
+				"envelope_trace":          "trace-1",
+				"envelope_provider_free":  true,
+				"envelope_events":         int64(1),
+				"envelope_event_id":       "event-2",
+				"envelope_event_sequence": int64(2),
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
