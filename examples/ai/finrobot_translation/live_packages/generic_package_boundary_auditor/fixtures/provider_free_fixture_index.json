@@ -53,6 +53,22 @@
       "real_dependency_imports": false
     },
     {
+      "fixture_key": "generic-package-boundary:capability-policy:offline",
+      "capability": "generic.ai.package.boundary.audit.capability_policy",
+      "path": "fixtures/capability_policy_fixture.json",
+      "schema": "schemas/capability_policy_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "surface": "capability_policy",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
       "fixture_key": "generic-package-boundary:findings:offline",
       "capability": "generic.ai.package.boundary.audit.findings",
       "path": "fixtures/audit_findings_fixture.json",

@@ -5,6 +5,9 @@
   "required": [
     "provider_free",
     "live_network",
+    "real_dependency_imports",
+    "workflow_id",
+    "run_id",
     "hooks"
   ],
   "properties": {
@@ -14,9 +17,22 @@
     "live_network": {
       "const": false
     },
+    "real_dependency_imports": {
+      "const": false
+    },
     "hooks": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "phase",
+          "event_id",
+          "emission_mode",
+          "payload_ref",
+          "provider_sink"
+        ]
+      }
     }
   }
 }
-

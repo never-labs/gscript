@@ -33,14 +33,51 @@
     "target_package": {
       "const": "generic_workflow_orchestrator"
     },
+    "source_refs": {
+      "type": "object"
+    },
+    "workflow_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
     "stage_mappings": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "stage_id",
+          "source_node_ids",
+          "source_node_types",
+          "input_ref",
+          "output_ref",
+          "trace_event_refs"
+        ]
+      }
     },
     "edge_mappings": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source_edge_type",
+          "source_edges",
+          "workflow_edge",
+          "handoff_ref"
+        ]
+      }
     },
     "evidence_mappings": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "evidence_kind",
+          "source_event_refs",
+          "workflow_trace_refs"
+        ]
+      }
     },
     "projection_assertions": {
       "type": "object"

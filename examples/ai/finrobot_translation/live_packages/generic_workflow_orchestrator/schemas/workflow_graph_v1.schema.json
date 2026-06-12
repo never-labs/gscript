@@ -7,6 +7,8 @@
     "entrypoint",
     "provider_free",
     "live_network",
+    "real_dependency_imports",
+    "package_name",
     "stages",
     "edges"
   ],
@@ -23,12 +25,33 @@
     "live_network": {
       "const": false
     },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "package_name": {
+      "const": "generic.ai.workflow.orchestration"
+    },
     "stages": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "depends_on",
+          "input_ref",
+          "output_ref",
+          "input_schema",
+          "output_schema"
+        ]
+      }
     },
     "edges": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2
+      }
     }
   }
 }
-

@@ -5,6 +5,8 @@
   "required": [
     "provider_free",
     "live_network",
+    "workflow_id",
+    "run_id",
     "handoffs"
   ],
   "properties": {
@@ -15,8 +17,18 @@
       "const": false
     },
     "handoffs": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_stage",
+          "to_stage",
+          "payload_ref",
+          "payload_schema",
+          "status",
+          "trace_event_id"
+        ]
+      }
     }
   }
 }
-

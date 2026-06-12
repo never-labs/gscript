@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "generic-package-boundary-capability-policy-fixture",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "default_decision": "deny",
+  "allowed_capability_prefixes": [
+    "generic.ai.package.boundary.audit.",
+    "ai.package.audit."
+  ],
+  "denied_by_default": [
+    "live_network",
+    "provider_credentials",
+    "provider_sdk_imports",
+    "runtime_mutation",
+    "filesystem_write_outside_package"
+  ],
+  "capabilities": [
+    {
+      "id": "manifest",
+      "capability": "generic.ai.package.boundary.audit.manifest",
+      "mode": "fixture_replay",
+      "live_network": false,
+      "provider_credentials_required": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "fixture_index",
+      "capability": "generic.ai.package.boundary.audit.fixture_index",
+      "mode": "fixture_replay",
+      "live_network": false,
+      "provider_credentials_required": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "example_registry",
+      "capability": "generic.ai.package.boundary.audit.example_registry",
+      "mode": "fixture_replay",
+      "live_network": false,
+      "provider_credentials_required": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "capability_policy",
+      "capability": "generic.ai.package.boundary.audit.capability_policy",
+      "mode": "fixture_replay",
+      "live_network": false,
+      "provider_credentials_required": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "findings",
+      "capability": "generic.ai.package.boundary.audit.findings",
+      "mode": "fixture_replay",
+      "live_network": false,
+      "provider_credentials_required": false,
+      "real_dependency_imports": false
+    },
+    {
+      "id": "missing_boundary_records",
+      "capability": "generic.ai.package.boundary.audit.missing_boundary_records",
+      "mode": "fixture_replay",
+      "live_network": false,
+      "provider_credentials_required": false,
+      "real_dependency_imports": false
+    }
+  ],
+  "acceptance_gates": [
+    "capabilities must use the generic.ai.package.boundary.audit or ai.package.audit prefix",
+    "live network, provider credentials, and provider SDK imports remain denied by default",
+    "audit outputs are deterministic fixture replay records",
+    "package manifests, fixture indexes, example registries, findings, and missing boundary records are covered"
+  ]
+}

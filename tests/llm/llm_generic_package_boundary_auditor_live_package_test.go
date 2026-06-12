@@ -234,26 +234,41 @@ func TestGenericPackageBoundaryAuditorCapabilityPolicyAndContract(t *testing.T) 
 
 func TestGenericPackageBoundaryAuditorFixtures(t *testing.T) {
 	base := genericPackageBoundaryAuditorDir(t)
+	manifest := loadGenericPackageBoundaryAuditorManifest(t, base)
 	var index struct {
 		ProviderFree          bool `json:"provider_free"`
 		LiveNetwork           bool `json:"live_network"`
 		RealDependencyImports bool `json:"real_dependency_imports"`
 		Fixtures              []struct {
-			FixtureKey string         `json:"fixture_key"`
-			Capability string         `json:"capability"`
-			Path       string         `json:"path"`
-			Schema     string         `json:"schema"`
-			Metadata   map[string]any `json:"metadata"`
+			FixtureKey            string         `json:"fixture_key"`
+			Capability            string         `json:"capability"`
+			Path                  string         `json:"path"`
+			Schema                string         `json:"schema"`
+			Metadata              map[string]any `json:"metadata"`
+			ProviderFree          bool           `json:"provider_free"`
+			LiveNetwork           bool           `json:"live_network"`
+			RealDependencyImports bool           `json:"real_dependency_imports"`
 		} `json:"fixtures"`
 	}
 	decodeGenericPackageBoundaryAuditorJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 5 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != len(manifest.Targets) {
 		t.Fatalf("fixture index header/count = %#v", index)
+	}
+	targetsByKey := map[string]genericPackageBoundaryAuditorTarget{}
+	for _, target := range manifest.Targets {
+		targetsByKey[target.FixtureKey] = target
 	}
 	seen := map[string]bool{}
 	for _, fixture := range index.Fixtures {
 		if fixture.FixtureKey == "" || fixture.Capability == "" || fixture.Path == "" || fixture.Schema == "" {
 			t.Fatalf("fixture metadata incomplete: %#v", fixture)
+		}
+		target, ok := targetsByKey[fixture.FixtureKey]
+		if !ok {
+			t.Fatalf("fixture %q is not declared by manifest audit_targets", fixture.FixtureKey)
+		}
+		if fixture.Capability != target.Capability {
+			t.Fatalf("%s capability = %q, want manifest capability %q", fixture.FixtureKey, fixture.Capability, target.Capability)
 		}
 		if !strings.HasPrefix(fixture.Capability, "generic.ai.package.boundary.audit.") {
 			t.Fatalf("fixture capability = %q", fixture.Capability)
@@ -261,12 +276,20 @@ func TestGenericPackageBoundaryAuditorFixtures(t *testing.T) {
 		if fixture.Metadata["replay_ready"] != true || fixture.Metadata["surface"] == "" {
 			t.Fatalf("%s fixture metadata = %#v", fixture.FixtureKey, fixture.Metadata)
 		}
+		if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports {
+			t.Fatalf("%s fixture must stay provider-free: %#v", fixture.FixtureKey, fixture)
+		}
 		if seen[fixture.FixtureKey] {
 			t.Fatalf("duplicate fixture key %q", fixture.FixtureKey)
 		}
 		seen[fixture.FixtureKey] = true
 		assertGenericPackageBoundaryAuditorJSONFile(t, filepath.Join(base, fixture.Path))
 		assertGenericPackageBoundaryAuditorJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+	for _, target := range manifest.Targets {
+		if !seen[target.FixtureKey] {
+			t.Fatalf("manifest audit target %q is missing from fixture index", target.FixtureKey)
+		}
 	}
 
 	assertGenericPackageBoundaryAuditorFindings(t, filepath.Join(base, "fixtures", "package_manifest_audit_fixture.json"), "package_manifest")

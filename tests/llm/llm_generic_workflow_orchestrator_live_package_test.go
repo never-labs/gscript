@@ -277,6 +277,108 @@ func TestGenericWorkflowOrchestratorGraphStageIOAndContracts(t *testing.T) {
 	}
 }
 
+func TestGenericWorkflowOrchestratorSchemaContractFixtureConsistency(t *testing.T) {
+	base := genericWorkflowOrchestratorLivePackageDir(t)
+	manifest := loadGenericWorkflowOrchestratorManifest(t, base)
+
+	for schemaKey, wants := range map[string][]string{
+		"workflow_graph":                  {"workflow_id", "entrypoint", "provider_free", "live_network", "real_dependency_imports", "package_name", "stages", "edges"},
+		"stage_io":                        {"provider_free", "live_network", "workflow_id", "run_id", "stage_io"},
+		"planning_graph_stage_projection": {"provider_free", "live_network", "real_dependency_imports", "source_package", "target_package", "source_refs", "workflow_id", "run_id", "stage_mappings", "edge_mappings", "evidence_mappings", "projection_assertions"},
+		"handoff_trace":                   {"provider_free", "live_network", "workflow_id", "run_id", "handoffs"},
+		"retry_cache_policy":              {"retry_policy", "cache_policy"},
+		"workflow_result":                 {"provider_free", "live_network", "real_dependency_imports", "workflow_id", "run_id", "entrypoint", "status", "stage_results", "artifacts", "trace_refs"},
+		"trace_emission_hooks":            {"provider_free", "live_network", "real_dependency_imports", "workflow_id", "run_id", "hooks"},
+	} {
+		assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas[schemaKey]), nil, wants)
+	}
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["workflow_graph"]), []string{"properties", "stages", "items"}, []string{"id", "depends_on", "input_ref", "output_ref", "input_schema", "output_schema"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["stage_io"]), []string{"properties", "stage_io", "items"}, []string{"stage_id", "input_ref", "input_shape", "output_ref", "output_shape", "status", "fixture_key", "attempt", "max_attempts", "cache_key", "cache_state", "trace_event_id"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["handoff_trace"]), []string{"properties", "handoffs", "items"}, []string{"from_stage", "to_stage", "payload_ref", "payload_schema", "status", "trace_event_id"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["workflow_result"]), []string{"properties", "stage_results", "items"}, []string{"stage_id", "status", "output_ref", "trace_event_id"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["workflow_result"]), []string{"properties", "artifacts", "items"}, []string{"artifact_id", "kind", "status", "source_refs"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["trace_emission_hooks"]), []string{"properties", "hooks", "items"}, []string{"id", "phase", "event_id", "emission_mode", "payload_ref", "provider_sink"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["planning_graph_stage_projection"]), []string{"properties", "stage_mappings", "items"}, []string{"stage_id", "source_node_ids", "source_node_types", "input_ref", "output_ref", "trace_event_refs"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["planning_graph_stage_projection"]), []string{"properties", "edge_mappings", "items"}, []string{"source_edge_type", "source_edges", "workflow_edge", "handoff_ref"})
+	assertGenericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["planning_graph_stage_projection"]), []string{"properties", "evidence_mappings", "items"}, []string{"evidence_kind", "source_event_refs", "workflow_trace_refs"})
+
+	type fixtureIndexRow struct {
+		FixtureKey        string   `json:"fixture_key"`
+		Capability        string   `json:"capability"`
+		CapabilityScope   string   `json:"capability_scope"`
+		CapabilityAliases []string `json:"capability_aliases"`
+		Path              string   `json:"path"`
+		Schema            string   `json:"schema"`
+		ProviderFree      bool     `json:"provider_free"`
+		LiveNetwork       bool     `json:"live_network"`
+		RealImports       bool     `json:"real_dependency_imports"`
+	}
+	var index struct {
+		Fixtures []fixtureIndexRow `json:"fixtures"`
+	}
+	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
+	fixturesByPath := map[string]fixtureIndexRow{}
+	for _, fixture := range index.Fixtures {
+		fixturesByPath[fixture.Path] = fixture
+	}
+	for key, fixturePath := range manifest.Fixtures {
+		if key == "index" {
+			continue
+		}
+		fixture, ok := fixturesByPath[fixturePath]
+		if !ok {
+			t.Fatalf("manifest fixture %q=%q missing from fixture index", key, fixturePath)
+		}
+		if fixture.Schema != manifest.Schemas[key] {
+			t.Fatalf("fixture %q schema = %q, want manifest schema %q", key, fixture.Schema, manifest.Schemas[key])
+		}
+		if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealImports {
+			t.Fatalf("fixture %q provider boundary mismatch: %#v", key, fixture)
+		}
+	}
+
+	traceHookCapabilities := map[string]bool{}
+	for _, hook := range manifest.TraceEmissionHooks {
+		traceHookCapabilities[hook.Capability] = true
+		if !contains(manifest.Capabilities, hook.Capability) {
+			t.Fatalf("manifest capabilities missing trace hook capability %q", hook.Capability)
+		}
+	}
+	traceHookFixture := fixturesByPath[manifest.Fixtures["trace_emission_hooks"]]
+	if traceHookFixture.Capability != "generic.ai.workflow.orchestration.trace_hooks" || traceHookFixture.CapabilityScope != "aggregate" {
+		t.Fatalf("trace hook fixture must be an aggregate capability: %#v", traceHookFixture)
+	}
+	if len(traceHookFixture.CapabilityAliases) != len(traceHookCapabilities) {
+		t.Fatalf("trace hook aliases = %#v, want capabilities %#v", traceHookFixture.CapabilityAliases, traceHookCapabilities)
+	}
+	for _, alias := range traceHookFixture.CapabilityAliases {
+		if !traceHookCapabilities[alias] {
+			t.Fatalf("trace hook alias %q is not declared by manifest trace hooks %#v", alias, manifest.TraceEmissionHooks)
+		}
+	}
+
+	var contract struct {
+		Stages []struct {
+			ID             string   `json:"id"`
+			OutputSchema   string   `json:"output_schema"`
+			RequiredFields []string `json:"required_fields"`
+		} `json:"stages"`
+	}
+	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, manifest.Entrypoints["workflow_graph_contract"]), &contract)
+	for _, stage := range contract.Stages {
+		switch stage.OutputSchema {
+		case manifest.Schemas["stage_io"]:
+			assertGenericWorkflowOrchestratorRequiredSubset(t, "stage_io item required fields", stage.RequiredFields, genericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["stage_io"]), []string{"properties", "stage_io", "items"}))
+		case manifest.Schemas["handoff_trace"]:
+			assertGenericWorkflowOrchestratorRequiredSubset(t, "handoff item required fields", stage.RequiredFields, genericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["handoff_trace"]), []string{"properties", "handoffs", "items"}))
+		case manifest.Schemas["workflow_result"]:
+			assertGenericWorkflowOrchestratorRequiredSubset(t, "workflow result required fields", stage.RequiredFields, genericWorkflowOrchestratorSchemaRequired(t, filepath.Join(base, manifest.Schemas["workflow_result"]), nil))
+		default:
+			t.Fatalf("stage %q output schema %q not declared in manifest schemas", stage.ID, stage.OutputSchema)
+		}
+	}
+}
+
 func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 	base := genericWorkflowOrchestratorLivePackageDir(t)
 	manifest := loadGenericWorkflowOrchestratorManifest(t, base)
@@ -883,6 +985,59 @@ func decodeGenericWorkflowOrchestratorJSONFile(t *testing.T, path string, value 
 	}
 	if err := json.Unmarshal(data, value); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
+	}
+}
+
+func assertGenericWorkflowOrchestratorSchemaRequired(t *testing.T, path string, cursor []string, wants []string) {
+	t.Helper()
+	required := genericWorkflowOrchestratorSchemaRequired(t, path, cursor)
+	for _, want := range wants {
+		if !contains(required, want) {
+			t.Fatalf("%s required at %v missing %q: %#v", path, cursor, want, required)
+		}
+	}
+}
+
+func genericWorkflowOrchestratorSchemaRequired(t *testing.T, path string, cursor []string) []string {
+	t.Helper()
+	var schema map[string]any
+	decodeGenericWorkflowOrchestratorJSONFile(t, path, &schema)
+	node := any(schema)
+	for _, segment := range cursor {
+		object, ok := node.(map[string]any)
+		if !ok {
+			t.Fatalf("%s cursor %v segment %q is not an object: %#v", path, cursor, segment, node)
+		}
+		node = object[segment]
+		if node == nil {
+			t.Fatalf("%s missing schema cursor %v at segment %q", path, cursor, segment)
+		}
+	}
+	object, ok := node.(map[string]any)
+	if !ok {
+		t.Fatalf("%s schema cursor %v is not an object: %#v", path, cursor, node)
+	}
+	raw, ok := object["required"].([]any)
+	if !ok {
+		t.Fatalf("%s schema cursor %v missing required array: %#v", path, cursor, object)
+	}
+	required := make([]string, 0, len(raw))
+	for _, value := range raw {
+		item, ok := value.(string)
+		if !ok || item == "" {
+			t.Fatalf("%s schema required item at %v must be a non-empty string: %#v", path, cursor, value)
+		}
+		required = append(required, item)
+	}
+	return required
+}
+
+func assertGenericWorkflowOrchestratorRequiredSubset(t *testing.T, label string, subset []string, required []string) {
+	t.Helper()
+	for _, field := range subset {
+		if !contains(required, field) {
+			t.Fatalf("%s missing contract field %q in schema required %#v", label, field, required)
+		}
 	}
 }
 
