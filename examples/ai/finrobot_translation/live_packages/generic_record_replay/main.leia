@@ -174,6 +174,40 @@ runtime_mismatch_replay.match({
 })
 runtime_mismatch_summary := runtime_mismatch_replay.summary()
 
+runtime_turn_record, runtime_turn_record_err := llm.replay_record({
+    record_id: "rec-runtime-turn"
+    replay_key: "turn:runtime:llm.turn"
+    request: {
+        model: "fixture-model"
+        messages: {llm.user("fixture replay direct turn")}
+    }
+    response: {
+        status: "final_answer"
+        text: "fixture replay direct result"
+        calls: {}
+        usage: {}
+    }
+})
+assert(runtime_turn_record_err == nil)
+runtime_turn_fixture, runtime_turn_fixture_err := llm.replay_fixture({runtime_turn_record}, {
+    fixture_id: "generic-ai-record-replay-runtime-turn"
+})
+assert(runtime_turn_fixture_err == nil)
+runtime_turn_replay, runtime_turn_replay_err := runtime_turn_fixture.replay({
+    model: "fixture-model"
+    messages: {llm.user("fixture replay direct turn")}
+}, "turn:runtime:llm.turn")
+assert(runtime_turn_replay_err == nil)
+runtime_turn_result, runtime_turn_err := llm.turn({
+    model: "fixture-model"
+    messages: {llm.user("fixture replay direct turn")}
+    replay: runtime_turn_replay
+})
+assert(runtime_turn_err == nil)
+assert(runtime_turn_result.text == "fixture replay direct result")
+assert(runtime_turn_result.replay.provider_free == true)
+assert(runtime_turn_fixture.summary().matched == 1)
+
 assert(runtime_partial_summary.matched == generic_record_replay_live_package.expected_partial_summary.matched)
 assert(runtime_partial_summary.unconsumed == generic_record_replay_live_package.expected_partial_summary.unconsumed)
 assert(runtime_partial_summary.next_index == generic_record_replay_live_package.expected_partial_summary.next_index)

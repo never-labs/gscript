@@ -358,6 +358,275 @@ exhausted := summary.exhausted
 	assertGlobalInt(t, interp, "exhausted", 1)
 }
 
+func TestLLMReplayFixtureReplayKeepsStrictOrder(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+first, err1 := llm.replay_record({
+    record_id: "rec-1"
+    replay_key: "turn:1"
+    request: {model: "mock" messages: {llm.user("first")}}
+    response: {status: "final_answer" text: "first" calls: {} usage: {}}
+})
+second, err2 := llm.replay_record({
+    record_id: "rec-2"
+    replay_key: "turn:2"
+    request: {model: "mock" messages: {llm.user("second")}}
+    response: {status: "final_answer" text: "second" calls: {} usage: {}}
+})
+fixture, fixture_err := llm.replay_fixture({first, second}, {
+    fixture_id: "fixture:strict"
+})
+replay, err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("second")}
+}, "turn:2")
+first_replay, first_err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("first")}
+}, "turn:1")
+summary := fixture.summary()
+
+replay_nil := replay == nil
+err_kind := err.kind
+err_status := err.status
+err_finding := err.finding_kind
+first_err_nil := first_err == nil
+first_text := first_replay.response.text
+matched := summary.matched
+mismatches := summary.mismatches
+unconsumed := summary.unconsumed
+next_index := summary.next_index
+`, nil)
+
+	if got := interp.GetGlobal("replay_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("replay_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "err_kind", "validation")
+	assertGlobalString(t, interp, "err_status", "mismatch")
+	assertGlobalString(t, interp, "err_finding", "generic.ai.replay.mismatch")
+	if got := interp.GetGlobal("first_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("first_err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "first_text", "first")
+	assertGlobalInt(t, interp, "matched", 1)
+	assertGlobalInt(t, interp, "mismatches", 1)
+	assertGlobalInt(t, interp, "unconsumed", 1)
+	assertGlobalInt(t, interp, "next_index", 1)
+}
+
+func TestLLMReplayFixtureReplaySynthesizesOldRecordAndReturnsClone(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+fixture, fixture_err := llm.replay_fixture({
+    {
+        record_id: "legacy-rec"
+        operation: "llm.turn"
+        capability: "generic.ai.turn"
+        replay_key: "turn:legacy"
+        request: {model: "mock" messages: {llm.user("legacy")}}
+        response: {status: "final_answer" text: "legacy fixture" calls: {} usage: {}}
+    },
+}, {
+    fixture_id: "fixture:legacy"
+})
+replay, err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("legacy")}
+}, "turn:legacy")
+replay.response.text = "mutated"
+stored_text := fixture.records[1].replay.response.text
+returned_text := replay.response.text
+err_nil := err == nil
+mode := replay.mode
+`, nil)
+
+	if got := interp.GetGlobal("err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "mode", "fixture_replay")
+	assertGlobalString(t, interp, "returned_text", "mutated")
+	assertGlobalString(t, interp, "stored_text", "legacy fixture")
+}
+
+func TestLLMReplayFixtureReplayRejectsUnnormalizedTurnRequest(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record, record_err := llm.replay_record({
+    record_id: "rec"
+    replay_key: "turn:missing"
+    request_hash: "hash:missing"
+    response: {status: "final_answer" text: "ok" calls: {} usage: {}}
+})
+fixture, fixture_err := llm.replay_fixture({record}, {
+    fixture_id: "fixture:missing"
+})
+replay, err := fixture.replay({model: "mock"}, "turn:missing")
+replay_nil := replay == nil
+err_kind := err.kind
+err_message := err.message
+`, nil)
+
+	if got := interp.GetGlobal("replay_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("replay_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "err_kind", "validation")
+	msg := interp.GetGlobal("err_message")
+	if !msg.IsString() || !strings.Contains(msg.Str(), "llm.turn requires messages") {
+		t.Fatalf("err_message = %v, want llm.turn requires messages", msg)
+	}
+}
+
+func TestLLMReplayFixtureReplayCustomIdentityFields(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record_key_only, err1 := llm.replay_record({
+    record_id: "rec-key"
+    replay_key: "turn:shared"
+    request: {model: "mock" messages: {llm.user("record request")}}
+    response: {status: "final_answer" text: "key only fixture" calls: {} usage: {}}
+})
+fixture_key_only, fixture_err1 := llm.replay_fixture({record_key_only}, {
+    fixture_id: "fixture:key-only"
+    identity_fields: {"replay_key"}
+})
+key_replay, key_err := fixture_key_only.replay({
+    replay_key: "turn:shared"
+}, "turn:shared")
+
+record_tenant, err2 := llm.replay_record({
+    record_id: "rec-tenant"
+    tenant_id: "alpha"
+    replay_key: "turn:tenant"
+    request: {model: "mock" messages: {llm.user("tenant request")}}
+    response: {status: "final_answer" text: "tenant fixture" calls: {} usage: {}}
+})
+fixture_tenant, fixture_err2 := llm.replay_fixture({record_tenant}, {
+    fixture_id: "fixture:tenant"
+    identity_fields: {"tenant_id", "replay_key"}
+})
+bad_replay, bad_err := fixture_tenant.replay({
+    tenant_id: "beta"
+    model: "mock"
+    messages: {llm.user("tenant request")}
+}, "turn:tenant")
+good_replay, good_err := fixture_tenant.replay({
+    tenant_id: "alpha"
+    model: "mock"
+    messages: {llm.user("tenant request")}
+}, "turn:tenant")
+
+setup_ok := err1 == nil && fixture_err1 == nil && err2 == nil && fixture_err2 == nil
+key_err_nil := key_err == nil
+key_text := key_replay.response.text
+bad_replay_nil := bad_replay == nil
+bad_status := bad_err.status
+bad_message := bad_err.message
+good_err_nil := good_err == nil
+good_text := good_replay.response.text
+`, nil)
+
+	if got := interp.GetGlobal("setup_ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("setup_ok = %v, want true", got)
+	}
+	if got := interp.GetGlobal("key_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("key_err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "key_text", "key only fixture")
+	if got := interp.GetGlobal("bad_replay_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("bad_replay_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "bad_status", "mismatch")
+	msg := interp.GetGlobal("bad_message")
+	if !msg.IsString() || !strings.Contains(msg.Str(), "tenant_id") {
+		t.Fatalf("bad_message = %v, want tenant_id mismatch", msg)
+	}
+	if got := interp.GetGlobal("good_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("good_err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "good_text", "tenant fixture")
+}
+
+func TestLLMReplayFixtureReplayCustomIdentityDoesNotRequireTurnRequest(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record_key_only, err1 := llm.replay_record({
+    record_id: "rec-key"
+    replay_key: "turn:shared"
+    request_hash: "hash:any"
+    response: {status: "final_answer" text: "key only fixture" calls: {} usage: {}}
+})
+fixture_key_only, fixture_err1 := llm.replay_fixture({record_key_only}, {
+    fixture_id: "fixture:key-only"
+    identity_fields: {"replay_key"}
+})
+key_replay, key_err := fixture_key_only.replay({replay_key: "turn:shared"})
+
+record_tool, err2 := llm.replay_record({
+    record_id: "tool-rec"
+    operation: "tool.call"
+    capability: "generic.ai.tool.invoke"
+    replay_key: "tool:1"
+    request_hash: "hash:any"
+    response: {status: "ok" text: "tool fixture"}
+})
+fixture_tool, fixture_err2 := llm.replay_fixture({record_tool}, {
+    fixture_id: "fixture:tool"
+    identity_fields: {"operation", "capability", "replay_key"}
+})
+tool_replay, tool_err := fixture_tool.replay({
+    operation: "tool.call"
+    capability: "generic.ai.tool.invoke"
+    replay_key: "tool:1"
+})
+
+setup_ok := err1 == nil && fixture_err1 == nil && err2 == nil && fixture_err2 == nil
+key_err_nil := key_err == nil
+key_text := key_replay.response.text
+tool_err_nil := tool_err == nil
+tool_text := tool_replay.response.text
+`, nil)
+
+	if got := interp.GetGlobal("setup_ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("setup_ok = %v, want true", got)
+	}
+	if got := interp.GetGlobal("key_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("key_err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "key_text", "key only fixture")
+	if got := interp.GetGlobal("tool_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("tool_err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "tool_text", "tool fixture")
+}
+
+func TestLLMReplayFixtureBadArguments(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+missing_ok, missing_err := pcall(llm.replay_fixture)
+bad_records_ok, bad_records_err := pcall(llm.replay_fixture, "records")
+bad_opts_ok, bad_opts_err := pcall(llm.replay_fixture, {}, "opts")
+record, record_err := llm.replay_record({
+    record_id: "rec"
+    replay_key: "turn:1"
+    request_hash: "hash:1"
+    response: {status: "final_answer" text: "ok" calls: {} usage: {}}
+})
+fixture, fixture_err := llm.replay_fixture({record}, {})
+bad_request_ok, bad_request_err := pcall(fixture.replay, "request", "turn:1")
+bad_key_ok, bad_key_err := pcall(fixture.replay, {request_hash: "hash:1"}, 1)
+
+setup_ok := record_err == nil && fixture_err == nil
+`, nil)
+
+	if got := interp.GetGlobal("setup_ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("setup_ok = %v, want true", got)
+	}
+	for _, name := range []string{"missing_ok", "bad_records_ok", "bad_opts_ok", "bad_request_ok", "bad_key_ok"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || got.Bool() {
+			t.Fatalf("%s = %v, want false", name, got)
+		}
+	}
+	for _, name := range []string{"missing_err", "bad_records_err", "bad_opts_err", "bad_request_err", "bad_key_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want error string", name, got)
+		}
+	}
+}
+
 func assertGlobalInt(t *testing.T, interp interface{ GetGlobal(string) Value }, name string, want int64) {
 	t.Helper()
 	got := interp.GetGlobal(name)
