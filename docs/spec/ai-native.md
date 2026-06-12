@@ -359,7 +359,8 @@ steps. Each step receives a context table with `input`, `initial_input`,
 ordered step results and a name-indexed context table, feeds the prior step's
 text or value to the next step, and returns a final workflow result plus an
 error value when a step fails. Mock fixtures replace matching steps for tests
-and examples.
+and examples. Fixture lookup is deterministic: `fixture_key` when declared,
+then step or stage name, then 1-based numeric step index.
 
 `llm.stage` has the same execution semantics as `llm.step`, but marks the
 value as a stage and preserves stage-oriented metadata in `opts`, such as

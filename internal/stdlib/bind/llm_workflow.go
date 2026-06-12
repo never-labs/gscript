@@ -485,7 +485,7 @@ func llmRunWorkflow(call ScriptFunctionCaller, steps []llmWorkflowStep, initialI
 }
 
 func llmRunWorkflowStep(call ScriptFunctionCaller, step llmWorkflowStep, index int, initialInput, input, previous, results, context Value, fixtures *Table) (Value, error) {
-	if fixture := llmWorkflowFixture(fixtures, step.Name, index); !fixture.IsNil() {
+	if fixture := llmWorkflowFixture(fixtures, step, index); !fixture.IsNil() {
 		value, errValue := llmWorkflowNormalizeFixture(fixture)
 		return llmWorkflowRecord(step, index, input, value, errValue, true), nil
 	}
@@ -560,14 +560,26 @@ func llmWorkflowCopyStepMetadata(metadata *Table, step llmWorkflowStep) {
 	}
 }
 
-func llmWorkflowFixture(fixtures *Table, name string, index int) Value {
+func llmWorkflowFixture(fixtures *Table, step llmWorkflowStep, index int) Value {
 	if fixtures == nil {
 		return NilValue()
 	}
-	if byName := fixtures.RawGetString(name); !byName.IsNil() {
+	if fixtureKey := llmWorkflowStepFixtureKey(step); fixtureKey != "" {
+		if byFixtureKey := fixtures.RawGetString(fixtureKey); !byFixtureKey.IsNil() {
+			return byFixtureKey
+		}
+	}
+	if byName := fixtures.RawGetString(step.Name); !byName.IsNil() {
 		return byName
 	}
 	return fixtures.RawGet(IntValue(int64(index)))
+}
+
+func llmWorkflowStepFixtureKey(step llmWorkflowStep) string {
+	if !step.Opts.IsTable() {
+		return ""
+	}
+	return llmWorkflowConfigString(step.Opts.Table(), "fixture_key", "")
 }
 
 func llmWorkflowNormalizeFixture(v Value) (Value, Value) {

@@ -492,3 +492,125 @@ final_input := result.steps[2].input
 		})
 	}
 }
+
+func TestLLMWorkflowMockCanResolveStageFixtureKey(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{}
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+graph := llm.workflow_graph({
+    workflow_id: "fixture-key-flow"
+    stages: {
+        llm.stage("plan", func(ctx) {
+            return llm.turn({messages: {llm.user("should not run")}})
+        }, {
+            fixture_key: "turn:plan"
+            capability: "generic.ai.workflow.stage.plan"
+        }),
+        llm.stage("finalize", func(ctx) {
+            return {text: "final " .. ctx.input}, nil
+        }, {
+            depends_on: {"plan"}
+            fixture_key: "turn:final"
+            capability: "generic.ai.workflow.stage.finalize"
+        }),
+    }
+})
+fixtures := {}
+fixtures["turn:plan"] = {text: "fixture plan"}
+mocked := graph.mock(fixtures)
+result, err := mocked.run("topic")
+text := result.text
+plan_mocked := result.steps[1].mocked
+plan_fixture_key := result.steps[1].trace.metadata.fixture_key
+final_input := result.steps[2].input
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 0 {
+				t.Fatalf("provider requests = %d, want 0", len(provider.requests))
+			}
+			for name, want := range map[string]any{
+				"text":             "final fixture plan",
+				"plan_mocked":      true,
+				"plan_fixture_key": "turn:plan",
+				"final_input":      "fixture plan",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLLMWorkflowMockPrefersFixtureKeyThenStageNameThenIndex(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+flow := llm.workflow({
+    llm.stage("named", func(ctx) {
+        return {text: "live named"}, nil
+    }, {fixture_key: "fixture:named"}),
+    llm.stage("keyed", func(ctx) {
+        return {text: "live keyed"}, nil
+    }, {fixture_key: "fixture:keyed"}),
+    llm.stage("indexed", func(ctx) {
+        return {text: "live indexed"}, nil
+    }),
+})
+fixtures := {
+    named: {text: "by name"}
+}
+fixtures["fixture:named"] = {text: "by key should win"}
+fixtures["fixture:keyed"] = {text: "by key"}
+fixtures[1] = {text: "index one"}
+fixtures[2] = {text: "index two"}
+fixtures[3] = {text: "by index"}
+mocked := flow.mock(fixtures)
+result, err := mocked.run("topic")
+first_text := result.steps[1].text
+second_text := result.steps[2].text
+third_text := result.steps[3].text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"first_text":  "by key should win",
+				"second_text": "by key",
+				"third_text":  "by index",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
