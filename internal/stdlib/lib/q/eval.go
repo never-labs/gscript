@@ -10185,6 +10185,9 @@ func applyOver(op byte, initial any, v any) (any, error) {
 		if initial != nil {
 			return initial, nil
 		}
+		if identity, ok := qMinMaxReduceIdentity(op, v); ok {
+			return identity, nil
+		}
 		return data.NullValue, nil
 	}
 	acc := initial
@@ -10201,6 +10204,51 @@ func applyOver(op byte, initial any, v any) (any, error) {
 		acc = next
 	}
 	return acc, nil
+}
+
+// qMinMaxReduceIdentity yields the canonical empty-vector identities for the
+// derived min/max reducers: `&/()` is the positive infinity of the element
+// type (0W, 0w, 1b) and `|/()` the negative one (-0W, -0w, 0b).
+func qMinMaxReduceIdentity(op byte, v any) (any, bool) {
+	if op != '&' && op != '|' {
+		return nil, false
+	}
+	kind := data.Kind("")
+	if array, ok := v.(data.Array); ok {
+		kind = array.Kind()
+	}
+	wantMax := op == '|'
+	switch kind {
+	case data.KindBool:
+		return !wantMax, true
+	case data.KindF32:
+		if wantMax {
+			return float32(math.Inf(-1)), true
+		}
+		return float32(math.Inf(1)), true
+	case data.KindF64:
+		if wantMax {
+			return math.Inf(-1), true
+		}
+		return math.Inf(1), true
+	case data.KindI16:
+		if wantMax {
+			return int16(-math.MaxInt16), true
+		}
+		return int16(math.MaxInt16), true
+	case data.KindI32:
+		if wantMax {
+			return int32(-math.MaxInt32), true
+		}
+		return int32(math.MaxInt32), true
+	default:
+		// Integer vectors and the untyped empty list reduce with the long
+		// identities, matching canonical `&/()` -> 0W and `|/()` -> -0W.
+		if wantMax {
+			return int64(-math.MaxInt64), true
+		}
+		return int64(math.MaxInt64), true
+	}
 }
 
 func applyScan(op byte, initial any, v any) (any, error) {
@@ -12220,22 +12268,87 @@ func hasTypedNullKind(v any) bool {
 	return ok && kind != data.KindNull
 }
 
+// applyDyadicLogical implements canonical q `&`/`and` (elementwise minimum)
+// and `|`/`or` (elementwise maximum). On booleans min/max IS logical and/or,
+// so strictly-boolean operands keep their boolean result. Nulls follow the
+// canonical sort order (nulls are smallest): the minimum against a null is
+// the null, the maximum is the other operand. Mixed bool/numeric operands
+// promote the boolean to its integer value per q type promotion.
 func applyDyadicLogical(op byte, left, right any) (any, error) {
-	lv, err := boolValue(left)
-	if err != nil {
-		return nil, err
-	}
-	rv, err := boolValue(right)
-	if err != nil {
-		return nil, err
-	}
-	switch op {
-	case '&':
-		return lv && rv, nil
-	case '|':
-		return lv || rv, nil
-	default:
+	if op != '&' && op != '|' {
 		return nil, fmt.Errorf("operator %q is not a logical verb", string(op))
+	}
+	if data.IsNull(left) || qIsNaNScalar(left) {
+		if op == '&' {
+			return left, nil
+		}
+		return qMinMaxPromoteAgainstNull(right, left), nil
+	}
+	if data.IsNull(right) || qIsNaNScalar(right) {
+		if op == '&' {
+			return right, nil
+		}
+		return qMinMaxPromoteAgainstNull(left, right), nil
+	}
+	lb, leftIsBool := left.(bool)
+	rb, rightIsBool := right.(bool)
+	if leftIsBool && rightIsBool {
+		if op == '&' {
+			return lb && rb, nil
+		}
+		return lb || rb, nil
+	}
+	if leftIsBool {
+		left = qBoolToInt64(lb)
+	}
+	if rightIsBool {
+		right = qBoolToInt64(rb)
+	}
+	cmp, err := compareOrdered(left, right)
+	if err != nil {
+		return nil, err
+	}
+	if (op == '&' && cmp <= 0) || (op == '|' && cmp >= 0) {
+		return left, nil
+	}
+	return right, nil
+}
+
+func qBoolToInt64(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// qMinMaxPromoteAgainstNull returns the surviving max operand, promoting a
+// boolean to its long value when the losing null is not a boolean null
+// (canonical q: 0N|0b is 0, while 0Nb|0b stays 0b).
+func qMinMaxPromoteAgainstNull(winner, null any) any {
+	b, isBool := winner.(bool)
+	if !isBool {
+		return winner
+	}
+	if kind, ok := data.NullKind(null); ok && kind == data.KindBool {
+		return winner
+	}
+	if !data.IsNull(null) {
+		// NaN float null: promote to float per q widening.
+		return float64(qBoolToInt64(b))
+	}
+	return qBoolToInt64(b)
+}
+
+// qIsNaNScalar reports float NaN operands so `&`/`|` rank them with the
+// nulls (canonical q sorts 0n below every other float).
+func qIsNaNScalar(v any) bool {
+	switch x := v.(type) {
+	case float64:
+		return math.IsNaN(x)
+	case float32:
+		return math.IsNaN(float64(x))
+	default:
+		return false
 	}
 }
 
@@ -12577,8 +12690,11 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		if op == '|' {
 			logical = "or"
 		}
-		shape := "truth-logical/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
-		if out, handled, err := data.TryTypedTruthLogical(logical, left, right); err != nil || handled {
+		// Canonical `&`/`|` are elementwise min/max. On booleans min/max IS
+		// logical and/or, so strictly-boolean operands keep the lazy logical
+		// mask carrier and the periodic where/count fast paths.
+		shape := "bool-logical/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
+		if out, handled, err := data.TryTypedBoolLogical(logical, left, right); err != nil || handled {
 			out, handled, err = qTypedRuntimeResult("ArrayBoolLogical", shape, out, handled, err)
 			if err != nil {
 				return nil, err
@@ -12588,6 +12704,21 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 			}
 		} else {
 			recordRuntimeKernelProbeReason("ArrayBoolLogical", shape, handled, err, RuntimeFallbackUnsupportedType)
+		}
+		// Numeric operands materialize the typed elementwise min/max; null
+		// carriers fall through to the boxed loop, which applies canonical
+		// null ordering per row (null&x is null, null|x is x).
+		minMaxShape := "minmax/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
+		if out, handled, err := data.TryTypedDyadicMinMax(left, right, op == '|'); err != nil || handled {
+			out, handled, err = qTypedRuntimeResult("ArrayDyadicMinMax", minMaxShape, out, handled, err)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
+				return out, nil
+			}
+		} else {
+			recordRuntimeKernelProbeReason("ArrayDyadicMinMax", minMaxShape, handled, err, RuntimeFallbackUnsupportedType)
 		}
 	}
 	if op == '^' {
@@ -13057,7 +13188,7 @@ func emptyQArrayFromHints(hints ...data.Kind) (data.Array, bool) {
 
 func qDyadicResultKind(op byte, left, right any) data.Kind {
 	switch op {
-	case '=', '<', '>', '&', '|', '~':
+	case '=', '<', '>', '~':
 		return data.KindBool
 	case '%':
 		return data.KindF64
@@ -13070,7 +13201,7 @@ func qDyadicResultKind(op byte, left, right any) data.Kind {
 				return kind
 			}
 		}
-	case 'm', 'M', '^':
+	case 'm', 'M', '^', '&', '|':
 		kind, ok := mergeQResultKinds(qKindOfValue(left), qKindOfValue(right))
 		if ok {
 			return kind
@@ -14796,6 +14927,23 @@ func where(v any) (any, error) {
 		}
 		return data.NewI64(out), nil
 	}
+	// Replication over a dense integer carrier: validate and size the result
+	// from the bulk values instead of boxing every row through Values().
+	if values, owned, ok := data.TryBulkI64(array); ok {
+		total, err := qWhereReplicationTotal(values)
+		if err != nil {
+			data.BulkI64Release(values, owned)
+			return nil, err
+		}
+		out := make([]int64, 0, total)
+		for i, n := range values {
+			for j := int64(0); j < n; j++ {
+				out = append(out, int64(i))
+			}
+		}
+		data.BulkI64Release(values, owned)
+		return data.NewI64(out), nil
+	}
 	var out []int64
 	total := int64(0)
 	for i, value := range array.Values() {
@@ -14818,6 +14966,22 @@ func where(v any) (any, error) {
 		}
 	}
 	return data.NewI64(out), nil
+}
+
+// qWhereReplicationTotal validates where's replication counts and returns
+// their sum, with the exact errors of the boxed row loop.
+func qWhereReplicationTotal(values []int64) (int64, error) {
+	total := int64(0)
+	for _, n := range values {
+		if n < 0 {
+			return 0, fmt.Errorf("where expects non-negative integer counts")
+		}
+		if n > qMaxListLength-total {
+			return 0, fmt.Errorf("where count %d exceeds the %d list limit", n, int64(qMaxListLength))
+		}
+		total += n
+	}
+	return total, nil
 }
 
 func whereFilterValue(left, right any) (any, error) {
@@ -15020,90 +15184,14 @@ func nullValue(v any) (any, error) {
 	return data.IsNull(v), nil
 }
 
+// logicalAnd / logicalOr are the word forms of canonical `&` (min) and `|`
+// (max); they share the verb dispatch so every route agrees.
 func logicalAnd(left, right any) (any, error) {
-	if out, handled, err := typedBoolLogical("and", left, right); err != nil || handled {
-		return out, err
-	}
-	return applyLogical(left, right, func(a, b bool) bool { return a && b })
+	return applyDyadic('&', left, right)
 }
 
 func logicalOr(left, right any) (any, error) {
-	if out, handled, err := typedBoolLogical("or", left, right); err != nil || handled {
-		return out, err
-	}
-	return applyLogical(left, right, func(a, b bool) bool { return a || b })
-}
-
-func typedBoolLogical(op string, left, right any) (any, bool, error) {
-	shape := op + "/" + logicalShape(left) + "/" + logicalShape(right)
-	out, handled, err := data.TryTypedBoolLogical(op, left, right)
-	return qTypedRuntimeResultReason("ArrayBoolLogical", shape, RuntimeFallbackUnsupportedType, out, handled, err)
-}
-
-func logicalShape(value any) string {
-	if array, ok := value.(data.Array); ok {
-		return string(array.Kind())
-	}
-	return string(qRuntimeKernelOperandKind(value, nil))
-}
-
-func applyLogical(left, right any, fn func(bool, bool) bool) (any, error) {
-	la, lok := left.(data.Array)
-	ra, rok := right.(data.Array)
-	if !lok && !rok {
-		lv, err := boolValue(left)
-		if err != nil {
-			return nil, err
-		}
-		rv, err := boolValue(right)
-		if err != nil {
-			return nil, err
-		}
-		return fn(lv, rv), nil
-	}
-	n := 0
-	switch {
-	case lok && rok:
-		if la.Len() != ra.Len() && la.Len() != 1 && ra.Len() != 1 {
-			return nil, fmt.Errorf("logical length mismatch")
-		}
-		n = la.Len()
-		if ra.Len() > n {
-			n = ra.Len()
-		}
-	case lok:
-		n = la.Len()
-	case rok:
-		n = ra.Len()
-	}
-	out := make([]bool, n)
-	for i := 0; i < n; i++ {
-		lv, rv := left, right
-		if lok {
-			var ok bool
-			lv, ok = la.At(vectorIndex(i, la.Len()))
-			if !ok {
-				return nil, fmt.Errorf("logical left row %d out of range", i)
-			}
-		}
-		if rok {
-			var ok bool
-			rv, ok = ra.At(vectorIndex(i, ra.Len()))
-			if !ok {
-				return nil, fmt.Errorf("logical right row %d out of range", i)
-			}
-		}
-		lt, err := boolValue(lv)
-		if err != nil {
-			return nil, err
-		}
-		rt, err := boolValue(rv)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = fn(lt, rt)
-	}
-	return data.NewBool(out), nil
+	return applyDyadic('|', left, right)
 }
 
 func boolValue(v any) (bool, error) {

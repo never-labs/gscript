@@ -57,8 +57,8 @@ gap	prd til 0	1	0N	empty-vector reducer identities: prd () should be 1
 match	avg til 0	0n
 gap	min 0#0.0	0w	0N	empty-vector reducer identities: float min () should be 0w
 gap	sum ()	0	0N	empty-vector reducer identities: sum () should be 0
-gap	(&/)[til 0]	0W	0N	empty-vector reducer identities for derived &/
-gap	(|/)[til 0]	-0W	0N	empty-vector reducer identities for derived |/
+match	(&/)[til 0]	0W
+match	(|/)[til 0]	-0W
 gap	(+/)[til 0]	0	0N	empty-vector reducer identities for derived +/
 gap	(*/)[til 0]	1	0N	empty-vector reducer identities for derived */
 match	count ()	0
@@ -117,13 +117,19 @@ match	null 0n	1b
 match	not 0	1b
 match	not 5	0b
 match	not 0 1 2	100b
-deviation	2&3	2	1b	truthiness & | : logical and/or instead of min/max
-deviation	2|3	3	1b	truthiness & | : logical and/or instead of min/max
+match	2&3	2
+match	2|3	3
 match	0b&1b	0b
 match	1b|0b	1b
-deviation	1 2&2 1	1 1	11b	truthiness & | : logical and/or instead of min/max
-deviation	0N&1	0N	0b	truthiness & | : null is falsy instead of propagating through min
-deviation	0N|1	1	1b	truthiness & | : null is falsy, or yields boolean
+match	1 2&2 1	1 1
+match	0N&1	0N
+match	0N|1	1
+match	1b&2	1
+match	1b|0	1
+match	0N|0b	0
+match	2.5|1 2 3	2.5 2.5 3
+match	(&/)[0#0.0]	0w
+match	(|/)[0#0.0]	-0w
 # ---- take / drop / reshape edges ----
 match	3#1 2	1 2 1
 match	5#1 2 3	1 2 3 1 2
@@ -215,8 +221,8 @@ match	{x div 2}/[7]	0
 match	3 {x+1}/ 0	3
 match	3 {x+1}\ 0	0 1 2 3
 match	(*/)[2 3 4]	24
-deviation	(|/)[3 1 2]	3	1b	truthiness & | : |/ reduces with logical or
-deviation	(&/)[3 1 2]	1	1b	truthiness & | : &/ reduces with logical and
+match	(|/)[3 1 2]	3
+match	(&/)[3 1 2]	1
 match	sum each (1 2;3 4)	3 7
 # ---- sort and grading ----
 match	iasc 2 1 2 1	1 3 0 2

@@ -166,6 +166,10 @@ func qEvalVectorVerbFormBacklogCases() []qEvalVectorCase {
 	}
 }
 
+// Canonical `&` is elementwise min: over the 0/1 and 0..2 mod masks the min
+// is 1 exactly when both are nonzero, and `where` over the 0/1 vector
+// replicates indexes by count, so the count matches the boolean-and mask.
+//
 //go:noinline
 func qEvalVectorVerbFormGoAmpMaskCount(rows int) int64 {
 	var count int64
@@ -178,14 +182,21 @@ func qEvalVectorVerbFormGoAmpMaskCount(rows int) int64 {
 	return count
 }
 
+// Canonical `|` is elementwise max: `count where m` over the integer max
+// mask follows where's replication semantics (indexes repeat per count), so
+// the expected value is the sum of max(x mod 2, x mod 5).
+//
 //go:noinline
 func qEvalVectorVerbFormGoPipeMaskCount(rows int) int64 {
 	var count int64
 	for i := 0; i < rows; i++ {
 		x := qEvalVectorGoBaselineInput[i]
-		if x%2 != 0 || x%5 != 0 {
-			count++
+		a := x % 2
+		b := x % 5
+		if b > a {
+			a = b
 		}
+		count += a
 	}
 	return count
 }
