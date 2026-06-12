@@ -3,7 +3,6 @@ package leia_test
 import (
 	"path/filepath"
 	"sort"
-	"strings"
 	"testing"
 )
 
@@ -22,7 +21,7 @@ func TestGenericAIDialectIndexProductionBoundariesAlignWithPackageMatrix(t *test
 		matrixByPackage[row.PackageName] = row
 	}
 
-	boundaryByDir := map[string]genericAIDialectIndexItem{}
+	boundaryByDir := map[string][]genericAIDialectIndexItem{}
 	for _, entry := range index.Entries {
 		if entry.ProductionPackageBoundary == nil {
 			t.Fatalf("%s missing checked-in production package boundary", entry.CapabilityID)
@@ -34,23 +33,28 @@ func TestGenericAIDialectIndexProductionBoundariesAlignWithPackageMatrix(t *test
 		if _, ok := matrixByDir[boundary.Directory]; !ok {
 			t.Fatalf("%s boundary directory %q is not represented in generic_ai_package_matrix", entry.CapabilityID, boundary.Directory)
 		}
-		boundaryByDir[boundary.Directory] = entry
+		row := matrixByDir[boundary.Directory]
+		assertGenericAIIndexAliasesResolveToMatrix(t, row, entry)
+		boundaryByDir[boundary.Directory] = append(boundaryByDir[boundary.Directory], entry)
 	}
 
 	for _, row := range matrix.Packages {
-		entry, ok := boundaryByDir[row.PackageDir]
+		entries, ok := boundaryByDir[row.PackageDir]
 		if !ok {
 			t.Fatalf("%s matrix package has no ai_dialect_index production boundary", row.ID)
 		}
-		boundary := *entry.ProductionPackageBoundary
-		if row.MainLeia != boundary.RegisteredExample {
-			t.Fatalf("%s matrix main_leia = %q, index registered_example = %q", row.ID, row.MainLeia, boundary.RegisteredExample)
-		}
-		if entry.Example != row.MainLeia {
-			t.Fatalf("%s index example = %q, want matrix main_leia %q", row.ID, entry.Example, row.MainLeia)
-		}
-		if entry.Fixture != row.FixtureIndex {
-			t.Fatalf("%s index fixture = %q, want matrix fixture_index %q", row.ID, entry.Fixture, row.FixtureIndex)
+		for _, entry := range entries {
+			boundary := *entry.ProductionPackageBoundary
+			if row.MainLeia != boundary.RegisteredExample {
+				t.Fatalf("%s matrix main_leia = %q, index registered_example = %q", row.ID, row.MainLeia, boundary.RegisteredExample)
+			}
+			if entry.Example != row.MainLeia {
+				t.Fatalf("%s index example = %q, want matrix main_leia %q", row.ID, entry.Example, row.MainLeia)
+			}
+			if entry.Fixture != row.FixtureIndex {
+				t.Fatalf("%s index fixture = %q, want matrix fixture_index %q", row.ID, entry.Fixture, row.FixtureIndex)
+			}
+			assertGenericAIIndexAliasesResolveToMatrix(t, row, entry)
 		}
 		if row.Manifest != filepath.ToSlash(filepath.Join(row.PackageDir, "package.manifest.json")) {
 			t.Fatalf("%s manifest path = %q", row.ID, row.Manifest)
@@ -59,10 +63,6 @@ func TestGenericAIDialectIndexProductionBoundariesAlignWithPackageMatrix(t *test
 		packageName, _ := manifest["package_name"].(string)
 		if packageName != row.PackageName {
 			t.Fatalf("%s package_name drift: matrix %q manifest %q", row.ID, row.PackageName, packageName)
-		}
-		if !genericAIMatrixCapabilitiesCoverIndexSurface(row, entry) {
-			t.Fatalf("%s capabilities do not cover index capability/surface: capability_id=%q surface=%#v capabilities=%#v",
-				row.ID, entry.CapabilityID, entry.DialectSurface, row.Capabilities)
 		}
 	}
 
@@ -108,6 +108,7 @@ func TestGenericAIBackendPlanProductionBoundariesAlignWithPackageMatrix(t *testi
 		if row.BackendShape != "" && shape.ShapeID != row.BackendShape {
 			t.Fatalf("%s shape_id = %q, want matrix backend_shape %q", row.ID, shape.ShapeID, row.BackendShape)
 		}
+		assertGenericAIBackendAliasesResolveToMatrix(t, row, shape)
 	}
 	if len(seenDirs) != len(matrix.Packages) {
 		t.Fatalf("backend/matrix package count drift: backend dirs=%d matrix packages=%d backend=%v matrix=%v",
@@ -115,32 +116,76 @@ func TestGenericAIBackendPlanProductionBoundariesAlignWithPackageMatrix(t *testi
 	}
 }
 
-func genericAIMatrixCapabilitiesCoverIndexSurface(row genericAIPackageRow, entry genericAIDialectIndexItem) bool {
-	haystack := strings.ToLower(row.Capability + "\n" + row.BackendShape + "\n" + strings.Join(row.Capabilities, "\n"))
-	if capabilityTail := genericAIAlignmentTail(entry.CapabilityID); capabilityTail != "" && strings.Contains(haystack, capabilityTail) {
+func assertGenericAIIndexAliasesResolveToMatrix(t *testing.T, row genericAIPackageRow, entry genericAIDialectIndexItem) {
+	t.Helper()
+	if !genericAIMatrixCapabilityExists(row, entry.CanonicalCapabilityID) {
+		t.Fatalf("%s index canonical_capability_id %q is not a matrix capability", row.ID, entry.CanonicalCapabilityID)
+	}
+	if !genericAIDialectAliasesContain(entry.CapabilityAliases, entry.Capability, entry.CanonicalCapabilityID) {
+		t.Fatalf("%s missing scoped alias for index capability slug %q -> %q", row.ID, entry.Capability, entry.CanonicalCapabilityID)
+	}
+	if !genericAIDialectAliasesContain(entry.CapabilityAliases, entry.CapabilityID, entry.CanonicalCapabilityID) {
+		t.Fatalf("%s missing scoped alias for index capability_id %q -> %q", row.ID, entry.CapabilityID, entry.CanonicalCapabilityID)
+	}
+	assertGenericAIDialectAliasesResolve(t, row, entry.CapabilityAliases)
+}
+
+func assertGenericAIBackendAliasesResolveToMatrix(t *testing.T, row genericAIPackageRow, shape genericAIDialectBackendShape) {
+	t.Helper()
+	if !genericAIMatrixCapabilityExists(row, shape.CanonicalCapabilityID) {
+		t.Fatalf("%s backend canonical_capability_id %q is not a matrix capability", row.ID, shape.CanonicalCapabilityID)
+	}
+	if !genericAIDialectAliasesContain(shape.CapabilityAliases, shape.ShapeID, shape.CanonicalCapabilityID) {
+		t.Fatalf("%s missing scoped alias for backend shape %q -> %q", row.ID, shape.ShapeID, shape.CanonicalCapabilityID)
+	}
+	for _, capability := range shape.Capabilities {
+		if !genericAIDialectAliasesContain(shape.CapabilityAliases, capability, shape.CanonicalCapabilityID) {
+			t.Fatalf("%s missing scoped alias for backend capability slug %q -> %q", row.ID, capability, shape.CanonicalCapabilityID)
+		}
+	}
+	assertGenericAIDialectAliasesResolve(t, row, shape.CapabilityAliases)
+}
+
+func assertGenericAIDialectAliasesResolve(t *testing.T, row genericAIPackageRow, aliases []genericAIDialectAlias) {
+	t.Helper()
+	if len(aliases) == 0 {
+		t.Fatalf("%s missing scoped capability aliases", row.ID)
+	}
+	for _, alias := range aliases {
+		if alias.Alias == "" || alias.TargetCapabilityID == "" || alias.AliasKind == "" || alias.Scope == "" || alias.Status != "active" {
+			t.Fatalf("%s incomplete capability alias: %#v", row.ID, alias)
+		}
+		if !genericAIMatrixCapabilityExists(row, alias.TargetCapabilityID) {
+			t.Fatalf("%s alias target %q is not a matrix capability", row.ID, alias.TargetCapabilityID)
+		}
+	}
+}
+
+func genericAIMatrixCapabilityExists(row genericAIPackageRow, capability string) bool {
+	if capability == "" {
+		return false
+	}
+	if row.Capability == capability {
 		return true
 	}
-	for _, surface := range entry.DialectSurface {
-		for _, token := range strings.FieldsFunc(strings.ToLower(surface), func(r rune) bool {
-			return r == '.' || r == '_' || r == '-' || r == ' '
-		}) {
-			if len(token) >= 4 && strings.Contains(haystack, token) {
-				return true
-			}
+	for _, candidate := range row.Capabilities {
+		if candidate == capability {
+			return true
 		}
 	}
 	return false
 }
 
-func genericAIAlignmentTail(value string) string {
-	parts := strings.Split(strings.ToLower(value), ".")
-	if len(parts) == 0 {
-		return ""
+func genericAIDialectAliasesContain(aliases []genericAIDialectAlias, alias, target string) bool {
+	for _, candidate := range aliases {
+		if candidate.Alias == alias && candidate.TargetCapabilityID == target && candidate.Status == "active" {
+			return true
+		}
 	}
-	return parts[len(parts)-1]
+	return false
 }
 
-func sortedGenericAIAlignmentKeys(values map[string]genericAIDialectIndexItem) []string {
+func sortedGenericAIAlignmentKeys(values map[string][]genericAIDialectIndexItem) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

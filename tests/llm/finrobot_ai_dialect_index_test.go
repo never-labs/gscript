@@ -31,6 +31,8 @@ type genericAIDialectIndex struct {
 type genericAIDialectIndexItem struct {
 	Capability                       string                         `json:"capability"`
 	CapabilityID                     string                         `json:"capability_id"`
+	CanonicalCapabilityID            string                         `json:"canonical_capability_id"`
+	CapabilityAliases                []genericAIDialectAlias        `json:"capability_aliases"`
 	ProviderFree                     bool                           `json:"provider_free"`
 	DomainSpecific                   bool                           `json:"domain_specific"`
 	FinRobotSpecificSyntaxAssumption bool                           `json:"finrobot_specific_syntax_assumption"`
@@ -70,17 +72,27 @@ type genericAIDialectBackendPlan struct {
 }
 
 type genericAIDialectBackendShape struct {
-	ShapeID         string                           `json:"shape_id"`
-	Status          string                           `json:"status"`
-	Capabilities    []string                         `json:"capabilities"`
-	Contract        string                           `json:"contract"`
-	Inputs          []string                         `json:"inputs"`
-	Outputs         []string                         `json:"outputs"`
-	Example         string                           `json:"example"`
-	Test            string                           `json:"test"`
-	Fixture         string                           `json:"fixture"`
-	SmokeCoverage   *genericAIDialectSmokeCoverage   `json:"smoke_coverage"`
-	PackageBoundary *genericAIDialectPackageBoundary `json:"package_boundary"`
+	ShapeID               string                           `json:"shape_id"`
+	Status                string                           `json:"status"`
+	Capabilities          []string                         `json:"capabilities"`
+	CanonicalCapabilityID string                           `json:"canonical_capability_id"`
+	CapabilityAliases     []genericAIDialectAlias          `json:"capability_aliases"`
+	Contract              string                           `json:"contract"`
+	Inputs                []string                         `json:"inputs"`
+	Outputs               []string                         `json:"outputs"`
+	Example               string                           `json:"example"`
+	Test                  string                           `json:"test"`
+	Fixture               string                           `json:"fixture"`
+	SmokeCoverage         *genericAIDialectSmokeCoverage   `json:"smoke_coverage"`
+	PackageBoundary       *genericAIDialectPackageBoundary `json:"package_boundary"`
+}
+
+type genericAIDialectAlias struct {
+	Alias              string `json:"alias"`
+	TargetCapabilityID string `json:"target_capability_id"`
+	AliasKind          string `json:"alias_kind"`
+	Scope              string `json:"scope"`
+	Status             string `json:"status"`
 }
 
 type genericAIDialectSmokeCoverage struct {

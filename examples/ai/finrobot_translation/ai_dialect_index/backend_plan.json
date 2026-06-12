@@ -61,7 +61,52 @@
           "state_version is monotonic and resume_token derives from checkpoint_key",
           "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.agent_state.store",
+      "capability_aliases": [
+        {
+          "alias": "agent",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "agent-state",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ai.agent_state.store",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.agent.run",
@@ -105,7 +150,31 @@
           "contract declares provider-free loop execution boundary",
           "tool contract projection maps replayable tool contracts into agent tools, tool history, and loop trace ownership"
         ]
-      }
+      },
+      "canonical_capability_id": "ai.agent.config.declarative",
+      "capability_aliases": [
+        {
+          "alias": "agent",
+          "target_capability_id": "ai.agent.config.declarative",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ai.agent.run",
+          "target_capability_id": "ai.agent.config.declarative",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "ai.agent.config.declarative",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.analytical_model.contracts",
@@ -153,7 +222,45 @@
           "scenario book fixtures declare assumption sets, scenario weights, sensitivity axes, provenance, and deterministic ordering",
           "forecast result fixtures carry rows, units, periods, scenario references, and transform notes"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.analytical_model.contracts",
+      "capability_aliases": [
+        {
+          "alias": "ai.analytical_model.contracts",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "analytical-model-contracts",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "data-normalization-contracts",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.chart.render_contracts",
@@ -198,7 +305,38 @@
           "render request/result contract envelopes are deterministic provider-free fixture data",
           "source metadata contract is redacted and replay-ready"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.chart.render.contracts",
+      "capability_aliases": [
+        {
+          "alias": "ai.chart.render_contracts",
+          "target_capability_id": "generic.ai.chart.render.contracts",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "chart-render",
+          "target_capability_id": "generic.ai.chart.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.chart.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ui-snapshot",
+          "target_capability_id": "generic.ai.chart.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.coding_workspace",
@@ -247,7 +385,45 @@
           "approval gates default to deny for execution and writes",
           "stdout and stderr captures are explicit replay fields"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.coding_workspace",
+      "capability_aliases": [
+        {
+          "alias": "ai.coding_workspace",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "coding-workspace",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.data_normalization.contracts",
@@ -296,7 +472,45 @@
           "schema mapping, field policy, missing policy, stale policy, type coercion, and unit transform contract fixtures decode",
           "provider response projection maps source envelopes, provenance refs, clean skips, and replay keys into normalized rows and validation records"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.data_normalization.contracts",
+      "capability_aliases": [
+        {
+          "alias": "ai.data_normalization.contracts",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "data-normalization-contracts",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "data-provider",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.data_provider.boundary",
@@ -348,7 +562,45 @@
           "request and response envelope contract fixtures remain provider-free and replayable",
           "pagination and rate-limit contract fixtures are metadata-only and deterministic"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.data_provider.boundary",
+      "capability_aliases": [
+        {
+          "alias": "ai.data_provider.boundary",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "data-provider",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.document.rag_pipeline",
@@ -397,7 +649,38 @@
           "RAG chunk provenance and corpus manifest stay domain-neutral and provider-free",
           "retrieval result citations resolve to known chunk identifiers"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.document.rag",
+      "capability_aliases": [
+        {
+          "alias": "ai.document.rag_pipeline",
+          "target_capability_id": "generic.ai.document.rag",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "document-rag",
+          "target_capability_id": "generic.ai.document.rag",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "memory",
+          "target_capability_id": "generic.ai.document.rag",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.document.rag",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.eval.run",
@@ -441,7 +724,31 @@
           "dataset manifest, case inputs, metric specs, judge replay records, findings, golden gates, and case result summary fixtures are all checked in",
           "fixture index is manifest-driven and does not require live network, credentials, provider SDKs, or real dependency imports"
         ]
-      }
+      },
+      "canonical_capability_id": "ai.eval.run.provider_free",
+      "capability_aliases": [
+        {
+          "alias": "ai.eval.run",
+          "target_capability_id": "ai.eval.run.provider_free",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evaluation",
+          "target_capability_id": "ai.eval.run.provider_free",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "ai.eval.run.provider_free",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.event_intelligence.boundary",
@@ -489,7 +796,45 @@
           "event extraction and taxonomy contract fixtures remain domain-neutral",
           "freshness, dedupe, relevance, sentiment, and impact contract fixtures are deterministic"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.event_intelligence.boundary",
+      "capability_aliases": [
+        {
+          "alias": "ai.event_intelligence.boundary",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "data-provider",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "event-intelligence",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.evidence.report_artifacts",
@@ -537,7 +882,38 @@
           "report outline and section dependency DAG remain domain-neutral and provider-free",
           "artifact and render manifests declare planned outputs without invoking renderers"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.evidence.report.artifacts",
+      "capability_aliases": [
+        {
+          "alias": "ai.evidence.report_artifacts",
+          "target_capability_id": "generic.ai.evidence.report.artifacts",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.evidence.report.artifacts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.evidence.report.artifacts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.ai.evidence.report.artifacts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.evidence.verify",
@@ -592,7 +968,52 @@
           "claim records, source refs, and citation refs decode without provider calls",
           "citation normalization preserves first-seen deterministic order and reports unresolved refs"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.evidence.verify",
+      "capability_aliases": [
+        {
+          "alias": "ai.evidence.verify",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "document-rag",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "event-intelligence",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-verification",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "report-render",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.memory.store",
@@ -636,7 +1057,31 @@
           "namespace policy and retrieval policy are provider-free and credential-free",
           "retrieval ranking and context window order are deterministic fixture data"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.memory.store",
+      "capability_aliases": [
+        {
+          "alias": "ai.memory.store",
+          "target_capability_id": "generic.ai.memory.store",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "memory",
+          "target_capability_id": "generic.ai.memory.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.memory.store",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.model.io.envelope",
@@ -684,7 +1129,45 @@
         "contract_path": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json",
         "provider_free": true,
         "domain_specific": false
-      }
+      },
+      "canonical_capability_id": "generic.ai.model.io.envelope",
+      "capability_aliases": [
+        {
+          "alias": "ai.model.io.envelope",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "model",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "model-io",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "turn",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.model.resolve",
@@ -725,7 +1208,24 @@
           "no live network",
           "no provider credentials"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.model.registry",
+      "capability_aliases": [
+        {
+          "alias": "ai.model.resolve",
+          "target_capability_id": "generic.ai.model.registry",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "model",
+          "target_capability_id": "generic.ai.model.registry",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.optional_adapter.boundary",
@@ -773,7 +1273,38 @@
           "dependency gate contract fixtures clean-skip when packages, credentials, or live network are absent",
           "adapter result envelope contract fixtures expose status, capability, fixture_key, data, and metadata"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.optional_adapter.boundary",
+      "capability_aliases": [
+        {
+          "alias": "ai.optional_adapter.boundary",
+          "target_capability_id": "generic.ai.optional_adapter.boundary",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.optional_adapter.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.optional_adapter.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.ai.optional_adapter.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.package.audit",
@@ -816,7 +1347,31 @@
           "fixture index audit verifies every fixture is local, replay-ready, schema-linked, and mapped to a capability",
           "example registry audit verifies aliases generic.ai.package.boundary.audit and ai.package.audit resolve to the same provider-free skeleton"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "capability_aliases": [
+        {
+          "alias": "ai.package.audit",
+          "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "capability",
+          "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "package-boundary",
+          "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.product_app.boundary",
@@ -870,7 +1425,52 @@
           "workflow projection maps provider-free workflow results into product task, route, and artifact refs",
           "session and task-log contract fixtures remain provider-free and credential-free"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.product_app.boundary",
+      "capability_aliases": [
+        {
+          "alias": "ai.product_app.boundary",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "product-app",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ui-snapshot",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.prompt.role_catalog",
@@ -917,7 +1517,38 @@
           "role profile versions and prompt template snapshots remain domain-neutral and provider-free",
           "delegation trigger parse examples resolve to declared role ids"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.prompt.role.catalog",
+      "capability_aliases": [
+        {
+          "alias": "agent",
+          "target_capability_id": "generic.ai.prompt.role.catalog",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ai.prompt.role_catalog",
+          "target_capability_id": "generic.ai.prompt.role.catalog",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "prompt-role-catalog",
+          "target_capability_id": "generic.ai.prompt.role.catalog",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.ai.prompt.role.catalog",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.report.render_contracts",
@@ -968,7 +1599,45 @@
           "request and result envelope contract fixtures remain provider-free and replayable",
           "output and artifact manifest contract fixtures use artifact URIs only"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.report.render.contracts",
+      "capability_aliases": [
+        {
+          "alias": "ai.report.render_contracts",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "chart-render",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "report-render",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ui-snapshot",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.strategy.backtest_contracts",
@@ -1016,7 +1685,45 @@
           "generic.strategy_backtest.run, strategy, allocation_policy, feature, and evaluator boundaries are represented without q runtime or live provider imports",
           "strategy manifest fixture validates strategy, allocation_policy, feature, evaluator bindings and deterministic seed"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.strategy.backtest.contracts",
+      "capability_aliases": [
+        {
+          "alias": "ai.strategy.backtest_contracts",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "data-provider",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "strategy-backtest-contracts",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.tool.invoke",
@@ -1061,7 +1768,38 @@
           "generic.ai.tool.contract exports declarative tool schema metadata",
           "ai.tool.invoke request arguments are validated before fixture execution"
         ]
-      }
+      },
+      "canonical_capability_id": "ai.tool.invoke",
+      "capability_aliases": [
+        {
+          "alias": "ai.tool.invoke",
+          "target_capability_id": "ai.tool.invoke",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "approval",
+          "target_capability_id": "ai.tool.invoke",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "capability",
+          "target_capability_id": "ai.tool.invoke",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "ai.tool.invoke",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.tool.registry",
@@ -1102,7 +1840,24 @@
         "contract_path": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/contracts/tool_registry_contract.json",
         "provider_free": true,
         "domain_specific": false
-      }
+      },
+      "canonical_capability_id": "generic.tool.registry.declare",
+      "capability_aliases": [
+        {
+          "alias": "ai.tool.registry",
+          "target_capability_id": "generic.tool.registry.declare",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.tool.registry.declare",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.trace.emit",
@@ -1146,7 +1901,38 @@
           "provider_free is true and live_network_default is false",
           "generic.ai.trace.events and ai.trace.emit capabilities are provider-free and fixture-replay only"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.trace.events",
+      "capability_aliases": [
+        {
+          "alias": "ai.trace.emit",
+          "target_capability_id": "generic.ai.trace.events",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.trace.events",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.trace.events",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.trace.events",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.transcript.pipeline",
@@ -1194,7 +1980,45 @@
           "fixtures prove speaker normalization, event-time correction, turn ordering, and segment provenance",
           "chunk fixtures preserve segment boundaries, deterministic order, and max token-estimate budget"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.transcript.pipeline",
+      "capability_aliases": [
+        {
+          "alias": "ai.transcript.pipeline",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "document-rag",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "memory",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "transcript-pipeline",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.turn.execute",
@@ -1238,7 +2062,31 @@
           "ai.turn.execute response envelope carries message, response_format, usage, error, tool request, and replay metadata",
           "tool request envelope is request-only and provider-free"
         ]
-      }
+      },
+      "canonical_capability_id": "ai.turn.execute",
+      "capability_aliases": [
+        {
+          "alias": "ai.turn.execute",
+          "target_capability_id": "ai.turn.execute",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "ai.turn.execute",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "turn",
+          "target_capability_id": "ai.turn.execute",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.ui.snapshot_evaluator",
@@ -1288,7 +2136,38 @@
           "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
           "viewport matrix and visual diff budgets are deterministic fixture data"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "capability_aliases": [
+        {
+          "alias": "ai.ui.snapshot_evaluator",
+          "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "ui-snapshot",
+          "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.workflow.orchestrate",
@@ -1332,7 +2211,31 @@
           "ai.workflow.orchestrate entrypoint has a deterministic workflow graph",
           "stage inputs and outputs are explicit and schema-addressed"
         ]
-      }
+      },
+      "canonical_capability_id": "ai.workflow.orchestrate.provider_free",
+      "capability_aliases": [
+        {
+          "alias": "ai.workflow.orchestrate",
+          "target_capability_id": "ai.workflow.orchestrate.provider_free",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "ai.workflow.orchestrate.provider_free",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "ai.workflow.orchestrate.provider_free",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "ai.workflow.plan_graph",
@@ -1374,7 +2277,24 @@
           "dependencies form an acyclic graph with explicit branch and merge edges",
           "retry metadata is deterministic fixture evidence, not provider behavior"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.planning.graph.define",
+      "capability_aliases": [
+        {
+          "alias": "ai.workflow.plan_graph",
+          "target_capability_id": "generic.planning.graph.define",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.planning.graph.define",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "generic.ai.approval.policy.evaluate",
@@ -1420,7 +2340,45 @@
           "provider_free is true and live_network_default is false",
           "generic.ai.approval.policy denies by default unless an exact capability grant exists"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.approval.policy.evaluate",
+      "capability_aliases": [
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "capability",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.approval.policy.evaluate",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     },
     {
       "shape_id": "generic.ai.record.replay.fixture",
@@ -1467,7 +2425,52 @@
           "provider_free is true, domain_specific is false, and live_network_default is false",
           "record schema requires record_id, sequence, replay_key, operation, capability, request_hash, response_hash, request, response, provider_free, and recorded_at"
         ]
-      }
+      },
+      "canonical_capability_id": "generic.ai.record.capture",
+      "capability_aliases": [
+        {
+          "alias": "evaluation",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.record.replay.fixture",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "backend_shape_id",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        },
+        {
+          "alias": "turn",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "backend_capability_slug",
+          "scope": "backend_shape",
+          "status": "active"
+        }
+      ]
     }
   ]
 }
