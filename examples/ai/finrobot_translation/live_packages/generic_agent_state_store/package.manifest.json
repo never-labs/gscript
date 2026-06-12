@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "id": "generic-agent-state-store",
+  "package_name": "leia-generic-ai-agent-state-store",
+  "package_boundary_id": "generic-ai-agent-state-store",
+  "capability_id": "generic.ai.agent_state.store",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic AI agent state store package for session snapshots, resumable checkpoints, redacted input/output refs, trace correlation, deterministic cache keys, and clean-skip adapter boundaries.",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "real_dependency_import_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "contract_root": "contracts",
+  "entrypoints": {
+    "main": "main.leia",
+    "contract": "contracts/generic_agent_state_store_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "agent_state_snapshot": "schemas/agent_state_snapshot_v1.schema.json",
+    "state_ref": "schemas/state_ref_v1.schema.json",
+    "checkpoint": "schemas/checkpoint_v1.schema.json",
+    "trace_correlation": "schemas/trace_correlation_v1.schema.json",
+    "redaction_audit": "schemas/redaction_audit_v1.schema.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_agent_state_store_contract.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "agent_state_snapshot": "fixtures/agent_state_snapshot_fixture.json",
+    "checkpoint_clean_skip": "fixtures/checkpoint_clean_skip_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.agent_state.store",
+    "generic.ai.agent_state.snapshot",
+    "generic.ai.agent_state.session",
+    "generic.ai.agent_state.checkpoint",
+    "generic.ai.agent_state.input_ref",
+    "generic.ai.agent_state.output_ref",
+    "generic.ai.agent_state.trace_correlation",
+    "generic.ai.agent_state.cache_key",
+    "generic.ai.agent_state.redaction",
+    "generic.ai.agent_state.clean_skip"
+  ],
+  "capability_surfaces": [
+    "agent_state_store",
+    "session_snapshot",
+    "checkpoint_key",
+    "resume_token",
+    "state_ref",
+    "trace_correlation",
+    "redaction_audit",
+    "adapter_boundaries"
+  ],
+  "default_policy": {
+    "mode": "fixture_replay",
+    "provider_policy": "provider-free",
+    "live_network": false,
+    "live_model_calls": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_agent_state_store_fixture"
+  },
+  "test_gates": [
+    "agent state store contract fixture decodes without provider SDKs, live databases, credentials, or network access",
+    "state_version is monotonic and resume_token derives from checkpoint_key",
+    "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads",
+    "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
+    "checkpoint and cache keys are deterministic sha256 values that exclude raw inputs, raw outputs, and secret-shaped fields",
+    "adapter boundaries clean-skip when durable state dependencies are absent"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in leia-generic-ai-agent-state-store handling; this provider-free package boundary owns resumable agent state, checkpoints, redacted refs, trace correlation, and clean-skip contracts."
+  }
+}

@@ -39,6 +39,11 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 			allowCapabilityID: true,
 		},
 		{
+			dir:               "generic_agent_state_store",
+			packageName:       "leia-generic-ai-agent-state-store",
+			allowCapabilityID: true,
+		},
+		{
 			dir:               "generic_evidence_report_artifacts",
 			packageName:       "leia-generic-ai-evidence-report-artifacts",
 			allowCapabilityID: true,

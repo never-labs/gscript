@@ -47,6 +47,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 	for _, want := range []string{
 		`role: "model"`,
 		`role: "model-io"`,
+		`role: "agent-state"`,
 		`role: "document-rag"`,
 		`role: "prompt-role"`,
 		`role: "memory"`,
@@ -76,6 +77,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "package-audit"`,
 		`package_id: "generic-model-registry"`,
 		`package_id: "generic-model-io-envelope"`,
+		`package_id: "generic-agent-state-store"`,
 		`package_id: "generic-document-rag-pipeline"`,
 		`package_id: "generic-prompt-role-catalog"`,
 		`package_id: "generic-memory-store"`,
@@ -208,6 +210,8 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 		"document-rag->memory",
 		"model->model-io",
 		"model-io->turn",
+		"turn->agent-state",
+		"agent-state->agent",
 		"memory->turn",
 		"prompt-role->agent",
 		"tool->turn",
@@ -225,7 +229,7 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 			t.Fatalf("composition missing required edge %s", want)
 		}
 	}
-	assertGenericAIWorkflowCompositionBoundaryOrder(t, boundaries, "approval", "tool", "turn", "agent", "workflow", "eval")
+	assertGenericAIWorkflowCompositionBoundaryOrder(t, boundaries, "approval", "tool", "turn", "agent-state", "agent", "workflow", "eval")
 	assertGenericAIWorkflowCompositionBoundaryOrder(t, boundaries, "replay", "trace", "approval", "package-audit")
 }
 

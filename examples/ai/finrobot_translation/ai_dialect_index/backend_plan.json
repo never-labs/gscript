@@ -10,6 +10,49 @@
   },
   "backend_shapes": [
     {
+      "shape_id": "ai.agent_state.store",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "agent-state",
+        "agent",
+        "workflow",
+        "trace",
+        "replay"
+      ],
+      "contract": "Normalize provider-free resumable agent state snapshots, session identity, deterministic checkpoint/cache keys, redacted input/output refs, trace correlation, and durable adapter clean skips.",
+      "inputs": [
+        "agent_run_id",
+        "session_id",
+        "state_snapshot",
+        "input_refs",
+        "output_refs",
+        "trace_correlation",
+        "redaction_policy"
+      ],
+      "outputs": [
+        "checkpoint_key",
+        "resume_token",
+        "cache_key",
+        "state_version",
+        "state_snapshot_ref",
+        "trace_correlation_ref",
+        "redaction_audit",
+        "adapter_clean_skips"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_agent_state_store.source.txt",
+      "test": "tests/llm/llm_generic_agent_state_store_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_agent_state_store_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-agent-state-store",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/contracts/generic_agent_state_store_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.agent.run",
       "status": "checked_in_package_boundary",
       "capabilities": [

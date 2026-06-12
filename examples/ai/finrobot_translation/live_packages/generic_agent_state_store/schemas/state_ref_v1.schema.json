@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-agent-state-store/state-ref-v1.schema.json",
+  "title": "Generic Agent State Ref",
+  "type": "object",
+  "required": [
+    "ref_id",
+    "kind",
+    "media_type",
+    "digest",
+    "summary",
+    "raw_value_stored"
+  ],
+  "properties": {
+    "ref_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "media_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_value_stored": {
+      "type": "boolean",
+      "const": false
+    }
+  },
+  "additionalProperties": false
+}

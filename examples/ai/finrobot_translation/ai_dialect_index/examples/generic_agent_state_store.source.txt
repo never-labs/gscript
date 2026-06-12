@@ -1,0 +1,31 @@
+agent_state_store {
+  provider_free true
+  live_network false
+  real_dependency_imports false
+
+  session "session-local-001" {
+    agent_run_id "agent-run-local-001"
+    state_version 2
+    checkpoint_key "sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42"
+    resume_token "checkpoint:sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42"
+  }
+
+  refs {
+    input "input-ref-request-001" digest "sha256:91d7ad0e8e9f64d781fc9a3e59d90c6de062be10e1692e5c4d5b7e27df7f1c22" raw_value_stored false
+    output "output-ref-final-001" digest "sha256:5e7633e67ef45a6f2ea05acffb69a3b21d0c2b2b487d2524a91c23c0887c8619" raw_value_stored false
+  }
+
+  trace {
+    trace_id "trace-local-001"
+    event_id "event-turn-002"
+    parent_event_id "event-turn-001"
+    turn_id "turn-local-002"
+  }
+
+  redaction {
+    enabled true
+    raw_prompt_stored false
+    raw_completion_stored false
+    placeholder "<redacted>"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "id": "generic-agent-state-store-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "package_boundary": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+  "fixtures": [
+    {
+      "fixture_key": "generic:agent_state_store:offline",
+      "capability": "generic.ai.agent_state.store",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/agent_state_snapshot_fixture.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/schemas/agent_state_snapshot_v1.schema.json"
+    },
+    {
+      "fixture_key": "generic:agent_state_store:clean_skip",
+      "capability": "generic.ai.agent_state.clean_skip",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/checkpoint_clean_skip_fixture.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/schemas/checkpoint_v1.schema.json"
+    }
+  ]
+}

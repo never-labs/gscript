@@ -27,6 +27,32 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_agent_state_store",
+      "package_name": "leia-generic-ai-agent-state-store",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+      "capability": "generic.ai.agent_state.store",
+      "capabilities": [
+        "generic.ai.agent_state.store",
+        "generic.ai.agent_state.snapshot",
+        "generic.ai.agent_state.session",
+        "generic.ai.agent_state.checkpoint",
+        "generic.ai.agent_state.input_ref",
+        "generic.ai.agent_state.output_ref",
+        "generic.ai.agent_state.trace_correlation",
+        "generic.ai.agent_state.cache_key",
+        "generic.ai.agent_state.redaction",
+        "generic.ai.agent_state.clean_skip"
+      ],
+      "backend_shape": "ai.agent_state.store",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/contracts/generic_agent_state_store_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_analytical_model_contracts",
       "package_name": "leia-generic-ai-analytical-model-contracts",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",

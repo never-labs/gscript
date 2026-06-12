@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-agent-state-store/agent-state-snapshot-v1.schema.json",
+  "title": "Generic Agent State Snapshot Fixture",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "package_boundary_id",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "real_dependency_imports",
+    "depends_on_q_runtime",
+    "contract",
+    "state_snapshots",
+    "replay_assertions"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string"
+    },
+    "package_boundary_id": {
+      "type": "string",
+      "const": "generic-ai-agent-state-store"
+    },
+    "provider_free": {
+      "type": "boolean",
+      "const": true
+    },
+    "domain_specific": {
+      "type": "boolean",
+      "const": false
+    },
+    "live_network": {
+      "type": "boolean",
+      "const": false
+    },
+    "live_model": {
+      "type": "boolean",
+      "const": false
+    },
+    "credentials_required": {
+      "type": "boolean",
+      "const": false
+    },
+    "real_dependency_imports": {
+      "type": "boolean",
+      "const": false
+    },
+    "depends_on_q_runtime": {
+      "type": "boolean",
+      "const": false
+    },
+    "contract": {
+      "type": "string"
+    },
+    "state_snapshots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "agent_run_id",
+          "session_id",
+          "state_version",
+          "resume_token",
+          "status",
+          "input_refs",
+          "output_refs",
+          "trace_correlation",
+          "checkpoint",
+          "redaction"
+        ],
+        "properties": {
+          "agent_run_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "resume_token": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "input_refs": {
+            "type": "array"
+          },
+          "output_refs": {
+            "type": "array"
+          },
+          "trace_correlation": {
+            "type": "object"
+          },
+          "checkpoint": {
+            "type": "object"
+          },
+          "redaction": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "replay_assertions": {
+      "type": "object"
+    }
+  }
+}

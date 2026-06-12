@@ -1,7 +1,7 @@
 // Provider-free generic AI workflow composition.
 //
 // This is a thin Leia-native composition over the generic package boundaries:
-// model, model-io, document-rag, prompt-role, memory, turn, tool,
+// model, model-io, document-rag, prompt-role, memory, turn, agent-state, tool,
 // tool-registry, optional-adapter, data-provider, data-normalization,
 // transcript-pipeline, analytical-model, event-intelligence, strategy-backtest,
 // coding-workspace, planning, agent, workflow, chart-render, evidence-report,
@@ -29,6 +29,7 @@ package_boundaries := {
     {role: "strategy-backtest" package_id: "generic-strategy-backtest-contracts" capability: "generic.ai.strategy.backtest.contracts" entrypoint: "ai.strategy.backtest_contracts" provider_free: true live_network: false},
     {role: "coding-workspace" package_id: "generic-coding-workspace" capability: "generic.ai.coding_workspace" entrypoint: "ai.coding_workspace" provider_free: true live_network: false},
     {role: "turn" package_id: "generic-turn-runner" capability: "ai.turn.execute" entrypoint: "ai.turn.execute" provider_free: true live_network: false},
+    {role: "agent-state" package_id: "generic-agent-state-store" capability: "generic.ai.agent_state.store" entrypoint: "ai.agent_state.store" provider_free: true live_network: false},
     {role: "agent" package_id: "generic-agent-runner" capability: "ai.agent.config.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
     {role: "planning" package_id: "generic-planning-graph" capability: "generic.planning.graph.define" entrypoint: "ai.workflow.plan_graph" provider_free: true live_network: false},
     {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "generic.ai.package.boundary.audit" provider_free: true live_network: false},
@@ -46,9 +47,10 @@ composition_edges := {
     {from: "document-rag" to: "memory" handoff: "retrieval evidence and cited context chunks"},
     {from: "memory" to: "turn" handoff: "retrieved context window"},
     {from: "model-io" to: "turn" handoff: "request, stream, response, usage, and redaction envelopes"},
+    {from: "turn" to: "agent-state" handoff: "redacted input refs, output refs, trace correlation, and checkpoint material"},
+    {from: "agent-state" to: "agent" handoff: "resumable state snapshot, resume token, and checkpoint key"},
     {from: "prompt-role" to: "agent" handoff: "role profile, prompt template, and output schema"},
     {from: "tool" to: "turn" handoff: "declarative tool schema"},
-    {from: "turn" to: "agent" handoff: "turn envelope and tool request"},
     {from: "agent" to: "workflow" handoff: "agent result and loop trace"},
     {from: "workflow" to: "eval" handoff: "workflow result fixture"},
     {from: "replay" to: "turn" handoff: "strict ordered record match"},
@@ -80,7 +82,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "model-io", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "analytical-model", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "model-io", "agent-state", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "analytical-model", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -106,10 +108,11 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 29 &&
-        #workflow_contract.edges == 28 &&
+    return #workflow_contract.composition == 30 &&
+        #workflow_contract.edges == 29 &&
         role_present("model") &&
         role_present("model-io") &&
+        role_present("agent-state") &&
         role_present("document-rag") &&
         role_present("prompt-role") &&
         role_present("memory") &&

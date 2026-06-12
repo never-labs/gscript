@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "generic-agent-state-store-provider-free-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:agent_state_store:offline",
+      "capability": "generic.ai.agent_state.store",
+      "path": "fixtures/agent_state_snapshot_fixture.json",
+      "schema": "schemas/agent_state_snapshot_v1.schema.json",
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "state_snapshots": 2,
+        "checkpoint_algorithm": "sha256"
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "generic:agent_state_store:clean_skip",
+      "capability": "generic.ai.agent_state.clean_skip",
+      "path": "fixtures/checkpoint_clean_skip_fixture.json",
+      "schema": "schemas/checkpoint_v1.schema.json",
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "reason": "durable state adapter unavailable"
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ]
+}
