@@ -5521,6 +5521,18 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	if !hasDyadicFunc {
 		if expr.adverb == "/" || expr.adverb == "\\" {
 			if unary, ok := lookupUnaryVerb(expr.verb); ok {
+				// A bare builtin verb word on the left is prefix application
+				// to the derived verb (`count next/x` = count (next/x)), not
+				// a seed: canonical q seeds are nouns or function literals.
+				if leftName := strings.TrimSpace(expr.left); isQBareName(leftName) && qIsBuiltinVerbName(leftName) {
+					if outer, ok := lookupUnaryVerb(leftName); ok {
+						iterated, err := s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: unary}, nil, right, expr.adverb == "\\")
+						if err != nil {
+							return nil, err
+						}
+						return outer(iterated)
+					}
+				}
 				// `n verb/ x` / `n verb\ x`: do-iterate a monadic verb.
 				return s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: unary}, left, right, expr.adverb == "\\")
 			}
@@ -9268,6 +9280,22 @@ func (s *EvalState) tryEvalSeededAdverbInfix(leftSrc, adverb, rightSrc string) (
 	return out, true, err
 }
 
+// qIsBuiltinVerbName reports whether name is a builtin verb word in any of
+// the dispatch tables. Used to keep bare verb words out of seed position in
+// seeded-iterate recognition (q seeds are nouns or function literals).
+func qIsBuiltinVerbName(name string) bool {
+	if _, ok := lookupUnaryVerb(name); ok {
+		return true
+	}
+	if _, ok := lookupDyadicVerbFunc(name); ok {
+		return true
+	}
+	if _, _, ok := lookupDyadicVerb(name); ok {
+		return true
+	}
+	return false
+}
+
 // findSeededIterateInfix detects `seed name/ x` / `seed name\ x` where name
 // is a bare identifier (a session-bound callable) preceded by a seed
 // expression. Builtin verbs are handled by findAdverb before this probe.
@@ -9327,8 +9355,14 @@ func findSeededIterateInfix(src string) (string, string, string, bool) {
 		if left == "" || right == "" || strings.HasPrefix(right, "[") {
 			continue
 		}
-		_, fnSrc, ok := splitTrailingCallableTerm(left)
+		prefix, fnSrc, ok := splitTrailingCallableTerm(left)
 		if !ok || !isQBareName(fnSrc) {
+			continue
+		}
+		if seed := strings.TrimSpace(prefix); isQBareName(seed) && qIsBuiltinVerbName(seed) {
+			// `count next/x` is prefix application of a verb word to the
+			// derived verb (count (next/x)), not a seeded iterate: canonical
+			// q seeds are nouns or function literals, never bare verb words.
 			continue
 		}
 		return left, string(ch), right, true
