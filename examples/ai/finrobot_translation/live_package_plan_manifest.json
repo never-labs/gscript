@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 82,
-  "translation_directory_file_count": 630,
+  "translation_directory_file_count": 635,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -131,6 +131,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
       "covers_package_ids": [
         "generic_evaluation_harness"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_memory_store",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "covers_package_ids": [
+        "generic_memory_store"
       ],
       "status": "checked_in_registered_example"
     },
@@ -718,6 +727,32 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_memory_store",
+      "package_name": "leia-generic-ai-memory-store",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "planned_directory": "packages/generic_ai/memory_store",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_memory_store/contracts/generic_memory_store_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "capabilities": [
+        "generic.ai.memory.store",
+        "generic.ai.memory.namespace",
+        "generic.ai.memory.retrieve",
+        "generic.ai.memory.context_window",
+        "generic.ai.memory.retrieval_policy",
+        "generic.ai.memory.provenance",
+        "generic.ai.memory.clean_skip"
+      ],
+      "test_gates": [
+        "memory store contract fixture decodes without Redis, Postgres, vector databases, embedding models, or managed memory providers",
+        "namespace policy and retrieval policy are provider-free and credential-free",
+        "retrieval ranking and context window order are deterministic fixture data",
+        "adapter boundaries prove dependency imports, live network, and credentials stay disabled"
       ],
       "no_built_in_guarantee": true
     },

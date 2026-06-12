@@ -26,6 +26,7 @@
     "model-io",
     "tool",
     "agent",
+    "memory",
     "workflow",
     "approval",
     "evaluation",
@@ -55,7 +56,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-agent-runner",
         "boundary": "declarative agent config, tool history, structured output, and replay policy",
-        "status": "missing",
+        "status": "resolved",
         "reason": "agent behavior is reusable but currently only represented through tests and examples"
       },
       "production_package_boundary": {
@@ -86,7 +87,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-approval-policy",
         "boundary": "capability-based approval decisions, clean skips, and replay trace envelopes",
-        "status": "missing",
+        "status": "resolved",
         "reason": "approval parity is fixture-backed but not extracted into a production package boundary"
       },
       "production_package_boundary": {
@@ -116,7 +117,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-capability-gates",
         "boundary": "capability vocabulary, default-deny policy, approval evidence, and clean-skip semantics",
-        "status": "missing",
+        "status": "resolved",
         "reason": "capability gates are currently audited through parity ledgers and examples, not a generic package boundary"
       },
       "production_package_boundary": {
@@ -147,7 +148,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-evaluation-harness",
         "boundary": "dataset manifest, judge replay, metrics, findings, and golden gates",
-        "status": "missing",
+        "status": "resolved",
         "reason": "evaluation harness parity is generic but has not been promoted to a production package boundary"
       },
       "production_package_boundary": {
@@ -155,6 +156,37 @@
         "package_id": "generic-evaluation-harness",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "memory",
+      "capability_id": "generic.ai.memory.store",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "memory.store",
+        "memory.namespace",
+        "memory.retrieve",
+        "memory.context_window",
+        "memory.provenance"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_memory_store.source.txt",
+      "test": "tests/llm/llm_generic_memory_store_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_memory_store_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-memory-store",
+        "boundary": "provider-free memory store, namespace, retrieval ranking, context window, and provenance contracts",
+        "status": "resolved",
+        "reason": "memory store behavior was embedded in document pipeline before being promoted to the generic_memory_store reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-memory-store",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
         "provider_free": true,
         "domain_specific": false
       }
@@ -176,7 +208,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-model-registry",
         "boundary": "model alias registry with provider-free replay defaults",
-        "status": "missing",
+        "status": "resolved",
         "reason": "model alias behavior is covered by examples and tests but has no standalone provider-free production package boundary"
       },
       "production_package_boundary": {
@@ -208,7 +240,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-model-io-envelope",
         "boundary": "provider-free request, stream chunk, response, usage, and redaction envelopes between model registry and turn execution",
-        "status": "missing",
+        "status": "resolved",
         "reason": "model IO envelope behavior was fixture-backed before being promoted to a reusable package boundary"
       },
       "production_package_boundary": {
@@ -238,7 +270,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-package-boundary-auditor",
         "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
-        "status": "missing",
+        "status": "resolved",
         "reason": "package boundary checks exist as an audit ledger and test but are not a reusable production package"
       },
       "production_package_boundary": {
@@ -267,7 +299,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-record-replay",
         "boundary": "record schema, replay matching, mismatch findings, and unconsumed record handling",
-        "status": "missing",
+        "status": "resolved",
         "reason": "record/replay fixtures are stable but not packaged as a generic production boundary"
       },
       "production_package_boundary": {
@@ -298,7 +330,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-tool-contracts",
         "boundary": "declarative tool schema, capability tags, and result envelope",
-        "status": "missing",
+        "status": "resolved",
         "reason": "tool metadata is proven by specimens but not packaged as a provider-neutral contract artifact"
       },
       "production_package_boundary": {
@@ -328,7 +360,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-tool-registry",
         "boundary": "checked-in provider-free package boundary",
-        "status": "missing",
+        "status": "resolved",
         "reason": "historical audit field retained; production package boundary is checked in below"
       },
       "production_package_boundary": {
@@ -358,7 +390,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-trace-events",
         "boundary": "provider-neutral trace event schema for turns, streams, approvals, and replay",
-        "status": "missing",
+        "status": "resolved",
         "reason": "trace events are asserted by tests and fixtures but lack a package-level schema boundary"
       },
       "production_package_boundary": {
@@ -388,7 +420,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-turn-runner",
         "boundary": "single-turn request, response, usage, and structured error envelope",
-        "status": "missing",
+        "status": "resolved",
         "reason": "turn specimens remain embedded in examples/tests rather than a reusable package contract"
       },
       "production_package_boundary": {
@@ -418,7 +450,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-workflow-orchestrator",
         "boundary": "multi-step agent and review-turn orchestration with replayable state",
-        "status": "missing",
+        "status": "resolved",
         "reason": "workflow examples demonstrate orchestration without a production package boundary"
       },
       "production_package_boundary": {
@@ -450,7 +482,7 @@
       "missing_production_package_boundary": {
         "package_id": "generic-ai-planning-graph",
         "boundary": "checked-in provider-free package boundary",
-        "status": "missing",
+        "status": "resolved",
         "reason": "historical audit field retained; production package boundary is checked in below"
       },
       "production_package_boundary": {

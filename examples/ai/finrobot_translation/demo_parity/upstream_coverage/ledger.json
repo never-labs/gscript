@@ -104,7 +104,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/README.md",
-          "sha256": "906ece67428ade06c0043bca5676581aa05bc835e44ee50269095c9ad48b57ba"
+          "sha256": "ae7bb69a9bfe6b32f46d3669b7d1568cc058ffbb1e22cafc8d21a5f5a535413f"
         }
       ],
       "next_action": "Refresh coverage prose when upstream README changes product or package scope."
@@ -481,7 +481,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json",
-          "sha256": "214a8f811d134cc0111f39bbb775c05bb8fb25316313fa3e6f95561f30363d63"
+          "sha256": "1138de251d862af7b8761ea43b9a1a4c799b6700739c061d4f87497fc7265ed0"
         }
       ],
       "next_action": "Attach section extraction fixtures to a document pipeline package implementation."
@@ -504,7 +504,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_packages/document_pipeline/fixtures/provider_free_fixture_index.json",
-          "sha256": "b9c8f69cd88e567e7c0abac2d87a5cfbcad3e2a74cfed51934b9fd652fc9b595"
+          "sha256": "6475948158b885adacff25654331d3a3363cc4266af3510d80e678bf1cdf3021"
         }
       ],
       "next_action": "Implement deterministic document conversion fixtures before enabling live PDF parsing."
@@ -549,7 +549,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json",
-          "sha256": "214a8f811d134cc0111f39bbb775c05bb8fb25316313fa3e6f95561f30363d63"
+          "sha256": "1138de251d862af7b8761ea43b9a1a4c799b6700739c061d4f87497fc7265ed0"
         }
       ],
       "next_action": "Keep query planning as generic tool/retrieval contracts."
@@ -1061,7 +1061,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
-          "sha256": "6226a2ad5c91183111dd8ee59d698c1c3ae376b8c6919c0c0ed3681779d93c55"
+          "sha256": "21dd206fd9f5e40a12c3e391488e96785f6cec0136be07d34c57fd86c88cee64"
         }
       ],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
@@ -1218,7 +1218,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/README.md",
-          "sha256": "906ece67428ade06c0043bca5676581aa05bc835e44ee50269095c9ad48b57ba"
+          "sha256": "ae7bb69a9bfe6b32f46d3669b7d1568cc058ffbb1e22cafc8d21a5f5a535413f"
         }
       ],
       "next_action": "Only add asset snapshots when UI/product visual parity requires them."

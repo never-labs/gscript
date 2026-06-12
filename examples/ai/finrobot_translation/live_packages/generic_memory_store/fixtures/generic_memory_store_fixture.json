@@ -25,37 +25,38 @@
   },
   "memory_items": [
     {
-      "memory_id": "mem:risk:operating:0001",
-      "text": "Supply disruption and customer concentration are operating risks in the offline context store.",
+      "memory_id": "mem:runbook:handoff:0001",
+      "text": "The offline context store preserves the current task objective, constraints, and open handoff notes.",
+      "tags": [
+        "runbook",
+        "summary"
+      ],
+      "source_ref": "fixture://generic/context/source:handoff:0001",
+      "chunk_id": "generic-context:handoff:0001",
+      "provenance": {
+        "fixture_key": "generic:memory_store:offline",
+        "source_fixture_key": "generic:context_source:offline",
+        "retriever_fixture_key": "generic:context_retrieval:offline"
+      }
+    },
+    {
+      "memory_id": "mem:risk:constraint:0001",
+      "text": "Do not require live network calls, provider SDK imports, credentials, or persistent stores in provider-free replay.",
       "tags": [
         "risk",
         "summary"
       ],
-      "source_ref": "fixture://rag/chunks/ACME-2025-10K:risk_factors:0001",
-      "chunk_id": "ACME-2025-10K:risk_factors:0001",
+      "source_ref": "fixture://generic/context/source:constraint:0001",
+      "chunk_id": "generic-context:constraint:0001",
       "provenance": {
         "fixture_key": "generic:memory_store:offline",
-        "source_fixture_key": "rag:chunks:ACME:10-K:offline",
-        "retriever_fixture_key": "retriever:ragquery:ACME:offline"
-      }
-    },
-    {
-      "memory_id": "mem:mda:revenue:0001",
-      "text": "Revenue increased due to services growth while hardware margin remained flat.",
-      "tags": [
-        "summary"
-      ],
-      "source_ref": "fixture://rag/chunks/ACME-2025-10K:mda:0001",
-      "chunk_id": "ACME-2025-10K:mda:0001",
-      "provenance": {
-        "fixture_key": "generic:memory_store:offline",
-        "source_fixture_key": "rag:chunks:ACME:10-K:offline",
-        "retriever_fixture_key": "retriever:ragquery:ACME:offline"
+        "source_fixture_key": "generic:context_source:offline",
+        "retriever_fixture_key": "generic:context_retrieval:offline"
       }
     }
   ],
   "retrieval_policy": {
-    "query": "operating risks",
+    "query": "provider-free handoff constraints",
     "top_k": 2,
     "ranking": "deterministic_fixture_score",
     "metadata_filters": {
@@ -70,18 +71,18 @@
   },
   "retrieval_results": [
     {
-      "memory_id": "mem:risk:operating:0001",
+      "memory_id": "mem:runbook:handoff:0001",
       "rank": 1,
       "score": 0.97,
-      "reason": "tag and query term match",
-      "context_ref": "ctx:generic:operating-risk:0001"
+      "reason": "handoff tag and query terms match",
+      "context_ref": "ctx:generic:handoff:0001"
     },
     {
-      "memory_id": "mem:mda:revenue:0001",
+      "memory_id": "mem:risk:constraint:0001",
       "rank": 2,
       "score": 0.61,
-      "reason": "linked retrieved chunk remains available for answer context",
-      "context_ref": "ctx:generic:revenue:0001"
+      "reason": "constraint memory remains available for context packing",
+      "context_ref": "ctx:generic:constraint:0001"
     }
   ],
   "context_window": {
@@ -89,8 +90,8 @@
     "max_context_items": 2,
     "token_budget": 256,
     "included_memory_ids": [
-      "mem:risk:operating:0001",
-      "mem:mda:revenue:0001"
+      "mem:runbook:handoff:0001",
+      "mem:risk:constraint:0001"
     ],
     "excluded_memory_ids": [],
     "deterministic_order": true
@@ -99,7 +100,7 @@
     {
       "id": "memory_store_boundary",
       "adapter": "fixture_memory_store",
-      "capability": "generic.memory.store",
+      "capability": "generic.ai.memory.store",
       "fixture_key": "generic:memory_store:offline",
       "dependency_imported": false,
       "credential_required": false,
@@ -109,7 +110,7 @@
     {
       "id": "context_retrieval_boundary",
       "adapter": "fixture_context_retriever",
-      "capability": "generic.memory.retrieve",
+      "capability": "generic.ai.memory.retrieve",
       "fixture_key": "generic:memory_store:offline",
       "dependency_imported": false,
       "credential_required": false,
@@ -119,7 +120,7 @@
   ],
   "provenance": {
     "fixture_key": "generic:memory_store:offline",
-    "linked_chunk_fixture_key": "rag:chunks:ACME:10-K:offline",
-    "linked_retriever_fixture_key": "retriever:ragquery:ACME:offline"
+    "linked_chunk_fixture_key": "generic:context_source:offline",
+    "linked_retriever_fixture_key": "generic:context_retrieval:offline"
   }
 }

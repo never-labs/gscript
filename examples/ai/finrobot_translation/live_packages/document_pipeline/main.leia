@@ -2,8 +2,8 @@
 //
 // The manifest and contracts are the contract of record. This executable
 // mirror keeps the package discoverable by smoke tests without importing or
-// calling SEC clients, Marker, embedding models, memory providers, vector stores,
-// or retrievers.
+// calling SEC clients, Marker, embedding models, vector stores, retrievers, or
+// the external generic memory store package.
 
 document_pipeline_live_package := {
     id: "finrobot-document-pipeline-live-package"
@@ -43,12 +43,6 @@ document_pipeline_live_package := {
             capabilities: {"finance.document.retriever.query", "finance.document.retriever.adapter_boundary", "finance.document.retriever.rank", "finance.document.answer.citations", "finance.document.answer.provenance"}
             required_fields: {"query", "answer", "retrieved_chunks", "rank", "score", "citation", "retriever_boundaries"}
         },
-        {
-            id: "generic_memory"
-            source_module: "generic/memory_store.leia"
-            capabilities: {"generic.memory.store", "generic.memory.namespace", "generic.memory.retrieve", "generic.context.window", "generic.retrieval.policy"}
-            required_fields: {"memory_id", "namespace", "source_ref", "retrieval_policy", "context_ref", "provenance"}
-        },
     }
     adapter_boundaries: {
         {id: "sec_filing_client" capability: "finance.document.sec.search_fetch" fixture_key: "sec:filing_search:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
@@ -58,7 +52,7 @@ document_pipeline_live_package := {
         {id: "embedding_adapter" capability: "finance.document.embedding.clean_skip" fixture_key: "rag:chunks:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
         {id: "vector_store_adapter" capability: "finance.document.vector_store.capability_gates" fixture_key: "rag:corpus_manifest:ACME:10-K:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
         {id: "vector_retriever" capability: "finance.document.vector_retriever.query" fixture_key: "retriever:ragquery:ACME:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
-        {id: "generic_memory_store" capability: "generic.memory.store_retrieve" fixture_key: "generic:memory_store:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
+        {id: "generic_memory_store" capability: "generic.ai.memory.store" fixture_key: "generic:memory_store:offline" live_network: false dependency_imported: false credential_required: false clean_skip: true},
     }
     fixture_keys: {
         "sec:filing_search:ACME:10-K:offline",
@@ -66,7 +60,6 @@ document_pipeline_live_package := {
         "rag:chunks:ACME:10-K:offline",
         "rag:corpus_manifest:ACME:10-K:offline",
         "retriever:ragquery:ACME:offline",
-        "generic:memory_store:offline",
         "adapter_boundary:document_pipeline:offline",
     }
 }
@@ -102,9 +95,9 @@ for i := 1; i <= #document_pipeline_live_package.adapter_boundaries; i++ {
     document_pipeline_boundary_count = document_pipeline_boundary_count + 1
 }
 
-assert(document_pipeline_module_count == 5)
+assert(document_pipeline_module_count == 4)
 assert(document_pipeline_boundary_count == 8)
-assert(#document_pipeline_live_package.fixture_keys == 7)
+assert(#document_pipeline_live_package.fixture_keys == 6)
 assert(document_pipeline_live_package.default_policy.mode == "fixture_replay")
 assert(document_pipeline_live_package.default_policy.clean_skip_without_dependency == true)
 

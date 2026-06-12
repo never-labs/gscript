@@ -114,26 +114,6 @@
       "real_dependency_imports": false
     },
     {
-      "fixture_key": "generic:memory_store:offline",
-      "capability": "generic.memory.store_retrieve",
-      "path": "fixtures/generic_memory_store_fixture.json",
-      "schema": "schemas/generic_memory_store_v1.schema.json",
-      "metadata": {
-        "replay_ready": true,
-        "contains_namespace_policy": true,
-        "contains_memory_items": true,
-        "contains_retrieval_policy": true,
-        "contains_context_window": true,
-        "contains_provider_free_boundaries": true,
-        "provider_free": true,
-        "live_network": false,
-        "real_dependency_imports": false
-      },
-      "provider_free": true,
-      "live_network": false,
-      "real_dependency_imports": false
-    },
-    {
       "fixture_key": "adapter_boundary:document_pipeline:offline",
       "capability": "finance.document.adapter.boundary",
       "path": "fixtures/adapter_boundary_fixture.json",

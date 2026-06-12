@@ -154,8 +154,8 @@
     },
     {
       "id": "generic_memory_store",
-      "display_name": "Generic memory store and context retrieval",
-      "capability": "generic.memory.store_retrieve",
+      "display_name": "External generic memory store package boundary",
+      "capability": "generic.ai.memory.store",
       "fixture_key": "generic:memory_store:offline",
       "live_network": false,
       "dependency_imported": false,
@@ -168,7 +168,8 @@
         "context_window_budget_required": true,
         "provider_credentials_required": false
       },
-      "gap": "Future package must provide durable memory storage, tenant isolation, retrieval ranking, and context packing outside Leia core."
+      "gap": "Future package must provide durable memory storage, tenant isolation, retrieval ranking, and context packing outside Leia core.",
+      "external_package": "generic_memory_store"
     }
   ]
 }

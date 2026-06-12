@@ -47,6 +47,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 	for _, want := range []string{
 		`role: "model"`,
 		`role: "model-io"`,
+		`role: "memory"`,
 		`role: "turn"`,
 		`role: "tool"`,
 		`role: "tool-registry"`,
@@ -60,6 +61,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "package-audit"`,
 		`package_id: "generic-model-registry"`,
 		`package_id: "generic-model-io-envelope"`,
+		`package_id: "generic-memory-store"`,
 		`package_id: "generic-turn-runner"`,
 		`package_id: "generic-tool-contracts"`,
 		`package_id: "generic-tool-registry"`,
@@ -167,6 +169,7 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 		"approval->tool",
 		"model->model-io",
 		"model-io->turn",
+		"memory->turn",
 		"tool->turn",
 		"replay->turn",
 		"trace->workflow",

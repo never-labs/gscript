@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "generic-memory-store-contract",
+  "package_boundary_id": "generic-ai-memory-store",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "credentials_required": false,
+  "capabilities": [
+    "generic.ai.memory.store",
+    "generic.ai.memory.namespace",
+    "generic.ai.memory.retrieve",
+    "generic.ai.memory.context_window",
+    "generic.ai.memory.retrieval_policy",
+    "generic.ai.memory.provenance",
+    "generic.ai.memory.clean_skip"
+  ],
+  "required_fields": [
+    "memory_store.store_id",
+    "namespace_policy.namespace",
+    "memory_items.memory_id",
+    "memory_items.provenance",
+    "retrieval_policy.query",
+    "retrieval_results.rank",
+    "context_window.included_memory_ids",
+    "adapter_boundaries.clean_skip",
+    "provenance.fixture_key"
+  ],
+  "adapter_contract": {
+    "concrete_provider_names_allowed": false,
+    "live_dependency_imports_allowed": false,
+    "credential_values_allowed": false,
+    "clean_skip_required": true,
+    "provider_free_replay_required": true
+  },
+  "acceptance_gates": [
+    "memory store fixtures remain local and provider-free",
+    "retrieval ranking is deterministic and replayable",
+    "context window budget and included memory IDs are explicit",
+    "adapter boundaries reject live network, credential, and dependency imports"
+  ]
+}

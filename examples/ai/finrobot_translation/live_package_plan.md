@@ -8,11 +8,11 @@ web services are not Leia built-ins.
 ## Package Skeleton Status
 
 Current registered-example status: 82 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples list --json`. All 35
+examples are discovered by `go run ./cmd/leia examples list --json`. All 36
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI
-model, model IO, turn, tool, agent, workflow, evaluation, replay, trace,
+model, model IO, memory, turn, tool, agent, workflow, evaluation, replay, trace,
 approval, and package-audit boundaries consumed by the translation.
 
 | Checked-in skeleton | Registered example | Target external package | Target directory | Contract |
@@ -48,6 +48,7 @@ approval, and package-audit boundaries consumed by the translation.
 | `live_packages/generic_planning_graph` | `live_packages/generic_planning_graph/main.leia` | `leia-generic-ai-planning-graph` | `packages/generic_ai/planning_graph` | `contracts/planning_graph_contract.json` |
 | `live_packages/generic_workflow_orchestrator` | `live_packages/generic_workflow_orchestrator/main.leia` | `leia-generic-ai-workflow-orchestrator` | `packages/generic_ai/workflow_orchestrator` | `contracts/workflow_graph_contract.json` |
 | `live_packages/generic_evaluation_harness` | `live_packages/generic_evaluation_harness/main.leia` | `leia-generic-ai-evaluation-harness` | `packages/generic_ai/evaluation_harness` | `contracts/evaluation_harness_contract.json` |
+| `live_packages/generic_memory_store` | `live_packages/generic_memory_store/main.leia` | `leia-generic-ai-memory-store` | `packages/generic_ai/memory_store` | `contracts/generic_memory_store_contract.json` |
 | `live_packages/generic_record_replay` | `live_packages/generic_record_replay/main.leia` | `leia-generic-ai-record-replay` | `packages/generic_ai/record_replay` | `contracts/record_replay_contract.json` |
 | `live_packages/generic_trace_events` | `live_packages/generic_trace_events/main.leia` | `leia-generic-ai-trace-events` | `packages/generic_ai/trace_events` | `contracts/trace_events_contract.json` |
 | `live_packages/generic_approval_policy` | `live_packages/generic_approval_policy/main.leia` | `leia-generic-ai-approval-policy` | `packages/generic_ai/approval_policy` | `contracts/generic_approval_policy_contract.json` |

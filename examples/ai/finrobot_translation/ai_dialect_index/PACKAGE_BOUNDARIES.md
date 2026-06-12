@@ -40,6 +40,7 @@ contracts, and fixtures for its boundary.
 <!-- ai-dialect-boundary-package-list:start -->
 - model: `examples/ai/finrobot_translation/live_packages/generic_model_registry`
 - model-io: `examples/ai/finrobot_translation/live_packages/generic_model_io_envelope`
+- memory: `examples/ai/finrobot_translation/live_packages/generic_memory_store`
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
 - tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
 - tool-registry: `examples/ai/finrobot_translation/live_packages/generic_tool_registry`
@@ -63,6 +64,8 @@ orthogonal and layered:
   descriptors, policy flags, and redaction rules.
 - model-io owns request, stream chunk, response, usage, replay correlation, and
   redaction envelopes between model resolution and turn execution.
+- memory owns namespace policy, memory items, deterministic retrieval ranking,
+  context windows, provenance, and provider-free adapter boundaries.
 - turn consumes model descriptors, structured messages, tool-call envelopes,
   replay fixtures, and output schemas to produce one deterministic model-turn
   result.
@@ -97,7 +100,7 @@ language or specializing the dialect for one application domain.
 
 | Responsibility | Owning package | Boundary |
 | --- | --- | --- |
-| Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, and workflow graphs; packages own validation, envelopes, loop semantics, and stage I/O. |
+| Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_memory_store`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, memory, and workflow graphs; packages own validation, envelopes, context windows, loop semantics, and stage I/O. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |
 | Trace | `generic_trace_events`, `generic_workflow_orchestrator`, `generic_agent_runner` | Runtime actions emit metadata-only event envelopes with correlation IDs, redaction policy, replay markers, and artifact references. |

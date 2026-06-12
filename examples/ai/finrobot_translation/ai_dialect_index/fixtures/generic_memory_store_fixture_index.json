@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "generic-memory-store-dialect-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "live_model": false,
+  "domain_specific": false,
+  "real_dependency_imports": false,
+  "capability_id": "generic.ai.memory.store",
+  "dialect_surface": [
+    "memory.store",
+    "memory.namespace",
+    "memory.retrieve",
+    "memory.context_window",
+    "memory.provenance"
+  ],
+  "fixture_key": "generic:memory_store:offline",
+  "production_package_boundary": {
+    "package_id": "generic-memory-store",
+    "directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+    "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+    "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json",
+    "provider_free": true,
+    "domain_specific": false
+  }
+}

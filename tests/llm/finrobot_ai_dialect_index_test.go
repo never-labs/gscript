@@ -148,12 +148,7 @@ func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 			assertGenericAIDialectFixtureProviderFree(t, root, entry.Fixture)
 			assertGenericAIDialectNoLivePackageReference(t, entry)
 			assertGenericAIDialectNoFinRobotSyntaxAssumption(t, entry)
-			if entry.MissingProductionPackageBoundary.PackageID == "" ||
-				entry.MissingProductionPackageBoundary.Boundary == "" ||
-				entry.MissingProductionPackageBoundary.Status != "missing" ||
-				entry.MissingProductionPackageBoundary.Reason == "" {
-				t.Fatalf("%s missing production package boundary is incomplete: %#v", entry.Capability, entry.MissingProductionPackageBoundary)
-			}
+			assertGenericAIDialectProductionBoundaryGap(t, entry)
 			assertGenericAIDialectProductionBoundary(t, root, entry)
 		})
 	}
@@ -562,6 +557,26 @@ func assertGenericAIDialectReference(t *testing.T, root, rel string, scanForQRun
 		if strings.Contains(strings.ToLower(string(data)), forbiddenRuntime) {
 			t.Fatalf("reference %q must not depend on the q runtime package", rel)
 		}
+	}
+}
+
+func assertGenericAIDialectProductionBoundaryGap(t *testing.T, entry genericAIDialectIndexItem) {
+	t.Helper()
+	gap := entry.MissingProductionPackageBoundary
+	if gap.PackageID == "" || gap.Boundary == "" || gap.Reason == "" {
+		t.Fatalf("%s production package boundary gap is incomplete: %#v", entry.Capability, gap)
+	}
+	switch gap.Status {
+	case "missing":
+		if entry.ProductionPackageBoundary != nil && entry.ProductionPackageBoundary.Status == "checked_in" {
+			t.Fatalf("%s has checked-in production boundary but unresolved missing gap: %#v", entry.Capability, gap)
+		}
+	case "resolved":
+		if entry.ProductionPackageBoundary == nil || entry.ProductionPackageBoundary.Status != "checked_in" {
+			t.Fatalf("%s resolved gap requires checked-in production boundary: gap=%#v boundary=%#v", entry.Capability, gap, entry.ProductionPackageBoundary)
+		}
+	default:
+		t.Fatalf("%s production package boundary gap has invalid status %q", entry.Capability, gap.Status)
 	}
 }
 

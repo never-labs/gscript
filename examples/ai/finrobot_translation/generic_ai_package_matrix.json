@@ -80,6 +80,29 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_memory_store",
+      "package_name": "leia-generic-ai-memory-store",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "capability": "generic.ai.memory.store",
+      "capabilities": [
+        "generic.ai.memory.store",
+        "generic.ai.memory.namespace",
+        "generic.ai.memory.retrieve",
+        "generic.ai.memory.context_window",
+        "generic.ai.memory.retrieval_policy",
+        "generic.ai.memory.provenance",
+        "generic.ai.memory.clean_skip"
+      ],
+      "backend_shape": "ai.memory.store",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_memory_store/contracts/generic_memory_store_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_model_io_envelope",
       "package_name": "leia-generic-ai-model-io-envelope",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",

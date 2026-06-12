@@ -26,8 +26,17 @@ func TestGenericAIDialectStaysOutOfLeiaCoreBuiltins(t *testing.T) {
 		t.Fatalf("generic AI dialect index leaked runtime/language coupling: %#v", index.Scope)
 	}
 	for _, entry := range index.Entries {
-		if entry.MissingProductionPackageBoundary.Status != "missing" {
-			t.Fatalf("%s must keep missing production boundary explicit: %#v", entry.CapabilityID, entry.MissingProductionPackageBoundary)
+		switch entry.MissingProductionPackageBoundary.Status {
+		case "missing":
+			if entry.ProductionPackageBoundary != nil && entry.ProductionPackageBoundary.Status == "checked_in" {
+				t.Fatalf("%s has checked-in package boundary but unresolved missing status: %#v", entry.CapabilityID, entry.MissingProductionPackageBoundary)
+			}
+		case "resolved":
+			if entry.ProductionPackageBoundary == nil || entry.ProductionPackageBoundary.Status != "checked_in" {
+				t.Fatalf("%s resolved package boundary requires checked-in production boundary: %#v", entry.CapabilityID, entry.MissingProductionPackageBoundary)
+			}
+		default:
+			t.Fatalf("%s must keep production boundary status explicit: %#v", entry.CapabilityID, entry.MissingProductionPackageBoundary)
 		}
 		for _, surface := range entry.DialectSurface {
 			assertGenericAIDialectSurfaceIsPackageLevel(t, entry.CapabilityID, surface)

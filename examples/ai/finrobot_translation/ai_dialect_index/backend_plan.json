@@ -76,6 +76,39 @@
       }
     },
     {
+      "shape_id": "ai.memory.store",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "memory",
+        "replay"
+      ],
+      "contract": "Normalize provider-free memory store items, namespace policy, retrieval ranking, context windows, and provenance.",
+      "inputs": [
+        "memory_items",
+        "namespace_policy",
+        "retrieval_policy",
+        "context_budget"
+      ],
+      "outputs": [
+        "retrieval_results",
+        "context_window",
+        "adapter_boundaries",
+        "provenance"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_memory_store.source.txt",
+      "test": "tests/llm/llm_generic_memory_store_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_memory_store_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-memory-store",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_memory_store/contracts/generic_memory_store_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.model.io.envelope",
       "status": "checked_in_package_boundary",
       "capabilities": [

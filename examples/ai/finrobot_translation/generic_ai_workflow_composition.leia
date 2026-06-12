@@ -1,13 +1,14 @@
 // Provider-free generic AI workflow composition.
 //
 // This is a thin Leia-native composition over the generic package boundaries:
-// model, model-io, turn, tool, tool-registry, planning, agent, workflow, eval,
-// replay, trace, approval, and package-audit. It intentionally declares no provider SDK,
-// network call, credential, or domain adapter.
+// model, model-io, memory, turn, tool, tool-registry, planning, agent, workflow,
+// eval, replay, trace, approval, and package-audit. It intentionally declares no
+// provider SDK, network call, credential, or domain adapter.
 
 package_boundaries := {
     {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "generic.ai.model.registry" provider_free: true live_network: false},
     {role: "model-io" package_id: "generic-model-io-envelope" capability: "generic.ai.model.io.envelope" entrypoint: "ai.model.io.envelope" provider_free: true live_network: false},
+    {role: "memory" package_id: "generic-memory-store" capability: "generic.ai.memory.store" entrypoint: "ai.memory.store" provider_free: true live_network: false},
     {role: "replay" package_id: "generic-record-replay" capability: "generic.ai.record.capture" entrypoint: "generic.ai.record.replay.fixture" provider_free: true live_network: false},
     {role: "trace" package_id: "generic-trace-events" capability: "generic.ai.trace.events" entrypoint: "ai.trace.emit" provider_free: true live_network: false},
     {role: "approval" package_id: "generic-approval-policy" capability: "generic.ai.approval.policy.evaluate" entrypoint: "generic.ai.approval.policy.evaluate" provider_free: true live_network: false},
@@ -23,6 +24,7 @@ package_boundaries := {
 
 composition_edges := {
     {from: "model" to: "model-io" handoff: "resolved model descriptor"},
+    {from: "memory" to: "turn" handoff: "retrieved context window"},
     {from: "model-io" to: "turn" handoff: "request, stream, response, usage, and redaction envelopes"},
     {from: "tool" to: "turn" handoff: "declarative tool schema"},
     {from: "turn" to: "agent" handoff: "turn envelope and tool request"},
@@ -44,7 +46,7 @@ workflow_contract := {
     credential_required: false
     composition: package_boundaries
     edges: composition_edges
-    native_surfaces: {"model", "model-io", "turn", "tool", "tool-registry", "planning", "agent", "workflow", "eval", "replay", "trace", "approval", "package-audit"}
+    native_surfaces: {"model", "model-io", "memory", "turn", "tool", "tool-registry", "planning", "agent", "workflow", "eval", "replay", "trace", "approval", "package-audit"}
 }
 
 func role_present(role) {
@@ -70,10 +72,11 @@ func provider_free_boundaries() {
 }
 
 func connected_native_surfaces() {
-    return #workflow_contract.composition == 13 &&
-        #workflow_contract.edges == 12 &&
+    return #workflow_contract.composition == 14 &&
+        #workflow_contract.edges == 13 &&
         role_present("model") &&
         role_present("model-io") &&
+        role_present("memory") &&
         role_present("turn") &&
         role_present("tool") &&
         role_present("tool-registry") &&

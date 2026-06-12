@@ -85,14 +85,15 @@
     },
     {
       "id": "generic_memory_store",
-      "display_name": "Generic memory store and context retrieval",
-      "capability": "generic.memory.store_retrieve",
+      "display_name": "External generic memory store package boundary",
+      "capability": "generic.ai.memory.store",
       "fixture_key": "generic:memory_store:offline",
       "schema": "adapter_boundary",
       "live_network": false,
       "dependency_imported": false,
       "credential_required": false,
-      "clean_skip": true
+      "clean_skip": true,
+      "external_package": "generic_memory_store"
     }
   ]
 }
