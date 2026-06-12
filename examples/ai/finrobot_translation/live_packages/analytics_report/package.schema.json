@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "id": "leia-analytics-report-package-schema",
+  "metadata_only": true,
   "schemas": {
     "finance_normalizer": {
       "required": [

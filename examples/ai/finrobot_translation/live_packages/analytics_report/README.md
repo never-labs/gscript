@@ -24,10 +24,12 @@ The skeleton covers these package surfaces:
 - Accessibility checklist, stale-data warning policy, and source annotation
   requirements that snapshots and report sections must carry forward.
 
-`package.manifest.json` declares the live package gates and capabilities.
-`package.schema.json` describes the contract surfaces. `analytics_report.leia`
-is the executable fixture that validates the contracts in interpreter and
-bytecode tests.
+`package.manifest.json` declares the live package gates, the target package name
+`leia-finrobot-analytics-report`, and both the legacy contract capabilities and
+the `finance.analytics_report.*` plan-compatible capabilities. `package.schema.json`
+describes the contract surfaces. `analytics_report.leia` is the executable
+fixture that validates the contracts in interpreter and bytecode tests and is
+also exposed as `entrypoints.main`.
 
 Renderer and snapshot contract notes:
 

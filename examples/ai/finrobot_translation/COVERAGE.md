@@ -44,8 +44,9 @@ notebook/tutorial parity.
 Structured gap status is also recorded in `gap_manifest.json`. That manifest
 keeps provider-free coverage, package hygiene exceptions, open production
 implementation gaps, and closed/non-gap guards in separate buckets. In
-particular, the package hygiene exceptions for `html_ui_snapshots` and
-`vendor_adapters` are `tracked_exception` records, not closed gaps.
+particular, the package hygiene exception for `html_ui_snapshots` is a
+`tracked_exception` record, not a closed gap. `vendor_adapters` now uses
+`package.manifest.json` and is covered by the regular package manifest audit.
 
 The generic AI dialect convergence items are no longer missing or planned
 FinRobot work. They are checked-in package boundaries under
@@ -278,11 +279,10 @@ structured `tracked_exception` entries:
 | Exception | Package | Status | Why it is not closed |
 | --- | --- | --- | --- |
 | `FR-HYGIENE-001` | `html_ui_snapshots` | `tracked_exception` | Legacy skeleton manifest shape still needs migration to the current per-manifest `no_built_in_guarantee` field. |
-| `FR-HYGIENE-002` | `vendor_adapters` | `tracked_exception` | Earlier `manifest.json` shape still needs migration to the current package manifest shape. |
 
-Both exceptions remain guarded by the global live-package plan guarantee,
+This exception remains guarded by the global live-package plan guarantee,
 provider-free defaults, disabled live network behavior, registered examples,
-and package manifest audit checks. They should not be counted as closed until
+and package manifest audit checks. It should not be counted as closed until
 the manifest-shape migration is complete.
 
 ## Provider-Free Slice Completion

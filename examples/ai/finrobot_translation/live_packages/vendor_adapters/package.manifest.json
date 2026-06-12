@@ -2,6 +2,7 @@
   "schema_version": 1,
   "id": "finrobot-live-vendor-adapters",
   "package": "example.com/leia/examples/ai/finrobot-translation/live-packages/vendor-adapters",
+  "package_name": "leia-finrobot-vendor-adapters",
   "version": "0.2.0-fixture-matrix",
   "provider_free": true,
   "live_network": false,
@@ -17,6 +18,9 @@
     "real_dependency_imports": false,
     "clean_skip_without_credentials": true,
     "redact_secret_values": true
+  },
+  "entrypoints": {
+    "main": "main.leia"
   },
   "redaction": {
     "enabled": true,
@@ -850,5 +854,9 @@
         "live_network": false
       }
     }
-  ]
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot vendor adapters or live finance provider clients as built-ins; this package declares provider-free adapter metadata and replay fixtures only."
+  }
 }

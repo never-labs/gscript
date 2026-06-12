@@ -77,8 +77,9 @@ live-package, generic live-package, and tutorial runnable counts are current.
 The file-inventory count was refreshed to 866 `rg --files` inventory files. `AI_DIALECT_GAPS.md` is
 absent in this worktree, so no AI-dialect gap document required updates.
 `gap_manifest.json` is present and is covered by the status-docs inventory test.
-Its package hygiene exception records for `html_ui_snapshots` and
-`vendor_adapters` remain `tracked_exception`, not closed.
+Its package hygiene exception record for `html_ui_snapshots` remains
+`tracked_exception`, not closed. `vendor_adapters` now uses
+`package.manifest.json` and is covered by the regular package manifest audit.
 
 Semantic guard note: the recent generic AI boundary guard state is reflected
 here as checked-in package-owned surface, not as planned FinRobot work. The

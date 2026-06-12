@@ -178,7 +178,7 @@ func TestOptionalIntegrationBoundariesCleanSkipWithoutDefaultProviderExecution(t
 func TestProviderBoundaryFixturesDoNotEnableLiveProviderExecutionByDefault(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
-		"examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json",
+		"examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
 		"examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json",
 		"examples/ai/finrobot_translation/live_packages/optional_integrations/contracts/optional_integration_capability_gates.json",
 		"examples/ai/finrobot_translation/live_packages/optional_integrations/fixtures/provider_free_fixture_index.json",

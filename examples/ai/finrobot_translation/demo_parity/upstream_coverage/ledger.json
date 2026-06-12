@@ -245,8 +245,8 @@
       "source_hash": "sha256:79a5c67d9c44b49fdb4b21e7d9fd678e6c9e17cce4b12c642d28911e5553458f",
       "fixture_hashes": [
         {
-          "path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json",
-          "sha256": "0078a042e5ea159b2f45fcd9407136d9d112fae99808cc4e5a021053eb3e5466"
+          "path": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
+          "sha256": "de0e4a4a3bbd15e6e31262101948a3e6a447e8d25539de9d4d427ca8e1d41466"
         }
       ],
       "next_action": "Implement live tool invocation only inside provider packages with explicit capabilities."
@@ -986,7 +986,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json",
-          "sha256": "88cd59d3b1ef99107cf3eb14f4632f78563946099722457ed50f7dc5b102c220"
+          "sha256": "b2874d829b1a8c10c3c34105cdc0c81ac60f4746f1167ef397630d16b75f6692"
         }
       ],
       "next_action": "Implement report assembly in a package after renderer and chart packages are ready."
@@ -1061,7 +1061,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
-          "sha256": "ef5138727f503bf7e606c04f12e3160549323a52d5bdd050d03f9981c91f55e7"
+          "sha256": "128153867a0f3380ea1673c65147a7cb86815efed22746dedb32cadfbb96b27c"
         }
       ],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."

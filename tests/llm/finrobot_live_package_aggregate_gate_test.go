@@ -37,7 +37,21 @@ func TestFinRobotLivePackageAggregateGate(t *testing.T) {
 				if strings.Contains(d.Name(), "manifest") {
 					manifestCount++
 				}
-				assertFinRobotLivePackageAggregateJSON(t, path)
+				decoded := assertFinRobotLivePackageAggregateJSON(t, path)
+				if filepath.Base(path) == "package.manifest.json" {
+					manifest, ok := decoded.(map[string]any)
+					if !ok {
+						t.Fatalf("%s root = %#v, want object", path, decoded)
+					}
+					assertFinRobotPackageManifestEntrypoints(t, pkgDir, path, manifest)
+				}
+				if finrobotLivePackageSchemaJSON(path) {
+					schema, ok := decoded.(map[string]any)
+					if !ok {
+						t.Fatalf("%s root = %#v, want schema object", path, decoded)
+					}
+					assertFinRobotLivePackageSchemaRequiredOrExempt(t, path, schema)
+				}
 				return nil
 			})
 			if err != nil {
@@ -48,6 +62,10 @@ func TestFinRobotLivePackageAggregateGate(t *testing.T) {
 			}
 			if checkedJSONCount == 0 {
 				t.Fatalf("%s has no manifest/schema/fixture JSON files", relDir)
+			}
+			indexPaths := finrobotPackageFixtureIndexPaths(t, root, relDir)
+			if len(indexPaths) == 0 {
+				t.Fatalf("%s has no provider-free fixture index", relDir)
 			}
 		})
 	}
@@ -82,7 +100,7 @@ func TestFinRobotLivePackageFixtureIndexesReferenceExistingJSON(t *testing.T) {
 		t.Run(filepath.Base(relDir), func(t *testing.T) {
 			indexPaths := finrobotPackageFixtureIndexPaths(t, root, relDir)
 			if len(indexPaths) == 0 {
-				t.Skip("package does not use provider-free fixture indexes")
+				t.Fatalf("%s has no provider-free fixture index", relDir)
 			}
 			pkgDir := filepath.Join(root, filepath.FromSlash(relDir))
 			for _, indexPath := range indexPaths {
@@ -179,7 +197,7 @@ func finrobotLivePackageAggregateJSON(path string) bool {
 		strings.Contains(slashPath, "/fixtures/")
 }
 
-func assertFinRobotLivePackageAggregateJSON(t *testing.T, path string) {
+func assertFinRobotLivePackageAggregateJSON(t *testing.T, path string) any {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -190,6 +208,86 @@ func assertFinRobotLivePackageAggregateJSON(t *testing.T, path string) {
 		t.Fatalf("%s is not valid JSON: %v", path, err)
 	}
 	assertFinRobotProviderFreeGate(t, filepath.ToSlash(path), decoded)
+	return decoded
+}
+
+func finrobotLivePackageSchemaJSON(path string) bool {
+	slashPath := filepath.ToSlash(path)
+	return filepath.Base(path) == "package.schema.json" ||
+		strings.Contains(slashPath, "/schemas/") ||
+		strings.HasSuffix(filepath.Base(path), ".schema.json")
+}
+
+func assertFinRobotPackageManifestEntrypoints(t *testing.T, pkgDir, manifestPath string, manifest map[string]any) {
+	t.Helper()
+	rawEntrypoints, ok := manifest["entrypoints"]
+	if !ok {
+		t.Fatalf("%s missing entrypoints", manifestPath)
+	}
+	entrypoints, ok := rawEntrypoints.(map[string]any)
+	if !ok || len(entrypoints) == 0 {
+		t.Fatalf("%s entrypoints = %#v, want non-empty object", manifestPath, rawEntrypoints)
+	}
+	for key, raw := range entrypoints {
+		ref, ok := raw.(string)
+		if !ok || strings.TrimSpace(ref) == "" {
+			t.Fatalf("%s entrypoints.%s = %#v, want non-empty file path", manifestPath, key, raw)
+		}
+		assertFinRobotManifestFileReference(t, pkgDir, manifestPath, "entrypoints."+key, ref)
+	}
+	for key, raw := range manifest {
+		if key == "entrypoints" || key != "fixture_index" && !strings.HasSuffix(key, "_fixture_index") {
+			continue
+		}
+		ref, ok := raw.(string)
+		if !ok || strings.TrimSpace(ref) == "" {
+			t.Fatalf("%s %s = %#v, want non-empty fixture index path", manifestPath, key, raw)
+		}
+		assertFinRobotManifestFileReference(t, pkgDir, manifestPath, key, ref)
+	}
+}
+
+func assertFinRobotManifestFileReference(t *testing.T, pkgDir, manifestPath, key, ref string) {
+	t.Helper()
+	refPath := strings.TrimSpace(strings.Split(ref, "#")[0])
+	if refPath == "" || strings.Contains(refPath, "://") || strings.HasPrefix(refPath, "$") {
+		t.Fatalf("%s %s = %q, want package-local file path", manifestPath, key, ref)
+	}
+	path := filepath.Clean(filepath.Join(pkgDir, filepath.FromSlash(refPath)))
+	rel, err := filepath.Rel(pkgDir, path)
+	if err != nil {
+		t.Fatalf("%s %s = %q: %v", manifestPath, key, ref, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		t.Fatalf("%s %s = %q resolves outside package", manifestPath, key, ref)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("%s %s = %q: %v", manifestPath, key, ref, err)
+	}
+	if info.IsDir() {
+		t.Fatalf("%s %s = %q resolves to directory", manifestPath, key, ref)
+	}
+}
+
+func assertFinRobotLivePackageSchemaRequiredOrExempt(t *testing.T, path string, schema map[string]any) {
+	t.Helper()
+	if raw, ok := schema["required"]; ok {
+		required, ok := raw.([]any)
+		if !ok || len(required) == 0 {
+			t.Fatalf("%s required = %#v, want non-empty array", path, raw)
+		}
+		for i, field := range required {
+			if name, ok := field.(string); !ok || strings.TrimSpace(name) == "" {
+				t.Fatalf("%s required[%d] = %#v, want non-empty string", path, i, field)
+			}
+		}
+		return
+	}
+	if finrobotLivePackageBoolOrConst(schema["metadata_only"], true) {
+		return
+	}
+	t.Fatalf("%s missing top-level required; set required or metadata_only=true for schema metadata registries", path)
 }
 
 func assertFinRobotProviderFreeGate(t *testing.T, path string, value any) {

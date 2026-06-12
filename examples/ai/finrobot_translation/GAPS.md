@@ -71,10 +71,11 @@ capability gates.
 Structured status for those buckets is recorded in `gap_manifest.json`. The
 manifest separates provider-free coverage, `tracked_exception` package hygiene
 records, open production implementation gaps, and closed/non-gap dialect guards.
-The current package hygiene exceptions are `FR-HYGIENE-001` for
-`html_ui_snapshots` and `FR-HYGIENE-002` for `vendor_adapters`; both are
-tracked exceptions backed by package-manifest audit waivers and must not be
-reported as closed until their legacy manifest shapes are migrated.
+The current package hygiene exception is `FR-HYGIENE-001` for
+`html_ui_snapshots`; it is a tracked exception backed by a package-manifest
+audit waiver and must not be reported as closed until its legacy manifest shape
+is migrated. `vendor_adapters` now uses `package.manifest.json` and is covered
+by the regular package manifest audit instead of a hygiene exception.
 
 The generic AI dialect convergence status is checked-in package boundary, not
 missing or planned. The `live_packages/generic_*` directories define reusable AI

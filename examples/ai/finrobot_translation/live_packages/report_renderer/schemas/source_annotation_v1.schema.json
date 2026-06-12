@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "id": "source_annotation_v1",
+  "metadata_only": true,
   "type": "object",
   "source_required": [
     "id",

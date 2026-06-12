@@ -101,8 +101,7 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 			"no open generic AI dialect gap",
 			"gap_manifest.json",
 			"FR-HYGIENE-001",
-			"FR-HYGIENE-002",
-			"tracked exceptions",
+			"tracked exception",
 		},
 	}
 	for rel, expected := range docs {
@@ -155,6 +154,8 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 			"755 files",
 			"770 files",
 			"785 files",
+			"FR-HYGIENE-002",
+			"html_ui_snapshots` and\n`vendor_adapters` are `tracked_exception`",
 		} {
 			if strings.Contains(text, stale) {
 				t.Fatalf("%s still contains stale inventory phrase %q", rel, stale)
@@ -169,16 +170,23 @@ func TestFinRobotGapManifestTracksPackageHygieneExceptions(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-ai-dialect-gap-manifest" {
 		t.Fatalf("gap manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
-	if len(manifest.PackageHygieneExceptions) != 2 {
-		t.Fatalf("package_hygiene_exceptions = %d, want 2", len(manifest.PackageHygieneExceptions))
+	ledger := loadFinRobotPackageManifestAuditLedger(t, root)
+	waivedPackages := map[string]bool{}
+	for _, waiver := range ledger.Waivers.NoBuiltInGuarantee {
+		waivedPackages[waiver.PackageID] = true
+	}
+	if len(manifest.PackageHygieneExceptions) != len(waivedPackages) {
+		t.Fatalf("package_hygiene_exceptions = %d, want waiver count %d", len(manifest.PackageHygieneExceptions), len(waivedPackages))
 	}
 	wantPackages := map[string]string{
 		"FR-HYGIENE-001": "html_ui_snapshots",
-		"FR-HYGIENE-002": "vendor_adapters",
 	}
 	for _, exception := range manifest.PackageHygieneExceptions {
 		if wantPackages[exception.ID] != exception.PackageID {
 			t.Fatalf("unexpected package hygiene exception: %#v", exception)
+		}
+		if !waivedPackages[exception.PackageID] {
+			t.Fatalf("%s exception package %q is not backed by package_manifest_audit waiver", exception.ID, exception.PackageID)
 		}
 		if exception.Status != "tracked_exception" {
 			t.Fatalf("%s status = %q, want tracked_exception", exception.ID, exception.Status)

@@ -14,11 +14,13 @@ import (
 type analyticsReportLivePackageManifest struct {
 	SchemaVersion               int      `json:"schema_version"`
 	ID                          string   `json:"id"`
+	PackageName                 string   `json:"package_name"`
 	ProviderFree                bool     `json:"provider_free"`
 	LiveNetworkDefault          bool     `json:"live_network_default"`
 	RealDependencyImportDefault bool     `json:"real_dependency_import_default"`
 	Capabilities                []string `json:"capabilities"`
 	Entrypoints                 struct {
+		Main    string `json:"main"`
 		Example string `json:"example"`
 		Schema  string `json:"schema"`
 	} `json:"entrypoints"`
@@ -94,6 +96,15 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 	if manifest.SchemaVersion != 1 || manifest.ID != "leia-analytics-report-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
+	if manifest.PackageName != "leia-finrobot-analytics-report" {
+		t.Fatalf("package_name = %q", manifest.PackageName)
+	}
+	if manifest.Entrypoints.Main != "analytics_report.leia" || manifest.Entrypoints.Example != manifest.Entrypoints.Main {
+		t.Fatalf("entrypoints = %#v, want main/example analytics_report.leia", manifest.Entrypoints)
+	}
+	if _, err := os.Stat(filepath.Join(base, manifest.Entrypoints.Main)); err != nil {
+		t.Fatalf("main entrypoint %q: %v", manifest.Entrypoints.Main, err)
+	}
 	if !manifest.ProviderFree || manifest.LiveNetworkDefault || manifest.RealDependencyImportDefault || manifest.ProviderGate.AllowNetwork {
 		t.Fatalf("provider-free gate is not closed: %#v", manifest)
 	}
@@ -109,6 +120,22 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
 	for _, want := range []string{
+		"finance.analytics_report.normalized_inputs",
+		"finance.analytics_report.valuation_summary",
+		"finance.analytics_report.sensitivity_matrix",
+		"finance.analytics_report.chart_specs",
+		"finance.analytics_report.report_outline",
+		"finance.analytics_report.section_dependency_dag",
+		"finance.analytics_report.evidence_citation_envelope",
+		"finance.analytics_report.render_manifest",
+		"finance.analytics_report.style_profile_policy",
+		"finance.analytics_report.partial_failure_fixture",
+		"finance.analytics_report.snapshot_metadata",
+		"finance.analytics_report.accessibility_checklist",
+		"finance.analytics_report.stale_data_policy",
+		"finance.analytics_report.source_annotations",
+		"finance.analytics_report.output_manifest",
+		"finance.analytics_report.renderer_contracts",
 		"finance.normalize.price_series",
 		"analytics.valuation.dcf",
 		"analytics.sensitivity.matrix",
@@ -129,6 +156,14 @@ func TestAnalyticsReportLivePackageManifestSchemaAndContracts(t *testing.T) {
 	} {
 		if !analyticsReportContains(manifest.Capabilities, want) {
 			t.Fatalf("manifest capabilities missing %q", want)
+		}
+	}
+	for _, planCapability := range analyticsReportPlanCapabilities(t) {
+		if !strings.HasPrefix(planCapability, "finance.analytics_report.") {
+			t.Fatalf("analytics_report plan capability %q does not use finance.analytics_report.*", planCapability)
+		}
+		if !analyticsReportContains(manifest.Capabilities, planCapability) {
+			t.Fatalf("analytics_report plan capability %q missing from manifest capabilities", planCapability)
 		}
 	}
 	if !analyticsReportContains(manifest.ArtifactContracts.ReportFormats, "text/html") || !analyticsReportContains(manifest.ArtifactContracts.ReportFormats, "application/pdf") {
@@ -355,6 +390,18 @@ func loadAnalyticsReportLivePackageSchema(t *testing.T, base string, name string
 		t.Fatalf("decode %s: %v", name, err)
 	}
 	return schema
+}
+
+func analyticsReportPlanCapabilities(t *testing.T) []string {
+	t.Helper()
+	plan := loadLivePackagePlanManifest(t, repoRoot(t))
+	for _, pkg := range plan.Packages {
+		if pkg.ID == "analytics_report" {
+			return pkg.Capabilities
+		}
+	}
+	t.Fatal("analytics_report package missing from live package plan")
+	return nil
 }
 
 func absFloat(v float64) float64 {

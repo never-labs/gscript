@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "id": "leia-analytics-report-live-package",
+  "package_name": "leia-finrobot-analytics-report",
   "package": {
     "name": "leia-analytics-report",
     "version": "0.1.0",
@@ -24,6 +25,22 @@
     "fixture_hook": "recorded_analytics_report_live_fixture"
   },
   "capabilities": [
+    "finance.analytics_report.normalized_inputs",
+    "finance.analytics_report.valuation_summary",
+    "finance.analytics_report.sensitivity_matrix",
+    "finance.analytics_report.chart_specs",
+    "finance.analytics_report.report_outline",
+    "finance.analytics_report.section_dependency_dag",
+    "finance.analytics_report.evidence_citation_envelope",
+    "finance.analytics_report.render_manifest",
+    "finance.analytics_report.style_profile_policy",
+    "finance.analytics_report.partial_failure_fixture",
+    "finance.analytics_report.snapshot_metadata",
+    "finance.analytics_report.accessibility_checklist",
+    "finance.analytics_report.stale_data_policy",
+    "finance.analytics_report.source_annotations",
+    "finance.analytics_report.output_manifest",
+    "finance.analytics_report.renderer_contracts",
     "finance.normalize.price_series",
     "finance.normalize.fundamentals",
     "finance.normalize.provenance",
@@ -47,6 +64,7 @@
     "renderer.pdf.contract"
   ],
   "entrypoints": {
+    "main": "analytics_report.leia",
     "example": "analytics_report.leia",
     "schema": "package.schema.json"
   },

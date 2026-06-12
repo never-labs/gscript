@@ -17,6 +17,7 @@ type vendorLivePackageManifest struct {
 	SchemaVersion         int    `json:"schema_version"`
 	ID                    string `json:"id"`
 	Package               string `json:"package"`
+	PackageName           string `json:"package_name"`
 	Version               string `json:"version"`
 	ProviderFree          bool   `json:"provider_free"`
 	LiveNetwork           bool   `json:"live_network"`
@@ -30,7 +31,8 @@ type vendorLivePackageManifest struct {
 		CleanSkipWithoutCredentials bool   `json:"clean_skip_without_credentials"`
 		RedactSecretValues          bool   `json:"redact_secret_values"`
 	} `json:"default_policy"`
-	Redaction struct {
+	Entrypoints map[string]string `json:"entrypoints"`
+	Redaction   struct {
 		Enabled        bool     `json:"enabled"`
 		SecretPatterns []string `json:"secret_patterns"`
 		Replacement    string   `json:"replacement"`
@@ -128,6 +130,10 @@ type vendorLivePackageManifest struct {
 			LiveNetwork    bool   `json:"live_network"`
 		} `json:"terms"`
 	} `json:"adapters"`
+	NoBuiltInGuarantee struct {
+		Required  bool   `json:"required"`
+		Statement string `json:"statement"`
+	} `json:"no_built_in_guarantee"`
 }
 
 func TestFinRobotVendorLivePackageManifestProviderFree(t *testing.T) {
@@ -137,6 +143,17 @@ func TestFinRobotVendorLivePackageManifestProviderFree(t *testing.T) {
 
 	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-live-vendor-adapters" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
+	}
+	if manifest.PackageName != "leia-finrobot-vendor-adapters" {
+		t.Fatalf("package_name = %q", manifest.PackageName)
+	}
+	if manifest.Entrypoints["main"] != "main.leia" {
+		t.Fatalf("entrypoints.main = %q", manifest.Entrypoints["main"])
+	}
+	if !manifest.NoBuiltInGuarantee.Required ||
+		!strings.Contains(strings.ToLower(manifest.NoBuiltInGuarantee.Statement), "does not provide") ||
+		!strings.Contains(strings.ToLower(manifest.NoBuiltInGuarantee.Statement), "built-in") {
+		t.Fatalf("no_built_in_guarantee incomplete: %#v", manifest.NoBuiltInGuarantee)
 	}
 	if !manifest.ProviderFree || manifest.LiveNetwork || manifest.RealDependencyImports {
 		t.Fatalf("provider-free defaults = provider_free=%v live_network=%v imports=%v", manifest.ProviderFree, manifest.LiveNetwork, manifest.RealDependencyImports)
@@ -464,13 +481,26 @@ func TestFinRobotVendorLivePackageProviderFreeBoundaryFixtures(t *testing.T) {
 
 func loadVendorLivePackageManifest(t *testing.T, pkgDir string) vendorLivePackageManifest {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(pkgDir, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
+	var data []byte
+	var manifestPath string
+	for _, name := range []string{"package.manifest.json", "manifest.json"} {
+		path := filepath.Join(pkgDir, name)
+		var err error
+		data, err = os.ReadFile(path)
+		if err == nil {
+			manifestPath = path
+			break
+		}
+		if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	if data == nil {
+		t.Fatalf("%s has no package.manifest.json or legacy manifest.json", pkgDir)
 	}
 	var manifest vendorLivePackageManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("decode vendor adapter live manifest: %v", err)
+		t.Fatalf("decode vendor adapter live manifest %s: %v", manifestPath, err)
 	}
 	return manifest
 }

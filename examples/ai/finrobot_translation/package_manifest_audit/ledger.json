@@ -25,11 +25,6 @@
         "package_id": "html_ui_snapshots",
         "reason": "Legacy skeleton manifest predates the per-manifest no_built_in_guarantee field; the package remains covered by the global plan guarantee and provider-free gates.",
         "covered_by_plan_guarantee": true
-      },
-      {
-        "package_id": "vendor_adapters",
-        "reason": "Vendor adapter skeleton uses the earlier manifest.json shape; the package remains covered by the global plan guarantee and provider-free gates.",
-        "covered_by_plan_guarantee": true
       }
     ]
   }

@@ -514,11 +514,18 @@
         "finance.analytics_report.valuation_summary",
         "finance.analytics_report.sensitivity_matrix",
         "finance.analytics_report.chart_specs",
+        "finance.analytics_report.report_outline",
+        "finance.analytics_report.section_dependency_dag",
+        "finance.analytics_report.evidence_citation_envelope",
+        "finance.analytics_report.render_manifest",
+        "finance.analytics_report.style_profile_policy",
+        "finance.analytics_report.partial_failure_fixture",
         "finance.analytics_report.snapshot_metadata",
         "finance.analytics_report.accessibility_checklist",
         "finance.analytics_report.stale_data_policy",
         "finance.analytics_report.source_annotations",
-        "finance.analytics_report.output_manifest"
+        "finance.analytics_report.output_manifest",
+        "finance.analytics_report.renderer_contracts"
       ],
       "test_gates": [
         "analytics report manifest and referenced JSON files decode without external dependencies",

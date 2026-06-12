@@ -2,6 +2,7 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 type financeNormalizersManifest struct {
@@ -82,6 +85,27 @@ type financeNormalizerSchema struct {
 	MissingRequiredPolicy string   `json:"missing_required_policy"`
 	MissingOptionalPolicy string   `json:"missing_optional_policy"`
 	ProviderFree          bool     `json:"provider_free"`
+}
+
+type financeNormalizersFixtureIndex struct {
+	SchemaVersion         int      `json:"schema_version"`
+	ID                    string   `json:"id"`
+	ProviderFree          bool     `json:"provider_free"`
+	LiveNetwork           bool     `json:"live_network"`
+	RealDependencyImports bool     `json:"real_dependency_imports"`
+	Capabilities          []string `json:"capabilities"`
+	Fixtures              []struct {
+		Key                   string         `json:"key"`
+		Schema                string         `json:"schema"`
+		SchemaPath            string         `json:"schema_path"`
+		Capability            string         `json:"capability"`
+		Path                  string         `json:"path"`
+		Rows                  int            `json:"rows"`
+		ProviderFree          bool           `json:"provider_free"`
+		LiveNetwork           bool           `json:"live_network"`
+		RealDependencyImports bool           `json:"real_dependency_imports"`
+		Metadata              map[string]any `json:"metadata"`
+	} `json:"fixtures"`
 }
 
 func TestFinRobotFinanceNormalizersLivePackageManifest(t *testing.T) {
@@ -168,6 +192,73 @@ func TestFinRobotFinanceNormalizersLivePackageManifest(t *testing.T) {
 	for _, domain := range wantDomains {
 		if len(manifest.DeterministicOrdering[domain]) == 0 {
 			t.Fatalf("deterministic ordering missing for %q", domain)
+		}
+	}
+}
+
+func TestFinRobotFinanceNormalizersFixtureIndexAlignsWithManifestAndPlan(t *testing.T) {
+	base := financeNormalizersLivePackageDir(t)
+	manifest := loadFinanceNormalizersManifest(t, base)
+	plan := loadLivePackagePlanManifest(t, repoRoot(t))
+
+	var index financeNormalizersFixtureIndex
+	decodeFinanceNormalizersJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
+	if index.SchemaVersion != 1 || index.ID != "finance_normalizers_provider_free_fixture_index" {
+		t.Fatalf("fixture index header = schema %d id %q", index.SchemaVersion, index.ID)
+	}
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports {
+		t.Fatalf("fixture index must stay provider-free/offline: %#v", index)
+	}
+
+	plannedCapabilities := financeNormalizersPlanCapabilities(t, plan)
+	manifestCapabilities := financeNormalizersStringSet(manifest.Capabilities)
+	indexCapabilities := financeNormalizersStringSet(index.Capabilities)
+	if !reflect.DeepEqual(indexCapabilities, plannedCapabilities) {
+		t.Fatalf("fixture index capabilities = %#v, want plan capabilities %#v", index.Capabilities, financeNormalizersSortedSet(plannedCapabilities))
+	}
+	for _, capability := range index.Capabilities {
+		if !manifestCapabilities[capability] {
+			t.Fatalf("fixture index capability %q missing from package manifest", capability)
+		}
+		if !plannedCapabilities[capability] {
+			t.Fatalf("fixture index capability %q missing from live_package_plan_manifest.json", capability)
+		}
+	}
+
+	seenKeys := map[string]bool{}
+	if len(index.Fixtures) != len(manifest.Fixtures)-1 {
+		t.Fatalf("fixture index entries = %d, want %d manifest fixtures excluding index", len(index.Fixtures), len(manifest.Fixtures)-1)
+	}
+	for i, fixture := range index.Fixtures {
+		if fixture.Key == "" || seenKeys[fixture.Key] {
+			t.Fatalf("fixture index entry %d has empty/duplicate key: %#v", i, fixture)
+		}
+		seenKeys[fixture.Key] = true
+		if fixture.Path != manifest.Fixtures[fixture.Key] {
+			t.Fatalf("fixture index %s path = %q, want manifest fixture path %q", fixture.Key, fixture.Path, manifest.Fixtures[fixture.Key])
+		}
+		if fixture.SchemaPath != manifest.Schemas[fixture.Key] {
+			t.Fatalf("fixture index %s schema_path = %q, want manifest schema path %q", fixture.Key, fixture.SchemaPath, manifest.Schemas[fixture.Key])
+		}
+		if !manifestCapabilities[fixture.Capability] || !plannedCapabilities[fixture.Capability] {
+			t.Fatalf("fixture index %s capability %q not declared by manifest and plan", fixture.Key, fixture.Capability)
+		}
+		if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports {
+			t.Fatalf("fixture index %s must stay provider-free/offline: %#v", fixture.Key, fixture)
+		}
+		if !finrobotLivePackageBoolOrConst(fixture.Metadata["replay_ready"], true) {
+			t.Fatalf("fixture index %s metadata must be replay_ready: %#v", fixture.Key, fixture.Metadata)
+		}
+		assertFinanceNormalizersJSONFile(t, filepath.Join(base, fixture.Path))
+		var schema financeNormalizerSchema
+		decodeFinanceNormalizersJSONFile(t, filepath.Join(base, fixture.SchemaPath), &schema)
+		if schema.ID != fixture.Schema {
+			t.Fatalf("fixture index %s schema = %q, want decoded schema id %q", fixture.Key, fixture.Schema, schema.ID)
+		}
+	}
+	for key := range manifest.Fixtures {
+		if key != "index" && !seenKeys[key] {
+			t.Fatalf("manifest fixture %q missing from provider_free_fixture_index", key)
 		}
 	}
 }
@@ -361,6 +452,47 @@ func TestFinRobotFinanceNormalizersSchemasFixturesAndOrdering(t *testing.T) {
 	}
 }
 
+func TestFinRobotFinanceNormalizersLivePackageExecutableSkeleton(t *testing.T) {
+	path := filepath.Join(financeNormalizersLivePackageDir(t), "main.leia")
+
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var prints []string
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString),
+				leia.WithPrint(func(args ...any) {
+					var parts []string
+					for _, arg := range args {
+						parts = append(parts, fmt.Sprint(arg))
+					}
+					prints = append(prints, strings.Join(parts, " "))
+				}),
+			}, tc.opts...)...)
+
+			if err := vm.ExecFile(path); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			got, err := vm.Get("finance_normalizers_live_package_summary")
+			if err != nil {
+				t.Fatalf("Get finance_normalizers_live_package_summary: %v", err)
+			}
+			want := "finance_normalizers_live_package provider_free=true domains=10 schemas=11 fixtures=11 live_network=false imports=false typed_boundaries=true"
+			if got != want {
+				t.Fatalf("finance_normalizers_live_package_summary = %#v, want %#v", got, want)
+			}
+			if len(prints) != 1 || prints[0] != want {
+				t.Fatalf("prints = %#v, want %q", prints, want)
+			}
+		})
+	}
+}
+
 func TestFinRobotFinanceNormalizersNoLiveProviders(t *testing.T) {
 	base := financeNormalizersLivePackageDir(t)
 	manifest := loadFinanceNormalizersManifest(t, base)
@@ -477,4 +609,37 @@ func financeNormalizerStringKey(v any) string {
 func jsonNumberString(value float64) string {
 	data, _ := json.Marshal(value)
 	return string(data)
+}
+
+func financeNormalizersPlanCapabilities(t *testing.T, plan livePackagePlanManifest) map[string]bool {
+	t.Helper()
+	for _, pkg := range plan.Packages {
+		if pkg.ID == "finance_normalizers" {
+			if pkg.PackageName != "leia-finrobot-finance-normalizers" ||
+				pkg.SkeletonDirectory != "examples/ai/finrobot_translation/live_packages/finance_normalizers" ||
+				!pkg.NoBuiltInGuarantee {
+				t.Fatalf("finance_normalizers plan entry incomplete: %#v", pkg)
+			}
+			return financeNormalizersStringSet(pkg.Capabilities)
+		}
+	}
+	t.Fatal("live_package_plan_manifest.json missing finance_normalizers package entry")
+	return nil
+}
+
+func financeNormalizersStringSet(values []string) map[string]bool {
+	set := make(map[string]bool, len(values))
+	for _, value := range values {
+		set[value] = true
+	}
+	return set
+}
+
+func financeNormalizersSortedSet(set map[string]bool) []string {
+	values := make([]string, 0, len(set))
+	for value := range set {
+		values = append(values, value)
+	}
+	sort.Strings(values)
+	return values
 }

@@ -88,7 +88,7 @@
       ],
       "mapped_live_package_skeletons": [
         "examples/ai/finrobot_translation/optional_integrations_manifest.json",
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
       ],
       "covered_concepts": [
         "forecast prompt/output shape",
@@ -128,7 +128,7 @@
         "examples/ai/finrobot_translation/finance_normalizers.leia"
       ],
       "mapped_live_package_skeletons": [
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
       ],
       "covered_concepts": [
         "SEC filing fixture chunks",
@@ -151,7 +151,7 @@
           "default_enabled": false,
           "requires_credentials": true,
           "clean_skip_without_credentials": true,
-          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
         }
       ]
     },
@@ -167,7 +167,7 @@
         "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia"
       ],
       "mapped_live_package_skeletons": [
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
       ],
       "covered_concepts": [
         "single assistant RAG shape",
@@ -189,7 +189,7 @@
           "default_enabled": false,
           "requires_credentials": true,
           "clean_skip_without_credentials": true,
-          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
         }
       ]
     },
@@ -205,7 +205,7 @@
         "examples/ai/finrobot_translation/data_tools.leia"
       ],
       "mapped_live_package_skeletons": [
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
       ],
       "covered_concepts": [
         "earnings document fixture inventory",
@@ -227,7 +227,7 @@
           "default_enabled": false,
           "requires_credentials": true,
           "clean_skip_without_credentials": true,
-          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
         }
       ]
     },
@@ -245,7 +245,7 @@
       ],
       "mapped_live_package_skeletons": [
         "examples/ai/finrobot_translation/optional_integrations_manifest.json",
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
       ],
       "covered_concepts": [
         "Ollama optional local LLM gate",
@@ -327,7 +327,7 @@
         "examples/ai/finrobot_translation/section_agents.leia"
       ],
       "mapped_live_package_skeletons": [
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
         "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
       ],
       "covered_concepts": [
@@ -371,7 +371,7 @@
       ],
       "mapped_live_package_skeletons": [
         "examples/ai/finrobot_translation/optional_integrations_manifest.json",
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json"
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
       ],
       "covered_concepts": [
         "FinGPT optional gate",
@@ -490,7 +490,7 @@
       ],
       "mapped_live_package_skeletons": [
         "examples/ai/finrobot_translation/optional_integrations_manifest.json",
-        "examples/ai/finrobot_translation/live_packages/vendor_adapters/manifest.json",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
         "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
       ],
       "covered_concepts": [

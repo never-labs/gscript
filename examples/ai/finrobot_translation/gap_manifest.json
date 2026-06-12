@@ -34,22 +34,6 @@
         "fixture_index_capabilities_checked"
       ],
       "not_closed_reason": "The hygiene exception is intentionally tracked until the legacy manifest shape is migrated."
-    },
-    {
-      "id": "FR-HYGIENE-002",
-      "package_id": "vendor_adapters",
-      "source": "package_manifest_audit/ledger.json",
-      "exception_kind": "legacy_manifest_shape",
-      "status": "tracked_exception",
-      "reason": "Vendor adapter skeleton uses the earlier manifest.json shape.",
-      "guardrails": [
-        "covered_by_global_live_package_plan_no_built_in_guarantee",
-        "provider_free_default_required",
-        "live_network_disabled",
-        "registered_example_required",
-        "fixture_index_capabilities_checked"
-      ],
-      "not_closed_reason": "The hygiene exception is intentionally tracked until the vendor adapter manifest is migrated to the current per-package shape."
     }
   ],
   "open_production_gaps": [
