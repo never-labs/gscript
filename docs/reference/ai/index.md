@@ -681,6 +681,14 @@ returns `{ok, status, findings}` for shape and offline-flag checks. These
 helpers treat `path`, `schema`, and `records_path` as metadata only; they do
 not open files, scan directories, read schemas, or require a specific package
 layout.
+`llm.provider_free_package_contract(spec, opts)` normalizes package boundary
+metadata for provider-free AI packages. It fills package identity,
+provider/offline flags, `default_policy`, `credentials`, entrypoint/schema/
+fixture/capability counts, and a summary table. `llm.validate_package_contract`
+returns a validation table for offline defaults, credential-free policy, and
+safe relative reference strings in `entrypoints`, `schemas`, and `fixtures`.
+These helpers do not load package files, resolve directories, inspect schemas,
+or require FinRobot-style names.
 `llm.replay_trace_event(match, opts)` projects a `fixture.match(...)` or
 `llm.replay_index(...).match(...)` result into a redacted trace event. Matched,
 mismatched, and exhausted replay states become `replay_record_matched`,
@@ -719,6 +727,15 @@ index := llm.fixture_index({
 index_gate := llm.validate_fixture_index(index, {
     require_replay_ready: true
     require_path: true
+})
+package_contract := llm.provider_free_package_contract({
+    id: "unit-package"
+    package_name: "unit-package"
+    entrypoints: {fixture_index: "fixtures/fixture_index.json"}
+    fixtures: {index: "fixtures/fixture_index.json"}
+})
+package_gate := llm.validate_package_contract(package_contract, {
+    require_fixture_index: true
 })
 request := {model: "fast", messages: {llm.user("hello")}}
 replay, err := fixture.replay(request, "turn:1")

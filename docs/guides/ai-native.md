@@ -645,6 +645,15 @@ gate := llm.validate_fixture_index(index, {
     require_replay_ready: true
     require_path: true
 })
+package_contract := llm.provider_free_package_contract({
+    id: "unit-package"
+    package_name: "unit-package"
+    entrypoints: {fixture_index: "fixtures/fixture_index.json"}
+    fixtures: {index: "fixtures/fixture_index.json"}
+})
+package_gate := llm.validate_package_contract(package_contract, {
+    require_fixture_index: true
+})
 replay, err := fixture.replay({
     model: "fast"
     messages: {llm.user("hello")}
@@ -659,6 +668,9 @@ result, err := llm.turn({
 `llm.fixture_index` and `llm.validate_fixture_index` only normalize and inspect
 metadata. They do not check whether files exist, load schemas, or assume a
 particular repository layout.
+`llm.provider_free_package_contract` and `llm.validate_package_contract` do the
+same for package-level boundaries: offline defaults, credential-free policy,
+and reference-string shape only.
 
 ## Human Review And Resume
 
