@@ -41,6 +41,7 @@ contracts, and fixtures for its boundary.
 - model: `examples/ai/finrobot_translation/live_packages/generic_model_registry`
 - model-io: `examples/ai/finrobot_translation/live_packages/generic_model_io_envelope`
 - document-rag: `examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline`
+- prompt-role: `examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog`
 - memory: `examples/ai/finrobot_translation/live_packages/generic_memory_store`
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
 - tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
@@ -68,6 +69,9 @@ orthogonal and layered:
 - document-rag owns document conversion, section extraction, chunk provenance,
   corpus manifests, retrieval results, citation consistency, and provider-free
   adapter boundaries.
+- prompt-role owns prompt catalogs, role profile versions, prompt template
+  snapshots, delegation triggers, output schemas, evidence validation, and
+  termination conventions.
 - memory owns namespace policy, memory items, deterministic retrieval ranking,
   context windows, provenance, and provider-free adapter boundaries.
 - turn consumes model descriptors, structured messages, tool-call envelopes,
@@ -106,6 +110,7 @@ language or specializing the dialect for one application domain.
 | --- | --- | --- |
 | Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_memory_store`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, memory, and workflow graphs; packages own validation, envelopes, context windows, loop semantics, and stage I/O. |
 | Document RAG | `generic_document_rag_pipeline`, `generic_memory_store` | Document conversion, sections, chunks, citations, retrieval results, and adapter clean-skip boundaries are generic package data; domain adapters provide source documents outside the core language. |
+| Prompt and role catalogs | `generic_prompt_role_catalog`, `generic_agent_runner`, `generic_workflow_orchestrator` | Prompt templates, role profiles, output schemas, delegation triggers, evidence validation, and termination conventions are package-owned fixtures and contracts, not built-in language syntax. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |
 | Trace | `generic_trace_events`, `generic_workflow_orchestrator`, `generic_agent_runner` | Runtime actions emit metadata-only event envelopes with correlation IDs, redaction policy, replay markers, and artifact references. |

@@ -30,6 +30,7 @@
     "model",
     "model-io",
     "package-boundary",
+    "prompt-role-catalog",
     "replay",
     "tool",
     "trace",
@@ -311,6 +312,39 @@
         "package_id": "generic-package-boundary-auditor",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "prompt-role-catalog",
+      "capability_id": "generic.ai.prompt.role.catalog",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "prompt.role_catalog",
+        "role.profile",
+        "prompt.template",
+        "role.delegation_trigger",
+        "role.output_schema",
+        "role.evidence_validation",
+        "role.termination"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_prompt_role_catalog.source.txt",
+      "test": "tests/llm/llm_generic_prompt_role_catalog_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_prompt_role_catalog_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-prompt-role-catalog",
+        "boundary": "provider-free prompt catalogs, role profile versions, prompt template snapshots, delegation triggers, output schemas, evidence validation, termination conventions, and drift fixtures",
+        "status": "resolved",
+        "reason": "prompt and role catalog behavior was promoted from FinRobot prompt role fixtures into the generic_prompt_role_catalog reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-prompt-role-catalog",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 83,
-  "translation_directory_file_count": 645,
+  "registered_examples_count": 84,
+  "translation_directory_file_count": 653,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -185,6 +185,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
       "covers_package_ids": [
         "generic_planning_graph"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_prompt_role_catalog",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "covers_package_ids": [
+        "generic_prompt_role_catalog"
       ],
       "status": "checked_in_registered_example"
     },
@@ -890,6 +899,33 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_prompt_role_catalog",
+      "package_name": "leia-generic-ai-prompt-role-catalog",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "planned_directory": "packages/generic_ai/prompt_role_catalog",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/contracts/generic_prompt_role_catalog_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "capabilities": [
+        "generic.ai.prompt.role.catalog",
+        "generic.ai.prompt.template.snapshot",
+        "generic.ai.role.profile.version",
+        "generic.ai.role.delegation.trigger",
+        "generic.ai.role.output.schema",
+        "generic.ai.role.evidence.validation",
+        "generic.ai.role.termination.convention",
+        "generic.ai.prompt.drift.fixture"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic prompt role catalog backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials, live model calls, live network, provider SDK, or q runtime dependency"
       ],
       "no_built_in_guarantee": true
     },

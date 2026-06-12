@@ -246,6 +246,42 @@
       }
     },
     {
+      "shape_id": "ai.prompt.role_catalog",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "prompt-role-catalog",
+        "agent",
+        "workflow"
+      ],
+      "contract": "Normalize provider-free prompt catalogs, role profiles, template snapshots, delegation triggers, output schemas, evidence validation, and termination conventions.",
+      "inputs": [
+        "catalog_manifest",
+        "role_profiles",
+        "prompt_templates",
+        "delegation_trigger_cases",
+        "evidence_policy"
+      ],
+      "outputs": [
+        "catalog_entries",
+        "role_profile_versions",
+        "output_schema",
+        "evidence_validation_cases",
+        "termination_drift_cases"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_prompt_role_catalog.source.txt",
+      "test": "tests/llm/llm_generic_prompt_role_catalog_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_prompt_role_catalog_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-prompt-role-catalog",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/contracts/generic_prompt_role_catalog_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.tool.invoke",
       "status": "checked_in_package_boundary",
       "capabilities": [

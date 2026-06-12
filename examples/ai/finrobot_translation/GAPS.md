@@ -23,8 +23,8 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 83 registered examples plus
-37 checked-in live-package skeleton directories:
+directory. The current provider-free surface is 84 registered examples plus
+38 checked-in live-package skeleton directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
@@ -37,7 +37,8 @@ directory. The current provider-free surface is 83 registered examples plus
 `live_packages/generic_model_io_envelope`,
 `live_packages/generic_model_registry`,
 `live_packages/generic_package_boundary_auditor`, `live_packages/generic_planning_graph`,
-`live_packages/generic_record_replay`, `live_packages/generic_tool_contracts`,
+`live_packages/generic_prompt_role_catalog`, `live_packages/generic_record_replay`,
+`live_packages/generic_tool_contracts`,
 `live_packages/generic_tool_registry`, `live_packages/generic_trace_events`,
 `live_packages/generic_turn_runner`, `live_packages/generic_workflow_orchestrator`,
 `live_packages/html_ui_snapshots`, `live_packages/news_catalyst`,
@@ -54,14 +55,14 @@ capability gates.
 
 The generic AI dialect convergence status is checked-in package boundary, not
 missing or planned. The `live_packages/generic_*` directories define reusable AI
-package contracts for model, model IO envelopes, document RAG, memory stores,
-turn, tool, agent, workflow, evaluation, replay, trace, approval, capability,
-and package-audit behavior. They are intentionally
+package contracts for model, model IO envelopes, document RAG, prompt/role
+catalogs, memory stores, turn, tool, agent, workflow, evaluation, replay,
+trace, approval, capability, and package-audit behavior. They are intentionally
 generic AI surfaces that the FinRobot translation consumes; they are not
 FinRobot-specific language features or FinRobot-owned product packages.
 
 The 2026-06-12 documentation semantic-guard refresh used read-only inventory to
-confirm 15 registered `live_packages/generic_*` examples and three top-level
+confirm 16 registered `live_packages/generic_*` examples and three top-level
 generic composition examples. It also rechecked approval/model/workflow/trace/eval
 wording in the coverage, verification, and gap documents. That guard keeps
 generic AI dialect capability in the closed/non-gap bucket unless a future

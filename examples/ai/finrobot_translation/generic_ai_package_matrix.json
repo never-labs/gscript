@@ -217,6 +217,30 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_prompt_role_catalog",
+      "package_name": "leia-generic-ai-prompt-role-catalog",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "capability": "generic.ai.prompt.role.catalog",
+      "capabilities": [
+        "generic.ai.prompt.role.catalog",
+        "generic.ai.prompt.template.snapshot",
+        "generic.ai.role.profile.version",
+        "generic.ai.role.delegation.trigger",
+        "generic.ai.role.output.schema",
+        "generic.ai.role.evidence.validation",
+        "generic.ai.role.termination.convention",
+        "generic.ai.prompt.drift.fixture"
+      ],
+      "backend_shape": "ai.prompt.role_catalog",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/contracts/generic_prompt_role_catalog_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_record_replay",
       "package_name": "leia-generic-ai-record-replay",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
