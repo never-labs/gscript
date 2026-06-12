@@ -1,0 +1,2 @@
+go test fuzz v1
+string("m:2 4#til 0;A:flip m;00000000000000000000000")

@@ -1,0 +1,2 @@
+go test fuzz v1
+string("x:til 1;m:0;(000)And((x)in 0)")

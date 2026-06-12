@@ -1,0 +1,364 @@
+# Canonical q golden corpus.
+#
+# Tab-separated columns: status, expr, canonical, leia, reason.
+#   status    one of match / deviation / gap.
+#   expr      the q expression under test (evaluated on a fresh session).
+#   canonical the value canonical kdb+/q returns for expr, written as a q
+#             literal/expression evaluated through Leia for comparison, or
+#             ERROR / ERROR:substr when canonical q signals an error, or NAN
+#             for a float NaN atom.
+#   leia      deviation entries: the DOCUMENTED Leia behavior (expression,
+#             ERROR:substr, or NAN); optional drift pin for gap entries.
+#   reason    free text for deviation/gap entries.
+#
+# Every canonical column was hand-encoded from canonical kdb+/q semantics;
+# entries the author was not certain about were left out rather than guessed.
+#
+# ---- null & arithmetic propagation ----
+match	1+0N	0N
+match	0N+1	0N
+match	2*0N	0N
+match	0N%2	0n
+match	1%0	0w
+match	-1%0	-0w
+deviation	0%0	0n	NAN	bitmap nulls: float NaN is distinct from null
+match	1+0n	0n
+match	0N-1	0N
+match	neg 0N	0N
+match	abs 0N	0N
+match	abs -0W	0W
+match	1 div 0	0N
+match	1 mod 0	0N
+match	7 div 2	3
+match	-7 div 2	-4
+match	7 mod 2	1
+match	-7 mod 2	1
+match	7.5 mod 2	1.5
+match	1%2	0.5
+# ---- aggregate null handling ----
+match	sum 1 0N 3	4
+match	avg 1 0N 3	2f
+match	min 1 0N 3	1
+match	max 1 0N 3	3
+match	prd 2 0N 4	8
+match	count 1 0N 3	3
+match	first 0N 1	0N
+match	sums 1 0N 3	1 1 4
+match	var 1 0N 3	1f
+match	avg 1 2 0n	1.5
+deviation	sum 0n 1	1f	1	bitmap nulls: 0n in a long vector context becomes 0N, sum stays long
+match	max 0N 0N	0N
+# ---- empty-vector identities ----
+match	sum 0#0	0
+match	sum til 0	0
+gap	min til 0	0W	0N	empty-vector reducer identities: min () should be 0W, not null
+gap	max til 0	-0W	0N	empty-vector reducer identities: max () should be -0W
+gap	prd til 0	1	0N	empty-vector reducer identities: prd () should be 1
+match	avg til 0	0n
+gap	min 0#0.0	0w	0N	empty-vector reducer identities: float min () should be 0w
+gap	sum ()	0	0N	empty-vector reducer identities: sum () should be 0
+gap	(&/)[til 0]	0W	0N	empty-vector reducer identities for derived &/
+gap	(|/)[til 0]	-0W	0N	empty-vector reducer identities for derived |/
+gap	(+/)[til 0]	0	0N	empty-vector reducer identities for derived +/
+gap	(*/)[til 0]	1	0N	empty-vector reducer identities for derived */
+match	count ()	0
+match	all ()	1b
+match	any ()	0b
+match	first 0#0	0N
+match	last 0#0	0N
+match	first 0#0.0	0n
+# ---- promotion matrix corners ----
+match	1+2	3
+match	1+2.5	3.5
+deviation	1i+1i	2i	2	long promotion: int arithmetic widens to long
+match	1i+1j	2
+deviation	1b+1b	2i	ERROR:numeric operands	truthiness booleans: no boolean arithmetic
+deviation	1b+1	2	ERROR:numeric operands	truthiness booleans: no boolean arithmetic
+deviation	1b+1f	2f	ERROR:numeric operands	truthiness booleans: no boolean arithmetic
+match	1i+1f	2f
+match	2=2.0	1b
+match	1i=1j	1b
+match	2 xexp 10	1024f
+match	sqrt 4	2f
+deviation	sqrt -1	0n	NAN	bitmap nulls: NaN result is not null
+match	exp 0	1f
+match	log 1	0f
+match	log 0	-0w
+deviation	log -1	0n	NAN	bitmap nulls: NaN result is not null
+match	floor 2.7	2
+match	ceiling 2.1	3
+match	floor -2.5	-3
+deviation	signum -3	-1i	-1	long promotion: signum returns long, canonical returns int
+deviation	signum 0	0i	0	long promotion: signum returns long, canonical returns int
+match	reciprocal 4	0.25
+match	abs -5	5
+match	neg 5	-5
+match	2 3 4*2	4 6 8
+match	1 2+10 20	11 22
+match	1 2+1 2 3	ERROR
+match	1.5+1 2	2.5 3.5
+# ---- comparison truth table incl. nulls and infinities ----
+match	0N<1	1b
+match	0N>1	0b
+match	0N=0N	1b
+match	0n=0n	1b
+match	0N<-0W	1b
+match	0w>0W	1b
+match	-0w<0N	0b
+match	1<2 3 0	110b
+match	0N~0N	1b
+match	1~1f	0b
+match	()~()	1b
+deviation	(0#0)~()	0b	1b	take-of-atom yields a generic empty list, so the two sides match
+match	1 2~1 2	1b
+deviation	0n~0N	0b	1b	single null model: typed nulls are not distinguished
+match	null 0N	1b
+match	null 0n	1b
+match	not 0	1b
+match	not 5	0b
+match	not 0 1 2	100b
+deviation	2&3	2	1b	truthiness & | : logical and/or instead of min/max
+deviation	2|3	3	1b	truthiness & | : logical and/or instead of min/max
+match	0b&1b	0b
+match	1b|0b	1b
+deviation	1 2&2 1	1 1	11b	truthiness & | : logical and/or instead of min/max
+deviation	0N&1	0N	0b	truthiness & | : null is falsy instead of propagating through min
+deviation	0N|1	1	1b	truthiness & | : null is falsy, or yields boolean
+# ---- take / drop / reshape edges ----
+match	3#1 2	1 2 1
+match	5#1 2 3	1 2 3 1 2
+match	-2#1 2 3	2 3
+match	-5#1 2 3	2 3 1 2 3
+match	0#1 2 3	til 0
+gap	3#0#1	0 0 0		take from empty typed vector should yield zero fills (concurrent fix in flight)
+gap	2#`a`b`c!1 2 3	`a`b!1 2	{(x;x)}[`a`b`c!1 2 3]	take on dict should keep first n entries, Leia cycles the dict as an item
+match	1_1 2 3	2 3
+match	-1_1 2 3	1 2
+match	5_1 2 3	til 0
+match	0_1 2 3	1 2 3
+match	2 3#til 6	(0 1 2;3 4 5)
+match	2 3#1 2	(1 2 1;2 1 2)
+gap	0N 2#til 6	(0 1;2 3;4 5)	ERROR:reshape	null reshape dimension should be computed from the other one
+gap	2 0N#til 6	(0 1 2;3 4 5)	ERROR:reshape	null reshape dimension should be computed from the other one
+gap	2 cut 1 2 3 4 5	(1 2;3 4;1#5)	enlist 3 4 5	atom cut should chunk by size, Leia cuts at index instead
+match	0 2 cut til 5	(0 1;2 3 4)
+match	2 sublist 1 2 3	1 2
+gap	10 sublist 1 2	1 2	10#1 2	sublist must not overtake, Leia cycles like take
+match	-2 sublist 1 2 3	2 3
+match	1 2 sublist til 10	1 2
+gap	enlist 1	1#1	value `a!1	enlist should return a typed one-item vector, Leia returns a generic list
+match	reverse 1 2 3	3 2 1
+match	1 rotate 1 2 3	2 3 1
+match	-1 rotate 1 2 3	3 1 2
+match	raze (1 2;3 4)	1 2 3 4
+gap	raze ()	()		empty raze yields a null-kind empty instead of ()
+match	flip (1 2;3 4)	(1 3;2 4)
+# ---- join (,) ----
+gap	1 2,3	1 2 3	ERROR	join verb , is not implemented
+gap	"ab","cd"	"abcd"	ERROR	join verb , is not implemented
+gap	(),1	1#1	ERROR	join verb , is not implemented
+gap	(,/)[(1 2;3 4)]	1 2 3 4	ERROR	join verb , is not implemented, so ,/ raze form fails
+# ---- indexing out of bounds -> nulls ----
+gap	(1 2 3)@5	0N	ERROR:out of range	index out of bounds should return 0N, Leia errors
+gap	(1 2 3)@-1	0N	ERROR	negative index should return 0N, Leia errors
+gap	(1 2 3)@0N	0N	ERROR	null index should return 0N, Leia errors
+gap	(1.5 2.5)@7	0n	ERROR:out of range	index out of bounds should return float null
+match	(1 2 3)@1 2	2 3
+match	(2 3#til 6) . 1 2	5
+match	x:10 20 30;x[1]	20
+gap	x:10 20 30;x 1	20	(10 20 30;1)	juxtaposed name indexing builds a list instead of indexing
+match	x:(1 2;3 4);x . (1;0)	3
+gap	x:(1 2;3 4);x[1;0]	3	ERROR	multi-axis bracket indexing on names unsupported
+# ---- dict operations ----
+match	(`a`b!1 2)`a	1
+match	(`a`b!1 2)`c	0N
+match	(`a`b!1 2)@`b`a	2 1
+match	key `a`b!1 2	`a`b
+deviation	value `a`b!1 2	1 2	value `x`y!1 2	dict values are returned as a generic list, canonical returns typed
+gap	(`a`b!1 2)?2	`b		dict find should return the key (concurrent fix in flight)
+gap	(`a`b!1 2)?99	`$""		dict find miss should return a null key
+match	(`a`a!1 2)`a	1
+match	count `a`b!1 2	2
+gap	(`a`b!1 2)+`b`c!10 20	`a`b`c!1 12 20	ERROR	dict key-union arithmetic absent
+gap	(`a`b!1 2)=`a`b!1 3	`a`b!10b		dict equality should compare values per key into a bool dict
+gap	reverse `a`b!1 2	`b`a!2 1	`a`b!1 2	reverse on dict should reverse both keys and values
+gap	where `a`b`c!1 0 2	`a`c`c	ERROR	where on dict should replicate keys by count
+gap	d:`a`b!1 2;d[`c]:3;d	`a`b`c!1 2 3	ERROR	dict element upsert assignment unsupported
+gap	d:`a`b!1 2;d[`a]:9;d	`a`b!9 2	ERROR	dict element assignment unsupported
+match	group 1 2 1	1 2!(0 2;1#1)
+match	group `a`b`a	`a`b!(0 2;1#1)
+match	cols ([] a:1 2; b:3 4)	`a`b
+match	count ([] a:1 2 3)	3
+# ---- adverb edges ----
+match	(+/)[1 2 3]	6
+match	+/ 1 2 3	6
+match	(+\)[1 2 3]	1 3 6
+match	0 +/ 1 2 3	6
+match	10 +/ 1 2 3	16
+match	10 +\ 1 2 3	11 13 16
+match	{x+y}/[1 2 3]	6
+match	{x+y}\[10;1 2 3]	11 13 16
+match	count each (1 2;enlist 3)	2 1
+match	count each (1 2;3)	2 1
+match	{x*2} each 1 2 3	2 4 6
+gap	{x} each ()	()		each over empty yields a null-kind empty instead of ()
+match	(-':)[1 3 6]	1 2 3
+match	deltas 1 3 6	1 2 3
+match	10 -': 1 3 6	-9 2 3
+match	1 2 3+\:10	11 12 13
+match	10+/:1 2 3	11 12 13
+gap	1 2+\:10 20	(11 21;12 22)	11 22	each-left with vector right collapses to plain dyadic application
+gap	1 2+/:10 20	(11 12;21 22)	11 22	each-right with vector left collapses to plain dyadic application
+gap	{x div 2}\[7]	7 3 1 0		converge scan missing (concurrent fix in flight)
+gap	{x div 2}/[7]	0		converge over missing (concurrent fix in flight)
+gap	3 {x+1}/ 0	3		iterate over missing (concurrent fix in flight)
+gap	3 {x+1}\ 0	0 1 2 3		iterate scan missing (concurrent fix in flight)
+match	(*/)[2 3 4]	24
+deviation	(|/)[3 1 2]	3	1b	truthiness & | : |/ reduces with logical or
+deviation	(&/)[3 1 2]	1	1b	truthiness & | : &/ reduces with logical and
+match	sum each (1 2;3 4)	3 7
+# ---- sort and grading ----
+match	iasc 2 1 2 1	1 3 0 2
+match	idesc 1 2 1 2	1 3 0 2
+match	asc 3 1 2	1 2 3
+match	desc 1 3 2	3 2 1
+match	rank 30 10 20	2 0 1
+match	asc `b`a`c	`a`b`c
+match	iasc til 0	til 0
+match	3 xrank til 6	0 0 1 1 2 2
+match	asc 0N 2 1	0N 1 2
+# ---- membership, search, set ops ----
+match	distinct 1 2 1 3	1 2 3
+match	1 2 3 in 2 3	011b
+match	2 in 1 2	1b
+match	1 2 3?2	1
+match	1 2 3?9	3
+match	1 2 3 inter 2 4	1#2
+match	1 2 3 except 2	1 3
+match	1 2 3 except 1 2 3	til 0
+match	1 2 union 2 3	1 2 3
+match	1 3 5 bin 4	1
+match	1 3 5 bin 0	-1
+match	1 3 5 binr 4	2
+match	2 within 1 3	1b
+match	0 5 within 1 3	00b
+match	where 0 1 1 0b	1 2
+match	where 0 2 1	1 1 2
+match	where 0#0b	til 0
+# ---- strings and symbols ----
+match	upper "abc"	"ABC"
+match	lower "AbC"	"abc"
+match	reverse "abc"	"cba"
+match	string `abc	"abc"
+match	string 42	"42"
+match	string 1.5	"1.5"
+match	`$"x"	`x
+match	"," sv ("ab";"cd")	"ab,cd"
+match	"," vs "ab,cd"	("ab";"cd")
+match	" " sv ("a";"b")	"a b"
+match	"abcab" ss "ab"	0 3
+match	ssr["hello";"l";"L"]	"heLLo"
+match	trim "  ab  "	"ab"
+match	ltrim " ab "	"ab "
+match	rtrim " ab "	" ab"
+match	"abc" like "a*"	1b
+match	"abc" like "a?c"	1b
+match	count "abc"	3
+match	reverse ""	""
+deviation	lower `ABC	`abc	"abc"	symbol case ops return strings
+deviation	upper `ab	`AB	"AB"	symbol case ops return strings
+deviation	raze string `ab`cd	"abcd"	("ab";"cd")	strings are atoms, not char lists, so raze does not concatenate
+deviation	"abc" 1	"b"	ERROR	strings are atoms: no char type, no string indexing by juxtaposition
+deviation	("ab")@5	" "	ERROR:out of range	strings are atoms: no char fill on out-of-range index
+gap	5$"ab"	"ab   "	ERROR:q cast	pad ($ with int left) not implemented
+gap	-5$"ab"	"   ab"	ERROR:q cast	pad ($ with int left) not implemented
+gap	1 "hello"	"e"		juxtaposed string indexing panics today (concurrent fix in flight)
+# ---- numeric encode / decode ----
+gap	2 vs 10	1 0 1 0	ERROR	numeric vs (base encode) not implemented
+gap	2 sv 1 0 1 0	10	ERROR	numeric sv (base decode) not implemented
+gap	10 vs 123	1 2 3	ERROR	numeric vs (base encode) not implemented
+# ---- temporal ----
+match	2024.01.02>2024.01.01	1b
+match	2024.01.01 within 2023.12.31 2024.06.30	1b
+match	12:00<13:00	1b
+match	12:30:00>12:29:59	1b
+match	2024.01.01=2024.01.01	1b
+gap	2024.01.01+1	2024.01.02	ERROR:numeric operands	temporal arithmetic (date plus days) missing
+gap	2024.01.02-2024.01.01	1i	ERROR:numeric operands	temporal difference missing
+gap	2024.05m+1	2024.06m	ERROR:numeric operands	temporal arithmetic (month plus months) missing
+gap	`mm$2024.05.01	5i	ERROR	temporal component cast `mm missing
+gap	`year$2024.05.01	2024i	ERROR	temporal component cast `year missing
+# ---- conditionals and control flow ----
+match	$[1b;`a;`b]	`a
+match	$[0;1;2]	2
+gap	$[0;1;0;2;3]	3	ERROR:three arguments	multi-branch $[c;t;c;t;f] conditional missing
+gap	?[1 0 1b;10 20 30;77 88 99]	10 88 30	ERROR	vector conditional ?[v;t;f] missing
+match	i:0;while[i<3;i:i+1];i	3
+# ---- type verb ----
+deviation	type 1	-7h	-7	type returns long, canonical returns short
+deviation	type 1 2	7h	7	type returns long, canonical returns short
+deviation	type 1.5	-9h	-9	type returns long, canonical returns short
+deviation	type `a	-11h	-11	type returns long, canonical returns short
+deviation	type "ab"	10h	10	type returns long, canonical returns short
+deviation	type ()	0h	0	type returns long, canonical returns short
+# ---- casts ----
+match	`float$1	1f
+deviation	`long$2.7	3	2	casts truncate toward zero, canonical rounds to nearest
+deviation	`long$-2.7	-3	-2	casts truncate toward zero, canonical rounds to nearest
+match	"J"$"42"	42
+match	"F"$"1.5"	1.5
+deviation	`boolean$2	1b	ERROR	truthiness booleans: no implicit numeric to bool cast
+match	`int$3.0	3i
+deviation	"J"$"junk"	0N	ERROR:q cast	failed string casts error instead of returning null
+# ---- misc verbs ----
+match	til 5	0 1 2 3 4
+match	til 0	0#1 2 3
+match	next 1 2 3	2 3 0N
+match	prev 1 2 3	0N 1 2
+match	fills 1 0N 3 0N	1 1 3 3
+match	fills 0N 1	0N 1
+match	0^1 0N 3	1 0 3
+match	9^0N	9
+match	0N 2^3 0N	3 2
+match	differ 1 1 2 2 3	10101b
+match	maxs 1 3 2	1 3 3
+match	mins 3 1 2	3 1 1
+match	prds 1 2 3	1 2 6
+match	avgs 2 4	2 3f
+match	med 3 1 2	2f
+match	med 1 2 3 4	2.5
+match	var 1 2 3 4	1.25
+match	dev 1 2 3 4	sqrt 1.25
+match	5 xbar 3 7 13	0 5 10
+match	5 xbar -1	-5
+match	2 mavg 1 2 3	1 1.5 2.5
+match	2 msum 1 2 3	1 3 5
+match	2 mmax 1 3 2	1 3 3
+match	2 mmin 3 1 2	3 1 1
+match	2 mcount 1 0N 3	1 1 1
+match	2 xprev 1 2 3 4	0N 0N 1 2
+gap	1 2 cross 10 20	(1 10;1 20;2 10;2 20)		cross rows are generic pairs, canonical returns typed long rows
+match	wavg[1 1;3 4]	3.5
+match	any 0 0 1b	1b
+match	all 1 1 0b	0b
+match	value 42	42
+gap	value "1+2"	3	"1+2"	value on a string should evaluate it
+gap	0N!42	42		display verb 0N! missing, parses as dict instead
+deviation	(sum;10 20 30 40) fby `a`a`b`b	30 30 70 70	ERROR:aggregate	fby is spelled agg vec fby group, canonical tuple form unsupported
+deviation	sum 1 2 3 4 fby `a`a`b`b	ERROR	3 3 7 7	fby dialect form: canonical q rejects a bare vector left of fby
+match	mmu[2 2#1 2 3 4f;2 2#5 6 7 8f]	(19 22f;43 50f)
+match	inv 2 2#1 0 0 1f	(1 0f;0 1f)
+gap	sum (1 2;3 4)	4 6	ERROR	columnar sum over a list of vectors missing
+# ---- right-to-left evaluation order ----
+deviation	2*3+4	14	10	left-assoc operators: Leia evaluates left to right
+deviation	10-3-2	9	5	left-assoc operators: Leia evaluates left to right
+match	2+3*4	14
+deviation	8%4%2	4f	1f	left-assoc operators: Leia evaluates left to right
+# ---- fuzzer findings (2026-06) ----
+match	(0%0)~0%0	1b
+match	count~count	1b
+match	{x+1}~{x+1}	1b
+gap	(`a`b!1 2)<>`a`b!1 2	`a`b!00b		dict <> panics today (comparing uncomparable type q.EvalDict, fuzzer finding)
+gap	min trim `a	ERROR	"a"	trim on a symbol atom should be a type error; compiled route returns a string (fuzzer finding)
+# ---- date rendering ----
+deviation	string 2024.01.05	"2024.01.05"	"2024-01-05"	ISO date strings: string of a date uses dashes

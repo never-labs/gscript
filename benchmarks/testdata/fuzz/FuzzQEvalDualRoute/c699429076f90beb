@@ -1,0 +1,2 @@
+go test fuzz v1
+string("px:00*((til 01) mod 010);A0:0And (px in 0)")

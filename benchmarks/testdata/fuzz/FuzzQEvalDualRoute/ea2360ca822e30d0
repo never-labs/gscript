@@ -1,0 +1,2 @@
+go test fuzz v1
+string("m:0#0;(m@0 0)")

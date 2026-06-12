@@ -1,0 +1,2 @@
+go test fuzz v1
+string("px:100*((til 06) mod 80);sz:1+((til 96) mod 50);sym:96#`AAPL`MSFT`NVDA`TSLA;idx:where px>=140;vals:(100+(idx mod 80))*6# idx")
