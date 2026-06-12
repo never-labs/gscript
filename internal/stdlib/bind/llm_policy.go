@@ -46,6 +46,29 @@ func (b *llmLibBuilder) registerPolicyHelpers() {
 	}
 	b.set("check_policy", checkPolicy)
 	b.set("checkPolicy", checkPolicy)
+
+	policyOutcome := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.policy_outcome' (tool or tools table expected)")
+		}
+		policy := llmCapabilityPolicyValue(nil)
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.policy_outcome' (policy table expected)")
+			}
+			policy = args[1].Table()
+		}
+		if len(args) >= 3 {
+			if !args[2].IsTable() {
+				return nil, fmt.Errorf("bad argument #3 to 'llm.policy_outcome' (options table expected)")
+			}
+			opts = args[2].Table()
+		}
+		return []Value{TableValue(llmPolicyOutcomeValue(args[0], policy, opts))}, nil
+	}
+	b.set("policy_outcome", policyOutcome)
+	b.set("policyOutcome", policyOutcome)
 }
 
 func llmCapabilityPolicyValue(opts *Table) *Table {
@@ -73,20 +96,92 @@ func llmCheckCapabilityPolicy(v Value, policy *Table) Value {
 	if policy == nil {
 		policy = llmCapabilityPolicyValue(nil)
 	}
-	for _, cap := range llmPolicyCapabilities(v) {
+	outcome := llmPolicyOutcomeValue(v, policy, nil)
+	if err := outcome.RawGetString("error"); err.IsTable() {
+		return err
+	}
+	return NilValue()
+}
+
+func llmPolicyOutcomeValue(v Value, policy, opts *Table) *Table {
+	if policy == nil {
+		policy = llmCapabilityPolicyValue(nil)
+	}
+	out := NewTable()
+	out.RawSetString("kind", StringValue("policy_outcome"))
+	out.RawSetString("version", StringValue("policy_outcome.v1"))
+	out.RawSetString("policy_kind", llmCloneValue(policy.RawGetString("kind")))
+	out.RawSetString("policy_version", llmCloneValue(policy.RawGetString("version")))
+	out.RawSetString("policy_default", llmCloneValue(policy.RawGetString("default")))
+	capabilities := llmPolicyCapabilities(v)
+	out.RawSetString("capabilities", llmPolicyCapabilitiesTable(capabilities))
+	out.RawSetString("ok", BoolValue(true))
+	out.RawSetString("allowed", BoolValue(true))
+	out.RawSetString("denied", BoolValue(false))
+	out.RawSetString("clean_skip", BoolValue(false))
+	out.RawSetString("approval_required", BoolValue(false))
+	out.RawSetString("side_effect_allowed", BoolValue(true))
+	out.RawSetString("status", StringValue("allowed"))
+	out.RawSetString("result_status", StringValue("ok"))
+
+	if opts != nil && opts.RawGetString("clean_skip").Truthy() {
+		out.RawSetString("status", StringValue("clean_skip"))
+		out.RawSetString("result_status", StringValue("skipped"))
+		out.RawSetString("allowed", BoolValue(false))
+		out.RawSetString("clean_skip", BoolValue(true))
+		out.RawSetString("side_effect_allowed", BoolValue(false))
+		if reason := opts.RawGetString("reason"); !reason.IsNil() {
+			out.RawSetString("reason", llmCloneValue(reason))
+		} else {
+			out.RawSetString("reason", StringValue("clean skip"))
+		}
+		if dependency := opts.RawGetString("dependency"); !dependency.IsNil() {
+			out.RawSetString("dependency", llmCloneValue(dependency))
+		}
+		return out
+	}
+
+	for _, cap := range capabilities {
 		if llmPolicyAllowsCapability(cap, policy) {
 			continue
 		}
 		if class := llmDeniedCapabilityClass(cap, policy); class != "" {
-			err := llmErrorValue("policy", "capability denied by policy: "+cap)
-			et := err.Table()
-			et.RawSetString("capability", StringValue(cap))
-			et.RawSetString("class", StringValue(class))
-			et.RawSetString("policy", policy.RawGetString("version"))
-			return err
+			err := llmPolicyDeniedErrorValue(cap, class, policy)
+			out.RawSetString("ok", BoolValue(false))
+			out.RawSetString("allowed", BoolValue(false))
+			out.RawSetString("denied", BoolValue(true))
+			out.RawSetString("side_effect_allowed", BoolValue(false))
+			out.RawSetString("status", StringValue("denied"))
+			out.RawSetString("result_status", StringValue("denied"))
+			out.RawSetString("capability", StringValue(cap))
+			out.RawSetString("class", StringValue(class))
+			out.RawSetString("policy", llmCloneValue(policy.RawGetString("version")))
+			out.RawSetString("message", llmCloneValue(err.Table().RawGetString("message")))
+			out.RawSetString("error", err)
+			if opts != nil && opts.RawGetString("approval_required").Truthy() {
+				out.RawSetString("approval_required", BoolValue(true))
+			}
+			return out
 		}
 	}
-	return NilValue()
+	return out
+}
+
+func llmPolicyDeniedErrorValue(cap, class string, policy *Table) Value {
+	err := llmErrorValue("policy", "capability denied by policy: "+cap)
+	et := err.Table()
+	et.RawSetString("capability", StringValue(cap))
+	et.RawSetString("class", StringValue(class))
+	et.RawSetString("policy", llmCloneValue(policy.RawGetString("version")))
+	return err
+}
+
+func llmPolicyCapabilitiesTable(capabilities []string) Value {
+	out := NewSequentialArrayTable(len(capabilities))
+	for i, cap := range capabilities {
+		out.RawSet(IntValue(int64(i+1)), StringValue(cap))
+	}
+	return TableValue(out)
 }
 
 func llmPolicyCapabilities(v Value) []string {
