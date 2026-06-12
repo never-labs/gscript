@@ -90,7 +90,7 @@ func TestGenericTurnRunnerManifestContracts(t *testing.T) {
 	base := genericTurnRunnerPackageDir(t)
 	manifest := loadGenericTurnRunnerManifest(t, base)
 
-	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-turn-runner-live-package" {
+	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-turn-runner-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
 	if manifest.PackageName != "leia-generic-ai-turn-runner" {

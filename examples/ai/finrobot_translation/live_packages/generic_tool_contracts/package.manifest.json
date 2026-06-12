@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "id": "finrobot-generic-tool-contracts-live-package",
+  "id": "generic-ai-tool-contracts-live-package",
   "package_name": "leia-generic-ai-tool-contracts",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for generic.ai.tool.contract, ai.tool.invoke, and registry descriptor projection contracts.",

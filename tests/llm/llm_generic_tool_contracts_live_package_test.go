@@ -60,7 +60,7 @@ func TestFinRobotGenericToolContractsLivePackageManifest(t *testing.T) {
 	base := genericToolContractsLivePackageDir(t)
 	manifest := loadGenericToolContractsManifest(t, base)
 
-	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-generic-tool-contracts-live-package" {
+	if manifest.SchemaVersion != 1 || manifest.ID != "generic-ai-tool-contracts-live-package" {
 		t.Fatalf("manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
 	}
 	if manifest.PackageName != "leia-generic-ai-tool-contracts" {

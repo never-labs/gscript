@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://never-labs.dev/schemas/finrobot/generic_trace_events/tool_approval_result_composition_v1.schema.json",
+  "$id": "https://never-labs.dev/schemas/generic-ai/generic_trace_events/tool_approval_result_composition_v1.schema.json",
   "title": "Generic Tool Approval Result Composition",
   "type": "object",
   "required": [

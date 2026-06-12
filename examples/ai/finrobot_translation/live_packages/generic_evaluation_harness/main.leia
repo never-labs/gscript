@@ -4,7 +4,7 @@
 // keeps ai.eval.run provider-free by modeling only checked-in replay data.
 
 generic_evaluation_harness_live_package := {
-    id: "finrobot-generic-evaluation-harness-live-package"
+    id: "generic-ai-evaluation-harness-live-package"
     provider_free: true
     live_network: false
     real_dependency_imports: false

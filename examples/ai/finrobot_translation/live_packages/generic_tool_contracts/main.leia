@@ -5,7 +5,7 @@
 // provider, host tool, network call, or external dependency.
 
 generic_tool_contracts_live_package := {
-    id: "finrobot-generic-tool-contracts-live-package"
+    id: "generic-ai-tool-contracts-live-package"
     provider_free: true
     live_network: false
     real_dependency_imports: false

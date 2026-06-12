@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://never-labs.dev/schemas/finrobot/generic_agent_state_store/trace_replay_projection_v1.schema.json",
+  "$id": "https://never-labs.dev/schemas/generic-ai/generic_agent_state_store/trace_replay_projection_v1.schema.json",
   "title": "Generic Agent State Trace Replay Projection",
   "type": "object",
   "required": [

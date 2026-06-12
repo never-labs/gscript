@@ -55,6 +55,40 @@ func TestGenericLivePackageConsistency(t *testing.T) {
 	}
 }
 
+func TestGenericLivePackagesDoNotLeakFinRobotBrandContent(t *testing.T) {
+	root := repoRoot(t)
+	packagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+	for _, packageDir := range genericLivePackageDirs(t, packagesRoot) {
+		packageDir := packageDir
+		t.Run(filepath.Base(packageDir), func(t *testing.T) {
+			err := filepath.WalkDir(packageDir, func(path string, entry os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if entry.IsDir() || !genericLivePackageDomainNeutralFile(path) {
+					return nil
+				}
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				content := genericLivePackageMaskAllowedPathContext(string(data))
+				lines := strings.Split(content, "\n")
+				for index, line := range lines {
+					if strings.Contains(strings.ToLower(line), "finrobot") {
+						rel := filepath.ToSlash(mustRel(t, root, path))
+						t.Fatalf("%s:%d leaks FinRobot brand content: %s", rel, index+1, strings.TrimSpace(line))
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestGenericLivePackageMatrixMatchesManifestAndDirectories(t *testing.T) {
 	root := repoRoot(t)
 	packagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
@@ -122,6 +156,27 @@ func TestGenericLivePackageMatrixMatchesManifestAndDirectories(t *testing.T) {
 
 	assertSameStringMap(t, "generic live package directories vs live package manifest", dirIDs, manifestIDs)
 	assertSameStringMap(t, "generic live package manifest vs matrix", manifestIDs, matrixIDs)
+}
+
+func genericLivePackageDomainNeutralFile(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".json", ".leia", ".md":
+		return true
+	default:
+		return false
+	}
+}
+
+func genericLivePackageMaskAllowedPathContext(content string) string {
+	replacements := []string{
+		"examples/ai/finrobot_translation",
+		"examples/ai/finrobot-translation",
+		"example.com/leia/examples/ai/finrobot-translation",
+	}
+	for _, replacement := range replacements {
+		content = strings.ReplaceAll(content, replacement, "examples/ai/<translation-root>")
+	}
+	return content
 }
 
 func genericLivePackageDirs(t *testing.T, packagesRoot string) []string {

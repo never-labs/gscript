@@ -3,7 +3,6 @@
   "id": "generic-tool-registry-contract",
   "provider_free": true,
   "domain_specific": false,
-  "finrobot_specific": false,
   "live_network": false,
   "real_dependency_imports": false,
   "local_execution": false,

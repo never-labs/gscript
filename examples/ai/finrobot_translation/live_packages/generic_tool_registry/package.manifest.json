@@ -9,7 +9,6 @@
   ],
   "provider_free": true,
   "domain_specific": false,
-  "finrobot_specific": false,
   "live_network_default": false,
   "real_dependency_import_default": false,
   "local_execution_default": false,

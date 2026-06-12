@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "id": "finrobot-generic-turn-runner-live-package",
+  "id": "generic-ai-turn-runner-live-package",
   "package_name": "leia-generic-ai-turn-runner",
   "version": "0.1.0-skeleton",
   "description": "Provider-free live package skeleton for generic AI single-turn request, memory context projection, and execution envelopes.",
