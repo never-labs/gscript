@@ -82,5 +82,40 @@
       "provider_credentials"
     ],
     "replacement": "<redacted>"
+  },
+  "registry_turn_projection": {
+    "source_packages": [
+      "generic-model-registry",
+      "generic-model-io-envelope",
+      "generic-turn-runner"
+    ],
+    "inputs": [
+      "model_alias_registry",
+      "replay_execution_descriptor",
+      "redaction_policy",
+      "provider_free_replay_record",
+      "single_turn_request"
+    ],
+    "outputs": [
+      "resolved_descriptor_ref",
+      "model_request_envelope",
+      "turn_request_projection",
+      "redaction_mapping",
+      "replay_match_mapping"
+    ],
+    "required_fields": [
+      "projection_id",
+      "requested_alias",
+      "resolved_descriptor_ref",
+      "model_request_turn_id",
+      "turn_request_id",
+      "request_hash",
+      "redaction_policy_ref",
+      "provider_free"
+    ],
+    "source_ids_are_not_assumed_equal": true,
+    "raw_prompt_stored": false,
+    "secret_values_allowed": false,
+    "deterministic_replay_required": true
   }
 }

@@ -381,6 +381,7 @@
         "generic.ai.model.io.stream_chunks",
         "generic.ai.model.io.provider_free_replay",
         "generic.ai.model.io.usage_cost_metadata",
+        "generic.ai.model.io.registry_turn_projection",
         "generic.ai.model.io.redaction"
       ],
       "backend_shape": "ai.model.io.envelope",

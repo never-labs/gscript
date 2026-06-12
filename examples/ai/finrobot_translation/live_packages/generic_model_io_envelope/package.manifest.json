@@ -26,11 +26,13 @@
     "request_envelope": "schemas/model_request_envelope.schema.json",
     "stream_chunk": "schemas/model_stream_chunk.schema.json",
     "response_envelope": "schemas/model_response_envelope.schema.json",
-    "provider_free_replay_fixture": "schemas/provider_free_replay_fixture.schema.json"
+    "provider_free_replay_fixture": "schemas/provider_free_replay_fixture.schema.json",
+    "registry_turn_projection": "schemas/registry_turn_projection_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
-    "provider_free_replay": "fixtures/provider_free_replay_fixture.json"
+    "provider_free_replay": "fixtures/provider_free_replay_fixture.json",
+    "registry_turn_projection": "fixtures/registry_turn_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.model.io.envelope",
@@ -39,6 +41,7 @@
     "generic.ai.model.io.stream_chunks",
     "generic.ai.model.io.provider_free_replay",
     "generic.ai.model.io.usage_cost_metadata",
+    "generic.ai.model.io.registry_turn_projection",
     "generic.ai.model.io.redaction"
   ],
   "capability_surfaces": [
@@ -48,6 +51,7 @@
     "response_envelope",
     "usage",
     "redaction",
+    "registry_turn_projection",
     "provider_free_replay"
   ],
   "default_policy": {
@@ -63,6 +67,7 @@
   "test_gates": [
     "request, stream chunk, and response envelopes decode without provider SDKs",
     "provider-free replay records preserve turn and adapter correlation",
+    "model registry aliases and replay descriptors project into provider-free model IO and turn request envelopes",
     "usage and cost metadata are explicit fixture fields",
     "redaction metadata proves no raw credential values are stored"
   ],

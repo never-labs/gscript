@@ -1232,12 +1232,14 @@
         "generic.ai.model.io.stream_chunks",
         "generic.ai.model.io.provider_free_replay",
         "generic.ai.model.io.usage_cost_metadata",
+        "generic.ai.model.io.registry_turn_projection",
         "generic.ai.model.io.redaction"
       ],
       "test_gates": [
         "fixture replay decodes request, stream chunk, and response envelope contracts",
         "contract gates prove usage/cost metadata and redaction fields are explicit",
         "provider-free fixture asserts no live network or credential requirement",
+        "registry-to-turn projection maps aliases, replay descriptors, redaction, and turn request hashes explicitly",
         "composition gate links model registry output to turn runner input through model IO envelope contracts"
       ],
       "no_built_in_guarantee": true

@@ -26,6 +26,7 @@ type genericModelIOEnvelopeManifest struct {
 	DependsOnQRuntime   bool     `json:"depends_on_q_runtime"`
 	RealImports         bool     `json:"real_dependency_imports"`
 	RealImportsDefault  bool     `json:"real_dependency_import_default"`
+	Capabilities        []string `json:"capabilities"`
 	CapabilitySurfaces  []string `json:"capability_surfaces"`
 	NoBuiltInGuarantee  struct {
 		Required  bool   `json:"required"`
@@ -74,6 +75,16 @@ type genericModelIOEnvelopeContract struct {
 		RedactedFields      []string `json:"redacted_fields"`
 		Replacement         string   `json:"replacement"`
 	} `json:"redaction"`
+	RegistryTurnProjection struct {
+		SourcePackages              []string `json:"source_packages"`
+		Inputs                      []string `json:"inputs"`
+		Outputs                     []string `json:"outputs"`
+		RequiredFields              []string `json:"required_fields"`
+		SourceIDsAreNotAssumedEqual bool     `json:"source_ids_are_not_assumed_equal"`
+		RawPromptStored             bool     `json:"raw_prompt_stored"`
+		SecretValuesAllowed         bool     `json:"secret_values_allowed"`
+		DeterministicReplayRequired bool     `json:"deterministic_replay_required"`
+	} `json:"registry_turn_projection"`
 }
 
 type genericModelIOReplayFixture struct {
@@ -145,11 +156,15 @@ func assertGenericModelIOEnvelopeBoundary(t *testing.T, manifest genericModelIOE
 		"model_io",
 		"provider_free_replay",
 		"redaction",
+		"registry_turn_projection",
 		"request_envelope",
 		"response_envelope",
 		"stream_chunk",
 		"usage",
 	})
+	if !genericLivePackageContains(manifest.Capabilities, "generic.ai.model.io.registry_turn_projection") {
+		t.Fatalf("manifest capabilities missing registry turn projection: %#v", manifest.Capabilities)
+	}
 	if manifest.Contracts["model_io_envelope"] == "" || manifest.Fixtures["provider_free_replay"] == "" {
 		t.Fatalf("manifest must link contract and fixture: %#v", manifest)
 	}
@@ -205,6 +220,18 @@ func assertGenericModelIOEnvelopeContract(t *testing.T, manifest genericModelIOE
 	if !contract.Redaction.Required || contract.Redaction.SecretValuesPresent || contract.Redaction.Replacement != "<redacted>" ||
 		len(contract.Redaction.RedactedFields) < 3 {
 		t.Fatalf("redaction contract incomplete: %#v", contract.Redaction)
+	}
+	if len(contract.RegistryTurnProjection.SourcePackages) != 3 ||
+		!contract.RegistryTurnProjection.SourceIDsAreNotAssumedEqual ||
+		contract.RegistryTurnProjection.RawPromptStored ||
+		contract.RegistryTurnProjection.SecretValuesAllowed ||
+		!contract.RegistryTurnProjection.DeterministicReplayRequired {
+		t.Fatalf("registry turn projection contract incomplete: %#v", contract.RegistryTurnProjection)
+	}
+	for _, want := range []string{"projection_id", "requested_alias", "resolved_descriptor_ref", "model_request_turn_id", "turn_request_id", "request_hash", "redaction_policy_ref", "provider_free"} {
+		if !genericLivePackageContains(contract.RegistryTurnProjection.RequiredFields, want) {
+			t.Fatalf("registry turn projection required_fields missing %q: %#v", want, contract.RegistryTurnProjection.RequiredFields)
+		}
 	}
 }
 
@@ -289,6 +316,8 @@ func assertGenericModelIOEnvelopeNoSecrets(t *testing.T, base string) {
 		filepath.Join(base, "package.manifest.json"),
 		filepath.Join(base, "contracts", "model_io_envelope_contract.json"),
 		filepath.Join(base, "fixtures", "provider_free_replay_fixture.json"),
+		filepath.Join(base, "fixtures", "registry_turn_projection_fixture.json"),
+		filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"),
 	}
 	for _, path := range entries {
 		data, err := os.ReadFile(path)
@@ -313,6 +342,170 @@ func assertGenericModelIOEnvelopeNoSecrets(t *testing.T, base string) {
 			if strings.Contains(lower, forbidden) {
 				t.Fatalf("%s contains provider/domain/secret marker %q", path, forbidden)
 			}
+		}
+	}
+}
+
+func TestGenericModelIOEnvelopeRegistryTurnProjection(t *testing.T) {
+	root := repoRoot(t)
+	base := filepath.Join(root, filepath.FromSlash(genericModelIOEnvelopeRoot))
+	var manifest genericModelIOEnvelopeManifest
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "package.manifest.json"), &manifest)
+
+	var index struct {
+		ProviderFree          bool `json:"provider_free"`
+		LiveNetwork           bool `json:"live_network"`
+		RealDependencyImports bool `json:"real_dependency_imports"`
+		Fixtures              []struct {
+			FixtureKey string         `json:"fixture_key"`
+			Capability string         `json:"capability"`
+			Path       string         `json:"path"`
+			Schema     string         `json:"schema"`
+			Metadata   map[string]any `json:"metadata"`
+		} `json:"fixtures"`
+	}
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, filepath.FromSlash(manifest.Fixtures["index"])), &index)
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
+		t.Fatalf("fixture index header/count mismatch: %#v", index)
+	}
+	projectionEntry := index.Fixtures[1]
+	if projectionEntry.FixtureKey != "generic_model_io:registry_turn_projection:v1" ||
+		projectionEntry.Capability != "generic.ai.model.io.registry_turn_projection" ||
+		projectionEntry.Path != manifest.Fixtures["registry_turn_projection"] ||
+		projectionEntry.Metadata["alias_mappings"] != float64(2) ||
+		projectionEntry.Metadata["request_mappings"] != float64(1) {
+		t.Fatalf("projection fixture index entry mismatch: %#v", projectionEntry)
+	}
+
+	var projection struct {
+		SchemaVersion         int               `json:"schema_version"`
+		ID                    string            `json:"id"`
+		ProjectionKind        string            `json:"projection_kind"`
+		PackageBoundaryID     string            `json:"package_boundary_id"`
+		ProviderFree          bool              `json:"provider_free"`
+		DomainSpecific        bool              `json:"domain_specific"`
+		LiveNetwork           bool              `json:"live_network"`
+		LiveModel             bool              `json:"live_model"`
+		CredentialsRequired   bool              `json:"credentials_required"`
+		RealDependencyImports bool              `json:"real_dependency_imports"`
+		SourceFixtureRefs     map[string]string `json:"source_fixture_refs"`
+		IdentityPolicy        struct {
+			ModelAliasesAreResolvedBeforeProjection         bool   `json:"model_aliases_are_resolved_before_projection"`
+			ModelIOTurnIDAndTurnRequestIDAreNotAssumedEqual bool   `json:"model_io_turn_id_and_turn_request_id_are_not_assumed_equal"`
+			ModelNamesAreCanonicalizedPerTargetEnvelope     bool   `json:"model_names_are_canonicalized_per_target_envelope"`
+			RequestHashSource                               string `json:"request_hash_source"`
+		} `json:"identity_policy"`
+		AliasResolutionMappings []struct {
+			RequestedAlias        string   `json:"requested_alias"`
+			ResolutionPath        []string `json:"resolution_path"`
+			ResolvedDescriptorRef string   `json:"resolved_descriptor_ref"`
+			ModelIOModel          string   `json:"model_io_model"`
+			TurnRequestModel      string   `json:"turn_request_model"`
+		} `json:"alias_resolution_mappings"`
+		RequestProjection struct {
+			RequestedAlias        string `json:"requested_alias"`
+			ResolvedDescriptorRef string `json:"resolved_descriptor_ref"`
+			DescriptorFixtureKey  string `json:"descriptor_fixture_key"`
+			DescriptorMode        string `json:"descriptor_mode"`
+			ModelIOTurnID         string `json:"model_io_turn_id"`
+			TurnRequestID         string `json:"turn_request_id"`
+			TurnCorrelationID     string `json:"turn_correlation_id"`
+			TraceID               string `json:"trace_id"`
+			ReplaySessionID       string `json:"replay_session_id"`
+			AdapterIdentity       string `json:"adapter_identity"`
+			ProviderFree          bool   `json:"provider_free"`
+			LiveNetwork           bool   `json:"live_network"`
+			LiveModel             bool   `json:"live_model"`
+		} `json:"request_projection"`
+		RedactionProjection struct {
+			RedactionPolicyRef          string   `json:"redaction_policy_ref"`
+			ModelRegistryRedactFields   []string `json:"model_registry_redact_fields"`
+			ModelIORedactedFields       []string `json:"model_io_redacted_fields"`
+			TurnRunnerSecretEnvPatterns []string `json:"turn_runner_secret_env_patterns"`
+			Replacement                 string   `json:"replacement"`
+			SecretValuesPresent         bool     `json:"secret_values_present"`
+			RawPromptStored             bool     `json:"raw_prompt_stored"`
+			RawCompletionStored         bool     `json:"raw_completion_stored"`
+		} `json:"redaction_projection"`
+		ReplayProjection struct {
+			ModelRegistryReplaySafe               bool   `json:"model_registry_replay_safe"`
+			ModelIOMode                           string `json:"model_io_mode"`
+			ModelIOStrictOrderedMatch             bool   `json:"model_io_strict_ordered_match"`
+			TurnRunnerMatchKey                    string `json:"turn_runner_match_key"`
+			TurnRunnerRequestHash                 string `json:"turn_runner_request_hash"`
+			RequestHashPreservedToExecuteResponse bool   `json:"request_hash_preserved_to_execute_response"`
+			ProviderFree                          bool   `json:"provider_free"`
+			LiveNetwork                           bool   `json:"live_network"`
+			CredentialsRequired                   bool   `json:"credentials_required"`
+		} `json:"replay_projection"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "fixtures", "registry_turn_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.ID != "generic-model-io-registry-turn-projection-fixture" ||
+		projection.ProjectionKind != "model_registry_to_model_io_turn_projection" ||
+		projection.PackageBoundaryID != manifest.PackageBoundaryID {
+		t.Fatalf("unexpected projection identity: %#v", projection)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork ||
+		projection.LiveModel || projection.CredentialsRequired || projection.RealDependencyImports {
+		t.Fatalf("projection must stay provider-free/local: %#v", projection)
+	}
+	for _, key := range []string{"model_alias_registry", "replay_execution_descriptor", "redaction_policy", "model_io_replay", "turn_request"} {
+		if projection.SourceFixtureRefs[key] == "" {
+			t.Fatalf("projection source fixture ref %q missing: %#v", key, projection.SourceFixtureRefs)
+		}
+	}
+	if !projection.IdentityPolicy.ModelAliasesAreResolvedBeforeProjection ||
+		!projection.IdentityPolicy.ModelIOTurnIDAndTurnRequestIDAreNotAssumedEqual ||
+		!projection.IdentityPolicy.ModelNamesAreCanonicalizedPerTargetEnvelope ||
+		projection.IdentityPolicy.RequestHashSource != "generic_turn_runner.replay.request_hash" {
+		t.Fatalf("identity policy incomplete: %#v", projection.IdentityPolicy)
+	}
+	if len(projection.AliasResolutionMappings) != 2 {
+		t.Fatalf("alias mappings = %d, want 2", len(projection.AliasResolutionMappings))
+	}
+	for _, mapping := range projection.AliasResolutionMappings {
+		if mapping.RequestedAlias == "" || len(mapping.ResolutionPath) == 0 ||
+			!strings.HasPrefix(mapping.ResolvedDescriptorRef, "model_registry:descriptor:") ||
+			mapping.ModelIOModel == "" || mapping.TurnRequestModel == "" {
+			t.Fatalf("alias projection mapping incomplete: %#v", mapping)
+		}
+	}
+	if projection.RequestProjection.RequestedAlias != "default" ||
+		projection.RequestProjection.ResolvedDescriptorRef != "model_registry:descriptor:fixture_analyst:v1" ||
+		projection.RequestProjection.DescriptorMode != "deterministic_fixture_replay" ||
+		projection.RequestProjection.ModelIOTurnID != "turn-generic-model-io-001" ||
+		projection.RequestProjection.TurnRequestID != "turn-request-acme-summary-001" ||
+		projection.RequestProjection.TurnCorrelationID != "corr-generic-turn-acme-summary-001" ||
+		projection.RequestProjection.AdapterIdentity != "generic-model-io-envelope-adapter" ||
+		!projection.RequestProjection.ProviderFree ||
+		projection.RequestProjection.LiveNetwork ||
+		projection.RequestProjection.LiveModel {
+		t.Fatalf("request projection mismatch: %#v", projection.RequestProjection)
+	}
+	if projection.RedactionProjection.RedactionPolicyRef != "generic-model-registry-redaction-v1" ||
+		projection.RedactionProjection.Replacement != "<redacted>" ||
+		projection.RedactionProjection.SecretValuesPresent ||
+		projection.RedactionProjection.RawPromptStored ||
+		projection.RedactionProjection.RawCompletionStored ||
+		len(projection.RedactionProjection.ModelRegistryRedactFields) < len(projection.RedactionProjection.ModelIORedactedFields) {
+		t.Fatalf("redaction projection mismatch: %#v", projection.RedactionProjection)
+	}
+	if !projection.ReplayProjection.ModelRegistryReplaySafe ||
+		projection.ReplayProjection.ModelIOMode != "provider-free" ||
+		!projection.ReplayProjection.ModelIOStrictOrderedMatch ||
+		projection.ReplayProjection.TurnRunnerMatchKey != "deterministic_request_hash" ||
+		projection.ReplayProjection.TurnRunnerRequestHash != "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba" ||
+		!projection.ReplayProjection.RequestHashPreservedToExecuteResponse ||
+		!projection.ReplayProjection.ProviderFree ||
+		projection.ReplayProjection.LiveNetwork ||
+		projection.ReplayProjection.CredentialsRequired {
+		t.Fatalf("replay projection mismatch: %#v", projection.ReplayProjection)
+	}
+	for _, want := range []string{"alias_resolution_is_explicit", "descriptor_ref_projects_to_model_io_request", "model_io_request_projects_to_turn_request", "redaction_policy_is_preserved", "request_hash_is_turn_runner_owned", "provider_free_chain", "live_network_absent", "real_dependency_imports_absent"} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
 		}
 	}
 }

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/generic_model_io_envelope/registry_turn_projection_v1.schema.json",
+  "title": "Generic Model Registry To Turn Projection",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "projection_kind",
+    "package_boundary_id",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "real_dependency_imports",
+    "source_fixture_refs",
+    "identity_policy",
+    "alias_resolution_mappings",
+    "request_projection",
+    "redaction_projection",
+    "replay_projection",
+    "projection_assertions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "projection_kind": {
+      "const": "model_registry_to_model_io_turn_projection"
+    },
+    "package_boundary_id": {
+      "const": "generic-ai-model-io-envelope"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "domain_specific": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "live_model": {
+      "const": false
+    },
+    "credentials_required": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "source_fixture_refs": {
+      "type": "object"
+    },
+    "identity_policy": {
+      "type": "object"
+    },
+    "alias_resolution_mappings": {
+      "type": "array",
+      "minItems": 1
+    },
+    "request_projection": {
+      "type": "object"
+    },
+    "redaction_projection": {
+      "type": "object"
+    },
+    "replay_projection": {
+      "type": "object"
+    },
+    "projection_assertions": {
+      "type": "object"
+    }
+  }
+}
