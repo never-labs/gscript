@@ -653,6 +653,7 @@ func llmTraceAssertValue(input, opts *Table) *Table {
 		}
 	}
 	llmTraceAssertPayloadFields(events, findings, opts)
+	llmTraceAssertRedaction(events, findings, opts)
 	out := NewTable()
 	out.RawSetString("ok", BoolValue(findings.Length() == 0))
 	if findings.Length() == 0 {
@@ -719,6 +720,56 @@ func llmTraceAssertPayloadFieldList(findings *Table, payload Value, fields []str
 			llmTraceAppendFinding(findings, "generic.ai.trace.missing_payload_field", fmt.Sprintf("%s event_type %q missing payload field %q", eventID, eventType, field))
 		}
 	}
+}
+
+func llmTraceAssertRedaction(events, findings, opts *Table) {
+	checks := []struct {
+		options []string
+		field   string
+		kind    string
+	}{
+		{[]string{"deny_secret_values", "deny_secret_values_present"}, "secret_values_present", "generic.ai.trace.secret_values_present"},
+		{[]string{"deny_raw_prompt_stored"}, "raw_prompt_stored", "generic.ai.trace.raw_prompt_stored"},
+		{[]string{"deny_raw_completion_stored"}, "raw_completion_stored", "generic.ai.trace.raw_completion_stored"},
+	}
+	enabled := false
+	for _, check := range checks {
+		if llmTraceAnyBool(opts, check.options) {
+			enabled = true
+			break
+		}
+	}
+	if !enabled {
+		return
+	}
+	for i := 1; i <= events.Length(); i++ {
+		event := events.RawGet(IntValue(int64(i)))
+		if !event.IsTable() {
+			continue
+		}
+		eventTable := event.Table()
+		eventID := llmTraceString(eventTable, "event_id", fmt.Sprintf("event:%d", i))
+		eventType := llmTraceString(eventTable, "event_type", llmTraceString(eventTable, "type", ""))
+		redaction := eventTable.RawGetString("redaction")
+		if !redaction.IsTable() {
+			continue
+		}
+		redactionTable := redaction.Table()
+		for _, check := range checks {
+			if llmTraceAnyBool(opts, check.options) && redactionTable.RawGetString(check.field).Truthy() {
+				llmTraceAppendFinding(findings, check.kind, fmt.Sprintf("%s event_type %q redaction.%s must be false", eventID, eventType, check.field))
+			}
+		}
+	}
+}
+
+func llmTraceAnyBool(t *Table, keys []string) bool {
+	for _, key := range keys {
+		if llmTraceBool(t, key, false) {
+			return true
+		}
+	}
+	return false
 }
 
 func llmTraceInputEvents(input *Table) *Table {

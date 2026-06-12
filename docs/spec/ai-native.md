@@ -616,8 +616,12 @@ findings}` and may require provider-free traces, deny live network/model flags,
 require event types, require correlation fields, require payload fields on all
 events, or require payload fields for specific event types via
 `require_event_payload_fields` or the equivalent
-`required_payload_fields_by_event_type`. These helpers are provider-free; they
-inspect ordinary trace tables and must not persist telemetry or call providers.
+`required_payload_fields_by_event_type`. It may also deny truthy redaction
+states on each event with `deny_secret_values_present` (alias:
+`deny_secret_values`), `deny_raw_prompt_stored`, and
+`deny_raw_completion_stored`. These helpers are provider-free; they inspect
+ordinary trace tables and must not persist telemetry, redact content, or call
+providers.
 
 `llm.replay_trace_event(match, opts)` projects the result of
 `llm.replay_index(...).match(...)` or a replay fixture matcher into a standard
