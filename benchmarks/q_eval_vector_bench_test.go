@@ -4668,6 +4668,20 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 			},
 		},
 		{
+			// parse is pure (q source -> nested-list parse tree); counting
+			// the trees pins the (verb;arg;...) spelling without touching the
+			// session-routed value/eval verbs (value_eval_parse.go). The til
+			// term keeps the baseline row-scaled.
+			name: "ParseTreeCount",
+			tags: []string{"parse"},
+			expr: func(rows int) string {
+				return fmt.Sprintf(`(count parse "2*3+1")+(count parse "neg 7")+count til %d`, rows)
+			},
+			goFn: func(rows int) int64 {
+				return 3 + 2 + int64(rows)
+			},
+		},
+		{
 			name:   "EnumSymbolStringMatchLike",
 			tags:   []string{"enum", "symbol", "string", "match-like"},
 			matrix: []string{"compare:symbol-vector:where", "compare:string-vector:where"},

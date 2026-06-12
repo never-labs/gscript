@@ -248,7 +248,7 @@ var qCompilePrefixWords = map[string]bool{
 	"atan": true, "reciprocal": true, "signum": true, "floor": true,
 	"ceiling": true, "inv": true, "sums": true, "prds": true, "mins": true,
 	"maxs": true, "avgs": true, "all": true, "any": true,
-	"flip": true, "enlist": true, "til": true,
+	"flip": true, "enlist": true, "til": true, "parse": true,
 }
 
 func compileQEvalExpr(src string, depth int) Expr {
@@ -270,7 +270,10 @@ func compileQEvalExpr(src string, depth int) Expr {
 	if strings.HasPrefix(src, "\\") || strings.HasPrefix(src, ".z.") {
 		return nil
 	}
-	for _, prefix := range []string{"set ", "lookup ", "get ", "hopen ", "take ", "drop "} {
+	// `eval ` stays on the string evaluator: parse-tree evaluation is
+	// session-routed (see value_eval_parse.go), and the cascade below has no
+	// faithful compiled form for it.
+	for _, prefix := range []string{"set ", "lookup ", "get ", "hopen ", "take ", "drop ", "eval "} {
 		if strings.HasPrefix(src, prefix) {
 			return nil
 		}
