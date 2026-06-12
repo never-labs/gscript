@@ -127,6 +127,15 @@ shapes. Agent-as-tool values report `type: "agent"` and carry
 `trace_contract: "agent_tool.v1"`; their provider-facing input schema describes
 arguments only, not the delegated agent's output shape.
 
+Use `llm.tool_outcome(call_or_tool_message, result_or_err, opts)` to project a
+tool dispatch into a stable, metadata-only table. It records fields such as
+`tool_call_id`, `tool_name`, `status`, `result_status`, `result_type`,
+`result_ref`, `arg_names`, `error_kind`, `replay_key`, and correlation IDs.
+`llm.tool_outcome_event(outcome, opts)` or
+`llm.tool_outcome_trace_event(...)` turns that projection into a generic trace
+event. The projection is ref-only: it does not copy raw tool args, raw tool
+results, raw prompts, or provider completions into the trace payload.
+
 ## Messages And History
 
 `turn` and `llm.turn` receive ordinary message arrays. Use `llm.system`,

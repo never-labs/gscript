@@ -179,6 +179,17 @@ search_runbook := tool {
 }
 ```
 
+`llm.tool_outcome(call_or_tool_message, result_or_err, opts)` projects tool
+dispatch metadata into an ordinary table with `kind: "tool_outcome"`,
+`schema_version: 1`, `version: "tool_outcome.v1"`, `tool_call_id`,
+`tool_name`, `status`, `result_status`, `result_type`, `result_ref`,
+`arg_names`, `error_kind`, redaction metadata, and correlation fields.
+`llm.tool_outcome_event(outcome, opts)` projects that table into the generic
+trace event shape; `llm.tool_outcome_trace_event` is an equivalent alias. These
+helpers must not copy raw tool arguments, raw result values, prompt text,
+provider completions, response bodies, stack traces, or credential-bearing
+metadata into the outcome payload.
+
 The required fields are:
 
 | Field | Meaning |
@@ -336,6 +347,10 @@ When the `flow` field is present, its function owns the workflow. No hidden
 turn or tool dispatch happens. Custom flows should call `llm.turn`,
 `llm.dispatch`, `msg.assistant_call`, `msg.tool_result`, and `msg.tool_error`
 explicitly.
+
+Custom flows that need auditable tool evidence should also use
+`llm.tool_outcome` and `llm.tool_outcome_event` rather than placing raw tool
+inputs or outputs in trace payloads.
 
 For complex flows that need exact control over metadata or call parameters,
 scripts may use the lower-level helper directly:
