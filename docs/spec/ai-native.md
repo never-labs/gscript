@@ -552,6 +552,13 @@ policy metadata, and booleans such as `allowed`, `denied`, `clean_skip`,
 a host or dependency gate that skipped execution without granting the
 capability.
 
+`llm.policy_outcome_event(outcome, opts)` projects a policy outcome into the
+generic trace event shape. `llm.policy_outcome_trace_event` is an equivalent
+alias for callers that prefer explicit trace naming. The default event type is
+`policy_outcome`. The projection may include safe policy decision fields,
+capabilities, dependency skip metadata, and correlation IDs, but must not clone
+executable tool values or raw error tables into the event payload.
+
 Policy checks are runtime gates over declared capabilities. They are not
 credential management, sandboxing, network enforcement, or proof that a tool
 body is harmless. Hosts must still enforce real resource boundaries.

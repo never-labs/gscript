@@ -576,6 +576,11 @@ portable decision table instead of tuple-style control flow. It returns
 `allowed`, `denied`, `clean_skip`, `approval_required`, and
 `side_effect_allowed`. Passing `{clean_skip: true, reason, dependency}` records
 a skipped host/dependency gate without granting the requested capability.
+Use `llm.policy_outcome_event(outcome, opts)` to add that decision to a generic
+trace envelope. `llm.policy_outcome_trace_event` is an equivalent explicit
+trace-named alias. The helper emits a redacted `policy_outcome` event with
+policy summary, capability, status, skip metadata, and correlation IDs, without
+copying raw error tables or executable tool values into the payload.
 
 Human approval and resume use the lower-level loop helpers. A pending snapshot
 is host-persistable data; `loop.resume(token, approval)` applies an approval
