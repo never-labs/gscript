@@ -2,11 +2,14 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 type genericModelRegistryManifest struct {
@@ -463,6 +466,210 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 	assertGenericModelRegistryFixtureIndexNoSecretGuard(t, base)
 }
 
+func TestGenericModelRegistryNestedSchemaRequiredFields(t *testing.T) {
+	base := genericModelRegistryPackageDir(t)
+
+	assertGenericModelRegistrySchemaRequired(t, filepath.Join(base, "schemas", "model_alias_registry_v1.schema.json"), []string{
+		"schema_version",
+		"id",
+		"capability_id",
+		"provider_free",
+		"live_network",
+		"aliases",
+	})
+	assertGenericModelRegistryNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_alias_registry_v1.schema.json"), []string{"properties", "aliases", "items"}, []string{
+		"alias",
+		"kind",
+	})
+	assertGenericModelRegistryNestedSchemaRequired(t, filepath.Join(base, "schemas", "model_alias_registry_v1.schema.json"), []string{"properties", "resolution_examples", "items"}, []string{
+		"input_alias",
+		"path",
+		"descriptor_ref",
+	})
+
+	assertGenericModelRegistrySchemaRequired(t, filepath.Join(base, "schemas", "execution_descriptor_v1.schema.json"), []string{
+		"schema_version",
+		"id",
+		"provider_free",
+		"live_network",
+		"descriptors",
+	})
+	assertGenericModelRegistryNestedSchemaRequired(t, filepath.Join(base, "schemas", "execution_descriptor_v1.schema.json"), []string{"properties", "descriptors", "items"}, []string{
+		"descriptor_ref",
+		"model_alias",
+		"provider",
+		"provider_model",
+		"mode",
+		"fixture_key",
+		"replay_safe",
+		"live_network",
+		"provider_credentials_required",
+		"secret_values_present",
+		"temperature",
+		"capability_flags",
+		"redaction_policy_ref",
+	})
+
+	assertGenericModelRegistrySchemaRequired(t, filepath.Join(base, "schemas", "live_provider_gate_v1.schema.json"), []string{
+		"schema_version",
+		"id",
+		"capability",
+		"provider_free",
+		"live_network",
+		"live_model_calls",
+		"enabled_by_default",
+		"requires_explicit_integration_env",
+		"integration_env",
+		"allowed_provider_env_refs",
+		"secret_values_present",
+		"credential_values_allowed",
+		"redaction_policy_ref",
+		"clean_skip_without_credentials",
+		"default_skip_reason",
+		"provider_protocols",
+		"live_smoke_contract",
+	})
+	assertGenericModelRegistryNestedSchemaRequired(t, filepath.Join(base, "schemas", "live_provider_gate_v1.schema.json"), []string{"properties", "live_smoke_contract"}, []string{
+		"prompt",
+		"expected_text",
+		"max_tokens",
+		"temperature",
+		"timeout_seconds",
+		"record_replay_required_for_ci",
+	})
+}
+
+func TestGenericModelRegistryFixtureIndexManifestAlignment(t *testing.T) {
+	base := genericModelRegistryPackageDir(t)
+	manifest := loadGenericModelRegistryManifest(t, base)
+	type fixtureIndexEntry struct {
+		Key                 string         `json:"key"`
+		Capability          string         `json:"capability"`
+		Path                string         `json:"path"`
+		Schema              string         `json:"schema"`
+		ProviderFree        bool           `json:"provider_free"`
+		LiveNetwork         bool           `json:"live_network"`
+		SecretValuesPresent bool           `json:"secret_values_present"`
+		Metadata            map[string]any `json:"metadata"`
+	}
+	var index struct {
+		ProviderFree        bool                `json:"provider_free"`
+		LiveNetwork         bool                `json:"live_network"`
+		SecretValuesPresent bool                `json:"secret_values_present"`
+		Fixtures            []fixtureIndexEntry `json:"fixtures"`
+	}
+	readJSONFile(t, filepath.Join(base, manifest.Entrypoints["fixture_index"]), &index)
+	if !index.ProviderFree || index.LiveNetwork || index.SecretValuesPresent || len(index.Fixtures) != 4 {
+		t.Fatalf("fixture index header/count mismatch: %#v", index)
+	}
+	want := map[string]struct {
+		capability string
+		path       string
+		schema     string
+	}{
+		"model_registry:aliases:v1": {
+			capability: "generic.ai.model.alias.resolve",
+			path:       manifest.Entrypoints["alias_registry"],
+			schema:     manifest.Schemas["alias_registry"],
+		},
+		"model_registry:descriptor:fixture_analyst:v1": {
+			capability: "generic.ai.model.descriptor.replay",
+			path:       "fixtures/replay_execution_descriptor_fixture.json",
+			schema:     manifest.Schemas["execution_descriptor"],
+		},
+		"model_registry:redaction:v1": {
+			capability: "generic.ai.model.redaction.policy",
+			path:       "fixtures/redaction_policy_fixture.json",
+			schema:     manifest.Schemas["redaction_policy"],
+		},
+		"model_registry:live_provider_gate:v1": {
+			capability: "generic.ai.model.live_provider_gate",
+			path:       manifest.Entrypoints["live_provider_gate"],
+			schema:     manifest.Schemas["live_provider_gate"],
+		},
+	}
+	seen := map[string]bool{}
+	for _, fixture := range index.Fixtures {
+		wantEntry, ok := want[fixture.Key]
+		if !ok {
+			t.Fatalf("unexpected fixture index key %q", fixture.Key)
+		}
+		if seen[fixture.Key] {
+			t.Fatalf("duplicate fixture index key %q", fixture.Key)
+		}
+		seen[fixture.Key] = true
+		if fixture.Capability != wantEntry.capability ||
+			!genericModelRegistryContains(manifest.Capabilities, fixture.Capability) ||
+			fixture.Path != wantEntry.path ||
+			fixture.Schema != wantEntry.schema ||
+			!fixture.ProviderFree ||
+			fixture.LiveNetwork ||
+			fixture.SecretValuesPresent {
+			t.Fatalf("fixture index entry is not aligned with manifest: entry=%#v want=%#v capabilities=%#v", fixture, wantEntry, manifest.Capabilities)
+		}
+		assertGenericModelRegistryJSONFile(t, filepath.Join(base, fixture.Path))
+		assertGenericModelRegistryJSONFile(t, filepath.Join(base, fixture.Schema))
+	}
+	for key := range want {
+		if !seen[key] {
+			t.Fatalf("fixture index missing key %q", key)
+		}
+	}
+}
+
+func TestGenericModelRegistryMainSmokeOutput(t *testing.T) {
+	base := genericModelRegistryPackageDir(t)
+	manifest := loadGenericModelRegistryManifest(t, base)
+	want := "generic_model_registry_live_package capability=generic.ai.model.registry capabilities=6 schemas=4 fixtures=4 provider_free=true live_network=false imports=false live_provider_gate=true routing_guard=true"
+
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var prints []string
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString),
+				leia.WithPrint(func(args ...any) {
+					var parts []string
+					for _, arg := range args {
+						parts = append(parts, fmt.Sprint(arg))
+					}
+					prints = append(prints, strings.Join(parts, " "))
+				}),
+			}, tc.opts...)...)
+			if err := vm.ExecFile(filepath.Join(base, manifest.Entrypoints["main"])); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			got, err := vm.Get("generic_model_registry_live_package_summary")
+			if err != nil {
+				t.Fatalf("Get generic_model_registry_live_package_summary: %v", err)
+			}
+			if got != want {
+				t.Fatalf("summary = %#v, want %#v", got, want)
+			}
+			if len(prints) != 1 || prints[0] != want {
+				t.Fatalf("prints = %#v, want %q", prints, want)
+			}
+			summary := genericModelRegistrySummaryFields(t, got.(string))
+			if summary["capability"] != manifest.DialectCapabilityID ||
+				summary["capabilities"] != fmt.Sprint(len(manifest.Capabilities)) ||
+				summary["schemas"] != fmt.Sprint(len(manifest.Schemas)) ||
+				summary["fixtures"] != "4" ||
+				(summary["provider_free"] == "true") != manifest.ProviderFree ||
+				(summary["live_network"] == "true") != manifest.LiveNetwork ||
+				(summary["imports"] == "true") != manifest.RealDependencyImports ||
+				(summary["live_provider_gate"] == "true") != manifest.CapabilityFlags["live_provider_gate"] ||
+				(summary["routing_guard"] == "true") != genericModelRegistryContains(manifest.Capabilities, "generic.ai.model.routing.guard") {
+				t.Fatalf("summary does not align with manifest: summary=%#v manifest=%#v", summary, manifest)
+			}
+		})
+	}
+}
+
 func assertGenericModelRegistryFixtureIndexNoSecretGuard(t *testing.T, base string) {
 	t.Helper()
 	var index struct {
@@ -471,6 +678,7 @@ func assertGenericModelRegistryFixtureIndexNoSecretGuard(t *testing.T, base stri
 		SecretValuesPresent bool `json:"secret_values_present"`
 		Fixtures            []struct {
 			Key                 string         `json:"key"`
+			Capability          string         `json:"capability"`
 			ProviderFree        bool           `json:"provider_free"`
 			LiveNetwork         bool           `json:"live_network"`
 			SecretValuesPresent bool           `json:"secret_values_present"`
@@ -482,7 +690,7 @@ func assertGenericModelRegistryFixtureIndexNoSecretGuard(t *testing.T, base stri
 		t.Fatalf("fixture index must stay provider-free, offline, and no-secret: %#v", index)
 	}
 	for _, fixture := range index.Fixtures {
-		if fixture.Key == "" || !fixture.ProviderFree || fixture.LiveNetwork || fixture.SecretValuesPresent {
+		if fixture.Key == "" || fixture.Capability == "" || !fixture.ProviderFree || fixture.LiveNetwork || fixture.SecretValuesPresent {
 			t.Fatalf("fixture index entry must stay provider-free, offline, and no-secret: %#v", fixture)
 		}
 		if fixture.Metadata["secret_values_present"] != false {
@@ -592,6 +800,66 @@ func assertGenericModelRegistryJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
 	readJSONFile(t, path, &value)
+}
+
+func assertGenericModelRegistrySchemaRequired(t *testing.T, path string, want []string) {
+	t.Helper()
+	assertGenericModelRegistryNestedSchemaRequired(t, path, nil, want)
+}
+
+func assertGenericModelRegistryNestedSchemaRequired(t *testing.T, path string, objectPath []string, want []string) {
+	t.Helper()
+	var schema map[string]any
+	readJSONFile(t, path, &schema)
+	current := any(schema)
+	for _, segment := range objectPath {
+		object, ok := current.(map[string]any)
+		if !ok {
+			t.Fatalf("%s path %v reached non-object at %q: %#v", path, objectPath, segment, current)
+		}
+		current, ok = object[segment]
+		if !ok {
+			t.Fatalf("%s missing schema path segment %q in %v", path, segment, objectPath)
+		}
+	}
+	object, ok := current.(map[string]any)
+	if !ok {
+		t.Fatalf("%s path %v is not an object: %#v", path, objectPath, current)
+	}
+	required, ok := object["required"].([]any)
+	if !ok {
+		t.Fatalf("%s path %v missing required array: %#v", path, objectPath, object["required"])
+	}
+	requiredSet := map[string]bool{}
+	for _, value := range required {
+		name, ok := value.(string)
+		if !ok {
+			t.Fatalf("%s path %v has non-string required value %#v", path, objectPath, value)
+		}
+		requiredSet[name] = true
+	}
+	for _, field := range want {
+		if !requiredSet[field] {
+			t.Fatalf("%s path %v required missing %q: %#v", path, objectPath, field, required)
+		}
+	}
+}
+
+func genericModelRegistrySummaryFields(t *testing.T, value string) map[string]string {
+	t.Helper()
+	fields := strings.Fields(value)
+	if len(fields) == 0 || fields[0] != "generic_model_registry_live_package" {
+		t.Fatalf("unexpected summary prefix: %q", value)
+	}
+	result := map[string]string{}
+	for _, field := range fields[1:] {
+		parts := strings.SplitN(field, "=", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			t.Fatalf("malformed summary field %q in %q", field, value)
+		}
+		result[parts[0]] = parts[1]
+	}
+	return result
 }
 
 func genericModelRegistryRepoRoot(t *testing.T) string {

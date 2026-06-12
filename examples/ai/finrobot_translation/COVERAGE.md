@@ -7,7 +7,7 @@ Baseline:
 - Leia branch: `codex/ai-dialect-polish` branch head.
 - FinRobot source: local `.external/FinRobot` checkout at `6a8161f`.
 - Translation directory: `examples/ai/finrobot_translation`.
-- Current translation directory file count: 865 files, including 53
+- Current translation directory file count: 866 files, including 53
   provider-free live-package skeleton directories and the upstream coverage
   ledger artifact.
 - Registered examples: 99 runnable/checkable examples discovered by
@@ -41,6 +41,12 @@ real provider clients, real document parsers, real chart/HTML/PDF renderers,
 real database/web orchestration, optional integrations, and broader
 notebook/tutorial parity.
 
+Structured gap status is also recorded in `gap_manifest.json`. That manifest
+keeps provider-free coverage, package hygiene exceptions, open production
+implementation gaps, and closed/non-gap guards in separate buckets. In
+particular, the package hygiene exceptions for `html_ui_snapshots` and
+`vendor_adapters` are `tracked_exception` records, not closed gaps.
+
 The generic AI dialect convergence items are no longer missing or planned
 FinRobot work. They are checked-in package boundaries under
 `live_packages/generic_*`, with manifests, contracts, fixtures, registered
@@ -61,7 +67,7 @@ The following read-only inventory commands were run from this worktree on
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `865` files |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `866` files |
 | `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `99` examples: `88` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
 | `find examples/ai/finrobot_translation/live_packages -mindepth 1 -maxdepth 1 -type d ...` | `53` live-package skeleton directories |
 | `find examples/ai/finrobot_translation/live_packages -path '*/fixtures/provider_free_fixture_index.json' -type f ...` | `52` provider-free fixture indexes |
@@ -70,7 +76,7 @@ The following read-only inventory commands were run from this worktree on
 | Same example inventory filtered to `/tutorial_parity/runnable/` | `13` registered tutorial parity examples |
 | `rg -n "generic\|AI dialect\|dialect\|planned\|missing\|guard\|semantic\|inventory" examples/ai/finrobot_translation/{COVERAGE.md,VERIFICATION.md,GAPS.md}` | Documentation semantic-guard search confirmed generic AI dialect status is documented as checked-in coverage, not planned or missing work |
 
-This refresh updated the file-inventory count to 865 `rg --files` inventory files. The registered
+This refresh updated the file-inventory count to 866 `rg --files` inventory files. The registered
 example, runner, live-package, generic live-package, and tutorial runnable
 counts now include the generic strategy backtest contracts package.
 
@@ -264,12 +270,27 @@ mistaken for missing language/runtime support.
 | Packaging/release | Installable external packages, dependency extras, cloud deployment smoke, artifact publish process | `setup.py`, requirements, Dockerfile, deploy scripts |
 | Tutorial parity | Live optional-provider execution and broader notebook artifact parity beyond the registered provider-free runnable tutorial examples | `tutorials_beginner/*`, `tutorials_advanced/*` |
 
+## Package Hygiene Exceptions
+
+`gap_manifest.json` records the current package hygiene exceptions as
+structured `tracked_exception` entries:
+
+| Exception | Package | Status | Why it is not closed |
+| --- | --- | --- | --- |
+| `FR-HYGIENE-001` | `html_ui_snapshots` | `tracked_exception` | Legacy skeleton manifest shape still needs migration to the current per-manifest `no_built_in_guarantee` field. |
+| `FR-HYGIENE-002` | `vendor_adapters` | `tracked_exception` | Earlier `manifest.json` shape still needs migration to the current package manifest shape. |
+
+Both exceptions remain guarded by the global live-package plan guarantee,
+provider-free defaults, disabled live network behavior, registered examples,
+and package manifest audit checks. They should not be counted as closed until
+the manifest-shape migration is complete.
+
 ## Provider-Free Slice Completion
 
 | Slice component | Evidence | Completion |
 | --- | --- | --- |
 | Registered example inventory | 99 registered examples under `examples/ai/finrobot_translation`; all runnable/checkable | Complete |
-| File inventory | 865 files in the translation directory, including checked-in live-package skeleton directories, status docs, and the upstream coverage ledger | Complete |
+| File inventory | 866 files in the translation directory, including checked-in live-package skeleton directories, status docs, the structured gap manifest, and the upstream coverage ledger | Complete |
 | Replay-backed AI workflows | 6 `llm-replay` examples with checked-in records for core agents, equity report, and quant experiments | Complete |
 | Host-VM contract examples | 88 `host-vm` examples for config, tools, schemas, API replay, reports, compliance, packaging, and live-package skeleton contracts | Complete |
 | Evaluate-runner examples | 5 `evaluate` examples for equity CLI workflow, web product smoke metadata, generic workflow orchestration, and generic agent-loop composition | Complete |

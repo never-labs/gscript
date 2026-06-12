@@ -34,6 +34,11 @@ changes.
 
 No `docs/spec/index.html` generation was run.
 
+Structured gap status verification includes `gap_manifest.json`. That manifest
+records package hygiene exceptions as `tracked_exception`, keeps production
+implementation work as `open`, and reserves `closed` for implemented generic
+dialect contracts or explicit non-gaps.
+
 ## Current Release-Gate Results
 
 The release gates below were rerun from this worktree on 2026-06-12 after the
@@ -55,7 +60,7 @@ Inventory and semantic-guard commands run on 2026-06-12 from
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `865` files |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `866` files |
 | `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `99` examples |
 | Same example inventory grouped by runner | `88` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
 | Same example inventory filtered to `/live_packages/` | `53` registered live-package examples, including the generic strategy backtest contracts package |
@@ -69,8 +74,11 @@ Inventory and semantic-guard commands run on 2026-06-12 from
 
 The inventory confirms the documented registered-example, runner,
 live-package, generic live-package, and tutorial runnable counts are current.
-The file-inventory count was refreshed to 865 `rg --files` inventory files. `AI_DIALECT_GAPS.md` is
+The file-inventory count was refreshed to 866 `rg --files` inventory files. `AI_DIALECT_GAPS.md` is
 absent in this worktree, so no AI-dialect gap document required updates.
+`gap_manifest.json` is present and is covered by the status-docs inventory test.
+Its package hygiene exception records for `html_ui_snapshots` and
+`vendor_adapters` remain `tracked_exception`, not closed.
 
 Semantic guard note: the recent generic AI boundary guard state is reflected
 here as checked-in package-owned surface, not as planned FinRobot work. The
@@ -256,7 +264,7 @@ go run ./cmd/leia check --no-docs --no-editor --no-examples .
 
 The FinRobot documentation inventory is aligned with the current
 `codex/ai-dialect-polish` surface: 99 registered runnable/checkable
-examples, 865 files in the translation directory, and 53 checked-in
+examples, 866 files in the translation directory, and 53 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
 FinRobot-only work. The current validation pass above did not generate

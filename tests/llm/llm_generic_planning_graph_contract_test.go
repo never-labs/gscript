@@ -2,11 +2,14 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 const genericPlanningGraphPackageDir = "examples/ai/finrobot_translation/live_packages/generic_planning_graph"
@@ -14,12 +17,20 @@ const genericPlanningGraphPackageDir = "examples/ai/finrobot_translation/live_pa
 type genericPlanningGraphContract struct {
 	SchemaVersion         int    `json:"schema_version"`
 	ID                    string `json:"id"`
+	PackageManifestID     string `json:"package_manifest_id"`
+	PackageName           string `json:"package_name"`
 	ProviderFree          bool   `json:"provider_free"`
 	DomainSpecific        bool   `json:"domain_specific"`
 	LiveNetwork           bool   `json:"live_network"`
 	LiveModel             bool   `json:"live_model"`
 	RealDependencyImports bool   `json:"real_dependency_imports"`
-	Semantics             struct {
+	SchemaRefs            struct {
+		PlanningGraph string `json:"planning_graph"`
+		PlanningTrace string `json:"planning_trace"`
+	} `json:"schema_refs"`
+	FixtureIndexRef string   `json:"fixture_index_ref"`
+	CapabilityRefs  []string `json:"capability_refs"`
+	Semantics       struct {
 		PlanNode struct {
 			RequiredFields  []string `json:"required_fields"`
 			AllowedNodeType []string `json:"allowed_node_types"`
@@ -64,6 +75,57 @@ type genericPlanningGraphContract struct {
 	AcceptanceGates []string `json:"acceptance_gates"`
 }
 
+type genericPlanningGraphManifest struct {
+	SchemaVersion               int               `json:"schema_version"`
+	ID                          string            `json:"id"`
+	PackageName                 string            `json:"package_name"`
+	ProviderFree                bool              `json:"provider_free"`
+	DomainSpecific              bool              `json:"domain_specific"`
+	LiveNetworkDefault          bool              `json:"live_network_default"`
+	LiveModelDefault            bool              `json:"live_model_default"`
+	RealDependencyImportDefault bool              `json:"real_dependency_import_default"`
+	Entrypoints                 map[string]string `json:"entrypoints"`
+	Schemas                     map[string]string `json:"schemas"`
+	Fixtures                    map[string]string `json:"fixtures"`
+	Capabilities                []string          `json:"capabilities"`
+	DefaultPolicy               struct {
+		Mode                        string `json:"mode"`
+		ProviderFree                bool   `json:"provider_free"`
+		LiveNetwork                 bool   `json:"live_network"`
+		LiveModel                   bool   `json:"live_model"`
+		ProviderCredentialsRequired bool   `json:"provider_credentials_required"`
+		RealDependencyImports       bool   `json:"real_dependency_imports"`
+		CleanSkipWithoutDependency  bool   `json:"clean_skip_without_dependency"`
+		FixtureHook                 string `json:"fixture_hook"`
+	} `json:"default_policy"`
+}
+
+type genericPlanningGraphFixtureIndex struct {
+	SchemaVersion         int      `json:"schema_version"`
+	ID                    string   `json:"id"`
+	ProviderFree          bool     `json:"provider_free"`
+	DomainSpecific        bool     `json:"domain_specific"`
+	LiveNetwork           bool     `json:"live_network"`
+	LiveModel             bool     `json:"live_model"`
+	RealDependencyImports bool     `json:"real_dependency_imports"`
+	PackageManifestID     string   `json:"package_manifest_id"`
+	ContractID            string   `json:"contract_id"`
+	Capabilities          []string `json:"capabilities"`
+	Fixtures              []struct {
+		ID                    string          `json:"id"`
+		Path                  string          `json:"path"`
+		SchemaRef             string          `json:"schema_ref"`
+		ContractID            string          `json:"contract_id"`
+		Capabilities          []string        `json:"capabilities"`
+		ProviderFree          bool            `json:"provider_free"`
+		LiveNetwork           bool            `json:"live_network"`
+		RealDependencyImports bool            `json:"real_dependency_imports"`
+		Metadata              map[string]bool `json:"metadata"`
+		Contract              string          `json:"contract"`
+		Covers                []string        `json:"covers"`
+	} `json:"fixtures"`
+}
+
 type genericPlanningGraphTraceFixture struct {
 	SchemaVersion         int    `json:"schema_version"`
 	FixtureKey            string `json:"fixture_key"`
@@ -103,6 +165,82 @@ type genericPlanningGraphTraceFixture struct {
 		MergeCount        int    `json:"merge_count"`
 		FinalStatus       string `json:"final_status"`
 	} `json:"summary"`
+}
+
+func TestGenericPlanningGraphLivePackageManifestContractAndFixtureIndexStayConsistent(t *testing.T) {
+	root := repoRoot(t)
+	manifest := loadGenericPlanningGraphManifest(t, root)
+	contract := loadGenericPlanningGraphContract(t, root)
+	index := loadGenericPlanningGraphFixtureIndex(t, root)
+
+	assertGenericPlanningGraphProviderFree(t, root, "package.manifest.json", manifest.ProviderFree, manifest.DomainSpecific, manifest.LiveNetworkDefault, manifest.LiveModelDefault, manifest.RealDependencyImportDefault)
+	assertGenericPlanningGraphProviderFree(t, root, "fixtures/provider_free_fixture_index.json", index.ProviderFree, index.DomainSpecific, index.LiveNetwork, index.LiveModel, index.RealDependencyImports)
+
+	if manifest.SchemaVersion != 1 || manifest.ID != "generic-planning-graph-live-package" || manifest.PackageName != "leia-generic-ai-planning-graph" {
+		t.Fatalf("manifest header mismatch: %#v", manifest)
+	}
+	if manifest.Entrypoints["smoke"] != "main.leia" || manifest.Entrypoints["main"] != "main.leia" {
+		t.Fatalf("manifest smoke/main entrypoints must both target main.leia: %#v", manifest.Entrypoints)
+	}
+	for _, rel := range []string{
+		manifest.Entrypoints["smoke"],
+		manifest.Entrypoints["planning_graph_contract"],
+		manifest.Entrypoints["trace_fixture"],
+		manifest.Entrypoints["fixture_index"],
+		manifest.Schemas["planning_graph"],
+		manifest.Schemas["planning_trace"],
+		manifest.Fixtures["index"],
+		manifest.Fixtures["trace"],
+	} {
+		assertGenericPlanningGraphPackageFileExists(t, root, rel)
+	}
+	if manifest.Entrypoints["planning_graph_contract"] != "contracts/planning_graph_contract.json" ||
+		manifest.Entrypoints["fixture_index"] != manifest.Fixtures["index"] ||
+		manifest.Entrypoints["trace_fixture"] != manifest.Fixtures["trace"] {
+		t.Fatalf("manifest entrypoints and fixture aliases diverged: entrypoints=%#v fixtures=%#v", manifest.Entrypoints, manifest.Fixtures)
+	}
+	if manifest.DefaultPolicy.Mode != "fixture_replay" ||
+		!manifest.DefaultPolicy.ProviderFree ||
+		manifest.DefaultPolicy.LiveNetwork ||
+		manifest.DefaultPolicy.LiveModel ||
+		manifest.DefaultPolicy.ProviderCredentialsRequired ||
+		manifest.DefaultPolicy.RealDependencyImports ||
+		!manifest.DefaultPolicy.CleanSkipWithoutDependency ||
+		manifest.DefaultPolicy.FixtureHook != "recorded_generic_planning_graph_fixture" {
+		t.Fatalf("manifest default policy must stay provider-free fixture replay: %#v", manifest.DefaultPolicy)
+	}
+
+	if contract.PackageManifestID != manifest.ID || contract.PackageName != manifest.PackageName {
+		t.Fatalf("contract does not point back to manifest/package: contract=%#v manifest=%#v", contract, manifest)
+	}
+	if contract.SchemaRefs.PlanningGraph != manifest.Schemas["planning_graph"] ||
+		contract.SchemaRefs.PlanningTrace != manifest.Schemas["planning_trace"] ||
+		contract.FixtureIndexRef != manifest.Fixtures["index"] {
+		t.Fatalf("contract refs diverge from manifest: schema_refs=%#v fixture_index=%q manifest=%#v", contract.SchemaRefs, contract.FixtureIndexRef, manifest)
+	}
+	assertGenericPlanningGraphStringSet(t, "manifest/contract capabilities", contract.CapabilityRefs, manifest.Capabilities)
+
+	if index.PackageManifestID != manifest.ID || index.ContractID != contract.ID {
+		t.Fatalf("fixture index header does not link manifest and contract: %#v", index)
+	}
+	assertGenericPlanningGraphStringSet(t, "fixture index capabilities", index.Capabilities, manifest.Capabilities)
+	if len(index.Fixtures) != 1 {
+		t.Fatalf("fixture index fixtures = %d, want 1", len(index.Fixtures))
+	}
+	fixture := index.Fixtures[0]
+	if fixture.ID != "planning_graph_trace" ||
+		fixture.Path != manifest.Fixtures["trace"] ||
+		fixture.SchemaRef != manifest.Schemas["planning_trace"] ||
+		fixture.Contract != manifest.Entrypoints["planning_graph_contract"] ||
+		fixture.ContractID != contract.ID {
+		t.Fatalf("fixture index trace entry diverges from manifest/contract: %#v", fixture)
+	}
+	if !fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports ||
+		!fixture.Metadata["provider_free"] || fixture.Metadata["live_network"] || fixture.Metadata["real_dependency_imports"] {
+		t.Fatalf("fixture index trace entry is not provider-free: %#v", fixture)
+	}
+	assertGenericPlanningGraphStringSet(t, "fixture index fixture capabilities", fixture.Capabilities, manifest.Capabilities)
+	assertGenericPlanningGraphStringSet(t, "fixture index semantic coverage", fixture.Covers, []string{"branch", "dependency", "merge", "plan_node", "retry", "trace_evidence"})
 }
 
 func TestGenericPlanningGraphContractCoversPlanDependencyRetryBranchMergeSemantics(t *testing.T) {
@@ -152,6 +290,59 @@ func TestGenericPlanningGraphContractCoversPlanDependencyRetryBranchMergeSemanti
 	if traceRefs["evt-expand-plan-attempt-1"] != "expand_plan" || traceRefs["evt-merge-checks-completed"] != "merge_checks" {
 		t.Fatalf("retry/merge trace evidence refs missing: %#v", traceRefs)
 	}
+}
+
+func TestGenericPlanningGraphSchemasRequireContractAndTraceEnvelope(t *testing.T) {
+	root := repoRoot(t)
+	graphSchema := loadGenericPlanningGraphSchema(t, root, "schemas/planning_graph.schema.json")
+	traceSchema := loadGenericPlanningGraphSchema(t, root, "schemas/planning_trace.schema.json")
+
+	assertGenericPlanningGraphRequiredContains(t, "planning graph root", graphSchema, []string{
+		"schema_version",
+		"id",
+		"package_manifest_id",
+		"package_name",
+		"provider_free",
+		"domain_specific",
+		"live_network",
+		"live_model",
+		"real_dependency_imports",
+		"schema_refs",
+		"fixture_index_ref",
+		"capability_refs",
+		"semantics",
+		"plan_nodes",
+		"edges",
+		"acceptance_gates",
+	})
+	graphProperties := genericPlanningGraphObject(t, graphSchema, "properties")
+	planNodes := genericPlanningGraphObject(t, graphProperties, "plan_nodes")
+	planNodeItems := genericPlanningGraphObject(t, planNodes, "items")
+	assertGenericPlanningGraphRequiredContains(t, "planning graph plan node items", planNodeItems, []string{"id", "node_type", "depends_on", "retry_policy", "trace_evidence"})
+	retryPolicy := genericPlanningGraphObject(t, genericPlanningGraphObject(t, planNodeItems, "properties"), "retry_policy")
+	assertGenericPlanningGraphRequiredContains(t, "planning graph retry policy", retryPolicy, []string{"max_attempts", "retryable", "backoff"})
+	edgeItems := genericPlanningGraphObject(t, genericPlanningGraphObject(t, graphProperties, "edges"), "items")
+	assertGenericPlanningGraphRequiredContains(t, "planning graph edge items", edgeItems, []string{"from", "to", "edge_type"})
+	semantics := genericPlanningGraphObject(t, graphProperties, "semantics")
+	assertGenericPlanningGraphRequiredContains(t, "planning graph semantics", semantics, []string{"plan_node", "dependency", "retry", "trace_evidence"})
+
+	assertGenericPlanningGraphRequiredContains(t, "planning trace root", traceSchema, []string{
+		"schema_version",
+		"fixture_key",
+		"contract_id",
+		"provider_free",
+		"domain_specific",
+		"live_network",
+		"live_model",
+		"real_dependency_imports",
+		"run_id",
+		"events",
+		"summary",
+	})
+	traceProperties := genericPlanningGraphObject(t, traceSchema, "properties")
+	eventItems := genericPlanningGraphObject(t, genericPlanningGraphObject(t, traceProperties, "events"), "items")
+	assertGenericPlanningGraphRequiredContains(t, "planning trace events", eventItems, []string{"trace_id", "event_id", "evidence_kind", "plan_node_id", "sequence", "status", "provider_free", "live_model"})
+	assertGenericPlanningGraphRequiredContains(t, "planning trace summary", genericPlanningGraphObject(t, traceProperties, "summary"), []string{"plan_node_count", "edge_count", "retry_attempt_count", "branch_count", "merge_count", "final_status"})
 }
 
 func TestGenericPlanningGraphTraceFixtureMatchesContractEvidence(t *testing.T) {
@@ -222,6 +413,52 @@ func TestGenericPlanningGraphTraceFixtureMatchesContractEvidence(t *testing.T) {
 	}
 }
 
+func TestGenericPlanningGraphMainLeiaSmokeExecutes(t *testing.T) {
+	root := repoRoot(t)
+	mainPath := filepath.Join(root, filepath.FromSlash(genericPlanningGraphPackageDir), "main.leia")
+	data, err := os.ReadFile(mainPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := strings.ToLower(string(data))
+	for _, forbidden := range []string{"import q", "q" + "/runtime", "$`", "$!`", "openai", "anthropic", "provider_sdk", "autogen", "finrobot"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("main.leia must stay provider-free and generic; found %q", forbidden)
+		}
+	}
+
+	vm := leia.New(leia.WithLibs(leia.LibAll), leia.WithVM())
+	if err := vm.ExecFile(mainPath); err != nil {
+		t.Fatalf("ExecFile main.leia: %v", err)
+	}
+	value, err := vm.Get("generic_planning_graph_live_package_summary")
+	if err != nil {
+		t.Fatalf("get smoke summary: %v", err)
+	}
+	summary := fmt.Sprint(value)
+	for _, want := range []string{
+		"generic_planning_graph_live_package",
+		"nodes=7",
+		"edges=7",
+		"trace_events=10",
+		"capabilities=6",
+		"provider_free=true",
+		"live_network=false",
+		"imports=false",
+	} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("smoke summary missing %q: %s", want, summary)
+		}
+	}
+}
+
+func loadGenericPlanningGraphManifest(t *testing.T, root string) genericPlanningGraphManifest {
+	t.Helper()
+	var manifest genericPlanningGraphManifest
+	readGenericPlanningGraphJSON(t, root, "package.manifest.json", &manifest)
+	return manifest
+}
+
 func loadGenericPlanningGraphContract(t *testing.T, root string) genericPlanningGraphContract {
 	t.Helper()
 	var contract genericPlanningGraphContract
@@ -229,11 +466,25 @@ func loadGenericPlanningGraphContract(t *testing.T, root string) genericPlanning
 	return contract
 }
 
+func loadGenericPlanningGraphFixtureIndex(t *testing.T, root string) genericPlanningGraphFixtureIndex {
+	t.Helper()
+	var index genericPlanningGraphFixtureIndex
+	readGenericPlanningGraphJSON(t, root, "fixtures/provider_free_fixture_index.json", &index)
+	return index
+}
+
 func loadGenericPlanningGraphTraceFixture(t *testing.T, root string) genericPlanningGraphTraceFixture {
 	t.Helper()
 	var fixture genericPlanningGraphTraceFixture
 	readGenericPlanningGraphJSON(t, root, "fixtures/planning_graph_trace_fixture.json", &fixture)
 	return fixture
+}
+
+func loadGenericPlanningGraphSchema(t *testing.T, root, rel string) map[string]any {
+	t.Helper()
+	var schema map[string]any
+	readGenericPlanningGraphJSON(t, root, rel, &schema)
+	return schema
 }
 
 func readGenericPlanningGraphJSON(t *testing.T, root, rel string, target any) {
@@ -245,6 +496,20 @@ func readGenericPlanningGraphJSON(t *testing.T, root, rel string, target any) {
 	}
 	if err := json.Unmarshal(data, target); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
+	}
+}
+
+func assertGenericPlanningGraphPackageFileExists(t *testing.T, root, rel string) {
+	t.Helper()
+	if rel == "" {
+		t.Fatal("empty package-relative path")
+	}
+	if filepath.IsAbs(rel) || strings.Contains(rel, "..") {
+		t.Fatalf("package path must be relative and scoped: %q", rel)
+	}
+	path := filepath.Join(root, filepath.FromSlash(genericPlanningGraphPackageDir), filepath.FromSlash(rel))
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("missing package file %s: %v", rel, err)
 	}
 }
 
@@ -273,6 +538,45 @@ func assertGenericPlanningGraphProviderFree(t *testing.T, root, rel string, prov
 			t.Fatalf("%s contains provider/domain marker %q", rel, forbidden)
 		}
 	}
+}
+
+func assertGenericPlanningGraphRequiredContains(t *testing.T, label string, object map[string]any, want []string) {
+	t.Helper()
+	rawRequired, ok := object["required"].([]any)
+	if !ok {
+		t.Fatalf("%s missing required array: %#v", label, object["required"])
+	}
+	got := make([]string, 0, len(rawRequired))
+	for _, value := range rawRequired {
+		field, ok := value.(string)
+		if !ok {
+			t.Fatalf("%s required contains non-string value: %#v", label, value)
+		}
+		got = append(got, field)
+	}
+	for _, field := range want {
+		if !genericPlanningGraphContains(got, field) {
+			t.Fatalf("%s required missing %q: %#v", label, field, got)
+		}
+	}
+}
+
+func genericPlanningGraphObject(t *testing.T, object map[string]any, key string) map[string]any {
+	t.Helper()
+	value, ok := object[key].(map[string]any)
+	if !ok {
+		t.Fatalf("object key %q is not an object: %#v", key, object[key])
+	}
+	return value
+}
+
+func genericPlanningGraphContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func assertGenericPlanningGraphAcyclic(t *testing.T, nodes map[string]struct {

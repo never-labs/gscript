@@ -12,6 +12,7 @@
       "mode": "deterministic_fixture_replay",
       "fixture_key": "model_registry:turn:analyst:ACME:v1",
       "replay_safe": true,
+      "live_network": false,
       "provider_credentials_required": false,
       "secret_values_present": false,
       "temperature": 0,
@@ -33,6 +34,7 @@
       "mode": "deterministic_fixture_replay",
       "fixture_key": "model_registry:turn:reviewer:ACME:v1",
       "replay_safe": true,
+      "live_network": false,
       "provider_credentials_required": false,
       "secret_values_present": false,
       "temperature": 0,
@@ -47,4 +49,3 @@
     }
   ]
 }
-

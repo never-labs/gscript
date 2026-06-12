@@ -400,6 +400,233 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 	}
 }
 
+func TestGenericToolContractsProjectionManifestContractFixtureRefsBidirectional(t *testing.T) {
+	contractsBase := genericToolContractsLivePackageDir(t)
+	registryBase := genericToolRegistryDir(t)
+	manifest := loadGenericToolContractsManifest(t, contractsBase)
+	registryManifest := loadGenericToolRegistryManifest(t, registryBase)
+	registryIndex := loadGenericToolRegistryFixtureIndex(t, registryBase)
+
+	manifestCapabilities := genericToolContractsCapabilitySet(manifest.Capabilities)
+	manifestSchemas := genericToolContractsValueSet(manifest.Schemas)
+	manifestFixtures := genericToolContractsValueSet(manifest.Fixtures)
+
+	var contract struct {
+		ArgumentValidation struct {
+			SchemaRef string `json:"schema_ref"`
+		} `json:"argument_validation"`
+		ResultEnvelope struct {
+			SchemaRef string `json:"schema_ref"`
+		} `json:"result_envelope"`
+		NormalizedError struct {
+			SchemaRef string `json:"schema_ref"`
+		} `json:"normalized_error"`
+		ArtifactRefs struct {
+			SchemaRef string `json:"schema_ref"`
+		} `json:"artifact_refs"`
+		Tools []struct {
+			CapabilityTags    []string `json:"capability_tags"`
+			ResultSchemaRef   string   `json:"result_schema_ref"`
+			ErrorSchemaRef    string   `json:"error_schema_ref"`
+			ArtifactSchemaRef string   `json:"artifact_schema_ref"`
+			FixtureKeys       []string `json:"fixture_keys"`
+		} `json:"tools"`
+	}
+	decodeGenericToolContractsJSONFile(t, filepath.Join(contractsBase, "contracts", "generic_tool_contract.json"), &contract)
+	for _, schemaRef := range []string{
+		contract.ArgumentValidation.SchemaRef,
+		contract.ResultEnvelope.SchemaRef,
+		contract.NormalizedError.SchemaRef,
+		contract.ArtifactRefs.SchemaRef,
+	} {
+		if !manifestSchemas[schemaRef] {
+			t.Fatalf("contract schema ref %q missing from generic tool contracts manifest schemas %#v", schemaRef, manifest.Schemas)
+		}
+	}
+
+	var fixtureIndex struct {
+		Fixtures []struct {
+			FixtureKey     string   `json:"fixture_key"`
+			Capability     string   `json:"capability"`
+			Path           string   `json:"path"`
+			Schema         string   `json:"schema"`
+			DialectExport  string   `json:"dialect_export"`
+			CapabilityTags []string `json:"capability_tags"`
+		} `json:"fixtures"`
+	}
+	decodeGenericToolContractsJSONFile(t, filepath.Join(contractsBase, "fixtures", "provider_free_fixture_index.json"), &fixtureIndex)
+	fixtureIndexByKey := map[string]struct {
+		Capability string
+		Path       string
+		Schema     string
+	}{}
+	for _, fixture := range fixtureIndex.Fixtures {
+		if !manifestCapabilities[fixture.Capability] {
+			t.Fatalf("fixture index capability %q missing from manifest capabilities %#v", fixture.Capability, manifest.Capabilities)
+		}
+		if !manifestCapabilities[fixture.DialectExport] {
+			t.Fatalf("fixture index dialect export %q missing from manifest capabilities %#v", fixture.DialectExport, manifest.Capabilities)
+		}
+		if !manifestFixtures[fixture.Path] {
+			t.Fatalf("fixture index path %q missing from manifest fixtures %#v", fixture.Path, manifest.Fixtures)
+		}
+		if fixture.Schema != "" && !manifestSchemas[fixture.Schema] {
+			t.Fatalf("fixture index schema %q missing from manifest schemas %#v", fixture.Schema, manifest.Schemas)
+		}
+		for _, tag := range fixture.CapabilityTags {
+			if !manifestCapabilities[tag] {
+				t.Fatalf("fixture index capability tag %q missing from manifest capabilities %#v", tag, manifest.Capabilities)
+			}
+		}
+		fixtureIndexByKey[fixture.FixtureKey] = struct {
+			Capability string
+			Path       string
+			Schema     string
+		}{
+			Capability: fixture.Capability,
+			Path:       fixture.Path,
+			Schema:     fixture.Schema,
+		}
+	}
+	for _, tool := range contract.Tools {
+		for _, tag := range tool.CapabilityTags {
+			if !manifestCapabilities[tag] {
+				t.Fatalf("contract tool capability tag %q missing from manifest capabilities %#v", tag, manifest.Capabilities)
+			}
+		}
+		for _, schemaRef := range []string{tool.ResultSchemaRef, tool.ErrorSchemaRef, tool.ArtifactSchemaRef} {
+			if !manifestSchemas[schemaRef] {
+				t.Fatalf("contract tool schema ref %q missing from manifest schemas %#v", schemaRef, manifest.Schemas)
+			}
+		}
+		for _, fixtureKey := range tool.FixtureKeys {
+			if fixtureIndexByKey[fixtureKey].Path == "" {
+				t.Fatalf("contract tool fixture key %q missing from fixture index", fixtureKey)
+			}
+		}
+	}
+
+	var projection struct {
+		FixtureKey        string `json:"fixture_key"`
+		ProjectionKind    string `json:"projection_kind"`
+		SourceFixtureRefs struct {
+			RegistryReadOnly        string `json:"registry_read_only"`
+			RegistryEffectfulDenied string `json:"registry_effectful_denied"`
+			ToolContract            string `json:"tool_contract"`
+		} `json:"source_fixture_refs"`
+		DescriptorProjections []struct {
+			SourceDescriptor struct {
+				ToolName         string   `json:"tool_name"`
+				CapabilityIDs    []string `json:"capability_ids"`
+				SourceFixtureKey string   `json:"source_fixture_key"`
+			} `json:"source_descriptor"`
+			ProjectedToolContract struct {
+				CapabilityTags    []string `json:"capability_tags"`
+				ResultSchemaRef   string   `json:"result_schema_ref"`
+				ErrorSchemaRef    string   `json:"error_schema_ref"`
+				ArtifactSchemaRef string   `json:"artifact_schema_ref"`
+			} `json:"projected_tool_contract"`
+			ProjectedInvokeRequest struct {
+				CapabilityTags []string `json:"capability_tags"`
+				ReplayKey      string   `json:"replay_key"`
+			} `json:"projected_invoke_request"`
+			ProjectedResultEnvelope struct {
+				Replay struct {
+					ReplayKey string `json:"replay_key"`
+				} `json:"replay"`
+			} `json:"projected_result_envelope"`
+			CapabilityMap []struct {
+				Source string `json:"source"`
+				Target string `json:"target"`
+			} `json:"capability_map"`
+		} `json:"descriptor_projections"`
+	}
+	projectionRel := manifest.Fixtures["registry_descriptor_projection"]
+	decodeGenericToolContractsJSONFile(t, filepath.Join(contractsBase, projectionRel), &projection)
+	if fixtureIndexByKey[projection.FixtureKey].Path != projectionRel {
+		t.Fatalf("projection fixture key %q path mismatch: index=%#v manifest=%q", projection.FixtureKey, fixtureIndexByKey[projection.FixtureKey], projectionRel)
+	}
+	if fixtureIndexByKey[projection.FixtureKey].Capability != "generic.ai.tool.contract.project_registry_descriptor" ||
+		fixtureIndexByKey[projection.FixtureKey].Schema != manifest.Schemas["tool_contract_projection"] {
+		t.Fatalf("projection fixture index entry does not match manifest capability/schema refs: %#v", fixtureIndexByKey[projection.FixtureKey])
+	}
+	if projection.ProjectionKind != "registry_descriptor_to_tool_contract" {
+		t.Fatalf("projection kind = %q", projection.ProjectionKind)
+	}
+	if filepath.Clean(projection.SourceFixtureRefs.ToolContract) != manifest.Entrypoints["generic_tool_contract"] {
+		t.Fatalf("projection tool contract ref %q does not mirror manifest entrypoint %q", projection.SourceFixtureRefs.ToolContract, manifest.Entrypoints["generic_tool_contract"])
+	}
+
+	registryCapabilities := map[string]string{}
+	for _, capability := range registryManifest.Capabilities {
+		registryCapabilities[capability.ID] = capability.Schema
+	}
+	registryFixtureByKey := map[string]struct {
+		Path      string
+		SchemaRef string
+	}{}
+	for _, fixture := range registryIndex.Fixtures {
+		registryFixtureByKey[fixture.FixtureKey] = struct {
+			Path      string
+			SchemaRef string
+		}{
+			Path:      fixture.Path,
+			SchemaRef: fixture.SchemaRef,
+		}
+	}
+	sourceRefByKey := map[string]string{
+		"generic_tool:invocation:trace:v1": projection.SourceFixtureRefs.RegistryReadOnly,
+		"generic_tool:approval:denied:v1":  projection.SourceFixtureRefs.RegistryEffectfulDenied,
+	}
+	for _, descriptorProjection := range projection.DescriptorProjections {
+		sourceKey := descriptorProjection.SourceDescriptor.SourceFixtureKey
+		registryEntry := registryFixtureByKey[sourceKey]
+		if registryEntry.Path == "" {
+			t.Fatalf("projection source fixture key %q missing from registry fixture index", sourceKey)
+		}
+		wantSourceRef := filepath.ToSlash(filepath.Join("..", "generic_tool_registry", registryEntry.Path))
+		if sourceRefByKey[sourceKey] != wantSourceRef {
+			t.Fatalf("projection source ref for %q = %q, want %q", sourceKey, sourceRefByKey[sourceKey], wantSourceRef)
+		}
+		sourceFixture := loadGenericToolRegistryFixture(t, filepath.Join(registryBase, filepath.FromSlash(registryEntry.Path)))
+		if sourceFixture.Trace.Provenance.FixtureKey != sourceKey ||
+			sourceFixture.Descriptor.ToolName != descriptorProjection.SourceDescriptor.ToolName {
+			t.Fatalf("projection source fixture %q does not round-trip to registry trace/descriptor: source=%#v projection=%#v", sourceKey, sourceFixture.Trace.Provenance, descriptorProjection.SourceDescriptor)
+		}
+		for _, capability := range descriptorProjection.SourceDescriptor.CapabilityIDs {
+			if registryCapabilities[capability] == "" {
+				t.Fatalf("projection source capability %q missing from registry manifest capabilities", capability)
+			}
+		}
+		for _, mapping := range descriptorProjection.CapabilityMap {
+			if registryCapabilities[mapping.Source] == "" {
+				t.Fatalf("projection capability map source %q missing from registry manifest capabilities", mapping.Source)
+			}
+			if !manifestCapabilities[mapping.Target] {
+				t.Fatalf("projection capability map target %q missing from contracts manifest capabilities", mapping.Target)
+			}
+		}
+		for _, tag := range append(descriptorProjection.ProjectedToolContract.CapabilityTags, descriptorProjection.ProjectedInvokeRequest.CapabilityTags...) {
+			if !manifestCapabilities[tag] {
+				t.Fatalf("projection capability tag %q missing from contracts manifest capabilities", tag)
+			}
+		}
+		for _, schemaRef := range []string{
+			descriptorProjection.ProjectedToolContract.ResultSchemaRef,
+			descriptorProjection.ProjectedToolContract.ErrorSchemaRef,
+			descriptorProjection.ProjectedToolContract.ArtifactSchemaRef,
+		} {
+			if !manifestSchemas[schemaRef] {
+				t.Fatalf("projection schema ref %q missing from contracts manifest schemas %#v", schemaRef, manifest.Schemas)
+			}
+		}
+		if descriptorProjection.ProjectedInvokeRequest.ReplayKey != sourceKey ||
+			descriptorProjection.ProjectedResultEnvelope.Replay.ReplayKey != sourceKey {
+			t.Fatalf("projection replay keys do not mirror source fixture key %q: %#v", sourceKey, descriptorProjection)
+		}
+	}
+}
+
 func TestGenericToolRegistryProjectsDescriptorToGenericToolContracts(t *testing.T) {
 	contractsBase := genericToolContractsLivePackageDir(t)
 	registryBase := genericToolRegistryDir(t)
@@ -715,6 +942,22 @@ func loadGenericToolContractsManifest(t *testing.T, base string) genericToolCont
 	var manifest genericToolContractsManifest
 	decodeGenericToolContractsJSONFile(t, filepath.Join(base, "package.manifest.json"), &manifest)
 	return manifest
+}
+
+func genericToolContractsCapabilitySet(capabilities []string) map[string]bool {
+	set := map[string]bool{}
+	for _, capability := range capabilities {
+		set[capability] = true
+	}
+	return set
+}
+
+func genericToolContractsValueSet(values map[string]string) map[string]bool {
+	set := map[string]bool{}
+	for _, value := range values {
+		set[value] = true
+	}
+	return set
 }
 
 func assertGenericToolContractsJSONFile(t *testing.T, path string) {

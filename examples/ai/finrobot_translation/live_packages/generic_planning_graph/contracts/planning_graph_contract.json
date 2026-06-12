@@ -1,11 +1,26 @@
 {
   "schema_version": 1,
   "id": "generic-planning-graph-contract-v1",
+  "package_manifest_id": "generic-planning-graph-live-package",
+  "package_name": "leia-generic-ai-planning-graph",
   "provider_free": true,
   "domain_specific": false,
   "live_network": false,
   "live_model": false,
   "real_dependency_imports": false,
+  "schema_refs": {
+    "planning_graph": "schemas/planning_graph.schema.json",
+    "planning_trace": "schemas/planning_trace.schema.json"
+  },
+  "fixture_index_ref": "fixtures/provider_free_fixture_index.json",
+  "capability_refs": [
+    "generic.planning.graph.define",
+    "generic.planning.node.classify",
+    "generic.planning.dependency.validate",
+    "generic.planning.retry.replay",
+    "generic.planning.branch.merge",
+    "generic.planning.trace.evidence"
+  ],
   "semantics": {
     "plan_node": {
       "required_fields": [

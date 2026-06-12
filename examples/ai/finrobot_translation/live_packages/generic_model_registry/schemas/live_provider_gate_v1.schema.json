@@ -26,7 +26,7 @@
     "live_smoke_contract"
   ],
   "properties": {
-    "schema_version": {"type": "integer"},
+    "schema_version": {"const": 1},
     "id": {"type": "string"},
     "capability": {"type": "string"},
     "provider_free": {"const": true},
@@ -59,6 +59,11 @@
         "record_replay_required_for_ci"
       ],
       "properties": {
+        "prompt": {"type": "string"},
+        "expected_text": {"type": "string"},
+        "max_tokens": {"type": "integer"},
+        "temperature": {"const": 0},
+        "timeout_seconds": {"type": "integer"},
         "record_replay_required_for_ci": {"const": true}
       }
     }

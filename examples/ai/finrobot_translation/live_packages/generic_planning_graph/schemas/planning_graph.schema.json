@@ -3,15 +3,102 @@
   "$id": "https://never-labs.dev/schemas/generic_ai/planning_graph.schema.json",
   "title": "generic planning graph",
   "type": "object",
-  "required": ["schema_version", "id", "provider_free", "plan_nodes", "edges"],
+  "required": ["schema_version", "id", "package_manifest_id", "package_name", "provider_free", "domain_specific", "live_network", "live_model", "real_dependency_imports", "schema_refs", "fixture_index_ref", "capability_refs", "semantics", "plan_nodes", "edges", "acceptance_gates"],
   "properties": {
     "schema_version": {"type": "integer", "const": 1},
     "id": {"type": "string"},
+    "package_manifest_id": {"type": "string"},
+    "package_name": {"type": "string"},
     "provider_free": {"type": "boolean", "const": true},
+    "domain_specific": {"type": "boolean", "const": false},
     "live_network": {"type": "boolean", "const": false},
+    "live_model": {"type": "boolean", "const": false},
     "real_dependency_imports": {"type": "boolean", "const": false},
-    "plan_nodes": {"type": "array", "items": {"type": "object"}},
-    "edges": {"type": "array", "items": {"type": "object"}}
+    "schema_refs": {
+      "type": "object",
+      "required": ["planning_graph", "planning_trace"],
+      "properties": {
+        "planning_graph": {"type": "string"},
+        "planning_trace": {"type": "string"}
+      }
+    },
+    "fixture_index_ref": {"type": "string"},
+    "capability_refs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "semantics": {
+      "type": "object",
+      "required": ["plan_node", "dependency", "retry", "trace_evidence"],
+      "properties": {
+        "plan_node": {
+          "type": "object",
+          "required": ["required_fields", "allowed_node_types"],
+          "properties": {
+            "required_fields": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "allowed_node_types": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        },
+        "dependency": {
+          "type": "object",
+          "required": ["required_fields", "allowed_edge_types", "acyclic"],
+          "properties": {
+            "required_fields": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "allowed_edge_types": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "acyclic": {"type": "boolean", "const": true}
+          }
+        },
+        "retry": {
+          "type": "object",
+          "required": ["required_fields", "provider_free", "allowed_backoff"],
+          "properties": {
+            "required_fields": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "provider_free": {"type": "boolean", "const": true},
+            "allowed_backoff": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        },
+        "trace_evidence": {
+          "type": "object",
+          "required": ["required_fields", "evidence_kinds"],
+          "properties": {
+            "required_fields": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "evidence_kinds": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        }
+      }
+    },
+    "plan_nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "node_type", "depends_on", "retry_policy", "trace_evidence"],
+        "properties": {
+          "id": {"type": "string"},
+          "node_type": {"type": "string"},
+          "depends_on": {"type": "array", "items": {"type": "string"}},
+          "retry_policy": {
+            "type": "object",
+            "required": ["max_attempts", "retryable", "backoff"],
+            "properties": {
+              "max_attempts": {"type": "integer", "minimum": 1},
+              "retryable": {"type": "boolean"},
+              "backoff": {"type": "string"}
+            }
+          },
+          "trace_evidence": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "edge_type"],
+        "properties": {
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "edge_type": {"type": "string"}
+        }
+      }
+    },
+    "acceptance_gates": {"type": "array", "items": {"type": "string"}, "minItems": 1}
   },
   "additionalProperties": true
 }

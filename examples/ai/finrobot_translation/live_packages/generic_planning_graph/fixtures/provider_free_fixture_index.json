@@ -6,11 +6,30 @@
   "live_network": false,
   "live_model": false,
   "real_dependency_imports": false,
+  "package_manifest_id": "generic-planning-graph-live-package",
+  "contract_id": "generic-planning-graph-contract-v1",
+  "capabilities": [
+    "generic.planning.graph.define",
+    "generic.planning.node.classify",
+    "generic.planning.dependency.validate",
+    "generic.planning.retry.replay",
+    "generic.planning.branch.merge",
+    "generic.planning.trace.evidence"
+  ],
   "fixtures": [
     {
       "id": "planning_graph_trace",
       "path": "fixtures/planning_graph_trace_fixture.json",
       "schema_ref": "schemas/planning_trace.schema.json",
+      "contract_id": "generic-planning-graph-contract-v1",
+      "capabilities": [
+        "generic.planning.graph.define",
+        "generic.planning.node.classify",
+        "generic.planning.dependency.validate",
+        "generic.planning.retry.replay",
+        "generic.planning.branch.merge",
+        "generic.planning.trace.evidence"
+      ],
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false,

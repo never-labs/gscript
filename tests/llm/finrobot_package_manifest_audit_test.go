@@ -402,6 +402,11 @@ func assertFinRobotAuditFixtureIndexCapabilities(t *testing.T, root, manifestPat
 	index := readJSONMap(t, indexPath)
 	manifestCapabilities := finrobotAuditStringSet(finrobotAuditCollectCapabilities(manifest))
 	plannedCapabilitySet := finrobotAuditStringSet(plannedCapabilities)
+	assertFinRobotFixtureIndexOfflineFlags(t, filepath.ToSlash(indexPath), index)
+	assertFinRobotFixtureIndexEntries(t, packageDir, indexPath, index)
+	if len(finrobotAuditFixtureIndexEntries(index)) == 0 {
+		t.Fatalf("%s has no fixture index entries", indexPath)
+	}
 	for _, capability := range finrobotAuditCollectCapabilityLists(index) {
 		assertFinRobotAuditNamespacedCapability(t, indexPath, capability)
 		if !manifestCapabilities[capability] {
@@ -426,6 +431,29 @@ func finrobotAuditFixtureIndexPath(manifest map[string]any) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func finrobotAuditFixtureIndexEntries(index map[string]any) []map[string]any {
+	fixtures, ok := index["fixtures"]
+	if !ok {
+		return nil
+	}
+	var entries []map[string]any
+	switch fixtures := fixtures.(type) {
+	case []any:
+		for _, raw := range fixtures {
+			if entry, ok := raw.(map[string]any); ok {
+				entries = append(entries, entry)
+			}
+		}
+	case map[string]any:
+		for _, raw := range fixtures {
+			if entry, ok := raw.(map[string]any); ok {
+				entries = append(entries, entry)
+			}
+		}
+	}
+	return entries
 }
 
 func finrobotAuditStringSet(values []string) map[string]bool {

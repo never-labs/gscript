@@ -40,6 +40,7 @@ type genericToolRegistryManifest struct {
 	Fixtures     map[string]string `json:"fixtures"`
 	Capabilities []struct {
 		ID               string `json:"id"`
+		CapabilityID     string `json:"capability_id"`
 		Schema           string `json:"schema"`
 		Default          string `json:"default"`
 		ApprovalRequired bool   `json:"approval_required"`
@@ -218,6 +219,130 @@ func TestGenericToolRegistryLivePackageFixtureIndex(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatalf("fixture index missing keys: %#v", want)
+	}
+}
+
+func TestGenericToolRegistryManifestContractFixtureTraceRefsBidirectional(t *testing.T) {
+	base := genericToolRegistryDir(t)
+	manifest := loadGenericToolRegistryManifest(t, base)
+	contract := genericToolRegistryContract{}
+	decodeGenericToolRegistryJSONFile(t, filepath.Join(base, "contracts", "tool_registry_contract.json"), &contract)
+	index := loadGenericToolRegistryFixtureIndex(t, base)
+
+	manifestSchemas := map[string]bool{}
+	for _, rel := range manifest.Schemas {
+		manifestSchemas[rel] = true
+	}
+	manifestFixtures := map[string]bool{}
+	for _, rel := range manifest.Fixtures {
+		manifestFixtures[rel] = true
+	}
+	manifestCapabilitySchema := map[string]string{}
+	manifestCapabilityApproval := map[string]bool{}
+	for _, capability := range manifest.Capabilities {
+		if capability.ID == "" || capability.CapabilityID != capability.ID {
+			t.Fatalf("manifest capability id/capability_id mismatch: %#v", capability)
+		}
+		if manifestCapabilitySchema[capability.ID] != "" {
+			t.Fatalf("duplicate manifest capability %q", capability.ID)
+		}
+		if !manifestSchemas[capability.Schema] {
+			t.Fatalf("manifest capability %q schema %q is not declared in manifest schemas %#v", capability.ID, capability.Schema, manifest.Schemas)
+		}
+		manifestCapabilitySchema[capability.ID] = capability.Schema
+		manifestCapabilityApproval[capability.ID] = capability.ApprovalRequired
+	}
+	if len(manifestCapabilitySchema) != len(contract.RequiredCapabilities) {
+		t.Fatalf("manifest capabilities and contract required capabilities differ: manifest=%#v contract=%#v", manifestCapabilitySchema, contract.RequiredCapabilities)
+	}
+	for _, capability := range contract.RequiredCapabilities {
+		if manifestCapabilitySchema[capability] == "" {
+			t.Fatalf("contract required capability %q missing from manifest capabilities", capability)
+		}
+	}
+	for _, schemaRef := range []string{contract.DescriptorContract.SchemaRef, contract.InvocationTraceContract.SchemaRef} {
+		if !manifestSchemas[schemaRef] {
+			t.Fatalf("contract schema ref %q missing from manifest schemas %#v", schemaRef, manifest.Schemas)
+		}
+	}
+	if !manifestFixtures[contract.InvocationTraceContract.FixtureRef] {
+		t.Fatalf("contract trace fixture ref %q missing from manifest fixtures %#v", contract.InvocationTraceContract.FixtureRef, manifest.Fixtures)
+	}
+	for _, edge := range contract.ApprovalEdges {
+		if edge.FixtureRef != "" && !manifestFixtures[edge.FixtureRef] {
+			t.Fatalf("approval edge %q fixture ref %q missing from manifest fixtures %#v", edge.ID, edge.FixtureRef, manifest.Fixtures)
+		}
+	}
+
+	indexByKey := map[string]struct {
+		Capability string
+		SchemaRef  string
+		Path       string
+		Status     string
+	}{}
+	for _, fixture := range index.Fixtures {
+		if manifestCapabilitySchema[fixture.Capability] == "" {
+			t.Fatalf("fixture index capability %q missing from manifest capabilities", fixture.Capability)
+		}
+		if fixture.SchemaRef != manifestCapabilitySchema[fixture.Capability] {
+			t.Fatalf("fixture index schema %q does not match manifest capability %q schema %q", fixture.SchemaRef, fixture.Capability, manifestCapabilitySchema[fixture.Capability])
+		}
+		if !manifestFixtures[fixture.Path] {
+			t.Fatalf("fixture index path %q missing from manifest fixtures %#v", fixture.Path, manifest.Fixtures)
+		}
+		if manifestCapabilityApproval[fixture.Capability] != (fixture.Status == "denied") && fixture.Capability == "generic.tool.approval.edge" {
+			t.Fatalf("approval fixture status does not mirror manifest approval requirement: %#v", fixture)
+		}
+		if indexByKey[fixture.FixtureKey].Capability != "" {
+			t.Fatalf("duplicate fixture key %q", fixture.FixtureKey)
+		}
+		indexByKey[fixture.FixtureKey] = struct {
+			Capability string
+			SchemaRef  string
+			Path       string
+			Status     string
+		}{
+			Capability: fixture.Capability,
+			SchemaRef:  fixture.SchemaRef,
+			Path:       fixture.Path,
+			Status:     fixture.Status,
+		}
+	}
+
+	seenTraceKeys := map[string]bool{}
+	for _, rel := range manifest.Fixtures {
+		if rel == "fixtures/provider_free_fixture_index.json" {
+			continue
+		}
+		fixture := loadGenericToolRegistryFixture(t, filepath.Join(base, filepath.FromSlash(rel)))
+		traceKey := fixture.Trace.Provenance.FixtureKey
+		indexEntry, ok := indexByKey[traceKey]
+		if !ok {
+			t.Fatalf("trace provenance fixture key %q missing from fixture index", traceKey)
+		}
+		if indexEntry.Path != rel {
+			t.Fatalf("trace provenance fixture key %q points to %q in index, want manifest fixture path %q", traceKey, indexEntry.Path, rel)
+		}
+		if indexEntry.SchemaRef != contract.InvocationTraceContract.SchemaRef {
+			t.Fatalf("trace fixture key %q schema ref = %q, want contract trace schema %q", traceKey, indexEntry.SchemaRef, contract.InvocationTraceContract.SchemaRef)
+		}
+		if !stringSliceContains(fixture.Trace.CapabilityIDs, indexEntry.Capability) {
+			t.Fatalf("trace %q missing indexed capability %q in trace capability ids %#v", traceKey, indexEntry.Capability, fixture.Trace.CapabilityIDs)
+		}
+		for _, capability := range append(fixture.Descriptor.CapabilityIDs, fixture.Trace.CapabilityIDs...) {
+			if manifestCapabilitySchema[capability] == "" {
+				t.Fatalf("fixture %q capability %q missing from manifest capabilities", traceKey, capability)
+			}
+			if !stringSliceContains(contract.RequiredCapabilities, capability) {
+				t.Fatalf("fixture %q capability %q missing from contract required capabilities %#v", traceKey, capability, contract.RequiredCapabilities)
+			}
+		}
+		seenTraceKeys[traceKey] = true
+	}
+	for key, entry := range indexByKey {
+		if entry.SchemaRef == contract.InvocationTraceContract.SchemaRef && !seenTraceKeys[key] {
+			t.Fatalf("trace schema fixture index key %q did not round-trip from fixture provenance", key)
+		}
 	}
 }
 
@@ -475,6 +600,13 @@ func loadGenericToolRegistryManifest(t *testing.T, base string) genericToolRegis
 	var manifest genericToolRegistryManifest
 	decodeGenericToolRegistryJSONFile(t, filepath.Join(base, "package.manifest.json"), &manifest)
 	return manifest
+}
+
+func loadGenericToolRegistryFixtureIndex(t *testing.T, base string) genericToolRegistryFixtureIndex {
+	t.Helper()
+	var index genericToolRegistryFixtureIndex
+	decodeGenericToolRegistryJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
+	return index
 }
 
 func loadGenericToolRegistryFixture(t *testing.T, path string) genericToolRegistryFixture {

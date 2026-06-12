@@ -12,6 +12,7 @@
   "fixture_root": "fixtures",
   "contract_root": "contracts",
   "entrypoints": {
+    "smoke": "main.leia",
     "main": "main.leia",
     "planning_graph_contract": "contracts/planning_graph_contract.json",
     "trace_fixture": "fixtures/planning_graph_trace_fixture.json",

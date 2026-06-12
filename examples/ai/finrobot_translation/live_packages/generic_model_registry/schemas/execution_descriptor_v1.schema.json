@@ -6,6 +6,7 @@
     "schema_version",
     "id",
     "provider_free",
+    "live_network",
     "descriptors"
   ],
   "properties": {
@@ -34,8 +35,10 @@
           "mode",
           "fixture_key",
           "replay_safe",
+          "live_network",
           "provider_credentials_required",
           "secret_values_present",
+          "temperature",
           "capability_flags",
           "redaction_policy_ref"
         ],
@@ -61,6 +64,9 @@
           "replay_safe": {
             "const": true
           },
+          "live_network": {
+            "const": false
+          },
           "provider_credentials_required": {
             "const": false
           },
@@ -72,6 +78,7 @@
           },
           "capability_flags": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "type": "string"
             }
@@ -84,4 +91,3 @@
     }
   }
 }
-

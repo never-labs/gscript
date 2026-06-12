@@ -3,15 +3,46 @@
   "$id": "https://never-labs.dev/schemas/generic_ai/planning_trace.schema.json",
   "title": "generic planning trace",
   "type": "object",
-  "required": ["schema_version", "fixture_key", "provider_free", "events", "summary"],
+  "required": ["schema_version", "fixture_key", "contract_id", "provider_free", "domain_specific", "live_network", "live_model", "real_dependency_imports", "run_id", "events", "summary"],
   "properties": {
     "schema_version": {"type": "integer", "const": 1},
     "fixture_key": {"type": "string"},
+    "contract_id": {"type": "string"},
     "provider_free": {"type": "boolean", "const": true},
+    "domain_specific": {"type": "boolean", "const": false},
     "live_network": {"type": "boolean", "const": false},
+    "live_model": {"type": "boolean", "const": false},
     "real_dependency_imports": {"type": "boolean", "const": false},
-    "events": {"type": "array", "items": {"type": "object"}},
-    "summary": {"type": "object"}
+    "run_id": {"type": "string"},
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trace_id", "event_id", "evidence_kind", "plan_node_id", "sequence", "status", "provider_free", "live_model"],
+        "properties": {
+          "trace_id": {"type": "string"},
+          "event_id": {"type": "string"},
+          "evidence_kind": {"type": "string"},
+          "plan_node_id": {"type": "string"},
+          "sequence": {"type": "integer", "minimum": 1},
+          "status": {"type": "string"},
+          "provider_free": {"type": "boolean", "const": true},
+          "live_model": {"type": "boolean", "const": false}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["plan_node_count", "edge_count", "retry_attempt_count", "branch_count", "merge_count", "final_status"],
+      "properties": {
+        "plan_node_count": {"type": "integer", "minimum": 1},
+        "edge_count": {"type": "integer", "minimum": 1},
+        "retry_attempt_count": {"type": "integer", "minimum": 0},
+        "branch_count": {"type": "integer", "minimum": 0},
+        "merge_count": {"type": "integer", "minimum": 0},
+        "final_status": {"type": "string"}
+      }
+    }
   },
   "additionalProperties": true
 }

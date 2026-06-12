@@ -1,12 +1,42 @@
 package leia_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+type finrobotGapManifest struct {
+	SchemaVersion            int    `json:"schema_version"`
+	ID                       string `json:"id"`
+	PackageHygieneExceptions []struct {
+		ID              string   `json:"id"`
+		PackageID       string   `json:"package_id"`
+		Source          string   `json:"source"`
+		ExceptionKind   string   `json:"exception_kind"`
+		Status          string   `json:"status"`
+		Reason          string   `json:"reason"`
+		Guardrails      []string `json:"guardrails"`
+		NotClosedReason string   `json:"not_closed_reason"`
+	} `json:"package_hygiene_exceptions"`
+	OpenProductionGaps []struct {
+		ID      string `json:"id"`
+		Area    string `json:"area"`
+		Status  string `json:"status"`
+		Summary string `json:"summary"`
+	} `json:"open_production_gaps"`
+	ClosedOrNonGapGuards []struct {
+		ID      string `json:"id"`
+		Status  string `json:"status"`
+		Kind    string `json:"kind"`
+		Summary string `json:"summary"`
+	} `json:"closed_or_non_gap_guards"`
+	DocumentedIn []string `json:"documented_in"`
+	Verification []string `json:"verification"`
+}
 
 func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 	root := repoRoot(t)
@@ -53,17 +83,26 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 			fmt.Sprintf("%d\n  provider-free live-package skeleton directories", liveSkeletons),
 			fmt.Sprintf("%d live-package skeletons use", providerFreeFixtureIndexes),
 			fmt.Sprintf("`%d` registered generic AI live-package examples", genericSkeletons),
+			"gap_manifest.json",
+			"FR-HYGIENE-001",
+			"tracked_exception",
 		},
 		"examples/ai/finrobot_translation/VERIFICATION.md": {
 			fmt.Sprintf("%d files", files),
 			fmt.Sprintf("`%d` registered live-package examples", liveSkeletons),
 			fmt.Sprintf("`%d` registered generic AI live-package examples", genericSkeletons),
 			fmt.Sprintf("`%d` provider-free fixture indexes", providerFreeFixtureIndexes),
+			"gap_manifest.json",
+			"tracked_exception",
 		},
 		"examples/ai/finrobot_translation/GAPS.md": {
 			fmt.Sprintf("%d registered examples", len(examples)),
 			fmt.Sprintf("%d checked-in live-package skeleton directories", liveSkeletons),
 			"no open generic AI dialect gap",
+			"gap_manifest.json",
+			"FR-HYGIENE-001",
+			"FR-HYGIENE-002",
+			"tracked exceptions",
 		},
 	}
 	for rel, expected := range docs {
@@ -124,6 +163,68 @@ func TestFinRobotStatusDocsMatchCurrentInventory(t *testing.T) {
 	}
 }
 
+func TestFinRobotGapManifestTracksPackageHygieneExceptions(t *testing.T) {
+	root := repoRoot(t)
+	manifest := loadFinRobotGapManifest(t, root)
+	if manifest.SchemaVersion != 1 || manifest.ID != "finrobot-ai-dialect-gap-manifest" {
+		t.Fatalf("gap manifest header = schema %d id %q", manifest.SchemaVersion, manifest.ID)
+	}
+	if len(manifest.PackageHygieneExceptions) != 2 {
+		t.Fatalf("package_hygiene_exceptions = %d, want 2", len(manifest.PackageHygieneExceptions))
+	}
+	wantPackages := map[string]string{
+		"FR-HYGIENE-001": "html_ui_snapshots",
+		"FR-HYGIENE-002": "vendor_adapters",
+	}
+	for _, exception := range manifest.PackageHygieneExceptions {
+		if wantPackages[exception.ID] != exception.PackageID {
+			t.Fatalf("unexpected package hygiene exception: %#v", exception)
+		}
+		if exception.Status != "tracked_exception" {
+			t.Fatalf("%s status = %q, want tracked_exception", exception.ID, exception.Status)
+		}
+		if strings.EqualFold(exception.Status, "closed") {
+			t.Fatalf("%s must not be marked closed", exception.ID)
+		}
+		if exception.Source != "package_manifest_audit/ledger.json" ||
+			exception.ExceptionKind == "" ||
+			exception.Reason == "" ||
+			exception.NotClosedReason == "" ||
+			len(exception.Guardrails) < 4 {
+			t.Fatalf("%s has incomplete hygiene tracking: %#v", exception.ID, exception)
+		}
+	}
+	if len(manifest.OpenProductionGaps) == 0 {
+		t.Fatal("gap_manifest.json must keep real production gaps visible")
+	}
+	for _, gap := range manifest.OpenProductionGaps {
+		if gap.Status != "open" {
+			t.Fatalf("%s production gap status = %q, want open", gap.ID, gap.Status)
+		}
+		if gap.Area == "" || gap.Summary == "" {
+			t.Fatalf("%s has incomplete production gap tracking: %#v", gap.ID, gap)
+		}
+	}
+	allowedGuardStatus := map[string]bool{"closed": true, "non_gap": true}
+	for _, guard := range manifest.ClosedOrNonGapGuards {
+		if !allowedGuardStatus[guard.Status] {
+			t.Fatalf("%s guard status = %q", guard.ID, guard.Status)
+		}
+	}
+	for _, rel := range []string{
+		"examples/ai/finrobot_translation/GAPS.md",
+		"examples/ai/finrobot_translation/COVERAGE.md",
+		"examples/ai/finrobot_translation/VERIFICATION.md",
+	} {
+		text := readFinRobotStatusDoc(t, root, rel)
+		for _, want := range []string{"gap_manifest.json", "tracked_exception"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("%s missing structured gap manifest phrase %q", rel, want)
+			}
+		}
+	}
+}
+
 func finrobotTranslationFileCount(t *testing.T, root string) int {
 	t.Helper()
 	count := 0
@@ -140,4 +241,27 @@ func finrobotTranslationFileCount(t *testing.T, root string) int {
 		t.Fatal(err)
 	}
 	return count
+}
+
+func loadFinRobotGapManifest(t *testing.T, root string) finrobotGapManifest {
+	t.Helper()
+	path := filepath.Join(root, "examples", "ai", "finrobot_translation", "gap_manifest.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest finrobotGapManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("decode gap_manifest.json: %v", err)
+	}
+	return manifest
+}
+
+func readFinRobotStatusDoc(t *testing.T, root, rel string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
