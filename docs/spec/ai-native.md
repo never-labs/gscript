@@ -691,6 +691,20 @@ relative reference strings, but they must not open fixture files, resolve paths,
 read schemas, scan package directories, require a specific filename, or embed a
 project-specific package layout.
 
+`llm.provider_free_package_contract(spec, opts)` normalizes package boundary
+metadata into an ordinary table with `kind: "provider_free_package_contract"`,
+`schema_version: 1`, `version: "provider_free_package_contract.v1"`,
+`package_id`, `package_name`, provider-free/offline flags, `default_policy`,
+`credentials`, entrypoint/schema/fixture/capability counts, and `summary`.
+`llm.validate_package_contract(contract, opts)` returns a gate table with
+`ok`, `status`, `result_status`, `finding_count`, `findings`, and `summary`.
+
+Package contract helpers must remain metadata-only. They may validate offline
+defaults, credential-free policy, empty required credential refs, optional
+fixture-index references, and safe relative reference strings, but they must
+not load package files, resolve directories, read schemas, require a specific
+entrypoint name, or embed a project-specific package layout.
+
 Scripts may validate trace evidence without a host trace sink.
 `llm.trace_summary(envelope_or_events)` returns deterministic event counts,
 ordered event types, replay keys, status counts, and ordering/correlation

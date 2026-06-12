@@ -434,6 +434,23 @@ func (b *llmLibBuilder) registerSchemaHelpers() {
 	}
 	b.set("report_artifact_contract", reportArtifactContract)
 	b.set("reportArtifactContract", reportArtifactContract)
+	packageContract := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.provider_free_package_contract' (package contract table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.provider_free_package_contract' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmProviderFreePackageContractValue(args[0].Table(), opts))}, nil
+	}
+	b.set("provider_free_package_contract", packageContract)
+	b.set("providerFreePackageContract", packageContract)
+	b.set("package_contract", packageContract)
+	b.set("packageContract", packageContract)
 }
 
 func (b *llmLibBuilder) registerValidationHelpers() {
@@ -469,6 +486,21 @@ func (b *llmLibBuilder) registerValidationHelpers() {
 	}
 	b.set("validate_output", validateOutput)
 	b.set("validateOutput", validateOutput)
+	validatePackageContract := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.validate_package_contract' (package contract table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.validate_package_contract' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmValidatePackageContractValue(args[0].Table(), opts))}, nil
+	}
+	b.set("validate_package_contract", validatePackageContract)
+	b.set("validatePackageContract", validatePackageContract)
 }
 
 func (b *llmLibBuilder) registerRuntimeHelpers() {
