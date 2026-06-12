@@ -669,11 +669,31 @@ func qPipelineRuntimePrimitiveCandidate(src string) bool {
 	if name, args, ok := qPipelineRuntimePrimitiveCall(src); ok {
 		return qPipelineRuntimePrimitiveCallArity(name, len(args))
 	}
+	if qPipelineDyadicWordShadowedByEarlierSplit(src) {
+		return false
+	}
 	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
 		left, right, ok := splitTopLevelWord(src, word)
 		if ok && qPipelineRuntimeDyadicPrimitiveOperands(word, left, right) {
 			return true
 		}
+	}
+	return false
+}
+
+// qPipelineDyadicWordShadowedByEarlierSplit reports whether s.eval would
+// split src at a probe that precedes its dyadic word map (composite
+// compares, match, find/roll, postfix symbol lookup). A dyadic-primitive
+// word plan for such a statement would claim a split position the string
+// evaluator never takes (`0~cov""` splits at `~`, not at `cov`).
+func qPipelineDyadicWordShadowedByEarlierSplit(src string) bool {
+	for _, op := range []string{"<>", "<=", ">=", "~", "?"} {
+		if _, _, ok := splitTopLevelOperator(src, op); ok {
+			return true
+		}
+	}
+	if _, _, ok := findPostfixLookup(src); ok {
+		return true
 	}
 	return false
 }
@@ -705,6 +725,9 @@ func buildQPipelineRuntimePrimitivePlan(src string) (qPipelinePlan, bool) {
 		default:
 			return qPipelinePlan{}, false
 		}
+	}
+	if qPipelineDyadicWordShadowedByEarlierSplit(src) {
+		return qPipelinePlan{}, false
 	}
 	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
 		left, right, ok := splitTopLevelWord(src, word)
