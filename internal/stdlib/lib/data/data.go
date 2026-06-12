@@ -5034,15 +5034,7 @@ func compareMask(array Array, op Op, value any) (Array, error) {
 			if !ok {
 				return nil, fmt.Errorf("compare mask row %d out of range", row)
 			}
-			eq := IsNull(v)
-			switch op {
-			case OpEQ:
-				out[row] = eq
-			case OpNE:
-				out[row] = !eq
-			default:
-				out[row] = false
-			}
+			out[row] = nullOrderedCompare(op, IsNull(v), true)
 		}
 		return newBoolTrusted(out), nil
 	}
@@ -5056,7 +5048,7 @@ func compareMask(array Array, op Op, value any) (Array, error) {
 			return nil, fmt.Errorf("compare mask row %d out of range", row)
 		}
 		if IsNull(v) {
-			out[row] = op == OpNE
+			out[row] = nullOrderedCompare(op, true, false)
 			continue
 		}
 		result, err := ApplyBinary(op, v, value)
@@ -8470,7 +8462,7 @@ func ApplyBinary(op Op, left, right any) (any, error) {
 		case OpAdd, OpSub, OpMul, OpDiv, OpMod:
 			return promotedNullForBinary(left, right), nil
 		case OpLT, OpLE, OpGT, OpGE:
-			return false, nil
+			return nullOrderedCompare(op, IsNull(left), IsNull(right)), nil
 		}
 	}
 	if cmp, ok := compareSameKind(left, right); ok {
@@ -13534,6 +13526,28 @@ func compareBool(left, right bool) int {
 		return -1
 	default:
 		return 1
+	}
+}
+
+// nullOrderedCompare reports the canonical q result of a comparison when at
+// least one operand is null: null sorts before every value and equals itself
+// (0N<1 -> 1b, 1<=0N -> 0b, 0N>=0N -> 1b, 0N=0N -> 1b).
+func nullOrderedCompare(op Op, leftNull, rightNull bool) bool {
+	switch op {
+	case OpEQ:
+		return leftNull && rightNull
+	case OpNE:
+		return leftNull != rightNull
+	case OpLT:
+		return leftNull && !rightNull
+	case OpGT:
+		return !leftNull && rightNull
+	case OpLE:
+		return leftNull
+	case OpGE:
+		return rightNull
+	default:
+		return false
 	}
 }
 

@@ -7,8 +7,10 @@ package benchmarks
 // Semantics encoded here were verified against the live evaluator:
 //   - sum (+/) and avg skip nulls for every numeric element kind
 //   - elementwise arithmetic propagates nulls (0Nh+1 -> 0N, typed)
-//   - <, >, within treat null operands as false; <> treats null-vs-value as
-//     true; =0N matches nulls; null verb flags them
+//   - ordered compares follow canonical q null semantics: null sorts before
+//     every value (0N<x is true for non-null x; 0N>x, x within a b with null
+//     x are false); <> treats null-vs-value as true; =0N matches nulls; null
+//     verb flags them
 //   - all integer arithmetic promotes to long; any float operand promotes the
 //     result to float64 (real+real is float64, not real)
 //   - boolean vectors are not numeric operands (+/mask and mask+1 error), so
@@ -209,13 +211,15 @@ func qTypeMatrixLongDivModNullSum(v []int64, n []bool, div int64, useDiv bool) (
 func qTypeMatrixShortGatherCompare(v []int16, n []bool, threshold int16, greater bool) (int64, int64) {
 	var sum, count int64
 	for i := range v {
-		if n[i] {
-			continue
-		}
 		hit := false
-		if greater {
+		switch {
+		case n[i]:
+			// Canonical q: null sorts before every value, so null<t hits
+			// and null>t misses for a non-null threshold.
+			hit = !greater
+		case greater:
 			hit = v[i] > threshold
-		} else {
+		default:
 			hit = v[i] < threshold
 		}
 		if hit {
@@ -230,13 +234,15 @@ func qTypeMatrixShortGatherCompare(v []int16, n []bool, threshold int16, greater
 func qTypeMatrixIntGatherCompare(v []int32, n []bool, threshold int32, greater bool) (int64, int64) {
 	var sum, count int64
 	for i := range v {
-		if n[i] {
-			continue
-		}
 		hit := false
-		if greater {
+		switch {
+		case n[i]:
+			// Canonical q: null sorts before every value, so null<t hits
+			// and null>t misses for a non-null threshold.
+			hit = !greater
+		case greater:
 			hit = v[i] > threshold
-		} else {
+		default:
 			hit = v[i] < threshold
 		}
 		if hit {

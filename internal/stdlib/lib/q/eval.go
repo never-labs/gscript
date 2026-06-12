@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"path"
 	"reflect"
@@ -663,7 +664,16 @@ type EvalState struct {
 	deferScanAssignments map[string]bool
 	assignPool           qAssignPool
 	scriptDepth          int
+	// rng backs the nondeterministic roll/deal (`x?y`) and `rand` verbs.
+	// It is lazily seeded with qDefaultRandSeed so a fresh session is
+	// reproducible (q's \S analog: a fixed default seed, settable later);
+	// within one session successive draws advance the stream.
+	rng *rand.Rand
 }
+
+// qDefaultRandSeed is the fixed default PRNG seed for roll/deal/rand,
+// mirroring q's deterministic default \S seed.
+const qDefaultRandSeed int64 = 0x5EED
 
 const qGlobalScriptPlanCacheLimit = 512
 const qGlobalPipelinePlanCacheLimit = 512
@@ -735,13 +745,76 @@ func EvalSourceCacheable(src string) bool {
 	}
 	uncacheable := []string{
 		".z.", "hopen", "hsym", "set ", "get ", "`:", "system ",
+		// Name-targeted mutation verbs change session state per call.
+		"insert", "upsert",
 	}
 	for _, marker := range uncacheable {
 		if strings.Contains(lower, marker) {
 			return false
 		}
 	}
+	// Roll/deal (`x?y`) and `rand` are nondeterministic: their results must
+	// never be memoized across evals.
+	if qSourceHasRandomVerb(src) {
+		return false
+	}
 	return true
+}
+
+// qSourceHasRandomVerb conservatively reports whether src may invoke the
+// nondeterministic roll/deal (`x?y` with an atom LHS) or `rand` verbs. Any
+// dyadic `?` counts unless it is the functional query prefix `?[...]` or a
+// prefix `?x` distinct; the textual scan cannot know whether a name LHS is an
+// integer atom, so vector-LHS find expressions are also (safely) excluded
+// from memoization.
+func qSourceHasRandomVerb(src string) bool {
+	scan := qEvalCacheScanText(src)
+	for i := 0; i < len(scan); i++ {
+		ch := scan[i]
+		if ch == '`' {
+			i = qSymbolLiteralEnd(scan, i) - 1
+			continue
+		}
+		if ch == '?' {
+			// Functional query `?[t;...]` is deterministic.
+			j := i + 1
+			for j < len(scan) && isQWhitespace(scan[j]) {
+				j++
+			}
+			if j < len(scan) && scan[j] == '[' {
+				continue
+			}
+			// Prefix `?x` distinct: `?` at expression start.
+			k := i - 1
+			for k >= 0 && isQWhitespace(scan[k]) {
+				k--
+			}
+			if k < 0 {
+				continue
+			}
+			switch scan[k] {
+			case '(', ';', '[', ',', '!', '+', '-', '*', '%', '&', '|', '^', '=', '<', '>', ':', '#', '_', '@', '~':
+				continue
+			}
+			return true
+		}
+		if isQIdentStart(ch) {
+			start := i
+			j := i
+			for j < len(scan) && isQIdentByte(scan[j]) {
+				j++
+			}
+			word := scan[start:j]
+			i = j - 1
+			if start > 0 && isQIdentByte(scan[start-1]) {
+				continue
+			}
+			if word == "rand" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // qEvalConstantWords lists identifier tokens that keep an expression
@@ -796,6 +869,11 @@ func qEvalConstantStatementSource(src string) bool {
 			// Numeric type suffixes (10f, 0N, 0w) ride directly on a digit.
 			if start > 0 && scan[start-1] >= '0' && scan[start-1] <= '9' {
 				continue
+			}
+			if word == "rand" {
+				// Nondeterministic: never constant-memoizable, even if a
+				// verb registry entry exists.
+				return false
 			}
 			if _, ok := qEvalConstantWords[word]; ok {
 				continue
@@ -1383,6 +1461,10 @@ func qScriptBindingPlanTextEligible(src string) bool {
 	if strings.ContainsAny(src, "`'\\\"") {
 		return false
 	}
+	// Nondeterministic roll/deal/rand must not enter cached binding plans.
+	if qSourceHasRandomVerb(src) {
+		return false
+	}
 	for _, marker := range []string{"0W", "0w", "0N", "0n"} {
 		if strings.Contains(src, marker) {
 			return false
@@ -1436,6 +1518,11 @@ func cachedValueExprTextEligible(src string) bool {
 		return true
 	}
 	if strings.ContainsAny(src, "`'\\/$\"") {
+		return false
+	}
+	// Nondeterministic roll/deal/rand must not enter the cached value-expr
+	// (compiled statement) route.
+	if qSourceHasRandomVerb(src) {
 		return false
 	}
 	if strings.Contains(src, "0W") || strings.Contains(src, "0w") {
@@ -2690,6 +2777,9 @@ func (s *EvalState) eval(src string) (any, error) {
 			return syms[0], nil
 		}
 	}
+	if out, handled, err := s.evalNamedInsertUpsert(src); handled || err != nil {
+		return out, err
+	}
 	if strings.HasPrefix(src, "@[") {
 		if value, ok, err := s.evalApplyIndexForm(src); ok || err != nil {
 			return value, err
@@ -2720,10 +2810,15 @@ func (s *EvalState) eval(src string) (any, error) {
 	}
 	if callableExpr, adverb, rightExpr, ok := s.findCallablePostfixAdverb(src); ok {
 		callable, err := s.eval(callableExpr)
-		if err != nil {
-			return nil, err
-		}
-		if !isCallable(callable) {
+		if err != nil || !isCallable(callable) {
+			// `seed f/ x` (do/while-iterate or seeded fold): the text left of
+			// the adverb is a seed expression followed by a callable term.
+			if out, handled, err2 := s.tryEvalSeededAdverbInfix(callableExpr, adverb, rightExpr); handled || err2 != nil {
+				return out, err2
+			}
+			if err != nil {
+				return nil, err
+			}
 			return nil, fmt.Errorf("left side of callable adverb is not callable")
 		}
 		if strings.HasPrefix(rightExpr, "[") && enclosed(rightExpr, '[', ']') {
@@ -2802,6 +2897,13 @@ func (s *EvalState) eval(src string) (any, error) {
 	if strings.HasPrefix(src, "get ") {
 		return s.evalGet(strings.TrimSpace(src[len("get "):]))
 	}
+	if strings.HasPrefix(src, "rand ") {
+		right, err := s.eval(strings.TrimSpace(src[len("rand "):]))
+		if err != nil {
+			return nil, err
+		}
+		return s.evalRand(right)
+	}
 	if strings.HasPrefix(src, "hopen ") {
 		return s.evalHopen(strings.TrimSpace(src[len("hopen "):]))
 	}
@@ -2873,6 +2975,13 @@ func (s *EvalState) eval(src string) (any, error) {
 	}
 	if expr, ok := findAdverb(src); ok {
 		return s.evalAdverb(expr)
+	}
+	// `seed name/ x` iterate with a session-bound callable name (the verb
+	// registry routes above handle builtin verbs).
+	if leftSrc, adverb, rightSrc, ok := findSeededIterateInfix(src); ok {
+		if out, handled, err := s.tryEvalSeededAdverbInfix(leftSrc, adverb, rightSrc); handled || err != nil {
+			return out, err
+		}
 	}
 	if strings.HasPrefix(src, "flip ") {
 		v, err := s.eval(strings.TrimSpace(src[len("flip "):]))
@@ -3100,6 +3209,10 @@ func (s *EvalState) eval(src string) (any, error) {
 		right, err := s.eval(rightExpr)
 		if err != nil {
 			return nil, err
+		}
+		// Integer-atom LHS is canonical q roll/deal, not find.
+		if n, ok := qRollDealCount(left); ok {
+			return s.rollOrDeal(n, right)
 		}
 		return findValue(left, right)
 	}
@@ -3570,6 +3683,12 @@ func evalValueBinary(op string, left, right any) (any, error) {
 	case "_":
 		return cutOrDrop(left, right)
 	case "?":
+		if _, ok := qRollDealCount(left); ok {
+			// Roll/deal is nondeterministic and needs session PRNG state;
+			// decline the compiled route so the string evaluator (the only
+			// execution) draws exactly once.
+			return nil, unsupportedEvalValueExpr{expr: Binary{Op: op}}
+		}
 		return findValue(left, right)
 	case "#":
 		if _, ok := left.(data.Array); ok {
@@ -5372,7 +5491,8 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 				return nil, fmt.Errorf("%s cannot be used with over", expr.verb)
 			}
 			if fn, ok := lookupUnaryVerb(expr.verb); ok {
-				return fn(right)
+				// Monadic verb with over is q's converge iterator.
+				return s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: fn}, nil, right, false)
 			}
 			return nil, fmt.Errorf("%s cannot be used with over", expr.verb)
 		case "\\":
@@ -5380,6 +5500,10 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 			if !ok {
 				if _, ok := lookupDyadicVerbFunc(expr.verb); ok {
 					return nil, fmt.Errorf("%s cannot be used with scan", expr.verb)
+				}
+				if fn, ok := lookupUnaryVerb(expr.verb); ok {
+					// Monadic verb with scan is converge collecting intermediates.
+					return s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: fn}, nil, right, true)
 				}
 				return nil, fmt.Errorf("%s cannot be used with scan", expr.verb)
 			}
@@ -5395,6 +5519,12 @@ func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
 	op, _, hasDyadicOp := lookupDyadicVerb(expr.verb)
 	fn, hasDyadicFunc := lookupDyadicVerbFunc(expr.verb)
 	if !hasDyadicFunc {
+		if expr.adverb == "/" || expr.adverb == "\\" {
+			if unary, ok := lookupUnaryVerb(expr.verb); ok {
+				// `n verb/ x` / `n verb\ x`: do-iterate a monadic verb.
+				return s.applyIterateOver(qUnaryFunction{name: expr.verb, fn: unary}, left, right, expr.adverb == "\\")
+			}
+		}
 		return nil, fmt.Errorf("%s cannot be used as a dyadic verb", expr.verb)
 	}
 	switch expr.adverb {
@@ -9103,6 +9233,162 @@ func (s *EvalState) findCallablePostfixAdverb(src string) (string, string, strin
 	return "", "", "", false
 }
 
+// tryEvalSeededAdverbInfix evaluates `seed f/ x` / `seed f\ x` where the
+// adverb's left text is a seed expression followed by a trailing callable
+// term (`3 {2*x}/ 1`, `{x<100} {2*x}/ 1`). With a monadic f these are q's
+// do/while iterate forms; with a dyadic f the seeded fold/scan.
+func (s *EvalState) tryEvalSeededAdverbInfix(leftSrc, adverb, rightSrc string) (any, bool, error) {
+	if adverb != "/" && adverb != "\\" {
+		return nil, false, nil
+	}
+	if strings.HasPrefix(rightSrc, "[") {
+		return nil, false, nil
+	}
+	seedSrc, fnSrc, ok := splitTrailingCallableTerm(leftSrc)
+	if !ok {
+		return nil, false, nil
+	}
+	fn, err := s.eval(fnSrc)
+	if err != nil || !isCallable(fn) {
+		return nil, false, nil
+	}
+	seed, err := s.eval(seedSrc)
+	if err != nil {
+		return nil, false, nil
+	}
+	right, err := s.eval(rightSrc)
+	if err != nil {
+		return nil, true, err
+	}
+	if adverb == "/" {
+		out, err := s.applyOverCallable(fn, seed, right)
+		return out, true, err
+	}
+	out, err := s.applyScanCallable(fn, seed, right)
+	return out, true, err
+}
+
+// findSeededIterateInfix detects `seed name/ x` / `seed name\ x` where name
+// is a bare identifier (a session-bound callable) preceded by a seed
+// expression. Builtin verbs are handled by findAdverb before this probe.
+func findSeededIterateInfix(src string) (string, string, string, bool) {
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	inString := false
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+			continue
+		case '(':
+			parenDepth++
+			continue
+		case ')':
+			parenDepth--
+			continue
+		case '[':
+			bracketDepth++
+			continue
+		case ']':
+			bracketDepth--
+			continue
+		case '{':
+			braceDepth++
+			continue
+		case '}':
+			braceDepth--
+			continue
+		}
+		if parenDepth != 0 || bracketDepth != 0 || braceDepth != 0 {
+			continue
+		}
+		if ch != '/' && ch != '\\' {
+			continue
+		}
+		if i+1 < len(src) && src[i+1] == ':' {
+			// each-left/each-right, not over/scan.
+			i++
+			continue
+		}
+		left := strings.TrimSpace(src[:i])
+		right := strings.TrimSpace(src[i+1:])
+		if left == "" || right == "" || strings.HasPrefix(right, "[") {
+			continue
+		}
+		_, fnSrc, ok := splitTrailingCallableTerm(left)
+		if !ok || !isQBareName(fnSrc) {
+			continue
+		}
+		return left, string(ch), right, true
+	}
+	return "", "", "", false
+}
+
+// splitTrailingCallableTerm splits src into a non-empty prefix expression and
+// a trailing callable term: a `{...}` lambda, a parenthesized expression, or
+// a bare name.
+func splitTrailingCallableTerm(src string) (string, string, bool) {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return "", "", false
+	}
+	last := src[len(src)-1]
+	var start int
+	switch last {
+	case '}':
+		start = findMatchingOpenBackward(src, '{', '}')
+	case ')':
+		start = findMatchingOpenBackward(src, '(', ')')
+	default:
+		if !isQIdentRest(last) {
+			return "", "", false
+		}
+		start = len(src) - 1
+		for start > 0 && isQIdentRest(src[start-1]) {
+			start--
+		}
+		if !isQIdentStart(src[start]) {
+			return "", "", false
+		}
+	}
+	if start <= 0 {
+		return "", "", false
+	}
+	prefix := strings.TrimSpace(src[:start])
+	if prefix == "" {
+		return "", "", false
+	}
+	return prefix, strings.TrimSpace(src[start:]), true
+}
+
+func findMatchingOpenBackward(src string, open, close byte) int {
+	depth := 0
+	for i := len(src) - 1; i >= 0; i-- {
+		switch src[i] {
+		case close:
+			depth++
+		case open:
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 func (s *EvalState) isPotentialCallableExpr(src string) bool {
 	src = strings.TrimSpace(src)
 	if src == "" {
@@ -9347,7 +9633,207 @@ func (s *EvalState) applyEachRightCallable(fn any, left any, right any) (any, er
 	return inferQArray(out, qKindOfValue(left), qKindOfValue(right)), nil
 }
 
+// qCallableMonadic reports whether fn is a rank-1 (or rank-0) callable.
+// q's over/scan adverbs are rank-dispatched: a MONADIC f makes f/ the
+// converge/do/while iterators, while a dyadic f makes f/ the seeded fold.
+func qCallableMonadic(fn any) bool {
+	switch f := fn.(type) {
+	case qLambda:
+		rank, ok := qLambdaRank(f.body)
+		return ok && rank <= 1
+	case qUnaryFunction:
+		return true
+	default:
+		return false
+	}
+}
+
+// qLambdaRank reports a lambda's rank: explicit parameter count when the
+// body declares `[...]`, otherwise the highest implicit x/y/z referenced
+// (nested lambdas excluded; their implicit params are their own).
+func qLambdaRank(body string) (int, bool) {
+	src := strings.TrimSpace(body)
+	if strings.HasPrefix(src, "[") {
+		end := findMatchingDelimiter(src, 0, '[', ']')
+		if end < 0 {
+			return 0, false
+		}
+		paramSrc := strings.TrimSpace(src[1:end])
+		if paramSrc == "" {
+			return 0, true
+		}
+		return len(splitQBracketFormArgs(paramSrc)), true
+	}
+	rank := 1
+	braceDepth := 0
+	inString := false
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+			continue
+		case '{':
+			braceDepth++
+			continue
+		case '}':
+			braceDepth--
+			continue
+		case '`':
+			i = qSymbolLiteralEnd(src, i) - 1
+			continue
+		}
+		if braceDepth != 0 {
+			continue
+		}
+		if isQIdentStart(ch) {
+			start := i
+			j := i
+			for j < len(src) && isQIdentRest(src[j]) {
+				j++
+			}
+			word := src[start:j]
+			i = j - 1
+			if start > 0 && isQIdentRest(src[start-1]) {
+				continue
+			}
+			switch word {
+			case "y":
+				if rank < 2 {
+					rank = 2
+				}
+			case "z":
+				rank = 3
+			}
+		}
+	}
+	return rank, true
+}
+
+// qIterateLimit caps converge/while iteration so non-terminating canonical
+// forms surface an error instead of hanging the process.
+const qIterateLimit = 1 << 20
+
+// applyIterateOver implements the canonical q monadic-f iterate family:
+//   - f/[x]        converge: apply f until the result matches the previous
+//     result or the original argument
+//   - n f/ x, f/[n;x]      do-iterate: apply f n times
+//   - cond f/ x, f/[c;x]   while-iterate: apply f while cond(result) is true
+//
+// scan (f\) returns every intermediate value, starting with x itself.
+func (s *EvalState) applyIterateOver(fn any, seed any, v any, scan bool) (any, error) {
+	collect := []any(nil)
+	if scan {
+		collect = append(collect, v)
+	}
+	finish := func(value any) (any, error) {
+		if scan {
+			return inferQArray(collect, qKindOfValue(v)), nil
+		}
+		return value, nil
+	}
+	if seed == nil {
+		// Converge.
+		prev := v
+		for iter := 0; ; iter++ {
+			if iter >= qIterateLimit {
+				return nil, fmt.Errorf("converge did not terminate within %d iterations", qIterateLimit)
+			}
+			next, err := s.applyCallable(fn, []any{prev})
+			if err != nil {
+				return nil, err
+			}
+			if matchValue(next, prev) {
+				return finish(prev)
+			}
+			if iter > 0 && matchValue(next, v) {
+				// Cycle back to the original argument.
+				return finish(next)
+			}
+			if scan {
+				collect = append(collect, next)
+			}
+			prev = next
+		}
+	}
+	if isCallable(seed) {
+		// While-iterate.
+		current := v
+		for iter := 0; ; iter++ {
+			if iter >= qIterateLimit {
+				return nil, fmt.Errorf("while-iterate did not terminate within %d iterations", qIterateLimit)
+			}
+			cond, err := s.applyCallable(seed, []any{current})
+			if err != nil {
+				return nil, err
+			}
+			proceed, err := qIterateTruthy(cond)
+			if err != nil {
+				return nil, err
+			}
+			if !proceed {
+				return finish(current)
+			}
+			next, err := s.applyCallable(fn, []any{current})
+			if err != nil {
+				return nil, err
+			}
+			if scan {
+				collect = append(collect, next)
+			}
+			current = next
+		}
+	}
+	n, ok := integerValue(seed)
+	if !ok {
+		return nil, fmt.Errorf("iterate left operand must be an integer count or a predicate")
+	}
+	if n < 0 {
+		return nil, fmt.Errorf("do-iterate count must be non-negative")
+	}
+	current := v
+	for i := int64(0); i < n; i++ {
+		next, err := s.applyCallable(fn, []any{current})
+		if err != nil {
+			return nil, err
+		}
+		if scan {
+			collect = append(collect, next)
+		}
+		current = next
+	}
+	return finish(current)
+}
+
+func qIterateTruthy(v any) (bool, error) {
+	switch x := v.(type) {
+	case bool:
+		return x, nil
+	default:
+		if data.IsNull(v) {
+			return false, nil
+		}
+		if n, ok := numeric(v); ok {
+			return n != 0, nil
+		}
+		return false, fmt.Errorf("while-iterate predicate produced %T, want boolean", v)
+	}
+}
+
 func (s *EvalState) applyOverCallable(fn any, initial any, v any) (any, error) {
+	if qCallableMonadic(fn) {
+		return s.applyIterateOver(fn, initial, v, false)
+	}
 	if adverbFn, ok := fn.(qAdverbFunction); ok && adverbFn.verb == "+" && adverbFn.adverb == "/" && initial == nil {
 		return sum(v)
 	}
@@ -9396,6 +9882,9 @@ func (s *EvalState) applyOverCallable(fn any, initial any, v any) (any, error) {
 }
 
 func (s *EvalState) applyScanCallable(fn any, initial any, v any) (any, error) {
+	if qCallableMonadic(fn) {
+		return s.applyIterateOver(fn, initial, v, true)
+	}
 	if adverbFn, ok := fn.(qAdverbFunction); ok && adverbFn.verb == "+" && adverbFn.adverb == "\\" && initial == nil {
 		return sums(v)
 	}
@@ -9822,6 +10311,12 @@ func parseSymbolList(src string) ([]data.Symbol, error) {
 		if sym == "" {
 			return nil, fmt.Errorf("empty symbol")
 		}
+		if strings.ContainsAny(sym, " \t\n\r") {
+			// `t insert (...)` and similar are expressions, not one symbol
+			// literal with embedded spaces; echoing them back silently as a
+			// symbol hid real parse failures.
+			return nil, fmt.Errorf("malformed symbol list near %q", sym)
+		}
 		out = append(out, data.Symbol(sym))
 	}
 	return out, nil
@@ -9967,7 +10462,14 @@ func parseAtomOrVector(src string) (any, error) {
 	}
 	xs := make([]int64, len(values))
 	for i, v := range values {
-		xs[i] = v.(int64)
+		n, ok := v.(int64)
+		if !ok {
+			// Mixed atom-vector literals like `1 "hello"` are not a typed
+			// vector; canonical q would need (1;"hello") for a generic list.
+			// Reject with a parse error instead of panicking.
+			return nil, fmt.Errorf("mixed-type vector literal %q is not supported; use (a;b) for a generic list", src)
+		}
+		xs[i] = n
 	}
 	return data.NewI64(xs), nil
 }
@@ -14654,7 +15156,183 @@ func (s *EvalState) tryEvalFindSum(src string) (any, bool, error) {
 	return out, true, nil
 }
 
+// randSource returns the per-session PRNG behind roll/deal/rand, lazily
+// seeded with the fixed default seed so fresh sessions are reproducible.
+func (s *EvalState) randSource() *rand.Rand {
+	if s.rng == nil {
+		s.rng = rand.New(rand.NewSource(qDefaultRandSeed))
+	}
+	return s.rng
+}
+
+// qRollDealCount reports whether left is an integer atom, which makes a
+// dyadic `?` a roll (x>=0) or deal (x<0) instead of find.
+func qRollDealCount(left any) (int64, bool) {
+	switch x := left.(type) {
+	case int64:
+		return x, true
+	case int32:
+		return int64(x), true
+	case int16:
+		return int64(x), true
+	case int:
+		return int64(x), true
+	default:
+		return 0, false
+	}
+}
+
+// rollOrDeal implements canonical q `x?y` with integer-atom x:
+//   - x?y (y int atom):  x random ints in [0,y); y=0 rolls full-range longs
+//   - x?y (y float atom): x random floats in [0,y)
+//   - x?y (y list/string): x random picks from y (with replacement)
+//   - negative x deals: |x| DISTINCT draws (errors when |x| exceeds the
+//     domain size, q's 'length)
+//
+// Draws come from the per-session seeded PRNG (see randSource), so results
+// are reproducible per fresh session and nondeterministic within a session.
+func (s *EvalState) rollOrDeal(n int64, right any) (any, error) {
+	deal := n < 0
+	count64 := n
+	if deal {
+		count64 = -count64
+	}
+	if int64(int(count64)) != count64 {
+		return nil, fmt.Errorf("roll count is too large")
+	}
+	count := int(count64)
+	rng := s.randSource()
+	switch y := right.(type) {
+	case int64, int32, int16, int:
+		domain, _ := qRollDealCount(y)
+		if domain < 0 {
+			return nil, fmt.Errorf("roll domain must be non-negative")
+		}
+		if domain == 0 {
+			if deal {
+				return nil, fmt.Errorf("deal domain must be positive")
+			}
+			out := make([]int64, count)
+			for i := range out {
+				out[i] = int64(rng.Uint64())
+			}
+			return data.NewI64(out), nil
+		}
+		if deal {
+			if count64 > domain {
+				return nil, fmt.Errorf("deal count %d exceeds domain %d", count, domain)
+			}
+			return data.NewI64(dealDistinctInts(rng, count, domain)), nil
+		}
+		out := make([]int64, count)
+		for i := range out {
+			out[i] = rng.Int63n(domain)
+		}
+		return data.NewI64(out), nil
+	case float64:
+		if deal {
+			return nil, fmt.Errorf("deal expects an integer or list domain")
+		}
+		if y <= 0 {
+			return nil, fmt.Errorf("roll domain must be positive")
+		}
+		out := make([]float64, count)
+		for i := range out {
+			out[i] = rng.Float64() * y
+		}
+		return data.NewF64(out), nil
+	case float32:
+		return s.rollOrDeal(n, float64(y))
+	case data.Array:
+		length := y.Len()
+		if length == 0 {
+			return nil, fmt.Errorf("roll list domain is empty")
+		}
+		var indexes []int64
+		if deal {
+			if count > length {
+				return nil, fmt.Errorf("deal count %d exceeds list length %d", count, length)
+			}
+			indexes = dealDistinctInts(rng, count, int64(length))
+		} else {
+			indexes = make([]int64, count)
+			for i := range indexes {
+				indexes[i] = rng.Int63n(int64(length))
+			}
+		}
+		out := make([]any, count)
+		for i, index := range indexes {
+			value, ok := y.At(int(index))
+			if !ok {
+				return nil, fmt.Errorf("roll list row %d out of range", index)
+			}
+			out[i] = value
+		}
+		return inferQArray(out, y.Kind()), nil
+	case string:
+		runes := []rune(y)
+		if len(runes) == 0 {
+			return nil, fmt.Errorf("roll string domain is empty")
+		}
+		var indexes []int64
+		if deal {
+			if count > len(runes) {
+				return nil, fmt.Errorf("deal count %d exceeds string length %d", count, len(runes))
+			}
+			indexes = dealDistinctInts(rng, count, int64(len(runes)))
+		} else {
+			indexes = make([]int64, count)
+			for i := range indexes {
+				indexes[i] = rng.Int63n(int64(len(runes)))
+			}
+		}
+		out := make([]rune, count)
+		for i, index := range indexes {
+			out[i] = runes[index]
+		}
+		return string(out), nil
+	default:
+		return nil, fmt.Errorf("roll/deal right operand %T is not supported", right)
+	}
+}
+
+// dealDistinctInts draws count distinct int64s from [0,domain) in random
+// order (Floyd's algorithm plus a final shuffle).
+func dealDistinctInts(rng *rand.Rand, count int, domain int64) []int64 {
+	chosen := make(map[int64]struct{}, count)
+	out := make([]int64, 0, count)
+	for v := domain - int64(count); v < domain; v++ {
+		candidate := rng.Int63n(v + 1)
+		if _, taken := chosen[candidate]; taken {
+			candidate = v
+		}
+		chosen[candidate] = struct{}{}
+		out = append(out, candidate)
+	}
+	rng.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	return out
+}
+
+// evalRand implements the unary `rand x` verb: a single draw, i.e. first 1?x.
+func (s *EvalState) evalRand(right any) (any, error) {
+	out, err := s.rollOrDeal(1, right)
+	if err != nil {
+		return nil, err
+	}
+	if array, ok := out.(data.Array); ok && array.Len() == 1 {
+		value, _ := array.At(0)
+		return value, nil
+	}
+	if str, ok := out.(string); ok && len(str) > 0 {
+		return string([]rune(str)[0]), nil
+	}
+	return out, nil
+}
+
 func findValue(left, right any) (any, error) {
+	if dict, ok := left.(EvalDict); ok {
+		return dictFindValue(dict, right)
+	}
 	if domainArray, ok := left.(data.Array); ok {
 		if queryArray, ok := right.(data.Array); ok {
 			out, handled := data.TryTypedFindI64(domainArray, queryArray)
@@ -14687,6 +15365,59 @@ func findValue(left, right any) (any, error) {
 		return out[0], nil
 	}
 	return data.NewI64(out), nil
+}
+
+// dictFindValue implements canonical q `?` on a dictionary: dict?value is a
+// reverse lookup returning the first key whose value matches; a missing value
+// returns the null of the key type (`(`a`b!1 2)?9` -> `).
+func dictFindValue(dict EvalDict, right any) (any, error) {
+	var queries []any
+	var scalar bool
+	if s, ok := right.(string); ok {
+		// A string is a scalar dictionary value, not a char-vector of queries.
+		queries, scalar = []any{s}, true
+	} else {
+		var err error
+		queries, scalar, err = findQueryValues(right)
+		if err != nil {
+			return nil, err
+		}
+	}
+	missing := dictFindMissingKey(dict)
+	out := make([]any, len(queries))
+	for i, query := range queries {
+		out[i] = missing
+		for j, candidate := range dict.Values {
+			if equalValue(candidate, query) {
+				out[i] = dict.Keys[j]
+				break
+			}
+		}
+	}
+	if scalar {
+		return out[0], nil
+	}
+	return inferQArray(out), nil
+}
+
+func dictFindMissingKey(dict EvalDict) any {
+	for _, key := range dict.Keys {
+		if data.IsNull(key) {
+			continue
+		}
+		switch key.(type) {
+		case data.Symbol:
+			return data.Symbol("")
+		case string:
+			return ""
+		default:
+			if kind := qKindOfValue(key); kind != "" && kind != data.KindAny {
+				return data.NullForKind(kind)
+			}
+			return data.NullValue
+		}
+	}
+	return data.NullValue
 }
 
 func findDomainValues(v any) ([]any, error) {
@@ -15458,6 +16189,9 @@ func raze(v any) (any, error) {
 func take(n int, v any) (any, error) {
 	switch x := v.(type) {
 	case data.Array:
+		if x.Len() == 0 && n != 0 {
+			return takeFromEmptyArray(x.Kind(), n)
+		}
 		return data.TakeRepeat(x, n)
 	case data.Frame:
 		indexes := qTakeIndexes(x.Len(), n)
@@ -15471,9 +16205,54 @@ func take(n int, v any) (any, error) {
 		return takeString(n, x), nil
 	default:
 		if n == 0 {
-			return data.NewAny(nil), nil
+			// 0#atom keeps the atom's type so a later n#(0#x) take can fill
+			// with the type's zero (canonical: 3#0#1 -> 0 0 0).
+			return data.TakeRepeat(inferQArray([]any{v}, qKindOfValue(v)), 0)
 		}
 		return data.TakeRepeat(inferQArray([]any{v}, qKindOfValue(v)), n)
+	}
+}
+
+// takeFromEmptyArray implements canonical q take from an empty list: the
+// result is |n| copies of the list type's zero/default fill (0, 0f, 0b,
+// empty symbol, ""), mirroring kdb+ `3#0#1` -> `0 0 0`. Kinds without an
+// obvious zero (generic/any, temporal) fill with null.
+func takeFromEmptyArray(kind data.Kind, n int) (any, error) {
+	count := n
+	if count < 0 {
+		count = -count
+	}
+	fill := qTakeFillForKind(kind)
+	values := make([]any, count)
+	for i := range values {
+		values[i] = fill
+	}
+	if fill == data.NullValue {
+		return data.InferArray(values), nil
+	}
+	return inferQArray(values, kind), nil
+}
+
+func qTakeFillForKind(kind data.Kind) any {
+	switch kind {
+	case data.KindI16:
+		return int16(0)
+	case data.KindI32:
+		return int32(0)
+	case data.KindI64:
+		return int64(0)
+	case data.KindF32:
+		return float32(0)
+	case data.KindF64:
+		return float64(0)
+	case data.KindBool:
+		return false
+	case data.KindSymbol:
+		return data.Symbol("")
+	case data.KindString:
+		return ""
+	default:
+		return data.NullValue
 	}
 }
 

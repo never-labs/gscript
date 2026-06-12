@@ -17,8 +17,11 @@ import (
 // q null semantics preserved by the kernels below:
 //   - elementwise arithmetic propagates nulls (and integer mod/div by zero
 //     produces null, matching the boxed fallback)
-//   - comparisons treat a null operand as false, except <> (true) and =0N
-//     (matches null rows); within treats null as false
+//   - comparisons follow canonical q null ordering (nullOrderedCompare):
+//     null sorts before every value and equals itself, so 0N<x and 0N<=x
+//     match for non-null x, x>0N and x>=0N match for non-null x, =0N
+//     matches null rows, and <> matches null-vs-value; within treats null
+//     as false (a<=0N never holds)
 //   - sum/avg skip nulls
 //   - fills forward-fills from the last non-null row; deltas propagates nulls
 type nullBitmapElem interface {
@@ -901,8 +904,8 @@ func compareNullBitmapDyadicMask(op Op, left, right any, length int) (Array, boo
 	leftNull := !leftIsArray && IsNull(left)
 	rightNull := !rightIsArray && IsNull(right)
 	if leftNull || rightNull {
-		// Null scalar: = matches null rows, <> matches value rows, ordered
-		// compares never match.
+		// Null scalar: canonical q null compare (null sorts first, equals
+		// itself) row by row against the null bitmap.
 		array := leftArray
 		if array == nil {
 			array = rightArray
@@ -910,17 +913,18 @@ func compareNullBitmapDyadicMask(op Op, left, right any, length int) (Array, boo
 		if array == nil || array.Len() != length {
 			return nil, false
 		}
+		carrier, ok := asNullBitmapCarrier(MaterializeArray(array))
+		if !ok {
+			return nil, false
+		}
+		nulls := carrier.nullBits()
 		out := make([]bool, length)
-		switch op {
-		case OpEQ, OpNE:
-			carrier, ok := asNullBitmapCarrier(MaterializeArray(array))
-			if !ok {
-				return nil, false
-			}
-			nulls := carrier.nullBits()
-			wantNull := op == OpEQ
-			for i := range out {
-				out[i] = nullBitGet(nulls, i) == wantNull
+		for i := range out {
+			rowNull := nullBitGet(nulls, i)
+			if leftNull {
+				out[i] = nullOrderedCompare(op, true, rowNull)
+			} else {
+				out[i] = nullOrderedCompare(op, rowNull, true)
 			}
 		}
 		return newBoolTrusted(out), true
@@ -946,10 +950,7 @@ func compareNullBitmapDyadicMask(op Op, left, right any, length int) (Array, boo
 			lv, lNull := lo.at(i)
 			rv, rNull := ro.at(i)
 			if lNull || rNull {
-				out[i] = op == OpNE && !(lNull && rNull)
-				if lNull && rNull && op == OpEQ {
-					out[i] = true
-				}
+				out[i] = nullOrderedCompare(op, lNull, rNull)
 				continue
 			}
 			out[i] = boolCompare(op, lv == rv, compareInt64(lv, rv))
@@ -972,10 +973,7 @@ func compareNullBitmapDyadicMask(op Op, left, right any, length int) (Array, boo
 		lv, lNull := lo.at(i)
 		rv, rNull := ro.at(i)
 		if lNull || rNull {
-			out[i] = op == OpNE && !(lNull && rNull)
-			if lNull && rNull && op == OpEQ {
-				out[i] = true
-			}
+			out[i] = nullOrderedCompare(op, lNull, rNull)
 			continue
 		}
 		out[i] = boolCompare(op, lv == rv, compareFloat64(lv, rv))
@@ -995,9 +993,10 @@ func isFloatScalar(value any) bool {
 }
 
 // nullBitmapCompareIndexesI64 returns selected row indexes for carrier-vs-
-// scalar comparisons over bitmap-backed integer/float trees. q null compare
-// semantics: a null row never matches <, <=, >, >=; = matches only a null
-// target; <> matches every non-equal row including null-vs-value.
+// scalar comparisons over bitmap-backed integer/float trees, with canonical
+// q null ordering: null sorts before every value and equals itself
+// (nullOrderedCompare), so null rows match <, <= and =0N, and value rows
+// match >0N, >=0N and <>0N.
 func nullBitmapCompareIndexesI64(array Array, op Op, value any) (Array, bool, error) {
 	if !nullBitmapBackedArray(array) {
 		return nil, false, nil
@@ -1009,11 +1008,8 @@ func nullBitmapCompareIndexesI64(array Array, op Op, value any) (Array, bool, er
 	}
 	length := array.Len()
 	if IsNull(value) {
-		// =0N selects null rows; <>0N selects value rows; ordered compares
-		// never match.
-		if op != OpEQ && op != OpNE {
-			return i64RangeArray{len: 0}, true, nil
-		}
+		// Canonical q null compare against a null scalar: null rows match
+		// =0N, <=0N, >=0N; value rows match <>0N, >0N, >=0N.
 		values, nulls, owned, ok := tryBulkI64NullableValues(array)
 		release := func() { bulkI64Release(values, owned) }
 		if !ok {
@@ -1029,10 +1025,9 @@ func nullBitmapCompareIndexesI64(array Array, op Op, value any) (Array, bool, er
 			length = len(values)
 		}
 		out := make([]int64, 0, length)
-		wantNull := op == OpEQ
 		for i := 0; i < length; i++ {
 			isNull := nulls != nil && nullBitGet(nulls, i)
-			if isNull == wantNull {
+			if nullOrderedCompare(op, isNull, true) {
 				out = append(out, int64(i))
 			}
 		}
@@ -1049,7 +1044,7 @@ func nullBitmapCompareIndexesI64(array Array, op Op, value any) (Array, bool, er
 		n := 0
 		for i, v := range values[:length] {
 			if nulls != nil && nullBitGet(nulls, i) {
-				if op == OpNE {
+				if nullOrderedCompare(op, true, false) {
 					scratch[n] = int64(i)
 					n++
 				}
@@ -1076,7 +1071,7 @@ func nullBitmapCompareIndexesI64(array Array, op Op, value any) (Array, bool, er
 		n := 0
 		for i, v := range values[:length] {
 			if nulls != nil && nullBitGet(nulls, i) {
-				if op == OpNE {
+				if nullOrderedCompare(op, true, false) {
 					scratch[n] = int64(i)
 					n++
 				}
