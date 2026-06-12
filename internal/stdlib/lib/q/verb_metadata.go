@@ -85,7 +85,7 @@ var qDispatchVerbNames = []string{
 	"+", "plus", "-", "minus", "*", "times", "%", "divide", "div", "mod",
 	"^", "fill", "~", "match", "=", "equal", "equals", "<", "less",
 	">", "more", "greater", "min", "max", "[", "left", "]", "right",
-	"&", "and", "|", "or",
+	"&", "and", "|", "or", ",",
 	// lookupDyadicVerbFunc
 	"bin", "binr", "xbar", "xrank", "msum", "mavg", "mcount", "mmin",
 	"mmax", "mdev", "ema", "xprev", "xcols", "xkey", "xgroup", "xasc",

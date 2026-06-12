@@ -1490,6 +1490,12 @@ func cachedValueExprEligible(expr Expr) bool {
 		switch strings.ToLower(x.Op) {
 		case "and", "or", "in", "within", "=", "<", ">", "<=", ">=", "<>", "~":
 			return false
+		case ",":
+			// The Pratt tree groups `#` tighter and `!` looser than `,`,
+			// while the string cascade gives the leftmost form the outermost
+			// position (2#1 2,3 4 is 2#(1 2,3 4) there). Join statements stay
+			// on the compiled route, which mirrors the cascade splits.
+			return false
 		}
 		if x.Op != "#" && cachedValueExprContainsTemporal(x) {
 			return false
@@ -3103,6 +3109,28 @@ func (s *EvalState) eval(src string) (any, error) {
 	if looksLikeTemporalVector(src) {
 		return parseAtomOrVector(src)
 	}
+	// `,` join: claimed before the loose-binding dyadic probes (~ ? word
+	// verbs # _ $ !) whenever the comma is the LEFTMOST top-level dyadic
+	// form, so canonical right-to-left grouping holds (see join.go).
+	if idx, ok := qTopLevelJoinSplit(src); ok {
+		if idx == 0 {
+			// Prefix `,x` is enlist (same shape as the `enlist ` branch).
+			right, err := s.eval(strings.TrimSpace(src[idx+1:]))
+			if err != nil {
+				return nil, err
+			}
+			return data.NewAny([]any{right}), nil
+		}
+		left, err := s.eval(strings.TrimSpace(src[:idx]))
+		if err != nil {
+			return nil, err
+		}
+		right, err := s.eval(strings.TrimSpace(src[idx+1:]))
+		if err != nil {
+			return nil, err
+		}
+		return joinValue(left, right)
+	}
 	for _, op := range []string{"<>", "<=", ">="} {
 		if leftExpr, rightExpr, ok := splitTopLevelOperator(src, op); ok {
 			left, err := s.eval(leftExpr)
@@ -3927,7 +3955,7 @@ func parseValueExpr(src string) (Expr, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	p := parser{tokens: tokens}
+	p := parser{tokens: tokens, commaJoin: true}
 	expr, err := p.parseExpr(0)
 	if err != nil {
 		return nil, true, err
@@ -5233,6 +5261,11 @@ func isSign(src string, i int) bool {
 	if i+1 >= len(src) || !isQNumericSignStart(src[i+1]) {
 		return false
 	}
+	if src[i] == ',' {
+		// `,` is never a numeric sign: `,1` is the prefix enlist join form
+		// and `x,1`/`x ,1` are joins.
+		return false
+	}
 	if i == 0 {
 		return true
 	}
@@ -5255,7 +5288,10 @@ func findDyadic(src string) (int, byte, bool) {
 	// expression its right argument (evaluated recursively, again leftmost),
 	// which is exactly q's right-associative grouping. `2*3+1` splits at `*`
 	// into 2*(3+1)=8; `10-4-2` splits at the first `-` into 10-(4-2)=8.
-	if idx := findTopLevel(src, "=<>+-*%&|^"); idx >= 0 {
+	// `,` (join) shares the single dyadic level: `1+2,3` is 1+(2,3) and
+	// `1 2,3+4` is 1 2,(3+4). Comma-leftmost sources are claimed early by
+	// qTopLevelJoinSplit; applyDyadic carries the ',' backstop.
+	if idx := findTopLevel(src, "=<>+-*%&|^,"); idx >= 0 {
 		return idx, src[idx], true
 	}
 	return 0, 0, false
@@ -5390,7 +5426,7 @@ func isIdentByte(b byte) bool {
 }
 
 func isDyadicOp(b byte) bool {
-	return b == '+' || b == '-' || b == '*' || b == '%' || b == '=' || b == '<' || b == '>' || b == '&' || b == '|' || b == '^' || b == '~'
+	return b == '+' || b == '-' || b == '*' || b == '%' || b == '=' || b == '<' || b == '>' || b == '&' || b == '|' || b == '^' || b == '~' || b == ','
 }
 
 func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
@@ -6637,7 +6673,9 @@ func (s *EvalState) tryEvalFirstLastDyadic(src string) (any, bool, error) {
 			continue
 		}
 		idx, op, ok := findDyadic(arg)
-		if !ok {
+		if !ok || op == ',' {
+			// Join changes the result length (l+r); the elementwise
+			// first/last shortcut below would be wrong for it.
 			continue
 		}
 		left, err := s.eval(strings.TrimSpace(arg[:idx]))
@@ -8230,6 +8268,8 @@ func lookupDyadicVerb(verb string) (byte, string, bool) {
 		return '&', "and", true
 	case "|", "or":
 		return '|', "or", true
+	case ",":
+		return ',', "join", true
 	default:
 		return 0, "", false
 	}
@@ -12164,6 +12204,10 @@ func qValidateFrameColumns(existing []data.Symbol, requested []data.Symbol, op s
 }
 
 func applyDyadic(op byte, left, right any) (any, error) {
+	if op == ',' {
+		// Join is a whole-value verb: it must not broadcast elementwise.
+		return joinValue(left, right)
+	}
 	if op == '~' {
 		return matchValue(left, right), nil
 	}

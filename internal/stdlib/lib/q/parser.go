@@ -44,6 +44,12 @@ func Parse(src string) (*Query, error) {
 type parser struct {
 	tokens []token
 	pos    int
+	// commaJoin makes parseExpr treat top-level `,` as the canonical q join
+	// verb (single dyadic precedence level). It is enabled only for plain
+	// value expressions (parseValueExpr); in qSQL queries `,` stays the
+	// clause separator (select a,b / comma-where / insert values lists), so
+	// Parse never sets it.
+	commaJoin bool
 }
 
 func (p *parser) parseQuery() (*Query, error) {
@@ -661,6 +667,20 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 	}
 	for {
 		tok := p.peek()
+		if tok.kind == tokenComma && p.commaJoin {
+			// Canonical q `,` join: same single precedence level as the
+			// other dyadic symbol verbs, right-associative.
+			if minPrec > 10 {
+				break
+			}
+			p.next()
+			right, err := p.parseExpr(10)
+			if err != nil {
+				return nil, err
+			}
+			left = Binary{Op: ",", Left: left, Right: right}
+			continue
+		}
 		if tok.kind == tokenBang {
 			if minPrec > 5 {
 				break

@@ -436,6 +436,20 @@ func compileQEvalExpr(src string, depth int) Expr {
 			return Call{Func: word, Arg: arg}
 		}
 	}
+	// `,` join: mirrors the string evaluator's qTopLevelJoinSplit claim just
+	// before the loose-binding dyadic probes (see join.go).
+	if idx, ok := qTopLevelJoinSplit(src); ok {
+		if idx == 0 {
+			// Prefix `,x` enlist; Call enlist executes data.NewAny([]any{v}),
+			// the same shape as the string evaluator's branch.
+			arg := compileQEvalExpr(src[1:], depth+1)
+			if arg == nil {
+				return nil
+			}
+			return Call{Func: "enlist", Arg: arg}
+		}
+		return compileQBinarySplit(",", src[:idx], src[idx+1:], depth)
+	}
 	// Composite comparisons, match, and find splits.
 	for _, op := range []string{"<>", "<=", ">="} {
 		if leftExpr, rightExpr, ok := splitTopLevelOperator(src, op); ok {
@@ -521,7 +535,7 @@ func compileQEvalExpr(src string, depth int) Expr {
 	// the dyadic verbs and evaluates right-to-left, so we split at the single
 	// LEFTMOST top-level operator (mirroring findDyadic): the leftmost verb is
 	// the outermost operation and the rest is its right argument.
-	if idx := findTopLevel(src, "=<>+-*%&|^"); idx >= 0 {
+	if idx := findTopLevel(src, "=<>+-*%&|^,"); idx >= 0 {
 		return compileQBinarySplit(string(src[idx]), src[:idx], src[idx+1:], depth)
 	}
 	// Symbol literals and symbol lists.

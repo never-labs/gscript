@@ -4785,6 +4785,7 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 	}
 	cases = append(cases, coverage...)
 	cases = append(cases, qEvalVectorVerbFormBacklogCases()...)
+	cases = append(cases, qEvalVectorJoinCases()...)
 	cases = append(cases, qEvalVectorComboCases()...)
 	cases = append(cases, qEvalVectorTypeNullMatrixCases()...)
 	return cases
