@@ -5073,10 +5073,13 @@ func TestEvalQWordVerbAdverbs(t *testing.T) {
 	assertEvalArray(t, "in'[1 2 3;2 2 4]", data.KindBool, []any{false, true, false})
 	assertEvalArray(t, "(in')[`AAPL`MSFT;`AAPL`IBM]", data.KindBool, []any{true, false})
 	assertEvalArray(t, "(within')[9 10 11;(10 20;10 20;10 20)]", data.KindBool, []any{false, true, true})
-	assertEvalArray(t, "(bin\\:)[10 20 30;5 10 25]", data.KindI64, []any{int64(-1), int64(0), int64(1)})
-	assertEvalArray(t, "(binr\\:)[10 20 20 30;5 20 25 35]", data.KindI64, []any{int64(0), int64(1), int64(3), int64(4)})
+	// Canonical adverb direction: each-right (/:) iterates the RIGHT operand
+	// against the whole left; each-left (\:) iterates the LEFT operand
+	// against the whole right (migrated from the pre-canonical inversion).
+	assertEvalArray(t, "(bin/:)[10 20 30;5 10 25]", data.KindI64, []any{int64(-1), int64(0), int64(1)})
+	assertEvalArray(t, "(binr/:)[10 20 20 30;5 20 25 35]", data.KindI64, []any{int64(0), int64(1), int64(3), int64(4)})
 	assertEvalArray(t, "(xbar\\:)[10;9 10 21]", data.KindI64, []any{int64(0), int64(10), int64(20)})
-	assertEvalArray(t, "(within/:)[9 10 11;10 20]", data.KindBool, []any{false, true, true})
+	assertEvalArray(t, "(within\\:)[9 10 11;10 20]", data.KindBool, []any{false, true, true})
 	assertEvalArray(t, "in':[1 2;1 1 2]", data.KindBool, []any{true, true, false})
 	assertEvalErrorContains(t, "(in/)[1 2 3]", "in cannot be used with over")
 	assertEvalErrorContains(t, "xbar\\1 2 3", "xbar cannot be used with scan")

@@ -321,11 +321,13 @@ func compileQEvalExpr(src string, depth int) Expr {
 		}
 		return nil
 	}
-	if _, _, ok := splitTopLevelWord(src, "each"); ok {
-		return nil
-	}
-	if _, _, ok := splitTopLevelWord(src, "fby"); ok {
-		return nil
+	// Word adverbs (f each x, f over x, f scan x, f prior x) and fby are
+	// callable-shaping forms: callable detection consults bindings, so they
+	// stay on the string evaluator.
+	for _, word := range []string{"each", "over", "scan", "prior", "fby"} {
+		if _, _, ok := splitTopLevelWord(src, word); ok {
+			return nil
+		}
 	}
 	if _, ok := parseUnaryComposition(src); ok {
 		return nil
