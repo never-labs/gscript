@@ -29,15 +29,16 @@ type genericAIDialectIndex struct {
 }
 
 type genericAIDialectIndexItem struct {
-	Capability                       string   `json:"capability"`
-	CapabilityID                     string   `json:"capability_id"`
-	ProviderFree                     bool     `json:"provider_free"`
-	DomainSpecific                   bool     `json:"domain_specific"`
-	FinRobotSpecificSyntaxAssumption bool     `json:"finrobot_specific_syntax_assumption"`
-	DialectSurface                   []string `json:"dialect_surface"`
-	Example                          string   `json:"example"`
-	Test                             string   `json:"test"`
-	Fixture                          string   `json:"fixture"`
+	Capability                       string                         `json:"capability"`
+	CapabilityID                     string                         `json:"capability_id"`
+	ProviderFree                     bool                           `json:"provider_free"`
+	DomainSpecific                   bool                           `json:"domain_specific"`
+	FinRobotSpecificSyntaxAssumption bool                           `json:"finrobot_specific_syntax_assumption"`
+	DialectSurface                   []string                       `json:"dialect_surface"`
+	Example                          string                         `json:"example"`
+	Test                             string                         `json:"test"`
+	Fixture                          string                         `json:"fixture"`
+	SmokeCoverage                    *genericAIDialectSmokeCoverage `json:"smoke_coverage"`
 	MissingProductionPackageBoundary struct {
 		PackageID string `json:"package_id"`
 		Boundary  string `json:"boundary"`
@@ -78,7 +79,16 @@ type genericAIDialectBackendShape struct {
 	Example         string                           `json:"example"`
 	Test            string                           `json:"test"`
 	Fixture         string                           `json:"fixture"`
+	SmokeCoverage   *genericAIDialectSmokeCoverage   `json:"smoke_coverage"`
 	PackageBoundary *genericAIDialectPackageBoundary `json:"package_boundary"`
+}
+
+type genericAIDialectSmokeCoverage struct {
+	Test              string   `json:"test"`
+	Command           string   `json:"command"`
+	PackageManifest   string   `json:"package_manifest"`
+	ManifestGateField string   `json:"manifest_gate_field"`
+	GateTerms         []string `json:"gate_terms"`
 }
 
 type genericAIDialectPackageBoundary struct {
@@ -150,6 +160,12 @@ func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 			assertGenericAIDialectNoFinRobotSyntaxAssumption(t, entry)
 			assertGenericAIDialectProductionBoundaryGap(t, entry)
 			assertGenericAIDialectProductionBoundary(t, root, entry)
+			if genericAIDialectRequiresSmokeCoverage(entry.CapabilityID) {
+				if entry.ProductionPackageBoundary == nil {
+					t.Fatalf("%s smoke coverage requires a production package boundary", entry.Capability)
+				}
+				assertGenericAIDialectSmokeCoverage(t, root, entry.CapabilityID, entry.Test, entry.ProductionPackageBoundary.Directory, entry.SmokeCoverage)
+			}
 		})
 	}
 
@@ -209,6 +225,9 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 			assertGenericAIDialectBackendShapeGeneric(t, shape)
 			assertGenericAIDialectBackendBoundaryIndexed(t, shape, indexedBoundaries)
 			assertGenericAIDialectBackendPackageBoundary(t, root, shape)
+			if shape.PackageBoundary != nil && genericAIDialectRequiresSmokeCoveragePackage(shape.PackageBoundary.PackageID) {
+				assertGenericAIDialectSmokeCoverage(t, root, shape.ShapeID, shape.Test, shape.PackageBoundary.Directory, shape.SmokeCoverage)
+			}
 		})
 	}
 	if len(seenShapes) < 8 {
@@ -217,6 +236,72 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 	for capability, covered := range requiredCapabilities {
 		if !covered {
 			t.Fatalf("required capability %q is not covered by backend plan", capability)
+		}
+	}
+}
+
+func genericAIDialectRequiresSmokeCoverage(capabilityID string) bool {
+	switch capabilityID {
+	case "generic.ai.model.io.envelope", "generic.ai.tool.registry":
+		return true
+	default:
+		return false
+	}
+}
+
+func genericAIDialectRequiresSmokeCoveragePackage(packageID string) bool {
+	switch packageID {
+	case "generic-model-io-envelope", "generic-tool-registry":
+		return true
+	default:
+		return false
+	}
+}
+
+func assertGenericAIDialectSmokeCoverage(t *testing.T, root, owner, indexedTest, boundaryDirectory string, smoke *genericAIDialectSmokeCoverage) {
+	t.Helper()
+	if smoke == nil {
+		t.Fatalf("%s is missing executable smoke coverage", owner)
+	}
+	if smoke.Test != indexedTest {
+		t.Fatalf("%s smoke test %q does not match indexed test %q", owner, smoke.Test, indexedTest)
+	}
+	assertGenericAIDialectReference(t, root, smoke.Test, true)
+	if smoke.Command == "" || !strings.HasPrefix(smoke.Command, "go test ./tests/llm -run ") {
+		t.Fatalf("%s smoke command is not an executable llm test gate: %q", owner, smoke.Command)
+	}
+	testName := strings.TrimSpace(strings.TrimPrefix(smoke.Command, "go test ./tests/llm -run "))
+	if testName == "" || strings.Contains(testName, " ") {
+		t.Fatalf("%s smoke command has invalid test selector: %q", owner, smoke.Command)
+	}
+	testData, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(smoke.Test)))
+	if err != nil {
+		t.Fatalf("%s: %v", smoke.Test, err)
+	}
+	if !strings.Contains(string(testData), "func "+testName+"(") {
+		t.Fatalf("%s smoke command selects missing test %q in %s", owner, testName, smoke.Test)
+	}
+	assertGenericAIDialectReference(t, root, smoke.PackageManifest, false)
+	if filepath.ToSlash(filepath.Dir(smoke.PackageManifest)) != boundaryDirectory {
+		t.Fatalf("%s smoke package manifest %q is outside boundary %q", owner, smoke.PackageManifest, boundaryDirectory)
+	}
+	if smoke.ManifestGateField != "test_gates" || len(smoke.GateTerms) == 0 {
+		t.Fatalf("%s smoke gate metadata is incomplete: %#v", owner, smoke)
+	}
+	var manifest struct {
+		TestGates []string `json:"test_gates"`
+	}
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(smoke.PackageManifest)))
+	if err != nil {
+		t.Fatalf("%s: %v", smoke.PackageManifest, err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("%s: %v", smoke.PackageManifest, err)
+	}
+	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, "\n"))
+	for _, term := range smoke.GateTerms {
+		if !strings.Contains(joinedGates, strings.ToLower(term)) {
+			t.Fatalf("%s smoke gates missing %q in %s: %s", owner, term, smoke.PackageManifest, joinedGates)
 		}
 	}
 }

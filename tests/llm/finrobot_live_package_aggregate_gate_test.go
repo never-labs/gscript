@@ -15,6 +15,7 @@ func TestFinRobotLivePackageAggregateGate(t *testing.T) {
 	root := repoRoot(t)
 	plan := loadLivePackagePlanManifest(t, root)
 	livePackagesRoot := filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages")
+	llmTestFiles := finrobotLivePackageLLMTestFiles(t, root)
 
 	actualPackageDirs := finrobotLivePackageDirs(t, root, livePackagesRoot)
 	plannedPackageDirs := finrobotLivePackagePlanSkeletonDirs(t, root, plan)
@@ -44,6 +45,7 @@ func TestFinRobotLivePackageAggregateGate(t *testing.T) {
 						t.Fatalf("%s root = %#v, want object", path, decoded)
 					}
 					assertFinRobotPackageManifestEntrypoints(t, pkgDir, path, manifest)
+					assertFinRobotPackageSmokeDiscovery(t, root, relDir, pkgDir, path, manifest, llmTestFiles)
 				}
 				if finrobotLivePackageSchemaJSON(path) {
 					schema, ok := decoded.(map[string]any)
@@ -245,6 +247,145 @@ func assertFinRobotPackageManifestEntrypoints(t *testing.T, pkgDir, manifestPath
 		}
 		assertFinRobotManifestFileReference(t, pkgDir, manifestPath, key, ref)
 	}
+}
+
+func assertFinRobotPackageSmokeDiscovery(t *testing.T, root, relDir, pkgDir, manifestPath string, manifest map[string]any, llmTestFiles []finrobotLLMTestFile) {
+	t.Helper()
+	entrypoints := manifest["entrypoints"].(map[string]any)
+	smokeRef, ok := finrobotLivePackageSmokeEntrypoint(entrypoints)
+	if !ok {
+		t.Fatalf("%s entrypoints must include smoke or main .leia entrypoint", manifestPath)
+	}
+	assertFinRobotManifestFileReference(t, pkgDir, manifestPath, "entrypoints.smoke_or_main", smokeRef)
+
+	testFiles := finrobotLivePackageSpecificTestFiles(root, relDir, manifest, llmTestFiles)
+	if len(testFiles) == 0 {
+		t.Fatalf("%s has no package-specific tests/llm test file", manifestPath)
+	}
+	for _, testFile := range testFiles {
+		if strings.Contains(testFile.Text, "ExecFile") {
+			return
+		}
+		if finrobotTestFileSmokeDiscoveryExempt(testFile.Text) {
+			return
+		}
+	}
+	if finrobotLivePackageSmokeDiscoveryExempt(manifest) {
+		return
+	}
+	var paths []string
+	for _, testFile := range testFiles {
+		paths = append(paths, testFile.RelPath)
+	}
+	t.Fatalf("%s package-specific test files %v must contain ExecFile or manifest metadata must declare contract_only/metadata_only smoke discovery", manifestPath, paths)
+}
+
+func finrobotLivePackageSmokeEntrypoint(entrypoints map[string]any) (string, bool) {
+	for _, key := range []string{"smoke", "main"} {
+		ref, ok := entrypoints[key].(string)
+		if !ok || strings.TrimSpace(ref) == "" {
+			continue
+		}
+		if strings.HasSuffix(strings.TrimSpace(strings.Split(ref, "#")[0]), ".leia") {
+			return ref, true
+		}
+	}
+	return "", false
+}
+
+func finrobotLivePackageSmokeDiscoveryExempt(value any) bool {
+	manifest, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	if finrobotSmokeDiscoveryExemptMap(manifest) {
+		return true
+	}
+	if smokeDiscovery, ok := manifest["smoke_discovery"].(map[string]any); ok {
+		return finrobotSmokeDiscoveryExemptMap(smokeDiscovery)
+	}
+	return false
+}
+
+func finrobotSmokeDiscoveryExemptMap(value map[string]any) bool {
+	return finrobotLivePackageBoolOrConst(value["contract_only"], true) ||
+		finrobotLivePackageBoolOrConst(value["metadata_only"], true) ||
+		value["mode"] == "metadata-only" ||
+		value["policy"] == "metadata-only"
+}
+
+func finrobotTestFileSmokeDiscoveryExempt(text string) bool {
+	text = strings.ToLower(text)
+	return strings.Contains(text, "contract_only") ||
+		strings.Contains(text, "metadata_only") ||
+		strings.Contains(text, "metadata-only")
+}
+
+type finrobotLLMTestFile struct {
+	RelPath string
+	Text    string
+}
+
+func finrobotLivePackageLLMTestFiles(t *testing.T, root string) []finrobotLLMTestFile {
+	t.Helper()
+	testRoot := filepath.Join(root, "tests", "llm")
+	entries, err := os.ReadDir(testRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []finrobotLLMTestFile
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		path := filepath.Join(testRoot, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, finrobotLLMTestFile{RelPath: filepath.ToSlash(rel), Text: string(data)})
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].RelPath < files[j].RelPath })
+	return files
+}
+
+func finrobotLivePackageSpecificTestFiles(root, relDir string, manifest map[string]any, llmTestFiles []finrobotLLMTestFile) []finrobotLLMTestFile {
+	packageName := filepath.Base(relDir)
+	manifestTokens := []string{
+		relDir,
+		filepath.ToSlash(filepath.Join(root, filepath.FromSlash(relDir))),
+		packageName,
+		strings.ReplaceAll(packageName, "_", "-"),
+		finrobotStringValue(manifest["id"]),
+		finrobotStringValue(manifest["package_name"]),
+	}
+	var matches []finrobotLLMTestFile
+	for _, testFile := range llmTestFiles {
+		text := strings.ToLower(filepath.ToSlash(testFile.Text))
+		relPath := strings.ToLower(testFile.RelPath)
+		for _, token := range manifestTokens {
+			token = strings.ToLower(strings.TrimSpace(token))
+			if token == "" {
+				continue
+			}
+			if strings.Contains(text, token) || strings.Contains(relPath, token) {
+				matches = append(matches, testFile)
+				break
+			}
+		}
+	}
+	return matches
+}
+
+func finrobotStringValue(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
 }
 
 func assertFinRobotManifestFileReference(t *testing.T, pkgDir, manifestPath, key, ref string) {

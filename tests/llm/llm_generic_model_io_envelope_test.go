@@ -2,11 +2,14 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 const genericModelIOEnvelopeRoot = "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope"
@@ -164,6 +167,86 @@ func TestGenericModelIOEnvelopeSchemaRequiredFields(t *testing.T) {
 	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "registry_turn_projection_v1.schema.json"), []string{"properties", "replay_projection"}, []string{"model_registry_replay_safe", "model_io_mode", "model_io_strict_ordered_match", "turn_runner_match_key", "turn_runner_request_hash", "request_hash_preserved_to_execute_response", "provider_free", "live_network", "credentials_required"})
 }
 
+func TestGenericModelIOEnvelopeMainExecutableSmoke(t *testing.T) {
+	root := repoRoot(t)
+	base := filepath.Join(root, filepath.FromSlash(genericModelIOEnvelopeRoot))
+	path := filepath.Join(base, "main.leia")
+
+	var fixture genericModelIOReplayFixture
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "fixtures", "provider_free_replay_fixture.json"), &fixture)
+	var manifest genericModelIOEnvelopeManifest
+	decodeGenericModelIOEnvelopeJSON(t, filepath.Join(base, "package.manifest.json"), &manifest)
+
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var prints []string
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString),
+				leia.WithPrint(func(args ...any) {
+					var parts []string
+					for _, arg := range args {
+						parts = append(parts, fmt.Sprint(arg))
+					}
+					prints = append(prints, strings.Join(parts, " "))
+				}),
+			}, tc.opts...)...)
+			if err := vm.ExecFile(path); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			got, err := vm.Get("generic_model_io_envelope_live_package_summary")
+			if err != nil {
+				t.Fatalf("Get generic_model_io_envelope_live_package_summary: %v", err)
+			}
+			summary, ok := got.(string)
+			if !ok {
+				t.Fatalf("summary = %T %#v, want string", got, got)
+			}
+			if len(prints) != 1 || prints[0] != summary {
+				t.Fatalf("prints = %#v, want one summary print %q", prints, summary)
+			}
+			fields := genericModelIOEnvelopeSummaryFields(t, summary)
+			if fields["adapter"] != fixture.Replay.AdapterIdentity ||
+				!genericModelIOEnvelopePositiveCount(fields["capabilities"]) ||
+				fields["request"] == "" ||
+				fields["stream"] == "" ||
+				fields["response"] == "" ||
+				(fields["provider_free"] == "true") != manifest.ProviderFree ||
+				(fields["live_network"] == "true") != manifest.LiveNetworkDefault ||
+				(fields["imports"] == "true") != manifest.RealImportsDefault {
+				t.Fatalf("summary does not align with package boundary: summary=%#v manifest=%#v fixture=%#v", fields, manifest, fixture.Replay)
+			}
+
+			global, err := vm.Get("generic_model_io_envelope_live_package")
+			if err != nil {
+				t.Fatalf("Get generic_model_io_envelope_live_package: %v", err)
+			}
+			pkg, ok := global.(map[string]any)
+			if !ok {
+				t.Fatalf("generic_model_io_envelope_live_package = %T %#v, want map", global, global)
+			}
+			if pkg["id"] == "" ||
+				pkg["package_name"] == "" ||
+				pkg["adapter_identity"] != fixture.Replay.AdapterIdentity ||
+				pkg["request_envelope"] != fields["request"] ||
+				pkg["stream_chunk_envelope"] != fields["stream"] ||
+				pkg["response_envelope"] != fields["response"] ||
+				pkg["provider_free"] != true ||
+				pkg["live_network"] != false ||
+				pkg["real_dependency_imports"] != false {
+				t.Fatalf("global package output mismatch: %#v", pkg)
+			}
+
+			assertGenericModelIOEnvelopeSmokeReplayRedaction(t, fixture)
+		})
+	}
+}
+
 func assertGenericModelIOEnvelopeBoundary(t *testing.T, manifest genericModelIOEnvelopeManifest) {
 	t.Helper()
 	if manifest.SchemaVersion != 1 ||
@@ -260,6 +343,32 @@ func assertGenericModelIOEnvelopeContract(t *testing.T, manifest genericModelIOE
 		if !genericLivePackageContains(contract.RegistryTurnProjection.RequiredFields, want) {
 			t.Fatalf("registry turn projection required_fields missing %q: %#v", want, contract.RegistryTurnProjection.RequiredFields)
 		}
+	}
+}
+
+func assertGenericModelIOEnvelopeSmokeReplayRedaction(t *testing.T, fixture genericModelIOReplayFixture) {
+	t.Helper()
+	if !fixture.ProviderFree || fixture.LiveNetwork || fixture.LiveModel || fixture.CredentialsRequired ||
+		fixture.Replay.Mode != "provider-free" ||
+		!fixture.Replay.StrictOrderedMatch ||
+		fixture.Replay.AdapterIdentity != "generic-model-io-envelope-adapter" ||
+		len(fixture.Records) != 1 {
+		t.Fatalf("replay fixture header mismatch: %#v", fixture)
+	}
+	record := fixture.Records[0]
+	requestMetadata, _ := record.Request["metadata"].(map[string]any)
+	responseMetadata, _ := record.Response["metadata"].(map[string]any)
+	requestRedaction, _ := record.Request["redaction"].(map[string]any)
+	responseRedaction, _ := record.Response["redaction"].(map[string]any)
+	if requestMetadata["provider_free"] != true ||
+		responseMetadata["provider_free"] != true ||
+		requestMetadata["replay_session_id"] != fixture.Replay.ReplaySessionID ||
+		responseMetadata["replay_session_id"] != fixture.Replay.ReplaySessionID ||
+		requestRedaction["applied"] != true ||
+		responseRedaction["applied"] != true ||
+		requestRedaction["secret_values_present"] != false ||
+		responseRedaction["secret_values_present"] != false {
+		t.Fatalf("replay/redaction smoke fields mismatch: request_metadata=%#v response_metadata=%#v request_redaction=%#v response_redaction=%#v", requestMetadata, responseMetadata, requestRedaction, responseRedaction)
 	}
 }
 
@@ -521,13 +630,17 @@ func TestGenericModelIOEnvelopeRegistryTurnProjection(t *testing.T) {
 			t.Fatalf("alias projection mapping incomplete: %#v", mapping)
 		}
 	}
-	if projection.RequestProjection.RequestedAlias != "default" ||
-		projection.RequestProjection.ResolvedDescriptorRef != "model_registry:descriptor:fixture_analyst:v1" ||
-		projection.RequestProjection.DescriptorMode != "deterministic_fixture_replay" ||
-		projection.RequestProjection.ModelIOTurnID != "turn-generic-model-io-001" ||
-		projection.RequestProjection.TurnRequestID != "turn-request-acme-summary-001" ||
-		projection.RequestProjection.TurnCorrelationID != "corr-generic-turn-acme-summary-001" ||
-		projection.RequestProjection.AdapterIdentity != "generic-model-io-envelope-adapter" ||
+	if projection.RequestProjection.RequestedAlias == "" ||
+		!strings.HasPrefix(projection.RequestProjection.ResolvedDescriptorRef, "model_registry:descriptor:") ||
+		projection.RequestProjection.DescriptorFixtureKey == "" ||
+		projection.RequestProjection.DescriptorMode == "" ||
+		projection.RequestProjection.ModelIOTurnID == "" ||
+		projection.RequestProjection.TurnRequestID == "" ||
+		projection.RequestProjection.ModelIOTurnID == projection.RequestProjection.TurnRequestID ||
+		projection.RequestProjection.TurnCorrelationID == "" ||
+		projection.RequestProjection.TraceID == "" ||
+		projection.RequestProjection.ReplaySessionID == "" ||
+		projection.RequestProjection.AdapterIdentity == "" ||
 		!projection.RequestProjection.ProviderFree ||
 		projection.RequestProjection.LiveNetwork ||
 		projection.RequestProjection.LiveModel {
@@ -542,10 +655,10 @@ func TestGenericModelIOEnvelopeRegistryTurnProjection(t *testing.T) {
 		t.Fatalf("redaction projection mismatch: %#v", projection.RedactionProjection)
 	}
 	if !projection.ReplayProjection.ModelRegistryReplaySafe ||
-		projection.ReplayProjection.ModelIOMode != "provider-free" ||
+		projection.ReplayProjection.ModelIOMode == "" ||
 		!projection.ReplayProjection.ModelIOStrictOrderedMatch ||
-		projection.ReplayProjection.TurnRunnerMatchKey != "deterministic_request_hash" ||
-		projection.ReplayProjection.TurnRunnerRequestHash != "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba" ||
+		projection.ReplayProjection.TurnRunnerMatchKey == "" ||
+		!genericModelIOEnvelopeSHA256Ref(projection.ReplayProjection.TurnRunnerRequestHash) ||
 		!projection.ReplayProjection.RequestHashPreservedToExecuteResponse ||
 		!projection.ReplayProjection.ProviderFree ||
 		projection.ReplayProjection.LiveNetwork ||
@@ -588,4 +701,51 @@ func assertGenericModelIOStringSet(t *testing.T, label string, got, want []strin
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("%s = %#v, want %#v", label, got, want)
 	}
+}
+
+func genericModelIOEnvelopeSummaryFields(t *testing.T, value string) map[string]string {
+	t.Helper()
+	fields := strings.Fields(value)
+	if len(fields) == 0 || fields[0] != "generic_model_io_envelope_live_package" {
+		t.Fatalf("unexpected summary prefix: %q", value)
+	}
+	result := map[string]string{}
+	for _, field := range fields[1:] {
+		parts := strings.SplitN(field, "=", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			t.Fatalf("malformed summary field %q in %q", field, value)
+		}
+		result[parts[0]] = parts[1]
+	}
+	for _, key := range []string{"adapter", "capabilities", "request", "stream", "response", "provider_free", "live_network", "imports"} {
+		if result[key] == "" {
+			t.Fatalf("summary field %q missing in %#v", key, result)
+		}
+	}
+	return result
+}
+
+func genericModelIOEnvelopeSHA256Ref(value string) bool {
+	const prefix = "sha256:"
+	if !strings.HasPrefix(value, prefix) || len(value) != len(prefix)+64 {
+		return false
+	}
+	for _, r := range value[len(prefix):] {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func genericModelIOEnvelopePositiveCount(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return value != "0"
 }

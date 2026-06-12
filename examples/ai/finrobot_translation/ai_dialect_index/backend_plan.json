@@ -522,6 +522,17 @@
       "example": "examples/ai/coding_agent_replay.leia",
       "test": "tests/llm/llm_generic_model_io_envelope_test.go",
       "fixture": "examples/ai/coding_agent_replay.records.json",
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_model_io_envelope_test.go",
+        "command": "go test ./tests/llm -run TestGenericModelIOEnvelopeMainExecutableSmoke",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "request",
+          "replay",
+          "redaction"
+        ]
+      },
       "package_boundary": {
         "status": "checked_in",
         "package_id": "generic-model-io-envelope",
@@ -841,6 +852,17 @@
       "example": "examples/ai/coding_agent_replay.leia",
       "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
       "fixture": "examples/ai/coding_agent_replay.records.json",
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericToolRegistryMainSmokeOutput",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest",
+          "descriptor",
+          "approval"
+        ]
+      },
       "package_boundary": {
         "status": "checked_in",
         "package_id": "generic-tool-registry",

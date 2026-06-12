@@ -2,12 +2,15 @@ package leia_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
 
 type genericToolRegistryManifest struct {
@@ -515,6 +518,63 @@ func TestGenericToolRegistryFixturesCoverSchemaTraceApprovalNoSecretNoNetwork(t 
 	assertGenericToolRegistryNoSecretNoNetwork(t, base, contract)
 }
 
+func TestGenericToolRegistryMainSmokeOutput(t *testing.T) {
+	base := genericToolRegistryDir(t)
+	manifest := loadGenericToolRegistryManifest(t, base)
+	contract := genericToolRegistryContract{}
+	decodeGenericToolRegistryJSONFile(t, filepath.Join(base, "contracts", "tool_registry_contract.json"), &contract)
+
+	for _, mode := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			var prints []string
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString),
+				leia.WithPrint(func(args ...any) {
+					parts := make([]string, 0, len(args))
+					for _, arg := range args {
+						parts = append(parts, fmt.Sprint(arg))
+					}
+					prints = append(prints, strings.Join(parts, " "))
+				}),
+			}, mode.opts...)...)
+			if err := vm.ExecFile(filepath.Join(base, manifest.Entrypoints["main"])); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			got, err := vm.Get("generic_tool_registry_live_package_summary")
+			if err != nil {
+				t.Fatalf("Get generic_tool_registry_live_package_summary: %v", err)
+			}
+			summaryText, ok := got.(string)
+			if !ok {
+				t.Fatalf("summary = %T %#v, want string", got, got)
+			}
+			if len(prints) != 1 || prints[0] != summaryText {
+				t.Fatalf("prints = %#v, want one summary print %q", prints, summaryText)
+			}
+
+			summary := genericToolRegistrySummaryFields(t, summaryText)
+			if summary["approval_edges"] != fmt.Sprint(len(contract.ApprovalEdges)) ||
+				(summary["provider_free"] == "true") != manifest.ProviderFree ||
+				(summary["live_network"] == "true") != manifest.LiveNetworkDefault ||
+				(summary["imports"] == "true") != manifest.RealDependencyImportDefault ||
+				(summary["local_execution"] == "true") != manifest.LocalExecutionDefault ||
+				(summary["provider_free"] == "true") != contract.ProviderFree ||
+				(summary["live_network"] == "true") != contract.LiveNetwork ||
+				(summary["imports"] == "true") != contract.RealDependencyImports ||
+				(summary["local_execution"] == "true") != contract.LocalExecution {
+				t.Fatalf("summary does not align with package provider-free boundary: summary=%#v manifest=%#v contract=%#v", summary, manifest, contract)
+			}
+		})
+	}
+}
+
 func assertGenericToolRegistryFixtureBoundary(t *testing.T, fixture genericToolRegistryFixture) {
 	t.Helper()
 	if fixture.SchemaVersion != 1 {
@@ -632,4 +692,21 @@ func decodeGenericToolRegistryJSONFile(t *testing.T, path string, out any) {
 	if err := json.Unmarshal(data, out); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
+}
+
+func genericToolRegistrySummaryFields(t *testing.T, value string) map[string]string {
+	t.Helper()
+	fields := strings.Fields(value)
+	if len(fields) == 0 || fields[0] != "generic_tool_registry_live_package" {
+		t.Fatalf("unexpected summary prefix: %q", value)
+	}
+	result := map[string]string{}
+	for _, field := range fields[1:] {
+		parts := strings.SplitN(field, "=", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			t.Fatalf("malformed summary field %q in %q", field, value)
+		}
+		result[parts[0]] = parts[1]
+	}
+	return result
 }
