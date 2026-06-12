@@ -189,7 +189,25 @@ func (l *Lowered) RuntimeDescriptor() QSQLRuntimeDescriptor {
 
 // ExecRuntime executes a lowered qSQL read plan through the typed query kernel
 // backend when supported, preserving QueryPlan.Exec as the semantic fallback.
+// A from-position subquery executes against the source frame first; the outer
+// plan consumes its result.
 func (l *Lowered) ExecRuntime(frame data.Frame) (data.Frame, error) {
+	if l == nil {
+		return data.Frame{}, fmt.Errorf("nil qSQL runtime plan")
+	}
+	if l.Sub != nil {
+		inner, err := l.Sub.ExecRuntime(frame)
+		if err != nil {
+			return data.Frame{}, err
+		}
+		if len(l.Sub.HiddenCols) > 0 {
+			inner, err = data.DropColumns(inner, l.Sub.HiddenCols...)
+			if err != nil {
+				return data.Frame{}, err
+			}
+		}
+		frame = inner
+	}
 	return l.execRuntime(frame, qSQLDefaultRuntimeBackend)
 }
 
@@ -201,6 +219,7 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 		backend = qSQLDefaultRuntimeBackend
 	}
 	plan := l.Plan
+	qExpandRuntimeAllColumnSelects(&plan, frame)
 	plan.Source = frame
 	descriptor := l.RuntimeDescriptor()
 	if !descriptor.Valid() {
@@ -229,6 +248,38 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 	}
 	recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "hit", "typed_kernel")
 	return out, nil
+}
+
+// qExpandRuntimeAllColumnSelects expands the `*` select-all marker against
+// the runtime frame schema (the bind layer performs the same expansion in its
+// plan-alignment cache; this covers the in-package runtime path, where
+// subquery sources make the schema known only at execution time).
+func qExpandRuntimeAllColumnSelects(plan *data.QueryPlan, frame data.Frame) {
+	hasAll := false
+	for _, item := range plan.Select {
+		if lit, ok := item.Expr.(data.Literal); ok {
+			if _, isAll := lit.Value.(AllColumns); isAll {
+				hasAll = true
+				break
+			}
+		}
+	}
+	if !hasAll {
+		return
+	}
+	expanded := make([]data.SelectItem, 0, len(plan.Select)+len(frame.Schema().Names()))
+	for _, item := range plan.Select {
+		if lit, ok := item.Expr.(data.Literal); ok {
+			if _, isAll := lit.Value.(AllColumns); isAll {
+				for _, name := range frame.Schema().Names() {
+					expanded = append(expanded, data.SelectItem{Name: name, Expr: data.ColumnRef{Name: name}})
+				}
+				continue
+			}
+		}
+		expanded = append(expanded, item)
+	}
+	plan.Select = expanded
 }
 
 func qSQLRuntimeUnsupportedReason(descriptor QSQLRuntimeDescriptor, plan data.QueryPlan) string {

@@ -21,7 +21,10 @@ type Lowered struct {
 	Mutation    *MutationPlan
 	Join        *JoinPlan
 	Joins       []*JoinPlan
-	Original    *Query
+	// Sub is the lowered from-position subquery; it executes against the
+	// resolved source frame first and the outer plan runs on its result.
+	Sub      *Lowered
+	Original *Query
 }
 
 type ExecDictPlan struct {
@@ -52,13 +55,15 @@ type MutationAssignment struct {
 	Name data.Symbol
 	Func string
 	Expr data.Expr
+	// Weight is the wavg weight expression for grouped weighted updates.
+	Weight data.Expr
 }
 
 func Lower(query *Query) (*Lowered, error) {
 	if query == nil {
 		return nil, fmt.Errorf("nil q query")
 	}
-	if query.From == "" && query.FromExpr == nil {
+	if query.From == "" && query.FromExpr == nil && query.FromQuery == nil {
 		return nil, fmt.Errorf("q query missing from source")
 	}
 	switch query.Kind {
@@ -79,8 +84,21 @@ func lowerRead(query *Query) (*Lowered, error) {
 	plan := data.QueryPlan{LimitN: -1, Distinct: query.Distinct}
 	var sourceFrame *data.Frame
 	var literalKeys []data.Symbol
+	var sub *Lowered
+	source := query.From
 	sourcePath := ""
-	if query.FromExpr != nil {
+	if query.FromQuery != nil {
+		var err error
+		sub, err = lowerSubQuery(query.FromQuery)
+		if err != nil {
+			return nil, err
+		}
+		// The outer query resolves the innermost source; the sub plan runs
+		// on that frame first and the outer plan consumes its result.
+		source = sub.Source
+		sourcePath = sub.SourcePath
+		sourceFrame = sub.Frame
+	} else if query.FromExpr != nil {
 		literalKeys = keyedTableLiteralKeys(query.FromExpr)
 		if path, ok := qPathSource(query.FromExpr); ok {
 			sourcePath = path
@@ -103,7 +121,7 @@ func lowerRead(query *Query) (*Lowered, error) {
 	}
 	windowProjectionAggregates := join != nil && (join.Kind == "window" || join.Kind == "window1") && len(query.By) == 0
 	if query.Where != nil {
-		filter, err := lowerExpr(query.Where)
+		filter, err := lowerWhereExpr(query.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +160,7 @@ func lowerRead(query *Query) (*Lowered, error) {
 	if execDict == nil {
 		for _, column := range query.Columns {
 			if _, ok := column.Expr.(AllColumns); ok {
-				if sourceFrame != nil {
+				if sourceFrame != nil && sub == nil {
 					for _, name := range sourceFrame.Schema().Names() {
 						plan.Select = append(plan.Select, data.SelectItem{Name: name, Expr: data.ColumnRef{Name: name}})
 					}
@@ -171,6 +189,25 @@ func lowerRead(query *Query) (*Lowered, error) {
 				name := data.Symbol(column.Name)
 				if name == "" {
 					name = data.Symbol(call.Func)
+				}
+				if call.Func == "wavg" {
+					weight, value, err := splitWavgArgs(call.Arg)
+					if err != nil {
+						return nil, err
+					}
+					weightExpr, err := lowerExpr(weight)
+					if err != nil {
+						return nil, err
+					}
+					valueExpr, err := lowerExpr(value)
+					if err != nil {
+						return nil, err
+					}
+					if windowProjectionAggregates {
+						return nil, fmt.Errorf("q wavg is not supported as a window join projection")
+					}
+					plan.Aggregates = append(plan.Aggregates, data.Aggregate{Name: name, Func: "wavg", Expr: valueExpr, Weight: weightExpr})
+					continue
 				}
 				expr, err := lowerExpr(call.Arg)
 				if err != nil {
@@ -238,7 +275,7 @@ func lowerRead(query *Query) (*Lowered, error) {
 	}
 	return &Lowered{
 		Op:          query.Kind,
-		Source:      query.From,
+		Source:      source,
 		SourcePath:  sourcePath,
 		Frame:       sourceFrame,
 		LiteralKeys: literalKeys,
@@ -248,8 +285,29 @@ func lowerRead(query *Query) (*Lowered, error) {
 		ExecDict:    execDict,
 		Join:        join,
 		Joins:       joins,
+		Sub:         sub,
 		Original:    query,
 	}, nil
+}
+
+// lowerSubQuery lowers a from-position sub-select. Subqueries are restricted
+// to plain read plans: the outer query supplies join resolution and mutation
+// semantics, and exec subqueries do not produce a table.
+func lowerSubQuery(query *Query) (*Lowered, error) {
+	if query.Kind != SelectQuery {
+		return nil, fmt.Errorf("q subquery must be a select")
+	}
+	if query.Join != nil || len(query.Joins) > 0 {
+		return nil, fmt.Errorf("q subquery does not support joins")
+	}
+	sub, err := Lower(query)
+	if err != nil {
+		return nil, fmt.Errorf("q subquery: %w", err)
+	}
+	if sub.Mutation != nil || sub.ExecDict != nil {
+		return nil, fmt.Errorf("q subquery must be a plain select")
+	}
+	return sub, nil
 }
 
 func qOrderColumnAvailable(plan data.QueryPlan, name data.Symbol) bool {
@@ -699,6 +757,9 @@ func lowerMutation(query *Query) (*Lowered, error) {
 	if query.Distinct || len(query.OrderBy) > 0 || query.Limit != nil || query.Take != nil {
 		return nil, fmt.Errorf("q %s does not support distinct, order, limit, or take", query.Kind)
 	}
+	if query.FromQuery != nil {
+		return nil, fmt.Errorf("q %s does not support a subquery source", query.Kind)
+	}
 	if query.Kind != UpdateQuery && len(query.By) > 0 {
 		return nil, fmt.Errorf("q %s does not support by", query.Kind)
 	}
@@ -721,7 +782,7 @@ func lowerMutation(query *Query) (*Lowered, error) {
 
 	mutation := &MutationPlan{Kind: query.Kind}
 	if query.Where != nil {
-		filter, err := lowerExpr(query.Where)
+		filter, err := lowerWhereExpr(query.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -773,22 +834,38 @@ func lowerMutation(query *Query) (*Lowered, error) {
 			}
 			funcName := ""
 			exprNode := column.Expr
+			var weightExpr data.Expr
 			if len(mutation.ByExprs) > 0 {
-				call, ok := column.Expr.(Call)
-				if !ok || !isAggregate(call.Func) {
-					return nil, fmt.Errorf("q grouped update assignment %q requires an aggregate expression", column.Name)
+				if call, ok := column.Expr.(Call); ok && isAggregate(call.Func) {
+					// Grouped aggregate assignment: each group's scalar result
+					// is broadcast to the group rows.
+					funcName = call.Func
+					exprNode = call.Arg
+					if call.Func == "wavg" {
+						weight, value, err := splitWavgArgs(call.Arg)
+						if err != nil {
+							return nil, err
+						}
+						weightExpr, err = lowerExpr(weight)
+						if err != nil {
+							return nil, err
+						}
+						exprNode = value
+					}
 				}
-				funcName = call.Func
-				exprNode = call.Arg
+				// Non-aggregate expressions are grouped window assignments:
+				// the expression is evaluated over each group's rows and
+				// scattered back row-by-row (update s:sums v by g from t).
 			}
 			expr, err := lowerExpr(exprNode)
 			if err != nil {
 				return nil, err
 			}
 			mutation.Assignments = append(mutation.Assignments, MutationAssignment{
-				Name: data.Symbol(column.Name),
-				Func: funcName,
-				Expr: expr,
+				Name:   data.Symbol(column.Name),
+				Func:   funcName,
+				Expr:   expr,
+				Weight: weightExpr,
 			})
 		}
 	case DeleteQuery:
@@ -878,7 +955,12 @@ func lowerExpr(expr Expr) (data.Expr, error) {
 		return data.Literal{Value: v}, nil
 	case RawLiteral:
 		return data.Literal{Value: x.Value}, nil
+	case whereAggregate:
+		return lowerWhereAggregate(x)
 	case Binary:
+		if qLogicalOp(x.Op) == "like" {
+			return lowerLikeExpr(x.Left, x.Right)
+		}
 		left, err := lowerExpr(x.Left)
 		if err != nil {
 			return nil, err

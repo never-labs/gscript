@@ -368,7 +368,7 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 	for i, item := range byInputs {
 		cols = append(cols, Column{Name: item.Name, Data: unwrapAttributedArray(byArrays[i]).Gather(repRows)})
 	}
-	for _, plan := range plans {
+	for planIdx, plan := range plans {
 		switch plan.fn {
 		case "count":
 			values := make([]int64, groups)
@@ -377,7 +377,7 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 		case "sum":
 			values := make([]float64, groups)
 			copy(values, slots[plan.slot].sums[:groups])
-			cols = append(cols, Column{Name: plan.name, Data: columnArray[float64]{kind: KindF64, data: values}})
+			cols = append(cols, sumOutputColumnFromF64(frame, aggs[planIdx].Aggregate, values))
 		case "avg":
 			sums := slots[plan.slot].sums
 			values := make([]float64, groups)

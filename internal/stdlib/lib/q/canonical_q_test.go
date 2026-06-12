@@ -37,7 +37,7 @@ import (
 // Shrink-only ratchets: counts may go down (promotions) but never up without
 // an explicit, reviewed bump.
 const (
-	canonicalQGapMax = 44
+	canonicalQGapMax = 42
 	// Reviewed bump 30 -> 32: the parse-tree spelling deviations (verbs are
 	// symbol names, not function atoms; see value_eval_parse.go).
 	canonicalQDeviationMax = 32

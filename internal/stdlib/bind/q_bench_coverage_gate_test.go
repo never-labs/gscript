@@ -38,12 +38,11 @@ var qSQLQueryKindBacklog = map[string]string{}
 
 // qSQLAggregateBacklog lists aggregates accepted by lower.go that cannot be
 // covered with a working qSQL query today. Entries need a justification and
-// the list may only shrink.
-const qSQLAggregateBacklogMax = 1
+// the list may only shrink. It is empty: wavg gained its weighted form
+// (wavg[w;v]) and is covered by the GroupWavgBySym matrix case.
+const qSQLAggregateBacklogMax = 0
 
-var qSQLAggregateBacklog = map[string]string{
-	"wavg": "qSQL lowering builds data.Aggregate without a Weight expression (Call carries a single argument), so execution fails with 'aggregate wavg expects a weight expression'; cover once the parser/lowerer grows a weighted-aggregate form",
-}
+var qSQLAggregateBacklog = map[string]string{}
 
 // ---------------------------------------------------------------------------
 // Source extraction via go/ast.

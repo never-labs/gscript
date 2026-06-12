@@ -575,6 +575,34 @@ var qSQLMatrixBenchCases = []qSQLMatrixBenchCase{
 		query: "exec size from trades where active=true,price>=100",
 		goFn:  qSQLMatrixGoExecVectorWhere,
 	},
+	// --- ungrouped (whole-table) aggregates --------------------------------
+	{
+		name:  "UngroupedAggSumCountMax",
+		tags:  []string{"qsql", "matrix", "query:select", "ungrouped-agg", "where", "agg:sum", "agg:count", "agg:max"},
+		query: "select shares:sum size,fills:count i,hi:max price from trades where active=true",
+		goFn:  qSQLMatrixGoUngroupedAggSumCountMax,
+	},
+	// --- subquery sources ---------------------------------------------------
+	{
+		name:  "SubquerySelectFromSelect",
+		tags:  []string{"qsql", "matrix", "query:select", "subquery", "where"},
+		query: "select sym,price from (select sym,price,size from trades where active=true) where price>=100",
+		goFn:  qSQLMatrixGoSubquerySelectFromSelect,
+	},
+	// --- canonical select[n;>c] ---------------------------------------------
+	{
+		name:  "SelectNTopByPrice",
+		tags:  []string{"qsql", "matrix", "query:select", "select-n", "order", "take"},
+		query: "select[128;>price] sym,price from trades",
+		goFn:  qSQLMatrixGoSelectNTopByPrice,
+	},
+	// --- weighted average ----------------------------------------------------
+	{
+		name:  "GroupWavgBySym",
+		tags:  []string{"qsql", "matrix", "query:select", "group", "agg:wavg"},
+		query: "select vw:wavg[size;price] by sym from trades",
+		goFn:  qSQLMatrixGoGroupWavgBySym,
+	},
 }
 
 // ---------------------------------------------------------------------------
@@ -1011,7 +1039,7 @@ func qSQLMatrixGoGroupXbarBucket(rows int) int64 {
 	in := qSQLMatrixInput
 	nsym := len(qSQLMatrixSymbols)
 	type group struct {
-		shares float64
+		shares int64
 		fills  int64
 	}
 	groups := make(map[int64]group, rows/256)
@@ -1019,8 +1047,9 @@ func qSQLMatrixGoGroupXbarBucket(rows int) int64 {
 		bucket := int64(i) * 10_000_000_000 / 3_600_000_000_000
 		key := bucket*int64(nsym) + int64(i%nsym)
 		g := groups[key]
-		// The qSQL sum aggregate accumulates in float64.
-		g.shares += float64(in.size[i])
+		// The qSQL sum aggregate is kind-preserving: sums over integer
+		// columns stay i64.
+		g.shares += in.size[i]
 		g.fills++
 		groups[key] = g
 	}
@@ -1028,7 +1057,7 @@ func qSQLMatrixGoGroupXbarBucket(rows int) int64 {
 	for key, g := range groups {
 		bucketNanos := (key / int64(nsym)) * 3_600_000_000_000
 		s := int(key % int64(nsym))
-		sum += int64(len(qSQLMatrixSymbols[s])) + bucketNanos + qSQLMatrixBitsF64(g.shares) + g.fills
+		sum += int64(len(qSQLMatrixSymbols[s])) + bucketNanos + g.shares + g.fills
 	}
 	return sum
 }
@@ -1126,6 +1155,77 @@ func qSQLMatrixGoExecVectorWhere(rows int) int64 {
 		if in.active[i] && in.price[i] >= 100 {
 			sum += in.size[i]
 		}
+	}
+	return sum
+}
+
+//go:noinline
+func qSQLMatrixGoUngroupedAggSumCountMax(rows int) int64 {
+	in := qSQLMatrixInput
+	var shares, fills int64
+	hi := math.Inf(-1)
+	for i := 0; i < rows; i++ {
+		if !in.active[i] {
+			continue
+		}
+		// Kind-preserving columnar sums: integer columns stay i64.
+		shares += in.size[i]
+		fills++
+		if in.price[i] > hi {
+			hi = in.price[i]
+		}
+	}
+	return shares + fills + qSQLMatrixBitsF64(hi)
+}
+
+//go:noinline
+func qSQLMatrixGoSubquerySelectFromSelect(rows int) int64 {
+	in := qSQLMatrixInput
+	var sum int64
+	for i := 0; i < rows; i++ {
+		if !in.active[i] || in.price[i] < 100 {
+			continue
+		}
+		sum += int64(len(in.sym[i])) + qSQLMatrixBitsF64(in.price[i])
+	}
+	return sum
+}
+
+//go:noinline
+func qSQLMatrixGoSelectNTopByPrice(rows int) int64 {
+	in := qSQLMatrixInput
+	matched := make([]int, rows)
+	for i := 0; i < rows; i++ {
+		matched[i] = i
+	}
+	sort.SliceStable(matched, func(a, b int) bool {
+		return in.price[matched[a]] > in.price[matched[b]]
+	})
+	if len(matched) > 128 {
+		matched = matched[:128]
+	}
+	var sum int64
+	for _, i := range matched {
+		sum += int64(len(in.sym[i])) + qSQLMatrixBitsF64(in.price[i])
+	}
+	return sum
+}
+
+//go:noinline
+func qSQLMatrixGoGroupWavgBySym(rows int) int64 {
+	in := qSQLMatrixInput
+	nsym := len(qSQLMatrixSymbols)
+	weighted := make([]float64, nsym)
+	weights := make([]float64, nsym)
+	for i := 0; i < rows; i++ {
+		s := i % nsym
+		w := float64(in.size[i])
+		weighted[s] += w * in.price[i]
+		weights[s] += w
+	}
+	var sum int64
+	for s := 0; s < nsym && s < rows; s++ {
+		sum += int64(len(qSQLMatrixSymbols[s])) + qSQLMatrixBitsF64(weighted[s]/weights[s])
 	}
 	return sum
 }

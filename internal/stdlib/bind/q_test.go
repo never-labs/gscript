@@ -1933,8 +1933,8 @@ func TestQSQLSelectWhereByOverFrame(t *testing.T) {
 	if got := first.RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
 		t.Fatalf("rollup[1].sym = %v, want AAPL", got)
 	}
-	if got := first.RawGetString("notional"); !got.IsFloat() || got.Float() != 4600 {
-		t.Fatalf("rollup[1].notional = %v, want 4600", got)
+	if got := first.RawGetString("notional"); !got.IsInt() || got.Int() != 4600 {
+		t.Fatalf("rollup[1].notional = %v, want long 4600", got)
 	}
 	if got := first.RawGetString("fills"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("rollup[1].fills = %v, want 2", got)
@@ -1943,8 +1943,8 @@ func TestQSQLSelectWhereByOverFrame(t *testing.T) {
 	if got := second.RawGetString("sym"); !got.IsString() || got.Str() != "MSFT" {
 		t.Fatalf("rollup[2].sym = %v, want MSFT", got)
 	}
-	if got := second.RawGetString("notional"); !got.IsFloat() || got.Float() != 4400 {
-		t.Fatalf("rollup[2].notional = %v, want 4400", got)
+	if got := second.RawGetString("notional"); !got.IsInt() || got.Int() != 4400 {
+		t.Fatalf("rollup[2].notional = %v, want long 4400", got)
 	}
 
 	also := interp.GetGlobal("also").Table()
@@ -2780,11 +2780,11 @@ func TestQSQLExecDictionaryProjectionReturnsDictionary(t *testing.T) {
 	if notionals == nil || notionals.Length() != 3 {
 		t.Fatalf("notional_values len = %v, want 3", notionals)
 	}
-	if got := notionals.RawGetInt(1); !got.IsFloat() || got.Float() != 1000 {
-		t.Fatalf("notional_values[1] = %v, want 1000", got)
+	if got := notionals.RawGetInt(1); !got.IsInt() || got.Int() != 1000 {
+		t.Fatalf("notional_values[1] = %v, want long 1000", got)
 	}
-	if got := notionals.RawGetInt(3); !got.IsFloat() || got.Float() != 3600 {
-		t.Fatalf("notional_values[3] = %v, want 3600", got)
+	if got := notionals.RawGetInt(3); !got.IsInt() || got.Int() != 3600 {
+		t.Fatalf("notional_values[3] = %v, want long 3600", got)
 	}
 }
 
@@ -6549,8 +6549,8 @@ func TestQSQLXbarBucketExecution(t *testing.T) {
 	if got := buckets.RawGetInt(1).Table().RawGetString("bucket"); !got.IsInt() || got.Int() != 0 {
 		t.Fatalf("buckets[1].bucket = %v, want 0", got)
 	}
-	if got := buckets.RawGetInt(1).Table().RawGetString("qty"); !got.IsFloat() || got.Float() != 30 {
-		t.Fatalf("buckets[1].qty = %v, want 30", got)
+	if got := buckets.RawGetInt(1).Table().RawGetString("qty"); !got.IsInt() || got.Int() != 30 {
+		t.Fatalf("buckets[1].qty = %v, want long 30", got)
 	}
 	if got := buckets.RawGetInt(2).Table().RawGetString("bucket"); !got.IsInt() || got.Int() != 10 {
 		t.Fatalf("buckets[2].bucket = %v, want 10", got)
@@ -8076,8 +8076,8 @@ func TestQSQLMutationPlanCacheSplitsBySchemaFingerprint(t *testing.T) {
 	if got := interp.GetGlobal("f64_rows").Table().RawGetInt(1).Table().RawGetString("adjusted"); !got.IsFloat() || got.Float() != 101 {
 		t.Fatalf("f64 adjusted = %v, want 101", got)
 	}
-	if got := interp.GetGlobal("i64_rows").Table().RawGetInt(1).Table().RawGetString("adjusted"); !got.IsFloat() || got.Float() != 101 {
-		t.Fatalf("i64 adjusted = %v, want 101", got)
+	if got := interp.GetGlobal("i64_rows").Table().RawGetInt(1).Table().RawGetString("adjusted"); !got.IsInt() || got.Int() != 101 {
+		t.Fatalf("i64 adjusted = %v, want long 101", got)
 	}
 	if got := interp.GetGlobal("f64_again").Table().RawGetInt(1).Table().RawGetString("adjusted"); !got.IsFloat() || got.Float() != 101 {
 		t.Fatalf("f64_again adjusted = %v, want 101", got)
@@ -8831,7 +8831,7 @@ partitioned_result := q.sql(only, "select total:sum qty by sym from trades")
 	if got := row.RawGetString("sym"); !got.IsString() || got.Str() != "AAPL" {
 		t.Fatalf("partitioned sym = %v, want AAPL", got)
 	}
-	if got := row.RawGetString("total"); !got.IsNumber() || got.Float() != 40 {
+	if got := row.RawGetString("total"); !got.IsNumber() || got.Number() != 40 {
 		t.Fatalf("partitioned total = %v, want 40", got)
 	}
 }

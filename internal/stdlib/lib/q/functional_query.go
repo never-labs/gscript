@@ -144,6 +144,17 @@ func qFunctionalListExpr(list data.Array) (Expr, error) {
 	head, _ := list.At(0)
 	switch fn := head.(type) {
 	case qDyadicFunction:
+		if n == 2 && isAggregate(fn.name) {
+			// Dual unary/dyadic verbs (min/max) evaluate to dyadic atoms in
+			// this dialect; their one-operand parse-tree spelling is the
+			// unary aggregate ((max;`v) is the column maximum).
+			argValue, _ := list.At(1)
+			arg, err := qFunctionalExprFromValue(argValue)
+			if err != nil {
+				return nil, err
+			}
+			return Call{Func: fn.name, Arg: arg}, nil
+		}
 		if n != 3 {
 			return nil, fmt.Errorf("q functional parse tree (%s;...) expects two operands, got %d", fn.name, n-1)
 		}
@@ -335,12 +346,23 @@ func (p qFunctionalProjection) allAggregates() bool {
 
 func qFunctionalTopAggregate(v any) bool {
 	list, ok := v.(data.Array)
-	if !ok || list.Len() != 2 {
+	if !ok {
 		return false
 	}
 	head, _ := list.At(0)
-	fn, ok := head.(qUnaryFunction)
-	return ok && isAggregate(fn.name)
+	switch fn := head.(type) {
+	case qUnaryFunction:
+		return list.Len() == 2 && isAggregate(fn.name)
+	case qDyadicFunction:
+		// Dual unary/dyadic aggregates spelled unary ((max;`v)) and the
+		// weighted aggregate (wavg;`w;`v).
+		if list.Len() == 2 {
+			return isAggregate(fn.name)
+		}
+		return list.Len() == 3 && fn.name == "wavg"
+	default:
+		return false
+	}
 }
 
 func qFunctionalProjectionSpec(av any) (qFunctionalProjection, error) {
@@ -486,11 +508,9 @@ func (s *EvalState) evalFunctionalQueryForm(args []string) (any, error) {
 	} else {
 		query.Columns = proj.columns
 	}
-	if execForm && len(by) == 0 && proj.allAggregates() {
-		// Whole-table aggregates have no grouped query-plan shape; project
-		// the aggregate arguments and reduce through the eval verbs.
-		return s.qFunctionalExecUngroupedAggregates(table.frame, query, proj)
-	}
+	// Whole-table aggregates (no by) lower to the columnar ungrouped
+	// aggregate path: a one-row frame whose atoms qFunctionalExecResult
+	// extracts for the exec form.
 
 	lowered, err := Lower(query)
 	if err != nil {
@@ -520,58 +540,6 @@ func (s *EvalState) evalFunctionalQueryForm(args []string) (any, error) {
 		}
 	}
 	return out, nil
-}
-
-// qFunctionalExecUngroupedAggregates evaluates an exec form whose projections
-// are all whole-table aggregates: the aggregate arguments are projected as
-// plain columns through the query runtime (applying the constraints), then
-// each column is reduced with the matching eval verb.
-func (s *EvalState) qFunctionalExecUngroupedAggregates(frame data.Frame, query *Query, proj qFunctionalProjection) (any, error) {
-	argQuery := &Query{Kind: SelectQuery, From: functionalQuerySource, Where: query.Where, Take: query.Take}
-	calls := make([]Call, len(proj.columns))
-	for i, column := range proj.columns {
-		call, ok := column.Expr.(Call)
-		if !ok {
-			return nil, fmt.Errorf("q functional exec aggregate projection %q is not an aggregate call", column.Name)
-		}
-		calls[i] = call
-		argQuery.Columns = append(argQuery.Columns, Column{Name: column.Name, Expr: call.Arg})
-	}
-	lowered, err := Lower(argQuery)
-	if err != nil {
-		return nil, err
-	}
-	out, err := lowered.ExecRuntime(frame)
-	if err != nil {
-		return nil, err
-	}
-	reduce := func(i int) (any, error) {
-		arr, ok := out.Column(data.Symbol(proj.columns[i].Name))
-		if !ok {
-			return nil, fmt.Errorf("q functional exec result is missing column %q", proj.columns[i].Name)
-		}
-		fn, ok := lookupUnaryVerb(calls[i].Func)
-		if !ok {
-			return nil, fmt.Errorf("q functional exec aggregate %q has no eval verb", calls[i].Func)
-		}
-		return fn(arr)
-	}
-	if !proj.dict {
-		return reduce(0)
-	}
-	result := EvalDict{
-		Keys:   make([]any, len(proj.columns)),
-		Values: make([]any, len(proj.columns)),
-	}
-	for i := range proj.columns {
-		value, err := reduce(i)
-		if err != nil {
-			return nil, err
-		}
-		result.Keys[i] = data.Symbol(proj.columns[i].Name)
-		result.Values[i] = value
-	}
-	return result, nil
 }
 
 // qFunctionalRekey restores the source key columns on a select result when
@@ -750,7 +718,7 @@ func qFunctionalRunMutation(frame data.Frame, mutation *MutationPlan) (data.Fram
 		if len(mutation.ByExprs) > 0 {
 			assignments := make([]data.GroupedAssignment, len(mutation.Assignments))
 			for i, assign := range mutation.Assignments {
-				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr}
+				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr, Weight: assign.Weight}
 			}
 			return data.UpdateBy(frame, mutation.Where, mutation.ByExprs, assignments)
 		}
@@ -780,7 +748,7 @@ func qFunctionalRunKeyedMutation(keyed data.KeyedFrame, mutation *MutationPlan) 
 		if len(mutation.ByExprs) > 0 {
 			assignments := make([]data.GroupedAssignment, len(mutation.Assignments))
 			for i, assign := range mutation.Assignments {
-				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr}
+				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr, Weight: assign.Weight}
 			}
 			return data.UpdateByKeyed(keyed, mutation.Where, mutation.ByExprs, assignments)
 		}
