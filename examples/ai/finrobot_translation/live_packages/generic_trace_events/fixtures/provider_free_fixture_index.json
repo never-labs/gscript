@@ -69,6 +69,25 @@
         "replay_ready": true,
         "projection_ready": true
       }
+    },
+    {
+      "key": "generic_trace_events:projection:tool_invocation:summarize_rows:offline",
+      "path": "fixtures/tool_invocation_projection_fixture.json",
+      "schema": "schemas/tool_invocation_projection_v1.schema.json",
+      "description": "Provider-free projection from generic tool registry invocation traces into ai.trace.tool events.",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "domain_specific": false,
+        "live_network": false,
+        "live_model": false,
+        "credentials_required": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "projection_ready": true
+      }
     }
   ],
   "replay_mode": "deterministic_fixture_replay",

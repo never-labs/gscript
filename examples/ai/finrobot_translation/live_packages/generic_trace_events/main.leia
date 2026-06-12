@@ -15,7 +15,7 @@ generic_trace_events_live_package := {
     capability: "generic.ai.trace.events"
     emit_shape: "ai.trace.emit"
     event_types: {"turn_start", "stream", "tool", "artifact", "approval", "replay"}
-    projection_types: {"approval_trace_projection"}
+    projection_types: {"approval_trace_projection", "tool_invocation_projection"}
     envelope_event_types: {
         "turn_start",
         "turn_end",
@@ -52,7 +52,8 @@ generic_trace_events_live_package := {
         envelope_fixture_key: "generic_trace_events:envelope:workflow_agent:offline"
         expected_envelope_event_count: 10
         approval_projection_fixture_key: "generic_trace_events:projection:approval_trace:deny_order:offline"
-        expected_projection_count: 1
+        tool_projection_fixture_key: "generic_trace_events:projection:tool_invocation:summarize_rows:offline"
+        expected_projection_count: 2
         mismatch_policy: "fail_closed"
         allow_live_sink: false
     }
@@ -71,7 +72,7 @@ func generic_trace_events_contract_ok(pkg) {
         pkg.capability == "generic.ai.trace.events" &&
         pkg.emit_shape == "ai.trace.emit" &&
         #pkg.event_types == 6 &&
-        #pkg.projection_types == 1 &&
+        #pkg.projection_types == 2 &&
         #pkg.envelope_event_types == 10 &&
         #pkg.match_keys == 4 &&
         #pkg.correlation_ids == 4 &&
@@ -84,7 +85,7 @@ func generic_trace_events_contract_ok(pkg) {
         pkg.replay.mode == "deterministic_fixture_replay" &&
         pkg.replay.expected_event_count == 6 &&
         pkg.replay.expected_envelope_event_count == 10 &&
-        pkg.replay.expected_projection_count == 1 &&
+        pkg.replay.expected_projection_count == 2 &&
         pkg.replay.allow_live_sink == false
 }
 

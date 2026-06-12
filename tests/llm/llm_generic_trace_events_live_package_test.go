@@ -354,20 +354,20 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		manifest.DefaultPolicy.FixtureHook != "recorded_generic_trace_events_fixture" {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
-	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture"} {
+	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture", "tool_invocation_projection_fixture"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 		assertGenericTraceEventsEntrypointPath(t, manifest.Entrypoints[key])
 	}
-	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "redaction_policy", "correlation_ids"} {
+	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "redaction_policy", "correlation_ids"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericTraceEventsJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "redaction_policy"} {
+	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "redaction_policy"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -401,6 +401,7 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		"ai.trace.sequence_marker",
 		"ai.trace.fixture_replay",
 		"ai.trace.approval_projection",
+		"ai.trace.tool_invocation_projection",
 		"ai.trace.external_envelope_projection",
 	} {
 		if !genericTraceEventsContains(manifest.Capabilities, want) {
@@ -672,6 +673,77 @@ func TestGenericTraceEventsApprovalTraceProjection(t *testing.T) {
 		t.Fatalf("approval projection replay must be deterministic and offline: event=%#v source=%#v", event.Replay, source.Replay)
 	}
 	assertGenericTraceProjectionPayload(t, event.Payload, source, projection.Fallbacks.ApprovalIDWhenMissing)
+}
+
+func TestGenericTraceEventsToolInvocationProjection(t *testing.T) {
+	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
+	contract := loadGenericTraceEventsContract(t, base)
+	var projection genericTraceEventsApprovalProjectionFixture
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "tool_invocation_projection_fixture.json"), &projection)
+
+	sourcePath := filepath.Join(base, filepath.FromSlash(projection.Source.Fixture))
+	source := loadGenericToolRegistryFixture(t, sourcePath)
+
+	if manifest.Fixtures["tool_invocation_projection"] != "fixtures/tool_invocation_projection_fixture.json" ||
+		manifest.Schemas["tool_invocation_projection"] != "schemas/tool_invocation_projection_v1.schema.json" {
+		t.Fatalf("tool projection manifest entries missing: fixtures=%#v schemas=%#v", manifest.Fixtures, manifest.Schemas)
+	}
+	projectionContract := genericTraceEventsFindExternalProjection(contract, "generic-tool-invocation-to-ai-trace-tool")
+	if projectionContract.ID == "" {
+		t.Fatalf("missing tool invocation external projection contract: %#v", contract.ExternalEnvelopeProjections)
+	}
+	if projectionContract.SourceFixture != projection.Source.Fixture ||
+		projectionContract.SourceSchema != projection.Source.Schema ||
+		projectionContract.TargetFixture != manifest.Fixtures["tool_invocation_projection"] ||
+		projectionContract.TargetSchema != projection.Target.Schema ||
+		projectionContract.TargetEventType != projection.Target.EventType ||
+		projectionContract.TargetCapability != projection.Target.Capability {
+		t.Fatalf("tool projection manifest/contract/fixture disconnected: contract=%#v projection=%#v", projectionContract, projection)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork || projection.LiveModel ||
+		projection.CredentialsRequired || projection.RealDependencyImports ||
+		!projectionContract.ProviderFree || projectionContract.LiveNetwork || projectionContract.LiveModel ||
+		projectionContract.CredentialsRequired || projectionContract.RealDependencyImports {
+		t.Fatalf("tool projection must stay provider-free/offline: projection=%#v contract=%#v", projection, projectionContract)
+	}
+	assertGenericTraceEventsSameStrings(t, "tool projection source paths", projectionContract.RequiredSourcePaths, []string{
+		"trace.trace_id",
+		"trace.tool_name",
+		"trace.caller_id",
+		"trace.executor_id",
+		"trace.capability_ids",
+		"trace.events",
+		"trace.schema_validation",
+		"trace.approval.decision",
+		"trace.result.status",
+		"trace.result.content",
+		"trace.provenance.fixture_key",
+	})
+
+	event := projection.ProjectedEvent
+	if event.SchemaVersion != 1 ||
+		!event.ProviderFree ||
+		event.LiveNetwork ||
+		event.RealDependencyImports ||
+		event.TraceID != source.Trace.TraceID ||
+		event.EventType != "tool" ||
+		event.Capability != "ai.trace.tool" {
+		t.Fatalf("projected tool trace event header invalid: event=%#v source=%#v", event, source.Trace)
+	}
+	if event.Correlation.TraceID != event.TraceID ||
+		event.Correlation.ToolCallID == "" ||
+		event.Payload["tool_call_id"] != event.Correlation.ToolCallID {
+		t.Fatalf("projected tool trace correlation invalid: event=%#v payload=%#v", event.Correlation, event.Payload)
+	}
+	if event.Redaction.SecretValuesPresent ||
+		event.Redaction.Status != "clean" ||
+		len(event.Redaction.RedactedFields) != 0 ||
+		!event.Replay.Deterministic ||
+		event.Replay.LiveSink {
+		t.Fatalf("tool projection redaction/replay invalid: redaction=%#v replay=%#v", event.Redaction, event.Replay)
+	}
+	assertGenericTraceToolProjectionPayload(t, event.Payload, source)
 }
 
 func TestGenericTraceEventsRedactionPolicy(t *testing.T) {
@@ -1037,7 +1109,9 @@ func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
 		"fixtures/provider_free_fixture_index.json",
 		"fixtures/redaction_policy_fixture.json",
 		"fixtures/trace_envelope_fixture.json",
+		"fixtures/tool_invocation_projection_fixture.json",
 		"schemas/approval_trace_projection_v1.schema.json",
+		"schemas/tool_invocation_projection_v1.schema.json",
 		"fixtures/trace_sequence_ACME_fixture.json",
 		"schemas/correlation_ids_v1.schema.json",
 		"schemas/redaction_policy_v1.schema.json",
@@ -1114,6 +1188,39 @@ func assertGenericTraceProjectionPayload(t *testing.T, payload map[string]any, s
 		if value, ok := payload["source_approval_id"]; !ok || value != nil {
 			t.Fatalf("projected payload source_approval_id = %#v, want null; payload=%#v", value, payload)
 		}
+	}
+}
+
+func assertGenericTraceToolProjectionPayload(t *testing.T, payload map[string]any, source genericToolRegistryFixture) {
+	t.Helper()
+	wantStrings := map[string]string{
+		"tool_name":          source.Trace.ToolName,
+		"caller_id":          source.Trace.CallerID,
+		"executor_id":        source.Trace.ExecutorID,
+		"approval_decision":  source.Trace.Approval.Decision,
+		"status":             source.Trace.Result.Status,
+		"text_preview":       source.Trace.Result.Content,
+		"source_fixture_key": source.Trace.Provenance.FixtureKey,
+		"provider_name":      "generic",
+	}
+	for key, want := range wantStrings {
+		if got, _ := payload[key].(string); got != want {
+			t.Fatalf("projected tool payload[%s] = %#v, want %q; payload=%#v", key, payload[key], want, payload)
+		}
+	}
+	if payload["input_digest"] == "" || payload["output_digest"] == "" {
+		t.Fatalf("projected tool payload must carry digests, not raw inputs: %#v", payload)
+	}
+	capabilities, ok := payload["capability_ids"].([]any)
+	if !ok || len(capabilities) != len(source.Trace.CapabilityIDs) {
+		t.Fatalf("projected tool payload capability_ids = %#v, want %d values", payload["capability_ids"], len(source.Trace.CapabilityIDs))
+	}
+	schemaValidation, ok := payload["schema_validation"].(map[string]any)
+	if !ok ||
+		schemaValidation["input_valid"] != source.Trace.SchemaValidation.InputValid ||
+		schemaValidation["output_valid"] != source.Trace.SchemaValidation.OutputValid ||
+		schemaValidation["additional_properties_rejected"] != source.Trace.SchemaValidation.AdditionalPropertiesRejected {
+		t.Fatalf("projected tool schema validation = %#v, want source %#v", payload["schema_validation"], source.Trace.SchemaValidation)
 	}
 }
 

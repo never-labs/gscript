@@ -168,6 +168,56 @@
       "live_model": false,
       "credentials_required": false,
       "real_dependency_imports": false
+    },
+    {
+      "id": "generic-tool-invocation-to-ai-trace-tool",
+      "source_package": "generic-tool-registry-live-package",
+      "source_schema": "../generic_tool_registry/schemas/tool_invocation_trace.schema.json",
+      "source_fixture": "../generic_tool_registry/fixtures/tool_registry_replay_trace_fixture.json",
+      "source_kind": "generic_tool_invocation_trace",
+      "target_schema": "schemas/trace_event_v1.schema.json",
+      "target_fixture": "fixtures/tool_invocation_projection_fixture.json",
+      "target_event_type": "tool",
+      "target_capability": "ai.trace.tool",
+      "required_source_paths": [
+        "trace.trace_id",
+        "trace.tool_name",
+        "trace.caller_id",
+        "trace.executor_id",
+        "trace.capability_ids",
+        "trace.events",
+        "trace.schema_validation",
+        "trace.approval.decision",
+        "trace.result.status",
+        "trace.result.content",
+        "trace.provenance.fixture_key"
+      ],
+      "required_target_paths": [
+        "trace_id",
+        "event_id",
+        "event_type",
+        "capability",
+        "correlation.tool_call_id",
+        "payload.tool_call_id",
+        "payload.tool_name",
+        "payload.caller_id",
+        "payload.executor_id",
+        "payload.capability_ids",
+        "payload.schema_validation",
+        "payload.approval_decision",
+        "payload.status",
+        "payload.input_digest",
+        "payload.output_digest",
+        "payload.source_fixture_key",
+        "redaction.secret_values_present",
+        "replay.deterministic"
+      ],
+      "null_policy": "stable_trace_correlation_fallbacks_for_missing_external_ids",
+      "provider_free": true,
+      "live_network": false,
+      "live_model": false,
+      "credentials_required": false,
+      "real_dependency_imports": false
     }
   ]
 }
