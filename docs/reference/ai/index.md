@@ -263,6 +263,17 @@ For explicit custom control, use `llm.agent(name, configFn, flowFn, opts)`.
 Custom flow functions call `llm.turn` and `llm.dispatch` directly; no hidden
 turn or dispatch occurs.
 
+Use `llm.agent_state_checkpoint(state, opts)` when a custom flow needs a
+portable resume marker or trace checkpoint. The helper returns a provider-free,
+ref-only table with `kind: "agent_state_checkpoint"`, schema/version metadata,
+agent/session/state identifiers, input/output/memory refs, deterministic
+`checkpoint_key` and `cache_key` values, a `resume_token`, redaction metadata,
+and trace correlation fields. `llm.agent_state_checkpoint_event(checkpoint,
+opts)` or `llm.agent_state_checkpoint_trace_event(...)` projects that checkpoint
+into a generic trace event. The helpers do not persist state, call providers,
+or copy raw prompts, raw inputs, raw outputs, credentials, or provider
+completions into payloads.
+
 ## Agent As Tool
 
 Use `llm.agent_as_tool(agent_value)` when a supervisor agent should call another
