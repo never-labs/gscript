@@ -460,50 +460,62 @@ func qCastTruncatedFloatInteger(value float64) (int64, bool) {
 	return int64(value), true
 }
 
+// castScalarStringValue parses text for a string-to-value cast. Canonical q
+// semantics: a failed numeric parse yields the target's null ("J"$"junk" is
+// 0N), never an error.
 func castScalarStringValue(kind data.Kind, text string) (any, bool, error) {
 	switch kind {
 	case data.KindSymbol:
 		return data.Symbol(text), true, nil
+	case data.KindBool:
+		// Canonical "B"$: the true spellings parse to 1b, anything else
+		// (including junk) is 0b — bool has no null.
+		switch strings.TrimSpace(text) {
+		case "1", "t", "T", "y", "Y", "true", "TRUE":
+			return true, true, nil
+		default:
+			return false, true, nil
+		}
 	case data.KindI8:
 		n, err := strconv.ParseInt(text, 10, 8)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return int8(n), true, nil
 	case data.KindI16:
 		n, err := strconv.ParseInt(text, 10, 16)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return int16(n), true, nil
 	case data.KindI32:
 		n, err := strconv.ParseInt(text, 10, 32)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return int32(n), true, nil
 	case data.KindI64:
 		n, err := strconv.ParseInt(text, 10, 64)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return n, true, nil
 	case data.KindU8:
 		n, err := strconv.ParseUint(text, 10, 8)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return uint8(n), true, nil
 	case data.KindF32:
 		n, err := strconv.ParseFloat(text, 32)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return float32(n), true, nil
 	case data.KindF64:
 		n, err := strconv.ParseFloat(text, 64)
 		if err != nil {
-			return nil, true, err
+			return data.NullForKind(kind), true, nil
 		}
 		return n, true, nil
 	default:
@@ -738,16 +750,16 @@ func qTemporalAccessorName(domain any) (string, bool) {
 		return "", false
 	}
 	switch string(sym) {
-	case "year", "mm", "dd", "hh", "ss", "week":
+	case "year", "mm", "dd", "hh", "uu", "ss", "week":
 		return string(sym), true
 	default:
 		return "", false
 	}
 }
 
-// qTemporalAccessorCast applies `year$ `mm$ `dd$ `hh$ `ss$ `week$ to temporal
-// operands. Non-temporal operands decline so symbol enum casts keep their
-// behavior.
+// qTemporalAccessorCast applies `year$ `mm$ `dd$ `hh$ `uu$ `ss$ `week$ to
+// temporal operands. Non-temporal operands decline so symbol enum casts keep
+// their behavior.
 func qTemporalAccessorCast(domain any, values any) (any, bool, error) {
 	name, ok := qTemporalAccessorName(domain)
 	if !ok {
@@ -837,6 +849,11 @@ func qTemporalAccessorScalar(name string, value any) (any, error) {
 	case "hh":
 		if nanos, ok := qTemporalTimeOfDayNanos(kind, u); ok {
 			return floorDiv(nanos, 60*temporalNanosPerMinute), nil
+		}
+	case "uu":
+		// Canonical `uu$ is minute-of-hour on every time-bearing kind.
+		if nanos, ok := qTemporalTimeOfDayNanos(kind, u); ok {
+			return floorMod(floorDiv(nanos, temporalNanosPerMinute), 60), nil
 		}
 	case "ss":
 		switch kind {

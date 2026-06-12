@@ -2845,6 +2845,9 @@ func (s *EvalState) eval(src string) (any, error) {
 	if out, ok, err := s.evalControlSpecialForm(src); ok || err != nil {
 		return out, err
 	}
+	if out, ok, err := evalConsoleWriteForm(src); ok || err != nil {
+		return out, err
+	}
 	if out, ok, err := s.evalFunctionalAmendForm(src); ok || err != nil {
 		return out, err
 	}
@@ -8505,9 +8508,24 @@ func evalValueKey(v any) string {
 	return fmt.Sprintf("%T:%#v", v, v)
 }
 
+var qFbyAggregateNames = []string{"sum", "sums", "avg", "var", "dev", "med", "min", "max", "first", "last", "count"}
+
 func parseFbyAggregate(src string) (string, string, error) {
 	src = strings.TrimSpace(src)
-	for _, name := range []string{"sum", "sums", "avg", "var", "dev", "med", "min", "max", "first", "last", "count"} {
+	// Canonical tuple spelling (agg;values) fby group, accepted alongside the
+	// dialect's word form `agg values fby group`.
+	if enclosed(src, '(', ')') {
+		inner := strings.TrimSpace(src[1 : len(src)-1])
+		if parts := splitTopLevelDelim(inner, ';'); len(parts) == 2 {
+			name := strings.TrimSpace(parts[0])
+			for _, agg := range qFbyAggregateNames {
+				if name == agg {
+					return agg, strings.TrimSpace(parts[1]), nil
+				}
+			}
+		}
+	}
+	for _, name := range qFbyAggregateNames {
 		if src == name {
 			return "", "", fmt.Errorf("fby %s requires a value vector", name)
 		}
@@ -11023,6 +11041,58 @@ func parseSymbolList(src string) ([]data.Symbol, error) {
 	return out, nil
 }
 
+// evalConsoleWriteForm implements the canonical q console handle write
+// h "text": handle 1/-1 is stdout, 2/-2 is stderr, the chars are written
+// (negative handles append a newline) and the handle is returned. Only the
+// literal-handle literal-string spelling is claimed — anything else falls
+// through to the ordinary cascade — so the check is pure syntax and never
+// double-evaluates an expression with side effects.
+func evalConsoleWriteForm(src string) (any, bool, error) {
+	if len(src) == 0 {
+		return nil, false, nil
+	}
+	switch src[0] {
+	case '1', '2', '-':
+	default:
+		return nil, false, nil
+	}
+	sp := strings.IndexAny(src, " \t")
+	if sp < 0 {
+		return nil, false, nil
+	}
+	var handle int64
+	switch src[:sp] {
+	case "1":
+		handle = 1
+	case "-1":
+		handle = -1
+	case "2":
+		handle = 2
+	case "-2":
+		handle = -2
+	default:
+		return nil, false, nil
+	}
+	rest := strings.TrimSpace(src[sp:])
+	if len(rest) < 2 || rest[0] != '"' || rest[len(rest)-1] != '"' {
+		return nil, false, nil
+	}
+	text, err := strconv.Unquote(rest)
+	if err != nil {
+		return nil, false, nil
+	}
+	out := os.Stdout
+	if handle == 2 || handle == -2 {
+		out = os.Stderr
+	}
+	if handle < 0 {
+		fmt.Fprintln(out, text)
+	} else {
+		fmt.Fprint(out, text)
+	}
+	return handle, true, nil
+}
+
 func parseAtomOrVector(src string) (any, error) {
 	if strings.HasPrefix(src, "\"") && strings.HasSuffix(src, "\"") {
 		v, err := strconv.Unquote(src)
@@ -12323,6 +12393,15 @@ func amendInputValues(value any, count int) ([]any, error) {
 	if count == 1 {
 		return []any{value}, nil
 	}
+	// Canonical q broadcasts an atom amend value over every index
+	// (@[1 2 3;0 1;+;10] -> 11 12 3).
+	if _, isArray := value.(data.Array); !isArray {
+		items := make([]any, count)
+		for i := range items {
+			items[i] = value
+		}
+		return items, nil
+	}
 	items, err := vectorValues(value)
 	if err != nil {
 		return nil, fmt.Errorf("amend value length mismatch")
@@ -12338,18 +12417,9 @@ func vectorAmend(array data.Array, key any, value any) (data.Array, error) {
 	if err != nil {
 		return nil, err
 	}
-	values := make([]any, len(indexes))
-	if len(indexes) == 1 {
-		values[0] = value
-	} else {
-		items, err := vectorValues(value)
-		if err != nil {
-			return nil, fmt.Errorf("amend value length mismatch")
-		}
-		if len(items) != len(indexes) {
-			return nil, fmt.Errorf("amend value length mismatch")
-		}
-		copy(values, items)
+	values, err := amendInputValues(value, len(indexes))
+	if err != nil {
+		return nil, err
 	}
 	return vectorAmendIndexes(array, indexes, values)
 }
@@ -12663,6 +12733,11 @@ func dictSymbolKeys(d EvalDict) ([]data.Symbol, error) {
 }
 
 func keyedTableByCount(keys any, values any) (any, bool, error) {
+	// Canonical n! applies to keyed tables too: 0!kt unkeys (the 0!1!t
+	// round-trip), n!kt rekeys the flattened table on its first n columns.
+	if keyed, ok := values.(data.KeyedFrame); ok {
+		values = keyed.Frame()
+	}
 	frame, ok := values.(data.Frame)
 	if !ok {
 		return nil, false, nil
@@ -14407,8 +14482,29 @@ func upperValue(v any) (any, error) {
 }
 
 func mapStringValue(name string, v any, fn func(string) string) (any, error) {
+	// Canonical q: upper/lower are type-preserving on symbols (`upper `ab
+	// is `AB, not "AB"); symbol atoms and symbol vectors stay symbols.
+	if name == "upper" || name == "lower" {
+		if sym, ok := v.(data.Symbol); ok {
+			return data.Symbol(fn(string(sym))), nil
+		}
+	}
 	if array, ok := v.(data.Array); ok {
 		if name == "upper" || name == "lower" {
+			if array.Kind() == data.KindSymbol {
+				out := make([]string, array.Len())
+				for i, item := range array.Values() {
+					switch sym := item.(type) {
+					case data.Symbol:
+						out[i] = fn(string(sym))
+					case string:
+						out[i] = fn(sym)
+					default:
+						return nil, fmt.Errorf("%s symbol row %d is not a symbol", name, i+1)
+					}
+				}
+				return data.NewSymbols(out), nil
+			}
 			typed, handled, err := data.TryTypedStringCase(array, name == "upper")
 			recordRuntimeKernelProbe("ArrayStringCase", name+"/"+string(array.Kind()), handled, err)
 			if err != nil || handled {
@@ -14868,7 +14964,9 @@ func prd(v any) (any, error) {
 		}
 	}
 	if !seen {
-		return data.NullValue, nil
+		// Canonical q: prd ignores nulls, so an all-null vector is the empty
+		// product 1 (prd 0N 0N -> 1), mirroring sum 0N 0N -> 0.
+		return qProductIdentityForKind(array.Kind()), nil
 	}
 	if hasFloat {
 		return totalF, nil
@@ -15340,7 +15438,10 @@ func value(v any) (any, error) {
 	case qEnumVector:
 		return x.decodedArray(), nil
 	case EvalDict:
-		return data.NewAny(x.Values), nil
+		// Canonical q: value of a dict is its value LIST as stored —
+		// homogeneous values compact to a typed vector (value `a`b!1 2 is
+		// 1 2j, not a generic list), mixed values stay generic.
+		return data.InferArray(x.Values), nil
 	case data.KeyedFrame:
 		return x.ValueFrame()
 	case string:
@@ -18359,6 +18460,21 @@ func compareOrdered(left, right any) (int, error) {
 		return compareFloat(ln, rn), nil
 	}
 	switch l := left.(type) {
+	case bool:
+		// Booleans are not numbers in this dialect, but they ARE ordered:
+		// 0b < 1b (canonical asc 101b -> 011b).
+		r, ok := right.(bool)
+		if !ok {
+			return 0, fmt.Errorf("ordered comparison type mismatch %T and %T", left, right)
+		}
+		switch {
+		case l == r:
+			return 0, nil
+		case r:
+			return -1, nil
+		default:
+			return 1, nil
+		}
 	case string:
 		if r, ok := right.(data.Symbol); ok {
 			return strings.Compare(l, string(r)), nil

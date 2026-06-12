@@ -54,11 +54,11 @@ func TestValueVerbDispatchMatrix(t *testing.T) {
 	if got := evalOnFresh(t, "value 42"); got != int64(42) {
 		t.Errorf("value 42 = %v, want 42", got)
 	}
-	// dict -> values as a generic list (pre-existing behavior kept; the
-	// generic-vs-typed shape is a documented canonical deviation).
+	// dict -> values, typed when homogeneous (canonical: value `a`b!1 2 is
+	// the long vector 1 2, not a generic list).
 	got := evalOnFresh(t, "value `a`b!1 2")
-	if !matchValue(got, data.NewAny([]any{int64(1), int64(2)})) {
-		t.Errorf("value `a`b!1 2 = %#v, want generic (1;2)", got)
+	if array, ok := got.(data.Array); !ok || array.Kind() != data.KindI64 || !matchValue(got, data.NewI64([]int64{1, 2})) {
+		t.Errorf("value `a`b!1 2 = %#v, want typed long vector 1 2", got)
 	}
 	// enum -> decoded values (pre-existing behavior kept).
 	gotEnum := evalOnFresh(t, "value `sym$`AAPL`MSFT")

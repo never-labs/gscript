@@ -21,7 +21,7 @@ match	2*0N	0N
 match	0N%2	0n
 match	1%0	0w
 match	-1%0	-0w
-deviation	0%0	0n	NAN	bitmap nulls: float NaN is distinct from null
+deviation	0%0	0n	NAN	single-null design: the dialect has ONE untyped null; IEEE NaN is an ordinary float value distinct from it, where canonical q's float null 0n doubles as NaN
 match	1+0n	0n
 match	0N-1	0N
 match	neg 0N	0N
@@ -46,7 +46,7 @@ match	first 0N 1	0N
 match	sums 1 0N 3	1 1 4
 match	var 1 0N 3	1f
 match	avg 1 2 0n	1.5
-deviation	sum 0n 1	1f	1	bitmap nulls: 0n in a long vector context becomes 0N, sum stays long
+deviation	sum 0n 1	1f	1	single-null design: 0n denotes the one untyped null, so 0n 1 is a long vector with a null and sum stays long; canonical's typed float null floats the vector
 match	max 0N 0N	0N
 # ---- empty-vector identities ----
 match	sum 0#0	0
@@ -70,26 +70,26 @@ match	first 0#0.0	0n
 # ---- promotion matrix corners ----
 match	1+2	3
 match	1+2.5	3.5
-deviation	1i+1i	2i	2	long promotion: int arithmetic widens to long
+deviation	1i+1i	2i	2	long-promotion design: the dialect's only integer surface type is long; all narrower integer results widen to long (canonical keeps int+int at int)
 match	1i+1j	2
-deviation	1b+1b	2i	ERROR:numeric operands	truthiness booleans: no boolean arithmetic
-deviation	1b+1	2	ERROR:numeric operands	truthiness booleans: no boolean arithmetic
-deviation	1b+1f	2f	ERROR:numeric operands	truthiness booleans: no boolean arithmetic
+deviation	1b+1b	2i	ERROR:numeric operands	boolean-is-logical design: booleans are truth values, not 1-bit integers; arithmetic on them is a type error where canonical q widens 1b to 1
+deviation	1b+1	2	ERROR:numeric operands	boolean-is-logical design: booleans are truth values, not 1-bit integers; arithmetic on them is a type error where canonical q widens 1b to 1
+deviation	1b+1f	2f	ERROR:numeric operands	boolean-is-logical design: booleans are truth values, not 1-bit integers; arithmetic on them is a type error where canonical q widens 1b to 1
 match	1i+1f	2f
 match	2=2.0	1b
 match	1i=1j	1b
 match	2 xexp 10	1024f
 match	sqrt 4	2f
-deviation	sqrt -1	0n	NAN	bitmap nulls: NaN result is not null
+deviation	sqrt -1	0n	NAN	single-null design: the dialect has ONE untyped null; IEEE NaN is an ordinary float value distinct from it, where canonical q's float null 0n doubles as NaN
 match	exp 0	1f
 match	log 1	0f
 match	log 0	-0w
-deviation	log -1	0n	NAN	bitmap nulls: NaN result is not null
+deviation	log -1	0n	NAN	single-null design: the dialect has ONE untyped null; IEEE NaN is an ordinary float value distinct from it, where canonical q's float null 0n doubles as NaN
 match	floor 2.7	2
 match	ceiling 2.1	3
 match	floor -2.5	-3
-deviation	signum -3	-1i	-1	long promotion: signum returns long, canonical returns int
-deviation	signum 0	0i	0	long promotion: signum returns long, canonical returns int
+deviation	signum -3	-1i	-1	long-promotion design: the dialect's only integer surface type is long; all narrower integer results widen to long (canonical signum returns int)
+deviation	signum 0	0i	0	long-promotion design: the dialect's only integer surface type is long; all narrower integer results widen to long (canonical signum returns int)
 match	reciprocal 4	0.25
 match	abs -5	5
 match	neg 5	-5
@@ -111,7 +111,7 @@ match	1~1f	0b
 match	()~()	1b
 match	(0#0)~()	0b
 match	1 2~1 2	1b
-deviation	0n~0N	0b	1b	single null model: typed nulls are not distinguished
+deviation	0n~0N	0b	1b	single-null design: 0n and 0N spell the same (only) null, so they match; canonical q has per-type nulls that do not match each other
 match	null 0N	1b
 match	null 0n	1b
 match	not 0	1b
@@ -196,7 +196,7 @@ match	(`a`b!1 2)`a	1
 match	(`a`b!1 2)`c	0N
 match	(`a`b!1 2)@`b`a	2 1
 match	key `a`b!1 2	`a`b
-deviation	value `a`b!1 2	1 2	value `x`y!1 2	dict values are returned as a generic list, canonical returns typed
+match	value `a`b!1 2	1 2
 match	(`a`b!1 2)?2	`b
 match	(`a`b!1 2)?99	`$""
 match	(`a`a!1 2)`a	1
@@ -307,14 +307,14 @@ match	"abc" like "a*"	1b
 match	"abc" like "a?c"	1b
 match	count "abc"	3
 match	reverse ""	""
-deviation	lower `ABC	`abc	"abc"	symbol case ops return strings
-deviation	upper `ab	`AB	"AB"	symbol case ops return strings
-deviation	raze string `ab`cd	"abcd"	("ab";"cd")	strings are atoms, not char lists, so raze does not concatenate
+match	lower `ABC	`abc
+match	upper `ab	`AB
+deviation	raze string `ab`cd	"abcd"	("ab";"cd")	strings-are-atoms design: a string is a scalar, not a char list, so string of a symbol vector is a string vector and raze returns it unchanged instead of concatenating
 match	"abc" 1	"b"
 match	("ab")@5	" "
 match	5$"ab"	"ab   "
 match	-5$"ab"	"   ab"
-deviation	1 "hello"	1	ERROR:mixed-type vector literal	canonical q applies an int atom to a string as a write to console handle 1 (prints, returns the handle); Leia rejects mixed juxtaposition with a parse error
+match	1 "hello"	1
 # ---- numeric encode / decode ----
 match	2 vs 10	1 0 1 0
 match	2 sv 1 0 1 0	10
@@ -326,12 +326,12 @@ match	12:00<13:00	1b
 match	12:30:00>12:29:59	1b
 match	2024.01.01=2024.01.01	1b
 match	2024.01.01+1	2024.01.02
-deviation	2024.01.02-2024.01.01	1i	1	width-only: the dialect promotes all ints to long by design, so temporal difference returns long where canonical returns int
+deviation	2024.01.02-2024.01.01	1i	1	long-promotion design: the dialect's only integer surface type is long; all narrower integer results widen to long (canonical date difference returns int)
 match	(2024.01.02-2024.01.01)=1	1b
 match	2024.05m+1	2024.06m
-deviation	`mm$2024.05.01	5i	5	width-only: the dialect promotes all ints to long by design, so temporal accessor casts return long where canonical returns int
+deviation	`mm$2024.05.01	5i	5	long-promotion design: the dialect's only integer surface type is long; all narrower integer results widen to long (canonical temporal accessor casts return int)
 match	(`mm$2024.05.01)=5	1b
-deviation	`year$2024.05.01	2024i	2024	width-only: the dialect promotes all ints to long by design, so temporal accessor casts return long where canonical returns int
+deviation	`year$2024.05.01	2024i	2024	long-promotion design: the dialect's only integer surface type is long; all narrower integer results widen to long (canonical temporal accessor casts return int)
 match	(`year$2024.05.01)=2024	1b
 match	2024.01.31+1	2024.02.01
 match	1+2024.01.31	2024.02.01
@@ -360,21 +360,21 @@ match	$[0;1;0;2;3]	3
 match	?[1 0 1b;10 20 30;77 88 99]	10 88 30
 match	i:0;while[i<3;i:i+1];i	3
 # ---- type verb ----
-deviation	type 1	-7h	-7	type returns long, canonical returns short
-deviation	type 1 2	7h	7	type returns long, canonical returns short
-deviation	type 1.5	-9h	-9	type returns long, canonical returns short
-deviation	type `a	-11h	-11	type returns long, canonical returns short
-deviation	type "ab"	10h	10	type returns long, canonical returns short
-deviation	type ()	0h	0	type returns long, canonical returns short
+deviation	type 1	-7h	-7	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
+deviation	type 1 2	7h	7	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
+deviation	type 1.5	-9h	-9	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
+deviation	type `a	-11h	-11	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
+deviation	type "ab"	10h	10	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
+deviation	type ()	0h	0	long-promotion design applied to type: codes agree with canonical numerically but are returned as long because the dialect has no short atom surface
 # ---- casts ----
 match	`float$1	1f
-deviation	`long$2.7	3	2	casts truncate toward zero, canonical rounds to nearest
-deviation	`long$-2.7	-3	-2	casts truncate toward zero, canonical rounds to nearest
+deviation	`long$2.7	3	2	float-to-integer casts truncate toward zero uniformly across scalar, vector-kernel, and JIT tiers; canonical rounds half-to-even — convergence deferred (multi-tier kernel change), not a design endorsement
+deviation	`long$-2.7	-3	-2	float-to-integer casts truncate toward zero uniformly across scalar, vector-kernel, and JIT tiers; canonical rounds half-to-even — convergence deferred (multi-tier kernel change), not a design endorsement
 match	"J"$"42"	42
 match	"F"$"1.5"	1.5
-deviation	`boolean$2	1b	ERROR	truthiness booleans: no implicit numeric to bool cast
+deviation	`boolean$2	1b	ERROR	boolean-is-logical design: only 0 and 1 cast to boolean; canonical q maps any nonzero number to 1b
 match	`int$3.0	3i
-deviation	"J"$"junk"	0N	ERROR:q cast	failed string casts error instead of returning null
+match	"J"$"junk"	0N
 # ---- misc verbs ----
 match	til 5	0 1 2 3 4
 match	til 0	0#1 2 3
@@ -418,12 +418,12 @@ match	eval parse "2*3+1"	8
 match	value parse "1+2"	3
 match	eval parse "deltas sums til 5"	0 1 2 3 4
 match	x:"3*4";1+value x	13
-deviation	parse "7 mod 3"	(mod;7;3)	(`mod;7;3)	parse trees spell verbs as symbol names; canonical q returns function atoms in head position
-deviation	eval (`mod;(`mod;17;10);3)	ERROR:mod	1	tree verbs are symbols resolved against the verb registries; canonical q signals 'mod for an unbound symbol head
+deviation	parse "7 mod 3"	(mod;7;3)	(`mod;7;3)	parse-tree spelling (representation-bound): tree heads are verb-name symbols, not function atoms; eval resolves symbol heads against the verb registries
+deviation	eval (`mod;(`mod;17;10);3)	ERROR:mod	1	parse-tree spelling consequence (representation-bound): symbol heads resolve as verbs, so (`mod;x;y) applies mod where canonical q signals 'mod for an unbound symbol head
 match	eval parse "`a`b!1 2"	`a`b!1 2
 match	0N!42	42
-deviation	(sum;10 20 30 40) fby `a`a`b`b	30 30 70 70	ERROR:aggregate	fby is spelled agg vec fby group, canonical tuple form unsupported
-deviation	sum 1 2 3 4 fby `a`a`b`b	ERROR	3 3 7 7	fby dialect form: canonical q rejects a bare vector left of fby
+match	(sum;10 20 30 40) fby `a`a`b`b	30 30 70 70
+deviation	sum 1 2 3 4 fby `a`a`b`b	ERROR	3 3 7 7	fby spelling: the dialect ALSO accepts the word form `agg vec fby group` (canonical q rejects a bare vector left of fby); the canonical tuple form (agg;vec) fby group is supported too
 match	mmu[2 2#1 2 3 4f;2 2#5 6 7 8f]	(19 22f;43 50f)
 match	inv 2 2#1 0 0 1f	(1 0f;0 1f)
 match	sum (1 2;3 4)	4 6
@@ -439,7 +439,7 @@ match	{x+1}~{x+1}	1b
 match	(`a`b!1 2)<>`a`b!1 2	`a`b!00b
 match	min trim `a	ERROR
 # ---- date rendering ----
-deviation	string 2024.01.05	"2024.01.05"	"2024-01-05"	ISO date strings: string of a date uses dashes
+deviation	string 2024.01.05	"2024.01.05"	"2024-01-05"	ISO-date-string design: string of a date renders the ISO 8601 dash form (2024-01-05); canonical q renders dots
 # ---- error trap & signal ----
 match	@[{x+1};1;`oops]	2
 match	@[{'x};"boom";{("caught";x)}]	("caught";"boom")
@@ -496,3 +496,168 @@ match	t:([] a:1 2 3); ![`t;();0b;(enlist `a)!enlist (*;`a;10)]	`t
 match	t:([] a:1 2 3); ![`t;();0b;(enlist `a)!enlist (*;`a;10)]; t	([] a:10 20 30)
 match	?[([] a:1 2 3;b:10 20 30);();0b;(enlist `c)!enlist (+;`a;`b)]	([] c:11 22 33)
 match	?[([] s:`x`y`x;b:10 20 30);();(enlist `s)!enlist `s;(enlist `t)!enlist (sum;`b)]	([s:`x`y] t:40 20)
+# ---- R15 breadth expansion: verb x edge-input combos ----
+match	reverse enlist 7	enlist 7
+match	distinct 1 1 1	enlist 1
+match	asc 101b	011b
+match	iasc 10b	1 0
+match	iasc `b`a	1 0
+match	desc 0N 2 1	2 1 0N
+match	sum 0N 0N	0
+match	avg 0N 0N	0n
+match	prd 0N 0N	1
+match	max enlist 0N	0N
+match	deltas til 0	til 0
+match	null deltas 0N 1	11b
+match	sums til 0	til 0
+match	neg 1 0N	-1 0N
+match	abs -1 0N	1 0N
+match	floor 0n	0N
+match	ceiling 0n	0N
+match	null 1 0N 2	010b
+match	where 3	0 0 0
+match	0N div 2	0N
+match	maxs 1 0N 3	1 1 3
+match	mins 3 0N 1	3 3 1
+match	2 msum 1 0N 3	1 1 3
+match	2 mavg 1 0N 3	1 1 3f
+match	2 mcount 1 0N 0N	1 1 0
+match	fills til 0	til 0
+match	differ til 0	0#0b
+match	(-':)[til 0]	til 0
+# ---- R15: temporal corners ----
+match	2024.12m+1	2025.01m
+match	2024.01m-2	2023.11m
+match	(2024.06m-2024.01m)=5	1b
+match	2024.02.28+2	2024.03.01
+match	2023.02.28+1	2023.03.01
+match	12:59+1	13:00
+match	12:59:59+1	13:00:00
+match	2024.01.01D23:59:59+1000000000	2024.01.02D00:00:00
+match	(`dd$2024.01.05 2024.02.07)=5 7	11b
+match	`month$2024.01.15 2024.02.20	2024.01 2024.02m
+match	(`hh$11:22:33)=11	1b
+match	(`uu$11:22:33)=22	1b
+match	(`uu$12:34)=34	1b
+match	(`ss$11:22:33)=33	1b
+match	`minute$11:22:33	11:22
+match	`second$2024.01.01D12:30:45	12:30:45
+match	`date$2024.01.01D12:30:45	2024.01.01
+match	0Nd<2024.01.01	1b
+match	-0Wd<2024.01.01	1b
+match	2024.01.01 in 2024.01.01 2024.01.02	1b
+# ---- R15: dict and keyed-table ops ----
+match	(0!1!([] a:1 2;b:10 20))~([] a:1 2;b:10 20)	1b
+match	0!([] a:1 2)	([] a:1 2)
+match	(`a xkey ([] a:1 2;b:3 4))~1!([] a:1 2;b:3 4)	1b
+match	(2!([] a:1 2;b:10 20;c:5 6))~`a`b xkey ([] a:1 2;b:10 20;c:5 6)	1b
+match	(value 1!([] a:1 2;b:3 4))~([] b:3 4)	1b
+match	cols 1!([] a:1 2;b:3 4)	`a`b
+match	count 1!([] a:1 2;b:3 4)	2
+match	value `a`b!(1 2;3 4)	(1 2;3 4)
+match	(`a`b!1 2)~`b`a!2 1	0b
+match	-2#`a`b`c!1 2 3	`b`c!2 3
+match	1#`a`b`c!1 2 3	(enlist `a)!enlist 1
+match	@[`a`b!1 2;`a;:;9]	`a`b!9 2
+# ---- R15: adverb matrices ----
+match	10 +/ til 0	10
+match	10 +\ til 0	til 0
+match	(+/)[0n;til 0]	0n
+match	{x+y}/[5;()]	5
+match	1 2,\:()	(enlist 1;enlist 2)
+match	(),/:1 2	(enlist 1;enlist 2)
+match	(,':)[1 2 3]	(1;2 1;3 2)
+match	1 2,'3 4 5	ERROR
+match	1 2+'1 2 3	ERROR
+match	{x,y}\[1 2 3]	(1;1 2;1 2 3)
+match	(*\)[1 2 3 4]	1 2 6 24
+match	2 {x*y}/ 3 4	24
+match	each[reverse;(1 2;3 4)]	(2 1;4 3)
+match	prior[+;1 2 3]	1 3 5
+match	(avg;1 2 3 4) fby `a`a`b`b	1.5 1.5 3.5 3.5
+# ---- R15: strings ----
+match	"abcadc" ss "a?c"	0 3
+match	"a1b2" ss "[0-9]"	1 3
+match	"abcabc" ss "[ab]b"	0 3
+match	ssr["toronto";"o";"0"]	"t0r0nt0"
+match	ssr["banana";"an";"AN"]	"bANANa"
+match	"abc" like "*b*"	1b
+match	"abc" like "ABC"	0b
+match	"a" like "[ab]"	1b
+match	"2024" like "202[0-9]"	1b
+match	`abc like "a*"	1b
+match	"." vs "a.b.c"	("a";"b";"c")
+match	"," vs "abc"	1_("x";"abc")
+match	"," sv enlist "ab"	"ab"
+match	2$"abcde"	"ab"
+match	string `a`b	("a";"b")
+match	upper `ab`cd	`AB`CD
+match	"abc"?"b"	1
+match	"ab" in ("ab";"cd")	1b
+# ---- R15: console handle writes ----
+match	-1 "bye"	-1
+match	2 "err"	2
+# ---- R15: take / drop / cut ----
+match	1#1 2 3	enlist 1
+match	-1#1 2 3	enlist 3
+match	(0#`a`b)~`$()	1b
+match	-5_1 2 3	til 0
+match	-1_enlist 1	til 0
+match	3 cut til 7	(0 1 2;3 4 5;enlist 6)
+match	0 1 3 cut til 5	(enlist 0;1 2;3 4)
+match	2#0#0.0	0 0f
+match	1_`a`b`c	`b`c
+# ---- R15: find / within / bin ----
+match	1 2 3?1 2	0 1
+match	1 2 3 within 2 3	011b
+match	2 within 3 1	0b
+match	1 3 5 bin 5	2
+match	1 3 5 bin 6	2
+match	1 3 5 binr 0	0
+match	1 3 5 binr 6	3
+match	5 within 1 0N	0b
+# ---- R15: join corners ----
+match	(),()	()
+match	0N,1	0N 1
+match	(1 2;3 4),enlist 5 6	(1 2;3 4;5 6)
+match	(([] a:1 2),([] a:3 4))~([] a:1 2 3 4)	1b
+match	`a`b,`c	`a`b`c
+match	"x","yz"	"xyz"
+match	raze (1;2;(3;(4;5)))	(1;2;3;(4;5))
+match	flip flip (1 2;3 4)	(1 2;3 4)
+match	flip enlist 1 2	(enlist 1;enlist 2)
+# ---- R15: set ops ----
+match	`a`b inter `b`c	enlist `b
+match	1 1 2 except 1	enlist 2
+match	distinct `a`b`a	`a`b
+# ---- R15: rotate / xprev ----
+match	1 rotate `a`b`c	`b`c`a
+match	-1 xprev 1 2 3	2 3 0N
+match	2 xprev til 0	til 0
+# ---- R15: encode / decode ----
+match	2 sv 1 1	3
+match	24 60 60 sv 1 1 1	3661
+match	24 60 60 vs 3661	1 1 1
+match	0 24 60 60 vs 90061	1 1 1 1
+match	2 2 2 vs 5	1 0 1
+# ---- R15: functional and indexed amend ----
+match	@[1 2 3;0;:;9]	9 2 3
+match	@[1 2 3;0 1;+;10]	11 12 3
+match	.[(1 2;3 4);(0;1);:;9]	(1 9;3 4)
+match	x:1 2 3;x[0 1]:9;x	9 9 3
+# ---- R15: casts ----
+match	"B"$"1"	1b
+match	"B"$"0"	0b
+match	"B"$"junk"	0b
+match	"J"$""	0N
+match	`float$1 2	1 2f
+match	(type 2024.01.01)=-14	1b
+match	(type `a`b)=11	1b
+# ---- R15: aggregates ----
+match	wavg[1 2;3 4]	11%3
+match	cov[1 2;3 4]	0.25
+match	cor[1 2;3 4]	1f
+# ---- R15: eval/parse round trips ----
+match	eval parse "reverse til 3"	2 1 0
+match	value parse "2 xexp 3"	8f
+match	eval parse "(1;2;3)"	1 2 3

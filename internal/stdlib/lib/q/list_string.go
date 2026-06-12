@@ -227,7 +227,106 @@ func qSSValue(left, right any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Canonical ss accepts the like wildcards ? and [...] (but not *).
+	// Plain needles keep the existing literal search.
+	if tokens, ok := compileQSSPattern(needle); ok {
+		return qSSPatternSearch(haystack, tokens), nil
+	}
 	return data.StringSearch(haystack, needle), nil
+}
+
+// qSSToken is one matcher position of a compiled ss pattern: a literal byte,
+// the any-char wildcard ?, or a [...] class (optionally ^-negated).
+type qSSToken struct {
+	literal byte
+	anyChar bool
+	class   []byte
+	negate  bool
+}
+
+// compileQSSPattern compiles an ss needle containing ? or [...] wildcards.
+// Literal-only needles (or malformed classes) decline so the plain
+// substring search keeps its behavior.
+func compileQSSPattern(pattern string) ([]qSSToken, bool) {
+	if !strings.ContainsAny(pattern, "?[") {
+		return nil, false
+	}
+	var tokens []qSSToken
+	for i := 0; i < len(pattern); i++ {
+		switch c := pattern[i]; c {
+		case '?':
+			tokens = append(tokens, qSSToken{anyChar: true})
+		case '[':
+			end := strings.IndexByte(pattern[i+1:], ']')
+			if end <= 0 {
+				return nil, false
+			}
+			body := pattern[i+1 : i+1+end]
+			i += end + 1
+			tok := qSSToken{}
+			if strings.HasPrefix(body, "^") {
+				tok.negate = true
+				body = body[1:]
+			}
+			for j := 0; j < len(body); j++ {
+				if j+2 < len(body) && body[j+1] == '-' && body[j] <= body[j+2] {
+					for ch := body[j]; ch <= body[j+2]; ch++ {
+						tok.class = append(tok.class, ch)
+					}
+					j += 2
+					continue
+				}
+				tok.class = append(tok.class, body[j])
+			}
+			if len(tok.class) == 0 {
+				return nil, false
+			}
+			tokens = append(tokens, tok)
+		default:
+			tokens = append(tokens, qSSToken{literal: c})
+		}
+	}
+	return tokens, true
+}
+
+func (t qSSToken) matches(c byte) bool {
+	if t.anyChar {
+		return true
+	}
+	if t.class != nil {
+		in := false
+		for _, ch := range t.class {
+			if ch == c {
+				in = true
+				break
+			}
+		}
+		return in != t.negate
+	}
+	return t.literal == c
+}
+
+// qSSPatternSearch scans for non-overlapping pattern matches, mirroring the
+// stepping convention of the literal data.StringSearch.
+func qSSPatternSearch(haystack string, tokens []qSSToken) data.Array {
+	n := len(tokens)
+	var indexes []int64
+	for i := 0; n > 0 && i+n <= len(haystack); {
+		matched := true
+		for j, tok := range tokens {
+			if !tok.matches(haystack[i+j]) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			indexes = append(indexes, int64(i))
+			i += n
+		} else {
+			i++
+		}
+	}
+	return data.NewI64(indexes)
 }
 
 func qSSRValue(args any) (any, error) {
@@ -260,9 +359,13 @@ func qSSRWithSourceValue(left, right any) (any, error) {
 
 func qSVValue(left, right any) (any, error) {
 	// Numeric left atom dispatches base decode: 2 sv 1 0 1 0 is 10 in
-	// canonical q. String/symbol left keeps the join semantics.
+	// canonical q. An integer-vector left is the mixed-radix form
+	// (24 60 60 sv 1 1 1 -> 3661). String/symbol left keeps join semantics.
 	if base, ok := qNumericBase(left); ok {
 		return qBaseDecode(base, right)
+	}
+	if radices, ok := qNumericBaseVector(left); ok {
+		return qMixedRadixDecode(radices, right)
 	}
 	sep, err := qStringOperand("sv", left)
 	if err != nil {
@@ -274,9 +377,14 @@ func qSVValue(left, right any) (any, error) {
 
 func qVSValue(left, right any) (any, error) {
 	// Numeric left atom dispatches base encode: 2 vs 10 is 1 0 1 0 and
-	// 10 vs 123 is 1 2 3 in canonical q. String/symbol left keeps split.
+	// 10 vs 123 is 1 2 3 in canonical q. An integer-vector left is the
+	// mixed-radix form (24 60 60 vs 3661 -> 1 1 1). String/symbol left
+	// keeps split semantics.
 	if base, ok := qNumericBase(left); ok {
 		return qBaseEncode(base, right)
+	}
+	if radices, ok := qNumericBaseVector(left); ok {
+		return qMixedRadixEncode(radices, right)
 	}
 	sep, err := qStringOperand("vs", left)
 	if err != nil {
@@ -303,6 +411,82 @@ func qNumericBase(v any) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// qNumericBaseVector recognizes an integer vector of radices for the
+// mixed-radix vs/sv forms. Every element must be a nonnegative integer; a
+// zero radix is only meaningful in the leading (unbounded) position.
+func qNumericBaseVector(v any) ([]int64, bool) {
+	array, ok := v.(data.Array)
+	if !ok || array.Len() == 0 {
+		return nil, false
+	}
+	out := make([]int64, array.Len())
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, false
+		}
+		if _, isBool := item.(bool); isBool {
+			return nil, false
+		}
+		n, ok := integerValue(item)
+		if !ok || n < 0 {
+			return nil, false
+		}
+		out[i] = n
+	}
+	return out, true
+}
+
+// qMixedRadixDecode is vector sv: fold the digits through the per-position
+// radices (24 60 60 sv 1 1 1 -> 3661).
+func qMixedRadixDecode(radices []int64, value any) (any, error) {
+	array, ok := value.(data.Array)
+	if !ok {
+		return nil, fmt.Errorf("sv expects a digit vector for mixed-radix decode")
+	}
+	if array.Len() != len(radices) {
+		return nil, fmt.Errorf("sv mixed-radix length mismatch: %d radices, %d digits", len(radices), array.Len())
+	}
+	var out int64
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("sv digit row %d out of range", i)
+		}
+		n, ok := integerValue(item)
+		if !ok {
+			return nil, fmt.Errorf("sv expects integer digits for mixed-radix decode")
+		}
+		out = out*radices[i] + n
+	}
+	return out, nil
+}
+
+// qMixedRadixEncode is vector vs: positional decomposition under the
+// per-position radices (24 60 60 vs 3661 -> 1 1 1). A leading zero radix is
+// unbounded and absorbs the remainder, matching canonical q.
+func qMixedRadixEncode(radices []int64, value any) (any, error) {
+	n, ok := integerValue(value)
+	if !ok || n < 0 {
+		return nil, fmt.Errorf("vs expects a non-negative integer value for mixed-radix encode")
+	}
+	digits := make([]int64, len(radices))
+	for i := len(radices) - 1; i >= 0; i-- {
+		radix := radices[i]
+		if i == 0 && radix == 0 {
+			digits[i] = n
+			n = 0
+			continue
+		}
+		if radix < 2 {
+			return nil, fmt.Errorf("vs mixed-radix positions after the first must be at least 2")
+		}
+		digits[i] = n % radix
+		n /= radix
+	}
+	return data.NewI64(digits), nil
 }
 
 // qBaseEncode is numeric vs: digits of value in the given base, most

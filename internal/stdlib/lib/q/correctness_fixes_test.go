@@ -64,8 +64,15 @@ func assertEvalI64Vector(t *testing.T, src string, want []int64) {
 // --- fix 1: mixed literal vector crash --------------------------------------
 
 func TestMixedLiteralVectorIsParseErrorNotPanic(t *testing.T) {
+	// 1 "hello" is NOT in the list below: it is the canonical console handle
+	// write (writes the chars to stdout, returns the handle; canonical_q.tsv).
+	if got, err := Eval(`1 "hello"`); err != nil || got != int64(1) {
+		t.Errorf("Eval(%q) = %#v, %v; want console write returning the handle 1", `1 "hello"`, got, err)
+	}
+	if got, err := Eval(`-1 "hello"`); err != nil || got != int64(-1) {
+		t.Errorf("Eval(%q) = %#v, %v; want console write returning the handle -1", `-1 "hello"`, got, err)
+	}
 	for _, src := range []string{
-		`1 "hello"`,
 		`1 2 "x"`,
 		`3 "a" 4`,
 	} {

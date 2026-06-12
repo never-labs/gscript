@@ -2345,7 +2345,10 @@ func TestEvalTypedCasts(t *testing.T) {
 
 	assertEvalErrorContains(t, "`short$40000", "q cast")
 	assertEvalValue(t, "`int$1.5", int32(1))
-	assertEvalErrorContains(t, "\"I\"$\"42.5\"", "q cast")
+	// Canonical q: a failed string-to-number parse yields the target null.
+	if got, err := Eval("\"I\"$\"42.5\""); err != nil || !data.IsNull(got) {
+		t.Errorf("Eval(%q) = %#v, %v; want 0Ni (failed parses cast to null)", "\"I\"$\"42.5\"", got, err)
+	}
 }
 
 func TestEvalDictionaryLookup(t *testing.T) {
@@ -3192,7 +3195,9 @@ func TestEvalDictionaryAmendAndUpsert(t *testing.T) {
 	assertEvalArray(t, "@[(1 2 0Ni);2;:;i$3]", data.KindI32, []any{int32(1), int32(2), int32(3)})
 	assertEvalArray(t, "@[(1e 0Ne);1;:;e$2]", data.KindF32, []any{float32(1), float32(2)})
 	assertEvalErrorContains(t, "@[(10 20);3;:;99]", "out of range")
-	assertEvalErrorContains(t, "@[(10 20);0 1;:;99]", "value length mismatch")
+	// Canonical q broadcasts an atom amend value over every index.
+	assertEvalArray(t, "@[(10 20);0 1;:;99]", data.KindI64, []any{int64(99), int64(99)})
+	assertEvalErrorContains(t, "@[(10 20 30);0 1;:;1 2 3]", "value length mismatch")
 }
 
 func TestEvalTableAndKeyedFunctionalAmend(t *testing.T) {
@@ -3968,7 +3973,7 @@ func TestEvalTypeStringAndCaseVerbs(t *testing.T) {
 
 	assertEvalValue(t, `lower "Straße"`, "straße")
 	assertEvalValue(t, `upper "Straße"`, "STRAßE")
-	assertEvalArray(t, "lower `AAPL`MSFT", data.KindString, []any{"aapl", "msft"})
+	assertEvalArray(t, "lower `AAPL`MSFT", data.KindSymbol, []any{data.Symbol("aapl"), data.Symbol("msft")})
 	assertEvalArray(t, `upper "alpha" "Beta"`, data.KindString, []any{"ALPHA", "BETA"})
 }
 
@@ -5821,12 +5826,13 @@ func TestEvalEachAdverbs(t *testing.T) {
 		data.NewString([]string{"AAPL", "MSFT"}),
 		data.NewString([]string{"2024-01-02", ""}),
 	})
+	// upper/lower are type-preserving on symbols (canonical q).
 	assertEvalArray(t, "lower' (`AAPL`MSFT;\"Alpha\" \"Beta\")", data.KindAny, []any{
-		data.NewString([]string{"aapl", "msft"}),
+		data.NewSymbols([]string{"aapl", "msft"}),
 		data.NewString([]string{"alpha", "beta"}),
 	})
 	assertEvalArray(t, "upper' (`aapl`msft;\"alpha\" \"Beta\")", data.KindAny, []any{
-		data.NewString([]string{"AAPL", "MSFT"}),
+		data.NewSymbols([]string{"AAPL", "MSFT"}),
 		data.NewString([]string{"ALPHA", "BETA"}),
 	})
 	assertEvalArray(t, "f:+';f[1 2 3;10 20 30]", data.KindI64, []any{int64(11), int64(22), int64(33)})
