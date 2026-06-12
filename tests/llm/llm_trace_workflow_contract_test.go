@@ -336,3 +336,135 @@ bad_first_kind := bad.findings[1].kind
 		})
 	}
 }
+
+func TestLLMReplayTraceEventHelper(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+record, record_err := llm.replay_record({
+    record_id: "rec-1"
+    replay_key: "turn:1"
+    request_hash: "sha256:req1"
+    response_hash: "sha256:res1"
+    response: {status: "final_answer" text: "secret answer" calls: {} usage: {}}
+})
+fixture, fixture_err := llm.replay_fixture({record}, {
+    fixture_id: "fixture:trace"
+    identity_fields: {"replay_key", "request_hash"}
+})
+matched := fixture.match({replay_key: "turn:1" request_hash: "sha256:req1"})
+matched_event := llm.replay_trace_event(matched, {
+    trace_id: "trace-replay"
+    sequence: 1
+    replay_session_id: "session-1"
+    workflow_run_id: "wf-1"
+})
+
+mismatch_record, mismatch_record_err := llm.replay_record({
+    record_id: "rec-2"
+    replay_key: "turn:2"
+    request_hash: "sha256:req2"
+    response_hash: "sha256:res2"
+    response: {status: "final_answer" text: "mismatch answer" calls: {} usage: {}}
+})
+mismatch_fixture, mismatch_fixture_err := llm.replay_fixture({mismatch_record}, {
+    fixture_id: "fixture:mismatch"
+    identity_fields: {"replay_key", "request_hash"}
+})
+mismatch := mismatch_fixture.match({replay_key: "turn:2" request_hash: "sha256:wrong"})
+mismatch_event := llm.replay_trace_event(mismatch, {
+    trace_id: "trace-replay"
+    sequence: 2
+    replay_session_id: "session-1"
+})
+
+exhausted := fixture.match({replay_key: "turn:missing" request_hash: "sha256:missing"})
+exhausted_event := llm.replay_trace_event(exhausted, {
+    trace_id: "trace-replay"
+    sequence: 3
+    replay_session_id: "session-1"
+})
+envelope := llm.trace_envelope({matched_event, mismatch_event, exhausted_event}, {
+    trace_id: "trace-replay"
+})
+summary := llm.trace_summary(envelope)
+gate := llm.trace_assert(envelope, {
+    require_provider_free: true
+    deny_live_network: true
+    required_event_types: {
+        "replay_record_matched",
+        "replay_record_mismatch",
+        "replay_record_exhausted",
+    }
+    require_correlation_fields: {"replay_session_id"}
+})
+
+setup_ok := record_err == nil && fixture_err == nil && mismatch_record_err == nil && mismatch_fixture_err == nil
+matched_type := matched_event.event_type
+matched_status := matched_event.status
+matched_replay_key := matched_event.replay.replay_key
+matched_request_hash := matched_event.replay.request_hash
+matched_response_hash := matched_event.replay.response_hash
+matched_record_id := matched_event.payload.record_id
+matched_summary_count := matched_event.payload.summary.matched
+matched_raw_request_nil := matched_event.payload.request == nil
+matched_raw_response_nil := matched_event.payload.response == nil
+matched_replay_response_nil := matched_event.replay.response == nil
+mismatch_type := mismatch_event.event_type
+mismatch_status := mismatch_event.status
+mismatch_finding := mismatch_event.payload.finding_kind
+exhausted_type := exhausted_event.event_type
+exhausted_status := exhausted_event.status
+exhausted_finding := exhausted_event.payload.finding_kind
+summary_events := summary.events
+summary_first_type := summary.event_types[1]
+summary_replay_key := summary.replay_keys[1]
+gate_ok := gate.ok
+gate_status := gate.status
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"setup_ok":                    true,
+				"matched_type":                "replay_record_matched",
+				"matched_status":              "matched",
+				"matched_replay_key":          "turn:1",
+				"matched_request_hash":        "sha256:req1",
+				"matched_response_hash":       "sha256:res1",
+				"matched_record_id":           "rec-1",
+				"matched_summary_count":       int64(1),
+				"matched_raw_request_nil":     true,
+				"matched_raw_response_nil":    true,
+				"matched_replay_response_nil": true,
+				"mismatch_type":               "replay_record_mismatch",
+				"mismatch_status":             "mismatch",
+				"mismatch_finding":            "generic.ai.replay.mismatch",
+				"exhausted_type":              "replay_record_exhausted",
+				"exhausted_status":            "exhausted",
+				"exhausted_finding":           "generic.ai.replay.exhausted",
+				"summary_events":              int64(3),
+				"summary_first_type":          "replay_record_matched",
+				"summary_replay_key":          "turn:1",
+				"gate_ok":                     true,
+				"gate_status":                 "ok",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}

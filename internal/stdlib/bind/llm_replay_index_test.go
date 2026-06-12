@@ -627,6 +627,142 @@ setup_ok := record_err == nil && fixture_err == nil
 	}
 }
 
+func TestLLMReplayTraceEventFromIndexMatch(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+records := {
+    {
+        record_id: "rec-000"
+        operation: "llm.turn"
+        capability: "generic.ai.turn"
+        replay_key: "turn:000"
+        request_hash: "sha256:req"
+        response_hash: "sha256:res"
+        response: {status: "final_answer" text: "secret"}
+    },
+}
+index, err := llm.replay_index(records, {
+    fixture_id: "fixture:trace"
+    identity_fields: {"operation", "capability", "replay_key", "request_hash"}
+})
+match := index.match({
+    operation: "llm.turn"
+    capability: "generic.ai.turn"
+    replay_key: "turn:000"
+    request_hash: "sha256:req"
+})
+event := llm.replay_trace_event(match, {
+    trace_id: "trace-1"
+    replay_session_id: "session-1"
+})
+
+err_nil := err == nil
+event_type := event.event_type
+status := event.status
+replay_key := event.replay.replay_key
+request_hash := event.replay.request_hash
+response_hash := event.replay.response_hash
+record_id := event.replay.record_id
+payload_ok := event.payload.ok
+payload_record_id := event.payload.record_id
+payload_matched := event.payload.summary.matched
+turn_id := event.correlation.turn_id
+replay_session_id := event.correlation.replay_session_id
+raw_request_nil := event.payload.request == nil
+raw_record_nil := event.payload.record == nil
+raw_response_nil := event.replay.response == nil
+`, nil)
+
+	if got := interp.GetGlobal("err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "event_type", "replay_record_matched")
+	assertGlobalString(t, interp, "status", "matched")
+	assertGlobalString(t, interp, "replay_key", "turn:000")
+	assertGlobalString(t, interp, "request_hash", "sha256:req")
+	assertGlobalString(t, interp, "response_hash", "sha256:res")
+	assertGlobalString(t, interp, "record_id", "rec-000")
+	if got := interp.GetGlobal("payload_ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("payload_ok = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "payload_record_id", "rec-000")
+	assertGlobalInt(t, interp, "payload_matched", 1)
+	assertGlobalString(t, interp, "turn_id", "turn:000")
+	assertGlobalString(t, interp, "replay_session_id", "session-1")
+	for _, name := range []string{"raw_request_nil", "raw_record_nil", "raw_response_nil"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || !got.Bool() {
+			t.Fatalf("%s = %v, want true", name, got)
+		}
+	}
+}
+
+func TestLLMReplayTraceEventMismatchAndBadArguments(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+records := {
+    {
+        record_id: "rec-001"
+        operation: "llm.turn"
+        capability: "generic.ai.turn"
+        replay_key: "turn:001"
+        request_hash: "sha256:req"
+        response_hash: "sha256:res"
+    },
+}
+index, err := llm.replay_index(records, {
+    fixture_id: "fixture:trace"
+    identity_fields: {"operation", "capability", "replay_key", "request_hash"}
+})
+mismatch := index.match({
+    operation: "llm.turn"
+    capability: "generic.ai.turn"
+    replay_key: "turn:001"
+    request_hash: "sha256:wrong"
+})
+mismatch_event := llm.replay_trace_event(mismatch, {trace_id: "trace-1"})
+exhausted_index, exhausted_index_err := llm.replay_index({}, {})
+exhausted := exhausted_index.match({replay_key: "turn:missing"})
+exhausted_event := llm.replay_trace_event(exhausted, {trace_id: "trace-1"})
+missing_ok, missing_err := pcall(llm.replay_trace_event)
+bad_opts_ok, bad_opts_err := pcall(llm.replay_trace_event, mismatch, "opts")
+
+setup_ok := err == nil && exhausted_index_err == nil
+mismatch_type := mismatch_event.event_type
+mismatch_status := mismatch_event.status
+mismatch_finding := mismatch_event.payload.finding_kind
+mismatch_message := mismatch_event.payload.message
+mismatch_count := mismatch_event.payload.summary.mismatches
+exhausted_type := exhausted_event.event_type
+exhausted_status := exhausted_event.status
+exhausted_finding := exhausted_event.payload.finding_kind
+exhausted_count := exhausted_event.payload.summary.exhausted
+`, nil)
+
+	if got := interp.GetGlobal("setup_ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("setup_ok = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "mismatch_type", "replay_record_mismatch")
+	assertGlobalString(t, interp, "mismatch_status", "mismatch")
+	assertGlobalString(t, interp, "mismatch_finding", "generic.ai.replay.mismatch")
+	msg := interp.GetGlobal("mismatch_message")
+	if !msg.IsString() || !strings.Contains(msg.Str(), "request_hash") {
+		t.Fatalf("mismatch_message = %v, want request_hash mismatch", msg)
+	}
+	assertGlobalInt(t, interp, "mismatch_count", 1)
+	assertGlobalString(t, interp, "exhausted_type", "replay_record_exhausted")
+	assertGlobalString(t, interp, "exhausted_status", "exhausted")
+	assertGlobalString(t, interp, "exhausted_finding", "generic.ai.replay.exhausted")
+	assertGlobalInt(t, interp, "exhausted_count", 1)
+	for _, name := range []string{"missing_ok", "bad_opts_ok"} {
+		if got := interp.GetGlobal(name); !got.IsBool() || got.Bool() {
+			t.Fatalf("%s = %v, want false", name, got)
+		}
+	}
+	for _, name := range []string{"missing_err", "bad_opts_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want error string", name, got)
+		}
+	}
+}
+
 func assertGlobalInt(t *testing.T, interp interface{ GetGlobal(string) Value }, name string, want int64) {
 	t.Helper()
 	got := interp.GetGlobal(name)

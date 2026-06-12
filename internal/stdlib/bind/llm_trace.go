@@ -55,6 +55,22 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	}
 	b.set("trace_assert", traceAssert)
 	b.set("traceAssert", traceAssert)
+
+	replayTraceEvent := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.replay_trace_event' (replay match table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.replay_trace_event' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmReplayTraceEventValue(args[0].Table(), opts))}, nil
+	}
+	b.set("replay_trace_event", replayTraceEvent)
+	b.set("replayTraceEvent", replayTraceEvent)
 }
 
 func llmTraceEventValue(src *Table) *Table {
@@ -100,6 +116,144 @@ func llmTraceEnvelopeValue(events, opts *Table) *Table {
 	out.RawSetString("events", llmTraceEventsValue(events, opts))
 	out.RawSetString("redaction", llmTraceRedactionValue(opts))
 	return out
+}
+
+func llmReplayTraceEventValue(match, opts *Table) *Table {
+	status := llmTraceString(match, "status", "mismatch")
+	eventType := llmReplayTraceEventType(status)
+	src := NewTable()
+	for _, key := range opts.PairsKeysSnapshot() {
+		src.RawSet(key, llmCloneValue(opts.RawGet(key)))
+	}
+	src.RawSetString("event_type", StringValue(llmTraceString(opts, "event_type", eventType)))
+	src.RawSetString("status", StringValue(status))
+	src.RawSetString("provider_free", BoolValue(llmTraceBool(opts, "provider_free", true)))
+	src.RawSetString("live_network", BoolValue(llmTraceBool(opts, "live_network", false)))
+	src.RawSetString("live_model", BoolValue(llmTraceBool(opts, "live_model", false)))
+
+	replay := NewTable()
+	replay.RawSetString("mode", StringValue(llmTraceString(opts, "replay_mode", llmReplayModeFixture)))
+	replay.RawSetString("provider_free", BoolValue(true))
+	replay.RawSetString("deterministic", BoolValue(true))
+	replay.RawSetString("created_from_provider", BoolValue(false))
+	payload := NewTable()
+	payload.RawSetString("ok", llmCloneValue(match.RawGetString("ok")))
+	payload.RawSetString("status", StringValue(status))
+	payload.RawSetString("next_index", llmCloneValue(match.RawGetString("next_index")))
+	if finding := match.RawGetString("finding_kind"); !finding.IsNil() {
+		payload.RawSetString("finding_kind", llmCloneValue(finding))
+	}
+	if message := match.RawGetString("message"); !message.IsNil() {
+		payload.RawSetString("message", StringValue(llmReplayTraceSafeMessage(message.Str())))
+	}
+	llmReplayTraceCopySummary(payload, match.RawGetString("summary"))
+	llmReplayTraceCopyIdentity(match, replay, payload)
+	llmReplayTraceCopyCorrelation(src, replay, payload)
+	src.RawSetString("replay", TableValue(replay))
+	src.RawSetString("payload", TableValue(payload))
+	return llmTraceEventValue(src)
+}
+
+func llmReplayTraceEventType(status string) string {
+	switch status {
+	case "matched":
+		return "replay_record_matched"
+	case "exhausted":
+		return "replay_record_exhausted"
+	default:
+		return "replay_record_mismatch"
+	}
+}
+
+func llmReplayTraceSafeMessage(message string) string {
+	const prefix = "replay identity mismatch on "
+	if len(message) > len(prefix) && message[:len(prefix)] == prefix {
+		field := message[len(prefix):]
+		for i, r := range field {
+			if r == ':' {
+				field = field[:i]
+				break
+			}
+		}
+		if field != "" {
+			return prefix + field
+		}
+	}
+	if message == "" {
+		return "replay trace event"
+	}
+	return "replay trace event"
+}
+
+func llmReplayTraceCopySummary(payload *Table, summary Value) {
+	if !summary.IsTable() {
+		return
+	}
+	src := summary.Table()
+	out := NewTable()
+	for _, field := range []string{"fixture_id", "strategy", "loaded_records", "requests", "matched", "mismatches", "exhausted", "unconsumed", "next_index"} {
+		if value := src.RawGetString(field); !value.IsNil() {
+			out.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if value := src.RawGetString("finding_kinds"); !value.IsNil() {
+		out.RawSetString("finding_kinds", llmCloneValue(value))
+	}
+	if value := src.RawGetString("matched_record_ids"); !value.IsNil() {
+		out.RawSetString("matched_record_ids", llmCloneValue(value))
+	}
+	payload.RawSetString("summary", TableValue(out))
+}
+
+func llmReplayTraceCopyIdentity(match, replay, payload *Table) {
+	record := match.RawGetString("record")
+	request := match.RawGetString("request")
+	if record.IsTable() {
+		recordTable := record.Table()
+		for _, field := range []string{"record_id", "replay_key", "request_hash", "response_hash", "fixture_key"} {
+			llmReplayTraceCopyField(recordTable, replay, field)
+		}
+		if replayValue := recordTable.RawGetString("replay"); replayValue.IsTable() {
+			for _, field := range []string{"replay_key", "request_hash", "response_hash"} {
+				llmReplayTraceCopyField(replayValue.Table(), replay, field)
+			}
+		}
+		if recordID := recordTable.RawGetString("record_id"); !recordID.IsNil() {
+			payload.RawSetString("record_id", llmCloneValue(recordID))
+		}
+	}
+	if request.IsTable() {
+		requestTable := request.Table()
+		for _, field := range []string{"replay_key", "request_hash"} {
+			if replay.RawGetString(field).IsNil() {
+				llmReplayTraceCopyField(requestTable, replay, field)
+			}
+		}
+	}
+}
+
+func llmReplayTraceCopyCorrelation(src, replay, payload *Table) {
+	if src.RawGetString("replay_session_id").IsNil() {
+		if summary := payload.RawGetString("summary"); summary.IsTable() {
+			if fixtureID := summary.Table().RawGetString("fixture_id"); !fixtureID.IsNil() {
+				src.RawSetString("replay_session_id", llmCloneValue(fixtureID))
+			}
+		}
+	}
+	if replayKey := replay.RawGetString("replay_key"); !replayKey.IsNil() {
+		if src.RawGetString("turn_id").IsNil() {
+			src.RawSetString("turn_id", llmCloneValue(replayKey))
+		}
+		if src.RawGetString("correlation_id").IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(replayKey))
+		}
+	}
+}
+
+func llmReplayTraceCopyField(src, dst *Table, field string) {
+	if value := src.RawGetString(field); !value.IsNil() {
+		dst.RawSetString(field, llmCloneValue(value))
+	}
 }
 
 func llmTraceSummaryValue(input *Table) *Table {
