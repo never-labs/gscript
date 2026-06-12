@@ -636,7 +636,9 @@ contacting a provider, so replay and workflow packages can gate trace evidence
 with ordinary assertions. Trace assertions may require event types, correlation
 fields, payload fields on all events, or event-type-specific payload fields with
 `require_event_payload_fields` or the equivalent
-`required_payload_fields_by_event_type`.
+`required_payload_fields_by_event_type`. It can also deny truthy redaction
+markers with `deny_secret_values_present`, `deny_raw_prompt_stored`, and
+`deny_raw_completion_stored`.
 
 ```leia
 record, err := llm.replay_record({
@@ -664,6 +666,8 @@ trace := llm.trace_envelope({event}, {trace_id: "unit-trace"})
 gate := llm.trace_assert(trace, {
     require_provider_free: true
     deny_live_network: true
+    deny_secret_values_present: true
+    deny_raw_prompt_stored: true
     required_event_types: {"turn_end"}
     require_event_payload_fields: {
         turn_end: {"status"}

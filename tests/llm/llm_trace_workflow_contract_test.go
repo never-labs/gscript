@@ -287,6 +287,9 @@ check := llm.trace_assert(envelope, {
     required_event_types: {"turn_start", "turn_end"}
     require_correlation_fields: {"turn_id", "replay_session_id"}
     require_payload_fields: {"phase"}
+    deny_secret_values_present: true
+    deny_raw_prompt_stored: true
+    deny_raw_completion_stored: true
     require_event_payload_fields: {
         turn_end: {"result"}
     }
@@ -299,6 +302,27 @@ payload_bad := llm.trace_assert(envelope, {
     required_payload_fields_by_event_type: {
         turn_start: {"result"}
     }
+})
+leaky := llm.trace_event({
+    trace_id: "trace-summary"
+    event_id: "event-3"
+    event_type: "turn_end"
+    sequence: 3
+    timestamp_ms: 120
+    status: "ok"
+    turn_id: "turn-1"
+    replay_session_id: "session-1"
+    payload: {phase: "leaky"}
+    redaction: {
+        secret_values_present: true
+        raw_prompt_stored: true
+        raw_completion_stored: false
+    }
+})
+redaction_bad := llm.trace_assert({leaky}, {
+    deny_secret_values_present: true
+    deny_raw_prompt_stored: true
+    deny_raw_completion_stored: true
 })
 
 event_count := summary.events
@@ -320,29 +344,39 @@ payload_bad_ok := payload_bad.ok
 payload_bad_status := payload_bad.status
 payload_bad_findings := #payload_bad.findings
 payload_bad_kind := payload_bad.findings[1].kind
+redaction_bad_ok := redaction_bad.ok
+redaction_bad_status := redaction_bad.status
+redaction_bad_findings := #redaction_bad.findings
+redaction_bad_first_kind := redaction_bad.findings[1].kind
+redaction_bad_second_kind := redaction_bad.findings[2].kind
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
 			for name, want := range map[string]any{
-				"event_count":          int64(2),
-				"first_type":           "turn_start",
-				"second_type":          "turn_end",
-				"ok_count":             int64(1),
-				"error_count":          int64(1),
-				"replay_key":           "turn:1",
-				"missing_correlation":  int64(0),
-				"sequence_gaps":        int64(0),
-				"non_monotonic":        int64(0),
-				"check_ok":             true,
-				"check_status":         "ok",
-				"bad_ok":               false,
-				"bad_status":           "failed",
-				"bad_findings":         int64(3),
-				"bad_first_kind":       "generic.ai.trace.missing_event_type",
-				"payload_bad_ok":       false,
-				"payload_bad_status":   "failed",
-				"payload_bad_findings": int64(1),
-				"payload_bad_kind":     "generic.ai.trace.missing_payload_field",
+				"event_count":               int64(2),
+				"first_type":                "turn_start",
+				"second_type":               "turn_end",
+				"ok_count":                  int64(1),
+				"error_count":               int64(1),
+				"replay_key":                "turn:1",
+				"missing_correlation":       int64(0),
+				"sequence_gaps":             int64(0),
+				"non_monotonic":             int64(0),
+				"check_ok":                  true,
+				"check_status":              "ok",
+				"bad_ok":                    false,
+				"bad_status":                "failed",
+				"bad_findings":              int64(3),
+				"bad_first_kind":            "generic.ai.trace.missing_event_type",
+				"payload_bad_ok":            false,
+				"payload_bad_status":        "failed",
+				"payload_bad_findings":      int64(1),
+				"payload_bad_kind":          "generic.ai.trace.missing_payload_field",
+				"redaction_bad_ok":          false,
+				"redaction_bad_status":      "failed",
+				"redaction_bad_findings":    int64(2),
+				"redaction_bad_first_kind":  "generic.ai.trace.secret_values_present",
+				"redaction_bad_second_kind": "generic.ai.trace.raw_prompt_stored",
 			} {
 				got, err := vm.Get(name)
 				if err != nil {
