@@ -8,6 +8,7 @@ generic_data_normalization_contracts_live_package := {
     real_dependency_imports: false
     live_model_calls: false
     schema_mappings: 2
+    provider_response_projections: 1
     field_policies: 3
     missing_policies: 2
     stale_policies: 2
@@ -27,10 +28,11 @@ assert(generic_data_normalization_contracts_live_package.normalized_rows == 4)
 assert(generic_data_normalization_contracts_live_package.validation_errors == 2)
 
 generic_data_normalization_contracts_live_package_summary := string.format(
-"generic_data_normalization_contracts_live_package capability=%s entrypoint=%s mappings=%d field_policies=%d missing=%d stale=%d coercions=%d unit_transforms=%d rows=%d provenance=%d validation_errors=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+"generic_data_normalization_contracts_live_package capability=%s entrypoint=%s mappings=%d provider_response_projections=%d field_policies=%d missing=%d stale=%d coercions=%d unit_transforms=%d rows=%d provenance=%d validation_errors=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
 generic_data_normalization_contracts_live_package.capability,
 generic_data_normalization_contracts_live_package.entrypoint,
 generic_data_normalization_contracts_live_package.schema_mappings,
+generic_data_normalization_contracts_live_package.provider_response_projections,
 generic_data_normalization_contracts_live_package.field_policies,
 generic_data_normalization_contracts_live_package.missing_policies,
 generic_data_normalization_contracts_live_package.stale_policies,

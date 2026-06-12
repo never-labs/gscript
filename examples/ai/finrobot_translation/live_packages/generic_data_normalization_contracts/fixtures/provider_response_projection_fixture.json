@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "fixture_key": "provider_response_projection:observations:offline:v1",
+  "projection_kind": "data_provider_response_to_normalized_rows",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "source_refs": {
+    "data_provider_boundary": "../generic_data_provider_boundary/fixtures/data_provider_boundary_fixture.json",
+    "normalization_mapping": "fixtures/normalization_mapping_fixture.json",
+    "normalized_rows": "fixtures/normalized_rows_fixture.json",
+    "validation": "fixtures/normalization_validation_fixture.json"
+  },
+  "dataset_id": "dataset-observations",
+  "mapping_id": "mapping-observations-v1",
+  "response_mappings": [
+    {
+      "request_id": "request:catalog:list",
+      "provider_id": "provider:catalog",
+      "status": "ok",
+      "provider_fixture_key": "fixture:provider:catalog:list",
+      "replay_key": "sha256:catalog-list-request",
+      "provenance_ref": "provenance:catalog:list",
+      "normalized_row_refs": [
+        1,
+        2
+      ],
+      "canonical_fields": [
+        "subject_id",
+        "period_key",
+        "measure_value",
+        "baseline_value"
+      ],
+      "validation_refs": []
+    },
+    {
+      "request_id": "request:documents:search",
+      "provider_id": "provider:documents",
+      "status": "ok",
+      "provider_fixture_key": "fixture:provider:documents:search",
+      "replay_key": "sha256:documents-search-request",
+      "provenance_ref": "provenance:documents:search",
+      "normalized_row_refs": [
+        3,
+        4
+      ],
+      "canonical_fields": [
+        "subject_id",
+        "period_key",
+        "measure_value",
+        "baseline_value"
+      ],
+      "validation_refs": [
+        "stale_observation"
+      ]
+    }
+  ],
+  "provenance_mappings": [
+    {
+      "provider_provenance_ref": "provenance:catalog:list",
+      "normalized_source_refs": [
+        "fixture://dataset-observations"
+      ],
+      "source_rows": [
+        1,
+        2
+      ],
+      "source_hashes": [
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ]
+    },
+    {
+      "provider_provenance_ref": "provenance:documents:search",
+      "normalized_source_refs": [
+        "fixture://dataset-observations"
+      ],
+      "source_rows": [
+        3,
+        4
+      ],
+      "source_hashes": [
+        "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      ]
+    }
+  ],
+  "clean_skip_mappings": [
+    {
+      "request_id": "request:events:stream",
+      "provider_id": "provider:events",
+      "status": "skipped",
+      "provider_fixture_key": "fixture:provider:events:stream",
+      "provenance_ref": "provenance:events:stream",
+      "error_id": "error:network-disabled",
+      "normalized_row_refs": [],
+      "validation_refs": [
+        "adapter_unavailable"
+      ],
+      "clean_skip": true
+    }
+  ],
+  "projection_assertions": {
+    "all_successful_provider_responses_mapped": true,
+    "clean_skip_responses_do_not_emit_rows": true,
+    "provider_request_ids_are_not_assumed_equal_to_row_ids": true,
+    "provenance_refs_are_preserved": true,
+    "replay_keys_are_preserved": true,
+    "canonical_fields_resolve_in_mapping": true,
+    "projection_is_provider_free": true
+  }
+}

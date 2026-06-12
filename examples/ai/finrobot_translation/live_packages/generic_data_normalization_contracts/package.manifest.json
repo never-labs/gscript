@@ -5,7 +5,7 @@
   "package_boundary_id": "generic-ai-data-normalization-contracts",
   "capability_id": "generic.ai.data_normalization.contracts",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free live package skeleton for schema mappings, field policies, missing and stale value policy, type coercion, unit transforms, provenance, validation envelopes, deterministic ordering, and adapter clean-skip contracts.",
+  "description": "Provider-free live package skeleton for schema mappings, provider response projection, field policies, missing and stale value policy, type coercion, unit transforms, provenance, validation envelopes, deterministic ordering, and adapter clean-skip contracts.",
   "source_modules": [
     "generic.data_normalization.contracts",
     "generic.data_normalization.schema_mapping",
@@ -48,6 +48,7 @@
   },
   "schemas": {
     "mapping": "schemas/normalization_mapping_v1.schema.json",
+    "provider_response_projection": "schemas/provider_response_projection_v1.schema.json",
     "normalized_rows": "schemas/normalized_rows_v1.schema.json",
     "validation": "schemas/normalization_validation_v1.schema.json",
     "clean_skip": "schemas/normalization_clean_skip_v1.schema.json"
@@ -55,6 +56,7 @@
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "mapping": "fixtures/normalization_mapping_fixture.json",
+    "provider_response_projection": "fixtures/provider_response_projection_fixture.json",
     "normalized_rows": "fixtures/normalized_rows_fixture.json",
     "validation": "fixtures/normalization_validation_fixture.json",
     "clean_skip": "fixtures/normalization_clean_skip_fixture.json"
@@ -65,6 +67,7 @@
       "source_module": "generic.data_normalization.schema_mapping",
       "capabilities": [
         "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.provider_response_projection",
         "generic.ai.data_normalization.field_policy",
         "generic.ai.data_normalization.deterministic_order"
       ],
@@ -127,6 +130,7 @@
   "capabilities": [
     "generic.ai.data_normalization.contracts",
     "generic.ai.data_normalization.schema_mapping",
+    "generic.ai.data_normalization.provider_response_projection",
     "generic.ai.data_normalization.field_policy",
     "generic.ai.data_normalization.missing_policy",
     "generic.ai.data_normalization.stale_policy",
@@ -185,6 +189,7 @@
   "test_gates": [
     "manifest and referenced JSON files decode without external dependencies",
     "schema mapping, field policy, missing policy, stale policy, type coercion, and unit transform contract fixtures decode",
+    "provider response projection maps source envelopes, provenance refs, clean skips, and replay keys into normalized rows and validation records",
     "normalized row fixtures carry deterministic ordering, provenance, missing reasons, and transform notes",
     "validation fixtures classify missing required values, stale values, and coercion warnings without live services",
     "adapter dependency absence produces a clean skip instead of live imports or network access",

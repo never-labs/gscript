@@ -212,6 +212,7 @@
         "unit_transform_policy"
       ],
       "outputs": [
+        "provider_response_projection",
         "normalized_rows",
         "provenance_records",
         "validation_errors",

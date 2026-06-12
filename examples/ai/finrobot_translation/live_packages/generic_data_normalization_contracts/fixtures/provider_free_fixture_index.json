@@ -15,6 +15,15 @@
       "metadata": {"replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false}
     },
     {
+      "fixture_key": "provider_response_projection:observations:offline:v1",
+      "path": "fixtures/provider_response_projection_fixture.json",
+      "schema": "schemas/provider_response_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {"replay_ready": true, "provider_free": true, "live_network": false, "real_dependency_imports": false}
+    },
+    {
       "fixture_key": "normalized_rows:observations:offline:v1",
       "path": "fixtures/normalized_rows_fixture.json",
       "schema": "schemas/normalized_rows_v1.schema.json",

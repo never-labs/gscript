@@ -991,6 +991,7 @@
       "capabilities": [
         "generic.ai.data_normalization.contracts",
         "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.provider_response_projection",
         "generic.ai.data_normalization.field_policy",
         "generic.ai.data_normalization.missing_policy",
         "generic.ai.data_normalization.stale_policy",
