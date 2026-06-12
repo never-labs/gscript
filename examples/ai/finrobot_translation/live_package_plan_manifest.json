@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 88,
-  "translation_directory_file_count": 685,
+  "registered_examples_count": 89,
+  "translation_directory_file_count": 695,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -194,6 +194,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
       "covers_package_ids": [
         "generic_model_registry"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_optional_adapter_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_optional_adapter_boundary"
       ],
       "status": "checked_in_registered_example"
     },
@@ -980,6 +989,35 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_optional_adapter_boundary",
+      "package_name": "leia-generic-ai-optional-adapter-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "planned_directory": "packages/generic_ai/optional_adapter_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/contracts/generic_optional_adapter_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_optional_adapter_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.optional_adapter.boundary",
+        "generic.ai.optional_adapter.registry",
+        "generic.ai.optional_dependency.gate",
+        "generic.ai.optional_adapter.result_envelope",
+        "generic.ai.optional_adapter.version_metadata",
+        "generic.ai.optional_adapter.terms_metadata",
+        "generic.ai.optional_adapter.credential_redaction",
+        "generic.ai.optional_adapter.clean_skip",
+        "generic.ai.optional_adapter.no_live_import_default"
+      ],
+      "test_gates": [
+        "optional adapter registry contract fixtures decode without importing optional dependencies",
+        "dependency gate contract fixtures clean-skip when packages, credentials, or live network are absent",
+        "adapter result envelope contract fixtures expose status, capability, fixture_key, data, and metadata",
+        "version and terms metadata contract fixtures are metadata-only and provider-free",
+        "credential redaction contract fixtures never expose secret values"
       ],
       "no_built_in_guarantee": true
     },

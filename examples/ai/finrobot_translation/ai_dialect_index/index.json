@@ -32,6 +32,7 @@
     "memory",
     "model",
     "model-io",
+    "optional-adapter",
     "package-boundary",
     "prompt-role-catalog",
     "replay",
@@ -386,6 +387,40 @@
         "package_id": "generic-model-registry",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "optional-adapter",
+      "capability_id": "generic.ai.optional_adapter.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "optional_adapter.registry",
+        "optional_adapter.dependency_gate",
+        "optional_adapter.result_envelope",
+        "optional_adapter.version_metadata",
+        "optional_adapter.terms_metadata",
+        "optional_adapter.credential_redaction",
+        "optional_adapter.clean_skip",
+        "optional_adapter.no_live_import_default"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_optional_adapter_boundary.source.txt",
+      "test": "tests/llm/llm_generic_optional_adapter_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_optional_adapter_boundary_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-optional-adapter-boundary",
+        "boundary": "provider-free optional adapter registry, dependency gates, result envelopes, version and terms metadata, credential redaction, no-live-import defaults, and clean skips",
+        "status": "resolved",
+        "reason": "optional dependency behavior was promoted from application-specific integration gates into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-optional-adapter-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

@@ -323,6 +323,43 @@
       }
     },
     {
+      "shape_id": "ai.optional_adapter.boundary",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "optional-adapter",
+        "approval",
+        "tool"
+      ],
+      "contract": "Normalize provider-free optional adapter registries, dependency gates, result envelopes, version and terms metadata, credential redaction, no-live-import defaults, and clean skips.",
+      "inputs": [
+        "adapter_registry_entry",
+        "dependency_state",
+        "credential_state",
+        "network_policy",
+        "fixture_key"
+      ],
+      "outputs": [
+        "dependency_gate",
+        "adapter_result_envelope",
+        "version_metadata",
+        "terms_metadata",
+        "credential_redaction",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_optional_adapter_boundary.source.txt",
+      "test": "tests/llm/llm_generic_optional_adapter_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_optional_adapter_boundary_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-optional-adapter-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/contracts/generic_optional_adapter_boundary_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.package.audit",
       "status": "checked_in_package_boundary",
       "capabilities": [

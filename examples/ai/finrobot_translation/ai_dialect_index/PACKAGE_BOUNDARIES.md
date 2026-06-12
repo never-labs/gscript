@@ -49,6 +49,7 @@ contracts, and fixtures for its boundary.
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
 - tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
 - tool-registry: `examples/ai/finrobot_translation/live_packages/generic_tool_registry`
+- optional-adapter: `examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary`
 - coding-workspace: `examples/ai/finrobot_translation/live_packages/generic_coding_workspace`
 - agent: `examples/ai/finrobot_translation/live_packages/generic_agent_runner`
 - planning: `examples/ai/finrobot_translation/live_packages/generic_planning_graph`
@@ -95,6 +96,9 @@ orthogonal and layered:
   implementation, and returns a normalized result envelope.
 - tool-registry declares reusable tool descriptors, validates schemas, records
   invocation traces, and keeps effectful approval edges provider-free by default.
+- optional-adapter owns optional dependency registries, package/import gates,
+  result envelopes, version and terms metadata, credential redaction, no-live-import
+  defaults, and clean-skip behavior for absent dependencies.
 - coding-workspace owns sandbox command envelopes, approval gates, stdout/stderr
   captures, file and image artifact manifests, notebook display metadata,
   cleanup policy, deterministic replay, and execution clean skips.
@@ -132,6 +136,7 @@ language or specializing the dialect for one application domain.
 | Chart rendering | `generic_chart_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Chart specs, recipe matrices, render envelopes, source metadata, and deterministic snapshot hashes are produced by chart-render; evidence-report consumes chart artifacts; UI snapshot evaluates rendered routes and accessibility without owning chart semantics. |
 | UI snapshot evaluation | `generic_ui_snapshot_evaluator`, `generic_evidence_report_artifacts`, `generic_trace_events` | Route DOM schemas, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean-skip metadata stay generic UI package data rather than product-specific web code. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
+| Optional adapters | `generic_optional_adapter_boundary`, `generic_approval_policy`, `generic_tool_contracts` | Optional package imports, missing credentials, disabled network, version metadata, terms metadata, and adapter result envelopes are normalized into provider-free clean skips before tool execution. |
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |
 | Coding workspace | `generic_coding_workspace`, `generic_approval_policy`, `generic_tool_contracts`, `generic_record_replay` | Command envelopes, stdout/stderr captures, generated artifacts, notebook display metadata, cleanup intent, and sandbox clean skips are package-owned fixtures behind explicit approval gates. |
 | Trace | `generic_trace_events`, `generic_workflow_orchestrator`, `generic_agent_runner` | Runtime actions emit metadata-only event envelopes with correlation IDs, redaction policy, replay markers, and artifact references. |

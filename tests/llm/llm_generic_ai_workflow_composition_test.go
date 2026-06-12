@@ -53,6 +53,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "turn"`,
 		`role: "tool"`,
 		`role: "tool-registry"`,
+		`role: "optional-adapter"`,
 		`role: "coding-workspace"`,
 		`role: "planning"`,
 		`role: "agent"`,
@@ -73,6 +74,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`package_id: "generic-turn-runner"`,
 		`package_id: "generic-tool-contracts"`,
 		`package_id: "generic-tool-registry"`,
+		`package_id: "generic-optional-adapter-boundary"`,
 		`package_id: "generic-coding-workspace"`,
 		`package_id: "generic-planning-graph"`,
 		`package_id: "generic-agent-runner"`,
@@ -180,6 +182,7 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 	for _, want := range []string{
 		"approval->tool",
 		"approval->coding-workspace",
+		"optional-adapter->tool",
 		"document-rag->memory",
 		"model->model-io",
 		"model-io->turn",

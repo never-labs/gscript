@@ -257,6 +257,31 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_optional_adapter_boundary",
+      "package_name": "leia-generic-ai-optional-adapter-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "capability": "generic.ai.optional_adapter.boundary",
+      "capabilities": [
+        "generic.ai.optional_adapter.boundary",
+        "generic.ai.optional_adapter.registry",
+        "generic.ai.optional_dependency.gate",
+        "generic.ai.optional_adapter.result_envelope",
+        "generic.ai.optional_adapter.version_metadata",
+        "generic.ai.optional_adapter.terms_metadata",
+        "generic.ai.optional_adapter.credential_redaction",
+        "generic.ai.optional_adapter.clean_skip",
+        "generic.ai.optional_adapter.no_live_import_default"
+      ],
+      "backend_shape": "ai.optional_adapter.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/contracts/generic_optional_adapter_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_package_boundary_auditor",
       "package_name": "leia-generic-ai-package-boundary-auditor",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",

@@ -23,8 +23,8 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 88 registered examples plus
-42 checked-in live-package skeleton directories:
+directory. The current provider-free surface is 89 registered examples plus
+43 checked-in live-package skeleton directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
@@ -39,6 +39,7 @@ directory. The current provider-free surface is 88 registered examples plus
 `live_packages/generic_evaluation_harness`, `live_packages/generic_memory_store`,
 `live_packages/generic_model_io_envelope`,
 `live_packages/generic_model_registry`,
+`live_packages/generic_optional_adapter_boundary`,
 `live_packages/generic_package_boundary_auditor`, `live_packages/generic_planning_graph`,
 `live_packages/generic_prompt_role_catalog`, `live_packages/generic_record_replay`,
 `live_packages/generic_tool_contracts`,
@@ -61,7 +62,7 @@ The generic AI dialect convergence status is checked-in package boundary, not
 missing or planned. The `live_packages/generic_*` directories define reusable AI
 package contracts for model, model IO envelopes, coding workspaces, document
 RAG, evidence/report artifacts, UI snapshot evaluation, chart render contracts,
-prompt/role catalogs, memory stores, turn, tool, agent, workflow, evaluation, replay, trace,
+optional adapter boundaries, prompt/role catalogs, memory stores, turn, tool, agent, workflow, evaluation, replay, trace,
 approval, capability, and package-audit behavior. They are intentionally
 generic AI surfaces that the FinRobot translation consumes; they are not
 FinRobot-specific language features or FinRobot-owned product packages.

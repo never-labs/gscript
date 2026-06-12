@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "no_live_import_default": true,
+  "adapter_registry": [
+    {
+      "adapter_id": "adapter:vector-store",
+      "capability": "generic.ai.optional_adapter.vector_store",
+      "package_name": "example-vector-store",
+      "import_name": "example_vector_store",
+      "fixture_key": "fixture:adapter:vector-store",
+      "output_schema": "schema:vector-store-result",
+      "no_live_import_default": true
+    },
+    {
+      "adapter_id": "adapter:renderer",
+      "capability": "generic.ai.optional_adapter.renderer",
+      "package_name": "example-renderer",
+      "import_name": "example_renderer",
+      "fixture_key": "fixture:adapter:renderer",
+      "output_schema": "schema:renderer-result",
+      "no_live_import_default": true
+    },
+    {
+      "adapter_id": "adapter:database",
+      "capability": "generic.ai.optional_adapter.database",
+      "package_name": "example-database-client",
+      "import_name": "example_database_client",
+      "fixture_key": "fixture:adapter:database",
+      "output_schema": "schema:database-result",
+      "no_live_import_default": true
+    }
+  ],
+  "dependency_gates": [
+    {
+      "adapter_id": "adapter:vector-store",
+      "dependency_imported": false,
+      "credential_required": false,
+      "credential_present": false,
+      "live_network": false,
+      "status_without_dependency": "skipped",
+      "clean_skip": true,
+      "reason": "optional package is unavailable in provider-free fixture mode"
+    },
+    {
+      "adapter_id": "adapter:renderer",
+      "dependency_imported": false,
+      "credential_required": false,
+      "credential_present": false,
+      "live_network": false,
+      "status_without_dependency": "skipped",
+      "clean_skip": true,
+      "reason": "renderer dependency is unavailable in provider-free fixture mode"
+    },
+    {
+      "adapter_id": "adapter:database",
+      "dependency_imported": false,
+      "credential_required": true,
+      "credential_present": false,
+      "live_network": false,
+      "status_without_dependency": "skipped",
+      "clean_skip": true,
+      "reason": "credential and network access are disabled in provider-free fixture mode"
+    }
+  ],
+  "result_envelopes": [
+    {
+      "status": "skipped",
+      "capability": "generic.ai.optional_adapter.vector_store",
+      "fixture_key": "fixture:adapter:vector-store",
+      "data": null,
+      "metadata": {
+        "adapter_id": "adapter:vector-store",
+        "skip_reason": "optional package is unavailable in provider-free fixture mode",
+        "replay_ready": true
+      }
+    },
+    {
+      "status": "skipped",
+      "capability": "generic.ai.optional_adapter.renderer",
+      "fixture_key": "fixture:adapter:renderer",
+      "data": null,
+      "metadata": {
+        "adapter_id": "adapter:renderer",
+        "skip_reason": "renderer dependency is unavailable in provider-free fixture mode",
+        "replay_ready": true
+      }
+    },
+    {
+      "status": "skipped",
+      "capability": "generic.ai.optional_adapter.database",
+      "fixture_key": "fixture:adapter:database",
+      "data": null,
+      "metadata": {
+        "adapter_id": "adapter:database",
+        "skip_reason": "credential and network access are disabled in provider-free fixture mode",
+        "replay_ready": true
+      }
+    }
+  ],
+  "version_metadata": [
+    {
+      "adapter_id": "adapter:vector-store",
+      "version_source": "fixture_metadata",
+      "minimum_supported": "unverified",
+      "detected_version": null,
+      "dependency_absent_status": "skipped"
+    },
+    {
+      "adapter_id": "adapter:renderer",
+      "version_source": "fixture_metadata",
+      "minimum_supported": "unverified",
+      "detected_version": null,
+      "dependency_absent_status": "skipped"
+    },
+    {
+      "adapter_id": "adapter:database",
+      "version_source": "fixture_metadata",
+      "minimum_supported": "unverified",
+      "detected_version": null,
+      "dependency_absent_status": "skipped"
+    }
+  ],
+  "terms_metadata": [
+    {
+      "adapter_id": "adapter:vector-store",
+      "mode": "fixture_replay",
+      "metadata_only": true,
+      "live_terms_required_before_network_use": true,
+      "live_network_enabled": false
+    },
+    {
+      "adapter_id": "adapter:renderer",
+      "mode": "fixture_replay",
+      "metadata_only": true,
+      "live_terms_required_before_network_use": true,
+      "live_network_enabled": false
+    },
+    {
+      "adapter_id": "adapter:database",
+      "mode": "fixture_replay",
+      "metadata_only": true,
+      "live_terms_required_before_network_use": true,
+      "live_network_enabled": false
+    }
+  ],
+  "credential_redaction": [
+    {
+      "adapter_id": "adapter:database",
+      "status": "redacted",
+      "secret_values_present": false,
+      "redacted_fields": [
+        "DATABASE_URL",
+        "api_key",
+        "access_token"
+      ]
+    },
+    {
+      "adapter_id": "adapter:vector-store",
+      "status": "redacted",
+      "secret_values_present": false,
+      "redacted_fields": [
+        "api_key",
+        "access_token",
+        "credential"
+      ]
+    }
+  ],
+  "adapter_boundaries": [
+    {
+      "id": "registry",
+      "capability": "generic.ai.optional_adapter.registry",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "gate",
+      "capability": "generic.ai.optional_dependency.gate",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "result-envelope",
+      "capability": "generic.ai.optional_adapter.result_envelope",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    }
+  ]
+}
