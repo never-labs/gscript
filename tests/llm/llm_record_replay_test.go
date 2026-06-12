@@ -314,6 +314,99 @@ kind := err.kind
 	}
 }
 
+func TestLLMScriptReplayRecordFixtureRoundTrip(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "live"}}
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+record, record_err := llm.replay_record({
+    record_id: "script-rec-1"
+    replay_key: "turn:script:1"
+    request: {
+        model: "mock-fast"
+        messages: {llm.system("short"), llm.user("hello script replay")}
+        max_tokens: 16
+    }
+    response: {
+        status: "final_answer"
+        text: "script fixture answer"
+        calls: {}
+        usage: {input_tokens: 2 output_tokens: 4 cost: 0.0 latency_ms: 0}
+    }
+})
+fixture, fixture_err := llm.replay_fixture({record}, {
+    fixture_id: "script-fixture"
+})
+match := fixture.match({
+    operation: record.operation
+    capability: record.capability
+    replay_key: record.replay_key
+    request_hash: record.request_hash
+})
+result, err := llm.turn({
+    model: "mock-fast"
+    messages: {llm.system("short"), llm.user("hello script replay")}
+    max_tokens: 16
+    replay: record.replay
+})
+summary := fixture.summary()
+
+record_err_nil := record_err == nil
+fixture_err_nil := fixture_err == nil
+err_nil := err == nil
+text := result.text
+usage := result.usage.output_tokens
+mode := result.replay.mode
+replay_key := result.replay.replay_key
+match_ok := match.ok
+matched := summary.matched
+unconsumed := summary.unconsumed
+matched_record_id := summary.matched_record_ids[1]
+provider_free := fixture.provider_free
+live_network := fixture.live_network
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 0 {
+				t.Fatalf("provider requests = %d, want 0", len(provider.requests))
+			}
+			for name, want := range map[string]any{
+				"record_err_nil":    true,
+				"fixture_err_nil":   true,
+				"err_nil":           true,
+				"text":              "script fixture answer",
+				"usage":             int64(4),
+				"mode":              "fixture_replay",
+				"replay_key":        "turn:script:1",
+				"match_ok":          true,
+				"matched":           int64(1),
+				"unconsumed":        int64(0),
+				"matched_record_id": "script-rec-1",
+				"provider_free":     true,
+				"live_network":      false,
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestLLMReplaySynthesizesStreamEventForOldFixtures(t *testing.T) {
 	record := llm.Record{
 		Request: llm.TurnRequest{

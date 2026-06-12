@@ -144,6 +144,109 @@ finding_count := #summary.finding_kinds
 	assertGlobalInt(t, interp, "finding_count", 2)
 }
 
+func TestLLMReplayRecordNormalizesHashesAndTurnReplayOptions(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record, err := llm.replay_record({
+    record_id: "rec-1"
+    replay_key: "turn:1"
+    request: {
+        model: "mock"
+        messages: {llm.user("hello replay")}
+        max_tokens: 16
+    }
+    response: {
+        status: "final_answer"
+        text: "fixture answer"
+        calls: {}
+        usage: {}
+    }
+})
+err_nil := err == nil
+mode := record.mode
+operation := record.operation
+capability := record.capability
+provider_free := record.provider_free
+live_network := record.live_network
+replay_mode := record.replay.mode
+replay_key := record.replay.replay_key
+request_hash_present := record.request_hash != ""
+response_hash_present := record.response_hash != ""
+replay_response_text := record.replay.response.text
+`, nil)
+
+	if got := interp.GetGlobal("err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "mode", "fixture_replay")
+	assertGlobalString(t, interp, "operation", "llm.turn")
+	assertGlobalString(t, interp, "capability", "generic.ai.turn")
+	assertGlobalString(t, interp, "replay_mode", "fixture_replay")
+	assertGlobalString(t, interp, "replay_key", "turn:1")
+	assertGlobalString(t, interp, "replay_response_text", "fixture answer")
+	if got := interp.GetGlobal("provider_free"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("provider_free = %v, want true", got)
+	}
+	if got := interp.GetGlobal("live_network"); !got.IsBool() || got.Bool() {
+		t.Fatalf("live_network = %v, want false", got)
+	}
+	if got := interp.GetGlobal("request_hash_present"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("request_hash_present = %v, want true", got)
+	}
+	if got := interp.GetGlobal("response_hash_present"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("response_hash_present = %v, want true", got)
+	}
+}
+
+func TestLLMReplayFixtureWrapsReplayIndexSession(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record1, err1 := llm.replay_record({
+    record_id: "rec-1"
+    replay_key: "turn:1"
+    request_hash: "hash:1"
+    response: {text: "one"}
+})
+record2, err2 := llm.replay_record({
+    record_id: "rec-2"
+    replay_key: "turn:2"
+    request_hash: "hash:2"
+    response: {text: "two"}
+})
+fixture, err := llm.replay_fixture({record1, record2}, {
+    fixture_id: "fixture:test"
+    identity_fields: {"replay_key", "request_hash"}
+})
+first := fixture.match({replay_key: "turn:1" request_hash: "hash:1"})
+bad := fixture.match({replay_key: "turn:2" request_hash: "wrong"})
+summary := fixture.summary()
+
+err_nil := err == nil
+fixture_id := fixture.fixture_id
+mode := fixture.mode
+loaded := fixture.loaded_records
+first_ok := first.ok
+bad_status := bad.status
+matched := summary.matched
+mismatches := summary.mismatches
+unconsumed := summary.unconsumed
+first_id := summary.matched_record_ids[1]
+`, nil)
+
+	if got := interp.GetGlobal("err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "fixture_id", "fixture:test")
+	assertGlobalString(t, interp, "mode", "fixture_replay")
+	assertGlobalInt(t, interp, "loaded", 2)
+	if got := interp.GetGlobal("first_ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("first_ok = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "bad_status", "mismatch")
+	assertGlobalInt(t, interp, "matched", 1)
+	assertGlobalInt(t, interp, "mismatches", 1)
+	assertGlobalInt(t, interp, "unconsumed", 1)
+	assertGlobalString(t, interp, "first_id", "rec-1")
+}
+
 func assertGlobalInt(t *testing.T, interp interface{ GetGlobal(string) Value }, name string, want int64) {
 	t.Helper()
 	got := interp.GetGlobal(name)
