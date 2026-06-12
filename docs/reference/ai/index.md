@@ -366,11 +366,16 @@ retrieval workflows:
 | `llm.retrieve(collection, query, opts)` / `llm.search(...)` | Return ranked local matches; `opts.limit` caps results and `opts.label` labels generated context. |
 | `llm.context(matches, opts)` | Build a context message wrapper, default label `Context`. |
 | `llm.evidence(matches, opts)` | Build an evidence message wrapper, default label `Evidence`. |
+| `llm.memory_outcome(context_or_matches, opts)` / `llm.retrieval_outcome(...)` | Project retrieval/context matches into a redacted, ref-only outcome table. |
+| `llm.memory_outcome_event(outcome, opts)` / `llm.memory_outcome_trace_event(...)` | Project that outcome into the generic trace event shape. |
 
 `context` and `evidence` fields on turn, agent, and section request tables are
 expanded into user messages before the provider call. These helpers are for
 script-local packaging and simple lexical retrieval; they are not a vector
 database, persistence layer, citation verifier, or permission boundary.
+`llm.memory_outcome` is observational: it records match count, query/label,
+top match identity, citation refs, and correlation fields without copying raw
+memory text, snippets, prompts, or provider results into the payload.
 
 ```leia
 docs := llm.collection({
@@ -383,6 +388,8 @@ docs := llm.collection({
 })
 
 ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
+outcome := llm.memory_outcome(ctx, {workflow_run_id: "run-42"})
+event := llm.memory_outcome_event(outcome, {trace_id: "memory-review"})
 result, err := llm.turn({
     model: "fast"
     user: "Who owns the incident?"
