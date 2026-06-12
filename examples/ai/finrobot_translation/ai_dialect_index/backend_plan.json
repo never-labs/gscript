@@ -1028,7 +1028,7 @@
       "capabilities": [
         "workflow"
       ],
-      "contract": "Define provider-free plan graph nodes, dependencies, retries, branch/merge joins, and trace evidence.",
+      "contract": "Define provider-free plan graph nodes, dependencies, retries, branch/merge joins, trace evidence, and workflow stage projection boundaries.",
       "inputs": [
         "goal_envelope",
         "available_steps",
@@ -1037,7 +1037,8 @@
       "outputs": [
         "plan_graph",
         "dependency_edges",
-        "trace_evidence"
+        "trace_evidence",
+        "workflow_stage_projection"
       ],
       "example": "examples/ai/finrobot_translation/generic_workflow_orchestration.leia",
       "test": "tests/llm/llm_generic_planning_graph_contract_test.go",

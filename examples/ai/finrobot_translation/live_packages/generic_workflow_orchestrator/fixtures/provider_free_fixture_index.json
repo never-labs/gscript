@@ -40,6 +40,24 @@
       "real_dependency_imports": false
     },
     {
+      "fixture_key": "generic_workflow:planning_graph_stage_projection:offline",
+      "capability": "generic.ai.workflow.orchestration.planning_graph_stage_projection",
+      "path": "fixtures/planning_graph_stage_projection_fixture.json",
+      "schema": "schemas/planning_graph_stage_projection_v1.schema.json",
+      "metadata": {
+        "provider_free": true,
+        "replay_ready": true,
+        "cache_key": "generic_orchestration_graph_v1:planning_graph_stage_projection",
+        "cache_state": "hit",
+        "max_attempts": 1,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
       "fixture_key": "generic_workflow:handoff_trace:offline",
       "capability": "generic.ai.workflow.orchestration.handoff_trace",
       "path": "fixtures/handoff_trace_fixture.json",

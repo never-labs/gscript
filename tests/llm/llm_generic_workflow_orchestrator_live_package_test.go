@@ -144,14 +144,14 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 	if manifest.DialectEntrypoints["orchestrate"] != "ai.workflow.orchestrate" {
 		t.Fatalf("orchestrate dialect entrypoint = %q", manifest.DialectEntrypoints["orchestrate"])
 	}
-	for _, key := range []string{"workflow_graph", "stage_io", "handoff_trace", "retry_cache_policy", "workflow_result", "trace_emission_hooks"} {
+	for _, key := range []string{"workflow_graph", "stage_io", "planning_graph_stage_projection", "handoff_trace", "retry_cache_policy", "workflow_result", "trace_emission_hooks"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "workflow_graph", "stage_io", "handoff_trace", "workflow_result", "trace_emission_hooks"} {
+	for _, key := range []string{"index", "workflow_graph", "stage_io", "planning_graph_stage_projection", "handoff_trace", "workflow_result", "trace_emission_hooks"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -178,6 +178,7 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 		"generic.ai.workflow.orchestration.stage.execute",
 		"generic.ai.workflow.orchestration.stage.handoff",
 		"generic.ai.workflow.orchestration.stage.finalize",
+		"generic.ai.workflow.orchestration.planning_graph_stage_projection",
 		"generic.ai.workflow.orchestration.workflow_result",
 		"ai.workflow.orchestrate.provider_free",
 	} {
@@ -189,7 +190,7 @@ func TestGenericWorkflowOrchestratorLivePackageManifest(t *testing.T) {
 		t.Fatal("missing no_built_in_guarantee")
 	}
 	joinedGates := strings.ToLower(strings.Join(manifest.TestGates, " "))
-	for _, want := range []string{"generic.ai.workflow.orchestration", "ai.workflow.orchestrate", "workflow graph", "stage inputs", "handoff trace", "retry/cache", "workflow result", "trace emission hooks"} {
+	for _, want := range []string{"generic.ai.workflow.orchestration", "ai.workflow.orchestrate", "workflow graph", "stage inputs", "planning graph projection", "handoff trace", "retry/cache", "workflow result", "trace emission hooks"} {
 		if !strings.Contains(joinedGates, want) {
 			t.Fatalf("test gates missing %q: %s", want, joinedGates)
 		}
@@ -297,7 +298,7 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 		} `json:"fixtures"`
 	}
 	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 5 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 6 {
 		t.Fatalf("fixture index header/count = %#v", index)
 	}
 	cacheStates := map[string]bool{}
@@ -585,6 +586,193 @@ func TestGenericWorkflowOrchestratorFixturesResultAndTraceHooks(t *testing.T) {
 	assertGenericWorkflowOrchestratorNoSecretMarkers(t, base)
 }
 
+func TestGenericWorkflowOrchestratorPlanningGraphStageProjection(t *testing.T) {
+	root := repoRoot(t)
+	base := genericWorkflowOrchestratorLivePackageDir(t)
+	planningContract := loadGenericPlanningGraphContract(t, root)
+	planningTrace := loadGenericPlanningGraphTraceFixture(t, root)
+
+	var projection struct {
+		FixtureKey            string `json:"fixture_key"`
+		Capability            string `json:"capability"`
+		ProviderFree          bool   `json:"provider_free"`
+		LiveNetwork           bool   `json:"live_network"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		SourcePackage         string `json:"source_package"`
+		TargetPackage         string `json:"target_package"`
+		SourceRefs            struct {
+			PlanningGraphContract string `json:"planning_graph_contract"`
+			PlanningTraceFixture  string `json:"planning_trace_fixture"`
+			WorkflowGraphFixture  string `json:"workflow_graph_fixture"`
+			StageIOFixture        string `json:"stage_io_fixture"`
+			HandoffTraceFixture   string `json:"handoff_trace_fixture"`
+			WorkflowResultFixture string `json:"workflow_result_fixture"`
+		} `json:"source_refs"`
+		WorkflowID    string `json:"workflow_id"`
+		RunID         string `json:"run_id"`
+		StageMappings []struct {
+			StageID         string   `json:"stage_id"`
+			SourceNodeIDs   []string `json:"source_node_ids"`
+			SourceNodeTypes []string `json:"source_node_types"`
+			InputRef        string   `json:"input_ref"`
+			OutputRef       string   `json:"output_ref"`
+			StageIORef      string   `json:"stage_io_ref"`
+			TraceEventRefs  []string `json:"trace_event_refs"`
+			RetryProjection struct {
+				Retryable          bool     `json:"retryable"`
+				MaxAttempts        int      `json:"max_attempts"`
+				AttemptEventRefs   []string `json:"attempt_event_refs"`
+				WorkflowCacheState string   `json:"workflow_cache_state"`
+			} `json:"retry_projection"`
+			BranchProjection struct {
+				BranchNodeID  string   `json:"branch_node_id"`
+				BranchTargets []string `json:"branch_targets"`
+			} `json:"branch_projection"`
+			MergeProjection struct {
+				MergeNodeID    string   `json:"merge_node_id"`
+				RequiredInputs []string `json:"required_inputs"`
+				Mode           string   `json:"mode"`
+			} `json:"merge_projection"`
+		} `json:"stage_mappings"`
+		EdgeMappings []struct {
+			SourceEdgeType string   `json:"source_edge_type"`
+			SourceEdges    []string `json:"source_edges"`
+			WorkflowEdge   string   `json:"workflow_edge"`
+			HandoffRef     string   `json:"handoff_ref"`
+		} `json:"edge_mappings"`
+		EvidenceMappings []struct {
+			EvidenceKind      string   `json:"evidence_kind"`
+			SourceEventRefs   []string `json:"source_event_refs"`
+			WorkflowTraceRefs []string `json:"workflow_trace_refs"`
+		} `json:"evidence_mappings"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeGenericWorkflowOrchestratorJSONFile(t, filepath.Join(base, "fixtures", "planning_graph_stage_projection_fixture.json"), &projection)
+	if projection.FixtureKey == "" || projection.Capability != "generic.ai.workflow.orchestration.planning_graph_stage_projection" ||
+		!projection.ProviderFree || projection.LiveNetwork || projection.RealDependencyImports ||
+		projection.SourcePackage != "generic_planning_graph" || projection.TargetPackage != "generic_workflow_orchestrator" {
+		t.Fatalf("projection header/provider boundary mismatch: %#v", projection)
+	}
+	for _, ref := range []string{
+		projection.SourceRefs.PlanningGraphContract,
+		projection.SourceRefs.PlanningTraceFixture,
+		projection.SourceRefs.WorkflowGraphFixture,
+		projection.SourceRefs.StageIOFixture,
+		projection.SourceRefs.HandoffTraceFixture,
+		projection.SourceRefs.WorkflowResultFixture,
+	} {
+		if ref == "" {
+			t.Fatalf("projection source refs incomplete: %#v", projection.SourceRefs)
+		}
+	}
+	if projection.WorkflowID != "generic_orchestration_graph_v1" || projection.RunID != "run_generic_orchestration_fixture_001" || len(projection.StageMappings) != 4 {
+		t.Fatalf("projection workflow identity/stage count mismatch: %#v", projection)
+	}
+
+	contractNodeIDs := map[string]string{}
+	contractTraceRefs := map[string]string{}
+	for _, node := range planningContract.PlanNodes {
+		contractNodeIDs[node.ID] = node.NodeType
+		for _, eventID := range node.TraceEvidence {
+			contractTraceRefs[eventID] = node.ID
+		}
+	}
+	traceEventKinds := map[string]string{}
+	for _, event := range planningTrace.Events {
+		traceEventKinds[event.EventID] = event.EvidenceKind
+	}
+	mappedNodes := map[string]bool{}
+	mappedTraceEvents := map[string]bool{}
+	stageIDs := map[string]bool{}
+	for _, mapping := range projection.StageMappings {
+		if mapping.StageID == "" || mapping.InputRef == "" || mapping.OutputRef == "" || len(mapping.SourceNodeIDs) == 0 || len(mapping.TraceEventRefs) == 0 {
+			t.Fatalf("projection stage mapping incomplete: %#v", mapping)
+		}
+		stageIDs[mapping.StageID] = true
+		if len(mapping.SourceNodeIDs) != len(mapping.SourceNodeTypes) {
+			t.Fatalf("%s source node id/type count mismatch: %#v", mapping.StageID, mapping)
+		}
+		for i, nodeID := range mapping.SourceNodeIDs {
+			nodeType := contractNodeIDs[nodeID]
+			if nodeType == "" || mapping.SourceNodeTypes[i] != nodeType {
+				t.Fatalf("%s maps unknown or mismatched node %q/%q, contract=%#v", mapping.StageID, nodeID, mapping.SourceNodeTypes[i], contractNodeIDs)
+			}
+			mappedNodes[nodeID] = true
+		}
+		for _, eventID := range mapping.TraceEventRefs {
+			if contractTraceRefs[eventID] == "" && !strings.HasPrefix(eventID, "evt_") {
+				t.Fatalf("%s maps unknown trace event %q", mapping.StageID, eventID)
+			}
+			mappedTraceEvents[eventID] = true
+		}
+	}
+	if !stageIDs["plan"] || !stageIDs["execute"] || !stageIDs["handoff"] || !stageIDs["finalize"] {
+		t.Fatalf("projection stage ids incomplete: %#v", stageIDs)
+	}
+	for nodeID := range contractNodeIDs {
+		if !mappedNodes[nodeID] {
+			t.Fatalf("planning node %q missing from workflow projection", nodeID)
+		}
+	}
+	for eventID := range contractTraceRefs {
+		if !mappedTraceEvents[eventID] {
+			t.Fatalf("planning trace event %q missing from workflow projection", eventID)
+		}
+	}
+	if len(projection.EdgeMappings) != 4 {
+		t.Fatalf("projection edge mapping count = %d, want 4", len(projection.EdgeMappings))
+	}
+	contractEdges := map[string]string{}
+	for _, edge := range planningContract.Edges {
+		contractEdges[edge.From+"->"+edge.To] = edge.EdgeType
+	}
+	mappedEdgeCount := 0
+	for _, mapping := range projection.EdgeMappings {
+		if mapping.SourceEdgeType == "" || mapping.WorkflowEdge == "" || mapping.HandoffRef == "" || len(mapping.SourceEdges) == 0 {
+			t.Fatalf("projection edge mapping incomplete: %#v", mapping)
+		}
+		for _, edge := range mapping.SourceEdges {
+			if contractEdges[edge] != mapping.SourceEdgeType {
+				t.Fatalf("edge %q maps as %q, contract type is %q", edge, mapping.SourceEdgeType, contractEdges[edge])
+			}
+			mappedEdgeCount++
+		}
+	}
+	if mappedEdgeCount != len(planningContract.Edges) {
+		t.Fatalf("mapped edge count = %d, want %d", mappedEdgeCount, len(planningContract.Edges))
+	}
+	evidenceKinds := map[string]bool{}
+	for _, mapping := range projection.EvidenceMappings {
+		if mapping.EvidenceKind == "" || len(mapping.SourceEventRefs) == 0 || len(mapping.WorkflowTraceRefs) == 0 {
+			t.Fatalf("evidence mapping incomplete: %#v", mapping)
+		}
+		evidenceKinds[mapping.EvidenceKind] = true
+		for _, eventID := range mapping.SourceEventRefs {
+			if traceEventKinds[eventID] != mapping.EvidenceKind {
+				t.Fatalf("evidence event %q maps as %q, trace fixture kind is %q", eventID, mapping.EvidenceKind, traceEventKinds[eventID])
+			}
+		}
+	}
+	for _, want := range planningContract.Semantics.TraceEvidence.EvidenceKinds {
+		if !evidenceKinds[want] {
+			t.Fatalf("projection evidence mappings missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"all_source_plan_nodes_mapped",
+		"all_source_dependency_edges_mapped",
+		"all_retry_attempts_visible_in_stage_metadata",
+		"branch_targets_preserved",
+		"merge_required_inputs_preserved",
+		"workflow_stage_ids_are_not_assumed_equal_to_plan_node_ids",
+		"projection_is_provider_free",
+	} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
+}
+
 func TestGenericWorkflowOrchestratorLivePackageNoLiveImports(t *testing.T) {
 	base := genericWorkflowOrchestratorLivePackageDir(t)
 	entries, err := os.ReadDir(base)
@@ -647,7 +835,7 @@ func TestGenericWorkflowOrchestratorLivePackageExecutableSkeleton(t *testing.T) 
 			if err != nil {
 				t.Fatalf("Get generic_workflow_orchestrator_live_package_summary: %v", err)
 			}
-			want := "generic_workflow_orchestrator_live_package package=generic.ai.workflow.orchestration entrypoint=ai.workflow.orchestrate stages=4 fixtures=5 schemas=6 provider_free=true live_network=false imports=false graph=true stage_io=true handoff_trace=true retry_cache=true workflow_result=true trace_hooks=true"
+			want := "generic_workflow_orchestrator_live_package package=generic.ai.workflow.orchestration entrypoint=ai.workflow.orchestrate stages=4 fixtures=6 schemas=7 provider_free=true live_network=false imports=false graph=true stage_io=true planning_projection=true handoff_trace=true retry_cache=true workflow_result=true trace_hooks=true"
 			if got != want {
 				t.Fatalf("generic_workflow_orchestrator_live_package_summary = %#v, want %#v", got, want)
 			}

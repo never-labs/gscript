@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/workflow_orchestrator/planning_graph_stage_projection_v1.schema.json",
+  "title": "GenericWorkflowPlanningGraphStageProjectionV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "source_package",
+    "target_package",
+    "source_refs",
+    "workflow_id",
+    "run_id",
+    "stage_mappings",
+    "edge_mappings",
+    "evidence_mappings",
+    "projection_assertions"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "source_package": {
+      "const": "generic_planning_graph"
+    },
+    "target_package": {
+      "const": "generic_workflow_orchestrator"
+    },
+    "stage_mappings": {
+      "type": "array"
+    },
+    "edge_mappings": {
+      "type": "array"
+    },
+    "evidence_mappings": {
+      "type": "array"
+    },
+    "projection_assertions": {
+      "type": "object"
+    }
+  }
+}

@@ -1665,6 +1665,7 @@
         "generic.ai.workflow.orchestration",
         "generic.ai.workflow.graph",
         "generic.ai.workflow.stage_io",
+        "generic.ai.workflow.planning_graph_stage_projection",
         "generic.ai.workflow.handoff_trace",
         "generic.ai.workflow.retry_cache",
         "generic.ai.workflow.result",

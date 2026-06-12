@@ -787,6 +787,7 @@
         "generic.ai.workflow.orchestration.stage.handoff",
         "generic.ai.workflow.orchestration.stage.finalize",
         "generic.ai.workflow.orchestration.stage_io",
+        "generic.ai.workflow.orchestration.planning_graph_stage_projection",
         "generic.ai.workflow.orchestration.handoff_trace",
         "generic.ai.workflow.orchestration.retry_cache_policy",
         "generic.ai.workflow.orchestration.workflow_result",
