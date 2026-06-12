@@ -652,6 +652,7 @@ func llmTraceAssertValue(input, opts *Table) *Table {
 			}
 		}
 	}
+	llmTraceAssertPayloadFields(events, findings, opts)
 	out := NewTable()
 	out.RawSetString("ok", BoolValue(findings.Length() == 0))
 	if findings.Length() == 0 {
@@ -662,6 +663,62 @@ func llmTraceAssertValue(input, opts *Table) *Table {
 	out.RawSetString("summary", TableValue(summary))
 	out.RawSetString("findings", TableValue(findings))
 	return out
+}
+
+func llmTraceAssertPayloadFields(events, findings, opts *Table) {
+	globalFields := llmTraceStringSlice(opts.RawGetString("require_payload_fields"))
+	eventFields := opts.RawGetString("require_event_payload_fields")
+	if !eventFields.IsTable() {
+		eventFields = opts.RawGetString("required_payload_fields_by_event_type")
+	}
+	if len(globalFields) == 0 && !eventFields.IsTable() {
+		return
+	}
+	for i := 1; i <= events.Length(); i++ {
+		event := events.RawGet(IntValue(int64(i)))
+		if !event.IsTable() {
+			continue
+		}
+		eventTable := event.Table()
+		eventType := llmTraceString(eventTable, "event_type", llmTraceString(eventTable, "type", ""))
+		eventID := llmTraceString(eventTable, "event_id", fmt.Sprintf("event:%d", i))
+		payload := eventTable.RawGetString("payload")
+		llmTraceAssertPayloadFieldList(findings, payload, globalFields, eventID, eventType)
+		if eventFields.IsTable() {
+			fields := llmTraceRequiredFieldsForEventType(eventFields.Table(), eventType)
+			llmTraceAssertPayloadFieldList(findings, payload, fields, eventID, eventType)
+		}
+	}
+}
+
+func llmTraceRequiredFieldsForEventType(spec *Table, eventType string) []string {
+	if spec == nil || eventType == "" {
+		return nil
+	}
+	if fields := llmTraceStringSlice(spec.RawGetString(eventType)); len(fields) > 0 {
+		return fields
+	}
+	for _, key := range spec.PairsKeysSnapshot() {
+		if key.Str() == eventType {
+			return llmTraceStringSlice(spec.RawGet(key))
+		}
+	}
+	return nil
+}
+
+func llmTraceAssertPayloadFieldList(findings *Table, payload Value, fields []string, eventID, eventType string) {
+	if len(fields) == 0 {
+		return
+	}
+	var payloadTable *Table
+	if payload.IsTable() {
+		payloadTable = payload.Table()
+	}
+	for _, field := range fields {
+		if payloadTable == nil || payloadTable.RawGetString(field).IsNil() {
+			llmTraceAppendFinding(findings, "generic.ai.trace.missing_payload_field", fmt.Sprintf("%s event_type %q missing payload field %q", eventID, eventType, field))
+		}
+	}
 }
 
 func llmTraceInputEvents(input *Table) *Table {
