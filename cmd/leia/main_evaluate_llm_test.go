@@ -116,6 +116,12 @@ evaluate "plain record case" {
 				RecordPath   string `json:"record_path"`
 				Turns        int    `json:"turns"`
 				StreamEvents int    `json:"stream_events"`
+				Events       []struct {
+					Type     string `json:"type"`
+					TraceID  string `json:"trace_id"`
+					EventID  string `json:"event_id"`
+					Sequence int64  `json:"sequence"`
+				} `json:"events"`
 			} `json:"llm"`
 		} `json:"cases"`
 		Notes []string `json:"notes"`
@@ -141,8 +147,17 @@ evaluate "plain record case" {
 	if report.Cases[0].LLM == nil || report.Cases[0].LLM.StreamEvents != 3 || report.Cases[0].LLM.Turns != 1 {
 		t.Fatalf("streamed case llm = %+v, want one turn and three stream events", report.Cases[0].LLM)
 	}
+	if !evaluateLLMEventsContain(report.Cases[0].LLM.Events, "turn_start", "turn_stream", "turn_end") {
+		t.Fatalf("streamed case events = %+v, want turn_start/turn_stream/turn_end", report.Cases[0].LLM.Events)
+	}
 	if report.Cases[1].LLM == nil || report.Cases[1].LLM.StreamEvents != 0 || report.Cases[1].LLM.Turns != 1 {
 		t.Fatalf("plain case llm = %+v, want one non-streaming turn", report.Cases[1].LLM)
+	}
+	if !evaluateLLMEventsContain(report.Cases[1].LLM.Events, "turn_start", "turn_end") {
+		t.Fatalf("plain case events = %+v, want turn_start/turn_end", report.Cases[1].LLM.Events)
+	}
+	if !evaluateLLMEventsSequenced(report.Cases[0].LLM.Events) || !evaluateLLMEventsSequenced(report.Cases[1].LLM.Events) {
+		t.Fatalf("case events are not sequenced: streamed=%+v plain=%+v", report.Cases[0].LLM.Events, report.Cases[1].LLM.Events)
 	}
 	for _, c := range report.Cases {
 		if c.LLM == nil || c.LLM.RecordPath == "" {
@@ -187,6 +202,16 @@ evaluate "plain record case" {
 			Name string `json:"name"`
 			LLM  *struct {
 				StreamEvents int `json:"stream_events"`
+				Events       []struct {
+					Type            string `json:"type"`
+					Status          string `json:"status"`
+					ReplayMode      string `json:"replay_mode"`
+					ReplayKey       string `json:"replay_key"`
+					RequestHash     string `json:"request_hash"`
+					ResponseHash    string `json:"response_hash"`
+					ProviderFree    bool   `json:"provider_free"`
+					ReplaySessionID string `json:"replay_session_id"`
+				} `json:"events"`
 			} `json:"llm"`
 		} `json:"cases"`
 	}
@@ -201,6 +226,9 @@ evaluate "plain record case" {
 	}
 	if len(replayReport.Cases) != 2 || replayReport.Cases[0].LLM == nil || replayReport.Cases[0].LLM.StreamEvents != 3 {
 		t.Fatalf("replay cases = %+v, want streamed case to replay three stream events", replayReport.Cases)
+	}
+	if !evaluateLLMReplayMatchedEventOK(replayReport.Cases[0].LLM.Events) || !evaluateLLMReplayMatchedEventOK(replayReport.Cases[1].LLM.Events) {
+		t.Fatalf("replay events missing matched provider-free metadata: %+v", replayReport.Cases)
 	}
 }
 
@@ -368,6 +396,62 @@ func containsEvaluateLLMString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
 			return true
+		}
+	}
+	return false
+}
+
+func evaluateLLMEventsContain(events []struct {
+	Type     string `json:"type"`
+	TraceID  string `json:"trace_id"`
+	EventID  string `json:"event_id"`
+	Sequence int64  `json:"sequence"`
+}, wants ...string) bool {
+	seen := map[string]bool{}
+	for _, event := range events {
+		seen[event.Type] = true
+	}
+	for _, want := range wants {
+		if !seen[want] {
+			return false
+		}
+	}
+	return true
+}
+
+func evaluateLLMEventsSequenced(events []struct {
+	Type     string `json:"type"`
+	TraceID  string `json:"trace_id"`
+	EventID  string `json:"event_id"`
+	Sequence int64  `json:"sequence"`
+}) bool {
+	for i, event := range events {
+		if event.TraceID == "" || event.EventID == "" || event.Sequence != int64(i+1) {
+			return false
+		}
+	}
+	return len(events) > 0
+}
+
+func evaluateLLMReplayMatchedEventOK(events []struct {
+	Type            string `json:"type"`
+	Status          string `json:"status"`
+	ReplayMode      string `json:"replay_mode"`
+	ReplayKey       string `json:"replay_key"`
+	RequestHash     string `json:"request_hash"`
+	ResponseHash    string `json:"response_hash"`
+	ProviderFree    bool   `json:"provider_free"`
+	ReplaySessionID string `json:"replay_session_id"`
+}) bool {
+	for _, event := range events {
+		if event.Type == "replay_record_matched" {
+			return event.Status == "matched" &&
+				event.ReplayMode == "fixture_replay" &&
+				event.ReplayKey != "" &&
+				strings.HasPrefix(event.RequestHash, "sha256:") &&
+				strings.HasPrefix(event.ResponseHash, "sha256:") &&
+				event.ProviderFree &&
+				strings.HasPrefix(event.ReplaySessionID, "llm-replay:")
 		}
 	}
 	return false

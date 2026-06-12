@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -122,12 +125,47 @@ type Case struct {
 }
 
 type LLMCaseRun struct {
-	TraceRef     string  `json:"trace_ref,omitempty"`
-	RecordPath   string  `json:"record_path,omitempty"`
-	Turns        int     `json:"turns,omitempty"`
-	StreamEvents int     `json:"stream_events,omitempty"`
-	ToolCalls    int     `json:"tool_calls,omitempty"`
-	Errors       int     `json:"errors,omitempty"`
+	TraceRef     string           `json:"trace_ref,omitempty"`
+	RecordPath   string           `json:"record_path,omitempty"`
+	Turns        int              `json:"turns,omitempty"`
+	StreamEvents int              `json:"stream_events,omitempty"`
+	ToolCalls    int              `json:"tool_calls,omitempty"`
+	Errors       int              `json:"errors,omitempty"`
+	InputTokens  int64            `json:"input_tokens,omitempty"`
+	OutputTokens int64            `json:"output_tokens,omitempty"`
+	LatencyMS    int64            `json:"latency_ms,omitempty"`
+	Cost         float64          `json:"cost,omitempty"`
+	Events       []LLMTraceRecord `json:"events,omitempty"`
+}
+
+type LLMTraceRecord struct {
+	TraceID         string         `json:"trace_id,omitempty"`
+	EventID         string         `json:"event_id,omitempty"`
+	ParentEventID   string         `json:"parent_event_id,omitempty"`
+	TurnID          string         `json:"turn_id,omitempty"`
+	ReplaySessionID string         `json:"replay_session_id,omitempty"`
+	Sequence        int64          `json:"sequence,omitempty"`
+	TimestampMS     int64          `json:"timestamp_ms,omitempty"`
+	Type            string         `json:"type"`
+	Model           string         `json:"model,omitempty"`
+	Status          string         `json:"status,omitempty"`
+	Tool            string         `json:"tool,omitempty"`
+	CallID          string         `json:"call_id,omitempty"`
+	ErrorKind       string         `json:"error_kind,omitempty"`
+	Step            int64          `json:"step,omitempty"`
+	Attempt         int64          `json:"attempt,omitempty"`
+	MessageCount    int            `json:"message_count,omitempty"`
+	ToolCount       int            `json:"tool_count,omitempty"`
+	Store           bool           `json:"store,omitempty"`
+	Usage           *LLMTraceUsage `json:"usage,omitempty"`
+	ReplayKey       string         `json:"replay_key,omitempty"`
+	RequestHash     string         `json:"request_hash,omitempty"`
+	ResponseHash    string         `json:"response_hash,omitempty"`
+	ReplayMode      string         `json:"replay_mode,omitempty"`
+	ProviderFree    bool           `json:"provider_free,omitempty"`
+}
+
+type LLMTraceUsage struct {
 	InputTokens  int64   `json:"input_tokens,omitempty"`
 	OutputTokens int64   `json:"output_tokens,omitempty"`
 	LatencyMS    int64   `json:"latency_ms,omitempty"`
@@ -883,7 +921,7 @@ func newRunContext(opts Options) (*runContext, error) {
 			return nil, err
 		}
 		run.replayProvider = llm.NewReplayProvider(records)
-		run.replayMonitor = &replayMonitor{provider: run.replayProvider}
+		run.replayMonitor = &replayMonitor{provider: run.replayProvider, sessionID: replaySessionID(opts.LLMReplayPath)}
 		run.report = &LLMRun{Mode: "replay", ReplayPath: opts.LLMReplayPath, LoadedTurns: len(records)}
 	}
 	if opts.LLMRecordPath != "" {
@@ -1139,6 +1177,8 @@ func executeCase(path string, prog *ast.Program, c parsedCase, run *runContext) 
 	interp.SetModule("eval", evalModule)
 	if run != nil {
 		if run.replayProvider != nil {
+			run.replayMonitor.SetTraceSink(trace.Record)
+			defer run.replayMonitor.ClearTraceSink()
 			interp.SetLLMProvider(llmbridge.ProviderAdapter(run.replayMonitor))
 		}
 		if run.recorder != nil {
@@ -1238,13 +1278,15 @@ func sanitizeCaseRecordName(name string) string {
 }
 
 type llmCaseTrace struct {
-	caseID string
-	mu     sync.Mutex
-	stats  LLMCaseRun
+	caseID   string
+	traceID  string
+	mu       sync.Mutex
+	stats    LLMCaseRun
+	sequence int64
 }
 
 func newLLMCaseTrace(caseID string) *llmCaseTrace {
-	return &llmCaseTrace{caseID: caseID}
+	return &llmCaseTrace{caseID: caseID, traceID: "case:" + caseID}
 }
 
 func (t *llmCaseTrace) Record(event runtime.LLMTraceEvent) {
@@ -1254,8 +1296,10 @@ func (t *llmCaseTrace) Record(event runtime.LLMTraceEvent) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.stats.TraceRef == "" {
-		t.stats.TraceRef = "case:" + t.caseID
+		t.stats.TraceRef = t.traceID
 	}
+	t.sequence++
+	t.stats.Events = append(t.stats.Events, llmTraceRecordFromRuntime(t.traceID, t.sequence, event))
 	switch event.Type {
 	case "turn_end":
 		t.stats.Turns++
@@ -1282,14 +1326,65 @@ func (t *llmCaseTrace) Snapshot() *LLMCaseRun {
 		return nil
 	}
 	out := t.stats
+	if len(t.stats.Events) > 0 {
+		out.Events = append([]LLMTraceRecord(nil), t.stats.Events...)
+	}
 	return &out
 }
 
+func llmTraceRecordFromRuntime(traceID string, sequence int64, event runtime.LLMTraceEvent) LLMTraceRecord {
+	record := LLMTraceRecord{
+		TraceID:         firstNonEmpty(event.TraceID, traceID),
+		EventID:         event.EventID,
+		ParentEventID:   event.ParentEventID,
+		TurnID:          event.TurnID,
+		ReplaySessionID: event.ReplaySessionID,
+		Sequence:        event.Sequence,
+		TimestampMS:     event.TimestampMS,
+		Type:            event.Type,
+		Model:           event.Model,
+		Status:          event.Status,
+		Tool:            event.Tool,
+		CallID:          event.CallID,
+		ErrorKind:       event.ErrorKind,
+		Step:            event.Step,
+		Attempt:         event.Attempt,
+		MessageCount:    event.MessageCount,
+		ToolCount:       event.ToolCount,
+		Store:           event.Store,
+		ReplayKey:       event.ReplayKey,
+		RequestHash:     event.RequestHash,
+		ResponseHash:    event.ResponseHash,
+		ReplayMode:      event.ReplayMode,
+		ProviderFree:    event.ProviderFree,
+	}
+	if record.Sequence == 0 {
+		record.Sequence = sequence
+	}
+	if record.EventID == "" {
+		record.EventID = fmt.Sprintf("%s:event:%d", record.TraceID, record.Sequence)
+	}
+	if record.TimestampMS == 0 {
+		record.TimestampMS = time.Now().UTC().UnixMilli()
+	}
+	if event.Usage.InputTokens != 0 || event.Usage.OutputTokens != 0 || event.Usage.LatencyMS != 0 || event.Usage.Cost != 0 {
+		record.Usage = &LLMTraceUsage{
+			InputTokens:  event.Usage.InputTokens,
+			OutputTokens: event.Usage.OutputTokens,
+			LatencyMS:    event.Usage.LatencyMS,
+			Cost:         event.Usage.Cost,
+		}
+	}
+	return record
+}
+
 type replayMonitor struct {
-	provider *llm.ReplayProvider
-	mu       sync.Mutex
-	active   replayCaseRef
-	errors   []replayError
+	provider  *llm.ReplayProvider
+	sessionID string
+	mu        sync.Mutex
+	active    replayCaseRef
+	trace     func(runtime.LLMTraceEvent)
+	errors    []replayError
 }
 
 type replayError struct {
@@ -1307,6 +1402,8 @@ func (m *replayMonitor) Turn(ctx context.Context, req llm.TurnRequest) (llm.Turn
 			m.errors = append(m.errors, replayError{err: err, item: m.active})
 			m.mu.Unlock()
 		}
+	} else {
+		m.recordMatched(req, res)
 	}
 	return res, err
 }
@@ -1321,6 +1418,8 @@ func (m *replayMonitor) StreamTurn(ctx context.Context, req llm.TurnRequest, sin
 			m.errors = append(m.errors, replayError{err: err, item: m.active})
 			m.mu.Unlock()
 		}
+	} else {
+		m.recordMatched(req, res)
 	}
 	return res, err
 }
@@ -1341,6 +1440,54 @@ func (m *replayMonitor) ClearActiveCase() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.active = replayCaseRef{}
+}
+
+func (m *replayMonitor) SetTraceSink(trace func(runtime.LLMTraceEvent)) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.trace = trace
+}
+
+func (m *replayMonitor) ClearTraceSink() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.trace = nil
+}
+
+func (m *replayMonitor) recordMatched(req llm.TurnRequest, res llm.TurnResult) {
+	if m == nil {
+		return
+	}
+	turn := m.provider.Consumed() - 1
+	if turn < 0 {
+		turn = 0
+	}
+	event := runtime.LLMTraceEvent{
+		Type:            "replay_record_matched",
+		Model:           req.Model,
+		Status:          "matched",
+		TurnID:          fmt.Sprintf("turn:%d", turn),
+		ReplaySessionID: m.sessionID,
+		ReplayKey:       fmt.Sprintf("turn:%d", turn),
+		RequestHash:     replayValueHash(req),
+		ResponseHash:    replayValueHash(res),
+		ReplayMode:      "fixture_replay",
+		ProviderFree:    true,
+		MessageCount:    len(req.Messages),
+		ToolCount:       len(req.Tools),
+	}
+	m.mu.Lock()
+	trace := m.trace
+	m.mu.Unlock()
+	if trace != nil {
+		trace(event)
+	}
 }
 
 func (m *replayMonitor) Findings() []Finding {
@@ -1443,6 +1590,32 @@ func replayRequestDetails(req llm.TurnRequest) map[string]any {
 		out["metadata"] = metadata
 	}
 	return out
+}
+
+func replaySessionID(path string) string {
+	if path == "" {
+		return "llm-replay"
+	}
+	sum := sha256.Sum256([]byte(path))
+	return "llm-replay:" + hex.EncodeToString(sum[:8])
+}
+
+func replayValueHash(v any) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func replayMessageDetails(msg llm.Message) map[string]any {
