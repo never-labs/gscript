@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 86,
-  "translation_directory_file_count": 669,
+  "registered_examples_count": 87,
+  "translation_directory_file_count": 677,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -257,6 +257,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
       "covers_package_ids": [
         "generic_turn_runner"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_ui_snapshot_evaluator",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "covers_package_ids": [
+        "generic_ui_snapshot_evaluator"
       ],
       "status": "checked_in_registered_example"
     },
@@ -1135,6 +1144,34 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_ui_snapshot_evaluator",
+      "package_name": "leia-generic-ai-ui-snapshot-evaluator",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "planned_directory": "packages/generic_ai/ui_snapshot_evaluator",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/contracts/generic_ui_snapshot_evaluator_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "capabilities": [
+        "generic.ai.ui.snapshot.evaluator",
+        "generic.ai.ui.route_dom_schema",
+        "generic.ai.ui.viewport_matrix",
+        "generic.ai.ui.visual_diff_budget",
+        "generic.ai.ui.accessibility_summary",
+        "generic.ai.ui.artifact_uri_manifest",
+        "generic.ai.ui.redaction_policy",
+        "generic.ai.ui.static_asset_policy",
+        "generic.ai.ui.browser_clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic UI snapshot evaluator backend boundary",
+        "registered example executes provider-free",
+        "no browser, network, provider SDK, renderer, or q runtime dependency"
       ],
       "no_built_in_guarantee": true
     },

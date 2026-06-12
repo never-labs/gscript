@@ -58,6 +58,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`role: "agent"`,
 		`role: "workflow"`,
 		`role: "evidence-report"`,
+		`role: "ui-snapshot"`,
 		`role: "eval"`,
 		`role: "replay"`,
 		`role: "trace"`,
@@ -76,6 +77,7 @@ func TestGenericAIWorkflowCompositionCoversGenericPackageBoundaries(t *testing.T
 		`package_id: "generic-agent-runner"`,
 		`package_id: "generic-workflow-orchestrator"`,
 		`package_id: "generic-evidence-report-artifacts"`,
+		`package_id: "generic-ui-snapshot-evaluator"`,
 		`package_id: "generic-evaluation-harness"`,
 		`package_id: "generic-record-replay"`,
 		`package_id: "generic-trace-events"`,
@@ -186,6 +188,7 @@ func TestGenericAIWorkflowCompositionUsesMatrixFixtureIndexes(t *testing.T) {
 		"trace->workflow",
 		"agent->workflow",
 		"workflow->evidence-report",
+		"evidence-report->ui-snapshot",
 		"workflow->eval",
 	} {
 		if !seenEdges[want] {

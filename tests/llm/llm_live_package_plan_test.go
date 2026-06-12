@@ -226,6 +226,7 @@ func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
 		"generic_tool_registry":             "generic.tool.",
 		"generic_trace_events":              "generic.ai.trace.",
 		"generic_turn_runner":               "generic.ai.turn.",
+		"generic_ui_snapshot_evaluator":     "generic.ai.",
 		"generic_workflow_orchestrator":     "generic.ai.workflow.",
 	}
 	for _, pkg := range manifest.Packages {

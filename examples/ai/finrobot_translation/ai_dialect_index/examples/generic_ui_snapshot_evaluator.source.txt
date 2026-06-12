@@ -1,0 +1,1 @@
+ai.ui.snapshot_evaluator { route_dom_snapshots, viewport_matrix, visual_diff_budgets, accessibility_summaries, artifact_uri_manifest, redaction_policy, browser_clean_skip }

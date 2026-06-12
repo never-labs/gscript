@@ -37,6 +37,7 @@
     "tool",
     "trace",
     "turn",
+    "ui-snapshot",
     "workflow"
   ],
   "entries": [
@@ -564,6 +565,40 @@
         "package_id": "generic-turn-runner",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "ui-snapshot",
+      "capability_id": "generic.ai.ui.snapshot.evaluator",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "ui.route_dom_schema",
+        "ui.viewport_matrix",
+        "ui.visual_diff_budget",
+        "ui.accessibility_summary",
+        "ui.artifact_uri_manifest",
+        "ui.redaction_policy",
+        "ui.static_asset_policy",
+        "ui.browser_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_ui_snapshot_evaluator.source.txt",
+      "test": "tests/llm/llm_generic_ui_snapshot_evaluator_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_ui_snapshot_evaluator_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-ui-snapshot-evaluator",
+        "boundary": "provider-free route DOM snapshots, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips",
+        "status": "resolved",
+        "reason": "generic UI snapshot evaluation behavior was promoted from HTML UI snapshot fixtures into a reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-ui-snapshot-evaluator",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

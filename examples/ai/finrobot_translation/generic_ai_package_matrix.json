@@ -418,6 +418,31 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_ui_snapshot_evaluator",
+      "package_name": "leia-generic-ai-ui-snapshot-evaluator",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "capability": "generic.ai.ui.snapshot.evaluator",
+      "capabilities": [
+        "generic.ai.ui.snapshot.evaluator",
+        "generic.ai.ui.route_dom_schema",
+        "generic.ai.ui.viewport_matrix",
+        "generic.ai.ui.visual_diff_budget",
+        "generic.ai.ui.accessibility_summary",
+        "generic.ai.ui.artifact_uri_manifest",
+        "generic.ai.ui.redaction_policy",
+        "generic.ai.ui.static_asset_policy",
+        "generic.ai.ui.browser_clean_skip"
+      ],
+      "backend_shape": "ai.ui.snapshot_evaluator",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/contracts/generic_ui_snapshot_evaluator_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_workflow_orchestrator",
       "package_name": "leia-generic-ai-workflow-orchestrator",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
