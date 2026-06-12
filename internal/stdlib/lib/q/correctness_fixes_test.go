@@ -670,3 +670,122 @@ func TestTakeFromEmptyFillsWithTypeZero(t *testing.T) {
 		t.Fatalf("2 3#til 6 = %#v, want 2x3 matrix", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Fuzzer-found panic fixes (formerly pinned in benchmarks/q_eval_fuzz_test.go
+// qEvalKnownCrashers): every input below used to crash the process.
+// ---------------------------------------------------------------------------
+
+// TestDictEqualityPerKey pins canonical `=`/`<>` on dictionaries: a dict of
+// booleans per key instead of a Go == panic on the uncomparable EvalDict.
+func TestDictEqualityPerKey(t *testing.T) {
+	assertEvalDictAny(t, "(`a`b!1 2)=(`a`b!1 3)",
+		[]any{data.Symbol("a"), data.Symbol("b")}, []any{true, false})
+	assertEvalDictAny(t, "(`a`b!1 2)<>`a`b!1 2",
+		[]any{data.Symbol("a"), data.Symbol("b")}, []any{false, false})
+	// Union alignment: keys present on one side only compare against null
+	// and yield 0b (left key order first, then unseen right keys).
+	assertEvalDictAny(t, "(`a`b!1 2)=(`b`c!2 9)",
+		[]any{data.Symbol("a"), data.Symbol("b"), data.Symbol("c")},
+		[]any{false, true, false})
+	// dict = atom broadcasts over the values.
+	assertEvalDictAny(t, "(`a`b!1 2)=(1)",
+		[]any{data.Symbol("a"), data.Symbol("b")}, []any{true, false})
+}
+
+// TestCallableEqualityIdentity pins `=`/`<>` on callables as match-style
+// identity (the rule ~ uses) instead of a Go == panic on uncomparable
+// function values.
+func TestCallableEqualityIdentity(t *testing.T) {
+	assertEvalValue(t, "qv:neg;(qv)=(qv)", true)
+	assertEvalValue(t, "qv:neg;(qv)<>(qv)", false)
+	assertEvalValue(t, "qv:neg;qw:count;(qv)<>(qw)", true)
+	assertBothRoutes(t, "qv:neg;(qv)<>(qv)")
+}
+
+// TestWhereReplicationLimit pins where on a long-infinity (or otherwise
+// astronomically large) replication count: a q error instead of a makeslice
+// overflow panic.
+func TestWhereReplicationLimit(t *testing.T) {
+	assertEvalErrorContains(t, "where 0W", "list limit")
+	assertEvalErrorContains(t, "where 1 0W", "list limit")
+	assertEvalI64Vector(t, "where 0 2 1", []int64{1, 1, 2})
+	// The original fuzzer crasher: the compiled route used to makeslice-panic
+	// before the string route's probe error could surface.
+	if _, err := Eval("flip where 0W"); err == nil {
+		t.Fatal("flip where 0W should error")
+	}
+}
+
+// TestReshapeFromEmptyFills pins reshape from an empty list: canonical q
+// fills with the type's zero (the 3#0#1 family) instead of building a matrix
+// view over an empty base that panics at materialization.
+func TestReshapeFromEmptyFills(t *testing.T) {
+	got, err := Eval("2 2#til 0")
+	if err != nil {
+		t.Fatalf("2 2#til 0 error: %v", err)
+	}
+	matrix, ok := got.(data.Matrix)
+	if !ok {
+		t.Fatalf("2 2#til 0 = %#v, want a matrix", got)
+	}
+	for row := 0; row < 2; row++ {
+		for col := 0; col < 2; col++ {
+			v, ok := matrix.Cell(row, col)
+			if !ok || v != int64(0) {
+				t.Fatalf("(2 2#til 0)[%d;%d] = %#v ok=%v, want 0", row, col, v, ok)
+			}
+		}
+	}
+	assertEvalI64Vector(t, "m:2 2#til 0;m . 0", []int64{0, 0})
+	assertBothRoutes(t, "m:2 2#til 0;m . 0")
+}
+
+// TestGatherIndexBoundsError pins vector indexing over short/empty bases: a
+// q index error (identical on both routes) instead of a Gather panic.
+func TestGatherIndexBoundsError(t *testing.T) {
+	assertEvalErrorContains(t, "m:0#0;(m@0 0)", "outside length 0")
+	assertEvalErrorContains(t, "m:0 0#0;(m@0 0)", "outside length 0")
+	assertEvalErrorContains(t, "(til 3)@4 5", "outside length 3")
+}
+
+// TestEmptyOperandLogicalBroadcast pins logical &/| between an empty list
+// and a broadcastable operand: an empty result (the empty side wins, same
+// rule as the len-1 broadcast) instead of an integer divide by zero when the
+// mask cycles row%0.
+func TestEmptyOperandLogicalBroadcast(t *testing.T) {
+	for _, src := range []string{"qv:rank til 1;()&(qv)", "qv:rank til 1;(qv)&()", "()&(enlist 1b)", "()|()"} {
+		got, err := Eval(src)
+		if err != nil {
+			t.Fatalf("Eval(%q) error: %v", src, err)
+		}
+		array, ok := got.(data.Array)
+		if !ok || array.Len() != 0 {
+			t.Fatalf("Eval(%q) = %#v, want an empty vector", src, got)
+		}
+		_ = array.Values() // materialization must not panic
+	}
+	// Mismatched non-broadcastable lengths still error.
+	assertEvalErrorContains(t, "(1 0b)&(1 1 0b)", "length")
+}
+
+// TestLazyBoolMaskMaterializes pins not/&-composed masks over lazy carriers
+// without a dedicated boolArrayAt case (membership and float-compare masks):
+// they must materialize instead of panicking "out of range".
+func TestLazyBoolMaskMaterializes(t *testing.T) {
+	got, err := Eval("x:til 1;not (x in 0)")
+	if err != nil {
+		t.Fatalf("not-over-membership error: %v", err)
+	}
+	array, ok := got.(data.Array)
+	if !ok || array.Len() != 1 {
+		t.Fatalf("not-over-membership = %#v, want 1-element bool vector", got)
+	}
+	if v, ok := array.At(0); !ok || v != false {
+		t.Fatalf("not (0 in 0) = %#v ok=%v, want 0b", v, ok)
+	}
+	values := array.Values()
+	if len(values) != 1 || values[0] != false {
+		t.Fatalf("materialized mask = %#v, want [false]", values)
+	}
+}

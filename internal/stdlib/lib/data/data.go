@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"io"
 	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -12586,6 +12587,21 @@ func coerceInt64Exact(v any) (int64, bool) {
 		return int64(n), true
 	case int64:
 		return n, true
+	case uint8:
+		return int64(n), true
+	case uint16:
+		return int64(n), true
+	case uint32:
+		return int64(n), true
+	case uint64:
+		// isIntegerArray admits unsigned columns (byte casts, ...); coerce
+		// them here too so lazy integer carriers built over them (fills,
+		// scalar dyadics) never defer a "want integer" error into a
+		// materialization panic.
+		if n > math.MaxInt64 {
+			return 0, false
+		}
+		return int64(n), true
 	case float32:
 		f := float64(n)
 		i := int64(f)
@@ -13392,7 +13408,19 @@ func equalScalar(left, right any) bool {
 	if cmp, ok := compareSameKind(left, right); ok {
 		return cmp == 0
 	}
+	// Go == panics on uncomparable operands (dicts, callables, slices that
+	// leak in through []any values); fall back to a deep comparison so the
+	// kernels return a value instead of crashing. The q layer intercepts
+	// dict/callable equality with canonical semantics before reaching here.
+	if !comparableScalarType(left) || !comparableScalarType(right) {
+		return reflect.DeepEqual(left, right)
+	}
 	return left == right
+}
+
+func comparableScalarType(v any) bool {
+	t := reflect.TypeOf(v)
+	return t == nil || t.Comparable()
 }
 
 func compareSameKind(left, right any) (int, bool) {

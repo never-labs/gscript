@@ -1488,6 +1488,16 @@ func (s *EvalState) evalQPipelineApplyGatherIndex(plan *qPipelinePlan) (any, boo
 	if array, ok := target.(data.Array); ok {
 		shape := "gather-at/" + string(array.Kind()) + "/" + qRuntimeCardinalityShape(len(indexes))
 		recordRuntimeKernelExecution("ArrayGatherIndex", shape, "attempt", "attempt")
+		// Array.Gather panics on out-of-range rows; validate up front with
+		// the boxed gather route's error (validateI64IndexArray) so both
+		// eval routes surface the identical index error.
+		length := array.Len()
+		for i, row := range indexes {
+			if row < 0 || row >= length {
+				recordRuntimeKernelExecution("ArrayGatherIndex", shape, "error", "runtime_error")
+				return nil, true, fmt.Errorf("index vector row %d value %d outside length %d", i, row, length)
+			}
+		}
 		out := array.Gather(indexes)
 		recordRuntimeKernelExecution("ArrayGatherIndex", shape, "hit", "typed_gather_index")
 		return out, true, nil
