@@ -265,6 +265,181 @@ second_capability := graph.graph.stages[2].capability
 	}
 }
 
+func TestLLMWorkflowGraphReplayTraceEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{}
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+plan_record, plan_record_err := llm.replay_record({
+    record_id: "rec-plan"
+    replay_key: "turn:plan"
+    request: {
+        model: "fixture-model"
+        messages: {llm.user("topic")}
+    }
+    response: {status: "final_answer" text: "plan text" calls: {} usage: {}}
+})
+final_record, final_record_err := llm.replay_record({
+    record_id: "rec-final"
+    replay_key: "turn:final"
+    request: {
+        model: "fixture-model"
+        messages: {llm.user("plan text")}
+    }
+    response: {status: "final_answer" text: "final text" calls: {} usage: {}}
+})
+plan_fixture, plan_fixture_err := llm.replay_fixture({plan_record}, {
+    fixture_id: "fixture:plan"
+    consume_on_match: false
+})
+final_fixture, final_fixture_err := llm.replay_fixture({final_record}, {
+    fixture_id: "fixture:final"
+    consume_on_match: false
+})
+
+plan_match := plan_fixture.match({
+    operation: "llm.turn"
+    capability: "generic.ai.turn"
+    replay_key: "turn:plan"
+    request_hash: plan_record.request_hash
+})
+final_match := final_fixture.match({
+    operation: "llm.turn"
+    capability: "generic.ai.turn"
+    replay_key: "turn:final"
+    request_hash: final_record.request_hash
+})
+plan_event := llm.replay_trace_event(plan_match, {
+    trace_id: "trace-workflow-replay"
+    sequence: 1
+    replay_session_id: "session-workflow"
+    workflow_run_id: "wf-replay"
+    workflow_step_id: "plan"
+})
+final_event := llm.replay_trace_event(final_match, {
+    trace_id: "trace-workflow-replay"
+    sequence: 2
+    replay_session_id: "session-workflow"
+    workflow_run_id: "wf-replay"
+    workflow_step_id: "finalize"
+})
+
+graph := llm.workflow_graph({
+    workflow_id: "wf-replay"
+    entrypoint: "ai.workflow.replay"
+    stages: {
+        llm.stage("plan", func(ctx) {
+            req := {model: "fixture-model" messages: {llm.user(ctx.input)}}
+            replay, replay_err := plan_fixture.replay(req, "turn:plan")
+            if replay_err != nil {
+                return nil, replay_err
+            }
+            return llm.turn({model: "fixture-model" messages: {llm.user(ctx.input)} replay: replay})
+        }, {
+            capability: "generic.ai.workflow.stage.plan"
+            fixture_key: "turn:plan"
+            input_ref: "request.topic"
+            output_ref: "plan.text"
+            input_schema: "topic.v1"
+            output_schema: "plan.v1"
+        }),
+        llm.stage("finalize", func(ctx) {
+            req := {model: "fixture-model" messages: {llm.user(ctx.input)}}
+            replay, replay_err := final_fixture.replay(req, "turn:final")
+            if replay_err != nil {
+                return nil, replay_err
+            }
+            return llm.turn({model: "fixture-model" messages: {llm.user(ctx.input)} replay: replay})
+        }, {
+            depends_on: {"plan"}
+            capability: "generic.ai.workflow.stage.finalize"
+            fixture_key: "turn:final"
+            input_ref: "plan.text"
+            output_ref: "final.text"
+            input_schema: "plan.v1"
+            output_schema: "final.v1"
+        }),
+    }
+    edges: {{from: "plan", to: "finalize"}}
+})
+result, err := graph.run("topic")
+envelope := llm.trace_envelope({plan_event, final_event}, {
+    trace_id: "trace-workflow-replay"
+})
+trace_summary := llm.trace_summary(envelope)
+trace_gate := llm.trace_assert(envelope, {
+    require_provider_free: true
+    deny_live_network: true
+    required_event_types: {"replay_record_matched"}
+    require_correlation_fields: {"replay_session_id", "workflow_run_id", "workflow_step_id"}
+})
+
+setup_ok := plan_record_err == nil && final_record_err == nil && plan_fixture_err == nil && final_fixture_err == nil
+run_err_nil := err == nil
+text := result.text
+workflow_id := result.workflow_id
+first_capability := result.steps[1].trace.metadata.capability
+first_fixture_key := result.steps[1].trace.metadata.fixture_key
+first_input_ref := result.steps[1].trace.metadata.input_ref
+first_output_ref := result.steps[1].trace.metadata.output_ref
+first_input_schema := result.steps[1].trace.metadata.input_schema
+first_output_schema := result.steps[1].trace.metadata.output_schema
+second_dep := result.steps[2].trace.metadata.depends_on[1]
+second_capability := result.steps[2].trace.metadata.capability
+graph_second_fixture := result.graph.stages[2].fixture_key
+plan_event_step := plan_event.correlation.workflow_step_id
+final_event_step := final_event.correlation.workflow_step_id
+trace_events := trace_summary.events
+trace_replay_key := trace_summary.replay_keys[1]
+trace_gate_ok := trace_gate.ok
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 0 {
+				t.Fatalf("provider requests = %d, want replay-only workflow", len(provider.requests))
+			}
+			for name, want := range map[string]any{
+				"setup_ok":             true,
+				"run_err_nil":          true,
+				"text":                 "final text",
+				"workflow_id":          "wf-replay",
+				"first_capability":     "generic.ai.workflow.stage.plan",
+				"first_fixture_key":    "turn:plan",
+				"first_input_ref":      "request.topic",
+				"first_output_ref":     "plan.text",
+				"first_input_schema":   "topic.v1",
+				"first_output_schema":  "plan.v1",
+				"second_dep":           "plan",
+				"second_capability":    "generic.ai.workflow.stage.finalize",
+				"graph_second_fixture": "turn:final",
+				"plan_event_step":      "plan",
+				"final_event_step":     "finalize",
+				"trace_events":         int64(2),
+				"trace_replay_key":     "turn:plan",
+				"trace_gate_ok":        true,
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestLLMWorkflowGraphMockPreservesGraphMetadata(t *testing.T) {
 	for _, tc := range []struct {
 		name string

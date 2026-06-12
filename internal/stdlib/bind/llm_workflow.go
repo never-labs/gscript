@@ -538,10 +538,26 @@ func llmWorkflowRecord(step llmWorkflowStep, index int, input, value, errValue V
 		metadata.RawSetString("index", IntValue(int64(index)))
 		metadata.RawSetString("mocked", BoolValue(mocked))
 		metadata.RawSetString("stage", BoolValue(step.Stage))
+		llmWorkflowCopyStepMetadata(metadata, step)
 		tt.RawSetString("metadata", TableValue(metadata))
 	}
 	record.RawSetString("trace", trace)
 	return TableValue(record)
+}
+
+func llmWorkflowCopyStepMetadata(metadata *Table, step llmWorkflowStep) {
+	if metadata == nil || !step.Opts.IsTable() {
+		return
+	}
+	opts := step.Opts.Table()
+	for _, field := range []string{"capability", "fixture_key", "input_ref", "output_ref", "input_schema", "output_schema"} {
+		if value := opts.RawGetString(field); !value.IsNil() {
+			metadata.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if value := opts.RawGetString("depends_on"); !value.IsNil() {
+		metadata.RawSetString("depends_on", llmCloneValue(value))
+	}
 }
 
 func llmWorkflowFixture(fixtures *Table, name string, index int) Value {
