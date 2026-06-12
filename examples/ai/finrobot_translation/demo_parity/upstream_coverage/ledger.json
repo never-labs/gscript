@@ -104,7 +104,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/README.md",
-          "sha256": "ae7bb69a9bfe6b32f46d3669b7d1568cc058ffbb1e22cafc8d21a5f5a535413f"
+          "sha256": "f9932212e455bf6c747ce7c64c1b1eb87b213526bb867af5477eab174bb61c07"
         }
       ],
       "next_action": "Refresh coverage prose when upstream README changes product or package scope."
@@ -1061,7 +1061,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
-          "sha256": "ec5ff824bb199b77045ba36503e75b436b992d7c80a3a47a26fa2da1effe0ced"
+          "sha256": "17363a02a2a321892d022d8e3744dd02cea36c893ca87c1e3c55fd2378073df8"
         }
       ],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."
@@ -1218,7 +1218,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/README.md",
-          "sha256": "ae7bb69a9bfe6b32f46d3669b7d1568cc058ffbb1e22cafc8d21a5f5a535413f"
+          "sha256": "f9932212e455bf6c747ce7c64c1b1eb87b213526bb867af5477eab174bb61c07"
         }
       ],
       "next_action": "Only add asset snapshots when UI/product visual parity requires them."

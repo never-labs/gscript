@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 82,
-  "translation_directory_file_count": 637,
+  "registered_examples_count": 83,
+  "translation_directory_file_count": 645,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -122,6 +122,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
       "covers_package_ids": [
         "generic_approval_policy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_document_rag_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "covers_package_ids": [
+        "generic_document_rag_pipeline"
       ],
       "status": "checked_in_registered_example"
     },
@@ -702,6 +711,33 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_document_rag_pipeline",
+      "package_name": "leia-generic-ai-document-rag-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "planned_directory": "packages/generic_ai/document_rag_pipeline",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/contracts/generic_document_rag_pipeline_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "capabilities": [
+        "generic.ai.document.rag",
+        "generic.ai.document.convert",
+        "generic.ai.document.section.extract",
+        "generic.ai.rag.chunk",
+        "generic.ai.rag.corpus_manifest",
+        "generic.ai.rag.retrieve",
+        "generic.ai.rag.citation_consistency",
+        "generic.ai.rag.adapter.clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic document RAG backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials, live network, provider SDK, or q runtime dependency"
       ],
       "no_built_in_guarantee": true
     },

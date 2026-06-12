@@ -21,19 +21,20 @@
     "missing_production_package_boundary_recorded": true
   },
   "required_capabilities": [
-    "model",
-    "turn",
-    "model-io",
-    "tool",
     "agent",
-    "memory",
-    "workflow",
     "approval",
-    "evaluation",
-    "replay",
-    "trace",
     "capability",
-    "package-boundary"
+    "document-rag",
+    "evaluation",
+    "memory",
+    "model",
+    "model-io",
+    "package-boundary",
+    "replay",
+    "tool",
+    "trace",
+    "turn",
+    "workflow"
   ],
   "entries": [
     {
@@ -125,6 +126,38 @@
         "package_id": "generic-approval-policy",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "document-rag",
+      "capability_id": "generic.ai.document.rag",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "document.convert",
+        "document.sections",
+        "rag.chunk",
+        "rag.retrieve",
+        "rag.citation_consistency",
+        "rag.adapter.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_document_rag_pipeline.source.txt",
+      "test": "tests/llm/llm_generic_document_rag_pipeline_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_document_rag_pipeline_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-document-rag-pipeline",
+        "boundary": "provider-free document conversion, section extraction, RAG chunking, corpus manifests, retrieval results, citation consistency, and adapter clean-skip contracts",
+        "status": "resolved",
+        "reason": "document RAG behavior was promoted from finance document pipeline fixtures into the generic_document_rag_pipeline reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-document-rag-pipeline",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

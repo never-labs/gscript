@@ -43,6 +43,44 @@
       }
     },
     {
+      "shape_id": "ai.document.rag_pipeline",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "document-rag",
+        "memory",
+        "replay"
+      ],
+      "contract": "Normalize provider-free document conversion, section extraction, RAG chunks, corpus manifests, retrieval results, citation consistency, and adapter clean-skip boundaries.",
+      "inputs": [
+        "document_source",
+        "conversion_policy",
+        "section_policy",
+        "chunk_policy",
+        "retriever_query"
+      ],
+      "outputs": [
+        "document_markdown",
+        "sections",
+        "chunks",
+        "corpus_manifest",
+        "retrieved_chunks",
+        "answer_citations",
+        "adapter_boundaries"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_document_rag_pipeline.source.txt",
+      "test": "tests/llm/llm_generic_document_rag_pipeline_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_document_rag_pipeline_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-document-rag-pipeline",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/contracts/generic_document_rag_pipeline_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.eval.run",
       "status": "checked_in_package_boundary",
       "capabilities": [

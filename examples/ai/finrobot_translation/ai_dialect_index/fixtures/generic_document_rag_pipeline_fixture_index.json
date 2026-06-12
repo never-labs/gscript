@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "generic-document-rag-pipeline-dialect-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "live_model": false,
+  "domain_specific": false,
+  "real_dependency_imports": false,
+  "capability_id": "generic.ai.document.rag",
+  "dialect_surface": [
+    "document.convert",
+    "document.sections",
+    "rag.chunk",
+    "rag.retrieve",
+    "rag.citation_consistency",
+    "rag.adapter.clean_skip"
+  ],
+  "fixture_key": "generic:document_rag:pipeline:offline",
+  "production_package_boundary": {
+    "package_id": "generic-ai-document-rag-pipeline",
+    "directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+    "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+    "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json",
+    "provider_free": true,
+    "domain_specific": false
+  }
+}

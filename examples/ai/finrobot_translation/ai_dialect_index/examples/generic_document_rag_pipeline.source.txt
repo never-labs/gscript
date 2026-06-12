@@ -1,0 +1,34 @@
+generic_ai_document_rag_pipeline_example:
+  provider_free: true
+  live_network: false
+  domain_specific: false
+
+  document.convert:
+    source_ref: "fixture://generic/documents/generic-doc-001"
+    media_type: "text/markdown"
+    preserve_offsets: true
+
+  document.sections:
+    section_policy: "heading_offsets"
+    required_fields: ["section_id", "section_title", "start_offset", "end_offset"]
+
+  rag.chunk:
+    chunk_policy:
+      max_tokens: 64
+      overlap_tokens: 8
+      section_aware: true
+    provenance:
+      source_document_ref: "fixture://generic/documents/generic-doc-001"
+      citation_consistency_required: true
+
+  rag.retrieve:
+    query: "Which operating risks affect the plan?"
+    top_k: 2
+    citation_consistency: true
+
+  rag.adapter.clean_skip:
+    converter_dependency_imported: false
+    embedding_dependency_imported: false
+    vector_dependency_imported: false
+    live_network: false
+    credential_required: false

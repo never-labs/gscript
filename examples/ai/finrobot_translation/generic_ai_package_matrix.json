@@ -54,6 +54,30 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_document_rag_pipeline",
+      "package_name": "leia-generic-ai-document-rag-pipeline",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "capability": "generic.ai.document.rag",
+      "capabilities": [
+        "generic.ai.document.rag",
+        "generic.ai.document.convert",
+        "generic.ai.document.section.extract",
+        "generic.ai.rag.chunk",
+        "generic.ai.rag.corpus_manifest",
+        "generic.ai.rag.retrieve",
+        "generic.ai.rag.citation_consistency",
+        "generic.ai.rag.adapter.clean_skip"
+      ],
+      "backend_shape": "ai.document.rag_pipeline",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/contracts/generic_document_rag_pipeline_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_evaluation_harness",
       "package_name": "leia-generic-ai-evaluation-harness",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
