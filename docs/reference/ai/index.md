@@ -601,6 +601,11 @@ normalizes one record, fills `operation`, `capability`, `request_hash`,
 strict ordered matcher used by `llm.replay_index`. `fixture.replay(request,
 replay_key)` matches a normalized turn request and returns replay options for
 `llm.turn`.
+`llm.replay_trace_event(match, opts)` projects a `fixture.match(...)` or
+`llm.replay_index(...).match(...)` result into a redacted trace event. Matched,
+mismatched, and exhausted replay states become `replay_record_matched`,
+`replay_record_mismatch`, and `replay_record_exhausted` events with replay
+identity hashes and summary counters, not raw prompts or response bodies.
 `llm.trace_summary(envelope_or_events)` returns deterministic trace counts,
 event types, replay keys, and ordering diagnostics. `llm.trace_assert(input,
 opts)` turns those checks into `{ok, status, summary, findings}` without
@@ -633,6 +638,16 @@ gate := llm.trace_assert(trace, {
     require_provider_free: true
     deny_live_network: true
     required_event_types: {"turn_end"}
+})
+match := fixture.match({
+    operation: "llm.turn"
+    capability: "generic.ai.turn"
+    replay_key: "turn:1"
+    request_hash: replay.request_hash
+})
+replay_event := llm.replay_trace_event(match, {
+    trace_id: "unit-trace"
+    replay_session_id: "unit-fixture"
 })
 ```
 

@@ -589,6 +589,16 @@ require event types, or require correlation fields. These helpers are
 provider-free; they inspect ordinary trace tables and must not persist telemetry
 or call providers.
 
+`llm.replay_trace_event(match, opts)` projects the result of
+`llm.replay_index(...).match(...)` or a replay fixture matcher into a standard
+trace event. It must preserve the replay matcher's status without re-matching:
+`matched`, `mismatch`, and `exhausted` become redacted replay trace events with
+safe identity fields such as `replay_key`, `request_hash`, `response_hash`,
+`record_id`, summary counters, and finding metadata. It must not clone raw
+request messages, raw records, or replay responses into the trace payload, and
+must not call providers, persist telemetry, or introduce a second replay
+matching algorithm.
+
 ## Evaluate Blocks
 
 `evaluate "case name" { ... }` declares a source-level regression case. The
