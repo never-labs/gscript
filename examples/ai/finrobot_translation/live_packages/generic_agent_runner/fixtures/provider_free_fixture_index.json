@@ -6,7 +6,8 @@
   "fixtures": [
     {
       "key": "agent_config",
-      "schema": "agent_config_v1",
+      "capability": "ai.agent.config.declarative",
+      "schema": "schemas/agent_config_v1.schema.json",
       "path": "fixtures/agent_config_fixture.json",
       "provider_free": true,
       "live_network": false,
@@ -20,7 +21,8 @@
     },
     {
       "key": "loop_trace",
-      "schema": "loop_trace_v1",
+      "capability": "ai.agent.loop_trace.emit",
+      "schema": "schemas/loop_trace_v1.schema.json",
       "path": "fixtures/loop_trace_fixture.json",
       "provider_free": true,
       "live_network": false,
@@ -34,7 +36,8 @@
     },
     {
       "key": "structured_output",
-      "schema": "structured_output_v1",
+      "capability": "ai.agent.structured_output.validate",
+      "schema": "schemas/structured_output_v1.schema.json",
       "path": "fixtures/structured_output_fixture.json",
       "provider_free": true,
       "live_network": false,
@@ -48,7 +51,9 @@
     },
     {
       "key": "tool_contract_agent_projection",
-      "schema": "tool_contract_agent_projection_v1",
+      "fixture_key": "tool_contract_agent_projection",
+      "capability": "ai.agent.tool_contract_projection",
+      "schema": "schemas/tool_contract_agent_projection_v1.schema.json",
       "path": "fixtures/tool_contract_agent_projection_fixture.json",
       "provider_free": true,
       "live_network": false,

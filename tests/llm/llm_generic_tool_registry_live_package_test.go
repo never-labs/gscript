@@ -88,6 +88,26 @@ type genericToolRegistryContract struct {
 	} `json:"negative_gates"`
 }
 
+type genericToolRegistryFixtureIndex struct {
+	SchemaVersion         int    `json:"schema_version"`
+	ID                    string `json:"id"`
+	ProviderFree          bool   `json:"provider_free"`
+	LiveNetwork           bool   `json:"live_network"`
+	RealDependencyImports bool   `json:"real_dependency_imports"`
+	LocalExecution        bool   `json:"local_execution"`
+	Fixtures              []struct {
+		FixtureKey            string         `json:"fixture_key"`
+		Capability            string         `json:"capability"`
+		SchemaRef             string         `json:"schema_ref"`
+		Path                  string         `json:"path"`
+		ProviderFree          bool           `json:"provider_free"`
+		LiveNetwork           bool           `json:"live_network"`
+		RealDependencyImports bool           `json:"real_dependency_imports"`
+		Metadata              map[string]any `json:"metadata"`
+		Status                string         `json:"status"`
+	} `json:"fixtures"`
+}
+
 type genericToolRegistryFixture struct {
 	SchemaVersion int `json:"schema_version"`
 	Descriptor    struct {
@@ -141,6 +161,66 @@ type genericToolRegistryFixture struct {
 	} `json:"trace"`
 }
 
+func TestGenericToolRegistryLivePackageFixtureIndex(t *testing.T) {
+	base := genericToolRegistryDir(t)
+	var index genericToolRegistryFixtureIndex
+	decodeGenericToolRegistryJSONFile(t, filepath.Join(base, "fixtures", "provider_free_fixture_index.json"), &index)
+	if index.SchemaVersion != 1 ||
+		index.ID != "generic-tool-registry-provider-free-fixture-index" ||
+		!index.ProviderFree || index.LiveNetwork || index.RealDependencyImports ||
+		index.LocalExecution || len(index.Fixtures) != 3 {
+		t.Fatalf("fixture index boundary drifted: %#v", index)
+	}
+
+	want := map[string]struct {
+		capability string
+		schemaRef  string
+		path       string
+		status     string
+	}{
+		"generic_tool:registry:descriptor:v1": {
+			capability: "generic.tool.registry.declare",
+			schemaRef:  "schemas/tool_descriptor.schema.json",
+			path:       "fixtures/tool_registry_replay_trace_fixture.json",
+			status:     "ok",
+		},
+		"generic_tool:invocation:trace:v1": {
+			capability: "generic.tool.invocation.trace",
+			schemaRef:  "schemas/tool_invocation_trace.schema.json",
+			path:       "fixtures/tool_registry_replay_trace_fixture.json",
+			status:     "ok",
+		},
+		"generic_tool:approval:denied:v1": {
+			capability: "generic.tool.approval.edge",
+			schemaRef:  "schemas/tool_invocation_trace.schema.json",
+			path:       "fixtures/approval_edge_fixture.json",
+			status:     "denied",
+		},
+	}
+	for _, fixture := range index.Fixtures {
+		expected, ok := want[fixture.FixtureKey]
+		if !ok {
+			t.Fatalf("unexpected fixture index key %q", fixture.FixtureKey)
+		}
+		if fixture.Capability != expected.capability ||
+			fixture.SchemaRef != expected.schemaRef ||
+			fixture.Path != expected.path ||
+			fixture.Status != expected.status ||
+			!fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports ||
+			fixture.Metadata["provider_free"] != true ||
+			fixture.Metadata["live_network"] != false ||
+			fixture.Metadata["real_dependency_imports"] != false {
+			t.Fatalf("fixture index entry drifted: %#v", fixture)
+		}
+		assertGenericToolRegistryFileExists(t, base, fixture.SchemaRef)
+		assertGenericToolRegistryFileExists(t, base, fixture.Path)
+		delete(want, fixture.FixtureKey)
+	}
+	if len(want) != 0 {
+		t.Fatalf("fixture index missing keys: %#v", want)
+	}
+}
+
 func TestGenericToolRegistryLivePackageManifestContractAndFixtures(t *testing.T) {
 	base := genericToolRegistryDir(t)
 	manifest := loadGenericToolRegistryManifest(t, base)
@@ -188,6 +268,20 @@ func TestGenericToolRegistryLivePackageManifestContractAndFixtures(t *testing.T)
 		}
 		assertGenericToolRegistryFileExists(t, base, capability.Schema)
 	}
+}
+
+func TestGenericToolRegistryLivePackageSchemaRequiredFields(t *testing.T) {
+	base := genericToolRegistryDir(t)
+	descriptorSchema := filepath.Join(base, "schemas", "tool_descriptor.schema.json")
+	assertDocumentPipelineSchemaRequired(t, descriptorSchema, []string{"tool_name", "description", "capability_ids", "input_schema", "output_schema", "caller_role", "executor_role", "effect", "approval_policy", "provider_wire_format", "live_network", "secret_parameters_allowed"})
+
+	traceSchema := filepath.Join(base, "schemas", "tool_invocation_trace.schema.json")
+	assertDocumentPipelineSchemaRequired(t, traceSchema, []string{"trace_id", "tool_name", "caller_id", "executor_id", "capability_ids", "events", "schema_validation", "approval", "result", "provenance"})
+	assertDocumentPipelineNestedSchemaRequired(t, traceSchema, []string{"properties", "events", "items"}, []string{"event", "sequence"})
+	assertDocumentPipelineNestedSchemaRequired(t, traceSchema, []string{"properties", "schema_validation"}, []string{"input_valid", "output_valid", "additional_properties_rejected"})
+	assertDocumentPipelineNestedSchemaRequired(t, traceSchema, []string{"properties", "approval"}, []string{"required", "decision", "approval_id", "reason"})
+	assertDocumentPipelineNestedSchemaRequired(t, traceSchema, []string{"properties", "result"}, []string{"ok", "status", "content", "metadata"})
+	assertDocumentPipelineNestedSchemaRequired(t, traceSchema, []string{"properties", "provenance"}, []string{"provider_free", "live_network", "real_dependency_imports", "local_execution", "fixture_key"})
 }
 
 func TestGenericToolRegistryContractSchemaTraceAndApprovalEdges(t *testing.T) {

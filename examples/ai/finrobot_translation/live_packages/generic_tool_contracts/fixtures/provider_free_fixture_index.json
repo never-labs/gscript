@@ -6,6 +6,7 @@
   "fixtures": [
     {
       "fixture_key": "generic_tool:invoke:fixture.lookup:ACME:1d:success",
+      "capability": "ai.tool.invoke",
       "path": "fixtures/invoke_success_fixture.json",
       "dialect_export": "ai.tool.invoke",
       "tool_name": "fixture.lookup",
@@ -30,6 +31,7 @@
     },
     {
       "fixture_key": "generic_tool:invoke:fixture.lookup:bad-args:validation",
+      "capability": "ai.tool.arguments.validate",
       "path": "fixtures/invoke_validation_error_fixture.json",
       "dialect_export": "ai.tool.invoke",
       "tool_name": "fixture.lookup",
@@ -54,6 +56,7 @@
     },
     {
       "fixture_key": "generic_tool:projection:registry_descriptor:tool_contract:v1",
+      "capability": "generic.ai.tool.contract.project_registry_descriptor",
       "path": "fixtures/registry_descriptor_to_tool_contract_projection_fixture.json",
       "schema": "schemas/tool_contract_projection_v1.schema.json",
       "dialect_export": "generic.ai.tool.contract.project_registry_descriptor",

@@ -90,12 +90,15 @@ type genericReplayRequest struct {
 }
 
 type genericReplayIndex struct {
-	SchemaVersion  int    `json:"schema_version"`
-	FixtureID      string `json:"fixture_id"`
-	ProviderFree   bool   `json:"provider_free"`
-	DomainSpecific bool   `json:"domain_specific"`
-	Strategy       string `json:"strategy"`
-	Matching       struct {
+	SchemaVersion   int               `json:"schema_version"`
+	FixtureID       string            `json:"fixture_id"`
+	ProviderFree    bool              `json:"provider_free"`
+	DomainSpecific  bool              `json:"domain_specific"`
+	Strategy        string            `json:"strategy"`
+	RecordSchema    string            `json:"record_schema"`
+	RecordsPath     string            `json:"records_path"`
+	RequestFixtures map[string]string `json:"request_fixtures"`
+	Matching        struct {
 		ScanAhead             bool     `json:"scan_ahead"`
 		ConsumeOnMatch        bool     `json:"consume_on_match"`
 		ConsumeOnMismatch     bool     `json:"consume_on_mismatch"`
@@ -104,8 +107,20 @@ type genericReplayIndex struct {
 		UnconsumedFindingKind string   `json:"unconsumed_finding_kind"`
 		ExhaustedFindingKind  string   `json:"exhausted_finding_kind"`
 	} `json:"matching"`
+	Fixtures []struct {
+		ID                    string         `json:"id"`
+		Path                  string         `json:"path"`
+		Schema                string         `json:"schema"`
+		Records               int            `json:"records"`
+		Metadata              map[string]any `json:"metadata"`
+		ProviderFree          bool           `json:"provider_free"`
+		LiveNetwork           bool           `json:"live_network"`
+		RealDependencyImports bool           `json:"real_dependency_imports"`
+	} `json:"fixtures"`
 	ExpectedSummaries         map[string]genericReplaySummary `json:"expected_summaries"`
 	DeterministicSummaryOrder []string                        `json:"deterministic_summary_order"`
+	LiveNetwork               bool                            `json:"live_network"`
+	RealDependencyImports     bool                            `json:"real_dependency_imports"`
 }
 
 type genericReplaySummary struct {
@@ -264,6 +279,13 @@ func TestGenericRecordReplaySmokeExecutes(t *testing.T) {
 func TestGenericRecordReplaySchemaAndFixtureIndex(t *testing.T) {
 	base := genericRecordReplayLivePackageDir(t)
 
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "record_v1.schema.json"), []string{"record_id", "sequence", "replay_key", "operation", "capability", "request_hash", "response_hash", "request", "response", "provider_free", "recorded_at"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "record_v1.schema.json"), []string{"properties", "request"}, []string{"canonical_json", "redactions"})
+	assertDocumentPipelineNestedSchemaRequired(t, filepath.Join(base, "schemas", "record_v1.schema.json"), []string{"properties", "response"}, []string{"canonical_json", "status"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "replay_index_v1.schema.json"), []string{"schema_version", "fixture_id", "provider_free", "domain_specific", "strategy", "record_schema", "records_path", "request_fixtures", "expected_summaries"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "match_finding_v1.schema.json"), []string{"kind", "cursor", "message", "provider_free"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "matching_summary_v1.schema.json"), []string{"fixture_id", "strategy", "loaded_records", "requests", "matched", "mismatches", "unconsumed", "exhausted", "next_index", "finding_kinds", "matched_record_ids"})
+
 	var recordSchema struct {
 		AdditionalProperties bool                       `json:"additionalProperties"`
 		Required             []string                   `json:"required"`
@@ -298,8 +320,16 @@ func TestGenericRecordReplaySchemaAndFixtureIndex(t *testing.T) {
 
 	index := loadGenericReplayIndex(t, base)
 	if index.SchemaVersion != 1 || index.FixtureID != "generic-ai-record-replay-fixture-index" ||
-		!index.ProviderFree || index.DomainSpecific || index.Strategy != "strict_ordered" {
+		!index.ProviderFree || index.DomainSpecific || index.Strategy != "strict_ordered" ||
+		index.RecordSchema != "schemas/record_v1.schema.json" ||
+		index.RecordsPath != "fixtures/ordered_records_fixture.json#/records" ||
+		index.LiveNetwork || index.RealDependencyImports {
 		t.Fatalf("unexpected replay index header: %#v", index)
+	}
+	for _, key := range []string{"strict_ordered_partial", "strict_ordered_mismatch"} {
+		if index.RequestFixtures[key] == "" {
+			t.Fatalf("request fixture %q missing: %#v", key, index.RequestFixtures)
+		}
 	}
 	if index.Matching.ScanAhead || !index.Matching.ConsumeOnMatch || index.Matching.ConsumeOnMismatch ||
 		index.Matching.MismatchFindingKind != "generic.ai.replay.mismatch" ||
@@ -314,6 +344,50 @@ func TestGenericRecordReplaySchemaAndFixtureIndex(t *testing.T) {
 	wantOrder := []string{"fixture_id", "strategy", "loaded_records", "requests", "matched", "mismatches", "unconsumed", "exhausted", "next_index", "finding_kinds", "matched_record_ids"}
 	if !reflect.DeepEqual(index.DeterministicSummaryOrder, wantOrder) {
 		t.Fatalf("deterministic summary order = %#v", index.DeterministicSummaryOrder)
+	}
+	wantFixtures := map[string]struct {
+		path    string
+		schema  string
+		records int
+	}{
+		"ordered_records": {
+			path:    "fixtures/ordered_records_fixture.json",
+			schema:  "schemas/record_v1.schema.json",
+			records: 3,
+		},
+		"matching_requests": {
+			path:    "fixtures/matching_requests_fixture.json",
+			records: 2,
+		},
+		"mismatch_requests": {
+			path:    "fixtures/mismatch_requests_fixture.json",
+			records: 2,
+		},
+	}
+	if len(index.Fixtures) != len(wantFixtures) {
+		t.Fatalf("fixture index entries = %d, want %d", len(index.Fixtures), len(wantFixtures))
+	}
+	for _, fixture := range index.Fixtures {
+		expected, ok := wantFixtures[fixture.ID]
+		if !ok {
+			t.Fatalf("unexpected fixture index entry %q", fixture.ID)
+		}
+		if fixture.Path != expected.path || fixture.Schema != expected.schema || fixture.Records != expected.records ||
+			!fixture.ProviderFree || fixture.LiveNetwork || fixture.RealDependencyImports ||
+			fixture.Metadata["replay_ready"] != true ||
+			fixture.Metadata["provider_free"] != true ||
+			fixture.Metadata["live_network"] != false ||
+			fixture.Metadata["real_dependency_imports"] != false {
+			t.Fatalf("fixture index entry drifted: %#v", fixture)
+		}
+		assertGenericRecordReplayPath(t, filepath.Join(base, fixture.Path))
+		if fixture.Schema != "" {
+			assertGenericRecordReplayPath(t, filepath.Join(base, fixture.Schema))
+		}
+		delete(wantFixtures, fixture.ID)
+	}
+	if len(wantFixtures) != 0 {
+		t.Fatalf("fixture index missing entries: %#v", wantFixtures)
 	}
 }
 

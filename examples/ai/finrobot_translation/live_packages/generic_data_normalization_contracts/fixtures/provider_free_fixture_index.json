@@ -7,6 +7,7 @@
   "fixtures": [
     {
       "fixture_key": "normalization_mapping:observations:offline:v1",
+      "capability": "generic.ai.data_normalization.schema_mapping",
       "path": "fixtures/normalization_mapping_fixture.json",
       "schema": "schemas/normalization_mapping_v1.schema.json",
       "provider_free": true,
@@ -16,6 +17,7 @@
     },
     {
       "fixture_key": "provider_response_projection:observations:offline:v1",
+      "capability": "generic.ai.data_normalization.provider_response_projection",
       "path": "fixtures/provider_response_projection_fixture.json",
       "schema": "schemas/provider_response_projection_v1.schema.json",
       "provider_free": true,
@@ -25,6 +27,7 @@
     },
     {
       "fixture_key": "normalized_rows:observations:offline:v1",
+      "capability": "generic.ai.data_normalization.deterministic_order",
       "path": "fixtures/normalized_rows_fixture.json",
       "schema": "schemas/normalized_rows_v1.schema.json",
       "provider_free": true,
@@ -34,6 +37,7 @@
     },
     {
       "fixture_key": "normalization_validation:observations:offline:v1",
+      "capability": "generic.ai.data_normalization.validation_error",
       "path": "fixtures/normalization_validation_fixture.json",
       "schema": "schemas/normalization_validation_v1.schema.json",
       "provider_free": true,
@@ -43,6 +47,7 @@
     },
     {
       "fixture_key": "normalization_clean_skip:offline:v1",
+      "capability": "generic.ai.data_normalization.adapter_clean_skip",
       "path": "fixtures/normalization_clean_skip_fixture.json",
       "schema": "schemas/normalization_clean_skip_v1.schema.json",
       "provider_free": true,
