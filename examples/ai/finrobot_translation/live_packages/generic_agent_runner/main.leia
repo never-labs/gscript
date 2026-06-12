@@ -8,7 +8,8 @@ generic_agent_runner_live_package := {
         max_steps: 4
         trace_events: 6
         output_required_fields: 3
-        capabilities: 6
+        capabilities: 7
+        tool_contract_projections: 1
     }
 }
 
@@ -22,13 +23,14 @@ func generic_agent_runner_provider_free_ok(pkg) {
 assert(generic_agent_runner_provider_free_ok(generic_agent_runner_live_package))
 
 generic_agent_runner_live_package_summary := string.format(
-"generic_agent_runner_live_package backend=%s tools=%d max_steps=%d trace_events=%d output_fields=%d capabilities=%d provider_free=%s live_network=%s imports=%s",
+"generic_agent_runner_live_package backend=%s tools=%d max_steps=%d trace_events=%d output_fields=%d capabilities=%d tool_contract_projections=%d provider_free=%s live_network=%s imports=%s",
 generic_agent_runner_live_package.backend_shape,
 generic_agent_runner_live_package.contracts.tools,
 generic_agent_runner_live_package.contracts.max_steps,
 generic_agent_runner_live_package.contracts.trace_events,
 generic_agent_runner_live_package.contracts.output_required_fields,
 generic_agent_runner_live_package.contracts.capabilities,
+generic_agent_runner_live_package.contracts.tool_contract_projections,
 generic_agent_runner_live_package.provider_free,
 generic_agent_runner_live_package.live_network,
 generic_agent_runner_live_package.real_dependency_imports)

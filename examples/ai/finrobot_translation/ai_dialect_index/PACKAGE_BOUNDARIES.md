@@ -60,7 +60,7 @@ contracts, and fixtures for its boundary.
 - tool-registry: `examples/ai/finrobot_translation/live_packages/generic_tool_registry`
 - optional-adapter: `examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary`
 - coding-workspace: `examples/ai/finrobot_translation/live_packages/generic_coding_workspace`
-- agent: `examples/ai/finrobot_translation/live_packages/generic_agent_runner`
+- agent: `examples/ai/finrobot_translation/live_packages/generic_agent_runner` (includes tool-contract-to-agent-runner projection)
 - planning: `examples/ai/finrobot_translation/live_packages/generic_planning_graph`
 - workflow: `examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator`
 - product-app: `examples/ai/finrobot_translation/live_packages/generic_product_app_boundary`
@@ -169,7 +169,7 @@ language or specializing the dialect for one application domain.
 
 | Responsibility | Owning package | Boundary |
 | --- | --- | --- |
-| Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_memory_store`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_planning_graph`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, memory, planning graphs, and workflow graphs; packages own validation, envelopes, context windows, loop semantics, planning-to-stage projection, and stage I/O. |
+| Package composition | `generic_model_registry`, `generic_model_io_envelope`, `generic_memory_store`, `generic_turn_runner`, `generic_tool_contracts`, `generic_agent_runner`, `generic_planning_graph`, `generic_workflow_orchestrator` | Leia scripts declare aliases, messages, tools, agents, memory, planning graphs, and workflow graphs; packages own validation, envelopes, context windows, tool-contract projection into agent tools, loop semantics, planning-to-stage projection, and stage I/O. |
 | Document RAG | `generic_document_rag_pipeline`, `generic_memory_store` | Document conversion, sections, chunks, citations, retrieval results, and adapter clean-skip boundaries are generic package data; domain adapters provide source documents outside the core language. |
 | Data providers | `generic_data_provider_boundary`, `generic_optional_adapter_boundary`, `generic_approval_policy` | Provider registries, request/response envelopes, pagination, rate limits, auth redaction, cache/retry policy, provenance, errors, and clean skips are package-owned data access contracts rather than domain-specific vendor syntax. |
 | Data normalization | `generic_data_normalization_contracts`, `generic_data_provider_boundary`, `generic_trace_events` | Schema mappings, provider response projection, field policies, missing/stale value handling, type coercions, unit transforms, provenance records, validation envelopes, deterministic ordering, and clean skips are reusable typed-record contracts between data access and analytics packages. |

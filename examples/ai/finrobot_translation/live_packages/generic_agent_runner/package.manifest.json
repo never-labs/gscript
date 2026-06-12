@@ -20,17 +20,20 @@
   "entrypoints": {
     "smoke": "main.leia",
     "contract": "contracts/agent_runner_contract.json",
-    "fixture_index": "fixtures/provider_free_fixture_index.json"
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "tool_contract_agent_projection": "fixtures/tool_contract_agent_projection_fixture.json"
   },
   "schemas": {
     "agent_config": "schemas/agent_config_v1.schema.json",
     "loop_trace": "schemas/loop_trace_v1.schema.json",
-    "structured_output": "schemas/structured_output_v1.schema.json"
+    "structured_output": "schemas/structured_output_v1.schema.json",
+    "tool_contract_agent_projection": "schemas/tool_contract_agent_projection_v1.schema.json"
   },
   "fixtures": {
     "agent_config": "fixtures/agent_config_fixture.json",
     "loop_trace": "fixtures/loop_trace_fixture.json",
-    "structured_output": "fixtures/structured_output_fixture.json"
+    "structured_output": "fixtures/structured_output_fixture.json",
+    "tool_contract_agent_projection": "fixtures/tool_contract_agent_projection_fixture.json"
   },
   "capabilities": [
     "ai.agent.config.declarative",
@@ -38,11 +41,13 @@
     "ai.agent.loop_trace.emit",
     "ai.agent.structured_output.validate",
     "ai.agent.replay_policy.enforce",
-    "ai.agent.max_steps.guard"
+    "ai.agent.max_steps.guard",
+    "ai.agent.tool_contract_projection"
   ],
   "test_gates": [
     "fixture JSON parses without live provider credentials",
     "contract declares provider-free loop execution boundary",
+    "tool contract projection maps replayable tool contracts into agent tools, tool history, and loop trace ownership",
     "Leia smoke example executes in interpreter and bytecode modes",
     "no q runtime, provider SDK, live network, or secret dependency"
   ],

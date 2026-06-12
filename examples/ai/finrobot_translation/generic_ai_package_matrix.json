@@ -15,7 +15,8 @@
         "ai.agent.loop_trace.emit",
         "ai.agent.structured_output.validate",
         "ai.agent.replay_policy.enforce",
-        "ai.agent.max_steps.guard"
+        "ai.agent.max_steps.guard",
+        "ai.agent.tool_contract_projection"
       ],
       "backend_shape": "ai.agent.run",
       "provider_free": true,
@@ -23,6 +24,9 @@
       "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_agent_runner/contracts/agent_runner_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/tool_contract_agent_projection_fixture.json"
       ],
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
     },

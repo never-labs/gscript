@@ -5,6 +5,15 @@
   "live_network": false,
   "backend_shape": "ai.agent.run",
   "capability": "ai.agent.config.declarative",
+  "capabilities": [
+    "ai.agent.config.declarative",
+    "ai.agent.tool_history.replay",
+    "ai.agent.loop_trace.emit",
+    "ai.agent.structured_output.validate",
+    "ai.agent.replay_policy.enforce",
+    "ai.agent.max_steps.guard",
+    "ai.agent.tool_contract_projection"
+  ],
   "inputs": [
     "agent_config",
     "initial_state",
@@ -34,6 +43,18 @@
     "ordering": "strict_sequence",
     "result_envelope_required": true,
     "unconsumed_records": "fail_closed"
+  },
+  "tool_contract_projection": {
+    "schema": "tool_contract_agent_projection_v1",
+    "source_package": "generic_tool_contracts",
+    "target_surfaces": [
+      "agent_config.tools",
+      "structured_output.tool_history",
+      "loop_trace.events"
+    ],
+    "correlation_owner": "agent_runner",
+    "trace_event_schema_redefined": false,
+    "provider_free": true
   },
   "structured_output": {
     "schema": "structured_output_v1",

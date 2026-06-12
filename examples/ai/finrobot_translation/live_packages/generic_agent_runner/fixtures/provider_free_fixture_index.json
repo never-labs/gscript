@@ -45,6 +45,24 @@
         "real_dependency_imports": false,
         "replay_ready": true
       }
+    },
+    {
+      "key": "tool_contract_agent_projection",
+      "schema": "tool_contract_agent_projection_v1",
+      "path": "fixtures/tool_contract_agent_projection_fixture.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "source_fixtures": 4,
+        "projected_agent_tools": 2,
+        "tool_history_mappings": 2,
+        "loop_trace_mappings": 2
+      }
     }
   ],
   "real_dependency_imports": false

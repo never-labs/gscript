@@ -823,11 +823,13 @@
         "ai.agent.loop_trace.emit",
         "ai.agent.structured_output.validate",
         "ai.agent.replay_policy.enforce",
-        "ai.agent.max_steps.guard"
+        "ai.agent.max_steps.guard",
+        "ai.agent.tool_contract_projection"
       ],
       "test_gates": [
         "provider-free fixture contract parses",
         "contract JSON declares generic AI backend boundary",
+        "tool contract projection maps provider-free tool contracts into agent tools and replayed tool history",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
       ],
