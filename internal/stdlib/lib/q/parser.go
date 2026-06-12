@@ -49,7 +49,8 @@ type parser struct {
 	// value expressions (parseValueExpr); in qSQL queries `,` stays the
 	// clause separator (select a,b / comma-where / insert values lists), so
 	// Parse never sets it.
-	commaJoin bool
+	commaJoin              bool
+	whereLogicalPrecedence bool
 }
 
 func (p *parser) parseQuery() (*Query, error) {
@@ -714,6 +715,11 @@ func (p *parser) parseValuesList() ([]Expr, error) {
 }
 
 func (p *parser) parseWhereExpr() (Expr, error) {
+	previous := p.whereLogicalPrecedence
+	p.whereLogicalPrecedence = true
+	defer func() {
+		p.whereLogicalPrecedence = previous
+	}()
 	expr, err := p.parseExpr(0)
 	if err != nil {
 		return nil, err
@@ -828,13 +834,20 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 				break
 			}
 			prec := precedence(op)
+			if p.whereLogicalPrecedence && (op == "and" || op == "or") {
+				prec = 5
+			}
 			if prec < minPrec {
 				break
 			}
 			p.next()
 			// Right-associative: recurse with the same minimum precedence so a
 			// following same-level operator is grabbed into the right operand.
-			right, err := p.parseExpr(prec)
+			rightMinPrec := prec
+			if p.whereLogicalPrecedence && (op == "and" || op == "or") {
+				rightMinPrec = prec + 1
+			}
+			right, err := p.parseExpr(rightMinPrec)
 			if err != nil {
 				return nil, err
 			}
@@ -981,7 +994,15 @@ func (p *parser) parsePrimary() (Expr, error) {
 			// as its argument. `sum price*size` is sum(price*size), not
 			// (sum price)*size. Parse the argument at minimum precedence so the
 			// trailing dyadic verbs fold into the prefix verb's right argument.
-			arg, err := p.parseExpr(0)
+			minPrec := 0
+			if qTightPrefixFunction(tok.text) {
+				// qSQL vector transforms are column-level unary operators. They
+				// bind before comparisons in where/order expressions, so
+				// `abs qty>20` means `(abs qty)>20` while aggregates such as
+				// `sum price*size` keep consuming their arithmetic argument.
+				minPrec = 11
+			}
+			arg, err := p.parseExpr(minPrec)
 			if err != nil {
 				return nil, err
 			}
@@ -1366,6 +1387,17 @@ func qPrefixFunction(name string) bool {
 	switch strings.ToLower(name) {
 	case "sum", "avg", "var", "dev", "med", "wavg", "count", "min", "max", "first", "last", "distinct",
 		"prev", "next", "deltas", "fills", "ratios", "sums", "prds", "mins", "maxs", "avgs",
+		"abs", "neg", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan",
+		"reciprocal", "signum", "floor", "ceiling", "null", "rank":
+		return true
+	default:
+		return false
+	}
+}
+
+func qTightPrefixFunction(name string) bool {
+	switch strings.ToLower(name) {
+	case "prev", "next", "deltas", "fills", "ratios", "sums", "prds", "mins", "maxs", "avgs",
 		"abs", "neg", "sqrt", "log", "exp", "sin", "cos", "tan", "asin", "acos", "atan",
 		"reciprocal", "signum", "floor", "ceiling", "null", "rank":
 		return true

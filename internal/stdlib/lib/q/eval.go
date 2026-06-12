@@ -8385,6 +8385,10 @@ func (s *EvalState) tryEvalCountRunningScan(src string) (any, bool, error) {
 			return out, true, err
 		}
 		shape := "vector-count/" + strings.TrimSpace(scan.word) + "/" + string(array.Kind())
+		if array.Len() == 0 {
+			recordRuntimeKernelProbe(scan.kernel, shape, true, nil)
+			return int64(0), true, nil
+		}
 		if !scan.kindOK(array.Kind()) {
 			err := fmt.Errorf("%s", scan.scanErr)
 			recordRuntimeKernelProbe(scan.kernel, shape, false, err)

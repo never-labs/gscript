@@ -782,6 +782,39 @@ func TestParseUpdateAndDeleteSkeleton(t *testing.T) {
 	}
 }
 
+func TestParseWhereLogicalPrecedence(t *testing.T) {
+	query := mustParse(t, "delete from trades where sym=`AAPL and price>100")
+	where, ok := query.Where.(Binary)
+	if !ok || where.Op != "and" {
+		t.Fatalf("where = %#v, want top-level and", query.Where)
+	}
+	left, ok := where.Left.(Binary)
+	if !ok || left.Op != "=" {
+		t.Fatalf("left = %#v, want equality predicate", where.Left)
+	}
+	right, ok := where.Right.(Binary)
+	if !ok || right.Op != ">" {
+		t.Fatalf("right = %#v, want greater-than predicate", where.Right)
+	}
+
+	query = mustParse(t, "select sym from trades where (sym=`AAPL or sym=`NVDA) and active and price>=100")
+	where, ok = query.Where.(Binary)
+	if !ok || where.Op != "and" {
+		t.Fatalf("where = %#v, want top-level and", query.Where)
+	}
+	if _, ok := where.Right.(Binary); !ok {
+		t.Fatalf("right = %#v, want price predicate", where.Right)
+	}
+	leftLogical, ok := where.Left.(Binary)
+	if !ok || leftLogical.Op != "and" {
+		t.Fatalf("left = %#v, want nested and", where.Left)
+	}
+	orPredicate, ok := leftLogical.Left.(Binary)
+	if !ok || orPredicate.Op != "or" {
+		t.Fatalf("nested left = %#v, want grouped or", leftLogical.Left)
+	}
+}
+
 func TestParseDeleteColumnListAndLower(t *testing.T) {
 	tests := []string{
 		"delete price,size from trades",
@@ -2564,7 +2597,7 @@ func TestLoweredTimeSeriesVectorWhereAndOrderExecute(t *testing.T) {
 }
 
 func TestLoweredAbsProjectionWhereAndOrderExecute(t *testing.T) {
-	query := mustParse(t, "select sym,abs_qty:abs signed_qty from trades where (abs signed_qty)>20 order by abs signed_qty desc")
+	query := mustParse(t, "select sym,abs_qty:abs signed_qty from trades where abs signed_qty>20 order by abs signed_qty desc")
 	lowered, err := Lower(query)
 	if err != nil {
 		t.Fatalf("Lower returned error: %v", err)

@@ -5887,6 +5887,8 @@ func TestEvalOverAndScanAdverbs(t *testing.T) {
 	// Canonical empty-fold identity: (+/)() -> 0.
 	assertEvalValue(t, "+/()", int64(0))
 	assertEvalArray(t, "+\\()", data.KindI64, []any{})
+	assertEvalValue(t, "count (+\\())", int64(0))
+	assertEvalValue(t, "count sums ()", int64(0))
 	assertEvalValue(t, "10+/()", int64(10))
 	assertEvalArray(t, "10+\\()", data.KindNull, nil)
 	assertEvalValue(t, "+/1 2 3 4", int64(10))

@@ -35,7 +35,7 @@ over_arity_ok, over_arity_err := pcall(q.eval, "(+/)[1;2;3]")
 
 check("q adverb over scan each", total == 350 && running[1] == 100 && running[4] == 350 && each_added[2] == 22)
 check("q adverb each-prior each-left", deltas[1] == 100 && deltas[2] == 5 && deltas[3] == -2 && left_each[3] == 7)
-check("q adverb scalar empty single boundaries", each_scalar_right[3] == 13 && each_scalar_left[1] == 11 && scan_single == 42 && data.is_null(over_empty) && scan_empty_count == 0 && each_prior_single == 10 && each_prior_with_seed[1] == -90 && each_left_empty_count == 0 && each_right_empty_count == 0)
+check("q adverb scalar empty single boundaries", each_scalar_right[3] == 13 && each_scalar_left[1] == 11 && scan_single == 42 && over_empty == 0 && scan_empty_count == 0 && each_prior_single == 10 && each_prior_with_seed[1] == -90 && each_left_empty_count == 0 && each_right_empty_count == 0)
 check("q adverb projected boundaries", projected_over == 16 && projected_scan[3] == 16 && projected_each[2] == 12 && projected_prior[2] == 5 && projected_each_left[3] == 7 && projected_each_right[2] == 19)
 check("q adverb error diagnostics", each_length_ok == false && contains(each_length_err, "length mismatch") && each_left_arity_ok == false && contains(each_left_arity_err, "expected 2 arguments") && over_arity_ok == false && contains(over_arity_err, "expected 1 or 2 arguments"))
 

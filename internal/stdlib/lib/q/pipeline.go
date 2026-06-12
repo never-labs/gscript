@@ -2872,6 +2872,10 @@ func (s *EvalState) evalQPipelineCountRunningScan(plan *qPipelinePlan) (any, boo
 	}
 	shape := "vector-count/" + plan.compareOp + "/" + string(array.Kind())
 	kernel := "ArrayCountRunningScan"
+	if array.Len() == 0 {
+		recordQTypedRuntimeKernel(kernel, shape, true, nil)
+		return int64(0), true, nil
+	}
 	switch plan.compareOp {
 	case "sums", "prds", "avgs":
 		if !qKindIsNumeric(array.Kind()) {
