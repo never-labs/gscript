@@ -556,6 +556,14 @@ input. If the approval contains `ok: true`, the derived decision status is
 are audit/replay data. They must not by themselves resume execution or mutate a
 host approval store.
 
+`llm.approval_trace_event(trace, opts)` projects an approval replay trace into
+the generic trace event shape. The default event type is
+`approval_replay_trace`; `opts.event_type` may override it for package-specific
+projections. The projection must copy only audit identity and summary fields
+such as decision status, result status, tool or operation name, capability,
+policy version/default, and correlation IDs. It must not clone raw pending
+arguments, approval tokens, or raw result values into the event payload.
+
 ## Trace, Record, And Replay
 
 Hosts can install trace sinks, recorders, or replay providers. Trace events are

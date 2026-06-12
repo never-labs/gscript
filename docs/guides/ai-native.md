@@ -576,6 +576,10 @@ trace := llm.approval_trace({
     result: denied
     policy: policy
 })
+event := llm.approval_trace_event(trace, {
+    trace_id: "release-review"
+    workflow_run_id: "release-42"
+})
 ```
 
 The trace is audit data. Resuming execution still happens through the matching
