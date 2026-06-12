@@ -1513,140 +1513,182 @@ func TryTypedBoolLogical(op string, left, right any) (Array, bool, error) {
 	return boolLogicalMask{op: op, leftScalar: lv, leftIsScalar: true, right: rightArray, len: length}, true, nil
 }
 
-// truthScalarValue maps a scalar onto q truthiness: null is false, numeric
-// values are true when nonzero, booleans pass through. ok=false reports a
-// value outside the truthiness domain so callers keep their fallback errors.
-func truthScalarValue(value any) (bool, bool) {
-	if IsNull(value) {
-		return false, true
+// tryDyadicMinMaxI64Bulk computes elementwise integer min/max over dense
+// bulk-flattenable carriers (with len-1 / scalar broadcast) in one tight
+// loop. handled=false defers to the per-row operand walk.
+func tryDyadicMinMaxI64Bulk(left, right any, length int, wantMax bool) (Array, bool) {
+	scalarOf := func(value any) (int64, bool) {
+		if array, ok := value.(Array); ok {
+			if array.Len() != 1 {
+				return 0, false
+			}
+			v, ok, err := integerArrayAt(array, 0)
+			if err != nil || !ok {
+				return 0, false
+			}
+			return v, true
+		}
+		if IsNull(value) {
+			return 0, false
+		}
+		return integerScalarValue(value)
 	}
-	switch x := value.(type) {
-	case bool:
-		return x, true
-	case int:
-		return x != 0, true
-	case int8:
-		return x != 0, true
-	case int16:
-		return x != 0, true
-	case int32:
-		return x != 0, true
-	case int64:
-		return x != 0, true
-	case uint:
-		return x != 0, true
-	case uint8:
-		return x != 0, true
-	case uint16:
-		return x != 0, true
-	case uint32:
-		return x != 0, true
-	case uint64:
-		return x != 0, true
-	case float32:
-		return x != 0, true
-	case float64:
-		return x != 0, true
+	bulkOf := func(value any) ([]int64, bool, bool) {
+		array, ok := value.(Array)
+		if !ok || array.Len() != length {
+			return nil, false, false
+		}
+		return tryBulkI64Values(array)
+	}
+	lv, lvOwned, lok := bulkOf(left)
+	rv, rvOwned, rok := bulkOf(right)
+	defer func() {
+		if lok {
+			bulkI64Release(lv, lvOwned)
+		}
+		if rok {
+			bulkI64Release(rv, rvOwned)
+		}
+	}()
+	out := make([]int64, length)
+	switch {
+	case lok && rok:
+		for i := range out {
+			a, b := lv[i], rv[i]
+			if wantMax == (b > a) {
+				a = b
+			}
+			out[i] = a
+		}
+	case lok:
+		b, ok := scalarOf(right)
+		if !ok {
+			return nil, false
+		}
+		for i, a := range lv {
+			if wantMax == (b > a) {
+				a = b
+			}
+			out[i] = a
+		}
+	case rok:
+		a, ok := scalarOf(left)
+		if !ok {
+			return nil, false
+		}
+		for i, b := range rv {
+			v := a
+			if wantMax == (b > v) {
+				v = b
+			}
+			out[i] = v
+		}
 	default:
-		return false, false
+		return nil, false
 	}
+	return newI64Trusted(out), true
 }
 
-// TryTypedTruthMask converts a boolean or numeric array into a q-truthiness
-// bool mask (null -> false, zero -> false, nonzero -> true) without per-row
-// boxing. Lazy integer scalar-dyadic carriers stay lazy as compare masks so
-// downstream where/count consumers keep their periodic index fast paths.
-func TryTypedTruthMask(array Array) (Array, bool, error) {
-	if array == nil {
-		return nil, false, nil
-	}
-	if attributed, ok := array.(attributedArray); ok {
-		return TryTypedTruthMask(attributed.array)
-	}
-	if array.Kind() == KindBool {
-		return array, true, nil
-	}
-	switch a := array.(type) {
-	case i64ScalarDyadicArray:
-		return i64ScalarDyadicCompareMask{values: a, op: OpNE, scalar: 0}, true, nil
-	case tiledArray:
-		source, handled, err := TryTypedTruthMask(a.source)
-		if err != nil || !handled {
-			return nil, false, err
-		}
-		return tiledArray{source: source, start: a.start, len: a.len}, true, nil
-	case nullableArray:
-		out := make([]bool, len(a.data))
-		for i, v := range a.data {
-			truth, ok := truthScalarValue(v)
-			if !ok {
-				return nil, false, nil
-			}
-			out[i] = truth
-		}
-		return newBoolTrusted(out), true, nil
-	}
-	if isIntegerArray(array) {
-		if values, owned, ok := tryBulkI64Values(array); ok {
-			out := make([]bool, len(values))
-			for i, v := range values {
-				out[i] = v != 0
-			}
-			bulkI64Release(values, owned)
-			return newBoolTrusted(out), true, nil
-		}
-		return nil, false, nil
-	}
-	if isNumericArray(array) {
-		if values, owned, ok := tryBulkF64Values(array); ok {
-			out := make([]bool, len(values))
-			for i, v := range values {
-				out[i] = v != 0
-			}
-			bulkF64Release(values, owned)
-			return newBoolTrusted(out), true, nil
-		}
-	}
-	return nil, false, nil
-}
-
-// TryTypedTruthLogical applies q truthiness and/or over boolean or numeric
-// operands by converting each side to a truth mask and composing the lazy
-// logical-mask carrier, so verb-form `&`/`|` over derived integer vectors
-// avoids per-row boxing and keeps periodic where/count fast paths.
-func TryTypedTruthLogical(op string, left, right any) (Array, bool, error) {
+// TryTypedDyadicMinMax materializes canonical q `&`/`|` — elementwise
+// minimum/maximum with scalar broadcast — over typed numeric operands.
+// Boolean operands stay on TryTypedBoolLogical (min/max on booleans IS
+// logical and/or); operands carrying nulls report handled=false so the boxed
+// route applies canonical null ordering per row (null&x is null, null|x is
+// x). Float NaN ranks below every other value, mirroring the null ordering.
+func TryTypedDyadicMinMax(left, right any, wantMax bool) (Array, bool, error) {
 	leftArray, leftIsArray := left.(Array)
 	rightArray, rightIsArray := right.(Array)
 	if !leftIsArray && !rightIsArray {
 		return nil, false, nil
 	}
-	if leftIsArray {
-		mask, handled, err := TryTypedTruthMask(leftArray)
-		if err != nil || !handled {
-			return nil, false, err
+	length := 0
+	switch {
+	case leftIsArray && rightIsArray:
+		switch {
+		case leftArray.Len() == rightArray.Len():
+			length = leftArray.Len()
+		case leftArray.Len() == 1:
+			length = rightArray.Len()
+		case rightArray.Len() == 1:
+			length = leftArray.Len()
+		default:
+			return nil, true, fmt.Errorf("vector length mismatch")
 		}
-		left = mask
-	} else {
-		truth, ok := truthScalarValue(left)
+	case leftIsArray:
+		length = leftArray.Len()
+	default:
+		length = rightArray.Len()
+	}
+	if leftIsArray && leftArray.Kind() == KindBool {
+		return nil, false, nil
+	}
+	if rightIsArray && rightArray.Kind() == KindBool {
+		return nil, false, nil
+	}
+	if IsNull(left) || IsNull(right) {
+		return nil, false, nil
+	}
+	if !typedNumericOperand(left) || !typedNumericOperand(right) {
+		return nil, false, nil
+	}
+	if typedIntegerOperand(left) && typedIntegerOperand(right) {
+		if out, handled := tryDyadicMinMaxI64Bulk(left, right, length, wantMax); handled {
+			return out, true, nil
+		}
+		out := make([]int64, length)
+		for row := 0; row < length; row++ {
+			lv, ok, err := integerMinMaxOperandAt(left, row, length)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			rv, ok, err := integerMinMaxOperandAt(right, row, length)
+			if err != nil {
+				return nil, true, err
+			}
+			if !ok {
+				return nil, false, nil
+			}
+			if wantMax == (rv > lv) {
+				lv = rv
+			}
+			out[row] = lv
+		}
+		return newI64Trusted(out), true, nil
+	}
+	out := make([]float64, length)
+	for row := 0; row < length; row++ {
+		lv, ok, err := numericMinMaxOperandAt(left, row, length)
+		if err != nil {
+			return nil, true, err
+		}
 		if !ok {
 			return nil, false, nil
 		}
-		left = truth
-	}
-	if rightIsArray {
-		mask, handled, err := TryTypedTruthMask(rightArray)
-		if err != nil || !handled {
-			return nil, false, err
+		rv, ok, err := numericMinMaxOperandAt(right, row, length)
+		if err != nil {
+			return nil, true, err
 		}
-		right = mask
-	} else {
-		truth, ok := truthScalarValue(right)
 		if !ok {
 			return nil, false, nil
 		}
-		right = truth
+		switch {
+		case math.IsNaN(lv):
+			if wantMax {
+				lv = rv
+			}
+		case math.IsNaN(rv):
+			if !wantMax {
+				lv = rv
+			}
+		case wantMax == (rv > lv):
+			lv = rv
+		}
+		out[row] = lv
 	}
-	return TryTypedBoolLogical(op, left, right)
+	return newF64Trusted(out), true, nil
 }
 
 // TryTypedIsNullMask produces the `null xs` bool mask without routing every
@@ -16678,10 +16720,10 @@ func boolArrayAt(array Array, row int) (bool, bool, error) {
 	}
 }
 
+// boolScalarValue admits only genuine booleans: under canonical q `&`/`|`
+// are min/max, so a null operand must fall back to the boxed route (nulls
+// sort smallest) instead of coercing to false inside the logical mask.
 func boolScalarValue(value any) (bool, bool) {
-	if IsNull(value) {
-		return false, true
-	}
 	out, ok := value.(bool)
 	return out, ok
 }

@@ -2421,14 +2421,60 @@ func TestEvalScriptWarmBindingsKeepFastAndSemanticPathsSeparate(t *testing.T) {
 }
 
 func TestEvalLogicalDyadicSymbols(t *testing.T) {
-	assertEvalArray(t, "1 0 1 & 1 1 0", data.KindBool, []any{true, false, false})
-	assertEvalArray(t, "1 0 1 | 0 1 0", data.KindBool, []any{true, true, true})
+	// Canonical q: `&`/`and` is elementwise minimum, `|`/`or` is maximum;
+	// integer operands stay numeric while boolean operands keep their
+	// logical-and/or behavior (min/max on booleans IS and/or).
+	assertEvalArray(t, "1 0 1 & 1 1 0", data.KindI64, []any{int64(1), int64(0), int64(0)})
+	assertEvalArray(t, "1 0 1 | 0 1 0", data.KindI64, []any{int64(1), int64(1), int64(1)})
 	assertEvalArray(t, "true false true & true true false", data.KindBool, []any{true, false, false})
 	assertEvalArray(t, "true false true | false true false", data.KindBool, []any{true, true, true})
-	assertEvalArray(t, "1 & 1 0 1", data.KindBool, []any{true, false, true})
-	assertEvalArray(t, "0 | 1 0 1", data.KindBool, []any{true, false, true})
-	assertEvalArray(t, "1 0 1 and 1 1 0", data.KindBool, []any{true, false, false})
-	assertEvalArray(t, "1 0 1 or 0 1 0", data.KindBool, []any{true, true, true})
+	assertEvalArray(t, "1 & 1 0 1", data.KindI64, []any{int64(1), int64(0), int64(1)})
+	assertEvalArray(t, "0 | 1 0 1", data.KindI64, []any{int64(1), int64(0), int64(1)})
+	assertEvalArray(t, "1 0 1 and 1 1 0", data.KindI64, []any{int64(1), int64(0), int64(0)})
+	assertEvalArray(t, "1 0 1 or 0 1 0", data.KindI64, []any{int64(1), int64(1), int64(1)})
+	assertEvalArray(t, "2 & 1 5 2", data.KindI64, []any{int64(1), int64(2), int64(2)})
+	assertEvalArray(t, "1 5 2 | 3", data.KindI64, []any{int64(3), int64(5), int64(3)})
+}
+
+// TestEvalCanonicalMinMaxLogical pins the canonical q semantics of `&`/`|`
+// and their word aliases: elementwise min/max with null ordering (nulls are
+// smallest), bool/numeric promotion, and intact boolean mask pipelines.
+func TestEvalCanonicalMinMaxLogical(t *testing.T) {
+	for _, tc := range []struct{ src, want string }{
+		{"2&3", "2"},
+		{"2|3", "3"},
+		{"0N&5", "0N"},
+		{"0N|5", "5"},
+		{"1b&0b", "0b"},
+		{"1b|0b", "1b"},
+		{"&/1 2 3", "1"},
+		{"|/1 2 3", "3"},
+		{"2 and 3", "2"},
+		{"2 or 3", "3"},
+		{"1b&2", "1"},
+		{"0b|0", "0"},
+		{"2.5|1 2 3", "2.5 2.5 3"},
+		{"0.5&1 2 3", "0.5 0.5 0.5"},
+		// Boolean compare masks keep the lazy logical-mask pipelines.
+		{"x:til 10;count where (x>1)&(x<9)", "7"},
+		{"x:til 10;m:(x>1)&(x<9);m~(x>1) and (x<9)", "1b"},
+		// `where` over a 0/1 min-mask replicates indexes like a bool mask.
+		{"x:til 12;a:x mod 2;b:x mod 3;count where a & b", "4"},
+	} {
+		got, err := Eval(tc.src)
+		if err != nil {
+			t.Errorf("Eval(%q) returned error: %v", tc.src, err)
+			continue
+		}
+		want, err := Eval(tc.want)
+		if err != nil {
+			t.Errorf("Eval(%q) returned error: %v", tc.want, err)
+			continue
+		}
+		if !matchValue(got, want) {
+			t.Errorf("Eval(%q) = %v (%T), want %v (%T)", tc.src, got, got, want, want)
+		}
+	}
 }
 
 func TestEvalParsedValueExprRunsCallsInNestedCombinations(t *testing.T) {
@@ -4424,7 +4470,7 @@ func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 		if stat.Kernel == "ArrayInMask" && stat.Shape == "in-mask/symbol/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenInMask = true
 		}
-		if stat.Kernel == "ArrayBoolLogical" && stat.Shape == "and/bool/bool" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+		if stat.Kernel == "ArrayBoolLogical" && stat.Shape == "bool-logical/and/bool/bool" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
 			seenBoolLogical = true
 		}
 		if stat.Kernel == "ArrayTrueCount" && stat.Shape == "true-count/bool" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
@@ -5265,25 +5311,35 @@ func TestEvalBooleanAndNullVerbs(t *testing.T) {
 	assertEvalValue(t, "count where null 42", int64(0))
 	assertEvalErrorContains(t, "not `AAPL", "bool or numeric")
 	assertEvalErrorContains(t, "null[1;2]", "unary function null expected 1 argument")
-	assertEvalValue(t, "true and 1", true)
-	assertEvalValue(t, "false or 2", true)
+	// Canonical and/or: min/max with bool->int promotion on mixed operands.
+	assertEvalValue(t, "true and 1", int64(1))
+	assertEvalValue(t, "false or 2", int64(2))
 	assertEvalArray(t, "true false true and true true false", data.KindBool, []any{true, false, false})
-	assertEvalArray(t, "0 1 2 or false", data.KindBool, []any{false, true, true})
+	assertEvalArray(t, "0 1 2 or false", data.KindI64, []any{int64(0), int64(1), int64(2)})
 }
 
 func TestEvalLogicalVerbAdverbs(t *testing.T) {
-	assertEvalValue(t, "true and 0N", false)
-	assertEvalValue(t, "0N or 2", true)
-	assertEvalArray(t, "1 0N 2 and'1 1 0", data.KindBool, []any{true, false, false})
-	assertEvalArray(t, "1 0N 2 or'0 0 0N", data.KindBool, []any{true, false, true})
-	assertEvalArray(t, "true and\\:1 0N 2", data.KindBool, []any{true, false, true})
-	assertEvalArray(t, "0 0N 2 or/:false", data.KindBool, []any{false, false, true})
-	assertEvalValue(t, "and/true 1 0N", false)
-	assertEvalValue(t, "or/false 0 0N 2", true)
-	assertEvalArray(t, "and\\true 1 0N 2", data.KindBool, []any{true, true, false, false})
-	assertEvalArray(t, "or\\false 0 0N 2", data.KindBool, []any{false, false, false, true})
-	assertEvalValue(t, "(and/)[true 1 0N]", false)
-	assertEvalArray(t, "(or\\)[false 0 0N 2]", data.KindBool, []any{false, false, false, true})
+	// Canonical and/or are min/max: nulls sort smallest (null&x is null,
+	// null|x is x) and mixed bool/numeric operands promote per q rules.
+	assertEvalValue(t, "null true and 0N", true)
+	assertEvalValue(t, "0N or 2", int64(2))
+	assertEvalValue(t, "(1 0N 2 and'1 1 0)~1 0N 0", true)
+	assertEvalValue(t, "(1 0N 2 or'0 0 0N)~1 0 2", true)
+	assertEvalValue(t, "(true and\\:1 0N 2)~1 0N 1", true)
+	assertEvalValue(t, "(0 0N 2 or/:false)~0 0 2", true)
+	assertEvalValue(t, "(and/true 1 0N)~0N", true)
+	assertEvalValue(t, "or/false 0 0N 2", int64(2))
+	assertEvalValue(t, "(and\\true 1 0N 2)~(1b;1;0N;0N)", true)
+	assertEvalValue(t, "(or\\false 0 0N 2)~(0b;0;0;2)", true)
+	assertEvalValue(t, "((and/)[true 1 0N])~0N", true)
+	assertEvalValue(t, "((or\\)[false 0 0N 2])~(0b;0;0;2)", true)
+	// Empty-vector reducer identities per element type.
+	assertEvalValue(t, "(&/)[til 0]", int64(math.MaxInt64))
+	assertEvalValue(t, "(|/)[til 0]", int64(-math.MaxInt64))
+	assertEvalValue(t, "(&/)[0#0.0]", math.Inf(1))
+	assertEvalValue(t, "(|/)[0#0.0]", math.Inf(-1))
+	assertEvalValue(t, "(&/)[0#0b]", true)
+	assertEvalValue(t, "(|/)[0#0b]", false)
 }
 
 func TestEvalNonNumericComparisons(t *testing.T) {
