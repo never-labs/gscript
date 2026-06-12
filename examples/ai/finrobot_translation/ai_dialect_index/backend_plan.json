@@ -114,6 +114,43 @@
       }
     },
     {
+      "shape_id": "ai.evidence.report_artifacts",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "evidence-report-artifacts",
+        "workflow",
+        "trace"
+      ],
+      "contract": "Normalize provider-free evidence source annotations, citation envelopes, report outlines, artifact manifests, render manifests, snapshot metadata, stale warnings, accessibility checks, and renderer clean skips.",
+      "inputs": [
+        "source_annotations",
+        "claim_records",
+        "report_outline",
+        "render_request",
+        "renderer_dependency_gate"
+      ],
+      "outputs": [
+        "citation_envelopes",
+        "artifact_manifest",
+        "render_manifest",
+        "output_manifest",
+        "snapshot_metadata",
+        "warnings"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_evidence_report_artifacts.source.txt",
+      "test": "tests/llm/llm_generic_evidence_report_artifacts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_evidence_report_artifacts_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-evidence-report-artifacts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.memory.store",
       "status": "checked_in_package_boundary",
       "capabilities": [
@@ -470,6 +507,77 @@
         "directory": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
         "contract_path": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/contracts/planning_graph_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "generic.ai.approval.policy.evaluate",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "approval",
+        "capability",
+        "tool",
+        "workflow"
+      ],
+      "contract": "Evaluate provider-free capability policies, approval decisions, risk levels, trace rows, and clean-skip outcomes before side-effecting operations.",
+      "inputs": [
+        "capability_request",
+        "policy_rules",
+        "approval_context",
+        "replay_fixture"
+      ],
+      "outputs": [
+        "decision",
+        "risk_level",
+        "trace_event",
+        "clean_skip_reason"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-approval-policy",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/contracts/generic_approval_policy_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "shape_id": "generic.ai.record.replay.fixture",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "replay",
+        "turn",
+        "tool",
+        "evaluation",
+        "trace"
+      ],
+      "contract": "Capture and replay provider-free model, tool, approval, trace, and artifact records with strict ordered matching, mismatch findings, and deterministic summaries.",
+      "inputs": [
+        "record_schema",
+        "record_index",
+        "request_envelope",
+        "matching_policy"
+      ],
+      "outputs": [
+        "replay_match",
+        "mismatch_findings",
+        "unconsumed_records",
+        "deterministic_summary"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+      "test": "tests/llm/llm_generic_record_replay_evaluation_evidence_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-record-replay",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_record_replay/contracts/record_replay_contract.json",
         "provider_free": true,
         "domain_specific": false
       }

@@ -1,0 +1,41 @@
+generic_evidence_report_artifacts_live_package := {
+    id: "generic-evidence-report-artifacts",
+    package_name: "leia-generic-ai-evidence-report-artifacts",
+    capability: "generic.ai.evidence.report.artifacts",
+    entrypoint: "ai.evidence.report_artifacts",
+    fixture_key: "generic:evidence_report_artifacts:offline",
+    provider_free: true,
+    live_network: false,
+    real_dependency_imports: false,
+    live_model_calls: false,
+    sources: 2,
+    evidence: 2,
+    artifacts: 3,
+    snapshots: 2,
+    warnings: 2,
+    clean_skip_adapters: 2
+}
+
+assert(generic_evidence_report_artifacts_live_package.provider_free)
+assert(!generic_evidence_report_artifacts_live_package.live_network)
+assert(!generic_evidence_report_artifacts_live_package.real_dependency_imports)
+assert(!generic_evidence_report_artifacts_live_package.live_model_calls)
+assert(generic_evidence_report_artifacts_live_package.sources == 2)
+assert(generic_evidence_report_artifacts_live_package.artifacts == 3)
+
+generic_evidence_report_artifacts_live_package_summary := string.format(
+"generic_evidence_report_artifacts_live_package capability=%s entrypoint=%s sources=%d evidence=%d artifacts=%d snapshots=%d warnings=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_evidence_report_artifacts_live_package.capability,
+generic_evidence_report_artifacts_live_package.entrypoint,
+generic_evidence_report_artifacts_live_package.sources,
+generic_evidence_report_artifacts_live_package.evidence,
+generic_evidence_report_artifacts_live_package.artifacts,
+generic_evidence_report_artifacts_live_package.snapshots,
+generic_evidence_report_artifacts_live_package.warnings,
+generic_evidence_report_artifacts_live_package.clean_skip_adapters,
+tostring(generic_evidence_report_artifacts_live_package.provider_free),
+tostring(generic_evidence_report_artifacts_live_package.live_network),
+tostring(generic_evidence_report_artifacts_live_package.real_dependency_imports),
+tostring(generic_evidence_report_artifacts_live_package.live_model_calls))
+
+print(generic_evidence_report_artifacts_live_package_summary)

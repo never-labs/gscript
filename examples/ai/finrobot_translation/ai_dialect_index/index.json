@@ -26,6 +26,7 @@
     "capability",
     "document-rag",
     "evaluation",
+    "evidence-report-artifacts",
     "memory",
     "model",
     "model-io",
@@ -190,6 +191,39 @@
         "package_id": "generic-evaluation-harness",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "evidence-report-artifacts",
+      "capability_id": "generic.ai.evidence.report.artifacts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "evidence.source_annotation",
+        "evidence.citation_envelope",
+        "report.outline",
+        "report.section_dependency_dag",
+        "artifact.manifest",
+        "render.manifest",
+        "render.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_evidence_report_artifacts.source.txt",
+      "test": "tests/llm/llm_generic_evidence_report_artifacts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_evidence_report_artifacts_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-evidence-report-artifacts",
+        "boundary": "provider-free evidence source annotations, citation envelopes, report outlines, section DAGs, artifact manifests, render manifests, snapshot metadata, stale warnings, accessibility checks, and renderer clean-skip contracts",
+        "status": "resolved",
+        "reason": "evidence/report/artifact behavior was promoted from report renderer and analytics report fixtures into the generic_evidence_report_artifacts reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-evidence-report-artifacts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

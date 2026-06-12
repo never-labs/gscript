@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "generic-evidence-report-artifacts-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:evidence_report_artifacts:offline",
+      "capability": "generic.ai.evidence.report.artifacts",
+      "path": "fixtures/generic_evidence_report_artifacts_fixture.json",
+      "schema": "schemas/generic_evidence_report_artifacts_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "domain_specific": false,
+        "source_annotation_count": 2,
+        "citation_envelope_count": 2,
+        "artifact_count": 3,
+        "snapshot_count": 2
+      }
+    }
+  ]
+}

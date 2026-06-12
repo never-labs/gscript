@@ -104,6 +104,38 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_evidence_report_artifacts",
+      "package_name": "leia-generic-ai-evidence-report-artifacts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+      "capability": "generic.ai.evidence.report.artifacts",
+      "capabilities": [
+        "generic.ai.evidence.report.artifacts",
+        "generic.ai.evidence.source_annotation",
+        "generic.ai.evidence.citation_envelope",
+        "generic.ai.report.outline",
+        "generic.ai.report.section_dependency_dag",
+        "generic.ai.report.style_profile_policy",
+        "generic.ai.report.partial_failure_fixture",
+        "generic.ai.artifact.manifest",
+        "generic.ai.artifact.render_manifest",
+        "generic.ai.artifact.snapshot_metadata",
+        "generic.ai.artifact.accessibility_checklist",
+        "generic.ai.artifact.stale_data_policy",
+        "generic.ai.render.request",
+        "generic.ai.render.output_manifest",
+        "generic.ai.render.warning",
+        "generic.ai.render.clean_skip"
+      ],
+      "backend_shape": "ai.evidence.report_artifacts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_memory_store",
       "package_name": "leia-generic-ai-memory-store",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_memory_store",

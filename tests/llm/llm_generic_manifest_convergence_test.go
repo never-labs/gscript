@@ -10,9 +10,10 @@ import (
 
 func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 	for _, tc := range []struct {
-		dir         string
-		packageName string
-		dialectKeys []string
+		dir               string
+		packageName       string
+		dialectKeys       []string
+		allowCapabilityID bool
 	}{
 		{
 			dir:         "generic_model_registry",
@@ -31,6 +32,11 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 			dialectKeys: []string{
 				"dialect_backend_shape",
 			},
+		},
+		{
+			dir:               "generic_evidence_report_artifacts",
+			packageName:       "leia-generic-ai-evidence-report-artifacts",
+			allowCapabilityID: true,
 		},
 	} {
 		t.Run(tc.dir, func(t *testing.T) {
@@ -83,7 +89,12 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 					t.Fatalf("missing dialect field %q", key)
 				}
 			}
-			for _, oldKey := range []string{"capability_id", "backend_shape"} {
+			if !tc.allowCapabilityID {
+				if _, ok := manifest["capability_id"]; ok {
+					t.Fatalf("old dialect symbol field %q must use a dialect_* name", "capability_id")
+				}
+			}
+			for _, oldKey := range []string{"backend_shape"} {
 				if _, ok := manifest[oldKey]; ok {
 					t.Fatalf("old dialect symbol field %q must use a dialect_* name", oldKey)
 				}

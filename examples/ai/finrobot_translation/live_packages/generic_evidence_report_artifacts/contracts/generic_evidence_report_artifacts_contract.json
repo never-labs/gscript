@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-evidence-report-artifacts",
+  "package_name": "generic.ai.evidence.report.artifacts",
+  "entrypoint": "ai.evidence.report_artifacts",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_credentials_required": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.evidence.report.artifacts",
+    "generic.ai.evidence.source_annotation",
+    "generic.ai.evidence.citation_envelope",
+    "generic.ai.report.outline",
+    "generic.ai.report.section_dependency_dag",
+    "generic.ai.report.style_profile_policy",
+    "generic.ai.report.partial_failure_fixture",
+    "generic.ai.artifact.manifest",
+    "generic.ai.artifact.render_manifest",
+    "generic.ai.artifact.snapshot_metadata",
+    "generic.ai.artifact.accessibility_checklist",
+    "generic.ai.artifact.stale_data_policy",
+    "generic.ai.render.request",
+    "generic.ai.render.output_manifest",
+    "generic.ai.render.warning",
+    "generic.ai.render.clean_skip"
+  ],
+  "modules": {
+    "evidence": {
+      "inputs": ["source_annotations", "claim_records"],
+      "outputs": ["citation_envelopes", "unresolved_refs"],
+      "required_fields": ["id", "claim_id", "source_refs", "citation_refs", "evidence_quality", "provider_free", "unresolved_refs"]
+    },
+    "report": {
+      "inputs": ["outline", "section_dependency_dag", "style_profile_policy"],
+      "outputs": ["report_plan", "partial_failure_fixture"],
+      "required_fields": ["id", "title", "sections", "style_profile_id", "evidence_policy_id", "render_manifest_id"]
+    },
+    "artifact": {
+      "inputs": ["report_plan", "render_request"],
+      "outputs": ["artifact_manifest", "render_manifest", "snapshot_metadata"],
+      "required_fields": ["manifest_id", "artifact_id", "kind", "format", "status", "hash_algorithm", "content_hash"]
+    },
+    "render": {
+      "inputs": ["render_request", "renderer_dependency_gate"],
+      "outputs": ["output_manifest", "render_warnings", "clean_skip"],
+      "required_fields": ["request_id", "output_formats", "renderer_dependency_gate", "warnings", "status"]
+    }
+  },
+  "field_contracts": {
+    "source_annotations": "source refs include stable id, title, kind, locator, retrieved_at, and evidence_hash",
+    "citation_envelopes": "citation refs must resolve to source annotations or appear in unresolved_refs",
+    "section_dependency_dag": "report section dependencies are explicit, acyclic fixture data",
+    "artifact_manifest": "artifact outputs declare kind, format, URI, status, hash algorithm, and warning refs",
+    "render_manifest": "planned render outputs are provider-free and may clean-skip without renderer dependencies",
+    "snapshot_metadata": "snapshot records include viewport, dimensions, content hash, source refs, warning refs, and disclosure refs",
+    "stale_data_policy": "stale source warnings name source refs and propagate to snapshots",
+    "accessibility_checklist": "accessibility assertions are fixture-level checklist rows, not live browser automation"
+  }
+}

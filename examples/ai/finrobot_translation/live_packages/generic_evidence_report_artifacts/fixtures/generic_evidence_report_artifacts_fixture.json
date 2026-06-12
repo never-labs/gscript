@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "source_annotations": [
+    {
+      "id": "source:fixture:overview",
+      "title": "Fixture Overview Source",
+      "kind": "document",
+      "locator": "fixture://generic/report/source/overview",
+      "as_of": "2026-06-12",
+      "stale_after": "2026-07-12",
+      "stale": false,
+      "license": "fixture-only",
+      "retrieved_at": "2026-06-12T00:00:00Z",
+      "evidence_hash": "sha256:overview-fixture"
+    },
+    {
+      "id": "source:fixture:risk",
+      "title": "Fixture Risk Source",
+      "kind": "table",
+      "locator": "fixture://generic/report/source/risk",
+      "as_of": "2026-05-01",
+      "stale_after": "2026-06-01",
+      "stale": true,
+      "license": "fixture-only",
+      "retrieved_at": "2026-06-12T00:00:00Z",
+      "evidence_hash": "sha256:risk-fixture"
+    }
+  ],
+  "citation_envelopes": [
+    {
+      "id": "evidence:claim:overview",
+      "claim_id": "claim:overview:001",
+      "source_refs": ["source:fixture:overview"],
+      "citation_refs": [{"source_id": "source:fixture:overview", "quote_policy": "short_quote_or_summary"}],
+      "evidence_quality": "fixture_verified",
+      "provider_free": true,
+      "unresolved_refs": []
+    },
+    {
+      "id": "evidence:claim:risk",
+      "claim_id": "claim:risk:001",
+      "source_refs": ["source:fixture:risk"],
+      "citation_refs": [{"source_id": "source:fixture:risk", "quote_policy": "short_quote_or_summary"}],
+      "evidence_quality": "fixture_stale_warning",
+      "provider_free": true,
+      "unresolved_refs": []
+    }
+  ],
+  "report_outline": {
+    "id": "generic-report-outline",
+    "title": "Generic Evidence Report",
+    "audience": "internal_review",
+    "time_horizon": "fixture_period",
+    "sections": ["overview", "risk"],
+    "style_profile_id": "style:concise",
+    "evidence_policy_id": "evidence:source_bound_claims",
+    "render_manifest_id": "render:manifest:generic-report"
+  },
+  "section_dependency_dag": {
+    "id": "section-dag-generic-report",
+    "nodes": [{"id": "overview"}, {"id": "risk"}],
+    "edges": [{"from": "overview", "to": "risk", "reason": "risk section cites overview context"}],
+    "acyclic": true,
+    "missing_dependency_policy": "block_section"
+  },
+  "style_profile_policy": {
+    "id": "style:concise",
+    "tone": "neutral",
+    "locale": "en-US",
+    "number_format": "plain",
+    "disclosure_policy": "required",
+    "forbidden_content": ["unsupported_claim"],
+    "provider_free": true
+  },
+  "partial_report_fixture": {
+    "id": "partial:generic-report",
+    "status": "partial_not_rendered",
+    "completed_sections": ["overview"],
+    "failed_sections": ["risk"],
+    "retryable": true,
+    "renderable": false,
+    "warning_refs": ["warning:stale-risk-source"],
+    "failure_reason": "stale_source_requires_review"
+  },
+  "artifact_manifest": {
+    "manifest_id": "artifact:manifest:generic-report",
+    "report_id": "generic-report",
+    "hash_algorithm": "sha256",
+    "manifest_hash": "sha256:generic-report-manifest",
+    "artifacts": [
+      {"artifact_id": "artifact:html", "kind": "html_report", "format": "text/html", "uri": "fixture://generic/report.html", "status": "planned_not_rendered", "content_hash": "sha256:html-placeholder", "warning_refs": ["warning:stale-risk-source"]},
+      {"artifact_id": "artifact:pdf", "kind": "pdf_report", "format": "application/pdf", "uri": "fixture://generic/report.pdf", "status": "planned_not_rendered", "content_hash": "sha256:pdf-placeholder", "warning_refs": ["warning:stale-risk-source"]},
+      {"artifact_id": "artifact:snapshot", "kind": "page_snapshot", "format": "image/png", "uri": "fixture://generic/snapshot.png", "status": "planned_not_rendered", "content_hash": "sha256:snapshot-placeholder", "warning_refs": ["warning:stale-risk-source"]}
+    ]
+  },
+  "render_manifest": {
+    "id": "render:manifest:generic-report",
+    "renderer_contract_refs": ["renderer:html", "renderer:pdf"],
+    "outputs": [
+      {"artifact_id": "artifact:html", "format": "text/html", "status": "clean_skipped_without_renderer"},
+      {"artifact_id": "artifact:pdf", "format": "application/pdf", "status": "clean_skipped_without_renderer"}
+    ],
+    "snapshots": ["snapshot:html:desktop", "snapshot:pdf:page1"],
+    "dependency_required": false,
+    "status": "clean_skipped_without_renderer"
+  },
+  "render_request": {
+    "request_id": "render:request:generic-report",
+    "report_id": "generic-report",
+    "title": "Generic Evidence Report",
+    "render_mode": "fixture_replay",
+    "renderer_dependency_gate": {"dependency_imported": false, "credential_required": false, "live_network": false, "clean_skip": true},
+    "output_formats": ["text/html", "application/pdf"]
+  },
+  "output_manifest": {
+    "report_id": "generic-report",
+    "request_id": "render:request:generic-report",
+    "artifact_manifest_id": "artifact:manifest:generic-report",
+    "renderer": "fixture_renderer_clean_skip",
+    "outputs": ["artifact:html", "artifact:pdf"],
+    "page_snapshots": ["snapshot:html:desktop", "snapshot:pdf:page1"],
+    "warnings": ["warning:stale-risk-source", "warning:renderer-clean-skip"],
+    "deterministic_fixture_hash": "sha256:output-manifest"
+  },
+  "snapshot_metadata": [
+    {
+      "snapshot_id": "snapshot:html:desktop",
+      "format": "text/html",
+      "viewport": "desktop",
+      "dimensions": {"width": 1440, "height": 1200},
+      "status": "planned_not_rendered",
+      "content_hash": "sha256:html-snapshot",
+      "hash_algorithm": "sha256",
+      "source_refs": ["source:fixture:overview", "source:fixture:risk"],
+      "warning_refs": ["warning:stale-risk-source"],
+      "disclosure_refs": ["disclosure:ai-assisted"]
+    },
+    {
+      "snapshot_id": "snapshot:pdf:page1",
+      "format": "application/pdf",
+      "viewport": "page-1",
+      "dimensions": {"width": 612, "height": 792},
+      "status": "planned_not_rendered",
+      "content_hash": "sha256:pdf-snapshot",
+      "hash_algorithm": "sha256",
+      "source_refs": ["source:fixture:overview"],
+      "warning_refs": [],
+      "disclosure_refs": ["disclosure:ai-assisted"]
+    }
+  ],
+  "warnings": [
+    {"id": "warning:stale-risk-source", "kind": "stale_data_warning", "severity": "review", "message": "One fixture source is stale and must be named.", "source_refs": ["source:fixture:risk"]},
+    {"id": "warning:renderer-clean-skip", "kind": "renderer_clean_skip", "severity": "info", "message": "Renderer dependency was not imported in provider-free mode.", "source_refs": []}
+  ],
+  "accessibility_checklist": {
+    "id": "accessibility:generic-report",
+    "standard": "WCAG 2.2 AA fixture checklist",
+    "checks": [
+      {"id": "headings", "status": "planned", "evidence_ref": "snapshot:html:desktop"},
+      {"id": "alt_text", "status": "planned", "evidence_ref": "snapshot:html:desktop"},
+      {"id": "contrast", "status": "planned", "evidence_ref": "snapshot:html:desktop"}
+    ]
+  },
+  "adapter_boundaries": [
+    {"id": "renderer", "capability": "generic.ai.render.clean_skip", "dependency_imported": false, "credential_required": false, "live_network": false, "clean_skip": true},
+    {"id": "snapshotter", "capability": "generic.ai.artifact.snapshot_metadata", "dependency_imported": false, "credential_required": false, "live_network": false, "clean_skip": true}
+  ]
+}

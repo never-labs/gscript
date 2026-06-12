@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/generic/ai/evidence_report_artifacts_v1.schema.json",
+  "title": "generic_evidence_report_artifacts_v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "live_model_calls",
+    "source_annotations",
+    "citation_envelopes",
+    "report_outline",
+    "section_dependency_dag",
+    "style_profile_policy",
+    "partial_report_fixture",
+    "artifact_manifest",
+    "render_manifest",
+    "render_request",
+    "output_manifest",
+    "snapshot_metadata",
+    "warnings",
+    "accessibility_checklist",
+    "adapter_boundaries"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "real_dependency_imports": {"const": false},
+    "live_model_calls": {"const": false},
+    "source_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "kind", "locator", "as_of", "stale_after", "stale", "license", "retrieved_at", "evidence_hash"]
+      }
+    },
+    "citation_envelopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "claim_id", "source_refs", "citation_refs", "evidence_quality", "provider_free", "unresolved_refs"]
+      }
+    },
+    "report_outline": {
+      "type": "object",
+      "required": ["id", "title", "audience", "time_horizon", "sections", "style_profile_id", "evidence_policy_id", "render_manifest_id"]
+    },
+    "section_dependency_dag": {
+      "type": "object",
+      "required": ["id", "nodes", "edges", "acyclic", "missing_dependency_policy"]
+    },
+    "style_profile_policy": {
+      "type": "object",
+      "required": ["id", "tone", "locale", "number_format", "disclosure_policy", "forbidden_content", "provider_free"]
+    },
+    "partial_report_fixture": {
+      "type": "object",
+      "required": ["id", "status", "completed_sections", "failed_sections", "retryable", "renderable", "warning_refs", "failure_reason"]
+    },
+    "artifact_manifest": {
+      "type": "object",
+      "required": ["manifest_id", "report_id", "hash_algorithm", "manifest_hash", "artifacts"]
+    },
+    "render_manifest": {
+      "type": "object",
+      "required": ["id", "renderer_contract_refs", "outputs", "snapshots", "dependency_required", "status"]
+    },
+    "render_request": {
+      "type": "object",
+      "required": ["request_id", "report_id", "title", "render_mode", "renderer_dependency_gate", "output_formats"]
+    },
+    "output_manifest": {
+      "type": "object",
+      "required": ["report_id", "request_id", "artifact_manifest_id", "renderer", "outputs", "page_snapshots", "warnings", "deterministic_fixture_hash"]
+    },
+    "snapshot_metadata": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["snapshot_id", "format", "viewport", "dimensions", "status", "content_hash", "hash_algorithm", "source_refs", "warning_refs", "disclosure_refs"]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "severity", "message", "source_refs"]
+      }
+    },
+    "accessibility_checklist": {
+      "type": "object",
+      "required": ["id", "standard", "checks"]
+    },
+    "adapter_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "capability", "dependency_imported", "credential_required", "live_network", "clean_skip"]
+      }
+    }
+  }
+}
