@@ -72,7 +72,7 @@ tick_flow := q.sql(
     "select qty:sum qty,events:count i,first_px:first px,last_px:last px by event,sym,bucket:xbar 60000000000 ts from trades order by event asc,sym asc,bucket asc"
 )
 
-opening_orders := q.sql(orders, "select order_id,sym,trade_date,session_time from trades where trade_date=2026.06.06 and session_time=09:30:00.000000000")
+opening_orders := q.sql(orders, "select order_id,sym,trade_date,session_time from trades where (trade_date=2026.06.06) and session_time=09:30:00.000000000")
 wide_spreads := q.sql(enriched, "select trade_id,sym,spread from trades where spread>=0.5 order by spread desc,trade_id asc")
 tsla_union := q.sql(symbol_book, "select sym,traded_qty,order_qty from trades where sym=`TSLA")
 

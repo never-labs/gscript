@@ -2293,8 +2293,40 @@ func (typedKernelRegistry) NumericUnary(op string, array Array) (Array, bool, er
 		if _, ok := asNullBitmapCarrier(array); ok {
 			return numericUnaryNullBitmap(op, array)
 		}
+		return numericUnaryDensified(op, array)
+	}
+}
+
+// numericUnaryDensified handles numeric-kinded lazy carriers (for example the
+// shared indexedArray row views that delete-where leaves behind) by exporting
+// them to dense typed storage before running the unary kernel. Views whose
+// rows the bulk exporter rejects (typically embedded nulls) fall back to a
+// boxed nullable pass so view columns keep the same unary semantics their
+// dense gathers had.
+func numericUnaryDensified(op string, array Array) (Array, bool, error) {
+	switch array.Kind() {
+	case KindF32, KindF64:
+		dst := make([]float64, array.Len())
+		ok, err := TryExportF64Copy(array, dst)
+		if err != nil {
+			return nil, true, err
+		}
+		if ok {
+			return numericUnarySlice(op, dst)
+		}
+	case KindI8, KindI16, KindI32, KindI64, KindU8, KindU16, KindU32, KindU64:
+		dst := make([]int64, array.Len())
+		ok, err := TryExportI64Copy(array, dst)
+		if err != nil {
+			return nil, true, err
+		}
+		if ok {
+			return numericUnarySlice(op, dst)
+		}
+	default:
 		return nil, false, nil
 	}
+	return numericUnaryNullable(op, array.Values())
 }
 
 func ApplyNumericUnaryValue(op string, value any) (any, bool, error) {

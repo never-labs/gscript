@@ -70,7 +70,7 @@ risk_rollup = q.sql(risk_rollup, "update vwap:notional/shares from trades")
 
 active_0930 := q.sql(
     events,
-    "select event_id,order_id,sym,event_date,event_time,action from trades where event_date=2026.06.06 and event_time=09:30:05 order by event_id asc"
+    "select event_id,order_id,sym,event_date,event_time,action from trades where (event_date=2026.06.06) and event_time=09:30:05 order by event_id asc"
 )
 
 without_tick := q.sql(sector_marked, "delete tick_size from trades")

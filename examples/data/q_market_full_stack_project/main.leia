@@ -93,7 +93,7 @@ book_value := q.value(book_by_sym)
 
 trimmed := q.sql(sector_joined, "delete tick_size from trades")
 high_value := q.sql(sector_joined, "select trade_id,sym,notional,sector from trades where notional>5000 order by notional desc")
-open_orders := q.sql(raw_orders, "select order_id,sym,trade_date,session_time from trades where trade_date=2026.06.06 and session_time=09:30:00 order by order_id asc")
+open_orders := q.sql(raw_orders, "select order_id,sym,trade_date,session_time from trades where (trade_date=2026.06.06) and session_time=09:30:00 order by order_id asc")
 
 check("trade order quote base shapes", #quotes == 8 && #raw_orders == 6 && #raw_trades == 7 && #trades == 6)
 check("update delete mutation pipeline", trades[1].notional == 4004.0 && trades[1].fee > 1.20 && trades[1].fee < 1.21 && trades[5].trade_id == 2006)

@@ -660,6 +660,7 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 		t.Fatalf("unexpected examples check payload: %#v", payload)
 	}
 	allowed := map[string]string{
+		"repo-ai-finrobot_translation-live_packages-earnings_transcript-main": "local AI playground profile or LLM replay fixture",
 		"repo-game_engine-chess":                "game/window host access",
 		"repo-game_engine-chess_ai":             "game/window host access",
 		"repo-game_engine-chess_bench":          "higher playground step budget",
