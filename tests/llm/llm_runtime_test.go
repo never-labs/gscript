@@ -62,7 +62,11 @@ func TestLLMTurnWithMockProvider(t *testing.T) {
 lookup := llm.tool("lookup", func(query) {
     return query, nil
 }, {description: "lookup docs", params: {"query"}})
+fail := llm.tool("fail", func(query) {
+    return nil, {kind: "validation", message: "raw failure for " .. query}
+}, {description: "fail docs", params: {"query"}})
 tools := {lookup}
+fail_tools := {fail}
 value := nil
 dispatch_err := nil
 result, err := llm.turn({
@@ -72,6 +76,58 @@ result, err := llm.turn({
     max_tokens: 64,
 })
 value, dispatch_err = llm.dispatch(result.calls[1], tools)
+ok_outcome := llm.tool_outcome(result.calls[1], value, {
+    workflow_run_id: "wf-tool"
+    workflow_step_id: "dispatch-ok"
+    component: "runtime-test"
+})
+ok_event := llm.tool_outcome_event(ok_outcome, {
+    trace_id: "trace-tool"
+    sequence: 1
+})
+fail_call := {id: "call_fail", tool: "fail", args: {query: "secret-query"}}
+fail_value, fail_err := llm.dispatch(fail_call, fail_tools)
+fail_outcome := llm.tool_outcome(fail_call, fail_err, {
+    workflow_run_id: "wf-tool"
+    workflow_step_id: "dispatch-fail"
+})
+fail_event := llm.tool_outcome_trace_event(fail_outcome, {
+    trace_id: "trace-tool"
+    sequence: 2
+})
+tool_trace := llm.trace_envelope({ok_event, fail_event}, {trace_id: "trace-tool"})
+tool_gate := llm.trace_assert(tool_trace, {
+    required_event_types: {"tool_outcome"}
+    require_event_payload_fields: {tool_outcome: {"tool_call_id", "tool_name", "status", "result_status"}}
+    require_correlation_fields: {"workflow_run_id", "workflow_step_id", "tool_call_id", "correlation_id"}
+    max_status_counts: {ok: 1, error: 1}
+    deny_raw_prompt_stored: true
+    deny_raw_completion_stored: true
+})
+ok_outcome_kind := ok_outcome.kind
+ok_outcome_schema := ok_outcome.schema_version
+ok_outcome_status := ok_outcome.status
+ok_outcome_result_status := ok_outcome.result_status
+ok_outcome_tool := ok_outcome.tool_name
+ok_outcome_call_id := ok_outcome.tool_call_id
+ok_outcome_result_type := ok_outcome.result_type
+ok_outcome_result_ref := ok_outcome.result_ref
+ok_outcome_arg_name := ok_outcome.arg_names[1]
+ok_outcome_args_redacted := ok_outcome.redaction.args_redacted
+ok_outcome_raw_args_stored := ok_outcome.redaction.raw_args_stored
+ok_event_type := ok_event.event_type
+ok_event_payload_value_missing := ok_event.payload.value == nil
+ok_event_payload_args_missing := ok_event.payload.args == nil
+ok_event_redaction_policy := ok_event.redaction.policy
+fail_outcome_status := fail_outcome.status
+fail_outcome_result_status := fail_outcome.result_status
+fail_outcome_ok := fail_outcome.ok
+fail_outcome_error_kind := fail_outcome.error_kind
+fail_outcome_message := fail_outcome.message
+fail_event_status := fail_event.status
+fail_event_payload_error_message_missing := fail_event.payload.error_message == nil
+tool_gate_ok := tool_gate.ok
+tool_gate_status := tool_gate.status
 `)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -99,6 +155,40 @@ value, dispatch_err = llm.dispatch(result.calls[1], tools)
 			}
 			if dispatchErr != nil {
 				t.Fatalf("dispatch_err = %#v", dispatchErr)
+			}
+			for name, want := range map[string]any{
+				"ok_outcome_kind":                          "tool_outcome",
+				"ok_outcome_schema":                        int64(1),
+				"ok_outcome_status":                        "ok",
+				"ok_outcome_result_status":                 "ok",
+				"ok_outcome_tool":                          "lookup",
+				"ok_outcome_call_id":                       "call_1",
+				"ok_outcome_result_type":                   "string",
+				"ok_outcome_result_ref":                    "call_1:result",
+				"ok_outcome_arg_name":                      "query",
+				"ok_outcome_args_redacted":                 true,
+				"ok_outcome_raw_args_stored":               false,
+				"ok_event_type":                            "tool_outcome",
+				"ok_event_payload_value_missing":           true,
+				"ok_event_payload_args_missing":            true,
+				"ok_event_redaction_policy":                "tool_outcome_ref_only",
+				"fail_outcome_status":                      "error",
+				"fail_outcome_result_status":               "error",
+				"fail_outcome_ok":                          false,
+				"fail_outcome_error_kind":                  "validation",
+				"fail_outcome_message":                     "tool outcome error",
+				"fail_event_status":                        "error",
+				"fail_event_payload_error_message_missing": true,
+				"tool_gate_ok":                             true,
+				"tool_gate_status":                         "ok",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
 			}
 		})
 	}

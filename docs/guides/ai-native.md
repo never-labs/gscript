@@ -522,6 +522,17 @@ event := llm.memory_outcome_event(outcome, {trace_id: "memory-review"})
 The outcome carries match refs, citations, rank, score, and correlation fields.
 It is not a durable memory store, vector index, or permission boundary.
 
+Tool dispatch can use the same trace-safe pattern:
+
+```leia
+value, err := llm.dispatch(call, tools)
+outcome := llm.tool_outcome(call, value, {workflow_run_id: "run-42"})
+event := llm.tool_outcome_event(outcome, {trace_id: "tool-review"})
+```
+
+The outcome records tool identity, result/error status, arg names, result refs,
+and redaction flags without copying raw args or raw result values.
+
 Use policy checks before exposing high-risk tools:
 
 ```leia
