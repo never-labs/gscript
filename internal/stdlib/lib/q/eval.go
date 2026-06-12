@@ -725,96 +725,22 @@ func EvalWithEnv(src string, env map[string]any) (any, error) {
 
 // EvalSourceCacheable reports whether src is safe for callers to memoize across
 // stateless Eval calls. Stateful workspace, system, IPC, and filesystem forms
-// stay uncached so repeated q.eval calls remain observably fresh.
+// stay uncached so repeated q.eval calls remain observably fresh, and
+// random (roll/deal/rand) forms are never memoized. Verb classification
+// comes from the verb metadata table (verb_metadata.go).
 func EvalSourceCacheable(src string) bool {
 	src = strings.TrimSpace(src)
 	if src == "" {
 		return false
 	}
-	scan := qEvalCacheScanText(src)
-	lower := strings.ToLower(scan)
-	parts := splitQScriptStatements(lower)
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if strings.HasPrefix(part, "\\") {
-			return false
-		}
-	}
-	uncacheable := []string{
-		".z.", "hopen", "hsym", "set ", "get ", "`:", "system ",
-		// Name-targeted mutation verbs change session state per call.
-		"insert", "upsert",
-	}
-	for _, marker := range uncacheable {
-		if strings.Contains(lower, marker) {
-			return false
-		}
-	}
-	// Roll/deal (`x?y`) and `rand` are nondeterministic: their results must
-	// never be memoized across evals.
-	if qSourceHasRandomVerb(src) {
-		return false
-	}
-	return true
+	return !qVerbMemoUnsafe(qSourceVerbFlags(src))
 }
 
-// qSourceHasRandomVerb conservatively reports whether src may invoke the
-// nondeterministic roll/deal (`x?y` with an atom LHS) or `rand` verbs. Any
-// dyadic `?` counts unless it is the functional query prefix `?[...]` or a
-// prefix `?x` distinct; the textual scan cannot know whether a name LHS is an
-// integer atom, so vector-LHS find expressions are also (safely) excluded
-// from memoization.
+// qSourceHasRandomVerb conservatively reports whether src may invoke a
+// Random-flagged verb (roll/deal via dyadic `?`, or `rand`); see
+// qScanMentionsRandomVerb in verb_metadata.go for the scan rules.
 func qSourceHasRandomVerb(src string) bool {
-	scan := qEvalCacheScanText(src)
-	for i := 0; i < len(scan); i++ {
-		ch := scan[i]
-		if ch == '`' {
-			i = qSymbolLiteralEnd(scan, i) - 1
-			continue
-		}
-		if ch == '?' {
-			// Functional query `?[t;...]` is deterministic.
-			j := i + 1
-			for j < len(scan) && isQWhitespace(scan[j]) {
-				j++
-			}
-			if j < len(scan) && scan[j] == '[' {
-				continue
-			}
-			// Prefix `?x` distinct: `?` at expression start.
-			k := i - 1
-			for k >= 0 && isQWhitespace(scan[k]) {
-				k--
-			}
-			if k < 0 {
-				continue
-			}
-			switch scan[k] {
-			case '(', ';', '[', ',', '!', '+', '-', '*', '%', '&', '|', '^', '=', '<', '>', ':', '#', '_', '@', '~':
-				continue
-			}
-			return true
-		}
-		if isQIdentStart(ch) {
-			start := i
-			j := i
-			for j < len(scan) && isQIdentByte(scan[j]) {
-				j++
-			}
-			word := scan[start:j]
-			i = j - 1
-			if start > 0 && isQIdentByte(scan[start-1]) {
-				continue
-			}
-			if word == "rand" {
-				return true
-			}
-		}
-	}
-	return false
+	return qScanMentionsRandomVerb(qEvalCacheScanText(src))
 }
 
 // qEvalConstantWords lists identifier tokens that keep an expression
@@ -870,21 +796,14 @@ func qEvalConstantStatementSource(src string) bool {
 			if start > 0 && scan[start-1] >= '0' && scan[start-1] <= '9' {
 				continue
 			}
-			if word == "rand" {
-				// Nondeterministic: never constant-memoizable, even if a
-				// verb registry entry exists.
+			// Verb classification comes from the metadata table: only
+			// known deterministic verbs/forms keep the expression closed;
+			// random/stateful/clock names and free user names disqualify it.
+			props, known := qVerbMetadataLookup(word)
+			if !known || qVerbMemoUnsafe(props) {
 				return false
 			}
-			if _, ok := qEvalConstantWords[word]; ok {
-				continue
-			}
-			if _, ok := lookupUnaryVerb(word); ok {
-				continue
-			}
-			if _, ok := lookupDyadicVerbFunc(word); ok {
-				continue
-			}
-			return false
+			continue
 		}
 	}
 	return true
