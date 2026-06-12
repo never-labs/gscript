@@ -29,6 +29,7 @@ func TestGenericLivePackageConsistency(t *testing.T) {
 			manifest := readJSONMap(t, manifestPath)
 			assertGenericLivePackageProviderFree(t, manifestPath, manifest)
 			assertGenericLivePackageFixtureReplayDefaultPolicy(t, manifestPath, manifest)
+			assertGenericLivePackageNoProviderCredentialDefaults(t, manifestPath, manifest)
 			assertGenericLivePackageEntrypoints(t, root, manifestPath, packageDir, manifest)
 			assertGenericLivePackageNoBuiltInGuarantee(t, manifestPath, manifest)
 			assertGenericLivePackageProviderFreeFixtureIndex(t, root, packageDir)
@@ -215,6 +216,26 @@ func assertGenericLivePackageFixtureReplayDefaultPolicy(t *testing.T, manifestPa
 		!finrobotLivePackageBoolOrConst(policy["clean_skip_without_descriptor"], true) &&
 		!finrobotLivePackageBoolOrConst(policy["clean_skip_without_sink"], true) {
 		t.Fatalf("%s default_policy missing clean-skip guard: %#v", manifestPath, policy)
+	}
+}
+
+func assertGenericLivePackageNoProviderCredentialDefaults(t *testing.T, manifestPath string, manifest map[string]any) {
+	t.Helper()
+	for _, key := range []string{"provider_credentials_required", "requires_credentials", "credentials_required", "credential_required"} {
+		assertFinRobotAuditRecursiveBool(t, manifestPath, manifest, key, false)
+	}
+	credentials, ok := manifest["credentials"].(map[string]any)
+	if !ok {
+		return
+	}
+	for _, key := range []string{"required_env", "optional_env", "secret_env_patterns", "secret_refs"} {
+		values, ok := credentials[key].([]any)
+		if ok && len(values) != 0 {
+			t.Fatalf("%s credentials.%s = %#v, want empty provider-free gate", manifestPath, key, values)
+		}
+	}
+	if required, ok := credentials["required"].(bool); ok && required {
+		t.Fatalf("%s credentials.required = true, want false", manifestPath)
 	}
 }
 

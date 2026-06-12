@@ -46,6 +46,12 @@ func TestGenericAIDialectIndexProductionBoundariesAlignWithPackageMatrix(t *test
 		if row.MainLeia != boundary.RegisteredExample {
 			t.Fatalf("%s matrix main_leia = %q, index registered_example = %q", row.ID, row.MainLeia, boundary.RegisteredExample)
 		}
+		if entry.Example != row.MainLeia {
+			t.Fatalf("%s index example = %q, want matrix main_leia %q", row.ID, entry.Example, row.MainLeia)
+		}
+		if entry.Fixture != row.FixtureIndex {
+			t.Fatalf("%s index fixture = %q, want matrix fixture_index %q", row.ID, entry.Fixture, row.FixtureIndex)
+		}
 		if row.Manifest != filepath.ToSlash(filepath.Join(row.PackageDir, "package.manifest.json")) {
 			t.Fatalf("%s manifest path = %q", row.ID, row.Manifest)
 		}
@@ -66,6 +72,46 @@ func TestGenericAIDialectIndexProductionBoundariesAlignWithPackageMatrix(t *test
 	}
 	if len(matrixByPackage) != len(matrix.Packages) {
 		t.Fatalf("duplicate package names in generic_ai_package_matrix")
+	}
+}
+
+func TestGenericAIBackendPlanProductionBoundariesAlignWithPackageMatrix(t *testing.T) {
+	root := repoRoot(t)
+	plan := loadGenericAIDialectBackendPlan(t, root)
+	matrix := loadGenericAIPackageMatrix(t, root)
+
+	matrixByDir := map[string]genericAIPackageRow{}
+	for _, row := range matrix.Packages {
+		matrixByDir[row.PackageDir] = row
+	}
+	seenDirs := map[string]bool{}
+	for _, shape := range plan.BackendShapes {
+		shape := shape
+		if shape.PackageBoundary == nil || shape.PackageBoundary.Status != "checked_in" {
+			t.Fatalf("%s missing checked-in package boundary", shape.ShapeID)
+		}
+		boundary := *shape.PackageBoundary
+		row, ok := matrixByDir[boundary.Directory]
+		if !ok {
+			t.Fatalf("%s package boundary directory %q is absent from generic package matrix", shape.ShapeID, boundary.Directory)
+		}
+		seenDirs[boundary.Directory] = true
+		if shape.Example != row.MainLeia {
+			t.Fatalf("%s backend example = %q, want matrix main_leia %q", shape.ShapeID, shape.Example, row.MainLeia)
+		}
+		if shape.Fixture != row.FixtureIndex {
+			t.Fatalf("%s backend fixture = %q, want matrix fixture_index %q", shape.ShapeID, shape.Fixture, row.FixtureIndex)
+		}
+		if boundary.RegisteredExample != row.MainLeia {
+			t.Fatalf("%s registered example = %q, want matrix main_leia %q", shape.ShapeID, boundary.RegisteredExample, row.MainLeia)
+		}
+		if row.BackendShape != "" && shape.ShapeID != row.BackendShape {
+			t.Fatalf("%s shape_id = %q, want matrix backend_shape %q", row.ID, shape.ShapeID, row.BackendShape)
+		}
+	}
+	if len(seenDirs) != len(matrix.Packages) {
+		t.Fatalf("backend/matrix package count drift: backend dirs=%d matrix packages=%d backend=%v matrix=%v",
+			len(seenDirs), len(matrix.Packages), sortedGenericAIAlignmentBoolKeys(seenDirs), sortedGenericAIAlignmentMatrixKeys(matrixByDir))
 	}
 }
 
@@ -95,6 +141,15 @@ func genericAIAlignmentTail(value string) string {
 }
 
 func sortedGenericAIAlignmentKeys(values map[string]genericAIDialectIndexItem) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedGenericAIAlignmentBoolKeys(values map[string]bool) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

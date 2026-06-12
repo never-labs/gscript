@@ -469,6 +469,12 @@ func assertGenericAIDialectBackendPackageBoundary(t *testing.T, root string, sha
 	if got, want := filepath.ToSlash(filepath.Dir(boundary.RegisteredExample)), boundary.Directory; got != want {
 		t.Fatalf("%s registered example %q is outside package directory %q", shape.ShapeID, boundary.RegisteredExample, boundary.Directory)
 	}
+	if shape.Example != boundary.RegisteredExample {
+		t.Fatalf("%s example = %q, want registered package example %q", shape.ShapeID, shape.Example, boundary.RegisteredExample)
+	}
+	if want := filepath.ToSlash(filepath.Join(boundary.Directory, "fixtures", "provider_free_fixture_index.json")); shape.Fixture != want {
+		t.Fatalf("%s fixture = %q, want package fixture index %q", shape.ShapeID, shape.Fixture, want)
+	}
 	if got, want := filepath.ToSlash(filepath.Dir(filepath.Dir(boundary.ContractPath))), boundary.Directory; got != want {
 		t.Fatalf("%s contract path %q is outside package directory %q", shape.ShapeID, boundary.ContractPath, boundary.Directory)
 	}

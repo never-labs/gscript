@@ -67,9 +67,9 @@
         "agent_state.trace_correlation",
         "agent_state.redaction"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_agent_state_store.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
       "test": "tests/llm/llm_generic_agent_state_store_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_agent_state_store_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-agent-state-store",
         "boundary": "provider-free agent state snapshots, session identity, deterministic checkpoints, redacted refs, trace correlation, and clean-skip contracts",
@@ -99,9 +99,9 @@
         "output",
         "max_steps"
       ],
-      "example": "examples/ai/general_analysis_assistant.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
       "test": "tests/llm/llm_generic_agent_runner_live_package_test.go",
-      "fixture": "examples/ai/general_analysis_assistant.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-agent-runner",
         "boundary": "declarative agent config, tool history, structured output, and replay policy",
@@ -132,9 +132,9 @@
         "provenance",
         "clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_analytical_model_contracts.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
       "test": "tests/llm/llm_generic_analytical_model_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_analytical_model_contracts_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-analytical-model-contracts",
         "boundary": "checked-in provider-free package boundary",
@@ -226,9 +226,9 @@
         "chart.snapshot_hash",
         "chart.renderer_clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_chart_render_contracts.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
       "test": "tests/llm/llm_generic_chart_render_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_chart_render_contracts_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-chart-render-contracts",
         "boundary": "provider-free chart specs, recipe semantic matrices, render request/result envelopes, source metadata, deterministic snapshot hashes, and unsupported renderer clean skips",
@@ -260,9 +260,9 @@
         "code.cleanup_policy",
         "code.clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_coding_workspace.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
       "test": "tests/llm/llm_generic_coding_workspace_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_coding_workspace_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-coding-workspace",
         "boundary": "provider-free coding workspace command envelopes, approval gates, stdout/stderr captures, file and image artifact manifests, notebook display metadata, cleanup policy, deterministic replay, and clean skips",
@@ -295,9 +295,9 @@
         "validation_error",
         "clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_normalization_contracts.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
       "test": "tests/llm/llm_generic_data_normalization_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_data_normalization_contracts_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-data-normalization-contracts",
         "boundary": "checked-in provider-free package boundary",
@@ -331,9 +331,9 @@
         "data_provider.error_envelope",
         "data_provider.clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_provider_boundary.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
       "test": "tests/llm/llm_generic_data_provider_boundary_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_data_provider_boundary_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-data-provider-boundary",
         "boundary": "provider-free data provider registry, request/response envelopes, pagination, rate-limit metadata, auth redaction, cache/retry policy, provenance, error envelopes, and clean skips",
@@ -363,9 +363,9 @@
         "rag.citation_consistency",
         "rag.adapter.clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_document_rag_pipeline.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
       "test": "tests/llm/llm_generic_document_rag_pipeline_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_document_rag_pipeline_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-document-rag-pipeline",
         "boundary": "provider-free document conversion, section extraction, RAG chunking, corpus manifests, retrieval results, citation consistency, and adapter clean-skip contracts",
@@ -394,9 +394,9 @@
         "eval.judge",
         "llm.replay"
       ],
-      "example": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
       "test": "tests/llm/llm_generic_evaluation_harness_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-evaluation-harness",
         "boundary": "dataset manifest, judge replay, metrics, findings, and golden gates",
@@ -429,9 +429,9 @@
         "event.prompt_contract",
         "event.adapter_clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_event_intelligence_boundary.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
       "test": "tests/llm/llm_generic_event_intelligence_boundary_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_event_intelligence_boundary_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-event-intelligence-boundary",
         "boundary": "provider-free event source snapshots, event extraction, taxonomies, freshness policy, dedupe/source confidence, relevance scoring, sentiment and impact labels, prompt contracts, and adapter clean skips",
@@ -462,9 +462,9 @@
         "render.manifest",
         "render.clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_evidence_report_artifacts.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
       "test": "tests/llm/llm_generic_evidence_report_artifacts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_evidence_report_artifacts_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-evidence-report-artifacts",
         "boundary": "provider-free evidence source annotations, citation envelopes, report outlines, section DAGs, artifact manifests, render manifests, snapshot metadata, stale warnings, accessibility checks, and renderer clean-skip contracts",
@@ -494,9 +494,9 @@
         "evidence.freshness_check",
         "evidence.clean_degradation"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_evidence_verification.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
       "test": "tests/llm/llm_generic_evidence_verification_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_evidence_verification_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-evidence-verification",
         "boundary": "provider-free claim/source/citation verification, freshness warning, unresolved-ref, quality-summary, and clean-degradation contracts",
@@ -525,9 +525,9 @@
         "memory.context_window",
         "memory.provenance"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_memory_store.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
       "test": "tests/llm/llm_generic_memory_store_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_memory_store_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-memory-store",
         "boundary": "provider-free memory store, namespace, retrieval ranking, context window, and provenance contracts",
@@ -557,9 +557,9 @@
         "model.io.redaction",
         "llm.replay"
       ],
-      "example": "examples/ai/coding_agent_replay.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
       "test": "tests/llm/llm_generic_model_io_envelope_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json",
       "smoke_coverage": {
         "test": "tests/llm/llm_generic_model_io_envelope_test.go",
         "command": "go test ./tests/llm -run TestGenericModelIOEnvelopeMainExecutableSmoke",
@@ -597,9 +597,9 @@
         "model.default",
         "provider_model_alias"
       ],
-      "example": "examples/ai/general_agent_workflow.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
       "test": "tests/llm/llm_generic_model_registry_live_package_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-model-registry",
         "boundary": "model alias registry with provider-free replay defaults",
@@ -631,9 +631,9 @@
         "optional_adapter.clean_skip",
         "optional_adapter.no_live_import_default"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_optional_adapter_boundary.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
       "test": "tests/llm/llm_generic_optional_adapter_boundary_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_optional_adapter_boundary_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-optional-adapter-boundary",
         "boundary": "provider-free optional adapter registry, dependency gates, result envelopes, version and terms metadata, credential redaction, no-live-import defaults, and clean skips",
@@ -661,9 +661,9 @@
         "no_built_in_guarantee",
         "registered_example"
       ],
-      "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
       "test": "tests/llm/llm_generic_package_boundary_auditor_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-package-boundary-auditor",
         "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
@@ -696,9 +696,9 @@
         "product_app.approval_boundary",
         "product_app.clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_product_app_boundary.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
       "test": "tests/llm/llm_generic_product_app_boundary_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_product_app_boundary_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-product-app-boundary",
         "boundary": "provider-free product app route contracts, sessions, task logs, artifact downloads, CRUD fixture state, database migration plans, deployment targets, approval boundaries, and clean skips",
@@ -729,9 +729,9 @@
         "role.evidence_validation",
         "role.termination"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_prompt_role_catalog.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
       "test": "tests/llm/llm_generic_prompt_role_catalog_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_prompt_role_catalog_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-prompt-role-catalog",
         "boundary": "provider-free prompt catalogs, role profile versions, prompt template snapshots, delegation triggers, output schemas, evidence validation, termination conventions, and drift fixtures",
@@ -793,9 +793,9 @@
         "report.render.fixture_hash",
         "report.render.clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_report_render_contracts.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
       "test": "tests/llm/llm_generic_report_render_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_report_render_contracts_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-report-render-contracts",
         "boundary": "provider-free report render requests, request/result envelopes, output and artifact manifests, snapshot metadata and hashes, warnings, annotations, fixture hashes, and renderer clean skips",
@@ -827,9 +827,9 @@
         "strategy.constraint_limits",
         "strategy.engine_clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
       "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_strategy_backtest_contracts_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-strategy-backtest-contracts",
         "boundary": "provider-free strategy simulation manifests, observation feeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, deterministic seeds, and optional engine clean skips",
@@ -858,9 +858,9 @@
         "requires",
         "tool_result"
       ],
-      "example": "examples/ai/coding_agent_replay.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
       "test": "tests/llm/llm_generic_tool_contracts_live_package_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-tool-contracts",
         "boundary": "declarative tool schema, capability tags, and result envelope",
@@ -888,9 +888,9 @@
         "invocation_trace",
         "approval_edge"
       ],
-      "example": "examples/ai/coding_agent_replay.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
       "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json",
       "smoke_coverage": {
         "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
         "command": "go test ./tests/llm -run TestGenericToolRegistryMainSmokeOutput",
@@ -929,9 +929,9 @@
         "turn_end",
         "approval_replay_trace"
       ],
-      "example": "examples/ai/record_replay_trace_project.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
       "test": "tests/llm/llm_generic_trace_events_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-trace-events",
         "boundary": "provider-neutral trace event schema for turns, streams, approvals, and replay",
@@ -961,9 +961,9 @@
         "chunk",
         "clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_transcript_pipeline.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
       "test": "tests/llm/llm_generic_transcript_pipeline_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_transcript_pipeline_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-transcript-pipeline",
         "boundary": "checked-in provider-free package boundary",
@@ -991,9 +991,9 @@
         "response_format",
         "usage"
       ],
-      "example": "examples/ai/coding_agent_replay.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
       "test": "tests/llm/llm_generic_turn_runner_live_package_test.go",
-      "fixture": "examples/ai/coding_agent_replay.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-turn-runner",
         "boundary": "single-turn request, response, usage, and structured error envelope",
@@ -1026,9 +1026,9 @@
         "ui.static_asset_policy",
         "ui.browser_clean_skip"
       ],
-      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_ui_snapshot_evaluator.source.txt",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
       "test": "tests/llm/llm_generic_ui_snapshot_evaluator_live_package_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_ui_snapshot_evaluator_fixture_index.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-ui-snapshot-evaluator",
         "boundary": "provider-free route DOM snapshots, evidence-report projection, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips",
@@ -1056,9 +1056,9 @@
         "tool_history",
         "workflow_state"
       ],
-      "example": "examples/ai/general_agent_workflow.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
       "test": "tests/llm/llm_generic_workflow_orchestrator_live_package_test.go",
-      "fixture": "examples/ai/general_agent_workflow.records.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-workflow-orchestrator",
         "boundary": "multi-step agent and review-turn orchestration with replayable state",
@@ -1088,9 +1088,9 @@
         "merge",
         "trace_evidence"
       ],
-      "example": "examples/ai/finrobot_translation/generic_workflow_orchestration.leia",
+      "example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
       "test": "tests/llm/llm_generic_planning_graph_contract_test.go",
-      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-planning-graph",
         "boundary": "checked-in provider-free package boundary",

@@ -264,24 +264,21 @@ func TestGenericApprovalPolicySmokeLeia(t *testing.T) {
 		}
 	}
 
-	for _, mode := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(mode.name, func(t *testing.T) {
-			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString)}, mode.opts...)...)
-			if err := vm.ExecFile(filepath.Join(base, "main.leia")); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, _ := vm.Get("generic_approval_policy_summary")
-			want := "generic_approval_policy capabilities=7 default_deny=6 clean_skip=6 provider_free=true live_network=false imports=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-		})
+	want := "generic_approval_policy capabilities=7 default_deny=6 clean_skip=6 provider_free=true live_network=false imports=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, filepath.Join(base, "main.leia"), "generic_approval_policy_summary", "generic_approval_policy", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "capabilities", "default_deny", "clean_skip", "provider_free", "live_network", "imports")
+		if fields["capabilities"] != "7" ||
+			fields["default_deny"] != "6" ||
+			fields["clean_skip"] != "6" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

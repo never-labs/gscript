@@ -2,7 +2,6 @@ package leia_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -427,27 +426,21 @@ func TestGenericPlanningGraphMainLeiaSmokeExecutes(t *testing.T) {
 		}
 	}
 
-	vm := leia.New(leia.WithLibs(leia.LibAll), leia.WithVM())
-	if err := vm.ExecFile(mainPath); err != nil {
-		t.Fatalf("ExecFile main.leia: %v", err)
-	}
-	value, err := vm.Get("generic_planning_graph_live_package_summary")
-	if err != nil {
-		t.Fatalf("get smoke summary: %v", err)
-	}
-	summary := fmt.Sprint(value)
-	for _, want := range []string{
-		"generic_planning_graph_live_package",
-		"nodes=7",
-		"edges=7",
-		"trace_events=10",
-		"capabilities=6",
-		"provider_free=true",
-		"live_network=false",
-		"imports=false",
-	} {
-		if !strings.Contains(summary, want) {
-			t.Fatalf("smoke summary missing %q: %s", want, summary)
+	want := "generic_planning_graph_live_package nodes=7 edges=7 trace_events=10 capabilities=6 provider_free=true live_network=false imports=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, mainPath, "generic_planning_graph_live_package_summary", "generic_planning_graph_live_package", leia.LibAll) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "nodes", "edges", "trace_events", "capabilities", "provider_free", "live_network", "imports")
+		if fields["nodes"] != "7" ||
+			fields["edges"] != "7" ||
+			fields["trace_events"] != "10" ||
+			fields["capabilities"] != "6" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
 		}
 	}
 }
