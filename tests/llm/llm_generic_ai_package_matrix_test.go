@@ -28,6 +28,7 @@ type genericAIPackageRow struct {
 	MainLeia     string   `json:"main_leia"`
 	Manifest     string   `json:"manifest"`
 	Contracts    []string `json:"contracts"`
+	Fixtures     []string `json:"fixtures"`
 	FixtureIndex string   `json:"fixture_index"`
 }
 

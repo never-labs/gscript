@@ -188,6 +188,102 @@ func assertLivePackageSkeletonSummaryMatchesPackages(t *testing.T, root string, 
 	}
 }
 
+func TestGenericLivePackagePlanRowsAlignWithPackageMatrix(t *testing.T) {
+	root := repoRoot(t)
+	plan := loadLivePackagePlanManifest(t, root)
+	matrix := loadGenericAIPackageMatrix(t, root)
+
+	planPackages := map[string]int{}
+	for index, pkg := range plan.Packages {
+		if strings.HasPrefix(pkg.ID, "generic_") {
+			planPackages[pkg.ID] = index
+		}
+	}
+	planSkeletons := map[string]int{}
+	for index, skeleton := range plan.LivePackageSkeletons {
+		if strings.HasPrefix(skeleton.ID, "generic_") {
+			planSkeletons[skeleton.ID] = index
+		}
+	}
+
+	matrixIDs := map[string]string{}
+	for _, row := range matrix.Packages {
+		row := row
+		matrixIDs[row.ID] = row.PackageDir
+		t.Run(row.ID, func(t *testing.T) {
+			planPkgIndex, ok := planPackages[row.ID]
+			if !ok {
+				t.Fatalf("%s missing from live_package_plan_manifest packages", row.ID)
+			}
+			planPkg := plan.Packages[planPkgIndex]
+			skeletonIndex, ok := planSkeletons[row.ID]
+			if !ok {
+				t.Fatalf("%s missing from live_package_plan_manifest live_package_skeletons", row.ID)
+			}
+			skeleton := plan.LivePackageSkeletons[skeletonIndex]
+			if planPkg.PackageName != row.PackageName {
+				t.Fatalf("%s package_name = %q, want matrix %q", row.ID, planPkg.PackageName, row.PackageName)
+			}
+			if planPkg.SkeletonDirectory != row.PackageDir {
+				t.Fatalf("%s skeleton_directory = %q, want matrix package_dir %q", row.ID, planPkg.SkeletonDirectory, row.PackageDir)
+			}
+			if planPkg.Manifest != row.Manifest {
+				t.Fatalf("%s manifest = %q, want matrix %q", row.ID, planPkg.Manifest, row.Manifest)
+			}
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(planPkg.MigrationSource))); err != nil {
+				t.Fatalf("%s migration_source %q: %v", row.ID, planPkg.MigrationSource, err)
+			}
+			if planPkg.PlannedDirectory != filepath.ToSlash(filepath.Join("packages", "generic_ai", strings.TrimPrefix(row.ID, "generic_"))) {
+				t.Fatalf("%s planned_directory = %q", row.ID, planPkg.PlannedDirectory)
+			}
+			if planPkg.Status != "skeleton_contract_checked_in" || !planPkg.NoBuiltInGuarantee {
+				t.Fatalf("%s plan package status/guarantee = %q/%v", row.ID, planPkg.Status, planPkg.NoBuiltInGuarantee)
+			}
+			if len(row.Capabilities) == 0 || len(planPkg.Capabilities) == 0 {
+				t.Fatalf("%s must keep capabilities in both matrix and live package plan", row.ID)
+			}
+			if !livePackagePlanStringSliceContains(row.Contracts, planPkg.Contract) {
+				t.Fatalf("%s plan contract %q not listed by matrix contracts %#v", row.ID, planPkg.Contract, row.Contracts)
+			}
+			if len(planPkg.TestGates) == 0 {
+				t.Fatalf("%s must keep test_gates in the live package plan", row.ID)
+			}
+
+			if skeleton.Directory != row.PackageDir {
+				t.Fatalf("%s skeleton directory = %q, want matrix package_dir %q", row.ID, skeleton.Directory, row.PackageDir)
+			}
+			if skeleton.RegisteredExample == nil || *skeleton.RegisteredExample != row.MainLeia {
+				t.Fatalf("%s registered_example = %#v, want matrix main_leia %q", row.ID, skeleton.RegisteredExample, row.MainLeia)
+			}
+			if skeleton.Status != "checked_in_registered_example" {
+				t.Fatalf("%s skeleton status = %q", row.ID, skeleton.Status)
+			}
+			if !livePackagePlanStringSliceContains(skeleton.CoversPackageIDs, row.ID) {
+				t.Fatalf("%s skeleton covers_package_ids = %#v", row.ID, skeleton.CoversPackageIDs)
+			}
+
+			packageManifest := readJSONMap(t, filepath.Join(root, filepath.FromSlash(row.Manifest)))
+			if got, _ := packageManifest["package_name"].(string); got != row.PackageName {
+				t.Fatalf("%s package manifest package_name = %q, want matrix %q", row.ID, got, row.PackageName)
+			}
+			if !finrobotLivePackageBoolOrConst(packageManifest["provider_free"], true) || !row.ProviderFree {
+				t.Fatalf("%s must remain provider-free in matrix and manifest", row.ID)
+			}
+			for _, path := range append(append([]string{row.PackageDir, row.MainLeia, row.Manifest, row.FixtureIndex}, row.Contracts...), row.Fixtures...) {
+				if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(path))); err != nil {
+					t.Fatalf("%s matrix path %q: %v", row.ID, path, err)
+				}
+			}
+		})
+	}
+	if len(planPackages) != len(matrixIDs) {
+		t.Fatalf("generic plan packages = %d, matrix packages = %d", len(planPackages), len(matrixIDs))
+	}
+	if len(planSkeletons) != len(matrixIDs) {
+		t.Fatalf("generic plan skeletons = %d, matrix packages = %d", len(planSkeletons), len(matrixIDs))
+	}
+}
+
 func sortedKeys(values map[string]bool) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
@@ -195,6 +291,15 @@ func sortedKeys(values map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func livePackagePlanStringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestFinRobotLivePackagePlanCapabilitiesAndGates(t *testing.T) {
