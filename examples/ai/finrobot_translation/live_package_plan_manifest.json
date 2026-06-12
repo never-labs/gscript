@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 99,
-  "translation_directory_file_count": 860,
+  "translation_directory_file_count": 862,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -1372,6 +1372,7 @@
         "generic.ai.product_app.boundary",
         "generic.ai.product_app.route_contract",
         "generic.ai.product_app.session_contract",
+        "generic.ai.product_app.workflow_projection",
         "generic.ai.product_app.task_log",
         "generic.ai.product_app.artifact_download",
         "generic.ai.product_app.crud_fixture_state",
@@ -1382,6 +1383,7 @@
       ],
       "test_gates": [
         "product app route contract fixtures decode without web framework dependencies",
+        "workflow projection maps provider-free workflow results into product task, route, and artifact refs",
         "session and task-log contract fixtures remain provider-free and credential-free",
         "artifact download and CRUD fixture-state contracts use fixture URIs only",
         "database migration and deployment target contracts are metadata-only by default",

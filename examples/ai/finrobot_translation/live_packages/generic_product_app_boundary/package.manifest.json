@@ -5,7 +5,7 @@
   "package_boundary_id": "generic-ai-product-app-boundary",
   "capability_id": "generic.ai.product_app.boundary",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free generic AI package for product app route contracts, sessions, task logs, artifact downloads, CRUD fixture state, database migration plans, deployment targets, approval boundaries, and clean skips.",
+  "description": "Provider-free generic AI package for product app route contracts, workflow projection, sessions, task logs, artifact downloads, CRUD fixture state, database migration plans, deployment targets, approval boundaries, and clean skips.",
   "provider_free": true,
   "domain_specific": false,
   "live_network_default": false,
@@ -24,19 +24,22 @@
   "schemas": {
     "product_app": "schemas/generic_product_app_boundary_v1.schema.json",
     "route_contract": "schemas/product_app_route_contract_v1.schema.json",
-    "lifecycle": "schemas/product_app_lifecycle_v1.schema.json"
+    "lifecycle": "schemas/product_app_lifecycle_v1.schema.json",
+    "workflow_product_app_projection": "schemas/workflow_product_app_projection_v1.schema.json"
   },
   "contracts": {
     "contract": "contracts/generic_product_app_boundary_contract.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
-    "product_app_boundary": "fixtures/product_app_boundary_fixture.json"
+    "product_app_boundary": "fixtures/product_app_boundary_fixture.json",
+    "workflow_product_app_projection": "fixtures/workflow_product_app_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.product_app.boundary",
     "generic.ai.product_app.route_contract",
     "generic.ai.product_app.session_contract",
+    "generic.ai.product_app.workflow_projection",
     "generic.ai.product_app.task_log",
     "generic.ai.product_app.artifact_download",
     "generic.ai.product_app.crud_fixture_state",
@@ -48,6 +51,7 @@
   "capability_surfaces": [
     "route_contracts",
     "session_contracts",
+    "workflow_projection",
     "task_logs",
     "artifact_downloads",
     "crud_fixture_state",
@@ -69,6 +73,7 @@
   },
   "test_gates": [
     "product app route contract fixtures decode without web framework dependencies",
+    "workflow projection maps provider-free workflow results into product task, route, and artifact refs",
     "session and task-log contract fixtures remain provider-free and credential-free",
     "artifact download and CRUD fixture-state contracts use fixture URIs only",
     "database migration and deployment target contracts are metadata-only by default",
@@ -76,6 +81,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide built-in leia-generic-ai-product-app-boundary web frameworks, auth systems, databases, artifact services, or deployment runtimes; this provider-free package boundary owns route, session, task-log, artifact download, CRUD fixture state, migration, deployment, approval, and clean-skip contracts."
+    "statement": "Leia core does not provide built-in leia-generic-ai-product-app-boundary web frameworks, auth systems, databases, artifact services, or deployment runtimes; this provider-free package boundary owns route, workflow projection, session, task-log, artifact download, CRUD fixture state, migration, deployment, approval, and clean-skip contracts."
   }
 }

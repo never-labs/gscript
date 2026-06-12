@@ -28,6 +28,27 @@
         "approvals": 2,
         "clean_skip": true
       }
+    },
+    {
+      "fixture_key": "generic:product_app_boundary:workflow_projection",
+      "capability": "generic.ai.product_app.workflow_projection",
+      "path": "fixtures/workflow_product_app_projection_fixture.json",
+      "schema": "schemas/workflow_product_app_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "source_package": "generic_workflow_orchestrator",
+        "stage_mappings": 4,
+        "artifact_mappings": 2,
+        "route_mappings": 3,
+        "raw_stage_payloads_allowed": false,
+        "live_side_effects_allowed": false
+      }
     }
   ]
 }

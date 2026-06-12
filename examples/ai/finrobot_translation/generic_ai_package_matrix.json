@@ -513,6 +513,7 @@
         "generic.ai.product_app.boundary",
         "generic.ai.product_app.route_contract",
         "generic.ai.product_app.session_contract",
+        "generic.ai.product_app.workflow_projection",
         "generic.ai.product_app.task_log",
         "generic.ai.product_app.artifact_download",
         "generic.ai.product_app.crud_fixture_state",
@@ -528,7 +529,10 @@
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/contracts/generic_product_app_boundary_contract.json"
       ],
-      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json"
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/workflow_product_app_projection_fixture.json"
+      ]
     },
     {
       "id": "generic_prompt_role_catalog",
