@@ -510,6 +510,18 @@ event := llm.budget_outcome_event(outcome, {trace_id: "budget-review"})
 helpers only build portable tables; they do not reserve budget, change
 accounting, or call providers.
 
+Retrieval and memory context can be traced the same way without storing raw
+memory text:
+
+```leia
+ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
+outcome := llm.memory_outcome(ctx, {workflow_run_id: "run-42"})
+event := llm.memory_outcome_event(outcome, {trace_id: "memory-review"})
+```
+
+The outcome carries match refs, citations, rank, score, and correlation fields.
+It is not a durable memory store, vector index, or permission boundary.
+
 Use policy checks before exposing high-risk tools:
 
 ```leia

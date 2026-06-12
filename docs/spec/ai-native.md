@@ -473,6 +473,17 @@ do not provide persistence, embeddings, vector search, citation verification,
 secret filtering, or authorization. Hosts and tools must still enforce access
 policy before source text is added to a request.
 
+`llm.memory_outcome(context_or_matches, opts)` and its alias
+`llm.retrieval_outcome(...)` project retrieval/context results into ordinary
+tables with `kind: "memory_outcome"`, `version: "memory_outcome.v1"`,
+`source_kind`, `status`, `result_status`, `query`, `label`, `match_count`,
+`top_id`, `top_score`, `top_match`, and ordered `match_refs`.
+`llm.memory_outcome_event(outcome, opts)` projects the outcome into the generic
+trace event shape; `llm.memory_outcome_trace_event` and
+`llm.retrieval_outcome_event` are equivalent aliases. The projection is
+ref-only by default and must not copy raw memory text, snippets, prompt text,
+provider completions, or hidden store state into trace payloads.
+
 ## Section Generation
 
 `llm.sections(config)` and `llm.generate_sections(config)` run a shared request
