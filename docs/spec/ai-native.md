@@ -575,7 +575,10 @@ same identity fields used by the strict ordered matcher: `operation`,
 `capability`, `replay_key`, and `request_hash`. They must not create hidden
 provider state, bypass host policy, or introduce a second matching algorithm.
 The fixture matcher must reuse the same `llm.replay_index` semantics as direct
-record/replay tests.
+record/replay tests. `fixture.replay(request, replay_key)` is a convenience
+over that matcher: it derives the request hash from the normalized turn request,
+consumes according to the fixture policy, and returns replay options for
+`llm.turn` or a validation error table.
 
 ## Evaluate Blocks
 

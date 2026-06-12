@@ -407,6 +407,118 @@ live_network := fixture.live_network
 	}
 }
 
+func TestLLMScriptReplayFixtureDirectReplayMismatchAndExhaustion(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "live"}}
+			vm := leia.New(append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)...)
+			if err := vm.Exec(`
+record, record_err := llm.replay_record({
+    record_id: "script-rec-direct"
+    replay_key: "turn:direct"
+    request: {
+        model: "mock-fast"
+        messages: {llm.user("direct replay")}
+        max_tokens: 8
+    }
+    response: {
+        status: "final_answer"
+        text: "direct fixture answer"
+        calls: {}
+        usage: {input_tokens: 1 output_tokens: 3 cost: 0.0 latency_ms: 0}
+    }
+})
+fixture, fixture_err := llm.replay_fixture({record}, {
+    fixture_id: "script-direct-fixture"
+})
+bad_replay, bad_err := fixture.replay({
+    model: "mock-fast"
+    messages: {llm.user("drifted replay")}
+    max_tokens: 8
+}, "turn:direct")
+replay, replay_err := fixture.replay({
+    model: "mock-fast"
+    messages: {llm.user("direct replay")}
+    max_tokens: 8
+}, "turn:direct")
+result, turn_err := llm.turn({
+    model: "mock-fast"
+    messages: {llm.user("direct replay")}
+    max_tokens: 8
+    replay: replay
+})
+exhausted_replay, exhausted_err := fixture.replay({
+    model: "mock-fast"
+    messages: {llm.user("direct replay")}
+    max_tokens: 8
+}, "turn:direct")
+summary := fixture.summary()
+
+record_err_nil := record_err == nil
+fixture_err_nil := fixture_err == nil
+bad_replay_nil := bad_replay == nil
+bad_kind := bad_err.kind
+bad_status := bad_err.status
+bad_finding := bad_err.finding_kind
+replay_err_nil := replay_err == nil
+turn_err_nil := turn_err == nil
+text := result.text
+turn_replay_key := result.replay.replay_key
+exhausted_replay_nil := exhausted_replay == nil
+exhausted_kind := exhausted_err.kind
+exhausted_status := exhausted_err.status
+exhausted_finding := exhausted_err.finding_kind
+matched := summary.matched
+mismatches := summary.mismatches
+exhausted := summary.exhausted
+unconsumed := summary.unconsumed
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 0 {
+				t.Fatalf("provider requests = %d, want 0", len(provider.requests))
+			}
+			for name, want := range map[string]any{
+				"record_err_nil":       true,
+				"fixture_err_nil":      true,
+				"bad_replay_nil":       true,
+				"bad_kind":             "validation",
+				"bad_status":           "mismatch",
+				"bad_finding":          "generic.ai.replay.mismatch",
+				"replay_err_nil":       true,
+				"turn_err_nil":         true,
+				"text":                 "direct fixture answer",
+				"turn_replay_key":      "turn:direct",
+				"exhausted_replay_nil": true,
+				"exhausted_kind":       "validation",
+				"exhausted_status":     "exhausted",
+				"exhausted_finding":    "generic.ai.replay.exhausted",
+				"matched":              int64(1),
+				"mismatches":           int64(1),
+				"exhausted":            int64(1),
+				"unconsumed":           int64(0),
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestLLMReplaySynthesizesStreamEventForOldFixtures(t *testing.T) {
 	record := llm.Record{
 		Request: llm.TurnRequest{

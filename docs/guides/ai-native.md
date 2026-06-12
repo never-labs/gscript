@@ -533,8 +533,8 @@ replay is for deterministic provider behavior.
 
 For compact script-owned fixtures, use `llm.replay_record` and
 `llm.replay_fixture`. A replay record fills stable identity fields and exposes a
-`record.replay` table that can drive `llm.turn` without contacting the
-provider.
+replay table. A replay fixture can match a normalized turn request and return
+options that drive `llm.turn` without contacting the provider.
 
 ```leia
 record, err := llm.replay_record({
@@ -543,10 +543,14 @@ record, err := llm.replay_record({
     response: {status: "final_answer", text: "fixture answer"}
 })
 fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+replay, err := fixture.replay({
+    model: "fast"
+    messages: {llm.user("hello")}
+}, "turn:1")
 result, err := llm.turn({
     model: "fast"
     messages: {llm.user("hello")}
-    replay: record.replay
+    replay: replay
 })
 ```
 

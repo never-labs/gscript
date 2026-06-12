@@ -247,6 +247,117 @@ first_id := summary.matched_record_ids[1]
 	assertGlobalString(t, interp, "first_id", "rec-1")
 }
 
+func TestLLMReplayFixtureBuildsTurnReplayFromRequest(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record, record_err := llm.replay_record({
+    record_id: "rec-direct"
+    replay_key: "turn:direct"
+    request: {
+        model: "mock"
+        messages: {llm.user("direct replay")}
+    }
+    response: {
+        status: "final_answer"
+        text: "direct fixture"
+        calls: {}
+        usage: {}
+    }
+})
+fixture, fixture_err := llm.replay_fixture({record}, {
+    fixture_id: "fixture:direct"
+})
+replay, err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("direct replay")}
+}, "turn:direct")
+summary := fixture.summary()
+
+record_err_nil := record_err == nil
+fixture_err_nil := fixture_err == nil
+err_nil := err == nil
+mode := replay.mode
+replay_key := replay.replay_key
+response_text := replay.response.text
+matched := summary.matched
+unconsumed := summary.unconsumed
+`, nil)
+
+	if got := interp.GetGlobal("record_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("record_err_nil = %v, want true", got)
+	}
+	if got := interp.GetGlobal("fixture_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("fixture_err_nil = %v, want true", got)
+	}
+	if got := interp.GetGlobal("err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "mode", "fixture_replay")
+	assertGlobalString(t, interp, "replay_key", "turn:direct")
+	assertGlobalString(t, interp, "response_text", "direct fixture")
+	assertGlobalInt(t, interp, "matched", 1)
+	assertGlobalInt(t, interp, "unconsumed", 0)
+}
+
+func TestLLMReplayFixtureReplayReportsMismatchAndExhaustion(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+record, record_err := llm.replay_record({
+    record_id: "rec-direct"
+    replay_key: "turn:direct"
+    request: {
+        model: "mock"
+        messages: {llm.user("direct replay")}
+    }
+    response: {status: "final_answer" text: "direct fixture" calls: {} usage: {}}
+})
+fixture, fixture_err := llm.replay_fixture({record}, {
+    fixture_id: "fixture:direct"
+})
+bad_replay, bad_err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("wrong replay")}
+}, "turn:direct")
+ok_replay, ok_err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("direct replay")}
+}, "turn:direct")
+exhausted_replay, exhausted_err := fixture.replay({
+    model: "mock"
+    messages: {llm.user("direct replay")}
+}, "turn:direct")
+summary := fixture.summary()
+
+bad_replay_nil := bad_replay == nil
+bad_kind := bad_err.kind
+bad_status := bad_err.status
+bad_finding := bad_err.finding_kind
+ok_err_nil := ok_err == nil
+exhausted_replay_nil := exhausted_replay == nil
+exhausted_status := exhausted_err.status
+exhausted_finding := exhausted_err.finding_kind
+matched := summary.matched
+mismatches := summary.mismatches
+exhausted := summary.exhausted
+`, nil)
+
+	if got := interp.GetGlobal("bad_replay_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("bad_replay_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "bad_kind", "validation")
+	assertGlobalString(t, interp, "bad_status", "mismatch")
+	assertGlobalString(t, interp, "bad_finding", "generic.ai.replay.mismatch")
+	if got := interp.GetGlobal("ok_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("ok_err_nil = %v, want true", got)
+	}
+	if got := interp.GetGlobal("exhausted_replay_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("exhausted_replay_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "exhausted_status", "exhausted")
+	assertGlobalString(t, interp, "exhausted_finding", "generic.ai.replay.exhausted")
+	assertGlobalInt(t, interp, "matched", 1)
+	assertGlobalInt(t, interp, "mismatches", 1)
+	assertGlobalInt(t, interp, "exhausted", 1)
+}
+
 func assertGlobalInt(t *testing.T, interp interface{ GetGlobal(string) Value }, name string, want int64) {
 	t.Helper()
 	got := interp.GetGlobal(name)
