@@ -517,6 +517,19 @@ trace event shape; `llm.memory_outcome_trace_event` and
 ref-only by default and must not copy raw memory text, snippets, prompt text,
 provider completions, or hidden store state into trace payloads.
 
+`llm.evidence_outcome(evidence_or_refs, opts)` and its alias
+`llm.citation_outcome(...)` project evidence refs into ordinary tables with
+`kind: "evidence_outcome"`, `schema_version: 1`, `version:
+"evidence_outcome.v1"`, `source_kind`, `status`, `result_status`,
+`evidence_count`, `citation_count`, `source_count`, `artifact_count`, top
+evidence identity fields, ordered `evidence_refs`, redaction metadata, and
+correlation fields. `llm.evidence_outcome_event(outcome, opts)` projects the
+outcome into the generic trace event shape; `llm.evidence_outcome_trace_event`
+and `llm.citation_outcome_event` are equivalent aliases. The helper is
+observational only: it does not verify citations, persist documents, authorize
+source access, call providers, or copy raw evidence text, snippets, prompts,
+completions, or credential-bearing metadata into trace payloads.
+
 ## Section Generation
 
 `llm.sections(config)` and `llm.generate_sections(config)` run a shared request

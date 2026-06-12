@@ -522,6 +522,24 @@ event := llm.memory_outcome_event(outcome, {trace_id: "memory-review"})
 The outcome carries match refs, citations, rank, score, and correlation fields.
 It is not a durable memory store, vector index, or permission boundary.
 
+Evidence refs for report sections can use the same pattern:
+
+```leia
+evidence_outcome := llm.evidence_outcome(llm.evidence(ctx.matches), {
+    workflow_run_id: "run-42"
+    report_id: "report-42"
+    section: "risk"
+})
+evidence_event := llm.evidence_outcome_event(evidence_outcome, {
+    trace_id: "evidence-review"
+})
+```
+
+The outcome records evidence refs, citation/source/artifact counts, top
+evidence identity, redaction flags, and correlation fields without copying raw
+evidence text or snippets. It is not a citation verifier or source permission
+boundary.
+
 Tool dispatch can use the same trace-safe pattern:
 
 ```leia
