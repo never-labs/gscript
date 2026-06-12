@@ -71,6 +71,22 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	}
 	b.set("replay_trace_event", replayTraceEvent)
 	b.set("replayTraceEvent", replayTraceEvent)
+
+	approvalTraceEvent := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.approval_trace_event' (approval trace table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.approval_trace_event' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmApprovalTraceEventValue(args[0].Table(), opts))}, nil
+	}
+	b.set("approval_trace_event", approvalTraceEvent)
+	b.set("approvalTraceEvent", approvalTraceEvent)
 }
 
 func llmTraceEventValue(src *Table) *Table {
@@ -254,6 +270,179 @@ func llmReplayTraceCopyField(src, dst *Table, field string) {
 	if value := src.RawGetString(field); !value.IsNil() {
 		dst.RawSetString(field, llmCloneValue(value))
 	}
+}
+
+func llmApprovalTraceEventValue(trace, opts *Table) *Table {
+	src := NewTable()
+	for _, key := range opts.PairsKeysSnapshot() {
+		src.RawSet(key, llmCloneValue(opts.RawGet(key)))
+	}
+	decisionStatus := llmApprovalTraceDecisionStatus(trace)
+	src.RawSetString("event_type", StringValue(llmTraceString(opts, "event_type", "approval_replay_trace")))
+	src.RawSetString("status", StringValue(llmTraceString(opts, "status", decisionStatus)))
+	src.RawSetString("provider_free", BoolValue(llmTraceBool(opts, "provider_free", llmTraceBool(trace, "provider_free", true))))
+	src.RawSetString("live_network", BoolValue(llmTraceBool(opts, "live_network", llmTraceBool(trace, "live_network", false))))
+	src.RawSetString("live_model", BoolValue(llmTraceBool(opts, "live_model", llmTraceBool(trace, "live_model", false))))
+	src.RawSetString("credentials_required", BoolValue(llmTraceBool(opts, "credentials_required", llmTraceBool(trace, "credentials_required", false))))
+	src.RawSetString("real_dependency_imports", BoolValue(llmTraceBool(opts, "real_dependency_imports", llmTraceBool(trace, "real_dependency_imports", false))))
+	llmApprovalTraceCopyCorrelation(trace, src)
+
+	replay := NewTable()
+	replay.RawSetString("mode", StringValue(llmTraceString(opts, "replay_mode", llmReplayModeFixture)))
+	replay.RawSetString("provider_free", BoolValue(true))
+	replay.RawSetString("deterministic", BoolValue(true))
+	replay.RawSetString("created_from_provider", BoolValue(false))
+	for _, field := range []string{"fixture_key", "replay_key", "request_hash", "response_hash", "record_id"} {
+		if value := opts.RawGetString(field); !value.IsNil() {
+			replay.RawSetString(field, llmCloneValue(value))
+		} else if value := trace.RawGetString(field); !value.IsNil() {
+			replay.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if replayInfo := trace.RawGetString("replay"); replayInfo.IsTable() {
+		for _, field := range []string{"fixture_key", "replay_key", "request_hash", "response_hash", "record_id", "deterministic"} {
+			if replay.RawGetString(field).IsNil() {
+				llmReplayTraceCopyField(replayInfo.Table(), replay, field)
+			}
+		}
+	}
+
+	payload := NewTable()
+	payload.RawSetString("kind", StringValue(llmTraceString(trace, "kind", "approval_replay_trace")))
+	payload.RawSetString("version", StringValue(llmTraceString(trace, "version", "approval_replay.v1")))
+	payload.RawSetString("decision", StringValue(decisionStatus))
+	payload.RawSetString("decision_status", StringValue(decisionStatus))
+	if resultStatus := llmApprovalTraceResultStatus(trace); resultStatus != "" {
+		payload.RawSetString("result_status", StringValue(resultStatus))
+	}
+	if reason := llmApprovalTraceDecisionReason(trace); reason != "" {
+		payload.RawSetString("reason", StringValue(reason))
+	}
+	llmApprovalTraceCopyRequestSummary(trace, payload)
+	llmApprovalTraceCopyPolicySummary(trace, payload)
+	if value := replay.RawGetString("fixture_key"); !value.IsNil() {
+		payload.RawSetString("source_fixture_key", llmCloneValue(value))
+	}
+	src.RawSetString("replay", TableValue(replay))
+	src.RawSetString("payload", TableValue(payload))
+	return llmTraceEventValue(src)
+}
+
+func llmApprovalTraceDecisionStatus(trace *Table) string {
+	if decision := trace.RawGetString("decision"); decision.IsTable() {
+		return llmTraceString(decision.Table(), "status", "denied")
+	}
+	if approval := trace.RawGetString("approval"); approval.IsTable() && approval.Table().RawGetString("ok").Truthy() {
+		return "approved"
+	}
+	return "denied"
+}
+
+func llmApprovalTraceDecisionReason(trace *Table) string {
+	if decision := trace.RawGetString("decision"); decision.IsTable() {
+		if reason := llmTraceString(decision.Table(), "reason", ""); reason != "" {
+			return reason
+		}
+	}
+	if approval := trace.RawGetString("approval"); approval.IsTable() {
+		return llmTraceString(approval.Table(), "reason", "")
+	}
+	return ""
+}
+
+func llmApprovalTraceResultStatus(trace *Table) string {
+	if result := trace.RawGetString("result"); result.IsTable() {
+		return llmTraceString(result.Table(), "status", "")
+	}
+	return ""
+}
+
+func llmApprovalTraceCopyCorrelation(trace, src *Table) {
+	request := llmApprovalTraceRequestTable(trace)
+	if request != nil {
+		for _, pair := range []struct {
+			source string
+			target string
+		}{
+			{"request_id", "tool_call_id"},
+			{"id", "tool_call_id"},
+			{"turn_id", "turn_id"},
+			{"workflow_run_id", "workflow_run_id"},
+			{"workflow_step_id", "workflow_step_id"},
+			{"agent_run_id", "agent_run_id"},
+		} {
+			if src.RawGetString(pair.target).IsNil() {
+				if value := request.RawGetString(pair.source); !value.IsNil() {
+					src.RawSetString(pair.target, llmCloneValue(value))
+				}
+			}
+		}
+	}
+	if approval := trace.RawGetString("approval"); approval.IsTable() && src.RawGetString("approval_id").IsNil() {
+		if value := approval.Table().RawGetString("approval_id"); !value.IsNil() {
+			src.RawSetString("approval_id", llmCloneValue(value))
+		}
+	}
+	if decision := trace.RawGetString("decision"); decision.IsTable() && src.RawGetString("approval_id").IsNil() {
+		if value := decision.Table().RawGetString("approval_id"); !value.IsNil() {
+			src.RawSetString("approval_id", llmCloneValue(value))
+		}
+	}
+	if fixture := trace.RawGetString("fixture_key"); !fixture.IsNil() && src.RawGetString("replay_session_id").IsNil() {
+		src.RawSetString("replay_session_id", llmCloneValue(fixture))
+	}
+	if src.RawGetString("correlation_id").IsNil() {
+		if value := src.RawGetString("tool_call_id"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		} else if value := src.RawGetString("approval_id"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		}
+	}
+}
+
+func llmApprovalTraceCopyRequestSummary(trace, payload *Table) {
+	request := llmApprovalTraceRequestTable(trace)
+	if request == nil {
+		return
+	}
+	for _, field := range []string{"id", "request_id", "tool", "operation", "capability", "risk_level", "approval_required"} {
+		if value := request.RawGetString(field); !value.IsNil() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if payload.RawGetString("operation").IsNil() {
+		if tool := payload.RawGetString("tool"); !tool.IsNil() {
+			payload.RawSetString("operation", llmCloneValue(tool))
+		}
+	}
+}
+
+func llmApprovalTraceCopyPolicySummary(trace, payload *Table) {
+	if policy := trace.RawGetString("policy"); policy.IsTable() {
+		for _, pair := range []struct {
+			source string
+			target string
+		}{
+			{"kind", "policy_kind"},
+			{"version", "policy_version"},
+			{"default", "policy_default"},
+			{"package", "policy_id"},
+		} {
+			if value := policy.Table().RawGetString(pair.source); !value.IsNil() {
+				payload.RawSetString(pair.target, llmCloneValue(value))
+			}
+		}
+	}
+}
+
+func llmApprovalTraceRequestTable(trace *Table) *Table {
+	if pending := trace.RawGetString("pending"); pending.IsTable() {
+		return pending.Table()
+	}
+	if request := trace.RawGetString("request"); request.IsTable() {
+		return request.Table()
+	}
+	return nil
 }
 
 func llmTraceSummaryValue(input *Table) *Table {

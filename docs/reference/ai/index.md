@@ -577,6 +577,12 @@ table such as `{ok: true}` or `{ok: false, reason: "..."}`. Use
 portable approval replay trace with `kind: "approval_replay_trace"` and
 `version: "approval_replay.v1"`.
 
+Use `llm.approval_trace_event(trace, opts)` when the approval decision should
+join a generic trace envelope. It returns a redacted `llm.trace_event`-compatible
+event with the default `event_type: "approval_replay_trace"`, correlation IDs,
+decision/result status, and policy summary fields. It does not copy approval
+tokens, raw tool arguments, or raw result values into the event payload.
+
 Use host-side record/replay for deterministic tests:
 
 ```go
