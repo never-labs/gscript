@@ -501,7 +501,7 @@ func compileQEvalExpr(src string, depth int) Expr {
 	if dollar := findTopLevel(src, "$"); dollar >= 0 {
 		return compileQCast(strings.TrimSpace(src[:dollar]), src[dollar+1:], depth)
 	}
-	if bang := findTopLevel(src, "!"); bang >= 0 {
+	if bang := findTopLevel(src, "!"); bang >= 0 && !qBangYieldsToLeftmostDyadic(src, bang) {
 		keys := compileQEvalExpr(src[:bang], depth+1)
 		if keys == nil {
 			return nil
@@ -686,6 +686,10 @@ func (s *EvalState) EvalScriptCompiledDifferential(src string) ([]EvalCompiledDi
 		if name, op, rhs, ok := splitTopLevelAugmentedAssignment(part); ok {
 			target = name + op + rhs
 		} else if _, rhs, ok := splitTopLevelAssignment(part); ok {
+			target = rhs
+		} else if _, _, rhs, ok := splitTopLevelIndexedAssignment(part); ok {
+			// Indexed assignment: only the rhs is an ordinary expression;
+			// the amend itself runs through s.evalScript below.
 			target = rhs
 		}
 		record := EvalCompiledDifferentialRecord{Statement: target, Match: true}

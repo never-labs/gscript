@@ -93,6 +93,19 @@ func xlogValue(left, right any) (any, error) {
 }
 
 func qDataNumericUnary(name string, value any) (any, error) {
+	// Unary numerics map over dictionary values, keeping the keys
+	// (canonical q: neg `a`b!1 2 -> `a`b!-1 -2).
+	if d, ok := value.(EvalDict); ok {
+		out, err := qDataNumericUnary(name, dictValuesArray(d))
+		if err != nil {
+			return nil, err
+		}
+		array, ok := out.(data.Array)
+		if !ok || array.Len() != len(d.Keys) {
+			return nil, fmt.Errorf("%s over dictionary values produced %T", name, out)
+		}
+		return EvalDict{Keys: append([]any(nil), d.Keys...), Values: array.Values()}, nil
+	}
 	if array, ok := value.(data.Array); ok {
 		shape := qRuntimeUnaryPrimitiveShape(name)
 		typed, handled, err := data.TryTypedQNumericUnary(name, array)

@@ -933,9 +933,16 @@ type qScriptPlan struct {
 }
 
 type qScriptStatement struct {
-	src         string
-	assign      string
-	rhs         string
+	src    string
+	assign string
+	rhs    string
+	// idxAssignName/idxAssignIndex carry indexed-assignment statements
+	// (`name[i;j;...]: rhs`, the statement form of @/. amend). assign stays
+	// empty for them so plain-binding probes (assign pool, deferred scans,
+	// reduction bundles, pipeline descriptors) skip these statements; rhs
+	// and the rhs plans below are still populated.
+	idxAssignName  string
+	idxAssignIndex string
 	valueExpr   Expr
 	bindingPlan qScriptBindingPlan
 	fastPlan    qEvalFastPlan
@@ -1134,6 +1141,7 @@ func buildQScriptPlan(src string) qScriptPlan {
 	parts := splitQScriptStatements(src)
 	statements := make([]qScriptStatement, 0, len(parts))
 	deferScanCandidates := false
+	indexedAssign := false
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		stmt := qScriptStatement{src: part}
@@ -1155,6 +1163,14 @@ func buildQScriptPlan(src string) qScriptPlan {
 			if _, _, ok := parseDeferredScan(rhs); ok {
 				deferScanCandidates = true
 			}
+		} else if name, indexSrc, rhs, ok := splitTopLevelIndexedAssignment(part); ok {
+			stmt.idxAssignName = name
+			stmt.idxAssignIndex = indexSrc
+			stmt.rhs = rhs
+			stmt.valueExpr = parseCachedValueExpr(rhs)
+			stmt.bindingPlan = buildQScriptWarmBindingPlan(rhs, stmt.valueExpr)
+			stmt.fastPlan = buildQEvalFastPlan(rhs)
+			indexedAssign = true
 		} else {
 			stmt.valueExpr = parseCachedValueExpr(part)
 			stmt.fastPlan = buildQEvalFastPlan(part)
@@ -1162,7 +1178,13 @@ func buildQScriptPlan(src string) qScriptPlan {
 		stmt.reduction, stmt.reductionOK = parseNumericReductionBinding(stmt)
 		statements = append(statements, stmt)
 	}
-	pipeline, _ := buildQScriptPipelineDescriptor(statements)
+	// Indexed-assignment statements rebind names through the amend
+	// machinery; the pipeline descriptor only models plain `name: rhs`
+	// bindings, so scripts containing them stay on the statement walker.
+	var pipeline *qScriptPipelineDescriptor
+	if !indexedAssign {
+		pipeline, _ = buildQScriptPipelineDescriptor(statements)
+	}
 	plan := qScriptPlan{statements: statements, deferScanCandidates: deferScanCandidates, scriptPipeline: pipeline}
 	plan.executable = buildQScriptExecutablePlan(plan)
 	return plan
@@ -1179,7 +1201,7 @@ func buildQScriptExecutablePlan(plan qScriptPlan) *qScriptExecutablePlan {
 		return nil
 	}
 	stmt := plan.statements[0]
-	if stmt.assign != "" || stmt.src == "" {
+	if stmt.assign != "" || stmt.idxAssignName != "" || stmt.src == "" {
 		return nil
 	}
 	if stmt.bindingPlan.kind == qScriptBindingInvalid && stmt.fastPlan.kind == qEvalFastInvalid && stmt.valueExpr == nil {
@@ -1515,6 +1537,13 @@ func cachedValueExprEligible(expr Expr) bool {
 		}
 		return true
 	case DictExpr:
+		// The Pratt tree gives `!` the loosest binding, so `1+2!3` parses
+		// as (1+2)!3 here, while the string cascade follows q's leftmost-
+		// verb-outermost rule (1+(2!3)). Dict keys carrying a dyadic verb
+		// stay on the string cascade so the routes agree.
+		if cachedValueExprContainsBinary(x.Keys) {
+			return false
+		}
 		return cachedValueExprEligible(x.Keys) && cachedValueExprEligible(x.Values)
 	case IndexExpr:
 		return cachedValueExprEligible(x.Expr) && cachedValueExprEligible(x.Index)
@@ -1533,6 +1562,28 @@ func cachedValueExprEligible(expr Expr) bool {
 	default:
 		return true
 	}
+}
+
+// cachedValueExprContainsBinary reports whether the subtree carries any
+// dyadic application (see the DictExpr eligibility comment).
+func cachedValueExprContainsBinary(expr Expr) bool {
+	switch x := expr.(type) {
+	case Binary:
+		return true
+	case Call:
+		return cachedValueExprContainsBinary(x.Arg)
+	case Vector:
+		for _, item := range x.Items {
+			if cachedValueExprContainsBinary(item) {
+				return true
+			}
+		}
+	case DictExpr:
+		return cachedValueExprContainsBinary(x.Keys) || cachedValueExprContainsBinary(x.Values)
+	case IndexExpr:
+		return cachedValueExprContainsBinary(x.Expr) || cachedValueExprContainsBinary(x.Index)
+	}
+	return false
 }
 
 func cachedValueExprContainsTemporal(expr Expr) bool {
@@ -1569,6 +1620,9 @@ func cachedValueExprContainsTemporal(expr Expr) bool {
 }
 
 func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
+	if stmt.idxAssignName != "" {
+		return s.evalIndexedAssignStatement(stmt)
+	}
 	target := stmt.src
 	if stmt.assign != "" {
 		target = stmt.rhs
@@ -1620,6 +1674,50 @@ func (s *EvalState) evalScriptStatement(stmt *qScriptStatement) (any, error) {
 		s.env[name] = v
 	}
 	return v, nil
+}
+
+// evalIndexedAssignStatement executes `name[i;j;...]: rhs`: the rhs and the
+// index expressions evaluate first, the existing amend machinery produces an
+// amended copy (the same kernels @[v;i;:;y] and .[m;path;:;y] use), and the
+// name re-binds to that copy (assign-pool COW contract). The statement value
+// is the assigned rhs, mirroring plain assignment.
+func (s *EvalState) evalIndexedAssignStatement(stmt *qScriptStatement) (any, error) {
+	value, err := s.evalCachedOrString(stmt.rhs, stmt.valueExpr, &stmt.bindingPlan, &stmt.fastPlan)
+	if err != nil {
+		return nil, err
+	}
+	target, ok := s.lookupName(stmt.idxAssignName)
+	if !ok {
+		return nil, fmt.Errorf("name %q is not defined", stmt.idxAssignName)
+	}
+	parts := splitQBracketFormArgs(stmt.idxAssignIndex)
+	path := make([]any, len(parts))
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, fmt.Errorf("indexed assignment %q has an empty index", stmt.src)
+		}
+		axis, err := s.eval(part)
+		if err != nil {
+			return nil, err
+		}
+		path[i] = axis
+	}
+	var amended any
+	if len(path) == 1 {
+		amended, err = amendValue(target, path[0], value)
+	} else {
+		amended, err = s.amendPath(target, path, nil, value)
+	}
+	if err != nil {
+		return nil, err
+	}
+	name := s.resolveAssignmentName(stmt.idxAssignName)
+	if s.assignPool.active {
+		amended = s.assignPoolMaterialize(name, amended)
+	}
+	s.env[name] = amended
+	return value, nil
 }
 
 func (s *EvalState) tryEvalCompareIndexStatsAssignment(src string) (any, bool, error) {
@@ -2773,6 +2871,24 @@ func (s *EvalState) eval(src string) (any, error) {
 		if isCallable(collection) {
 			return s.applyCallableIndex(collection, indexExpr)
 		}
+		// Multi-axis data indexing m[i;j;...] walks one axis at a time,
+		// matching `.` dot-apply path semantics (t[0;`a] is the cell,
+		// m[1;0] the matrix element). Elided axes keep the prior cascade.
+		if parts := splitTopLevelDelim(indexExpr, ';'); len(parts) > 1 && !qHasEmptyPart(parts) {
+			current := collection
+			for _, part := range parts {
+				axis, err := s.eval(part)
+				if err != nil {
+					return nil, err
+				}
+				next, err := indexValue(current, axis)
+				if err != nil {
+					return nil, err
+				}
+				current = next
+			}
+			return current, nil
+		}
 		index, err := s.eval(indexExpr)
 		if err != nil {
 			return nil, err
@@ -3220,14 +3336,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := leftValue.(data.Array); ok {
-			return reshapeValue(leftValue, v)
-		}
-		n, ok := integerValue(leftValue)
-		if !ok || int64(int(n)) != n {
-			return nil, fmt.Errorf("# left operand must be an integer count")
-		}
-		return take(int(n), v)
+		return takeOrReshapeValue(leftValue, v)
 	}
 	if underscore := findTopLevel(src, "_"); underscore >= 0 {
 		left, err := s.eval(strings.TrimSpace(src[:underscore]))
@@ -3251,7 +3360,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		}
 		return castOrEnum(domain, values)
 	}
-	if bang := findTopLevel(src, "!"); bang >= 0 {
+	if bang := findTopLevel(src, "!"); bang >= 0 && !qBangYieldsToLeftmostDyadic(src, bang) {
 		keys, err := s.eval(strings.TrimSpace(src[:bang]))
 		if err != nil {
 			return nil, err
@@ -3645,14 +3754,7 @@ func evalValueBinary(op string, left, right any) (any, error) {
 		}
 		return findValue(left, right)
 	case "#":
-		if _, ok := left.(data.Array); ok {
-			return reshapeValue(left, right)
-		}
-		n, ok := integerValue(left)
-		if !ok || int64(int(n)) != n {
-			return nil, fmt.Errorf("# left operand must be an integer count")
-		}
-		return take(int(n), right)
+		return takeOrReshapeValue(left, right)
 	}
 	if op == "-" && isNumericZero(left) {
 		if value, ok := negateTypedNumeric(right); ok {
@@ -4317,6 +4419,15 @@ func splitTopLevel(src string, sep byte) []string {
 	return parts
 }
 
+func qHasEmptyPart(parts []string) bool {
+	for _, part := range parts {
+		if strings.TrimSpace(part) == "" {
+			return true
+		}
+	}
+	return false
+}
+
 func splitTopLevelAssignment(src string) (string, string, bool) {
 	colon := findTopLevel(src, ":")
 	if colon < 0 {
@@ -4328,6 +4439,38 @@ func splitTopLevelAssignment(src string) (string, string, bool) {
 	}
 	rhs := strings.TrimSpace(src[colon+1:])
 	return name, rhs, rhs != ""
+}
+
+// splitTopLevelIndexedAssignment recognizes `name[i;j;...]: rhs` statements:
+// a bound name followed by exactly one bracket group spanning the rest of
+// the assignment target. Returns the name, the bracket interior (index
+// expressions separated by `;`), and the rhs source.
+func splitTopLevelIndexedAssignment(src string) (string, string, string, bool) {
+	colon := findTopLevel(src, ":")
+	if colon <= 0 {
+		return "", "", "", false
+	}
+	left := strings.TrimSpace(src[:colon])
+	if !strings.HasSuffix(left, "]") {
+		return "", "", "", false
+	}
+	open := strings.IndexByte(left, '[')
+	if open <= 0 {
+		return "", "", "", false
+	}
+	name := strings.TrimSpace(left[:open])
+	if !isQAssignmentName(name) {
+		return "", "", "", false
+	}
+	if findMatchingDelimiter(left, open, '[', ']') != len(left)-1 {
+		return "", "", "", false
+	}
+	indexSrc := strings.TrimSpace(left[open+1 : len(left)-1])
+	if indexSrc == "" {
+		return "", "", "", false
+	}
+	rhs := strings.TrimSpace(src[colon+1:])
+	return name, indexSrc, rhs, rhs != ""
 }
 
 func splitTopLevelAugmentedAssignment(src string) (string, string, string, bool) {
@@ -5279,6 +5422,17 @@ func isSign(src string, i int) bool {
 
 func isQNumericSignStart(ch byte) bool {
 	return (ch >= '0' && ch <= '9') || ch == '.'
+}
+
+// qBangYieldsToLeftmostDyadic reports whether the `!` claim must yield to a
+// top-level symbol dyadic verb LEFT of the first top-level bang: under q's
+// right-to-left grouping the leftmost verb is the outermost operation, so
+// `d1+`b`c!10 20` is d1+(`b`c!10 20), not (d1+`b`c)!10 20. The `,` join keeps
+// its own leftmost claim (qTopLevelJoinSplit) and yields to a bang left of
+// the comma, matching the established cascade order.
+func qBangYieldsToLeftmostDyadic(src string, bang int) bool {
+	idx, _, ok := findDyadic(src)
+	return ok && idx < bang
 }
 
 func findDyadic(src string) (int, byte, bool) {
@@ -11087,6 +11241,9 @@ func indexValue(v any, index any) (any, error) {
 		return dictLookup(v, index)
 	}
 	if frame, ok := v.(data.Frame); ok {
+		if out, handled, err := frameRowIndexValue(frame, index); handled || err != nil {
+			return out, err
+		}
 		return frameColumnLookup(frame, index)
 	}
 	if keyed, ok := v.(data.KeyedFrame); ok {
@@ -11287,6 +11444,9 @@ func amendValue(v any, key any, value any) (any, error) {
 		return vectorAmend(array, key, value)
 	}
 	if frame, ok := v.(data.Frame); ok {
+		if out, handled, err := frameColumnAssignValue(frame, key, value); handled || err != nil {
+			return out, err
+		}
 		return frameAmend(frame, key, value)
 	}
 	if keyed, ok := v.(data.KeyedFrame); ok {
@@ -12215,6 +12375,9 @@ func applyDyadic(op byte, left, right any) (any, error) {
 		if out, handled, err := equalsDictOrCallable(left, right); handled || err != nil {
 			return out, err
 		}
+	}
+	if out, handled, err := applyDictDyadic(op, left, right); handled || err != nil {
+		return out, err
 	}
 	la, lok := left.(data.Array)
 	ra, rok := right.(data.Array)
@@ -13645,6 +13808,7 @@ func mapStringValue(name string, v any, fn func(string) string) (any, error) {
 }
 
 func sum(v any) (any, error) {
+	v = dictAggregateArgument(v)
 	if _, ok := numeric(v); ok {
 		return v, nil
 	}
@@ -13698,6 +13862,7 @@ func sum(v any) (any, error) {
 }
 
 func avg(v any) (any, error) {
+	v = dictAggregateArgument(v)
 	if n, ok := numeric(v); ok {
 		return n, nil
 	}
@@ -13771,6 +13936,7 @@ func devFromVariance(variance any) (any, error) {
 }
 
 func medValue(v any) (any, error) {
+	v = dictAggregateArgument(v)
 	if n, ok := numeric(v); ok {
 		return n, nil
 	}
@@ -14000,6 +14166,7 @@ func wavg(weights, values any) (any, error) {
 }
 
 func prd(v any) (any, error) {
+	v = dictAggregateArgument(v)
 	if _, ok := numeric(v); ok {
 		return v, nil
 	}
@@ -14415,6 +14582,7 @@ func anyValue(v any) (any, error) {
 }
 
 func boolAggregate(name string, v any, initial bool, fn func(bool, bool) bool) (any, error) {
+	v = dictAggregateArgument(v)
 	array, ok := v.(data.Array)
 	if !ok {
 		b, err := boolValue(v)
@@ -14985,6 +15153,7 @@ func maxValue(v any) (any, error) {
 }
 
 func extrema(v any, wantMax bool) (any, error) {
+	v = dictAggregateArgument(v)
 	array, ok := v.(data.Array)
 	if !ok {
 		return v, nil
@@ -15039,6 +15208,9 @@ func extrema(v any, wantMax bool) (any, error) {
 const qMaxListLength = math.MaxInt32
 
 func where(v any) (any, error) {
+	if d, ok := v.(EvalDict); ok {
+		return dictWhere(d)
+	}
 	array, ok := v.(data.Array)
 	if !ok {
 		if truth, ok := v.(bool); ok {
@@ -16512,6 +16684,8 @@ func raze(v any) (any, error) {
 
 func take(n int, v any) (any, error) {
 	switch x := v.(type) {
+	case EvalDict:
+		return dictTakeCount(x, n)
 	case data.Array:
 		if x.Len() == 0 && n != 0 {
 			return takeFromEmptyArray(x.Kind(), n)
@@ -17005,6 +17179,8 @@ func takeString(n int, v string) string {
 
 func drop(n int, v any) (any, error) {
 	switch x := v.(type) {
+	case EvalDict:
+		return dictDropCount(x, n), nil
 	case data.Array:
 		return dropArray(x, n)
 	case data.Frame:
@@ -17067,6 +17243,19 @@ func rotateIndexes(length, n int) []int {
 }
 
 func cutOrDrop(left any, right any) (any, error) {
+	// Dict drop: `a _ d (and d _ `a) removes keys; integer-atom left keeps
+	// entry-count drop semantics through drop()'s EvalDict case.
+	if d, ok := right.(EvalDict); ok {
+		if keys, ok := qDictDropKeyOperand(left); ok {
+			return dictDropKeys(d, keys), nil
+		}
+	}
+	if d, ok := left.(EvalDict); ok {
+		if keys, ok := qDictDropKeyOperand(right); ok {
+			return dictDropKeys(d, keys), nil
+		}
+		return nil, fmt.Errorf("_ on a dictionary expects symbol keys or an integer count")
+	}
 	switch x := left.(type) {
 	case int64:
 		return drop(int(x), right)
