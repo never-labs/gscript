@@ -114,6 +114,56 @@ func fusedPredicateWhereIndexArray(mask Array) (Array, bool) {
 		c.releaseOwnedBools()
 		return out, true
 	}
+	acc, ok := c.evalDenseBools(root)
+	if !ok {
+		return nil, false
+	}
+	indexes := bulkI64Get(length)
+	count := 0
+	for row, keep := range acc {
+		if keep {
+			indexes[count] = int64(row)
+			count++
+		}
+	}
+	bulkBoolRelease(acc, true)
+	out := make([]int64, count)
+	copy(out, indexes[:count])
+	bulkI64Release(indexes, true)
+	return newI64Trusted(out), true
+}
+
+// fusedPredicateDenseBoolMask lowers a compound mask tree to one pooled dense
+// bool vector through the same compiled predicate tree `where` uses, so
+// streaming reductions over compound masks share its exact row semantics
+// without the per-row carrier walk. The returned buffer is owned by the
+// caller: release it with bulkBoolRelease(mask, true).
+func fusedPredicateDenseBoolMask(mask Array) ([]bool, bool) {
+	switch mask.(type) {
+	case boolLogicalMask, notMask, i64MembershipMask, i64WithinMask:
+	default:
+		return nil, false
+	}
+	length := mask.Len()
+	if length == 0 {
+		return nil, false
+	}
+	c := predCompiler{length: length, nodeBudget: predNodeBudget}
+	root, ok := c.compile(mask, false)
+	if !ok {
+		c.releaseOwnedBools()
+		return nil, false
+	}
+	c.foldSingleUseLeafChains(root)
+	return c.evalDenseBools(root)
+}
+
+// evalDenseBools flattens the compiled tree's leaf sources and evaluates the
+// predicate into one pooled dense bool buffer. All compiler-owned state is
+// released before returning; on ok the caller owns the returned buffer and
+// releases it with bulkBoolRelease(acc, true).
+func (c *predCompiler) evalDenseBools(root *predNode) ([]bool, bool) {
+	length := c.length
 	sources := make([][]int64, len(c.sources))
 	sourcesOwned := make([]bool, len(c.sources))
 	sourcesF64 := make([][]float64, len(c.sourcesF64))
@@ -155,20 +205,8 @@ func fusedPredicateWhereIndexArray(mask Array) (Array, bool) {
 	}
 	acc := bulkBoolGet(length)
 	evalPredInto(root, acc, predCombineSet, sources, sourcesF64)
-	indexes := bulkI64Get(length)
-	count := 0
-	for row, keep := range acc {
-		if keep {
-			indexes[count] = int64(row)
-			count++
-		}
-	}
-	bulkBoolRelease(acc, true)
 	release()
-	out := make([]int64, count)
-	copy(out, indexes[:count])
-	bulkI64Release(indexes, true)
-	return newI64Trusted(out), true
+	return acc, true
 }
 
 // flattenSource materializes leaf source idx, reusing the flattened values of

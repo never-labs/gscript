@@ -211,6 +211,8 @@ func tryBulkI64Values(array Array) (values []int64, owned bool, ok bool) {
 		return out, true, true
 	case i64ScalarDyadicArray:
 		return tryBulkI64ScalarDyadicValues(a)
+	case i64DyadicMinMaxArray:
+		return tryBulkI64DyadicMinMaxValues(a)
 	case i64FillArray:
 		// scalar ^ shifted/plain sources flatten in one pass: in-range rows
 		// take the source value, out-of-range (shift-created null) rows take
@@ -485,6 +487,240 @@ func tryBulkI64ScalarDyadicValues(a i64ScalarDyadicArray) ([]int64, bool, bool) 
 	}
 	bulkI64Release(source, sourceOwned)
 	return out, true, true
+}
+
+// tryBulkI64DyadicMinMaxValues flattens a lazy elementwise min/max node in
+// one fused pass over the bulk-flattened operands: same int64 walks
+// tryBulkI64Values would materialize per side, same comparison the eager
+// tryDyadicMinMaxI64Bulk loop applies, so values are identical without the
+// dense intermediate vector outliving the call.
+func tryBulkI64DyadicMinMaxValues(a i64DyadicMinMaxArray) ([]int64, bool, bool) {
+	lv, lvOwned, ok := tryBulkI64Values(a.left)
+	if !ok || len(lv) < a.len {
+		bulkI64Release(lv, lvOwned)
+		return nil, false, false
+	}
+	rv, rvOwned, ok := tryBulkI64Values(a.right)
+	if !ok || len(rv) < a.len {
+		bulkI64Release(lv, lvOwned)
+		bulkI64Release(rv, rvOwned)
+		return nil, false, false
+	}
+	out := bulkI64Get(a.len)
+	wantMax := a.wantMax
+	for i := range out {
+		v, b := lv[i], rv[i]
+		if wantMax == (b > v) {
+			v = b
+		}
+		out[i] = v
+	}
+	bulkI64Release(lv, lvOwned)
+	bulkI64Release(rv, rvOwned)
+	return out, true, true
+}
+
+// WhereReplicationStatus reports how a streaming where-replication total
+// terminated, so callers keep their exact boxed-route error messages.
+type WhereReplicationStatus uint8
+
+const (
+	WhereReplicationOK WhereReplicationStatus = iota
+	WhereReplicationNegative
+	WhereReplicationLimit
+)
+
+// TryTypedWhereReplicationTotal computes the q `count where v` replication
+// total — the sum of the non-negative integer counts with the boxed loop's
+// incremental list-limit validation — in one streaming pass over the bulk
+// flatteners. Lazy elementwise min/max nodes fuse the combine into the
+// accumulation loop so the dense min/max vector is never written.
+// handled=false defers carriers the bulk flatteners decline (nullable,
+// non-integer). On a non-OK status the second result is the offending count.
+func TryTypedWhereReplicationTotal(array Array, limit int64) (int64, int64, WhereReplicationStatus, bool) {
+	if node, ok := unwrapAttributedArray(array).(i64DyadicMinMaxArray); ok {
+		if total, bad, status, ok := whereReplicationTotalMinMaxStreamed(node, limit); ok {
+			return total, bad, status, true
+		}
+		lv, lvOwned, okLeft := tryBulkI64Values(node.left)
+		if okLeft && len(lv) >= node.len {
+			rv, rvOwned, okRight := tryBulkI64Values(node.right)
+			if okRight && len(rv) >= node.len {
+				var total int64
+				wantMax := node.wantMax
+				status := WhereReplicationOK
+				var bad int64
+				for i := 0; i < node.len; i++ {
+					v, b := lv[i], rv[i]
+					if wantMax == (b > v) {
+						v = b
+					}
+					if v < 0 {
+						status, bad = WhereReplicationNegative, v
+						break
+					}
+					if v > limit-total {
+						status, bad = WhereReplicationLimit, v
+						break
+					}
+					total += v
+				}
+				bulkI64Release(lv, lvOwned)
+				bulkI64Release(rv, rvOwned)
+				if status != WhereReplicationOK {
+					return 0, bad, status, true
+				}
+				return total, 0, WhereReplicationOK, true
+			}
+			bulkI64Release(rv, rvOwned)
+		}
+		bulkI64Release(lv, lvOwned)
+	}
+	values, owned, ok := tryBulkI64Values(array)
+	if !ok {
+		return 0, 0, WhereReplicationOK, false
+	}
+	var total int64
+	for _, n := range values {
+		if n < 0 {
+			bulkI64Release(values, owned)
+			return 0, n, WhereReplicationNegative, true
+		}
+		if n > limit-total {
+			bulkI64Release(values, owned)
+			return 0, n, WhereReplicationLimit, true
+		}
+		total += n
+	}
+	bulkI64Release(values, owned)
+	return total, 0, WhereReplicationOK, true
+}
+
+// i64StepRangeStreamer recomputes windows of a scalar-dyadic chain over an
+// affine range base on demand: the same applyI64ScalarDyadicStepRange /
+// applyI64ScalarDyadicStep loops tryBulkI64ScalarDyadicValues runs over the
+// full vector, restarted at a row offset (the range value at row i is
+// start+stride*i, so any window is itself a range walk). Values are
+// bit-exact with the full flatten; only the buffer locality changes.
+type i64StepRangeStreamer struct {
+	steps     [4]i64ScalarDyadicStep
+	stepCount int
+	start     int64
+	stride    int64
+}
+
+func newI64StepRangeStreamer(array Array) (i64StepRangeStreamer, bool) {
+	var s i64StepRangeStreamer
+	dyadic, ok := unwrapAttributedArray(array).(i64ScalarDyadicArray)
+	if !ok {
+		return s, false
+	}
+	base, stepCount, status := collectI64ScalarDyadicSteps(dyadic, &s.steps)
+	if status != i64DyadicStepsOK || stepCount < 1 {
+		return s, false
+	}
+	r, isRange := unwrapAttributedArray(base).(i64RangeArray)
+	if !isRange || r.len < dyadic.len {
+		return s, false
+	}
+	s.stepCount = stepCount
+	s.start = r.start
+	s.stride = r.step
+	return s, true
+}
+
+// fill computes rows [offset, offset+len(out)) into out.
+func (s *i64StepRangeStreamer) fill(offset int, out []int64) bool {
+	start := s.start + s.stride*int64(offset)
+	if !applyI64ScalarDyadicStepRange(s.steps[s.stepCount-1], start, s.stride, out) {
+		return false
+	}
+	for i := s.stepCount - 2; i >= 0; i-- {
+		if !applyI64ScalarDyadicStep(s.steps[i], out, out) {
+			return false
+		}
+	}
+	return true
+}
+
+// whereReplicationTotalMinMaxStreamed accumulates the replication total of a
+// lazy min/max node whose operands are scalar-dyadic chains over range bases
+// in L1-resident stack chunks, so neither operand vector nor the min/max
+// vector is ever written to a full-length buffer.
+func whereReplicationTotalMinMaxStreamed(node i64DyadicMinMaxArray, limit int64) (int64, int64, WhereReplicationStatus, bool) {
+	leftStream, ok := newI64StepRangeStreamer(node.left)
+	if !ok {
+		return 0, 0, WhereReplicationOK, false
+	}
+	rightStream, ok := newI64StepRangeStreamer(node.right)
+	if !ok {
+		return 0, 0, WhereReplicationOK, false
+	}
+	// When both sides are provably bounded in [0, bound) — outermost mod
+	// step with a positive modulus — and len*(bound-1) cannot exceed the
+	// limit, the per-element validation branches are dead: drop them from
+	// the hot loop. Totals are identical (validation never fires).
+	leftBound, leftBounded := leftStream.nonNegativeBound()
+	rightBound, rightBounded := rightStream.nonNegativeBound()
+	unchecked := false
+	if leftBounded && rightBounded {
+		bound := leftBound
+		if rightBound > bound {
+			bound = rightBound
+		}
+		// bound (not bound-1) absorbs the floored-mod float path's ±1ulp
+		// edge for negative inputs over huge moduli.
+		if bound > 0 && node.len > 0 && bound <= limit/int64(node.len) {
+			unchecked = true
+		}
+	}
+	const chunk = 512
+	var lbuf, rbuf [chunk]int64
+	var total int64
+	wantMax := node.wantMax
+	for offset := 0; offset < node.len; offset += chunk {
+		n := node.len - offset
+		if n > chunk {
+			n = chunk
+		}
+		lv, rv := lbuf[:n], rbuf[:n]
+		if !leftStream.fill(offset, lv) || !rightStream.fill(offset, rv) {
+			return 0, 0, WhereReplicationOK, false
+		}
+		if unchecked {
+			for i, v := range lv {
+				if b := rv[i]; wantMax == (b > v) {
+					v = b
+				}
+				total += v
+			}
+			continue
+		}
+		for i, v := range lv {
+			b := rv[i]
+			if wantMax == (b > v) {
+				v = b
+			}
+			if v < 0 {
+				return 0, v, WhereReplicationNegative, true
+			}
+			if v > limit-total {
+				return 0, v, WhereReplicationLimit, true
+			}
+			total += v
+		}
+	}
+	return total, 0, WhereReplicationOK, true
+}
+
+// nonNegativeBound reports an exclusive upper bound for the streamed values
+// when the outermost step is a positive-modulus mod (values in [0, bound)).
+func (s *i64StepRangeStreamer) nonNegativeBound() (int64, bool) {
+	step := s.steps[0]
+	if step.op == OpMod && !step.scalarLeft && step.scalar > 0 {
+		return step.scalar, true
+	}
+	return 0, false
 }
 
 // qModPow2Mask reports the AND mask for a positive power-of-two modulus.
@@ -2240,6 +2476,127 @@ func TryTypedConcat(left, right Array) (Array, bool) {
 		return nil, false
 	}
 	return concatTypedArrays([]Array{l, r}, l.Len()+r.Len())
+}
+
+// TryTypedJoinAtom returns the q `,` (join) vector,atom append (prepend=false)
+// / atom,vector prepend (prepend=true) as one typed column when the atom
+// carries exactly the array's kind — join never promotes, so any kind
+// mismatch declines to the caller's boxed kind-merge. Integer atoms joined to
+// lazy range/segment carriers extend the lazy segment form without
+// materializing; everything else densifies through the same carriers
+// TryTypedConcat uses. Null atoms and empty arrays decline (empties adopt the
+// atom's kind on the boxed route).
+func TryTypedJoinAtom(array Array, atom any, prepend bool) (Array, bool) {
+	if array == nil || array.Len() == 0 || IsNull(atom) {
+		return nil, false
+	}
+	if v, ok := atom.(int); ok {
+		atom = int64(v)
+	}
+	if v, ok := atom.(int64); ok && array.Kind() == KindI64 {
+		if out, ok := tryJoinAtomI64Lazy(array, v, prepend); ok {
+			return out, true
+		}
+	}
+	a := MaterializeArray(array)
+	if attributed, ok := a.(attributedArray); ok {
+		a = attributed.array
+	}
+	switch ca := a.(type) {
+	case columnArray[bool]:
+		return joinColumnAtom(ca, KindBool, atom, prepend)
+	case columnArray[int8]:
+		return joinColumnAtom(ca, KindI8, atom, prepend)
+	case columnArray[int16]:
+		return joinColumnAtom(ca, KindI16, atom, prepend)
+	case columnArray[int32]:
+		return joinColumnAtom(ca, KindI32, atom, prepend)
+	case columnArray[int64]:
+		return joinColumnAtom(ca, KindI64, atom, prepend)
+	case columnArray[uint8]:
+		return joinColumnAtom(ca, KindU8, atom, prepend)
+	case columnArray[uint16]:
+		return joinColumnAtom(ca, KindU16, atom, prepend)
+	case columnArray[uint32]:
+		return joinColumnAtom(ca, KindU32, atom, prepend)
+	case columnArray[uint64]:
+		return joinColumnAtom(ca, KindU64, atom, prepend)
+	case columnArray[float32]:
+		return joinColumnAtom(ca, KindF32, atom, prepend)
+	case columnArray[float64]:
+		return joinColumnAtom(ca, KindF64, atom, prepend)
+	case columnArray[string]:
+		return joinColumnAtom(ca, KindString, atom, prepend)
+	case columnArray[Symbol]:
+		return joinColumnAtom(ca, KindSymbol, atom, prepend)
+	case columnArray[Month]:
+		return joinColumnAtom(ca, KindMonth, atom, prepend)
+	case columnArray[Date]:
+		return joinColumnAtom(ca, KindDate, atom, prepend)
+	case columnArray[DateTime]:
+		return joinColumnAtom(ca, KindDateTime, atom, prepend)
+	case columnArray[Timespan]:
+		return joinColumnAtom(ca, KindTimespan, atom, prepend)
+	case columnArray[Minute]:
+		return joinColumnAtom(ca, KindMinute, atom, prepend)
+	case columnArray[Second]:
+		return joinColumnAtom(ca, KindSecond, atom, prepend)
+	case columnArray[Time]:
+		return joinColumnAtom(ca, KindTime, atom, prepend)
+	case columnArray[Timestamp]:
+		return joinColumnAtom(ca, KindTimestamp, atom, prepend)
+	}
+	return nil, false
+}
+
+// joinColumnAtom appends/prepends one atom of the column's exact element
+// type. The kind equality check keeps unusual kind taggings on the boxed
+// route, mirroring the joinOperandValues kind-merge.
+func joinColumnAtom[T any](ca columnArray[T], kind Kind, atom any, prepend bool) (Array, bool) {
+	if ca.kind != kind {
+		return nil, false
+	}
+	v, ok := atom.(T)
+	if !ok {
+		return nil, false
+	}
+	out := make([]T, 0, len(ca.data)+1)
+	if prepend {
+		out = append(out, v)
+		out = append(out, ca.data...)
+	} else {
+		out = append(out, ca.data...)
+		out = append(out, v)
+	}
+	return columnArray[T]{kind: ca.kind, data: out}, true
+}
+
+// tryJoinAtomI64Lazy extends lazy int range/segment carriers with a one-row
+// segment instead of densifying, so range,atom join chains (`0,x,100` over
+// `x:til n`) stay lazy for downstream streaming reductions.
+func tryJoinAtomI64Lazy(array Array, v int64, prepend bool) (Array, bool) {
+	if attributed, ok := array.(attributedArray); ok {
+		array = attributed.array
+	}
+	atomSegment := i64RangeArray{start: v, step: 0, len: 1}
+	switch a := array.(type) {
+	case i64RangeArray:
+		if prepend {
+			return newI64SegmentArray(atomSegment, a), true
+		}
+		return newI64SegmentArray(a, atomSegment), true
+	case i64SegmentArray:
+		segments := make([]i64RangeArray, 0, len(a.segments)+1)
+		if prepend {
+			segments = append(segments, atomSegment)
+			segments = append(segments, a.segments...)
+		} else {
+			segments = append(segments, a.segments...)
+			segments = append(segments, atomSegment)
+		}
+		return newI64SegmentArray(segments...), true
+	}
+	return nil, false
 }
 
 // TryTypedUnion returns the q union of two same-kind typed arrays: left

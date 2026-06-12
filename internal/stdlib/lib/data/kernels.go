@@ -1632,6 +1632,15 @@ func TryTypedDyadicMinMax(left, right any, wantMax bool) (Array, bool, error) {
 		return nil, false, nil
 	}
 	if typedIntegerOperand(left) && typedIntegerOperand(right) {
+		// Same-length dense integer vectors stay lazy: streaming consumers
+		// (where-replication counts, sums, bulk flattens) combine the
+		// operands in pooled buffers, and materializing consumers densify
+		// through tryBulkI64Values with the exact eager-loop values.
+		if leftIsArray && rightIsArray && length > 0 &&
+			leftArray.Len() == length && rightArray.Len() == length &&
+			lazyMinMaxI64Carrier(leftArray) && lazyMinMaxI64Carrier(rightArray) {
+			return i64DyadicMinMaxArray{left: leftArray, right: rightArray, wantMax: wantMax, len: length}, true, nil
+		}
 		if out, handled := tryDyadicMinMaxI64Bulk(left, right, length, wantMax); handled {
 			return out, true, nil
 		}
@@ -6189,6 +6198,28 @@ func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
 		if sum, handled, err := typedIntegerSumContiguousRange(array, rows); err != nil || handled {
 			return sum, handled, err
 		}
+	}
+	// Compound mask trees (bool-logical and/or chains, membership, within)
+	// lower to one dense pooled bool pass through the same compiled
+	// predicate `where` uses, instead of a per-row carrier-tree walk.
+	if dense, ok := fusedPredicateDenseBoolMask(mask); ok {
+		if bulk, owned, okValues := tryBulkI64Values(array); okValues && len(bulk) >= len(dense) {
+			var total int64
+			count := 0
+			for row, keep := range dense {
+				if keep {
+					total += bulk[row]
+					count++
+				}
+			}
+			bulkI64Release(bulk, owned)
+			bulkBoolRelease(dense, true)
+			if count == 0 {
+				return NullValue, true, nil
+			}
+			return total, true, nil
+		}
+		bulkBoolRelease(dense, true)
 	}
 	var total int64
 	count := 0
@@ -15666,6 +15697,124 @@ func (a i64ScalarDyadicArray) i64At(row int) (int64, bool, error) {
 		return 0, ok, err
 	}
 	return applyI64ScalarDyadicValue(a.op, value, a.scalar, a.scalarLeft)
+}
+
+// i64DyadicMinMaxArray is the lazy carrier for canonical q `&`/`|` —
+// elementwise integer min/max — over two same-length bulk-flattenable
+// integer vectors. Keeping the node lazy lets streaming consumers (where
+// replication counts, sums, bulk flatten chains) combine the operands in
+// pooled buffers instead of materializing the min/max vector per binding.
+// Row values are bit-exact with the eager tryDyadicMinMaxI64Bulk loop.
+type i64DyadicMinMaxArray struct {
+	left    Array
+	right   Array
+	wantMax bool
+	len     int
+}
+
+func (a i64DyadicMinMaxArray) Kind() Kind { return KindI64 }
+
+func (a i64DyadicMinMaxArray) Len() int { return a.len }
+
+func (a i64DyadicMinMaxArray) At(row int) (any, bool) {
+	value, ok, err := a.i64At(row)
+	if err != nil || !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func (a i64DyadicMinMaxArray) Values() []any {
+	if values, owned, ok := tryBulkI64Values(a); ok && len(values) >= a.len {
+		out := make([]any, a.len)
+		for row := range out {
+			out[row] = values[row]
+		}
+		bulkI64Release(values, owned)
+		return out
+	}
+	out := make([]any, a.len)
+	for row := range out {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data dyadic min/max row %d out of range", row))
+		}
+		out[row] = value
+	}
+	return out
+}
+
+func (a i64DyadicMinMaxArray) Gather(indexes []int) Array {
+	// Dense-ish gathers flatten once through the bulk kernel; sparse gathers
+	// keep the per-row path so they do not pay a full flatten (same policy
+	// as i64ScalarDyadicArray).
+	if len(indexes)*4 >= a.len {
+		if values, owned, ok := tryBulkI64Values(a); ok {
+			if len(indexes) == a.len && isIdentityIndexes(indexes) {
+				if !owned {
+					values = append([]int64(nil), values...)
+				}
+				return newI64Trusted(values)
+			}
+			out := make([]int64, len(indexes))
+			for i, row := range indexes {
+				if row < 0 || row >= len(values) {
+					bulkI64Release(values, owned)
+					panic(fmt.Sprintf("data dyadic min/max gather row %d out of range", row))
+				}
+				out[i] = values[row]
+			}
+			bulkI64Release(values, owned)
+			return newI64Trusted(out)
+		}
+	}
+	out := make([]int64, len(indexes))
+	for i, row := range indexes {
+		value, ok, err := a.i64At(row)
+		if err != nil || !ok {
+			panic(fmt.Sprintf("data dyadic min/max gather row %d out of range", row))
+		}
+		out[i] = value
+	}
+	return newI64Trusted(out)
+}
+
+func (a i64DyadicMinMaxArray) i64At(row int) (int64, bool, error) {
+	if row < 0 || row >= a.len {
+		return 0, false, fmt.Errorf("array row %d out of range", row)
+	}
+	lv, ok, err := integerArrayAt(a.left, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	rv, ok, err := integerArrayAt(a.right, row)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	if a.wantMax == (rv > lv) {
+		lv = rv
+	}
+	return lv, true, nil
+}
+
+// lazyMinMaxI64Carrier gates the lazy min/max node on operand carriers whose
+// bulk flatten (tryBulkI64Values) is known to succeed, so the node never
+// strands a consumer on the per-row walk for the dense shapes the eager
+// kernel handled.
+func lazyMinMaxI64Carrier(array Array) bool {
+	switch a := array.(type) {
+	case attributedArray:
+		return lazyMinMaxI64Carrier(a.array)
+	case columnArray[int64]:
+		return true
+	case i64RangeArray, i64SegmentArray:
+		return true
+	case i64ScalarDyadicArray:
+		return lazyMinMaxI64Carrier(a.source)
+	case i64DyadicMinMaxArray:
+		return lazyMinMaxI64Carrier(a.left) && lazyMinMaxI64Carrier(a.right)
+	}
+	return false
 }
 
 func (a i64ScalarDyadicRunningSumArray) Kind() Kind { return KindI64 }

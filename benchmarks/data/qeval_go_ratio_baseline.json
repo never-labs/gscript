@@ -1951,25 +1951,9 @@
       "reason": "Go baseline straddles the 100ns trust threshold (71-88ns re-measured); ratio flickers on capture variance",
       "ref": "R12 settlement re-verification"
     },
-    "JoinAtomAppendPrependCountSum": {
-      "reason": "new , (join) verb (R12), boxed atom/list paths pending typed kernel pass scheduled R13",
-      "ref": "R12-J"
-    },
-    "JoinRazeOverNestedSum": {
-      "reason": "new , (join) verb (R12), boxed atom/list paths pending typed kernel pass scheduled R13",
-      "ref": "R12-J"
-    },
     "TaskDCastSymbolNumericEnvelope": {
       "reason": "Go baseline straddles the 100ns trust threshold (57-93ns re-measured); ratio flickers in/out of trust on capture variance. Sub-microsecond envelope, not a regression.",
       "ref": "R7 settlement re-verification"
-    },
-    "VerbFormAmpLogicalMaskCount": {
-      "reason": "canonical min/max (R11) semantically replaced the lazy bool mask with numeric min + where-replication; fused numeric-min where kernel is the optimization candidate",
-      "ref": "R11-AMP"
-    },
-    "VerbFormPipeLogicalMaskCount": {
-      "reason": "canonical min/max (R11), same as Amp row",
-      "ref": "R11-AMP"
     }
   },
   "family_targets": {},

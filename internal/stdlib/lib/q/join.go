@@ -170,6 +170,21 @@ func joinSequences(left, right any) (any, error) {
 			return out, nil
 		}
 	}
+	// vector,atom append / atom,vector prepend: exact-kind atoms extend the
+	// typed carrier directly (join never promotes; mismatches fall through
+	// to the boxed kind-merge below).
+	if leftIsArray && !rightIsArray {
+		if out, handled := data.TryTypedJoinAtom(leftArray, right, false); handled {
+			recordRuntimeKernelProbe("ArrayConcat", "join-append/"+string(leftArray.Kind()), handled, nil)
+			return out, nil
+		}
+	}
+	if rightIsArray && !leftIsArray {
+		if out, handled := data.TryTypedJoinAtom(rightArray, left, true); handled {
+			recordRuntimeKernelProbe("ArrayConcat", "join-prepend/"+string(rightArray.Kind()), handled, nil)
+			return out, nil
+		}
+	}
 	leftValues, leftKind := joinOperandValues(left, leftArray, leftIsArray)
 	rightValues, rightKind := joinOperandValues(right, rightArray, rightIsArray)
 	values := make([]any, 0, len(leftValues)+len(rightValues))
