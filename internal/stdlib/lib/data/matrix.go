@@ -53,6 +53,26 @@ func (m transposedMatrixArray) SourceMatrix() Matrix {
 	return m.source
 }
 
+// MatrixCellKind reports the element kind of a 2-D rectangular matrix view's
+// cells without allocating row views or shape copies. ok is false when value
+// is not a recognized rectangular matrix view (callers must then inspect the
+// rows themselves).
+func MatrixCellKind(value any) (kind Kind, ok bool) {
+	switch m := value.(type) {
+	case matrixArray:
+		if len(m.shape) == 2 {
+			return m.data.Kind(), true
+		}
+	case transposedMatrixArray:
+		return MatrixCellKind(m.source)
+	case ndMatrixView:
+		if len(m.shape) == 2 {
+			return m.data.Kind(), true
+		}
+	}
+	return KindAny, false
+}
+
 // ReshapeArray returns a q-style reshape view. Scalar shapes behave like take;
 // two-dimensional shapes are represented as a matrix/list-of-lists value, and
 // higher-dimensional shapes are represented as nested row-major views.
@@ -1211,6 +1231,14 @@ func (m transposedMatrixArray) RowArray(row int) (Array, bool) {
 }
 
 func (r transposedMatrixRowArray) Kind() Kind {
+	// Avoid Shape()/RowArray(0) allocations for the common concrete source:
+	// a transposed row's kind is the source matrix's flat data kind.
+	if source, ok := r.matrix.source.(matrixArray); ok {
+		if len(source.shape) == 2 && source.shape[0] > 0 {
+			return source.data.Kind()
+		}
+		return KindAny
+	}
 	shape := r.matrix.source.Shape()
 	if len(shape) == 2 && shape[0] > 0 {
 		if row, ok := r.matrix.source.RowArray(0); ok {
