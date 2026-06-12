@@ -61,6 +61,7 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		"generic.ai.agent_state.input_ref",
 		"generic.ai.agent_state.output_ref",
 		"generic.ai.agent_state.trace_correlation",
+		"generic.ai.agent_state.trace_replay_projection",
 		"generic.ai.agent_state.cache_key",
 		"generic.ai.agent_state.redaction",
 		"generic.ai.agent_state.clean_skip",
@@ -102,6 +103,15 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 			CleanSkipRequired            bool `json:"clean_skip_required"`
 			ProviderFreeReplayRequired   bool `json:"provider_free_replay_required"`
 		} `json:"adapter_contract"`
+		TraceReplayProjectionContract struct {
+			Source                     string   `json:"source"`
+			TargetEventTypes           []string `json:"target_event_types"`
+			RequiredCorrelationFields  []string `json:"required_correlation_fields"`
+			ReplayMatchFields          []string `json:"replay_match_fields"`
+			RawPayloadsAllowed         bool     `json:"raw_payloads_allowed"`
+			SecretValuesAllowed        bool     `json:"secret_values_allowed"`
+			DeterministicOrderRequired bool     `json:"deterministic_order_required"`
+		} `json:"trace_replay_projection_contract"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Contracts["contract"]), &contract)
 	if contract.SchemaVersion != 1 || contract.PackageBoundaryID != manifest.PackageBoundaryID ||
@@ -132,6 +142,22 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		!contract.AdapterContract.ProviderFreeReplayRequired {
 		t.Fatalf("adapter contract is not provider-free: %#v", contract.AdapterContract)
 	}
+	if contract.TraceReplayProjectionContract.Source != "state_snapshots" ||
+		contract.TraceReplayProjectionContract.RawPayloadsAllowed ||
+		contract.TraceReplayProjectionContract.SecretValuesAllowed ||
+		!contract.TraceReplayProjectionContract.DeterministicOrderRequired {
+		t.Fatalf("trace replay projection contract drifted: %#v", contract.TraceReplayProjectionContract)
+	}
+	for _, want := range []string{"agent_state_checkpoint", "agent_state_resume"} {
+		if !genericLivePackageContains(contract.TraceReplayProjectionContract.TargetEventTypes, want) {
+			t.Fatalf("trace replay target_event_types missing %q: %#v", want, contract.TraceReplayProjectionContract.TargetEventTypes)
+		}
+	}
+	for _, want := range []string{"agent_run_id", "session_id", "state_version", "checkpoint_key", "cache_key"} {
+		if !genericLivePackageContains(contract.TraceReplayProjectionContract.ReplayMatchFields, want) {
+			t.Fatalf("trace replay match fields missing %q: %#v", want, contract.TraceReplayProjectionContract.ReplayMatchFields)
+		}
+	}
 
 	var index struct {
 		ProviderFree          bool `json:"provider_free"`
@@ -146,7 +172,7 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		} `json:"fixtures"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
 		t.Fatalf("fixture index header/count mismatch: %#v", index)
 	}
 	if index.Fixtures[0].FixtureKey != "generic:agent_state_store:offline" ||
@@ -160,6 +186,13 @@ func TestGenericAgentStateStoreLivePackageContractFixtureClosedLoop(t *testing.T
 		index.Fixtures[1].Capability != "generic.ai.agent_state.clean_skip" ||
 		index.Fixtures[1].Path != manifest.Fixtures["checkpoint_clean_skip"] {
 		t.Fatalf("clean-skip fixture index entry mismatch: %#v", index.Fixtures[1])
+	}
+	if index.Fixtures[2].FixtureKey != "generic:agent_state_store:trace_replay_projection" ||
+		index.Fixtures[2].Capability != "generic.ai.agent_state.trace_replay_projection" ||
+		index.Fixtures[2].Path != manifest.Fixtures["trace_replay_projection"] ||
+		index.Fixtures[2].Schema != manifest.Schemas["trace_replay_projection"] ||
+		index.Fixtures[2].Metadata["raw_payloads_allowed"] != false {
+		t.Fatalf("trace replay projection fixture index entry mismatch: %#v", index.Fixtures[2])
 	}
 }
 
@@ -180,6 +213,97 @@ func TestGenericAgentStateStoreLivePackageSchemaRequiredFields(t *testing.T) {
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "checkpoint_v1.schema.json"), []string{"checkpoint_key", "cache_key", "key_algorithm", "key_material_fields", "excluded_fields", "stable_across_replay"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "trace_correlation_v1.schema.json"), []string{"trace_id", "event_id", "parent_event_id", "agent_run_id", "session_id", "turn_id", "checkpoint_key"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "redaction_audit_v1.schema.json"), []string{"enabled", "secret_values_present", "raw_prompt_stored", "raw_completion_stored", "redacted_fields", "placeholder", "credential_refs"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "trace_replay_projection_v1.schema.json"), []string{"schema_version", "id", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model", "credentials_required", "real_dependency_imports", "depends_on_q_runtime", "source_fixture", "projection_kind", "raw_payloads_allowed", "secret_values_allowed", "projected_events", "replay_assertions"})
+}
+
+func TestGenericAgentStateStoreTraceReplayProjection(t *testing.T) {
+	base := genericAgentStateStorePackageDir(t)
+	source := loadGenericAgentStateCheckpointFixtureFromPath(t, filepath.Join(base, "fixtures", "agent_state_snapshot_fixture.json"))
+	var projection struct {
+		SchemaVersion         int    `json:"schema_version"`
+		ID                    string `json:"id"`
+		PackageBoundaryID     string `json:"package_boundary_id"`
+		ProviderFree          bool   `json:"provider_free"`
+		DomainSpecific        bool   `json:"domain_specific"`
+		LiveNetwork           bool   `json:"live_network"`
+		LiveModel             bool   `json:"live_model"`
+		CredentialsRequired   bool   `json:"credentials_required"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		DependsOnQRuntime     bool   `json:"depends_on_q_runtime"`
+		SourceFixture         string `json:"source_fixture"`
+		ProjectionKind        string `json:"projection_kind"`
+		RawPayloadsAllowed    bool   `json:"raw_payloads_allowed"`
+		SecretValuesAllowed   bool   `json:"secret_values_allowed"`
+		ProjectedEvents       []struct {
+			EventType           string   `json:"event_type"`
+			Sequence            int      `json:"sequence"`
+			Status              string   `json:"status"`
+			TraceID             string   `json:"trace_id"`
+			EventID             string   `json:"event_id"`
+			ParentEventID       string   `json:"parent_event_id"`
+			AgentRunID          string   `json:"agent_run_id"`
+			SessionID           string   `json:"session_id"`
+			TurnID              string   `json:"turn_id"`
+			StateVersion        int      `json:"state_version"`
+			CheckpointKey       string   `json:"checkpoint_key"`
+			CacheKey            string   `json:"cache_key"`
+			ResumeToken         string   `json:"resume_token"`
+			InputRefIDs         []string `json:"input_ref_ids"`
+			OutputRefIDs        []string `json:"output_ref_ids"`
+			ReplayMatchKey      string   `json:"replay_match_key"`
+			RawPayloadsAllowed  bool     `json:"raw_payloads_allowed"`
+			SecretValuesPresent bool     `json:"secret_values_present"`
+		} `json:"projected_events"`
+		ReplayAssertions map[string]bool `json:"replay_assertions"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "trace_replay_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.ID != "generic-agent-state-trace-replay-projection-fixture" ||
+		projection.PackageBoundaryID != "generic-ai-agent-state-store" ||
+		projection.SourceFixture != "fixtures/agent_state_snapshot_fixture.json" ||
+		projection.ProjectionKind != "agent_state_checkpoint_trace_replay_projection" {
+		t.Fatalf("unexpected projection header: %#v", projection)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork || projection.LiveModel ||
+		projection.CredentialsRequired || projection.RealDependencyImports || projection.DependsOnQRuntime ||
+		projection.RawPayloadsAllowed || projection.SecretValuesAllowed {
+		t.Fatalf("projection must stay provider-free and no-secret: %#v", projection)
+	}
+	if len(projection.ProjectedEvents) != len(source.StateSnapshots) {
+		t.Fatalf("projected event count = %d, want %d", len(projection.ProjectedEvents), len(source.StateSnapshots))
+	}
+	lastSequence := 0
+	for i, event := range projection.ProjectedEvents {
+		snapshot := source.StateSnapshots[i]
+		if event.Sequence <= lastSequence {
+			t.Fatalf("projection sequence is not increasing: %#v", projection.ProjectedEvents)
+		}
+		lastSequence = event.Sequence
+		if event.AgentRunID != snapshot.AgentRunID ||
+			event.SessionID != snapshot.SessionID ||
+			event.StateVersion != snapshot.StateVersion ||
+			event.Status != snapshot.Status ||
+			event.TraceID != snapshot.TraceCorrelation.TraceID ||
+			event.EventID != snapshot.TraceCorrelation.EventID ||
+			event.ParentEventID != snapshot.TraceCorrelation.ParentEventID ||
+			event.TurnID != snapshot.TraceCorrelation.TurnID ||
+			event.CheckpointKey != snapshot.Checkpoint.CheckpointKey ||
+			event.CacheKey != snapshot.Checkpoint.CacheKey ||
+			event.ResumeToken != snapshot.ResumeToken {
+			t.Fatalf("projection event does not match source snapshot: event=%#v snapshot=%#v", event, snapshot)
+		}
+		if event.RawPayloadsAllowed || event.SecretValuesPresent ||
+			!strings.Contains(event.ReplayMatchKey, event.AgentRunID) ||
+			!strings.Contains(event.ReplayMatchKey, event.SessionID) ||
+			!strings.Contains(event.ReplayMatchKey, event.CheckpointKey) {
+			t.Fatalf("projection replay/no-secret fields are invalid: %#v", event)
+		}
+	}
+	for _, want := range []string{"sequence_strictly_increasing", "checkpoint_keys_match_source_snapshots", "resume_tokens_derive_from_checkpoint_keys", "replay_match_keys_include_state_version", "raw_payloads_absent", "secret_values_absent"} {
+		if !projection.ReplayAssertions[want] {
+			t.Fatalf("projection replay assertion missing %q: %#v", want, projection.ReplayAssertions)
+		}
+	}
 }
 
 func TestGenericAgentStateStoreLivePackageExecutableSkeleton(t *testing.T) {

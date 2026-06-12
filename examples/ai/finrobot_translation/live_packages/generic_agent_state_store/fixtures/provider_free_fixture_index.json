@@ -37,6 +37,24 @@
       "provider_free": true,
       "live_network": false,
       "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "generic:agent_state_store:trace_replay_projection",
+      "capability": "generic.ai.agent_state.trace_replay_projection",
+      "path": "fixtures/trace_replay_projection_fixture.json",
+      "schema": "schemas/trace_replay_projection_v1.schema.json",
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "source_fixture": "fixtures/agent_state_snapshot_fixture.json",
+        "projected_events": 2,
+        "raw_payloads_allowed": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
     }
   ]
 }

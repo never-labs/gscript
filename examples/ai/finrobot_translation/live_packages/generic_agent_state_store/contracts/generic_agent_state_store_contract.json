@@ -17,6 +17,7 @@
     "generic.ai.agent_state.input_ref",
     "generic.ai.agent_state.output_ref",
     "generic.ai.agent_state.trace_correlation",
+    "generic.ai.agent_state.trace_replay_projection",
     "generic.ai.agent_state.cache_key",
     "generic.ai.agent_state.redaction",
     "generic.ai.agent_state.clean_skip"
@@ -73,6 +74,34 @@
     "checkpoint_key_matches_state": true,
     "event_id_unique": true
   },
+  "trace_replay_projection_contract": {
+    "source": "state_snapshots",
+    "target_event_types": [
+      "agent_state_checkpoint",
+      "agent_state_resume"
+    ],
+    "required_correlation_fields": [
+      "trace_id",
+      "event_id",
+      "parent_event_id",
+      "agent_run_id",
+      "session_id",
+      "turn_id",
+      "checkpoint_key",
+      "state_version",
+      "resume_token"
+    ],
+    "replay_match_fields": [
+      "agent_run_id",
+      "session_id",
+      "state_version",
+      "checkpoint_key",
+      "cache_key"
+    ],
+    "raw_payloads_allowed": false,
+    "secret_values_allowed": false,
+    "deterministic_order_required": true
+  },
   "redaction_contract": {
     "enabled": true,
     "secret_values_present": false,
@@ -100,6 +129,7 @@
     "state snapshots are resumable from checkpoint_key and state_version",
     "input_refs and output_refs carry stable ids, digests, media types, and redacted summaries instead of raw payloads",
     "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
+    "state trace replay projection emits deterministic checkpoint/resume events without raw payloads or secrets",
     "cache_key and checkpoint_key are deterministic sha256 values and exclude raw input, raw output, and secret-bearing fields",
     "redaction metadata proves secret_values_present=false and uses placeholders for credential-shaped fields",
     "missing durable state adapters produce clean-skip envelopes instead of importing dependencies"

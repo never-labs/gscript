@@ -39,6 +39,7 @@
         "generic.ai.agent_state.input_ref",
         "generic.ai.agent_state.output_ref",
         "generic.ai.agent_state.trace_correlation",
+        "generic.ai.agent_state.trace_replay_projection",
         "generic.ai.agent_state.cache_key",
         "generic.ai.agent_state.redaction",
         "generic.ai.agent_state.clean_skip"

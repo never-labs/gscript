@@ -17,6 +17,12 @@
       "capability": "generic.ai.agent_state.clean_skip",
       "path": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/checkpoint_clean_skip_fixture.json",
       "schema": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/schemas/checkpoint_v1.schema.json"
+    },
+    {
+      "fixture_key": "generic:agent_state_store:trace_replay_projection",
+      "capability": "generic.ai.agent_state.trace_replay_projection",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/trace_replay_projection_fixture.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/schemas/trace_replay_projection_v1.schema.json"
     }
   ]
 }

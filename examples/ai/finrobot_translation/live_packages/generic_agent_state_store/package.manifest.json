@@ -26,7 +26,8 @@
     "state_ref": "schemas/state_ref_v1.schema.json",
     "checkpoint": "schemas/checkpoint_v1.schema.json",
     "trace_correlation": "schemas/trace_correlation_v1.schema.json",
-    "redaction_audit": "schemas/redaction_audit_v1.schema.json"
+    "redaction_audit": "schemas/redaction_audit_v1.schema.json",
+    "trace_replay_projection": "schemas/trace_replay_projection_v1.schema.json"
   },
   "contracts": {
     "contract": "contracts/generic_agent_state_store_contract.json"
@@ -34,7 +35,8 @@
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "agent_state_snapshot": "fixtures/agent_state_snapshot_fixture.json",
-    "checkpoint_clean_skip": "fixtures/checkpoint_clean_skip_fixture.json"
+    "checkpoint_clean_skip": "fixtures/checkpoint_clean_skip_fixture.json",
+    "trace_replay_projection": "fixtures/trace_replay_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.agent_state.store",
@@ -44,6 +46,7 @@
     "generic.ai.agent_state.input_ref",
     "generic.ai.agent_state.output_ref",
     "generic.ai.agent_state.trace_correlation",
+    "generic.ai.agent_state.trace_replay_projection",
     "generic.ai.agent_state.cache_key",
     "generic.ai.agent_state.redaction",
     "generic.ai.agent_state.clean_skip"
@@ -55,6 +58,7 @@
     "resume_token",
     "state_ref",
     "trace_correlation",
+    "trace_replay_projection",
     "redaction_audit",
     "adapter_boundaries"
   ],
@@ -73,6 +77,7 @@
     "state_version is monotonic and resume_token derives from checkpoint_key",
     "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads",
     "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
+    "trace replay projection maps checkpoint snapshots to deterministic trace and replay correlation events",
     "checkpoint and cache keys are deterministic sha256 values that exclude raw inputs, raw outputs, and secret-shaped fields",
     "adapter boundaries clean-skip when durable state dependencies are absent"
   ],

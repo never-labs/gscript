@@ -850,6 +850,7 @@
         "generic.ai.agent_state.input_ref",
         "generic.ai.agent_state.output_ref",
         "generic.ai.agent_state.trace_correlation",
+        "generic.ai.agent_state.trace_replay_projection",
         "generic.ai.agent_state.cache_key",
         "generic.ai.agent_state.redaction",
         "generic.ai.agent_state.clean_skip"
@@ -859,6 +860,7 @@
         "state_version is monotonic and resume_token derives from checkpoint_key",
         "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads",
         "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
+        "trace replay projection maps checkpoint snapshots to deterministic trace and replay correlation events",
         "checkpoint and cache keys are deterministic sha256 values that exclude raw inputs, raw outputs, and secret-shaped fields",
         "adapter boundaries clean-skip when durable state dependencies are absent"
       ],
