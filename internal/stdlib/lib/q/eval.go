@@ -2198,6 +2198,11 @@ func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
 		return nil, false, nil
 	}
 	args := splitQBracketFormArgs(src[2 : len(src)-1])
+	if src[0] == '?' && len(args) >= 4 {
+		// Functional qSQL select/exec ?[t;c;b;a] (functional_query.go).
+		out, err := s.evalFunctionalQueryForm(args)
+		return out, true, err
+	}
 	if len(args) != 3 {
 		return nil, true, fmt.Errorf("%c[] conditional expects three arguments", src[0])
 	}
@@ -2730,6 +2735,17 @@ func (s *EvalState) eval(src string) (any, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty q expression")
 	}
+	switch src {
+	case "<=", ">=", "<>":
+		// Composite comparison atoms: the infix forms ride
+		// applyCompositeDyadic, and the bare spellings would otherwise be
+		// split as malformed infix expressions. Needed so canonical
+		// functional parse trees like (<=;`a;2) construct naturally.
+		op := src
+		return qDyadicFunction{name: op, fn: func(left, right any) (any, error) {
+			return applyCompositeDyadic(op, left, right)
+		}}, nil
+	}
 	if src[0] == '\'' {
 		// Signal form 'x (trap_signal.go). Unclaimed '-prefixed statements
 		// keep their pre-existing cascade errors.
@@ -2741,6 +2757,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		return out, err
 	}
 	if out, ok, err := s.evalControlSpecialForm(src); ok || err != nil {
+		return out, err
+	}
+	if out, ok, err := s.evalFunctionalAmendForm(src); ok || err != nil {
 		return out, err
 	}
 	if out, handled, err := s.tryEvalSortRankReducerBundle(src); err != nil || handled {
@@ -17516,6 +17535,31 @@ func matchValueBudget(left, right any, budget *int) bool {
 		}
 		return true
 	}
+	leftFrame, leftIsFrame := left.(data.Frame)
+	rightFrame, rightIsFrame := right.(data.Frame)
+	if leftIsFrame || rightIsFrame {
+		if !leftIsFrame || !rightIsFrame {
+			return false
+		}
+		return matchFrameBudget(leftFrame, rightFrame, budget)
+	}
+	leftKeyed, leftIsKeyed := left.(data.KeyedFrame)
+	rightKeyed, rightIsKeyed := right.(data.KeyedFrame)
+	if leftIsKeyed || rightIsKeyed {
+		if !leftIsKeyed || !rightIsKeyed {
+			return false
+		}
+		leftKeys, rightKeys := leftKeyed.Keys(), rightKeyed.Keys()
+		if len(leftKeys) != len(rightKeys) {
+			return false
+		}
+		for i := range leftKeys {
+			if leftKeys[i] != rightKeys[i] {
+				return false
+			}
+		}
+		return matchFrameBudget(leftKeyed.Frame(), rightKeyed.Frame(), budget)
+	}
 	leftDict, leftIsDict := left.(EvalDict)
 	rightDict, rightIsDict := right.(EvalDict)
 	if leftIsDict || rightIsDict {
@@ -17530,6 +17574,30 @@ func matchValueBudget(left, right any, budget *int) bool {
 		return true
 	}
 	return reflect.DeepEqual(left, right)
+}
+
+// matchFrameBudget compares tables structurally: same column names in the
+// same order and element-wise matching columns. Lazy column views (index,
+// fused-kernel, scan views) compare by value, which reflect.DeepEqual cannot.
+func matchFrameBudget(left, right data.Frame, budget *int) bool {
+	leftNames := left.Schema().Names()
+	rightNames := right.Schema().Names()
+	if len(leftNames) != len(rightNames) || left.Len() != right.Len() {
+		return false
+	}
+	for i := range leftNames {
+		if leftNames[i] != rightNames[i] {
+			return false
+		}
+	}
+	for _, name := range leftNames {
+		leftColumn, leftOK := left.Column(name)
+		rightColumn, rightOK := right.Column(name)
+		if !leftOK || !rightOK || !matchValueBudget(leftColumn, rightColumn, budget) {
+			return false
+		}
+	}
+	return true
 }
 
 func likeValue(left, right any) (any, error) {

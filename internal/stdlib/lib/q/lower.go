@@ -876,6 +876,8 @@ func lowerExpr(expr Expr) (data.Expr, error) {
 			return nil, err
 		}
 		return data.Literal{Value: v}, nil
+	case RawLiteral:
+		return data.Literal{Value: x.Value}, nil
 	case Binary:
 		left, err := lowerExpr(x.Left)
 		if err != nil {
@@ -1073,6 +1075,8 @@ func lowerLiteralValue(expr Expr) (any, error) {
 	switch x := expr.(type) {
 	case Number:
 		return lowerNumberLiteral(x.Text)
+	case RawLiteral:
+		return x.Value, nil
 	case Symbol:
 		return data.Symbol(x.Name), nil
 	case String:

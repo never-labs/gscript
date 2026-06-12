@@ -51,6 +51,7 @@ const (
 	qVerbNameSystemCommand = "\\"  // \x system commands
 	qVerbNameFileHandle    = "`:"  // file-handle symbol literals
 	qVerbNameClock         = ".z." // .z namespace reads
+	qVerbNameAmendByName   = "![`" // functional amend ![`t;...] writing back by name
 )
 
 // qVerbMetadataExceptions lists every name that is not a plain deterministic
@@ -70,7 +71,12 @@ var qVerbMetadataExceptions = map[string]qVerbProps{
 	"hsym":                 {Stateful: true, marker: "hsym"},
 	"system":               {Stateful: true, marker: "system "},
 	qVerbNameSystemCommand: {Stateful: true},
-	qVerbNameFileHandle:    {Stateful: true, marker: qVerbNameFileHandle},
+	// Functional amend by table name (![`t;c;b;a]) writes the mutated table
+	// back to the workspace; detected structurally (qScanMentionsAmendByName)
+	// because the marker scan cannot skip whitespace. Value-form functional
+	// queries (?[t;...] and ![t;...] on table values) stay deterministic.
+	qVerbNameAmendByName: {Stateful: true},
+	qVerbNameFileHandle:  {Stateful: true, marker: qVerbNameFileHandle},
 	// Clock: per-call environment reads.
 	qVerbNameClock: {ReadsClock: true, marker: qVerbNameClock},
 }
@@ -194,10 +200,33 @@ func qSourceVerbFlags(src string) qVerbProps {
 			flags = qVerbFlagsUnion(flags, m.props)
 		}
 	}
+	if qScanMentionsAmendByName(scan) {
+		flags = qVerbFlagsUnion(flags, qVerbMetadata(qVerbNameAmendByName))
+	}
 	if qScanMentionsRandomVerb(scan) {
 		flags.Random = true
 	}
 	return flags
+}
+
+// qScanMentionsAmendByName conservatively reports whether the scan text may
+// contain a functional amend targeting a workspace table by symbol name:
+// `![` followed (modulo whitespace) by a symbol literal. Those forms write
+// the mutated table back into the session and must never be memoized.
+func qScanMentionsAmendByName(scan string) bool {
+	for i := 0; i+1 < len(scan); i++ {
+		if scan[i] != '!' || scan[i+1] != '[' {
+			continue
+		}
+		j := i + 2
+		for j < len(scan) && isQWhitespace(scan[j]) {
+			j++
+		}
+		if j < len(scan) && scan[j] == '`' {
+			return true
+		}
+	}
+	return false
 }
 
 func qVerbFlagsUnion(a, b qVerbProps) qVerbProps {
