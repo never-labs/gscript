@@ -308,6 +308,93 @@ quote_kind := raw_quote.kind
 	}
 }
 
+func TestAIDialectDeclarativeAgentAndPromptMessages(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{Status: "final_answer", Text: "turn-ok"},
+				{Status: "final_answer", Text: `{"summary":"agent-ok"}`},
+			}}
+			opts := append([]leia.Option{
+				leia.WithLibs(leia.LibString | leia.LibLLM | leia.LibDialect),
+				leia.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := leia.New(opts...)
+			if err := vm.Exec(`
+model {
+    default: "mock-fast"
+}
+
+lookup := tool {
+    name: "lookup"
+    fn: func(topic) { return "found:" .. topic, nil }
+    params: {"topic"}
+    description: "Lookup evidence."
+}
+
+turn_result, turn_err := turn {
+    model: "mock-fast"
+    messages: {
+        prompt { role: "system", text: "Be concise." },
+        prompt { role: "user", text: "Summarize Leia." },
+    }
+}
+
+writer := agent {
+    name: "writer"
+    model: "mock-fast"
+    instructions: prompt { role: "system", text: "Use evidence and be brief." }
+    tools: {lookup}
+    params: {"question"}
+    output: {summary: "short"}
+    max_steps: 1
+}
+
+agent_result, agent_err := writer("What is Leia?")
+turn_text := turn_result.text
+agent_summary := agent_result.value.summary
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 2 {
+				t.Fatalf("requests = %#v, want two", provider.requests)
+			}
+			turnReq := provider.requests[0]
+			if len(turnReq.Messages) != 2 || turnReq.Messages[0].Role != "system" || turnReq.Messages[0].Text != "Be concise." || turnReq.Messages[1].Role != "user" || turnReq.Messages[1].Text != "Summarize Leia." {
+				t.Fatalf("turn messages = %#v", turnReq.Messages)
+			}
+			agentReq := provider.requests[1]
+			if agentReq.Model != "mock-fast" {
+				t.Fatalf("agent model = %q, want mock-fast", agentReq.Model)
+			}
+			if len(agentReq.Messages) != 2 || agentReq.Messages[0].Role != "system" || agentReq.Messages[0].Text != "Use evidence and be brief." || agentReq.Messages[1].Role != "user" || agentReq.Messages[1].Text != "What is Leia?" {
+				t.Fatalf("agent messages = %#v", agentReq.Messages)
+			}
+			if len(agentReq.Tools) != 1 || agentReq.Tools[0].Name != "lookup" {
+				t.Fatalf("agent tools = %#v", agentReq.Tools)
+			}
+			for name, want := range map[string]any{
+				"turn_text":     "turn-ok",
+				"agent_summary": "agent-ok",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestEvaluateStatementIsNoopOutsideEvaluateCLI(t *testing.T) {
 	source := `
 before := "kept"
@@ -340,20 +427,53 @@ after := before
 	}
 }
 
-func TestAIDialectReplayExampleIsDeterministic(t *testing.T) {
-	records, err := llm.LoadRecords(filepath.Join("..", "..", "examples", "ai", "coding_agent_replay.records.json"))
-	if err != nil {
-		t.Fatalf("LoadRecords: %v", err)
-	}
-	vm := leia.New(
-		leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect),
-		leia.WithLLMReplay(records),
-	)
-	if err := vm.ExecFile(filepath.Join("..", "..", "examples", "ai", "coding_agent_replay.leia")); err != nil {
-		t.Fatalf("ExecFile: %v", err)
-	}
-	text, _ := vm.Get("summary")
-	if text != "Use read_file, search_text, apply_patch, and run_shell." {
-		t.Fatalf("summary = %#v", text)
+func TestAIDialectReplayExamplesAreDeterministic(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		source  string
+		records string
+		want    map[string]any
+	}{
+		{
+			name:    "coding agent tools",
+			source:  "coding_agent_replay.leia",
+			records: "coding_agent_replay.records.json",
+			want: map[string]any{
+				"summary": "Use read_file, search_text, apply_patch, and run_shell.",
+			},
+		},
+		{
+			name:    "general agent workflow",
+			source:  "general_agent_workflow.leia",
+			records: "general_agent_workflow.records.json",
+			want: map[string]any{
+				"plan_summary": "Ship passwordless onboarding in three verified steps.",
+				"plan_owner":   "platform",
+				"review_text":  "Plan is replay-friendly: deterministic inputs, local evidence, and explicit verification.",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			records, err := llm.LoadRecords(filepath.Join("..", "..", "examples", "ai", tc.records))
+			if err != nil {
+				t.Fatalf("LoadRecords: %v", err)
+			}
+			vm := leia.New(
+				leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect),
+				leia.WithLLMReplay(records),
+			)
+			if err := vm.ExecFile(filepath.Join("..", "..", "examples", "ai", tc.source)); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+			for name, want := range tc.want {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
 	}
 }

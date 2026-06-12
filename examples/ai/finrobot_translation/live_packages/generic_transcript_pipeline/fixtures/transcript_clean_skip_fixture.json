@@ -1,0 +1,37 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "fixture_key": "transcript_clean_skip:offline:v1",
+  "skips": [
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "clean_skip:speech_adapter:offline:v1",
+      "skip_code": "speech_adapter_unavailable",
+      "dependency": "speech_to_text",
+      "adapter": "speech_to_text",
+      "reason": "speech processing dependency is unavailable in provider-free fixture mode",
+      "recoverable": true
+    },
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "clean_skip:diarization_adapter:offline:v1",
+      "skip_code": "diarization_adapter_unavailable",
+      "dependency": "speaker_diarization",
+      "adapter": "speaker_diarization",
+      "reason": "speaker diarization dependency is unavailable in provider-free fixture mode",
+      "recoverable": true
+    },
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "clean_skip:source_fetch_adapter:offline:v1",
+      "skip_code": "source_fetch_adapter_unavailable",
+      "dependency": "remote_source_fetch",
+      "adapter": "remote_source_fetch",
+      "reason": "remote source fetch dependency is unavailable in provider-free fixture mode",
+      "recoverable": true
+    }
+  ]
+}

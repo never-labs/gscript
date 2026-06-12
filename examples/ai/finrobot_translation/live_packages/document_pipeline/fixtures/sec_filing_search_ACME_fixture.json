@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "ticker": "ACME",
+  "query": {
+    "form_type": "10-K",
+    "date_from": "2025-01-01",
+    "date_to": "2026-06-11",
+    "user_agent_policy": {
+      "required_for_live": true,
+      "declared_in_fixture": false,
+      "contact": null,
+      "clean_skip_without_user_agent": true
+    },
+    "rate_limit_policy": {
+      "source": "SEC fair access policy",
+      "max_requests_per_second": 10,
+      "burst_allowed": false,
+      "enforced_in_fixture": false,
+      "clean_skip_without_policy": true
+    }
+  },
+  "results": [
+    {
+      "accession_number": "0000000000-26-000001",
+      "cik": "0000000000",
+      "company_name": "ACME Industrial Systems Inc.",
+      "ticker": "ACME",
+      "form_type": "10-K",
+      "filing_date": "2026-02-24",
+      "period_end": "2025-12-31",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+      "document_url": "fixtures/raw/acme-20251231.htm",
+      "redirect_chain": [
+        {
+          "from": "https://www.sec.gov/Archives/edgar/data/0000000000/000000000026000001/acme-20251231.htm",
+          "to": "fixtures/raw/acme-20251231.htm",
+          "status": 200,
+          "fixture_redirect": true
+        }
+      ],
+      "cache": {
+        "key": "sec:ACME:10-K:0000000000-26-000001",
+        "mode": "fixture_replay",
+        "hit": true,
+        "ttl_seconds": 0,
+        "etag": "fixture-etag-acme-10k",
+        "last_modified": "2026-02-24T00:00:00Z"
+      },
+      "provenance": {
+        "provider": "offline_fixture",
+        "fixture_key": "sec:filing_search:ACME:10-K:offline",
+        "captured_at": "2026-06-11T00:00:00Z",
+        "live_network": false
+      }
+    }
+  ]
+}

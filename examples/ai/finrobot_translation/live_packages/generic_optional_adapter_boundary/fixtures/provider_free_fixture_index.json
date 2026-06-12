@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "generic-optional-adapter-boundary-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:optional_adapter_boundary:offline",
+      "capability": "generic.ai.optional_adapter.boundary",
+      "path": "fixtures/optional_adapter_boundary_fixture.json",
+      "schema": "schemas/optional_adapter_result_envelope_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "adapters": 3,
+        "dependency_gates": 3,
+        "result_envelopes": 3,
+        "credential_redactions": 2,
+        "clean_skip": true
+      }
+    }
+  ]
+}

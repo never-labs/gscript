@@ -1,0 +1,53 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_key": "metric_summary:subject_alpha:baseline_rule:offline:v1",
+  "strategy_id": "baseline_rule_strategy",
+  "subject_id": "subject_alpha",
+  "deterministic_seed": "generic-strategy-backtest-contracts-offline-v1",
+  "metric_summary": {
+    "start_resource": 100000.00,
+    "end_state_value": 100017.76,
+    "total_delta": 0.0001776,
+    "normalized_delta": 0.00561,
+    "variability": 0.04137,
+    "stability": 0.1753,
+    "max_regret": 0.006957,
+    "success_rate": 0.667,
+    "execution_count": 3,
+    "activity_rate": 0.66048,
+    "average_allocation": 0.218,
+    "max_allocation": 0.32
+  },
+  "constraint_limits": [
+    {
+      "id": "max_allocation_pct",
+      "metric": "allocation_weight",
+      "limit": 0.35,
+      "observed": 0.32,
+      "status": "pass"
+    },
+    {
+      "id": "max_regret_pct",
+      "metric": "max_regret",
+      "limit": 0.12,
+      "observed": 0.006957,
+      "status": "pass"
+    },
+    {
+      "id": "min_resource_pct",
+      "metric": "resource_weight",
+      "limit": 0.05,
+      "observed": 0.147,
+      "status": "pass"
+    },
+    {
+      "id": "max_execution_value_pct",
+      "metric": "execution_value_weight",
+      "limit": 0.25,
+      "observed": 0.214,
+      "status": "pass"
+    }
+  ]
+}

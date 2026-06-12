@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/generic_ai_approval_policy/capability_vocabulary_v1.schema.json",
+  "title": "Generic AI capability vocabulary",
+  "type": "object",
+  "required": ["id", "capability", "risk_level", "default_decision", "requires_approval", "clean_skip", "provider_binding"],
+  "properties": {
+    "id": {"type": "string"},
+    "capability": {"type": "string", "pattern": "^generic\\.ai\\.capability\\."},
+    "risk_level": {"enum": ["low", "medium", "high", "critical"]},
+    "default_decision": {"enum": ["allow_fixture", "deny"]},
+    "requires_approval": {"type": "boolean"},
+    "clean_skip": {"type": "boolean"},
+    "provider_binding": {"enum": ["none", "external"]}
+  },
+  "additionalProperties": false
+}

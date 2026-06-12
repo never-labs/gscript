@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "id": "generic-tool-registry-provider-free-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "local_execution": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic_tool:registry:descriptor:v1",
+      "capability": "generic.tool.registry.declare",
+      "schema_ref": "schemas/tool_descriptor.schema.json",
+      "path": "fixtures/tool_registry_replay_trace_fixture.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "status": "ok"
+    },
+    {
+      "fixture_key": "generic_tool:invocation:trace:v1",
+      "capability": "generic.tool.invocation.trace",
+      "schema_ref": "schemas/tool_invocation_trace.schema.json",
+      "path": "fixtures/tool_registry_replay_trace_fixture.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "status": "ok"
+    },
+    {
+      "fixture_key": "generic_tool:approval:denied:v1",
+      "capability": "generic.tool.approval.edge",
+      "schema_ref": "schemas/tool_invocation_trace.schema.json",
+      "path": "fixtures/approval_edge_fixture.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "status": "denied"
+    }
+  ]
+}

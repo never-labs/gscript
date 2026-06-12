@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "normalized_sec_filing_v1",
+  "domain": "sec",
+  "description": "Canonical SEC filing metadata and extracted section references.",
+  "required": [
+    "schema",
+    "symbol",
+    "cik",
+    "form",
+    "accession_number",
+    "filed_at",
+    "period_end",
+    "sections",
+    "as_of",
+    "stale_after_days",
+    "stale",
+    "source_id",
+    "record_hash"
+  ],
+  "canonical_fields": [
+    "schema",
+    "symbol",
+    "cik",
+    "form",
+    "accession_number",
+    "filed_at",
+    "period_end",
+    "sections",
+    "as_of",
+    "stale_after_days",
+    "stale",
+    "missing_reason",
+    "source_id",
+    "record_hash"
+  ],
+  "deterministic_order": [
+    "filed_at",
+    "accession_number"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason",
+  "provider_free": true
+}

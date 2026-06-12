@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-io-registry-turn-projection-fixture",
+  "projection_kind": "model_registry_to_model_io_turn_projection",
+  "package_boundary_id": "generic-ai-model-io-envelope",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "credentials_required": false,
+  "real_dependency_imports": false,
+  "source_fixture_refs": {
+    "model_alias_registry": "../generic_model_registry/fixtures/model_alias_registry_fixture.json",
+    "replay_execution_descriptor": "../generic_model_registry/fixtures/replay_execution_descriptor_fixture.json",
+    "redaction_policy": "../generic_model_registry/fixtures/redaction_policy_fixture.json",
+    "model_io_replay": "fixtures/provider_free_replay_fixture.json",
+    "turn_request": "../generic_turn_runner/fixtures/generic_turn_request_fixture.json"
+  },
+  "identity_policy": {
+    "model_aliases_are_resolved_before_projection": true,
+    "model_io_turn_id_and_turn_request_id_are_not_assumed_equal": true,
+    "model_names_are_canonicalized_per_target_envelope": true,
+    "request_hash_source": "generic_turn_runner.replay.request_hash",
+    "normalization_policy": "explicit_model_alias_descriptor_and_turn_request_mapping"
+  },
+  "alias_resolution_mappings": [
+    {
+      "requested_alias": "default",
+      "resolution_path": [
+        "default",
+        "analyst",
+        "fixture_analyst"
+      ],
+      "resolved_descriptor_ref": "model_registry:descriptor:fixture_analyst:v1",
+      "model_io_model": "mock-generic-model",
+      "turn_request_model": "fixture-model"
+    },
+    {
+      "requested_alias": "reviewer",
+      "resolution_path": [
+        "reviewer",
+        "fixture_reviewer"
+      ],
+      "resolved_descriptor_ref": "model_registry:descriptor:fixture_reviewer:v1",
+      "model_io_model": "mock-generic-model",
+      "turn_request_model": "fixture-model"
+    }
+  ],
+  "request_projection": {
+    "requested_alias": "default",
+    "resolved_descriptor_ref": "model_registry:descriptor:fixture_analyst:v1",
+    "descriptor_fixture_key": "model_registry:turn:analyst:ACME:v1",
+    "descriptor_mode": "deterministic_fixture_replay",
+    "model_io_turn_id": "turn-generic-model-io-001",
+    "turn_request_id": "turn-request-acme-summary-001",
+    "turn_correlation_id": "corr-generic-turn-acme-summary-001",
+    "trace_id": "trace-generic-model-io-001",
+    "replay_session_id": "replay-generic-model-io-001",
+    "adapter_identity": "generic-model-io-envelope-adapter",
+    "response_format_projection": {
+      "model_io_type": "text",
+      "turn_runner_type": "json_schema",
+      "schema_projection_required": true
+    },
+    "tool_projection": {
+      "descriptor_tool_calling": true,
+      "model_io_tool_count": 0,
+      "turn_runner_tool_count": 1,
+      "tool_declarations_projected_by_turn_runner": true
+    },
+    "provider_free": true,
+    "live_network": false,
+    "live_model": false
+  },
+  "redaction_projection": {
+    "redaction_policy_ref": "generic-model-registry-redaction-v1",
+    "model_registry_redact_fields": [
+      "api_key",
+      "authorization",
+      "credential",
+      "secret",
+      "token"
+    ],
+    "model_io_redacted_fields": [
+      "api_key",
+      "authorization"
+    ],
+    "turn_runner_secret_env_patterns": [],
+    "replacement": "<redacted>",
+    "secret_values_present": false,
+    "raw_prompt_stored": false,
+    "raw_completion_stored": false
+  },
+  "replay_projection": {
+    "model_registry_replay_safe": true,
+    "model_io_mode": "provider-free",
+    "model_io_strict_ordered_match": true,
+    "turn_runner_match_key": "deterministic_request_hash",
+    "turn_runner_request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+    "request_hash_preserved_to_execute_response": true,
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false
+  },
+  "projection_assertions": {
+    "alias_resolution_is_explicit": true,
+    "descriptor_ref_projects_to_model_io_request": true,
+    "model_io_request_projects_to_turn_request": true,
+    "redaction_policy_is_preserved": true,
+    "request_hash_is_turn_runner_owned": true,
+    "provider_free_chain": true,
+    "live_network_absent": true,
+    "real_dependency_imports_absent": true
+  }
+}

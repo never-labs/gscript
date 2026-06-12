@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-io-envelope",
+  "package_name": "leia-generic-ai-model-io-envelope",
+  "package_boundary_id": "generic-ai-model-io-envelope",
+  "capability_id": "generic.ai.model.io.envelope",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic model IO envelope package for request, stream chunk, response, usage, replay, and redaction contracts.",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "real_dependency_import_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "contract_root": "contracts",
+  "entrypoints": {
+    "main": "main.leia",
+    "contract": "contracts/model_io_envelope_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json",
+    "provider_free_replay": "fixtures/provider_free_replay_fixture.json"
+  },
+  "schemas": {
+    "request_envelope": "schemas/model_request_envelope.schema.json",
+    "stream_chunk": "schemas/model_stream_chunk.schema.json",
+    "response_envelope": "schemas/model_response_envelope.schema.json",
+    "provider_free_replay_fixture": "schemas/provider_free_replay_fixture.schema.json",
+    "registry_turn_projection": "schemas/registry_turn_projection_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "provider_free_replay": "fixtures/provider_free_replay_fixture.json",
+    "registry_turn_projection": "fixtures/registry_turn_projection_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.model.io.envelope",
+    "generic.ai.model.io.request_envelope",
+    "generic.ai.model.io.response_envelope",
+    "generic.ai.model.io.stream_chunks",
+    "generic.ai.model.io.provider_free_replay",
+    "generic.ai.model.io.usage_cost_metadata",
+    "generic.ai.model.io.registry_turn_projection",
+    "generic.ai.model.io.redaction"
+  ],
+  "capability_surfaces": [
+    "model_io",
+    "request_envelope",
+    "stream_chunk",
+    "response_envelope",
+    "usage",
+    "redaction",
+    "registry_turn_projection",
+    "provider_free_replay"
+  ],
+  "default_policy": {
+    "mode": "fixture_replay",
+    "provider_policy": "provider-free",
+    "live_network": false,
+    "live_model_calls": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_descriptor": true,
+    "fixture_hook": "recorded_generic_model_io_envelope_fixture"
+  },
+  "test_gates": [
+    "request, stream chunk, and response envelopes decode without provider SDKs",
+    "provider-free replay records preserve turn and adapter correlation",
+    "model registry aliases and replay descriptors project into provider-free model IO and turn request envelopes",
+    "usage and cost metadata are explicit fixture fields",
+    "redaction metadata proves no raw credential values are stored"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in leia-generic-ai-model-io-envelope handling; this provider-free package boundary owns request, stream, response, usage, and redaction contracts."
+  },
+  "live_network": false,
+  "live_model": false,
+  "credentials_required": false,
+  "real_dependency_imports": false,
+  "contracts": {
+    "model_io_envelope": "contracts/model_io_envelope_contract.json"
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-model-io-envelope; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
+  },
+  "dialect_capability_id": "generic.ai.model.io.envelope",
+  "dialect_backend_shape": "ai.model.io.envelope",
+  "dialect_aliases": [
+    {
+      "id": "ai.model.io.envelope",
+      "target": "generic.ai.model.io.envelope",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.model.io.envelope",
+  "capability_aliases": [
+    {
+      "alias": "ai.model.io.envelope",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.model.io.envelope",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "model",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "model-io",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "model-io",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "generic.ai.model.io.envelope",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
+}

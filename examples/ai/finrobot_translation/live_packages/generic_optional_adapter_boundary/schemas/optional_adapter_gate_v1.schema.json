@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generic optional adapter gate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "dependency_gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "dependency_gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adapter_id",
+          "dependency_imported",
+          "credential_required",
+          "credential_present",
+          "live_network",
+          "status_without_dependency",
+          "clean_skip"
+        ],
+        "properties": {
+          "adapter_id": {
+            "type": "string"
+          },
+          "dependency_imported": {
+            "const": false
+          },
+          "credential_required": {
+            "type": "boolean"
+          },
+          "credential_present": {
+            "const": false
+          },
+          "live_network": {
+            "const": false
+          },
+          "status_without_dependency": {
+            "const": "skipped"
+          },
+          "clean_skip": {
+            "const": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

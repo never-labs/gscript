@@ -1,0 +1,284 @@
+// Provider-free FinRobot coding notebook live package smoke.
+//
+// This executable mirror summarizes the checked-in contracts for coding.py
+// notebook, sandbox command, artifact, image display, and replay boundaries.
+// It does not import notebook kernels, provider SDKs, data runtimes, or
+// command execution hosts.
+
+coding_notebook_live_package := {
+    id: "finrobot-coding-notebook-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    default_policy: {
+        mode: "fixture_replay"
+        sandbox_execution_default: "deny"
+        file_write_default: "deny"
+        image_display_default: "fixture_only"
+        fixture_hook: "recorded_coding_notebook_fixture"
+    }
+    sandbox_approvals: {
+        {
+            id: "deny_live_notebook_kernel"
+            capability: "coding.notebook.command.execute"
+            operation: "execute_command"
+            decision: "deny"
+            stdout_required: true
+            stderr_required: true
+            exit_code_required: true
+        },
+        {
+            id: "deny_unapproved_file_write"
+            capability: "coding.notebook.file.write"
+            operation: "write_file"
+            decision: "deny"
+            stdout_required: false
+            stderr_required: false
+            exit_code_required: false
+        },
+        {
+            id: "allow_fixture_image_display"
+            capability: "coding.notebook.image.display"
+            operation: "display_image"
+            decision: "allow_fixture"
+            stdout_required: false
+            stderr_required: false
+            exit_code_required: false
+        },
+    }
+    denied_command: {
+        replay_key: "command:deny:notebook-kernel"
+        capability: "coding.notebook.command.execute"
+        command: "python -m ipykernel_launcher -f /tmp/live-kernel.json"
+        command_envelope: {
+            argv: {"python", "-m", "ipykernel_launcher", "-f", "/tmp/live-kernel.json"}
+            cwd: "examples/ai/finrobot_translation"
+            env_allowlist: {}
+            shell: false
+            timeout_bucket: "denied"
+            network: false
+            filesystem_write: false
+            executed: false
+        }
+        approval_decision: "deny"
+        approval_reason: "notebook kernel execution is disabled in replay mode"
+        exit_code: 126
+        stdout: ""
+        stderr: "denied: notebook kernel execution is disabled in replay mode"
+        captures: {
+            {channel: "stdout" text: "" bytes: 0 truncated: false},
+            {channel: "stderr" text: "denied: notebook kernel execution is disabled in replay mode" bytes: 60 truncated: false},
+        }
+        executed: false
+        deterministic: true
+    }
+    deterministic_replay: {
+        replay_seed: "finrobot-coding-notebook-v1"
+        command_replay_key: "command:execute:factor-signal-fixture"
+        command_stdout: "signals: PDD=0.18 BABA=0.11"
+        command_stderr: ""
+        command_exit_code: 0
+        command_duration_bucket: "short"
+        command_executed: false
+        artifact_count: 3
+        file_artifact_manifest_count: 2
+        image_artifact_manifest_count: 1
+        display_count: 1
+        live_notebook: false
+    }
+    artifact_contract: {
+        required_fields: {"artifact_id", "replay_key", "path", "media_type", "sha256", "bytes", "provenance"}
+        media_types: {"application/vnd.jupyter", "text/x-python", "image/png"}
+        local_paths_only: true
+    }
+    file_image_artifacts: {
+        {
+            artifact_id: "artifact_strategy_ipynb"
+            replay_key: "file:read:notebooks/strategy.ipynb"
+            path: "notebooks/strategy.ipynb"
+            media_type: "application/vnd.jupyter"
+            sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            bytes: 2048
+            operation: "read_file"
+        },
+        {
+            artifact_id: "artifact_strategy_py"
+            replay_key: "file:write:artifacts/strategy.py"
+            path: "artifacts/strategy.py"
+            media_type: "text/x-python"
+            sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            bytes: 512
+            operation: "write_file"
+        },
+        {
+            artifact_id: "artifact_allocation_png"
+            replay_key: "display:image:allocation-chart"
+            path: "artifacts/allocation.png"
+            media_type: "image/png"
+            sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            bytes: 4096
+            operation: "display_image"
+        },
+    }
+    file_artifact_manifest: {
+        manifest_id: "manifest:file:strategy-fixtures"
+        replay_key: "manifest:file:strategy-fixtures"
+        kind: "file"
+        artifact_ids: {"artifact_strategy_ipynb", "artifact_strategy_py"}
+        count: 2
+        total_bytes: 2560
+        sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+    image_artifact_manifest: {
+        manifest_id: "manifest:image:allocation-fixtures"
+        replay_key: "manifest:image:allocation-fixtures"
+        kind: "image"
+        artifact_ids: {"artifact_allocation_png"}
+        count: 1
+        total_bytes: 4096
+        sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        displays: {"display_allocation_chart"}
+    }
+    cleanup_policy: {
+        mode: "fixture_noop"
+        delete_unapproved_outputs: true
+        preserve_fixture_artifacts: true
+        cleanup_replay_key: "cleanup:coding-notebook:fixture-noop"
+        paths: {"artifacts/strategy.py", "artifacts/allocation.png"}
+        executed: false
+    }
+    capability_metadata: {
+        {id: "file_read" capability: "coding.notebook.file.read" default: "fixture" schema: "file_image_artifact" approval_required: false},
+        {id: "file_write" capability: "coding.notebook.file.write" default: "deny_without_approval" schema: "file_image_artifact" approval_required: true},
+        {id: "command_execute" capability: "coding.notebook.command.execute" default: "deny_without_approval" schema: "sandbox_command" approval_required: true},
+        {id: "display_image" capability: "coding.notebook.image.display" default: "fixture" schema: "notebook_display" approval_required: false},
+        {id: "deterministic_replay" capability: "coding.notebook.replay.deterministic" default: "fixture" schema: "sandbox_command" approval_required: false},
+    }
+}
+
+func coding_notebook_provider_free_ok(pkg) {
+    if pkg == nil {
+        return false
+    }
+    return pkg.provider_free == true &&
+        pkg.live_network == false &&
+        pkg.real_dependency_imports == false &&
+        pkg.default_policy.mode == "fixture_replay" &&
+        pkg.default_policy.sandbox_execution_default == "deny" &&
+        pkg.default_policy.file_write_default == "deny" &&
+        pkg.default_policy.image_display_default == "fixture_only"
+}
+
+func coding_notebook_denied_command_ok(command) {
+    if command == nil {
+        return false
+    }
+    return command.capability == "coding.notebook.command.execute" &&
+        command.approval_decision == "deny" &&
+        command.exit_code == 126 &&
+        command.stdout == "" &&
+        command.stderr == "denied: notebook kernel execution is disabled in replay mode" &&
+        command.command_envelope.executed == false &&
+        command.command_envelope.shell == false &&
+        command.executed == false &&
+        #command.captures == 2 &&
+        command.deterministic == true
+}
+
+func coding_notebook_replay_ok(replay) {
+    if replay == nil {
+        return false
+    }
+    return replay.replay_seed == "finrobot-coding-notebook-v1" &&
+        replay.command_stdout == "signals: PDD=0.18 BABA=0.11" &&
+        replay.command_stderr == "" &&
+        replay.command_exit_code == 0 &&
+        replay.command_duration_bucket == "short" &&
+        replay.command_executed == false &&
+        replay.artifact_count == 3 &&
+        replay.file_artifact_manifest_count == 2 &&
+        replay.image_artifact_manifest_count == 1 &&
+        replay.display_count == 1 &&
+        replay.live_notebook == false
+}
+
+func coding_notebook_cleanup_ok(policy) {
+    if policy == nil {
+        return false
+    }
+    return policy.mode == "fixture_noop" &&
+        policy.delete_unapproved_outputs == true &&
+        policy.preserve_fixture_artifacts == true &&
+        policy.cleanup_replay_key == "cleanup:coding-notebook:fixture-noop" &&
+        policy.executed == false
+}
+
+func coding_notebook_artifact_ok(artifact) {
+    if artifact == nil {
+        return false
+    }
+    return artifact.artifact_id != nil &&
+        artifact.replay_key != nil &&
+        artifact.path != nil &&
+        artifact.media_type != nil &&
+        #artifact.sha256 == 64 &&
+        artifact.bytes > 0
+}
+
+func coding_notebook_capability_metadata_ok(metadata) {
+    if metadata == nil {
+        return false
+    }
+    return metadata.id != nil &&
+        metadata.capability != nil &&
+        metadata.default != nil &&
+        metadata.schema != nil &&
+        (metadata.capability != "coding.notebook.command.execute" || metadata.approval_required == true) &&
+        (metadata.capability != "coding.notebook.file.write" || metadata.approval_required == true)
+}
+
+assert(coding_notebook_provider_free_ok(coding_notebook_live_package))
+assert(coding_notebook_denied_command_ok(coding_notebook_live_package.denied_command))
+assert(coding_notebook_replay_ok(coding_notebook_live_package.deterministic_replay))
+assert(#coding_notebook_live_package.sandbox_approvals == 3)
+assert(#coding_notebook_live_package.artifact_contract.required_fields == 7)
+assert(#coding_notebook_live_package.file_image_artifacts == 3)
+assert(coding_notebook_live_package.file_artifact_manifest.count == 2)
+assert(coding_notebook_live_package.image_artifact_manifest.count == 1)
+assert(coding_notebook_cleanup_ok(coding_notebook_live_package.cleanup_policy))
+assert(#coding_notebook_live_package.capability_metadata == 5)
+
+coding_notebook_artifact_count := 0
+for i := 1; i <= #coding_notebook_live_package.file_image_artifacts; i++ {
+    artifact := coding_notebook_live_package.file_image_artifacts[i]
+    assert(coding_notebook_artifact_ok(artifact))
+    coding_notebook_artifact_count = coding_notebook_artifact_count + 1
+}
+
+coding_notebook_capability_count := 0
+for i := 1; i <= #coding_notebook_live_package.capability_metadata; i++ {
+    metadata := coding_notebook_live_package.capability_metadata[i]
+    assert(coding_notebook_capability_metadata_ok(metadata))
+    coding_notebook_capability_count = coding_notebook_capability_count + 1
+}
+
+coding_notebook_live_package_summary := string.format(
+"coding_notebook_live_package approvals=%d denied=%s stdout=%s stderr=%s replay=%s executed=%s file_manifest=%d image_manifest=%d cleanup=%s artifacts=%d displays=%d capabilities=%d provider_free=%s live_network=%s imports=%s",
+#coding_notebook_live_package.sandbox_approvals,
+coding_notebook_live_package.denied_command.approval_decision,
+coding_notebook_live_package.deterministic_replay.command_stdout,
+coding_notebook_live_package.denied_command.stderr,
+coding_notebook_live_package.deterministic_replay.replay_seed,
+tostring(coding_notebook_live_package.deterministic_replay.command_executed),
+coding_notebook_live_package.file_artifact_manifest.count,
+coding_notebook_live_package.image_artifact_manifest.count,
+coding_notebook_live_package.cleanup_policy.mode,
+coding_notebook_artifact_count,
+coding_notebook_live_package.deterministic_replay.display_count,
+coding_notebook_capability_count,
+tostring(coding_notebook_live_package.provider_free),
+tostring(coding_notebook_live_package.live_network),
+tostring(coding_notebook_live_package.real_dependency_imports)
+)
+
+print(coding_notebook_live_package_summary)

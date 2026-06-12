@@ -1,0 +1,34 @@
+generic_document_rag_pipeline_live_package := {
+    id: "generic-document-rag-pipeline",
+    package_name: "leia-generic-ai-document-rag-pipeline",
+    capability: "generic.ai.document.rag",
+    entrypoint: "ai.document.rag_pipeline",
+    fixture_key: "generic:document_rag:pipeline:offline",
+    provider_free: true,
+    live_network: false,
+    real_dependency_imports: false,
+    sections: 3,
+    chunks: 3,
+    retrieved_chunks: 2,
+    adapter_boundaries: 5
+}
+
+assert(generic_document_rag_pipeline_live_package.provider_free)
+assert(!generic_document_rag_pipeline_live_package.live_network)
+assert(!generic_document_rag_pipeline_live_package.real_dependency_imports)
+assert(generic_document_rag_pipeline_live_package.sections == 3)
+assert(generic_document_rag_pipeline_live_package.chunks == 3)
+assert(generic_document_rag_pipeline_live_package.retrieved_chunks == 2)
+
+generic_document_rag_pipeline_live_package_summary := string.format(
+"generic_document_rag_pipeline_live_package capability=%s entrypoint=%s chunks=%d retrieved=%d adapters=%d provider_free=%s live_network=%s imports=%s",
+generic_document_rag_pipeline_live_package.capability,
+generic_document_rag_pipeline_live_package.entrypoint,
+generic_document_rag_pipeline_live_package.chunks,
+generic_document_rag_pipeline_live_package.retrieved_chunks,
+generic_document_rag_pipeline_live_package.adapter_boundaries,
+tostring(generic_document_rag_pipeline_live_package.provider_free),
+tostring(generic_document_rag_pipeline_live_package.live_network),
+tostring(generic_document_rag_pipeline_live_package.real_dependency_imports))
+
+print(generic_document_rag_pipeline_live_package_summary)

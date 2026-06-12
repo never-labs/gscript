@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/equity_analysis_pipeline/provider_free_trace_v1.schema.json",
+  "title": "FinRobot Equity Analysis Provider Free Trace",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_key",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "run_id",
+    "stage_events",
+    "timing_envelope",
+    "artifact_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "stage_events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "stage_id",
+          "status",
+          "fixture_key",
+          "attempt",
+          "retry_metadata",
+          "cache_metadata",
+          "timing"
+        ],
+        "properties": {
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retry_metadata": {
+            "type": "object",
+            "required": [
+              "max_attempts",
+              "retryable",
+              "retry_after_ms"
+            ]
+          },
+          "cache_metadata": {
+            "type": "object",
+            "required": [
+              "cache_key",
+              "cache_state"
+            ]
+          },
+          "timing": {
+            "type": "object",
+            "required": [
+              "clock",
+              "started_ms",
+              "ended_ms",
+              "duration_ms",
+              "budget_ms"
+            ]
+          }
+        }
+      }
+    },
+    "timing_envelope": {
+      "type": "object",
+      "required": [
+        "clock",
+        "total_budget_ms",
+        "total_duration_ms"
+      ]
+    },
+    "artifact_refs": {
+      "type": "array"
+    }
+  }
+}

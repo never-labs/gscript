@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "query": {
+    "ticker": "ACME",
+    "cik": "0000000000",
+    "form_types": [
+      "10-K",
+      "10-Q"
+    ],
+    "date_range": {
+      "start": "2025-01-01",
+      "end": "2026-03-31"
+    },
+    "user_agent_policy": {
+      "required_for_live": true,
+      "declared_in_fixture": false,
+      "clean_skip_without_user_agent": true
+    },
+    "rate_limit_policy": {
+      "source": "SEC fair access policy",
+      "max_requests_per_second": 10,
+      "enforced_in_fixture": false,
+      "clean_skip_without_policy": true
+    },
+    "terms": {
+      "usage": "offline-fixture-only",
+      "attribution": "SEC fair-access metadata retained",
+      "redistribution": "fixture-only",
+      "live_network": false,
+      "user_agent_required_for_live": true
+    }
+  },
+  "results": [
+    {
+      "document_id": "ACME-2025-10K",
+      "ticker": "ACME",
+      "cik": "0000000000",
+      "company_name": "ACME Example Corporation",
+      "accession_number": "0000000000-26-000001",
+      "form_type": "10-K",
+      "filing_date": "2026-02-20",
+      "period_end": "2025-12-31",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/",
+      "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+      "artifact_hint": "sec_html",
+      "redirect_chain": [
+        {
+          "from": "https://sec.example.invalid/acme/10k",
+          "to": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+          "status": 200,
+          "fixture_redirect": true
+        }
+      ],
+      "cache": {
+        "key": "sec:ACME:10-K:2025:primary",
+        "mode": "fixture_replay",
+        "hit": true,
+        "ttl_seconds": 0
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "SEC fair-access metadata retained",
+        "redistribution": "fixture-only",
+        "live_network": false
+      },
+      "provenance": {
+        "fixture_key": "sec:search:ACME:10K10Q:offline",
+        "source": "synthetic-offline-fixture",
+        "captured_at": "2026-06-11T00:00:00Z",
+        "live_network": false,
+        "redacted": true
+      }
+    },
+    {
+      "document_id": "ACME-2026-Q1-10Q",
+      "ticker": "ACME",
+      "cik": "0000000000",
+      "company_name": "ACME Example Corporation",
+      "accession_number": "0000000000-26-000010",
+      "form_type": "10-Q",
+      "filing_date": "2026-05-05",
+      "period_end": "2026-03-31",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/",
+      "document_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/acme-20260331.pdf",
+      "artifact_hint": "sec_pdf",
+      "redirect_chain": [
+        {
+          "from": "https://sec.example.invalid/acme/10q",
+          "to": "https://www.sec.gov/Archives/edgar/data/0/000000000026000010/acme-20260331.pdf",
+          "status": 200,
+          "fixture_redirect": true
+        }
+      ],
+      "cache": {
+        "key": "sec:ACME:10-Q:2026Q1:primary",
+        "mode": "fixture_replay",
+        "hit": true,
+        "ttl_seconds": 0
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "SEC fair-access metadata retained",
+        "redistribution": "fixture-only",
+        "live_network": false
+      },
+      "provenance": {
+        "fixture_key": "sec:search:ACME:10K10Q:offline",
+        "source": "synthetic-offline-fixture",
+        "captured_at": "2026-06-11T00:00:00Z",
+        "live_network": false,
+        "redacted": true
+      }
+    }
+  ]
+}

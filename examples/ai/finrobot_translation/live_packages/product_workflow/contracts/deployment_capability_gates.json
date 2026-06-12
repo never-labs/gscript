@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-product-workflow-deployment-capability-gates",
+  "provider_free": true,
+  "live_network": false,
+  "gates": [
+    {
+      "id": "local_fixture_service",
+      "capability": "product.workflow.deploy.local",
+      "state": "allowed",
+      "requires_credentials": false,
+      "live_network": false
+    },
+    {
+      "id": "container_image",
+      "capability": "product.workflow.deploy.container",
+      "state": "contract_only",
+      "requires_credentials": false,
+      "live_network": false
+    },
+    {
+      "id": "cloud_runtime",
+      "capability": "product.workflow.deploy.cloud",
+      "state": "denied_until_external_package",
+      "requires_credentials": false,
+      "live_network": false
+    },
+    {
+      "id": "database",
+      "capability": "product.workflow.db.migration.plan",
+      "state": "contract_only",
+      "requires_credentials": false,
+      "live_network": false
+    },
+    {
+      "id": "object_storage_downloads",
+      "capability": "product.workflow.download.artifact",
+      "state": "fixture_only",
+      "requires_credentials": false,
+      "live_network": false
+    },
+    {
+      "id": "observability_export",
+      "capability": "product.workflow.task_log.read",
+      "state": "local_log_only",
+      "requires_credentials": false,
+      "live_network": false
+    }
+  ]
+}

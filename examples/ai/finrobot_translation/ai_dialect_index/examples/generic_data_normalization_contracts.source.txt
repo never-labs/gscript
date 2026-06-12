@@ -1,0 +1,8 @@
+// Generic data normalization contracts example source.
+// Declares schema mappings, field policies, missing and stale value handling,
+// type coercion, unit transforms, provenance, validation envelopes, and clean
+// skips without source SDK imports or live network access.
+
+capability generic.ai.data_normalization.contracts
+entrypoint ai.data_normalization.contracts
+fixture examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json

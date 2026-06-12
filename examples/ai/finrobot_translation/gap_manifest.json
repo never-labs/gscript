@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-ai-dialect-gap-manifest",
+  "audit_date": "2026-06-12",
+  "scope": {
+    "translation_directory": "examples/ai/finrobot_translation",
+    "provider_free_slice_status": "covered",
+    "generic_ai_dialect_status": "checked_in_package_boundary",
+    "live_external_package_status": "open_production_implementation",
+    "runtime_changes": false
+  },
+  "status_policy": {
+    "closed_allowed_for": [
+      "implemented_generic_dialect_contract",
+      "explicit_non_gap"
+    ],
+    "package_hygiene_exception_status": "tracked_exception",
+    "production_gap_status": "open",
+    "must_not_close_real_gaps": true
+  },
+  "package_hygiene_exceptions": [
+    {
+      "id": "FR-HYGIENE-001",
+      "package_id": "html_ui_snapshots",
+      "source": "package_manifest_audit/ledger.json",
+      "exception_kind": "legacy_manifest_shape",
+      "status": "tracked_exception",
+      "reason": "Legacy skeleton manifest predates the per-manifest no_built_in_guarantee field.",
+      "guardrails": [
+        "covered_by_global_live_package_plan_no_built_in_guarantee",
+        "provider_free_default_required",
+        "live_network_disabled",
+        "registered_example_required",
+        "fixture_index_capabilities_checked"
+      ],
+      "not_closed_reason": "The hygiene exception is intentionally tracked until the legacy manifest shape is migrated."
+    }
+  ],
+  "open_production_gaps": [
+    {
+      "id": "FR-PROD-001",
+      "area": "live_finance_providers",
+      "status": "open",
+      "summary": "Live yfinance, Finnhub, FMP, SEC, Reddit/PRAW, FinNLP, and earnings-call clients remain external package implementation work."
+    },
+    {
+      "id": "FR-PROD-002",
+      "area": "document_rag_rendering",
+      "status": "open",
+      "summary": "Live SEC/PDF parsing, vector retrieval providers, HTML rendering, chart rendering, and PDF export remain external package implementation work."
+    },
+    {
+      "id": "FR-PROD-003",
+      "area": "product_operations",
+      "status": "open",
+      "summary": "Real web routes, workers, auth, persistence, status recovery, downloads, static assets, and cloud deployment smoke remain product-layer implementation work."
+    },
+    {
+      "id": "FR-PROD-004",
+      "area": "optional_integrations",
+      "status": "open",
+      "summary": "Live optional FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, and Ollama integrations remain gated package work."
+    }
+  ],
+  "closed_or_non_gap_guards": [
+    {
+      "id": "FR-GUARD-001",
+      "status": "closed",
+      "kind": "implemented_generic_dialect_contract",
+      "summary": "Provider-free model, turn, tool, agent, workflow, replay, trace, evaluation, approval, and package-audit contracts are checked in as reusable generic AI package boundaries."
+    },
+    {
+      "id": "FR-GUARD-002",
+      "status": "non_gap",
+      "kind": "explicit_non_gap",
+      "summary": "FinRobot-specific syntax, vendor built-ins, role-profile syntax, report-section syntax, and q runtime changes are not required for the translation slice."
+    }
+  ],
+  "documented_in": [
+    "GAPS.md",
+    "COVERAGE.md",
+    "VERIFICATION.md"
+  ],
+  "verification": [
+    "tests/llm/finrobot_status_docs_inventory_test.go",
+    "tests/llm/finrobot_package_manifest_audit_test.go"
+  ]
+}

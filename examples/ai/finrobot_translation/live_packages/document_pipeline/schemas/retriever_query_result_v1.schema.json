@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/document_pipeline/retriever_query_result_v1.schema.json",
+  "title": "FinRobot document pipeline retriever query fixture",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "query",
+    "answer",
+    "retriever",
+    "retriever_boundaries",
+    "retrieved_chunks",
+    "answer_citations",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "provider_free": {
+      "type": "boolean",
+      "const": true
+    },
+    "live_network": {
+      "type": "boolean",
+      "const": false
+    },
+    "query": {
+      "type": "string"
+    },
+    "answer": {
+      "type": "string"
+    },
+    "retriever": {
+      "type": "object",
+      "required": [
+        "adapter",
+        "top_k",
+        "live_network",
+        "dependency_imported",
+        "clean_skip_without_dependency",
+        "skip_reason",
+        "embedding_adapter",
+        "vector_adapter"
+      ]
+    },
+    "retrieved_chunks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "chunk_id",
+          "rank",
+          "score",
+          "section_id",
+          "citation"
+        ]
+      }
+    },
+    "retriever_boundaries": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "adapter",
+          "fixture_key",
+          "dependency_imported",
+          "credential_required",
+          "live_network",
+          "clean_skip"
+        ]
+      }
+    },
+    "answer_citations": {
+      "type": "array",
+      "minItems": 1
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "fixture_key",
+        "chunk_fixture_key",
+        "accession_number"
+      ]
+    }
+  }
+}

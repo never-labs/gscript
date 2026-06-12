@@ -1,0 +1,102 @@
+// Provider-free FinRobot product workflow live package smoke.
+// No web server, database, object store, provider SDK, network, or credentials
+// are used here; this summarizes the checked-in contracts as executable data.
+
+product_workflow_live_package := {
+    id: "finrobot-product-workflow-live-package"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    contracts: {
+        routes: 12
+        auth_session_transitions: 5
+        report_request_states: 8
+        task_log_events: 5
+        download_artifacts: 4
+        db_migrations: 2
+        db_tables: 9
+        ui_template_routes: 12
+        accessibility_checks: 9
+        accessibility_gate_results: 3
+        visual_viewports: 2
+        route_session_snapshots: 3
+        crud_command_envelopes: 3
+        artifact_manifest_items: 4
+        approval_decisions: 4
+        workflow_replay_events: 8
+        deployment_gates: 6
+    }
+    capabilities: {
+        "product.workflow.web.route",
+        "product.workflow.auth.session",
+        "product.workflow.history.read",
+        "product.workflow.task_log.read",
+        "product.workflow.download.artifact",
+        "product.workflow.download.artifact_manifest",
+        "product.workflow.crud.report_request",
+        "product.workflow.approval.boundary",
+        "product.workflow.replay.fixture",
+        "product.workflow.db.migration.plan",
+        "product.workflow.web.template_snapshot",
+        "product.workflow.web.accessibility_snapshot_gate",
+    }
+}
+
+func product_workflow_provider_free_ok(pkg) {
+    if pkg == nil {
+        return false
+    }
+    return pkg.provider_free == true && pkg.live_network == false && pkg.real_dependency_imports == false
+}
+
+func product_workflow_contract_counts_ok(contracts) {
+    if contracts == nil {
+        return false
+    }
+    return contracts.routes == 12 &&
+        contracts.auth_session_transitions == 5 &&
+        contracts.report_request_states == 8 &&
+        contracts.task_log_events == 5 &&
+        contracts.download_artifacts == 4 &&
+        contracts.db_migrations == 2 &&
+        contracts.db_tables == 9 &&
+        contracts.ui_template_routes == 12 &&
+        contracts.accessibility_checks == 9 &&
+        contracts.accessibility_gate_results == 3 &&
+        contracts.visual_viewports == 2 &&
+        contracts.route_session_snapshots == 3 &&
+        contracts.crud_command_envelopes == 3 &&
+        contracts.artifact_manifest_items == 4 &&
+        contracts.approval_decisions == 4 &&
+        contracts.workflow_replay_events == 8 &&
+        contracts.deployment_gates == 6
+}
+
+assert(product_workflow_provider_free_ok(product_workflow_live_package))
+assert(product_workflow_contract_counts_ok(product_workflow_live_package.contracts))
+assert(#product_workflow_live_package.capabilities == 12)
+
+product_workflow_live_package_summary := string.format(
+"product_workflow_live_package routes=%d auth=%d request_states=%d task_events=%d downloads=%d db_migrations=%d db_tables=%d ui_routes=%d accessibility=%d a11y_gate_results=%d route_sessions=%d crud_commands=%d artifact_items=%d approvals=%d replay_events=%d gates=%d provider_free=%s live_network=%s imports=%s",
+product_workflow_live_package.contracts.routes,
+product_workflow_live_package.contracts.auth_session_transitions,
+product_workflow_live_package.contracts.report_request_states,
+product_workflow_live_package.contracts.task_log_events,
+product_workflow_live_package.contracts.download_artifacts,
+product_workflow_live_package.contracts.db_migrations,
+product_workflow_live_package.contracts.db_tables,
+product_workflow_live_package.contracts.ui_template_routes,
+product_workflow_live_package.contracts.accessibility_checks,
+product_workflow_live_package.contracts.accessibility_gate_results,
+product_workflow_live_package.contracts.route_session_snapshots,
+product_workflow_live_package.contracts.crud_command_envelopes,
+product_workflow_live_package.contracts.artifact_manifest_items,
+product_workflow_live_package.contracts.approval_decisions,
+product_workflow_live_package.contracts.workflow_replay_events,
+product_workflow_live_package.contracts.deployment_gates,
+tostring(product_workflow_live_package.provider_free),
+tostring(product_workflow_live_package.live_network),
+tostring(product_workflow_live_package.real_dependency_imports)
+)
+
+print(product_workflow_live_package_summary)

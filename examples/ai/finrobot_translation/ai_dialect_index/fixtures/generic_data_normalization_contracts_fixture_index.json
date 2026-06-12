@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "generic-data-normalization-contracts-index-fixture",
+  "package_id": "generic-data-normalization-contracts",
+  "provider_free": true,
+  "live_network": false,
+  "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json",
+  "fixtures": [
+    "normalization_mapping:observations:offline:v1",
+    "provider_response_projection:observations:offline:v1",
+    "normalized_rows:observations:offline:v1",
+    "normalization_validation:observations:offline:v1",
+    "normalization_clean_skip:offline:v1"
+  ]
+}

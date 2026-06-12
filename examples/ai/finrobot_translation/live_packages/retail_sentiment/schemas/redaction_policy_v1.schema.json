@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/finrobot/retail_sentiment/redaction_policy_v1.schema.json",
+  "title": "FinRobotRetailSentimentRedactionPolicyV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "provider_free",
+    "live_network",
+    "raw_identifiers_allowed",
+    "raw_urls_allowed",
+    "secret_material_allowed",
+    "forbidden_fields",
+    "replacement_fields",
+    "prompt_safe"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer"},
+    "policy_id": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "raw_identifiers_allowed": {"type": "boolean", "const": false},
+    "raw_urls_allowed": {"type": "boolean", "const": false},
+    "secret_material_allowed": {"type": "boolean", "const": false},
+    "forbidden_fields": {"type": "array", "items": {"type": "string"}},
+    "replacement_fields": {"type": "array", "items": {"type": "string"}},
+    "prompt_safe": {"type": "boolean"}
+  },
+  "$defs": {
+    "redaction_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "raw_identifiers_removed",
+        "raw_urls_removed",
+        "secrets_removed",
+        "display_handle",
+        "redacted_uri"
+      ],
+      "properties": {
+        "policy_id": {"type": "string"},
+        "raw_identifiers_removed": {"type": "boolean"},
+        "raw_urls_removed": {"type": "boolean"},
+        "secrets_removed": {"type": "boolean"},
+        "display_handle": {"type": "string"},
+        "redacted_uri": {"type": "string"}
+      }
+    },
+    "redaction_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "raw_identifiers_removed",
+        "raw_urls_removed",
+        "secrets_removed",
+        "prompt_safe"
+      ],
+      "properties": {
+        "policy_id": {"type": "string"},
+        "raw_identifiers_removed": {"type": "boolean"},
+        "raw_urls_removed": {"type": "boolean"},
+        "secrets_removed": {"type": "boolean"},
+        "prompt_safe": {"type": "boolean"}
+      }
+    }
+  }
+}

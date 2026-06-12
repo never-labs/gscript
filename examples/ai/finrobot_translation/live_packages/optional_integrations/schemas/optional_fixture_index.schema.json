@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/finrobot/optional_fixture_index.schema.json",
+  "title": "FinRobot optional integration provider-free fixture index",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "required": [
+          "fixture_key",
+          "integration_id",
+          "capability",
+          "metadata"
+        ],
+        "properties": {
+          "fixture_key": {
+            "type": "string"
+          },
+          "integration_id": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string",
+            "pattern": "^optional\\."
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

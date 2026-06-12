@@ -1,6 +1,10 @@
 package bind
 
-import stdlibllm "github.com/never-labs/leia/internal/stdlib/lib/llm"
+import (
+	"strings"
+
+	stdlibllm "github.com/never-labs/leia/internal/stdlib/lib/llm"
+)
 
 func llmToolsFromValue(v Value) []LLMTool {
 	if !v.IsTable() {
@@ -19,10 +23,187 @@ func llmToolsFromValue(v Value) []LLMTool {
 			Description: tt.RawGetString("description").Str(),
 			Params:      llmStringSliceFromValue(tt.RawGetString("params")),
 			Requires:    llmStringSliceFromValue(tt.RawGetString("requires")),
-			Schema:      llmAnyFromValue(tt.RawGetString("schema")),
+			Schema:      llmToolProviderSchema(tt),
 		})
 	}
 	return out
+}
+
+func llmToolProviderSchema(tool *Table) any {
+	if tool == nil {
+		return nil
+	}
+	if schema := tool.RawGetString("schema"); !schema.IsNil() {
+		return llmAnyFromValue(schema)
+	}
+	if llmToolIsAgentTool(tool) {
+		return nil
+	}
+	hasOutputMetadata := !tool.RawGetString("output").IsNil()
+	if params := llmStringSliceFromValue(tool.RawGetString("params")); hasOutputMetadata && len(params) > 0 {
+		return llmAnyFromValue(llmToolParamsSchemaValue(params))
+	}
+	if output := tool.RawGetString("output"); !output.IsNil() {
+		return llmAnyFromValue(output)
+	}
+	return nil
+}
+
+func llmToolIsAgentTool(tool *Table) bool {
+	if tool == nil {
+		return false
+	}
+	if tool.RawGetString("__llm_agent_tool").Bool() {
+		return true
+	}
+	if fn := tool.RawGetString("fn").GoFunction(); fn != nil {
+		return strings.HasPrefix(fn.Name, "llm.agent_as_tool.")
+	}
+	return false
+}
+
+func llmToolParamsSchemaValue(params []string) Value {
+	schema := NewTable()
+	schema.RawSetString("type", StringValue("object"))
+	props := NewTable()
+	required := NewSequentialArrayTable(len(params))
+	for i, name := range params {
+		prop := NewTable()
+		prop.RawSetString("type", StringValue("string"))
+		props.RawSetString(name, TableValue(prop))
+		required.RawSet(IntValue(int64(i+1)), StringValue(name))
+	}
+	schema.RawSetString("properties", TableValue(props))
+	schema.RawSetString("required", TableValue(required))
+	return TableValue(schema)
+}
+
+func llmToolSchemaValue(v Value) Value {
+	if !v.IsTable() {
+		return NilValue()
+	}
+	t := v.Table()
+	if llmLooksLikeToolTable(t) {
+		return TableValue(llmSingleToolSchemaTable(t))
+	}
+	out := NewTable()
+	for i := 1; i <= t.Length(); i++ {
+		tv := t.RawGet(IntValue(int64(i)))
+		if !tv.IsTable() || !llmLooksLikeToolTable(tv.Table()) {
+			continue
+		}
+		out.RawSet(IntValue(int64(out.Length()+1)), TableValue(llmSingleToolSchemaTable(tv.Table())))
+	}
+	return TableValue(out)
+}
+
+func llmToolInfoValue(v Value) Value {
+	if !v.IsTable() {
+		return NilValue()
+	}
+	t := v.Table()
+	if llmLooksLikeToolTable(t) {
+		return TableValue(llmSingleToolContractTable(t))
+	}
+	out := NewTable()
+	for i := 1; i <= t.Length(); i++ {
+		tv := t.RawGet(IntValue(int64(i)))
+		if !tv.IsTable() || !llmLooksLikeToolTable(tv.Table()) {
+			continue
+		}
+		out.RawSet(IntValue(int64(out.Length()+1)), TableValue(llmSingleToolContractTable(tv.Table())))
+	}
+	out.RawSetString("kind", StringValue("tool_inventory"))
+	out.RawSetString("capabilities", llmToolCapsValue(t))
+	return TableValue(out)
+}
+
+func llmLooksLikeToolTable(t *Table) bool {
+	if t == nil {
+		return false
+	}
+	return t.RawGetString("__llm_tool").Bool() || !t.RawGetString("name").IsNil() || !t.RawGetString("fn").IsNil()
+}
+
+func llmSingleToolSchemaTable(tool *Table) *Table {
+	out := llmSingleToolContractTable(tool)
+	out.RawSetString("kind", StringValue("tool_schema"))
+	return out
+}
+
+func llmSingleToolContractTable(tool *Table) *Table {
+	out := NewTable()
+	out.RawSetString("kind", StringValue("tool_contract"))
+	out.RawSetString("name", StringValue(tool.RawGetString("name").Str()))
+	out.RawSetString("description", StringValue(tool.RawGetString("description").Str()))
+	if llmToolIsAgentTool(tool) {
+		out.RawSetString("type", StringValue("agent"))
+	} else {
+		out.RawSetString("type", StringValue("function"))
+	}
+	if params := tool.RawGetString("params"); params.IsTable() {
+		out.RawSetString("params", llmCloneValue(params))
+	}
+	requires := llmToolCapabilitiesValue(tool)
+	if requires.IsTable() {
+		out.RawSetString("requires", llmCloneValue(requires))
+		out.RawSetString("capabilities", llmCloneValue(requires))
+	}
+	if schema := tool.RawGetString("schema"); !schema.IsNil() {
+		out.RawSetString("schema", llmCloneValue(schema))
+	} else if params := llmStringSliceFromValue(tool.RawGetString("params")); len(params) > 0 {
+		out.RawSetString("schema", llmToolParamsSchemaValue(params))
+	} else if output := tool.RawGetString("output"); !output.IsNil() {
+		out.RawSetString("schema", llmCloneValue(output))
+	}
+	if output := tool.RawGetString("output"); !output.IsNil() {
+		out.RawSetString("output", llmCloneValue(output))
+	}
+	if result := llmToolResultValue(tool); !result.IsNil() {
+		out.RawSetString("result", llmCloneValue(result))
+	}
+	if err := tool.RawGetString("error"); !err.IsNil() {
+		out.RawSetString("error", llmCloneValue(err))
+	}
+	if replayKey := tool.RawGetString("replay_key"); !replayKey.IsNil() {
+		out.RawSetString("replay_key", llmCloneValue(replayKey))
+	}
+	return out
+}
+
+func llmToolCapabilitiesValue(tool *Table) Value {
+	if tool == nil {
+		return NilValue()
+	}
+	if caps := tool.RawGetString("capabilities"); caps.IsTable() {
+		return caps
+	}
+	if requires := tool.RawGetString("requires"); requires.IsTable() {
+		return requires
+	}
+	return NilValue()
+}
+
+func llmToolResultValue(tool *Table) Value {
+	if tool == nil {
+		return NilValue()
+	}
+	if result := tool.RawGetString("result"); !result.IsNil() {
+		return result
+	}
+	return tool.RawGetString("output")
+}
+
+func llmCloneValue(v Value) Value {
+	if !v.IsTable() {
+		return v
+	}
+	src := v.Table()
+	out := NewTable()
+	for _, key := range src.PairsKeysSnapshot() {
+		out.RawSet(key, llmCloneValue(src.RawGet(key)))
+	}
+	return TableValue(out)
 }
 
 func llmToolCallFromTable(t *Table) LLMToolCall {
@@ -72,10 +253,72 @@ func llmToolSummaries(tools *Table) []stdlibllm.ToolSummary {
 		tool := tv.Table()
 		out = append(out, stdlibllm.ToolSummary{
 			Name:     tool.RawGetString("name").Str(),
-			Requires: llmStringSliceFromValue(tool.RawGetString("requires")),
+			Requires: llmStringSliceFromValue(llmToolCapabilitiesValue(tool)),
 		})
 	}
 	return out
+}
+
+func llmValidateToolContracts(tools *Table) Value {
+	if tools == nil {
+		return llmErrorValue("validation", "tools table expected")
+	}
+	for i := 1; i <= tools.Length(); i++ {
+		tv := tools.RawGet(IntValue(int64(i)))
+		if !tv.IsTable() || !llmLooksLikeToolTable(tv.Table()) {
+			err := llmErrorValue("validation", "tool inventory contains non-tool entry")
+			et := err.Table()
+			et.RawSetString("index", IntValue(int64(i)))
+			return err
+		}
+		if err := llmValidateSingleToolContract(tv.Table(), i); !err.IsNil() {
+			return err
+		}
+	}
+	return NilValue()
+}
+
+func llmValidateSingleToolContract(tool *Table, index int) Value {
+	missing := ""
+	switch {
+	case tool.RawGetString("name").Str() == "":
+		missing = "name"
+	case llmToolContractSchemaValue(tool).IsNil():
+		missing = "schema"
+	case len(llmStringSliceFromValue(llmToolCapabilitiesValue(tool))) == 0:
+		missing = "capabilities"
+	case llmToolResultValue(tool).IsNil():
+		missing = "result"
+	case tool.RawGetString("error").IsNil():
+		missing = "error"
+	case tool.RawGetString("replay_key").IsNil():
+		missing = "replay_key"
+	}
+	if missing == "" {
+		return NilValue()
+	}
+	err := llmErrorValue("validation", "tool contract missing "+missing+": "+tool.RawGetString("name").Str())
+	et := err.Table()
+	et.RawSetString("field", StringValue(missing))
+	et.RawSetString("tool", StringValue(tool.RawGetString("name").Str()))
+	et.RawSetString("index", IntValue(int64(index)))
+	return err
+}
+
+func llmToolContractSchemaValue(tool *Table) Value {
+	if tool == nil {
+		return NilValue()
+	}
+	if schema := tool.RawGetString("schema"); !schema.IsNil() {
+		return schema
+	}
+	if params := llmStringSliceFromValue(tool.RawGetString("params")); len(params) > 0 {
+		return llmToolParamsSchemaValue(params)
+	}
+	if output := tool.RawGetString("output"); !output.IsNil() {
+		return output
+	}
+	return NilValue()
 }
 
 func llmDispatch(call ScriptFunctionCaller, callTable, tools *Table) ([]Value, error) {

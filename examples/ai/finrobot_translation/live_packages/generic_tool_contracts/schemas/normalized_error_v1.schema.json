@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/leia/ai/normalized_error_v1.schema.json",
+  "title": "AI Tool Normalized Error",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "message",
+    "field",
+    "retryable",
+    "provider_free"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "validation",
+        "approval_required",
+        "approval_denied",
+        "capability_unavailable",
+        "tool_not_found",
+        "execution_failed",
+        "artifact_unavailable"
+      ]
+    },
+    "message": {"type": "string", "minLength": 1},
+    "field": {"type": ["string", "null"]},
+    "retryable": {"type": "boolean"},
+    "provider_free": {"const": true},
+    "details": {"type": "object"}
+  }
+}

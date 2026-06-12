@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "function_id": "fmp_get_ratings",
+  "source_module": "finrobot/data_source/market_data_api.py",
+  "provider": "fmp",
+  "capability": "finance.facade.fmp.ratings.fetch",
+  "symbol": "ACME",
+  "dataset": "ratings",
+  "input": {
+    "symbol": "ACME"
+  },
+  "output": {
+    "fields": {
+      "rating": "outperform_fixture",
+      "rating_score": 4,
+      "recommendation": "buy",
+      "rating_date": "2026-06-11"
+    },
+    "source_ref": "src_fmp_ratings"
+  },
+  "fallback": {
+    "order": [
+      "fmp",
+      "yfinance",
+      "finnhub",
+      "openbb"
+    ],
+    "selected_provider": "fmp",
+    "attempted": [
+      "fmp"
+    ],
+    "clean_skip_without_dependency": true
+  },
+  "provenance": {
+    "provider": "fmp",
+    "fixture_key": "function:fmp:ratings:ACME",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_schema": "function_fixture_v1",
+    "source_url_redacted": true,
+    "stale_after_days": 7,
+    "replay_ready": true
+  }
+}

@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "id": "generic-strategy-backtest-contracts",
+  "package_name": "leia-generic-ai-strategy-backtest-contracts",
+  "package_boundary_id": "generic-ai-strategy-backtest-contracts",
+  "capability_id": "generic.ai.strategy.backtest.contracts",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for strategy simulation and backtest manifests, observation feeds, execution ledgers, allocation series, performance series, metric_summary, constraint limits, deterministic seeds, and optional engine clean-skip contracts.",
+  "source_modules": [
+    "generic.strategy_backtest.run",
+    "generic.strategy.definition",
+    "generic.strategy.sizing_policy",
+    "generic.strategy.feature",
+    "generic.strategy.evaluator"
+  ],
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; generic strategy engines, data providers, visualization engines, and credentialed adapters belong only to future provider-specific packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_strategy_backtest_contracts_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "generic_strategy_backtest_contracts_contract": "contracts/generic_strategy_backtest_contracts_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_strategy_backtest_contracts_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json"
+  },
+  "schemas": {
+    "strategy_manifest": "schemas/strategy_manifest_v1.schema.json",
+    "observation_feed": "schemas/observation_feed_v1.schema.json",
+    "execution_ledger": "schemas/execution_ledger_v1.schema.json",
+    "allocation_series": "schemas/allocation_series_v1.schema.json",
+    "performance_series": "schemas/performance_series_v1.schema.json",
+    "metric_summary": "schemas/metric_summary_v1.schema.json",
+    "constraint_limits": "schemas/constraint_limits_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "strategy_manifest": "fixtures/strategy_manifest_fixture.json",
+    "observation_feed": "fixtures/observation_feed_fixture.json",
+    "execution_ledger": "fixtures/execution_ledger_fixture.json",
+    "allocation_series": "fixtures/allocation_series_fixture.json",
+    "performance_series": "fixtures/performance_series_fixture.json",
+    "metric_summary": "fixtures/metric_summary_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "back_test",
+      "source_module": "generic.strategy_backtest.run",
+      "capabilities": [
+        "generic.ai.strategy.backtest.run.fixture",
+        "generic.ai.strategy.backtest.strategy.bind",
+        "generic.ai.strategy.backtest.observation_feed.bind",
+        "generic.ai.strategy.backtest.allocations.allocation_series",
+        "generic.ai.strategy.backtest.performance.series",
+        "generic.ai.strategy.backtest.metric_summary.collect",
+        "generic.ai.strategy.backtest.constraint_limits.enforce"
+      ],
+      "output_schemas": [
+        "strategy_manifest",
+        "execution_ledger",
+        "allocation_series",
+        "performance_series",
+        "metric_summary",
+        "constraint_limits"
+      ]
+    },
+    {
+      "id": "strategy",
+      "source_module": "generic.strategy.definition",
+      "capabilities": [
+        "generic.ai.strategy.backtest.strategy.signal",
+        "generic.ai.strategy.backtest.strategy.action_intent",
+        "generic.ai.strategy.backtest.strategy.parameters",
+        "generic.ai.strategy.backtest.strategy.lifecycle"
+      ],
+      "output_schemas": [
+        "strategy_manifest",
+        "execution_ledger"
+      ]
+    },
+    {
+      "id": "allocation_policy",
+      "source_module": "generic.strategy.sizing_policy",
+      "capabilities": [
+        "generic.ai.strategy.backtest.allocation_policy.allocation_size",
+        "generic.ai.strategy.backtest.allocation_policy.resource_guard",
+        "generic.ai.strategy.backtest.allocation_policy.batch_rounding",
+        "generic.ai.strategy.backtest.allocation_policy.constraint_budget",
+        "generic.ai.strategy.backtest.allocations.allocation_series"
+      ],
+      "output_schemas": [
+        "strategy_manifest",
+        "constraint_limits",
+        "allocation_series"
+      ]
+    },
+    {
+      "id": "feature",
+      "source_module": "generic.strategy.feature",
+      "capabilities": [
+        "generic.ai.strategy.backtest.feature.rule",
+        "generic.ai.strategy.backtest.feature.threshold_cross",
+        "generic.ai.strategy.backtest.feature.warmup",
+        "generic.ai.strategy.backtest.feature.provenance"
+      ],
+      "output_schemas": [
+        "strategy_manifest"
+      ]
+    },
+    {
+      "id": "evaluator",
+      "source_module": "generic.strategy.evaluator",
+      "capabilities": [
+        "generic.ai.strategy.backtest.evaluator.delta",
+        "generic.ai.strategy.backtest.evaluator.regret",
+        "generic.ai.strategy.backtest.evaluator.stability",
+        "generic.ai.strategy.backtest.evaluator.executions",
+        "generic.ai.strategy.backtest.performance.series"
+      ],
+      "output_schemas": [
+        "metric_summary",
+        "execution_ledger",
+        "allocation_series",
+        "performance_series"
+      ]
+    }
+  ],
+  "deterministic_replay": {
+    "seed": "generic-strategy-backtest-contracts-offline-v1",
+    "seed_hash": "sha256:75df5dcdf77a387392d370c0d97c902753615606f576a84f7408adcc5af5464d",
+    "start_resource": 100000,
+    "cost_bps": 5,
+    "adjustment_bps": 2,
+    "timezone": "UTC",
+    "observation_feed_fixture": "observation_feed:subject_alpha:step:offline:v1",
+    "execution_ledger_fixture": "execution_ledger:subject_alpha:baseline_rule:offline:v1",
+    "allocation_series_fixture": "allocation_series:subject_alpha:baseline_rule:offline:v1",
+    "performance_series_fixture": "performance_series:subject_alpha:baseline_rule:offline:v1",
+    "metric_summary_fixture": "metric_summary:subject_alpha:baseline_rule:offline:v1",
+    "deterministic_action": true,
+    "provider_free": true,
+    "live_network": false
+  },
+  "strategy_outputs": [
+    {
+      "id": "baseline_rule_strategy",
+      "capability": "generic.ai.strategy.backtest.strategy.signal",
+      "fixture_key": "strategy_manifest:baseline_rule:offline:v1",
+      "schema": "strategy_manifest",
+      "required_fields": [
+        "strategy_id",
+        "parameters",
+        "feature_bindings",
+        "allocation_policy_binding",
+        "evaluator_bindings",
+        "deterministic_seed"
+      ],
+      "provider_free": true,
+      "live_network": false
+    }
+  ],
+  "analytics_outputs": [
+    {
+      "id": "allocation_series",
+      "capability": "generic.ai.strategy.backtest.allocations.allocation_series",
+      "fixture_key": "allocation_series:subject_alpha:baseline_rule:offline:v1",
+      "schema": "allocation_series",
+      "required_fields": [
+        "timestamp",
+        "resource_weight",
+        "allocation_weight",
+        "gross_allocation",
+        "net_allocation",
+        "state_value"
+      ],
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "performance_series",
+      "capability": "generic.ai.strategy.backtest.performance.series",
+      "fixture_key": "performance_series:subject_alpha:baseline_rule:offline:v1",
+      "schema": "performance_series",
+      "required_fields": [
+        "timestamp",
+        "state_value",
+        "step_delta",
+        "cumulative_delta",
+        "regret",
+        "rolling_stability_score"
+      ],
+      "provider_free": true,
+      "live_network": false
+    }
+  ],
+  "constraint_limits": [
+    {
+      "id": "max_allocation_pct",
+      "metric": "allocation_weight",
+      "limit": 0.35,
+      "observed": 0.32,
+      "status": "pass",
+      "live_network": false
+    },
+    {
+      "id": "max_regret_pct",
+      "metric": "max_regret",
+      "limit": 0.12,
+      "observed": 0.00696,
+      "status": "pass",
+      "live_network": false
+    },
+    {
+      "id": "min_resource_pct",
+      "metric": "resource_weight",
+      "limit": 0.05,
+      "observed": 0.147,
+      "status": "pass",
+      "live_network": false
+    },
+    {
+      "id": "max_execution_value_pct",
+      "metric": "execution_value_weight",
+      "limit": 0.25,
+      "observed": 0.214,
+      "status": "pass",
+      "live_network": false
+    }
+  ],
+  "optional_dependencies": [
+    {
+      "id": "generic_optional_engine",
+      "import_name": "generic_optional_engine",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_reason": "generic optional strategy engine execution is represented by provider-free fixtures until an optional provider package is installed."
+    },
+    {
+      "id": "generic_optional_visualizer",
+      "import_name": "generic_optional_visualizer",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_reason": "Visualization rendering is represented by JSON-backed contracts until an optional renderer package is installed."
+    },
+    {
+      "id": "generic_optional_provider",
+      "import_name": "generic_optional_provider",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_reason": "Optional data access is represented by deterministic provider-free fixtures until an optional provider package is installed."
+    }
+  ],
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "generic.strategy_backtest.run, strategy, allocation_policy, feature, and evaluator boundaries are represented without q runtime or live provider imports",
+    "strategy manifest fixture validates strategy, allocation_policy, feature, evaluator bindings and deterministic seed",
+    "observation feed fixture validates typed rows, timezone, schedule, provenance, and provider-free replay key",
+    "execution ledger schema validates action, result, side, value, amount, cost, adjustment, resource, state, and realized delta fields",
+    "allocation series fixture validates resource, allocation, gross allocation, net allocation, units, and state value rows",
+    "performance fixture validates deterministic daily performance, cumulative delta, regret, rolling stability, and max-regret summary",
+    "metric_summary schema validates performance, win rate, activity_rate, exposure, and constraint-limit status",
+    "optional strategy engine, visualizer, and data provider capability gates clean-skip without importing real packages by default or entering default CI"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide leia-generic-ai-strategy-backtest-contracts as a built-in package boundary, strategy engine, data provider, visualizer, execution adapter, or constraint evaluator; future external packages must satisfy these provider-free contracts before enabling live execution."
+  },
+  "capabilities": [
+    "generic.ai.strategy.backtest.contracts",
+    "generic.ai.strategy.backtest.strategy.bind",
+    "generic.ai.strategy.backtest.observation_feed.bind",
+    "generic.ai.strategy.backtest.execution_ledger",
+    "generic.ai.strategy.backtest.allocation_series",
+    "generic.ai.strategy.backtest.performance.series",
+    "generic.ai.strategy.backtest.metric_summary.collect",
+    "generic.ai.strategy.backtest.constraint_limits.enforce",
+    "generic.ai.strategy.backtest.engine.clean_skip"
+  ],
+  "dialect_capability_id": "generic.ai.strategy.backtest.contracts",
+  "dialect_backend_shape": "ai.strategy.backtest_contracts",
+  "dialect_aliases": [
+    {
+      "id": "ai.strategy.backtest_contracts",
+      "target": "generic.ai.strategy.backtest.contracts",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.strategy.backtest.contracts",
+  "capability_aliases": [
+    {
+      "alias": "ai.strategy.backtest_contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "data-provider",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.strategy.backtest.contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "strategy-backtest-contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "strategy-backtest-contracts",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.strategy.backtest.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/ui/snapshot_evaluation_v1.schema.json",
+  "title": "Provider-Free UI Snapshot Evaluation Dialect",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "requires_browser",
+    "route_dom_snapshots",
+    "viewport_matrix",
+    "visual_diff_budgets",
+    "accessibility_summaries",
+    "artifact_uri_manifest",
+    "redaction_policy"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "requires_browser": {"type": "boolean", "const": false},
+    "route_dom_snapshots": {"type": "array", "minItems": 1},
+    "viewport_matrix": {"type": "array", "minItems": 1},
+    "visual_diff_budgets": {"type": "array", "minItems": 1},
+    "accessibility_summaries": {"type": "array", "minItems": 1},
+    "artifact_uri_manifest": {"type": "object"},
+    "redaction_policy": {"type": "object"}
+  }
+}

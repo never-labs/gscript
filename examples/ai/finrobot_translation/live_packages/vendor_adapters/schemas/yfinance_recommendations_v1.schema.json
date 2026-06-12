@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YFinanceRecommendationsFixtureV1",
+  "type": "object",
+  "required": [
+    "fixture_key",
+    "provider",
+    "captured_at",
+    "request",
+    "metadata",
+    "payload"
+  ],
+  "properties": {
+    "fixture_key": {
+      "const": "yfinance:recommendations:ACME"
+    },
+    "provider": {
+      "const": "yfinance"
+    },
+    "captured_at": {
+      "type": "string"
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "symbol",
+        "live_network"
+      ],
+      "properties": {
+        "symbol": {
+          "type": "string"
+        },
+        "live_network": {
+          "const": false
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "schema",
+        "provenance",
+        "capability",
+        "rate_limit",
+        "terms"
+      ],
+      "properties": {
+        "schema": {
+          "const": "schemas/yfinance_recommendations_v1.schema.json"
+        },
+        "capability": {
+          "const": "finance.vendor.yfinance.recommendations"
+        },
+        "provenance": {
+          "type": "object",
+          "required": [
+            "source",
+            "captured_at",
+            "live_network",
+            "redacted"
+          ],
+          "properties": {
+            "live_network": {
+              "const": false
+            },
+            "redacted": {
+              "const": true
+            }
+          }
+        },
+        "rate_limit": {
+          "type": "object",
+          "required": [
+            "policy",
+            "window_seconds",
+            "limit",
+            "retry_after_seconds"
+          ]
+        },
+        "terms": {
+          "type": "object",
+          "required": [
+            "usage",
+            "attribution",
+            "redistribution",
+            "live_network"
+          ],
+          "properties": {
+            "live_network": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}

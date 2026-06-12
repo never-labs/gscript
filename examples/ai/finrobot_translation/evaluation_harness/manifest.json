@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "harness_id": "FR-GAP-023-finrobot-evaluation-harness",
+  "fixture_version": "finrobot-eval-fixtures-v1",
+  "generated_at": "2026-06-11T00:00:00Z",
+  "ci_report": {
+    "format": "json",
+    "gate": true,
+    "provider_free": true,
+    "command_template": "leia evaluate --gate --report ${REPORT} --replay ${REPLAY_RECORDS} ${MATERIALIZED_SOURCE}"
+  },
+  "ai_evaluation_capability": {
+    "id": "ai-evaluation-dialect-provider-free-v1",
+    "scope": "generic-ai-evaluation",
+    "domain_specific": false,
+    "network_policy": "disabled_by_default",
+    "model_policy": "replay_or_stub_only",
+    "test_hardcoding_policy": "manifest_driven",
+    "dialect_surface": [
+      "evaluate_block",
+      "eval.load_jsonl",
+      "eval.case",
+      "eval.metric",
+      "eval.judge",
+      "eval.usage",
+      "eval.budget",
+      "llm.replay"
+    ],
+    "capability_specimen": {
+      "id": "generic_ai_evaluation_dialect",
+      "source_path": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.source.txt",
+      "dataset_path": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation_dataset.jsonl",
+      "replay_records_path": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.records.json",
+      "source_sha256": "a0f03802b778800261fec051db5820c1d8ffa9232b6e3451b775d9c15df63ba2",
+      "dataset_sha256": "495328590fb3fb8844b861ded85215da853774f139e000db30c5cd8ada216882",
+      "replay_records_sha256": "e6bb2f4b0c16303c759aa294663c9f40000a8a046e3f510c0a4f20613c3a01f5",
+      "turn_count": 1,
+      "models": [
+        "mock-ai-eval-judge"
+      ],
+      "dataset_rows": 2,
+      "subcase_ids": [
+        "judge-deterministic-replay",
+        "manifest-threshold-gate"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 4,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": [
+          "generic ai evaluation dialect specimen"
+        ],
+        "metrics": [
+          {
+            "name": "dataset_item_valid",
+            "type": "bool",
+            "count": 2,
+            "pass_rate": 1.0
+          },
+          {
+            "name": "judge_passed",
+            "type": "bool",
+            "count": 2,
+            "pass_rate": 1.0
+          },
+          {
+            "name": "answer_chars",
+            "type": "number",
+            "count": 2,
+            "mean": 64.0
+          },
+          {
+            "name": "rubric_label",
+            "type": "string",
+            "count": 2
+          },
+          {
+            "name": "judge_cost",
+            "type": "number",
+            "count": 1,
+            "mean": 0.004
+          },
+          {
+            "name": "judge_input_tokens",
+            "type": "number",
+            "count": 1,
+            "mean": 4.0
+          },
+          {
+            "name": "judge_output_tokens",
+            "type": "number",
+            "count": 1,
+            "mean": 3.0
+          },
+          {
+            "name": "judge_tokens",
+            "type": "number",
+            "count": 1,
+            "mean": 7.0
+          }
+        ]
+      },
+      "source_materialization": {
+        "required": true,
+        "input_extension": ".source.txt",
+        "materialized_extension": ".leia",
+        "materialized_filename": "generic_ai_evaluation.leia",
+        "dataset_copy_required": true,
+        "reason": "The checked-in specimen is stored as text fixture content and must be materialized into a temporary Leia source file beside the dataset fixture before evaluation."
+      }
+    }
+  },
+  "judge_spec": {
+    "id": "generic_binary_judge_v1",
+    "purpose": "Score any AI output against a rubric using replay-backed eval.judge.",
+    "request_contract": {
+      "required_fields": [
+        "model",
+        "messages"
+      ],
+      "default_max_tokens": 200,
+      "default_budget": {
+        "turns": 1,
+        "tokens": 512
+      },
+      "message_roles": [
+        "system",
+        "user"
+      ]
+    },
+    "response_contract": {
+      "accepted_text_values": [
+        "pass",
+        "fail"
+      ],
+      "usage_metrics": [
+        "judge_cost",
+        "judge_input_tokens",
+        "judge_output_tokens",
+        "judge_tokens"
+      ],
+      "failure_finding_kind": "llm_replay_mismatch"
+    }
+  },
+  "metric_registry": [
+    {
+      "name": "dataset_item_valid",
+      "type": "bool",
+      "aggregation": "pass_rate",
+      "golden_min": 1.0
+    },
+    {
+      "name": "judge_passed",
+      "type": "bool",
+      "aggregation": "pass_rate",
+      "golden_min": 1.0
+    },
+    {
+      "name": "answer_chars",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_min": 1.0
+    },
+    {
+      "name": "rubric_label",
+      "type": "string",
+      "aggregation": "value_counts"
+    },
+    {
+      "name": "judge_tokens",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 16.0
+    },
+    {
+      "name": "judge_input_tokens",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 512.0
+    },
+    {
+      "name": "judge_output_tokens",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 200.0
+    },
+    {
+      "name": "judge_cost",
+      "type": "number",
+      "aggregation": "mean_min_max",
+      "golden_max": 0.02
+    }
+  ],
+  "dataset_manifest": {
+    "format": "jsonl",
+    "id_field": "id",
+    "required_fields": [
+      "id",
+      "input",
+      "answer",
+      "rubric",
+      "rubric_label",
+      "needs_judge",
+      "expected_judgment"
+    ],
+    "minimum_rows": 2,
+    "row_policy": "stable_ordered_fixture"
+  },
+  "record_replay_matching": {
+    "mode": "strict_ordered",
+    "matched_request_fields": [
+      "model",
+      "messages.role",
+      "messages.text",
+      "max_tokens",
+      "tools",
+      "stream"
+    ],
+    "unmatched_request_finding_kind": "llm_replay_mismatch",
+    "exhausted_replay_finding_kind": "llm_replay_exhausted",
+    "unconsumed_replay_finding_kind": "llm_replay_unconsumed",
+    "failure_details": [
+      "expected",
+      "actual",
+      "case_id",
+      "case_name"
+    ]
+  },
+  "scoring_trace": {
+    "report_fields": [
+      "schema_version",
+      "status",
+      "summary",
+      "llm",
+      "cases",
+      "metrics",
+      "findings"
+    ],
+    "case_fields": [
+      "case_id",
+      "name",
+      "source_path",
+      "status",
+      "llm",
+      "subcases",
+      "assertions"
+    ],
+    "llm_case_fields": [
+      "trace_ref",
+      "turns",
+      "input_tokens",
+      "output_tokens",
+      "cost"
+    ],
+    "subcase_fields": [
+      "case_id",
+      "status",
+      "metrics"
+    ],
+    "finding_policy": "empty_on_success_structured_on_failure"
+  },
+  "provider_free_model_stub": {
+    "allowed_model_prefix": "mock-",
+    "provider_env_policy": "ignored",
+    "live_provider_calls": false,
+    "network_calls": false,
+    "stub_modes": [
+      "replay"
+    ]
+  },
+  "failure_envelope": {
+    "status_on_failure": "failed",
+    "finding_kinds": [
+      "llm_replay_mismatch",
+      "llm_replay_exhausted",
+      "llm_replay_unconsumed",
+      "evaluate_regression",
+      "evaluate_metric_regression"
+    ],
+    "required_fields": [
+      "kind",
+      "severity",
+      "message",
+      "path"
+    ],
+    "details_required_for": [
+      "llm_replay_mismatch",
+      "llm_replay_exhausted",
+      "llm_replay_unconsumed",
+      "evaluate_regression",
+      "evaluate_metric_regression"
+    ],
+    "details_policy": "machine_readable"
+  },
+  "golden_threshold_gates": {
+    "gate": true,
+    "summary_pass_rate_min": 1.0,
+    "cases_failed_max": 0,
+    "findings_max": 0,
+    "regression_threshold": 0.0,
+    "metric_thresholds": [
+      {
+        "name": "dataset_item_valid",
+        "type": "bool",
+        "pass_rate_min": 1.0
+      },
+      {
+        "name": "judge_passed",
+        "type": "bool",
+        "pass_rate_min": 1.0
+      },
+      {
+        "name": "judge_tokens",
+        "type": "number",
+        "mean_max": 16.0
+      }
+    ]
+  },
+  "records_inventory": [
+    {
+      "id": "core_agents_main",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/core_agents/main.leia",
+      "source_records_path": "examples/ai/finrobot_translation/core_agents/main.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/core_agents/main.records.json",
+      "source_records_sha256": "175945fc031f63f2fce5322565be41cc93c988a27531ba4fcb7f1fa553e5bfa3",
+      "replay_records_sha256": "175945fc031f63f2fce5322565be41cc93c988a27531ba4fcb7f1fa553e5bfa3",
+      "turn_count": 2,
+      "models": [
+        "mock-finrobot-core",
+        "mock-finrobot-review"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 2,
+        "cases_passed": 2,
+        "cases_failed": 0,
+        "assertions": 12,
+        "llm_loaded_turns": 2,
+        "llm_replayed_turns": 2,
+        "llm_turns": 2,
+        "case_names": [
+          "agent library maps to declarative Leia agents",
+          "role prompt mirrors FinRobot responsibility preprocessing"
+        ]
+      }
+    },
+    {
+      "id": "core_agents_workflow_handoff",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia",
+      "source_records_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.records.json",
+      "source_records_sha256": "b144488bde3b9bdffbd64876743f1ebd9232956aaaf25920ec90681a080ee660",
+      "replay_records_sha256": "b144488bde3b9bdffbd64876743f1ebd9232956aaaf25920ec90681a080ee660",
+      "turn_count": 3,
+      "models": [
+        "mock-employee",
+        "mock-leader"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 2,
+        "cases_passed": 2,
+        "cases_failed": 0,
+        "assertions": 10,
+        "llm_loaded_turns": 3,
+        "llm_replayed_turns": 3,
+        "llm_turns": 3,
+        "case_names": [
+          "leader workflow delegates through agent as tool",
+          "group chat speaker policy is represented as explicit history"
+        ]
+      }
+    },
+    {
+      "id": "equity_report",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/equity_report.leia",
+      "source_records_path": "examples/ai/finrobot_translation/equity_report.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/equity_report.records.json",
+      "source_records_sha256": "d108ebc8ca2d1fc83b16c601d2eae04be4443e77627aed26b9c8db775423d9b1",
+      "replay_records_sha256": "d108ebc8ca2d1fc83b16c601d2eae04be4443e77627aed26b9c8db775423d9b1",
+      "turn_count": 5,
+      "models": [
+        "mock-finrobot-equity",
+        "mock-finrobot-report-review"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 22,
+        "llm_loaded_turns": 5,
+        "llm_replayed_turns": 5,
+        "llm_turns": 5,
+        "case_names": [
+          "finrobot equity report replay"
+        ]
+      }
+    },
+    {
+      "id": "quant_investment_group",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/quant_experiments/investment_group.leia",
+      "source_records_path": "examples/ai/finrobot_translation/quant_experiments/investment_group.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/investment_group.records.json",
+      "source_records_sha256": "430b378757a953a7ebc3a6f45ae3114715a1c85ad869cec46fb36af35e542831",
+      "replay_records_sha256": "430b378757a953a7ebc3a6f45ae3114715a1c85ad869cec46fb36af35e542831",
+      "turn_count": 1,
+      "models": [
+        "mock-fast"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 1,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": [
+          "FinRobot investment group replay"
+        ]
+      }
+    },
+    {
+      "id": "quant_multi_factor_agents",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.leia",
+      "source_records_path": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.records.json",
+      "source_records_sha256": "ff33ea0bcbf370b845f58906fb4ce25742aa47090a19e92b0cdfff16394074e6",
+      "replay_records_sha256": "ff33ea0bcbf370b845f58906fb4ce25742aa47090a19e92b0cdfff16394074e6",
+      "turn_count": 1,
+      "models": [
+        "mock-fast"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 1,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": [
+          "FinRobot multi-factor agents replay"
+        ]
+      }
+    },
+    {
+      "id": "quant_portfolio_optimization",
+      "fixture_version": "finrobot-eval-fixtures-v1",
+      "source_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+      "source_records_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.records.json",
+      "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.records.json",
+      "source_records_sha256": "41419362f5ff0c0daf8b7f1b77eb5e6bc3ea59cd4992646955099d4e875aaa01",
+      "replay_records_sha256": "41419362f5ff0c0daf8b7f1b77eb5e6bc3ea59cd4992646955099d4e875aaa01",
+      "turn_count": 1,
+      "models": [
+        "mock-fast"
+      ],
+      "golden_report": {
+        "status": "ok",
+        "evaluate_blocks": 1,
+        "cases_passed": 1,
+        "cases_failed": 0,
+        "assertions": 1,
+        "llm_loaded_turns": 1,
+        "llm_replayed_turns": 1,
+        "llm_turns": 1,
+        "case_names": [
+          "FinRobot portfolio optimization replay"
+        ]
+      }
+    }
+  ]
+}

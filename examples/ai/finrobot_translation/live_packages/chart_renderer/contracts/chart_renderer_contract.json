@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-chart-renderer-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "source_modules": [
+    "finrobot/charting.py",
+    "finrobot/chart_generator.py",
+    "finrobot/enhanced_chart_generator.py",
+    "mplfinance"
+  ],
+  "modules": [
+    {
+      "id": "charting",
+      "source_module": "finrobot/charting.py",
+      "required_fields": [
+        "chart_id",
+        "symbol",
+        "chart_type",
+        "series",
+        "recipe_semantics",
+        "source_metadata",
+        "stale_data_warning"
+      ]
+    },
+    {
+      "id": "chart_generator",
+      "source_module": "finrobot/chart_generator.py",
+      "required_fields": [
+        "request_id",
+        "renderer",
+        "dimensions",
+        "theme",
+        "output_format",
+        "chart_spec"
+      ]
+    },
+    {
+      "id": "enhanced_chart_generator",
+      "source_module": "finrobot/enhanced_chart_generator.py",
+      "required_fields": [
+        "indicators",
+        "panels",
+        "annotations",
+        "result_envelope",
+        "snapshot"
+      ]
+    },
+    {
+      "id": "mplfinance_adapter",
+      "source_module": "mplfinance",
+      "required_fields": [
+        "renderer",
+        "dependency_imported",
+        "clean_skip",
+        "unsupported_reason"
+      ]
+    }
+  ],
+  "typed_envelopes": [
+    {
+      "id": "chart_spec",
+      "schema": "schemas/chart_spec_v1.schema.json",
+      "fixture": "fixtures/chart_spec_ACME_candlestick_fixture.json",
+      "required_fields": [
+        "schema_version",
+        "provider_free",
+        "chart_id",
+        "symbol",
+        "chart_type",
+        "series",
+        "dimensions",
+        "theme",
+        "source_metadata",
+        "stale_data_warning"
+      ]
+    },
+    {
+      "id": "chart_recipe_matrix",
+      "schema": "schemas/chart_recipe_matrix_v1.schema.json",
+      "fixture": "fixtures/chart_recipe_semantic_matrix_fixture.json",
+      "required_fields": [
+        "schema_version",
+        "provider_free",
+        "live_network",
+        "real_dependency_imports",
+        "dialect",
+        "recipes",
+        "snapshot"
+      ]
+    },
+    {
+      "id": "render_request",
+      "schema": "schemas/render_request_v1.schema.json",
+      "fixture": "fixtures/render_request_ACME_candlestick_fixture.json",
+      "required_fields": [
+        "request_id",
+        "renderer",
+        "output_format",
+        "dimensions",
+        "theme",
+        "chart_spec_ref",
+        "live_network",
+        "real_dependency_imports"
+      ]
+    },
+    {
+      "id": "render_result",
+      "schema": "schemas/render_result_v1.schema.json",
+      "fixture": "fixtures/render_result_ACME_candlestick_snapshot_fixture.json",
+      "required_fields": [
+        "request_id",
+        "ok",
+        "renderer",
+        "artifact",
+        "snapshot",
+        "warnings",
+        "source_metadata"
+      ]
+    }
+  ],
+  "source_metadata_contract": {
+    "schema": "schemas/source_metadata_v1.schema.json",
+    "required_fields": [
+      "provider",
+      "fixture_key",
+      "captured_at",
+      "as_of",
+      "source_schema",
+      "source_url_redacted",
+      "stale_after_days",
+      "is_stale",
+      "replay_ready"
+    ],
+    "redact_source_url": true,
+    "live_network": false
+  },
+  "stale_data_warning_contract": {
+    "required": true,
+    "warning_code": "STALE_SOURCE_DATA",
+    "trigger_field": "source_metadata.is_stale",
+    "fixture": "fixtures/render_result_ACME_candlestick_snapshot_fixture.json"
+  },
+  "snapshot_contract": {
+    "required": true,
+    "hash_algorithm": "sha256",
+    "hash_field": "snapshot.hash",
+    "fixture": "fixtures/render_result_ACME_candlestick_snapshot_fixture.json",
+    "deterministic_inputs": [
+      "chart_spec",
+      "dimensions",
+      "theme",
+      "renderer",
+      "output_format"
+    ]
+  },
+  "acceptance_gates": [
+    "charting and chart_generator return typed envelopes instead of renderer-native objects",
+    "render requests and results carry provider_free=true and live_network=false",
+    "chart recipe matrix covers financial semantic families with deterministic spec hashes before any renderer binding",
+    "source metadata redacts URLs, declares replay readiness, and emits a stale-data warning when data is stale",
+    "dimensions and theme are explicit in both request and result contracts",
+    "snapshot hashes are deterministic fixture values",
+    "unsupported renderer paths clean-skip without importing mplfinance, matplotlib, plotly, browser, or network dependencies"
+  ]
+}

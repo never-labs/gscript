@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic-ai/generic_trace_events/model_turn_replay_trace_projection_v1.schema.json",
+  "title": "Generic Model Turn Replay Trace Projection",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "projection_kind",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "real_dependency_imports",
+    "sources",
+    "correlation_policy",
+    "field_mappings",
+    "projected_events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "projection_kind": {
+      "const": "external_envelope_sequence_to_trace_envelope"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "domain_specific": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "live_model": {
+      "const": false
+    },
+    "credentials_required": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "sources": {
+      "type": "object",
+      "required": [
+        "model_io",
+        "turn_execution",
+        "turn_replay_match",
+        "record_replay"
+      ]
+    },
+    "correlation_policy": {
+      "type": "object",
+      "required": [
+        "trace_id_source",
+        "turn_id_source",
+        "replay_session_id_source",
+        "request_hash_source"
+      ]
+    },
+    "field_mappings": {
+      "type": "array",
+      "minItems": 1
+    },
+    "projected_events": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "trace_envelope_v1.schema.json#/properties/events/items"
+      }
+    }
+  }
+}

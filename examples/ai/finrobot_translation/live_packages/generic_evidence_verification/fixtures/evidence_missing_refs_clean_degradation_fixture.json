@@ -1,0 +1,12 @@
+{
+  "action_id": "degrade-claim-missing-001",
+  "claim_id": "claim-missing-001",
+  "mode": "omit_claim_and_warn",
+  "reason": "required source ref is unresolved",
+  "provider_free": true,
+  "live_network": false,
+  "invented_claim_allowed": false,
+  "warning_refs": [
+    "unresolved:source_missing_ref"
+  ]
+}

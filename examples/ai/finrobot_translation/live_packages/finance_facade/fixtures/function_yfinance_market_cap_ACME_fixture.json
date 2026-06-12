@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "function_id": "yfinance_get_market_cap",
+  "source_module": "finrobot/data_source/market_data_api.py",
+  "provider": "yfinance",
+  "capability": "finance.facade.yfinance.market_cap.fetch",
+  "symbol": "ACME",
+  "dataset": "market_cap",
+  "input": {
+    "symbol": "ACME"
+  },
+  "output": {
+    "fields": {
+      "market_cap": 2320000000,
+      "shares_outstanding": 45000000,
+      "last_price": 51.56,
+      "currency": "USD",
+      "as_of": "2026-06-11"
+    },
+    "source_ref": "src_yfinance_market_cap"
+  },
+  "fallback": {
+    "order": [
+      "yfinance",
+      "fmp",
+      "finnhub",
+      "openbb"
+    ],
+    "selected_provider": "yfinance",
+    "attempted": [
+      "yfinance"
+    ],
+    "clean_skip_without_dependency": true
+  },
+  "provenance": {
+    "provider": "yfinance",
+    "fixture_key": "function:yfinance:market_cap:ACME",
+    "captured_at": "2026-06-11T00:00:00Z",
+    "source_schema": "function_fixture_v1",
+    "source_url_redacted": true,
+    "stale_after_days": 7,
+    "replay_ready": true
+  }
+}

@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-optional-integrations-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "captured_at": "2026-06-11T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_key": "fingpt:forecast:ACME:2026-06-11",
+      "integration_id": "fingpt",
+      "capability": "optional.ai.fingpt.forecast",
+      "metadata": {
+        "symbol": "ACME",
+        "horizon": "30d",
+        "sentiment": "constructive",
+        "version_metadata": {
+          "package": "fingpt",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.ai.fingpt.forecast",
+          "fixture_key": "fingpt:forecast:ACME:2026-06-11",
+          "data": {
+            "symbol": "ACME",
+            "horizon": "30d",
+            "sentiment": "constructive"
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "fingpt": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "finrl:strategy:ACME:offline",
+      "integration_id": "finrl",
+      "capability": "optional.quant.finrl.strategy",
+      "metadata": {
+        "symbol": "ACME",
+        "strategy": "ppo_fixture",
+        "reward": 0.12,
+        "trades": 3,
+        "version_metadata": {
+          "package": "finrl",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.quant.finrl.strategy",
+          "fixture_key": "finrl:strategy:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "strategy": "ppo_fixture",
+            "reward": 0.12,
+            "trades": 3
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "finrl": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "finml:factors:ACME:offline",
+      "integration_id": "finml",
+      "capability": "optional.quant.finml.factor_model",
+      "metadata": {
+        "symbol": "ACME",
+        "factors": [
+          "quality",
+          "momentum"
+        ],
+        "score": 0.71,
+        "version_metadata": {
+          "package": "finml",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.quant.finml.factor_model",
+          "fixture_key": "finml:factors:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "factors": [
+              "quality",
+              "momentum"
+            ],
+            "score": 0.71
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "finml": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "backtrader:sma_cross:ACME:offline",
+      "integration_id": "backtrader",
+      "capability": "optional.quant.backtrader.backtest",
+      "metadata": {
+        "symbol": "ACME",
+        "strategy": "sma_cross",
+        "sharpe": 1.24,
+        "max_drawdown": 0.08,
+        "version_metadata": {
+          "package": "backtrader",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.quant.backtrader.backtest",
+          "fixture_key": "backtrader:sma_cross:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "strategy": "sma_cross",
+            "sharpe": 1.24,
+            "max_drawdown": 0.08
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "backtrader": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "mplfinance:candles:ACME:offline",
+      "integration_id": "mplfinance",
+      "capability": "optional.chart.mplfinance.render",
+      "metadata": {
+        "symbol": "ACME",
+        "artifact": "candles.png",
+        "renderer": "fixture_only",
+        "version_metadata": {
+          "package": "mplfinance",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.chart.mplfinance.render",
+          "fixture_key": "mplfinance:candles:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "artifact": "candles.png",
+            "renderer": "fixture_only"
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "mplfinance": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "openbb:market_data:ACME:offline",
+      "integration_id": "openbb",
+      "capability": "optional.data.openbb.market_data",
+      "metadata": {
+        "symbol": "ACME",
+        "close": 103.2,
+        "source": "fixture",
+        "version_metadata": {
+          "package": "openbb",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "request": {
+          "dataset": "market_data",
+          "query": {
+            "symbol": "ACME",
+            "asset_class": "equity",
+            "interval": "1d",
+            "adjusted": true
+          }
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.data.openbb.market_data",
+          "fixture_key": "openbb:market_data:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "close": 103.2,
+            "currency": "USD"
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "OPENBB_PAT": "skipped",
+          "OPENBB_DATABASE_URL": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "ollama:function_call:ACME:offline",
+      "integration_id": "ollama",
+      "capability": "optional.llm.ollama.local",
+      "metadata": {
+        "symbol": "ACME",
+        "model": "llama3-fixture",
+        "tool_call": "lookup_symbol",
+        "version_metadata": {
+          "package": "ollama",
+          "version_source": "fixture_metadata",
+          "detected_version": null,
+          "dependency_absent_status": "skipped"
+        },
+        "result_envelope": {
+          "status": "ok",
+          "capability": "optional.llm.ollama.local",
+          "fixture_key": "ollama:function_call:ACME:offline",
+          "data": {
+            "symbol": "ACME",
+            "model": "llama3-fixture",
+            "tool_call": "lookup_symbol"
+          },
+          "metadata": {
+            "source": "fixture",
+            "provider_free": true,
+            "live_network": false,
+            "real_dependency_imports": false
+          }
+        },
+        "absence_gates": {
+          "ollama": "skipped"
+        },
+        "terms": {
+          "mode": "fixture_replay",
+          "metadata_only": true,
+          "live_terms_required_before_network_use": true
+        },
+        "credential_redaction": {
+          "status": "redacted",
+          "secret_values_present": false
+        },
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ]
+}

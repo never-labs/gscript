@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "fixture_key": "equity_pipeline:artifact_manifest:ACME:offline",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "report_id": "ACME-equity-analysis-2026-06-11",
+  "artifacts": [
+    {
+      "artifact_id": "report_markdown",
+      "kind": "report",
+      "format": "text/markdown",
+      "status": "planned_not_rendered",
+      "source_refs": [
+        "equity_pipeline:section_handoff:ACME:offline"
+      ]
+    },
+    {
+      "artifact_id": "valuation_table",
+      "kind": "table",
+      "format": "application/json",
+      "status": "specified",
+      "source_refs": [
+        "equity_pipeline:forecast:ACME:offline"
+      ]
+    },
+    {
+      "artifact_id": "revenue_forecast_chart",
+      "kind": "chart",
+      "format": "image/png",
+      "status": "planned_not_rendered",
+      "source_refs": [
+        "equity_pipeline:forecast:ACME:offline"
+      ]
+    },
+    {
+      "artifact_id": "provider_free_trace",
+      "kind": "trace",
+      "format": "application/json",
+      "status": "specified",
+      "source_refs": [
+        "equity_pipeline:trace:ACME:offline"
+      ]
+    },
+    {
+      "artifact_id": "ai_disclosure",
+      "kind": "disclosure",
+      "format": "text/plain",
+      "status": "specified",
+      "source_refs": [
+        "src-policy-fixture"
+      ]
+    }
+  ],
+  "trace_refs": [
+    "equity_pipeline:trace:ACME:offline"
+  ],
+  "disclosures": [
+    {
+      "id": "ai_disclosure",
+      "text": "Generated from offline fixtures; verify before investment use.",
+      "must_render": true
+    },
+    {
+      "id": "investment_risk",
+      "text": "This is not investment advice.",
+      "must_render": true
+    }
+  ]
+}

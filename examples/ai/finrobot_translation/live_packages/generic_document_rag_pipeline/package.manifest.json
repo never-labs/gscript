@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "id": "generic-document-rag-pipeline",
+  "package_name": "leia-generic-ai-document-rag-pipeline",
+  "package_boundary_id": "generic-ai-document-rag-pipeline",
+  "capability_id": "generic.ai.document.rag",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic document RAG package for document conversion, section extraction, chunk provenance, corpus manifests, retrieval results, citation consistency, and clean-skip adapter boundaries.",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "real_dependency_import_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "contract_root": "contracts",
+  "entrypoints": {
+    "main": "main.leia",
+    "contract": "contracts/generic_document_rag_pipeline_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "document_rag_pipeline": "schemas/generic_document_rag_pipeline_v1.schema.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_document_rag_pipeline_contract.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "document_rag_pipeline": "fixtures/generic_document_rag_pipeline_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.document.rag",
+    "generic.ai.document.convert",
+    "generic.ai.document.section.extract",
+    "generic.ai.rag.chunk",
+    "generic.ai.rag.corpus_manifest",
+    "generic.ai.rag.retrieve",
+    "generic.ai.rag.citation_consistency",
+    "generic.ai.rag.adapter.clean_skip"
+  ],
+  "capability_surfaces": [
+    "document_conversion",
+    "section_extraction",
+    "chunk_policy",
+    "chunk_provenance",
+    "corpus_manifest",
+    "retrieval_result",
+    "citation_consistency",
+    "adapter_boundaries"
+  ],
+  "default_policy": {
+    "mode": "fixture_replay",
+    "provider_policy": "provider-free",
+    "live_network": false,
+    "live_model_calls": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_document_rag_pipeline_fixture"
+  },
+  "test_gates": [
+    "document conversion and section extraction fixtures decode without provider SDKs or live network",
+    "RAG chunk provenance and corpus manifest stay domain-neutral and provider-free",
+    "retrieval result citations resolve to known chunk identifiers",
+    "adapter boundaries prove converter, chunker, embedding, vector store, and retriever dependencies remain clean-skip"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in leia-generic-ai-document-rag-pipeline handling; this provider-free package boundary owns document conversion, RAG chunking, retrieval, citation, and adapter contracts."
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-document-rag-pipeline; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
+  },
+  "dialect_capability_id": "generic.ai.document.rag",
+  "dialect_backend_shape": "ai.document.rag_pipeline",
+  "dialect_aliases": [
+    {
+      "id": "ai.document.rag_pipeline",
+      "target": "generic.ai.document.rag",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.document.rag",
+  "capability_aliases": [
+    {
+      "alias": "ai.document.rag_pipeline",
+      "target_capability_id": "generic.ai.document.rag",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "document-rag",
+      "target_capability_id": "generic.ai.document.rag",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "document-rag",
+      "target_capability_id": "generic.ai.document.rag",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.document.rag",
+      "target_capability_id": "generic.ai.document.rag",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "memory",
+      "target_capability_id": "generic.ai.document.rag",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.document.rag",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
+}

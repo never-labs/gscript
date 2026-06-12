@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-strict-ordered-replay-matching-contract",
+  "provider_free": true,
+  "domain_specific": false,
+  "strategy": "strict_ordered",
+  "rules": [
+    {
+      "id": "match_next_record_only",
+      "description": "Each incoming request is compared with the record at the current cursor only.",
+      "required": true
+    },
+    {
+      "id": "no_scan_ahead",
+      "description": "A later record with the same replay key must not be consumed when the current record mismatches.",
+      "required": true
+    },
+    {
+      "id": "mismatch_is_finding",
+      "description": "Operation, capability, replay_key, or request_hash differences emit a mismatch finding with expected and actual values.",
+      "required": true
+    },
+    {
+      "id": "unconsumed_records_are_findings",
+      "description": "Records at or after the final cursor emit unconsumed_record findings after replay requests are exhausted.",
+      "required": true
+    },
+    {
+      "id": "summary_is_deterministic",
+      "description": "Summary fields, finding kind order, and matched record IDs are stable across equivalent fixture runs.",
+      "required": true
+    }
+  ],
+  "finding_kinds": {
+    "mismatch": "generic.ai.replay.mismatch",
+    "unconsumed": "generic.ai.replay.unconsumed_record",
+    "exhausted": "generic.ai.replay.exhausted"
+  },
+  "request_identity_fields": ["operation", "capability", "replay_key", "request_hash"],
+  "summary_fixture": "fixtures/provider_free_fixture_index.json#/expected_summaries/strict_ordered_partial"
+}

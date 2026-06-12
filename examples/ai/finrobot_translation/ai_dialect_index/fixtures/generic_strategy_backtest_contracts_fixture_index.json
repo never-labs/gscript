@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "fixture_index_id": "generic-strategy-backtest-contracts-fixture-index",
+  "capability_id": "generic.ai.strategy.backtest.contracts",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic_strategy_backtest_contracts:provider_free_fixture_index:v1",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/schemas/strategy_manifest_v1.schema.json",
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "generic_strategy_backtest_contracts:contract:v1",
+      "path": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json",
+      "schema": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/schemas/metric_summary_v1.schema.json",
+      "replay_ready": true
+    }
+  ]
+}

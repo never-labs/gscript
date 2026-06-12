@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-agent-state-store/checkpoint-v1.schema.json",
+  "title": "Generic Agent State Checkpoint",
+  "type": "object",
+  "required": [
+    "checkpoint_key",
+    "cache_key",
+    "key_algorithm",
+    "key_material_fields",
+    "excluded_fields",
+    "stable_across_replay"
+  ],
+  "properties": {
+    "checkpoint_key": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "cache_key": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "key_algorithm": {
+      "type": "string",
+      "const": "sha256"
+    },
+    "key_material_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "excluded_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "stable_across_replay": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic_eval:agent_run_projection:offline:v1",
+  "projection_kind": "agent_run_to_evaluation_harness_projection",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "source_fixture_refs": {
+    "agent_tool_contract_projection": "../generic_agent_runner/fixtures/tool_contract_agent_projection_fixture.json",
+    "agent_loop_trace": "../generic_agent_runner/fixtures/loop_trace_fixture.json",
+    "record_replay_ordered_records": "../generic_record_replay/fixtures/ordered_records_fixture.json",
+    "record_replay_matching_requests": "../generic_record_replay/fixtures/matching_requests_fixture.json",
+    "trace_envelope": "../generic_trace_events/fixtures/trace_envelope_fixture.json",
+    "case_result_summary": "fixtures/case_result_summary_fixture.json",
+    "golden_gates": "fixtures/golden_gates_fixture.json"
+  },
+  "run_identity_mappings": [
+    {
+      "source_package": "generic_agent_runner",
+      "source_identity": "generic_agent_loop_trace_fixture",
+      "target_dataset_id": "generic-ai-eval-smoke-dataset",
+      "target_case_id": "case-risk-summary",
+      "identity_policy": "explicit_projection_mapping_no_id_equality_assumption",
+      "provider_free": true
+    },
+    {
+      "source_package": "generic_record_replay",
+      "source_identity": "generic-ai-record-replay-ordered-records",
+      "target_dataset_id": "generic-ai-eval-smoke-dataset",
+      "target_case_id": "case-catalyst-classification",
+      "identity_policy": "explicit_projection_mapping_no_id_equality_assumption",
+      "provider_free": true
+    }
+  ],
+  "replay_record_mappings": [
+    {
+      "record_id": "rec-000-analyst-intent",
+      "replay_key": "turn:000:llm.complete",
+      "operation": "llm.complete",
+      "capability": "generic.ai.completion",
+      "request_hash_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "target_case_id": "case-risk-summary",
+      "projected_metric_ids": [
+        "dataset_item_valid",
+        "judge_passed"
+      ],
+      "provider_free": true
+    },
+    {
+      "record_id": "rec-001-tool-lookup",
+      "replay_key": "turn:001:tool.lookup",
+      "operation": "tool.call",
+      "capability": "generic.ai.tool.invoke",
+      "request_hash_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "target_case_id": "case-catalyst-classification",
+      "projected_metric_ids": [
+        "dataset_item_valid",
+        "judge_passed"
+      ],
+      "provider_free": true
+    }
+  ],
+  "trace_event_mappings": [
+    {
+      "source_trace_id": "trace-generic-agent-loop-1",
+      "source_event_type": "agent_start",
+      "target_case_id": "case-risk-summary",
+      "target_judge_trace_ref": "case:case-risk-summary:judge:1",
+      "projection_policy": "trace_event_ref_only",
+      "provider_free": true
+    },
+    {
+      "source_trace_id": "trace-generic-agent-loop-1",
+      "source_event_type": "agent_turn_tool_dispatch",
+      "target_case_id": "case-catalyst-classification",
+      "target_judge_trace_ref": "case:case-catalyst-classification:judge:1",
+      "projection_policy": "trace_event_ref_only",
+      "provider_free": true
+    }
+  ],
+  "case_result_mappings": [
+    {
+      "target_case_id": "case-risk-summary",
+      "source_tool_history_status": "ok",
+      "source_replay_key": "generic_tool:invocation:trace:v1",
+      "target_status": "passed",
+      "target_judge_trace_ref": "case:case-risk-summary:judge:1",
+      "assertions_projected": 4,
+      "finding_count": 0
+    },
+    {
+      "target_case_id": "case-catalyst-classification",
+      "source_tool_history_status": "denied",
+      "source_replay_key": "generic_tool:approval:denied:v1",
+      "target_status": "passed",
+      "target_judge_trace_ref": "case:case-catalyst-classification:judge:1",
+      "assertions_projected": 4,
+      "finding_count": 0
+    }
+  ],
+  "golden_gate_projection": {
+    "source_summary_status": "passed",
+    "target_gate": true,
+    "target_pass_rate": 1,
+    "cases_failed": 0,
+    "findings": 0,
+    "judge_replay_errors": 0,
+    "provider_free": true
+  },
+  "projection_assertions": {
+    "agent_run_projects_to_eval_cases": true,
+    "record_replay_keys_are_kept_distinct_from_trace_ids": true,
+    "trace_events_are_referenced_not_redefined": true,
+    "tool_history_status_projects_to_case_status": true,
+    "denied_tool_history_can_project_to_passed_policy_case": true,
+    "golden_gate_uses_eval_summary_not_source_trace_status": true,
+    "provider_free_boundary_preserved": true,
+    "live_network_absent": true,
+    "real_dependency_imports_absent": true
+  }
+}

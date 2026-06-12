@@ -1,0 +1,259 @@
+// data_normalization.leia - FR-GAP-008 typed table/data normalization fixture.
+// The example is deliberately domain-neutral: nested provider JSON records are
+// flattened into a typed row contract with provenance and missing-data markers.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+typed_table_contract := {
+    name: "generic_observation_table",
+    version: "FR-GAP-008",
+    columns: {
+        {name: "entity_id", kind: "string", required: true},
+        {name: "entity_name", kind: "string", required: true},
+        {name: "period", kind: "string", required: true},
+        {name: "region", kind: "string", required: false},
+        {name: "segment", kind: "string", required: false},
+        {name: "actual_value", kind: "number", required: false},
+        {name: "baseline_value", kind: "number", required: false},
+        {name: "adjusted_value", kind: "number", required: true},
+        {name: "is_missing", kind: "bool", required: true},
+        {name: "missing_reason", kind: "string", required: false},
+        {name: "source_provider", kind: "string", required: true},
+        {name: "source_dataset", kind: "string", required: true},
+        {name: "source_id", kind: "string", required: true},
+        {name: "source_row", kind: "number", required: true},
+        {name: "retrieved_at", kind: "string", required: true},
+    },
+    missing_strategy: {
+        name: "zero_fill_with_flag",
+        value_column: "actual_value",
+        adjusted_column: "adjusted_value",
+        flag_column: "is_missing",
+        reason_column: "missing_reason",
+    },
+    provenance_columns: {"source_provider", "source_dataset", "source_id", "source_row", "retrieved_at"},
+}
+
+nested_json_records := {
+    {
+        source: {provider: "provider_a", dataset: "observations", id: "obs-a", retrieved_at: "2026-06-11T00:00:00Z", row: 1},
+        entity: {id: "alpha", name: "Alpha Unit", attrs: {region: "north", segment: "core"}},
+        observation: {period: "2026-Q1", metrics: {actual: 10.0, baseline: 8.0}},
+    },
+    {
+        source: {provider: "provider_a", dataset: "observations", id: "obs-a", retrieved_at: "2026-06-11T00:00:00Z", row: 2},
+        entity: {id: "alpha", name: "Alpha Unit", attrs: {region: "north", segment: "core"}},
+        observation: {period: "2026-Q2", metrics: {actual: nil, baseline: 9.0}, missing: {reason: "provider_null"}},
+    },
+    {
+        source: {provider: "provider_b", dataset: "observations", id: "obs-b", retrieved_at: "2026-06-11T00:01:00Z", row: 1},
+        entity: {id: "beta", name: "Beta Unit", attrs: {region: "south", segment: "growth"}},
+        observation: {period: "2026-Q1", metrics: {actual: 7.0, baseline: 6.5}},
+    },
+    {
+        source: {provider: "provider_b", dataset: "observations", id: "obs-b", retrieved_at: "2026-06-11T00:01:00Z", row: 2},
+        entity: {id: "beta", name: "Beta Unit", attrs: {region: "south", segment: "growth"}},
+        observation: {period: "2026-Q2", metrics: {actual: 11.0, baseline: 7.5}},
+    },
+}
+
+entity_reference_rows := {
+    {entity_id: "alpha", category: "control", risk_band: "low", ref_source_id: "ref-1"},
+    {entity_id: "beta", category: "treatment", risk_band: "medium", ref_source_id: "ref-1"},
+    {entity_id: "gamma", category: "holdout", risk_band: "unknown", ref_source_id: "ref-2"},
+}
+
+func flatten_observation(record) {
+    actual := record.observation.metrics.actual
+    is_missing := actual == nil
+    adjusted := actual
+    reason := nil
+    if is_missing {
+        adjusted = 0.0
+        reason = record.observation.missing.reason
+    }
+    return {
+        entity_id: record.entity.id,
+        entity_name: record.entity.name,
+        period: record.observation.period,
+        region: record.entity.attrs.region,
+        segment: record.entity.attrs.segment,
+        actual_value: actual,
+        baseline_value: record.observation.metrics.baseline,
+        adjusted_value: adjusted,
+        is_missing: is_missing,
+        missing_reason: reason,
+        source_provider: record.source.provider,
+        source_dataset: record.source.dataset,
+        source_id: record.source.id,
+        source_row: record.source.row,
+        retrieved_at: record.source.retrieved_at,
+    }
+}
+
+func normalize_rows(records) {
+    rows := {}
+    for i := 1; i <= #records; i++ {
+        rows[#rows + 1] = flatten_observation(records[i])
+    }
+    table.sort(rows, func(a, b) {
+        if a.entity_id == b.entity_id {
+            return a.period < b.period
+        }
+        return a.entity_id < b.entity_id
+    })
+    return rows
+}
+
+func index_reference(rows) {
+    index := {}
+    for i := 1; i <= #rows; i++ {
+        index[rows[i].entity_id] = rows[i]
+    }
+    return index
+}
+
+func left_join_reference(rows, reference_rows) {
+    refs := index_reference(reference_rows)
+    out := {}
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        ref := refs[row.entity_id]
+        joined := row
+        if ref == nil {
+            joined.category = nil
+            joined.risk_band = nil
+            joined.reference_source_id = nil
+            joined.join_status = "missing_reference"
+        } else {
+            joined.category = ref.category
+            joined.risk_band = ref.risk_band
+            joined.reference_source_id = ref.ref_source_id
+            joined.join_status = "matched"
+        }
+        out[#out + 1] = joined
+    }
+    return out
+}
+
+func group_by_entity(rows) {
+    by_entity := {}
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        group := by_entity[row.entity_id]
+        if group == nil {
+            group = {entity_id: row.entity_id, row_count: 0, observed_count: 0, missing_count: 0, adjusted_sum: 0.0}
+            by_entity[row.entity_id] = group
+        }
+        group.row_count = group.row_count + 1
+        group.adjusted_sum = group.adjusted_sum + row.adjusted_value
+        if row.is_missing {
+            group.missing_count = group.missing_count + 1
+        } else {
+            group.observed_count = group.observed_count + 1
+        }
+    }
+    out := {}
+    for _, group := range pairs(by_entity) {
+        group.observed_avg = group.adjusted_sum / group.row_count
+        out[#out + 1] = group
+    }
+    table.sort(out, func(a, b) { return a.entity_id < b.entity_id })
+    return out
+}
+
+func window_for(rows, entity_id, end_period, size) {
+    window := {}
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        if row.entity_id == entity_id && row.period <= end_period {
+            window[#window + 1] = row
+        }
+    }
+    if #window > size {
+        trimmed := {}
+        start := #window - size + 1
+        for i := start; i <= #window; i++ {
+            trimmed[#trimmed + 1] = window[i]
+        }
+        window = trimmed
+    }
+    return window
+}
+
+func rolling_values(rows, size) {
+    out := {}
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        window := window_for(rows, row.entity_id, row.period, size)
+        total := 0.0
+        for j := 1; j <= #window; j++ {
+            total = total + window[j].adjusted_value
+        }
+        out[#out + 1] = {
+            entity_id: row.entity_id,
+            period: row.period,
+            window_size: size,
+            window_count: #window,
+            rolling_sum: total,
+            rolling_avg: total / #window,
+            source_id: row.source_id,
+        }
+    }
+    return out
+}
+
+func validate_normalized_rows(rows) {
+    missing := 0
+    provenance_ok := true
+    for i := 1; i <= #rows; i++ {
+        row := rows[i]
+        if row.is_missing {
+            missing = missing + 1
+        }
+        if row.source_provider == nil || row.source_dataset == nil || row.source_id == nil || row.source_row == nil || row.retrieved_at == nil {
+            provenance_ok = false
+        }
+    }
+    return {row_count: #rows, missing_count: missing, provenance_ok: provenance_ok}
+}
+
+normalized_rows := normalize_rows(nested_json_records)
+joined_rows := left_join_reference(normalized_rows, entity_reference_rows)
+entity_groups := group_by_entity(normalized_rows)
+alpha_q2_window := window_for(normalized_rows, "alpha", "2026-Q2", 2)
+rolling_two_periods := rolling_values(normalized_rows, 2)
+validation := validate_normalized_rows(normalized_rows)
+
+check("nested JSON flatten preserves typed columns", #normalized_rows == 4 && normalized_rows[1].entity_id == "alpha" && normalized_rows[1].region == "north")
+check("provenance columns are present", validation.provenance_ok && normalized_rows[4].source_provider == "provider_b" && normalized_rows[4].source_row == 2)
+check("missing data is filled and flagged", validation.missing_count == 1 && normalized_rows[2].actual_value == nil && normalized_rows[2].adjusted_value == 0.0 && normalized_rows[2].missing_reason == "provider_null")
+check("left join enriches rows without finance semantics", #joined_rows == 4 && joined_rows[1].category == "control" && joined_rows[3].category == "treatment")
+check("group validation aggregates normalized rows", #entity_groups == 2 && entity_groups[1].entity_id == "alpha" && entity_groups[1].missing_count == 1 && entity_groups[2].adjusted_sum == 18.0)
+check("window validation keeps entity-local periods", #alpha_q2_window == 2 && alpha_q2_window[1].period == "2026-Q1" && alpha_q2_window[2].period == "2026-Q2")
+check("rolling validation uses normalized adjusted values", #rolling_two_periods == 4 && rolling_two_periods[2].rolling_sum == 10.0 && rolling_two_periods[4].rolling_avg == 9.0)
+
+data_normalization_summary := string.format(
+    "fr_gap_008 rows=%d missing=%d groups=%d rolling=%d",
+    #normalized_rows,
+    validation.missing_count,
+    #entity_groups,
+    #rolling_two_periods
+)
+
+data_normalization_result := {
+    contract: typed_table_contract,
+    normalized_rows: normalized_rows,
+    joined_rows: joined_rows,
+    entity_groups: entity_groups,
+    alpha_q2_window: alpha_q2_window,
+    rolling_two_periods: rolling_two_periods,
+    validation: validation,
+    summary: data_normalization_summary,
+}
+
+print(data_normalization_summary)

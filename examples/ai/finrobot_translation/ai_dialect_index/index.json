@@ -1,0 +1,1984 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-dialect-package-index-audit",
+  "baseline_branch": "origin/codex/ai-dialect-polish",
+  "scope": {
+    "translation_root": "examples/ai/finrobot_translation",
+    "index_directory": "examples/ai/finrobot_translation/ai_dialect_index",
+    "provider_free": true,
+    "domain_specific": false,
+    "read_only": true,
+    "imports_live_packages": false,
+    "depends_on_q_runtime": false,
+    "finrobot_specific_syntax_assumption": false
+  },
+  "rules": {
+    "reference_paths_exist": true,
+    "fixtures_are_provider_free": true,
+    "tests_are_index_driven": true,
+    "no_q_runtime_dependency": true,
+    "no_finrobot_specific_syntax_assumption": true,
+    "missing_production_package_boundary_recorded": true
+  },
+  "required_capabilities": [
+    "agent",
+    "agent-state",
+    "analytical-model-contracts",
+    "approval",
+    "capability",
+    "chart-render",
+    "coding-workspace",
+    "data-normalization-contracts",
+    "data-provider",
+    "document-rag",
+    "evaluation",
+    "event-intelligence",
+    "evidence-report-artifacts",
+    "evidence-verification",
+    "memory",
+    "model",
+    "model-io",
+    "optional-adapter",
+    "package-boundary",
+    "product-app",
+    "prompt-role-catalog",
+    "replay",
+    "report-render",
+    "strategy-backtest-contracts",
+    "tool",
+    "trace",
+    "transcript-pipeline",
+    "turn",
+    "ui-snapshot",
+    "workflow"
+  ],
+  "entries": [
+    {
+      "capability": "agent-state",
+      "capability_id": "generic.ai.agent_state.store",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "agent_state.store",
+        "agent_state.snapshot",
+        "agent_state.checkpoint",
+        "agent_state.refs",
+        "agent_state.trace_correlation",
+        "agent_state.redaction"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+      "test": "tests/llm/llm_generic_agent_state_store_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-agent-state-store",
+        "boundary": "provider-free agent state snapshots, session identity, deterministic checkpoints, redacted refs, trace correlation, and clean-skip contracts",
+        "status": "resolved",
+        "reason": "agent state checkpoint contracts were index-only before being promoted to the generic_agent_state_store reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-agent-state-store",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_agent_state_store_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericAgentStateStoreLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "agent state store contract fixture decodes without provider SDKs, live databases, credentials, or network access",
+          "state_version is monotonic and resume_token derives from checkpoint_key",
+          "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.agent_state.store",
+      "capability_aliases": [
+        {
+          "alias": "agent-state",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.agent_state.store",
+          "target_capability_id": "generic.ai.agent_state.store",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "agent",
+      "capability_id": "generic.ai.agent.declarative",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "agent",
+        "instructions",
+        "tools",
+        "params",
+        "output",
+        "max_steps"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+      "test": "tests/llm/llm_generic_agent_runner_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-agent-runner",
+        "boundary": "declarative agent config, tool history, structured output, and replay policy",
+        "status": "resolved",
+        "reason": "agent behavior was promoted from examples and tests into the generic_agent_runner provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-agent-runner",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_agent_runner_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericAgentRunnerLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "fixture JSON parses without live provider credentials",
+          "contract declares provider-free loop execution boundary",
+          "tool contract projection maps replayable tool contracts into agent tools, tool history, and loop trace ownership"
+        ]
+      },
+      "canonical_capability_id": "ai.agent.config.declarative",
+      "capability_aliases": [
+        {
+          "alias": "agent",
+          "target_capability_id": "ai.agent.config.declarative",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.agent.declarative",
+          "target_capability_id": "ai.agent.config.declarative",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "analytical-model-contracts",
+      "capability_id": "generic.ai.analytical_model.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "method_output",
+        "assumption_audit",
+        "scenario_book",
+        "sensitivity_grid",
+        "tolerance_gate",
+        "provenance",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+      "test": "tests/llm/llm_generic_analytical_model_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-analytical-model-contracts",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "analytical model behavior was promoted into a generic provider-free package boundary for assumption audit, scenario books, sensitivity grids, method outputs, tolerance gates, provenance, and clean skips"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-analytical-model-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_analytical_model_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericAnalyticalModelContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "scenario book fixtures declare assumption sets, scenario weights, sensitivity axes, provenance, and deterministic ordering",
+          "forecast result fixtures carry rows, units, periods, scenario references, and transform notes"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.analytical_model.contracts",
+      "capability_aliases": [
+        {
+          "alias": "analytical-model-contracts",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.analytical_model.contracts",
+          "target_capability_id": "generic.ai.analytical_model.contracts",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "approval",
+      "capability_id": "generic.ai.approval.policy",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "llm.policy",
+        "llm.check_policy",
+        "loop.snapshot",
+        "loop.resume",
+        "llm.approval_trace"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-approval-policy",
+        "boundary": "capability-based approval decisions, clean skips, and replay trace envelopes",
+        "status": "resolved",
+        "reason": "approval parity was promoted into the generic_approval_policy provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-approval-policy",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericApprovalPolicySmokeLeia",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "generic.ai.approval.policy denies by default unless an exact capability grant exists"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.approval.policy.evaluate",
+      "capability_aliases": [
+        {
+          "alias": "approval",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.approval.policy",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "capability",
+      "capability_id": "generic.ai.capability.gate",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "requires",
+        "capability_tag",
+        "default_deny",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-capability-gates",
+        "boundary": "capability vocabulary, default-deny policy, approval evidence, and clean-skip semantics",
+        "status": "resolved",
+        "reason": "capability gates were consolidated into the generic_approval_policy package boundary and audit fixtures"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-approval-policy",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericApprovalPolicySmokeLeia",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "generic.ai.approval.policy denies by default unless an exact capability grant exists"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.approval.policy.evaluate",
+      "capability_aliases": [
+        {
+          "alias": "capability",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.capability.gate",
+          "target_capability_id": "generic.ai.approval.policy.evaluate",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "chart-render",
+      "capability_id": "generic.ai.chart.render.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "chart.spec",
+        "chart.recipe_matrix",
+        "chart.render_request",
+        "chart.render_result",
+        "chart.source_metadata",
+        "chart.snapshot_hash",
+        "chart.renderer_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
+      "test": "tests/llm/llm_generic_chart_render_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-chart-render-contracts",
+        "boundary": "provider-free chart specs, recipe semantic matrices, render request/result envelopes, source metadata, deterministic snapshot hashes, and unsupported renderer clean skips",
+        "status": "resolved",
+        "reason": "chart rendering behavior was promoted from domain renderers into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-chart-render-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_chart_render_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericChartRenderContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "chart spec and recipe matrix contract fixtures decode without renderer dependencies",
+          "render request/result contract envelopes are deterministic provider-free fixture data",
+          "source metadata contract is redacted and replay-ready"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.chart.render.contracts",
+      "capability_aliases": [
+        {
+          "alias": "chart-render",
+          "target_capability_id": "generic.ai.chart.render.contracts",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.chart.render.contracts",
+          "target_capability_id": "generic.ai.chart.render.contracts",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "coding-workspace",
+      "capability_id": "generic.ai.coding_workspace",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "code.sandbox_command",
+        "code.approval_gate",
+        "code.stdout_stderr_capture",
+        "artifact.file_manifest",
+        "artifact.image_manifest",
+        "notebook.display",
+        "code.cleanup_policy",
+        "code.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "test": "tests/llm/llm_generic_coding_workspace_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-coding-workspace",
+        "boundary": "provider-free coding workspace command envelopes, approval gates, stdout/stderr captures, file and image artifact manifests, notebook display metadata, cleanup policy, deterministic replay, and clean skips",
+        "status": "resolved",
+        "reason": "coding workspace and artifact behavior was promoted from coding notebook fixtures into a reusable generic package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-coding-workspace",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_coding_workspace_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericCodingWorkspaceLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "sandbox command envelopes decode without executing host commands",
+          "approval gates default to deny for execution and writes",
+          "stdout and stderr captures are explicit replay fields"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.coding_workspace",
+      "capability_aliases": [
+        {
+          "alias": "coding-workspace",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.coding_workspace",
+          "target_capability_id": "generic.ai.coding_workspace",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "data-normalization-contracts",
+      "capability_id": "generic.ai.data_normalization.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "schema_mapping",
+        "field_policy",
+        "missing_policy",
+        "stale_policy",
+        "type_coercion",
+        "unit_transform",
+        "provenance",
+        "validation_error",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+      "test": "tests/llm/llm_generic_data_normalization_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-data-normalization-contracts",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "data normalization was promoted into a generic provider-free package boundary for schema mappings, field policies, missing and stale value policy, type coercion, unit transforms, provenance, validation envelopes, and clean skips"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-data-normalization-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_data_normalization_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericDataNormalizationContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "schema mapping, field policy, missing policy, stale policy, type coercion, and unit transform contract fixtures decode",
+          "provider response projection maps source envelopes, provenance refs, clean skips, and replay keys into normalized rows and validation records"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.data_normalization.contracts",
+      "capability_aliases": [
+        {
+          "alias": "data-normalization-contracts",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.data_normalization.contracts",
+          "target_capability_id": "generic.ai.data_normalization.contracts",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "data-provider",
+      "capability_id": "generic.ai.data_provider.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "data_provider.registry",
+        "data_provider.request_envelope",
+        "data_provider.response_envelope",
+        "data_provider.pagination",
+        "data_provider.rate_limit",
+        "data_provider.auth_redaction",
+        "data_provider.cache_retry_policy",
+        "data_provider.provenance",
+        "data_provider.error_envelope",
+        "data_provider.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+      "test": "tests/llm/llm_generic_data_provider_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-data-provider-boundary",
+        "boundary": "provider-free data provider registry, request/response envelopes, pagination, rate-limit metadata, auth redaction, cache/retry policy, provenance, error envelopes, and clean skips",
+        "status": "resolved",
+        "reason": "data provider behavior was promoted from domain-specific vendor adapters into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-data-provider-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_data_provider_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericDataProviderBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "data provider registry contract fixtures decode without provider SDK imports",
+          "request and response envelope contract fixtures remain provider-free and replayable",
+          "pagination and rate-limit contract fixtures are metadata-only and deterministic"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.data_provider.boundary",
+      "capability_aliases": [
+        {
+          "alias": "data-provider",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.data_provider.boundary",
+          "target_capability_id": "generic.ai.data_provider.boundary",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "document-rag",
+      "capability_id": "generic.ai.document.rag",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "document.convert",
+        "document.sections",
+        "rag.chunk",
+        "rag.retrieve",
+        "rag.citation_consistency",
+        "rag.adapter.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "test": "tests/llm/llm_generic_document_rag_pipeline_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-document-rag-pipeline",
+        "boundary": "provider-free document conversion, section extraction, RAG chunking, corpus manifests, retrieval results, citation consistency, and adapter clean-skip contracts",
+        "status": "resolved",
+        "reason": "document RAG behavior was promoted from finance document pipeline fixtures into the generic_document_rag_pipeline reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-document-rag-pipeline",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_document_rag_pipeline_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericDocumentRAGPipelineLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "document conversion and section extraction fixtures decode without provider SDKs or live network",
+          "RAG chunk provenance and corpus manifest stay domain-neutral and provider-free",
+          "retrieval result citations resolve to known chunk identifiers"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.document.rag",
+      "capability_aliases": [
+        {
+          "alias": "document-rag",
+          "target_capability_id": "generic.ai.document.rag",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.document.rag",
+          "target_capability_id": "generic.ai.document.rag",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "evaluation",
+      "capability_id": "generic.ai.evaluation.harness",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "evaluate_block",
+        "eval.case",
+        "eval.metric",
+        "eval.judge",
+        "llm.replay"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+      "test": "tests/llm/llm_generic_evaluation_harness_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-evaluation-harness",
+        "boundary": "dataset manifest, judge replay, metrics, findings, and golden gates",
+        "status": "resolved",
+        "reason": "evaluation harness parity was promoted into the generic_evaluation_harness provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-evaluation-harness",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_evaluation_harness_live_package_test.go",
+        "command": "go test ./tests/llm -run TestFinRobotGenericEvaluationHarnessExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "generic.ai.evaluation.harness and ai.eval.run surfaces are declared as provider-free live package skeleton capabilities",
+          "dataset manifest, case inputs, metric specs, judge replay records, findings, golden gates, and case result summary fixtures are all checked in",
+          "fixture index is manifest-driven and does not require live network, credentials, provider SDKs, or real dependency imports"
+        ]
+      },
+      "canonical_capability_id": "ai.eval.run.provider_free",
+      "capability_aliases": [
+        {
+          "alias": "evaluation",
+          "target_capability_id": "ai.eval.run.provider_free",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.evaluation.harness",
+          "target_capability_id": "ai.eval.run.provider_free",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "event-intelligence",
+      "capability_id": "generic.ai.event_intelligence.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "event.source_snapshot",
+        "event.extraction",
+        "event.taxonomy",
+        "event.freshness_policy",
+        "event.dedupe_confidence",
+        "event.relevance_score",
+        "event.sentiment_impact",
+        "event.prompt_contract",
+        "event.adapter_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+      "test": "tests/llm/llm_generic_event_intelligence_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-event-intelligence-boundary",
+        "boundary": "provider-free event source snapshots, event extraction, taxonomies, freshness policy, dedupe/source confidence, relevance scoring, sentiment and impact labels, prompt contracts, and adapter clean skips",
+        "status": "resolved",
+        "reason": "event intelligence behavior was promoted from application-specific news/catalyst metadata into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-event-intelligence-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_event_intelligence_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericEventIntelligenceBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "event source snapshot contract fixtures decode without provider SDK imports",
+          "event extraction and taxonomy contract fixtures remain domain-neutral",
+          "freshness, dedupe, relevance, sentiment, and impact contract fixtures are deterministic"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.event_intelligence.boundary",
+      "capability_aliases": [
+        {
+          "alias": "event-intelligence",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.event_intelligence.boundary",
+          "target_capability_id": "generic.ai.event_intelligence.boundary",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "evidence-report-artifacts",
+      "capability_id": "generic.ai.evidence.report.artifacts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "evidence.source_annotation",
+        "evidence.citation_envelope",
+        "report.outline",
+        "report.section_dependency_dag",
+        "artifact.manifest",
+        "render.manifest",
+        "render.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+      "test": "tests/llm/llm_generic_evidence_report_artifacts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-evidence-report-artifacts",
+        "boundary": "provider-free evidence source annotations, citation envelopes, report outlines, section DAGs, artifact manifests, render manifests, snapshot metadata, stale warnings, accessibility checks, and renderer clean-skip contracts",
+        "status": "resolved",
+        "reason": "evidence/report/artifact behavior was promoted from report renderer and analytics report fixtures into the generic_evidence_report_artifacts reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-evidence-report-artifacts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_evidence_report_artifacts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericEvidenceReportArtifactsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "evidence source annotations and citation envelopes resolve without provider calls",
+          "report outline and section dependency DAG remain domain-neutral and provider-free",
+          "artifact and render manifests declare planned outputs without invoking renderers"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.evidence.report.artifacts",
+      "capability_aliases": [
+        {
+          "alias": "evidence-report-artifacts",
+          "target_capability_id": "generic.ai.evidence.report.artifacts",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.evidence.report.artifacts",
+          "target_capability_id": "generic.ai.evidence.report.artifacts",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "evidence-verification",
+      "capability_id": "generic.ai.evidence.verify",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "evidence.verify",
+        "evidence.claim_record",
+        "evidence.source_ref",
+        "evidence.citation_ref",
+        "evidence.freshness_check",
+        "evidence.clean_degradation"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "test": "tests/llm/llm_generic_evidence_verification_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-evidence-verification",
+        "boundary": "provider-free claim/source/citation verification, freshness warning, unresolved-ref, quality-summary, and clean-degradation contracts",
+        "status": "resolved",
+        "reason": "evidence verification policy was duplicated across analyzer, report, and renderer packages before being promoted to a reusable generic boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-evidence-verification",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_evidence_verification_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericEvidenceVerificationLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "document RAG answer citations project into claim records, source annotations, and normalized citation refs without assuming IDs are shared across packages",
+          "claim records, source refs, and citation refs decode without provider calls",
+          "citation normalization preserves first-seen deterministic order and reports unresolved refs"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.evidence.verify",
+      "capability_aliases": [
+        {
+          "alias": "evidence-verification",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "generic.ai.evidence.verify",
+          "target_capability_id": "generic.ai.evidence.verify",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "memory",
+      "capability_id": "generic.ai.memory.store",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "memory.store",
+        "memory.namespace",
+        "memory.retrieve",
+        "memory.context_window",
+        "memory.provenance"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "test": "tests/llm/llm_generic_memory_store_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-memory-store",
+        "boundary": "provider-free memory store, namespace, retrieval ranking, context window, and provenance contracts",
+        "status": "resolved",
+        "reason": "memory store behavior was embedded in document pipeline before being promoted to the generic_memory_store reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-memory-store",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_memory_store_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericMemoryStoreLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "memory store contract fixture decodes without Redis, Postgres, vector databases, embedding models, or managed memory providers",
+          "namespace policy and retrieval policy are provider-free and credential-free",
+          "retrieval ranking and context window order are deterministic fixture data"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.memory.store",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.memory.store",
+          "target_capability_id": "generic.ai.memory.store",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "memory",
+          "target_capability_id": "generic.ai.memory.store",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "model-io",
+      "capability_id": "generic.ai.model.io.envelope",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "model.io.request",
+        "model.io.stream_chunk",
+        "model.io.response",
+        "model.io.usage",
+        "model.io.redaction",
+        "llm.replay"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+      "test": "tests/llm/llm_generic_model_io_envelope_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json",
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_model_io_envelope_test.go",
+        "command": "go test ./tests/llm -run TestGenericModelIOEnvelopeMainExecutableSmoke",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "request, stream chunk, and response envelopes decode without provider SDKs",
+          "provider-free replay records preserve turn and adapter correlation",
+          "model registry aliases and replay descriptors project into provider-free model IO and turn request envelopes"
+        ]
+      },
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-model-io-envelope",
+        "boundary": "provider-free request, stream chunk, response, usage, and redaction envelopes between model registry and turn execution",
+        "status": "resolved",
+        "reason": "model IO envelope behavior was fixture-backed before being promoted to a reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-io-envelope",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "canonical_capability_id": "generic.ai.model.io.envelope",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.model.io.envelope",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "model-io",
+          "target_capability_id": "generic.ai.model.io.envelope",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "model",
+      "capability_id": "generic.ai.model.registry",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "model",
+        "model.default",
+        "provider_model_alias"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+      "test": "tests/llm/llm_generic_model_registry_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-model-registry",
+        "boundary": "model alias registry with provider-free replay defaults",
+        "status": "resolved",
+        "reason": "model alias behavior was promoted from examples and tests into the generic_model_registry provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-model-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_model_registry_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericModelRegistryMainSmokeOutput",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "provider_free",
+          "no live network",
+          "no provider credentials"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.model.registry",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.model.registry",
+          "target_capability_id": "generic.ai.model.registry",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "model",
+          "target_capability_id": "generic.ai.model.registry",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "optional-adapter",
+      "capability_id": "generic.ai.optional_adapter.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "optional_adapter.registry",
+        "optional_adapter.dependency_gate",
+        "optional_adapter.result_envelope",
+        "optional_adapter.version_metadata",
+        "optional_adapter.terms_metadata",
+        "optional_adapter.credential_redaction",
+        "optional_adapter.clean_skip",
+        "optional_adapter.no_live_import_default"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+      "test": "tests/llm/llm_generic_optional_adapter_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-optional-adapter-boundary",
+        "boundary": "provider-free optional adapter registry, dependency gates, result envelopes, version and terms metadata, credential redaction, no-live-import defaults, and clean skips",
+        "status": "resolved",
+        "reason": "optional dependency behavior was promoted from application-specific integration gates into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-optional-adapter-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_optional_adapter_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericOptionalAdapterBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "optional adapter registry contract fixtures decode without importing optional dependencies",
+          "dependency gate contract fixtures clean-skip when packages, credentials, or live network are absent",
+          "adapter result envelope contract fixtures expose status, capability, fixture_key, data, and metadata"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.optional_adapter.boundary",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.optional_adapter.boundary",
+          "target_capability_id": "generic.ai.optional_adapter.boundary",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "optional-adapter",
+          "target_capability_id": "generic.ai.optional_adapter.boundary",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "package-boundary",
+      "capability_id": "generic.ai.package.boundary.audit",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "package_manifest",
+        "provider_free_gate",
+        "no_built_in_guarantee",
+        "registered_example"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+      "test": "tests/llm/llm_generic_package_boundary_auditor_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-package-boundary-auditor",
+        "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
+        "status": "resolved",
+        "reason": "package boundary checks were promoted from audit ledger coverage into the generic_package_boundary_auditor package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-package-boundary-auditor",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_package_boundary_auditor_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericPackageBoundaryAuditorExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "package manifest audit verifies provider-free defaults, entrypoints, schema references, no credentials, and no built-in guarantee",
+          "fixture index audit verifies every fixture is local, replay-ready, schema-linked, and mapped to a capability",
+          "example registry audit verifies aliases generic.ai.package.boundary.audit and ai.package.audit resolve to the same provider-free skeleton"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.package.boundary.audit.manifest",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.package.boundary.audit",
+          "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "package-boundary",
+          "target_capability_id": "generic.ai.package.boundary.audit.manifest",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "product-app",
+      "capability_id": "generic.ai.product_app.boundary",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "product_app.route_contract",
+        "product_app.session_contract",
+        "product_app.task_log",
+        "product_app.artifact_download",
+        "product_app.crud_fixture_state",
+        "product_app.db_migration_plan",
+        "product_app.deployment_target",
+        "product_app.approval_boundary",
+        "product_app.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
+      "test": "tests/llm/llm_generic_product_app_boundary_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-product-app-boundary",
+        "boundary": "provider-free product app route contracts, sessions, task logs, artifact downloads, CRUD fixture state, database migration plans, deployment targets, approval boundaries, and clean skips",
+        "status": "resolved",
+        "reason": "product application shell behavior was promoted from application-specific workflow metadata into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-product-app-boundary",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_product_app_boundary_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericProductAppBoundaryLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "product app route contract fixtures decode without web framework dependencies",
+          "workflow projection maps provider-free workflow results into product task, route, and artifact refs",
+          "session and task-log contract fixtures remain provider-free and credential-free"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.product_app.boundary",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.product_app.boundary",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "product-app",
+          "target_capability_id": "generic.ai.product_app.boundary",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "prompt-role-catalog",
+      "capability_id": "generic.ai.prompt.role.catalog",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "prompt.role_catalog",
+        "role.profile",
+        "prompt.template",
+        "role.delegation_trigger",
+        "role.output_schema",
+        "role.evidence_validation",
+        "role.termination"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "test": "tests/llm/llm_generic_prompt_role_catalog_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-prompt-role-catalog",
+        "boundary": "provider-free prompt catalogs, role profile versions, prompt template snapshots, delegation triggers, output schemas, evidence validation, termination conventions, and drift fixtures",
+        "status": "resolved",
+        "reason": "prompt and role catalog behavior was promoted from FinRobot prompt role fixtures into the generic_prompt_role_catalog reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-prompt-role-catalog",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_prompt_role_catalog_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericPromptRoleCatalogLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "prompt catalog and role profile fixtures decode without provider SDKs or live model calls",
+          "role profile versions and prompt template snapshots remain domain-neutral and provider-free",
+          "delegation trigger parse examples resolve to declared role ids"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.prompt.role.catalog",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.prompt.role.catalog",
+          "target_capability_id": "generic.ai.prompt.role.catalog",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "prompt-role-catalog",
+          "target_capability_id": "generic.ai.prompt.role.catalog",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "replay",
+      "capability_id": "generic.ai.record.replay",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "llm.replay",
+        "recorded_turn",
+        "strict_ordered_match"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+      "test": "tests/llm/llm_generic_record_replay_evaluation_evidence_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-record-replay",
+        "boundary": "record schema, replay matching, mismatch findings, and unconsumed record handling",
+        "status": "resolved",
+        "reason": "record/replay fixtures were promoted into the generic_record_replay provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-record-replay",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_record_replay_evaluation_evidence_test.go",
+        "command": "go test ./tests/llm -run TestGenericRecordReplayReportIsEvaluationCaseEvidence",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_record_replay/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true, domain_specific is false, and live_network_default is false",
+          "record schema requires record_id, sequence, replay_key, operation, capability, request_hash, response_hash, request, response, provider_free, and recorded_at"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.record.capture",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.record.replay",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "replay",
+          "target_capability_id": "generic.ai.record.capture",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "report-render",
+      "capability_id": "generic.ai.report.render.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "report.render.request",
+        "report.render.request_envelope",
+        "report.render.output_manifest",
+        "report.render.artifact_manifest",
+        "report.render.snapshot_metadata",
+        "report.render.warning",
+        "report.render.annotation",
+        "report.render.fixture_hash",
+        "report.render.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
+      "test": "tests/llm/llm_generic_report_render_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-report-render-contracts",
+        "boundary": "provider-free report render requests, request/result envelopes, output and artifact manifests, snapshot metadata and hashes, warnings, annotations, fixture hashes, and renderer clean skips",
+        "status": "resolved",
+        "reason": "report rendering behavior was promoted from application-specific report renderer metadata into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-report-render-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_report_render_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericReportRenderContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "report render request contract fixtures decode without renderer dependencies",
+          "request and result envelope contract fixtures remain provider-free and replayable",
+          "output and artifact manifest contract fixtures use artifact URIs only"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.report.render.contracts",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.report.render.contracts",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "report-render",
+          "target_capability_id": "generic.ai.report.render.contracts",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "strategy-backtest-contracts",
+      "capability_id": "generic.ai.strategy.backtest.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "strategy.manifest",
+        "strategy.observation_feed",
+        "strategy.execution_ledger",
+        "strategy.allocation_series",
+        "strategy.performance_series",
+        "strategy.metric_summary",
+        "strategy.constraint_limits",
+        "strategy.engine_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+      "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-strategy-backtest-contracts",
+        "boundary": "provider-free strategy simulation manifests, observation feeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, deterministic seeds, and optional engine clean skips",
+        "status": "resolved",
+        "reason": "strategy simulation and backtest behavior is represented as reusable package contracts rather than built-in language or project-specific runtime behavior"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-strategy-backtest-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericStrategyBacktestContractsLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "generic.strategy_backtest.run, strategy, allocation_policy, feature, and evaluator boundaries are represented without q runtime or live provider imports",
+          "strategy manifest fixture validates strategy, allocation_policy, feature, evaluator bindings and deterministic seed"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.strategy.backtest.contracts",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.strategy.backtest.contracts",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "strategy-backtest-contracts",
+          "target_capability_id": "generic.ai.strategy.backtest.contracts",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "tool",
+      "capability_id": "generic.ai.tool.contract",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "tool",
+        "params",
+        "description",
+        "requires",
+        "tool_result"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+      "test": "tests/llm/llm_generic_tool_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-tool-contracts",
+        "boundary": "declarative tool schema, capability tags, and result envelope",
+        "status": "resolved",
+        "reason": "tool metadata specimens were promoted into the generic_tool_contracts provider-neutral package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-tool-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_tool_contracts_live_package_test.go",
+        "command": "go test ./tests/llm -run TestFinRobotGenericToolContractsFixtureIndexAndSmoke",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "generic.ai.tool.contract exports declarative tool schema metadata",
+          "ai.tool.invoke request arguments are validated before fixture execution"
+        ]
+      },
+      "canonical_capability_id": "ai.tool.invoke",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.tool.contract",
+          "target_capability_id": "ai.tool.invoke",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "ai.tool.invoke",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "tool",
+      "capability_id": "generic.ai.tool.registry",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "tool_descriptor",
+        "schema_validation",
+        "invocation_trace",
+        "approval_edge"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+      "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json",
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_tool_registry_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericToolRegistryMainSmokeOutput",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest, contract, schemas, and fixtures decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "required and optional credentials are empty"
+        ]
+      },
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-tool-registry",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "historical audit field retained; production package boundary is checked in below"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-tool-registry",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "canonical_capability_id": "generic.tool.registry.declare",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.tool.registry",
+          "target_capability_id": "generic.tool.registry.declare",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "tool",
+          "target_capability_id": "generic.tool.registry.declare",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "trace",
+      "capability_id": "generic.ai.trace.events",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "turn_start",
+        "turn_stream",
+        "turn_end",
+        "approval_replay_trace"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+      "test": "tests/llm/llm_generic_trace_events_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-trace-events",
+        "boundary": "provider-neutral trace event schema for turns, streams, approvals, and replay",
+        "status": "resolved",
+        "reason": "trace event tests and fixtures were promoted into the generic_trace_events package-level schema boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-trace-events",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_trace_events_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericTraceEventsMainLeiaSmoke",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "provider_free is true and live_network_default is false",
+          "generic.ai.trace.events and ai.trace.emit capabilities are provider-free and fixture-replay only"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.trace.events",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.trace.events",
+          "target_capability_id": "generic.ai.trace.events",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "trace",
+          "target_capability_id": "generic.ai.trace.events",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "transcript-pipeline",
+      "capability_id": "generic.ai.transcript.pipeline",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "transcript_source",
+        "speaker",
+        "segment",
+        "event_time_policy",
+        "chunk",
+        "clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
+      "test": "tests/llm/llm_generic_transcript_pipeline_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-transcript-pipeline",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "transcript handling was promoted into a generic provider-free package boundary for source envelopes, speaker normalization, segment provenance, event-time correction, chunking, and clean skips"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-transcript-pipeline",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_transcript_pipeline_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericTranscriptPipelineLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "manifest and referenced JSON files decode without external dependencies",
+          "fixtures prove speaker normalization, event-time correction, turn ordering, and segment provenance",
+          "chunk fixtures preserve segment boundaries, deterministic order, and max token-estimate budget"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.transcript.pipeline",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.transcript.pipeline",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "transcript-pipeline",
+          "target_capability_id": "generic.ai.transcript.pipeline",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "turn",
+      "capability_id": "generic.ai.turn.request",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "turn",
+        "messages",
+        "response_format",
+        "usage"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+      "test": "tests/llm/llm_generic_turn_runner_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-turn-runner",
+        "boundary": "single-turn request, response, usage, and structured error envelope",
+        "status": "resolved",
+        "reason": "turn specimens remain embedded in examples/tests rather than a reusable package contract"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-turn-runner",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_turn_runner_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericTurnRunnerSmokeAndNoProviderDependencies",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "single-turn request schema carries messages, response_format, usage-free request metadata, and replay key material",
+          "ai.turn.execute response envelope carries message, response_format, usage, error, tool request, and replay metadata",
+          "tool request envelope is request-only and provider-free"
+        ]
+      },
+      "canonical_capability_id": "ai.turn.execute",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.turn.request",
+          "target_capability_id": "ai.turn.execute",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "turn",
+          "target_capability_id": "ai.turn.execute",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "ui-snapshot",
+      "capability_id": "generic.ai.ui.snapshot.evaluator",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "ui.route_dom_schema",
+        "ui.snapshot.evidence_report_projection",
+        "ui.viewport_matrix",
+        "ui.visual_diff_budget",
+        "ui.accessibility_summary",
+        "ui.artifact_uri_manifest",
+        "ui.redaction_policy",
+        "ui.static_asset_policy",
+        "ui.browser_clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "test": "tests/llm/llm_generic_ui_snapshot_evaluator_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-ui-snapshot-evaluator",
+        "boundary": "provider-free route DOM snapshots, evidence-report projection, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips",
+        "status": "resolved",
+        "reason": "generic UI snapshot evaluation behavior was promoted from HTML UI snapshot fixtures into a reusable package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-ui-snapshot-evaluator",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_ui_snapshot_evaluator_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericUISnapshotEvaluatorLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "route DOM snapshot fixtures decode without launching a browser",
+          "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
+          "viewport matrix and visual diff budgets are deterministic fixture data"
+        ]
+      },
+      "canonical_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.ui.snapshot.evaluator",
+          "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "ui-snapshot",
+          "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "workflow",
+      "capability_id": "generic.ai.workflow.orchestration",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "agent",
+        "turn",
+        "tool_history",
+        "workflow_state"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+      "test": "tests/llm/llm_generic_workflow_orchestrator_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-workflow-orchestrator",
+        "boundary": "multi-step agent and review-turn orchestration with replayable state",
+        "status": "resolved",
+        "reason": "workflow orchestration examples were promoted into the generic_workflow_orchestrator provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-workflow-orchestrator",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_workflow_orchestrator_live_package_test.go",
+        "command": "go test ./tests/llm -run TestGenericWorkflowOrchestratorLivePackageExecutableSkeleton",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "generic.ai.workflow.orchestration is represented as a provider-free live package skeleton",
+          "ai.workflow.orchestrate entrypoint has a deterministic workflow graph",
+          "stage inputs and outputs are explicit and schema-addressed"
+        ]
+      },
+      "canonical_capability_id": "ai.workflow.orchestrate.provider_free",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.workflow.orchestration",
+          "target_capability_id": "ai.workflow.orchestrate.provider_free",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "ai.workflow.orchestrate.provider_free",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "capability": "workflow",
+      "capability_id": "generic.ai.workflow.planning_graph",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "plan_node",
+        "dependency_edge",
+        "retry_policy",
+        "branch",
+        "merge",
+        "trace_evidence"
+      ],
+      "example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+      "test": "tests/llm/llm_generic_planning_graph_contract_test.go",
+      "fixture": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-planning-graph",
+        "boundary": "checked-in provider-free package boundary",
+        "status": "resolved",
+        "reason": "historical audit field retained; production package boundary is checked in below"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-planning-graph",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "smoke_coverage": {
+        "test": "tests/llm/llm_generic_planning_graph_contract_test.go",
+        "command": "go test ./tests/llm -run TestGenericPlanningGraphMainLeiaSmokeExecutes",
+        "package_manifest": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
+        "manifest_gate_field": "test_gates",
+        "gate_terms": [
+          "plan nodes declare generic node_type and do not encode provider or domain-specific semantics",
+          "dependencies form an acyclic graph with explicit branch and merge edges",
+          "retry metadata is deterministic fixture evidence, not provider behavior"
+        ]
+      },
+      "canonical_capability_id": "generic.planning.graph.define",
+      "capability_aliases": [
+        {
+          "alias": "generic.ai.workflow.planning_graph",
+          "target_capability_id": "generic.planning.graph.define",
+          "alias_kind": "dialect_capability_id",
+          "scope": "package",
+          "status": "active"
+        },
+        {
+          "alias": "workflow",
+          "target_capability_id": "generic.planning.graph.define",
+          "alias_kind": "dialect_slug",
+          "scope": "package",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}

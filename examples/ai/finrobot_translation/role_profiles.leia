@@ -1,0 +1,122 @@
+// role_profiles.leia - FR-GAP-016 FinRobot prompt/role package data.
+// Data-only registry fixture: no runtime agent construction and no live tools.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+role_registry := {
+    Market_Analyst: {
+        id: "Market_Analyst",
+        title: "Market Analyst",
+        source: "FinRobot.agent_library",
+        profile: "Collect local evidence, aggregate it for the client request, and reply TERMINATE when the task is done.",
+        responsibilities: {
+            "Collect local market evidence from replayable fixtures.",
+            "Summarize market context and source coverage for the report team.",
+            "Return a structured handoff and the TERMINATE convention when complete."
+        },
+        tool_names: {"load_profile", "search_local_notes"},
+        output_contract: "role_handoff_v1",
+    },
+    Expert_Investor: {
+        id: "Expert_Investor",
+        title: "Expert Investor",
+        source: "FinRobot.agent_library",
+        profile: "Generate a customized analysis report from supplied local evidence and client feedback. Reply TERMINATE when everything is settled.",
+        responsibilities: {
+            "Convert supplied evidence into an investment view.",
+            "Track client feedback and preserve source-backed caveats.",
+            "Return final report guidance and the TERMINATE convention when complete."
+        },
+        tool_names: {"load_profile", "build_report_outline"},
+        output_contract: "role_handoff_v1",
+    },
+    Data_Analyst: {
+        id: "Data_Analyst",
+        title: "Data Analyst",
+        source: "FinRobot.agent_library",
+        profile: "Analyze data with local tools, collaborate in group workflows, and reply TERMINATE when everything is done.",
+        responsibilities: {
+            "Normalize tabular financial data before section drafting.",
+            "Surface calculation assumptions and fixture provenance.",
+            "Return structured data notes and the TERMINATE convention when complete."
+        },
+        tool_names: {},
+        output_contract: "role_handoff_v1",
+    },
+    Report_Section_Writer: {
+        id: "Report_Section_Writer",
+        title: "Report Section Writer",
+        source: "FinRobot.text_generator_agents",
+        profile: "Draft report sections from normalized evidence and return schema-shaped section payloads.",
+        responsibilities: {
+            "Draft only from supplied section evidence.",
+            "Preserve required report taxonomy identifiers.",
+            "Return schema-shaped section payloads for deterministic replay."
+        },
+        tool_names: {},
+        output_contract: "report_section_payload_v1",
+    },
+}
+
+role_registry_order := {"Market_Analyst", "Expert_Investor", "Data_Analyst", "Report_Section_Writer"}
+
+func render_role_prompt(role_id) {
+    role := role_registry[role_id]
+    if role == nil {
+        return nil
+    }
+    body := "As a " .. role.title .. ", your responsibilities are as follows:"
+    for i := 1; i <= #role.responsibilities; i++ {
+        body = body .. "\n - " .. role.responsibilities[i]
+    }
+    return body .. "\n\nReply \"TERMINATE\" in the end when everything is done."
+}
+
+role_prompt_snapshots := {
+    Market_Analyst: render_role_prompt("Market_Analyst"),
+    Expert_Investor: render_role_prompt("Expert_Investor"),
+    Data_Analyst: render_role_prompt("Data_Analyst"),
+    Report_Section_Writer: render_role_prompt("Report_Section_Writer"),
+}
+
+role_profile_schema := {
+    id: "Role_Id",
+    title: "Role Title",
+    source: "FinRobot.source",
+    profile: "Role profile text.",
+    responsibilities: {"Responsibility"},
+    tool_names: {"tool_name"},
+    output_contract: "contract_id",
+}
+
+role_profile_no_tool_schema := {
+    id: "Role_Id",
+    title: "Role Title",
+    source: "FinRobot.source",
+    profile: "Role profile text.",
+    responsibilities: {"Responsibility"},
+    output_contract: "contract_id",
+}
+
+market_role_ok, market_role_msg := llm.validate_output(role_registry.Market_Analyst, role_profile_schema)
+section_writer_ok, section_writer_msg := llm.validate_output(role_registry.Report_Section_Writer, role_profile_no_tool_schema)
+
+check("registry count", #role_registry_order == 4)
+check("market role schema", market_role_ok == true)
+check("section writer schema", section_writer_ok == true)
+check("data-only registry entry", role_registry.Market_Analyst.tool_names[1] == "load_profile")
+check("section writer has no runtime tools", #role_registry.Report_Section_Writer.tool_names == 0)
+check("prompt snapshot", role_prompt_snapshots.Market_Analyst == "As a Market Analyst, your responsibilities are as follows:\n - Collect local market evidence from replayable fixtures.\n - Summarize market context and source coverage for the report team.\n - Return a structured handoff and the TERMINATE convention when complete.\n\nReply \"TERMINATE\" in the end when everything is done.")
+check("missing role", render_role_prompt("Unknown_Role") == nil)
+
+role_registry_count := #role_registry_order
+market_prompt_snapshot := role_prompt_snapshots.Market_Analyst
+section_writer_contract := role_registry.Report_Section_Writer.output_contract
+
+print("role_registry_count", role_registry_count)
+print("market_prompt_snapshot", market_prompt_snapshot)
+print("section_writer_contract", section_writer_contract)

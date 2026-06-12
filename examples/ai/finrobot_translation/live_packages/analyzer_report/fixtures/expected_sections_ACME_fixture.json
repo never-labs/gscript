@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "fixture_key": "analyzer_report:ACME:offline:v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "ticker": "ACME",
+  "as_of": "2026-06-11",
+  "source_index": [
+    {
+      "source_id": "src_filing_10k",
+      "normalized_source_id": "src_filing_10k",
+      "kind": "filing",
+      "title": "ACME Form 10-K fixture",
+      "publisher": "SEC replay fixture",
+      "published_at": "2026-02-20",
+      "retrieved_at": "2026-06-11T00:00:00Z",
+      "locator": "item_1a_risk_factors",
+      "evidence_hash": "sha256:acme10kfixture"
+    },
+    {
+      "source_id": "src_metrics",
+      "normalized_source_id": "src_metrics",
+      "kind": "fundamental_metric",
+      "title": "ACME normalized metrics fixture",
+      "publisher": "FinRobot replay fixture",
+      "published_at": "2026-06-10",
+      "retrieved_at": "2026-06-11T00:00:00Z",
+      "locator": "fundamentals.fy2025",
+      "evidence_hash": "sha256:acmemetricsfixture"
+    },
+    {
+      "source_id": "src_transcript",
+      "normalized_source_id": "src_transcript",
+      "kind": "earnings_transcript",
+      "title": "ACME Q4 transcript fixture",
+      "publisher": "Earnings replay fixture",
+      "published_at": "2026-02-21",
+      "retrieved_at": "2026-06-11T00:00:00Z",
+      "locator": "management_outlook",
+      "evidence_hash": "sha256:acmetranscriptfixture"
+    },
+    {
+      "source_id": "src_news",
+      "normalized_source_id": "src_news",
+      "kind": "news_event",
+      "title": "ACME catalyst news fixture",
+      "publisher": "News replay fixture",
+      "published_at": "2026-06-09",
+      "retrieved_at": "2026-06-11T00:00:00Z",
+      "locator": "catalyst_digest",
+      "evidence_hash": "sha256:acmenewsfixture"
+    }
+  ],
+  "expected_sections": [
+    {
+      "section_id": "risk",
+      "title": "Risk Assessment",
+      "output_envelope": "risk_output_v1",
+      "summary": "ACME risk assessment fixture with resolved filing and metrics evidence.",
+      "source_refs": ["src_filing_10k", "src_metrics"],
+      "citations": ["[source:src_filing_10k]", "[source:src_metrics]"],
+      "normalized_citations": ["[source:src_filing_10k]", "[source:src_metrics]"],
+      "source_freshness_warnings": [],
+      "evidence_validation": {"provider_free": true, "live_network": false, "validated": true, "unresolved_source_refs": [], "missing_source_refs": [], "omitted_claims": [], "fixture_key": "section_schema:risk:v1"},
+      "payload": {"risk_factors": ["customer concentration", "margin sensitivity"], "severity": "medium", "mitigants": ["long-term contracts", "cash reserve"]}
+    },
+    {
+      "section_id": "thesis",
+      "title": "Investment Thesis",
+      "output_envelope": "thesis_output_v1",
+      "summary": "ACME thesis fixture with balanced bull, bear, and base case evidence.",
+      "source_refs": ["src_transcript", "src_metrics"],
+      "citations": ["[source:src_transcript]", "[source:src_metrics]"],
+      "normalized_citations": ["[source:src_transcript]", "[source:src_metrics]"],
+      "source_freshness_warnings": [],
+      "evidence_validation": {"provider_free": true, "live_network": false, "validated": true, "unresolved_source_refs": [], "missing_source_refs": [], "omitted_claims": [], "fixture_key": "section_schema:thesis:v1"},
+      "payload": {"bull_case": "operating leverage improves", "bear_case": "demand slows", "base_case": "steady growth", "investment_view": "neutral positive"}
+    },
+    {
+      "section_id": "valuation",
+      "title": "Valuation Analysis",
+      "output_envelope": "valuation_output_v1",
+      "summary": "ACME valuation fixture with offline assumptions and target-price envelope.",
+      "source_refs": ["src_metrics", "src_transcript"],
+      "citations": ["[source:src_metrics]", "[source:src_transcript]"],
+      "normalized_citations": ["[source:src_metrics]", "[source:src_transcript]"],
+      "source_freshness_warnings": [],
+      "evidence_validation": {"provider_free": true, "live_network": false, "validated": true, "unresolved_source_refs": [], "missing_source_refs": [], "omitted_claims": [], "fixture_key": "section_schema:valuation:v1"},
+      "payload": {"method": "dcf_plus_peer_multiple", "assumptions": ["8 percent revenue CAGR", "10 percent discount rate"], "target_price": 56.45, "sensitivity": "base case within replay tolerance"}
+    },
+    {
+      "section_id": "news",
+      "title": "Recent News and Catalysts",
+      "output_envelope": "news_output_v1",
+      "summary": "ACME news fixture with catalyst and sentiment evidence.",
+      "source_refs": ["src_news", "src_transcript"],
+      "citations": ["[source:src_news]", "[source:src_transcript]"],
+      "normalized_citations": ["[source:src_news]", "[source:src_transcript]"],
+      "source_freshness_warnings": [],
+      "evidence_validation": {"provider_free": true, "live_network": false, "validated": true, "unresolved_source_refs": [], "missing_source_refs": [], "omitted_claims": [], "fixture_key": "section_schema:news:v1"},
+      "payload": {"catalysts": ["new product ramp"], "sentiment": "constructive", "time_horizon": "next two quarters", "impact": "moderate positive"}
+    }
+  ],
+  "missing_evidence_degradation": [
+    {
+      "section_id": "valuation",
+      "title": "Valuation Analysis",
+      "output_envelope": "valuation_output_v1",
+      "summary": "ACME valuation target omitted because the required transcript evidence is missing in this degradation fixture.",
+      "source_refs": ["src_metrics"],
+      "citations": ["[source:src_metrics]"],
+      "normalized_citations": ["[source:src_metrics]"],
+      "source_freshness_warnings": [
+        {"source_id": "src_metrics", "warning_code": "missing_required_source_ref", "message": "Required earnings_transcript evidence is absent for valuation."}
+      ],
+      "evidence_validation": {
+        "provider_free": true,
+        "live_network": false,
+        "validated": false,
+        "unresolved_source_refs": [],
+        "missing_source_refs": ["earnings_transcript"],
+        "omitted_claims": ["target_price"],
+        "warning_codes": ["missing_required_source_ref", "claim_omitted_due_to_missing_evidence"],
+        "fixture_key": "analyzer_report:ACME:missing-evidence:offline:v1"
+      },
+      "payload": {"method": "dcf_plus_peer_multiple", "assumptions": ["8 percent revenue CAGR", "10 percent discount rate"], "target_price": null, "sensitivity": "target suppressed until required transcript evidence is available"}
+    }
+  ]
+}

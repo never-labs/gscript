@@ -1,0 +1,100 @@
+// general_analysis_assistant.leia - Replay-backed generic AI analysis assistant.
+// Shows how Leia's AI dialect expresses a multi-source analyst workflow with
+// a model, local evidence tools, one structured agent, and one review turn.
+
+model {
+    default: "mock-analysis"
+}
+
+local_context := {
+    request: "Analyze a launch readiness decision for a subscription workflow.",
+    metrics: "activation +8%, support contacts +14%, p95 checkout latency +22ms",
+    constraints: "no provider calls during replay; evidence must be auditable",
+    policy: "ship only when owner, rollback, and measurement plan are explicit"
+}
+
+evidence_log := {}
+
+func remember(kind, value) {
+    evidence_log[#evidence_log + 1] = kind .. ":" .. value
+}
+
+load_context := tool {
+    name: "load_context"
+    fn: func(topic) {
+        remember("load_context", topic)
+        return local_context.metrics, nil
+    }
+    params: {"topic"}
+    description: "Load local metrics and qualitative context for the analysis."
+}
+
+retrieve_policy := tool {
+    name: "retrieve_policy"
+    fn: func(domain) {
+        remember("retrieve_policy", domain)
+        return local_context.policy, nil
+    }
+    params: {"domain"}
+    description: "Retrieve local decision policy for the requested domain."
+}
+
+compare_scenarios := tool {
+    name: "compare_scenarios"
+    fn: func(base, proposed) {
+        remember("compare_scenarios", base .. "->" .. proposed)
+        return "base=stable; proposed=higher activation with support risk", nil
+    }
+    params: {"base", "proposed"}
+    description: "Compare baseline and proposed operating scenarios."
+}
+
+analysis_assistant := agent {
+    name: "general_analysis_assistant"
+    model: "mock-analysis"
+    instructions: prompt { role: "system", text: "Act as a generic AI analysis assistant. Use local evidence, separate findings from risks, and return a decision-ready brief." }
+    tools: {load_context, retrieve_policy, compare_scenarios}
+    params: {"question"}
+    output: {
+        brief: "decision brief"
+        evidence: {"metrics", "policy", "scenario"}
+        findings: {"finding"}
+        risks: {"risk"}
+        actions: {"action"}
+        owner: "team"
+        recommendation: "decision"
+        replay_ready: true
+    }
+    max_steps: 1
+}
+
+analysis, analysis_err := analysis_assistant(local_context.request)
+assert(analysis_err == nil)
+assert(analysis.value.brief == "Launch can proceed behind a guarded rollout because activation improves while support risk remains measurable.")
+assert(analysis.value.evidence[1] == "activation +8%; support contacts +14%; checkout latency +22ms")
+assert(analysis.value.evidence[3] == "baseline stable; proposed rollout needs support watch")
+assert(analysis.value.findings[1] == "Activation signal is positive")
+assert(analysis.value.findings[2] == "Support load is the main constraint")
+assert(analysis.value.risks[1] == "Support contact growth can hide onboarding defects")
+assert(analysis.value.actions[1] == "Assign an owner before rollout")
+assert(analysis.value.actions[3] == "Review activation and support deltas after 24 hours")
+assert(analysis.value.owner == "growth-ops")
+assert(analysis.value.recommendation == "guarded rollout")
+assert(analysis.value.replay_ready == true)
+
+review, review_err := turn {
+    model: "mock-analysis-review"
+    messages: {
+        llm.system("Review the analysis assistant output for evidence grounding, actionability, and replay determinism."),
+        llm.user(analysis.text),
+    }
+}
+assert(review_err == nil)
+assert(review.text == "Analysis is replayable and decision-ready: evidence is local, risks are explicit, and actions name owner, rollback, and measurement.")
+
+print("brief", analysis.value.brief)
+print("owner", analysis.value.owner)
+print("recommendation", analysis.value.recommendation)
+print("actions", #analysis.value.actions)
+print("review", review.text)
+print("ok")

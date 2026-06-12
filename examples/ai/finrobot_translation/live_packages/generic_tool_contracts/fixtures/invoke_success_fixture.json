@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "request": {
+    "tool_name": "fixture.lookup",
+    "arguments": {
+      "ticker": "ACME",
+      "horizon": "1d"
+    },
+    "capability_tags": [
+      "generic.ai.tool.contract",
+      "ai.tool.invoke"
+    ],
+    "approval": {
+      "state": "fixture_only",
+      "approval_id": "approval:fixture:lookup:ACME:1d",
+      "required": false,
+      "reason": "fixture replay does not require live approval"
+    },
+    "replay_key": "generic_tool:invoke:fixture.lookup:ACME:1d:success",
+    "provider_free": true,
+    "live_network": false
+  },
+  "result": {
+    "ok": true,
+    "tool_name": "fixture.lookup",
+    "capability_tags": [
+      "generic.ai.tool.contract",
+      "ai.tool.invoke",
+      "ai.tool.result.envelope",
+      "ai.tool.artifact.refs"
+    ],
+    "approval": {
+      "state": "fixture_only",
+      "approval_id": "approval:fixture:lookup:ACME:1d",
+      "required": false,
+      "reason": "fixture replay approved by checked-in contract"
+    },
+    "value": {
+      "ticker": "ACME",
+      "horizon": "1d",
+      "summary": "provider-free fixture lookup completed"
+    },
+    "error": null,
+    "artifact_refs": [
+      {
+        "artifact_id": "artifact_generic_tool_lookup_ACME_1d",
+        "uri": "artifact://generic_tool_contracts/lookup/ACME/1d.json",
+        "media_type": "application/json",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bytes": 192,
+        "provenance": {
+          "source": "fixture_replay",
+          "tool_name": "fixture.lookup",
+          "provider_free": true,
+          "live_network": false
+        },
+        "replay_key": "generic_tool:artifact:fixture.lookup:ACME:1d"
+      }
+    ],
+    "replay": {
+      "mode": "fixture_replay",
+      "replay_key": "generic_tool:invoke:fixture.lookup:ACME:1d:success",
+      "deterministic": true,
+      "provider_free": true,
+      "live_network": false
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "fixture_key": "vendor_adapters:auth_redaction:offline",
+  "provider": "vendor_adapters",
+  "capability": "finance.vendor.adapter.auth_redaction",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "live_network": false,
+  "provider_free": true,
+  "secret_value_policy": "never-store-secret-values",
+  "secret_values_present": false,
+  "replacement": "<redacted>",
+  "credential_required_for_replay": false,
+  "headers_redacted": [
+    "authorization",
+    "x-api-key",
+    "finnhub-token"
+  ],
+  "query_params_redacted": [
+    "token",
+    "apikey",
+    "api_key",
+    "client_secret"
+  ],
+  "env_refs": [
+    "env:FINNHUB_TOKEN",
+    "env:FMP_API_KEY",
+    "env:REDDIT_CLIENT_ID",
+    "env:REDDIT_CLIENT_SECRET",
+    "env:SEC_USER_AGENT"
+  ],
+  "terms": {
+    "usage": "offline-fixture-only",
+    "attribution": "provider terms metadata retained",
+    "redistribution": "do-not-redistribute-live-payloads",
+    "live_network": false
+  }
+}

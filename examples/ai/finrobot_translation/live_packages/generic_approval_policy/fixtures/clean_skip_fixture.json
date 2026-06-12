@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic.ai.approval.policy:clean_skip:network_absent:v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "requested_capability": "generic.ai.capability.network.http",
+  "risk_level": "medium",
+  "status": "skipped",
+  "clean_skip": true,
+  "skip_reason": "live network capability requires an external provider package that is absent in provider-free mode",
+  "dependency_imported": false,
+  "credentials_required": false,
+  "secret_values_present": false,
+  "result_envelope": {
+    "status": "skipped",
+    "capability": "generic.ai.capability.network.http",
+    "fixture_key": "generic.ai.approval.policy:clean_skip:network_absent:v1",
+    "data": null,
+    "metadata": {
+      "provider_free": true,
+      "clean_skip": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  }
+}

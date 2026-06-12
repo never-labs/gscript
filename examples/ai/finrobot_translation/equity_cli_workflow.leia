@@ -1,0 +1,389 @@
+// equity_cli_workflow.leia - FR-GAP-019 offline equity report CLI workflow.
+//
+// This fixture models generate_financial_analysis.py -> create_equity_report.py
+// -> generate_pdf_report.py as named workflow stages. It records dependencies,
+// tool contracts, retry/stale-section hooks, artifact manifests, and final
+// output paths without rendering HTML or PDF.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+contract := llm.report_artifact_contract({
+    name: "finrobot_equity_cli_workflow",
+    version: "FR-GAP-019",
+})
+
+cli_config := {
+    workflow_id: "finrobot_equity_cli_aapl_2026_06_11",
+    ticker: "AAPL",
+    report_date: "2026-06-11",
+    output_dir: "output/AAPL/report",
+    offline: true,
+    renderer_required: false,
+    renderer_mode: "planned_not_rendered",
+    retry_policy: {
+        max_attempts: 3,
+        backoff_ms: 250,
+        retryable_errors: {"fixture_missing", "section_agent_timeout"},
+    },
+    stale_section_policy: {
+        mode: "fail_required_section",
+        hook: "on_stale_required_section",
+        allowed_optional_stale: {"recent_news"},
+    },
+}
+
+source_annotations := {
+    {
+        id: "src_financial_metrics",
+        title: "Financial metrics and forecasts fixture",
+        kind: "csv",
+        locator: "examples/ai/finrobot_translation/fixtures/financial_metrics_and_forecasts.csv",
+        as_of: "2026-03-31",
+        stale_after: "2026-05-31",
+        stale: true,
+        license: "fixture",
+        retrieved_at: "2026-06-11T00:00:00Z",
+        evidence_hash: "sha256:fixture-financial-metrics",
+    },
+    {
+        id: "src_ratios",
+        title: "Valuation ratios fixture",
+        kind: "csv",
+        locator: "examples/ai/finrobot_translation/fixtures/ratios_raw_data.csv",
+        as_of: "2026-03-31",
+        stale_after: "2026-05-31",
+        stale: true,
+        license: "fixture",
+        retrieved_at: "2026-06-11T00:00:00Z",
+        evidence_hash: "sha256:fixture-ratios",
+    },
+    {
+        id: "src_news",
+        title: "News and catalyst fixture",
+        kind: "json",
+        locator: "examples/ai/finrobot_translation/fixtures/news_catalysts.json",
+        as_of: "2026-06-10",
+        stale_after: "2026-06-12",
+        stale: false,
+        license: "fixture",
+        retrieved_at: "2026-06-11T00:00:00Z",
+        evidence_hash: "sha256:fixture-news",
+    },
+}
+
+report_sections := {
+    {
+        id: "executive_summary",
+        title: "Executive Summary",
+        order: 1,
+        required: true,
+        content: "Fixture-backed investment summary planned by the CLI workflow.",
+        chart_refs: {},
+        source_refs: {"src_financial_metrics", "src_ratios"},
+        ai_disclosure: true,
+        disclosure_ref: "ai_disclosure",
+    },
+    {
+        id: "financial_analysis",
+        title: "Financial Analysis",
+        order: 2,
+        required: true,
+        content: "Revenue, EBITDA, margin, and EPS section generated from recorded CSVs.",
+        chart_refs: {"chart_revenue_ebitda"},
+        source_refs: {"src_financial_metrics"},
+        ai_disclosure: true,
+        disclosure_ref: "ai_disclosure",
+    },
+    {
+        id: "valuation_analysis",
+        title: "Valuation Analysis",
+        order: 3,
+        required: true,
+        content: "DCF, EV/EBITDA, and peer comparison section generated from recorded ratios.",
+        chart_refs: {"chart_eps_pe"},
+        source_refs: {"src_ratios"},
+        ai_disclosure: true,
+        disclosure_ref: "ai_disclosure",
+    },
+    {
+        id: "recent_news",
+        title: "Recent News and Catalysts",
+        order: 4,
+        required: false,
+        content: "Recent fixture news and catalyst summary.",
+        chart_refs: {},
+        source_refs: {"src_news"},
+        ai_disclosure: true,
+        disclosure_ref: "ai_disclosure",
+    },
+}
+
+chart_specs := {
+    {
+        id: "chart_revenue_ebitda",
+        title: "Revenue & EBITDA Trend",
+        section_id: "financial_analysis",
+        kind: "timeseries_combo",
+        renderer: "chart.package.timeseries_combo",
+        source_refs: {"src_financial_metrics"},
+        x: "fiscal_year",
+        series: {"Revenue", "EBITDA"},
+        artifact: {
+            id: "artifact_chart_revenue_ebitda_png",
+            kind: "image/png",
+            path: "output/AAPL/report/charts/AAPL_revenue_ebitda.png",
+            status: "specified_not_rendered",
+        },
+    },
+    {
+        id: "chart_eps_pe",
+        title: "EPS x PE Trend Analysis",
+        section_id: "valuation_analysis",
+        kind: "dual_axis_line",
+        renderer: "chart.package.dual_axis_line",
+        source_refs: {"src_ratios"},
+        x: "fiscal_year",
+        series: {"Diluted EPS", "PE Ratio"},
+        artifact: {
+            id: "artifact_chart_eps_pe_png",
+            kind: "image/png",
+            path: "output/AAPL/report/charts/AAPL_eps_pe.png",
+            status: "specified_not_rendered",
+        },
+    },
+}
+
+load_cli_config := tool {
+    name: "load_cli_config"
+    fn: func(request) {
+        return cli_config, nil
+    }
+    params: {"request"}
+    description: "Resolve local CLI config, output directory, retry policy, and stale-section policy."
+}
+
+load_recorded_inputs := tool {
+    name: "load_recorded_inputs"
+    fn: func(config) {
+        return {
+            ticker: config.ticker,
+            dependencies: {"load_cli_config"},
+            source_annotations: source_annotations,
+            input_artifacts: {
+                {id: "artifact_metrics_csv", kind: "text/csv", path: source_annotations[1].locator, status: "fixture_replayed"},
+                {id: "artifact_ratios_csv", kind: "text/csv", path: source_annotations[2].locator, status: "fixture_replayed"},
+                {id: "artifact_news_json", kind: "application/json", path: source_annotations[3].locator, status: "fixture_replayed"},
+            },
+            retry: {attempt: 1, max_attempts: config.retry_policy.max_attempts, backoff_ms: 0, reason: "fixture-hit"},
+        }, nil
+    }
+    params: {"config"}
+    description: "Load recorded financial, valuation, and news inputs for offline replay."
+}
+
+normalize_financial_tables := tool {
+    name: "normalize_financial_tables"
+    fn: func(inputs) {
+        return {
+            dependencies: {"load_recorded_inputs"},
+            tables: {"financial_metrics_and_forecasts", "ratios_raw_data"},
+            output_artifact: {id: "artifact_normalized_financials", kind: "application/json", path: "output/AAPL/report/intermediate/normalized_financials.json", status: "planned"},
+            retry: {attempt: 1, max_attempts: cli_config.retry_policy.max_attempts, backoff_ms: 0, reason: "normalized"},
+        }, nil
+    }
+    params: {"inputs"}
+    description: "Normalize recorded CSV inputs into deterministic report tables."
+}
+
+generate_section_text := tool {
+    name: "generate_section_text"
+    fn: func(normalized) {
+        return {
+            dependencies: {"normalize_financial_tables"},
+            sections: report_sections,
+            output_artifact: {id: "artifact_section_text_json", kind: "application/json", path: "output/AAPL/report/intermediate/section_text.json", status: "planned"},
+            retry: {attempt: 1, max_attempts: cli_config.retry_policy.max_attempts, backoff_ms: 0, reason: "section-agents-replayed"},
+        }, nil
+    }
+    params: {"normalized"}
+    description: "Replay section-agent outputs as structured report sections."
+}
+
+plan_report_artifacts := tool {
+    name: "plan_report_artifacts"
+    fn: func(section_run) {
+        ai_disclosure := "AI_DISCLOSURE: This CLI equity report is AI-assisted, source-backed, offline replayed, and not investment advice."
+        return {
+            dependencies: {"generate_section_text"},
+            artifact_manifest: {
+                contract: contract.version,
+                report_id: "AAPL_2026_06_11_equity_report",
+                generated_at: "2026-06-11T00:00:00Z",
+                report_sections: {"executive_summary", "financial_analysis", "valuation_analysis", "recent_news"},
+                chart_specs: {"chart_revenue_ebitda", "chart_eps_pe"},
+                artifacts: {
+                    {id: "artifact_html_report", kind: "text/html", path: "output/AAPL/report/AAPL_Professional_Equity_Report.html", status: "planned_not_rendered"},
+                    {id: "artifact_pdf_report", kind: "application/pdf", path: "output/AAPL/report/AAPL_Professional_Equity_Report.pdf", status: "planned_not_rendered"},
+                    {id: "artifact_manifest_json", kind: "application/json", path: "output/AAPL/report/artifact_manifest.json", status: "planned"},
+                    section_run.output_artifact,
+                    chart_specs[1].artifact,
+                    chart_specs[2].artifact,
+                },
+                source_annotations: source_annotations,
+                warnings: {"stale_data_warning: required financial and valuation fixtures are stale relative to 2026-06-11"},
+                ai_disclosure: ai_disclosure,
+            },
+        }, nil
+    }
+    params: {"section_run"}
+    description: "Plan HTML/PDF/chart artifacts and manifest output without running a renderer."
+}
+
+func stale_section_failure_hook(section_id, source_id) {
+    return {
+        hook: cli_config.stale_section_policy.hook,
+        kind: "stale_required_section",
+        section_id: section_id,
+        source_id: source_id,
+        retryable: false,
+        action: "fail_before_final_report",
+        message: "Required section " .. section_id .. " depends on stale source " .. source_id,
+    }
+}
+
+func stale_optional_section_hook(section_id, source_id) {
+    return {
+        hook: "on_stale_optional_section",
+        kind: "stale_optional_section",
+        section_id: section_id,
+        source_id: source_id,
+        retryable: false,
+        action: "warn_and_continue",
+        message: "Optional section " .. section_id .. " depends on stale source " .. source_id,
+    }
+}
+
+validate_stale_sections := tool {
+    name: "validate_stale_sections"
+    fn: func(plan) {
+        return {
+            dependencies: {"plan_report_artifacts"},
+            ok: true,
+            evaluated_policy: cli_config.stale_section_policy.mode,
+            failure_hooks: {
+                stale_section_failure_hook("financial_analysis", "src_financial_metrics"),
+                stale_section_failure_hook("valuation_analysis", "src_ratios"),
+            },
+            warning_hooks: {
+                stale_optional_section_hook("recent_news", "src_news"),
+            },
+            manifest: plan.artifact_manifest,
+        }, nil
+    }
+    params: {"plan"}
+    description: "Evaluate stale section hooks and keep the offline manifest inspectable."
+}
+
+finalize_report_output := tool {
+    name: "finalize_report_output"
+    fn: func(validation) {
+        return {
+            dependencies: {"validate_stale_sections"},
+            final_report_output: {
+                report_id: validation.manifest.report_id,
+                html: validation.manifest.artifacts[1].path,
+                pdf: validation.manifest.artifacts[2].path,
+                manifest: validation.manifest.artifacts[3].path,
+                renderer_required: cli_config.renderer_required,
+                renderer_mode: cli_config.renderer_mode,
+                status: "planned_not_rendered",
+            },
+            artifact_manifest: validation.manifest,
+            failure_hooks: validation.failure_hooks,
+            warning_hooks: validation.warning_hooks,
+        }, nil
+    }
+    params: {"validation"}
+    description: "Return final CLI report output paths and hook metadata without rendering."
+}
+
+equity_cli_workflow := llm.workflow({
+    llm.step("load_cli_config", func(ctx) {
+        return load_cli_config.fn(ctx.input)
+    }, {tool: load_cli_config.name, dependencies: {}}),
+    llm.step("load_recorded_inputs", func(ctx) {
+        return load_recorded_inputs.fn(ctx.context.load_cli_config.value)
+    }, {tool: load_recorded_inputs.name, dependencies: {"load_cli_config"}}),
+    llm.step("normalize_financial_tables", func(ctx) {
+        return normalize_financial_tables.fn(ctx.context.load_recorded_inputs.value)
+    }, {tool: normalize_financial_tables.name, dependencies: {"load_recorded_inputs"}}),
+    llm.step("generate_section_text", func(ctx) {
+        return generate_section_text.fn(ctx.context.normalize_financial_tables.value)
+    }, {tool: generate_section_text.name, dependencies: {"normalize_financial_tables"}}),
+    llm.step("plan_report_artifacts", func(ctx) {
+        return plan_report_artifacts.fn(ctx.context.generate_section_text.value)
+    }, {tool: plan_report_artifacts.name, dependencies: {"generate_section_text"}}),
+    llm.step("validate_stale_sections", func(ctx) {
+        return validate_stale_sections.fn(ctx.context.plan_report_artifacts.value)
+    }, {tool: validate_stale_sections.name, dependencies: {"plan_report_artifacts"}, failure_hook: cli_config.stale_section_policy.hook}),
+    llm.step("finalize_report_output", func(ctx) {
+        return finalize_report_output.fn(ctx.context.validate_stale_sections.value)
+    }, {tool: finalize_report_output.name, dependencies: {"validate_stale_sections"}}),
+})
+
+workflow_result, workflow_err := equity_cli_workflow.run({ticker: "AAPL", report_date: "2026-06-11"})
+final_report_output := workflow_result.value.final_report_output
+artifact_manifest := workflow_result.value.artifact_manifest
+workflow_steps := workflow_result.steps
+workflow_stage_contract := equity_cli_workflow.steps
+failure_hooks := workflow_result.value.failure_hooks
+warning_hooks := workflow_result.value.warning_hooks
+
+section_ok, section_msg := llm.validate_output(report_sections[1], contract.schemas.report_section)
+chart_ok, chart_msg := llm.validate_output(chart_specs[1], contract.schemas.chart_spec)
+source_ok, source_msg := llm.validate_output(source_annotations[1], contract.schemas.source_annotation)
+manifest_ok, manifest_msg := llm.validate_output(artifact_manifest, contract.schemas.artifact_manifest)
+
+check("workflow ok", workflow_err == nil && workflow_result.status == "ok")
+check("named stage count", #workflow_steps == 7)
+check("stage metadata count", #workflow_stage_contract == 7)
+check("dependency metadata", workflow_stage_contract[4].opts.dependencies[1] == "normalize_financial_tables")
+check("runtime dependency output", workflow_steps[5].value.dependencies[1] == "generate_section_text")
+check("retry policy", workflow_steps[2].value.retry.max_attempts == 3)
+check("stale failure hooks", #failure_hooks == 2 && failure_hooks[1].action == "fail_before_final_report")
+check("optional stale warning hook", #warning_hooks == 1 && warning_hooks[1].action == "warn_and_continue")
+check("section schema", section_ok == true)
+check("chart schema", chart_ok == true)
+check("source schema", source_ok == true)
+check("manifest schema", manifest_ok == true)
+check("manifest artifacts", #artifact_manifest.artifacts == 6)
+check("final HTML output", final_report_output.html == "output/AAPL/report/AAPL_Professional_Equity_Report.html")
+check("final PDF output", final_report_output.pdf == "output/AAPL/report/AAPL_Professional_Equity_Report.pdf")
+check("renderer boundary", final_report_output.renderer_required == false && final_report_output.status == "planned_not_rendered")
+
+print("workflow", cli_config.workflow_id)
+print("stages", #workflow_steps)
+print("manifest", artifact_manifest.report_id)
+print("html", final_report_output.html)
+print("pdf", final_report_output.pdf)
+print("failure_hooks", #failure_hooks)
+print("ok")
+
+evaluate "fr-gap-019 equity cli workflow stages" {
+    assert(workflow_err == nil)
+    assert(workflow_result.status == "ok")
+    assert(#workflow_steps == 7)
+    assert(workflow_stage_contract[6].opts.failure_hook == "on_stale_required_section")
+    assert(workflow_steps[2].value.retry.max_attempts == 3)
+    assert(#failure_hooks == 2)
+    assert(failure_hooks[1].kind == "stale_required_section")
+    assert(failure_hooks[1].retryable == false)
+    assert(#artifact_manifest.artifacts == 6)
+    assert(manifest_ok == true)
+    assert(final_report_output.renderer_required == false)
+    assert(final_report_output.status == "planned_not_rendered")
+}

@@ -1,0 +1,45 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "trace_emission_hooks_fixture": "fixtures/trace_emission_hooks_fixture.json",
+  "trace_emission_hooks_schema": "schemas/trace_emission_hooks_v1.schema.json",
+  "hooks": [
+    {
+      "id": "on_workflow_started",
+      "phase": "workflow_started",
+      "required_fields": [
+        "workflow_id",
+        "run_id",
+        "event_id",
+        "emission_mode"
+      ]
+    },
+    {
+      "id": "on_stage_completed",
+      "phase": "stage_completed",
+      "required_fields": [
+        "stage_id",
+        "status",
+        "event_id",
+        "emission_mode"
+      ]
+    },
+    {
+      "id": "on_workflow_completed",
+      "phase": "workflow_completed",
+      "required_fields": [
+        "workflow_id",
+        "run_id",
+        "status",
+        "event_id"
+      ]
+    }
+  ],
+  "acceptance_gates": [
+    "trace emission hooks are declared as offline fixture hooks",
+    "no hook imports tracing providers or opens a network sink",
+    "stage completion hook includes retry/cache metadata references",
+    "workflow completion hook links to workflow result trace refs"
+  ]
+}

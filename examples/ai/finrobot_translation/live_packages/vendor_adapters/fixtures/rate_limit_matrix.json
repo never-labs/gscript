@@ -1,0 +1,70 @@
+{
+  "fixture_key": "vendor_adapters:rate_limits:offline",
+  "provider": "vendor_adapters",
+  "capability": "finance.vendor.adapter.rate_limits",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "live_network": false,
+  "provider_free": true,
+  "metadata": {
+    "mode": "fixture_replay",
+    "source": "synthetic-offline-fixture",
+    "redacted": true,
+    "secret_values_present": false,
+    "terms": {
+      "usage": "offline-fixture-only",
+      "attribution": "provider terms metadata retained",
+      "redistribution": "do-not-redistribute-live-payloads",
+      "live_network": false
+    },
+    "retry_cache_envelope": {
+      "max_attempts": 1,
+      "backoff": "none",
+      "cache_mode": "fixture_replay",
+      "cache_state": "fixture-hit"
+    }
+  },
+  "providers": [
+    {
+      "provider": "yfinance",
+      "window_seconds": 60,
+      "limit": 120,
+      "retry_after_seconds": 1,
+      "policy": "metadata-only"
+    },
+    {
+      "provider": "fmp",
+      "window_seconds": 86400,
+      "limit": 300,
+      "retry_after_seconds": 2,
+      "policy": "metadata-only"
+    },
+    {
+      "provider": "sec",
+      "window_seconds": 1,
+      "limit": 10,
+      "retry_after_seconds": 1,
+      "policy": "metadata-only"
+    },
+    {
+      "provider": "finnhub",
+      "window_seconds": 60,
+      "limit": 60,
+      "retry_after_seconds": 0,
+      "policy": "metadata-only"
+    },
+    {
+      "provider": "reddit",
+      "window_seconds": 600,
+      "limit": 600,
+      "retry_after_seconds": 0,
+      "policy": "metadata-only"
+    },
+    {
+      "provider": "earnings",
+      "window_seconds": 60,
+      "limit": 30,
+      "retry_after_seconds": 0,
+      "policy": "metadata-only"
+    }
+  ]
+}

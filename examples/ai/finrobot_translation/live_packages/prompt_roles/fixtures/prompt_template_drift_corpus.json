@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-prompt-template-drift-corpus-v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "capabilities": [
+    "prompt.role.catalog.prompts",
+    "prompt.role.catalog.utils",
+    "prompt.role.catalog.equity_agents",
+    "prompt.role.section.output_schema",
+    "prompt.role.termination.convention",
+    "prompt.role.evidence.validation"
+  ],
+  "trigger_parsing": [
+    {
+      "id": "prompts_section_body_delegates_to_writer",
+      "source_module": "FinRobot.prompts",
+      "source_file_hint": "prompts.py",
+      "entry_id": "report_instruction",
+      "pattern": "(?i)\\b(section body|paragraph|rewrite)\\b",
+      "input": "rewrite the risk paragraph with cited evidence",
+      "expected_match": true,
+      "expected_delegate_role_id": "Report_Section_Writer"
+    },
+    {
+      "id": "prompts_missing_refs_do_not_delegate_to_writer",
+      "source_module": "FinRobot.prompts",
+      "source_file_hint": "prompts.py",
+      "entry_id": "report_instruction",
+      "pattern": "(?i)\\b(section body|paragraph|rewrite)\\b",
+      "input": "list missing source refs before writing",
+      "expected_match": false,
+      "expected_delegate_role_id": ""
+    },
+    {
+      "id": "utils_unresolved_source_delegates_to_data",
+      "source_module": "FinRobot.utils",
+      "source_file_hint": "utils.py",
+      "entry_id": "evidence_guardrail",
+      "pattern": "(?i)\\b(unresolved|missing source|no citation)\\b",
+      "input": "unresolved metric citation in the valuation section",
+      "expected_match": true,
+      "expected_delegate_role_id": "Data_Analyst"
+    },
+    {
+      "id": "utils_valid_refs_do_not_delegate",
+      "source_module": "FinRobot.utils",
+      "source_file_hint": "utils.py",
+      "entry_id": "source_citation_rule",
+      "pattern": "(?i)\\b(narrative|section|prose)\\b",
+      "input": "return unresolved source ids",
+      "expected_match": false,
+      "expected_delegate_role_id": ""
+    }
+  ],
+  "template_snapshots": [
+    {
+      "id": "role_market_analyst_snapshot",
+      "kind": "role",
+      "role_id": "Market_Analyst",
+      "source_catalog": "agent_library",
+      "required_placeholders": ["{{ticker}}", "{{source_refs}}"],
+      "template": "As Market_Analyst for {{ticker}}, use only supplied {{source_refs}}, identify market context gaps, and finish complete responses with TERMINATE.",
+      "expected_sections": ["market context", "source_refs", "TERMINATE"]
+    },
+    {
+      "id": "section_company_overview_snapshot",
+      "kind": "section",
+      "role_id": "Report_Section_Writer",
+      "source_catalog": "text_generator_agents",
+      "required_placeholders": ["{{section_id}}", "{{source_refs}}", "{{evidence_validation}}"],
+      "template": "Draft {{section_id}} with summary, body, key_points, {{source_refs}}, {{evidence_validation}}, and the exact TERMINATE completion literal.",
+      "expected_sections": ["summary", "body", "key_points", "source_refs", "evidence_validation", "TERMINATE"]
+    },
+    {
+      "id": "utils_evidence_guardrail_snapshot",
+      "kind": "validator",
+      "role_id": "Data_Analyst",
+      "source_catalog": "utils",
+      "required_placeholders": ["{{minimum_source_refs}}", "{{fixture_keys}}"],
+      "template": "Validate at least {{minimum_source_refs}} source_refs, require {{fixture_keys}}, reject unresolved_source_refs, keep provider_free true, and return TERMINATE only when complete.",
+      "expected_sections": ["source_refs", "fixture_keys", "unresolved_source_refs", "provider_free", "TERMINATE"]
+    }
+  ],
+  "equity_agents_response_drift": {
+    "contract_name": "equity_agents_section_response",
+    "source_module": "FinRobot.equity_agents",
+    "source_file_hint": "equity_agents.py",
+    "required_fields": {
+      "section_id": "string",
+      "title": "string",
+      "summary": "string",
+      "body": "string",
+      "key_points": "array",
+      "source_refs": "array",
+      "evidence_validation": "object",
+      "termination": "string"
+    },
+    "cases": [
+      {
+        "id": "valid_section_response",
+        "expected_valid": true,
+        "expected_reason": "matches_required_shape",
+        "response": {
+          "section_id": "company_overview",
+          "title": "Company Overview",
+          "summary": "Fixture-backed overview.",
+          "body": "The section uses supplied evidence only.",
+          "key_points": ["Profile evidence is present"],
+          "source_refs": ["src_company_profile"],
+          "evidence_validation": {
+            "provider_free": true,
+            "live_network": false,
+            "validated": true,
+            "minimum_source_refs": 1,
+            "source_refs": ["src_company_profile"],
+            "unresolved_source_refs": [],
+            "fixture_keys": ["prompt_catalog:equity_agents:v1"],
+            "rules": [
+              {"id": "minimum_source_refs", "passes": true},
+              {"id": "no_unresolved_source_refs", "passes": true},
+              {"id": "fixture_key_required", "passes": true}
+            ]
+          },
+          "termination": "TERMINATE"
+        }
+      },
+      {
+        "id": "missing_evidence_validation",
+        "expected_valid": false,
+        "expected_reason": "missing_required_field",
+        "response": {
+          "section_id": "company_overview",
+          "title": "Company Overview",
+          "summary": "Fixture-backed overview.",
+          "body": "The section uses supplied evidence only.",
+          "key_points": ["Profile evidence is present"],
+          "source_refs": ["src_company_profile"],
+          "termination": "TERMINATE"
+        }
+      },
+      {
+        "id": "source_refs_scalar_drift",
+        "expected_valid": false,
+        "expected_reason": "field_type_drift",
+        "response": {
+          "section_id": "company_overview",
+          "title": "Company Overview",
+          "summary": "Fixture-backed overview.",
+          "body": "The section uses supplied evidence only.",
+          "key_points": ["Profile evidence is present"],
+          "source_refs": "src_company_profile",
+          "evidence_validation": {
+            "provider_free": true,
+            "live_network": false,
+            "validated": true,
+            "minimum_source_refs": 1,
+            "source_refs": ["src_company_profile"],
+            "unresolved_source_refs": [],
+            "fixture_keys": ["prompt_catalog:equity_agents:v1"],
+            "rules": [
+              {"id": "minimum_source_refs", "passes": true},
+              {"id": "no_unresolved_source_refs", "passes": true},
+              {"id": "fixture_key_required", "passes": true}
+            ]
+          },
+          "termination": "TERMINATE"
+        }
+      },
+      {
+        "id": "termination_literal_drift",
+        "expected_valid": false,
+        "expected_reason": "termination_drift",
+        "response": {
+          "section_id": "company_overview",
+          "title": "Company Overview",
+          "summary": "Fixture-backed overview.",
+          "body": "The section uses supplied evidence only.",
+          "key_points": ["Profile evidence is present"],
+          "source_refs": ["src_company_profile"],
+          "evidence_validation": {
+            "provider_free": true,
+            "live_network": false,
+            "validated": true,
+            "minimum_source_refs": 1,
+            "source_refs": ["src_company_profile"],
+            "unresolved_source_refs": [],
+            "fixture_keys": ["prompt_catalog:equity_agents:v1"],
+            "rules": [
+              {"id": "minimum_source_refs", "passes": true},
+              {"id": "no_unresolved_source_refs", "passes": true},
+              {"id": "fixture_key_required", "passes": true}
+            ]
+          },
+          "termination": "DONE"
+        }
+      }
+    ]
+  },
+  "source_evidence_validator_corpus": [
+    {
+      "id": "valid_multiple_refs",
+      "expected_valid": true,
+      "minimum_source_refs": 2,
+      "source_refs": ["src_company_profile", "src_financial_metrics"],
+      "unresolved_source_refs": [],
+      "fixture_keys": ["prompt_catalog:prompts:v1", "prompt_catalog:utils:v1"],
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "not_enough_refs",
+      "expected_valid": false,
+      "minimum_source_refs": 2,
+      "source_refs": ["src_company_profile"],
+      "unresolved_source_refs": [],
+      "fixture_keys": ["prompt_catalog:prompts:v1"],
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "unresolved_ref_blocks_completion",
+      "expected_valid": false,
+      "minimum_source_refs": 1,
+      "source_refs": ["src_company_profile"],
+      "unresolved_source_refs": ["src_missing_segment"],
+      "fixture_keys": ["prompt_catalog:utils:v1"],
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "missing_fixture_key_blocks_completion",
+      "expected_valid": false,
+      "minimum_source_refs": 1,
+      "source_refs": ["src_company_profile"],
+      "unresolved_source_refs": [],
+      "fixture_keys": [],
+      "provider_free": true,
+      "live_network": false
+    }
+  ],
+  "termination_convention_drift": [
+    {"id": "exact_literal", "output": "TERMINATE", "expected_accept": true},
+    {"id": "lowercase_literal", "output": "terminate", "expected_accept": false},
+    {"id": "suffix_literal", "output": "TERMINATED", "expected_accept": false},
+    {"id": "extra_sentence", "output": "TERMINATE.", "expected_accept": false},
+    {"id": "leading_space", "output": " TERMINATE", "expected_accept": false},
+    {"id": "trailing_newline", "output": "TERMINATE\n", "expected_accept": false}
+  ]
+}

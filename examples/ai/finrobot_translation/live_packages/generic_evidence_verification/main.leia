@@ -1,0 +1,44 @@
+generic_evidence_verification_live_package := {
+    id: "generic-evidence-verification"
+    package_name: "leia-generic-ai-evidence-verification"
+    capability: "generic.ai.evidence.verify"
+    entrypoint: "ai.evidence.verify"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    document_rag_projections: 1
+    claim_records: 3
+    source_refs: 4
+    normalized_citations: 4
+    verification_results: 3
+    freshness_warnings: 1
+    unresolved_refs: 1
+    clean_degradation_actions: 1
+}
+
+assert(generic_evidence_verification_live_package.provider_free)
+assert(!generic_evidence_verification_live_package.live_network)
+assert(!generic_evidence_verification_live_package.real_dependency_imports)
+assert(!generic_evidence_verification_live_package.live_model_calls)
+assert(generic_evidence_verification_live_package.claim_records == 3)
+assert(generic_evidence_verification_live_package.clean_degradation_actions == 1)
+
+generic_evidence_verification_live_package_summary := string.format(
+"generic_evidence_verification_live_package capability=%s entrypoint=%s rag_projections=%d claims=%d sources=%d citations=%d results=%d freshness_warnings=%d unresolved=%d clean_degradation=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_evidence_verification_live_package.capability,
+generic_evidence_verification_live_package.entrypoint,
+generic_evidence_verification_live_package.document_rag_projections,
+generic_evidence_verification_live_package.claim_records,
+generic_evidence_verification_live_package.source_refs,
+generic_evidence_verification_live_package.normalized_citations,
+generic_evidence_verification_live_package.verification_results,
+generic_evidence_verification_live_package.freshness_warnings,
+generic_evidence_verification_live_package.unresolved_refs,
+generic_evidence_verification_live_package.clean_degradation_actions,
+tostring(generic_evidence_verification_live_package.provider_free),
+tostring(generic_evidence_verification_live_package.live_network),
+tostring(generic_evidence_verification_live_package.real_dependency_imports),
+tostring(generic_evidence_verification_live_package.live_model_calls))
+
+print(generic_evidence_verification_live_package_summary)

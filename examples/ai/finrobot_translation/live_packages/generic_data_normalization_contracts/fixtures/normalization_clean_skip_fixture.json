@@ -1,0 +1,27 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "fixture_key": "normalization_clean_skip:offline:v1",
+  "skips": [
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "clean_skip:schema_catalog:offline:v1",
+      "skip_code": "schema_catalog_unavailable",
+      "dependency": "schema_catalog",
+      "adapter": "schema_catalog",
+      "reason": "schema catalog dependency is unavailable in provider-free fixture mode",
+      "recoverable": true
+    },
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "clean_skip:validation_service:offline:v1",
+      "skip_code": "validation_service_unavailable",
+      "dependency": "remote_validation_service",
+      "adapter": "remote_validation_service",
+      "reason": "remote validation dependency is unavailable in provider-free fixture mode",
+      "recoverable": true
+    }
+  ]
+}

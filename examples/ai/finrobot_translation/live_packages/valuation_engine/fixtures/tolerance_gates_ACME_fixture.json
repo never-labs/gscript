@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "symbol": "ACME",
+  "currency": "USD",
+  "gates": [
+    {
+      "id": "dcf_enterprise_value",
+      "metric": "enterprise_value",
+      "expected": 2310.802011,
+      "actual": 2310.802011,
+      "absolute_tolerance": 0.000001,
+      "status": "pass",
+      "period": "FY2026-FY2030"
+    },
+    {
+      "id": "dcf_price_per_share",
+      "metric": "price_per_share",
+      "expected": 43.61604,
+      "actual": 43.61604,
+      "absolute_tolerance": 0.000001,
+      "status": "pass",
+      "period": "FY2026-FY2030"
+    },
+    {
+      "id": "ev_ebitda_price_per_share",
+      "metric": "price_per_share",
+      "expected": 50.2,
+      "actual": 50.2,
+      "absolute_tolerance": 0.000001,
+      "status": "pass",
+      "period": "FY2026E"
+    },
+    {
+      "id": "pe_price_per_share",
+      "metric": "price_per_share",
+      "expected": 53.2,
+      "actual": 53.2,
+      "absolute_tolerance": 0.000001,
+      "status": "pass",
+      "period": "FY2026E"
+    },
+    {
+      "id": "synthesis_target_price",
+      "metric": "target_price",
+      "expected": 47.50802,
+      "actual": 47.50802,
+      "absolute_tolerance": 0.000001,
+      "status": "pass",
+      "period": "FY2026E"
+    }
+  ],
+  "provenance": {
+    "provider": "fixture",
+    "fixture_key": "valuation:ACME:tolerance_gates:offline",
+    "captured_at": "2026-06-30T00:00:00Z",
+    "source_schema": "schemas/tolerance_gate_v1.schema.json",
+    "source_url_redacted": true,
+    "stale_after_days": 0,
+    "replay_ready": true
+  }
+}

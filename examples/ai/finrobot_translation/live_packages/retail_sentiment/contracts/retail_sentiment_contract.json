@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-retail-sentiment-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_hook": "recorded_retail_sentiment_live_fixture",
+  "modules": [
+    {
+      "id": "retail_sentiment_client",
+      "source_module": "retail_sentiment_client.py",
+      "inputs": [
+        "ticker",
+        "as_of",
+        "source_snapshots"
+      ],
+      "outputs": [
+        "sentiment_aggregate",
+        "source_snapshot_refs",
+        "redaction_summary",
+        "stale_snapshot_warning"
+      ],
+      "required_fields": [
+        "aggregate_score",
+        "mention_volume",
+        "platform_weights",
+        "source_terms",
+        "pagination_metadata",
+        "auth_redaction",
+        "normalization",
+        "redaction",
+        "stale_snapshot_warning"
+      ]
+    }
+  ],
+  "field_contracts": {
+    "source_snapshot": {
+      "type": "snapshot",
+      "platforms": [
+        "adanos",
+        "reddit",
+        "x_social",
+        "polymarket"
+      ],
+      "required_sections": [
+        "source_terms",
+        "pagination_metadata",
+        "auth_redaction",
+        "normalization",
+        "redaction",
+        "metrics",
+        "stale_snapshot_warning"
+      ]
+    },
+    "sentiment_aggregate": {
+      "type": "aggregate",
+      "score_range": [
+        -1,
+        1
+      ],
+      "source_snapshot_refs_required": true,
+      "redaction_summary_required": true,
+      "normalization_required": true
+    },
+    "redaction_policy": {
+      "type": "policy",
+      "forbidden_fields": [
+        "raw_user_handle",
+        "raw_url",
+        "access_token",
+        "cookie",
+        "authorization_header"
+      ]
+    },
+    "source_terms": {
+      "type": "metadata",
+      "required_fields": [
+        "usage",
+        "attribution",
+        "redistribution",
+        "retention_days",
+        "terms_version",
+        "effective_date",
+        "prompt_summary_allowed"
+      ]
+    },
+    "pagination_metadata": {
+      "type": "metadata",
+      "required_fields": [
+        "pagination_mode",
+        "page_size",
+        "page_count",
+        "items_observed",
+        "next_cursor_redacted",
+        "raw_cursor_removed"
+      ]
+    },
+    "auth_redaction": {
+      "type": "redaction",
+      "required_fields": [
+        "access_token_removed",
+        "cookie_removed",
+        "authorization_header_removed",
+        "secret_material_present",
+        "redaction_marker"
+      ]
+    },
+    "normalization": {
+      "type": "normalization",
+      "required_fields": [
+        "sentiment_label",
+        "category",
+        "score_scale"
+      ]
+    },
+    "stale_snapshot_warning": {
+      "type": "warning",
+      "trigger": "as_of older than stale_after_days",
+      "required_fields": [
+        "is_stale",
+        "stale_after_days",
+        "message"
+      ]
+    }
+  },
+  "fixtures": [
+    {
+      "fixture_key": "retail_sentiment:sources:ACME:2026-06-11",
+      "path": "fixtures/source_snapshot_ACME_fixture.json",
+      "schema": "schemas/source_snapshot_v1.schema.json",
+      "replay_ready": true
+    },
+    {
+      "fixture_key": "retail_sentiment:aggregate:ACME:2026-06-11",
+      "path": "fixtures/sentiment_aggregate_ACME_fixture.json",
+      "schema": "schemas/sentiment_aggregate_v1.schema.json",
+      "replay_ready": true
+    }
+  ],
+  "acceptance_gates": [
+    "source snapshots cover Adanos, Reddit, X, and Polymarket without live network access",
+    "source snapshots expose pagination metadata with only redacted cursors",
+    "source terms metadata is retained for each platform snapshot",
+    "auth redaction removes access tokens, cookies, and authorization headers before prompt formatting",
+    "sentiment and category normalization use canonical labels across providers",
+    "redaction removes raw handles, URLs, tokens, cookies, and authorization headers before prompt formatting",
+    "aggregate output links every platform contribution back to source snapshot refs",
+    "stale snapshot warnings are explicit and deterministic in provider-free fixtures"
+  ]
+}

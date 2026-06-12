@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generic report render contracts v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "live_model_calls",
+    "render_requests",
+    "request_envelopes",
+    "render_results",
+    "output_manifests",
+    "artifact_manifest",
+    "snapshot_metadata",
+    "warnings",
+    "annotations",
+    "fixture_hashes",
+    "renderer_skips",
+    "adapter_boundaries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "live_model_calls": {
+      "const": false
+    },
+    "render_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "render_mode",
+          "formats",
+          "artifact_policy",
+          "fixture_key",
+          "live_network",
+          "real_dependency_imports",
+          "renderer_dependency_gate"
+        ]
+      }
+    },
+    "request_envelopes": {
+      "type": "array"
+    },
+    "render_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "status",
+          "output_manifest_ref",
+          "artifact_manifest_ref",
+          "snapshot_refs",
+          "warning_refs",
+          "annotation_refs",
+          "clean_skip"
+        ]
+      }
+    },
+    "output_manifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "output_id",
+          "media_type",
+          "artifact_refs",
+          "uri_policy",
+          "remote_fetch"
+        ]
+      }
+    },
+    "artifact_manifest": {
+      "type": "object"
+    },
+    "snapshot_metadata": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "snapshot_id",
+          "page_ref",
+          "hash_algorithm",
+          "hash",
+          "deterministic_inputs"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array"
+    },
+    "annotations": {
+      "type": "array"
+    },
+    "fixture_hashes": {
+      "type": "array"
+    },
+    "renderer_skips": {
+      "type": "array"
+    },
+    "adapter_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "capability",
+          "dependency_imported",
+          "credential_required",
+          "live_network",
+          "clean_skip"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "dependency_imported": {
+            "const": false
+          },
+          "credential_required": {
+            "type": "boolean"
+          },
+          "live_network": {
+            "const": false
+          },
+          "clean_skip": {
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}

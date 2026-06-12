@@ -1,0 +1,11 @@
+# Base install for provider-free FinRobot translation examples.
+leia>=0.1.0
+
+# Optional extras are declared in package_deploy_setup.py and mirrored in
+# package_deploy_manifest.json:
+#   pip install "leia-finrobot-translation[web]"
+#   pip install "leia-finrobot-translation[finance]"
+#   pip install "leia-finrobot-translation[documents]"
+#   pip install "leia-finrobot-translation[charts]"
+#   pip install "leia-finrobot-translation[cloud]"
+#   pip install "leia-finrobot-translation[all]"

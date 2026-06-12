@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "generic-memory-store-provider-free-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:memory_store:offline",
+      "capability": "generic.ai.memory.store",
+      "path": "fixtures/generic_memory_store_fixture.json",
+      "schema": "schemas/generic_memory_store_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "context_window_budget": 256
+      }
+    }
+  ]
+}

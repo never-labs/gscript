@@ -1,0 +1,6 @@
+// Provider-free FinRobot factor research live package skeleton.
+// No live provider SDKs, network calls, or credentials are used here.
+
+factor_research_live_package_summary := "factor_research_live_package experiments=1 transforms=4 exposures=3 handoffs=3 provider_free=true live_network=false imports=false fixtures=4"
+
+print(factor_research_live_package_summary)

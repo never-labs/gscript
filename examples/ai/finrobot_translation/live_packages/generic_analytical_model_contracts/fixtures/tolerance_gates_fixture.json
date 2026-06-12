@@ -1,0 +1,12 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "fixture_key": "tolerance_gates:subject_alpha:offline:v1",
+  "scenario_book_id": "scenario-book-alpha-v1",
+  "tolerance_gates": [
+    {"gate_id": "low-period-002", "expected_value": 104.03, "actual_value": 104.03, "absolute_tolerance": 0.000001, "status": "pass", "audit_event_ref": 2},
+    {"gate_id": "base-period-002", "expected_value": 106.08, "actual_value": 106.08, "absolute_tolerance": 0.000001, "status": "pass", "audit_event_ref": 3},
+    {"gate_id": "high-period-002", "expected_value": 108.15, "actual_value": 108.15, "absolute_tolerance": 0.000001, "status": "pass", "audit_event_ref": 4}
+  ],
+  "summary": {"gate_count": 3, "passed": 3, "failed": 0, "provider_free": true, "live_network": false}
+}

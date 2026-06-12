@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "symbol": "ACME",
+  "currency": "USD",
+  "period": "FY2026E",
+  "assumptions": [
+    {
+      "id": "discount_rate",
+      "value": 0.09,
+      "unit": "ratio",
+      "source_ref": "valuation:ACME:dcf:offline"
+    },
+    {
+      "id": "terminal_growth_rate",
+      "value": 0.03,
+      "unit": "ratio",
+      "source_ref": "valuation:ACME:dcf:offline"
+    },
+    {
+      "id": "ev_ebitda_multiple",
+      "value": 11.0,
+      "unit": "turns",
+      "source_ref": "valuation:ACME:ev_ebitda:offline"
+    },
+    {
+      "id": "pe_multiple",
+      "value": 14.0,
+      "unit": "turns",
+      "source_ref": "valuation:ACME:pe:offline"
+    },
+    {
+      "id": "method_weight_sum",
+      "value": 1.0,
+      "unit": "ratio",
+      "source_ref": "valuation:ACME:synthesis:offline"
+    }
+  ],
+  "audit_results": [
+    {
+      "rule": "discount_rate_gt_terminal_growth",
+      "status": "pass",
+      "observed": 0.06,
+      "message": "discount_rate minus terminal_growth_rate is positive"
+    },
+    {
+      "rule": "weights_sum_to_one",
+      "status": "pass",
+      "observed": 1.0,
+      "message": "method weights sum to 1.0"
+    },
+    {
+      "rule": "currency_period_present",
+      "status": "pass",
+      "observed": 1.0,
+      "message": "currency and period are explicit on all method outputs"
+    },
+    {
+      "rule": "provenance_replay_ready",
+      "status": "pass",
+      "observed": 1.0,
+      "message": "fixture provenance is replay-ready and source URL redacted"
+    }
+  ],
+  "provenance": {
+    "provider": "fixture",
+    "fixture_key": "valuation:ACME:assumption_audit:offline",
+    "captured_at": "2026-06-30T00:00:00Z",
+    "source_schema": "schemas/assumption_audit_v1.schema.json",
+    "source_url_redacted": true,
+    "stale_after_days": 0,
+    "replay_ready": true
+  }
+}

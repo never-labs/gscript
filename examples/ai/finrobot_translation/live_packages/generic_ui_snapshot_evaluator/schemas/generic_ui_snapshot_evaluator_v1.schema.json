@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generic UI Snapshot Evaluator Fixture",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "live_model_calls",
+    "requires_browser",
+    "requires_credentials",
+    "route_dom_snapshots",
+    "viewport_matrix",
+    "visual_diff_budgets",
+    "accessibility_summaries",
+    "artifact_uri_manifest",
+    "static_asset_policy",
+    "redaction_policy",
+    "adapter_boundaries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "live_model_calls": {
+      "const": false
+    },
+    "requires_browser": {
+      "const": false
+    },
+    "requires_credentials": {
+      "const": false
+    },
+    "route_dom_snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "route_id",
+          "route",
+          "method",
+          "fixture_url",
+          "dom_schema",
+          "snapshot_refs",
+          "artifact_refs"
+        ]
+      }
+    },
+    "viewport_matrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "width",
+          "height",
+          "device_scale_factor",
+          "color_scheme",
+          "reduced_motion"
+        ]
+      }
+    },
+    "visual_diff_budgets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "route_id",
+          "viewport_id",
+          "max_changed_pixels_ratio",
+          "max_layout_shift_px",
+          "text_overflow_allowed",
+          "missing_region_allowed"
+        ]
+      }
+    },
+    "accessibility_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "route_id",
+          "mode",
+          "standards",
+          "required_checks",
+          "violations_allowed",
+          "manual_review_required"
+        ]
+      }
+    },
+    "artifact_uri_manifest": {
+      "type": "object",
+      "required": [
+        "uri_policy",
+        "external_fetch",
+        "allowed_schemes",
+        "artifacts"
+      ]
+    },
+    "static_asset_policy": {
+      "type": "object",
+      "required": [
+        "external_fetch",
+        "remote_fonts",
+        "inline_or_local_only",
+        "hash_algorithm",
+        "network_required"
+      ]
+    },
+    "redaction_policy": {
+      "type": "object",
+      "required": [
+        "mode",
+        "applies_before_hashing",
+        "secret_env_patterns_allowed",
+        "rules",
+        "forbidden_output_patterns"
+      ]
+    },
+    "adapter_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "capability",
+          "dependency_imported",
+          "credential_required",
+          "live_network",
+          "clean_skip"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "id": "generic_turn_runner_contract_v1",
+  "provider_free": true,
+  "live_network": false,
+  "capabilities": [
+    {
+      "name": "generic.ai.turn.request",
+      "schema": "single_turn_request_v1",
+      "turn_model": "single_turn",
+      "requires_messages": true,
+      "requires_response_format": true,
+      "requires_replay_key": true,
+      "requires_correlation_id": true,
+      "requires_no_secret_evidence": true
+    },
+    {
+      "name": "ai.turn.execute",
+      "schema": "execute_response_envelope_v1",
+      "requires_usage": true,
+      "requires_error_envelope": true,
+      "requires_tool_request_envelope": true,
+      "requires_replay_match": true,
+      "requires_correlation_id": true,
+      "requires_no_secret_evidence": true
+    },
+    {
+      "name": "generic.ai.turn.memory_context_projection",
+      "schema": "memory_context_turn_projection_v1",
+      "requires_source_memory_refs": true,
+      "requires_target_turn_request": true,
+      "requires_context_message": true,
+      "requires_no_raw_memory_text": true,
+      "requires_no_secret_evidence": true
+    }
+  ],
+  "message_contract": {
+    "roles": ["system", "user", "assistant", "tool"],
+    "content_types": ["text", "json"],
+    "ordered": true,
+    "provider_free": true
+  },
+  "response_format_contract": {
+    "modes": ["text", "json_object", "json_schema"],
+    "json_schema_required_fields": ["name", "schema", "strict"],
+    "provider_free": true
+  },
+  "usage_contract": {
+    "fields": ["input_tokens", "output_tokens", "total_tokens", "source"],
+    "source": "fixture",
+    "provider_free": true
+  },
+  "error_contract": {
+    "fields": ["code", "message", "retryable", "provider_free", "live_network", "credentials_required", "secret_env_patterns", "no_secret", "request_hash", "correlation_id"],
+    "codes": ["replay_miss", "schema_mismatch", "tool_request_invalid", "provider_unavailable"],
+    "provider_free": true
+  },
+  "tool_request_contract": {
+    "schema": "tool_request_envelope_v1",
+    "request_only": true,
+    "live_execution": false,
+    "required_fields": ["tool_call_id", "correlation_id", "name", "arguments", "status", "replay", "policy"],
+    "provider_free": true
+  },
+  "replay_record_match_contract": {
+    "schema": "replay_record_match_v1",
+    "match_key": "deterministic_request_hash",
+    "canonicalization": ["exclude_request_id", "preserve_message_order", "sort_object_keys", "include_response_format", "include_tool_declarations"],
+    "miss_behavior": "clean-skip",
+    "provider_free": true,
+    "live_network": false
+  },
+  "memory_context_projection_contract": {
+    "source_package": "generic_memory_store",
+    "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+    "target_fixture": "fixtures/generic_turn_request_fixture.json",
+    "target_field": "messages",
+    "projection_policy": "context_ref_message",
+    "required_source_fields": ["context_window.included_memory_ids", "retrieval_results.memory_id", "retrieval_results.context_ref", "provenance.fixture_key"],
+    "required_target_fields": ["request_id", "correlation_id", "message.role", "message.content", "message.metadata.context_refs"],
+    "raw_memory_text_allowed": false,
+    "secret_values_allowed": false,
+    "deterministic_order_required": true,
+    "provider_free": true
+  },
+  "semantic_guard_contract": {
+    "stable_request_hash": true,
+    "correlation_id_required": true,
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true,
+    "covered_envelopes": ["turn_request", "tool_request", "replay_match", "execute_response", "error_envelope"]
+  }
+}

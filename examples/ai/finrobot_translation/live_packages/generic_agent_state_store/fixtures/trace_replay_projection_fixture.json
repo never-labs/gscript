@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "generic-agent-state-trace-replay-projection-fixture",
+  "package_boundary_id": "generic-ai-agent-state-store",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "credentials_required": false,
+  "real_dependency_imports": false,
+  "depends_on_q_runtime": false,
+  "source_fixture": "fixtures/agent_state_snapshot_fixture.json",
+  "projection_kind": "agent_state_checkpoint_trace_replay_projection",
+  "raw_payloads_allowed": false,
+  "secret_values_allowed": false,
+  "projected_events": [
+    {
+      "event_type": "agent_state_checkpoint",
+      "sequence": 1,
+      "status": "tool_wait",
+      "trace_id": "trace-local-001",
+      "event_id": "event-turn-001",
+      "parent_event_id": "event-agent-start",
+      "agent_run_id": "agent-run-local-001",
+      "session_id": "session-local-001",
+      "turn_id": "turn-local-001",
+      "state_version": 1,
+      "checkpoint_key": "sha256:1c4b3f1bbf67d15c9225a3e6cf0a22bbf8c099412c2118e45dd9107dfcd6cf29",
+      "cache_key": "sha256:3d4e0af706d910af5dbb30d5f759c8d634a92d851f1dbfe09339e7a996e6f02f",
+      "resume_token": "checkpoint:sha256:1c4b3f1bbf67d15c9225a3e6cf0a22bbf8c099412c2118e45dd9107dfcd6cf29",
+      "input_ref_ids": [
+        "input-ref-request-001"
+      ],
+      "output_ref_ids": [
+        "output-ref-plan-001"
+      ],
+      "replay_match_key": "agent-run-local-001/session-local-001/1/sha256:1c4b3f1bbf67d15c9225a3e6cf0a22bbf8c099412c2118e45dd9107dfcd6cf29",
+      "raw_payloads_allowed": false,
+      "secret_values_present": false
+    },
+    {
+      "event_type": "agent_state_resume",
+      "sequence": 2,
+      "status": "completed",
+      "trace_id": "trace-local-001",
+      "event_id": "event-turn-002",
+      "parent_event_id": "event-turn-001",
+      "agent_run_id": "agent-run-local-001",
+      "session_id": "session-local-001",
+      "turn_id": "turn-local-002",
+      "state_version": 2,
+      "checkpoint_key": "sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42",
+      "cache_key": "sha256:9af5be9e7a3294b047603f8bc6682e75ba44c773e3e989e198c23b89710246c9",
+      "resume_token": "checkpoint:sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42",
+      "input_ref_ids": [
+        "input-ref-request-001",
+        "input-ref-tool-result-001"
+      ],
+      "output_ref_ids": [
+        "output-ref-final-001"
+      ],
+      "replay_match_key": "agent-run-local-001/session-local-001/2/sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42",
+      "raw_payloads_allowed": false,
+      "secret_values_present": false
+    }
+  ],
+  "replay_assertions": {
+    "sequence_strictly_increasing": true,
+    "checkpoint_keys_match_source_snapshots": true,
+    "resume_tokens_derive_from_checkpoint_keys": true,
+    "replay_match_keys_include_state_version": true,
+    "raw_payloads_absent": true,
+    "secret_values_absent": true
+  }
+}

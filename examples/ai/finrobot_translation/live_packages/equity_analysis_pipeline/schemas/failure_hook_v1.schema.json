@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/equity_analysis_pipeline/failure_hook_v1.schema.json",
+  "title": "FinRobot Equity Analysis Failure Hooks",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_key",
+    "provider_free",
+    "live_network",
+    "hooks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "hooks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "stage_id",
+          "trigger",
+          "fallback_action",
+          "status",
+          "trace_event_id",
+          "retry_metadata",
+          "cache_metadata",
+          "timing"
+        ],
+        "properties": {
+          "retry_metadata": {
+            "type": "object",
+            "required": [
+              "max_attempts",
+              "retryable",
+              "retry_after_ms"
+            ]
+          },
+          "cache_metadata": {
+            "type": "object",
+            "required": [
+              "cache_key",
+              "cache_state"
+            ]
+          },
+          "timing": {
+            "type": "object",
+            "required": [
+              "clock",
+              "duration_ms",
+              "budget_ms"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

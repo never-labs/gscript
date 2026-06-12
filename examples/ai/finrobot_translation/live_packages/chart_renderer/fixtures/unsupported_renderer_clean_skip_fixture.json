@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "request_id": "render_req_ACME_plotly_unsupported_001",
+  "ok": false,
+  "skip": true,
+  "renderer": "plotly",
+  "unsupported_reason": "Renderer plotly is outside the provider-free chart_renderer skeleton and clean-skips until an external renderer package is installed.",
+  "dependency_imported": false,
+  "clean_skip": true,
+  "fixture_key": "skip:renderer:plotly:offline"
+}

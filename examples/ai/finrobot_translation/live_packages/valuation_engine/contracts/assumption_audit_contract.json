@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-valuation-assumption-audit-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "schema": "schemas/assumption_audit_v1.schema.json",
+  "fixture": "fixtures/assumption_audit_ACME_fixture.json",
+  "required_fields": [
+    "symbol",
+    "currency",
+    "period",
+    "assumptions",
+    "audit_results",
+    "provenance"
+  ],
+  "audit_rules": [
+    "discount_rate must be greater than terminal_growth_rate",
+    "method weights must sum to 1.0 within tolerance",
+    "currency must be explicit on every method and synthesis output",
+    "period must be explicit on every method and synthesis output",
+    "provenance must be replay_ready and source URL redacted"
+  ],
+  "acceptance_gates": [
+    "assumption audit fixture contains no live provider credentials",
+    "all audit results pass in deterministic skeleton fixtures",
+    "violations are represented as typed audit rows for future provider packages"
+  ]
+}

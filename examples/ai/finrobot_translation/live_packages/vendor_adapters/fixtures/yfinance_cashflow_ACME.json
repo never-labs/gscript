@@ -1,0 +1,44 @@
+{
+  "fixture_key": "yfinance:cashflow:ACME:annual",
+  "provider": "yfinance",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "symbol": "ACME",
+    "period": "annual",
+    "live_network": false
+  },
+  "metadata": {
+    "schema": "schemas/yfinance_cashflow_v1.schema.json",
+    "provenance": {
+      "source": "synthetic-offline-fixture",
+      "captured_at": "2026-06-11T00:00:00Z",
+      "live_network": false,
+      "redacted": true
+    },
+    "capability": "finance.vendor.yfinance.cashflow",
+    "rate_limit": {
+      "policy": "metadata-only",
+      "window_seconds": 60,
+      "limit": 120,
+      "retry_after_seconds": 1
+    },
+    "terms": {
+      "usage": "offline-fixture-only",
+      "attribution": "provider terms metadata retained",
+      "redistribution": "do-not-redistribute-live-payloads",
+      "live_network": false
+    }
+  },
+  "payload": {
+    "symbol": "ACME",
+    "period": "annual",
+    "cashflow": [
+      {
+        "date": "2025-12-31",
+        "operating_cash_flow": 870000000,
+        "capital_expenditures": -190000000,
+        "free_cash_flow": 680000000
+      }
+    ]
+  }
+}

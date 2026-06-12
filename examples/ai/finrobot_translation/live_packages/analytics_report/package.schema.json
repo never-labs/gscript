@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "id": "leia-analytics-report-package-schema",
+  "metadata_only": true,
+  "schemas": {
+    "finance_normalizer": {
+      "required": [
+        "schema",
+        "symbol",
+        "period",
+        "currency",
+        "value",
+        "source_id",
+        "captured_at",
+        "stale_after"
+      ],
+      "provenance_required": true
+    },
+    "valuation_result": {
+      "required": [
+        "method",
+        "symbol",
+        "valuation_date",
+        "currency",
+        "price",
+        "assumptions",
+        "source_refs"
+      ],
+      "methods": [
+        "dcf",
+        "peer_multiple",
+        "target_price"
+      ]
+    },
+    "sensitivity_matrix": {
+      "required": [
+        "base_case",
+        "row_axis",
+        "column_axis",
+        "cells",
+        "best_case",
+        "worst_case"
+      ]
+    },
+    "chart_artifact": {
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "source_refs",
+        "artifact"
+      ],
+      "artifact_required": [
+        "id",
+        "kind",
+        "path",
+        "status"
+      ]
+    },
+    "snapshot_metadata": {
+      "required": [
+        "id",
+        "artifact_id",
+        "media_type",
+        "snapshot_kind",
+        "renderer_contract_id",
+        "status",
+        "created_at",
+        "dimensions",
+        "checksum",
+        "accessibility_refs",
+        "source_refs",
+        "warning_refs",
+        "renderer_dependency_required"
+      ],
+      "formats": [
+        "text/html",
+        "application/pdf",
+        "image/png"
+      ],
+      "statuses": [
+        "specified_not_rendered",
+        "planned_not_rendered",
+        "captured_by_external_package"
+      ]
+    },
+    "accessibility_checklist": {
+      "required": [
+        "id",
+        "target_artifact_id",
+        "standard",
+        "items",
+        "status",
+        "checked_at",
+        "provider_free"
+      ],
+      "item_required": [
+        "id",
+        "requirement",
+        "required",
+        "status"
+      ]
+    },
+    "stale_data_policy": {
+      "required": [
+        "policy_id",
+        "generated_at",
+        "freshness_basis",
+        "warning_required_when_source_stale",
+        "warning_marker",
+        "warning_scope",
+        "snapshot_warning_refs_required"
+      ]
+    },
+    "source_annotation_requirements": {
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "locator",
+        "as_of",
+        "stale_after",
+        "stale",
+        "license",
+        "retrieved_at",
+        "evidence_hash"
+      ],
+      "all_report_source_refs_must_resolve": true,
+      "all_snapshot_source_refs_must_resolve": true
+    },
+    "report_outline": {
+      "required": [
+        "id",
+        "title",
+        "audience",
+        "time_horizon",
+        "sections",
+        "style_profile_id",
+        "evidence_policy_id",
+        "render_manifest_id"
+      ],
+      "section_required": [
+        "id",
+        "title",
+        "order",
+        "required",
+        "depends_on",
+        "evidence_policy",
+        "render_targets"
+      ]
+    },
+    "section_dependency_dag": {
+      "required": [
+        "id",
+        "nodes",
+        "edges",
+        "acyclic",
+        "missing_dependency_policy"
+      ],
+      "edge_required": [
+        "from",
+        "to",
+        "reason"
+      ],
+      "must_be_acyclic": true
+    },
+    "evidence_citation_envelope": {
+      "required": [
+        "id",
+        "claim_id",
+        "source_refs",
+        "citation_refs",
+        "evidence_quality",
+        "provider_free",
+        "unresolved_refs"
+      ],
+      "citation_required": [
+        "id",
+        "source_id",
+        "locator",
+        "quote_policy",
+        "as_of"
+      ],
+      "all_citation_source_refs_must_resolve": true
+    },
+    "render_artifact_manifest": {
+      "required": [
+        "id",
+        "renderer_contract_refs",
+        "outputs",
+        "snapshots",
+        "dependency_required",
+        "status"
+      ],
+      "output_required": [
+        "artifact_id",
+        "format",
+        "path",
+        "status",
+        "snapshot_ref"
+      ],
+      "statuses": [
+        "planned_not_rendered",
+        "specified_not_rendered",
+        "rendered_by_external_package",
+        "partial_not_rendered"
+      ]
+    },
+    "style_profile_policy": {
+      "required": [
+        "id",
+        "tone",
+        "locale",
+        "number_format",
+        "currency",
+        "disclosure_policy",
+        "forbidden_content",
+        "provider_free"
+      ]
+    },
+    "partial_report_fixture": {
+      "required": [
+        "id",
+        "status",
+        "completed_sections",
+        "failed_sections",
+        "retryable",
+        "renderable",
+        "warning_refs",
+        "failure_reason"
+      ],
+      "statuses": [
+        "partial",
+        "failed",
+        "degraded"
+      ]
+    },
+    "report_artifact": {
+      "required": [
+        "contract",
+        "report_id",
+        "generated_at",
+        "report_outline",
+        "section_dependency_dag",
+        "report_sections",
+        "evidence_citation_envelopes",
+        "chart_specs",
+        "artifacts",
+        "render_artifact_manifest",
+        "snapshot_metadata",
+        "accessibility_checklist",
+        "style_profile_policy",
+        "partial_report_fixture",
+        "stale_data_policy",
+        "source_annotation_requirements",
+        "source_annotations",
+        "warnings",
+        "ai_disclosure"
+      ]
+    },
+    "renderer_contract": {
+      "required": [
+        "id",
+        "format",
+        "input_schema",
+        "output_artifact",
+        "network_required",
+        "external_dependency_required",
+        "snapshot_metadata_schema",
+        "accessibility_checklist_schema",
+        "stale_data_policy"
+      ],
+      "formats": [
+        "text/html",
+        "application/pdf"
+      ]
+    }
+  },
+  "provider_free_gate": {
+    "network_required": false,
+    "credentials_required": false,
+    "provider_sdks_required": false
+  }
+}

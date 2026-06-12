@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Generic Chart Render Contracts Fixture",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "live_model_calls",
+    "chart_specs",
+    "recipe_matrix",
+    "render_requests",
+    "render_results",
+    "renderer_skips",
+    "adapter_boundaries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "live_model_calls": {
+      "const": false
+    },
+    "chart_specs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "chart_id",
+          "chart_type",
+          "series",
+          "dimensions",
+          "theme",
+          "source_metadata",
+          "stale_data_warning"
+        ]
+      }
+    },
+    "recipe_matrix": {
+      "type": "object",
+      "required": [
+        "id",
+        "dialect",
+        "recipes",
+        "snapshot"
+      ]
+    },
+    "render_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "renderer",
+          "output_format",
+          "dimensions",
+          "theme",
+          "chart_spec_ref",
+          "live_network",
+          "real_dependency_imports"
+        ]
+      }
+    },
+    "render_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "ok",
+          "renderer",
+          "artifact",
+          "snapshot",
+          "warnings",
+          "source_metadata_ref"
+        ]
+      }
+    },
+    "renderer_skips": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "renderer",
+          "dependency_imported",
+          "credential_required",
+          "live_network",
+          "clean_skip",
+          "reason"
+        ]
+      }
+    },
+    "adapter_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "capability",
+          "dependency_imported",
+          "credential_required",
+          "live_network",
+          "clean_skip"
+        ]
+      }
+    }
+  }
+}

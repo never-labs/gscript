@@ -1,0 +1,53 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_key": "metrics:ACME:sma_cross:offline:v1",
+  "strategy_id": "sma_cross_strategy",
+  "symbol": "ACME",
+  "deterministic_seed": "finrobot-backtest-strategy-offline-v1",
+  "metrics": {
+    "start_cash": 100000.00,
+    "end_value": 100017.76,
+    "total_return": 0.0001776,
+    "annualized_return": 0.00561,
+    "volatility": 0.04137,
+    "sharpe": 0.1753,
+    "max_drawdown": 0.006957,
+    "win_rate": 0.667,
+    "trade_count": 3,
+    "turnover": 0.66048,
+    "average_exposure": 0.218,
+    "max_exposure": 0.32
+  },
+  "risk_limits": [
+    {
+      "id": "max_position_pct",
+      "metric": "position_weight",
+      "limit": 0.35,
+      "observed": 0.32,
+      "status": "pass"
+    },
+    {
+      "id": "max_drawdown_pct",
+      "metric": "max_drawdown",
+      "limit": 0.12,
+      "observed": 0.006957,
+      "status": "pass"
+    },
+    {
+      "id": "min_cash_pct",
+      "metric": "cash_weight",
+      "limit": 0.05,
+      "observed": 0.147,
+      "status": "pass"
+    },
+    {
+      "id": "max_trade_notional_pct",
+      "metric": "trade_notional_weight",
+      "limit": 0.25,
+      "observed": 0.214,
+      "status": "pass"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "manifest_id": "finrobot-python-test-parity-fixtures",
+  "fixture_version": "finrobot-python-test-parity-v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "python_runtime_required": false,
+  "source_scope": "finrobot_equity/core/tests/*",
+  "coverage_entries": [
+    {
+      "id": "financial_data_processor",
+      "source_python_tests": ["finrobot_equity/core/tests/test_financial_data_processor.py"],
+      "fixture_path": "fixtures/financial_data_processor_ACME_fixture.json",
+      "fixture_sha256": "cd6b9ae34b457a4142a9c077b33463a9d39dae4a57c53d2e26c9069ffca508bb",
+      "assertion_groups": ["normalization", "numeric_coercion", "required_metrics", "source_provenance"],
+      "expected_fields": ["schema_version", "fixture_key", "provider_free", "live_network", "raw_inputs", "normalized_rows", "assertion_intent", "provenance"],
+      "expected_array_min_counts": {"normalized_rows": 7}
+    },
+    {
+      "id": "valuation_engine",
+      "source_python_tests": ["finrobot_equity/core/tests/test_valuation_engine.py"],
+      "fixture_path": "fixtures/valuation_engine_ACME_fixture.json",
+      "fixture_sha256": "d4626ebbfa9729e0211c92a80e9c6d1fdb6ae726464752d5af254a5078f3f633",
+      "assertion_groups": ["dcf_math", "multiple_math", "target_price_synthesis", "tolerance_gates"],
+      "expected_fields": ["schema_version", "fixture_key", "provider_free", "live_network", "inputs", "method_outputs", "target_price_synthesis", "assertion_intent", "provenance"],
+      "expected_array_min_counts": {"method_outputs": 3}
+    },
+    {
+      "id": "report_structure",
+      "source_python_tests": ["finrobot_equity/core/tests/test_report_structure.py"],
+      "fixture_path": "fixtures/report_structure_ACME_fixture.json",
+      "fixture_sha256": "7699732ff049cc6a3e5e42aec092800ee97d908b16e37f06c6401540bc84544b",
+      "assertion_groups": ["section_order", "required_sections", "source_refs", "disclosures"],
+      "expected_fields": ["schema_version", "fixture_key", "provider_free", "live_network", "ordered_sections", "section_contracts", "assertion_intent", "disclosures", "provenance"],
+      "expected_array_min_counts": {"ordered_sections": 6, "section_contracts": 6}
+    },
+    {
+      "id": "chart_report_artifact",
+      "source_python_tests": [
+        "finrobot_equity/core/tests/test_chart_renderer.py",
+        "finrobot_equity/core/tests/test_report_artifacts.py"
+      ],
+      "fixture_path": "fixtures/chart_report_artifact_ACME_fixture.json",
+      "fixture_sha256": "6c97b78b700a349a98e3f16685c40af0b9abdac647d6ec62434035a799e67fe7",
+      "assertion_groups": ["chart_snapshot", "artifact_manifest", "html_pdf_outputs", "clean_skip_without_renderer"],
+      "expected_fields": ["schema_version", "fixture_key", "provider_free", "live_network", "renderer_dependency_required", "clean_skip_without_renderer", "chart_artifact", "report_artifacts", "assertion_intent", "provenance"],
+      "expected_array_min_counts": {"report_artifacts": 2}
+    },
+    {
+      "id": "web_product_state",
+      "source_python_tests": ["finrobot_equity/core/tests/test_web_product_state.py"],
+      "fixture_path": "fixtures/web_product_state_ACME_fixture.json",
+      "fixture_sha256": "30ef1fa0abe18bd46eaa183cce64442c9790b558e361f82d704b81da6f4ee535",
+      "assertion_groups": ["routes", "auth_sessions", "request_lifecycle", "download_authorization"],
+      "expected_fields": ["schema_version", "fixture_key", "provider_free", "live_network", "routes", "sessions", "report_request_lifecycle", "download_authorization", "assertion_intent", "provenance"],
+      "expected_array_min_counts": {"routes": 5, "sessions": 3, "report_request_lifecycle": 4, "download_authorization": 3}
+    }
+  ]
+}

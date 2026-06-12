@@ -4,10 +4,64 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 1,
-  "translation_directory_file_count": 12,
+  "registered_examples_count": 99,
+  "translation_directory_file_count": 867,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
+    {
+      "id": "analytics_report",
+      "directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/analytics_report/analytics_report.leia",
+      "covers_package_ids": [
+        "analytics_report"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "analyzer_report",
+      "directory": "examples/ai/finrobot_translation/live_packages/analyzer_report",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/analyzer_report/main.leia",
+      "covers_package_ids": [
+        "analyzer_report"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "backtest_strategy",
+      "directory": "examples/ai/finrobot_translation/live_packages/backtest_strategy",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/backtest_strategy/main.leia",
+      "covers_package_ids": [
+        "backtest_strategy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "chart_renderer",
+      "directory": "examples/ai/finrobot_translation/live_packages/chart_renderer",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/chart_renderer/main.leia",
+      "covers_package_ids": [
+        "chart_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "coding_notebook",
+      "directory": "examples/ai/finrobot_translation/live_packages/coding_notebook",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/coding_notebook/main.leia",
+      "covers_package_ids": [
+        "coding_notebook"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "document_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/document_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/document_pipeline/main.leia",
+      "covers_package_ids": [
+        "document_pipeline"
+      ],
+      "status": "checked_in_registered_example"
+    },
     {
       "id": "earnings_transcript",
       "directory": "examples/ai/finrobot_translation/live_packages/earnings_transcript",
@@ -16,13 +70,427 @@
         "earnings_transcript"
       ],
       "status": "checked_in_registered_example"
+    },
+    {
+      "id": "equity_analysis_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/main.leia",
+      "covers_package_ids": [
+        "equity_analysis_pipeline"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "factor_research",
+      "directory": "examples/ai/finrobot_translation/live_packages/factor_research",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/factor_research/main.leia",
+      "covers_package_ids": [
+        "factor_research"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "finance_facade",
+      "directory": "examples/ai/finrobot_translation/live_packages/finance_facade",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/finance_facade/main.leia",
+      "covers_package_ids": [
+        "finance_facade"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "finance_normalizers",
+      "directory": "examples/ai/finrobot_translation/live_packages/finance_normalizers",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/finance_normalizers/main.leia",
+      "covers_package_ids": [
+        "finance_normalizers"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_agent_runner",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+      "covers_package_ids": [
+        "generic_agent_runner"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_agent_state_store",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+      "covers_package_ids": [
+        "generic_agent_state_store"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_analytical_model_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_analytical_model_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_approval_policy",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "covers_package_ids": [
+        "generic_approval_policy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_chart_render_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_chart_render_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_coding_workspace",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "covers_package_ids": [
+        "generic_coding_workspace"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_data_normalization_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_data_normalization_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_data_provider_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_data_provider_boundary"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_document_rag_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "covers_package_ids": [
+        "generic_document_rag_pipeline"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_evaluation_harness",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+      "covers_package_ids": [
+        "generic_evaluation_harness"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_event_intelligence_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_event_intelligence_boundary"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_evidence_report_artifacts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+      "covers_package_ids": [
+        "generic_evidence_report_artifacts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_evidence_verification",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "covers_package_ids": [
+        "generic_evidence_verification"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_memory_store",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "covers_package_ids": [
+        "generic_memory_store"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_model_io_envelope",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+      "covers_package_ids": [
+        "generic_model_io_envelope"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_model_registry",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+      "covers_package_ids": [
+        "generic_model_registry"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_optional_adapter_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_optional_adapter_boundary"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_package_boundary_auditor",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+      "covers_package_ids": [
+        "generic_package_boundary_auditor"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_planning_graph",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+      "covers_package_ids": [
+        "generic_planning_graph"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_product_app_boundary",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
+      "covers_package_ids": [
+        "generic_product_app_boundary"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_prompt_role_catalog",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "covers_package_ids": [
+        "generic_prompt_role_catalog"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_record_replay",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+      "covers_package_ids": [
+        "generic_record_replay"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_report_render_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_report_render_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_strategy_backtest_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_strategy_backtest_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_tool_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_tool_contracts"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_tool_registry",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+      "covers_package_ids": [
+        "generic_tool_registry"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_trace_events",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+      "covers_package_ids": [
+        "generic_trace_events"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_transcript_pipeline",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
+      "covers_package_ids": [
+        "generic_transcript_pipeline"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_turn_runner",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+      "covers_package_ids": [
+        "generic_turn_runner"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_ui_snapshot_evaluator",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "covers_package_ids": [
+        "generic_ui_snapshot_evaluator"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_workflow_orchestrator",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+      "covers_package_ids": [
+        "generic_workflow_orchestrator"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "html_ui_snapshots",
+      "directory": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/main.leia",
+      "covers_package_ids": [
+        "html_ui_snapshots"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "news_catalyst",
+      "directory": "examples/ai/finrobot_translation/live_packages/news_catalyst",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/news_catalyst/main.leia",
+      "covers_package_ids": [
+        "news_catalyst"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "optional_integrations",
+      "directory": "examples/ai/finrobot_translation/live_packages/optional_integrations",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/optional_integrations/main.leia",
+      "covers_package_ids": [
+        "optional_integrations"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "product_workflow",
+      "directory": "examples/ai/finrobot_translation/live_packages/product_workflow",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/product_workflow/main.leia",
+      "covers_package_ids": [
+        "web_product"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "prompt_roles",
+      "directory": "examples/ai/finrobot_translation/live_packages/prompt_roles",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/prompt_roles/main.leia",
+      "covers_package_ids": [
+        "prompt_roles"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "report_renderer",
+      "directory": "examples/ai/finrobot_translation/live_packages/report_renderer",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/report_renderer/main.leia",
+      "covers_package_ids": [
+        "report_renderer"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "retail_sentiment",
+      "directory": "examples/ai/finrobot_translation/live_packages/retail_sentiment",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/retail_sentiment/main.leia",
+      "covers_package_ids": [
+        "retail_sentiment"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "sec_filings",
+      "directory": "examples/ai/finrobot_translation/live_packages/sec_filings",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/sec_filings/main.leia",
+      "covers_package_ids": [
+        "sec_filings"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "tutorial_demo_parity",
+      "directory": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/main.leia",
+      "covers_package_ids": [
+        "tutorial_demo_parity"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "valuation_engine",
+      "directory": "examples/ai/finrobot_translation/live_packages/valuation_engine",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/valuation_engine/main.leia",
+      "covers_package_ids": [
+        "valuation_engine"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "vendor_adapters",
+      "directory": "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/vendor_adapters/main.leia",
+      "covers_package_ids": [
+        "vendor_adapters"
+      ],
+      "status": "checked_in_registered_example"
     }
   ],
   "live_network_default": false,
   "real_dependency_import_default": false,
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide built-in finance vendors, earnings-call transcript normalizers, or report services; live behavior must ship as external packages behind capability gates.",
+    "statement": "Leia core does not provide built-in finance vendors, valuation formulas, report renderers, or web product services; live behavior must ship as external packages behind capability gates.",
     "core_boundary": [
       "composition",
       "capability contracts",
@@ -33,13 +501,190 @@
   },
   "packages": [
     {
+      "id": "analytics_report",
+      "package_name": "leia-finrobot-analytics-report",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analytics_report",
+      "planned_directory": "packages/finrobot/analytics_report",
+      "manifest": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/analytics_report/package.schema.json",
+      "migration_source": "examples/ai/finrobot_translation/reporting.leia",
+      "capabilities": [
+        "finance.analytics_report.normalized_inputs",
+        "finance.analytics_report.valuation_summary",
+        "finance.analytics_report.sensitivity_matrix",
+        "finance.analytics_report.chart_specs",
+        "finance.analytics_report.report_outline",
+        "finance.analytics_report.section_dependency_dag",
+        "finance.analytics_report.evidence_citation_envelope",
+        "finance.analytics_report.render_manifest",
+        "finance.analytics_report.style_profile_policy",
+        "finance.analytics_report.partial_failure_fixture",
+        "finance.analytics_report.snapshot_metadata",
+        "finance.analytics_report.accessibility_checklist",
+        "finance.analytics_report.stale_data_policy",
+        "finance.analytics_report.source_annotations",
+        "finance.analytics_report.output_manifest",
+        "finance.analytics_report.renderer_contracts"
+      ],
+      "test_gates": [
+        "analytics report manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and require provider-free report artifacts",
+        "fixture tests validate normalized inputs, valuation summaries, chart specs, stale-data checks, source annotations, accessibility metadata, and output manifests",
+        "aggregate report skeleton remains composition-only and delegates live finance providers, valuation engines, chart renderers, and report renderers to external packages"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "analyzer_report",
+      "package_name": "leia-finrobot-analyzer-report",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/analyzer_report",
+      "planned_directory": "packages/finrobot/analyzer_report",
+      "manifest": "examples/ai/finrobot_translation/live_packages/analyzer_report/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/analyzer_report/contracts/analyzer_report_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/section_agents.leia",
+      "capabilities": [
+        "finance.analyzer.report.orchestrate",
+        "finance.analyzer.section.schema",
+        "finance.analyzer.prompt.catalog",
+        "finance.analyzer.evidence.enforce",
+        "finance.analyzer.citation.require",
+        "finance.analyzer.output.risk",
+        "finance.analyzer.output.thesis",
+        "finance.analyzer.output.valuation",
+        "finance.analyzer.output.news",
+        "finance.analyzer.expected_sections.replay"
+      ],
+      "test_gates": [
+        "analyzer report manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required data provider or model credentials",
+        "section schema fixtures validate risk, thesis, valuation, and news output envelopes with citations",
+        "source evidence tests reject unresolved refs and require replayable expected sections before live analyzer packages are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "backtest_strategy",
+      "package_name": "leia-finrobot-backtest-strategy",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/backtest_strategy",
+      "planned_directory": "packages/finrobot/backtest_strategy",
+      "manifest": "examples/ai/finrobot_translation/live_packages/backtest_strategy/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/backtest_strategy/contracts/backtest_strategy_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+      "capabilities": [
+        "finance.backtest.strategy.manifest",
+        "finance.backtest.data_feed",
+        "finance.backtest.deterministic_seed",
+        "finance.backtest.trade_ledger",
+        "finance.backtest.metrics",
+        "finance.backtest.risk_limits",
+        "finance.backtest.optional_dependency.skip",
+        "finance.backtest.analyzer.output"
+      ],
+      "test_gates": [
+        "backtest strategy manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert Backtrader and pandas imports clean-skip by default",
+        "fixture tests validate strategy, sizer, indicator, analyzer, data feed, deterministic seed, trade ledger, metrics, and risk-limit schemas",
+        "provider-free tests keep strategy execution outside Leia core until the external backtest package is explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "chart_renderer",
+      "package_name": "leia-finrobot-chart-renderer",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/chart_renderer",
+      "planned_directory": "packages/finrobot/chart_renderer",
+      "manifest": "examples/ai/finrobot_translation/live_packages/chart_renderer/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/chart_renderer/contracts/chart_renderer_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/report_contract.leia",
+      "capabilities": [
+        "chart.render.spec",
+        "chart.render.request",
+        "chart.render.result",
+        "chart.render.source_metadata",
+        "chart.render.stale_warning",
+        "chart.render.dimensions",
+        "chart.render.theme",
+        "chart.render.snapshot_hash",
+        "chart.render.unsupported_skip"
+      ],
+      "test_gates": [
+        "chart renderer manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert unsupported renderer requests clean-skip",
+        "fixture tests validate chart specs, render request/result envelopes, source metadata, stale-data warnings, dimensions, theme, and snapshot hash",
+        "provider-free tests keep mplfinance, plotting libraries, and renderer imports outside Leia core until explicit package enablement"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "coding_notebook",
+      "package_name": "leia-finrobot-coding-notebook",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/coding_notebook",
+      "planned_directory": "packages/finrobot/coding_notebook",
+      "manifest": "examples/ai/finrobot_translation/live_packages/coding_notebook/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/coding_notebook/contracts/coding_notebook_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/generated_code_tooling.leia",
+      "capabilities": [
+        "coding.notebook.file.read",
+        "coding.notebook.file.write",
+        "coding.notebook.command.execute",
+        "coding.notebook.command.deny",
+        "coding.notebook.stdout.capture",
+        "coding.notebook.stderr.capture",
+        "coding.notebook.image.display",
+        "coding.notebook.artifact.publish",
+        "coding.notebook.replay.deterministic",
+        "coding.notebook.metadata.capability"
+      ],
+      "test_gates": [
+        "coding notebook manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert sandbox command/file-write approvals deny by default",
+        "fixture tests validate file/image artifact contracts, denied command stdout/stderr capture, and deterministic replay metadata",
+        "capability metadata tests keep notebook kernels, generated code execution, file writes, and image display behind explicit approval gates"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "document_pipeline",
+      "package_name": "leia-finrobot-document-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/document_pipeline",
+      "planned_directory": "packages/finrobot/document_pipeline",
+      "manifest": "examples/ai/finrobot_translation/live_packages/document_pipeline/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/document_pipeline/contracts/document_pipeline_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/document_rag.leia",
+      "capabilities": [
+        "finance.document.sec.search",
+        "finance.document.sec.fetch",
+        "finance.document.html.to_markdown",
+        "finance.document.pdf.to_markdown",
+        "finance.document.section.extract",
+        "finance.document.chunk",
+        "finance.document.citation.link",
+        "finance.document.provenance.trace",
+        "finance.document.vector.adapter",
+        "finance.document.retriever.query"
+      ],
+      "test_gates": [
+        "document pipeline manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no SEC, Marker, embedding, vector store, or retriever credentials",
+        "fixture tests validate SEC filing metadata, HTML/PDF markdown boundaries, section extraction, chunks, citations, provenance, and retriever query results",
+        "adapter boundary tests keep SEC search/fetch, converter, vector store, embedding, and retriever calls metadata-only until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
       "id": "earnings_transcript",
       "package_name": "leia-finrobot-earnings-transcript",
       "status": "skeleton_contract_checked_in",
       "skeleton_directory": "examples/ai/finrobot_translation/live_packages/earnings_transcript",
       "planned_directory": "packages/finrobot/earnings_transcript",
-      "manifest": "packages/finrobot/earnings_transcript/package.manifest.json",
-      "contract": "packages/finrobot/earnings_transcript/contracts/earnings_transcript_contract.json",
+      "manifest": "examples/ai/finrobot_translation/live_packages/earnings_transcript/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/earnings_transcript/contracts/earnings_transcript_contract.json",
       "migration_source": "examples/ai/finrobot_translation/live_packages/earnings_transcript/main.leia",
       "capabilities": [
         "finance.earnings_transcript.speaker.clean",
@@ -53,15 +698,1323 @@
         "manifest and contract tests run against provider-free fixtures",
         "fixture replay proves speaker cleaning, date correction, quarter/year lookup, segment provenance, and chunking",
         "optional HTTP cleaner absence produces clean skip with live_network=false",
-        "approval policy tests deny external network calls unless a future provider package grants matching capability"
+        "approval policy contract tests deny external network calls unless a future provider package grants matching capability"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "equity_analysis_pipeline",
+      "package_name": "leia-finrobot-equity-analysis-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline",
+      "planned_directory": "packages/finrobot/equity_analysis_pipeline",
+      "manifest": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/equity_analysis_pipeline/contracts/stage_dag_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+      "capabilities": [
+        "finance.pipeline.stage_dag",
+        "finance.pipeline.fetch_fixture",
+        "finance.pipeline.normalize_fixture",
+        "finance.pipeline.forecast_fixture",
+        "finance.pipeline.section_agent_handoff",
+        "finance.pipeline.artifact_manifest",
+        "finance.pipeline.failure_hooks",
+        "finance.pipeline.provider_free_trace"
+      ],
+      "test_gates": [
+        "equity analysis pipeline contract manifest and referenced JSON files decode without external dependencies",
+        "stage DAG tests cover fetch, normalize, forecast, section_agents, and artifact_plan ordering",
+        "fixture tests validate input, normalized financials, forecast output, section-agent handoff, artifact manifest, failure hooks, and provider-free trace",
+        "provider-free gates forbid live provider SDK imports, network calls, and hidden runtime dependencies"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "factor_research",
+      "package_name": "leia-finrobot-factor-research",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/factor_research",
+      "planned_directory": "packages/finrobot/factor_research",
+      "manifest": "examples/ai/finrobot_translation/live_packages/factor_research/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/factor_research/contracts/factor_research_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/quant_experiments/multi_factor_agents.leia",
+      "capabilities": [
+        "finance.factor_research.agent.orchestrate",
+        "finance.factor_research.data.market_panel",
+        "finance.factor_research.data.factor_panel",
+        "finance.factor_research.transform.winsorize",
+        "finance.factor_research.transform.zscore",
+        "finance.factor_research.transform.neutralize",
+        "finance.factor_research.transform.composite",
+        "finance.factor_research.exposure.calculate",
+        "finance.factor_research.exposure.risk.limit",
+        "finance.factor_research.handoff.boundary"
+      ],
+      "test_gates": [
+        "factor research manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required market data or optimizer credentials",
+        "fixture tests validate market data, factor data, factor transforms, and portfolio factor exposure schemas",
+        "agent handoff boundary tests keep provider, market data, factor data, and optimizer calls metadata-only until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "finance_facade",
+      "package_name": "leia-finrobot-finance-facade",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/finance_facade",
+      "planned_directory": "packages/finrobot/finance_facade",
+      "manifest": "examples/ai/finrobot_translation/live_packages/finance_facade/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/finance_facade/contracts/finance_facade_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/data_tools.leia",
+      "capabilities": [
+        "finance.facade.market_data.fetch",
+        "finance.facade.market_data.table",
+        "finance.facade.fundamentals.fetch",
+        "finance.facade.provider.fallback",
+        "finance.facade.cache.read_through",
+        "finance.facade.retry.backoff",
+        "finance.facade.rate_limit.apply",
+        "finance.facade.provenance.attach",
+        "finance.facade.error.envelope"
+      ],
+      "test_gates": [
+        "finance facade manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert provider fallback order remains fixture-only",
+        "fixture tests validate market data and fundamental typed table schemas with provenance",
+        "error envelope, cache, retry, and rate-limit metadata stay provider-free until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "finance_normalizers",
+      "package_name": "leia-finrobot-finance-normalizers",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/finance_normalizers",
+      "planned_directory": "packages/finrobot/finance_normalizers",
+      "manifest": "examples/ai/finrobot_translation/live_packages/finance_normalizers/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/finance_normalizers/contracts/finance_normalizers_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.normalizers.statements.canonicalize",
+        "finance.normalizers.ratios.canonicalize",
+        "finance.normalizers.market.canonicalize",
+        "finance.normalizers.news.canonicalize",
+        "finance.normalizers.sec.canonicalize",
+        "finance.normalizers.peer.canonicalize",
+        "finance.normalizers.provenance.attach",
+        "finance.normalizers.field_policy.stale",
+        "finance.normalizers.field_policy.missing",
+        "finance.normalizers.ordering.deterministic"
+      ],
+      "test_gates": [
+        "finance normalizers contract manifest and referenced JSON files decode without external dependencies",
+        "schema tests cover statements, ratios, market, news, SEC, peer, provenance, and normalizer policy",
+        "fixture tests validate canonical fields, stale and missing field policy, and deterministic ordering",
+        "provider gates forbid live network access, provider credentials, provider SDK imports, and q/runtime coupling"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_agent_runner",
+      "package_name": "leia-generic-ai-agent-runner",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+      "planned_directory": "packages/generic_ai/agent_runner",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/contracts/agent_runner_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+      "capabilities": [
+        "ai.agent.config.declarative",
+        "ai.agent.tool_history.replay",
+        "ai.agent.loop_trace.emit",
+        "ai.agent.structured_output.validate",
+        "ai.agent.replay_policy.enforce",
+        "ai.agent.max_steps.guard",
+        "ai.agent.tool_contract_projection"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "tool contract projection maps provider-free tool contracts into agent tools and replayed tool history",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_agent_state_store",
+      "package_name": "leia-generic-ai-agent-state-store",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+      "planned_directory": "packages/generic_ai/agent_state_store",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/contracts/generic_agent_state_store_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+      "capabilities": [
+        "generic.ai.agent_state.store",
+        "generic.ai.agent_state.snapshot",
+        "generic.ai.agent_state.session",
+        "generic.ai.agent_state.checkpoint",
+        "generic.ai.agent_state.input_ref",
+        "generic.ai.agent_state.output_ref",
+        "generic.ai.agent_state.trace_correlation",
+        "generic.ai.agent_state.trace_replay_projection",
+        "generic.ai.agent_state.memory_context_projection",
+        "generic.ai.agent_state.cache_key",
+        "generic.ai.agent_state.redaction",
+        "generic.ai.agent_state.clean_skip"
+      ],
+      "test_gates": [
+        "agent state store contract fixture decodes without provider SDKs, live databases, credentials, or network access",
+        "state_version is monotonic and resume_token derives from checkpoint_key",
+        "input_refs and output_refs store stable digests and redacted summaries instead of raw payloads",
+        "trace correlation links agent_run_id, session_id, turn_id, event_id, parent_event_id, and checkpoint_key",
+        "trace replay projection maps checkpoint snapshots to deterministic trace and replay correlation events",
+        "memory context projection maps ranked memory refs into resumable snapshots without copying raw memory text",
+        "checkpoint and cache keys are deterministic sha256 values that exclude raw inputs, raw outputs, and secret-shaped fields",
+        "adapter boundaries clean-skip when durable state dependencies are absent"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_analytical_model_contracts",
+      "package_name": "leia-generic-ai-analytical-model-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "planned_directory": "packages/generic_ai/analytical_model_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/contracts/generic_analytical_model_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_analytical_model_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.analytical_model.contracts",
+        "generic.ai.analytical_model.method.output",
+        "generic.ai.analytical_model.assumption.audit",
+        "generic.ai.analytical_model.scenario.book",
+        "generic.ai.analytical_model.sensitivity.grid",
+        "generic.ai.analytical_model.tolerance_gate.evaluate",
+        "generic.ai.analytical_model.provenance.attach",
+        "generic.ai.analytical_model.clean_skip"
+      ],
+      "test_gates": [
+        "scenario book, method output, tolerance gate, and clean-skip contract fixtures decode without numeric engine imports",
+        "assumption audit, sensitivity grid, provenance, and deterministic ordering fixtures remain provider-free and replayable",
+        "method output fixtures carry scenario references, units, periods, transform notes, and audit events",
+        "tolerance fixtures compare expected and actual values within explicit absolute tolerances",
+        "registered example executes without host runtime internals, live network, or live model calls"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_approval_policy",
+      "package_name": "leia-generic-ai-approval-policy",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+      "planned_directory": "packages/generic_ai/approval_policy",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/contracts/generic_approval_policy_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "capabilities": [
+        "generic.ai.approval.policy",
+        "generic.ai.capability.gate",
+        "generic.ai.policy.default_deny",
+        "generic.ai.approval.trace",
+        "generic.ai.clean_skip",
+        "generic.ai.risk_level"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_chart_render_contracts",
+      "package_name": "leia-generic-ai-chart-render-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+      "planned_directory": "packages/generic_ai/chart_render_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/contracts/generic_chart_render_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_chart_render_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.chart.render.contracts",
+        "generic.ai.chart.spec",
+        "generic.ai.chart.recipe.matrix",
+        "generic.ai.chart.render.request",
+        "generic.ai.chart.render.result",
+        "generic.ai.chart.source.metadata",
+        "generic.ai.chart.snapshot.hash",
+        "generic.ai.chart.renderer.clean_skip",
+        "generic.ai.chart.unsupported_renderer"
+      ],
+      "test_gates": [
+        "chart spec and recipe matrix contract fixtures decode without renderer dependencies",
+        "render request/result contract envelopes are deterministic provider-free fixture data",
+        "source metadata contract is redacted and replay-ready",
+        "snapshot hash contract values are deterministic fixture values",
+        "unsupported renderer contract paths produce clean-skip envelopes"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_coding_workspace",
+      "package_name": "leia-generic-ai-coding-workspace",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "planned_directory": "packages/generic_ai/coding_workspace",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/contracts/generic_coding_workspace_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "capabilities": [
+        "generic.ai.coding_workspace",
+        "generic.ai.code.command.request",
+        "generic.ai.code.command.result",
+        "generic.ai.code.approval.gate",
+        "generic.ai.code.stdout.stderr",
+        "generic.ai.artifact.file_manifest",
+        "generic.ai.artifact.image_manifest",
+        "generic.ai.notebook.display",
+        "generic.ai.code.cleanup_policy",
+        "generic.ai.code.replay.deterministic",
+        "generic.ai.code.capability.metadata",
+        "generic.ai.code.clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic coding workspace artifact backend boundary",
+        "registered example executes provider-free",
+        "no command execution host, notebook kernel, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_data_normalization_contracts",
+      "package_name": "leia-generic-ai-data-normalization-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "planned_directory": "packages/generic_ai/data_normalization_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/contracts/generic_data_normalization_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_normalization_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.data_normalization.contracts",
+        "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.provider_response_projection",
+        "generic.ai.data_normalization.field_policy",
+        "generic.ai.data_normalization.missing_policy",
+        "generic.ai.data_normalization.stale_policy",
+        "generic.ai.data_normalization.type_coercion",
+        "generic.ai.data_normalization.unit_transform",
+        "generic.ai.data_normalization.provenance",
+        "generic.ai.data_normalization.validation_error",
+        "generic.ai.data_normalization.deterministic_order",
+        "generic.ai.data_normalization.adapter_clean_skip"
+      ],
+      "test_gates": [
+        "schema mapping, normalized row, validation, and clean-skip contract fixtures decode without source adapter imports",
+        "field policy, missing policy, stale policy, type coercion, and unit transform fixtures remain provider-free and replayable",
+        "normalized row fixtures carry deterministic ordering, provenance records, missing reasons, and transform notes",
+        "validation fixtures classify missing optional values and stale observations without live services",
+        "registered example executes without host runtime internals, live network, or live model calls"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_data_provider_boundary",
+      "package_name": "leia-generic-ai-data-provider-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "planned_directory": "packages/generic_ai/data_provider_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/contracts/generic_data_provider_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_data_provider_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.data_provider.boundary",
+        "generic.ai.data_provider.registry",
+        "generic.ai.data_provider.request_envelope",
+        "generic.ai.data_provider.response_envelope",
+        "generic.ai.data_provider.pagination",
+        "generic.ai.data_provider.rate_limit",
+        "generic.ai.data_provider.auth_redaction",
+        "generic.ai.data_provider.cache_retry_policy",
+        "generic.ai.data_provider.provenance",
+        "generic.ai.data_provider.error_envelope",
+        "generic.ai.data_provider.clean_skip"
+      ],
+      "test_gates": [
+        "data provider registry contract fixtures decode without provider SDK imports",
+        "request and response envelope contract fixtures remain provider-free and replayable",
+        "pagination and rate-limit contract fixtures are metadata-only and deterministic",
+        "auth redaction and provenance contract fixtures never expose secret values",
+        "error envelope and clean-skip contract fixtures cover disabled network and absent credential states"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_document_rag_pipeline",
+      "package_name": "leia-generic-ai-document-rag-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "planned_directory": "packages/generic_ai/document_rag_pipeline",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/contracts/generic_document_rag_pipeline_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "capabilities": [
+        "generic.ai.document.rag",
+        "generic.ai.document.convert",
+        "generic.ai.document.section.extract",
+        "generic.ai.rag.chunk",
+        "generic.ai.rag.corpus_manifest",
+        "generic.ai.rag.retrieve",
+        "generic.ai.rag.citation_consistency",
+        "generic.ai.rag.adapter.clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic document RAG backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_evaluation_harness",
+      "package_name": "leia-generic-ai-evaluation-harness",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+      "planned_directory": "packages/generic_ai/evaluation_harness",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/contracts/evaluation_harness_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+      "capabilities": [
+        "generic.ai.evaluation.harness.dataset_manifest",
+        "generic.ai.evaluation.harness.case_inputs",
+        "generic.ai.evaluation.harness.metric_specs",
+        "generic.ai.evaluation.harness.judge_replay_records",
+        "generic.ai.evaluation.harness.findings",
+        "generic.ai.evaluation.harness.golden_gates",
+        "generic.ai.evaluation.harness.case_result_summary",
+        "generic.ai.evaluation.harness.agent_run_projection"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "agent-run projection maps provider-free agent, replay, and trace references into evaluation case results",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_event_intelligence_boundary",
+      "package_name": "leia-generic-ai-event-intelligence-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "planned_directory": "packages/generic_ai/event_intelligence_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/contracts/generic_event_intelligence_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_event_intelligence_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.event_intelligence.boundary",
+        "generic.ai.event.source_snapshot",
+        "generic.ai.event.extraction",
+        "generic.ai.event.taxonomy",
+        "generic.ai.event.freshness_policy",
+        "generic.ai.event.dedupe_confidence",
+        "generic.ai.event.relevance_score",
+        "generic.ai.event.sentiment_impact",
+        "generic.ai.event.prompt_contract",
+        "generic.ai.event.adapter_clean_skip"
+      ],
+      "test_gates": [
+        "event source snapshot contract fixtures decode without provider SDK imports",
+        "event extraction and taxonomy contract fixtures remain domain-neutral",
+        "freshness, dedupe, relevance, sentiment, and impact contract fixtures are deterministic",
+        "prompt contract fixtures forbid raw credentials, raw URLs, and unredacted handles",
+        "adapter boundary fixtures clean-skip when providers, credentials, or live network are absent"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_evidence_report_artifacts",
+      "package_name": "leia-generic-ai-evidence-report-artifacts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+      "planned_directory": "packages/generic_ai/evidence_report_artifacts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+      "capabilities": [
+        "generic.ai.evidence.report.artifacts",
+        "generic.ai.evidence.source_annotation",
+        "generic.ai.evidence.citation_envelope",
+        "generic.ai.report.outline",
+        "generic.ai.report.section_dependency_dag",
+        "generic.ai.report.style_profile_policy",
+        "generic.ai.report.partial_failure_fixture",
+        "generic.ai.artifact.manifest",
+        "generic.ai.artifact.render_manifest",
+        "generic.ai.artifact.snapshot_metadata",
+        "generic.ai.artifact.accessibility_checklist",
+        "generic.ai.artifact.stale_data_policy",
+        "generic.ai.render.request",
+        "generic.ai.render.output_manifest",
+        "generic.ai.render.warning",
+        "generic.ai.evidence.report.render_projection",
+        "generic.ai.evidence.report.chart_artifact_projection",
+        "generic.ai.render.clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic evidence/report/artifact backend boundary",
+        "verification-to-render projection preserves explicit source, citation, warning, artifact, and render request mappings",
+        "chart-render artifact projection preserves chart artifacts, warnings, source metadata, and snapshot hashes",
+        "registered example executes provider-free",
+        "no renderer, browser, provider credentials, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_evidence_verification",
+      "package_name": "leia-generic-ai-evidence-verification",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "planned_directory": "packages/generic_ai/evidence_verification",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/contracts/generic_evidence_verification_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "capabilities": [
+        "generic.ai.evidence.verify",
+        "generic.ai.evidence.document_rag_projection",
+        "generic.ai.evidence.claim_record",
+        "generic.ai.evidence.source_ref",
+        "generic.ai.evidence.citation_ref",
+        "generic.ai.evidence.requirement_matrix",
+        "generic.ai.evidence.citation_normalize",
+        "generic.ai.evidence.freshness_check",
+        "generic.ai.evidence.unresolved_ref",
+        "generic.ai.evidence.quality_summary",
+        "generic.ai.evidence.clean_degradation"
+      ],
+      "test_gates": [
+        "evidence verification contract claim records, source refs, and citation refs decode without provider calls",
+        "citation normalization preserves first-seen deterministic order and reports unresolved refs",
+        "freshness checks emit warnings from fixture timestamps without live network access",
+        "missing required evidence produces clean degradation actions instead of invented claims",
+        "evidence quality summaries are deterministic provider-free fixture data"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_memory_store",
+      "package_name": "leia-generic-ai-memory-store",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "planned_directory": "packages/generic_ai/memory_store",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_memory_store/contracts/generic_memory_store_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "capabilities": [
+        "generic.ai.memory.store",
+        "generic.ai.memory.namespace",
+        "generic.ai.memory.retrieve",
+        "generic.ai.memory.context_window",
+        "generic.ai.memory.retrieval_policy",
+        "generic.ai.memory.provenance",
+        "generic.ai.memory.clean_skip"
+      ],
+      "test_gates": [
+        "memory store contract fixture decodes without Redis, Postgres, vector databases, embedding models, or managed memory providers",
+        "namespace policy and retrieval policy are provider-free and credential-free",
+        "retrieval ranking and context window order are deterministic fixture data",
+        "adapter boundaries prove dependency imports, live network, and credentials stay disabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_model_io_envelope",
+      "package_name": "leia-generic-ai-model-io-envelope",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "planned_directory": "packages/generic_ai/model_io_envelope",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json",
+      "migration_source": "examples/ai/coding_agent_replay.records.json",
+      "capabilities": [
+        "generic.ai.model.io.envelope",
+        "generic.ai.model.io.request_envelope",
+        "generic.ai.model.io.response_envelope",
+        "generic.ai.model.io.stream_chunks",
+        "generic.ai.model.io.provider_free_replay",
+        "generic.ai.model.io.usage_cost_metadata",
+        "generic.ai.model.io.registry_turn_projection",
+        "generic.ai.model.io.redaction"
+      ],
+      "test_gates": [
+        "fixture replay decodes request, stream chunk, and response envelope contracts",
+        "contract gates prove usage/cost metadata and redaction fields are explicit",
+        "provider-free fixture asserts no live network or credential requirement",
+        "registry-to-turn projection maps aliases, replay descriptors, redaction, and turn request hashes explicitly",
+        "composition gate links model registry output to turn runner input through model IO envelope contracts"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_model_registry",
+      "package_name": "leia-generic-ai-model-registry",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+      "planned_directory": "packages/generic_ai/model_registry",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_model_registry/contracts/model_registry_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+      "capabilities": [
+        "generic.ai.model.registry",
+        "generic.ai.model.provider_policy",
+        "generic.ai.model.execution_descriptor",
+        "generic.ai.model.redaction_policy",
+        "generic.ai.model.capability_flags",
+        "generic.ai.model.alias_resolution"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_optional_adapter_boundary",
+      "package_name": "leia-generic-ai-optional-adapter-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "planned_directory": "packages/generic_ai/optional_adapter_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/contracts/generic_optional_adapter_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_optional_adapter_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.optional_adapter.boundary",
+        "generic.ai.optional_adapter.registry",
+        "generic.ai.optional_dependency.gate",
+        "generic.ai.optional_adapter.result_envelope",
+        "generic.ai.optional_adapter.version_metadata",
+        "generic.ai.optional_adapter.terms_metadata",
+        "generic.ai.optional_adapter.credential_redaction",
+        "generic.ai.optional_adapter.clean_skip",
+        "generic.ai.optional_adapter.no_live_import_default"
+      ],
+      "test_gates": [
+        "optional adapter registry contract fixtures decode without importing optional dependencies",
+        "dependency gate contract fixtures clean-skip when packages, credentials, or live network are absent",
+        "adapter result envelope contract fixtures expose status, capability, fixture_key, data, and metadata",
+        "version and terms metadata contract fixtures are metadata-only and provider-free",
+        "credential redaction contract fixtures never expose secret values"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_package_boundary_auditor",
+      "package_name": "leia-generic-ai-package-boundary-auditor",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+      "planned_directory": "packages/generic_ai/package_boundary_auditor",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/contracts/package_boundary_audit_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+      "capabilities": [
+        "generic.ai.package.boundary.audit.manifest",
+        "generic.ai.package.boundary.audit.fixture_index",
+        "generic.ai.package.boundary.audit.example_registry",
+        "generic.ai.package.boundary.audit.capability_policy",
+        "generic.ai.package.boundary.audit.findings",
+        "generic.ai.package.boundary.audit.missing_boundary_records"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_planning_graph",
+      "package_name": "leia-generic-ai-planning-graph",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+      "planned_directory": "packages/generic_ai/planning_graph",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/contracts/planning_graph_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+      "capabilities": [
+        "generic.planning.graph.define",
+        "generic.planning.node.classify",
+        "generic.planning.dependency.validate",
+        "generic.planning.retry.replay",
+        "generic.planning.branch.merge",
+        "generic.planning.trace.evidence"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_product_app_boundary",
+      "package_name": "leia-generic-ai-product-app-boundary",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+      "planned_directory": "packages/generic_ai/product_app_boundary",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/contracts/generic_product_app_boundary_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_product_app_boundary.source.txt",
+      "capabilities": [
+        "generic.ai.product_app.boundary",
+        "generic.ai.product_app.route_contract",
+        "generic.ai.product_app.session_contract",
+        "generic.ai.product_app.workflow_projection",
+        "generic.ai.product_app.task_log",
+        "generic.ai.product_app.artifact_download",
+        "generic.ai.product_app.crud_fixture_state",
+        "generic.ai.product_app.db_migration_plan",
+        "generic.ai.product_app.deployment_target",
+        "generic.ai.product_app.approval_boundary",
+        "generic.ai.product_app.clean_skip"
+      ],
+      "test_gates": [
+        "product app route contract fixtures decode without web framework dependencies",
+        "workflow projection maps provider-free workflow results into product task, route, and artifact refs",
+        "session and task-log contract fixtures remain provider-free and credential-free",
+        "artifact download and CRUD fixture-state contracts use fixture URIs only",
+        "database migration and deployment target contracts are metadata-only by default",
+        "approval boundary and clean-skip contract fixtures block live side effects"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_prompt_role_catalog",
+      "package_name": "leia-generic-ai-prompt-role-catalog",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "planned_directory": "packages/generic_ai/prompt_role_catalog",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/contracts/generic_prompt_role_catalog_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "capabilities": [
+        "generic.ai.prompt.role.catalog",
+        "generic.ai.prompt.template.snapshot",
+        "generic.ai.role.profile.version",
+        "generic.ai.role.delegation.trigger",
+        "generic.ai.role.output.schema",
+        "generic.ai.role.evidence.validation",
+        "generic.ai.role.termination.convention",
+        "generic.ai.prompt.drift.fixture"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic prompt role catalog backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials, live model calls, live network, provider SDK, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_record_replay",
+      "package_name": "leia-generic-ai-record-replay",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
+      "planned_directory": "packages/generic_ai/record_replay",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_record_replay/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_record_replay/contracts/record_replay_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+      "capabilities": [
+        "generic.ai.record.schema",
+        "generic.ai.record.capture",
+        "generic.ai.replay.index",
+        "generic.ai.replay.match.strict_ordered",
+        "generic.ai.replay.finding.mismatch",
+        "generic.ai.replay.finding.unconsumed",
+        "generic.ai.replay.summary.deterministic"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_report_render_contracts",
+      "package_name": "leia-generic-ai-report-render-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "planned_directory": "packages/generic_ai/report_render_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/contracts/generic_report_render_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_report_render_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.report.render.contracts",
+        "generic.ai.report.render.request",
+        "generic.ai.report.render.request_envelope",
+        "generic.ai.report.render.output_manifest",
+        "generic.ai.report.render.artifact_manifest",
+        "generic.ai.report.render.snapshot_metadata",
+        "generic.ai.report.render.snapshot_hash",
+        "generic.ai.report.render.warning",
+        "generic.ai.report.render.annotation",
+        "generic.ai.report.render.fixture_hash",
+        "generic.ai.report.render.clean_skip"
+      ],
+      "test_gates": [
+        "report render request contract fixtures decode without renderer dependencies",
+        "request and result envelope contract fixtures remain provider-free and replayable",
+        "output and artifact manifest contract fixtures use artifact URIs only",
+        "snapshot metadata, warning, and annotation contract fixtures are deterministic",
+        "renderer dependency gates produce clean-skip contract envelopes"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_strategy_backtest_contracts",
+      "package_name": "leia-generic-ai-strategy-backtest-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "planned_directory": "packages/generic_ai/strategy_backtest_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.strategy.backtest.contracts",
+        "generic.ai.strategy.backtest.strategy.bind",
+        "generic.ai.strategy.backtest.observation_feed.bind",
+        "generic.ai.strategy.backtest.execution_ledger",
+        "generic.ai.strategy.backtest.allocation_series",
+        "generic.ai.strategy.backtest.performance.series",
+        "generic.ai.strategy.backtest.metric_summary.collect",
+        "generic.ai.strategy.backtest.constraint_limits.enforce",
+        "generic.ai.strategy.backtest.engine.clean_skip"
+      ],
+      "test_gates": [
+        "strategy manifest and deterministic seed contract fixtures decode without engine imports",
+        "observation feed and execution ledger fixtures remain provider-free and replayable",
+        "allocation series, performance series, metric summary, and constraint limit fixtures are deterministic",
+        "optional engine, visualizer, and data-provider adapter boundaries clean-skip without imports or credentials",
+        "registered example executes without q runtime, live network, or live model calls"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_tool_contracts",
+      "package_name": "leia-generic-ai-tool-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+      "planned_directory": "packages/generic_ai/tool_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+      "capabilities": [
+        "generic.ai.tool.contract",
+        "generic.ai.tool.contract.project_registry_descriptor",
+        "generic.ai.tool.invoke",
+        "generic.ai.tool.argument_validation",
+        "generic.ai.tool.result_envelope",
+        "generic.ai.tool.normalized_error",
+        "generic.ai.tool.artifact_ref"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "registry descriptor projection fixture maps registry declarations into generic tool contracts",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_tool_registry",
+      "package_name": "leia-generic-ai-tool-registry",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+      "planned_directory": "packages/generic_ai/tool_registry",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/contracts/tool_registry_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+      "capabilities": [
+        "generic.tool.registry.declare",
+        "generic.tool.registry.validate_schema",
+        "generic.tool.invocation.trace",
+        "generic.tool.approval.edge",
+        "generic.tool.registry.replay_fixture"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_trace_events",
+      "package_name": "leia-generic-ai-trace-events",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+      "planned_directory": "packages/generic_ai/trace_events",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_trace_events/contracts/trace_events_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+      "capabilities": [
+        "generic.ai.trace.events",
+        "generic.ai.trace.emit",
+        "generic.ai.trace.correlation_ids",
+        "generic.ai.trace.sequence_marker",
+        "generic.ai.trace.redaction_policy",
+        "generic.ai.trace.fixture_replay"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_transcript_pipeline",
+      "package_name": "leia-generic-ai-transcript-pipeline",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+      "planned_directory": "packages/generic_ai/transcript_pipeline",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/contracts/generic_transcript_pipeline_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_transcript_pipeline.source.txt",
+      "capabilities": [
+        "generic.ai.transcript.pipeline",
+        "generic.ai.transcript.source_envelope",
+        "generic.ai.transcript.speaker.normalize",
+        "generic.ai.transcript.speaker.alias",
+        "generic.ai.transcript.speaker.role",
+        "generic.ai.transcript.segment.normalize",
+        "generic.ai.transcript.turn.order",
+        "generic.ai.transcript.offset.provenance",
+        "generic.ai.transcript.event_time.correct",
+        "generic.ai.transcript.chunk",
+        "generic.ai.transcript.chunk.boundary_preserve",
+        "generic.ai.transcript.chunk.token_budget",
+        "generic.ai.transcript.provenance",
+        "generic.ai.transcript.adapter.clean_skip"
+      ],
+      "test_gates": [
+        "source envelope, segment, chunk, and clean-skip contract fixtures decode without speech provider imports",
+        "speaker normalization, event-time correction, turn ordering, and segment provenance remain fixture replayable",
+        "chunk fixtures preserve turn boundaries, deterministic order, overlap, and token budgets",
+        "speech, diarization, cleaner, and remote-source adapters clean-skip without imports or credentials",
+        "registered example executes without q runtime, live network, or live model calls"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_turn_runner",
+      "package_name": "leia-generic-ai-turn-runner",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+      "planned_directory": "packages/generic_ai/turn_runner",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+      "capabilities": [
+        "generic.ai.turn.request",
+        "generic.ai.turn.execute",
+        "generic.ai.turn.response_envelope",
+        "generic.ai.turn.tool_request",
+        "generic.ai.turn.replay_match",
+        "generic.ai.turn.error_envelope",
+        "generic.ai.turn.memory_context_projection"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "memory context projection maps provider-free memory refs into deterministic turn request messages",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_ui_snapshot_evaluator",
+      "package_name": "leia-generic-ai-ui-snapshot-evaluator",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "planned_directory": "packages/generic_ai/ui_snapshot_evaluator",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/contracts/generic_ui_snapshot_evaluator_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "capabilities": [
+        "generic.ai.ui.snapshot.evaluator",
+        "generic.ai.ui.snapshot.evidence_report_projection",
+        "generic.ai.ui.route_dom_schema",
+        "generic.ai.ui.viewport_matrix",
+        "generic.ai.ui.visual_diff_budget",
+        "generic.ai.ui.accessibility_summary",
+        "generic.ai.ui.artifact_uri_manifest",
+        "generic.ai.ui.redaction_policy",
+        "generic.ai.ui.static_asset_policy",
+        "generic.ai.ui.browser_clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic UI snapshot evaluator backend boundary",
+        "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
+        "registered example executes provider-free",
+        "no browser, network, provider SDK, renderer, or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_workflow_orchestrator",
+      "package_name": "leia-generic-ai-workflow-orchestrator",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+      "planned_directory": "packages/generic_ai/workflow_orchestrator",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+      "capabilities": [
+        "generic.ai.workflow.orchestration",
+        "generic.ai.workflow.graph",
+        "generic.ai.workflow.stage_io",
+        "generic.ai.workflow.planning_graph_stage_projection",
+        "generic.ai.workflow.handoff_trace",
+        "generic.ai.workflow.retry_cache",
+        "generic.ai.workflow.result",
+        "generic.ai.workflow.trace_hooks"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic AI backend boundary",
+        "registered example executes provider-free",
+        "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "html_ui_snapshots",
+      "package_name": "leia-finrobot-html-ui-snapshots",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots",
+      "planned_directory": "packages/finrobot/html_ui_snapshots",
+      "manifest": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/html_ui_snapshots/contracts/html_ui_snapshot_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/web_product.leia",
+      "capabilities": [
+        "ui.template.inventory",
+        "ui.template.required_sections",
+        "ui.template.table_placeholder",
+        "ui.template.chart_placeholder",
+        "ui.template.disclosure_markup",
+        "ui.template.source_provenance_markup",
+        "ui.accessibility.checklist",
+        "ui.static_asset_manifest",
+        "ui.snapshot.deterministic_hash",
+        "ui.snapshot.provider_free"
+      ],
+      "test_gates": [
+        "HTML/UI snapshot manifest and referenced JSON files decode without external dependencies",
+        "fixture tests cover template inventory, required sections, table and chart placeholders, disclosure markup, source provenance markup, accessibility checklist, static assets, and deterministic snapshot hash",
+        "contract tests run with live_network=false and require no browser, network, database, or renderer dependency",
+        "provider-free gates keep visual regression and real browser snapshots outside Leia core until an external package is explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "news_catalyst",
+      "package_name": "leia-finrobot-news-catalyst",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/news_catalyst",
+      "planned_directory": "packages/finrobot/news_catalyst",
+      "manifest": "examples/ai/finrobot_translation/live_packages/news_catalyst/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/news_catalyst/contracts/news_catalyst_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.news.fetch.fixture",
+        "finance.news.relevance.score",
+        "finance.news.category.classify",
+        "finance.news.sentiment.score",
+        "finance.news.source.rank",
+        "finance.catalyst.detect",
+        "finance.catalyst.impact.score",
+        "finance.catalyst.time_horizon.classify",
+        "finance.retail_sentiment.snapshot",
+        "finance.retail_sentiment.adapter.boundary"
+      ],
+      "test_gates": [
+        "news catalyst manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no required credentials",
+        "fixture tests validate relevance, category, sentiment, impact, source ranking, and retail sentiment snapshots",
+        "adapter boundary tests keep Polymarket, X, and Reddit metadata-only until live packages are explicitly enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "optional_integrations",
+      "package_name": "leia-finrobot-optional-integrations",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/optional_integrations",
+      "planned_directory": "packages/finrobot/optional_integrations",
+      "manifest": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/optional_integrations/contracts/optional_integration_capability_gates.json",
+      "migration_source": "examples/ai/finrobot_translation/optional_integrations.leia",
+      "capabilities": [
+        "integration.optional.fingpt.forecast",
+        "integration.optional.finrl.strategy",
+        "integration.optional.finml.dataset",
+        "integration.optional.backtrader.backtest",
+        "integration.optional.mplfinance.chart",
+        "integration.optional.openbb.data",
+        "integration.optional.ollama.local_model"
+      ],
+      "test_gates": [
+        "optional integration manifests declare clean skip behavior, fixture keys, schemas, and capability gates",
+        "contract tests run with live_network=false and assert absent optional dependencies do not fail provider-free CI",
+        "fixture tests validate FinGPT, FinRL, FinML, Backtrader, mplfinance, OpenBB, and Ollama metadata without imports",
+        "approval policy tests deny live optional integrations unless the matching capability and dependency gate are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "prompt_roles",
+      "package_name": "leia-finrobot-prompt-roles",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/prompt_roles",
+      "planned_directory": "packages/finrobot/prompt_roles",
+      "manifest": "examples/ai/finrobot_translation/live_packages/prompt_roles/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/prompt_roles/contracts/prompt_role_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/role_profiles.leia",
+      "capabilities": [
+        "prompt.role.catalog.agent_library",
+        "prompt.role.catalog.prompts",
+        "prompt.role.catalog.utils",
+        "prompt.role.catalog.text_generator_agents",
+        "prompt.role.catalog.equity_agents",
+        "prompt.role.profile.version",
+        "prompt.role.section.output_schema",
+        "prompt.role.termination.convention",
+        "prompt.role.evidence.validation"
+      ],
+      "test_gates": [
+        "prompt catalog fixture tests cover agent_library, prompts, utils, text_generator_agents, and equity_agents without live model calls",
+        "contract tests run with live_network=false and assert role profile versions plus TERMINATE convention",
+        "section output schema fixture tests validate source evidence references without credentials",
+        "provider-free package tests deny external I/O, provider credentials, and external prompt/model SDK imports"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "report_renderer",
+      "package_name": "leia-finrobot-report-renderer",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/report_renderer",
+      "planned_directory": "packages/finrobot/report_renderer",
+      "manifest": "examples/ai/finrobot_translation/live_packages/report_renderer/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/report_renderer/contracts/report_renderer_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/report_contract.leia",
+      "capabilities": [
+        "report.render.request",
+        "report.render.html.contract",
+        "report.render.pdf.contract",
+        "report.render.output_manifest",
+        "report.render.page_snapshot_metadata",
+        "report.render.table_warning",
+        "report.render.markdown_warning",
+        "report.render.disclosure_annotation",
+        "report.render.source_annotation",
+        "report.render.missing_chart_handling",
+        "report.render.fixture_hash",
+        "report.render.clean_skip"
+      ],
+      "test_gates": [
+        "report renderer manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert optional renderer dependencies clean-skip",
+        "fixture tests validate HTML/PDF request, output manifest, page snapshot metadata, warnings, disclosures, source annotations, and missing chart handling",
+        "deterministic fixture hash remains stable without invoking a live renderer"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "retail_sentiment",
+      "package_name": "leia-finrobot-retail-sentiment",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/retail_sentiment",
+      "planned_directory": "packages/finrobot/retail_sentiment",
+      "manifest": "examples/ai/finrobot_translation/live_packages/retail_sentiment/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/retail_sentiment/contracts/retail_sentiment_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/finance_normalizers.leia",
+      "capabilities": [
+        "finance.retail_sentiment.source_snapshot",
+        "finance.retail_sentiment.aggregate",
+        "finance.retail_sentiment.redaction_policy",
+        "finance.retail_sentiment.terms_metadata",
+        "finance.retail_sentiment.prompt_format",
+        "finance.retail_sentiment.stale_snapshot_warning",
+        "finance.retail_sentiment.adapter_clean_skip"
+      ],
+      "test_gates": [
+        "retail sentiment manifest and referenced JSON files decode without external dependencies",
+        "fixture tests cover Adanos, Reddit, X, and Polymarket source snapshots without live adapters",
+        "schema tests validate sentiment aggregates, redaction policy, terms metadata, prompt-format contract, and stale snapshot warning",
+        "adapter boundary tests clean-skip optional providers and reject raw handles, raw URLs, tokens, cookies, and authorization headers"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "sec_filings",
+      "package_name": "leia-finrobot-sec-filings",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/sec_filings",
+      "planned_directory": "packages/finrobot/sec_filings",
+      "manifest": "examples/ai/finrobot_translation/live_packages/sec_filings/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/sec_filings/contracts/sec_filings_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/document_rag.leia",
+      "capabilities": [
+        "finance.document.sec.search",
+        "finance.document.sec.fetch",
+        "finance.document.sec.form_filter",
+        "finance.document.sec.html.artifact",
+        "finance.document.sec.pdf.artifact",
+        "finance.document.sec.section.extract",
+        "finance.document.sec.artifact.provenance",
+        "finance.document.sec.redirect.trace",
+        "finance.document.sec.cache.metadata",
+        "finance.document.sec.user_agent.policy",
+        "finance.document.sec.terms.metadata",
+        "finance.document.sec.live_network"
+      ],
+      "test_gates": [
+        "SEC filings manifest and referenced JSON files decode without external dependencies",
+        "contract tests run with live_network=false and assert no SEC credentials, user-agent, parser dependency, or live network is enabled by default",
+        "fixture tests validate offline 10-K and 10-Q search, fetch, section extraction, HTML/PDF artifact provenance, redirect/cache metadata, user-agent policy, and terms metadata",
+        "adapter boundary tests keep SEC search, archive fetch, HTML parser, and PDF reader calls metadata-only until explicit capability/env live gates are enabled"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "tutorial_demo_parity",
+      "package_name": "leia-finrobot-tutorial-demo-parity",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity",
+      "planned_directory": "packages/finrobot/tutorial_demo_parity",
+      "manifest": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/tutorial_demo_parity/contracts/tutorial_demo_parity_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/tutorial_parity/ledger.json",
+      "capabilities": [
+        "parity.tutorial.ledger.validate",
+        "parity.tutorial.notebook.checklist",
+        "parity.demo.smoke_contract",
+        "parity.demo.agent_builder",
+        "parity.demo.backtrader",
+        "parity.replay.provider_records",
+        "parity.optional_gate.clean_skip"
+      ],
+      "test_gates": [
+        "fixture tests validate tutorial and demo parity ledgers without notebook execution or provider calls",
+        "contract tests require registered provider-free smoke examples and replay record links",
+        "optional gate tests require live_network_default=false, default_enabled=false, and clean skips",
+        "notebook-to-Leia conversion checklist gates any future live package implementation"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "valuation_engine",
+      "package_name": "leia-finrobot-valuation-engine",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/valuation_engine",
+      "planned_directory": "packages/finrobot/valuation_engine",
+      "manifest": "examples/ai/finrobot_translation/live_packages/valuation_engine/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/valuation_engine/contracts/valuation_engine_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/valuation_analytics.leia",
+      "capabilities": [
+        "finance.valuation.dcf",
+        "finance.valuation.ev_ebitda",
+        "finance.valuation.pe_multiple",
+        "finance.valuation.target_price_synthesis",
+        "finance.valuation.football_field",
+        "finance.valuation.assumption_audit",
+        "finance.valuation.tolerance_gate",
+        "finance.valuation.currency_period_provenance"
+      ],
+      "test_gates": [
+        "valuation engine manifest and referenced JSON files decode without external dependencies",
+        "fixture tests cover DCF, EV/EBITDA, P/E, target price synthesis, football-field data, assumption audit, and tolerance gates",
+        "contract tests require formulas, currency, period, provenance, explicit assumptions, and deterministic tolerance metadata",
+        "provider-free gates reject hidden live data fetches and q/runtime valuation optimization dependencies"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "vendor_adapters",
+      "package_name": "leia-finrobot-vendor-adapters",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/vendor_adapters",
+      "planned_directory": "packages/finrobot/vendor_adapters",
+      "manifest": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
+      "migration_source": "examples/ai/finrobot_translation/vendor_adapters.leia",
+      "capabilities": [
+        "finance.vendor.yahoo.chart",
+        "finance.vendor.finnhub.profile",
+        "finance.vendor.fmp.key_metrics",
+        "finance.vendor.sec.filing",
+        "finance.vendor.earnings.transcript",
+        "finance.vendor.reddit.search"
+      ],
+      "test_gates": [
+        "manifest declares every live provider capability, credential env var, rate-limit policy, terms metadata, and replay fixture key",
+        "contract tests run with live_network=false and assert clean skips when optional provider credentials are absent",
+        "fixture replay tests validate response schema compatibility without importing yfinance, Finnhub, FMP, SEC, earnings, or Reddit clients",
+        "approval policy tests deny external network calls unless the matching provider capability is granted"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "web_product",
+      "package_name": "leia-finrobot-web-product",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/product_workflow",
+      "planned_directory": "packages/finrobot/web_product",
+      "manifest": "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/product_workflow/contracts/product_workflow_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/web_product.leia",
+      "capabilities": [
+        "web.route.report",
+        "web.auth.session",
+        "web.background_task.log",
+        "web.artifact.download",
+        "web.crud.fixture_state",
+        "web.ui.snapshot",
+        "web.accessibility.checklist"
+      ],
+      "test_gates": [
+        "route parity tests cover replay UI paths and fail when live-only routes bypass fixtures",
+        "auth/session and background task logs are fixture-backed unless explicit product credentials are configured",
+        "download contract tests validate artifact manifests rather than fetching remote objects",
+        "accessibility and UI snapshot smoke tests remain provider-free and deterministic in CI"
       ],
       "no_built_in_guarantee": true
     }
   ],
   "global_test_gates": [
-    "no test may require real network access",
-    "live_network defaults to false",
-    "credentials are not required for provider-free skeletons",
-    "capabilities must be explicit before future live provider packages can run"
+    "no test in this plan may perform real network I/O",
+    "live package manifests must default live_network to false",
+    "optional provider credentials must be redacted and absent-safe",
+    "each package must declare capabilities before it can replace a replay fixture",
+    "the replay slice remains the golden contract until the corresponding package contract passes"
   ]
 }

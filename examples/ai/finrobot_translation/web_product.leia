@@ -1,0 +1,268 @@
+// web_product.leia - FR-GAP-020/024 offline web product + UI snapshot smoke.
+//
+// This fixture records route, auth/session, task-log, download, CRUD, and UI
+// snapshot parity metadata for finrobot_equity/web_app without starting a web
+// server, touching SQLite, or rendering templates.
+
+func check(name, ok) {
+    if !ok {
+        error("check failed: " .. name)
+    }
+}
+
+web_product_contract := {
+    id: "finrobot_equity_web_product_smoke",
+    gaps: {"FR-GAP-020", "FR-GAP-024"},
+    offline: true,
+    real_web_server: false,
+    live_network: false,
+    sqlite_driver_required: false,
+    renderer_required: false,
+}
+
+route_parity_metadata := {
+    source_package: "finrobot_equity/web_app",
+    routes: {
+        {id: "home", method: "GET", path: "/", template: "index.html", auth: "optional", parity: "mapped"},
+        {id: "login", method: "GET", path: "/login", template: "login.html", auth: "anonymous", parity: "mapped"},
+        {id: "oauth_callback", method: "GET", path: "/auth/callback", template: "redirect.html", auth: "oauth_state", parity: "mapped"},
+        {id: "logout", method: "POST", path: "/logout", template: "redirect.html", auth: "session", parity: "mapped"},
+        {id: "reports_index", method: "GET", path: "/reports", template: "reports.html", auth: "session", parity: "mapped"},
+        {id: "report_detail", method: "GET", path: "/reports/{report_id}", template: "report_detail.html", auth: "session", parity: "mapped"},
+        {id: "report_download", method: "GET", path: "/reports/{report_id}/download/{artifact}", template: nil, auth: "session", parity: "mapped"},
+        {id: "submit_equity_request", method: "POST", path: "/api/reports", template: nil, auth: "session", parity: "mapped"},
+        {id: "task_status", method: "GET", path: "/api/tasks/{task_id}", template: nil, auth: "session", parity: "mapped"},
+        {id: "admin_dashboard", method: "GET", path: "/admin", template: "admin/dashboard.html", auth: "admin_session", parity: "mapped"},
+        {id: "admin_users", method: "GET", path: "/admin/users", template: "admin/users.html", auth: "admin_session", parity: "mapped"},
+        {id: "admin_task_log", method: "GET", path: "/admin/tasks", template: "admin/tasks.html", auth: "admin_session", parity: "mapped"},
+    },
+    route_smoke_matrix: {
+        {route_id: "home", fixture_status: 200, session: "anonymous", workflow_mocked: false},
+        {route_id: "login", fixture_status: 200, session: "anonymous", workflow_mocked: false},
+        {route_id: "oauth_callback", fixture_status: 302, session: "oauth_valid_state", workflow_mocked: false},
+        {route_id: "reports_index", fixture_status: 200, session: "user_session", workflow_mocked: false},
+        {route_id: "report_detail", fixture_status: 200, session: "user_session", workflow_mocked: false},
+        {route_id: "report_download", fixture_status: 200, session: "user_session", workflow_mocked: false},
+        {route_id: "submit_equity_request", fixture_status: 202, session: "user_session", workflow_mocked: true},
+        {route_id: "task_status", fixture_status: 200, session: "user_session", workflow_mocked: true},
+        {route_id: "admin_dashboard", fixture_status: 200, session: "admin_session", workflow_mocked: false},
+        {route_id: "admin_users", fixture_status: 200, session: "admin_session", workflow_mocked: false},
+        {route_id: "admin_task_log", fixture_status: 200, session: "admin_session", workflow_mocked: false},
+    },
+}
+
+auth_session_fixture := {
+    users: {
+        {id: "usr_analyst", email: "analyst@example.test", role: "analyst", active: true, oauth_subject: "oauth|analyst"},
+        {id: "usr_admin", email: "admin@example.test", role: "admin", active: true, oauth_subject: "oauth|admin"},
+        {id: "usr_disabled", email: "disabled@example.test", role: "analyst", active: false, oauth_subject: "oauth|disabled"},
+    },
+    sessions: {
+        {id: "sess_user", user_id: "usr_analyst", cookie: "finrobot_session=sess_user", csrf: "csrf-user-001", expires_at: "2026-06-11T12:00:00Z", admin: false},
+        {id: "sess_admin", user_id: "usr_admin", cookie: "finrobot_session=sess_admin", csrf: "csrf-admin-001", expires_at: "2026-06-11T12:00:00Z", admin: true},
+    },
+    oauth_states: {
+        {state: "state-valid-user", nonce: "nonce-user", next: "/reports", status: "valid"},
+        {state: "state-expired", nonce: "nonce-old", next: "/", status: "expired"},
+    },
+    denied_cases: {
+        {route_id: "admin_dashboard", session: "sess_user", fixture_status: 403, reason: "requires_admin"},
+        {route_id: "reports_index", session: "missing", fixture_status: 401, reason: "requires_session"},
+        {route_id: "oauth_callback", state: "state-expired", fixture_status: 400, reason: "expired_oauth_state"},
+    },
+}
+
+background_task_log := {
+    {task_id: "task_aapl_001", request_id: "req_aapl_001", event: "queued", at: "2026-06-11T09:00:00Z", level: "info", message: "Equity report request queued"},
+    {task_id: "task_aapl_001", request_id: "req_aapl_001", event: "started", at: "2026-06-11T09:00:05Z", level: "info", message: "Mocked workflow process started"},
+    {task_id: "task_aapl_001", request_id: "req_aapl_001", event: "artifact_planned", at: "2026-06-11T09:00:14Z", level: "info", message: "HTML/PDF/download manifest planned"},
+    {task_id: "task_aapl_001", request_id: "req_aapl_001", event: "completed", at: "2026-06-11T09:00:20Z", level: "info", message: "Mocked workflow process completed"},
+}
+
+download_manifest := {
+    report_id: "rep_aapl_001",
+    owner_user_id: "usr_analyst",
+    base_route: "/reports/rep_aapl_001/download",
+    artifacts: {
+        {id: "html", filename: "AAPL_Professional_Equity_Report.html", media_type: "text/html", path: "output/AAPL/report/AAPL_Professional_Equity_Report.html", disposition: "attachment", status: "planned_not_rendered"},
+        {id: "pdf", filename: "AAPL_Professional_Equity_Report.pdf", media_type: "application/pdf", path: "output/AAPL/report/AAPL_Professional_Equity_Report.pdf", disposition: "attachment", status: "planned_not_rendered"},
+        {id: "manifest", filename: "artifact_manifest.json", media_type: "application/json", path: "output/AAPL/report/artifact_manifest.json", disposition: "attachment", status: "planned"},
+        {id: "task_log", filename: "task_aapl_001.jsonl", media_type: "application/jsonl", path: "output/AAPL/report/task_aapl_001.jsonl", disposition: "attachment", status: "fixture"},
+    },
+}
+
+sqliteish_crud_fixture := {
+    schema: {
+        users: {"id", "email", "role", "active", "oauth_subject"},
+        sessions: {"id", "user_id", "csrf", "expires_at"},
+        report_requests: {"id", "user_id", "ticker", "status", "task_id"},
+        reports: {"id", "request_id", "ticker", "status", "artifact_manifest_id"},
+    },
+    seed_rows: {
+        users: auth_session_fixture.users,
+        sessions: auth_session_fixture.sessions,
+        report_requests: {
+            {id: "req_aapl_001", user_id: "usr_analyst", ticker: "AAPL", status: "completed", task_id: "task_aapl_001"},
+        },
+        reports: {
+            {id: "rep_aapl_001", request_id: "req_aapl_001", ticker: "AAPL", status: "completed", artifact_manifest_id: "manifest_aapl_001"},
+        },
+    },
+    operations: {
+        {op: "create", table: "report_requests", id: "req_msft_001", fixture_status: "inserted"},
+        {op: "read", table: "reports", id: "rep_aapl_001", fixture_status: "found"},
+        {op: "update", table: "report_requests", id: "req_msft_001", fixture_status: "queued_to_completed"},
+        {op: "delete", table: "sessions", id: "sess_expired", fixture_status: "deleted_zero_or_one"},
+    },
+}
+
+snapshot_manifest := {
+    id: "finrobot_web_static_template_snapshot_2026_06_11",
+    renderer_required: false,
+    templates: {
+        {id: "tpl_index", path: "web_app/templates/index.html", route_id: "home", hash: "sha256:tpl-index-fixture"},
+        {id: "tpl_reports", path: "web_app/templates/reports.html", route_id: "reports_index", hash: "sha256:tpl-reports-fixture"},
+        {id: "tpl_report_detail", path: "web_app/templates/report_detail.html", route_id: "report_detail", hash: "sha256:tpl-report-detail-fixture"},
+        {id: "tpl_admin_dashboard", path: "web_app/templates/admin/dashboard.html", route_id: "admin_dashboard", hash: "sha256:tpl-admin-dashboard-fixture"},
+    },
+    static_assets: {
+        {id: "css_app", path: "web_app/static/css/app.css", kind: "text/css", hash: "sha256:css-app-fixture"},
+        {id: "js_app", path: "web_app/static/js/app.js", kind: "application/javascript", hash: "sha256:js-app-fixture"},
+        {id: "logo", path: "web_app/static/img/logo.svg", kind: "image/svg+xml", hash: "sha256:logo-fixture"},
+    },
+    snapshots: {
+        {id: "snap_home_desktop", route_id: "home", viewport: "1440x900", artifact: "snapshots/home.desktop.png", status: "declared_not_rendered"},
+        {id: "snap_reports_mobile", route_id: "reports_index", viewport: "390x844", artifact: "snapshots/reports.mobile.png", status: "declared_not_rendered"},
+        {id: "snap_admin_desktop", route_id: "admin_dashboard", viewport: "1440x900", artifact: "snapshots/admin.desktop.png", status: "declared_not_rendered"},
+    },
+}
+
+accessibility_checklist := {
+    {id: "landmarks", target: "templates", check: "main/nav/header landmarks declared", status: "planned_fixture"},
+    {id: "headings", target: "templates", check: "single h1 and ordered section headings", status: "planned_fixture"},
+    {id: "forms", target: "templates", check: "labels, errors, csrf hidden input, and autocomplete metadata", status: "planned_fixture"},
+    {id: "tables", target: "templates", check: "report/admin tables expose captions and scope headers", status: "planned_fixture"},
+    {id: "downloads", target: "routes", check: "download controls have accessible names and media type labels", status: "planned_fixture"},
+    {id: "contrast", target: "static/css/app.css", check: "color tokens meet WCAG AA contrast", status: "planned_fixture"},
+    {id: "keyboard", target: "static/js/app.js", check: "modal and admin controls are keyboard reachable", status: "planned_fixture"},
+}
+
+func has_route(route_id) {
+    for i := 1; i <= #route_parity_metadata.routes; i++ {
+        if route_parity_metadata.routes[i].id == route_id {
+            return true
+        }
+    }
+    return false
+}
+
+func smoke_status(route_id) {
+    for i := 1; i <= #route_parity_metadata.route_smoke_matrix; i++ {
+        row := route_parity_metadata.route_smoke_matrix[i]
+        if row.route_id == route_id {
+            return row.fixture_status
+        }
+    }
+    return 0
+}
+
+func has_crud_op(op) {
+    for i := 1; i <= #sqliteish_crud_fixture.operations; i++ {
+        if sqliteish_crud_fixture.operations[i].op == op {
+            return true
+        }
+    }
+    return false
+}
+
+func has_accessibility_item(id) {
+    for i := 1; i <= #accessibility_checklist; i++ {
+        if accessibility_checklist[i].id == id {
+            return true
+        }
+    }
+    return false
+}
+
+route_parity_ok := web_product_contract.real_web_server == false &&
+    #route_parity_metadata.routes == 12 &&
+    has_route("oauth_callback") &&
+    has_route("report_download") &&
+    has_route("admin_task_log") &&
+    smoke_status("submit_equity_request") == 202
+
+auth_session_ok := #auth_session_fixture.users == 3 &&
+    #auth_session_fixture.sessions == 2 &&
+    auth_session_fixture.sessions[2].admin == true &&
+    #auth_session_fixture.oauth_states == 2 &&
+    #auth_session_fixture.denied_cases == 3
+
+background_log_ok := #background_task_log == 4 &&
+    background_task_log[1].event == "queued" &&
+    background_task_log[4].event == "completed" &&
+    string.find(background_task_log[2].message, "Mocked workflow", 1, true) != nil
+
+downloads_ok := #download_manifest.artifacts == 4 &&
+    download_manifest.artifacts[1].media_type == "text/html" &&
+    download_manifest.artifacts[2].media_type == "application/pdf" &&
+    download_manifest.artifacts[4].id == "task_log"
+
+crud_fixture_ok := #sqliteish_crud_fixture.schema.users == 5 &&
+    #sqliteish_crud_fixture.seed_rows.report_requests == 1 &&
+    has_crud_op("create") &&
+    has_crud_op("read") &&
+    has_crud_op("update") &&
+    has_crud_op("delete")
+
+snapshot_manifest_ok := snapshot_manifest.renderer_required == false &&
+    #snapshot_manifest.templates == 4 &&
+    #snapshot_manifest.static_assets == 3 &&
+    #snapshot_manifest.snapshots == 3 &&
+    snapshot_manifest.snapshots[1].status == "declared_not_rendered"
+
+accessibility_checklist_ok := #accessibility_checklist == 7 &&
+    has_accessibility_item("landmarks") &&
+    has_accessibility_item("forms") &&
+    has_accessibility_item("tables") &&
+    has_accessibility_item("contrast") &&
+    has_accessibility_item("keyboard")
+
+web_product_smoke_ok := route_parity_ok &&
+    auth_session_ok &&
+    background_log_ok &&
+    downloads_ok &&
+    crud_fixture_ok &&
+    snapshot_manifest_ok &&
+    accessibility_checklist_ok
+
+check("contract boundary", web_product_contract.offline == true && web_product_contract.real_web_server == false)
+check("route parity metadata", route_parity_ok)
+check("auth/session fixture", auth_session_ok)
+check("background task log", background_log_ok)
+check("download manifest", downloads_ok)
+check("sqlite-ish CRUD fixture", crud_fixture_ok)
+check("static/template snapshot manifest", snapshot_manifest_ok)
+check("accessibility checklist", accessibility_checklist_ok)
+check("web product smoke", web_product_smoke_ok)
+
+print("web_product", web_product_contract.id)
+print("routes", #route_parity_metadata.routes)
+print("sessions", #auth_session_fixture.sessions)
+print("task_log", #background_task_log)
+print("downloads", #download_manifest.artifacts)
+print("crud_ops", #sqliteish_crud_fixture.operations)
+print("snapshots", #snapshot_manifest.snapshots)
+print("accessibility", #accessibility_checklist)
+print("ok")
+
+evaluate "fr-gap-020-024 web product ui snapshot smoke" {
+    assert(web_product_contract.real_web_server == false)
+    assert(route_parity_ok == true)
+    assert(auth_session_ok == true)
+    assert(background_log_ok == true)
+    assert(downloads_ok == true)
+    assert(crud_fixture_ok == true)
+    assert(snapshot_manifest_ok == true)
+    assert(accessibility_checklist_ok == true)
+    assert(web_product_smoke_ok == true)
+}

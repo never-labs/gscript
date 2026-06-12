@@ -1,0 +1,31 @@
+// Provider-free FinRobot-style model alias and routing fixture.
+// The route helper records the selected alias/provider/model and can replay the
+// same decision without contacting any provider.
+
+config := llm.config
+
+finrobot_models, model_config_err := config.aliases({
+    default: "analyst",
+    analyst: "cheap_analyst",
+    cheap_analyst: {
+        provider: "local-replay",
+        provider_model: "mock-finrobot-analyst",
+    },
+    reviewer: {
+        provider: "audit-replay",
+        model: "mock-finrobot-reviewer",
+    },
+})
+
+analyst_route, analyst_route_err := config.route(finrobot_models, {
+    model: "analyst",
+})
+
+// Replay locks the original decision even if the requested model changes.
+replayed_route, replay_route_err := config.route(finrobot_models, {
+    model: "reviewer",
+    replay: analyst_route.replay,
+})
+
+provider_selection_trace := analyst_route.trace
+deterministic_replay_decision := replayed_route.replay.decision

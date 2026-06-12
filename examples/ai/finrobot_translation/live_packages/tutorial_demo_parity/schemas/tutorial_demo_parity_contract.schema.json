@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "ledgers",
+    "contract_surfaces",
+    "acceptance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "ledgers": {
+      "type": "array",
+      "minItems": 2
+    },
+    "contract_surfaces": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance": {
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic-ai/generic_agent_state_store/trace_replay_projection_v1.schema.json",
+  "title": "Generic Agent State Trace Replay Projection",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "package_boundary_id",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "real_dependency_imports",
+    "depends_on_q_runtime",
+    "source_fixture",
+    "projection_kind",
+    "raw_payloads_allowed",
+    "secret_values_allowed",
+    "projected_events",
+    "replay_assertions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "package_boundary_id": {
+      "const": "generic-ai-agent-state-store"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "domain_specific": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "live_model": {
+      "const": false
+    },
+    "credentials_required": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "depends_on_q_runtime": {
+      "const": false
+    },
+    "source_fixture": {
+      "type": "string"
+    },
+    "projection_kind": {
+      "const": "agent_state_checkpoint_trace_replay_projection"
+    },
+    "raw_payloads_allowed": {
+      "const": false
+    },
+    "secret_values_allowed": {
+      "const": false
+    },
+    "projected_events": {
+      "type": "array",
+      "minItems": 1
+    },
+    "replay_assertions": {
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-news-catalyst-live-package",
+  "package_name": "leia-finrobot-news-catalyst",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot news integration, catalyst analysis, and retail sentiment boundaries.",
+  "source_modules": [
+    "finrobot_equity/core/src/modules/catalyst_analyzer.py",
+    "finrobot_equity/core/src/modules/news_integrator.py",
+    "finrobot_equity/core/src/modules/retail_sentiment_client.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; Polymarket, X, Reddit, and news provider credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_news_catalyst_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "news_catalyst_contract": "contracts/news_catalyst_contract.json",
+    "news_event_catalyst_dialect_contract": "contracts/news_event_catalyst_dialect_contract.json",
+    "adapter_boundary_contract": "contracts/adapter_boundary_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "news_event_catalyst_dialect": "schemas/news_event_catalyst_dialect_v1.schema.json",
+    "news_event": "schemas/news_event_v1.schema.json",
+    "source_ranking": "schemas/source_ranking_v1.schema.json",
+    "retail_sentiment_snapshot": "schemas/retail_sentiment_snapshot_v1.schema.json",
+    "catalyst_analysis": "schemas/catalyst_analysis_v1.schema.json",
+    "adapter_boundary": "schemas/adapter_boundary_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "event_extraction": "fixtures/event_extraction_ACME_fixture.json",
+    "news_catalyst": "fixtures/news_catalyst_ACME_fixture.json",
+    "retail_sentiment": "fixtures/retail_sentiment_ACME_snapshot.json",
+    "adapter_boundary": "fixtures/adapter_boundary_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "news_integrator",
+      "source_module": "news_integrator.py",
+      "capabilities": [
+        "ai.news.source.ingest.schema",
+        "ai.news.event.extract",
+        "ai.event.lifecycle.canonicalize",
+        "ai.news.freshness.evaluate",
+        "ai.news.dedupe.confidence.envelope",
+        "finance.news.fetch.fixture",
+        "finance.news.relevance.score",
+        "finance.news.category.classify",
+        "finance.news.sentiment.score",
+        "finance.news.source.rank"
+      ],
+      "output_schemas": [
+        "news_event",
+        "source_ranking"
+      ]
+    },
+    {
+      "id": "catalyst_analyzer",
+      "source_module": "catalyst_analyzer.py",
+      "capabilities": [
+        "ai.catalyst.classification.taxonomy",
+        "ai.prompt.contract.news_event_catalyst",
+        "finance.catalyst.detect",
+        "finance.catalyst.impact.score",
+        "finance.catalyst.time_horizon.classify",
+        "finance.catalyst.evidence.link"
+      ],
+      "output_schemas": [
+        "catalyst_analysis"
+      ]
+    },
+    {
+      "id": "retail_sentiment_client",
+      "source_module": "retail_sentiment_client.py",
+      "capabilities": [
+        "finance.retail_sentiment.snapshot",
+        "finance.retail_sentiment.platform.aggregate",
+        "finance.retail_sentiment.volume.normalize",
+        "finance.retail_sentiment.adapter.boundary"
+      ],
+      "output_schemas": [
+        "retail_sentiment_snapshot",
+        "adapter_boundary"
+      ]
+    }
+  ],
+  "adapter_boundaries": [
+    {
+      "id": "polymarket",
+      "display_name": "Polymarket",
+      "capability": "finance.retail_sentiment.polymarket.market_snapshot",
+      "fixture_key": "polymarket:market_snapshot:ACME:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "x_social",
+      "display_name": "X",
+      "capability": "finance.retail_sentiment.x.mention_snapshot",
+      "fixture_key": "x:mention_snapshot:ACME:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "reddit",
+      "display_name": "Reddit",
+      "capability": "finance.retail_sentiment.reddit.thread_snapshot",
+      "fixture_key": "reddit:thread_snapshot:ACME:offline",
+      "schema": "adapter_boundary",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "required and optional credentials are empty",
+    "source ingestion schema, event extraction fixture, and prompt contract are provider-free",
+    "freshness/staleness policy separates recency decay from source trust",
+    "dedupe/source confidence envelope preserves canonical and duplicate event ids",
+    "catalyst classification taxonomy is reusable across news/event/catalyst prompts",
+    "generic reuse targets cover equity news, macro events, credit events, and commodity events",
+    "news relevance, category, sentiment, impact, source ranking, and retail sentiment snapshot schemas are present",
+    "Polymarket, X, and Reddit adapter boundaries are metadata-only and fixture-backed",
+    "main.leia contains no live provider SDK imports or network execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot news, catalyst, Polymarket, X, or Reddit live clients as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}

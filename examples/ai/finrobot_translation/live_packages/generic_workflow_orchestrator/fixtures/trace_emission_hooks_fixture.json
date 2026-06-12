@@ -1,0 +1,49 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "workflow_id": "generic_orchestration_graph_v1",
+  "run_id": "run_generic_orchestration_fixture_001",
+  "hooks": [
+    {
+      "id": "on_workflow_started",
+      "phase": "workflow_started",
+      "event_id": "evt_workflow_started",
+      "emission_mode": "fixture_append_only",
+      "payload_ref": "workflow_request",
+      "provider_sink": null
+    },
+    {
+      "id": "on_stage_completed",
+      "phase": "stage_completed",
+      "event_id": "evt_execute_completed",
+      "stage_id": "execute",
+      "status": "completed",
+      "emission_mode": "fixture_append_only",
+      "payload_ref": "execution_outputs",
+      "retry_cache_ref": {
+        "attempt": 1,
+        "max_attempts": 1,
+        "cache_key": "run_generic_orchestration_fixture_001:execute",
+        "cache_state": "hit"
+      },
+      "provider_sink": null
+    },
+    {
+      "id": "on_workflow_completed",
+      "phase": "workflow_completed",
+      "event_id": "evt_workflow_completed",
+      "status": "completed",
+      "emission_mode": "fixture_append_only",
+      "payload_ref": "workflow_result",
+      "trace_refs": [
+        "evt_workflow_started",
+        "evt_plan_completed",
+        "evt_execute_completed",
+        "evt_handoff_completed",
+        "evt_finalize_completed"
+      ],
+      "provider_sink": null
+    }
+  ]
+}

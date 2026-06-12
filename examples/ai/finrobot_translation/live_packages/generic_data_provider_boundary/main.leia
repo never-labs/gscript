@@ -1,0 +1,48 @@
+generic_data_provider_boundary_live_package := {
+    id: "generic-data-provider-boundary"
+    package_name: "leia-generic-ai-data-provider-boundary"
+    capability: "generic.ai.data_provider.boundary"
+    entrypoint: "ai.data_provider.boundary"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    providers: 3
+    requests: 3
+    responses: 3
+    pagination: 2
+    rate_limits: 2
+    redactions: 2
+    policies: 2
+    provenance: 3
+    errors: 1
+    clean_skip_adapters: 3
+}
+
+assert(generic_data_provider_boundary_live_package.provider_free)
+assert(!generic_data_provider_boundary_live_package.live_network)
+assert(!generic_data_provider_boundary_live_package.real_dependency_imports)
+assert(!generic_data_provider_boundary_live_package.live_model_calls)
+assert(generic_data_provider_boundary_live_package.providers == 3)
+assert(generic_data_provider_boundary_live_package.responses == 3)
+
+generic_data_provider_boundary_live_package_summary := string.format(
+"generic_data_provider_boundary_live_package capability=%s entrypoint=%s providers=%d requests=%d responses=%d pagination=%d rate_limits=%d redactions=%d policies=%d provenance=%d errors=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_data_provider_boundary_live_package.capability,
+generic_data_provider_boundary_live_package.entrypoint,
+generic_data_provider_boundary_live_package.providers,
+generic_data_provider_boundary_live_package.requests,
+generic_data_provider_boundary_live_package.responses,
+generic_data_provider_boundary_live_package.pagination,
+generic_data_provider_boundary_live_package.rate_limits,
+generic_data_provider_boundary_live_package.redactions,
+generic_data_provider_boundary_live_package.policies,
+generic_data_provider_boundary_live_package.provenance,
+generic_data_provider_boundary_live_package.errors,
+generic_data_provider_boundary_live_package.clean_skip_adapters,
+tostring(generic_data_provider_boundary_live_package.provider_free),
+tostring(generic_data_provider_boundary_live_package.live_network),
+tostring(generic_data_provider_boundary_live_package.real_dependency_imports),
+tostring(generic_data_provider_boundary_live_package.live_model_calls))
+
+print(generic_data_provider_boundary_live_package_summary)

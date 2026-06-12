@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-registry-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "secret_values_present": false,
+  "fixtures": [
+    {
+      "key": "model_registry:aliases:v1",
+      "capability": "generic.ai.model.alias.resolve",
+      "path": "fixtures/model_alias_registry_fixture.json",
+      "schema": "schemas/model_alias_registry_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "secret_values_present": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "secret_values_present": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "model_registry:descriptor:fixture_analyst:v1",
+      "capability": "generic.ai.model.descriptor.replay",
+      "path": "fixtures/replay_execution_descriptor_fixture.json",
+      "schema": "schemas/execution_descriptor_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "secret_values_present": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "secret_values_present": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "model_registry:redaction:v1",
+      "capability": "generic.ai.model.redaction.policy",
+      "path": "fixtures/redaction_policy_fixture.json",
+      "schema": "schemas/redaction_policy_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "secret_values_present": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "secret_values_present": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "model_registry:live_provider_gate:v1",
+      "capability": "generic.ai.model.live_provider_gate",
+      "path": "fixtures/live_provider_gate_fixture.json",
+      "schema": "schemas/live_provider_gate_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "secret_values_present": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "secret_values_present": false,
+        "replay_ready": true,
+        "clean_skip_without_credentials": true,
+        "integration_env": "LEIA_LLM_INTEGRATION"
+      }
+    }
+  ],
+  "real_dependency_imports": false
+}

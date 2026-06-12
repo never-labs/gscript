@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/generic/ai/prompt_role_catalog_v1.schema.json",
+  "title": "generic_prompt_role_catalog_v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "live_model_calls",
+    "catalog",
+    "role_profiles",
+    "prompt_templates",
+    "delegation_triggers",
+    "output_schema",
+    "evidence_validation_cases",
+    "termination_convention",
+    "adapter_boundaries"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "real_dependency_imports": {"const": false},
+    "live_model_calls": {"const": false},
+    "catalog": {
+      "type": "object",
+      "required": ["catalog_id", "fixture_key", "default_termination", "domain_identifiers"]
+    },
+    "role_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role_id", "version", "status", "instructions", "tool_policy", "output_schema", "termination"]
+      }
+    },
+    "prompt_templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entry_id", "role_id", "kind", "template", "required_placeholders", "constraints", "expected_sections"]
+      }
+    },
+    "delegation_triggers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entry_id", "pattern", "input", "matched", "delegate_role_id", "reason"]
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["schema_id", "required_fields"]
+    },
+    "evidence_validation_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_id", "validated", "minimum_source_refs", "source_refs", "unresolved_source_refs", "fixture_keys", "rules"]
+      }
+    },
+    "termination_convention": {
+      "type": "object",
+      "required": ["literal", "required_for_final", "drift_cases"]
+    },
+    "adapter_boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "capability", "dependency_imported", "credential_required", "live_network", "clean_skip"]
+      }
+    }
+  }
+}

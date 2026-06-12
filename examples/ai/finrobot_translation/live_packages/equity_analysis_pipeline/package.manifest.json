@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-equity-analysis-pipeline-live-package",
+  "package_name": "leia-finrobot-equity-analysis-pipeline",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot generate_financial_analysis.py fetch, normalize, forecast, section-agent handoff, and artifact-plan orchestration.",
+  "source_modules": [
+    "finrobot_equity/core/src/generate_financial_analysis.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; market data, filings, model provider, forecast engine, and artifact storage credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_equity_analysis_pipeline_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "stage_dag_contract": "contracts/stage_dag_contract.json",
+    "failure_hooks_contract": "contracts/failure_hooks_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "pipeline_input": "schemas/pipeline_input_v1.schema.json",
+    "normalized_financials": "schemas/normalized_financials_v1.schema.json",
+    "forecast_result": "schemas/forecast_result_v1.schema.json",
+    "section_agent_handoff": "schemas/section_agent_handoff_v1.schema.json",
+    "artifact_manifest": "schemas/artifact_manifest_v1.schema.json",
+    "failure_hook": "schemas/failure_hook_v1.schema.json",
+    "provider_free_trace": "schemas/provider_free_trace_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "input": "fixtures/pipeline_input_ACME_fixture.json",
+    "normalized_financials": "fixtures/normalized_financials_ACME_fixture.json",
+    "forecast": "fixtures/forecast_ACME_fixture.json",
+    "section_agent_handoff": "fixtures/section_agent_handoff_ACME_fixture.json",
+    "artifact_manifest": "fixtures/artifact_manifest_ACME_fixture.json",
+    "failure_hooks": "fixtures/failure_hooks_fixture.json",
+    "provider_free_trace": "fixtures/provider_free_trace_ACME_fixture.json"
+  },
+  "stages": [
+    {
+      "id": "fetch",
+      "source_step": "fetch financial and market inputs",
+      "capability": "finance.equity_analysis_pipeline.fetch.inputs",
+      "depends_on": [],
+      "input_schema": "pipeline_input",
+      "output_schema": "normalized_financials",
+      "fixture_key": "equity_pipeline:input:ACME:offline",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "normalize",
+      "source_step": "normalize raw financial data",
+      "capability": "finance.equity_analysis_pipeline.normalize.financials",
+      "depends_on": [
+        "fetch"
+      ],
+      "input_schema": "normalized_financials",
+      "output_schema": "normalized_financials",
+      "fixture_key": "equity_pipeline:normalized:ACME:offline",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "forecast",
+      "source_step": "forecast revenue, margins, cash flow, and target price",
+      "capability": "finance.equity_analysis_pipeline.forecast.valuation",
+      "depends_on": [
+        "normalize"
+      ],
+      "input_schema": "normalized_financials",
+      "output_schema": "forecast_result",
+      "fixture_key": "equity_pipeline:forecast:ACME:offline",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "section_agents",
+      "source_step": "handoff forecast and evidence to section agents",
+      "capability": "finance.equity_analysis_pipeline.section_agents.handoff",
+      "depends_on": [
+        "forecast"
+      ],
+      "input_schema": "forecast_result",
+      "output_schema": "section_agent_handoff",
+      "fixture_key": "equity_pipeline:section_handoff:ACME:offline",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "artifact_plan",
+      "source_step": "plan report, chart, table, and trace artifacts",
+      "capability": "finance.equity_analysis_pipeline.artifact.plan",
+      "depends_on": [
+        "section_agents"
+      ],
+      "input_schema": "section_agent_handoff",
+      "output_schema": "artifact_manifest",
+      "fixture_key": "equity_pipeline:artifact_manifest:ACME:offline",
+      "provider_free": true,
+      "live_network": false
+    }
+  ],
+  "failure_hooks": [
+    {
+      "id": "fetch_provider_unavailable",
+      "stage_id": "fetch",
+      "capability": "finance.equity_analysis_pipeline.failure.fetch",
+      "fixture_key": "equity_pipeline:failure_hooks:offline",
+      "clean_skip": true,
+      "live_network": false
+    },
+    {
+      "id": "normalization_missing_metric",
+      "stage_id": "normalize",
+      "capability": "finance.equity_analysis_pipeline.failure.normalize",
+      "fixture_key": "equity_pipeline:failure_hooks:offline",
+      "clean_skip": true,
+      "live_network": false
+    },
+    {
+      "id": "forecast_assumption_gap",
+      "stage_id": "forecast",
+      "capability": "finance.equity_analysis_pipeline.failure.forecast",
+      "fixture_key": "equity_pipeline:failure_hooks:offline",
+      "clean_skip": true,
+      "live_network": false
+    },
+    {
+      "id": "section_agent_handoff_incomplete",
+      "stage_id": "section_agents",
+      "capability": "finance.equity_analysis_pipeline.failure.section_agents",
+      "fixture_key": "equity_pipeline:failure_hooks:offline",
+      "clean_skip": true,
+      "live_network": false
+    },
+    {
+      "id": "artifact_renderer_missing",
+      "stage_id": "artifact_plan",
+      "capability": "finance.equity_analysis_pipeline.failure.artifact",
+      "fixture_key": "equity_pipeline:failure_hooks:offline",
+      "clean_skip": true,
+      "live_network": false
+    }
+  ],
+  "cache_policy": {
+    "enabled": true,
+    "provider_free": true,
+    "live_network": false,
+    "mode": "fixture_metadata_only",
+    "key_fields": [
+      "ticker",
+      "as_of",
+      "stage_id",
+      "fixture_key"
+    ],
+    "cache_states": [
+      "hit",
+      "miss",
+      "bypass"
+    ]
+  },
+  "retry_policy": {
+    "enabled": true,
+    "provider_free": true,
+    "live_network": false,
+    "mode": "deterministic_fixture_replay",
+    "max_attempts": 1,
+    "backoff": "none",
+    "retryable_statuses": [
+      "provider_dependency_missing",
+      "renderer_dependency_missing"
+    ]
+  },
+  "stage_timing_envelope": {
+    "clock": "fixture_monotonic_ms",
+    "total_budget_ms": 2500,
+    "stage_budgets": [
+      {
+        "stage_id": "fetch",
+        "budget_ms": 400
+      },
+      {
+        "stage_id": "normalize",
+        "budget_ms": 450
+      },
+      {
+        "stage_id": "forecast",
+        "budget_ms": 650
+      },
+      {
+        "stage_id": "section_agents",
+        "budget_ms": 600
+      },
+      {
+        "stage_id": "artifact_plan",
+        "budget_ms": 400
+      }
+    ]
+  },
+  "test_gates": [
+    "generate_financial_analysis.py pipeline source is represented by a provider-free stage DAG",
+    "fetch, normalize, forecast, section_agents, and artifact_plan fixtures decode without provider credentials",
+    "forecast fixture includes revenue, margin, free cash flow, valuation, and assumption provenance",
+    "section-agent handoff fixture includes ordered sections, evidence refs, and TERMINATE convention metadata",
+    "artifact manifest fixture includes planned report, chart, table, trace, and disclosure artifacts",
+    "failure hooks clean-skip without live network, provider credentials, or real dependency imports",
+    "retry/cache metadata is represented as deterministic fixture metadata",
+    "stage timing envelope records monotonic fixture timings within declared budgets",
+    "main.leia contains no live provider SDK imports or network execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot equity analysis fetchers, pandas normalizers, valuation forecasters, AutoGen section agents, renderers, or artifact persistence as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}

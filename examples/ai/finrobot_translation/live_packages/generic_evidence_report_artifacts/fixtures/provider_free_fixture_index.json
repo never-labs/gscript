@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "id": "generic-evidence-report-artifacts-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:evidence_report_artifacts:offline",
+      "capability": "generic.ai.evidence.report.artifacts",
+      "path": "fixtures/generic_evidence_report_artifacts_fixture.json",
+      "schema": "schemas/generic_evidence_report_artifacts_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "domain_specific": false,
+        "source_annotation_count": 2,
+        "citation_envelope_count": 2,
+        "artifact_count": 3,
+        "snapshot_count": 2
+      }
+    },
+    {
+      "fixture_key": "generic:evidence_report_artifacts:verification_render_projection",
+      "capability": "generic.ai.evidence.report.render_projection",
+      "path": "fixtures/verification_render_projection_fixture.json",
+      "schema": "schemas/verification_render_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "domain_specific": false,
+        "source_fixtures": 3,
+        "source_mappings": 4,
+        "citation_mappings": 3,
+        "warning_mappings": 2,
+        "artifact_mappings": 3,
+        "render_request_mappings": 2
+      }
+    },
+    {
+      "fixture_key": "generic:evidence_report_artifacts:chart_render_artifact_projection",
+      "capability": "generic.ai.evidence.report.chart_artifact_projection",
+      "path": "fixtures/chart_render_artifact_projection_fixture.json",
+      "schema": "schemas/chart_render_artifact_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "domain_specific": false,
+        "source_fixtures": 2,
+        "chart_artifact_mappings": 1,
+        "chart_warning_mappings": 2,
+        "source_metadata_mappings": 2,
+        "snapshot_mappings": 2
+      }
+    }
+  ]
+}

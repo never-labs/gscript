@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "id": "generic-agent-state-session-checkpoint-fixture",
+  "package_boundary_id": "generic-ai-agent-state-store",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "credentials_required": false,
+  "real_dependency_imports": false,
+  "depends_on_q_runtime": false,
+  "contract": "examples/ai/finrobot_translation/ai_dialect_index/contracts/generic_agent_state_session_checkpoint_contract.json",
+  "purpose": "Provider-free fixture for resumable generic agent state, session identity, checkpoint keys, input/output references, trace correlation, and no-secret redaction.",
+  "state_snapshots": [
+    {
+      "agent_run_id": "agent-run-local-001",
+      "session_id": "session-local-001",
+      "state_version": 1,
+      "resume_token": "checkpoint:sha256:1c4b3f1bbf67d15c9225a3e6cf0a22bbf8c099412c2118e45dd9107dfcd6cf29",
+      "status": "tool_wait",
+      "input_refs": [
+        {
+          "ref_id": "input-ref-request-001",
+          "kind": "user_request",
+          "media_type": "text/plain",
+          "digest": "sha256:91d7ad0e8e9f64d781fc9a3e59d90c6de062be10e1692e5c4d5b7e27df7f1c22",
+          "summary": "redacted local request summary",
+          "raw_value_stored": false
+        }
+      ],
+      "output_refs": [
+        {
+          "ref_id": "output-ref-plan-001",
+          "kind": "tool_plan",
+          "media_type": "application/json",
+          "digest": "sha256:b1b9091ee98bf7f3314e618e418e6567b5ee2594983f188ae4501704b526b657",
+          "summary": "fixture tool plan envelope",
+          "raw_value_stored": false
+        }
+      ],
+      "trace_correlation": {
+        "trace_id": "trace-local-001",
+        "event_id": "event-turn-001",
+        "parent_event_id": "event-agent-start",
+        "agent_run_id": "agent-run-local-001",
+        "session_id": "session-local-001",
+        "turn_id": "turn-local-001",
+        "checkpoint_key": "sha256:1c4b3f1bbf67d15c9225a3e6cf0a22bbf8c099412c2118e45dd9107dfcd6cf29"
+      },
+      "checkpoint": {
+        "checkpoint_key": "sha256:1c4b3f1bbf67d15c9225a3e6cf0a22bbf8c099412c2118e45dd9107dfcd6cf29",
+        "cache_key": "sha256:3d4e0af706d910af5dbb30d5f759c8d634a92d851f1dbfe09339e7a996e6f02f",
+        "key_algorithm": "sha256",
+        "key_material_fields": [
+          "agent_run_id",
+          "session_id",
+          "state_version",
+          "input_ref_ids",
+          "output_ref_ids",
+          "trace_id",
+          "turn_id"
+        ],
+        "excluded_fields": [
+          "raw_input",
+          "raw_output",
+          "secret",
+          "token",
+          "authorization",
+          "cookie"
+        ],
+        "stable_across_replay": true
+      },
+      "redaction": {
+        "enabled": true,
+        "secret_values_present": false,
+        "raw_prompt_stored": false,
+        "raw_completion_stored": false,
+        "redacted_fields": [
+          "authorization",
+          "cookie",
+          "api_key",
+          "access_token"
+        ],
+        "placeholder": "<redacted>",
+        "credential_refs": [
+          {
+            "field": "authorization",
+            "value": "<redacted>",
+            "raw_value_stored": false
+          }
+        ]
+      }
+    },
+    {
+      "agent_run_id": "agent-run-local-001",
+      "session_id": "session-local-001",
+      "state_version": 2,
+      "resume_token": "checkpoint:sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42",
+      "status": "completed",
+      "input_refs": [
+        {
+          "ref_id": "input-ref-request-001",
+          "kind": "user_request",
+          "media_type": "text/plain",
+          "digest": "sha256:91d7ad0e8e9f64d781fc9a3e59d90c6de062be10e1692e5c4d5b7e27df7f1c22",
+          "summary": "redacted local request summary",
+          "raw_value_stored": false
+        },
+        {
+          "ref_id": "input-ref-tool-result-001",
+          "kind": "tool_result",
+          "media_type": "application/json",
+          "digest": "sha256:a69de136ed726b26004524f3769018e6f42cd9f8a6d061f1a9c44d2b8c629941",
+          "summary": "fixture tool result envelope",
+          "raw_value_stored": false
+        }
+      ],
+      "output_refs": [
+        {
+          "ref_id": "output-ref-final-001",
+          "kind": "assistant_output",
+          "media_type": "application/json",
+          "digest": "sha256:5e7633e67ef45a6f2ea05acffb69a3b21d0c2b2b487d2524a91c23c0887c8619",
+          "summary": "fixture final response envelope",
+          "raw_value_stored": false
+        }
+      ],
+      "trace_correlation": {
+        "trace_id": "trace-local-001",
+        "event_id": "event-turn-002",
+        "parent_event_id": "event-turn-001",
+        "agent_run_id": "agent-run-local-001",
+        "session_id": "session-local-001",
+        "turn_id": "turn-local-002",
+        "checkpoint_key": "sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42"
+      },
+      "checkpoint": {
+        "checkpoint_key": "sha256:4ca03b4680c87b48ff5404da271e2f1bbf6239178ea1ded33054124643a37d42",
+        "cache_key": "sha256:9af5be9e7a3294b047603f8bc6682e75ba44c773e3e989e198c23b89710246c9",
+        "key_algorithm": "sha256",
+        "key_material_fields": [
+          "agent_run_id",
+          "session_id",
+          "state_version",
+          "input_ref_ids",
+          "output_ref_ids",
+          "trace_id",
+          "turn_id"
+        ],
+        "excluded_fields": [
+          "raw_input",
+          "raw_output",
+          "secret",
+          "token",
+          "authorization",
+          "cookie"
+        ],
+        "stable_across_replay": true
+      },
+      "redaction": {
+        "enabled": true,
+        "secret_values_present": false,
+        "raw_prompt_stored": false,
+        "raw_completion_stored": false,
+        "redacted_fields": [
+          "authorization",
+          "cookie",
+          "api_key",
+          "access_token"
+        ],
+        "placeholder": "<redacted>",
+        "credential_refs": [
+          {
+            "field": "authorization",
+            "value": "<redacted>",
+            "raw_value_stored": false
+          }
+        ]
+      }
+    }
+  ],
+  "replay_assertions": {
+    "state_versions": [
+      1,
+      2
+    ],
+    "resume_from_checkpoint_key": true,
+    "input_refs_resolve": true,
+    "output_refs_resolve": true,
+    "trace_correlation_complete": true,
+    "cache_keys_stable": true,
+    "checkpoint_keys_stable": true,
+    "redaction_no_secret": true
+  }
+}

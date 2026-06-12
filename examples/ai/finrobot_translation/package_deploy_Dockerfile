@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY examples/ai/finrobot_translation/package_deploy_requirements.txt /app/package_deploy_requirements.txt
+RUN python -m pip install --no-cache-dir -r /app/package_deploy_requirements.txt
+
+COPY examples/ai/finrobot_translation /app/examples/ai/finrobot_translation
+
+ENV LEIA_FINROBOT_DATA_DIR=/app/examples/ai/finrobot_translation
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["python", "/app/examples/ai/finrobot_translation/package_deploy_run_web_app.py"]

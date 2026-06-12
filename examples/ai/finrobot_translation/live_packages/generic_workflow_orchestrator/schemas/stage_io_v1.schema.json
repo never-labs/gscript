@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowStageIOV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "workflow_id",
+    "run_id",
+    "stage_io"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "stage_io": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "stage_id",
+          "input_ref",
+          "input_shape",
+          "output_ref",
+          "output_shape",
+          "status",
+          "fixture_key",
+          "attempt",
+          "max_attempts",
+          "cache_key",
+          "cache_state",
+          "trace_event_id"
+        ]
+      }
+    }
+  }
+}

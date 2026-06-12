@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/package_manifest_audit.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "audit_kind",
+    "scope",
+    "rules",
+    "waivers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "const": "finrobot-package-manifest-consistency-audit"
+    },
+    "audit_kind": {
+      "const": "package_manifest_consistency"
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "live_packages_root",
+        "plan_manifest",
+        "read_only",
+        "generic_package_boundary",
+        "fixture_index_capability_scope"
+      ],
+      "properties": {
+        "live_packages_root": {
+          "type": "string"
+        },
+        "plan_manifest": {
+          "type": "string"
+        },
+        "read_only": {
+          "const": true
+        },
+        "generic_package_boundary": {
+          "const": true
+        },
+        "fixture_index_capability_scope": {
+          "const": "all_package_manifests"
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "required": [
+        "provider_free",
+        "live_network_disabled",
+        "manifest_entrypoints_exist",
+        "referenced_artifacts_exist",
+        "capability_prefixes_match_plan",
+        "fixture_index_capabilities_match_manifest_and_plan",
+        "no_built_in_guarantee",
+        "registered_example_mapping"
+      ],
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "waivers": {
+      "type": "object",
+      "required": [
+        "no_built_in_guarantee"
+      ],
+      "properties": {
+        "no_built_in_guarantee": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "package_id",
+              "reason",
+              "covered_by_plan_guarantee"
+            ],
+            "properties": {
+              "package_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "covered_by_plan_guarantee": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

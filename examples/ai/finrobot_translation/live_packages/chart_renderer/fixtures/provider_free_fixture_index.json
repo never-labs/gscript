@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "spec:ACME:candlestick:offline",
+      "capability": "finance.chart_renderer.spec.compose",
+      "path": "fixtures/chart_spec_ACME_candlestick_fixture.json",
+      "schema": "schemas/chart_spec_v1.schema.json",
+      "metadata": {
+        "symbol": "ACME",
+        "chart_type": "candlestick",
+        "renderer": "mplfinance",
+        "replay_ready": true,
+        "stale_after_days": 7,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "recipes:semantic_matrix:v1:offline",
+      "capability": "finance.chart_renderer.recipe.semantic_matrix",
+      "path": "fixtures/chart_recipe_semantic_matrix_fixture.json",
+      "schema": "schemas/chart_recipe_matrix_v1.schema.json",
+      "metadata": {
+        "dialect": "leia.finance.chart_recipe.v1",
+        "recipe_count": 7,
+        "replay_ready": true,
+        "spec_hash_contract": true,
+        "renderer_neutral": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "request:ACME:candlestick:mplfinance:offline",
+      "capability": "finance.chart_renderer.request.build",
+      "path": "fixtures/render_request_ACME_candlestick_fixture.json",
+      "schema": "schemas/render_request_v1.schema.json",
+      "metadata": {
+        "renderer": "mplfinance",
+        "output_format": "svg",
+        "replay_ready": true,
+        "live_network": false,
+        "provider_free": true,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "render:ACME:candlestick:mplfinance:offline",
+      "capability": "finance.chart_renderer.snapshot.hash",
+      "path": "fixtures/render_result_ACME_candlestick_snapshot_fixture.json",
+      "schema": "schemas/render_result_v1.schema.json",
+      "metadata": {
+        "renderer": "mplfinance",
+        "hash_algorithm": "sha256",
+        "snapshot_hash": "1d7b2a0a74d79d1c8cfab39e89c9d9b73e8cfe9656e8f2d3b4c6a7e9f1023456",
+        "replay_ready": true,
+        "stale_data_warning": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "skip:renderer:plotly:offline",
+      "capability": "finance.chart_renderer.renderer.unsupported_skip",
+      "path": "fixtures/unsupported_renderer_clean_skip_fixture.json",
+      "schema": "schemas/renderer_skip_v1.schema.json",
+      "metadata": {
+        "renderer": "plotly",
+        "replay_ready": true,
+        "clean_skip": true,
+        "dependency_imported": false,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ]
+}

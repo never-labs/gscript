@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-package-manifest-consistency-audit",
+  "audit_kind": "package_manifest_consistency",
+  "scope": {
+    "live_packages_root": "examples/ai/finrobot_translation/live_packages",
+    "plan_manifest": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
+    "read_only": true,
+    "generic_package_boundary": true,
+    "fixture_index_capability_scope": "all_package_manifests"
+  },
+  "rules": {
+    "provider_free": true,
+    "live_network_disabled": true,
+    "manifest_entrypoints_exist": true,
+    "referenced_artifacts_exist": true,
+    "capability_prefixes_match_plan": true,
+    "fixture_index_capabilities_match_manifest_and_plan": true,
+    "no_built_in_guarantee": true,
+    "registered_example_mapping": true
+  },
+  "waivers": {
+    "no_built_in_guarantee": [
+      {
+        "package_id": "html_ui_snapshots",
+        "reason": "Legacy skeleton manifest predates the per-manifest no_built_in_guarantee field; the package remains covered by the global plan guarantee and provider-free gates.",
+        "covered_by_plan_guarantee": true
+      }
+    ]
+  }
+}

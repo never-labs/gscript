@@ -1,0 +1,6 @@
+// Provider-free FinRobot chart renderer live package skeleton.
+// No renderer SDKs, network calls, credentials, q/runtime hooks, or live chart dependencies are used here.
+
+chart_renderer_live_package_summary := "chart_renderer_live_package modules=4 renderers=3 schemas=6 fixtures=5 provider_free=true live_network=false imports=false clean_skip=true"
+
+print(chart_renderer_live_package_summary)

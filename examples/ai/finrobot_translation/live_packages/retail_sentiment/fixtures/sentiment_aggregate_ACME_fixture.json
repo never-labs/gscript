@@ -1,0 +1,47 @@
+{
+  "fixture_key": "retail_sentiment:aggregate:ACME:2026-06-11",
+  "provider_free": true,
+  "live_network": false,
+  "ticker": "ACME",
+  "as_of": "2026-06-11T16:00:00Z",
+  "aggregate_score": 0.31,
+  "mention_volume": 2060,
+  "bullish_ratio": 0.58,
+  "bearish_ratio": 0.27,
+  "neutral_ratio": 0.15,
+  "platform_weights": {
+    "adanos": 0.16,
+    "reddit": 0.18,
+    "x_social": 0.54,
+    "polymarket": 0.12
+  },
+  "source_snapshot_refs": [
+    "adanos_acme_offline_001",
+    "reddit_acme_offline_001",
+    "x_acme_offline_001",
+    "polymarket_acme_offline_001"
+  ],
+  "redaction_summary": {
+    "policy_id": "retail_sentiment_redaction_v1",
+    "raw_identifiers_removed": true,
+    "raw_urls_removed": true,
+    "secrets_removed": true,
+    "prompt_safe": true
+  },
+  "stale_snapshot_warning": {
+    "is_stale": true,
+    "stale_after_days": 1,
+    "message": "Retail sentiment aggregate uses stale provider-free source snapshots and must not be treated as live market data."
+  },
+  "normalization": {
+    "method": "provider_free_volume_weighted_fixture",
+    "dedupe_window_hours": 24,
+    "live_network": false,
+    "sentiment_scale": "minus_one_to_one",
+    "aggregate_sentiment_label": "bullish",
+    "category_weights": {
+      "retail_discussion": 0.88,
+      "prediction_market": 0.12
+    }
+  }
+}

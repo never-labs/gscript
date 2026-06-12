@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowResultV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "workflow_id",
+    "run_id",
+    "entrypoint",
+    "status",
+    "stage_results",
+    "artifacts",
+    "trace_refs"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "workflow_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "entrypoint": {
+      "const": "ai.workflow.orchestrate"
+    },
+    "status": {
+      "type": "string"
+    },
+    "stage_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "stage_id",
+          "status",
+          "output_ref",
+          "trace_event_id"
+        ]
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "kind",
+          "status",
+          "source_refs"
+        ]
+      }
+    },
+    "trace_refs": {
+      "type": "array"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "generic-strategy-backtest-contracts-optional-dependencies",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "dependencies": [
+    {
+      "id": "generic_optional_engine",
+      "import_name": "generic_optional_engine",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_result": "SKIP_OPTIONAL_DEPENDENCY"
+    },
+    {
+      "id": "generic_optional_visualizer",
+      "import_name": "generic_optional_visualizer",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_result": "SKIP_OPTIONAL_DEPENDENCY"
+    },
+    {
+      "id": "generic_optional_provider",
+      "import_name": "generic_optional_provider",
+      "required_by_default": false,
+      "real_dependency_imported": false,
+      "clean_skip_without_dependency": true,
+      "skip_result": "SKIP_OPTIONAL_DEPENDENCY"
+    }
+  ],
+  "default_behavior": {
+    "mode": "fixture_replay",
+    "raises_on_missing_optional_dependency": false,
+    "imports_live_dependency": false,
+    "network_access": false,
+    "default_ci_enabled": false
+  }
+}

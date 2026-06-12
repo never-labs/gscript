@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-finance-normalizers-live-package",
+  "package_name": "leia-finrobot-finance-normalizers",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot finance normalizer contracts and typed data normalization boundaries.",
+  "source_mode": "fixture-contract",
+  "target_mode": "live-package-skeleton",
+  "source_modules": [
+    "finrobot/data_source/finance_data.py",
+    "finrobot/data_source/market_data.py",
+    "finrobot/data_source/finnhub_utils.py",
+    "finrobot/data_source/fmp_utils.py",
+    "finrobot/data_source/sec_utils.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; live providers such as yfinance, FMP, Finnhub, SEC API, OpenBB, and Reddit belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_finance_normalizers_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "contract": "contracts/finance_normalizers_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "statement": "schemas/normalized_statement_v1.schema.json",
+    "ratio": "schemas/normalized_ratio_v1.schema.json",
+    "market": "schemas/normalized_market_bar_v1.schema.json",
+    "news": "schemas/normalized_news_event_v1.schema.json",
+    "sec": "schemas/normalized_sec_filing_v1.schema.json",
+    "peer": "schemas/peer_snapshot_v1.schema.json",
+    "provenance": "schemas/provenance_record_v1.schema.json",
+    "policy": "schemas/normalizer_policy_v1.schema.json",
+    "normalization_boundary": "schemas/typed_normalization_boundary_v1.schema.json",
+    "corporate_action": "schemas/corporate_action_adjustment_v1.schema.json",
+    "validation_error": "schemas/validation_error_taxonomy_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "statement": "fixtures/statement_ACME_2026Q1_fixture.json",
+    "ratio": "fixtures/ratio_ACME_2026Q1_fixture.json",
+    "market": "fixtures/market_ACME_daily_fixture.json",
+    "news": "fixtures/news_ACME_fixture.json",
+    "sec": "fixtures/sec_ACME_10q_fixture.json",
+    "peer": "fixtures/peer_ACME_snapshot_fixture.json",
+    "provenance": "fixtures/provenance_ACME_fixture.json",
+    "policy": "fixtures/normalizer_policy_fixture.json",
+    "normalization_boundary": "fixtures/typed_normalization_boundary_fixture.json",
+    "corporate_action": "fixtures/corporate_action_adjustment_fixture.json",
+    "validation_error": "fixtures/validation_error_taxonomy_fixture.json"
+  },
+  "normalizer_domains": [
+    "statements",
+    "ratios",
+    "market",
+    "news",
+    "sec",
+    "peer",
+    "provenance",
+    "normalization_boundary",
+    "corporate_actions",
+    "validation"
+  ],
+  "capabilities": [
+    "finance.normalizers.statements.canonicalize",
+    "finance.normalizers.ratios.canonicalize",
+    "finance.normalizers.market.canonicalize",
+    "finance.normalizers.news.canonicalize",
+    "finance.normalizers.sec.canonicalize",
+    "finance.normalizers.peer.canonicalize",
+    "finance.normalizers.provenance.attach",
+    "finance.normalizers.symbol.normalize",
+    "finance.normalizers.date.normalize",
+    "finance.normalizers.currency.normalize",
+    "finance.normalizers.corporate_actions.adjust",
+    "finance.normalizers.unit_currency.envelope",
+    "finance.normalizers.validation.error_taxonomy",
+    "finance.normalizers.field_policy.stale",
+    "finance.normalizers.field_policy.missing",
+    "finance.normalizers.ordering.deterministic"
+  ],
+  "blocked_imports": [
+    "yfinance",
+    "finnhub",
+    "fredapi",
+    "openbb",
+    "sec_api",
+    "requests",
+    "httpx",
+    "urllib",
+    "aiohttp",
+    "pandas_datareader",
+    "praw"
+  ],
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "provider_sdks_required": false,
+    "test_rule": "package tests must pass with fixtures only, no credentials, no provider SDK imports, and no network I/O"
+  },
+  "field_canonicalization": {
+    "case": "snake_case",
+    "currency": "ISO-4217 uppercase",
+    "date": "RFC3339 full-date or timestamp",
+    "symbol": "uppercase ticker",
+    "numeric_units": "explicit unit and scale fields",
+    "null_policy": "missing required fields fail; optional unavailable values are explicit null with missing_reason",
+    "typed_boundary": "symbol, date, currency, unit, corporate action, and validation errors are normalized before provider-specific interpretation",
+    "conversion_envelope": "raw value, normalized value, unit, scale, currency, conversion rate, source currency, target currency, and precision metadata"
+  },
+  "stale_missing_policy": {
+    "stale_basis": "as_of plus stale_after_days",
+    "stale_required": true,
+    "missing_required_policy": "reject_record",
+    "missing_optional_policy": "emit_null_with_missing_reason",
+    "warning_marker": "finance_normalizer_stale_field",
+    "missing_reason_required_when_null": true,
+    "missing_reason_taxonomy": [
+      "source_not_disclosed",
+      "provider_fixture_did_not_include_field",
+      "dash_placeholder",
+      "not_available_placeholder",
+      "forecast_not_disclosed",
+      "currency_conversion_rate_missing"
+    ]
+  },
+  "deterministic_ordering": {
+    "statements": [
+      "symbol",
+      "fiscal_year",
+      "fiscal_period",
+      "statement_type",
+      "line_item"
+    ],
+    "ratios": [
+      "symbol",
+      "fiscal_year",
+      "fiscal_period",
+      "ratio"
+    ],
+    "market": [
+      "symbol",
+      "date"
+    ],
+    "news": [
+      "published_at",
+      "source_id",
+      "headline"
+    ],
+    "sec": [
+      "filed_at",
+      "accession_number"
+    ],
+    "peer": [
+      "peer_group_id",
+      "symbol",
+      "peer_symbol",
+      "metric"
+    ],
+    "provenance": [
+      "source_id",
+      "record_hash"
+    ],
+    "normalization_boundary": [
+      "boundary_type",
+      "input_field",
+      "raw_value"
+    ],
+    "corporate_actions": [
+      "symbol",
+      "effective_date",
+      "action_type"
+    ],
+    "validation": [
+      "error_code",
+      "domain",
+      "field"
+    ]
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "schemas cover statements, ratios, market, news, SEC, peer, provenance, normalizer policy, typed normalization boundaries, corporate actions, and validation errors",
+    "fixtures declare canonical snake_case fields, stale/missing field policy, typed unit/currency conversion envelopes, corporate action adjustments, validation error taxonomy, and deterministic ordering keys",
+    "provider gate forbids live network access, provider credentials, and provider SDK imports",
+    "normalizers remain independent of q/runtime and future live provider packages"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot finance normalizers or live finance providers as built-ins; this package declares provider-free normalization schemas and fixtures only."
+  }
+}

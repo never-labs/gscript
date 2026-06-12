@@ -1,0 +1,39 @@
+{
+  "fixture_key": "fmp:key_metrics:ACME:annual",
+  "provider": "fmp",
+  "captured_at": "2026-06-11T00:00:00Z",
+  "request": {
+    "symbol": "ACME",
+    "period": "annual",
+    "live_network": false
+  },
+  "metadata": {
+    "schema": "schemas/fmp_key_metrics_v1.schema.json",
+    "provenance": {
+      "source": "synthetic-offline-fixture",
+      "captured_at": "2026-06-11T00:00:00Z",
+      "live_network": false,
+      "redacted": true
+    },
+    "capability": "finance.vendor.fmp.key_metrics",
+    "rate_limit": {
+      "policy": "metadata-only",
+      "window_seconds": 86400,
+      "limit": 300,
+      "retry_after_seconds": 2
+    },
+    "terms": {
+      "usage": "offline-fixture-only",
+      "attribution": "provider terms metadata retained",
+      "redistribution": "do-not-redistribute-live-payloads",
+      "live_network": false
+    }
+  },
+  "payload": {
+    "symbol": "ACME",
+    "date": "2025-12-31",
+    "revenue_per_share": 42.1,
+    "gross_profit_margin": 0.42,
+    "return_on_invested_capital": 0.18
+  }
+}

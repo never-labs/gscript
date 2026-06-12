@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/finrobot/news_event_catalyst_dialect_v1.schema.json",
+  "title": "ProviderFreeNewsEventCatalystDialectV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture_key",
+    "provider_free",
+    "live_network",
+    "ticker",
+    "as_of",
+    "source_ingestion",
+    "event_mentions",
+    "dedupe_groups",
+    "confidence_envelopes",
+    "prompt_contract_eval"
+  ],
+  "properties": {
+    "fixture_key": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "ticker": {"type": "string"},
+    "as_of": {"type": "string", "format": "date-time"},
+    "source_ingestion": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "source_kind",
+          "publisher",
+          "published_at",
+          "observed_at",
+          "headline",
+          "url",
+          "language",
+          "instrument_refs",
+          "freshness_label",
+          "age_hours",
+          "staleness_reason"
+        ],
+        "properties": {
+          "source_id": {"type": "string"},
+          "source_kind": {"type": "string"},
+          "publisher": {"type": "string"},
+          "published_at": {"type": "string", "format": "date-time"},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "headline": {"type": "string"},
+          "body_excerpt": {"type": "string"},
+          "url": {"type": "string"},
+          "language": {"type": "string"},
+          "instrument_refs": {"type": "array", "items": {"type": "string"}},
+          "freshness_label": {"type": "string", "enum": ["fresh", "aging", "stale", "archival"]},
+          "age_hours": {"type": "number", "minimum": 0},
+          "staleness_reason": {"type": "string"}
+        }
+      }
+    },
+    "event_mentions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mention_id",
+          "source_id",
+          "canonical_event_subject",
+          "category",
+          "catalyst_type",
+          "direction",
+          "extracted_event_id",
+          "extraction_confidence"
+        ],
+        "properties": {
+          "mention_id": {"type": "string"},
+          "source_id": {"type": "string"},
+          "canonical_event_subject": {"type": "string"},
+          "category": {"type": "string"},
+          "catalyst_type": {"type": "string"},
+          "direction": {"type": "string", "enum": ["positive", "neutral", "negative", "mixed"]},
+          "extracted_event_id": {"type": "string"},
+          "extraction_confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "dedupe_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dedupe_group_id",
+          "canonical_event_id",
+          "duplicate_event_ids",
+          "canonical_selection_reason"
+        ],
+        "properties": {
+          "dedupe_group_id": {"type": "string"},
+          "canonical_event_id": {"type": "string"},
+          "duplicate_event_ids": {"type": "array", "items": {"type": "string"}},
+          "canonical_selection_reason": {"type": "string"}
+        }
+      }
+    },
+    "confidence_envelopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "confidence_low",
+          "confidence_mid",
+          "confidence_high",
+          "source_trust",
+          "directness",
+          "corroboration",
+          "recency",
+          "extraction_quality",
+          "confidence_rationale"
+        ],
+        "properties": {
+          "event_id": {"type": "string"},
+          "confidence_low": {"type": "number", "minimum": 0, "maximum": 1},
+          "confidence_mid": {"type": "number", "minimum": 0, "maximum": 1},
+          "confidence_high": {"type": "number", "minimum": 0, "maximum": 1},
+          "source_trust": {"type": "number", "minimum": 0, "maximum": 1},
+          "directness": {"type": "number", "minimum": 0, "maximum": 1},
+          "corroboration": {"type": "number", "minimum": 0, "maximum": 1},
+          "recency": {"type": "number", "minimum": 0, "maximum": 1},
+          "extraction_quality": {"type": "number", "minimum": 0, "maximum": 1},
+          "confidence_rationale": {"type": "string"}
+        }
+      }
+    },
+    "prompt_contract_eval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "must_pass",
+        "must_not_pass",
+        "deterministic_ordering",
+        "taxonomy_only"
+      ],
+      "properties": {
+        "must_pass": {"type": "boolean", "const": true},
+        "must_not_pass": {"type": "boolean", "const": true},
+        "deterministic_ordering": {"type": "boolean", "const": true},
+        "taxonomy_only": {"type": "boolean", "const": true}
+      }
+    }
+  }
+}

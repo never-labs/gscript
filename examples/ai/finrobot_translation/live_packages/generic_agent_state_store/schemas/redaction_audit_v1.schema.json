@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-agent-state-store/redaction-audit-v1.schema.json",
+  "title": "Generic Agent State Redaction Audit",
+  "type": "object",
+  "required": [
+    "enabled",
+    "secret_values_present",
+    "raw_prompt_stored",
+    "raw_completion_stored",
+    "redacted_fields",
+    "placeholder",
+    "credential_refs"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "const": true
+    },
+    "secret_values_present": {
+      "type": "boolean",
+      "const": false
+    },
+    "raw_prompt_stored": {
+      "type": "boolean",
+      "const": false
+    },
+    "raw_completion_stored": {
+      "type": "boolean",
+      "const": false
+    },
+    "redacted_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "placeholder": {
+      "type": "string",
+      "const": "<redacted>"
+    },
+    "credential_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "field",
+          "value",
+          "raw_value_stored"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "string",
+            "const": "<redacted>"
+          },
+          "raw_value_stored": {
+            "type": "boolean",
+            "const": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

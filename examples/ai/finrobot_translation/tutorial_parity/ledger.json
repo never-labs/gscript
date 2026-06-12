@@ -1,0 +1,564 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-tutorial-parity-ledger",
+  "audit_date": "2026-06-12",
+  "source": {
+    "repo": "FinRobot",
+    "source_commit": "6a8161f",
+    "tutorial_roots": [
+      "tutorials_beginner",
+      "tutorials_advanced"
+    ]
+  },
+  "target": {
+    "repo": "leia",
+    "baseline_branch": "origin/codex/ai-dialect-polish",
+    "baseline_commit": "b3b6088d",
+    "translation_root": "examples/ai/finrobot_translation",
+    "provider_free_default": true,
+    "live_network_default": false,
+    "real_dependency_import_default": false
+  },
+  "status_values": [
+    "mapped_provider_free_contract",
+    "mapped_provider_free_replay",
+    "mapped_optional_live_gate"
+  ],
+  "global_gates": [
+    "ledger tests must not call live providers or open network sockets",
+    "provider-free mappings must point at checked-in Leia examples or live package skeleton metadata",
+    "optional live gates must default live_network_default=false and default_enabled=false",
+    "credentials are optional only, absent-safe, and redacted by the corresponding live package skeleton"
+  ],
+  "tutorials": [
+    {
+      "id": "beginner-agent-annual-report",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/agent_annual_report.ipynb",
+      "source_title": "Financial Analyst Agent for Annual Report Writing",
+      "status": "mapped_provider_free_replay",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/equity_report.leia",
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+        "examples/ai/finrobot_translation/section_agents.leia",
+        "examples/ai/finrobot_translation/report_contract.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json",
+        "examples/ai/finrobot_translation/live_packages/product_workflow/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "annual report workflow",
+        "section agent roles",
+        "report artifact contract",
+        "provider-free replayed equity report"
+      ],
+      "gaps": [
+        "no notebook-by-notebook translated tutorial exists yet",
+        "live SEC, market data, chart rendering, HTML, and PDF generation remain external package work"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "annual-report-live-data",
+          "capabilities": [
+            "finance.vendor.sec.filing",
+            "finance.vendor.fmp.key_metrics",
+            "report.render.html",
+            "report.render.pdf"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "beginner-agent-fingpt-forecaster",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/agent_fingpt_forecaster.ipynb",
+      "source_title": "FinGPT-Forecaster Re-implemented with FinRobot",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/section_agents.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/model_alias_routing_example.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "forecast prompt/output shape",
+        "optional FinGPT gate",
+        "provider-free market/news fixture normalizers"
+      ],
+      "gaps": [
+        "FinGPT model execution is not translated as a default dependency",
+        "live news and price providers require optional credentials and capability grants"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "fingpt-forecast",
+          "capabilities": [
+            "optional.ai.fingpt.forecast",
+            "finance.vendor.finnhub.profile",
+            "finance.vendor.yahoo.chart"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "beginner-agent-rag-earnings-call-sec-filings",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/agent_rag_earnings_call_sec_filings.ipynb",
+      "source_title": "Earnings Call and SEC Filing RAG",
+      "status": "mapped_provider_free_contract",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/api_replay.leia",
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "SEC filing fixture chunks",
+        "earnings transcript fixture chunks",
+        "RAG citation contract",
+        "provider replay metadata"
+      ],
+      "gaps": [
+        "wkhtmltopdf, SEC HTML/PDF conversion, and live transcript retrieval are not default dependencies",
+        "vector-store lifecycle is represented by provider-free fixtures only"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "rag-live-documents",
+          "capabilities": [
+            "finance.vendor.sec.filing",
+            "finance.vendor.earnings.transcript"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "beginner-agent-rag-qa",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/agent_rag_qa.ipynb",
+      "source_title": "RetrieveChat based FinRobot-RAG",
+      "status": "mapped_provider_free_contract",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/core_agents/main.leia",
+        "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "single assistant RAG shape",
+        "local corpus fixture",
+        "citation-bearing answer contract"
+      ],
+      "gaps": [
+        "AutoGen RetrieveChat lifecycle is not translated notebook-by-notebook",
+        "live vector database and model calls remain external package work"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "rag-live-retrieval",
+          "capabilities": [
+            "finance.vendor.sec.filing",
+            "finance.vendor.earnings.transcript"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "beginner-agent-rag-qa-up",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/agent_rag_qa_up.ipynb",
+      "source_title": "Updated Earnings and SEC RAG QA",
+      "status": "mapped_provider_free_contract",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/document_rag.leia",
+        "examples/ai/finrobot_translation/api_replay.leia",
+        "examples/ai/finrobot_translation/data_tools.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "earnings document fixture inventory",
+        "SEC filing fixture inventory",
+        "RAG query contract"
+      ],
+      "gaps": [
+        "upstream helper-specific control flow has not been ported",
+        "live earnings and filings data source clients are optional only"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "rag-helper-live-data",
+          "capabilities": [
+            "finance.vendor.earnings.transcript",
+            "finance.vendor.sec.filing"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "beginner-ollama-function-call",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/ollama function call.ipynb",
+      "source_title": "Ollama Function Call",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/data_tools.leia",
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/model_alias_routing_example.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "Ollama optional local LLM gate",
+        "function-call style tool descriptors",
+        "Yahoo and Finnhub fixture outputs"
+      ],
+      "gaps": [
+        "local Ollama daemon calls are not run by default",
+        "live function-call provider behavior needs explicit optional gate coverage"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "ollama-function-call-local",
+          "capabilities": [
+            "optional.llm.ollama.local",
+            "finance.vendor.finnhub.profile",
+            "finance.vendor.yahoo.chart"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "beginner-ollama-stock-chart",
+      "level": "beginner",
+      "source_path": "tutorials_beginner/ollama stock chart.ipynb",
+      "source_title": "Ollama Stock Chart",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/reporting.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/valuation_analytics.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "chart artifact contract",
+        "optional Ollama local model gate",
+        "provider-free chart specs"
+      ],
+      "gaps": [
+        "live chart rendering and local multimodal model execution are not default behavior",
+        "notebook-specific stock chart prompts have not been ported"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "ollama-chart-local",
+          "capabilities": [
+            "optional.llm.ollama.local",
+            "artifact.chart.spec",
+            "report.render.chart_spec"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "advanced-agent-annual-report",
+      "level": "advanced",
+      "source_path": "tutorials_advanced/agent_annual_report.ipynb",
+      "source_title": "Advanced Financial Analyst Agent for Annual Report Writing",
+      "status": "mapped_provider_free_replay",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/equity_report.leia",
+        "examples/ai/finrobot_translation/reporting.leia",
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/section_agents.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "registered toolkits",
+        "FMP data fixture contract",
+        "annual report artifact contract",
+        "provider-free replayed report"
+      ],
+      "gaps": [
+        "advanced notebook-specific function registration order is mapped but not translated",
+        "live FMP data and renderer integrations require optional package work"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "advanced-annual-report-live",
+          "capabilities": [
+            "finance.vendor.fmp.key_metrics",
+            "finance.vendor.sec.filing",
+            "report.render.html",
+            "report.render.pdf"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "advanced-agent-fingpt-forecaster",
+      "level": "advanced",
+      "source_path": "tutorials_advanced/agent_fingpt_forecaster.ipynb",
+      "source_title": "Advanced FinGPT-Forecaster Re-implemented with FinRobot",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia",
+        "examples/ai/finrobot_translation/data_tools.leia",
+        "examples/ai/finrobot_translation/section_agents.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "FinGPT optional gate",
+        "Finnhub and Yahoo fixture contracts",
+        "forecast section schema"
+      ],
+      "gaps": [
+        "live FinGPT and provider-backed forecasting are not part of default tests",
+        "notebook-by-notebook parity needs a separate translated tutorial"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "advanced-fingpt-forecast",
+          "capabilities": [
+            "optional.ai.fingpt.forecast",
+            "finance.vendor.finnhub.profile",
+            "finance.vendor.yahoo.chart"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "advanced-agent-openbb",
+      "level": "advanced",
+      "source_path": "tutorials_advanced/agent_openbb.ipynb",
+      "source_title": "Hierarchical Function Calling Agent for OpenBB",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/data_tools.leia",
+        "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia",
+        "examples/ai/finrobot_translation/api_replay.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+      ],
+      "covered_concepts": [
+        "OpenBB optional integration gate",
+        "hierarchical agent handoff shape",
+        "provider-free function-call inventory"
+      ],
+      "gaps": [
+        "OpenBB database construction and PAT-backed calls are not default dependencies",
+        "DSPy/OpenBB agent internals are represented as optional capability metadata only"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "openbb-market-data",
+          "capabilities": [
+            "optional.data.openbb.market_data"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "advanced-agent-trade-strategist",
+      "level": "advanced",
+      "source_path": "tutorials_advanced/agent_trade_strategist.ipynb",
+      "source_title": "Trading Strategist Agent with BackTrader",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+        "examples/ai/finrobot_translation/generated_code_tooling.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/compliance_policy.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "Backtrader optional gate",
+        "code-writing approval boundary",
+        "provider-free portfolio optimization fixture"
+      ],
+      "gaps": [
+        "live Backtrader strategy execution is optional and disabled by default",
+        "generated-code notebook workflow is represented by capability gates rather than live execution"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "backtrader-strategy",
+          "capabilities": [
+            "optional.quant.backtrader.backtest",
+            "finance.valuation.assumption_audit"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "advanced-lmm-agent-mplfinance",
+      "level": "advanced",
+      "source_path": "tutorials_advanced/lmm_agent_mplfinance.ipynb",
+      "source_title": "Multimodal FinRobot with MplFinance plotting",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/reporting.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/vendor_adapters.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/package.manifest.json",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "mplfinance optional chart gate",
+        "multimodal chart artifact boundary",
+        "Finnhub fixture adapter"
+      ],
+      "gaps": [
+        "live image rendering and multimodal model calls are not run by default",
+        "chart visual parity needs renderer package snapshot tests"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "mplfinance-chart-render",
+          "capabilities": [
+            "optional.chart.mplfinance.render",
+            "finance.vendor.finnhub.profile",
+            "artifact.chart.spec"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "advanced-lmm-agent-opt-smacross",
+      "level": "advanced",
+      "source_path": "tutorials_advanced/lmm_agent_opt_smacross.ipynb",
+      "source_title": "Optimizing SMACross Trading with MultiModal Agent",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/generated_code_tooling.leia",
+        "examples/ai/finrobot_translation/sensitivity_math.leia"
+      ],
+      "mapped_live_package_skeletons": [
+        "examples/ai/finrobot_translation/optional_integrations_manifest.json",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+      ],
+      "covered_concepts": [
+        "SMACross optimization fixture shape",
+        "Backtrader optional gate",
+        "mplfinance optional gate",
+        "sensitivity fixture math"
+      ],
+      "gaps": [
+        "live SMACross optimization loop and chart inspection are optional only",
+        "multimodal notebook-specific prompts are not translated yet"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "smacross-optimization",
+          "capabilities": [
+            "optional.quant.backtrader.backtest",
+            "optional.chart.mplfinance.render",
+            "finance.valuation.sensitivity_matrix"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/optional_integrations_manifest.json"
+        }
+      ]
+    }
+  ]
+}

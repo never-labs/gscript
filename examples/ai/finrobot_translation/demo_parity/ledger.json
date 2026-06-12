@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-demo-regression-parity-ledger",
+  "audit_date": "2026-06-12",
+  "source": {
+    "repo": "FinRobot",
+    "source_commit": "6a8161f",
+    "source_roots": [
+      ".",
+      "finrobot_equity/core/tests"
+    ]
+  },
+  "target": {
+    "repo": "leia",
+    "baseline_branch": "origin/codex/ai-dialect-polish",
+    "translation_root": "examples/ai/finrobot_translation",
+    "provider_free_default": true,
+    "live_network_default": false,
+    "real_dependency_import_default": false
+  },
+  "status_values": [
+    "mapped_provider_free_contract",
+    "mapped_provider_free_replay",
+    "mapped_provider_free_evaluate",
+    "mapped_optional_live_gate"
+  ],
+  "global_gates": [
+    "demo parity tests must not call live providers, import AutoGen, import Backtrader, render charts, render PDFs, or open network sockets",
+    "provider-free mappings must point at checked-in Leia examples, evaluate blocks, replay records, or live package skeleton metadata",
+    "optional live gates must keep live_network_default=false and default_enabled=false",
+    "credentials and external services are optional only, absent-safe, and redacted by the corresponding live package skeleton"
+  ],
+  "records_manifest": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
+  "sources": [
+    {
+      "id": "agent-builder-demo",
+      "kind": "demo",
+      "source_path": "agent_builder_demo.py",
+      "source_title": "AutoGen AgentBuilder stock forecaster demo",
+      "status": "mapped_provider_free_replay",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/core_agents/main.leia",
+        "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia",
+        "examples/ai/finrobot_translation/model_alias_routing_example.leia",
+        "examples/ai/finrobot_translation/generated_code_tooling.leia",
+        "examples/ai/finrobot_translation/section_agents.leia"
+      ],
+      "mapped_evaluate_examples": [],
+      "mapped_evaluate_records": [
+        {
+          "manifest_record_id": "core_agents_main",
+          "source_path": "examples/ai/finrobot_translation/core_agents/main.leia",
+          "replay_records_path": "examples/ai/finrobot_translation/core_agents/main.records.json",
+          "covered_cases": [
+            "agent library maps to declarative Leia agents",
+            "role prompt mirrors FinRobot responsibility preprocessing"
+          ]
+        },
+        {
+          "manifest_record_id": "core_agents_workflow_handoff",
+          "source_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.leia",
+          "replay_records_path": "examples/ai/finrobot_translation/core_agents/workflow_handoff.records.json",
+          "covered_cases": [
+            "leader workflow delegates through agent as tool",
+            "group chat speaker policy is represented as explicit history"
+          ]
+        }
+      ],
+      "covered_concepts": [
+        "agent builder configuration as provider-free role and routing metadata",
+        "group chat handoff as explicit replayed workflow records",
+        "generated-code capability envelope without default code execution",
+        "stock-forecast prompt shape represented as section-agent contracts"
+      ],
+      "gaps": [
+        "AutoGen AgentBuilder dynamic agent synthesis is not imported or executed in default tests",
+        "live GPT-4 model calls, mutable group-chat lifecycle, and local Python code execution remain optional live-package work",
+        "the saved config file is treated as external source metadata rather than a default runtime dependency"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "agent-builder-live-autogen",
+          "capabilities": [
+            "optional.ai.autogen.agent_builder",
+            "optional.ai.model.gpt4",
+            "optional.code.python.execute"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "backtrader-test-module",
+      "kind": "demo_regression",
+      "source_path": "test_module.py",
+      "source_title": "Backtrader TestStrategy regression demo",
+      "status": "mapped_optional_live_gate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+        "examples/ai/finrobot_translation/sensitivity_math.leia",
+        "examples/ai/finrobot_translation/live_packages/optional_integrations/main.leia"
+      ],
+      "mapped_evaluate_examples": [],
+      "mapped_evaluate_records": [
+        {
+          "manifest_record_id": "quant_portfolio_optimization",
+          "source_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.leia",
+          "replay_records_path": "examples/ai/finrobot_translation/quant_experiments/portfolio_optimization.records.json",
+          "covered_cases": [
+            "FinRobot portfolio optimization replay"
+          ]
+        }
+      ],
+      "covered_concepts": [
+        "optional Backtrader integration is represented by a disabled capability gate",
+        "deterministic portfolio replay stands in for provider-free quant workflow regression",
+        "strategy parameter and exit-window concepts are tracked as future live-package requirements"
+      ],
+      "gaps": [
+        "Backtrader is not a default dependency and the strategy class is not imported by Leia tests",
+        "bar-by-bar broker state, order notifications, commissions, and trade PnL need a live Backtrader package",
+        "market data feeds remain fixture/replay data unless an optional provider package is enabled"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "backtrader-strategy-live",
+          "capabilities": [
+            "optional.quant.backtrader",
+            "finance.vendor.yahoo.chart",
+            "optional.code.python.execute"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/optional_integrations/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "core-test-generate-report",
+      "kind": "core_test",
+      "source_path": "finrobot_equity/core/tests/test_generate_report.py",
+      "source_title": "Mock equity report PDF/chart generation regression",
+      "status": "mapped_provider_free_evaluate",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia",
+        "examples/ai/finrobot_translation/equity_report.leia",
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/reporting.leia",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/analytics_report.leia"
+      ],
+      "mapped_evaluate_examples": [
+        "examples/ai/finrobot_translation/equity_cli_workflow.leia"
+      ],
+      "mapped_evaluate_records": [
+        {
+          "manifest_record_id": "equity_report",
+          "source_path": "examples/ai/finrobot_translation/equity_report.leia",
+          "replay_records_path": "examples/ai/finrobot_translation/equity_report.records.json",
+          "covered_cases": [
+            "finrobot equity report replay"
+          ]
+        }
+      ],
+      "covered_concepts": [
+        "mock report data, ordered report sections, chart artifact metadata, and report manifest boundaries",
+        "provider-free equity report replay records for section-agent output",
+        "evaluate gate over the equity CLI stage DAG"
+      ],
+      "gaps": [
+        "real matplotlib/chart image generation is not run by default tests",
+        "professional PDF rendering, font/layout behavior, and page snapshots remain external package work",
+        "pandas/numpy dataframes are represented as checked-in typed fixtures and schemas"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "report-render-live",
+          "capabilities": [
+            "report.render.chart",
+            "report.render.html",
+            "report.render.pdf"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "core-test-modules",
+      "kind": "core_test",
+      "source_path": "finrobot_equity/core/tests/test_modules.py",
+      "source_title": "Enhanced equity module import and fixture behavior regression",
+      "status": "mapped_provider_free_contract",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/data_normalization.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia",
+        "examples/ai/finrobot_translation/valuation_analytics.leia",
+        "examples/ai/finrobot_translation/sensitivity_math.leia",
+        "examples/ai/finrobot_translation/section_agents.leia",
+        "examples/ai/finrobot_translation/report_contract.leia",
+        "examples/ai/finrobot_translation/live_packages/analytics_report/analytics_report.leia",
+        "examples/ai/finrobot_translation/live_packages/news_catalyst/main.leia",
+        "examples/ai/finrobot_translation/live_packages/prompt_roles/main.leia"
+      ],
+      "mapped_evaluate_examples": [],
+      "mapped_evaluate_records": [],
+      "covered_concepts": [
+        "module availability is represented as registered provider-free examples and package manifests",
+        "sensitivity, valuation, catalyst, report-structure, and section-agent fixture contracts",
+        "live-package skeletons record implementation gates without importing Python modules"
+      ],
+      "gaps": [
+        "Python module imports are not executed in provider-free Leia regression tests",
+        "full dataframe, chart, text generation, and report structure method parity is represented by fixture-level contracts only",
+        "broader method-by-method Python assertions remain future Leia evaluations or package tests"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "equity-core-python-modules-live",
+          "capabilities": [
+            "finance.analytics.valuation",
+            "finance.analytics.sensitivity",
+            "finance.news.catalyst",
+            "report.render.chart"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": false,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/analytics_report/package.manifest.json"
+        }
+      ]
+    },
+    {
+      "id": "core-test-retail-sentiment-client",
+      "kind": "core_test",
+      "source_path": "finrobot_equity/core/tests/test_retail_sentiment_client.py",
+      "source_title": "Retail sentiment client aggregation, prompt, and HTML regression",
+      "status": "mapped_provider_free_contract",
+      "mapped_examples": [
+        "examples/ai/finrobot_translation/vendor_adapters.leia",
+        "examples/ai/finrobot_translation/finance_normalizers.leia",
+        "examples/ai/finrobot_translation/reporting.leia",
+        "examples/ai/finrobot_translation/optional_integrations.leia",
+        "examples/ai/finrobot_translation/live_packages/news_catalyst/main.leia",
+        "examples/ai/finrobot_translation/live_packages/vendor_adapters/main.leia"
+      ],
+      "mapped_evaluate_examples": [],
+      "mapped_evaluate_records": [],
+      "covered_concepts": [
+        "retail sentiment source schema and source-alignment fixture",
+        "provider adapter boundary with network-off default and terms metadata",
+        "prompt/report rendering expectations represented as provider-free text and HTML boundary contracts"
+      ],
+      "gaps": [
+        "Adanos, Reddit, X, and Polymarket HTTP calls are not made in default tests",
+        "monkeypatched Python request behavior is represented as checked-in adapter fixtures rather than live mocks",
+        "full HTML template parity and rendered visual snapshots remain product package work"
+      ],
+      "optional_live_gates": [
+        {
+          "id": "retail-sentiment-live-sources",
+          "capabilities": [
+            "finance.vendor.retail_sentiment.adanos",
+            "finance.vendor.reddit.search",
+            "finance.vendor.x.sentiment",
+            "finance.vendor.polymarket.sentiment"
+          ],
+          "live_network_default": false,
+          "default_enabled": false,
+          "requires_credentials": true,
+          "clean_skip_without_credentials": true,
+          "skeleton": "examples/ai/finrobot_translation/live_packages/news_catalyst/package.manifest.json"
+        }
+      ]
+    }
+  ]
+}

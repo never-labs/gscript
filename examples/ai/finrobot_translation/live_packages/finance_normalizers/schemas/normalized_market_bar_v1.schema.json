@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "normalized_market_bar_v1",
+  "domain": "market",
+  "description": "Canonical OHLCV market bar with explicit provenance.",
+  "required": [
+    "schema",
+    "symbol",
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "currency",
+    "adjusted",
+    "as_of",
+    "stale_after_days",
+    "stale",
+    "source_id",
+    "record_hash"
+  ],
+  "canonical_fields": [
+    "schema",
+    "symbol",
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "currency",
+    "adjusted",
+    "as_of",
+    "stale_after_days",
+    "stale",
+    "missing_reason",
+    "source_id",
+    "record_hash"
+  ],
+  "deterministic_order": [
+    "symbol",
+    "date"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason",
+  "provider_free": true
+}

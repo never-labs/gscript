@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "document_id": "ACME-2025-10K",
+  "ticker": "ACME",
+  "cik": "0000000000",
+  "accession_number": "0000000000-26-000001",
+  "form_type": "10-K",
+  "filing_date": "2026-02-20",
+  "primary_artifact": "acme-20251231-html",
+  "user_agent_policy": {
+    "required_for_live": true,
+    "declared_in_fixture": false,
+    "clean_skip_without_user_agent": true
+  },
+  "redirect_chain": [
+    {
+      "from": "https://sec.example.invalid/acme/10k",
+      "to": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+      "status": 200,
+      "fixture_redirect": true
+    }
+  ],
+  "cache": {
+    "key": "sec:ACME:10-K:2025:primary",
+    "mode": "fixture_replay",
+    "hit": true,
+    "ttl_seconds": 0
+  },
+  "terms": {
+    "usage": "offline-fixture-only",
+    "attribution": "SEC fair-access metadata retained",
+    "redistribution": "fixture-only",
+    "live_network": false,
+    "user_agent_required_for_live": true
+  },
+  "artifacts": [
+    {
+      "artifact_id": "acme-20251231-html",
+      "artifact_type": "sec_html",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/0/000000000026000001/acme-20251231.htm",
+      "mime_type": "text/html",
+      "content_sha256": "0a74a7d7c4aaacme10khtmlfixture000000000000000000000000000000000000",
+      "byte_length": 4096,
+      "parser_boundary": {
+        "adapter": "fixture_html_parser",
+        "dependency_imported": false,
+        "live_network": false,
+        "clean_skip": true
+      },
+      "provenance": {
+        "fixture_key": "sec:fetch:ACME:10K:offline",
+        "source": "synthetic-offline-fixture",
+        "captured_at": "2026-06-11T00:00:00Z",
+        "live_network": false,
+        "redacted": true
+      },
+      "terms": {
+        "usage": "offline-fixture-only",
+        "attribution": "SEC fair-access metadata retained",
+        "redistribution": "fixture-only",
+        "live_network": false
+      }
+    }
+  ],
+  "markdown_preview": "## Item 1. Business\nACME sells industrial control systems.\n\n## Item 1A. Risk Factors\nSupply concentration may affect margins.\n\n## Item 7. Management Discussion and Analysis\nRevenue increased due to renewal demand."
+}

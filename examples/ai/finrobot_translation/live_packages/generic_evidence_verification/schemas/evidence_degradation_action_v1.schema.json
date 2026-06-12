@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-evidence-verification/evidence-degradation-action-v1.schema.json",
+  "title": "Generic Evidence Clean Degradation Action",
+  "type": "object",
+  "required": [
+    "action_id",
+    "claim_id",
+    "mode",
+    "reason",
+    "provider_free",
+    "live_network",
+    "invented_claim_allowed",
+    "warning_refs"
+  ],
+  "properties": {
+    "action_id": {"type": "string"},
+    "claim_id": {"type": "string"},
+    "mode": {"type": "string"},
+    "reason": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "invented_claim_allowed": {"type": "boolean", "const": false},
+    "warning_refs": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-workflow-orchestrator-live-package",
+  "package_name": "leia-generic-ai-workflow-orchestrator",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for ai.workflow.orchestrate workflow graph execution, planning graph projection, stage I/O, handoff trace, retry/cache policy, workflow result, and trace emission hooks.",
+  "source_modules": [
+    "main.leia"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; provider adapters, model endpoints, storage backends, queue brokers, and tracing sinks belong only to future provider-specific packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_workflow_orchestrator_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "workflow_graph_contract": "contracts/workflow_graph_contract.json",
+    "trace_hooks_contract": "contracts/trace_emission_hooks_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "workflow_graph": "schemas/workflow_graph_v1.schema.json",
+    "stage_io": "schemas/stage_io_v1.schema.json",
+    "planning_graph_stage_projection": "schemas/planning_graph_stage_projection_v1.schema.json",
+    "handoff_trace": "schemas/handoff_trace_v1.schema.json",
+    "retry_cache_policy": "schemas/retry_cache_policy_v1.schema.json",
+    "workflow_result": "schemas/workflow_result_v1.schema.json",
+    "trace_emission_hooks": "schemas/trace_emission_hooks_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "workflow_graph": "fixtures/workflow_graph_fixture.json",
+    "stage_io": "fixtures/stage_io_fixture.json",
+    "planning_graph_stage_projection": "fixtures/planning_graph_stage_projection_fixture.json",
+    "handoff_trace": "fixtures/handoff_trace_fixture.json",
+    "workflow_result": "fixtures/workflow_result_fixture.json",
+    "trace_emission_hooks": "fixtures/trace_emission_hooks_fixture.json"
+  },
+  "workflow_graph": {
+    "id": "generic_orchestration_graph_v1",
+    "entrypoint": "ai.workflow.orchestrate",
+    "capability": "generic.ai.workflow.orchestration.graph",
+    "stages": [
+      {
+        "id": "plan",
+        "capability": "generic.ai.workflow.orchestration.stage.plan",
+        "depends_on": [],
+        "input_schema": "workflow_graph",
+        "output_schema": "stage_io",
+        "fixture_key": "generic_workflow:stage:plan:offline",
+        "provider_free": true,
+        "live_network": false
+      },
+      {
+        "id": "execute",
+        "capability": "generic.ai.workflow.orchestration.stage.execute",
+        "depends_on": [
+          "plan"
+        ],
+        "input_schema": "stage_io",
+        "output_schema": "stage_io",
+        "fixture_key": "generic_workflow:stage:execute:offline",
+        "provider_free": true,
+        "live_network": false
+      },
+      {
+        "id": "handoff",
+        "capability": "generic.ai.workflow.orchestration.stage.handoff",
+        "depends_on": [
+          "execute"
+        ],
+        "input_schema": "stage_io",
+        "output_schema": "handoff_trace",
+        "fixture_key": "generic_workflow:stage:handoff:offline",
+        "provider_free": true,
+        "live_network": false
+      },
+      {
+        "id": "finalize",
+        "capability": "generic.ai.workflow.orchestration.stage.finalize",
+        "depends_on": [
+          "handoff"
+        ],
+        "input_schema": "handoff_trace",
+        "output_schema": "workflow_result",
+        "fixture_key": "generic_workflow:stage:finalize:offline",
+        "provider_free": true,
+        "live_network": false
+      }
+    ],
+    "edges": [
+      [
+        "plan",
+        "execute"
+      ],
+      [
+        "execute",
+        "handoff"
+      ],
+      [
+        "handoff",
+        "finalize"
+      ]
+    ]
+  },
+  "retry_policy": {
+    "enabled": true,
+    "provider_free": true,
+    "live_network": false,
+    "mode": "deterministic_fixture_replay",
+    "max_attempts": 1,
+    "backoff": "none",
+    "retryable_statuses": [
+      "dependency_missing",
+      "stage_fixture_missing",
+      "trace_sink_unavailable"
+    ]
+  },
+  "cache_policy": {
+    "enabled": true,
+    "provider_free": true,
+    "live_network": false,
+    "mode": "fixture_metadata_only",
+    "key_fields": [
+      "workflow_id",
+      "run_id",
+      "stage_id",
+      "input_hash",
+      "fixture_key"
+    ],
+    "cache_states": [
+      "hit",
+      "miss",
+      "bypass"
+    ]
+  },
+  "trace_emission_hooks": [
+    {
+      "id": "on_workflow_started",
+      "phase": "workflow_started",
+      "capability": "generic.ai.workflow.orchestration.trace.workflow_started",
+      "fixture_key": "generic_workflow:trace_hooks:offline",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "on_stage_completed",
+      "phase": "stage_completed",
+      "capability": "generic.ai.workflow.orchestration.trace.stage_completed",
+      "fixture_key": "generic_workflow:trace_hooks:offline",
+      "provider_free": true,
+      "live_network": false
+    },
+    {
+      "id": "on_workflow_completed",
+      "phase": "workflow_completed",
+      "capability": "generic.ai.workflow.orchestration.trace.workflow_completed",
+      "fixture_key": "generic_workflow:trace_hooks:offline",
+      "provider_free": true,
+      "live_network": false
+    }
+  ],
+  "capabilities": [
+    "generic.ai.workflow.orchestration.graph",
+    "generic.ai.workflow.orchestration.stage.plan",
+    "generic.ai.workflow.orchestration.stage.execute",
+    "generic.ai.workflow.orchestration.stage.handoff",
+    "generic.ai.workflow.orchestration.stage.finalize",
+    "generic.ai.workflow.orchestration.stage_io",
+    "generic.ai.workflow.orchestration.planning_graph_stage_projection",
+    "generic.ai.workflow.orchestration.handoff_trace",
+    "generic.ai.workflow.orchestration.retry_cache_policy",
+    "generic.ai.workflow.orchestration.workflow_result",
+    "generic.ai.workflow.orchestration.trace.workflow_started",
+    "generic.ai.workflow.orchestration.trace.stage_completed",
+    "generic.ai.workflow.orchestration.trace.workflow_completed",
+    "ai.workflow.orchestrate.provider_free"
+  ],
+  "dialect_surface": [
+    "generic.ai.workflow.orchestration",
+    "ai.workflow.orchestrate"
+  ],
+  "test_gates": [
+    "generic.ai.workflow.orchestration is represented as a provider-free live package skeleton",
+    "ai.workflow.orchestrate entrypoint has a deterministic workflow graph",
+    "stage inputs and outputs are explicit and schema-addressed",
+    "planning graph projection maps plan nodes, dependency edges, retry evidence, branch evidence, and merge evidence into workflow stage records",
+    "handoff trace records from_stage, to_stage, payload refs, and trace event ids",
+    "retry/cache policy is deterministic fixture metadata with no backoff or live network",
+    "workflow result records status, stage results, artifacts, and trace refs",
+    "trace emission hooks are declared without importing tracing providers",
+    "main.leia contains no provider SDK imports or network execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide generic AI workflow orchestration providers, model endpoints, queue brokers, storage backends, planning graph projection backends, or trace exporters as built-ins; leia-generic-ai-workflow-orchestrator defines the provider-free package boundary."
+  },
+  "dialect_entrypoints": {
+    "orchestrate": "ai.workflow.orchestrate"
+  },
+  "dialect_capability_id": "ai.workflow.orchestrate.provider_free",
+  "dialect_backend_shape": "ai.workflow.orchestrate",
+  "dialect_aliases": [
+    {
+      "id": "ai.workflow.orchestrate",
+      "target": "ai.workflow.orchestrate.provider_free",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "ai.workflow.orchestrate.provider_free",
+  "capability_aliases": [
+    {
+      "alias": "ai.workflow.orchestrate",
+      "target_capability_id": "ai.workflow.orchestrate.provider_free",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.workflow.orchestration",
+      "target_capability_id": "ai.workflow.orchestrate.provider_free",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "ai.workflow.orchestrate.provider_free",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "ai.workflow.orchestrate.provider_free",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "ai.workflow.orchestrate.provider_free",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
+}

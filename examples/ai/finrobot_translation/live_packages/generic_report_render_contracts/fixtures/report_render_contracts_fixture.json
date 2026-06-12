@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "render_requests": [
+    {
+      "request_id": "render:report:html",
+      "render_mode": "html",
+      "formats": [
+        "text/html"
+      ],
+      "artifact_policy": "artifact_uri_only",
+      "fixture_key": "fixture:report:html",
+      "live_network": false,
+      "real_dependency_imports": false,
+      "renderer_dependency_gate": {
+        "dependency_imported": false,
+        "clean_skip": true
+      }
+    },
+    {
+      "request_id": "render:report:pdf",
+      "render_mode": "pdf",
+      "formats": [
+        "application/pdf"
+      ],
+      "artifact_policy": "artifact_uri_only",
+      "fixture_key": "fixture:report:pdf",
+      "live_network": false,
+      "real_dependency_imports": false,
+      "renderer_dependency_gate": {
+        "dependency_imported": false,
+        "clean_skip": true
+      }
+    }
+  ],
+  "request_envelopes": [
+    {
+      "request_id": "render:report:html",
+      "replay_key": "sha256:report-html-request",
+      "fixture_key": "fixture:report:html",
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "request_id": "render:report:pdf",
+      "replay_key": "sha256:report-pdf-request",
+      "fixture_key": "fixture:report:pdf",
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ],
+  "render_results": [
+    {
+      "request_id": "render:report:html",
+      "status": "ok",
+      "output_manifest_ref": "output:report:html",
+      "artifact_manifest_ref": "artifact-manifest:report",
+      "snapshot_refs": [
+        "snapshot:page:one",
+        "snapshot:page:two"
+      ],
+      "warning_refs": [
+        "warning:table-layout",
+        "warning:markdown-fallback"
+      ],
+      "annotation_refs": [
+        "annotation:source",
+        "annotation:disclosure"
+      ],
+      "clean_skip": false
+    },
+    {
+      "request_id": "render:report:pdf",
+      "status": "skipped",
+      "output_manifest_ref": "output:report:pdf",
+      "artifact_manifest_ref": "artifact-manifest:report",
+      "snapshot_refs": [
+        "snapshot:pdf:clean-skip"
+      ],
+      "warning_refs": [
+        "warning:renderer-skip"
+      ],
+      "annotation_refs": [
+        "annotation:source"
+      ],
+      "clean_skip": true
+    }
+  ],
+  "output_manifests": [
+    {
+      "output_id": "output:report:html",
+      "media_type": "text/html",
+      "artifact_refs": [
+        "artifact:report:html"
+      ],
+      "uri_policy": "artifact_uri_only",
+      "remote_fetch": false
+    },
+    {
+      "output_id": "output:report:pdf",
+      "media_type": "application/pdf",
+      "artifact_refs": [
+        "artifact:report:pdf"
+      ],
+      "uri_policy": "artifact_uri_only",
+      "remote_fetch": false
+    }
+  ],
+  "artifact_manifest": {
+    "manifest_id": "artifact-manifest:report",
+    "artifacts": [
+      {
+        "artifact_id": "artifact:report:html",
+        "uri": "artifact://reports/report.html",
+        "media_type": "text/html",
+        "hash": "sha256:report-html"
+      },
+      {
+        "artifact_id": "artifact:report:pdf",
+        "uri": "artifact://reports/report.pdf",
+        "media_type": "application/pdf",
+        "hash": "sha256:report-pdf"
+      },
+      {
+        "artifact_id": "artifact:snapshot:page-one",
+        "uri": "artifact://snapshots/page-one.png",
+        "media_type": "image/png",
+        "hash": "sha256:page-one"
+      }
+    ],
+    "remote_fetch": false
+  },
+  "snapshot_metadata": [
+    {
+      "snapshot_id": "snapshot:page:one",
+      "page_ref": "page:one",
+      "hash_algorithm": "sha256",
+      "hash": "sha256:snapshot-page-one",
+      "deterministic_inputs": [
+        "artifact_manifest",
+        "viewport",
+        "fixture_seed"
+      ]
+    },
+    {
+      "snapshot_id": "snapshot:page:two",
+      "page_ref": "page:two",
+      "hash_algorithm": "sha256",
+      "hash": "sha256:snapshot-page-two",
+      "deterministic_inputs": [
+        "artifact_manifest",
+        "viewport",
+        "fixture_seed"
+      ]
+    },
+    {
+      "snapshot_id": "snapshot:pdf:clean-skip",
+      "page_ref": "pdf:clean-skip",
+      "hash_algorithm": "sha256",
+      "hash": "sha256:pdf-clean-skip",
+      "deterministic_inputs": [
+        "renderer_dependency_gate",
+        "fixture_seed"
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "warning_id": "warning:table-layout",
+      "kind": "table",
+      "severity": "review",
+      "message": "table layout requires review in fixture render"
+    },
+    {
+      "warning_id": "warning:markdown-fallback",
+      "kind": "markdown",
+      "severity": "info",
+      "message": "markdown fallback used in fixture render"
+    },
+    {
+      "warning_id": "warning:renderer-skip",
+      "kind": "clean_skip",
+      "severity": "info",
+      "message": "renderer dependency unavailable in provider-free fixture mode"
+    }
+  ],
+  "annotations": [
+    {
+      "annotation_id": "annotation:source",
+      "kind": "source",
+      "required": true,
+      "resolved": true
+    },
+    {
+      "annotation_id": "annotation:disclosure",
+      "kind": "disclosure",
+      "required": true,
+      "resolved": true
+    }
+  ],
+  "fixture_hashes": [
+    {
+      "fixture_key": "fixture:report:html",
+      "hash_algorithm": "sha256",
+      "hash": "sha256:fixture-report-html"
+    },
+    {
+      "fixture_key": "fixture:report:pdf",
+      "hash_algorithm": "sha256",
+      "hash": "sha256:fixture-report-pdf"
+    }
+  ],
+  "renderer_skips": [
+    {
+      "id": "renderer:clean-skip",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true,
+      "reason": "renderer dependency is unavailable in provider-free fixture mode"
+    }
+  ],
+  "adapter_boundaries": [
+    {
+      "id": "renderer",
+      "capability": "generic.ai.report.render.clean_skip",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "snapshotter",
+      "capability": "generic.ai.report.render.snapshot_hash",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    }
+  ]
+}

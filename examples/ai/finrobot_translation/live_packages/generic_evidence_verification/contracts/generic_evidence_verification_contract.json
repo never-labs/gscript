@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "generic-evidence-verification-contract-v1",
+  "package_boundary_id": "generic-ai-evidence-verification",
+  "package_name": "generic.ai.evidence.verify",
+  "entrypoint": "ai.evidence.verify",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_credentials_required": false,
+  "provider_sdks_required": false,
+  "depends_on_q_runtime": false,
+  "capabilities": [
+    "generic.ai.evidence.verify",
+    "generic.ai.evidence.document_rag_projection",
+    "generic.ai.evidence.claim_record",
+    "generic.ai.evidence.source_ref",
+    "generic.ai.evidence.citation_ref",
+    "generic.ai.evidence.requirement_matrix",
+    "generic.ai.evidence.citation_normalize",
+    "generic.ai.evidence.freshness_check",
+    "generic.ai.evidence.unresolved_ref",
+    "generic.ai.evidence.quality_summary",
+    "generic.ai.evidence.clean_degradation"
+  ],
+  "modules": {
+    "policy": {
+      "inputs": [
+        "evidence_policy",
+        "evidence_requirement_matrix"
+      ],
+      "outputs": [
+        "policy_decisions"
+      ],
+      "required_fields": [
+        "minimum_source_refs_per_claim",
+        "allowed_evidence_kinds",
+        "reject_unresolved_refs",
+        "clean_degradation_mode"
+      ]
+    },
+    "citation_normalization": {
+      "inputs": [
+        "citation_refs",
+        "source_annotations"
+      ],
+      "outputs": [
+        "normalized_citations",
+        "unresolved_refs"
+      ],
+      "required_fields": [
+        "source_id",
+        "normalized_source_id",
+        "locator",
+        "first_seen_order"
+      ]
+    },
+    "freshness": {
+      "inputs": [
+        "source_annotations",
+        "freshness_policy"
+      ],
+      "outputs": [
+        "freshness_warnings"
+      ],
+      "required_fields": [
+        "source_id",
+        "kind",
+        "observed_at",
+        "stale_after_days",
+        "warning_level"
+      ]
+    },
+    "verification": {
+      "inputs": [
+        "claim_records",
+        "source_annotations",
+        "normalized_citations",
+        "freshness_warnings"
+      ],
+      "outputs": [
+        "verification_results",
+        "evidence_quality_summary",
+        "clean_degradation_actions"
+      ],
+      "required_fields": [
+        "claim_id",
+        "status",
+        "resolved_source_refs",
+        "unresolved_refs",
+        "freshness_warning_refs",
+        "action"
+      ]
+    }
+  },
+  "field_contracts": {
+    "document_rag_evidence_projection": "document RAG retrieved chunks and answer citations project into claim records, source annotations, normalized citation refs, and projection assertions",
+    "claim_records": "claim records include claim_id, claim_kind, required_evidence_kinds, source_refs, citation_refs, and allow_missing_evidence",
+    "source_annotations": "source annotations include source_id, kind, locator, observed_at, retrieved_at, evidence_hash, and provider_free",
+    "citation_refs": "citation refs must resolve to source annotations or appear in unresolved_refs",
+    "requirement_matrix": "requirement rows define minimum refs, allowed evidence kinds, required fields, and clean degradation modes",
+    "citation_normalization": "normalization lowercases ids, strips query fragments, dedupes repeated refs, and preserves first-seen order",
+    "freshness_policy": "freshness rules compare fixture timestamps and emit warning refs without network calls",
+    "clean_degradation": "unsupported or unresolved claims are omitted or degraded with deterministic warnings instead of invented evidence"
+  },
+  "acceptance_gates": [
+    "all checked refs either resolve to source annotations or appear in unresolved_refs",
+    "document RAG answer citations resolve to source chunks before becoming evidence claims",
+    "claims with insufficient required evidence produce clean_degradation_actions",
+    "freshness warnings name stale source refs and do not block unless policy says so",
+    "normalized citations preserve deterministic first-seen order",
+    "fixtures remain provider-free, credential-free, live-network-free, and model-call-free"
+  ]
+}

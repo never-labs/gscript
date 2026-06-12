@@ -1,0 +1,76 @@
+// FinRobot quantitative multi-factor agents translated to Leia + q + AI.
+// Mirrors experiments/multi_factor_agents.py and quantitative_investment_group_config.json.
+
+model {
+    default: "mock-fast"
+}
+
+evaluate "FinRobot multi-factor agents replay" {
+
+    func check(name, ok) {
+        if !ok {
+            print("failed", name)
+        }
+        assert(ok)
+        print("ok", name)
+    }
+
+    factor_panel := q.sql(
+    "select sym,value,growth,momentum,quality,volatility,liquidity,sentiment,macro from ([] sym:`AAPL`MSFT`NVDA`JPM`XOM; value:0.62 0.55 0.40 0.70 0.58; growth:0.52 0.47 0.86 0.42 0.33; momentum:0.45 0.50 0.92 0.38 0.30; quality:0.83 0.79 0.74 0.68 0.61; volatility:0.25 0.22 0.48 0.31 0.36; liquidity:0.95 0.92 0.88 0.86 0.72; sentiment:0.40 0.45 0.80 0.36 0.20; macro:0.61 0.58 0.64 0.52 0.44)",
+    {}
+    )
+
+    factor_panel = q.sql(factor_panel, "update risk_penalty:volatility*0.45 from trades")
+    factor_panel = q.sql(factor_panel, "update composite:value*0.20+growth*0.15+momentum*0.20+quality*0.15+liquidity*0.10+sentiment*0.10+macro*0.10-risk_penalty from trades")
+    ranked := q.sql(factor_panel, "select sym,value,growth,momentum,quality,volatility,liquidity,sentiment,macro,risk_penalty,composite from trades order by composite desc")
+
+    top_book := q.sql(ranked, "select sym,composite,volatility,liquidity from trades where composite>0.20 order by composite desc")
+    factor_rollup := q.sql(ranked, "select avg_score:sum composite, names:count i by bucket:`approved from trades where composite>0.20")
+
+    load_factor_data := tool {
+        name: "load_factor_data"
+        fn: func(scope) {
+            return "scope=" .. scope .. "; rows=5; factors=value,growth,momentum,quality,volatility,liquidity,sentiment,macro", nil
+        }
+        params: {"scope"}
+        description: "Return a deterministic local factor data manifest."
+    }
+
+    run_factor_model := tool {
+        name: "run_factor_model"
+        fn: func(symbol) {
+            row := q.sql(ranked, "select sym,composite,volatility,liquidity from trades where sym=`" .. symbol)
+            if #row == 0 {
+                return "symbol=" .. symbol .. "; missing=true", nil
+            }
+            return string.format("symbol=%s; composite=%.4f; volatility=%.2f; liquidity=%.2f", row[1].sym, row[1].composite, row[1].volatility, row[1].liquidity), nil
+        }
+        params: {"symbol"}
+        description: "Replay a local multi-factor score for one symbol."
+    }
+
+    researcher := agent {
+        name: "multi_factor_researcher"
+        config: func(request) {
+            return {
+                model: "mock-fast"
+                messages: {
+                    llm.system("Coordinate FinRobot-style factor researchers using only local factor evidence."),
+                    llm.user(request),
+                }
+            }, nil
+        }
+        params: {"request"}
+    }
+
+    agent_result, agent_err := researcher("Validate the Dow 30 multi-factor sleeve and choose the strongest local candidate.")
+
+    check("q ranks multi-factor candidates", #ranked == 5 && ranked[1].sym == "NVDA" && ranked[1].composite > ranked[2].composite)
+    check("q filters approved factor book", #top_book == 4 && top_book[1].sym == "NVDA" && top_book[4].sym == "MSFT")
+    check("q rolls up factor cohort", #factor_rollup == 1 && factor_rollup[1].names == 4)
+    check("AI agent stays offline and mockable", agent_err == nil && agent_result.text == "Direct llm.turn keeps examples simple.")
+
+    summary := string.format("quant_multi_factor top=%s approved=%d score=%.4f", ranked[1].sym, #top_book, ranked[1].composite)
+    print(summary)
+
+}

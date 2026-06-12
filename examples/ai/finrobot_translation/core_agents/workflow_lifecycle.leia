@@ -1,0 +1,345 @@
+// finrobot_translation/core_agents/workflow_lifecycle.leia
+//
+// Provider-free AutoGen workflow lifecycle parity fixture.
+// Source mapping:
+// - SingleAssistant -> resettable single agent state with deterministic local cache
+// - SingleAssistantShadow -> trigger-only shadow run that summarizes without mutating the primary state
+// - MultiAssistantWithLeader -> explicit leader-to-specialist handoff trace and max-round stop
+// - cache_seed / retry_envelope / human_input_mode -> workflow state metadata, not provider settings
+// - TERMINATE -> prompt/output convention validated by assertions, not a runtime control signal
+
+lifecycle_fixture := {
+    provider_free: true,
+    live_network: false,
+    credentials_required: false,
+    replay_mode: "local-fixture",
+    cache_policy: "memory-fixture-only",
+    cache_seed: "finrobot-lifecycle-seed-001",
+    human_input_mode: "NEVER",
+    reflection_placeholder: "reflection-disabled-placeholder",
+}
+
+func new_lifecycle_state(name) {
+    return {
+        name: name,
+        reset_count: 0,
+        cache_seed: lifecycle_fixture.cache_seed,
+        cache_hits: 0,
+        cache_misses: 0,
+        human_input_mode: lifecycle_fixture.human_input_mode,
+        human_inputs_requested: 0,
+        reflection_summary_method: lifecycle_fixture.reflection_placeholder,
+        turns: {},
+        trace: {},
+        retry_envelopes: {},
+        nested_summaries: {},
+    }
+}
+
+func reset_lifecycle(state, reason) {
+    state.reset_count = state.reset_count + 1
+    state.turns = {}
+    state.trace[#state.trace + 1] = "reset:" .. reason
+    return state
+}
+
+func seed_cache(state, key, value) {
+    state.turns[#state.turns + 1] = {key: state.cache_seed .. ":" .. key, value: value, seeded: true}
+    state.trace[#state.trace + 1] = "cache-seed:" .. state.cache_seed .. ":" .. key
+    return state
+}
+
+func cache_lookup(state, key, value) {
+    seeded_key := state.cache_seed .. ":" .. key
+    for i := 1; i <= #state.turns; i++ {
+        if state.turns[i].key == key || state.turns[i].key == seeded_key {
+            state.cache_hits = state.cache_hits + 1
+            state.trace[#state.trace + 1] = "cache-hit:" .. key
+            return state.turns[i].value
+        }
+    }
+    state.cache_misses = state.cache_misses + 1
+    state.turns[#state.turns + 1] = {key: key, value: value}
+    state.trace[#state.trace + 1] = "cache-miss:" .. key
+    return value
+}
+
+func request_human_input(state, prompt) {
+    state.trace[#state.trace + 1] = "human-input-suppressed:" .. state.human_input_mode .. ":" .. prompt
+    return {
+        requested: false,
+        mode: state.human_input_mode,
+        prompt: prompt,
+        metadata: {
+            source: "UserProxyAgent",
+            reason: "provider-free replay fixture",
+            blocking: false,
+        }
+    }, nil
+}
+
+func record_tool_retry(state, tool_name, attempts) {
+    envelope := {
+        tool: tool_name,
+        max_attempts: attempts,
+        attempts: {},
+        final_status: "pending",
+        retryable: true,
+        provider_free: true,
+    }
+    for i := 1; i <= attempts; i++ {
+        status := "retry"
+        if i == attempts {
+            status = "ok"
+        }
+        envelope.attempts[#envelope.attempts + 1] = {
+            attempt: i,
+            status: status,
+            error_kind: "local-fixture-timeout",
+            replay_key: state.cache_seed .. ":" .. tool_name .. ":" .. i,
+        }
+    }
+    envelope.final_status = "ok"
+    state.retry_envelopes[#state.retry_envelopes + 1] = envelope
+    state.trace[#state.trace + 1] = "tool-retry:" .. tool_name .. ":" .. attempts
+    return envelope
+}
+
+func single_assistant_run(state, task) {
+    cached := cache_lookup(state, "single:" .. task, "single assistant processed " .. task .. " TERMINATE")
+    state.trace[#state.trace + 1] = "trigger:user"
+    return {
+        mode: "SingleAssistant",
+        text: cached,
+        terminated: string.find(cached, "TERMINATE", 1, true) != nil,
+        cache_hits: state.cache_hits,
+        cache_misses: state.cache_misses,
+        cache_seed: state.cache_seed,
+        reset_count: state.reset_count,
+        human_input_mode: state.human_input_mode,
+        reflection_summary_method: state.reflection_summary_method,
+        provider_free: lifecycle_fixture.provider_free,
+    }, nil
+}
+
+func shadow_assistant_run(primary_state, shadow_state, trigger, task) {
+    shadow_state.trace[#shadow_state.trace + 1] = "trigger:" .. trigger
+    summary := "shadow summary for " .. task .. " from " .. trigger .. " TERMINATE"
+    shadow_state.turns[#shadow_state.turns + 1] = {key: "shadow:" .. task, value: summary}
+    shadow_state.nested_summaries[#shadow_state.nested_summaries + 1] = {
+        source: "SingleAssistantShadow",
+        trigger: trigger,
+        summary: summary,
+        reflection_summary_method: shadow_state.reflection_summary_method,
+    }
+    return {
+        mode: "SingleAssistantShadow",
+        text: summary,
+        nested_summary: "shadow observed primary resets=" .. primary_state.reset_count,
+        nested_summary_count: #shadow_state.nested_summaries,
+        reflection_summary_method: shadow_state.reflection_summary_method,
+        primary_turns_after_shadow: #primary_state.turns,
+        shadow_turns: #shadow_state.turns,
+        terminated: string.find(summary, "TERMINATE", 1, true) != nil,
+        provider_free: lifecycle_fixture.provider_free,
+    }, nil
+}
+
+func specialist_config(order) {
+    return {
+        model: "provider-free-specialist",
+        messages: {
+            llm.system("Translated FinRobot specialist. Use only local fixture evidence and reply TERMINATE."),
+            llm.user(order),
+        }
+    }
+}
+
+func specialist_flow(order) {
+    return {
+        status: "done",
+        text: "specialist completed " .. order .. " TERMINATE",
+        value: {
+            completed: true,
+            summary: "nested chat summary: " .. order,
+            next_speaker: "User_Proxy",
+            terminated: true,
+        }
+    }, nil
+}
+
+specialist := llm.agent("Lifecycle_Market_Analyst", specialist_config, specialist_flow, {
+    params: {"order"}
+    description: "Provider-free translated AutoGen specialist."
+})
+
+lifecycle_handoff := llm.handoff(specialist, {name: "leader_to_market_analyst"})
+
+func handoff_dag() {
+    return {
+        nodes: {
+            {id: "User_Proxy", type: "human_proxy", human_input_mode: lifecycle_fixture.human_input_mode},
+            {id: "FinRobot_Group_Leader", type: "leader", reflection_summary_method: lifecycle_fixture.reflection_placeholder},
+            {id: "Lifecycle_Market_Analyst", type: "specialist", reflection_summary_method: lifecycle_fixture.reflection_placeholder},
+        },
+        edges: {
+            {from: "User_Proxy", to: "FinRobot_Group_Leader", trigger: "initial_task"},
+            {from: "FinRobot_Group_Leader", to: "Lifecycle_Market_Analyst", trigger: "order_message"},
+            {from: "Lifecycle_Market_Analyst", to: "User_Proxy", trigger: "handoff_return"},
+        },
+        acyclic: true,
+        entrypoint: "User_Proxy",
+        terminal: "User_Proxy",
+    }
+}
+
+func leader_workflow(task, max_round) {
+    state := new_lifecycle_state("leader")
+    state = seed_cache(state, "leader:" .. task, "seeded leader cache")
+    human_input, human_input_err := request_human_input(state, "Approve lifecycle handoff?")
+    if human_input_err != nil {
+        return nil, human_input_err
+    }
+    retry_envelope := record_tool_retry(state, "leader_to_market_analyst", 2)
+    dag := handoff_dag()
+    rounds := {}
+    rounds[#rounds + 1] = {round: 1, speaker: "User_Proxy", trigger: "initial_task", text: task}
+    rounds[#rounds + 1] = {round: 2, speaker: "FinRobot_Group_Leader", trigger: "order_message", text: "[Lifecycle_Market_Analyst] collect local lifecycle evidence"}
+
+    handoff_result, handoff_err := llm.dispatch({
+        id: "lifecycle_handoff",
+        tool: "leader_to_market_analyst",
+        args: {order: "collect local lifecycle evidence"},
+    }, {lifecycle_handoff})
+    if handoff_err != nil {
+        return nil, handoff_err
+    }
+
+    rounds[#rounds + 1] = {round: 3, speaker: "Lifecycle_Market_Analyst", trigger: "handoff_return", text: handoff_result.summary}
+    stopped_by_max_round := false
+    if #rounds >= max_round {
+        stopped_by_max_round = true
+    } else {
+        rounds[#rounds + 1] = {round: 4, speaker: "FinRobot_Group_Leader", trigger: "final", text: "leader accepted specialist result TERMINATE"}
+    }
+
+    final_text := "leader accepted specialist result TERMINATE"
+    return {
+        mode: "MultiAssistantWithLeader",
+        text: final_text,
+        rounds: rounds,
+        round_count: #rounds,
+        max_round: max_round,
+        stopped_by_max_round: stopped_by_max_round,
+        nested_chat_summary: handoff_result.summary,
+        nested_summary_ledger: {
+            {parent: "FinRobot_Group_Leader", child: "Lifecycle_Market_Analyst", summary: handoff_result.summary, reflection_summary_method: state.reflection_summary_method}
+        },
+        handoff_dag: dag,
+        handoff_trace_type: handoff_result.trace.type,
+        handoff_trace_name: handoff_result.trace.name,
+        handoff_child_name: handoff_result.trace.children[1].name,
+        handoff_child_parent: handoff_result.trace.children[1].parent.name,
+        tool_call_retry_envelope: retry_envelope,
+        human_input_mode_metadata: human_input,
+        cache_seed: state.cache_seed,
+        state_trace: state.trace,
+        reflection_summary_method: state.reflection_summary_method,
+        next_speaker: handoff_result.next_speaker,
+        terminated: string.find(final_text, "TERMINATE", 1, true) != nil,
+        provider_free_replay: {
+            mode: lifecycle_fixture.replay_mode,
+            live_network: lifecycle_fixture.live_network,
+            credentials_required: lifecycle_fixture.credentials_required,
+            cache_policy: lifecycle_fixture.cache_policy,
+            cache_seed: lifecycle_fixture.cache_seed,
+        }
+    }, nil
+}
+
+evaluate "single assistant lifecycle reset cache trigger terminate" {
+    state := new_lifecycle_state("single")
+    state = reset_lifecycle(state, "new_chat")
+    state = seed_cache(state, "single:seeded task", "seeded single assistant answer TERMINATE")
+    seeded, seeded_err := single_assistant_run(state, "seeded task")
+    first, first_err := single_assistant_run(state, "draft lifecycle note")
+    second, second_err := single_assistant_run(state, "draft lifecycle note")
+
+    assert(seeded_err == nil)
+    assert(first_err == nil)
+    assert(second_err == nil)
+    assert(seeded.cache_hits == 1)
+    assert(seeded.cache_seed == "finrobot-lifecycle-seed-001")
+    assert(seeded.human_input_mode == "NEVER")
+    assert(seeded.reflection_summary_method == "reflection-disabled-placeholder")
+    assert(first.mode == "SingleAssistant")
+    assert(first.reset_count == 1)
+    assert(first.cache_misses == 1)
+    assert(second.cache_hits == 2)
+    assert(second.terminated == true)
+    assert(second.provider_free == true)
+    assert(state.trace[1] == "reset:new_chat")
+    assert(state.trace[2] == "cache-seed:finrobot-lifecycle-seed-001:single:seeded task")
+    assert(state.trace[3] == "cache-hit:single:seeded task")
+    assert(state.trace[5] == "cache-miss:single:draft lifecycle note")
+    assert(state.trace[7] == "cache-hit:single:draft lifecycle note")
+}
+
+evaluate "single assistant shadow keeps primary state isolated" {
+    primary := new_lifecycle_state("primary")
+    shadow := new_lifecycle_state("shadow")
+    primary = reset_lifecycle(primary, "primary_start")
+    primary_result, primary_err := single_assistant_run(primary, "prepare primary answer")
+    shadow_result, shadow_err := shadow_assistant_run(primary, shadow, "after_primary_reply", "prepare primary answer")
+
+    assert(primary_err == nil)
+    assert(shadow_err == nil)
+    assert(primary_result.terminated == true)
+    assert(shadow_result.mode == "SingleAssistantShadow")
+    assert(shadow_result.primary_turns_after_shadow == 1)
+    assert(shadow_result.shadow_turns == 1)
+    assert(shadow_result.nested_summary == "shadow observed primary resets=1")
+    assert(shadow_result.nested_summary_count == 1)
+    assert(shadow_result.reflection_summary_method == "reflection-disabled-placeholder")
+    assert(shadow_result.terminated == true)
+    assert(shadow_result.provider_free == true)
+}
+
+evaluate "multi assistant leader lifecycle handoff max round replay" {
+    result, err := leader_workflow("Coordinate provider-free lifecycle parity.", 3)
+
+    assert(err == nil)
+    assert(result.mode == "MultiAssistantWithLeader")
+    assert(result.round_count == 3)
+    assert(result.max_round == 3)
+    assert(result.stopped_by_max_round == true)
+    assert(result.rounds[2].trigger == "order_message")
+    assert(result.nested_chat_summary == "nested chat summary: collect local lifecycle evidence")
+    assert(result.nested_summary_ledger[1].reflection_summary_method == "reflection-disabled-placeholder")
+    assert(result.next_speaker == "User_Proxy")
+    assert(result.handoff_dag.acyclic == true)
+    assert(result.handoff_dag.nodes[1].human_input_mode == "NEVER")
+    assert(result.handoff_dag.edges[2].trigger == "order_message")
+    assert(result.handoff_trace_type == "agent_tool")
+    assert(result.handoff_trace_name == "leader_to_market_analyst")
+    assert(result.handoff_child_name == "Lifecycle_Market_Analyst")
+    assert(result.handoff_child_parent == "leader_to_market_analyst")
+    assert(result.tool_call_retry_envelope.tool == "leader_to_market_analyst")
+    assert(result.tool_call_retry_envelope.attempts[1].status == "retry")
+    assert(result.tool_call_retry_envelope.attempts[2].status == "ok")
+    assert(result.tool_call_retry_envelope.final_status == "ok")
+    assert(result.human_input_mode_metadata.requested == false)
+    assert(result.human_input_mode_metadata.mode == "NEVER")
+    assert(result.human_input_mode_metadata.metadata.blocking == false)
+    assert(result.cache_seed == "finrobot-lifecycle-seed-001")
+    assert(result.state_trace[1] == "cache-seed:finrobot-lifecycle-seed-001:leader:Coordinate provider-free lifecycle parity.")
+    assert(result.state_trace[2] == "human-input-suppressed:NEVER:Approve lifecycle handoff?")
+    assert(result.state_trace[3] == "tool-retry:leader_to_market_analyst:2")
+    assert(result.reflection_summary_method == "reflection-disabled-placeholder")
+    assert(result.terminated == true)
+    assert(result.provider_free_replay.mode == "local-fixture")
+    assert(result.provider_free_replay.live_network == false)
+    assert(result.provider_free_replay.credentials_required == false)
+    assert(result.provider_free_replay.cache_policy == "memory-fixture-only")
+    assert(result.provider_free_replay.cache_seed == "finrobot-lifecycle-seed-001")
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/generic-evidence-verification/citation-normalization-v1.schema.json",
+  "title": "Generic Citation Normalization",
+  "type": "object",
+  "required": [
+    "normalization_id",
+    "provider_free",
+    "live_network",
+    "source_id_case",
+    "strip_query_fragments_from_locator",
+    "dedupe_repeated_refs",
+    "preserve_first_seen_order",
+    "normalized_citations"
+  ],
+  "properties": {
+    "normalization_id": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "source_id_case": {"type": "string"},
+    "strip_query_fragments_from_locator": {"type": "boolean"},
+    "dedupe_repeated_refs": {"type": "boolean"},
+    "preserve_first_seen_order": {"type": "boolean"},
+    "normalized_citations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "source_id",
+          "normalized_source_id",
+          "locator",
+          "first_seen_order",
+          "resolved"
+        ],
+        "properties": {
+          "claim_id": {"type": "string"},
+          "source_id": {"type": "string"},
+          "normalized_source_id": {"type": "string"},
+          "locator": {"type": "string"},
+          "first_seen_order": {"type": "integer"},
+          "resolved": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

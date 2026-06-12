@@ -1,0 +1,509 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-optional-integration-capability-gates",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "no_live_import_default": true,
+  "clean_skip_without_dependency": true,
+  "fixture_hook": "recorded_optional_live_fixture",
+  "gates": [
+    {
+      "id": "fingpt",
+      "capability": "optional.ai.fingpt.forecast",
+      "package_name": "fingpt",
+      "import_name": "fingpt",
+      "fixture_key": "fingpt:forecast:ACME:2026-06-11",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "fingpt",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "python_package": {
+          "name": "fingpt",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "fingpt",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "api_key",
+          "access_token",
+          "credential"
+        ]
+      }
+    },
+    {
+      "id": "finrl",
+      "capability": "optional.quant.finrl.strategy",
+      "package_name": "finrl",
+      "import_name": "finrl",
+      "fixture_key": "finrl:strategy:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "finrl",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "python_package": {
+          "name": "finrl",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "finrl",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "api_key",
+          "access_token",
+          "credential"
+        ]
+      }
+    },
+    {
+      "id": "finml",
+      "capability": "optional.quant.finml.factor_model",
+      "package_name": "finml",
+      "import_name": "finml",
+      "fixture_key": "finml:factors:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "finml",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "python_package": {
+          "name": "finml",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "finml",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "api_key",
+          "access_token",
+          "credential"
+        ]
+      }
+    },
+    {
+      "id": "backtrader",
+      "capability": "optional.quant.backtrader.backtest",
+      "package_name": "backtrader",
+      "import_name": "backtrader",
+      "fixture_key": "backtrader:sma_cross:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "backtrader",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "python_package": {
+          "name": "backtrader",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "backtrader",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "api_key",
+          "access_token",
+          "credential"
+        ]
+      }
+    },
+    {
+      "id": "mplfinance",
+      "capability": "optional.chart.mplfinance.render",
+      "package_name": "mplfinance",
+      "import_name": "mplfinance",
+      "fixture_key": "mplfinance:candles:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "mplfinance",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "python_package": {
+          "name": "mplfinance",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "mplfinance",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "api_key",
+          "access_token",
+          "credential"
+        ]
+      }
+    },
+    {
+      "id": "openbb",
+      "capability": "optional.data.openbb.market_data",
+      "package_name": "openbb",
+      "import_name": "openbb",
+      "fixture_key": "openbb:market_data:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "openbb",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "request_schema": {
+        "schema_version": 1,
+        "type": "object",
+        "required": [
+          "dataset",
+          "query"
+        ],
+        "properties": {
+          "dataset": {
+            "const": "market_data"
+          },
+          "query": {
+            "type": "object",
+            "required": [
+              "symbol",
+              "asset_class",
+              "interval",
+              "adjusted"
+            ],
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "asset_class": {
+                "enum": [
+                  "equity"
+                ]
+              },
+              "interval": {
+                "enum": [
+                  "1d"
+                ]
+              },
+              "adjusted": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "pat": {
+          "env": "OPENBB_PAT",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        },
+        "database": {
+          "env": "OPENBB_DATABASE_URL",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "openbb",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "OPENBB_PAT",
+          "OPENBB_DATABASE_URL",
+          "api_key",
+          "access_token"
+        ]
+      }
+    },
+    {
+      "id": "ollama",
+      "capability": "optional.llm.ollama.local",
+      "package_name": "ollama",
+      "import_name": "ollama",
+      "fixture_key": "ollama:function_call:ACME:offline",
+      "clean_skip": true,
+      "requires_credentials": false,
+      "live_network": false,
+      "dependency_imported": false,
+      "status_without_dependency": "skipped",
+      "provider_credentials_required": false,
+      "credential_absent_safe": true,
+      "no_live_import_default": true,
+      "version_metadata": {
+        "package": "ollama",
+        "version_source": "fixture_metadata",
+        "minimum_supported": "unverified",
+        "detected_version": null,
+        "dependency_absent_status": "skipped"
+      },
+      "tool_adapter_result_envelope": {
+        "schema_version": 1,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "required_fields": [
+          "status",
+          "capability",
+          "fixture_key",
+          "data",
+          "metadata"
+        ],
+        "status_values": [
+          "ok",
+          "skipped"
+        ],
+        "skip_status": "skipped",
+        "data_source": "fixture"
+      },
+      "absence_gates": {
+        "local_endpoint": {
+          "name": "ollama",
+          "clean_skip": true,
+          "absent_status": "skipped"
+        }
+      },
+      "terms_metadata": {
+        "integration": "ollama",
+        "mode": "fixture_replay",
+        "metadata_only": true,
+        "live_terms_required_before_network_use": true,
+        "live_network_enabled": false
+      },
+      "credential_redaction": {
+        "status": "redacted",
+        "secret_values_present": false,
+        "redacted_fields": [
+          "base_url",
+          "authorization",
+          "credential"
+        ]
+      }
+    }
+  ]
+}

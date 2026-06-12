@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-product-app-boundary",
+  "package_name": "generic.ai.product_app.boundary",
+  "entrypoint": "ai.product_app.boundary",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.product_app.boundary",
+    "generic.ai.product_app.route_contract",
+    "generic.ai.product_app.session_contract",
+    "generic.ai.product_app.workflow_projection",
+    "generic.ai.product_app.task_log",
+    "generic.ai.product_app.artifact_download",
+    "generic.ai.product_app.crud_fixture_state",
+    "generic.ai.product_app.db_migration_plan",
+    "generic.ai.product_app.deployment_target",
+    "generic.ai.product_app.approval_boundary",
+    "generic.ai.product_app.clean_skip"
+  ],
+  "modules": {
+    "routing": {
+      "inputs": [
+        "route_descriptor",
+        "method",
+        "handler_ref"
+      ],
+      "outputs": [
+        "route_contract",
+        "required_capabilities"
+      ],
+      "required_fields": [
+        "route_id",
+        "method",
+        "path",
+        "handler_ref",
+        "auth_required",
+        "capability"
+      ]
+    },
+    "state": {
+      "inputs": [
+        "session_fixture",
+        "crud_fixture",
+        "task_log_fixture"
+      ],
+      "outputs": [
+        "session_contract",
+        "crud_state",
+        "task_log"
+      ],
+      "required_fields": [
+        "session_id",
+        "actor_ref",
+        "state_key",
+        "fixture_uri"
+      ]
+    },
+    "delivery": {
+      "inputs": [
+        "artifact_manifest",
+        "deployment_target",
+        "migration_plan"
+      ],
+      "outputs": [
+        "download_contract",
+        "deployment_contract",
+        "migration_contract",
+        "clean_skip"
+      ],
+      "required_fields": [
+        "artifact_id",
+        "uri",
+        "target",
+        "live_network",
+        "clean_skip"
+      ]
+    }
+  },
+  "workflow_projection_contract": {
+    "source_package": "generic_workflow_orchestrator",
+    "source_fixtures": [
+      "../generic_workflow_orchestrator/fixtures/workflow_graph_fixture.json",
+      "../generic_workflow_orchestrator/fixtures/workflow_result_fixture.json"
+    ],
+    "target_fixture": "fixtures/product_app_boundary_fixture.json",
+    "target_capability": "generic.ai.product_app.workflow_projection",
+    "required_source_fields": [
+      "workflow_id",
+      "run_id",
+      "stage_results.stage_id",
+      "stage_results.status",
+      "artifacts.artifact_id",
+      "trace_refs"
+    ],
+    "required_target_fields": [
+      "route_id",
+      "task_id",
+      "artifact_id",
+      "correlation_id",
+      "fixture_uri"
+    ],
+    "raw_stage_payloads_allowed": false,
+    "live_side_effects_allowed": false,
+    "deterministic_order_required": true,
+    "provider_free": true
+  },
+  "field_contracts": {
+    "route_contracts": "routes declare route id, method, path, handler reference, auth requirement, and capability without importing a web framework",
+    "session_contracts": "sessions are fixture-backed actor and policy envelopes with no credentials or live auth provider",
+    "workflow_projection": "workflow projection maps workflow stage and artifact refs into product task logs, routes, and artifact downloads without live side effects",
+    "task_logs": "task logs record status transitions, timestamps, correlation ids, and replay metadata",
+    "artifact_downloads": "artifact downloads use fixture or artifact URIs plus hashes and never fetch remote objects by default",
+    "crud_fixture_state": "CRUD fixture state records deterministic create/read/update/delete operations over fixture state keys",
+    "db_migration_plan": "database migration plans are metadata-only, ordered, and clean-skip without a database client",
+    "deployment_targets": "deployment targets describe local/container/cloud metadata while live deployment stays disabled",
+    "approval_boundaries": "approval boundaries gate route mutations, downloads, migrations, and deployments before side effects",
+    "clean_skips": "clean skips return skipped envelopes for absent framework, database, artifact store, or deployment runtime"
+  }
+}

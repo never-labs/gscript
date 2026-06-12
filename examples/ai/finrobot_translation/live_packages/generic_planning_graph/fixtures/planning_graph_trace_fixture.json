@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "fixture_key": "generic_planning_graph:trace:offline",
+  "contract_id": "generic-planning-graph-contract-v1",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "real_dependency_imports": false,
+  "run_id": "generic-planning-graph-run-001",
+  "events": [
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-receive-goal-started",
+      "evidence_kind": "plan.node.started",
+      "plan_node_id": "receive_goal",
+      "sequence": 1,
+      "status": "started",
+      "provider_free": true,
+      "live_model": false,
+      "dependencies_satisfied": []
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-receive-goal-completed",
+      "evidence_kind": "plan.node.completed",
+      "plan_node_id": "receive_goal",
+      "sequence": 2,
+      "status": "completed",
+      "provider_free": true,
+      "live_model": false,
+      "outputs": [
+        "goal_envelope"
+      ]
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-expand-plan-attempt-1",
+      "evidence_kind": "plan.retry.attempt",
+      "plan_node_id": "expand_plan",
+      "sequence": 3,
+      "status": "retry",
+      "provider_free": true,
+      "live_model": false,
+      "attempt": 1,
+      "retry_metadata": {
+        "max_attempts": 2,
+        "retryable": true,
+        "backoff": "fixed_fixture_ms",
+        "backoff_ms": 25,
+        "reason": "missing_required_dependency_edge"
+      }
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-expand-plan-attempt-2",
+      "evidence_kind": "plan.retry.attempt",
+      "plan_node_id": "expand_plan",
+      "sequence": 4,
+      "status": "ok",
+      "provider_free": true,
+      "live_model": false,
+      "attempt": 2,
+      "retry_metadata": {
+        "max_attempts": 2,
+        "retryable": true,
+        "backoff": "fixed_fixture_ms",
+        "backoff_ms": 25,
+        "reason": "fixture_replay_corrected_edge"
+      }
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-expand-plan-completed",
+      "evidence_kind": "plan.node.completed",
+      "plan_node_id": "expand_plan",
+      "sequence": 5,
+      "status": "completed",
+      "provider_free": true,
+      "live_model": false,
+      "dependencies_satisfied": [
+        "receive_goal"
+      ]
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-branch-parallel-checks",
+      "evidence_kind": "plan.branch.selected",
+      "plan_node_id": "branch_parallel_checks",
+      "sequence": 6,
+      "status": "branched",
+      "provider_free": true,
+      "live_model": false,
+      "branches": [
+        "validate_dependencies",
+        "collect_evidence"
+      ]
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-validate-dependencies-completed",
+      "evidence_kind": "plan.node.completed",
+      "plan_node_id": "validate_dependencies",
+      "sequence": 7,
+      "status": "completed",
+      "provider_free": true,
+      "live_model": false,
+      "dependencies_satisfied": [
+        "branch_parallel_checks"
+      ]
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-collect-evidence-completed",
+      "evidence_kind": "plan.node.completed",
+      "plan_node_id": "collect_evidence",
+      "sequence": 8,
+      "status": "completed",
+      "provider_free": true,
+      "live_model": false,
+      "dependencies_satisfied": [
+        "branch_parallel_checks"
+      ]
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-merge-checks-completed",
+      "evidence_kind": "plan.merge.completed",
+      "plan_node_id": "merge_checks",
+      "sequence": 9,
+      "status": "completed",
+      "provider_free": true,
+      "live_model": false,
+      "merged_inputs": [
+        "validate_dependencies",
+        "collect_evidence"
+      ]
+    },
+    {
+      "trace_id": "trace-generic-planning-001",
+      "event_id": "evt-emit-artifact-plan-completed",
+      "evidence_kind": "plan.node.completed",
+      "plan_node_id": "emit_artifact_plan",
+      "sequence": 10,
+      "status": "completed",
+      "provider_free": true,
+      "live_model": false,
+      "dependencies_satisfied": [
+        "merge_checks"
+      ],
+      "artifact_refs": [
+        "plan_graph_contract",
+        "trace_evidence"
+      ]
+    }
+  ],
+  "summary": {
+    "plan_node_count": 7,
+    "edge_count": 7,
+    "retry_attempt_count": 2,
+    "branch_count": 2,
+    "merge_count": 1,
+    "final_status": "completed"
+  }
+}

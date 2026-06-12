@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-tutorial-demo-parity-optional-live-gates",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "gates": [
+    {
+      "id": "tutorial-notebook-live-data",
+      "scope": "tutorials_beginner tutorials_advanced",
+      "capabilities": [
+        "parity.tutorial.live_data",
+        "parity.tutorial.notebook_execution",
+        "parity.replay.provider_records"
+      ],
+      "live_network_default": false,
+      "default_enabled": false,
+      "requires_credentials": true,
+      "dependency_imported": false,
+      "clean_skip_without_credentials": true,
+      "status_without_credentials": "skipped",
+      "fixture_key": "tutorials:provider_free:ledger:2026-06-12"
+    },
+    {
+      "id": "agent-builder-demo-live-autogen",
+      "scope": "agent_builder_demo.py",
+      "capabilities": [
+        "parity.demo.agent_builder",
+        "optional.ai.autogen.agent_builder",
+        "optional.ai.model.gpt4"
+      ],
+      "live_network_default": false,
+      "default_enabled": false,
+      "requires_credentials": true,
+      "dependency_imported": false,
+      "clean_skip_without_credentials": true,
+      "status_without_credentials": "skipped",
+      "fixture_key": "demo:agent_builder:provider_free:2026-06-12"
+    },
+    {
+      "id": "backtrader-test-module-live",
+      "scope": "test_module.py",
+      "capabilities": [
+        "parity.demo.backtrader",
+        "optional.quant.backtrader.backtest",
+        "finance.vendor.yahoo.chart"
+      ],
+      "live_network_default": false,
+      "default_enabled": false,
+      "requires_credentials": false,
+      "dependency_imported": false,
+      "clean_skip_without_credentials": true,
+      "status_without_credentials": "skipped",
+      "fixture_key": "demo:backtrader_test_module:provider_free:2026-06-12"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic_ai/model_response_envelope.schema.json",
+  "title": "generic model response envelope",
+  "type": "object",
+  "required": ["envelope_version", "turn_id", "status", "text", "tool_calls", "finish_reason", "usage", "metadata", "redaction"],
+  "properties": {
+    "envelope_version": {"type": "string", "const": "model_response_envelope_v1"},
+    "turn_id": {"type": "string"},
+    "status": {"type": "string"},
+    "text": {"type": "string"},
+    "tool_calls": {"type": "array", "items": {"type": "object"}},
+    "finish_reason": {"type": "string"},
+    "usage": {
+      "type": "object",
+      "required": ["input_tokens", "output_tokens", "total_tokens", "cost", "currency", "latency_ms"]
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["trace_id", "replay_session_id", "adapter_identity", "provider_free"]
+    },
+    "redaction": {
+      "type": "object",
+      "required": ["applied", "secret_values_present", "redacted_fields"]
+    }
+  },
+  "additionalProperties": true
+}

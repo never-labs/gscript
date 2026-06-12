@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GenericWorkflowTraceEmissionHooksV1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "workflow_id",
+    "run_id",
+    "hooks"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "phase",
+          "event_id",
+          "emission_mode",
+          "payload_ref",
+          "provider_sink"
+        ]
+      }
+    }
+  }
+}

@@ -17,6 +17,8 @@ func InstallLLM(installer runtime.StdlibInstaller, opts LLMOptions) {
 		opts.Context,
 		opts.Trace,
 	)
+	configLib := BuildLLMConfigLib(llmConfigOptions{envRead: opts.EnvironmentRead})
+	llmLib.RawSetString("config", runtime.TableValue(configLib))
 	installer.RegisterTable("llm", llmLib)
 	installer.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
 	installer.RegisterTable("msg", BuildLLMMessageLib())

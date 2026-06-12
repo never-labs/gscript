@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-optional-adapter-boundary",
+  "package_name": "generic.ai.optional_adapter.boundary",
+  "entrypoint": "ai.optional_adapter.boundary",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.optional_adapter.boundary",
+    "generic.ai.optional_adapter.registry",
+    "generic.ai.optional_dependency.gate",
+    "generic.ai.optional_adapter.result_envelope",
+    "generic.ai.optional_adapter.version_metadata",
+    "generic.ai.optional_adapter.terms_metadata",
+    "generic.ai.optional_adapter.credential_redaction",
+    "generic.ai.optional_adapter.clean_skip",
+    "generic.ai.optional_adapter.no_live_import_default"
+  ],
+  "modules": {
+    "registry": {
+      "inputs": [
+        "adapter_descriptor",
+        "capability",
+        "fixture_key",
+        "output_schema"
+      ],
+      "outputs": [
+        "adapter_registry_entry",
+        "no_live_import_default"
+      ],
+      "required_fields": [
+        "adapter_id",
+        "capability",
+        "package_name",
+        "import_name",
+        "fixture_key",
+        "output_schema",
+        "no_live_import_default"
+      ]
+    },
+    "gate": {
+      "inputs": [
+        "registry_entry",
+        "dependency_state",
+        "credential_state",
+        "network_policy"
+      ],
+      "outputs": [
+        "gate_status",
+        "clean_skip",
+        "reason"
+      ],
+      "required_fields": [
+        "adapter_id",
+        "dependency_imported",
+        "credential_required",
+        "credential_present",
+        "live_network",
+        "status_without_dependency",
+        "clean_skip"
+      ]
+    },
+    "result_envelope": {
+      "inputs": [
+        "gate_status",
+        "fixture_key",
+        "adapter_metadata"
+      ],
+      "outputs": [
+        "status",
+        "capability",
+        "fixture_key",
+        "data",
+        "metadata"
+      ],
+      "required_fields": [
+        "status",
+        "capability",
+        "fixture_key",
+        "data",
+        "metadata"
+      ]
+    }
+  },
+  "field_contracts": {
+    "adapter_registry": "registry entries declare adapter id, capability, package/import names, fixture key, output schema, and no-live-import default without importing dependencies",
+    "dependency_gate": "dependency gates evaluate package, credential, and network availability into ok or skipped status without side effects",
+    "result_envelope": "result envelopes carry status, capability, fixture key, data, metadata, and skip reason in a stable provider-free shape",
+    "version_metadata": "version metadata is fixture-sourced or unknown when dependencies are absent and never imports packages to inspect versions",
+    "terms_metadata": "terms metadata records live-network prerequisites before any external call is allowed",
+    "credential_redaction": "credential redaction records redacted field names and proves secret values are absent from outputs",
+    "no_live_import_default": "no-live-import default prevents optional package imports during provider-free fixture replay",
+    "clean_skip": "clean skips return skipped envelopes for absent package, absent credential, or disabled network states"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "status": "passed",
+  "summary": {
+    "evaluate_blocks": 1,
+    "cases_total": 2,
+    "cases_passed": 2,
+    "cases_failed": 0,
+    "assertions": 8,
+    "pass_rate": 1,
+    "judge_replay_errors": 0
+  },
+  "llm": {
+    "mode": "replay",
+    "loaded_turns": 2,
+    "replayed_turns": 2,
+    "turns": 2,
+    "input_tokens": 112,
+    "output_tokens": 46,
+    "judge_tokens": 158,
+    "judge_cost": 0,
+    "errors": 0
+  },
+  "cases": [
+    {
+      "case_id": "case-risk-summary",
+      "name": "Risk summary preserves source facts",
+      "status": "passed",
+      "judge_trace_ref": "case:case-risk-summary:judge:1",
+      "assertions": 4,
+      "metrics": [
+        {"metric_id": "dataset_item_valid", "type": "boolean", "value": true},
+        {"metric_id": "judge_passed", "type": "boolean", "value": true},
+        {"metric_id": "answer_chars", "type": "numeric", "value": 104},
+        {"metric_id": "rubric_label", "type": "categorical", "value": "pass"},
+        {"metric_id": "judge_tokens", "type": "token_count", "value": 82}
+      ]
+    },
+    {
+      "case_id": "case-catalyst-classification",
+      "name": "Catalyst classification uses allowed labels",
+      "status": "passed",
+      "judge_trace_ref": "case:case-catalyst-classification:judge:1",
+      "assertions": 4,
+      "metrics": [
+        {"metric_id": "dataset_item_valid", "type": "boolean", "value": true},
+        {"metric_id": "judge_passed", "type": "boolean", "value": true},
+        {"metric_id": "answer_chars", "type": "numeric", "value": 72},
+        {"metric_id": "rubric_label", "type": "categorical", "value": "pass"},
+        {"metric_id": "judge_tokens", "type": "token_count", "value": 76}
+      ]
+    }
+  ],
+  "metrics": [
+    {"metric_id": "dataset_item_valid", "type": "boolean", "count": 2, "pass_rate": 1},
+    {"metric_id": "judge_passed", "type": "boolean", "count": 2, "pass_rate": 1},
+    {"metric_id": "answer_chars", "type": "numeric", "count": 2, "mean": 88},
+    {"metric_id": "rubric_label", "type": "categorical", "count": 2, "values": {"pass": 2}},
+    {"metric_id": "judge_tokens", "type": "token_count", "count": 2, "sum": 158}
+  ],
+  "findings": []
+}

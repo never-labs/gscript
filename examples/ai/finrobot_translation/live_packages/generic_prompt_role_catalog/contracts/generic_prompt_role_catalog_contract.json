@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-prompt-role-catalog",
+  "package_name": "generic.ai.prompt.role.catalog",
+  "entrypoint": "ai.prompt.role_catalog",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_credentials_required": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.prompt.role.catalog",
+    "generic.ai.prompt.template.snapshot",
+    "generic.ai.role.profile.version",
+    "generic.ai.role.delegation.trigger",
+    "generic.ai.role.output.schema",
+    "generic.ai.role.evidence.validation",
+    "generic.ai.role.termination.convention",
+    "generic.ai.prompt.drift.fixture"
+  ],
+  "modules": {
+    "prompt_catalog": {
+      "inputs": ["catalog_id", "role_profiles", "template_snapshots"],
+      "outputs": ["catalog_entries", "template_drift_cases"],
+      "required_fields": ["catalog_id", "entry_id", "role_id", "kind", "template", "constraints"]
+    },
+    "role_profile": {
+      "inputs": ["role_id", "version", "instructions", "tool_policy"],
+      "outputs": ["profile_snapshot", "handoff_fields", "termination"],
+      "required_fields": ["role_id", "version", "status", "instructions", "output_schema", "termination"]
+    },
+    "delegation_trigger": {
+      "inputs": ["pattern", "input_text", "role_catalog"],
+      "outputs": ["matched", "delegate_role_id", "reason"],
+      "required_fields": ["pattern", "input", "matched", "delegate_role_id"]
+    },
+    "evidence_validation": {
+      "inputs": ["source_refs", "unresolved_source_refs", "fixture_keys"],
+      "outputs": ["validated", "rules", "failure_reason"],
+      "required_fields": ["minimum_source_refs", "source_refs", "unresolved_source_refs", "fixture_keys", "rules"]
+    }
+  },
+  "field_contracts": {
+    "role_profile_versions": "role ids, semantic versions, and output schema names are explicit fixture data",
+    "prompt_template_snapshots": "template text, placeholders, constraints, and expected sections are stable replay fixtures",
+    "delegation_triggers": "trigger parse examples must resolve to declared role ids or a no-match result",
+    "evidence_validation": "source refs and unresolved refs are validated without live retrieval or model calls",
+    "termination_convention": "completion literals are package policy, not core language syntax"
+  }
+}

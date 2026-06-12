@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "id": "generic_agent_runner_contract",
+  "provider_free": true,
+  "live_network": false,
+  "backend_shape": "ai.agent.run",
+  "capability": "ai.agent.config.declarative",
+  "capabilities": [
+    "ai.agent.config.declarative",
+    "ai.agent.tool_history.replay",
+    "ai.agent.loop_trace.emit",
+    "ai.agent.structured_output.validate",
+    "ai.agent.replay_policy.enforce",
+    "ai.agent.max_steps.guard",
+    "ai.agent.tool_contract_projection"
+  ],
+  "inputs": [
+    "agent_config",
+    "initial_state",
+    "tool_registry",
+    "max_steps"
+  ],
+  "outputs": [
+    "final_output",
+    "tool_history",
+    "workflow_state",
+    "loop_trace"
+  ],
+  "agent_config": {
+    "schema": "agent_config_v1",
+    "required": [
+      "id",
+      "instructions",
+      "tools",
+      "params",
+      "output",
+      "max_steps",
+      "replay_policy"
+    ]
+  },
+  "tool_history": {
+    "mode": "fixture_replay",
+    "ordering": "strict_sequence",
+    "result_envelope_required": true,
+    "unconsumed_records": "fail_closed"
+  },
+  "tool_contract_projection": {
+    "schema": "tool_contract_agent_projection_v1",
+    "source_package": "generic_tool_contracts",
+    "target_surfaces": [
+      "agent_config.tools",
+      "structured_output.tool_history",
+      "loop_trace.events"
+    ],
+    "correlation_owner": "agent_runner",
+    "trace_event_schema_redefined": false,
+    "provider_free": true
+  },
+  "structured_output": {
+    "schema": "structured_output_v1",
+    "validation": "required_fields_and_type_tags",
+    "missing_output_policy": "clean_error_envelope"
+  },
+  "loop_trace": {
+    "schema": "loop_trace_v1",
+    "events": [
+      "agent_start",
+      "turn_start",
+      "tool_request",
+      "tool_result",
+      "turn_end",
+      "agent_end"
+    ],
+    "correlation_ids_required": true,
+    "redaction_policy": "no_secret_values"
+  },
+  "guards": {
+    "max_steps_required": true,
+    "default_max_steps": 4,
+    "live_tool_invocation": false,
+    "provider_credentials_required": false,
+    "clean_skip_without_replay": true
+  }
+}

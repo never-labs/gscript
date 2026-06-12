@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "finance_normalizers_contract_v1",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "domains": [
+    "statements",
+    "ratios",
+    "market",
+    "news",
+    "sec",
+    "peer",
+    "provenance",
+    "normalization_boundary",
+    "corporate_actions",
+    "validation"
+  ],
+  "canonical_field_rules": [
+    "All emitted field names are snake_case.",
+    "Symbols are uppercase tickers.",
+    "Dates use RFC3339 full-date or timestamp strings.",
+    "Currencies use uppercase ISO-4217 codes.",
+    "Numeric facts carry explicit unit and scale fields.",
+    "Unit and currency conversions use an explicit envelope with raw value, normalized value, unit, scale, source currency, target currency, conversion rate, and precision.",
+    "Corporate action adjusted values declare adjustment factor, method, effective date, raw value, and adjusted value.",
+    "Validation failures use a stable error_code taxonomy rather than provider-specific exception text."
+  ],
+  "stale_missing_policy": {
+    "stale_basis": "as_of plus stale_after_days",
+    "stale_required": true,
+    "missing_required_policy": "reject_record",
+    "missing_optional_policy": "emit_null_with_missing_reason",
+    "warning_marker": "finance_normalizer_stale_field",
+    "missing_reason_required_when_null": true,
+    "missing_reason_taxonomy": [
+      "source_not_disclosed",
+      "provider_fixture_did_not_include_field",
+      "dash_placeholder",
+      "not_available_placeholder",
+      "forecast_not_disclosed",
+      "currency_conversion_rate_missing"
+    ]
+  },
+  "typed_normalization_boundary": {
+    "schema": "typed_normalization_boundary_v1",
+    "covers": [
+      "symbol",
+      "date",
+      "currency",
+      "missing_value",
+      "unit_currency_envelope"
+    ],
+    "provider_free": true
+  },
+  "corporate_action_adjustment": {
+    "schema": "corporate_action_adjustment_v1",
+    "required_adjustment_fields": [
+      "symbol",
+      "effective_date",
+      "action_type",
+      "adjustment_factor",
+      "raw_close",
+      "adjusted_close",
+      "raw_volume",
+      "adjusted_volume",
+      "adjustment_method"
+    ],
+    "provider_free": true
+  },
+  "validation_error_taxonomy": {
+    "schema": "validation_error_taxonomy_v1",
+    "error_codes": [
+      "currency_conversion_rate_missing",
+      "date_not_rfc3339",
+      "missing_required_field",
+      "optional_value_missing",
+      "symbol_not_canonical",
+      "unit_scale_missing"
+    ],
+    "provider_free": true
+  },
+  "deterministic_ordering_required": true,
+  "acceptance_gates": [
+    "Statement, ratio, market, news, SEC, peer, provenance, typed boundary, corporate action, and validation taxonomy fixtures validate against declared required fields.",
+    "No fixture or example imports live provider SDKs or opens network paths.",
+    "Missing optional fields are explicit null values with missing_reason entries.",
+    "Stale fields carry stale=true and stale_after metadata.",
+    "Rows are emitted in the deterministic order declared by the manifest.",
+    "Symbol/date/currency/unit conversions are represented as provider-free typed normalization records.",
+    "Corporate action fixtures expose raw and adjusted values plus the adjustment method.",
+    "Validation errors use stable taxonomy codes that Leia, Q, and AI workflows can share."
+  ]
+}

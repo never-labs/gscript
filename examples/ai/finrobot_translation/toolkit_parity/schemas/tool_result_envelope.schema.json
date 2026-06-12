@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "generic_ai_tool_result_envelope_v1",
+  "provider_free": true,
+  "domain": "generic_ai_tool_dialect",
+  "description": "Provider-free envelope for successful tool outputs and structured tool errors.",
+  "required": [
+    "ok",
+    "tool_name"
+  ],
+  "success_required": [
+    "ok",
+    "tool_name",
+    "output_format",
+    "content",
+    "provenance"
+  ],
+  "error_required": [
+    "ok",
+    "tool_name",
+    "error"
+  ],
+  "canonical_fields": [
+    "ok",
+    "tool_name",
+    "output_format",
+    "content",
+    "table",
+    "artifacts",
+    "provenance",
+    "error"
+  ],
+  "structured_error_fields": [
+    "code",
+    "message",
+    "stage",
+    "retryable",
+    "details"
+  ],
+  "output_formats": [
+    "text",
+    "table",
+    "json",
+    "artifact"
+  ],
+  "additional_properties": false,
+  "missing_required_policy": "reject_result"
+}

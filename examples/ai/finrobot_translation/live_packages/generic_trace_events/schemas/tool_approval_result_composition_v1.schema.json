@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic-ai/generic_trace_events/tool_approval_result_composition_v1.schema.json",
+  "title": "Generic Tool Approval Result Composition",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "composition_kind",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "real_dependency_imports",
+    "source_refs",
+    "identity_policy",
+    "field_mappings",
+    "source_observations",
+    "projected_events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "composition_kind": {
+      "const": "tool_invocation_approval_result_trace_composition"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "domain_specific": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "live_model": {
+      "const": false
+    },
+    "credentials_required": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "source_refs": {
+      "type": "object",
+      "required": [
+        "tool_registry",
+        "approval_policy",
+        "tool_contracts"
+      ]
+    },
+    "identity_policy": {
+      "type": "object",
+      "required": [
+        "canonical_tool_call_id",
+        "canonical_tool_name",
+        "canonical_capability",
+        "approval_id_when_missing",
+        "source_ids_are_not_assumed_equal",
+        "normalization_policy"
+      ]
+    },
+    "field_mappings": {
+      "type": "array",
+      "minItems": 1
+    },
+    "source_observations": {
+      "type": "object"
+    },
+    "projected_events": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "trace_envelope_v1.schema.json#/properties/events/items"
+      }
+    }
+  }
+}

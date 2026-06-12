@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "id": "statement_ACME_2026Q1_fixture",
+  "provider_free": true,
+  "rows": [
+    {
+      "schema": "normalized_statement_v1",
+      "symbol": "ACME",
+      "statement_type": "cash_flow",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "period_end": "2026-03-31",
+      "line_item": "free_cash_flow",
+      "value": null,
+      "currency": "USD",
+      "unit": "currency",
+      "scale": 1,
+      "as_of": "2026-05-01",
+      "stale_after_days": 90,
+      "stale": false,
+      "missing_reason": "provider_fixture_did_not_include_free_cash_flow",
+      "source_id": "fixture.statement.acme.2026q1",
+      "record_hash": "sha256:statement-acme-2026q1-fcf"
+    },
+    {
+      "schema": "normalized_statement_v1",
+      "symbol": "ACME",
+      "statement_type": "income_statement",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "period_end": "2026-03-31",
+      "line_item": "revenue",
+      "value": 1250000000,
+      "currency": "USD",
+      "unit": "currency",
+      "scale": 1,
+      "as_of": "2026-05-01",
+      "stale_after_days": 90,
+      "stale": false,
+      "source_id": "fixture.statement.acme.2026q1",
+      "record_hash": "sha256:statement-acme-2026q1-revenue"
+    }
+  ],
+  "deterministic_order": [
+    "symbol",
+    "fiscal_year",
+    "fiscal_period",
+    "statement_type",
+    "line_item"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-finance-facade-provider-fallback-contract",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "fallback_order": [
+    {
+      "id": "yfinance",
+      "display_name": "Yahoo Finance",
+      "capability": "finance.facade.provider.yfinance",
+      "datasets": [
+        "market_data",
+        "profile"
+      ],
+      "fixture_key": "market_data:ACME:yfinance:offline",
+      "schema": "market_data_table",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "fmp",
+      "display_name": "Financial Modeling Prep",
+      "capability": "finance.facade.provider.fmp",
+      "datasets": [
+        "fundamentals",
+        "financials"
+      ],
+      "fixture_key": "fundamentals:ACME:fmp:offline",
+      "schema": "fundamental_table",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "finnhub",
+      "display_name": "Finnhub",
+      "capability": "finance.facade.provider.finnhub",
+      "datasets": [
+        "profile",
+        "metrics"
+      ],
+      "fixture_key": "profile:ACME:finnhub:offline",
+      "schema": "fundamental_table",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "sec",
+      "display_name": "SEC EDGAR",
+      "capability": "finance.facade.provider.sec",
+      "datasets": [
+        "filings",
+        "facts"
+      ],
+      "fixture_key": "filing:ACME:sec:offline",
+      "schema": "fundamental_table",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "openbb",
+      "display_name": "OpenBB",
+      "capability": "finance.facade.provider.openbb",
+      "datasets": [
+        "market_data",
+        "fundamentals"
+      ],
+      "fixture_key": "market_data:ACME:openbb:offline",
+      "schema": "provider_fallback",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "fallback_rules": [
+    "try providers in listed order for the requested dataset",
+    "return the first schema-valid typed table fixture when live_network=false",
+    "wrap provider failures in error_envelope and continue only when retryable=true",
+    "stop fallback when rate_limit_policy returns retry_after_seconds without an offline fixture"
+  ],
+  "acceptance_gates": [
+    "fallback order is stable and deterministic",
+    "all fallback entries remain provider-free in this skeleton",
+    "missing dependencies and credentials clean-skip without test failure",
+    "rate limit and retry behavior is observable through fixture metadata"
+  ]
+}

@@ -1,0 +1,59 @@
+[
+  {
+    "Request": {
+      "Model": "mock-plan",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Create a short implementation workflow from local evidence."
+        },
+        {
+          "Role": "user",
+          "Text": "Ship passwordless onboarding"
+        }
+      ],
+      "Tools": [
+        {
+          "Name": "search_docs",
+          "Description": "Search local product documentation.",
+          "Params": [
+            "query"
+          ]
+        },
+        {
+          "Name": "fetch_ticket",
+          "Description": "Fetch local ticket metadata.",
+          "Params": [
+            "id"
+          ]
+        }
+      ],
+      "ResponseFormat": {
+        "type": "json_object"
+      }
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "{\"summary\":\"Ship passwordless onboarding in three verified steps.\",\"owner\":\"platform\",\"steps\":[\"discover\",\"build\",\"verify\"],\"replay_ready\":true}"
+    }
+  },
+  {
+    "Request": {
+      "Model": "mock-review",
+      "Messages": [
+        {
+          "Role": "system",
+          "Text": "Review the structured plan for replay readiness."
+        },
+        {
+          "Role": "user",
+          "Text": "{\"summary\":\"Ship passwordless onboarding in three verified steps.\",\"owner\":\"platform\",\"steps\":[\"discover\",\"build\",\"verify\"],\"replay_ready\":true}"
+        }
+      ]
+    },
+    "Result": {
+      "Status": "final_answer",
+      "Text": "Plan is replay-friendly: deterministic inputs, local evidence, and explicit verification."
+    }
+  }
+]

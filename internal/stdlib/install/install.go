@@ -166,6 +166,7 @@ func InstallLLM(interp *runtime.Interpreter) {
 				sink(event)
 			}
 		},
+		EnvironmentRead: interp.EnvironmentReadEnabled,
 	})
 }
 

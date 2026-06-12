@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "page_snapshot_metadata_v1",
+  "type": "object",
+  "required": [
+    "id",
+    "page_number",
+    "format",
+    "viewport",
+    "dimensions",
+    "status",
+    "content_hash",
+    "hash_algorithm",
+    "hash_seed",
+    "source_refs",
+    "warning_refs",
+    "disclosure_refs"
+  ],
+  "formats": [
+    "text/html",
+    "application/pdf",
+    "image/png"
+  ],
+  "statuses": [
+    "specified_not_rendered",
+    "planned_not_rendered",
+    "clean_skipped_without_renderer"
+  ]
+}

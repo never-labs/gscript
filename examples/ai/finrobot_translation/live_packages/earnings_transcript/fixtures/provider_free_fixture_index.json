@@ -2,6 +2,8 @@
   "schema_version": 1,
   "id": "earnings_transcript_provider_free_fixture_index",
   "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
   "fixtures": [
     {
       "key": "raw_transcript",

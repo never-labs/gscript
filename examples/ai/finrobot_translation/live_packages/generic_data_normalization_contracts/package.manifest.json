@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "id": "generic-data-normalization-contracts",
+  "package_name": "leia-generic-ai-data-normalization-contracts",
+  "package_boundary_id": "generic-ai-data-normalization-contracts",
+  "capability_id": "generic.ai.data_normalization.contracts",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for schema mappings, provider response projection, field policies, missing and stale value policy, type coercion, unit transforms, provenance, validation envelopes, deterministic ordering, and adapter clean-skip contracts.",
+  "source_modules": [
+    "generic.data_normalization.contracts",
+    "generic.data_normalization.schema_mapping",
+    "generic.data_normalization.field_policy",
+    "generic.data_normalization.validation",
+    "generic.data_normalization.provenance"
+  ],
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; source systems, catalogs, warehouses, and remote validation services belong only to provider-specific adapter packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_data_normalization_contracts_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "generic_data_normalization_contracts_contract": "contracts/generic_data_normalization_contracts_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_data_normalization_contracts_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json"
+  },
+  "schemas": {
+    "mapping": "schemas/normalization_mapping_v1.schema.json",
+    "provider_response_projection": "schemas/provider_response_projection_v1.schema.json",
+    "normalized_rows": "schemas/normalized_rows_v1.schema.json",
+    "validation": "schemas/normalization_validation_v1.schema.json",
+    "clean_skip": "schemas/normalization_clean_skip_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "mapping": "fixtures/normalization_mapping_fixture.json",
+    "provider_response_projection": "fixtures/provider_response_projection_fixture.json",
+    "normalized_rows": "fixtures/normalized_rows_fixture.json",
+    "validation": "fixtures/normalization_validation_fixture.json",
+    "clean_skip": "fixtures/normalization_clean_skip_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "schema_mapping",
+      "source_module": "generic.data_normalization.schema_mapping",
+      "capabilities": [
+        "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.provider_response_projection",
+        "generic.ai.data_normalization.field_policy",
+        "generic.ai.data_normalization.deterministic_order"
+      ],
+      "output_schemas": [
+        "mapping",
+        "normalized_rows"
+      ]
+    },
+    {
+      "id": "value_policy",
+      "source_module": "generic.data_normalization.field_policy",
+      "capabilities": [
+        "generic.ai.data_normalization.missing_policy",
+        "generic.ai.data_normalization.stale_policy",
+        "generic.ai.data_normalization.type_coercion",
+        "generic.ai.data_normalization.unit_transform"
+      ],
+      "output_schemas": [
+        "mapping",
+        "validation"
+      ]
+    },
+    {
+      "id": "provenance",
+      "source_module": "generic.data_normalization.provenance",
+      "capabilities": [
+        "generic.ai.data_normalization.provenance",
+        "generic.ai.data_normalization.contracts"
+      ],
+      "output_schemas": [
+        "normalized_rows",
+        "validation"
+      ]
+    },
+    {
+      "id": "validation",
+      "source_module": "generic.data_normalization.validation",
+      "capabilities": [
+        "generic.ai.data_normalization.validation_error",
+        "generic.ai.data_normalization.adapter_clean_skip"
+      ],
+      "output_schemas": [
+        "validation",
+        "clean_skip"
+      ]
+    }
+  ],
+  "normalization_domains": [
+    "schema_mapping",
+    "field_policy",
+    "missing_policy",
+    "stale_policy",
+    "type_coercion",
+    "unit_transform",
+    "provenance",
+    "validation_error",
+    "deterministic_order",
+    "adapter_clean_skip"
+  ],
+  "capabilities": [
+    "generic.ai.data_normalization.contracts",
+    "generic.ai.data_normalization.schema_mapping",
+    "generic.ai.data_normalization.provider_response_projection",
+    "generic.ai.data_normalization.field_policy",
+    "generic.ai.data_normalization.missing_policy",
+    "generic.ai.data_normalization.stale_policy",
+    "generic.ai.data_normalization.type_coercion",
+    "generic.ai.data_normalization.unit_transform",
+    "generic.ai.data_normalization.provenance",
+    "generic.ai.data_normalization.validation_error",
+    "generic.ai.data_normalization.deterministic_order",
+    "generic.ai.data_normalization.adapter_clean_skip"
+  ],
+  "blocked_imports": [
+    "requests",
+    "httpx",
+    "urllib",
+    "aiohttp",
+    "sqlalchemy",
+    "psycopg2",
+    "snowflake",
+    "bigquery",
+    "pandas",
+    "pyarrow"
+  ],
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "provider_sdks_required": false,
+    "test_rule": "package tests must pass with fixtures only, no credentials, no provider SDK imports, and no network I/O"
+  },
+  "field_canonicalization": {
+    "case": "snake_case",
+    "field_mapping": "raw paths map to canonical fields with required, nullable, type, and policy metadata",
+    "missing": "missing optional values carry a reason while missing required values emit validation errors",
+    "stale": "freshness policy compares observed_at and stale_after timestamps without calling source systems",
+    "type_coercion": "string, integer, number, bool, and timestamp coercions are declared by mapping fixtures",
+    "unit_transform": "raw value, normalized value, unit, scale, transform id, and precision metadata stay explicit",
+    "provenance": "every normalized row carries source_ref, source_row, source_hash, observed_at, and transform notes"
+  },
+  "deterministic_ordering": {
+    "mappings": [
+      "mapping_id",
+      "canonical_field"
+    ],
+    "rows": [
+      "dataset_id",
+      "subject_id",
+      "period_key",
+      "source_row"
+    ],
+    "validation": [
+      "severity",
+      "error_code",
+      "canonical_field"
+    ]
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "schema mapping, field policy, missing policy, stale policy, type coercion, and unit transform contract fixtures decode",
+    "provider response projection maps source envelopes, provenance refs, clean skips, and replay keys into normalized rows and validation records",
+    "normalized row fixtures carry deterministic ordering, provenance, missing reasons, and transform notes",
+    "validation fixtures classify missing required values, stale values, and coercion warnings without live services",
+    "adapter dependency absence produces a clean skip instead of live imports or network access",
+    "data normalization contracts remain independent of host runtime internals and future provider packages"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide leia-generic-ai-data-normalization-contracts as a built-in source connector, catalog, validation service, or package boundary; this package declares provider-free schemas and fixtures only."
+  },
+  "dialect_capability_id": "generic.ai.data_normalization.contracts",
+  "dialect_backend_shape": "ai.data_normalization.contracts",
+  "dialect_aliases": [
+    {
+      "id": "ai.data_normalization.contracts",
+      "target": "generic.ai.data_normalization.contracts",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.data_normalization.contracts",
+  "capability_aliases": [
+    {
+      "alias": "ai.data_normalization.contracts",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "data-normalization-contracts",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "data-normalization-contracts",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "data-provider",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.data_normalization.contracts",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.data_normalization.contracts",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "id": "finance_normalizers_provider_free_fixture_index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "capabilities": [
+    "finance.normalizers.statements.canonicalize",
+    "finance.normalizers.ratios.canonicalize",
+    "finance.normalizers.market.canonicalize",
+    "finance.normalizers.news.canonicalize",
+    "finance.normalizers.sec.canonicalize",
+    "finance.normalizers.peer.canonicalize",
+    "finance.normalizers.provenance.attach",
+    "finance.normalizers.field_policy.stale",
+    "finance.normalizers.field_policy.missing",
+    "finance.normalizers.ordering.deterministic"
+  ],
+  "fixtures": [
+    {
+      "key": "statement",
+      "schema": "normalized_statement_v1",
+      "schema_path": "schemas/normalized_statement_v1.schema.json",
+      "capability": "finance.normalizers.statements.canonicalize",
+      "path": "fixtures/statement_ACME_2026Q1_fixture.json",
+      "rows": 2,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "ratio",
+      "schema": "normalized_ratio_v1",
+      "schema_path": "schemas/normalized_ratio_v1.schema.json",
+      "capability": "finance.normalizers.ratios.canonicalize",
+      "path": "fixtures/ratio_ACME_2026Q1_fixture.json",
+      "rows": 2,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "market",
+      "schema": "normalized_market_bar_v1",
+      "schema_path": "schemas/normalized_market_bar_v1.schema.json",
+      "capability": "finance.normalizers.market.canonicalize",
+      "path": "fixtures/market_ACME_daily_fixture.json",
+      "rows": 2,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "news",
+      "schema": "normalized_news_event_v1",
+      "schema_path": "schemas/normalized_news_event_v1.schema.json",
+      "capability": "finance.normalizers.news.canonicalize",
+      "path": "fixtures/news_ACME_fixture.json",
+      "rows": 2,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "sec",
+      "schema": "normalized_sec_filing_v1",
+      "schema_path": "schemas/normalized_sec_filing_v1.schema.json",
+      "capability": "finance.normalizers.sec.canonicalize",
+      "path": "fixtures/sec_ACME_10q_fixture.json",
+      "rows": 1,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "peer",
+      "schema": "peer_snapshot_v1",
+      "schema_path": "schemas/peer_snapshot_v1.schema.json",
+      "capability": "finance.normalizers.peer.canonicalize",
+      "path": "fixtures/peer_ACME_snapshot_fixture.json",
+      "rows": 2,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "provenance",
+      "schema": "provenance_record_v1",
+      "schema_path": "schemas/provenance_record_v1.schema.json",
+      "capability": "finance.normalizers.provenance.attach",
+      "path": "fixtures/provenance_ACME_fixture.json",
+      "rows": 7,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "policy",
+      "schema": "normalizer_policy_v1",
+      "schema_path": "schemas/normalizer_policy_v1.schema.json",
+      "capability": "finance.normalizers.field_policy.stale",
+      "path": "fixtures/normalizer_policy_fixture.json",
+      "rows": 1,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "normalization_boundary",
+      "schema": "typed_normalization_boundary_v1",
+      "schema_path": "schemas/typed_normalization_boundary_v1.schema.json",
+      "capability": "finance.normalizers.field_policy.missing",
+      "path": "fixtures/typed_normalization_boundary_fixture.json",
+      "rows": 5,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "corporate_action",
+      "schema": "corporate_action_adjustment_v1",
+      "schema_path": "schemas/corporate_action_adjustment_v1.schema.json",
+      "capability": "finance.normalizers.ordering.deterministic",
+      "path": "fixtures/corporate_action_adjustment_fixture.json",
+      "rows": 2,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    },
+    {
+      "key": "validation_error",
+      "schema": "validation_error_taxonomy_v1",
+      "schema_path": "schemas/validation_error_taxonomy_v1.schema.json",
+      "capability": "finance.normalizers.field_policy.missing",
+      "path": "fixtures/validation_error_taxonomy_fixture.json",
+      "rows": 6,
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true
+      }
+    }
+  ]
+}

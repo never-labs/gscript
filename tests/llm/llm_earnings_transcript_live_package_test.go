@@ -124,7 +124,7 @@ func TestFinRobotEarningsTranscriptLivePackageManifest(t *testing.T) {
 		"finance.earnings_transcript.chunk",
 		"finance.earnings_transcript.http_clean.skip",
 	} {
-		if !contains(manifest.Capabilities, want) {
+		if !earningsTranscriptContains(manifest.Capabilities, want) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
 		}
 	}
@@ -152,7 +152,7 @@ func TestFinRobotEarningsTranscriptSchemasFixturesAndProvenance(t *testing.T) {
 			t.Fatalf("%s schema header incomplete: %#v", key, schema)
 		}
 		for _, want := range []string{"schema"} {
-			if !contains(schema.Required, want) {
+			if !earningsTranscriptContains(schema.Required, want) {
 				t.Fatalf("%s schema required fields missing %q: %#v", key, want, schema.Required)
 			}
 		}
@@ -394,7 +394,7 @@ func earningsTranscriptStringKey(v any) string {
 	}
 }
 
-func contains(values []string, want string) bool {
+func earningsTranscriptContains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
 			return true

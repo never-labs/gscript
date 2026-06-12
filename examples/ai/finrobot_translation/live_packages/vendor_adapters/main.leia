@@ -1,0 +1,182 @@
+// Provider-free live package skeleton for FinRobot vendor adapters.
+//
+// The JSON manifest is the contract of record. This executable mirror keeps the
+// package discoverable by Leia smoke tests while preserving fixture-only
+// defaults for CI and replay runs.
+
+vendor_live_package := {
+    id: "finrobot-live-vendor-adapters"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    default_policy: {
+        mode: "fixture_replay"
+        live_network: false
+        provider_credentials_required: false
+        clean_skip_without_credentials: true
+        redact_secret_values: true
+    }
+    redaction: {
+        enabled: true
+        replacement: "<redacted>"
+        secret_patterns: {
+            "env:FINNHUB_TOKEN",
+            "env:FMP_API_KEY",
+            "env:REDDIT_CLIENT_ID",
+            "env:REDDIT_CLIENT_SECRET",
+            "env:SEC_USER_AGENT",
+        }
+    }
+    capability_registry: {
+        version: "vendor-adapter-capabilities-v1"
+        mode: "provider-free-boundary"
+        provider_free: true
+        live_network: false
+        registry_scope: "external-data-and-tool-adapter-dialect"
+        common_capabilities: {
+            "market_chart",
+            "financial_statement_history",
+            "company_profile",
+            "dividend_history",
+            "analyst_recommendations",
+            "key_metrics",
+            "technical_indicators",
+            "company_news",
+            "sec_filings",
+            "social_search",
+            "transcript_lookup",
+        }
+    }
+    auth_redaction: {
+        enabled: true
+        fixture: "fixtures/auth_redaction_policy.json"
+        fixture_key: "vendor_adapters:auth_redaction:offline"
+        secret_value_policy: "never-store-secret-values"
+        credential_required_for_fixture_replay: false
+        secret_values_present: false
+        replacement: "<redacted>"
+        env_refs: {
+            "env:FINNHUB_TOKEN",
+            "env:FMP_API_KEY",
+            "env:REDDIT_CLIENT_ID",
+            "env:REDDIT_CLIENT_SECRET",
+            "env:SEC_USER_AGENT",
+        }
+    }
+    retry_cache_envelope: {
+        mode: "deterministic_fixture_replay"
+        provider_free: true
+        live_network: false
+        max_attempts: 1
+        backoff: "none"
+        retryable_error_kinds: {
+            "rate_limited",
+            "timeout",
+            "transient_provider_error",
+        }
+        cache: {
+            mode: "fixture_replay"
+            namespace: "finrobot.vendor_adapters"
+            key_source: "fixture_key"
+            ttl_seconds: 0
+            hit_state: "fixture-hit"
+            miss_behavior: "clean-skip"
+        }
+    }
+    error_taxonomy: {
+        version: "vendor-error-taxonomy-v1"
+        normalized_errors: {
+            {kind: "rate_limited" http_status: 429 retryable: true cache_state: "stale-allowed"},
+            {kind: "auth_missing" http_status: 401 retryable: false cache_state: "fixture-only"},
+            {kind: "not_found" http_status: 404 retryable: false cache_state: "negative-cache"},
+            {kind: "schema_mismatch" http_status: 422 retryable: false cache_state: "quarantine"},
+            {kind: "transient_provider_error" http_status: 503 retryable: true cache_state: "stale-allowed"},
+        }
+    }
+    rate_limit_fixture: {
+        fixture: "fixtures/rate_limit_matrix.json"
+        fixture_key: "vendor_adapters:rate_limits:offline"
+        capability: "finance.vendor.adapter.rate_limits"
+        live_network: false
+    }
+    offline_replay: {
+        enabled: true
+        fixture_index: "fixtures/offline_replay_index.json"
+        require_fixture_key: true
+        live_network: false
+        provider_credentials_required: false
+        miss_behavior: "clean-skip"
+        secret_values_present: false
+    }
+    adapters: {
+        {id: "yfinance_chart" provider: "yfinance" capability: "finance.vendor.yfinance.chart" schema: "schemas/yfinance_chart_v1.schema.json" fixture: "fixtures/yfinance_chart_ACME.json" fixture_key: "yfinance:chart:ACME:1mo" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 120 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "yfinance_statements" provider: "yfinance" capability: "finance.vendor.yfinance.statements" schema: "schemas/yfinance_statements_v1.schema.json" fixture: "fixtures/yfinance_statements_ACME.json" fixture_key: "yfinance:statements:ACME:annual" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 120 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "yfinance_info" provider: "yfinance" capability: "finance.vendor.yfinance.info" schema: "schemas/yfinance_info_v1.schema.json" fixture: "fixtures/yfinance_info_ACME.json" fixture_key: "yfinance:info:ACME" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 120 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "yfinance_dividends" provider: "yfinance" capability: "finance.vendor.yfinance.dividends" schema: "schemas/yfinance_dividends_v1.schema.json" fixture: "fixtures/yfinance_dividends_ACME.json" fixture_key: "yfinance:dividends:ACME" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 120 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "yfinance_cashflow" provider: "yfinance" capability: "finance.vendor.yfinance.cashflow" schema: "schemas/yfinance_cashflow_v1.schema.json" fixture: "fixtures/yfinance_cashflow_ACME.json" fixture_key: "yfinance:cashflow:ACME:annual" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 120 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "yfinance_recommendations" provider: "yfinance" capability: "finance.vendor.yfinance.recommendations" schema: "schemas/yfinance_recommendations_v1.schema.json" fixture: "fixtures/yfinance_recommendations_ACME.json" fixture_key: "yfinance:recommendations:ACME" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 120 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "fmp_key_metrics" provider: "fmp" capability: "finance.vendor.fmp.key_metrics" schema: "schemas/fmp_key_metrics_v1.schema.json" fixture: "fixtures/fmp_key_metrics_ACME.json" fixture_key: "fmp:key_metrics:ACME:annual" credential: {required: false secret_ref: "env:FMP_API_KEY" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 86400 limit: 300 retry_after_seconds: 2} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "fmp_technical_indicators" provider: "fmp" capability: "finance.vendor.fmp.technical_indicators" schema: "schemas/fmp_technical_indicators_v1.schema.json" fixture: "fixtures/fmp_technical_indicators_ACME.json" fixture_key: "fmp:technical_indicators:ACME:daily" credential: {required: false secret_ref: "env:FMP_API_KEY" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 86400 limit: 300 retry_after_seconds: 2} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "fmp_company_metrics" provider: "fmp" capability: "finance.vendor.fmp.company_metrics" schema: "schemas/fmp_company_metrics_v1.schema.json" fixture: "fixtures/fmp_company_metrics_ACME.json" fixture_key: "fmp:company_metrics:ACME:annual" credential: {required: false secret_ref: "env:FMP_API_KEY" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 86400 limit: 300 retry_after_seconds: 2} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "fmp_news" provider: "fmp" capability: "finance.vendor.fmp.news" schema: "schemas/fmp_news_v1.schema.json" fixture: "fixtures/fmp_news_ACME.json" fixture_key: "fmp:news:ACME" credential: {required: false secret_ref: "env:FMP_API_KEY" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 86400 limit: 300 retry_after_seconds: 2} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "fmp_ratings" provider: "fmp" capability: "finance.vendor.fmp.ratings" schema: "schemas/fmp_ratings_v1.schema.json" fixture: "fixtures/fmp_ratings_ACME.json" fixture_key: "fmp:ratings:ACME" credential: {required: false secret_ref: "env:FMP_API_KEY" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 86400 limit: 300 retry_after_seconds: 2} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "fmp_targets" provider: "fmp" capability: "finance.vendor.fmp.targets" schema: "schemas/fmp_targets_v1.schema.json" fixture: "fixtures/fmp_targets_ACME.json" fixture_key: "fmp:targets:ACME" credential: {required: false secret_ref: "env:FMP_API_KEY" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 86400 limit: 300 retry_after_seconds: 2} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "sec_filing_10k" provider: "sec" capability: "finance.vendor.sec.filing.10k" schema: "schemas/sec_filing_10k_v1.schema.json" fixture: "fixtures/sec_filing_10k_ACME.json" fixture_key: "sec:filing:ACME:10-K:2025" credential: {required: false secret_ref: "env:SEC_USER_AGENT" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 1 limit: 10 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "SEC fair-access metadata retained" redistribution: "fixture-only" live_network: false user_agent_required_for_live: true}},
+        {id: "sec_filing_10q" provider: "sec" capability: "finance.vendor.sec.filing.10q" schema: "schemas/sec_filing_10q_v1.schema.json" fixture: "fixtures/sec_filing_10q_ACME.json" fixture_key: "sec:filing:ACME:10-Q:2026Q1" credential: {required: false secret_ref: "env:SEC_USER_AGENT" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 1 limit: 10 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "SEC fair-access metadata retained" redistribution: "fixture-only" live_network: false user_agent_required_for_live: true}},
+        {id: "sec_filing_8k" provider: "sec" capability: "finance.vendor.sec.filing.8k" schema: "schemas/sec_filing_8k_v1.schema.json" fixture: "fixtures/sec_filing_8k_ACME.json" fixture_key: "sec:filing:ACME:8-K:2026-06-01" credential: {required: false secret_ref: "env:SEC_USER_AGENT" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 1 limit: 10 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "SEC fair-access metadata retained" redistribution: "fixture-only" live_network: false user_agent_required_for_live: true}},
+        {id: "sec_companyfacts" provider: "sec" capability: "finance.vendor.sec.companyfacts" schema: "schemas/sec_companyfacts_v1.schema.json" fixture: "fixtures/sec_companyfacts_ACME.json" fixture_key: "sec:companyfacts:ACME" credential: {required: false secret_ref: "env:SEC_USER_AGENT" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 1 limit: 10 retry_after_seconds: 1} terms: {usage: "offline-fixture-only" attribution: "SEC fair-access metadata retained" redistribution: "fixture-only" live_network: false user_agent_required_for_live: true}},
+        {id: "finnhub_profile" provider: "finnhub" capability: "finance.vendor.finnhub.profile" schema: "schemas/finnhub_profile_v1.schema.json" fixture: "fixtures/finnhub_profile_ACME.json" fixture_key: "finnhub:profile:ACME" credential: {required: false secret_ref: "env:FINNHUB_TOKEN" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 60 retry_after_seconds: 0} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "finnhub_metrics" provider: "finnhub" capability: "finance.vendor.finnhub.metrics" schema: "schemas/finnhub_metrics_v1.schema.json" fixture: "fixtures/finnhub_metrics_ACME.json" fixture_key: "finnhub:metrics:ACME" credential: {required: false secret_ref: "env:FINNHUB_TOKEN" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 60 retry_after_seconds: 0} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "finnhub_news_error" provider: "finnhub" capability: "finance.vendor.finnhub.news_error" schema: "schemas/finnhub_news_error_v1.schema.json" fixture: "fixtures/finnhub_news_error_ACME.json" fixture_key: "finnhub:news:error:ACME" credential: {required: false secret_ref: "env:FINNHUB_TOKEN" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 60 retry_after_seconds: 0} terms: {usage: "offline-fixture-only" attribution: "provider terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "reddit_search" provider: "reddit" capability: "finance.vendor.reddit.search" schema: "schemas/reddit_search_v1.schema.json" fixture: "fixtures/reddit_search_ACME.json" fixture_key: "reddit:search:ACME:sentiment" credential: {required: false secret_ref: "env:REDDIT_CLIENT_SECRET" redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 600 limit: 600 retry_after_seconds: 0} terms: {usage: "offline-fixture-only" attribution: "platform terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+        {id: "earnings_transcript" provider: "earnings" capability: "finance.vendor.earnings.transcript" schema: "schemas/earnings_transcript_v1.schema.json" fixture: "fixtures/earnings_transcript_ACME.json" fixture_key: "earnings:transcript:ACME:2025:Q4" credential: {required: false secret_ref: nil redacted: true} rate_limit: {policy: "metadata-only" window_seconds: 60 limit: 30 retry_after_seconds: 0} terms: {usage: "offline-fixture-only" attribution: "transcript terms metadata retained" redistribution: "do-not-redistribute-live-payloads" live_network: false}},
+    }
+}
+
+func vendor_live_adapter_ok(adapter) {
+    if adapter == nil {
+        return false
+    }
+    if vendor_live_package.provider_free != true || vendor_live_package.live_network != false || vendor_live_package.real_dependency_imports != false {
+        return false
+    }
+    if adapter.credential.required != false || adapter.credential.redacted != true {
+        return false
+    }
+    if adapter.terms.live_network != false || adapter.rate_limit.policy != "metadata-only" {
+        return false
+    }
+    return adapter.capability != nil && adapter.schema != nil && adapter.fixture != nil && adapter.fixture_key != nil
+}
+
+vendor_live_ok_count := 0
+for i := 1; i <= #vendor_live_package.adapters; i++ {
+    assert(vendor_live_adapter_ok(vendor_live_package.adapters[i]))
+    vendor_live_ok_count = vendor_live_ok_count + 1
+}
+
+assert(vendor_live_package.default_policy.live_network == false)
+assert(vendor_live_package.default_policy.provider_credentials_required == false)
+assert(#vendor_live_package.redaction.secret_patterns == 5)
+assert(#vendor_live_package.capability_registry.common_capabilities == 11)
+assert(vendor_live_package.auth_redaction.secret_values_present == false)
+assert(vendor_live_package.retry_cache_envelope.cache.mode == "fixture_replay")
+assert(#vendor_live_package.error_taxonomy.normalized_errors == 5)
+assert(vendor_live_package.rate_limit_fixture.live_network == false)
+assert(vendor_live_package.offline_replay.miss_behavior == "clean-skip")
+assert(vendor_live_ok_count == 21)
+
+vendor_live_package_summary := string.format(
+"vendor_live_package adapters=%d provider_free=%s live_network=%s imports=%s redaction=%s capabilities=%d errors=%d replay=%s cache=%s",
+vendor_live_ok_count,
+tostring(vendor_live_package.provider_free),
+tostring(vendor_live_package.live_network),
+tostring(vendor_live_package.real_dependency_imports),
+tostring(vendor_live_package.redaction.enabled),
+#vendor_live_package.capability_registry.common_capabilities,
+#vendor_live_package.error_taxonomy.normalized_errors,
+vendor_live_package.offline_replay.miss_behavior,
+vendor_live_package.retry_cache_envelope.cache.hit_state
+)
+
+print(vendor_live_package_summary)

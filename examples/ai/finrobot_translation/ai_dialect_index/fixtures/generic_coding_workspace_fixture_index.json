@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "package_id": "generic-ai-coding-workspace",
+  "provider_free": true,
+  "live_network": false,
+  "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json",
+  "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia"
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leia.dev/schemas/finrobot/html_ui/accessibility_checklist_v1.schema.json",
+  "title": "FinRobot HTML/UI Static Accessibility Checklist",
+  "type": "object",
+  "required": ["mode", "requires_browser", "checks"],
+  "properties": {
+    "mode": {"type": "string", "const": "static_dom_contract"},
+    "requires_browser": {"type": "boolean", "const": false},
+    "checks": {"type": "array", "minItems": 1}
+  }
+}

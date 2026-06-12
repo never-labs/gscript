@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "leia://generic-ai/forecast/clean-skip/v1",
+  "title": "Generic forecast clean skip",
+  "type": "object",
+  "required": ["provider_free", "live_network", "fixture_key", "skip_code", "dependency", "adapter", "reason", "recoverable"],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "fixture_key": {"type": "string"},
+    "skip_code": {"type": "string"},
+    "dependency": {"type": "string"},
+    "adapter": {"type": "string"},
+    "reason": {"type": "string"},
+    "recoverable": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

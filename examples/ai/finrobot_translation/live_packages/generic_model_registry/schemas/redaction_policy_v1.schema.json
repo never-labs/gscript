@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/leia/generic-model-registry/redaction_policy_v1.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "provider_free",
+    "enabled",
+    "replacement",
+    "secret_value_policy",
+    "secret_values_present",
+    "redact_fields",
+    "env_ref_patterns"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "enabled": {
+      "const": true
+    },
+    "replacement": {
+      "const": "<redacted>"
+    },
+    "secret_value_policy": {
+      "const": "never-store-secret-values"
+    },
+    "secret_values_present": {
+      "const": false
+    },
+    "redact_fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "env_ref_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

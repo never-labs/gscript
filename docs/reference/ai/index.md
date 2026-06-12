@@ -5,6 +5,13 @@ providers. The language-level surface is intentionally small: tagged `model`,
 `tool`, `agent`, and `turn` blocks plus ordinary `llm.*`, `msg.*`, and
 `history.*` helpers.
 
+AI native does not mean AI intrinsic. The tagged forms are syntax for building
+ordinary values and calling ordinary runtime helpers; they do not add hidden
+prompt memory, model-specific evaluation rules, or a separate agent engine.
+Provider I/O, tool dispatch, budgets, trace, record, and replay all pass through
+the same host-visible `llm` runtime paths whether the source uses dialect syntax
+or direct helper calls.
+
 ## Host Contract
 
 Embedders install providers through Go options:
@@ -46,6 +53,15 @@ Rules:
 - Alias cycles are invalid.
 - Secrets should come from environment variables or host-injected providers.
 - Host policy decides whether script-declared provider configs are honored.
+- Provider config fields are `protocol`, `base_url`, `api_key`,
+  `provider_model`, and optional host/provider names. Go hosts receive the
+  normalized shape as `llm.ProviderConfig`.
+- A model alias is a routing name, not a credential boundary. Scripts should
+  keep aliases stable across environments and let the host map them to the
+  actual provider/model through `WithLLMProvider`, `WithLLMProviderFactory`, or
+  environment-backed config.
+- Do not log secrets, copy secret values into traces, or commit replay records
+  made with unredacted provider configuration.
 
 ## Tool Dialect
 
@@ -72,9 +88,44 @@ Tool fields:
 | `params` | Ordered parameter names. |
 | `description` | Provider-visible description. |
 | `requires` | Capability labels for host policy and audit. |
+| `capabilities` | Alias for `requires` in lower-level `llm.tool` option tables. |
+| `schema` | Optional provider/tool input schema metadata. |
+| `result` / `output` | Script-visible success shape for contract inventory and validation. |
+| `error` | Script-visible structured error shape for contract inventory. |
+| `replay_key` | Stable key template for deterministic tool fixtures and audit logs. |
 
 Runtime helpers remain available through `llm.tool`, `llm.toolof`,
-`llm.agent_as_tool`, `llm.dispatch`, `llm.tool_caps`, and `llm.check_tools`.
+`llm.agent_as_tool`, `llm.dispatch`, `llm.tool_caps`, `llm.check_tools`,
+`llm.tool_schema`, `llm.tool_info`, and `llm.validate_tools`.
+
+Tool contracts are metadata for hosts, tests, replay fixtures, and provider
+adapter schemas. They are not authorization by themselves and they do not
+coerce tool return values. Use `llm.validate_tools(tools)` to fail fast when a
+tool list is missing required contract metadata for a workflow:
+
+```leia
+lookup := llm.tool("lookup", func(query) {
+    return {answer: "docs:" .. query}, nil
+}, {
+    params: {"query"}
+    description: "Lookup local documents."
+    capabilities: {"docs.read", "replay.local"}
+    result: {answer: "string"}
+    error: {kind: "validation", message: "string"}
+    replay_key: "lookup:{query}"
+})
+
+info := llm.tool_info({lookup})
+ok, err := llm.validate_tools({lookup})
+```
+
+`llm.tool_info(tool_or_tools)` returns a contract inventory with normalized
+`name`, `kind`, `type`, `description`, `params`, `schema`, `capabilities`,
+`requires`, `result`, `error`, and `replay_key` fields. `llm.tool_schema(...)`
+returns the provider-facing input schema and script-visible result/error
+shapes. Agent-as-tool values report `type: "agent"` and carry
+`trace_contract: "agent_tool.v1"`; their provider-facing input schema describes
+arguments only, not the delegated agent's output shape.
 
 ## Messages And History
 
@@ -89,6 +140,21 @@ history[#history + 1] = msg.assistant("draft")
 
 Message tables use normalized roles: `system`, `user`, `assistant`, and
 `tool`.
+
+A `prompt { role: "...", text: "..." }` block is message-object shorthand. It
+produces the same kind of normalized table accepted by `messages` and by the
+`msg` helpers:
+
+```leia
+messages := {
+    prompt { role: "system", text: "Answer from local evidence." }
+    prompt { role: "user", text: "Summarize the release." }
+}
+```
+
+Prompt message objects are data, not compiler directives. They may appear in
+message arrays, agent `instructions`, or generated config tables. Trace sinks
+may redact prompt text according to host policy.
 
 ## Turn Dialect
 
@@ -151,6 +217,34 @@ answer := agent {
 result, err := answer("What changed?")
 ```
 
+For common single-input agents, the dialect also accepts a declarative shorthand.
+The shorthand synthesizes the same config function and still lowers through
+`llm.agent`; it does not introduce a separate execution engine.
+
+```leia
+summarize := agent {
+    name: "summarize"
+    params: {"topic"}
+    model: "fast"
+    instructions: prompt { role: "system", text: "Use evidence and be concise." }
+    tools: {search_runbook}
+    output: {summary: "short"}
+}
+
+result, err := summarize("release process")
+```
+
+When `messages` is omitted, the first call argument becomes `user`. The
+`instructions` field is treated as `system` unless `system` is already present.
+Prompt field blocks with `role` and `text` are ordinary message tables, so they
+can be placed directly in `messages`.
+
+Use the shorthand when the agent is a prompt capsule: fixed model, fixed
+instructions, optional tools, sampling controls, metadata, budget, and expected
+output shape. Use an explicit `config` function when call arguments need custom
+mapping or dynamic request fields. Use a custom `flow` only when the script must
+own turn sequencing, message history, or dispatch.
+
 For an agent without a custom flow function, Leia runs the built-in loop:
 synthesize messages from `system` and `user`, call one turn, dispatch returned
 tool calls, append assistant tool-call and tool-result messages, and repeat
@@ -179,12 +273,275 @@ supervisor := agent {
 }
 ```
 
-## Budgets, Replay, And Trace
+`llm.handoff(agent, opts)` and `llm.delegate(agent, opts)` are agent-as-tool
+aliases for composition-oriented code. They wrap an existing agent as a tool
+descriptor, copy supported metadata such as `name`, `description`, `params`,
+`requires`, and `output`, and invoke the nested agent through the same dispatch
+path as other tools. They do not create a private scheduler or send the nested
+agent's output shape as the provider-facing tool input schema. If the delegated
+agent pauses for approval, dispatch returns a structured pending error so the
+host can persist or resume the outer workflow.
+
+Agent-as-tool dispatch also attaches a generic trace contract. A successful
+delegation result may contain `trace` or `tool_trace` with:
+
+| Field | Meaning |
+|---|---|
+| `type` | Node type such as `agent_tool`, `agent`, `workflow`, or `workflow_step`. |
+| `name` | Tool, agent, workflow, or step name. |
+| `status` | Runtime status such as `ok`, `done`, `pending`, `stopped`, or `error`. |
+| `parent` | Lightweight parent reference when nested. |
+| `children` | Ordered nested trace nodes. |
+| `error` | Structured error table when the node failed or paused. |
+| `budget` / `cancel` | Copied budget or cancellation error details when applicable. |
+| `metadata` | Host/script metadata table. |
+
+This trace contract is script-visible result metadata. It complements host
+trace sinks, which receive metadata events such as `turn_start`, `turn_end`,
+`turn_error`, and streaming events.
+
+## Structured Output
+
+Agents and turns can request structured output with an `output` shape and can
+also pass provider-facing hints through `response_format`.
+
+```leia
+extract := agent {
+    name: "extract"
+    params: {"note"}
+    model: "fast"
+    instructions: prompt { role: "system", text: "Extract project and owner." }
+    output: {project: "ORCHID", owner: "ADA"}
+}
+```
+
+`output` is a validation contract over provider results. It does not make model
+text part of Leia syntax or add a new type system rule. Built-in agent
+execution validates configured shapes; custom flows should call
+`llm.validate_output(value, schema)` when they need the same check. Validation
+failures are structured errors, not provider answers.
+
+The lower-level schema helpers are useful when the same shape is shared across
+tools, turns, agents, and section generation:
+
+| Helper | Meaning |
+|---|---|
+| `llm.schema(spec)` | Normalize a lightweight shape or JSON Schema-like table to a JSON Schema table. |
+| `llm.schema_info(spec)` / `llm.schemaInfo(spec)` | Return `{schema, json_schema, kind}` for inspection. |
+| `llm.output_schema(name, spec, opts)` | Build a provider-facing `response_format` table of type `json_schema`. |
+
+Lightweight object specs treat string values as field types, a trailing `?` as
+optional, one-element arrays as array item specs, and descriptor tables as field
+schemas with metadata such as `description`.
+
+```leia
+contact_schema := llm.schema({
+    name: {type: "string", description: "Display name"}
+    score: "number"
+    nickname: "string?"
+    tags: {"string"}
+})
+
+format := llm.output_schema("contact", contact_schema)
+result, err := llm.turn({
+    model: "fast"
+    messages: {llm.user("Extract the contact.")}
+    response_format: format
+})
+ok, message := llm.validate_output(result.text, contact_schema)
+```
+
+Schemas are request and validation metadata. They do not make model output a
+typed Leia value until the script parses or validates it.
+
+## Retrieval Context And Evidence
+
+The memory/RAG helpers build ordinary tables and messages for small local
+retrieval workflows:
+
+| Helper | Meaning |
+|---|---|
+| `llm.doc(value, opts)` / `llm.document(value, opts)` | Build a document table with `text` plus optional `id`, `title`, `source`, `tags`, `sections`, or other metadata. |
+| `llm.collection(docs)` / `llm.docs(docs)` | Build a collection table with `docs` and `count`. |
+| `llm.retrieve(collection, query, opts)` / `llm.search(...)` | Return ranked local matches; `opts.limit` caps results and `opts.label` labels generated context. |
+| `llm.context(matches, opts)` | Build a context message wrapper, default label `Context`. |
+| `llm.evidence(matches, opts)` | Build an evidence message wrapper, default label `Evidence`. |
+
+`context` and `evidence` fields on turn, agent, and section request tables are
+expanded into user messages before the provider call. These helpers are for
+script-local packaging and simple lexical retrieval; they are not a vector
+database, persistence layer, citation verifier, or permission boundary.
+
+```leia
+docs := llm.collection({
+    llm.doc("Checkout runbook says payment queue owns sev2 incidents.", {
+        id: "runbook"
+        title: "Checkout runbook"
+        source: "local/runbook"
+        tags: {"checkout", "payments"}
+    })
+})
+
+ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
+result, err := llm.turn({
+    model: "fast"
+    user: "Who owns the incident?"
+    evidence: llm.evidence(ctx.matches, {label: "Runbook evidence"})
+})
+```
+
+Documents may carry section text and provenance metadata so report or RAG code
+can preserve source identity before prompt assembly:
+
+```leia
+policy_doc := llm.document({
+    id: "policy"
+    title: "Release policy"
+    source: "docs/release.md"
+    sections: {
+        approvals: "Production releases require owner approval."
+        rollback: "Rollback plans must name the on-call."
+    }
+})
+```
+
+The retrieval helpers rank and package only the collection passed to them. A
+host or tool must filter documents before collection construction when access
+control, tenant boundaries, licensing, freshness, or secret handling matter.
+
+## Workflows
+
+`llm.workflow(steps)` creates a sequential runner for named AI or non-AI steps.
+Each step is built with `llm.step(name, fn, opts)` or supplied as a function. A
+workflow value exposes `run(input, opts)` and `mock(fixtures)`.
+
+```leia
+flow := llm.workflow({
+    llm.step("draft", func(ctx) {
+        return llm.turn({model: "fast", messages: {llm.user(ctx.input)}})
+    })
+    llm.step("revise", func(ctx) {
+        return llm.turn({model: "fast", messages: {llm.user(ctx.input)}})
+    })
+})
+
+result, err := flow.run("release notes")
+```
+
+Step functions receive a context table with `input`, `initial_input`,
+`previous`, accumulated `results`, and named `context`. A step may
+return a provider/agent result table, a plain value, and optionally an error.
+The next step receives the prior step's text or value as its input. The final
+workflow result includes `status`, `text`, `value`, ordered `steps`, and named
+`context`.
+
+Use workflows for deterministic sequencing, replay, and test fixtures around
+agent calls. They are not parallel execution, durable orchestration, retries, or
+transaction management. `flow.mock({step_name: fixture})` replaces named steps
+with fixtures and is intended for tests and offline examples.
+
+## Section Generation
+
+`llm.sections(config)` and `llm.generate_sections(config)` run the same agent
+request shape once per requested section and return ordered and name-indexed
+results.
+
+```leia
+generated, err := llm.sections({
+    model: "fast"
+    messages: {llm.system("Return JSON."), llm.user("Draft the report.")}
+    evidence: "Evidence: launch checklist is complete."
+    sections: {
+        {
+            name: "summary"
+            instructions: "Create the summary section."
+            output: {headline: "Short headline", confidence: 0.5}
+        }
+        {
+            name: "risk"
+            prompt: "Create the risk section."
+            output: {risk: "Low", owner: "team"}
+        }
+    }
+})
+headline := generated.values.summary.headline
+```
+
+Top-level request fields such as `model`, `messages`, `tools`, `context`, and
+`evidence` are shared. Each section must have `name` and may provide
+`instructions` or `prompt`, `output`, section-local evidence, and other request
+fields. Results are returned as `sections` in order, `results` by section name,
+and parsed `values` by section name when structured output is configured.
+
+Sections are a convenience for independent report parts. They do not guarantee
+cross-section consistency, automatic citations, or shared hidden memory beyond
+the request fields supplied to each section.
+
+## Report Artifact Contract
+
+`llm.report_artifact_contract(opts)` returns a generic, offline-verifiable
+contract table for report-producing workflows. It is useful when an agent or
+workflow produces sections, chart plans, source annotations, and artifact
+manifests that another renderer or CI check will validate.
+
+```leia
+contract := llm.report_artifact_contract({
+    name: "release_report"
+    version: "report.v1"
+})
+
+manifest := contract.manifest_template
+section_schema := contract.schemas.report_section
+```
+
+The returned table includes `name`, `version`, `offline_verifiable`,
+`renderer_required`, `schemas`, `manifest_template`, and `required_markers`.
+The schemas cover:
+
+| Schema | Purpose |
+|---|---|
+| `report_section` | Ordered section content with chart/source references and AI disclosure flags. |
+| `chart_spec` | Chart intent plus source references and planned/rendered artifact metadata. |
+| `artifact_manifest` | Report id, generated time, sections, chart specs, artifacts, source annotations, warnings, and disclosure. |
+| `source_annotation` | Source identity, locator, freshness fields, optional license, retrieval time, and evidence hash. |
+
+This helper declares an artifact boundary; it does not render HTML/PDF, fetch
+data, verify citations, or make product-specific report APIs. Scripts should
+validate produced tables with `llm.validate_output` or ordinary assertions and
+leave rendering to explicit code or host tooling.
+
+## Budgets, Policy, Approval, Replay, And Trace
 
 Budgets can be attached to agent config tables or managed with lower-level
 helpers such as `llm.with_budget`. Public dimensions include `turns`, `calls`,
 `tokens`, and `time`. Provider usage may include cost metadata, but Leia does
 not promise money accounting as a stable script-level budget dimension.
+
+Budgets gate AI runtime work before or after provider turns and tool dispatch.
+They do not change ordinary expression evaluation outside the helper paths.
+Declarative agents, explicit agents, and direct turns share the same accounting
+when they lower through `llm`.
+
+Policy helpers operate on tool capability labels:
+
+```leia
+policy := llm.policy()
+ok, err := llm.check_policy({search_runbook}, policy)
+```
+
+The default policy is `capability_policy.v1` with `default:
+"deny_high_risk"`. It denies capability classes for trading, portfolio,
+generated-code, network, credential, and publish actions unless an exact
+capability is listed in `allow`. `llm.check_policy(tool_or_tools, policy)`
+returns `(true, nil)` or `(nil, {kind: "policy", capability, class, policy,
+message})`.
+
+Human approval and resume use the lower-level loop helpers. A pending snapshot
+is host-persistable data; `loop.resume(token, approval)` applies an approval
+table such as `{ok: true}` or `{ok: false, reason: "..."}`. Use
+`llm.approval_trace({token, pending, approval, result, policy})` to record a
+portable approval replay trace with `kind: "approval_replay_trace"` and
+`version: "approval_replay.v1"`.
 
 Use host-side record/replay for deterministic tests:
 
@@ -202,6 +559,37 @@ _ = replay
 
 Use `llm.NewTraceRecorder()` or `leia.WithLLMTrace` for metadata events. Trace
 events intentionally omit prompt text and tool result values by default.
+Record/replay observes normalized requests after dialect lowering, so replay
+fixtures should not depend on whether the source used shorthand syntax or
+direct helper calls. Trace is for operational visibility and may redact content;
+replay is for deterministic provider behavior and must be strict about request
+matching.
+
+## Evaluation Harness
+
+`evaluate "name" { ... }` declares a regression case discovered by
+`leia evaluate`. The `eval` module is available only while the evaluation
+harness runs the block.
+
+| Function | Meaning |
+|---|---|
+| `eval.case(id, fn)` | Run one named subcase and continue after subcase failures. |
+| `eval.metric(name, value)` | Record bool, number, string, nil, or JSON-like metrics. |
+| `eval.load_jsonl(path)` | Load a JSON Lines corpus relative to the evaluate source. |
+| `eval.skip_if(cond, reason)` | Skip the active subcase when `cond` is truthy. |
+| `eval.fail_if(cond, message)` | Fail the active subcase when `cond` is truthy. |
+| `eval.usage()` | Return current case LLM usage. |
+| `eval.budget(table)` | Fail when current usage exceeds a positive limit. |
+| `eval.judge(options)` | Run a bounded judge turn through `llm.turn(options)`. |
+
+The CLI supports `--list`, `--filter`, `--parallel`, `--format json|text|html`,
+`--output`/`--report`, `--gate`, `--baseline`, `--compare`,
+`--regression-threshold`, `--llm-record`, `--llm-replay`, and
+`--update-golden`. JSON reports preserve case metrics, usage, diagnostics, and
+optional baseline comparison. Boolean metrics become pass-rate summaries;
+numeric metrics become count/mean/min/max summaries; string metrics become
+category counts. LLM fixture modes are intended for deterministic provider
+behavior and may serialize execution even when `--parallel` is set.
 
 ## Live Provider Tests
 

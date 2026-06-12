@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "id": "generic-ui-snapshot-evaluator",
+  "package_name": "leia-generic-ai-ui-snapshot-evaluator",
+  "package_boundary_id": "generic-ai-ui-snapshot-evaluator",
+  "capability_id": "generic.ai.ui.snapshot.evaluator",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic AI package for static UI route DOM snapshots, evidence-report projection, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips.",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "real_dependency_import_default": false,
+  "depends_on_q_runtime": false,
+  "browser_required_default": false,
+  "credential_required_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "contract_root": "contracts",
+  "entrypoints": {
+    "main": "main.leia",
+    "contract": "contracts/generic_ui_snapshot_evaluator_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "ui_snapshot_evaluator": "schemas/generic_ui_snapshot_evaluator_v1.schema.json",
+    "evidence_report_ui_snapshot_projection": "schemas/evidence_report_ui_snapshot_projection_v1.schema.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_ui_snapshot_evaluator_contract.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "ui_snapshot_evaluator": "fixtures/generic_ui_snapshot_evaluator_fixture.json",
+    "evidence_report_ui_snapshot_projection": "fixtures/evidence_report_ui_snapshot_projection_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.ui.snapshot.evaluator",
+    "generic.ai.ui.snapshot.evidence_report_projection",
+    "generic.ai.ui.route_dom_schema",
+    "generic.ai.ui.viewport_matrix",
+    "generic.ai.ui.visual_diff_budget",
+    "generic.ai.ui.accessibility_summary",
+    "generic.ai.ui.artifact_uri_manifest",
+    "generic.ai.ui.redaction_policy",
+    "generic.ai.ui.static_asset_policy",
+    "generic.ai.ui.browser_clean_skip"
+  ],
+  "capability_surfaces": [
+    "route_dom_snapshots",
+    "evidence_report_projection",
+    "viewport_matrix",
+    "visual_diff_budgets",
+    "accessibility_summaries",
+    "artifact_uri_manifest",
+    "redaction_policy",
+    "static_asset_policy",
+    "browser_clean_skip"
+  ],
+  "default_policy": {
+    "mode": "fixture_replay",
+    "provider_policy": "provider-free",
+    "live_network": false,
+    "live_model_calls": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "browser_required": false,
+    "clean_skip_without_browser": true,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_ui_snapshot_evaluator_fixture"
+  },
+  "test_gates": [
+    "route DOM snapshot fixtures decode without launching a browser",
+    "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
+    "viewport matrix and visual diff budgets are deterministic fixture data",
+    "accessibility summaries are static DOM summaries with zero live audits",
+    "artifact URI manifest allows only fixture and artifact schemes",
+    "redaction policy runs before hashing and forbids credential output patterns",
+    "static asset policy forbids remote assets and remote fonts",
+    "browser absence produces clean-skip metadata instead of failure"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in leia-generic-ai-ui-snapshot-evaluator browser automation or visual diffing; this provider-free package boundary owns UI snapshot, evidence-report projection, viewport, diff budget, accessibility summary, artifact URI, redaction, static asset, and browser clean-skip contracts."
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-ui-snapshot-evaluator; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
+  },
+  "dialect_capability_id": "generic.ai.ui.snapshot.evaluator",
+  "dialect_backend_shape": "ai.ui.snapshot_evaluator",
+  "dialect_aliases": [
+    {
+      "id": "ai.ui.snapshot_evaluator",
+      "target": "generic.ai.ui.snapshot.evaluator",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.ui.snapshot.evaluator",
+  "capability_aliases": [
+    {
+      "alias": "ai.ui.snapshot_evaluator",
+      "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "evidence-report-artifacts",
+      "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.ui.snapshot.evaluator",
+      "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "trace",
+      "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "ui-snapshot",
+      "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "ui-snapshot",
+      "target_capability_id": "generic.ai.ui.snapshot.evaluator",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
+}

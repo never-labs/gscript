@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generic.capability_policy.v1",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "default_decision",
+    "allowed_capability_prefixes",
+    "denied_by_default",
+    "capabilities"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "default_decision": {
+      "const": "deny"
+    },
+    "allowed_capability_prefixes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "denied_by_default": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "minItems": 1
+    }
+  }
+}

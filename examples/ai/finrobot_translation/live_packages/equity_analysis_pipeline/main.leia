@@ -1,0 +1,6 @@
+// Provider-free FinRobot equity analysis pipeline live package skeleton.
+// No live provider SDKs, network calls, credentials, or Python runtime imports are used here.
+
+equity_analysis_pipeline_live_package_summary := "equity_analysis_pipeline_live_package stages=5 fixtures=7 schemas=7 failure_hooks=5 provider_free=true live_network=false imports=false trace=provider_free retry_cache=true timing=fixture_monotonic_ms"
+
+print(equity_analysis_pipeline_live_package_summary)

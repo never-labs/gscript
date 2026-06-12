@@ -138,6 +138,41 @@ func TestExamplesCommandDiscoversPackageManagedProjectEntrypoints(t *testing.T) 
 	}
 }
 
+func TestExamplesCommandDiscoversAllFinRobotTranslationExamples(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	examples, err := cliRepositoryExamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered := make(map[string]cliExample, len(examples))
+	for _, example := range examples {
+		discovered[example.Path] = example
+	}
+
+	expected, err := finRobotTranslationExamplePaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expected) == 0 {
+		t.Fatal("no FinRobot translation examples found")
+	}
+
+	for _, path := range expected {
+		t.Run(path, func(t *testing.T) {
+			example, ok := discovered[path]
+			if !ok {
+				t.Fatalf("examples CLI must discover FinRobot translation example %s", path)
+			}
+			if !example.Runnable || !example.Checkable || example.Requires != "" {
+				t.Fatalf("%s metadata = %#v, want runnable checkable example with no skip reason", path, example)
+			}
+			if want := expectedFinRobotTranslationRunner(root, path); example.Runner != want {
+				t.Fatalf("%s runner = %q, want %q", path, example.Runner, want)
+			}
+		})
+	}
+}
+
 func TestExamplesCommandVerifiesPackageManagedProjects(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
 	examples, err := cliRepositoryExamples()
@@ -296,6 +331,68 @@ func TestExamplesCommandDirectorySelectorsCoverExampleProjects(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestExamplesCommandFinRobotTranslationSelectorChecksEveryExample(t *testing.T) {
+	root := filepath.Dir(playgroundExamplesRoot())
+	expected, err := finRobotTranslationExamplePaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedByID := make(map[string]bool, len(expected))
+	for _, path := range expected {
+		expectedByID[strings.TrimSuffix(strings.ReplaceAll(strings.TrimPrefix(path, "examples/"), "/", "-"), ".leia")] = true
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runExamplesCommand([]string{"check", "--json", "--jobs=4", "--timeout=20s", "ai/finrobot_translation"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runExamplesCommand code = %d, stdout = %q stderr = %q", code, stdout.String(), stderr.String())
+	}
+	var payload struct {
+		SchemaVersion int                     `json:"schema_version"`
+		OK            bool                    `json:"ok"`
+		Runnable      int                     `json:"runnable"`
+		Skipped       int                     `json:"skipped"`
+		Failed        int                     `json:"failed"`
+		Results       []cliExampleCheckResult `json:"results"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid examples check JSON: %v\n%s", err, stdout.String())
+	}
+	if payload.SchemaVersion != 1 || !payload.OK || payload.Runnable != len(expected) || payload.Skipped != 0 || payload.Failed != 0 {
+		t.Fatalf("unexpected FinRobot examples check payload: %#v", payload)
+	}
+	if len(payload.Results) != len(expected) {
+		t.Fatalf("FinRobot examples check results = %d, want %d", len(payload.Results), len(expected))
+	}
+	for _, result := range payload.Results {
+		id := strings.TrimPrefix(result.ID, "repo-")
+		if !expectedByID[id] {
+			t.Fatalf("FinRobot selector returned unexpected example %s (%s)", result.ID, result.Path)
+		}
+		if result.Status == "skipped" {
+			t.Fatalf("FinRobot example %s unexpectedly skipped: %s", result.ID, result.Requires)
+		}
+	}
+}
+
+func TestExamplesCommandJSONCaptureBlocksProcessOutputLeaks(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := captureCLIExampleProcessOutput(func() int {
+		_, _ = os.Stdout.WriteString("direct stdout leak\n")
+		_, _ = os.Stderr.WriteString("direct stderr leak\n")
+		return 0
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("capture code = %d, want 0", code)
+	}
+	if stdout.String() != "direct stdout leak\n" {
+		t.Fatalf("captured stdout = %q", stdout.String())
+	}
+	if stderr.String() != "direct stderr leak\n" {
+		t.Fatalf("captured stderr = %q", stderr.String())
 	}
 }
 
@@ -481,6 +578,46 @@ func documentedExamplesCheckSelectors(command []string) []string {
 	return selectors
 }
 
+func finRobotTranslationExamplePaths(root string) ([]string, error) {
+	var paths []string
+	base := filepath.Join(root, "examples", "ai", "finrobot_translation")
+	err := filepath.WalkDir(base, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".leia" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		paths = append(paths, filepath.ToSlash(rel))
+		return nil
+	})
+	sort.Strings(paths)
+	return paths, err
+}
+
+func expectedFinRobotTranslationRunner(root, path string) string {
+	sourcePath := filepath.Join(root, filepath.FromSlash(path))
+	if info, err := os.Stat(strings.TrimSuffix(sourcePath, filepath.Ext(sourcePath)) + ".records.json"); err == nil && !info.IsDir() {
+		return "llm-replay"
+	}
+	src, err := os.ReadFile(sourcePath)
+	if err == nil {
+		for _, line := range strings.Split(string(src), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "evaluate ") {
+				return "evaluate"
+			}
+		}
+	}
+	return "host-vm"
+}
+
 func TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples(t *testing.T) {
 	playgroundExamples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
@@ -660,7 +797,6 @@ func TestExamplesCommandDefaultCheckSkipsOnlyOptInExamples(t *testing.T) {
 		t.Fatalf("unexpected examples check payload: %#v", payload)
 	}
 	allowed := map[string]string{
-		"repo-ai-finrobot_translation-live_packages-earnings_transcript-main": "local AI playground profile or LLM replay fixture",
 		"repo-game_engine-chess":                "game/window host access",
 		"repo-game_engine-chess_ai":             "game/window host access",
 		"repo-game_engine-chess_bench":          "higher playground step budget",
@@ -703,7 +839,18 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"repo-evaluate-project_agent_regression",
 		"repo-ai-coding_agent_replay",
 		"repo-ai-coding_agent_project-main",
+		"repo-ai-finrobot_translation-core_agents-main",
+		"repo-ai-finrobot_translation-core_agents-workflow_handoff",
+		"repo-ai-finrobot_translation-data_tools",
+		"repo-ai-finrobot_translation-equity_report",
+		"repo-ai-finrobot_translation-quant_experiments-investment_group",
+		"repo-ai-finrobot_translation-quant_experiments-multi_factor_agents",
+		"repo-ai-finrobot_translation-quant_experiments-portfolio_optimization",
+		"repo-ai-finrobot_translation-reporting",
 		"repo-ai-tagged_agent_workflow",
+		"repo-ai-general_agent_workflow",
+		"repo-ai-general_analysis_assistant",
+		"repo-ai-translation_research_assistant",
 		"repo-ai-record_replay_trace_project",
 		"repo-workflow-support_triage_replay",
 		"repo-testing-jsonl_workflow_test",
@@ -726,7 +873,18 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-evaluate-project_agent_regression",
 		"ok      repo-ai-coding_agent_replay",
 		"ok      repo-ai-coding_agent_project-main",
+		"ok      repo-ai-finrobot_translation-core_agents-main",
+		"ok      repo-ai-finrobot_translation-core_agents-workflow_handoff",
+		"ok      repo-ai-finrobot_translation-data_tools",
+		"ok      repo-ai-finrobot_translation-equity_report",
+		"ok      repo-ai-finrobot_translation-quant_experiments-investment_group",
+		"ok      repo-ai-finrobot_translation-quant_experiments-multi_factor_agents",
+		"ok      repo-ai-finrobot_translation-quant_experiments-portfolio_optimization",
+		"ok      repo-ai-finrobot_translation-reporting",
 		"ok      repo-ai-tagged_agent_workflow",
+		"ok      repo-ai-general_agent_workflow",
+		"ok      repo-ai-general_analysis_assistant",
+		"ok      repo-ai-translation_research_assistant",
 		"ok      repo-ai-record_replay_trace_project",
 		"ok      repo-workflow-support_triage_replay",
 		"ok      repo-testing-jsonl_workflow_test",
@@ -734,7 +892,7 @@ func TestExamplesCommandChecksDeterministicSpecialRunners(t *testing.T) {
 		"ok      repo-tooling-release_gate_project-main",
 		"ok      repo-performance-execution_modes_matrix",
 		"ok      repo-ui-package_managed-main",
-		"examples: 17 ok, 0 skipped, 0 failed",
+		"examples: 28 ok, 0 skipped, 0 failed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("examples check missing %q\n%s", want, out)

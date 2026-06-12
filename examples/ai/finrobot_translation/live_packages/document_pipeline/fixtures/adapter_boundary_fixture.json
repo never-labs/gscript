@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "boundaries": [
+    {
+      "id": "sec_filing_client",
+      "display_name": "SEC filing search and fetch",
+      "capability": "finance.document.sec.search_fetch",
+      "fixture_key": "sec:filing_search:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "SEC user-agent contact and rate-limit enforcement are absent in provider-free fixture replay.",
+      "policy": {
+        "user_agent_required_for_live": true,
+        "rate_limit_required_for_live": true,
+        "max_requests_per_second": 10,
+        "redirect_cache_metadata_required": true
+      },
+      "gap": "Future package must implement SEC search/fetch rate limits and user-agent policy outside Leia core."
+    },
+    {
+      "id": "html_parser",
+      "display_name": "SEC HTML parser boundary",
+      "capability": "finance.document.html.parse_boundary",
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "HTML parsing is represented by normalized fixture metadata without parser imports.",
+      "policy": {
+        "accepted_inputs": [
+          "sec_html"
+        ],
+        "required_outputs": [
+          "normalized_dom_ref",
+          "section_anchor_map",
+          "table_policy"
+        ]
+      },
+      "gap": "Future package must choose an HTML parser and document table and section-anchor fidelity drift."
+    },
+    {
+      "id": "pdf_to_markdown_converter",
+      "display_name": "PDF to markdown converter boundary",
+      "capability": "finance.document.pdf.to_markdown_boundary",
+      "fixture_key": "converter:sec_markdown:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "PDF conversion is represented by page spans and layout warnings without Marker or PDF imports.",
+      "policy": {
+        "accepted_inputs": [
+          "sec_pdf"
+        ],
+        "required_outputs": [
+          "markdown",
+          "page_spans",
+          "layout_warnings"
+        ]
+      },
+      "gap": "Future package must choose Marker or another PDF-to-markdown converter and document layout fidelity drift."
+    },
+    {
+      "id": "chunk_citation_adapter",
+      "display_name": "Chunk citation and vector payload adapter",
+      "capability": "finance.document.chunk_citation.vector_matrix",
+      "fixture_key": "rag:chunks:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Chunk, citation, and vector payload stages use fixture-only adapter matrix rows.",
+      "policy": {
+        "matrix_stages": [
+          "chunk",
+          "citation",
+          "vector_payload"
+        ],
+        "required_columns": [
+          "stage",
+          "input",
+          "output",
+          "adapter",
+          "fixture_key",
+          "clean_skip"
+        ]
+      },
+      "gap": "Future package must implement chunking, citation linking, and vector payload adapters outside Leia core."
+    },
+    {
+      "id": "embedding_adapter",
+      "display_name": "Embedding adapter clean skip",
+      "capability": "finance.document.embedding.clean_skip",
+      "fixture_key": "rag:chunks:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Embedding IDs are fixture references and no embedding model is imported.",
+      "policy": {
+        "fallback_adapter": "fixture_embedding_ref",
+        "skip_reason_required": true
+      },
+      "gap": "Future package must provide embedding model selection and credential handling outside Leia core."
+    },
+    {
+      "id": "vector_store_adapter",
+      "display_name": "Vector store capability gates",
+      "capability": "finance.document.vector_store.capability_gates",
+      "fixture_key": "rag:corpus_manifest:ACME:10-K:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Vector store capabilities are expressed as fixture gates without importing LangChain or vector database clients.",
+      "policy": {
+        "required_capabilities": [
+          "similarity_search",
+          "metadata_filter"
+        ],
+        "optional_capabilities": [
+          "persistent_index"
+        ],
+        "optional_dependencies": [
+          "langchain",
+          "vector_store"
+        ],
+        "skip_reason_required": true
+      },
+      "gap": "Future package must provide vector store selection, persistence semantics, metadata filter parity, and dependency clean-skip behavior."
+    },
+    {
+      "id": "vector_retriever",
+      "display_name": "Vector store and retriever",
+      "capability": "finance.document.vector_retriever.query",
+      "fixture_key": "retriever:ragquery:ACME:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Retriever ranks fixture chunks through fixture_vector_index without vector database imports.",
+      "policy": {
+        "fallback_adapter": "fixture_vector_index",
+        "ranked_chunks_required": true,
+        "answer_citations_required": true
+      },
+      "gap": "Future package must provide embedding model, vector index, ranking, and persistence adapters."
+    },
+    {
+      "id": "generic_memory_store",
+      "display_name": "External generic memory store package boundary",
+      "capability": "generic.ai.memory.store",
+      "fixture_key": "generic:memory_store:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true,
+      "clean_skip_reason": "Memory store and context retrieval are static fixture records without external memory providers or persistence imports.",
+      "policy": {
+        "namespace_policy_required": true,
+        "memory_item_provenance_required": true,
+        "context_window_budget_required": true,
+        "provider_credentials_required": false
+      },
+      "gap": "Future package must provide durable memory storage, tenant isolation, retrieval ranking, and context packing outside Leia core.",
+      "external_package": "generic_memory_store"
+    }
+  ]
+}

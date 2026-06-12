@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "ratio_ACME_2026Q1_fixture",
+  "provider_free": true,
+  "rows": [
+    {
+      "schema": "normalized_ratio_v1",
+      "symbol": "ACME",
+      "ratio": "debt_to_equity",
+      "value": 0.42,
+      "unit": "ratio",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "as_of": "2026-05-01",
+      "stale_after_days": 90,
+      "stale": false,
+      "source_id": "fixture.ratio.acme.2026q1",
+      "record_hash": "sha256:ratio-acme-2026q1-debt-to-equity"
+    },
+    {
+      "schema": "normalized_ratio_v1",
+      "symbol": "ACME",
+      "ratio": "gross_margin",
+      "value": 0.61,
+      "unit": "ratio",
+      "fiscal_year": 2026,
+      "fiscal_period": "Q1",
+      "as_of": "2026-05-01",
+      "stale_after_days": 90,
+      "stale": false,
+      "source_id": "fixture.ratio.acme.2026q1",
+      "record_hash": "sha256:ratio-acme-2026q1-gross-margin"
+    }
+  ],
+  "deterministic_order": [
+    "symbol",
+    "fiscal_year",
+    "fiscal_period",
+    "ratio"
+  ]
+}

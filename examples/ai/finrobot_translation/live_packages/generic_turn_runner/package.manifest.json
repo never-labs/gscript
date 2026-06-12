@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-turn-runner-live-package",
+  "package_name": "leia-generic-ai-turn-runner",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for generic AI single-turn request, memory context projection, and execution envelopes.",
+  "source_mode": "fixture-contract",
+  "target_mode": "live-package-skeleton",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No provider credentials are declared by this skeleton; provider-specific model adapters belong in future packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_turn_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "contract": "contracts/generic_turn_runner_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "turn_request": "schemas/single_turn_request_v1.schema.json",
+    "execute_response": "schemas/execute_response_envelope_v1.schema.json",
+    "tool_request": "schemas/tool_request_envelope_v1.schema.json",
+    "replay_record": "schemas/replay_record_match_v1.schema.json",
+    "error": "schemas/error_envelope_v1.schema.json",
+    "memory_context_turn_projection": "schemas/memory_context_turn_projection_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "turn_request": "fixtures/generic_turn_request_fixture.json",
+    "execute_response": "fixtures/ai_turn_execute_fixture.json",
+    "tool_request": "fixtures/tool_request_fixture.json",
+    "replay_record": "fixtures/replay_record_match_fixture.json",
+    "error": "fixtures/error_envelope_fixture.json",
+    "memory_context_turn_projection": "fixtures/memory_context_turn_projection_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.turn.request",
+    "ai.turn.execute",
+    "generic.ai.turn.memory_context_projection"
+  ],
+  "blocked_imports": [
+    "openai",
+    "anthropic",
+    "google.generativeai",
+    "cohere",
+    "mistralai",
+    "requests",
+    "httpx",
+    "urllib",
+    "aiohttp",
+    "q/runtime"
+  ],
+  "request_contract": {
+    "dialect_capability": "generic.ai.turn.request",
+    "schema": "single_turn_request_v1",
+    "turn_model": "single_turn",
+    "required_fields": [
+      "request_id",
+      "correlation_id",
+      "model",
+      "messages",
+      "response_format",
+      "replay"
+    ],
+    "message_roles": [
+      "system",
+      "user",
+      "assistant",
+      "tool"
+    ],
+    "response_format_modes": [
+      "text",
+      "json_object",
+      "json_schema"
+    ],
+    "provider_free": true
+  },
+  "execute_contract": {
+    "dialect_capability": "ai.turn.execute",
+    "schema": "execute_response_envelope_v1",
+    "response_envelope_fields": [
+      "status",
+      "request_id",
+      "correlation_id",
+      "message",
+      "response_format",
+      "usage",
+      "error",
+      "tool_requests",
+      "replay"
+    ],
+    "usage_fields": [
+      "input_tokens",
+      "output_tokens",
+      "total_tokens",
+      "source"
+    ],
+    "error_fields": [
+      "code",
+      "message",
+      "retryable",
+      "provider_free",
+      "live_network",
+      "credentials_required",
+      "no_secret",
+      "request_hash",
+      "correlation_id"
+    ],
+    "provider_free": true
+  },
+  "tool_request_contract": {
+    "schema": "tool_request_envelope_v1",
+    "required_fields": [
+      "tool_call_id",
+      "correlation_id",
+      "name",
+      "arguments",
+      "status",
+      "replay"
+    ],
+    "argument_encoding": "json_object",
+    "execution_policy": "request-only-envelope",
+    "live_execution": false
+  },
+  "replay_match_contract": {
+    "schema": "replay_record_match_v1",
+    "match_key": "deterministic_request_hash",
+    "canonicalization": [
+      "request_id excluded from hash",
+      "messages preserve order",
+      "object keys sorted",
+      "response_format included",
+      "tool declarations included",
+      "temperature and max_output_tokens included"
+    ],
+    "miss_behavior": "clean-skip",
+    "provider_credentials_required": false,
+    "live_network": false
+  },
+  "memory_context_projection_contract": {
+    "dialect_capability": "generic.ai.turn.memory_context_projection",
+    "source_package": "generic_memory_store",
+    "source_fixture": "../generic_memory_store/fixtures/generic_memory_store_fixture.json",
+    "target_fixture": "fixtures/generic_turn_request_fixture.json",
+    "target_field": "messages",
+    "projection_policy": "context_ref_message",
+    "raw_memory_text_allowed": false,
+    "secret_values_allowed": false,
+    "deterministic_order_required": true
+  },
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "provider_sdks_required": false,
+    "test_rule": "package tests must pass with fixtures only, no credentials, no provider SDK imports, no q/runtime dependency, and no network I/O"
+  },
+  "test_gates": [
+    "single-turn request schema carries messages, response_format, usage-free request metadata, and replay key material",
+    "ai.turn.execute response envelope carries message, response_format, usage, error, tool request, and replay metadata",
+    "tool request envelope is request-only and provider-free",
+    "memory context projection maps ranked memory context refs into deterministic turn messages without raw memory text",
+    "replay record match contract is deterministic, provider-free, and clean-skips on misses",
+    "turn request, tool request, replay match, execute response, and error envelope carry stable request hash, correlation id, offline provider-free state, and no-secret evidence"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide generic AI provider execution as a built-in; leia-generic-ai-turn-runner defines the provider-free package boundary for request, execution, tool, and replay contracts."
+  },
+  "dialect_capability_id": "ai.turn.execute",
+  "dialect_backend_shape": "ai.turn.execute",
+  "dialect_aliases": [
+    {
+      "id": "ai.turn.execute",
+      "target": "ai.turn.execute",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "ai.turn.execute",
+  "capability_aliases": [
+    {
+      "alias": "ai.turn.execute",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.turn.request",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "turn",
+      "target_capability_id": "ai.turn.execute",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
+}

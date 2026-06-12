@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "corporate_action_adjustment_v1",
+  "domain": "corporate_actions",
+  "description": "Provider-free corporate action adjustment row for split, dividend, and market-bar restatement fixtures.",
+  "required": [
+    "schema",
+    "symbol",
+    "effective_date",
+    "action_type",
+    "adjustment_factor",
+    "raw_close",
+    "adjusted_close",
+    "raw_volume",
+    "adjusted_volume",
+    "currency",
+    "adjustment_method",
+    "as_of",
+    "stale_after_days",
+    "stale",
+    "source_id",
+    "record_hash"
+  ],
+  "canonical_fields": [
+    "schema",
+    "symbol",
+    "effective_date",
+    "action_type",
+    "adjustment_factor",
+    "raw_close",
+    "adjusted_close",
+    "raw_volume",
+    "adjusted_volume",
+    "cash_amount",
+    "currency",
+    "adjustment_method",
+    "missing_reason",
+    "as_of",
+    "stale_after_days",
+    "stale",
+    "source_id",
+    "record_hash"
+  ],
+  "deterministic_order": [
+    "symbol",
+    "effective_date",
+    "action_type"
+  ],
+  "missing_required_policy": "reject_record",
+  "missing_optional_policy": "emit_null_with_missing_reason",
+  "provider_free": true
+}

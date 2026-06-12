@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/finrobot/product_workflow/deployment_gate.schema.json",
+  "title": "FinRobot Product Workflow Deployment Gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "capability", "state", "requires_credentials", "live_network"],
+  "properties": {
+    "id": {"type": "string"},
+    "capability": {"type": "string", "pattern": "^product\\.workflow\\."},
+    "state": {"type": "string"},
+    "requires_credentials": {"const": false},
+    "live_network": {"const": false}
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "generic-evidence-report-artifacts-dialect-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "live_model": false,
+  "domain_specific": false,
+  "real_dependency_imports": false,
+  "capability_id": "generic.ai.evidence.report.artifacts",
+  "dialect_surface": [
+    "evidence.source_annotation",
+    "evidence.citation_envelope",
+    "report.outline",
+    "report.section_dependency_dag",
+    "artifact.manifest",
+    "render.manifest",
+    "render.clean_skip"
+  ],
+  "fixture_key": "generic:evidence_report_artifacts:offline",
+  "production_package_boundary": {
+    "package_id": "generic-ai-evidence-report-artifacts",
+    "directory": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+    "registered_example": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+    "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json",
+    "provider_free": true,
+    "domain_specific": false
+  }
+}

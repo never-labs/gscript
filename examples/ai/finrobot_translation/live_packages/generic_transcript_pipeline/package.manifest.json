@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "id": "generic-transcript-pipeline",
+  "package_name": "leia-generic-ai-transcript-pipeline",
+  "package_boundary_id": "generic-ai-transcript-pipeline",
+  "capability_id": "generic.ai.transcript.pipeline",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for transcript source envelopes, speaker normalization, segment provenance, event-time correction, turn-aware chunking, and adapter clean-skip contracts.",
+  "source_modules": [
+    "generic.transcript.pipeline",
+    "generic.transcript.speaker_normalizer",
+    "generic.transcript.segmenter",
+    "generic.transcript.chunker",
+    "generic.transcript.event_time_policy"
+  ],
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; speech processors, diarizers, remote fetchers, and cleaner services belong only to provider-specific adapter packages.",
+    "required_env": [],
+    "optional_env": [],
+    "secret_refs": [],
+    "provider_credentials_required": false
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_transcript_pipeline_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "generic_transcript_pipeline_contract": "contracts/generic_transcript_pipeline_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_transcript_pipeline_contract.json",
+    "optional_dependency_contract": "contracts/optional_dependency_contract.json"
+  },
+  "schemas": {
+    "source_envelope": "schemas/transcript_source_envelope_v1.schema.json",
+    "segment": "schemas/transcript_segment_v1.schema.json",
+    "chunk": "schemas/transcript_chunk_v1.schema.json",
+    "clean_skip": "schemas/transcript_clean_skip_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "source_envelope": "fixtures/transcript_source_envelope_fixture.json",
+    "segments": "fixtures/transcript_segments_fixture.json",
+    "chunks": "fixtures/transcript_chunks_fixture.json",
+    "clean_skip": "fixtures/transcript_clean_skip_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "source_envelope",
+      "source_module": "generic.transcript.pipeline",
+      "capabilities": [
+        "generic.ai.transcript.source_envelope",
+        "generic.ai.transcript.event_time.correct",
+        "generic.ai.transcript.provenance"
+      ],
+      "output_schemas": [
+        "source_envelope",
+        "segment"
+      ]
+    },
+    {
+      "id": "speaker_normalizer",
+      "source_module": "generic.transcript.speaker_normalizer",
+      "capabilities": [
+        "generic.ai.transcript.speaker.normalize",
+        "generic.ai.transcript.speaker.alias",
+        "generic.ai.transcript.speaker.role"
+      ],
+      "output_schemas": [
+        "segment"
+      ]
+    },
+    {
+      "id": "segmenter",
+      "source_module": "generic.transcript.segmenter",
+      "capabilities": [
+        "generic.ai.transcript.segment.normalize",
+        "generic.ai.transcript.turn.order",
+        "generic.ai.transcript.offset.provenance"
+      ],
+      "output_schemas": [
+        "segment"
+      ]
+    },
+    {
+      "id": "chunker",
+      "source_module": "generic.transcript.chunker",
+      "capabilities": [
+        "generic.ai.transcript.chunk",
+        "generic.ai.transcript.chunk.boundary_preserve",
+        "generic.ai.transcript.chunk.token_budget"
+      ],
+      "output_schemas": [
+        "chunk"
+      ]
+    },
+    {
+      "id": "adapter_boundary",
+      "source_module": "generic.transcript.event_time_policy",
+      "capabilities": [
+        "generic.ai.transcript.adapter.clean_skip",
+        "generic.ai.transcript.pipeline"
+      ],
+      "output_schemas": [
+        "clean_skip"
+      ]
+    }
+  ],
+  "normalization_domains": [
+    "source_envelope",
+    "speaker_normalization",
+    "segment_provenance",
+    "event_time_correction",
+    "turn_aware_chunking",
+    "adapter_clean_skip"
+  ],
+  "capabilities": [
+    "generic.ai.transcript.pipeline",
+    "generic.ai.transcript.source_envelope",
+    "generic.ai.transcript.speaker.normalize",
+    "generic.ai.transcript.speaker.alias",
+    "generic.ai.transcript.speaker.role",
+    "generic.ai.transcript.segment.normalize",
+    "generic.ai.transcript.turn.order",
+    "generic.ai.transcript.offset.provenance",
+    "generic.ai.transcript.event_time.correct",
+    "generic.ai.transcript.chunk",
+    "generic.ai.transcript.chunk.boundary_preserve",
+    "generic.ai.transcript.chunk.token_budget",
+    "generic.ai.transcript.provenance",
+    "generic.ai.transcript.adapter.clean_skip"
+  ],
+  "blocked_imports": [
+    "requests",
+    "httpx",
+    "urllib",
+    "aiohttp",
+    "selenium",
+    "playwright",
+    "whisper",
+    "assemblyai",
+    "deepgram",
+    "rev_ai",
+    "speech_recognition"
+  ],
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "provider_sdks_required": false,
+    "test_rule": "package tests must pass with fixtures only, no credentials, no provider SDK imports, and no network I/O"
+  },
+  "field_canonicalization": {
+    "case": "snake_case",
+    "source": "source_id, source_ref, source_type, language, timezone, captured_at, and event_time are normalized before segmentation",
+    "speaker": "trim whitespace, collapse aliases, retain raw label, normalized label, role, and confidence",
+    "segment": "stable segment_id plus turn_index, text, line range, character offsets, source hash, and transform notes",
+    "event_time": "prefer trusted calendar fixture when raw event_time is missing, stale, or contradictory",
+    "chunking": "stable chunk_index ordered by turn_index with token_estimate budget metadata"
+  },
+  "event_time_policy": {
+    "calendar_lookup_required": false,
+    "source_time_conflict_policy": "prefer trusted event calendar fixture when present; otherwise preserve source event_time and emit a warning",
+    "unknown_event_policy": "emit clean_skip with reason event_time_lookup_missing only when downstream policy requires event_time",
+    "warning_marker": "generic_transcript_event_time_corrected"
+  },
+  "chunking_policy": {
+    "max_token_estimate": 80,
+    "overlap_segments": 1,
+    "preserve_segment_boundaries": true,
+    "deterministic_order": [
+      "source_id",
+      "event_id",
+      "chunk_index"
+    ]
+  },
+  "deterministic_ordering": {
+    "segments": [
+      "source_id",
+      "event_id",
+      "turn_index",
+      "segment_id"
+    ],
+    "chunks": [
+      "source_id",
+      "event_id",
+      "chunk_index"
+    ],
+    "skips": [
+      "skip_code",
+      "dependency"
+    ]
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "fixtures prove speaker normalization, event-time correction, turn ordering, and segment provenance",
+    "chunk fixtures preserve segment boundaries, deterministic order, and max token-estimate budget",
+    "optional speech, diarization, cleaner, or fetcher absence produces a clean skip instead of network access",
+    "transcript pipeline remains independent of host runtime internals and future provider packages"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide leia-generic-ai-transcript-pipeline as a built-in transcript vendor, speech processor, cleaner, or package boundary; this package declares provider-free schemas and fixtures only."
+  },
+  "dialect_capability_id": "generic.ai.transcript.pipeline",
+  "dialect_backend_shape": "ai.transcript.pipeline",
+  "dialect_aliases": [
+    {
+      "id": "ai.transcript.pipeline",
+      "target": "generic.ai.transcript.pipeline",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.transcript.pipeline",
+  "capability_aliases": [
+    {
+      "alias": "ai.transcript.pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "document-rag",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.transcript.pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "memory",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "optional-adapter",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "transcript-pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "transcript-pipeline",
+      "target_capability_id": "generic.ai.transcript.pipeline",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
+}

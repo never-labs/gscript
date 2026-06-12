@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-factor-research-live-package",
+  "package_name": "leia-finrobot-factor-research",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free live package skeleton for FinRobot multi-factor agents, factor transforms, factor data fixtures, portfolio exposure analysis, and agent handoff boundaries.",
+  "source_modules": [
+    "experiments/multi_factor_agents.py",
+    "finrobot_quantitative/factor_transforms.py",
+    "finrobot_quantitative/portfolio_factor_exposure.py"
+  ],
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "secret_env_patterns": [],
+    "policy": "No credentials are declared by this skeleton; market data, factor data, broker, and optimizer credentials belong only to future provider-specific packages."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_factor_research_live_fixture"
+  },
+  "entrypoints": {
+    "smoke": "main.leia",
+    "factor_research_contract": "contracts/factor_research_contract.json",
+    "agent_handoff_boundary_contract": "contracts/agent_handoff_boundary_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "market_data": "schemas/market_data_v1.schema.json",
+    "factor_data": "schemas/factor_data_v1.schema.json",
+    "portfolio_factor_exposure": "schemas/portfolio_factor_exposure_v1.schema.json",
+    "agent_handoff_boundary": "schemas/agent_handoff_boundary_v1.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "market_data": "fixtures/market_data_ACME_universe_fixture.json",
+    "factor_data": "fixtures/factor_data_ACME_universe_fixture.json",
+    "portfolio_exposure": "fixtures/portfolio_factor_exposure_fixture.json",
+    "agent_handoff_boundary": "fixtures/agent_handoff_boundary_fixture.json"
+  },
+  "modules": [
+    {
+      "id": "multi_factor_agents",
+      "source_module": "experiments/multi_factor_agents.py",
+      "capabilities": [
+        "finance.factor_research.agent.orchestrate",
+        "finance.factor_research.factor.rank",
+        "finance.factor_research.portfolio.construct",
+        "finance.factor_research.handoff.boundary"
+      ],
+      "output_schemas": [
+        "factor_data",
+        "portfolio_factor_exposure",
+        "agent_handoff_boundary"
+      ]
+    },
+    {
+      "id": "factor_transforms",
+      "source_module": "factor_transforms.py",
+      "capabilities": [
+        "finance.factor_research.transform.winsorize",
+        "finance.factor_research.transform.zscore",
+        "finance.factor_research.transform.neutralize",
+        "finance.factor_research.transform.composite"
+      ],
+      "output_schemas": [
+        "factor_data"
+      ]
+    },
+    {
+      "id": "portfolio_factor_exposure",
+      "source_module": "portfolio_factor_exposure.py",
+      "capabilities": [
+        "finance.factor_research.exposure.calculate",
+        "finance.factor_research.exposure.sector.aggregate",
+        "finance.factor_research.exposure.risk.limit",
+        "finance.factor_research.exposure.provenance"
+      ],
+      "output_schemas": [
+        "portfolio_factor_exposure"
+      ]
+    }
+  ],
+  "factor_transforms": [
+    {
+      "id": "winsorize",
+      "capability": "finance.factor_research.transform.winsorize",
+      "input_schema": "factor_data",
+      "output_schema": "factor_data",
+      "parameters": {
+        "lower_quantile": 0.05,
+        "upper_quantile": 0.95
+      },
+      "provider_free": true
+    },
+    {
+      "id": "zscore",
+      "capability": "finance.factor_research.transform.zscore",
+      "input_schema": "factor_data",
+      "output_schema": "factor_data",
+      "parameters": {
+        "group_by": "as_of",
+        "ddof": 0
+      },
+      "provider_free": true
+    },
+    {
+      "id": "sector_neutralize",
+      "capability": "finance.factor_research.transform.neutralize",
+      "input_schema": "factor_data",
+      "output_schema": "factor_data",
+      "parameters": {
+        "neutralizer": "sector",
+        "method": "demean"
+      },
+      "provider_free": true
+    },
+    {
+      "id": "composite_score",
+      "capability": "finance.factor_research.transform.composite",
+      "input_schema": "factor_data",
+      "output_schema": "factor_data",
+      "parameters": {
+        "weights": {
+          "value": 0.2,
+          "growth": 0.15,
+          "momentum": 0.2,
+          "quality": 0.15,
+          "liquidity": 0.1,
+          "sentiment": 0.1,
+          "macro": 0.1
+        },
+        "risk_penalty_factor": "volatility",
+        "risk_penalty_weight": 0.45
+      },
+      "provider_free": true
+    }
+  ],
+  "factor_transform_registry": {
+    "registry_id": "factor_transform_registry_v1",
+    "provider_free": true,
+    "live_network": false,
+    "real_dependency_imports": false,
+    "ordering": [
+      "winsorize",
+      "zscore",
+      "sector_neutralize",
+      "composite_score"
+    ],
+    "entries": [
+      {
+        "id": "winsorize",
+        "deterministic": true,
+        "input_fields": [
+          "rows[].factors"
+        ],
+        "output_fields": [
+          "rows[].factors"
+        ],
+        "provenance_tag": "transform:winsorize:v1",
+        "failure_mode": "clean_skip_invalid_quantiles"
+      },
+      {
+        "id": "zscore",
+        "deterministic": true,
+        "input_fields": [
+          "rows[].factors"
+        ],
+        "output_fields": [
+          "rows[].factors"
+        ],
+        "provenance_tag": "transform:zscore:v1",
+        "failure_mode": "clean_skip_insufficient_cross_section"
+      },
+      {
+        "id": "sector_neutralize",
+        "deterministic": true,
+        "input_fields": [
+          "rows[].sector",
+          "rows[].factors"
+        ],
+        "output_fields": [
+          "rows[].factors"
+        ],
+        "provenance_tag": "transform:sector_neutralize:v1",
+        "failure_mode": "clean_skip_missing_sector"
+      },
+      {
+        "id": "composite_score",
+        "deterministic": true,
+        "input_fields": [
+          "rows[].factors",
+          "rows[].risk_penalty"
+        ],
+        "output_fields": [
+          "rows[].composite_score"
+        ],
+        "provenance_tag": "transform:composite_score:v1",
+        "failure_mode": "clean_skip_missing_factor_weight"
+      }
+    ]
+  },
+  "agent_handoff_boundaries": [
+    {
+      "id": "factor_data_provider",
+      "display_name": "Factor data provider",
+      "capability": "finance.factor_research.data.factor_panel",
+      "fixture_key": "factor_data:ACME_UNIVERSE:offline",
+      "schema": "factor_data",
+      "request_owner": "multi_factor_researcher",
+      "response_owner": "factor_data_provider",
+      "input_contract": "universe_id + as_of + transform_registry",
+      "output_contract": "factor_data_v1 fixture panel",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "market_data_provider",
+      "display_name": "Market data provider",
+      "capability": "finance.factor_research.data.market_panel",
+      "fixture_key": "market_data:ACME_UNIVERSE:offline",
+      "schema": "market_data",
+      "request_owner": "multi_factor_researcher",
+      "response_owner": "market_data_provider",
+      "input_contract": "universe_id + as_of",
+      "output_contract": "market_data_v1 fixture panel",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "portfolio_optimizer",
+      "display_name": "Portfolio optimizer",
+      "capability": "finance.factor_research.optimizer.factor_exposure",
+      "fixture_key": "portfolio_exposure:ACME_UNIVERSE:offline",
+      "schema": "portfolio_factor_exposure",
+      "request_owner": "multi_factor_researcher",
+      "response_owner": "portfolio_optimizer",
+      "input_contract": "holdings + factor_data + risk_envelope",
+      "output_contract": "portfolio_factor_exposure_v1 fixture result",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ],
+  "optional_optimizer_gate": {
+    "id": "portfolio_optimizer_optional_gate",
+    "capability": "finance.factor_research.optimizer.factor_exposure",
+    "dependency": "external_factor_optimizer",
+    "required": false,
+    "default_enabled": false,
+    "provider_free_default": true,
+    "live_network_default": false,
+    "credential_required_default": false,
+    "clean_skip_without_dependency": true,
+    "skip_status": "clean_skipped_without_optimizer",
+    "fixture_fallback": "portfolio_exposure:ACME_UNIVERSE:offline"
+  },
+  "test_gates": [
+    "manifest and referenced JSON files decode without external dependencies",
+    "provider_free is true and live_network_default is false",
+    "experiments/multi_factor_agents.py migration source is represented by a provider-free agent handoff boundary",
+    "factor transform fixtures cover winsorize, zscore, neutralize, and composite scoring without provider imports",
+    "market data and factor data fixtures validate symbols, as_of dates, provenance, and stale-data metadata",
+    "portfolio factor exposure fixtures validate exposure vectors, exposure summaries, sector rollups, risk envelopes, risk limits, and source refs",
+    "agent handoff boundaries define request/response ownership and remain fixture replay only",
+    "optional optimizer gate defaults disabled and clean-skips to the fixture fallback",
+    "main.leia contains no live provider SDK imports or network execution"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide FinRobot factor data providers, market data clients, factor transforms, portfolio optimizers, or multi-factor agents as built-ins; future external packages must satisfy these provider-free contracts first."
+  }
+}

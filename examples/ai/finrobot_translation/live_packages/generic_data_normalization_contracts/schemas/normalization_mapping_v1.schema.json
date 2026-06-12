@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "leia://generic-ai/data-normalization/mapping/v1",
+  "title": "Generic data normalization mapping",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "mapping_id",
+    "dataset_id",
+    "canonical_fields",
+    "field_policies",
+    "deterministic_order"
+  ],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "fixture_key": {"type": "string"},
+    "mapping_id": {"type": "string"},
+    "dataset_id": {"type": "string"},
+    "canonical_fields": {"type": "array", "items": {"type": "object"}},
+    "field_policies": {"type": "array", "items": {"type": "object"}},
+    "deterministic_order": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

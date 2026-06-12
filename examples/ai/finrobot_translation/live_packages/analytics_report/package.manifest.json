@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "id": "leia-analytics-report-live-package",
+  "package_name": "leia-finrobot-analytics-report",
+  "package": {
+    "name": "leia-analytics-report",
+    "version": "0.1.0",
+    "description": "Provider-free live package skeleton for generic analytics reports"
+  },
+  "source_mode": "fixture-contract",
+  "target_mode": "live-package-skeleton",
+  "provider_free": true,
+  "live_network_default": false,
+  "real_dependency_import_default": false,
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in finance providers, valuation formulas, chart renderers, HTML renderers, or PDF renderers; this package declares those surfaces as external capabilities behind provider-free gates."
+  },
+  "default_policy": {
+    "mode": "fixture_replay",
+    "live_network": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_analytics_report_live_fixture"
+  },
+  "capabilities": [
+    "finance.analytics_report.normalized_inputs",
+    "finance.analytics_report.valuation_summary",
+    "finance.analytics_report.sensitivity_matrix",
+    "finance.analytics_report.chart_specs",
+    "finance.analytics_report.report_outline",
+    "finance.analytics_report.section_dependency_dag",
+    "finance.analytics_report.evidence_citation_envelope",
+    "finance.analytics_report.render_manifest",
+    "finance.analytics_report.style_profile_policy",
+    "finance.analytics_report.partial_failure_fixture",
+    "finance.analytics_report.snapshot_metadata",
+    "finance.analytics_report.accessibility_checklist",
+    "finance.analytics_report.stale_data_policy",
+    "finance.analytics_report.source_annotations",
+    "finance.analytics_report.output_manifest",
+    "finance.analytics_report.renderer_contracts",
+    "finance.normalize.price_series",
+    "finance.normalize.fundamentals",
+    "finance.normalize.provenance",
+    "analytics.valuation.dcf",
+    "analytics.valuation.peer_multiple",
+    "analytics.valuation.target_price",
+    "analytics.sensitivity.matrix",
+    "artifact.chart.spec",
+    "artifact.snapshot.metadata",
+    "artifact.accessibility.checklist",
+    "artifact.stale_data.policy",
+    "artifact.source_annotation.requirements",
+    "artifact.evidence_citation.envelope",
+    "artifact.report.manifest",
+    "artifact.render.manifest",
+    "report.outline.schema",
+    "report.section_dependency.dag",
+    "report.style_profile.policy",
+    "report.partial_failure.fixture",
+    "renderer.html.contract",
+    "renderer.pdf.contract"
+  ],
+  "entrypoints": {
+    "main": "analytics_report.leia",
+    "example": "analytics_report.leia",
+    "schema": "package.schema.json"
+  },
+  "contracts": {
+    "normalizer": "schemas.finance_normalizer",
+    "valuation": "schemas.valuation_result",
+    "sensitivity": "schemas.sensitivity_matrix",
+    "chart_artifact": "schemas.chart_artifact",
+    "snapshot_metadata": "schemas.snapshot_metadata",
+    "accessibility_checklist": "schemas.accessibility_checklist",
+    "stale_data_policy": "schemas.stale_data_policy",
+    "source_annotation_requirements": "schemas.source_annotation_requirements",
+    "evidence_citation_envelope": "schemas.evidence_citation_envelope",
+    "report_outline": "schemas.report_outline",
+    "section_dependency_dag": "schemas.section_dependency_dag",
+    "render_artifact_manifest": "schemas.render_artifact_manifest",
+    "style_profile_policy": "schemas.style_profile_policy",
+    "partial_report_fixture": "schemas.partial_report_fixture",
+    "report_artifact": "schemas.report_artifact",
+    "renderer": "schemas.renderer_contract"
+  },
+  "provider_gate": {
+    "allow_network": false,
+    "required_credentials": [],
+    "optional_credentials": [],
+    "blocked_imports": [
+      "yfinance",
+      "finnhub",
+      "fredapi",
+      "openbb",
+      "sec_api",
+      "plotly",
+      "playwright",
+      "wkhtmltopdf"
+    ],
+    "test_rule": "package tests must pass with no credentials, no provider SDK imports, and no network I/O"
+  },
+  "artifact_contracts": {
+    "chart_kinds": [
+      "line",
+      "bar",
+      "sensitivity_heatmap"
+    ],
+    "report_formats": [
+      "text/html",
+      "application/pdf"
+    ],
+    "snapshot_formats": [
+      "text/html",
+      "application/pdf",
+      "image/png"
+    ],
+    "snapshot_statuses": [
+      "specified_not_rendered",
+      "planned_not_rendered",
+      "captured_by_external_package"
+    ],
+    "accessibility_standards": [
+      "WCAG 2.2 AA contract checklist"
+    ],
+    "stale_data_warning_policy": {
+      "warning_required_when_source_stale": true,
+      "warning_marker": "stale_data_warning",
+      "stale_source_refs_must_be_named": true,
+      "snapshots_must_carry_warning_refs": true
+    },
+    "source_annotation_requirements": [
+      "id",
+      "title",
+      "kind",
+      "locator",
+      "as_of",
+      "stale_after",
+      "stale",
+      "license",
+      "retrieved_at",
+      "evidence_hash"
+    ],
+    "report_outline_requirements": [
+      "id",
+      "title",
+      "audience",
+      "time_horizon",
+      "sections",
+      "style_profile_id",
+      "evidence_policy_id",
+      "render_manifest_id"
+    ],
+    "section_dependency_dag_requirements": [
+      "id",
+      "nodes",
+      "edges",
+      "acyclic",
+      "missing_dependency_policy"
+    ],
+    "evidence_envelope_requirements": [
+      "id",
+      "claim_id",
+      "source_refs",
+      "citation_refs",
+      "evidence_quality",
+      "provider_free",
+      "unresolved_refs"
+    ],
+    "render_artifact_manifest_requirements": [
+      "id",
+      "renderer_contract_refs",
+      "outputs",
+      "snapshots",
+      "dependency_required",
+      "status"
+    ],
+    "style_profile_policy_requirements": [
+      "id",
+      "tone",
+      "locale",
+      "number_format",
+      "currency",
+      "disclosure_policy",
+      "forbidden_content",
+      "provider_free"
+    ],
+    "partial_report_fixture_requirements": [
+      "id",
+      "status",
+      "completed_sections",
+      "failed_sections",
+      "retryable",
+      "renderable",
+      "warning_refs",
+      "failure_reason"
+    ],
+    "render_statuses": [
+      "specified_not_rendered",
+      "planned_not_rendered",
+      "rendered_by_external_package",
+      "partial_not_rendered"
+    ],
+    "required_markers": [
+      "report_outline",
+      "section_dependency_dag",
+      "evidence_citation_envelopes",
+      "render_artifact_manifest",
+      "style_profile_policy",
+      "partial_report_fixture",
+      "source_annotations",
+      "stale_data_warnings",
+      "ai_disclosure",
+      "renderer_contract",
+      "snapshot_metadata",
+      "accessibility_checklist",
+      "source_annotation_requirements",
+      "provider_free"
+    ]
+  },
+  "test_gates": [
+    "manifest and schema files are valid JSON and schema_version 1",
+    "provider_free is true and live_network_default is false",
+    "no provider credentials or provider SDKs are required for tests",
+    "Leia fixture execution validates finance normalizers, valuation analytics, sensitivity matrix, chart specs, report manifest, and HTML/PDF renderer contracts",
+    "artifact contracts declare planned HTML and PDF outputs without invoking a renderer"
+  ]
+}

@@ -36,13 +36,25 @@ func registerDialectAI(register dialectRegisterFunc, opts HostOptions) {
 
 func dialectPrompt(body Value, opts *Table) Value {
 	out := NewTable()
-	out.RawSetString("text", StringValue(body.String()))
 	out.RawSetString("body", body)
+	text := body.String()
+	role := NilValue()
+	if body.IsTable() {
+		t := body.Table()
+		if v := t.RawGetString("text"); v.IsString() {
+			text = v.Str()
+		}
+		role = t.RawGetString("role")
+	}
+	out.RawSetString("text", StringValue(text))
 	if opts != nil {
 		out.RawSetString("options", TableValue(opts))
-		if role := opts.RawGetString("role"); role.IsString() {
-			out.RawSetString("role", role)
+		if optRole := opts.RawGetString("role"); optRole.IsString() {
+			role = optRole
 		}
+	}
+	if role.IsString() && role.Str() != "" {
+		out.RawSetString("role", role)
 	}
 	return TableValue(out)
 }
@@ -94,8 +106,16 @@ func (d dialectAI) agent(body Value, _ *Table) ([]Value, error) {
 	if !name.IsString() || name.Str() == "" {
 		return nil, fmt.Errorf("agent dialect requires string field name")
 	}
-	if !config.IsFunction() {
-		return nil, fmt.Errorf("agent dialect requires function field config")
+	if config.IsNil() {
+		config = FunctionValue(&GoFunction{
+			Name: "llm.agent.config." + name.Str(),
+			Fn: func(callArgs []Value) ([]Value, error) {
+				cfg := dialectAgentConfigTable(t, callArgs)
+				return []Value{TableValue(cfg), NilValue()}, nil
+			},
+		})
+	} else if !config.IsFunction() {
+		return nil, fmt.Errorf("agent dialect field config must be a function when provided")
 	}
 	args := []Value{name, config}
 	if flow := t.RawGetString("flow"); !flow.IsNil() {
@@ -113,6 +133,69 @@ func (d dialectAI) agent(body Value, _ *Table) ([]Value, error) {
 		args = append(args, TableValue(meta))
 	}
 	return d.callLLM("agent", args...)
+}
+
+func dialectAgentConfigTable(src *Table, callArgs []Value) *Table {
+	out := NewTable()
+	for _, key := range src.PairsKeysSnapshot() {
+		if key.IsString() && dialectAgentMetadataField(key.Str()) {
+			continue
+		}
+		out.RawSet(key, src.RawGet(key))
+	}
+	if out.RawGetString("system").IsNil() {
+		if instructions := src.RawGetString("instructions"); !instructions.IsNil() {
+			out.RawSetString("system", dialectAITextValue(instructions))
+		}
+	}
+	if out.RawGetString("user").IsNil() && out.RawGetString("messages").IsNil() && len(callArgs) > 0 {
+		out.RawSetString("user", dialectAITextValue(callArgs[0]))
+	}
+	if len(callArgs) > 0 {
+		out.RawSetString("args", dialectAIArgsValue(callArgs))
+		if params := src.RawGetString("params"); params.IsTable() {
+			out.RawSetString("input", dialectAIParamArgsValue(params.Table(), callArgs))
+		}
+	}
+	return out
+}
+
+func dialectAgentMetadataField(key string) bool {
+	switch key {
+	case "name", "config", "fn", "flow", "params", "description":
+		return true
+	default:
+		return false
+	}
+}
+
+func dialectAITextValue(v Value) Value {
+	if v.IsTable() {
+		t := v.Table()
+		if text := t.RawGetString("text"); text.IsString() {
+			return text
+		}
+	}
+	return StringValue(v.Str())
+}
+
+func dialectAIArgsValue(args []Value) Value {
+	out := NewSequentialArrayTable(len(args))
+	for i, arg := range args {
+		out.RawSetInt(int64(i+1), arg)
+	}
+	return TableValue(out)
+}
+
+func dialectAIParamArgsValue(params *Table, args []Value) Value {
+	out := NewTable()
+	for i := 1; i <= params.Length() && i <= len(args); i++ {
+		name := params.RawGetInt(int64(i))
+		if name.IsString() && name.Str() != "" {
+			out.RawSetString(name.Str(), args[i-1])
+		}
+	}
+	return TableValue(out)
 }
 
 func (d dialectAI) callLLM(name string, args ...Value) ([]Value, error) {

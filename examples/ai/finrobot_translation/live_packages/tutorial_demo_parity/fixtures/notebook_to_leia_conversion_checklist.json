@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "finrobot-notebook-to-leia-conversion-checklist",
+  "provider_free": true,
+  "required_before_live_package_implementation": true,
+  "items": [
+    {
+      "id": "source-inventory",
+      "description": "Record notebook or demo source path, title, tutorial level, and upstream commit in the parity ledger.",
+      "required": true
+    },
+    {
+      "id": "provider-boundary",
+      "description": "Separate provider calls, model calls, chart/PDF rendering, vector stores, and local services into optional capability gates.",
+      "required": true
+    },
+    {
+      "id": "fixture-replay",
+      "description": "Map default behavior to checked-in Leia examples, evaluation harness records, or provider-free JSON fixtures.",
+      "required": true
+    },
+    {
+      "id": "smoke-contract",
+      "description": "Add a deterministic smoke contract that can run without AutoGen, Backtrader, provider SDKs, credentials, or network access.",
+      "required": true
+    },
+    {
+      "id": "ledger-gap",
+      "description": "Keep explicit gaps for notebook-specific control flow and live behavior that has not moved behind package gates yet.",
+      "required": true
+    },
+    {
+      "id": "optional-gate",
+      "description": "Declare disabled optional live gates with clean skip behavior and redacted credentials before enabling any live integration.",
+      "required": true
+    }
+  ]
+}

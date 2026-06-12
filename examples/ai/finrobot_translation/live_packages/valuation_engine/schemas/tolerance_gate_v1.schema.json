@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/valuation_engine/tolerance_gate_v1.schema.json",
+  "title": "FinRobot Valuation Tolerance Gate",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "symbol",
+    "currency",
+    "gates",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1
+    },
+    "provenance": {
+      "type": "object"
+    }
+  }
+}

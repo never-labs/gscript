@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-document-rag-pipeline",
+  "package_name": "generic.ai.document.rag",
+  "entrypoint": "ai.document.rag_pipeline",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_credentials_required": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.document.rag",
+    "generic.ai.document.convert",
+    "generic.ai.document.section.extract",
+    "generic.ai.rag.chunk",
+    "generic.ai.rag.corpus_manifest",
+    "generic.ai.rag.retrieve",
+    "generic.ai.rag.citation_consistency",
+    "generic.ai.rag.adapter.clean_skip"
+  ],
+  "modules": {
+    "document_convert": {
+      "inputs": ["document_source", "conversion_policy"],
+      "outputs": ["document_markdown", "source_offsets"],
+      "required_fields": ["document_id", "source_ref", "markdown", "source_offsets"]
+    },
+    "section_extract": {
+      "inputs": ["document_markdown", "section_policy"],
+      "outputs": ["sections"],
+      "required_fields": ["section_id", "section_title", "start_offset", "end_offset"]
+    },
+    "rag_chunk": {
+      "inputs": ["document_markdown", "sections", "chunk_policy"],
+      "outputs": ["chunks", "corpus_manifest", "citation_map"],
+      "required_fields": ["chunk_id", "corpus_id", "text", "section_id", "citation", "provenance", "embedding_ref"]
+    },
+    "rag_retrieve": {
+      "inputs": ["query", "retriever_policy", "chunks"],
+      "outputs": ["retrieved_chunks", "answer_citations"],
+      "required_fields": ["query", "rank", "score", "chunk_id", "citation"]
+    }
+  },
+  "adapter_contract": {
+    "converter_dependency_imported": false,
+    "chunker_dependency_imported": false,
+    "embedding_dependency_imported": false,
+    "vector_dependency_imported": false,
+    "retriever_dependency_imported": false,
+    "credential_values_allowed": false,
+    "live_network_allowed": false,
+    "clean_skip_required": true,
+    "provider_free_replay_required": true
+  },
+  "field_contracts": {
+    "citation_consistency": "retrieval citations must reference chunk ids present in the chunk set",
+    "provenance": "chunk provenance must contain corpus_id, source_document_ref, source_offsets, and fixture keys",
+    "domain_boundary": "domain identifiers are optional metadata and must not be required by the generic package",
+    "clean_skip": "external converter, embedding, vector store, and retriever dependencies must be represented by provider-free clean-skip adapter boundaries"
+  }
+}

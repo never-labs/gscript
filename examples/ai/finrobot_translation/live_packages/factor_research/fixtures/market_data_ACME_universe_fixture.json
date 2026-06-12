@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "fixture_key": "market_data:ACME_UNIVERSE:offline",
+  "provider_free": true,
+  "live_network": false,
+  "as_of": "2025-12-31",
+  "captured_at": "2026-01-02T00:00:00Z",
+  "stale_after_days": 7,
+  "source_refs": [
+    {
+      "id": "market_fixture_acme_universe",
+      "provider": "fixture",
+      "replay_key": "market_data:ACME_UNIVERSE:offline",
+      "captured_at": "2026-01-02T00:00:00Z",
+      "source_schema": "market_data_v1",
+      "license": "example-fixture",
+      "stale_after_days": 7,
+      "row_count": 5,
+      "source_url_redacted": true
+    }
+  ],
+  "provenance_summary": {
+    "provider": "fixture",
+    "replay_key": "market_data:ACME_UNIVERSE:offline",
+    "captured_at": "2026-01-02T00:00:00Z",
+    "stale_after_days": 7,
+    "row_count": 5,
+    "source_refs": [
+      "market_fixture_acme_universe"
+    ],
+    "source_url_redacted": true
+  },
+  "rows": [
+    {
+      "symbol": "AAPL",
+      "sector": "technology",
+      "as_of": "2025-12-31",
+      "open": 194.1,
+      "high": 196.4,
+      "low": 192.8,
+      "close": 195.3,
+      "volume": 52100000,
+      "currency": "USD",
+      "source_ref": "market_fixture_acme_universe"
+    },
+    {
+      "symbol": "MSFT",
+      "sector": "technology",
+      "as_of": "2025-12-31",
+      "open": 426.2,
+      "high": 431.5,
+      "low": 423.6,
+      "close": 429.7,
+      "volume": 24100000,
+      "currency": "USD",
+      "source_ref": "market_fixture_acme_universe"
+    },
+    {
+      "symbol": "NVDA",
+      "sector": "technology",
+      "as_of": "2025-12-31",
+      "open": 131.4,
+      "high": 136.8,
+      "low": 130.6,
+      "close": 135.9,
+      "volume": 287500000,
+      "currency": "USD",
+      "source_ref": "market_fixture_acme_universe"
+    },
+    {
+      "symbol": "JPM",
+      "sector": "financials",
+      "as_of": "2025-12-31",
+      "open": 238.5,
+      "high": 241.2,
+      "low": 236.4,
+      "close": 240.1,
+      "volume": 9200000,
+      "currency": "USD",
+      "source_ref": "market_fixture_acme_universe"
+    },
+    {
+      "symbol": "XOM",
+      "sector": "energy",
+      "as_of": "2025-12-31",
+      "open": 105.1,
+      "high": 106.3,
+      "low": 103.8,
+      "close": 104.4,
+      "volume": 14800000,
+      "currency": "USD",
+      "source_ref": "market_fixture_acme_universe"
+    }
+  ]
+}

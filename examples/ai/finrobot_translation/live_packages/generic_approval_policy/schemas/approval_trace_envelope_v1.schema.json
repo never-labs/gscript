@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/generic_ai_approval_policy/approval_trace_envelope_v1.schema.json",
+  "title": "Generic AI approval trace envelope",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "trace_id",
+    "fixture_key",
+    "provider_free",
+    "request",
+    "policy",
+    "decision",
+    "result",
+    "replay"
+  ],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "kind": {"const": "generic_ai_approval_trace"},
+    "trace_id": {"type": "string"},
+    "fixture_key": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true},
+    "live_network": {"type": "boolean", "const": false},
+    "real_dependency_imports": {"type": "boolean", "const": false},
+    "request": {
+      "type": "object",
+      "required": ["request_id", "tool", "capability", "risk_level"],
+      "properties": {
+        "request_id": {"type": "string"},
+        "tool": {"type": "string"},
+        "capability": {"type": "string", "pattern": "^generic\\.ai\\.capability\\."},
+        "risk_level": {"enum": ["low", "medium", "high", "critical"]},
+        "args_shape": {"type": "object"}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "required": ["package", "default_decision", "exact_capability_match_required", "allowed_capabilities"],
+      "properties": {
+        "package": {"const": "generic.ai.approval.policy"},
+        "default_decision": {"const": "deny"},
+        "exact_capability_match_required": {"type": "boolean", "const": true},
+        "allowed_capabilities": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["status", "reason", "approval_required"],
+      "properties": {
+        "status": {"enum": ["allowed", "denied", "skipped"]},
+        "reason": {"type": "string"},
+        "approval_required": {"type": "boolean"},
+        "approval_id": {"type": ["string", "null"]}
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["status", "executed", "side_effects", "secret_values_present"],
+      "properties": {
+        "status": {"enum": ["ok", "denied", "skipped"]},
+        "executed": {"type": "boolean"},
+        "side_effects": {"type": "boolean"},
+        "secret_values_present": {"type": "boolean", "const": false}
+      }
+    },
+    "replay": {"type": "object"}
+  }
+}

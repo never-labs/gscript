@@ -1,0 +1,43 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "fixture_key": "transcript_chunks:session_alpha:offline:v1",
+  "source_id": "source-session-alpha",
+  "event_id": "event-alpha-review",
+  "chunk_policy": {
+    "max_token_estimate": 80,
+    "overlap_segments": 1,
+    "preserve_segment_boundaries": true,
+    "deterministic_order": ["source_id", "event_id", "chunk_index"]
+  },
+  "chunks": [
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "chunk:session_alpha:001:offline:v1",
+      "source_id": "source-session-alpha",
+      "event_id": "event-alpha-review",
+      "chunk_id": "chunk-001",
+      "chunk_index": 1,
+      "segment_ids": ["seg-001", "seg-002", "seg-003"],
+      "token_estimate": 24,
+      "overlap_from_previous": 0,
+      "text": "host: Welcome to the review.\nparticipant_a: The first workflow finished with stable results.\nparticipant_a: The second workflow needs a clearer owner.",
+      "provenance": {"source_ref": "fixture://transcripts/session-alpha", "segment_range": ["seg-001", "seg-003"], "source_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"}
+    },
+    {
+      "provider_free": true,
+      "live_network": false,
+      "fixture_key": "chunk:session_alpha:002:offline:v1",
+      "source_id": "source-session-alpha",
+      "event_id": "event-alpha-review",
+      "chunk_id": "chunk-002",
+      "chunk_index": 2,
+      "segment_ids": ["seg-003", "seg-004"],
+      "token_estimate": 17,
+      "overlap_from_previous": 1,
+      "text": "participant_a: The second workflow needs a clearer owner.\nobserver: Please keep both notes attached to the same event.",
+      "provenance": {"source_ref": "fixture://transcripts/session-alpha", "segment_range": ["seg-003", "seg-004"], "source_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"}
+    }
+  ]
+}

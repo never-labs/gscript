@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/generic_ai/strategy_backtest_contracts/allocation_series_v1.schema.json",
+  "title": "Strategy Backtest Allocation Series",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "strategy_id",
+    "subject_id",
+    "deterministic_seed",
+    "source_ref",
+    "rows"
+  ],
+  "properties": {
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "fixture_key": {
+      "type": "string"
+    },
+    "strategy_id": {
+      "type": "string"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string"
+    },
+    "deterministic_seed": {
+      "type": "string"
+    },
+    "source_ref": {
+      "type": "string"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "timestamp",
+          "resource",
+          "resource_weight",
+          "units",
+          "allocation_value",
+          "allocation_weight",
+          "gross_allocation",
+          "net_allocation",
+          "state_value"
+        ]
+      }
+    }
+  }
+}

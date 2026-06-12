@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "generic-ui-snapshot-evaluator-provider-free-fixtures",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:ui_snapshot_evaluator:offline",
+      "capability": "generic.ai.ui.snapshot.evaluator",
+      "path": "fixtures/generic_ui_snapshot_evaluator_fixture.json",
+      "schema": "schemas/generic_ui_snapshot_evaluator_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "routes": 2,
+        "viewports": 3,
+        "budgets": 3,
+        "accessibility_summaries": 2,
+        "artifacts": 3,
+        "clean_skip": true
+      }
+    },
+    {
+      "fixture_key": "generic:ui_snapshot_evaluator:evidence_report_projection",
+      "capability": "generic.ai.ui.snapshot.evidence_report_projection",
+      "path": "fixtures/evidence_report_ui_snapshot_projection_fixture.json",
+      "schema": "schemas/evidence_report_ui_snapshot_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "replay_ready": true,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "source_package": "generic_evidence_report_artifacts",
+        "snapshot_mappings": 2,
+        "artifact_uri_mappings": 3,
+        "warning_mappings": 2,
+        "accessibility_mappings": 3,
+        "remote_fetch": false,
+        "browser_required": false
+      }
+    }
+  ]
+}

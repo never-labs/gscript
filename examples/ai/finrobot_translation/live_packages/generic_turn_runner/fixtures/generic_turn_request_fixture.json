@@ -1,0 +1,62 @@
+{
+  "schema": "single_turn_request_v1",
+  "request_id": "turn-request-acme-summary-001",
+  "correlation_id": "corr-generic-turn-acme-summary-001",
+  "model": "fixture-model",
+  "messages": [
+    {"role": "system", "content": "Return concise JSON using the requested schema."},
+    {"role": "user", "content": "Summarize ACME revenue trend from the provided fixture context."}
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "turn_summary",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "required": ["summary", "confidence"],
+        "properties": {
+          "summary": {"type": "string"},
+          "confidence": {"type": "number"}
+        }
+      }
+    }
+  },
+  "temperature": 0,
+  "max_output_tokens": 128,
+  "tools": [
+    {
+      "name": "fixture.lookup",
+      "description": "Request-only fixture tool for quote metadata.",
+      "input_schema": {
+        "type": "object",
+        "required": ["ticker", "horizon"],
+        "properties": {
+          "ticker": {"type": "string"},
+          "horizon": {"type": "string"}
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true,
+    "correlation_id": "corr-generic-turn-acme-summary-001",
+    "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba"
+  },
+  "replay": {
+    "fixture_key": "generic_turn:request:acme_summary:v1",
+    "match_key": "deterministic_request_hash",
+    "request_hash": "sha256:40c43cc2c05232c0dc659cf6e266d046905b01b383cccfd952d9d9abcabd05ba",
+    "canonicalization": ["exclude_request_id", "preserve_message_order", "sort_object_keys", "include_response_format", "include_tool_declarations"],
+    "correlation_id": "corr-generic-turn-acme-summary-001",
+    "provider_free": true,
+    "live_network": false,
+    "credentials_required": false,
+    "secret_env_patterns": [],
+    "no_secret": true
+  }
+}

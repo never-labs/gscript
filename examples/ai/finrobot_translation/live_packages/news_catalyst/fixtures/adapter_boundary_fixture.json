@@ -1,0 +1,39 @@
+{
+  "fixture_key": "adapter_boundary:ACME:offline",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "ticker": "ACME",
+  "boundaries": [
+    {
+      "id": "polymarket",
+      "capability": "finance.retail_sentiment.polymarket.market_snapshot",
+      "adapter_kind": "prediction_market",
+      "fixture_key": "polymarket:market_snapshot:ACME:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "x_social",
+      "capability": "finance.retail_sentiment.x.mention_snapshot",
+      "adapter_kind": "social_stream",
+      "fixture_key": "x:mention_snapshot:ACME:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    },
+    {
+      "id": "reddit",
+      "capability": "finance.retail_sentiment.reddit.thread_snapshot",
+      "adapter_kind": "community_thread",
+      "fixture_key": "reddit:thread_snapshot:ACME:offline",
+      "live_network": false,
+      "dependency_imported": false,
+      "credential_required": false,
+      "clean_skip": true
+    }
+  ]
+}

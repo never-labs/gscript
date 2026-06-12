@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/generic-ai/generic_trace_events/trace_sequence_v1.schema.json",
+  "title": "Generic AI Trace Sequence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_key",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "trace_id",
+    "run_id",
+    "turn_id",
+    "sequence_policy",
+    "redaction_policy_ref",
+    "events",
+    "replay_assertions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "sequence_policy": {
+      "type": "object",
+      "required": [
+        "marker",
+        "clock",
+        "strictly_increasing"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "$ref": "trace_event_v1.schema.json"
+      }
+    },
+    "replay_assertions": {
+      "type": "object",
+      "required": [
+        "mode",
+        "expected_event_count",
+        "match_keys",
+        "mismatch_policy"
+      ]
+    }
+  }
+}

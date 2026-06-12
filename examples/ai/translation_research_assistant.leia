@@ -1,0 +1,93 @@
+// translation_research_assistant.leia - Replay-backed AI translation skeleton.
+// Demonstrates how a Python/TS-style LLM research assistant becomes Leia
+// dialect composition: model {}, local evidence tools, agent {}, structured
+// output, and a final review turn. The fixture is generic and offline replayable.
+
+model {
+    default: "mock-translation"
+}
+
+source_pattern := "Python/TS orchestrator: gather evidence, call analyze(), call translate(), assemble report."
+
+evidence_log := {}
+
+func remember(kind, value) {
+    evidence_log[#evidence_log + 1] = kind .. ":" .. value
+}
+
+load_source := tool {
+    name: "load_source"
+    fn: func(path) {
+        remember("load_source", path)
+        return source_pattern, nil
+    }
+    params: {"path"}
+    description: "Load a local Python or TypeScript assistant skeleton."
+}
+
+search_corpus := tool {
+    name: "search_corpus"
+    fn: func(query) {
+        remember("search_corpus", query)
+        return "research notes: keep evidence local, make prompts declarative, assert replay outputs", nil
+    }
+    params: {"query"}
+    description: "Search local research notes used by the assistant."
+}
+
+build_report := tool {
+    name: "build_report"
+    fn: func(summary, workflow) {
+        remember("build_report", summary)
+        return {
+            title: "Leia AI research assistant translation",
+            summary: summary,
+            workflow: workflow,
+            replay: true
+        }, nil
+    }
+    params: {"summary", "workflow"}
+    description: "Assemble a deterministic analysis report from structured fields."
+}
+
+translator := agent {
+    name: "assistant_translator"
+    model: "mock-translation"
+    instructions: prompt { role: "system", text: "Translate an imperative LLM analysis assistant into Leia dialect composition." }
+    tools: {load_source, search_corpus, build_report}
+    params: {"request"}
+    output: {
+        source_style: "python_ts"
+        leia_blocks: {"model", "tool", "agent", "turn"}
+        workflow: {"research", "analysis", "report"}
+        replay_ready: true
+        summary: "translation summary"
+    }
+    max_steps: 1
+}
+
+translation, translation_err := translator("Rewrite the generic LLM research assistant into Leia.")
+assert(translation_err == nil)
+assert(translation.value.source_style == "python_ts")
+assert(translation.value.leia_blocks[1] == "model")
+assert(translation.value.leia_blocks[4] == "turn")
+assert(translation.value.workflow[1] == "research")
+assert(translation.value.workflow[3] == "report")
+assert(translation.value.replay_ready == true)
+assert(translation.value.summary == "Compose the assistant as local research tools, a structured analysis agent, and a replay-checked report turn.")
+
+review, review_err := turn {
+    model: "mock-report"
+    messages: {
+        llm.system("Review the Leia translation for offline replay and generic research workflow coverage."),
+        llm.user(translation.text),
+    }
+}
+assert(review_err == nil)
+assert(review.text == "Translation is replayable: local research evidence, structured analysis output, and deterministic report review.")
+
+print("source_style", translation.value.source_style)
+print("blocks", #translation.value.leia_blocks)
+print("workflow", translation.value.workflow[1] .. "/" .. translation.value.workflow[2] .. "/" .. translation.value.workflow[3])
+print("review", review.text)
+print("ok")

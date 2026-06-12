@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "id": "generic-coding-workspace",
+  "package_name": "leia-generic-ai-coding-workspace",
+  "package_boundary_id": "generic-ai-coding-workspace",
+  "capability_id": "generic.ai.coding_workspace",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic AI package for sandbox command envelopes, approval gates, stdout/stderr captures, file and image artifact manifests, notebook display metadata, cleanup policy, deterministic replay, and clean skips.",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "real_dependency_import_default": false,
+  "depends_on_q_runtime": false,
+  "credential_required_default": false,
+  "fixture_root": "fixtures",
+  "schema_root": "schemas",
+  "contract_root": "contracts",
+  "entrypoints": {
+    "main": "main.leia",
+    "contract": "contracts/generic_coding_workspace_contract.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "coding_workspace": "schemas/generic_coding_workspace_v1.schema.json"
+  },
+  "contracts": {
+    "contract": "contracts/generic_coding_workspace_contract.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "coding_workspace": "fixtures/generic_coding_workspace_fixture.json"
+  },
+  "capabilities": [
+    "generic.ai.coding_workspace",
+    "generic.ai.code.command.request",
+    "generic.ai.code.command.result",
+    "generic.ai.code.approval.gate",
+    "generic.ai.code.stdout.stderr",
+    "generic.ai.artifact.file_manifest",
+    "generic.ai.artifact.image_manifest",
+    "generic.ai.notebook.display",
+    "generic.ai.code.cleanup_policy",
+    "generic.ai.code.replay.deterministic",
+    "generic.ai.code.capability.metadata",
+    "generic.ai.code.clean_skip"
+  ],
+  "capability_surfaces": [
+    "sandbox_command",
+    "approval_gate",
+    "stdout_stderr_capture",
+    "file_artifact_manifest",
+    "image_artifact_manifest",
+    "notebook_display",
+    "cleanup_policy",
+    "deterministic_replay",
+    "clean_skip"
+  ],
+  "default_policy": {
+    "mode": "fixture_replay",
+    "provider_policy": "provider-free",
+    "live_network": false,
+    "live_model_calls": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "sandbox_execution_default": "deny_without_approval",
+    "file_write_default": "deny_without_approval",
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_coding_workspace_fixture"
+  },
+  "test_gates": [
+    "sandbox command envelopes decode without executing host commands",
+    "approval gates default to deny for execution and writes",
+    "stdout and stderr captures are explicit replay fields",
+    "file and image artifact manifests are deterministic provider-free fixture data",
+    "notebook display metadata never imports a live kernel",
+    "cleanup policy is fixture-only and clean-skips without dependencies"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide built-in leia-generic-ai-coding-workspace execution, notebook kernel, or artifact publishing; this provider-free package boundary owns coding workspace, approval, capture, artifact manifest, replay, cleanup, and clean-skip contracts."
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-coding-workspace; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
+  },
+  "dialect_capability_id": "generic.ai.coding_workspace",
+  "dialect_backend_shape": "ai.coding_workspace",
+  "dialect_aliases": [
+    {
+      "id": "ai.coding_workspace",
+      "target": "generic.ai.coding_workspace",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.ai.coding_workspace",
+  "capability_aliases": [
+    {
+      "alias": "ai.coding_workspace",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "approval",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "coding-workspace",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "coding-workspace",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.coding_workspace",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "replay",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "tool",
+      "target_capability_id": "generic.ai.coding_workspace",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    }
+  ]
+}

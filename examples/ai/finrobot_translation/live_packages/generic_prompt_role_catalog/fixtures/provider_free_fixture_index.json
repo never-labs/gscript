@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "generic-prompt-role-catalog-fixture-index",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixtures": [
+    {
+      "fixture_key": "generic:prompt_role_catalog:offline",
+      "capability": "generic.ai.prompt.role.catalog",
+      "path": "fixtures/generic_prompt_role_catalog_fixture.json",
+      "schema": "schemas/generic_prompt_role_catalog_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "domain_specific": false,
+        "role_count": 3,
+        "template_count": 3,
+        "delegation_case_count": 4
+      }
+    }
+  ]
+}

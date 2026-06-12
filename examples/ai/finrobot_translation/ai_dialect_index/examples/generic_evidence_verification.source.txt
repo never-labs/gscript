@@ -1,0 +1,32 @@
+evidence_verify {
+  provider_free true
+  live_network false
+  real_dependency_imports false
+
+  policy "evidence-policy-offline-v1" {
+    minimum_source_refs_per_claim 1
+    reject_unresolved_refs true
+    citation_normalization "lower_snake_first_seen_order"
+    freshness_as_of "2026-06-12"
+  }
+
+  claim "claim-status-001" {
+    kind "status_summary"
+    source_refs ["source_doc_overview", "source_metric_delivery"]
+    citation_refs ["source_doc_overview", "source_metric_delivery"]
+  }
+
+  claim "claim-missing-001" {
+    kind "event_summary"
+    source_refs ["source_event_review", "source_missing_ref"]
+    citation_refs ["source_event_review", "source_missing_ref"]
+    on_missing_evidence "omit_claim_and_warn"
+  }
+
+  output {
+    normalized_citations true
+    unresolved_refs true
+    freshness_warnings true
+    clean_degradation_actions true
+  }
+}

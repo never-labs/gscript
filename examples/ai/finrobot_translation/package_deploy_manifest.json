@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "gap_id": "FR-GAP-021",
+  "package": {
+    "name": "leia-finrobot-translation",
+    "version": "0.1.0",
+    "description": "Provider-free FinRobot translation examples for the Leia AI dialect",
+    "python_requires": ">=3.10"
+  },
+  "files": {
+    "requirements": "package_deploy_requirements.txt",
+    "setup": "package_deploy_setup.py",
+    "dockerfile": "package_deploy_Dockerfile",
+    "gcloud": "package_deploy_gcloud.sh",
+    "run_web_app": "package_deploy_run_web_app.py"
+  },
+  "entry_points": {
+    "console_scripts": [
+      "finrobot-translation-web=package_deploy_run_web_app:main"
+    ]
+  },
+  "install": {
+    "base_requirements": [
+      "leia>=0.1.0"
+    ],
+    "optional_extras": {
+      "web": [
+        "flask>=3.0",
+        "gunicorn>=22.0"
+      ],
+      "finance": [
+        "yfinance>=0.2",
+        "pandas>=2.2"
+      ],
+      "documents": [
+        "pypdf>=4.0",
+        "beautifulsoup4>=4.12"
+      ],
+      "charts": [
+        "plotly>=5.20",
+        "kaleido>=0.2"
+      ],
+      "cloud": [
+        "google-cloud-logging>=3.10"
+      ],
+      "all": [
+        "leia-finrobot-translation[web,finance,documents,charts,cloud]"
+      ]
+    }
+  },
+  "environment": {
+    "required": [
+      {
+        "name": "LEIA_FINROBOT_DATA_DIR",
+        "purpose": "Directory containing replay fixtures, generated reports, and package data",
+        "default": "./examples/ai/finrobot_translation"
+      }
+    ],
+    "optional": [
+      {
+        "name": "OPENAI_API_KEY",
+        "purpose": "Optional live model provider credential; replay smoke tests must not require it",
+        "redact": true
+      },
+      {
+        "name": "FINNHUB_API_KEY",
+        "purpose": "Optional live finance adapter credential",
+        "redact": true
+      },
+      {
+        "name": "FMP_API_KEY",
+        "purpose": "Optional live finance adapter credential",
+        "redact": true
+      },
+      {
+        "name": "PORT",
+        "purpose": "HTTP port for package_deploy_run_web_app.py",
+        "default": "8080"
+      }
+    ],
+    "checks": [
+      {
+        "id": "data_dir_exists",
+        "kind": "path",
+        "env": "LEIA_FINROBOT_DATA_DIR",
+        "required": true
+      },
+      {
+        "id": "replay_manifest_present",
+        "kind": "file",
+        "path": "evaluation_harness/manifest.json",
+        "base_env": "LEIA_FINROBOT_DATA_DIR",
+        "required": true
+      },
+      {
+        "id": "live_provider_keys_optional",
+        "kind": "secret",
+        "env": "OPENAI_API_KEY",
+        "required": false,
+        "redact": true
+      }
+    ]
+  },
+  "commands": {
+    "local_service": "python examples/ai/finrobot_translation/package_deploy_run_web_app.py",
+    "docker_build": "docker build -f examples/ai/finrobot_translation/package_deploy_Dockerfile -t leia-finrobot-translation .",
+    "docker_run": "docker run --rm -p 8080:8080 -e LEIA_FINROBOT_DATA_DIR=/app/examples/ai/finrobot_translation leia-finrobot-translation",
+    "gcloud_deploy": "examples/ai/finrobot_translation/package_deploy_gcloud.sh leia-finrobot-translation us-central1"
+  },
+  "server": {
+    "recommended": "gunicorn",
+    "fallback": "python-http.server ThreadingHTTPServer",
+    "module": "package_deploy_run_web_app:main",
+    "bind_env": "PORT",
+    "default_port": "8080",
+    "provider_free": true,
+    "live_network_default": false,
+    "metadata_source": "product_deploy_parity/package_deploy_parity_ledger.json#/server_metadata"
+  },
+  "product_deploy_parity": {
+    "ledger": "product_deploy_parity/package_deploy_parity_ledger.json",
+    "product_workflow_manifest": "live_packages/product_workflow/package.manifest.json",
+    "deployment_gates": "live_packages/product_workflow/contracts/deployment_capability_gates.json",
+    "static_assets": "live_packages/product_workflow/templates/static_asset_manifest.json",
+    "db_migrations": "live_packages/product_workflow/contracts/db_migration_contract.json",
+    "provider_free": true,
+    "live_network_default": false,
+    "clean_skip_default": true
+  },
+  "smoke": {
+    "provider_free": true,
+    "checks": [
+      "manifest files exist",
+      "setup extras mirror manifest optional_extras",
+      "requirements include base package and optional-extra comments",
+      "run_web_app exposes check_environment and main",
+      "docker and gcloud commands reference the manifest entry files",
+      "product deploy parity ledger covers env, static assets, server metadata, auth/session, db migration, clean skip, and no-network defaults"
+    ]
+  }
+}

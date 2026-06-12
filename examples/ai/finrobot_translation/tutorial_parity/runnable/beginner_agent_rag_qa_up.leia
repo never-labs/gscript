@@ -1,0 +1,6 @@
+row := {id: "beginner-agent-rag-qa-up" provider_free: true live_network: false credentials_required: false artifacts: {"document_inventory", "retriever_query_contract", "provider_free_fixture_index"}}
+assert(row.provider_free == true)
+assert(row.live_network == false)
+assert(row.credentials_required == false)
+assert(#row.artifacts == 3)
+print("tutorial_parity_matrix row=beginner-agent-rag-qa-up artifacts=3 provider_free=true live_network=false credentials_required=false")

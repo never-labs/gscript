@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "report_envelope_v1",
+  "type": "object",
+  "required": ["id", "section_id", "required_fields"],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "id": {"enum": ["risk_output_v1", "thesis_output_v1", "valuation_output_v1", "news_output_v1"]},
+    "section_id": {"enum": ["risk", "thesis", "valuation", "news"]},
+    "required_fields": {"type": "array", "minItems": 5, "items": {"type": "string"}}
+  }
+}

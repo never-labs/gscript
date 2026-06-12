@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "id": "generic-ai-approval-policy-contract",
+  "package_name": "generic.ai.approval.policy",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "fixture_hook": "recorded_generic_approval_policy_fixture",
+  "default_policy": {
+    "decision": "deny",
+    "reason": "deny unless an exact capability grant is present",
+    "unknown_capability": "deny",
+    "missing_approval": "deny",
+    "dependency_absent": "skipped",
+    "credential_absent": "skipped",
+    "live_network_absent": "skipped"
+  },
+  "risk_levels": [
+    {
+      "id": "low",
+      "approval_required": false,
+      "default_outcome": "allow_fixture",
+      "examples": ["generic.ai.capability.local.read"]
+    },
+    {
+      "id": "medium",
+      "approval_required": true,
+      "default_outcome": "deny",
+      "examples": ["generic.ai.capability.network.http", "generic.ai.capability.publish.web"]
+    },
+    {
+      "id": "high",
+      "approval_required": true,
+      "default_outcome": "deny",
+      "examples": ["generic.ai.capability.generated_code.execute", "generic.ai.capability.portfolio.rebalance"]
+    },
+    {
+      "id": "critical",
+      "approval_required": true,
+      "default_outcome": "deny",
+      "examples": ["generic.ai.capability.credential.read", "generic.ai.capability.trading.order_submit"]
+    }
+  ],
+  "approval_trace_envelope": {
+    "kind": "generic_ai_approval_trace",
+    "schema": "schemas/approval_trace_envelope_v1.schema.json",
+    "required_fields": [
+      "trace_id",
+      "fixture_key",
+      "provider_free",
+      "request",
+      "policy",
+      "decision",
+      "result",
+      "replay"
+    ],
+    "decision_status_values": ["allowed", "denied", "skipped"],
+    "result_status_values": ["ok", "denied", "skipped"],
+    "secret_values_present": false
+  },
+  "policy_outcome_fixtures": [
+    {
+      "fixture_key": "generic.ai.approval.policy:allow:local_read:v1",
+      "capability": "generic.ai.capability.local.read",
+      "risk_level": "low",
+      "decision": "allowed",
+      "requires_approval": false
+    },
+    {
+      "fixture_key": "generic.ai.approval.policy:deny:trading_order:v1",
+      "capability": "generic.ai.capability.trading.order_submit",
+      "risk_level": "critical",
+      "decision": "denied",
+      "requires_approval": true
+    },
+    {
+      "fixture_key": "generic.ai.approval.policy:skip:network_absent:v1",
+      "capability": "generic.ai.capability.network.http",
+      "risk_level": "medium",
+      "decision": "skipped",
+      "requires_approval": true
+    }
+  ],
+  "test_gates": [
+    "default policy denies missing and unknown capability grants",
+    "risk levels are low, medium, high, and critical",
+    "approval trace envelope is provider-free and contains no secret values",
+    "clean skip returns skipped for absent dependency, credential, or live network prerequisites"
+  ]
+}

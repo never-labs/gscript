@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "provenance_ACME_fixture",
+  "provider_free": true,
+  "rows": [
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.market.acme.daily",
+      "source_type": "market_fixture",
+      "title": "ACME daily OHLCV fixture",
+      "locator": "fixture://market/acme/daily",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-02T00:00:00Z",
+      "as_of": "2026-05-02",
+      "license": "test-fixture",
+      "record_hash": "sha256:market-acme-daily",
+      "evidence_hash": "sha256:evidence-market-acme-daily"
+    },
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.news.acme.analyst_day",
+      "source_type": "news_fixture",
+      "title": "ACME analyst day news fixture",
+      "locator": "fixture://news/acme/analyst-day",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-03T15:00:00Z",
+      "as_of": "2026-05-03T15:00:00Z",
+      "license": "test-fixture",
+      "record_hash": "sha256:news-acme-analyst-day",
+      "evidence_hash": "sha256:evidence-news-acme-analyst-day"
+    },
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.news.acme.q1",
+      "source_type": "news_fixture",
+      "title": "ACME first quarter news fixture",
+      "locator": "fixture://news/acme/q1-revenue-growth",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-01T13:30:00Z",
+      "as_of": "2026-05-01T13:30:00Z",
+      "license": "test-fixture",
+      "record_hash": "sha256:news-acme-q1",
+      "evidence_hash": "sha256:evidence-news-acme-q1"
+    },
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.peer.acme.snapshot",
+      "source_type": "peer_fixture",
+      "title": "ACME peer comparison fixture",
+      "locator": "fixture://peer/acme/snapshot",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-01T00:00:00Z",
+      "as_of": "2026-05-01",
+      "license": "test-fixture",
+      "record_hash": "sha256:peer-acme-snapshot",
+      "evidence_hash": "sha256:evidence-peer-acme-snapshot"
+    },
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.ratio.acme.2026q1",
+      "source_type": "ratio_fixture",
+      "title": "ACME ratio fixture",
+      "locator": "fixture://ratios/acme/2026q1",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-01T00:00:00Z",
+      "as_of": "2026-05-01",
+      "license": "test-fixture",
+      "record_hash": "sha256:ratio-acme-2026q1",
+      "evidence_hash": "sha256:evidence-ratio-acme-2026q1"
+    },
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.sec.acme.10q.2026q1",
+      "source_type": "sec_fixture",
+      "title": "ACME 2026 Q1 10-Q fixture",
+      "locator": "fixture://sec/acme/10q",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-01T00:00:00Z",
+      "as_of": "2026-05-01",
+      "license": "test-fixture",
+      "record_hash": "sha256:sec-acme-10q-2026q1",
+      "evidence_hash": "sha256:evidence-sec-acme-10q-2026q1"
+    },
+    {
+      "schema": "provenance_record_v1",
+      "source_id": "fixture.statement.acme.2026q1",
+      "source_type": "statement_fixture",
+      "title": "ACME statement fixture",
+      "locator": "fixture://statements/acme/2026q1",
+      "provider": "fixture",
+      "provider_free": true,
+      "retrieved_at": "2026-05-01T00:00:00Z",
+      "as_of": "2026-05-01",
+      "license": "test-fixture",
+      "record_hash": "sha256:statement-acme-2026q1",
+      "evidence_hash": "sha256:evidence-statement-acme-2026q1"
+    }
+  ],
+  "deterministic_order": [
+    "source_id",
+    "record_hash"
+  ]
+}

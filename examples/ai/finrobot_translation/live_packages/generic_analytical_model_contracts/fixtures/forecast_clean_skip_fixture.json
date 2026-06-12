@@ -1,0 +1,9 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "fixture_key": "forecast_clean_skip:offline:v1",
+  "skips": [
+    {"provider_free": true, "live_network": false, "fixture_key": "clean_skip:assumption_provider:offline:v1", "skip_code": "assumption_provider_unavailable", "dependency": "assumption_provider", "adapter": "assumption_provider", "reason": "assumption provider dependency is unavailable in provider-free fixture mode", "recoverable": true},
+    {"provider_free": true, "live_network": false, "fixture_key": "clean_skip:simulation_engine:offline:v1", "skip_code": "simulation_engine_unavailable", "dependency": "simulation_engine", "adapter": "simulation_engine", "reason": "simulation engine dependency is unavailable in provider-free fixture mode", "recoverable": true}
+  ]
+}

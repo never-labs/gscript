@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "generic_research_agent_fixture",
+  "instructions": "Use replayed local evidence and return a structured answer.",
+  "tools": [
+    {
+      "name": "local_research",
+      "capability": "tool.local.research",
+      "provider_free": true
+    },
+    {
+      "name": "policy_check",
+      "capability": "tool.policy.check",
+      "provider_free": true
+    }
+  ],
+  "params": {
+    "temperature": 0,
+    "replay_mode": "strict"
+  },
+  "output": {
+    "schema": "structured_output_v1",
+    "required_fields": ["answer", "evidence_refs", "risk"]
+  },
+  "max_steps": 4,
+  "replay_policy": {
+    "mode": "fixture_replay",
+    "strict_ordered_match": true,
+    "unconsumed_records": "fail_closed"
+  }
+}

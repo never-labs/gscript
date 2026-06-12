@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "generic-planning-graph-live-package",
+  "package_name": "leia-generic-ai-planning-graph",
+  "version": "0.1.0-skeleton",
+  "description": "Provider-free generic planning and workflow graph contract for plan nodes, dependencies, retry policy, branch/merge joins, and trace evidence.",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network_default": false,
+  "live_model_default": false,
+  "real_dependency_import_default": false,
+  "fixture_root": "fixtures",
+  "contract_root": "contracts",
+  "entrypoints": {
+    "smoke": "main.leia",
+    "main": "main.leia",
+    "planning_graph_contract": "contracts/planning_graph_contract.json",
+    "trace_fixture": "fixtures/planning_graph_trace_fixture.json",
+    "fixture_index": "fixtures/provider_free_fixture_index.json"
+  },
+  "schemas": {
+    "planning_graph": "schemas/planning_graph.schema.json",
+    "planning_trace": "schemas/planning_trace.schema.json"
+  },
+  "fixtures": {
+    "index": "fixtures/provider_free_fixture_index.json",
+    "trace": "fixtures/planning_graph_trace_fixture.json"
+  },
+  "capabilities": [
+    "generic.planning.graph.define",
+    "generic.planning.node.classify",
+    "generic.planning.dependency.validate",
+    "generic.planning.retry.replay",
+    "generic.planning.branch.merge",
+    "generic.planning.trace.evidence"
+  ],
+  "default_policy": {
+    "mode": "fixture_replay",
+    "provider_free": true,
+    "live_network": false,
+    "live_model": false,
+    "provider_credentials_required": false,
+    "real_dependency_imports": false,
+    "clean_skip_without_dependency": true,
+    "fixture_hook": "recorded_generic_planning_graph_fixture"
+  },
+  "test_gates": [
+    "plan nodes declare generic node_type and do not encode provider or domain-specific semantics",
+    "dependencies form an acyclic graph with explicit branch and merge edges",
+    "retry metadata is deterministic fixture evidence, not provider behavior",
+    "trace evidence references every plan node, edge, retry, branch, and merge event"
+  ],
+  "no_built_in_guarantee": {
+    "required": true,
+    "statement": "Leia core does not provide leia-generic-ai-planning-graph as a built-in; this provider-free package boundary owns planning graph semantics."
+  },
+  "credentials": {
+    "required": [],
+    "optional": [],
+    "required_env": [],
+    "optional_env": [],
+    "secret_env_patterns": [],
+    "secret_refs": [],
+    "provider_credentials_required": false,
+    "policy": "No credentials are declared by leia-generic-ai-planning-graph; provider credentials belong only to provider-specific adapter packages behind explicit capability gates."
+  },
+  "dialect_capability_id": "generic.planning.graph.define",
+  "dialect_backend_shape": "ai.workflow.plan_graph",
+  "dialect_aliases": [
+    {
+      "id": "ai.workflow.plan_graph",
+      "target": "generic.planning.graph.define",
+      "scope": "package",
+      "source": "generic_ai_package_matrix.backend_shape",
+      "status": "active"
+    }
+  ],
+  "canonical_capability_id": "generic.planning.graph.define",
+  "capability_aliases": [
+    {
+      "alias": "ai.workflow.plan_graph",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "backend_shape_id",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "generic.ai.workflow.planning_graph",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "dialect_capability_id",
+      "scope": "package",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "backend_capability_slug",
+      "scope": "backend_shape",
+      "status": "active"
+    },
+    {
+      "alias": "workflow",
+      "target_capability_id": "generic.planning.graph.define",
+      "alias_kind": "dialect_slug",
+      "scope": "package",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "generic-analytical-model-contracts-contract",
+  "package_id": "generic-analytical-model-contracts",
+  "capability_id": "generic.ai.analytical_model.contracts",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "depends_on_q_runtime": false,
+  "field_contracts": {
+    "scenario_book": {
+      "schema": "schemas/scenario_book_v1.schema.json",
+      "fixture": "fixtures/scenario_book_fixture.json",
+      "required_fields": ["provider_free", "live_network", "fixture_key", "scenario_book_id", "assumption_sets", "scenarios", "sensitivity_axes", "deterministic_order"]
+    },
+    "forecast_result": {
+      "schema": "schemas/forecast_result_v1.schema.json",
+      "fixture": "fixtures/forecast_result_fixture.json",
+      "required_fields": ["provider_free", "live_network", "fixture_key", "scenario_book_id", "forecast_rows", "provenance", "audit_events"]
+    },
+    "tolerance_gate": {
+      "schema": "schemas/tolerance_gate_v1.schema.json",
+      "fixture": "fixtures/tolerance_gates_fixture.json",
+      "required_fields": ["provider_free", "live_network", "fixture_key", "scenario_book_id", "tolerance_gates", "summary"]
+    },
+    "clean_skip": {
+      "schema": "schemas/forecast_clean_skip_v1.schema.json",
+      "fixture": "fixtures/forecast_clean_skip_fixture.json",
+      "required_fields": ["provider_free", "live_network", "fixture_key", "skip_code", "dependency", "adapter", "reason", "recoverable"]
+    }
+  },
+  "acceptance_gates": [
+    "scenario book fixtures declare assumptions, scenarios, sensitivity axes, provenance, and deterministic ordering",
+    "forecast result fixtures reference scenario ids and carry period, measure, value, unit, and audit event data",
+    "tolerance fixtures compare expected and actual values using explicit absolute tolerances",
+    "clean-skip fixtures cover unavailable assumption provider and simulation adapters",
+    "all fixtures remain provider-free, offline, and independent of host runtime internals"
+  ]
+}

@@ -1,0 +1,163 @@
+// Provider-free generic AI workflow composition.
+//
+// This is a thin Leia-native composition over the generic package boundaries:
+// model, model-io, document-rag, prompt-role, memory, turn, agent-state, tool,
+// tool-registry, optional-adapter, data-provider, data-normalization,
+// transcript-pipeline, analytical-model, event-intelligence, strategy-backtest,
+// coding-workspace, planning, agent, workflow, chart-render, evidence-verification, evidence-report,
+// report-render, product-app, ui-snapshot, eval, replay, trace, approval,
+// and package-audit. It intentionally declares no
+// provider SDK, network call, credential, or domain adapter.
+
+package_boundaries := {
+    {role: "model" package_id: "generic-model-registry" capability: "generic.ai.model.registry" entrypoint: "ai.model.resolve" provider_free: true live_network: false},
+    {role: "model-io" package_id: "generic-model-io-envelope" capability: "generic.ai.model.io.envelope" entrypoint: "ai.model.io.envelope" provider_free: true live_network: false},
+    {role: "document-rag" package_id: "generic-document-rag-pipeline" capability: "generic.ai.document.rag" entrypoint: "ai.document.rag_pipeline" provider_free: true live_network: false},
+    {role: "prompt-role" package_id: "generic-prompt-role-catalog" capability: "generic.ai.prompt.role.catalog" entrypoint: "ai.prompt.role_catalog" provider_free: true live_network: false},
+    {role: "memory" package_id: "generic-memory-store" capability: "generic.ai.memory.store" entrypoint: "ai.memory.store" provider_free: true live_network: false},
+    {role: "replay" package_id: "generic-record-replay" capability: "generic.ai.record.capture" entrypoint: "generic.ai.record.replay.fixture" provider_free: true live_network: false},
+    {role: "trace" package_id: "generic-trace-events" capability: "generic.ai.trace.events" entrypoint: "ai.trace.emit" provider_free: true live_network: false},
+    {role: "approval" package_id: "generic-approval-policy" capability: "generic.ai.approval.policy.evaluate" entrypoint: "generic.ai.approval.policy.evaluate" provider_free: true live_network: false},
+    {role: "tool" package_id: "generic-tool-contracts" capability: "ai.tool.invoke" entrypoint: "ai.tool.invoke" provider_free: true live_network: false},
+    {role: "tool-registry" package_id: "generic-tool-registry" capability: "generic.tool.registry.declare" entrypoint: "ai.tool.registry" provider_free: true live_network: false},
+    {role: "optional-adapter" package_id: "generic-optional-adapter-boundary" capability: "generic.ai.optional_adapter.boundary" entrypoint: "ai.optional_adapter.boundary" provider_free: true live_network: false},
+    {role: "data-provider" package_id: "generic-data-provider-boundary" capability: "generic.ai.data_provider.boundary" entrypoint: "ai.data_provider.boundary" provider_free: true live_network: false},
+    {role: "data-normalization" package_id: "generic-data-normalization-contracts" capability: "generic.ai.data_normalization.contracts" entrypoint: "ai.data_normalization.contracts" provider_free: true live_network: false},
+    {role: "analytical-model" package_id: "generic-analytical-model-contracts" capability: "generic.ai.analytical_model.contracts" entrypoint: "ai.analytical_model.contracts" provider_free: true live_network: false},
+    {role: "transcript-pipeline" package_id: "generic-transcript-pipeline" capability: "generic.ai.transcript.pipeline" entrypoint: "ai.transcript.pipeline" provider_free: true live_network: false},
+    {role: "event-intelligence" package_id: "generic-event-intelligence-boundary" capability: "generic.ai.event_intelligence.boundary" entrypoint: "ai.event_intelligence.boundary" provider_free: true live_network: false},
+    {role: "strategy-backtest" package_id: "generic-strategy-backtest-contracts" capability: "generic.ai.strategy.backtest.contracts" entrypoint: "ai.strategy.backtest_contracts" provider_free: true live_network: false},
+    {role: "coding-workspace" package_id: "generic-coding-workspace" capability: "generic.ai.coding_workspace" entrypoint: "ai.coding_workspace" provider_free: true live_network: false},
+    {role: "turn" package_id: "generic-turn-runner" capability: "ai.turn.execute" entrypoint: "ai.turn.execute" provider_free: true live_network: false},
+    {role: "agent-state" package_id: "generic-agent-state-store" capability: "generic.ai.agent_state.store" entrypoint: "ai.agent_state.store" provider_free: true live_network: false},
+    {role: "agent" package_id: "generic-agent-runner" capability: "ai.agent.config.declarative" entrypoint: "ai.agent.run" provider_free: true live_network: false},
+    {role: "planning" package_id: "generic-planning-graph" capability: "generic.planning.graph.define" entrypoint: "ai.workflow.plan_graph" provider_free: true live_network: false},
+    {role: "package-audit" package_id: "generic-package-boundary-auditor" capability: "generic.ai.package.boundary.audit.manifest" entrypoint: "ai.package.audit" provider_free: true live_network: false},
+    {role: "workflow" package_id: "generic-workflow-orchestrator" capability: "ai.workflow.orchestrate.provider_free" entrypoint: "ai.workflow.orchestrate" provider_free: true live_network: false},
+    {role: "chart-render" package_id: "generic-chart-render-contracts" capability: "generic.ai.chart.render.contracts" entrypoint: "ai.chart.render_contracts" provider_free: true live_network: false},
+    {role: "evidence-verification" package_id: "generic-evidence-verification" capability: "generic.ai.evidence.verify" entrypoint: "ai.evidence.verify" provider_free: true live_network: false},
+    {role: "evidence-report" package_id: "generic-evidence-report-artifacts" capability: "generic.ai.evidence.report.artifacts" entrypoint: "ai.evidence.report_artifacts" provider_free: true live_network: false},
+    {role: "report-render" package_id: "generic-report-render-contracts" capability: "generic.ai.report.render.contracts" entrypoint: "ai.report.render_contracts" provider_free: true live_network: false},
+    {role: "product-app" package_id: "generic-product-app-boundary" capability: "generic.ai.product_app.boundary" entrypoint: "ai.product_app.boundary" provider_free: true live_network: false},
+    {role: "ui-snapshot" package_id: "generic-ui-snapshot-evaluator" capability: "generic.ai.ui.snapshot.evaluator" entrypoint: "ai.ui.snapshot_evaluator" provider_free: true live_network: false},
+    {role: "eval" package_id: "generic-evaluation-harness" capability: "ai.eval.run.provider_free" entrypoint: "ai.eval.run" provider_free: true live_network: false},
+}
+
+composition_edges := {
+    {from: "model" to: "model-io" handoff: "resolved model descriptor"},
+    {from: "document-rag" to: "memory" handoff: "retrieval evidence and cited context chunks"},
+    {from: "memory" to: "turn" handoff: "retrieved context window"},
+    {from: "model-io" to: "turn" handoff: "request, stream, response, usage, and redaction envelopes"},
+    {from: "turn" to: "agent-state" handoff: "redacted input refs, output refs, trace correlation, and checkpoint material"},
+    {from: "agent-state" to: "trace" handoff: "checkpoint/resume trace replay projection"},
+    {from: "agent-state" to: "replay" handoff: "state version, checkpoint key, cache key, and resume token replay match material"},
+    {from: "agent-state" to: "agent" handoff: "resumable state snapshot, resume token, and checkpoint key"},
+    {from: "prompt-role" to: "agent" handoff: "role profile, prompt template, and output schema"},
+    {from: "tool" to: "turn" handoff: "declarative tool schema"},
+    {from: "agent" to: "workflow" handoff: "agent result and loop trace"},
+    {from: "workflow" to: "eval" handoff: "workflow result fixture"},
+    {from: "replay" to: "turn" handoff: "strict ordered record match"},
+    {from: "trace" to: "workflow" handoff: "correlated events"},
+    {from: "approval" to: "tool" handoff: "capability decision"},
+    {from: "tool-registry" to: "tool" handoff: "validated tool descriptor"},
+    {from: "optional-adapter" to: "tool" handoff: "optional dependency gate and clean-skip envelope"},
+    {from: "data-provider" to: "tool" handoff: "provider request and response envelopes"},
+    {from: "data-provider" to: "data-normalization" handoff: "source records and provider provenance"},
+    {from: "data-normalization" to: "analytical-model" handoff: "normalized rows, provenance, and validation envelopes"},
+    {from: "transcript-pipeline" to: "document-rag" handoff: "normalized segments and turn-aware transcript chunks"},
+    {from: "data-provider" to: "event-intelligence" handoff: "source snapshots and provider provenance"},
+    {from: "data-provider" to: "strategy-backtest" handoff: "observation feed and provider provenance"},
+    {from: "approval" to: "coding-workspace" handoff: "execution and file-write capability decision"},
+    {from: "planning" to: "workflow" handoff: "plan graph and dependency evidence"},
+    {from: "package-audit" to: "workflow" handoff: "provider-free boundary gate"},
+    {from: "chart-render" to: "evidence-report" handoff: "chart render artifacts and source metadata"},
+    {from: "workflow" to: "evidence-verification" handoff: "claim records, source annotations, citation refs, and evidence policy"},
+    {from: "evidence-verification" to: "evidence-report" handoff: "verified citations, freshness warnings, unresolved refs, and degradation actions"},
+    {from: "evidence-report" to: "report-render" handoff: "report render requests and artifact manifests"},
+    {from: "workflow" to: "product-app" handoff: "route, session, task, artifact, and CRUD product shell"},
+    {from: "evidence-report" to: "ui-snapshot" handoff: "artifact URI manifest and snapshot metadata"},
+}
+
+workflow_contract := {
+    id: "generic-ai-workflow-composition"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    credential_required: false
+    composition: package_boundaries
+    edges: composition_edges
+    native_surfaces: {"model", "model-io", "agent-state", "document-rag", "prompt-role", "memory", "turn", "tool", "tool-registry", "optional-adapter", "data-provider", "data-normalization", "analytical-model", "transcript-pipeline", "event-intelligence", "strategy-backtest", "coding-workspace", "planning", "agent", "workflow", "chart-render", "evidence-verification", "evidence-report", "report-render", "product-app", "ui-snapshot", "eval", "replay", "trace", "approval", "package-audit"}
+}
+
+func role_present(role) {
+    for i := 1; i <= #workflow_contract.composition; i++ {
+        if workflow_contract.composition[i].role == role {
+            return true
+        }
+    }
+    return false
+}
+
+func provider_free_boundaries() {
+    for i := 1; i <= #workflow_contract.composition; i++ {
+        boundary := workflow_contract.composition[i]
+        if boundary.provider_free != true || boundary.live_network != false {
+            return false
+        }
+    }
+    return workflow_contract.provider_free == true &&
+        workflow_contract.live_network == false &&
+        workflow_contract.real_dependency_imports == false &&
+        workflow_contract.credential_required == false
+}
+
+func connected_native_surfaces() {
+    return #workflow_contract.composition == 31 &&
+        #workflow_contract.edges == 32 &&
+        role_present("model") &&
+        role_present("model-io") &&
+        role_present("agent-state") &&
+        role_present("document-rag") &&
+        role_present("prompt-role") &&
+        role_present("memory") &&
+        role_present("turn") &&
+        role_present("tool") &&
+        role_present("tool-registry") &&
+        role_present("optional-adapter") &&
+        role_present("data-provider") &&
+        role_present("data-normalization") &&
+        role_present("analytical-model") &&
+        role_present("transcript-pipeline") &&
+        role_present("event-intelligence") &&
+        role_present("strategy-backtest") &&
+        role_present("coding-workspace") &&
+        role_present("planning") &&
+        role_present("agent") &&
+        role_present("workflow") &&
+        role_present("chart-render") &&
+        role_present("evidence-verification") &&
+        role_present("evidence-report") &&
+        role_present("report-render") &&
+        role_present("product-app") &&
+        role_present("ui-snapshot") &&
+        role_present("eval") &&
+        role_present("replay") &&
+        role_present("trace") &&
+        role_present("approval") &&
+        role_present("package-audit")
+}
+
+assert(provider_free_boundaries())
+assert(connected_native_surfaces())
+
+package_boundary_count := #workflow_contract.composition
+composition_edge_count := #workflow_contract.edges
+composition_summary := string.format(
+    "%s boundaries=%d edges=%d provider_free=%s",
+    workflow_contract.id,
+    package_boundary_count,
+    composition_edge_count,
+    tostring(workflow_contract.provider_free)
+)
+
+print(composition_summary)

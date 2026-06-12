@@ -1,0 +1,845 @@
+{
+  "schema_version": 1,
+  "matrix_id": "generic-ai-live-package-matrix",
+  "description": "Machine-readable index for provider-free generic AI live packages.",
+  "source_root": "examples/ai/finrobot_translation/live_packages",
+  "packages": [
+    {
+      "id": "generic_agent_runner",
+      "package_name": "leia-generic-ai-agent-runner",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_agent_runner",
+      "capability": "ai.agent.config.declarative",
+      "capabilities": [
+        "ai.agent.config.declarative",
+        "ai.agent.tool_history.replay",
+        "ai.agent.loop_trace.emit",
+        "ai.agent.structured_output.validate",
+        "ai.agent.replay_policy.enforce",
+        "ai.agent.max_steps.guard",
+        "ai.agent.tool_contract_projection"
+      ],
+      "backend_shape": "ai.agent.run",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/contracts/agent_runner_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/tool_contract_agent_projection_fixture.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_runner/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_agent_state_store",
+      "package_name": "leia-generic-ai-agent-state-store",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store",
+      "capability": "generic.ai.agent_state.store",
+      "capabilities": [
+        "generic.ai.agent_state.store",
+        "generic.ai.agent_state.snapshot",
+        "generic.ai.agent_state.session",
+        "generic.ai.agent_state.checkpoint",
+        "generic.ai.agent_state.input_ref",
+        "generic.ai.agent_state.output_ref",
+        "generic.ai.agent_state.trace_correlation",
+        "generic.ai.agent_state.trace_replay_projection",
+        "generic.ai.agent_state.memory_context_projection",
+        "generic.ai.agent_state.cache_key",
+        "generic.ai.agent_state.redaction",
+        "generic.ai.agent_state.clean_skip"
+      ],
+      "backend_shape": "ai.agent_state.store",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/contracts/generic_agent_state_store_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_agent_state_store/fixtures/memory_context_projection_fixture.json"
+      ]
+    },
+    {
+      "id": "generic_analytical_model_contracts",
+      "package_name": "leia-generic-ai-analytical-model-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts",
+      "capability": "generic.ai.analytical_model.contracts",
+      "capabilities": [
+        "generic.ai.analytical_model.contracts",
+        "generic.ai.analytical_model.method.output",
+        "generic.ai.analytical_model.assumption.audit",
+        "generic.ai.analytical_model.scenario.book",
+        "generic.ai.analytical_model.sensitivity.grid",
+        "generic.ai.analytical_model.tolerance_gate.evaluate",
+        "generic.ai.analytical_model.provenance.attach",
+        "generic.ai.analytical_model.clean_skip"
+      ],
+      "backend_shape": "ai.analytical_model.contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/contracts/generic_analytical_model_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_analytical_model_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_approval_policy",
+      "package_name": "leia-generic-ai-approval-policy",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
+      "capability": "generic.ai.approval.policy.evaluate",
+      "capabilities": [
+        "generic.ai.capability.local.read",
+        "generic.ai.capability.network.http",
+        "generic.ai.capability.credential.read",
+        "generic.ai.capability.generated_code.execute",
+        "generic.ai.capability.trading.order_submit",
+        "generic.ai.capability.portfolio.rebalance",
+        "generic.ai.capability.publish.web",
+        "generic.ai.approval.policy.evaluate",
+        "generic.ai.approval.policy.trace",
+        "generic.ai.approval.policy.clean_skip"
+      ],
+      "backend_shape": "generic.ai.approval.policy.evaluate",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_approval_policy/contracts/generic_approval_policy_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_approval_policy/contracts/generic_capability_gate_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_chart_render_contracts",
+      "package_name": "leia-generic-ai-chart-render-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts",
+      "capability": "generic.ai.chart.render.contracts",
+      "capabilities": [
+        "generic.ai.chart.render.contracts",
+        "generic.ai.chart.spec",
+        "generic.ai.chart.recipe.matrix",
+        "generic.ai.chart.render.request",
+        "generic.ai.chart.render.result",
+        "generic.ai.chart.source.metadata",
+        "generic.ai.chart.snapshot.hash",
+        "generic.ai.chart.renderer.clean_skip",
+        "generic.ai.chart.unsupported_renderer"
+      ],
+      "backend_shape": "ai.chart.render_contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/contracts/generic_chart_render_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_coding_workspace",
+      "package_name": "leia-generic-ai-coding-workspace",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "capability": "generic.ai.coding_workspace",
+      "capabilities": [
+        "generic.ai.coding_workspace",
+        "generic.ai.code.command.request",
+        "generic.ai.code.command.result",
+        "generic.ai.code.approval.gate",
+        "generic.ai.code.stdout.stderr",
+        "generic.ai.artifact.file_manifest",
+        "generic.ai.artifact.image_manifest",
+        "generic.ai.notebook.display",
+        "generic.ai.code.cleanup_policy",
+        "generic.ai.code.replay.deterministic",
+        "generic.ai.code.capability.metadata",
+        "generic.ai.code.clean_skip"
+      ],
+      "backend_shape": "ai.coding_workspace",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/contracts/generic_coding_workspace_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_data_normalization_contracts",
+      "package_name": "leia-generic-ai-data-normalization-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts",
+      "capability": "generic.ai.data_normalization.contracts",
+      "capabilities": [
+        "generic.ai.data_normalization.contracts",
+        "generic.ai.data_normalization.schema_mapping",
+        "generic.ai.data_normalization.provider_response_projection",
+        "generic.ai.data_normalization.field_policy",
+        "generic.ai.data_normalization.missing_policy",
+        "generic.ai.data_normalization.stale_policy",
+        "generic.ai.data_normalization.type_coercion",
+        "generic.ai.data_normalization.unit_transform",
+        "generic.ai.data_normalization.provenance",
+        "generic.ai.data_normalization.validation_error",
+        "generic.ai.data_normalization.deterministic_order",
+        "generic.ai.data_normalization.adapter_clean_skip"
+      ],
+      "backend_shape": "ai.data_normalization.contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/contracts/generic_data_normalization_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_data_normalization_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_data_provider_boundary",
+      "package_name": "leia-generic-ai-data-provider-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary",
+      "capability": "generic.ai.data_provider.boundary",
+      "capabilities": [
+        "generic.ai.data_provider.boundary",
+        "generic.ai.data_provider.registry",
+        "generic.ai.data_provider.request_envelope",
+        "generic.ai.data_provider.response_envelope",
+        "generic.ai.data_provider.pagination",
+        "generic.ai.data_provider.rate_limit",
+        "generic.ai.data_provider.auth_redaction",
+        "generic.ai.data_provider.cache_retry_policy",
+        "generic.ai.data_provider.provenance",
+        "generic.ai.data_provider.error_envelope",
+        "generic.ai.data_provider.clean_skip"
+      ],
+      "backend_shape": "ai.data_provider.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/contracts/generic_data_provider_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_document_rag_pipeline",
+      "package_name": "leia-generic-ai-document-rag-pipeline",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",
+      "capability": "generic.ai.document.rag",
+      "capabilities": [
+        "generic.ai.document.rag",
+        "generic.ai.document.convert",
+        "generic.ai.document.section.extract",
+        "generic.ai.rag.chunk",
+        "generic.ai.rag.corpus_manifest",
+        "generic.ai.rag.retrieve",
+        "generic.ai.rag.citation_consistency",
+        "generic.ai.rag.adapter.clean_skip"
+      ],
+      "backend_shape": "ai.document.rag_pipeline",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/contracts/generic_document_rag_pipeline_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_evaluation_harness",
+      "package_name": "leia-generic-ai-evaluation-harness",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness",
+      "capability": "ai.eval.run.provider_free",
+      "capabilities": [
+        "generic.ai.evaluation.harness.dataset_manifest",
+        "generic.ai.evaluation.harness.case_inputs",
+        "generic.ai.evaluation.harness.metric_specs",
+        "generic.ai.evaluation.harness.judge_replay_records",
+        "generic.ai.evaluation.harness.findings",
+        "generic.ai.evaluation.harness.golden_gates",
+        "generic.ai.evaluation.harness.case_result_summary",
+        "generic.ai.evaluation.harness.agent_run_projection",
+        "ai.eval.run.provider_free",
+        "ai.eval.run.fixture_replay",
+        "ai.eval.run.golden_gate"
+      ],
+      "backend_shape": "ai.eval.run",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/contracts/evaluation_harness_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/agent_run_evaluation_projection_fixture.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evaluation_harness/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_event_intelligence_boundary",
+      "package_name": "leia-generic-ai-event-intelligence-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary",
+      "capability": "generic.ai.event_intelligence.boundary",
+      "capabilities": [
+        "generic.ai.event_intelligence.boundary",
+        "generic.ai.event.source_snapshot",
+        "generic.ai.event.extraction",
+        "generic.ai.event.taxonomy",
+        "generic.ai.event.freshness_policy",
+        "generic.ai.event.dedupe_confidence",
+        "generic.ai.event.relevance_score",
+        "generic.ai.event.sentiment_impact",
+        "generic.ai.event.prompt_contract",
+        "generic.ai.event.adapter_clean_skip"
+      ],
+      "backend_shape": "ai.event_intelligence.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/contracts/generic_event_intelligence_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_evidence_report_artifacts",
+      "package_name": "leia-generic-ai-evidence-report-artifacts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",
+      "capability": "generic.ai.evidence.report.artifacts",
+      "capabilities": [
+        "generic.ai.evidence.report.artifacts",
+        "generic.ai.evidence.source_annotation",
+        "generic.ai.evidence.citation_envelope",
+        "generic.ai.report.outline",
+        "generic.ai.report.section_dependency_dag",
+        "generic.ai.report.style_profile_policy",
+        "generic.ai.report.partial_failure_fixture",
+        "generic.ai.artifact.manifest",
+        "generic.ai.artifact.render_manifest",
+        "generic.ai.artifact.snapshot_metadata",
+        "generic.ai.artifact.accessibility_checklist",
+        "generic.ai.artifact.stale_data_policy",
+        "generic.ai.render.request",
+        "generic.ai.render.output_manifest",
+        "generic.ai.render.warning",
+        "generic.ai.evidence.report.render_projection",
+        "generic.ai.evidence.report.chart_artifact_projection",
+        "generic.ai.render.clean_skip"
+      ],
+      "backend_shape": "ai.evidence.report_artifacts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/verification_render_projection_fixture.json",
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/chart_render_artifact_projection_fixture.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_evidence_verification",
+      "package_name": "leia-generic-ai-evidence-verification",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification",
+      "capability": "generic.ai.evidence.verify",
+      "capabilities": [
+        "generic.ai.evidence.verify",
+        "generic.ai.evidence.document_rag_projection",
+        "generic.ai.evidence.claim_record",
+        "generic.ai.evidence.source_ref",
+        "generic.ai.evidence.citation_ref",
+        "generic.ai.evidence.requirement_matrix",
+        "generic.ai.evidence.citation_normalize",
+        "generic.ai.evidence.freshness_check",
+        "generic.ai.evidence.unresolved_ref",
+        "generic.ai.evidence.quality_summary",
+        "generic.ai.evidence.clean_degradation"
+      ],
+      "backend_shape": "ai.evidence.verify",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/contracts/generic_evidence_verification_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_verification/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_memory_store",
+      "package_name": "leia-generic-ai-memory-store",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_memory_store",
+      "capability": "generic.ai.memory.store",
+      "capabilities": [
+        "generic.ai.memory.store",
+        "generic.ai.memory.namespace",
+        "generic.ai.memory.retrieve",
+        "generic.ai.memory.context_window",
+        "generic.ai.memory.retrieval_policy",
+        "generic.ai.memory.provenance",
+        "generic.ai.memory.clean_skip"
+      ],
+      "backend_shape": "ai.memory.store",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_memory_store/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_memory_store/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_memory_store/contracts/generic_memory_store_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_memory_store/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_model_io_envelope",
+      "package_name": "leia-generic-ai-model-io-envelope",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope",
+      "capability": "generic.ai.model.io.envelope",
+      "capabilities": [
+        "generic.ai.model.io.envelope",
+        "generic.ai.model.io.request_envelope",
+        "generic.ai.model.io.response_envelope",
+        "generic.ai.model.io.stream_chunks",
+        "generic.ai.model.io.provider_free_replay",
+        "generic.ai.model.io.usage_cost_metadata",
+        "generic.ai.model.io.registry_turn_projection",
+        "generic.ai.model.io.redaction"
+      ],
+      "backend_shape": "ai.model.io.envelope",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/contracts/model_io_envelope_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_model_io_envelope/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_model_registry",
+      "package_name": "leia-generic-ai-model-registry",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_model_registry",
+      "capability": "generic.ai.model.registry",
+      "capabilities": [
+        "generic.ai.model.registry",
+        "generic.ai.model.alias.resolve",
+        "generic.ai.model.descriptor.replay",
+        "generic.ai.model.redaction.policy",
+        "generic.ai.model.routing.guard",
+        "generic.ai.model.live_provider_gate"
+      ],
+      "backend_shape": "ai.model.resolve",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_model_registry/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_model_registry/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_model_registry/contracts/model_registry_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_model_registry/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_optional_adapter_boundary",
+      "package_name": "leia-generic-ai-optional-adapter-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary",
+      "capability": "generic.ai.optional_adapter.boundary",
+      "capabilities": [
+        "generic.ai.optional_adapter.boundary",
+        "generic.ai.optional_adapter.registry",
+        "generic.ai.optional_dependency.gate",
+        "generic.ai.optional_adapter.result_envelope",
+        "generic.ai.optional_adapter.version_metadata",
+        "generic.ai.optional_adapter.terms_metadata",
+        "generic.ai.optional_adapter.credential_redaction",
+        "generic.ai.optional_adapter.clean_skip",
+        "generic.ai.optional_adapter.no_live_import_default"
+      ],
+      "backend_shape": "ai.optional_adapter.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/contracts/generic_optional_adapter_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_package_boundary_auditor",
+      "package_name": "leia-generic-ai-package-boundary-auditor",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor",
+      "capability": "generic.ai.package.boundary.audit.manifest",
+      "capabilities": [
+        "generic.ai.package.boundary.audit.manifest",
+        "generic.ai.package.boundary.audit.fixture_index",
+        "generic.ai.package.boundary.audit.example_registry",
+        "generic.ai.package.boundary.audit.capability_policy",
+        "generic.ai.package.boundary.audit.findings",
+        "generic.ai.package.boundary.audit.missing_boundary_records"
+      ],
+      "backend_shape": "ai.package.audit",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/contracts/capability_policy.json",
+        "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/contracts/package_boundary_audit_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_package_boundary_auditor/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_planning_graph",
+      "package_name": "leia-generic-ai-planning-graph",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_planning_graph",
+      "capability": "generic.planning.graph.define",
+      "capabilities": [
+        "generic.planning.graph.define",
+        "generic.planning.node.classify",
+        "generic.planning.dependency.validate",
+        "generic.planning.retry.replay",
+        "generic.planning.branch.merge",
+        "generic.planning.trace.evidence"
+      ],
+      "backend_shape": "ai.workflow.plan_graph",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_planning_graph/contracts/planning_graph_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_planning_graph/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_product_app_boundary",
+      "package_name": "leia-generic-ai-product-app-boundary",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary",
+      "capability": "generic.ai.product_app.boundary",
+      "capabilities": [
+        "generic.ai.product_app.boundary",
+        "generic.ai.product_app.route_contract",
+        "generic.ai.product_app.session_contract",
+        "generic.ai.product_app.workflow_projection",
+        "generic.ai.product_app.task_log",
+        "generic.ai.product_app.artifact_download",
+        "generic.ai.product_app.crud_fixture_state",
+        "generic.ai.product_app.db_migration_plan",
+        "generic.ai.product_app.deployment_target",
+        "generic.ai.product_app.approval_boundary",
+        "generic.ai.product_app.clean_skip"
+      ],
+      "backend_shape": "ai.product_app.boundary",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/contracts/generic_product_app_boundary_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_product_app_boundary/fixtures/workflow_product_app_projection_fixture.json"
+      ]
+    },
+    {
+      "id": "generic_prompt_role_catalog",
+      "package_name": "leia-generic-ai-prompt-role-catalog",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog",
+      "capability": "generic.ai.prompt.role.catalog",
+      "capabilities": [
+        "generic.ai.prompt.role.catalog",
+        "generic.ai.prompt.template.snapshot",
+        "generic.ai.role.profile.version",
+        "generic.ai.role.delegation.trigger",
+        "generic.ai.role.output.schema",
+        "generic.ai.role.evidence.validation",
+        "generic.ai.role.termination.convention",
+        "generic.ai.prompt.drift.fixture"
+      ],
+      "backend_shape": "ai.prompt.role_catalog",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/contracts/generic_prompt_role_catalog_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_record_replay",
+      "package_name": "leia-generic-ai-record-replay",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
+      "capability": "generic.ai.record.capture",
+      "capabilities": [
+        "generic.ai.record.schema",
+        "generic.ai.record.capture",
+        "generic.ai.replay.index",
+        "generic.ai.replay.match.strict_ordered",
+        "generic.ai.replay.finding.mismatch",
+        "generic.ai.replay.finding.unconsumed",
+        "generic.ai.replay.summary.deterministic"
+      ],
+      "backend_shape": "generic.ai.record.replay.fixture",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_record_replay/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_record_replay/contracts/record_replay_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_record_replay/contracts/strict_ordered_matching_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_report_render_contracts",
+      "package_name": "leia-generic-ai-report-render-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "capability": "generic.ai.report.render.contracts",
+      "capabilities": [
+        "generic.ai.report.render.contracts",
+        "generic.ai.report.render.request",
+        "generic.ai.report.render.request_envelope",
+        "generic.ai.report.render.output_manifest",
+        "generic.ai.report.render.artifact_manifest",
+        "generic.ai.report.render.snapshot_metadata",
+        "generic.ai.report.render.snapshot_hash",
+        "generic.ai.report.render.warning",
+        "generic.ai.report.render.annotation",
+        "generic.ai.report.render.fixture_hash",
+        "generic.ai.report.render.clean_skip"
+      ],
+      "backend_shape": "ai.report.render_contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/contracts/generic_report_render_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_strategy_backtest_contracts",
+      "package_name": "leia-generic-ai-strategy-backtest-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "capability": "generic.ai.strategy.backtest.contracts",
+      "capabilities": [
+        "generic.ai.strategy.backtest.contracts",
+        "generic.ai.strategy.backtest.strategy.bind",
+        "generic.ai.strategy.backtest.observation_feed.bind",
+        "generic.ai.strategy.backtest.execution_ledger",
+        "generic.ai.strategy.backtest.allocation_series",
+        "generic.ai.strategy.backtest.performance.series",
+        "generic.ai.strategy.backtest.metric_summary.collect",
+        "generic.ai.strategy.backtest.constraint_limits.enforce",
+        "generic.ai.strategy.backtest.engine.clean_skip"
+      ],
+      "backend_shape": "ai.strategy.backtest_contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_tool_contracts",
+      "package_name": "leia-generic-ai-tool-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",
+      "capability": "ai.tool.invoke",
+      "capabilities": [
+        "generic.ai.tool.contract",
+        "generic.ai.tool.contract.project_registry_descriptor",
+        "ai.tool.invoke",
+        "ai.tool.schema.declarative",
+        "ai.tool.arguments.validate",
+        "ai.tool.capability.tags",
+        "ai.tool.approval.state",
+        "ai.tool.result.envelope",
+        "ai.tool.error.normalized",
+        "ai.tool.artifact.refs",
+        "ai.tool.replay.fixture"
+      ],
+      "backend_shape": "ai.tool.invoke",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/contracts/generic_tool_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/registry_descriptor_to_tool_contract_projection_fixture.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_tool_registry",
+      "package_name": "leia-generic-ai-tool-registry",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_tool_registry",
+      "capability": "generic.tool.registry.declare",
+      "capabilities": [
+        "generic.tool.registry.declare",
+        "generic.tool.registry.validate_schema",
+        "generic.tool.invocation.trace",
+        "generic.tool.approval.edge",
+        "generic.tool.registry.replay_fixture"
+      ],
+      "backend_shape": "ai.tool.registry",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_tool_registry/contracts/tool_registry_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_tool_registry/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_trace_events",
+      "package_name": "leia-generic-ai-trace-events",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_trace_events",
+      "capability": "generic.ai.trace.events",
+      "capabilities": [
+        "generic.ai.trace.events",
+        "ai.trace.emit",
+        "ai.trace.turn_start",
+        "ai.trace.stream",
+        "ai.trace.tool",
+        "ai.trace.artifact",
+        "ai.trace.approval",
+        "ai.trace.replay",
+        "ai.trace.redaction_policy",
+        "ai.trace.correlation_ids",
+        "ai.trace.sequence_marker",
+        "ai.trace.fixture_replay",
+        "ai.trace.envelope",
+        "ai.trace.turn_end",
+        "ai.trace.tool_call",
+        "ai.trace.tool_result",
+        "ai.trace.workflow_step",
+        "ai.trace.replay_record_matched",
+        "ai.trace.agent_start",
+        "ai.trace.agent_turn_tool_dispatch",
+        "ai.trace.agent_done",
+        "ai.trace.workflow_correlation",
+        "ai.trace.agent_correlation",
+        "ai.trace.approval_projection",
+        "ai.trace.external_envelope_projection",
+        "ai.trace.tool_invocation_projection",
+        "ai.trace.model_turn_replay_projection",
+        "ai.trace.tool_approval_result_composition"
+      ],
+      "backend_shape": "ai.trace.emit",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_trace_events/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_trace_events/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_trace_events/contracts/trace_events_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_trace_events/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_transcript_pipeline",
+      "package_name": "leia-generic-ai-transcript-pipeline",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline",
+      "capability": "generic.ai.transcript.pipeline",
+      "capabilities": [
+        "generic.ai.transcript.pipeline",
+        "generic.ai.transcript.source_envelope",
+        "generic.ai.transcript.speaker.normalize",
+        "generic.ai.transcript.speaker.alias",
+        "generic.ai.transcript.speaker.role",
+        "generic.ai.transcript.segment.normalize",
+        "generic.ai.transcript.turn.order",
+        "generic.ai.transcript.offset.provenance",
+        "generic.ai.transcript.event_time.correct",
+        "generic.ai.transcript.chunk",
+        "generic.ai.transcript.chunk.boundary_preserve",
+        "generic.ai.transcript.chunk.token_budget",
+        "generic.ai.transcript.provenance",
+        "generic.ai.transcript.adapter.clean_skip"
+      ],
+      "backend_shape": "ai.transcript.pipeline",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/contracts/generic_transcript_pipeline_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json"
+    },
+    {
+      "id": "generic_turn_runner",
+      "package_name": "leia-generic-ai-turn-runner",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_turn_runner",
+      "capability": "ai.turn.execute",
+      "capabilities": [
+        "generic.ai.turn.request",
+        "ai.turn.execute",
+        "generic.ai.turn.memory_context_projection"
+      ],
+      "backend_shape": "ai.turn.execute",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/contracts/generic_turn_runner_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_turn_runner/fixtures/memory_context_turn_projection_fixture.json"
+      ]
+    },
+    {
+      "id": "generic_ui_snapshot_evaluator",
+      "package_name": "leia-generic-ai-ui-snapshot-evaluator",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator",
+      "capability": "generic.ai.ui.snapshot.evaluator",
+      "capabilities": [
+        "generic.ai.ui.snapshot.evaluator",
+        "generic.ai.ui.snapshot.evidence_report_projection",
+        "generic.ai.ui.route_dom_schema",
+        "generic.ai.ui.viewport_matrix",
+        "generic.ai.ui.visual_diff_budget",
+        "generic.ai.ui.accessibility_summary",
+        "generic.ai.ui.artifact_uri_manifest",
+        "generic.ai.ui.redaction_policy",
+        "generic.ai.ui.static_asset_policy",
+        "generic.ai.ui.browser_clean_skip"
+      ],
+      "backend_shape": "ai.ui.snapshot_evaluator",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/contracts/generic_ui_snapshot_evaluator_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/evidence_report_ui_snapshot_projection_fixture.json"
+      ]
+    },
+    {
+      "id": "generic_workflow_orchestrator",
+      "package_name": "leia-generic-ai-workflow-orchestrator",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator",
+      "capability": "ai.workflow.orchestrate.provider_free",
+      "capabilities": [
+        "generic.ai.workflow.orchestration.graph",
+        "generic.ai.workflow.orchestration.stage.plan",
+        "generic.ai.workflow.orchestration.stage.execute",
+        "generic.ai.workflow.orchestration.stage.handoff",
+        "generic.ai.workflow.orchestration.stage.finalize",
+        "generic.ai.workflow.orchestration.stage_io",
+        "generic.ai.workflow.orchestration.planning_graph_stage_projection",
+        "generic.ai.workflow.orchestration.handoff_trace",
+        "generic.ai.workflow.orchestration.retry_cache_policy",
+        "generic.ai.workflow.orchestration.workflow_result",
+        "generic.ai.workflow.orchestration.trace.workflow_started",
+        "generic.ai.workflow.orchestration.trace.stage_completed",
+        "generic.ai.workflow.orchestration.trace.workflow_completed",
+        "ai.workflow.orchestrate.provider_free"
+      ],
+      "backend_shape": "ai.workflow.orchestrate",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/workflow_graph_contract.json",
+        "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/contracts/trace_emission_hooks_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator/fixtures/provider_free_fixture_index.json"
+    }
+  ]
+}

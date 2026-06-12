@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "records": [
+    {
+      "record_id": "sample-missing-fixture-index",
+      "package_id": "sample-provider-free-live-package",
+      "missing_boundary_type": "fixture_index",
+      "required_artifact": "fixtures/provider_free_fixture_index.json",
+      "owner_hint": "package maintainer",
+      "blocking": true,
+      "remediation": "Add a provider-free fixture index with local fixture paths, schema links, replay_ready metadata, and capability mappings."
+    },
+    {
+      "record_id": "sample-missing-example-registry",
+      "package_id": "sample-provider-free-live-package",
+      "missing_boundary_type": "example_registry",
+      "required_artifact": "registered_example mapping",
+      "owner_hint": "AI dialect registry owner",
+      "blocking": true,
+      "remediation": "Register package_name and aliases to a local provider-free example entrypoint."
+    },
+    {
+      "record_id": "sample-missing-capability-policy",
+      "package_id": "sample-provider-free-live-package",
+      "missing_boundary_type": "capability_policy",
+      "required_artifact": "contracts/capability_policy.json",
+      "owner_hint": "package maintainer",
+      "blocking": true,
+      "remediation": "Add a capability policy that denies live network, credentials, provider SDK imports, and runtime mutation by default."
+    }
+  ]
+}

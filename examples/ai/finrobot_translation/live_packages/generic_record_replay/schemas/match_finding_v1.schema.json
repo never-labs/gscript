@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generic.ai.record.replay.match_finding.v1",
+  "title": "Generic AI replay matching finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "cursor", "message", "provider_free"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "generic.ai.replay.mismatch",
+        "generic.ai.replay.unconsumed_record",
+        "generic.ai.replay.exhausted"
+      ]
+    },
+    "cursor": {"type": "integer", "minimum": 0},
+    "record_id": {"type": "string"},
+    "expected": {"type": "object", "additionalProperties": true},
+    "actual": {"type": "object", "additionalProperties": true},
+    "message": {"type": "string"},
+    "provider_free": {"type": "boolean", "const": true}
+  }
+}
