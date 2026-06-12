@@ -2060,8 +2060,12 @@ func qRunSQLScoped(name string, args qSQLArgsResult) (Value, error) {
 	}
 	for si := range tmpl.subs {
 		subSrc := fmt.Sprintf("%s\x00sub%d", args.source, si)
-		subPlan := qPrepareSQLPlanForFrame(subSrc, tmpl.subs[si].plan, frame, bindings, true)
-		subOut, err := qRunSQLPlan(subSrc, subPlan, frame)
+		// The warm no-binding path returns the schema-stable kernel cache key
+		// alongside the aligned plan so each subquery stage skips the
+		// per-call plan fingerprint serialization (same contract as the
+		// outer plan below).
+		subPlan, subKernelKey := qPrepareSQLPlanForFrameWithKernelKey(subSrc, tmpl.subs[si].plan, frame, bindings, true)
+		subOut, err := qRunSQLPlanWithKernelKey(subSrc, subPlan, frame, subKernelKey)
 		if err != nil {
 			return NilValue(), fmt.Errorf("%s: subquery: %w", name, err)
 		}
