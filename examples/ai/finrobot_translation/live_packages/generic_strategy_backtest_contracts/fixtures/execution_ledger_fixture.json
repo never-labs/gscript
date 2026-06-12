@@ -1,0 +1,73 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "fixture_key": "execution_ledger:subject_alpha:baseline_rule:offline:v1",
+  "strategy_id": "baseline_rule_strategy",
+  "subject_id": "subject_alpha",
+  "unit": "USD",
+  "deterministic_seed": "generic-strategy-backtest-contracts-offline-v1",
+  "schema_fields": [
+    "execution_id",
+    "action_id",
+    "timestamp",
+    "side",
+    "amount",
+    "value",
+    "gross_value",
+    "cost",
+    "adjustment",
+    "resource_after",
+    "state_after",
+    "realized_delta",
+    "source_ref"
+  ],
+  "executions": [
+    {
+      "execution_id": "T-0001",
+      "action_id": "O-0001",
+      "timestamp": "2025-01-06T21:00:00Z",
+      "side": "increase",
+      "amount": 320,
+      "value": 103.10,
+      "gross_value": 32992.00,
+      "cost": 16.50,
+      "adjustment": 6.60,
+      "resource_after": 66984.90,
+      "state_after": 320,
+      "realized_delta": 0,
+      "source_ref": "observation_feed:subject_alpha:step:offline:v1"
+    },
+    {
+      "execution_id": "T-0002",
+      "action_id": "O-0002",
+      "timestamp": "2025-01-09T21:00:00Z",
+      "side": "decrease",
+      "amount": 160,
+      "value": 103.40,
+      "gross_value": 16544.00,
+      "cost": 8.27,
+      "adjustment": 3.31,
+      "resource_after": 83517.32,
+      "state_after": 160,
+      "realized_delta": 36.00,
+      "source_ref": "observation_feed:subject_alpha:step:offline:v1"
+    },
+    {
+      "execution_id": "T-0003",
+      "action_id": "O-0003",
+      "timestamp": "2025-01-13T21:00:00Z",
+      "side": "decrease",
+      "amount": 160,
+      "value": 103.20,
+      "gross_value": 16512.00,
+      "cost": 8.26,
+      "adjustment": 3.30,
+      "resource_after": 100017.76,
+      "state_after": 0,
+      "realized_delta": 4.00,
+      "source_ref": "observation_feed:subject_alpha:step:offline:v1"
+    }
+  ]
+}
+

@@ -210,6 +210,31 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_strategy_backtest_contracts",
+      "package_name": "leia-generic-ai-strategy-backtest-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+      "capability": "generic.ai.strategy.backtest.contracts",
+      "capabilities": [
+        "generic.ai.strategy.backtest.contracts",
+        "generic.ai.strategy.backtest.strategy.bind",
+        "generic.ai.strategy.backtest.observation_feed.bind",
+        "generic.ai.strategy.backtest.execution_ledger",
+        "generic.ai.strategy.backtest.allocation_series",
+        "generic.ai.strategy.backtest.performance.series",
+        "generic.ai.strategy.backtest.metric_summary.collect",
+        "generic.ai.strategy.backtest.constraint_limits.enforce",
+        "generic.ai.strategy.backtest.engine.clean_skip"
+      ],
+      "backend_shape": "ai.strategy.backtest_contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_evidence_report_artifacts",
       "package_name": "leia-generic-ai-evidence-report-artifacts",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts",

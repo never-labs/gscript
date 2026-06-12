@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/generic_ai/strategy_backtest_contracts/metric_summary_v1.schema.json",
+  "title": "Strategy Backtest Metric Summary",
+  "type": "object",
+  "required": [
+    "provider_free",
+    "live_network",
+    "fixture_key",
+    "strategy_id",
+    "subject_id",
+    "deterministic_seed",
+    "metric_summary",
+    "constraint_limits"
+  ],
+  "properties": {
+    "provider_free": {"const": true},
+    "live_network": {"const": false},
+    "real_dependency_imports": {"const": false},
+    "fixture_key": {"type": "string"},
+    "strategy_id": {"type": "string"},
+    "subject_id": {"type": "string"},
+    "deterministic_seed": {"type": "string"},
+    "metric_summary": {
+      "type": "object",
+      "required": [
+        "start_resource",
+        "end_state_value",
+        "total_delta",
+        "normalized_delta",
+        "variability",
+        "stability",
+        "max_regret",
+        "success_rate",
+        "execution_count",
+        "activity_rate",
+        "average_allocation",
+        "max_allocation"
+      ]
+    },
+    "constraint_limits": {
+      "type": "array",
+      "items": {"$ref": "constraint_limits_v1.schema.json"},
+      "minItems": 1
+    }
+  }
+}

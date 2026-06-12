@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.example/schemas/generic_ai/strategy_backtest_contracts/constraint_limits_v1.schema.json",
+  "title": "Strategy Backtest Constraint Limit",
+  "type": "object",
+  "required": [
+    "id",
+    "metric",
+    "limit",
+    "observed",
+    "status"
+  ],
+  "properties": {
+    "id": {"type": "string"},
+    "metric": {"type": "string"},
+    "limit": {"type": "number"},
+    "observed": {"type": "number"},
+    "status": {"enum": ["pass", "warn", "fail"]},
+    "provider_free": {"const": true},
+    "live_network": {"const": false}
+  }
+}
+

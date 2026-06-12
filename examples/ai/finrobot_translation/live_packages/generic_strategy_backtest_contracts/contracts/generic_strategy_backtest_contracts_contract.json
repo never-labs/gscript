@@ -1,0 +1,163 @@
+{
+  "id": "generic-strategy-backtest-contracts-contract",
+  "version": "1.0.0",
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "clean_skip_without_dependency": true,
+  "source_module": "generic.strategy_backtest.run",
+  "deterministic_seed": "generic-strategy-backtest-contracts-offline-v1",
+  "modules": [
+    {
+      "id": "back_test",
+      "source_module": "generic.strategy_backtest.run",
+      "required_fields": [
+        "strategy_manifest",
+        "observation_feed",
+        "execution_ledger",
+        "allocation_series",
+        "performance_series",
+        "metric_summary",
+        "constraint_limits"
+      ]
+    },
+    {
+      "id": "strategy",
+      "source_module": "generic.strategy.definition",
+      "required_fields": [
+        "strategy_id",
+        "parameters",
+        "signals",
+        "action_intents"
+      ]
+    },
+    {
+      "id": "allocation_policy",
+      "source_module": "generic.strategy.sizing_policy",
+      "required_fields": [
+        "allocation_policy_id",
+        "resource_buffer_pct",
+        "max_allocation_pct",
+        "batch_size"
+      ]
+    },
+    {
+      "id": "feature",
+      "source_module": "generic.strategy.feature",
+      "required_fields": [
+        "feature_id",
+        "lookback",
+        "warmup_bars",
+        "result_field"
+      ]
+    },
+    {
+      "id": "evaluator",
+      "source_module": "generic.strategy.evaluator",
+      "required_fields": [
+        "evaluator_id",
+        "metric_keys",
+        "execution_ledger_schema",
+        "metric_summary_schema"
+      ]
+    }
+  ],
+  "field_contracts": {
+    "strategy_manifest": {
+      "schema": "schemas/strategy_manifest_v1.schema.json",
+      "fixture": "fixtures/strategy_manifest_fixture.json",
+      "required_fields": [
+        "strategy_id",
+        "strategy_class",
+        "parameters",
+        "feature_bindings",
+        "allocation_policy_binding",
+        "evaluator_bindings",
+        "deterministic_seed"
+      ]
+    },
+    "observation_feed": {
+      "schema": "schemas/observation_feed_v1.schema.json",
+      "fixture": "fixtures/observation_feed_fixture.json",
+      "required_fields": [
+        "fixture_key",
+        "subject_id",
+        "granularity",
+        "timezone",
+        "schedule",
+        "rows"
+      ]
+    },
+    "execution_ledger": {
+      "schema": "schemas/execution_ledger_v1.schema.json",
+      "fixture": "fixtures/execution_ledger_fixture.json",
+      "required_fields": [
+        "execution_id",
+        "action_id",
+        "side",
+        "amount",
+        "value",
+        "cost",
+        "adjustment",
+        "resource_after",
+        "state_after",
+        "realized_delta"
+      ]
+    },
+    "metric_summary": {
+      "schema": "schemas/metric_summary_v1.schema.json",
+      "fixture": "fixtures/metric_summary_fixture.json",
+      "required_fields": [
+        "total_delta",
+        "normalized_delta",
+        "variability",
+        "stability",
+        "max_regret",
+        "success_rate",
+        "activity_rate",
+        "constraint_limits"
+      ]
+    },
+    "allocation_series": {
+      "schema": "schemas/allocation_series_v1.schema.json",
+      "fixture": "fixtures/allocation_series_fixture.json",
+      "required_fields": [
+        "timestamp",
+        "resource_weight",
+        "allocation_weight",
+        "gross_allocation",
+        "net_allocation",
+        "state_value"
+      ]
+    },
+    "performance_series": {
+      "schema": "schemas/performance_series_v1.schema.json",
+      "fixture": "fixtures/performance_series_fixture.json",
+      "required_fields": [
+        "timestamp",
+        "state_value",
+        "step_delta",
+        "cumulative_delta",
+        "regret",
+        "rolling_stability_score"
+      ]
+    },
+    "constraint_limits": {
+      "schema": "schemas/constraint_limits_v1.schema.json",
+      "fixture": "fixtures/metric_summary_fixture.json",
+      "required_fields": [
+        "id",
+        "metric",
+        "limit",
+        "observed",
+        "status"
+      ]
+    }
+  },
+  "acceptance_gates": [
+    "generic.strategy_backtest.run can be replayed from provider-free fixtures without importing generic optional strategy engine",
+    "strategy, allocation_policy, feature, and evaluator output contracts are explicit and schema-backed",
+    "observation feed, execution ledger, allocation series, performance, metric_summary, deterministic seed, and constraint limits are fixture-backed",
+    "optional dependencies clean-skip when generic optional strategy engine, generic_optional_visualizer are unavailable"
+  ]
+}

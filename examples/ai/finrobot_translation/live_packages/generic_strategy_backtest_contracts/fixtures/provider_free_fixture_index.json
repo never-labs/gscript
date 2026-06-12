@@ -1,0 +1,106 @@
+{
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "deterministic_seed": "generic-strategy-backtest-contracts-offline-v1",
+  "fixtures": [
+    {
+      "fixture_key": "strategy_manifest:baseline_rule:offline:v1",
+      "capability": "generic.ai.strategy.backtest.strategy.bind",
+      "path": "fixtures/strategy_manifest_fixture.json",
+      "schema": "schemas/strategy_manifest_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "strategy_id": "baseline_rule_strategy",
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "observation_feed:subject_alpha:step:offline:v1",
+      "capability": "generic.ai.strategy.backtest.observation_feed.bind",
+      "path": "fixtures/observation_feed_fixture.json",
+      "schema": "schemas/observation_feed_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "subject_id": "subject_alpha",
+        "row_count": 8,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "execution_ledger:subject_alpha:baseline_rule:offline:v1",
+      "capability": "generic.ai.strategy.backtest.evaluator.executions",
+      "path": "fixtures/execution_ledger_fixture.json",
+      "schema": "schemas/execution_ledger_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "execution_count": 3,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "allocation_series:subject_alpha:baseline_rule:offline:v1",
+      "capability": "generic.ai.strategy.backtest.allocations.allocation_series",
+      "path": "fixtures/allocation_series_fixture.json",
+      "schema": "schemas/allocation_series_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "row_count": 8,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "performance_series:subject_alpha:baseline_rule:offline:v1",
+      "capability": "generic.ai.strategy.backtest.performance.series",
+      "path": "fixtures/performance_series_fixture.json",
+      "schema": "schemas/performance_series_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "row_count": 8,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    },
+    {
+      "fixture_key": "metric_summary:subject_alpha:baseline_rule:offline:v1",
+      "capability": "generic.ai.strategy.backtest.metric_summary.collect",
+      "path": "fixtures/metric_summary_fixture.json",
+      "schema": "schemas/metric_summary_v1.schema.json",
+      "metadata": {
+        "replay_ready": true,
+        "constraint_limit_count": 4,
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false
+      },
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false
+    }
+  ],
+  "schema_version": 1
+}

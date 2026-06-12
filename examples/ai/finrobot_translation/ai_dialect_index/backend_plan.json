@@ -264,6 +264,43 @@
       }
     },
     {
+      "shape_id": "ai.strategy.backtest_contracts",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "strategy-backtest-contracts",
+        "data-provider",
+        "optional-adapter",
+        "trace"
+      ],
+      "inputs": [
+        "strategy_manifest",
+        "observation_feed",
+        "deterministic_seed",
+        "optional_engine_policy"
+      ],
+      "outputs": [
+        "execution_ledger",
+        "allocation_series",
+        "performance_series",
+        "metric_summary",
+        "constraint_limits",
+        "adapter_clean_skips"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_strategy_backtest_contracts.source.txt",
+      "test": "tests/llm/llm_generic_strategy_backtest_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_strategy_backtest_contracts_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-strategy-backtest-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_strategy_backtest_contracts/contracts/generic_strategy_backtest_contracts_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      },
+      "contract": "Normalize provider-free strategy simulation manifests, observation feeds, deterministic seeds, execution ledgers, allocation series, performance series, metric summaries, constraint limits, and optional engine clean skips."
+    },
+    {
       "shape_id": "ai.evidence.report_artifacts",
       "status": "checked_in_package_boundary",
       "capabilities": [

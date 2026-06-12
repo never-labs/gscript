@@ -1,0 +1,46 @@
+generic_strategy_backtest_contracts_live_package := {
+    id: "generic-strategy-backtest-contracts"
+    package_name: "leia-generic-ai-strategy-backtest-contracts"
+    capability: "generic.ai.strategy.backtest.contracts"
+    entrypoint: "ai.strategy.backtest_contracts"
+    provider_free: true
+    live_network: false
+    real_dependency_imports: false
+    live_model_calls: false
+    strategies: 1
+    observation_feeds: 1
+    seeds: 1
+    ledgers: 1
+    allocation_series: 1
+    performance: 1
+    metric_summary: 1
+    constraint_limits: 4
+    clean_skip_adapters: 3
+}
+
+assert(generic_strategy_backtest_contracts_live_package.provider_free)
+assert(!generic_strategy_backtest_contracts_live_package.live_network)
+assert(!generic_strategy_backtest_contracts_live_package.real_dependency_imports)
+assert(!generic_strategy_backtest_contracts_live_package.live_model_calls)
+assert(generic_strategy_backtest_contracts_live_package.strategies == 1)
+assert(generic_strategy_backtest_contracts_live_package.constraint_limits == 4)
+
+generic_strategy_backtest_contracts_live_package_summary := string.format(
+"generic_strategy_backtest_contracts_live_package capability=%s entrypoint=%s strategies=%d observation_feeds=%d seeds=%d ledgers=%d allocation_series=%d performance=%d metric_summary=%d constraint_limits=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+generic_strategy_backtest_contracts_live_package.capability,
+generic_strategy_backtest_contracts_live_package.entrypoint,
+generic_strategy_backtest_contracts_live_package.strategies,
+generic_strategy_backtest_contracts_live_package.observation_feeds,
+generic_strategy_backtest_contracts_live_package.seeds,
+generic_strategy_backtest_contracts_live_package.ledgers,
+generic_strategy_backtest_contracts_live_package.allocation_series,
+generic_strategy_backtest_contracts_live_package.performance,
+generic_strategy_backtest_contracts_live_package.metric_summary,
+generic_strategy_backtest_contracts_live_package.constraint_limits,
+generic_strategy_backtest_contracts_live_package.clean_skip_adapters,
+tostring(generic_strategy_backtest_contracts_live_package.provider_free),
+tostring(generic_strategy_backtest_contracts_live_package.live_network),
+tostring(generic_strategy_backtest_contracts_live_package.real_dependency_imports),
+tostring(generic_strategy_backtest_contracts_live_package.live_model_calls))
+
+print(generic_strategy_backtest_contracts_live_package_summary)
