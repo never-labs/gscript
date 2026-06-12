@@ -134,7 +134,9 @@ func llmSingleToolSchemaTable(tool *Table) *Table {
 func llmSingleToolContractTable(tool *Table) *Table {
 	out := NewTable()
 	out.RawSetString("kind", StringValue("tool_contract"))
-	out.RawSetString("name", StringValue(tool.RawGetString("name").Str()))
+	name := tool.RawGetString("name").Str()
+	out.RawSetString("name", StringValue(name))
+	out.RawSetString("tool_name", StringValue(name))
 	out.RawSetString("description", StringValue(tool.RawGetString("description").Str()))
 	if llmToolIsAgentTool(tool) {
 		out.RawSetString("type", StringValue("agent"))
@@ -148,19 +150,27 @@ func llmSingleToolContractTable(tool *Table) *Table {
 	if requires.IsTable() {
 		out.RawSetString("requires", llmCloneValue(requires))
 		out.RawSetString("capabilities", llmCloneValue(requires))
+		out.RawSetString("capability_ids", llmCloneValue(requires))
 	}
+	var inputSchema Value
 	if schema := tool.RawGetString("schema"); !schema.IsNil() {
-		out.RawSetString("schema", llmCloneValue(schema))
+		inputSchema = schema
 	} else if params := llmStringSliceFromValue(tool.RawGetString("params")); len(params) > 0 {
-		out.RawSetString("schema", llmToolParamsSchemaValue(params))
+		inputSchema = llmToolParamsSchemaValue(params)
 	} else if output := tool.RawGetString("output"); !output.IsNil() {
-		out.RawSetString("schema", llmCloneValue(output))
+		inputSchema = output
+	}
+	if !inputSchema.IsNil() {
+		out.RawSetString("schema", llmCloneValue(inputSchema))
+		out.RawSetString("input_schema", llmCloneValue(inputSchema))
 	}
 	if output := tool.RawGetString("output"); !output.IsNil() {
 		out.RawSetString("output", llmCloneValue(output))
+		out.RawSetString("output_schema", llmCloneValue(output))
 	}
 	if result := llmToolResultValue(tool); !result.IsNil() {
 		out.RawSetString("result", llmCloneValue(result))
+		out.RawSetString("output_schema", llmCloneValue(result))
 	}
 	if err := tool.RawGetString("error"); !err.IsNil() {
 		out.RawSetString("error", llmCloneValue(err))
@@ -168,7 +178,30 @@ func llmSingleToolContractTable(tool *Table) *Table {
 	if replayKey := tool.RawGetString("replay_key"); !replayKey.IsNil() {
 		out.RawSetString("replay_key", llmCloneValue(replayKey))
 	}
+	llmSetToolDescriptorString(out, tool, "caller_role", "caller")
+	llmSetToolDescriptorString(out, tool, "executor_role", "executor")
+	llmSetToolDescriptorString(out, tool, "effect", "read_only")
+	llmSetToolDescriptorString(out, tool, "approval_policy", "not_required_for_fixture")
+	llmSetToolDescriptorString(out, tool, "provider_wire_format", "none")
+	llmSetToolDescriptorBool(out, tool, "live_network", false)
+	llmSetToolDescriptorBool(out, tool, "secret_parameters_allowed", false)
 	return out
+}
+
+func llmSetToolDescriptorString(out, tool *Table, field, fallback string) {
+	if value := tool.RawGetString(field); value.IsString() {
+		out.RawSetString(field, llmCloneValue(value))
+		return
+	}
+	out.RawSetString(field, StringValue(fallback))
+}
+
+func llmSetToolDescriptorBool(out, tool *Table, field string, fallback bool) {
+	if value := tool.RawGetString(field); value.IsBool() {
+		out.RawSetString(field, llmCloneValue(value))
+		return
+	}
+	out.RawSetString(field, BoolValue(fallback))
 }
 
 func llmToolCapabilitiesValue(tool *Table) Value {
@@ -295,11 +328,39 @@ func llmValidateSingleToolContract(tool *Table, index int) Value {
 		missing = "replay_key"
 	}
 	if missing == "" {
-		return NilValue()
+		return llmValidateToolProviderFreeDescriptor(tool, index)
 	}
 	err := llmErrorValue("validation", "tool contract missing "+missing+": "+tool.RawGetString("name").Str())
 	et := err.Table()
 	et.RawSetString("field", StringValue(missing))
+	et.RawSetString("tool", StringValue(tool.RawGetString("name").Str()))
+	et.RawSetString("index", IntValue(int64(index)))
+	return err
+}
+
+func llmValidateToolProviderFreeDescriptor(tool *Table, index int) Value {
+	if value := tool.RawGetString("provider_wire_format"); value.IsString() && value.Str() != "none" {
+		return llmToolContractFieldError(tool, index, "provider_wire_format", "tool contract provider_wire_format must be none")
+	}
+	if tool.RawGetString("live_network").Bool() {
+		return llmToolContractFieldError(tool, index, "live_network", "tool contract live_network must be false")
+	}
+	if tool.RawGetString("secret_parameters_allowed").Bool() {
+		return llmToolContractFieldError(tool, index, "secret_parameters_allowed", "tool contract secret_parameters_allowed must be false")
+	}
+	if value := tool.RawGetString("effect"); value.IsString() && value.Str() != "read_only" && value.Str() != "effectful" {
+		return llmToolContractFieldError(tool, index, "effect", "tool contract effect must be read_only or effectful")
+	}
+	if value := tool.RawGetString("approval_policy"); value.IsString() && value.Str() != "not_required_for_fixture" && value.Str() != "deny_without_approval" {
+		return llmToolContractFieldError(tool, index, "approval_policy", "tool contract approval_policy is unsupported")
+	}
+	return NilValue()
+}
+
+func llmToolContractFieldError(tool *Table, index int, field, message string) Value {
+	err := llmErrorValue("validation", message+": "+tool.RawGetString("name").Str())
+	et := err.Table()
+	et.RawSetString("field", StringValue(field))
 	et.RawSetString("tool", StringValue(tool.RawGetString("name").Str()))
 	et.RawSetString("index", IntValue(int64(index)))
 	return err

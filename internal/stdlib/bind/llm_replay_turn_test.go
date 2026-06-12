@@ -1,6 +1,8 @@
 package bind
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -148,6 +150,92 @@ result, err := llm.turn({
 		matched.MessageCount != 1 ||
 		matched.Usage.OutputTokens != 3 {
 		t.Fatalf("replay match trace = %#v", matched)
+	}
+}
+
+type testLLMReactReplayMatchProvider struct {
+	requests []runtime.LLMTurnRequest
+	results  []runtime.LLMTurnResult
+}
+
+func (p *testLLMReactReplayMatchProvider) Turn(_ context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
+	p.requests = append(p.requests, req)
+	if len(p.results) == 0 {
+		return runtime.LLMTurnResult{Status: "final_answer", Text: "done"}, nil
+	}
+	res := p.results[0]
+	p.results = p.results[1:]
+	return res, nil
+}
+
+func (p *testLLMReactReplayMatchProvider) LastLLMReplayMatch() (runtime.LLMReplayMatch, bool) {
+	turn := len(p.requests) - 1
+	if turn < 0 {
+		return runtime.LLMReplayMatch{}, false
+	}
+	return runtime.LLMReplayMatch{
+		Turn:         turn,
+		ReplayKey:    fmt.Sprintf("turn:%d", turn),
+		RequestHash:  fmt.Sprintf("sha256:req:%d", turn),
+		ResponseHash: fmt.Sprintf("sha256:res:%d", turn),
+		ReplayMode:   "fixture_replay",
+		ProviderFree: true,
+	}, true
+}
+
+func TestLLMReactEmitsReplayMatchTraceForEachTurn(t *testing.T) {
+	provider := &testLLMReactReplayMatchProvider{results: []runtime.LLMTurnResult{
+		{
+			Status: "tool_calls",
+			Calls: []runtime.LLMToolCall{{
+				ID:   "call_1",
+				Tool: "lookup",
+				Args: map[string]any{"name": "leia"},
+			}},
+		},
+		{Status: "final_answer", Text: "done", Usage: runtime.LLMTurnUsage{InputTokens: 3, OutputTokens: 5}},
+	}}
+	var events []runtime.LLMTraceEvent
+	runLLMTestProgramWithTrace(t, `
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+result, err := llm.react({
+    model: "mock"
+    messages: {llm.user("find docs")}
+    tools: {lookup}
+    max_steps: 3
+})
+`, provider, func(event runtime.LLMTraceEvent) {
+		events = append(events, event)
+	})
+	var matches []runtime.LLMTraceEvent
+	seenToolCall := false
+	seenToolResult := false
+	seenReactDone := false
+	for _, event := range events {
+		switch event.Type {
+		case "replay_record_matched":
+			matches = append(matches, event)
+		case "tool_call":
+			seenToolCall = true
+		case "tool_result":
+			seenToolResult = true
+		case "react_done":
+			seenReactDone = true
+		}
+	}
+	if len(matches) != 2 {
+		t.Fatalf("matches = %#v, all events=%#v", matches, events)
+	}
+	if matches[0].Step != 0 || matches[0].ToolCount != 1 || matches[0].ReplayKey != "turn:0" || !matches[0].ProviderFree {
+		t.Fatalf("first replay match = %#v", matches[0])
+	}
+	if matches[1].Step != 1 || matches[1].ToolCount != 1 || matches[1].ReplayKey != "turn:1" || matches[1].Usage.OutputTokens != 5 {
+		t.Fatalf("second replay match = %#v", matches[1])
+	}
+	if !seenToolCall || !seenToolResult || !seenReactDone {
+		t.Fatalf("tool/react events missing: tool_call=%v tool_result=%v react_done=%v events=%#v", seenToolCall, seenToolResult, seenReactDone, events)
 	}
 }
 

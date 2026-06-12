@@ -271,6 +271,8 @@ func (b *llmLibBuilder) registerToolHelpers() {
 	}
 	b.set("tool_info", toolInfo)
 	b.set("toolInfo", toolInfo)
+	b.set("tool_descriptor", toolInfo)
+	b.set("toolDescriptor", toolInfo)
 }
 
 func (b *llmLibBuilder) registerToolCheckHelper() {
@@ -305,6 +307,13 @@ func llmNewToolValue(name string, fn Value, opts Value) Value {
 	var result Value
 	var errorSpec Value
 	var replayKey Value
+	var callerRole Value
+	var executorRole Value
+	var effect Value
+	var approvalPolicy Value
+	var providerWireFormat Value
+	var liveNetwork Value
+	var secretParametersAllowed Value
 	if opts.IsTable() {
 		optTable := opts.Table()
 		desc = optTable.RawGetString("description").Str()
@@ -318,6 +327,13 @@ func llmNewToolValue(name string, fn Value, opts Value) Value {
 		result = optTable.RawGetString("result")
 		errorSpec = optTable.RawGetString("error")
 		replayKey = optTable.RawGetString("replay_key")
+		callerRole = optTable.RawGetString("caller_role")
+		executorRole = optTable.RawGetString("executor_role")
+		effect = optTable.RawGetString("effect")
+		approvalPolicy = optTable.RawGetString("approval_policy")
+		providerWireFormat = optTable.RawGetString("provider_wire_format")
+		liveNetwork = optTable.RawGetString("live_network")
+		secretParametersAllowed = optTable.RawGetString("secret_parameters_allowed")
 	}
 	tool := NewTable()
 	tool.RawSetString("__llm_tool", BoolValue(true))
@@ -348,6 +364,27 @@ func llmNewToolValue(name string, fn Value, opts Value) Value {
 	}
 	if !replayKey.IsNil() {
 		tool.RawSetString("replay_key", replayKey)
+	}
+	if !callerRole.IsNil() {
+		tool.RawSetString("caller_role", callerRole)
+	}
+	if !executorRole.IsNil() {
+		tool.RawSetString("executor_role", executorRole)
+	}
+	if !effect.IsNil() {
+		tool.RawSetString("effect", effect)
+	}
+	if !approvalPolicy.IsNil() {
+		tool.RawSetString("approval_policy", approvalPolicy)
+	}
+	if !providerWireFormat.IsNil() {
+		tool.RawSetString("provider_wire_format", providerWireFormat)
+	}
+	if !liveNetwork.IsNil() {
+		tool.RawSetString("live_network", liveNetwork)
+	}
+	if !secretParametersAllowed.IsNil() {
+		tool.RawSetString("secret_parameters_allowed", secretParametersAllowed)
 	}
 	return TableValue(tool)
 }
