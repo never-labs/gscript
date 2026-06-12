@@ -1229,6 +1229,22 @@ func (a crossArray) At(index int) (any, bool) {
 	if !ok {
 		return nil, false
 	}
+	// Same-kind scalar pairs produce typed rows (canonical q: 1 2 cross 10 20
+	// has long rows, not generic pairs).
+	switch l := left.(type) {
+	case int64:
+		if r, ok := right.(int64); ok {
+			return NewI64([]int64{l, r}), true
+		}
+	case float64:
+		if r, ok := right.(float64); ok {
+			return NewF64([]float64{l, r}), true
+		}
+	case Symbol:
+		if r, ok := right.(Symbol); ok {
+			return NewSymbols([]string{string(l), string(r)}), true
+		}
+	}
 	return crossPairArray{left: left, right: right}, true
 }
 

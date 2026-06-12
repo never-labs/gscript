@@ -2206,12 +2206,45 @@ func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
 		out, err := s.evalFunctionalQueryForm(args)
 		return out, true, err
 	}
+	if src[0] == '$' && len(args) > 3 {
+		// Canonical multi-branch $[c1;t1;c2;t2;...;f]: odd argument counts
+		// chain cond/then pairs lazily with a trailing else.
+		if len(args)%2 == 0 {
+			return nil, true, fmt.Errorf("$[] conditional expects an odd number of arguments")
+		}
+		i := 0
+		for ; i+1 < len(args); i += 2 {
+			cond, err := s.eval(args[i])
+			if err != nil {
+				return nil, true, err
+			}
+			truth, err := boolValue(cond)
+			if err != nil {
+				return nil, true, err
+			}
+			if truth {
+				out, err := s.eval(args[i+1])
+				return out, true, err
+			}
+		}
+		out, err := s.eval(args[i])
+		return out, true, err
+	}
 	if len(args) != 3 {
 		return nil, true, fmt.Errorf("%c[] conditional expects three arguments", src[0])
 	}
 	cond, err := s.eval(args[0])
 	if err != nil {
 		return nil, true, err
+	}
+	if src[0] == '?' {
+		// Vector conditional ?[v;t;f]: a boolean-vector condition selects
+		// elementwise (canonical q), disambiguated from roll/deal (atom
+		// left, dyadic) and functional select (4+ arguments, table arg0).
+		if condArray, ok := cond.(data.Array); ok && condArray.Kind() == data.KindBool {
+			out, err := s.evalVectorConditional(condArray, args[1], args[2])
+			return out, true, err
+		}
 	}
 	truth, err := boolValue(cond)
 	if err != nil {
@@ -2223,6 +2256,56 @@ func (s *EvalState) evalConditionalSpecialForm(src string) (any, bool, error) {
 	}
 	out, err := s.eval(args[2])
 	return out, true, err
+}
+
+// evalVectorConditional implements canonical ?[v;t;f] with a boolean vector
+// condition: elementwise selection with atom broadcast. Both branches
+// evaluate eagerly (the canonical vector conditional is not lazy).
+func (s *EvalState) evalVectorConditional(cond data.Array, trueSrc, falseSrc string) (any, error) {
+	trueValue, err := s.eval(trueSrc)
+	if err != nil {
+		return nil, err
+	}
+	falseValue, err := s.eval(falseSrc)
+	if err != nil {
+		return nil, err
+	}
+	n := cond.Len()
+	itemAt := func(v any, i int) (any, error) {
+		array, ok := v.(data.Array)
+		if !ok {
+			return v, nil
+		}
+		if array.Len() != n {
+			return nil, fmt.Errorf("?[] vector conditional operands must conform to the condition length")
+		}
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("?[] vector conditional row %d out of range", i)
+		}
+		return item, nil
+	}
+	out := make([]any, n)
+	for i := 0; i < n; i++ {
+		flag, ok := cond.At(i)
+		if !ok {
+			return nil, fmt.Errorf("?[] vector conditional row %d out of range", i)
+		}
+		truth, err := boolValue(flag)
+		if err != nil {
+			return nil, err
+		}
+		branch := falseValue
+		if truth {
+			branch = trueValue
+		}
+		item, err := itemAt(branch, i)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = item
+	}
+	return inferQArray(out), nil
 }
 
 func (s *EvalState) evalControlSpecialForm(src string) (any, bool, error) {
@@ -3393,13 +3476,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		if table, ok, err := keyedTableByCount(keys, values); ok || err != nil {
-			return table, err
-		}
-		if keyed, ok, err := keyedTable(keys, values); ok || err != nil {
-			return keyed, err
-		}
-		return dict(keys, values)
+		return qBangValue(keys, values)
 	}
 	if leftExpr, rightExpr, ok := findPostfixSymbolLookup(src); ok {
 		left, err := s.eval(leftExpr)
@@ -3656,13 +3733,7 @@ func (s *EvalState) evalValueExpr(expr Expr) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		if table, ok, err := keyedTableByCount(keys, values); ok || err != nil {
-			return table, err
-		}
-		if keyed, ok, err := keyedTable(keys, values); ok || err != nil {
-			return keyed, err
-		}
-		return dict(keys, values)
+		return qBangValue(keys, values)
 	case IndexExpr:
 		collection, err := s.evalValueExpr(x.Expr)
 		if err != nil {
@@ -11237,6 +11308,25 @@ func (s *EvalState) amendPath(target any, path []any, op any, value any) (any, e
 	return setContainerChild(target, path[0], next)
 }
 
+// qBangValue dispatches dyadic ! on evaluated operands. A null atom left is
+// the canonical 0N!x display verb (print x, return x — the q debugging
+// idiom); otherwise count-keyed tables, keyed tables, then dict construction.
+// Both the string evaluator and the compiled DictExpr route funnel here so
+// the routes agree by construction.
+func qBangValue(keys, values any) (any, error) {
+	if data.IsNull(keys) {
+		fmt.Println(qExprLiteral(values))
+		return values, nil
+	}
+	if table, ok, err := keyedTableByCount(keys, values); ok || err != nil {
+		return table, err
+	}
+	if keyed, ok, err := keyedTable(keys, values); ok || err != nil {
+		return keyed, err
+	}
+	return dict(keys, values)
+}
+
 func dict(keys any, values any) (EvalDict, error) {
 	keyItems, err := dictKeyItems(keys)
 	if err != nil {
@@ -13893,6 +13983,9 @@ func sum(v any) (any, error) {
 	if array.Len() == 0 {
 		return data.NullValue, nil
 	}
+	if out, handled, err := qColumnarAggregate("+", array); handled || err != nil {
+		return out, err
+	}
 	shape := "vector-reduce/sum/" + string(array.Kind())
 	out, handled, err := data.TryTypedNumericSum(array)
 	out, handled, err = qTypedRuntimeResultReason("ArraySum", shape, RuntimeFallbackUnsupportedType, out, handled, err)
@@ -13933,6 +14026,40 @@ func sum(v any) (any, error) {
 		return totalF, nil
 	}
 	return totalI, nil
+}
+
+// qColumnarAggregate folds a generic list of conformable vectors pairwise
+// with the given dyadic verb: sum (1 2;3 4) is 4 6 in canonical q (atoms
+// broadcast). It only engages when the list holds at least one vector item;
+// flat numeric lists keep the scalar reduction path.
+func qColumnarAggregate(op string, array data.Array) (any, bool, error) {
+	if array.Kind() != data.KindAny || array.Len() == 0 {
+		return nil, false, nil
+	}
+	items := array.Values()
+	hasVector := false
+	for _, item := range items {
+		if _, ok := item.(data.Array); ok {
+			hasVector = true
+			break
+		}
+	}
+	if !hasVector {
+		return nil, false, nil
+	}
+	fn, ok := lookupDyadicVerbFunc(op)
+	if !ok {
+		return nil, false, nil
+	}
+	acc := items[0]
+	for _, item := range items[1:] {
+		out, err := fn(acc, item)
+		if err != nil {
+			return nil, true, err
+		}
+		acc = out
+	}
+	return acc, true, nil
 }
 
 func avg(v any) (any, error) {
@@ -16548,6 +16675,19 @@ func countDistinct(v any) (any, error) {
 }
 
 func reverse(v any) (any, error) {
+	if d, ok := v.(EvalDict); ok {
+		// Canonical q reverses both sides of a dict: reverse `a`b!1 2 is
+		// `b`a!2 1.
+		keys := make([]any, len(d.Keys))
+		for i := range d.Keys {
+			keys[i] = d.Keys[len(d.Keys)-1-i]
+		}
+		values := make([]any, len(d.Values))
+		for i := range d.Values {
+			values[i] = d.Values[len(d.Values)-1-i]
+		}
+		return EvalDict{Keys: keys, Values: values}, nil
+	}
 	array, ok := v.(data.Array)
 	if !ok {
 		if s, ok := v.(string); ok {

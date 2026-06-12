@@ -789,3 +789,54 @@ func TestLazyBoolMaskMaterializes(t *testing.T) {
 		t.Fatalf("materialized mask = %#v, want [false]", values)
 	}
 }
+
+// TestEdgeSemanticsBasket2 pins the canonical edge semantics promoted in the
+// canonical-q corpus (pad, numeric vs/sv, dict reverse, multi-branch and
+// vector conditionals, typed cross rows, 0N! display, columnar sum, trim
+// symbol type error) plus edge variants the corpus does not carry.
+func TestEdgeSemanticsBasket2(t *testing.T) {
+	// Pad truncates to the width and applies per list item.
+	assertEvalValue(t, `2$"abcd"`, "ab")
+	assertEvalValue(t, `0$"abc"`, "")
+	assertEvalArray(t, `3$("ab";"cdef")`, data.KindString, []any{"ab ", "cde"})
+	// Numeric vs/sv: zero encodes to a single digit, encode/decode round-trip.
+	assertEvalArray(t, "2 vs 0", data.KindI64, []any{int64(0)})
+	assertEvalValue(t, "10 sv 10 vs 123", int64(123))
+	// String separators keep the split/join semantics.
+	assertEvalValue(t, `"," sv ("a";"b")`, "a,b")
+	// Dict reverse round-trips.
+	assertEvalValue(t, "(reverse reverse `a`b!1 2)~`a`b!1 2", true)
+	// Multi-branch conditional: first true branch wins lazily; even arity errors.
+	assertEvalValue(t, "$[1;10;1;20;30]", int64(10))
+	assertEvalValue(t, "$[0;1;0;2;0;3;4]", int64(4))
+	if _, err := Eval("$[1;2;3;4]"); err == nil {
+		t.Fatalf("$[] with even arity should error")
+	}
+	// Vector conditional broadcasts atom branches; non-bool vectors error.
+	assertEvalArray(t, "?[1 0 1b;7;0]", data.KindI64, []any{int64(7), int64(0), int64(7)})
+	if _, err := Eval("?[1 0 2;1 2 3;4 5 6]"); err == nil {
+		t.Fatalf("?[] with a non-bool vector condition should error")
+	}
+	// Cross rows are typed for same-kind scalar pairs.
+	assertEvalValue(t, "(1 2 cross 10 20)[1]~1 20", true)
+	assertEvalValue(t, "(`a`b cross `c`d)[3]~`b`d", true)
+	// 0N! returns its operand (display goes to stdout).
+	assertEvalArray(t, "0N!1 2 3", data.KindI64, []any{int64(1), int64(2), int64(3)})
+	// Columnar sum broadcasts atom items and folds three vectors.
+	assertEvalArray(t, "sum (1;2 3)", data.KindI64, []any{int64(3), int64(4)})
+	assertEvalArray(t, "sum (1 2;3 4;5 6)", data.KindI64, []any{int64(9), int64(12)})
+	// The trim family rejects symbols on every spelling.
+	for _, src := range []string{"trim `a", "ltrim `a", "rtrim `a", "trim `a`b", "min trim `a"} {
+		if _, err := Eval(src); err == nil || !strings.Contains(err.Error(), "expects string values") {
+			t.Errorf("Eval(%q) = %v; want symbol type error", src, err)
+		}
+	}
+	// Compiler-representable statements agree across both routes.
+	for _, src := range []string{
+		"2 vs 10", "10 vs 123", "2 sv 1 0 1 0",
+		"sum (1 2;3 4)", "1 2 cross 10 20", "reverse `a`b!1 2",
+		`5$"ab"`, `-5$"ab"`, "0N!42",
+	} {
+		assertBothRoutes(t, src)
+	}
+}
