@@ -41,7 +41,8 @@
     "redaction_policy_fixture": "fixtures/redaction_policy_fixture.json",
     "trace_envelope_fixture": "fixtures/trace_envelope_fixture.json",
     "approval_trace_projection_fixture": "fixtures/approval_trace_projection_fixture.json",
-    "tool_invocation_projection_fixture": "fixtures/tool_invocation_projection_fixture.json"
+    "tool_invocation_projection_fixture": "fixtures/tool_invocation_projection_fixture.json",
+    "model_turn_replay_trace_projection_fixture": "fixtures/model_turn_replay_trace_projection_fixture.json"
   },
   "schemas": {
     "trace_event": "schemas/trace_event_v1.schema.json",
@@ -50,7 +51,8 @@
     "correlation_ids": "schemas/correlation_ids_v1.schema.json",
     "trace_envelope": "schemas/trace_envelope_v1.schema.json",
     "approval_trace_projection": "schemas/approval_trace_projection_v1.schema.json",
-    "tool_invocation_projection": "schemas/tool_invocation_projection_v1.schema.json"
+    "tool_invocation_projection": "schemas/tool_invocation_projection_v1.schema.json",
+    "model_turn_replay_trace_projection": "schemas/model_turn_replay_trace_projection_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
@@ -58,7 +60,8 @@
     "redaction_policy": "fixtures/redaction_policy_fixture.json",
     "trace_envelope": "fixtures/trace_envelope_fixture.json",
     "approval_trace_projection": "fixtures/approval_trace_projection_fixture.json",
-    "tool_invocation_projection": "fixtures/tool_invocation_projection_fixture.json"
+    "tool_invocation_projection": "fixtures/tool_invocation_projection_fixture.json",
+    "model_turn_replay_trace_projection": "fixtures/model_turn_replay_trace_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.trace.events",
@@ -86,7 +89,8 @@
     "ai.trace.agent_correlation",
     "ai.trace.approval_projection",
     "ai.trace.external_envelope_projection",
-    "ai.trace.tool_invocation_projection"
+    "ai.trace.tool_invocation_projection",
+    "ai.trace.model_turn_replay_projection"
   ],
   "event_contracts": [
     {
@@ -329,7 +333,9 @@
     "approval trace projection maps generic approval policy envelopes into ai.trace.approval events without importing provider SDKs",
     "approval projection preserves default-deny decision metadata while redacting secret-bearing source fields",
     "tool invocation projection maps generic tool registry invocation traces into ai.trace.tool events without live execution",
-    "tool projection preserves schema validation, approval decision, result status, and provenance while omitting raw inputs and provider wire data"
+    "tool projection preserves schema validation, approval decision, result status, and provenance while omitting raw inputs and provider wire data",
+    "model turn replay projection maps model IO, turn execution, turn replay match, and record replay fixtures into trace envelope events",
+    "model turn replay projection keeps unlike source identifiers explicit instead of assuming request_id, correlation_id, turn_id, and record_id equality"
   ],
   "no_built_in_guarantee": {
     "required": true,

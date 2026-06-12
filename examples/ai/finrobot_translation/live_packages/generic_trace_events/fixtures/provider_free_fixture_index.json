@@ -88,6 +88,26 @@
         "replay_ready": true,
         "projection_ready": true
       }
+    },
+    {
+      "key": "generic_trace_events:projection:model_turn_replay:offline",
+      "path": "fixtures/model_turn_replay_trace_projection_fixture.json",
+      "schema": "schemas/model_turn_replay_trace_projection_v1.schema.json",
+      "description": "Provider-free projection from model IO, turn execution, turn replay match, and record replay fixtures into trace envelope events.",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "domain_specific": false,
+        "live_network": false,
+        "live_model": false,
+        "credentials_required": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "projection_ready": true,
+        "event_count": 3
+      }
     }
   ],
   "replay_mode": "deterministic_fixture_replay",

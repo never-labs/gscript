@@ -218,6 +218,57 @@
       "live_model": false,
       "credentials_required": false,
       "real_dependency_imports": false
+    },
+    {
+      "id": "generic-model-turn-replay-to-trace-envelope",
+      "source_packages": [
+        "generic-model-io-envelope",
+        "generic-turn-runner",
+        "generic-record-replay"
+      ],
+      "source_fixtures": [
+        "../generic_model_io_envelope/fixtures/provider_free_replay_fixture.json",
+        "../generic_turn_runner/fixtures/ai_turn_execute_fixture.json",
+        "../generic_turn_runner/fixtures/replay_record_match_fixture.json",
+        "../generic_record_replay/fixtures/ordered_records_fixture.json"
+      ],
+      "target_schema": "schemas/model_turn_replay_trace_projection_v1.schema.json",
+      "target_fixture": "fixtures/model_turn_replay_trace_projection_fixture.json",
+      "target_event_types": [
+        "turn_start",
+        "turn_end",
+        "replay_record_matched"
+      ],
+      "target_capability": "ai.trace.model_turn_replay_projection",
+      "required_source_paths": [
+        "model_io.records[0].request.turn_id",
+        "model_io.records[0].request.metadata.trace_id",
+        "model_io.replay.replay_session_id",
+        "model_io.records[0].response.status",
+        "turn_execution.replay.request_hash",
+        "turn_execution.replay.record_id",
+        "turn_replay_match.record_id",
+        "record_replay.records[0].record_id",
+        "record_replay.records[0].request_hash",
+        "record_replay.records[0].response_hash"
+      ],
+      "required_target_paths": [
+        "projected_events[0].event_type",
+        "projected_events[0].correlation.turn_id",
+        "projected_events[0].correlation.replay_session_id",
+        "projected_events[1].event_type",
+        "projected_events[1].payload.turn_record_id",
+        "projected_events[2].event_type",
+        "projected_events[2].payload.record_replay_record_id",
+        "projected_events[2].payload.request_hash",
+        "projected_events[2].payload.response_hash"
+      ],
+      "identity_policy": "explicit_mapping_only_no_cross_package_id_equality_assumption",
+      "provider_free": true,
+      "live_network": false,
+      "live_model": false,
+      "credentials_required": false,
+      "real_dependency_imports": false
     }
   ]
 }

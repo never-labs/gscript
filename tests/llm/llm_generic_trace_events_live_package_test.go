@@ -136,6 +136,8 @@ type genericTraceEventsContract struct {
 
 type genericTraceEventsExternalProjection struct {
 	ID                    string   `json:"id"`
+	SourcePackages        []string `json:"source_packages"`
+	SourceFixtures        []string `json:"source_fixtures"`
 	SourcePackage         string   `json:"source_package"`
 	SourceSchema          string   `json:"source_schema"`
 	SourceFixture         string   `json:"source_fixture"`
@@ -143,10 +145,12 @@ type genericTraceEventsExternalProjection struct {
 	TargetSchema          string   `json:"target_schema"`
 	TargetFixture         string   `json:"target_fixture"`
 	TargetEventType       string   `json:"target_event_type"`
+	TargetEventTypes      []string `json:"target_event_types"`
 	TargetCapability      string   `json:"target_capability"`
 	RequiredSourcePaths   []string `json:"required_source_paths"`
 	RequiredTargetPaths   []string `json:"required_target_paths"`
 	NullPolicy            string   `json:"null_policy"`
+	IdentityPolicy        string   `json:"identity_policy"`
 	ProviderFree          bool     `json:"provider_free"`
 	LiveNetwork           bool     `json:"live_network"`
 	LiveModel             bool     `json:"live_model"`
@@ -321,6 +325,49 @@ type genericTraceEventsApprovalSourceFixture struct {
 	} `json:"replay"`
 }
 
+type genericTraceEventsModelTurnReplayProjectionFixture struct {
+	SchemaVersion         int    `json:"schema_version"`
+	ID                    string `json:"id"`
+	ProjectionKind        string `json:"projection_kind"`
+	ProviderFree          bool   `json:"provider_free"`
+	DomainSpecific        bool   `json:"domain_specific"`
+	LiveNetwork           bool   `json:"live_network"`
+	LiveModel             bool   `json:"live_model"`
+	CredentialsRequired   bool   `json:"credentials_required"`
+	RealDependencyImports bool   `json:"real_dependency_imports"`
+	Sources               map[string]struct {
+		PackageID      string `json:"package_id"`
+		Fixture        string `json:"fixture"`
+		Schema         string `json:"schema"`
+		RecordSelector string `json:"record_selector"`
+	} `json:"sources"`
+	CorrelationPolicy struct {
+		TraceIDSource               string   `json:"trace_id_source"`
+		TurnIDSource                string   `json:"turn_id_source"`
+		ReplaySessionIDSource       string   `json:"replay_session_id_source"`
+		RequestHashSource           string   `json:"request_hash_source"`
+		TurnRecordIDSource          string   `json:"turn_record_id_source"`
+		RecordReplayIDSource        string   `json:"record_replay_id_source"`
+		SourceIDsAreNotAssumedEqual []string `json:"source_ids_are_not_assumed_equal"`
+	} `json:"correlation_policy"`
+	FieldMappings []struct {
+		Source string `json:"source"`
+		Target string `json:"target"`
+	} `json:"field_mappings"`
+	ProjectedEvents []genericTraceEventsProjectedEnvelopeEvent `json:"projected_events"`
+}
+
+type genericTraceEventsProjectedEnvelopeEvent struct {
+	TraceID     string            `json:"trace_id"`
+	EventID     string            `json:"event_id"`
+	EventType   string            `json:"event_type"`
+	TimestampMS int64             `json:"timestamp_ms"`
+	Sequence    int               `json:"sequence"`
+	Status      string            `json:"status"`
+	Correlation map[string]string `json:"correlation"`
+	Payload     map[string]any    `json:"payload"`
+}
+
 func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 	base := genericTraceEventsLivePackageDir(t)
 	manifest := loadGenericTraceEventsManifest(t, base)
@@ -354,20 +401,20 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		manifest.DefaultPolicy.FixtureHook != "recorded_generic_trace_events_fixture" {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
-	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture", "tool_invocation_projection_fixture"} {
+	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture", "tool_invocation_projection_fixture", "model_turn_replay_trace_projection_fixture"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 		assertGenericTraceEventsEntrypointPath(t, manifest.Entrypoints[key])
 	}
-	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "redaction_policy", "correlation_ids"} {
+	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "model_turn_replay_trace_projection", "redaction_policy", "correlation_ids"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericTraceEventsJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "redaction_policy"} {
+	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "model_turn_replay_trace_projection", "redaction_policy"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -402,6 +449,7 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		"ai.trace.fixture_replay",
 		"ai.trace.approval_projection",
 		"ai.trace.tool_invocation_projection",
+		"ai.trace.model_turn_replay_projection",
 		"ai.trace.external_envelope_projection",
 	} {
 		if !genericTraceEventsContains(manifest.Capabilities, want) {
@@ -746,6 +794,98 @@ func TestGenericTraceEventsToolInvocationProjection(t *testing.T) {
 	assertGenericTraceToolProjectionPayload(t, event.Payload, source)
 }
 
+func TestGenericTraceEventsModelTurnReplayProjection(t *testing.T) {
+	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
+	contract := loadGenericTraceEventsContract(t, base)
+	var projection genericTraceEventsModelTurnReplayProjectionFixture
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "model_turn_replay_trace_projection_fixture.json"), &projection)
+
+	if manifest.Fixtures["model_turn_replay_trace_projection"] != "fixtures/model_turn_replay_trace_projection_fixture.json" ||
+		manifest.Schemas["model_turn_replay_trace_projection"] != "schemas/model_turn_replay_trace_projection_v1.schema.json" {
+		t.Fatalf("model turn replay projection manifest entries missing: fixtures=%#v schemas=%#v", manifest.Fixtures, manifest.Schemas)
+	}
+	projectionContract := genericTraceEventsFindExternalProjection(contract, "generic-model-turn-replay-to-trace-envelope")
+	if projectionContract.ID == "" {
+		t.Fatalf("missing model turn replay external projection contract: %#v", contract.ExternalEnvelopeProjections)
+	}
+	if projectionContract.TargetFixture != manifest.Fixtures["model_turn_replay_trace_projection"] ||
+		projectionContract.TargetSchema != manifest.Schemas["model_turn_replay_trace_projection"] ||
+		projectionContract.TargetCapability != "ai.trace.model_turn_replay_projection" {
+		t.Fatalf("model turn replay projection manifest/contract disconnected: contract=%#v manifest=%#v", projectionContract, manifest.Fixtures)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork || projection.LiveModel ||
+		projection.CredentialsRequired || projection.RealDependencyImports ||
+		!projectionContract.ProviderFree || projectionContract.LiveNetwork || projectionContract.LiveModel ||
+		projectionContract.CredentialsRequired || projectionContract.RealDependencyImports {
+		t.Fatalf("model turn replay projection must stay provider-free/offline: projection=%#v contract=%#v", projection, projectionContract)
+	}
+	assertGenericTraceEventsSameStrings(t, "model turn replay target event types", projectionContract.TargetEventTypes, []string{"turn_start", "turn_end", "replay_record_matched"})
+	assertGenericTraceEventsSameStrings(t, "model turn replay source packages", projectionContract.SourcePackages, []string{"generic-model-io-envelope", "generic-turn-runner", "generic-record-replay"})
+
+	modelIO := decodeGenericTraceEventsMapFile(t, filepath.Join(base, filepath.FromSlash(projection.Sources["model_io"].Fixture)))
+	turnExecution := decodeGenericTraceEventsMapFile(t, filepath.Join(base, filepath.FromSlash(projection.Sources["turn_execution"].Fixture)))
+	turnReplay := decodeGenericTraceEventsMapFile(t, filepath.Join(base, filepath.FromSlash(projection.Sources["turn_replay_match"].Fixture)))
+	recordReplay := decodeGenericTraceEventsMapFile(t, filepath.Join(base, filepath.FromSlash(projection.Sources["record_replay"].Fixture)))
+
+	traceID := genericTraceEventsPathString(t, modelIO, "records.0.request.metadata.trace_id")
+	turnID := genericTraceEventsPathString(t, modelIO, "records.0.request.turn_id")
+	replaySessionID := genericTraceEventsPathString(t, modelIO, "replay.replay_session_id")
+	responseStatus := genericTraceEventsPathString(t, modelIO, "records.0.response.status")
+	turnRequestHash := genericTraceEventsPathString(t, turnExecution, "replay.request_hash")
+	turnRecordID := genericTraceEventsPathString(t, turnExecution, "replay.record_id")
+	turnReplayRecordID := genericTraceEventsPathString(t, turnReplay, "record_id")
+	recordReplayRecordID := genericTraceEventsPathString(t, recordReplay, "records.0.record_id")
+	recordReplayRequestHash := genericTraceEventsPathString(t, recordReplay, "records.0.request_hash")
+	recordReplayResponseHash := genericTraceEventsPathString(t, recordReplay, "records.0.response_hash")
+
+	if traceID == "" || turnID == "" || replaySessionID == "" || turnRequestHash == "" ||
+		turnRecordID == "" || turnReplayRecordID == "" || recordReplayRecordID == "" {
+		t.Fatalf("source fixture identity fields incomplete")
+	}
+	if turnRecordID != turnReplayRecordID {
+		t.Fatalf("turn execution record_id %q != replay match record_id %q", turnRecordID, turnReplayRecordID)
+	}
+	if len(projection.CorrelationPolicy.SourceIDsAreNotAssumedEqual) == 0 ||
+		!strings.Contains(projectionContract.IdentityPolicy, "no_cross_package_id_equality") {
+		t.Fatalf("projection must explicitly avoid source ID equality assumptions: projection=%#v contract=%#v", projection.CorrelationPolicy, projectionContract.IdentityPolicy)
+	}
+
+	wantOrder := []string{"turn_start", "turn_end", "replay_record_matched"}
+	seenIDs := map[string]bool{}
+	for i, event := range projection.ProjectedEvents {
+		if event.EventType != wantOrder[i] || event.TraceID != traceID || event.Sequence != i+1 || event.TimestampMS == 0 {
+			t.Fatalf("projected event[%d] = %#v, want type %q trace %q seq %d", i, event, wantOrder[i], traceID, i+1)
+		}
+		if seenIDs[event.EventID] {
+			t.Fatalf("duplicate projected event id %q", event.EventID)
+		}
+		seenIDs[event.EventID] = true
+		if event.Correlation["turn_id"] != turnID || event.Correlation["replay_session_id"] != replaySessionID {
+			t.Fatalf("%s correlation = %#v, want turn=%q replay=%q", event.EventID, event.Correlation, turnID, replaySessionID)
+		}
+	}
+	turnStart := projection.ProjectedEvents[0]
+	if turnStart.Payload["model_alias"] != genericTraceEventsPathString(t, modelIO, "records.0.request.model") ||
+		turnStart.Payload["request_hash"] != turnRequestHash {
+		t.Fatalf("turn_start payload does not explain model request/hash: %#v", turnStart.Payload)
+	}
+	turnEnd := projection.ProjectedEvents[1]
+	if turnEnd.Payload["response_status"] != responseStatus ||
+		turnEnd.Payload["turn_record_id"] != turnRecordID {
+		t.Fatalf("turn_end payload does not explain response/turn record: %#v", turnEnd.Payload)
+	}
+	replayMatched := projection.ProjectedEvents[2]
+	if replayMatched.Payload["turn_replay_record_id"] != turnReplayRecordID ||
+		replayMatched.Payload["record_replay_record_id"] != recordReplayRecordID ||
+		replayMatched.Payload["request_hash"] != turnRequestHash ||
+		replayMatched.Payload["record_replay_request_hash"] != recordReplayRequestHash ||
+		replayMatched.Payload["response_hash"] != recordReplayResponseHash ||
+		replayMatched.Payload["deterministic"] != true {
+		t.Fatalf("replay_record_matched payload does not explain replay identity: %#v", replayMatched.Payload)
+	}
+}
+
 func TestGenericTraceEventsRedactionPolicy(t *testing.T) {
 	base := genericTraceEventsLivePackageDir(t)
 	var policy genericTraceEventsRedactionPolicy
@@ -999,6 +1139,13 @@ func decodeGenericTraceEventsJSONFile(t *testing.T, path string, out any) {
 	}
 }
 
+func decodeGenericTraceEventsMapFile(t *testing.T, path string) map[string]any {
+	t.Helper()
+	var out map[string]any
+	decodeGenericTraceEventsJSONFile(t, path, &out)
+	return out
+}
+
 func assertGenericTraceEventsJSONFile(t *testing.T, path string) {
 	t.Helper()
 	var value any
@@ -1099,6 +1246,34 @@ func genericTraceEventsPayloadHasDigestForField(payload map[string]any, field, a
 	return false
 }
 
+func genericTraceEventsPathString(t *testing.T, value map[string]any, dottedPath string) string {
+	t.Helper()
+	current := any(value)
+	for _, part := range strings.Split(dottedPath, ".") {
+		switch node := current.(type) {
+		case map[string]any:
+			next, ok := node[part]
+			if !ok {
+				t.Fatalf("path %q missing segment %q in %#v", dottedPath, part, node)
+			}
+			current = next
+		case []any:
+			index, err := strconv.Atoi(part)
+			if err != nil || index < 0 || index >= len(node) {
+				t.Fatalf("path %q has invalid index %q for %#v", dottedPath, part, node)
+			}
+			current = node[index]
+		default:
+			t.Fatalf("path %q cannot descend into %T %#v at %q", dottedPath, current, current, part)
+		}
+	}
+	text, ok := current.(string)
+	if !ok {
+		t.Fatalf("path %q = %#v, want string", dottedPath, current)
+	}
+	return text
+}
+
 func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
 	t.Helper()
 	for _, rel := range []string{
@@ -1106,11 +1281,13 @@ func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
 		"package.manifest.json",
 		"contracts/trace_events_contract.json",
 		"fixtures/approval_trace_projection_fixture.json",
+		"fixtures/model_turn_replay_trace_projection_fixture.json",
 		"fixtures/provider_free_fixture_index.json",
 		"fixtures/redaction_policy_fixture.json",
 		"fixtures/trace_envelope_fixture.json",
 		"fixtures/tool_invocation_projection_fixture.json",
 		"schemas/approval_trace_projection_v1.schema.json",
+		"schemas/model_turn_replay_trace_projection_v1.schema.json",
 		"schemas/tool_invocation_projection_v1.schema.json",
 		"fixtures/trace_sequence_ACME_fixture.json",
 		"schemas/correlation_ids_v1.schema.json",
