@@ -436,9 +436,6 @@ func qEvalFuzzLambdaRecursionRisk(src string) bool {
 // entry's removal the moment the crash is fixed, after which the fuzzer
 // guards the fix.
 var qEvalKnownCrashers = map[string]string{
-	// `1 "hello"`-style numeric/string juxtaposition (fix in flight on a
-	// concurrent branch).
-	`1 "hello"`: "interface conversion: interface {} is string, not int64",
 	// FINDING (this fuzzer): <> (and = ) on dicts or callables reaches a Go
 	// == on uncomparable types and panics.
 	"(`a`b!1 2)<>`a`b!1 2": "comparing uncomparable type",

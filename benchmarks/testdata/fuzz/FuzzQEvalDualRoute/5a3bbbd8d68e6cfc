@@ -1,0 +1,2 @@
+go test fuzz v1
+string("(count prev 0Ni 1i 0Ni)+(count next/0Ni 1  0Ni)+(count deltas 1i 0Ni 3i)+(count fills 0Nfi1.5f 0Nf)")

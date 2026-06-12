@@ -109,7 +109,7 @@ match	1<2 3 0	110b
 match	0N~0N	1b
 match	1~1f	0b
 match	()~()	1b
-deviation	(0#0)~()	0b	1b	take-of-atom yields a generic empty list, so the two sides match
+match	(0#0)~()	0b
 match	1 2~1 2	1b
 deviation	0n~0N	0b	1b	single null model: typed nulls are not distinguished
 match	null 0N	1b
@@ -130,7 +130,7 @@ match	5#1 2 3	1 2 3 1 2
 match	-2#1 2 3	2 3
 match	-5#1 2 3	2 3 1 2 3
 match	0#1 2 3	til 0
-gap	3#0#1	0 0 0		take from empty typed vector should yield zero fills (concurrent fix in flight)
+match	3#0#1	0 0 0
 gap	2#`a`b`c!1 2 3	`a`b!1 2	{(x;x)}[`a`b`c!1 2 3]	take on dict should keep first n entries, Leia cycles the dict as an item
 match	1_1 2 3	2 3
 match	-1_1 2 3	1 2
@@ -175,8 +175,8 @@ match	(`a`b!1 2)`c	0N
 match	(`a`b!1 2)@`b`a	2 1
 match	key `a`b!1 2	`a`b
 deviation	value `a`b!1 2	1 2	value `x`y!1 2	dict values are returned as a generic list, canonical returns typed
-gap	(`a`b!1 2)?2	`b		dict find should return the key (concurrent fix in flight)
-gap	(`a`b!1 2)?99	`$""		dict find miss should return a null key
+match	(`a`b!1 2)?2	`b
+match	(`a`b!1 2)?99	`$""
 match	(`a`a!1 2)`a	1
 match	count `a`b!1 2	2
 gap	(`a`b!1 2)+`b`c!10 20	`a`b`c!1 12 20	ERROR	dict key-union arithmetic absent
@@ -209,10 +209,10 @@ match	1 2 3+\:10	11 12 13
 match	10+/:1 2 3	11 12 13
 gap	1 2+\:10 20	(11 21;12 22)	11 22	each-left with vector right collapses to plain dyadic application
 gap	1 2+/:10 20	(11 12;21 22)	11 22	each-right with vector left collapses to plain dyadic application
-gap	{x div 2}\[7]	7 3 1 0		converge scan missing (concurrent fix in flight)
-gap	{x div 2}/[7]	0		converge over missing (concurrent fix in flight)
-gap	3 {x+1}/ 0	3		iterate over missing (concurrent fix in flight)
-gap	3 {x+1}\ 0	0 1 2 3		iterate scan missing (concurrent fix in flight)
+match	{x div 2}\[7]	7 3 1 0
+match	{x div 2}/[7]	0
+match	3 {x+1}/ 0	3
+match	3 {x+1}\ 0	0 1 2 3
 match	(*/)[2 3 4]	24
 deviation	(|/)[3 1 2]	3	1b	truthiness & | : |/ reduces with logical or
 deviation	(&/)[3 1 2]	1	1b	truthiness & | : &/ reduces with logical and

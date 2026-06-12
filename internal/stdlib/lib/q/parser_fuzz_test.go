@@ -30,11 +30,7 @@ import (
 // value it currently raises. Inputs whose panic matches an entry are skipped
 // by the fuzzer instead of failing; the companion test below fails as soon as
 // the crash is fixed, demanding the entry's removal.
-var qParseKnownCrashers = map[string]string{
-	// Numeric-then-string juxtaposition: parseAtomOrVector assumes int64
-	// items. Fix in flight on a concurrent branch.
-	`1 "hello"`: "interface conversion: interface {} is string, not int64",
-}
+var qParseKnownCrashers = map[string]string{}
 
 func qParseKnownCrasherPanic(r any) bool {
 	text := panicText(r)
