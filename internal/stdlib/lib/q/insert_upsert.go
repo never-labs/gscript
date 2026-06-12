@@ -8,7 +8,7 @@ import (
 )
 
 // evalNamedInsertUpsert implements the canonical q name-targeted mutation
-// verbs `` `t insert rows`` and `` `t upsert rows``: the named table in the
+// verbs “ `t insert rows“ and “ `t upsert rows“: the named table in the
 // session environment is mutated in place. insert appends and returns the
 // new row indexes (erroring on duplicate keys for keyed tables); upsert
 // appends for plain tables and key-merges for keyed tables, returning the
