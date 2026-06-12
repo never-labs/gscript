@@ -30,6 +30,31 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	}
 	b.set("trace_envelope", traceEnvelope)
 	b.set("traceEnvelope", traceEnvelope)
+
+	traceSummary := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.trace_summary' (trace envelope or events table expected)")
+		}
+		return []Value{TableValue(llmTraceSummaryValue(args[0].Table()))}, nil
+	}
+	b.set("trace_summary", traceSummary)
+	b.set("traceSummary", traceSummary)
+
+	traceAssert := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.trace_assert' (trace envelope or events table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.trace_assert' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmTraceAssertValue(args[0].Table(), opts))}, nil
+	}
+	b.set("trace_assert", traceAssert)
+	b.set("traceAssert", traceAssert)
 }
 
 func llmTraceEventValue(src *Table) *Table {
@@ -75,6 +100,165 @@ func llmTraceEnvelopeValue(events, opts *Table) *Table {
 	out.RawSetString("events", llmTraceEventsValue(events, opts))
 	out.RawSetString("redaction", llmTraceRedactionValue(opts))
 	return out
+}
+
+func llmTraceSummaryValue(input *Table) *Table {
+	events := llmTraceInputEvents(input)
+	out := NewTable()
+	out.RawSetString("trace_id", StringValue(llmTraceString(input, "trace_id", "")))
+	out.RawSetString("events", IntValue(int64(events.Length())))
+	out.RawSetString("event_types", TableValue(NewSequentialArrayTable(0)))
+	out.RawSetString("replay_keys", TableValue(NewSequentialArrayTable(0)))
+	out.RawSetString("status_counts", TableValue(NewTable()))
+	out.RawSetString("missing_correlation", IntValue(0))
+	out.RawSetString("sequence_gaps", IntValue(0))
+	out.RawSetString("non_monotonic_timestamps", IntValue(0))
+	out.RawSetString("provider_free", BoolValue(llmTraceBool(input, "provider_free", true)))
+	out.RawSetString("live_network", BoolValue(llmTraceBool(input, "live_network", false)))
+	out.RawSetString("live_model", BoolValue(llmTraceBool(input, "live_model", false)))
+	out.RawSetString("credentials_required", BoolValue(llmTraceBool(input, "credentials_required", false)))
+	out.RawSetString("real_dependency_imports", BoolValue(llmTraceBool(input, "real_dependency_imports", false)))
+
+	eventTypes := out.RawGetString("event_types").Table()
+	replayKeys := out.RawGetString("replay_keys").Table()
+	statusCounts := out.RawGetString("status_counts").Table()
+	seenTypes := map[string]bool{}
+	seenReplayKeys := map[string]bool{}
+	lastSequence := int64(0)
+	lastTimestamp := int64(0)
+	for i := 1; i <= events.Length(); i++ {
+		event := events.RawGet(IntValue(int64(i)))
+		if !event.IsTable() {
+			continue
+		}
+		eventTable := event.Table()
+		eventType := llmTraceString(eventTable, "event_type", llmTraceString(eventTable, "type", ""))
+		if eventType != "" && !seenTypes[eventType] {
+			seenTypes[eventType] = true
+			eventTypes.RawSet(IntValue(int64(eventTypes.Length()+1)), StringValue(eventType))
+		}
+		status := llmTraceString(eventTable, "status", "ok")
+		statusCounts.RawSetString(status, IntValue(llmTraceInt64(statusCounts, status, 0)+1))
+		if i == 1 {
+			out.RawSetString("first_event_id", llmCloneValue(eventTable.RawGetString("event_id")))
+		}
+		out.RawSetString("last_event_id", llmCloneValue(eventTable.RawGetString("event_id")))
+		if correlation := eventTable.RawGetString("correlation"); !correlation.IsTable() {
+			out.RawSetString("missing_correlation", IntValue(out.RawGetString("missing_correlation").Int()+1))
+		}
+		sequence := llmTraceInt64(eventTable, "sequence", int64(i))
+		if lastSequence != 0 && sequence != lastSequence+1 {
+			out.RawSetString("sequence_gaps", IntValue(out.RawGetString("sequence_gaps").Int()+1))
+		}
+		lastSequence = sequence
+		timestamp := llmTraceInt64(eventTable, "timestamp_ms", 0)
+		if timestamp != 0 && lastTimestamp != 0 && timestamp < lastTimestamp {
+			out.RawSetString("non_monotonic_timestamps", IntValue(out.RawGetString("non_monotonic_timestamps").Int()+1))
+		}
+		if timestamp != 0 {
+			lastTimestamp = timestamp
+		}
+		if replay := eventTable.RawGetString("replay"); replay.IsTable() {
+			replayKey := llmTraceString(replay.Table(), "replay_key", "")
+			if replayKey != "" && !seenReplayKeys[replayKey] {
+				seenReplayKeys[replayKey] = true
+				replayKeys.RawSet(IntValue(int64(replayKeys.Length()+1)), StringValue(replayKey))
+			}
+		}
+	}
+	return out
+}
+
+func llmTraceAssertValue(input, opts *Table) *Table {
+	summary := llmTraceSummaryValue(input)
+	findings := NewSequentialArrayTable(0)
+	events := llmTraceInputEvents(input)
+	if llmTraceBool(opts, "require_provider_free", false) && !summary.RawGetString("provider_free").Truthy() {
+		llmTraceAppendFinding(findings, "generic.ai.trace.provider_not_free", "trace provider_free must be true")
+	}
+	if llmTraceBool(opts, "deny_live_network", false) && summary.RawGetString("live_network").Truthy() {
+		llmTraceAppendFinding(findings, "generic.ai.trace.live_network", "trace live_network must be false")
+	}
+	if llmTraceBool(opts, "deny_live_model", false) && summary.RawGetString("live_model").Truthy() {
+		llmTraceAppendFinding(findings, "generic.ai.trace.live_model", "trace live_model must be false")
+	}
+	if llmTraceBool(opts, "deny_credentials_required", false) && summary.RawGetString("credentials_required").Truthy() {
+		llmTraceAppendFinding(findings, "generic.ai.trace.credentials_required", "trace credentials_required must be false")
+	}
+	for _, eventType := range llmTraceStringSlice(opts.RawGetString("required_event_types")) {
+		if !llmTraceSummaryHasString(summary.RawGetString("event_types"), eventType) {
+			llmTraceAppendFinding(findings, "generic.ai.trace.missing_event_type", fmt.Sprintf("trace missing event_type %q", eventType))
+		}
+	}
+	requiredCorrelation := llmTraceStringSlice(opts.RawGetString("require_correlation_fields"))
+	if len(requiredCorrelation) > 0 {
+		for i := 1; i <= events.Length(); i++ {
+			event := events.RawGet(IntValue(int64(i)))
+			if !event.IsTable() {
+				continue
+			}
+			eventTable := event.Table()
+			correlation := eventTable.RawGetString("correlation")
+			for _, field := range requiredCorrelation {
+				if !correlation.IsTable() || llmTraceString(correlation.Table(), field, "") == "" {
+					eventID := llmTraceString(eventTable, "event_id", fmt.Sprintf("event:%d", i))
+					llmTraceAppendFinding(findings, "generic.ai.trace.missing_correlation", fmt.Sprintf("%s missing correlation field %q", eventID, field))
+				}
+			}
+		}
+	}
+	out := NewTable()
+	out.RawSetString("ok", BoolValue(findings.Length() == 0))
+	if findings.Length() == 0 {
+		out.RawSetString("status", StringValue("ok"))
+	} else {
+		out.RawSetString("status", StringValue("failed"))
+	}
+	out.RawSetString("summary", TableValue(summary))
+	out.RawSetString("findings", TableValue(findings))
+	return out
+}
+
+func llmTraceInputEvents(input *Table) *Table {
+	if events := input.RawGetString("events"); events.IsTable() {
+		return events.Table()
+	}
+	return input
+}
+
+func llmTraceStringSlice(value Value) []string {
+	if !value.IsTable() {
+		return nil
+	}
+	table := value.Table()
+	out := make([]string, 0, table.Length())
+	for i := 1; i <= table.Length(); i++ {
+		item := table.RawGet(IntValue(int64(i)))
+		if item.IsString() && item.Str() != "" {
+			out = append(out, item.Str())
+		}
+	}
+	return out
+}
+
+func llmTraceSummaryHasString(value Value, want string) bool {
+	if !value.IsTable() {
+		return false
+	}
+	table := value.Table()
+	for i := 1; i <= table.Length(); i++ {
+		if table.RawGet(IntValue(int64(i))).Str() == want {
+			return true
+		}
+	}
+	return false
+}
+
+func llmTraceAppendFinding(findings *Table, kind, message string) {
+	finding := NewTable()
+	finding.RawSetString("kind", StringValue(kind))
+	finding.RawSetString("message", StringValue(message))
+	findings.RawSet(IntValue(int64(findings.Length()+1)), TableValue(finding))
 }
 
 func llmTraceEnvelopeSchemaValue() Value {

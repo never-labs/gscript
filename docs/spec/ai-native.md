@@ -580,6 +580,15 @@ over that matcher: it derives the request hash from the normalized turn request,
 consumes according to the fixture policy, and returns replay options for
 `llm.turn` or a validation error table.
 
+Scripts may validate trace evidence without a host trace sink.
+`llm.trace_summary(envelope_or_events)` returns deterministic event counts,
+ordered event types, replay keys, status counts, and ordering/correlation
+diagnostics. `llm.trace_assert(input, opts)` returns `{ok, status, summary,
+findings}` and may require provider-free traces, deny live network/model flags,
+require event types, or require correlation fields. These helpers are
+provider-free; they inspect ordinary trace tables and must not persist telemetry
+or call providers.
+
 ## Evaluate Blocks
 
 `evaluate "case name" { ... }` declares a source-level regression case. The
