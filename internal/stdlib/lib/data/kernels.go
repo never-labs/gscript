@@ -6572,7 +6572,9 @@ func TryTypedSortIndexesI64(array Array, descending bool) (Array, bool, error) {
 	case nullBitmapCarrier:
 		return typedSortRowIndexesByArray(a, descending), true, nil
 	case columnArray[int64]:
-		return typedSortIndexesBy(a.data, descending, compareTypedSigned[int64]), true, nil
+		// Dense i64 runs the prepared-key radix/pair sort instead of a
+		// sort.SliceStable comparison loop; the permutation is identical.
+		return typedSortIndexesI64Keys(a.data, descending), true, nil
 	case i64RangeArray:
 		if a.len == 0 {
 			return NewI64Range(0, 1, 0), true, nil
@@ -7636,12 +7638,31 @@ func TryTypedMovingNumericSumSum(array Array, width int, average bool) (any, boo
 		}
 		return movingSumSumI64Range(values, width), true, nil
 	}
-	if !average && array.Kind() != KindF64 && array.Kind() != KindF32 {
+	if array.Kind() != KindF64 && array.Kind() != KindF32 {
 		// Null-free integer carriers flatten once and run the identical
 		// sliding-window accumulation over a dense slice, replacing the
 		// per-row integerArrayAt dispatch below. tryBulkI64Values declines
-		// on nulls, so the fallback semantics are unchanged.
+		// on nulls, so the fallback semantics are unchanged. The mavg branch
+		// keeps the boxed route's per-window arithmetic bit-for-bit: an int64
+		// sliding window divided by the same prefix-clamped count per row.
 		if values, owned, ok := tryBulkI64Values(array); ok {
+			if average {
+				var window int64
+				var total float64
+				for row, value := range values {
+					window += value
+					if row >= width {
+						window -= values[row-width]
+					}
+					count := row + 1
+					if count > width {
+						count = width
+					}
+					total += float64(window) / float64(count)
+				}
+				bulkI64Release(values, owned)
+				return total, true, nil
+			}
 			var window, total int64
 			for row, value := range values {
 				window += value
