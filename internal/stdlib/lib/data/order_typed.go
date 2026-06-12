@@ -74,6 +74,61 @@ func sortIndexesByPreparedKeys(indexes []int, keys []uint64) []int {
 	if n == 0 {
 		return []int{}
 	}
+	perm := stableKeyPermutation(keys)
+	if perm == nil {
+		return append([]int(nil), indexes...)
+	}
+	out := make([]int, n)
+	for i, pos := range perm {
+		out[i] = indexes[pos]
+	}
+	return out
+}
+
+// typedSortIndexesI64Keys stably sorts identity row indexes by dense int64
+// values through the same prepared-key machinery as the frame order-by route:
+// sign-biased uint64 keys (complemented for descending) feed the span-scaled
+// LSD radix sort, or the position-tie-break pair sort for small inputs. The
+// output permutation is identical to the sort.SliceStable comparison route it
+// replaces, without the per-comparison closure dispatch.
+func typedSortIndexesI64Keys(values []int64, descending bool) Array {
+	n := len(values)
+	if n == 0 {
+		return NewI64Range(0, 1, 0)
+	}
+	keys := make([]uint64, n)
+	if descending {
+		for i, v := range values {
+			keys[i] = ^(uint64(v) ^ (1 << 63))
+		}
+	} else {
+		for i, v := range values {
+			keys[i] = uint64(v) ^ (1 << 63)
+		}
+	}
+	out := make([]int64, n)
+	perm := stableKeyPermutation(keys)
+	if perm == nil {
+		for i := range out {
+			out[i] = int64(i)
+		}
+		return newI64Trusted(out)
+	}
+	for i, pos := range perm {
+		out[i] = int64(pos)
+	}
+	return newI64Trusted(out)
+}
+
+// stableKeyPermutation returns the stable ascending order of keys as original
+// positions: result[i] is the position of the i-th smallest key, and equal
+// keys keep their original relative order (sort.SliceStable semantics). A nil
+// result means every key is equal, i.e. the identity permutation. Large
+// inputs run a stable LSD radix sort whose pass count scales with the
+// observed key span; small inputs use the pdq pair sort with a position
+// tie-break. The radix path scrambles the caller's keys slice in place.
+func stableKeyPermutation(keys []uint64) []int {
+	n := len(keys)
 	minKey, maxKey := keys[0], keys[0]
 	for _, k := range keys[1:] {
 		if k < minKey {
@@ -84,7 +139,7 @@ func sortIndexesByPreparedKeys(indexes []int, keys []uint64) []int {
 		}
 	}
 	if minKey == maxKey {
-		return append([]int(nil), indexes...)
+		return nil
 	}
 	if n < 256 || n > math.MaxInt32 {
 		pairs := make([]orderKeyPos[uint64], n)
@@ -102,7 +157,7 @@ func sortIndexesByPreparedKeys(indexes []int, keys []uint64) []int {
 		})
 		out := make([]int, n)
 		for i, pair := range pairs {
-			out[i] = indexes[pair.pos]
+			out[i] = pair.pos
 		}
 		return out
 	}
@@ -144,7 +199,7 @@ func sortIndexesByPreparedKeys(indexes []int, keys []uint64) []int {
 	}
 	out := make([]int, n)
 	for i := 0; i < n; i++ {
-		out[i] = indexes[positions[i]]
+		out[i] = int(positions[i])
 	}
 	return out
 }
