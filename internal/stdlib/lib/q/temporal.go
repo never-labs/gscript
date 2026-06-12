@@ -2,6 +2,7 @@ package q
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +28,9 @@ func parseTemporalToken(text string) (string, string, bool) {
 		return "time", text, true
 	case "0np":
 		return "timestamp", text, true
+	}
+	if kind, ok := temporalInfinityTokenKind(text); ok {
+		return kind, text, true
 	}
 	switch {
 	case strings.Contains(text, "D") && strings.Count(strings.SplitN(text, "D", 2)[0], ".") == 0:
@@ -118,6 +122,90 @@ func parseTypedNullTokenKind(text string) (string, bool) {
 
 func parseQTemporal(kind, text string) (any, error) {
 	return ParseTemporal(kind, text)
+}
+
+// temporalInfinityTokenKind recognizes the temporal infinity literals 0Wd 0Wm
+// 0Wz 0Wn 0Wu 0Wv 0Wt 0Wp and their negative forms, returning the temporal
+// kind name.
+func temporalInfinityTokenKind(text string) (string, bool) {
+	body := strings.TrimPrefix(text, "-")
+	if len(body) != 3 || body[0] != '0' || (body[1] != 'W' && body[1] != 'w') {
+		return "", false
+	}
+	switch body[2] {
+	case 'd':
+		return "date", true
+	case 'm':
+		return "month", true
+	case 'z':
+		return "datetime", true
+	case 'n':
+		return "timespan", true
+	case 'u':
+		return "minute", true
+	case 'v':
+		return "second", true
+	case 't':
+		return "time", true
+	case 'p':
+		return "timestamp", true
+	default:
+		return "", false
+	}
+}
+
+// parseTemporalInfinity builds the infinity value for a recognized 0W*/-0W*
+// temporal token. Temporal infinities are the extreme underlying encodings, so
+// they sort greatest (least when negative) within their kind and wrap under
+// arithmetic exactly like integer 0W does.
+func parseTemporalInfinity(text string) (any, bool) {
+	kindName, ok := temporalInfinityTokenKind(text)
+	if !ok {
+		return nil, false
+	}
+	n := int64(math.MaxInt64)
+	if strings.HasPrefix(text, "-") {
+		n = -n
+	}
+	value, ok := data.NewTemporalValue(data.Kind(kindName), n)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+// temporalInfinityToken formats a temporal infinity back to its literal
+// token, mirroring typedNullTokenForKind.
+func temporalInfinityToken(kind data.Kind, n int64) (string, bool) {
+	var suffix byte
+	switch kind {
+	case data.KindMonth:
+		suffix = 'm'
+	case data.KindDate:
+		suffix = 'd'
+	case data.KindDateTime:
+		suffix = 'z'
+	case data.KindTimespan:
+		suffix = 'n'
+	case data.KindMinute:
+		suffix = 'u'
+	case data.KindSecond:
+		suffix = 'v'
+	case data.KindTime:
+		suffix = 't'
+	case data.KindTimestamp:
+		suffix = 'p'
+	default:
+		return "", false
+	}
+	switch n {
+	case math.MaxInt64:
+		return "0W" + string(suffix), true
+	case -math.MaxInt64:
+		return "-0W" + string(suffix), true
+	default:
+		return "", false
+	}
 }
 
 func parseTemporalAtomOrVector(text string) (any, bool, error) {
@@ -257,6 +345,9 @@ func coerceTemporalValue(kind data.Kind, v any) (any, bool) {
 }
 
 func ParseTemporal(kind, text string) (any, error) {
+	if value, ok := parseTemporalInfinity(text); ok {
+		return value, nil
+	}
 	switch kind {
 	case "month":
 		if strings.EqualFold(text, "0Nm") {
@@ -479,6 +570,11 @@ func parseQTimestamp(text string) (data.Timestamp, error) {
 }
 
 func FormatTemporal(v any) (string, bool) {
+	if n, kind, ok := data.TemporalUnderlying(v); ok {
+		if token, ok := temporalInfinityToken(kind, n); ok {
+			return token, true
+		}
+	}
 	switch x := v.(type) {
 	case data.Month:
 		months := x.Months()
@@ -493,11 +589,23 @@ func FormatTemporal(v any) (string, bool) {
 	case data.Timespan:
 		return formatQTimespanNanos(x.Nanos()), true
 	case data.Minute:
-		return fmt.Sprintf("%02d:%02d", x.Minutes()/60, x.Minutes()%60), true
+		minutes := x.Minutes()
+		sign := ""
+		if minutes < 0 {
+			sign, minutes = "-", -minutes
+		}
+		return fmt.Sprintf("%s%02d:%02d", sign, minutes/60, minutes%60), true
 	case data.Second:
 		seconds := x.Seconds()
-		return fmt.Sprintf("%02d:%02d:%02d", seconds/3600, seconds/60%60, seconds%60), true
+		sign := ""
+		if seconds < 0 {
+			sign, seconds = "-", -seconds
+		}
+		return fmt.Sprintf("%s%02d:%02d:%02d", sign, seconds/3600, seconds/60%60, seconds%60), true
 	case data.Time:
+		if nanos := x.Nanos(); nanos < 0 {
+			return "-" + formatQTimeNanosUnsigned(absNanos(nanos)), true
+		}
 		return formatQTimeNanos(x.Nanos()), true
 	case data.Timestamp:
 		tm := time.Unix(0, x.UnixNanos()).UTC()
@@ -573,4 +681,260 @@ func formatQTimeNanos(nanos int64) string {
 		frac += "0"
 	}
 	return fmt.Sprintf("%02d:%02d:%02d.%s", hour, minute, second, frac)
+}
+
+// --- temporal dyadic arithmetic ----------------------------------------------
+//
+// Canonical kdb+/q temporal arithmetic on scalars. The rules implemented here
+// are the ones the canonical harness pins:
+//
+//	temporal + int / int + temporal -> same kind (int scaled per kind:
+//	    days for dates, months for months, minutes/seconds for those kinds,
+//	    milliseconds for times, nanoseconds for timestamps/timespans, days
+//	    for datetimes)
+//	temporal - int                  -> same kind
+//	temporal - temporal (same kind) -> span: date/month -> long, timestamp/
+//	    timespan/datetime -> timespan, minute/second/time -> same kind
+//	date + time-of-day / timespan   -> timestamp (and date - timespan)
+//	timestamp ± timespan            -> timestamp
+//	timestamp - date, date - timestamp -> timespan
+//	time-of-day ± time-of-day       -> finer of the two kinds
+//
+// Anything else (floats, int - temporal, month/date sums, datetime mixes)
+// stays unhandled so the caller's numeric-operand error is preserved.
+
+const (
+	temporalNanosPerDay    int64 = 24 * 60 * 60 * 1_000_000_000
+	temporalNanosPerMinute int64 = 60 * 1_000_000_000
+	temporalNanosPerSecond int64 = 1_000_000_000
+)
+
+// applyTemporalDyadic handles + and - when at least one operand is a temporal
+// scalar. handled=false means the operand shapes are not temporal arithmetic
+// and the caller should keep its existing dispatch.
+func applyTemporalDyadic(op byte, left, right any) (any, bool, error) {
+	if op != '+' && op != '-' {
+		return nil, false, nil
+	}
+	lu, lk, lok := data.TemporalUnderlying(left)
+	ru, rk, rok := data.TemporalUnderlying(right)
+	switch {
+	case lok && !rok:
+		n, ok := temporalIntegerOperand(right)
+		if !ok {
+			return nil, false, nil
+		}
+		scale, ok := data.TemporalIntUnitScale(lk)
+		if !ok {
+			return nil, false, nil
+		}
+		if op == '-' {
+			n = -n
+		}
+		value, ok := data.NewTemporalValue(lk, lu+n*scale)
+		return value, ok, nil
+	case !lok && rok:
+		if op != '+' {
+			return nil, false, nil
+		}
+		n, ok := temporalIntegerOperand(left)
+		if !ok {
+			return nil, false, nil
+		}
+		scale, ok := data.TemporalIntUnitScale(rk)
+		if !ok {
+			return nil, false, nil
+		}
+		value, ok := data.NewTemporalValue(rk, ru+n*scale)
+		return value, ok, nil
+	case lok && rok:
+		return applyTemporalPairDyadic(op, lu, lk, ru, rk)
+	default:
+		return nil, false, nil
+	}
+}
+
+func temporalIntegerOperand(v any) (int64, bool) {
+	if b, ok := v.(bool); ok {
+		if b {
+			return 1, true
+		}
+		return 0, true
+	}
+	return integerValue(v)
+}
+
+func applyTemporalPairDyadic(op byte, lu int64, lk data.Kind, ru int64, rk data.Kind) (any, bool, error) {
+	if lk == rk {
+		switch op {
+		case '-':
+			span, ok := data.TemporalSpanKind(lk)
+			if !ok {
+				return nil, false, nil
+			}
+			if span == data.KindI64 {
+				return lu - ru, true, nil
+			}
+			value, ok := data.NewTemporalValue(span, lu-ru)
+			return value, ok, nil
+		case '+':
+			switch lk {
+			case data.KindMinute, data.KindSecond, data.KindTime, data.KindTimespan:
+				value, ok := data.NewTemporalValue(lk, lu+ru)
+				return value, ok, nil
+			}
+			return nil, false, nil
+		}
+		return nil, false, nil
+	}
+	if isTimeOfDayKind(lk) && isTimeOfDayKind(rk) {
+		merged, ok := mergeTemporalKinds(lk, rk)
+		if !ok {
+			return nil, false, nil
+		}
+		lm := temporalTimeOfDayInUnits(lu, lk, merged)
+		rm := temporalTimeOfDayInUnits(ru, rk, merged)
+		n := lm + rm
+		if op == '-' {
+			n = lm - rm
+		}
+		value, ok := data.NewTemporalValue(merged, n)
+		return value, ok, nil
+	}
+	switch op {
+	case '+':
+		switch {
+		case lk == data.KindDate && (isTimeOfDayKind(rk) || rk == data.KindTimespan):
+			value, ok := data.NewTemporalValue(data.KindTimestamp, lu*temporalNanosPerDay+temporalNanos(ru, rk))
+			return value, ok, nil
+		case rk == data.KindDate && (isTimeOfDayKind(lk) || lk == data.KindTimespan):
+			value, ok := data.NewTemporalValue(data.KindTimestamp, ru*temporalNanosPerDay+temporalNanos(lu, lk))
+			return value, ok, nil
+		case lk == data.KindTimestamp && rk == data.KindTimespan:
+			value, ok := data.NewTemporalValue(data.KindTimestamp, lu+ru)
+			return value, ok, nil
+		case lk == data.KindTimespan && rk == data.KindTimestamp:
+			value, ok := data.NewTemporalValue(data.KindTimestamp, lu+ru)
+			return value, ok, nil
+		}
+	case '-':
+		switch {
+		case lk == data.KindTimestamp && rk == data.KindTimespan:
+			value, ok := data.NewTemporalValue(data.KindTimestamp, lu-ru)
+			return value, ok, nil
+		case lk == data.KindDate && rk == data.KindTimespan:
+			value, ok := data.NewTemporalValue(data.KindTimestamp, lu*temporalNanosPerDay-ru)
+			return value, ok, nil
+		case lk == data.KindTimestamp && rk == data.KindDate:
+			value, ok := data.NewTemporalValue(data.KindTimespan, lu-ru*temporalNanosPerDay)
+			return value, ok, nil
+		case lk == data.KindDate && rk == data.KindTimestamp:
+			value, ok := data.NewTemporalValue(data.KindTimespan, lu*temporalNanosPerDay-ru)
+			return value, ok, nil
+		}
+	}
+	return nil, false, nil
+}
+
+// temporalTimeOfDayInUnits converts a time-of-day underlying count from one
+// time-of-day kind into another (only coarse -> fine conversions occur:
+// minute -> second/time, second -> time).
+func temporalTimeOfDayInUnits(n int64, from, to data.Kind) int64 {
+	if from == to {
+		return n
+	}
+	switch {
+	case from == data.KindMinute && to == data.KindSecond:
+		return n * 60
+	case from == data.KindMinute && to == data.KindTime:
+		return n * temporalNanosPerMinute
+	case from == data.KindSecond && to == data.KindTime:
+		return n * temporalNanosPerSecond
+	default:
+		return n
+	}
+}
+
+// temporalNanos converts a time-of-day or timespan underlying count to
+// nanoseconds.
+func temporalNanos(n int64, kind data.Kind) int64 {
+	switch kind {
+	case data.KindMinute:
+		return n * temporalNanosPerMinute
+	case data.KindSecond:
+		return n * temporalNanosPerSecond
+	default: // time, timespan already store nanoseconds
+		return n
+	}
+}
+
+// temporalDyadicResultKind mirrors applyTemporalDyadic for null propagation:
+// it returns the result kind of op over the two operand kinds when temporal
+// arithmetic applies, so typed temporal nulls survive + and -.
+func temporalDyadicResultKind(op byte, lk, rk data.Kind) (data.Kind, bool) {
+	if op != '+' && op != '-' {
+		return "", false
+	}
+	lt := data.IsTemporalKind(lk)
+	rt := data.IsTemporalKind(rk)
+	switch {
+	case lt && !rt:
+		if temporalIntLikeKind(rk) {
+			return lk, true
+		}
+		return "", false
+	case rt && !lt:
+		if op == '+' && temporalIntLikeKind(lk) {
+			return rk, true
+		}
+		return "", false
+	case lt && rt:
+		if lk == rk {
+			if op == '-' {
+				return data.TemporalSpanKind(lk)
+			}
+			switch lk {
+			case data.KindMinute, data.KindSecond, data.KindTime, data.KindTimespan:
+				return lk, true
+			}
+			return "", false
+		}
+		if isTimeOfDayKind(lk) && isTimeOfDayKind(rk) {
+			return mergeTemporalKinds(lk, rk)
+		}
+		switch op {
+		case '+':
+			switch {
+			case lk == data.KindDate && (isTimeOfDayKind(rk) || rk == data.KindTimespan),
+				rk == data.KindDate && (isTimeOfDayKind(lk) || lk == data.KindTimespan),
+				lk == data.KindTimestamp && rk == data.KindTimespan,
+				lk == data.KindTimespan && rk == data.KindTimestamp:
+				return data.KindTimestamp, true
+			}
+		case '-':
+			switch {
+			case lk == data.KindTimestamp && rk == data.KindTimespan,
+				lk == data.KindDate && rk == data.KindTimespan:
+				return data.KindTimestamp, true
+			case lk == data.KindTimestamp && rk == data.KindDate,
+				lk == data.KindDate && rk == data.KindTimestamp:
+				return data.KindTimespan, true
+			}
+		}
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+// temporalIntLikeKind reports kinds that act as plain integer steps in
+// temporal arithmetic, including null/any so typed temporal nulls propagate
+// against untyped nulls.
+func temporalIntLikeKind(kind data.Kind) bool {
+	switch kind {
+	case data.KindNull, data.KindAny, data.KindBool:
+		return true
+	default:
+		return qKindIsInteger(kind)
+	}
 }

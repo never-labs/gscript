@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
@@ -47,6 +48,12 @@ func qCastTargetFromDomain(domain any) (qCastTarget, bool) {
 }
 
 func castOrEnum(domain any, values any) (any, error) {
+	// Temporal accessor casts (`year$d, `mm$d, `hh$t, ...) share the symbol
+	// domain syntax with enum casts; the operand disambiguates: accessors
+	// only apply to temporal values, enum casts only to symbol values.
+	if out, handled, err := qTemporalAccessorCast(domain, values); handled || err != nil {
+		return out, err
+	}
 	if target, ok := qCastTargetFromDomain(domain); ok {
 		return castValue(target, values)
 	}
@@ -238,6 +245,9 @@ func castScalarValue(kind data.Kind, value any) (any, error) {
 	if temporalKind, ok := qTemporalCastKindName(kind); ok {
 		if text, ok := value.(string); ok {
 			return parseQTemporal(temporalKind, text)
+		}
+		if converted, handled, err := castTemporalScalarValue(kind, value); handled || err != nil {
+			return converted, err
 		}
 	}
 	if text, ok := value.(string); ok {
@@ -518,4 +528,261 @@ func enumCast(domain any, values any) (qEnumVector, error) {
 		return qEnumVector{}, fmt.Errorf("q enum cast `%s expects symbol values", sym)
 	}
 	return qEnumVector{domain: sym, encoded: data.NewEncodedSymbols(symbols)}, nil
+}
+
+// --- temporal casts -----------------------------------------------------------
+
+// castTemporalScalarValue converts a temporal scalar into another temporal
+// kind for `kind$value casts: date/month/timestamp/datetime move along the
+// calendar axis, minute/second/time/timespan along the time-of-day axis, and
+// instants project onto either axis (date$timestamp, minute$timestamp, ...).
+func castTemporalScalarValue(kind data.Kind, value any) (any, bool, error) {
+	u, from, ok := data.TemporalUnderlying(value)
+	if !ok {
+		return nil, false, nil
+	}
+	if from == kind {
+		return value, true, nil
+	}
+	// Infinities project onto the target kind keeping their sign.
+	if u == math.MaxInt64 || u == -math.MaxInt64 {
+		out, ok := data.NewTemporalValue(kind, u)
+		if !ok {
+			return nil, false, nil
+		}
+		return out, true, nil
+	}
+	switch kind {
+	case data.KindMonth:
+		if year, month, _, ok := qTemporalCivil(from, u); ok {
+			return data.MonthFromMonths(int64(year-1970)*12 + int64(month-1)), true, nil
+		}
+	case data.KindDate:
+		if from == data.KindMonth {
+			year := 1970 + floorDiv(u, 12)
+			month := u - floorDiv(u, 12)*12 + 1
+			days := time.Date(int(year), time.Month(month), 1, 0, 0, 0, 0, time.UTC).Unix() / 86400
+			return data.DateFromDays(days), true, nil
+		}
+		if days, ok := qTemporalDays(from, u); ok {
+			return data.DateFromDays(days), true, nil
+		}
+	case data.KindTimestamp:
+		switch from {
+		case data.KindDate:
+			return data.TimestampFromUnixNanos(u * temporalNanosPerDay), true, nil
+		case data.KindDateTime:
+			return data.TimestampFromUnixNanos(u), true, nil
+		}
+	case data.KindDateTime:
+		switch from {
+		case data.KindDate:
+			return data.DateTimeFromUnixNanos(u * temporalNanosPerDay), true, nil
+		case data.KindTimestamp:
+			return data.DateTimeFromUnixNanos(u), true, nil
+		}
+	case data.KindMinute:
+		if nanos, ok := qTemporalTimeOfDayNanos(from, u); ok {
+			return data.MinuteFromMinutes(floorDiv(nanos, temporalNanosPerMinute)), true, nil
+		}
+	case data.KindSecond:
+		if nanos, ok := qTemporalTimeOfDayNanos(from, u); ok {
+			return data.SecondFromSeconds(floorDiv(nanos, temporalNanosPerSecond)), true, nil
+		}
+	case data.KindTime:
+		if from == data.KindTimespan {
+			return data.TimeFromNanos(floorMod(u, temporalNanosPerDay)), true, nil
+		}
+		if nanos, ok := qTemporalTimeOfDayNanos(from, u); ok {
+			return data.TimeFromNanos(nanos), true, nil
+		}
+	case data.KindTimespan:
+		switch from {
+		case data.KindMinute:
+			return data.TimespanFromNanos(u * temporalNanosPerMinute), true, nil
+		case data.KindSecond:
+			return data.TimespanFromNanos(u * temporalNanosPerSecond), true, nil
+		case data.KindTime:
+			return data.TimespanFromNanos(u), true, nil
+		case data.KindTimestamp, data.KindDateTime:
+			return data.TimespanFromNanos(floorMod(u, temporalNanosPerDay)), true, nil
+		}
+	}
+	return nil, true, fmt.Errorf("cannot cast %s to %s", from, kind)
+}
+
+// qTemporalDays maps an instant kind onto whole days since 1970-01-01.
+func qTemporalDays(kind data.Kind, u int64) (int64, bool) {
+	switch kind {
+	case data.KindDate:
+		return u, true
+	case data.KindTimestamp, data.KindDateTime:
+		return floorDiv(u, temporalNanosPerDay), true
+	default:
+		return 0, false
+	}
+}
+
+// qTemporalCivil returns the civil (year, month, day) of a calendar-bearing
+// temporal value.
+func qTemporalCivil(kind data.Kind, u int64) (int, int, int, bool) {
+	if kind == data.KindMonth {
+		year := 1970 + floorDiv(u, 12)
+		month := u - floorDiv(u, 12)*12 + 1
+		return int(year), int(month), 1, true
+	}
+	days, ok := qTemporalDays(kind, u)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	tm := time.Unix(days*86400, 0).UTC()
+	year, month, day := tm.Date()
+	return year, int(month), day, true
+}
+
+// qTemporalTimeOfDayNanos maps a time-of-day or instant kind onto
+// nanoseconds since midnight.
+func qTemporalTimeOfDayNanos(kind data.Kind, u int64) (int64, bool) {
+	switch kind {
+	case data.KindMinute:
+		return u * temporalNanosPerMinute, true
+	case data.KindSecond:
+		return u * temporalNanosPerSecond, true
+	case data.KindTime:
+		return u, true
+	case data.KindTimestamp, data.KindDateTime:
+		return floorMod(u, temporalNanosPerDay), true
+	default:
+		return 0, false
+	}
+}
+
+func floorMod(left, right int64) int64 {
+	return left - floorDiv(left, right)*right
+}
+
+// --- temporal accessor casts --------------------------------------------------
+
+// qTemporalAccessorName recognizes the accessor cast domains. `mm is
+// month-of-year on calendar kinds and minute-of-hour on time-of-day kinds;
+// the others are single-axis.
+func qTemporalAccessorName(domain any) (string, bool) {
+	sym, ok := domain.(data.Symbol)
+	if !ok {
+		return "", false
+	}
+	switch string(sym) {
+	case "year", "mm", "dd", "hh", "ss", "week":
+		return string(sym), true
+	default:
+		return "", false
+	}
+}
+
+// qTemporalAccessorCast applies `year$ `mm$ `dd$ `hh$ `ss$ `week$ to temporal
+// operands. Non-temporal operands decline so symbol enum casts keep their
+// behavior.
+func qTemporalAccessorCast(domain any, values any) (any, bool, error) {
+	name, ok := qTemporalAccessorName(domain)
+	if !ok {
+		return nil, false, nil
+	}
+	if array, ok := values.(data.Array); ok {
+		if !data.IsTemporalKind(array.Kind()) {
+			return nil, false, nil
+		}
+		out := make([]any, array.Len())
+		for i := range out {
+			item, ok := array.At(i)
+			if !ok {
+				return nil, true, fmt.Errorf("q cast `%s row %d out of range", name, i+1)
+			}
+			converted, err := qTemporalAccessorScalar(name, item)
+			if err != nil {
+				return nil, true, err
+			}
+			out[i] = converted
+		}
+		kind := data.KindI64
+		if name == "week" {
+			kind = data.KindDate
+		}
+		column, err := data.NewColumnWithKind("_", kind, out)
+		if err != nil {
+			return nil, true, fmt.Errorf("q cast `%s: %w", name, err)
+		}
+		return column.Data, true, nil
+	}
+	if !qTemporalAccessorOperand(values) {
+		return nil, false, nil
+	}
+	out, err := qTemporalAccessorScalar(name, values)
+	return out, true, err
+}
+
+func qTemporalAccessorOperand(value any) bool {
+	if kind, ok := data.NullKind(value); ok {
+		return data.IsTemporalKind(kind)
+	}
+	return temporalKindOfValue(value) != ""
+}
+
+func qTemporalAccessorScalar(name string, value any) (any, error) {
+	if data.IsNull(value) {
+		if name == "week" {
+			return data.NullForKind(data.KindDate), nil
+		}
+		return data.NullForKind(data.KindI64), nil
+	}
+	u, kind, ok := data.TemporalUnderlying(value)
+	if !ok {
+		return nil, fmt.Errorf("q cast `%s expects a temporal value, got %T", name, value)
+	}
+	// Infinities stay infinite under accessors (year$0Wd -> 0W).
+	if u == math.MaxInt64 || u == -math.MaxInt64 {
+		if name == "week" {
+			return data.DateFromDays(u), nil
+		}
+		return u, nil
+	}
+	switch name {
+	case "year":
+		if year, _, _, ok := qTemporalCivil(kind, u); ok {
+			return int64(year), nil
+		}
+	case "mm":
+		switch kind {
+		case data.KindMonth, data.KindDate, data.KindTimestamp, data.KindDateTime:
+			if _, month, _, ok := qTemporalCivil(kind, u); ok {
+				return int64(month), nil
+			}
+		default:
+			if nanos, ok := qTemporalTimeOfDayNanos(kind, u); ok {
+				return floorMod(floorDiv(nanos, temporalNanosPerMinute), 60), nil
+			}
+		}
+	case "dd":
+		switch kind {
+		case data.KindDate, data.KindTimestamp, data.KindDateTime:
+			if _, _, day, ok := qTemporalCivil(kind, u); ok {
+				return int64(day), nil
+			}
+		}
+	case "hh":
+		if nanos, ok := qTemporalTimeOfDayNanos(kind, u); ok {
+			return floorDiv(nanos, 60*temporalNanosPerMinute), nil
+		}
+	case "ss":
+		switch kind {
+		case data.KindSecond, data.KindTime, data.KindTimestamp, data.KindDateTime:
+			if nanos, ok := qTemporalTimeOfDayNanos(kind, u); ok {
+				return floorMod(floorDiv(nanos, temporalNanosPerSecond), 60), nil
+			}
+		}
+	case "week":
+		if days, ok := qTemporalDays(kind, u); ok {
+			return data.DateFromDays(days - floorMod(days+3, 7)), nil
+		}
+	}
+	return nil, fmt.Errorf("q cast `%s does not apply to %s values", name, kind)
 }
