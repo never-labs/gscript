@@ -91,6 +91,66 @@ err_message := err.message
 	}
 }
 
+type testLLMReplayMatchProvider struct {
+	*testLLMProvider
+	match runtime.LLMReplayMatch
+}
+
+func (p *testLLMReplayMatchProvider) LastLLMReplayMatch() (runtime.LLMReplayMatch, bool) {
+	return p.match, true
+}
+
+func TestLLMTurnEmitsReplayMatchTraceFromProvider(t *testing.T) {
+	provider := &testLLMReplayMatchProvider{
+		testLLMProvider: &testLLMProvider{res: runtime.LLMTurnResult{
+			Status: "final_answer",
+			Text:   "matched answer",
+			Usage:  runtime.LLMTurnUsage{InputTokens: 2, OutputTokens: 3},
+		}},
+		match: runtime.LLMReplayMatch{
+			Turn:            4,
+			ReplayKey:       "turn:4",
+			RequestHash:     "sha256:req",
+			ResponseHash:    "sha256:res",
+			ReplayMode:      "fixture_replay",
+			ReplaySessionID: "session-4",
+			ProviderFree:    true,
+		},
+	}
+	var events []runtime.LLMTraceEvent
+	runLLMTestProgramWithTrace(t, `
+result, err := llm.turn({
+    model: "mock"
+    messages: {llm.user("hello replay provider")}
+})
+`, provider, func(event runtime.LLMTraceEvent) {
+		events = append(events, event)
+	})
+	var matched *runtime.LLMTraceEvent
+	for i := range events {
+		if events[i].Type == "replay_record_matched" {
+			matched = &events[i]
+			break
+		}
+	}
+	if matched == nil {
+		t.Fatalf("trace events = %#v, want replay_record_matched", events)
+	}
+	if matched.Model != "mock" ||
+		matched.Status != "matched" ||
+		matched.TurnID != "turn:4" ||
+		matched.ReplaySessionID != "session-4" ||
+		matched.ReplayKey != "turn:4" ||
+		matched.RequestHash != "sha256:req" ||
+		matched.ResponseHash != "sha256:res" ||
+		matched.ReplayMode != "fixture_replay" ||
+		!matched.ProviderFree ||
+		matched.MessageCount != 1 ||
+		matched.Usage.OutputTokens != 3 {
+		t.Fatalf("replay match trace = %#v", matched)
+	}
+}
+
 func assertGlobalString(t *testing.T, interp *runtime.Interpreter, name, want string) {
 	t.Helper()
 	got := interp.GetGlobal(name)

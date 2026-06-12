@@ -2,6 +2,8 @@ package llm
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -70,9 +72,11 @@ func LoadRecorder(path string) (*Recorder, error) {
 
 // ReplayProvider is a deterministic test provider for recorded LLM turns.
 type ReplayProvider struct {
-	mu      sync.Mutex
-	records []Record
-	next    int
+	mu           sync.Mutex
+	records      []Record
+	next         int
+	lastMatch    ReplayMatch
+	hasLastMatch bool
 }
 
 // ReplayMismatchError reports a deterministic replay request mismatch.
@@ -190,17 +194,24 @@ func (p *ReplayProvider) nextRecord(req TurnRequest) (Record, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.next >= len(p.records) {
+		p.lastMatch = ReplayMatch{}
+		p.hasLastMatch = false
 		return Record{}, &ReplayExhaustedError{Turn: p.next}
 	}
 	record := p.records[p.next]
+	turn := p.next
 	p.next++
 	if !requestsEqual(req, record.Request) {
+		p.lastMatch = ReplayMatch{}
+		p.hasLastMatch = false
 		return Record{}, &ReplayMismatchError{
-			Turn:     p.next - 1,
+			Turn:     turn,
 			Expected: cloneRequest(record.Request),
 			Actual:   cloneRequest(req),
 		}
 	}
+	p.lastMatch = replayMatchForRecord(record, turn)
+	p.hasLastMatch = true
 	return cloneRecord(record), nil
 }
 
@@ -220,6 +231,8 @@ func (p *ReplayProvider) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.next = 0
+	p.lastMatch = ReplayMatch{}
+	p.hasLastMatch = false
 }
 
 func (p *ReplayProvider) Records() []Record {
@@ -230,6 +243,58 @@ func (p *ReplayProvider) Records() []Record {
 		out[i] = cloneRecord(p.records[i])
 	}
 	return out
+}
+
+func (p *ReplayProvider) LastReplayMatch() (ReplayMatch, bool) {
+	if p == nil {
+		return ReplayMatch{}, false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastMatch, p.hasLastMatch
+}
+
+func replayMatchForRecord(record Record, turn int) ReplayMatch {
+	replayKey := record.Request.Metadata["replay_key"]
+	if replayKey == "" {
+		replayKey = fmt.Sprintf("turn:%d", turn)
+	}
+	requestHash := firstRecordMetadata(record, "request_hash")
+	if requestHash == "" {
+		requestHash = stableRecordHash(record.Request)
+	}
+	responseHash := firstRecordMetadata(record, "response_hash")
+	if responseHash == "" {
+		responseHash = stableRecordHash(record.Result)
+	}
+	replayMode := firstRecordMetadata(record, "replay_mode")
+	if replayMode == "" {
+		replayMode = "fixture_replay"
+	}
+	return ReplayMatch{
+		Turn:         turn,
+		ReplayKey:    replayKey,
+		RequestHash:  requestHash,
+		ResponseHash: responseHash,
+		ReplayMode:   replayMode,
+		ProviderFree: true,
+	}
+}
+
+func firstRecordMetadata(record Record, key string) string {
+	if record.Request.Metadata == nil {
+		return ""
+	}
+	return record.Request.Metadata[key]
+}
+
+func stableRecordHash(v any) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func cloneRecord(record Record) Record {

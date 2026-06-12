@@ -20,6 +20,22 @@ type LLMStreamingProvider interface {
 	StreamTurn(context.Context, LLMTurnRequest, LLMStreamSink) (LLMTurnResult, error)
 }
 
+// LLMReplayMatchProvider is an optional extension for providers that can expose
+// deterministic replay metadata for the latest successfully matched turn.
+type LLMReplayMatchProvider interface {
+	LastLLMReplayMatch() (LLMReplayMatch, bool)
+}
+
+type LLMReplayMatch struct {
+	Turn            int
+	ReplayKey       string
+	RequestHash     string
+	ResponseHash    string
+	ReplayMode      string
+	ReplaySessionID string
+	ProviderFree    bool
+}
+
 type LLMStreamEvent struct {
 	Type   string
 	Token  string

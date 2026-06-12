@@ -1,9 +1,11 @@
 package llmbridge
 
 import (
+	"context"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
+	"github.com/never-labs/leia/llm"
 )
 
 func TestPublicTraceEventCarriesReplayEnvelopeFields(t *testing.T) {
@@ -38,5 +40,37 @@ func TestPublicTraceEventCarriesReplayEnvelopeFields(t *testing.T) {
 		event.ReplayMode != "fixture_replay" ||
 		!event.ProviderFree {
 		t.Fatalf("trace event mapping lost replay envelope fields: %#v", event)
+	}
+}
+
+type replayMatchProvider struct {
+	match llm.ReplayMatch
+}
+
+func (p replayMatchProvider) Turn(context.Context, llm.TurnRequest) (llm.TurnResult, error) {
+	return llm.TurnResult{Status: "final_answer"}, nil
+}
+
+func (p replayMatchProvider) LastReplayMatch() (llm.ReplayMatch, bool) {
+	return p.match, true
+}
+
+func TestProviderAdapterCarriesReplayMatchProvider(t *testing.T) {
+	provider := ProviderAdapter(replayMatchProvider{match: llm.ReplayMatch{
+		Turn:            3,
+		ReplayKey:       "turn:3",
+		RequestHash:     "sha256:req",
+		ResponseHash:    "sha256:res",
+		ReplayMode:      "fixture_replay",
+		ReplaySessionID: "session-1",
+		ProviderFree:    true,
+	}})
+	replay, ok := provider.(runtime.LLMReplayMatchProvider)
+	if !ok {
+		t.Fatal("ProviderAdapter did not expose runtime replay match provider")
+	}
+	match, ok := replay.LastLLMReplayMatch()
+	if !ok || match.Turn != 3 || match.ReplayKey != "turn:3" || match.ReplaySessionID != "session-1" || !match.ProviderFree {
+		t.Fatalf("LastLLMReplayMatch = %#v ok=%v", match, ok)
 	}
 }

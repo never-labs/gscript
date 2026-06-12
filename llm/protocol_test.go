@@ -44,8 +44,19 @@ func TestRecorderAndReplayProvider(t *testing.T) {
 	if err != nil || res.Text != "ok" {
 		t.Fatalf("Turn res=%#v err=%v", res, err)
 	}
+	match, ok := replay.LastReplayMatch()
+	if !ok {
+		t.Fatal("LastReplayMatch ok=false, want true")
+	}
+	if match.Turn != 0 || match.ReplayKey != "turn:0" || match.ReplayMode != "fixture_replay" || !match.ProviderFree || match.RequestHash == "" || match.ResponseHash == "" {
+		t.Fatalf("LastReplayMatch = %#v", match)
+	}
 	if replay.Consumed() != 1 || replay.Remaining() != 0 {
 		t.Fatalf("after turn consumed=%d remaining=%d", replay.Consumed(), replay.Remaining())
+	}
+	replay.Reset()
+	if _, ok := replay.LastReplayMatch(); ok {
+		t.Fatal("LastReplayMatch after Reset ok=true, want false")
 	}
 }
 
@@ -74,6 +85,10 @@ func TestReplayProviderStreamsRecordedEvents(t *testing.T) {
 	}
 	if res.Text != "hello stream" || len(tokens) != 3 || tokens[0]+tokens[1]+tokens[2] != "hello stream" {
 		t.Fatalf("res=%#v tokens=%#v", res, tokens)
+	}
+	match, ok := replay.LastReplayMatch()
+	if !ok || match.Turn != 0 || match.ReplayKey != "turn:0" {
+		t.Fatalf("LastReplayMatch = %#v ok=%v", match, ok)
 	}
 }
 
@@ -115,6 +130,9 @@ func TestReplayTypedErrors(t *testing.T) {
 	var mismatch *llm.ReplayMismatchError
 	if !errors.As(err, &mismatch) {
 		t.Fatalf("err = %T %v, want ReplayMismatchError", err, err)
+	}
+	if _, ok := replay.LastReplayMatch(); ok {
+		t.Fatal("LastReplayMatch after mismatch ok=true, want false")
 	}
 	if mismatch.Expected.Messages[0].Text != "expected" || mismatch.Actual.Messages[0].Text != "actual" {
 		t.Fatalf("mismatch = %#v", mismatch)

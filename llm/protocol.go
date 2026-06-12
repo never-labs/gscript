@@ -20,6 +20,22 @@ type StreamingProvider interface {
 	StreamTurn(context.Context, TurnRequest, StreamSink) (TurnResult, error)
 }
 
+// ReplayMatchProvider is an optional extension for deterministic replay
+// providers that can expose the most recent successfully matched fixture turn.
+type ReplayMatchProvider interface {
+	LastReplayMatch() (ReplayMatch, bool)
+}
+
+type ReplayMatch struct {
+	Turn            int
+	ReplayKey       string
+	RequestHash     string
+	ResponseHash    string
+	ReplayMode      string
+	ReplaySessionID string
+	ProviderFree    bool
+}
+
 type StreamEvent struct {
 	Type   string
 	Token  string
