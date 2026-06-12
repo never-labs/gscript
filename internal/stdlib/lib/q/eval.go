@@ -9700,6 +9700,33 @@ func qLambdaRank(body string) (int, bool) {
 // forms surface an error instead of hanging the process.
 const qIterateLimit = 1 << 20
 
+// qIterateWallBudget bounds wall-clock time of converge/do/while iteration.
+// Canonical q would spin forever on non-terminating iterates; this sandbox
+// guard converts them into a q error. Tests/fuzzers may lower it via
+// SetIterateWallBudget.
+var qIterateWallBudget atomic.Int64
+
+func init() { qIterateWallBudget.Store(int64(3 * time.Second)) }
+
+// SetIterateWallBudget overrides the converge/do/while wall-clock budget and
+// returns the previous value. Intended for tests and fuzz harnesses.
+func SetIterateWallBudget(d time.Duration) time.Duration {
+	return time.Duration(qIterateWallBudget.Swap(int64(d)))
+}
+
+type qIterateClock struct {
+	start  time.Time
+	budget time.Duration
+}
+
+func newQIterateClock() qIterateClock {
+	return qIterateClock{start: time.Now(), budget: time.Duration(qIterateWallBudget.Load())}
+}
+
+func (c qIterateClock) exceeded(iter int64) bool {
+	return iter&1023 == 1023 && time.Since(c.start) > c.budget
+}
+
 // applyIterateOver implements the canonical q monadic-f iterate family:
 //   - f/[x]        converge: apply f until the result matches the previous
 //     result or the original argument
@@ -9721,9 +9748,10 @@ func (s *EvalState) applyIterateOver(fn any, seed any, v any, scan bool) (any, e
 	if seed == nil {
 		// Converge.
 		prev := v
+		clock := newQIterateClock()
 		for iter := 0; ; iter++ {
-			if iter >= qIterateLimit {
-				return nil, fmt.Errorf("converge did not terminate within %d iterations", qIterateLimit)
+			if iter >= qIterateLimit || clock.exceeded(int64(iter)) {
+				return nil, fmt.Errorf("converge did not terminate within %d iterations", iter)
 			}
 			next, err := s.applyCallable(fn, []any{prev})
 			if err != nil {
@@ -9745,9 +9773,10 @@ func (s *EvalState) applyIterateOver(fn any, seed any, v any, scan bool) (any, e
 	if isCallable(seed) {
 		// While-iterate.
 		current := v
+		clock := newQIterateClock()
 		for iter := 0; ; iter++ {
-			if iter >= qIterateLimit {
-				return nil, fmt.Errorf("while-iterate did not terminate within %d iterations", qIterateLimit)
+			if iter >= qIterateLimit || clock.exceeded(int64(iter)) {
+				return nil, fmt.Errorf("while-iterate did not terminate within %d iterations", iter)
 			}
 			cond, err := s.applyCallable(seed, []any{current})
 			if err != nil {
@@ -9778,7 +9807,11 @@ func (s *EvalState) applyIterateOver(fn any, seed any, v any, scan bool) (any, e
 		return nil, fmt.Errorf("do-iterate count must be non-negative")
 	}
 	current := v
+	clock := newQIterateClock()
 	for i := int64(0); i < n; i++ {
+		if clock.exceeded(i) {
+			return nil, fmt.Errorf("do-iterate did not terminate within budget after %d iterations", i)
+		}
 		next, err := s.applyCallable(fn, []any{current})
 		if err != nil {
 			return nil, err
@@ -15073,6 +15106,15 @@ func splitWhereCompareExpr(src string) (string, string, string, bool) {
 		return "", "", "", false
 	}
 	if _, _, ok := splitTopLevelWord(src, "or"); ok {
+		return "", "", "", false
+	}
+	// Canonical right-to-left: a top-level & or | binds the comparison on its
+	// right (`(x>1)&x<9` is (x>1)&(x<9)); splitting at the comparison here
+	// would mis-group, so decline and let the general routes evaluate.
+	if _, _, ok := splitTopLevelOperator(src, "&"); ok {
+		return "", "", "", false
+	}
+	if _, _, ok := splitTopLevelOperator(src, "|"); ok {
 		return "", "", "", false
 	}
 	for _, op := range []string{"<>", "<=", ">=", "=", "<", ">"} {

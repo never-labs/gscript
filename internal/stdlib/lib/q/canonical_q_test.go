@@ -38,7 +38,7 @@ import (
 // an explicit, reviewed bump.
 const (
 	canonicalQGapMax       = 51
-	canonicalQDeviationMax = 33
+	canonicalQDeviationMax = 30
 	canonicalQEntryMin     = 300
 )
 

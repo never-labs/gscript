@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -709,6 +710,10 @@ func qEvalDualRouteCheck(t *testing.T, src string) (compiled, total int) {
 // ---------------------------------------------------------------------------
 
 func FuzzQEvalDualRoute(f *testing.F) {
+	// Non-terminating converge/while iterates are bounded by a wall budget;
+	// keep it tight so the fuzzer spends time exploring, not waiting.
+	prev := stdq.SetIterateWallBudget(150 * time.Millisecond)
+	f.Cleanup(func() { stdq.SetIterateWallBudget(prev) })
 	for _, tc := range qEvalVectorCases {
 		f.Add(tc.expr(qEvalFuzzSeedRows))
 	}
