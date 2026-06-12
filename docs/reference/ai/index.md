@@ -672,6 +672,15 @@ normalizes one record, fills `operation`, `capability`, `request_hash`,
 strict ordered matcher used by `llm.replay_index`. `fixture.replay(request,
 replay_key)` matches a normalized turn request and returns replay options for
 `llm.turn`.
+`llm.fixture_index(spec, opts)` normalizes provider-free fixture index metadata
+for packages and replay catalogs. It fills stable offline defaults such as
+`provider_free: true`, `live_network: false`, `real_dependency_imports: false`,
+`mode: "fixture_replay"`, `strategy: "strict_ordered"`, normalized fixture
+entries, matching metadata, and a summary table. `llm.validate_fixture_index`
+returns `{ok, status, findings}` for shape and offline-flag checks. These
+helpers treat `path`, `schema`, and `records_path` as metadata only; they do
+not open files, scan directories, read schemas, or require a specific package
+layout.
 `llm.replay_trace_event(match, opts)` projects a `fixture.match(...)` or
 `llm.replay_index(...).match(...)` result into a redacted trace event. Matched,
 mismatched, and exhausted replay states become `replay_record_matched`,
@@ -697,6 +706,20 @@ record, err := llm.replay_record({
     response: {status: "final_answer", text: "fixture answer"}
 })
 fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+index := llm.fixture_index({
+    fixture_id: "unit-fixtures"
+    fixtures: {
+        {
+            fixture_key: "turn:1"
+            path: "fixtures/turns.json#/records/0"
+            schema: "schemas/turn_record.schema.json"
+        }
+    }
+})
+index_gate := llm.validate_fixture_index(index, {
+    require_replay_ready: true
+    require_path: true
+})
 request := {model: "fast", messages: {llm.user("hello")}}
 replay, err := fixture.replay(request, "turn:1")
 result, err := llm.turn({

@@ -631,6 +631,20 @@ record, err := llm.replay_record({
     response: {status: "final_answer", text: "fixture answer"}
 })
 fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+index := llm.fixture_index({
+    fixture_id: "unit-fixture-index"
+    fixtures: {
+        {
+            fixture_key: "turn:1"
+            path: "fixtures/turns.json#/records/0"
+            schema: "schemas/turn_record.schema.json"
+        }
+    }
+})
+gate := llm.validate_fixture_index(index, {
+    require_replay_ready: true
+    require_path: true
+})
 replay, err := fixture.replay({
     model: "fast"
     messages: {llm.user("hello")}
@@ -641,6 +655,10 @@ result, err := llm.turn({
     replay: replay
 })
 ```
+
+`llm.fixture_index` and `llm.validate_fixture_index` only normalize and inspect
+metadata. They do not check whether files exist, load schemas, or assume a
+particular repository layout.
 
 ## Human Review And Resume
 

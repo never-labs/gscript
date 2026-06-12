@@ -675,6 +675,22 @@ over that matcher: it derives the request hash from the normalized turn request,
 consumes according to the fixture policy, and returns replay options for
 `llm.turn` or a validation error table.
 
+`llm.fixture_index(spec, opts)` normalizes offline fixture index metadata into
+an ordinary provider-free table with `kind: "fixture_index"`, `schema_version:
+1`, `version: "fixture_index.v1"`, `fixture_id`, provider/offline flags,
+`mode`, `strategy`, normalized `fixtures`, `matching`, deterministic summary
+order, and `summary`. Fixture entries may use `fixture_key`, `key`, or `id` for
+identity and may carry `path`, `schema`, `schema_path`, `schemas`,
+`capability`, and `metadata`. `llm.validate_fixture_index(index, opts)` returns
+a gate table with `ok`, `status`, `result_status`, `fixture_count`,
+`finding_count`, and `findings`.
+
+Fixture index helpers must remain metadata-only. They may validate table shape,
+provider-free/offline flags, replay-ready metadata when requested, and safe
+relative reference strings, but they must not open fixture files, resolve paths,
+read schemas, scan package directories, require a specific filename, or embed a
+project-specific package layout.
+
 Scripts may validate trace evidence without a host trace sink.
 `llm.trace_summary(envelope_or_events)` returns deterministic event counts,
 ordered event types, replay keys, status counts, and ordering/correlation
