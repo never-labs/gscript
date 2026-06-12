@@ -707,7 +707,13 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 			break
 		}
 		p.next()
-		right, err := p.parseExpr(prec + 1)
+		// `#` is right-associative as in q: 3#0#1 is 3#(0#1) (take from the
+		// empty list), not (3#0)#1 (a reshape).
+		nextMin := prec + 1
+		if tok.text == "#" {
+			nextMin = prec
+		}
+		right, err := p.parseExpr(nextMin)
 		if err != nil {
 			return nil, err
 		}

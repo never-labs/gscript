@@ -2283,11 +2283,13 @@ func TestNullableComparisonAndWithinBoundaries(t *testing.T) {
 			want:  []any{false, true, true},
 		},
 		{
-			name:  "symbol le preserves symbol kind",
+			// Canonical q null compare: null sorts before every value, so a
+			// null row satisfies <= against any target.
+			name:  "symbol le treats null as smallest",
 			array: NewColumn("sym", []any{Symbol("a"), NullValue, Symbol("c")}).Data,
 			op:    OpLE,
 			value: Symbol("b"),
-			want:  []any{true, false, false},
+			want:  []any{true, true, false},
 		},
 		{
 			name:  "date ge skips null rows",
