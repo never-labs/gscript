@@ -654,6 +654,17 @@ package_contract := llm.provider_free_package_contract({
 package_gate := llm.validate_package_contract(package_contract, {
     require_fixture_index: true
 })
+http_record, err := llm.replay_http_record({
+    replay_key: "api:metrics:1"
+    request: {method: "GET" url: "https://example.invalid/metrics"}
+    response: {status: 200 body: "[{\"x\":1}]" typed_as: "MetricRow[]"}
+    rate_limit: {limit: 300 remaining: 1 retry_after_seconds: 2}
+    terms: {usage: "offline-fixture" live_network: false}
+})
+artifact_record, err := llm.replay_artifact_record({
+    replay_key: "download:report:1"
+    artifact: {id: "report-html" media_type: "text/html" sha256: "provided"}
+})
 replay, err := fixture.replay({
     model: "fast"
     messages: {llm.user("hello")}
@@ -671,6 +682,9 @@ particular repository layout.
 `llm.provider_free_package_contract` and `llm.validate_package_contract` do the
 same for package-level boundaries: offline defaults, credential-free policy,
 and reference-string shape only.
+`llm.replay_http_record` and `llm.replay_artifact_record` normalize replay
+metadata only. They do not fetch URLs, read files, compute file hashes, or store
+raw response bodies/artifact content by default.
 
 ## Human Review And Resume
 

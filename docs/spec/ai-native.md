@@ -705,6 +705,21 @@ fixture-index references, and safe relative reference strings, but they must
 not load package files, resolve directories, read schemas, require a specific
 entrypoint name, or embed a project-specific package layout.
 
+`llm.replay_http_record(spec, opts)` normalizes HTTP/API replay metadata into an
+ordinary table with `kind: "replay_http_record"`, `schema_version: 1`,
+`version: "replay_http_record.v1"`, replay identity, provider-free/offline
+flags, redacted `request`, metadata-only `response`, optional `retry`,
+`pagination`, `rate_limit`, `error`, `terms`, `redaction`, and `summary`.
+`llm.replay_artifact_record(spec, opts)` does the same for downloaded artifact
+metadata with `kind: "replay_artifact_record"` and an `artifact` metadata table.
+
+Replay metadata record helpers must not perform HTTP requests, open artifact
+files, resolve paths, compute file hashes from disk, or require referenced
+resources to exist. They may redact sensitive headers and auth references and
+may record caller-provided hashes, byte counts, mock URIs, rate-limit metadata,
+pagination metadata, and terms metadata. Raw response bodies and raw artifact
+content must not be copied into normalized records by default.
+
 Scripts may validate trace evidence without a host trace sink.
 `llm.trace_summary(envelope_or_events)` returns deterministic event counts,
 ordered event types, replay keys, status counts, and ordering/correlation

@@ -20,6 +20,38 @@ func registerLLMReplayHelpers(t *Table) {
 		}
 		return []Value{TableValue(llmReplayRecordValue(args[0].Table())), NilValue()}, nil
 	})
+	replayHTTPRecord := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.replay_http_record' (HTTP replay record table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.replay_http_record' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmReplayHTTPRecordValue(args[0].Table(), opts)), NilValue()}, nil
+	}
+	setLLMFunction(t, "llm", "replay_http_record", replayHTTPRecord)
+	setLLMFunction(t, "llm", "replayHttpRecord", replayHTTPRecord)
+	setLLMFunction(t, "llm", "replay_api_record", replayHTTPRecord)
+	setLLMFunction(t, "llm", "replayApiRecord", replayHTTPRecord)
+	replayArtifactRecord := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.replay_artifact_record' (artifact replay record table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.replay_artifact_record' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmReplayArtifactRecordValue(args[0].Table(), opts)), NilValue()}, nil
+	}
+	setLLMFunction(t, "llm", "replay_artifact_record", replayArtifactRecord)
+	setLLMFunction(t, "llm", "replayArtifactRecord", replayArtifactRecord)
 	setLLMFunction(t, "llm", "replay_fixture", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.replay_fixture' (records or fixture table expected)")

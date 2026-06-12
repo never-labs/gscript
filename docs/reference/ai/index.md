@@ -689,6 +689,14 @@ returns a validation table for offline defaults, credential-free policy, and
 safe relative reference strings in `entrypoints`, `schemas`, and `fixtures`.
 These helpers do not load package files, resolve directories, inspect schemas,
 or require FinRobot-style names.
+`llm.replay_http_record(spec, opts)` and `llm.replay_artifact_record(spec,
+opts)` normalize caller-supplied HTTP/API and downloaded-artifact replay
+metadata. They fill provider-free/offline flags, replay identity, request and
+response summaries, redaction metadata, rate-limit/pagination/terms fields, and
+artifact provenance fields. They redact sensitive headers and auth refs, and
+they do not keep raw response bodies or artifact content in the normalized
+record by default. They never perform HTTP requests, open artifact files,
+resolve paths, compute file hashes, or require referenced resources to exist.
 `llm.replay_trace_event(match, opts)` projects a `fixture.match(...)` or
 `llm.replay_index(...).match(...)` result into a redacted trace event. Matched,
 mismatched, and exhausted replay states become `replay_record_matched`,
@@ -736,6 +744,22 @@ package_contract := llm.provider_free_package_contract({
 })
 package_gate := llm.validate_package_contract(package_contract, {
     require_fixture_index: true
+})
+http_record, err := llm.replay_http_record({
+    replay_key: "api:metrics:1"
+    request: {method: "GET" url: "https://example.invalid/metrics"}
+    response: {status: 200 body: "[{\"x\":1}]" typed_as: "MetricRow[]"}
+    rate_limit: {limit: 300 remaining: 1 retry_after_seconds: 2}
+    terms: {usage: "offline-fixture" live_network: false}
+})
+artifact_record, err := llm.replay_artifact_record({
+    replay_key: "download:report:1"
+    artifact: {
+        id: "report-html"
+        media_type: "text/html"
+        sha256: "provided-by-fixture"
+        replay_uri: "mock://artifacts/report.html"
+    }
 })
 request := {model: "fast", messages: {llm.user("hello")}}
 replay, err := fixture.replay(request, "turn:1")
