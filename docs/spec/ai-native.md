@@ -530,6 +530,18 @@ observational only: it does not verify citations, persist documents, authorize
 source access, call providers, or copy raw evidence text, snippets, prompts,
 completions, or credential-bearing metadata into trace payloads.
 
+`llm.model_io_envelope(spec, opts)` projects a model request/response boundary
+into an ordinary provider-free metadata table with `kind:
+"model_io_envelope"`, `schema_version: 1`, `version:
+"model_io_envelope.v1"`, operation/capability fields, provider/model routing
+metadata, redacted request headers/auth, message/tool summaries, response
+completion summaries, usage totals, schema hints, refs, redaction metadata, and
+a compact summary. `llm.model_call_envelope(...)` and `llm.turn_envelope(...)`
+are aliases. The helper never calls a provider, executes tools, stores raw
+prompts/messages/completions, or requires provider credentials. It is the shared
+shape for dialects and packages that need model-call provenance without making
+model I/O a built-in language concept.
+
 ## Section Generation
 
 `llm.sections(config)` and `llm.generate_sections(config)` run a shared request

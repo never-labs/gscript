@@ -320,6 +320,27 @@ This trace contract is script-visible result metadata. It complements host
 trace sinks, which receive metadata events such as `turn_start`, `turn_end`,
 `turn_error`, and streaming events.
 
+## Model I/O Envelopes
+
+Use `llm.model_io_envelope(spec, opts)` when a script or package needs a stable
+provider-free record of a model request/response boundary:
+
+```leia
+envelope := llm.model_io_envelope({
+    model: "fast"
+    request: {messages: {llm.user("Summarize ACME.")}}
+    response: {finish_reason: "stop" usage: {prompt_tokens: 8 completion_tokens: 5}}
+}, {capability: "generic.ai.turn"})
+```
+
+The envelope records routing metadata, redacted request headers/auth,
+message/tool counts, response presence, tool-call counts, usage totals, schema
+hints, refs, redaction policy, and a compact summary. It does not call a
+provider, execute tools, keep raw prompt/completion text, or require
+credentials. `llm.modelIOEnvelope`, `llm.model_call_envelope`,
+`llm.modelCallEnvelope`, `llm.turn_envelope`, and `llm.turnEnvelope` are
+equivalent aliases.
+
 ## Structured Output
 
 Agents and turns can request structured output with an `output` shape and can
