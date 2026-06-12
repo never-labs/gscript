@@ -112,6 +112,11 @@ type LLMTraceEvent struct {
 	ToolCount    int
 	Store        bool
 	Usage        LLMTurnUsage
+	ReplayKey    string
+	RequestHash  string
+	ResponseHash string
+	ReplayMode   string
+	ProviderFree bool
 }
 
 type LLMTraceSink func(LLMTraceEvent)

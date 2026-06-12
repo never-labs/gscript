@@ -57,6 +57,11 @@ func parseLLMTestProgram(t *testing.T, src string) *ast.Program {
 
 func runLLMTestProgram(t *testing.T, src string, provider runtime.LLMProvider) *runtime.Interpreter {
 	t.Helper()
+	return runLLMTestProgramWithTrace(t, src, provider, nil)
+}
+
+func runLLMTestProgramWithTrace(t *testing.T, src string, provider runtime.LLMProvider, trace runtime.LLMTraceSink) *runtime.Interpreter {
+	t.Helper()
 	interp := runtime.NewCore()
 	InstallLLM(interpInstaller{interp: interp}, LLMOptions{
 		Call:     interp.CallFunction,
@@ -65,6 +70,7 @@ func runLLMTestProgram(t *testing.T, src string, provider runtime.LLMProvider) *
 			return interp.MaxHostResultBytes()
 		},
 		Context: func() context.Context { return context.Background() },
+		Trace:   trace,
 	})
 	if err := interp.Exec(parseLLMTestProgram(t, src)); err != nil {
 		t.Fatalf("Exec: %v", err)

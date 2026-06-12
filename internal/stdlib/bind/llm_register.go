@@ -493,18 +493,18 @@ func (b *llmLibBuilder) llmTurn(args []Value) ([]Value, error) {
 	if onStream.IsNil() {
 		onStream = opts.RawGetString("onStream")
 	}
-	p, providerErr := llmResolveProviderForModel(opts, b.modelAliases, b.currentProvider(), b.currentProviderFactory())
-	if !providerErr.IsNil() {
-		b.agentConfigMu.RUnlock()
-		b.trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: providerErr.Table().RawGetString("message").Str()})
-		return []Value{NilValue(), providerErr}, nil
+	replayPlan := llmTurnReplayPlanFromOptions(opts)
+	var p LLMProvider
+	if !replayPlan.enabled {
+		var providerErr Value
+		p, providerErr = llmResolveProviderForModel(opts, b.modelAliases, b.currentProvider(), b.currentProviderFactory())
+		if !providerErr.IsNil() {
+			b.agentConfigMu.RUnlock()
+			b.trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: providerErr.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), providerErr}, nil
+		}
 	}
 	llmResolveModelAlias(opts, b.modelAliases)
-	if p == nil {
-		b.agentConfigMu.RUnlock()
-		b.trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: "llm provider not configured"})
-		return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
-	}
 	if opts.RawGetString("messages").IsNil() {
 		memoryContext := opts.RawGetString("context")
 		memoryEvidence := opts.RawGetString("evidence")
@@ -542,6 +542,19 @@ func (b *llmLibBuilder) llmTurn(args []Value) ([]Value, error) {
 	if err != nil {
 		b.trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
 		return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+	}
+	if replayPlan.enabled {
+		if errVal := llmTurnReplayValidate(replayPlan, req); !errVal.IsNil() {
+			b.trace(LLMTraceEvent{Type: "turn_replay_error", Model: req.Model, ErrorKind: llmErrorKind(errVal), Message: errVal.Table().RawGetString("message").Str(), ReplayKey: replayPlan.replayKey, RequestHash: llmTurnRequestHash(req), ReplayMode: replayPlan.mode, ProviderFree: true})
+			return []Value{NilValue(), errVal}, nil
+		}
+		out := llmTurnReplayResult(replayPlan, req)
+		b.trace(LLMTraceEvent{Type: "turn_replay", Model: req.Model, Status: out.Table().RawGetString("status").Str(), MessageCount: len(req.Messages), ToolCount: len(req.Tools), ReplayKey: replayPlan.replayKey, RequestHash: llmTurnRequestHash(req), ResponseHash: out.Table().RawGetString("replay").Table().RawGetString("response_hash").Str(), ReplayMode: replayPlan.mode, ProviderFree: true})
+		return []Value{out, NilValue()}, nil
+	}
+	if p == nil {
+		b.trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: "llm provider not configured"})
+		return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 	}
 	budgets := b.currentBudgets().with(llmBudgetFromOptions(opts))
 	if err := budgets.beforeTurn(); !err.IsNil() {
