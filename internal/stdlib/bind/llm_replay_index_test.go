@@ -627,6 +627,145 @@ setup_ok := record_err == nil && fixture_err == nil
 	}
 }
 
+func TestLLMFixtureIndexNormalizesAndValidatesOfflineMetadata(t *testing.T) {
+	interp := runLLMTestProgram(t, `
+index := llm.fixture_index({
+    fixture_id: "generic-ai-fixture-index"
+    fixtures: {
+        {
+            fixture_key: "case:a"
+            capability: "generic.ai.fixture.case"
+            path: "fixtures/case_a.json"
+            schema: "schemas/case.schema.json"
+            metadata: {case_count: 1}
+        }
+        {
+            id: "case:b"
+            path: "fixtures/case_b.json#/records"
+            schema_path: "schemas/case.schema.json"
+        }
+    }
+}, {
+    identity_fields: {"operation", "replay_key"}
+})
+gate := llm.validate_fixture_index(index, {
+    require_replay_ready: true
+    require_path: true
+})
+
+object_index := llm.fixtureIndex({
+    fixture_id: "object-fixtures"
+    fixtures: {
+        alpha: {
+            key: "alpha"
+            path: "fixtures/alpha.json"
+            metadata: {replay_ready: true}
+        }
+        beta: {
+            fixture_key: "beta"
+            path: "fixtures/beta.json"
+        }
+    }
+})
+object_gate := llm.validateFixtureIndex(object_index, {require_replay_ready: true})
+
+bad_index := llm.fixture_index({
+    fixture_id: "bad-index"
+    provider_free: false
+    live_network: true
+    fixtures: {
+        {
+            id: "bad"
+            path: "../secrets.json"
+            provider_free: false
+            metadata: {replay_ready: false provider_free: false live_network: true real_dependency_imports: true}
+        }
+    }
+})
+bad_gate := llm.validate_fixture_index(bad_index, {
+    require_replay_ready: true
+    require_path: true
+})
+
+index_marker := index.__llm_fixture_index
+index_kind := index.kind
+index_version := index.version
+index_fixture_id := index.fixture_id
+index_provider_free := index.provider_free
+index_live_network := index.live_network
+index_imports := index.real_dependency_imports
+index_strategy := index.strategy
+index_fixture_count := index.fixture_count
+index_first_id := index.fixtures[1].id
+index_first_key := index.fixtures[1].fixture_key
+index_first_replay_ready := index.fixtures[1].metadata.replay_ready
+index_second_schema := index.fixtures[2].schema
+index_identity_first := index.matching.identity_fields[1]
+index_identity_second := index.matching.identity_fields[2]
+index_summary_count := index.summary.fixture_count
+gate_ok := gate.ok
+gate_status := gate.status
+gate_findings := gate.finding_count
+object_count := object_index.fixture_count
+object_first_key := object_index.fixtures[1].fixture_key
+object_second_key := object_index.fixtures[2].fixture_key
+object_gate_ok := object_gate.ok
+bad_ok := bad_gate.ok
+bad_status := bad_gate.status
+bad_findings := bad_gate.finding_count
+bad_first_kind := bad_gate.findings[1].kind
+
+missing_ok, missing_err := pcall(llm.fixture_index)
+bad_opts_ok, bad_opts_err := pcall(llm.fixture_index, {}, "opts")
+bad_validate_ok, bad_validate_err := pcall(llm.validate_fixture_index, {}, "opts")
+`, nil)
+
+	for name, want := range map[string]Value{
+		"index_marker":             BoolValue(true),
+		"index_kind":               StringValue("fixture_index"),
+		"index_version":            StringValue("fixture_index.v1"),
+		"index_fixture_id":         StringValue("generic-ai-fixture-index"),
+		"index_provider_free":      BoolValue(true),
+		"index_live_network":       BoolValue(false),
+		"index_imports":            BoolValue(false),
+		"index_strategy":           StringValue("strict_ordered"),
+		"index_fixture_count":      IntValue(2),
+		"index_first_id":           StringValue("case:a"),
+		"index_first_key":          StringValue("case:a"),
+		"index_first_replay_ready": BoolValue(true),
+		"index_second_schema":      StringValue("schemas/case.schema.json"),
+		"index_identity_first":     StringValue("operation"),
+		"index_identity_second":    StringValue("replay_key"),
+		"index_summary_count":      IntValue(2),
+		"gate_ok":                  BoolValue(true),
+		"gate_status":              StringValue("ok"),
+		"gate_findings":            IntValue(0),
+		"object_count":             IntValue(2),
+		"object_first_key":         StringValue("alpha"),
+		"object_second_key":        StringValue("beta"),
+		"object_gate_ok":           BoolValue(true),
+		"bad_ok":                   BoolValue(false),
+		"bad_status":               StringValue("failed"),
+		"bad_first_kind":           StringValue("provider_free"),
+		"missing_ok":               BoolValue(false),
+		"bad_opts_ok":              BoolValue(false),
+		"bad_validate_ok":          BoolValue(false),
+	} {
+		got := interp.GetGlobal(name)
+		if !got.Equal(want) {
+			t.Fatalf("%s = %v, want %v", name, got, want)
+		}
+	}
+	if got := interp.GetGlobal("bad_findings"); !got.IsInt() || got.Int() < 5 {
+		t.Fatalf("bad_findings = %v, want at least 5", got)
+	}
+	for _, name := range []string{"missing_err", "bad_opts_err", "bad_validate_err"} {
+		if got := interp.GetGlobal(name); !got.IsString() || got.Str() == "" {
+			t.Fatalf("%s = %v, want error string", name, got)
+		}
+	}
+}
+
 func TestLLMReplayTraceEventFromIndexMatch(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 records := {

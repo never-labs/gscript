@@ -1,6 +1,9 @@
 package bind
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 var llmReplayDefaultIdentityFields = []string{"operation", "capability", "replay_key", "request_hash"}
 
@@ -68,6 +71,349 @@ func registerLLMReplayHelpers(t *Table) {
 		}
 		return []Value{TableValue(session), NilValue()}, nil
 	})
+	setLLMFunction(t, "llm", "fixture_index", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.fixture_index' (fixture index table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.fixture_index' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmFixtureIndexValue(args[0].Table(), opts))}, nil
+	})
+	setLLMFunction(t, "llm", "fixtureIndex", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.fixtureIndex' (fixture index table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.fixtureIndex' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmFixtureIndexValue(args[0].Table(), opts))}, nil
+	})
+	setLLMFunction(t, "llm", "validate_fixture_index", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.validate_fixture_index' (fixture index table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.validate_fixture_index' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmValidateFixtureIndexValue(args[0].Table(), opts))}, nil
+	})
+	setLLMFunction(t, "llm", "validateFixtureIndex", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.validateFixtureIndex' (fixture index table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.validateFixtureIndex' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmValidateFixtureIndexValue(args[0].Table(), opts))}, nil
+	})
+}
+
+func llmFixtureIndexValue(src, opts *Table) *Table {
+	out := NewTable()
+	for _, key := range src.PairsKeysSnapshot() {
+		out.RawSet(key, llmCloneValue(src.RawGet(key)))
+	}
+	out.RawSetString("__llm_fixture_index", BoolValue(true))
+	out.RawSetString("kind", StringValue("fixture_index"))
+	out.RawSetString("schema_version", IntValue(int64(llmReplayOptionInt(src, "schema_version", llmReplayOptionInt(opts, "schema_version", 1)))))
+	out.RawSetString("version", StringValue(llmReplayOptionString(src, "version", llmReplayOptionString(opts, "version", "fixture_index.v1"))))
+	fixtureID := llmReplayOptionString(src, "fixture_id", llmReplayOptionString(src, "id", llmReplayOptionString(opts, "fixture_id", "fixture-index")))
+	out.RawSetString("fixture_id", StringValue(fixtureID))
+	if out.RawGetString("id").IsNil() {
+		out.RawSetString("id", StringValue(fixtureID))
+	}
+	out.RawSetString("provider_free", BoolValue(llmReplayOptionBool(src, "provider_free", llmReplayOptionBool(opts, "provider_free", true))))
+	out.RawSetString("domain_specific", BoolValue(llmReplayOptionBool(src, "domain_specific", llmReplayOptionBool(opts, "domain_specific", false))))
+	out.RawSetString("live_network", BoolValue(llmReplayOptionBool(src, "live_network", llmReplayOptionBool(opts, "live_network", false))))
+	out.RawSetString("live_model", BoolValue(llmReplayOptionBool(src, "live_model", llmReplayOptionBool(opts, "live_model", false))))
+	out.RawSetString("live_model_calls", BoolValue(llmReplayOptionBool(src, "live_model_calls", llmReplayOptionBool(opts, "live_model_calls", false))))
+	out.RawSetString("real_dependency_imports", BoolValue(llmReplayOptionBool(src, "real_dependency_imports", llmReplayOptionBool(opts, "real_dependency_imports", false))))
+	out.RawSetString("credentials_required", BoolValue(llmReplayOptionBool(src, "credentials_required", llmReplayOptionBool(opts, "credentials_required", false))))
+	out.RawSetString("provider_credentials_required", BoolValue(llmReplayOptionBool(src, "provider_credentials_required", llmReplayOptionBool(opts, "provider_credentials_required", false))))
+	out.RawSetString("secret_values_present", BoolValue(llmReplayOptionBool(src, "secret_values_present", llmReplayOptionBool(opts, "secret_values_present", false))))
+	out.RawSetString("mode", StringValue(llmReplayOptionString(src, "mode", llmReplayOptionString(opts, "mode", llmReplayModeFixture))))
+	out.RawSetString("strategy", StringValue(llmReplayOptionString(src, "strategy", llmReplayOptionString(opts, "strategy", "strict_ordered"))))
+	fixtures := llmFixtureIndexFixtures(src, opts, out)
+	out.RawSetString("fixtures", TableValue(fixtures))
+	out.RawSetString("fixture_count", IntValue(int64(fixtures.Length())))
+	out.RawSetString("matching", TableValue(llmFixtureIndexMatchingValue(src, opts)))
+	out.RawSetString("deterministic_summary_order", llmReplayStringListValue([]string{"fixture_id", "strategy", "fixture_count", "provider_free", "live_network", "real_dependency_imports"}))
+	out.RawSetString("summary", TableValue(llmFixtureIndexSummaryValue(out)))
+	return out
+}
+
+func llmFixtureIndexMatchingValue(src, opts *Table) *Table {
+	matching := NewTable()
+	if existing := src.RawGetString("matching"); existing.IsTable() {
+		llmCopyTable(matching, existing.Table(), true)
+	}
+	matching.RawSetString("scan_ahead", BoolValue(llmReplayOptionBool(matching, "scan_ahead", false)))
+	matching.RawSetString("consume_on_match", BoolValue(llmReplayOptionBool(matching, "consume_on_match", llmReplayOptionBool(opts, "consume_on_match", true))))
+	matching.RawSetString("consume_on_mismatch", BoolValue(llmReplayOptionBool(matching, "consume_on_mismatch", llmReplayOptionBool(opts, "consume_on_mismatch", false))))
+	if matching.RawGetString("identity_fields").IsNil() {
+		matching.RawSetString("identity_fields", llmReplayStringListValue(llmReplayIdentityFields(opts)))
+	}
+	matching.RawSetString("mismatch_finding_kind", StringValue(llmReplayOptionString(matching, "mismatch_finding_kind", "generic.ai.replay.mismatch")))
+	matching.RawSetString("unconsumed_finding_kind", StringValue(llmReplayOptionString(matching, "unconsumed_finding_kind", "generic.ai.replay.unconsumed_record")))
+	matching.RawSetString("exhausted_finding_kind", StringValue(llmReplayOptionString(matching, "exhausted_finding_kind", "generic.ai.replay.exhausted")))
+	return matching
+}
+
+func llmFixtureIndexSummaryValue(index *Table) *Table {
+	summary := NewTable()
+	for _, field := range []string{"fixture_id", "strategy", "fixture_count", "provider_free", "domain_specific", "live_network", "live_model", "real_dependency_imports", "credentials_required"} {
+		if value := index.RawGetString(field); !value.IsNil() {
+			summary.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	return summary
+}
+
+func llmFixtureIndexFixtures(src, opts, index *Table) *Table {
+	fixturesValue := src.RawGetString("fixtures")
+	if !fixturesValue.IsTable() {
+		return NewSequentialArrayTable(0)
+	}
+	srcFixtures := fixturesValue.Table()
+	out := NewSequentialArrayTable(0)
+	for _, item := range llmFixtureIndexEntryValues(srcFixtures) {
+		if !item.IsTable() {
+			continue
+		}
+		out.RawSet(IntValue(int64(out.Length()+1)), TableValue(llmFixtureIndexEntryValue(item.Table(), opts, index, out.Length()+1)))
+	}
+	return out
+}
+
+func llmFixtureIndexEntryValue(src, opts, index *Table, ordinal int) *Table {
+	out := NewTable()
+	for _, key := range src.PairsKeysSnapshot() {
+		out.RawSet(key, llmCloneValue(src.RawGet(key)))
+	}
+	id := llmReplayOptionString(src, "id", llmReplayOptionString(src, "fixture_key", llmReplayOptionString(src, "key", fmt.Sprintf("fixture:%d", ordinal))))
+	fixtureKey := llmReplayOptionString(src, "fixture_key", id)
+	out.RawSetString("id", StringValue(id))
+	out.RawSetString("fixture_key", StringValue(fixtureKey))
+	if out.RawGetString("schema").IsNil() {
+		if value := src.RawGetString("schema_path"); !value.IsNil() {
+			out.RawSetString("schema", llmCloneValue(value))
+		} else if value := src.RawGetString("schemas"); !value.IsNil() {
+			out.RawSetString("schema", llmCloneValue(value))
+		}
+	}
+	out.RawSetString("provider_free", BoolValue(llmReplayOptionBool(src, "provider_free", llmReplayOptionBool(index, "provider_free", true))))
+	out.RawSetString("live_network", BoolValue(llmReplayOptionBool(src, "live_network", llmReplayOptionBool(index, "live_network", false))))
+	out.RawSetString("live_model", BoolValue(llmReplayOptionBool(src, "live_model", llmReplayOptionBool(index, "live_model", false))))
+	out.RawSetString("real_dependency_imports", BoolValue(llmReplayOptionBool(src, "real_dependency_imports", llmReplayOptionBool(index, "real_dependency_imports", false))))
+	out.RawSetString("credentials_required", BoolValue(llmReplayOptionBool(src, "credentials_required", llmReplayOptionBool(index, "credentials_required", false))))
+	out.RawSetString("provider_credentials_required", BoolValue(llmReplayOptionBool(src, "provider_credentials_required", llmReplayOptionBool(index, "provider_credentials_required", false))))
+	metadata := NewTable()
+	if existing := src.RawGetString("metadata"); existing.IsTable() {
+		llmCopyTable(metadata, existing.Table(), true)
+	}
+	metadata.RawSetString("replay_ready", BoolValue(llmReplayOptionBool(metadata, "replay_ready", llmReplayOptionBool(opts, "replay_ready", true))))
+	metadata.RawSetString("provider_free", BoolValue(llmReplayOptionBool(metadata, "provider_free", llmReplayOptionBool(out, "provider_free", true))))
+	metadata.RawSetString("live_network", BoolValue(llmReplayOptionBool(metadata, "live_network", llmReplayOptionBool(out, "live_network", false))))
+	metadata.RawSetString("real_dependency_imports", BoolValue(llmReplayOptionBool(metadata, "real_dependency_imports", llmReplayOptionBool(out, "real_dependency_imports", false))))
+	metadata.RawSetString("credentials_required", BoolValue(llmReplayOptionBool(metadata, "credentials_required", llmReplayOptionBool(out, "credentials_required", false))))
+	metadata.RawSetString("live_model_calls", BoolValue(llmReplayOptionBool(metadata, "live_model_calls", llmReplayOptionBool(index, "live_model_calls", false))))
+	out.RawSetString("metadata", TableValue(metadata))
+	return out
+}
+
+func llmValidateFixtureIndexValue(index, opts *Table) *Table {
+	findings := NewSequentialArrayTable(0)
+	if llmReplayOptionBool(opts, "require_provider_free", true) && !llmReplayOptionBool(index, "provider_free", false) {
+		llmFixtureIndexFinding(findings, "provider_free", "fixture index must be provider-free", "")
+	}
+	if llmReplayOptionBool(opts, "require_offline", true) {
+		if llmReplayOptionBool(index, "live_network", false) {
+			llmFixtureIndexFinding(findings, "live_network", "fixture index must not require live network", "")
+		}
+		if llmReplayOptionBool(index, "real_dependency_imports", false) {
+			llmFixtureIndexFinding(findings, "real_dependency_imports", "fixture index must not require real dependency imports", "")
+		}
+		if llmReplayOptionBool(index, "credentials_required", false) || llmReplayOptionBool(index, "provider_credentials_required", false) {
+			llmFixtureIndexFinding(findings, "credentials_required", "fixture index must not require credentials", "")
+		}
+	}
+	fixtures := index.RawGetString("fixtures").Table()
+	if fixtures == nil || fixtures.Length() == 0 {
+		if llmReplayOptionBool(opts, "require_fixtures", false) {
+			llmFixtureIndexFinding(findings, "fixtures", "fixture index must contain fixtures", "")
+		}
+	} else {
+		llmValidateFixtureIndexEntries(fixtures, opts, findings)
+	}
+	ok := findings.Length() == 0
+	out := NewTable()
+	out.RawSetString("kind", StringValue("fixture_index_validation"))
+	out.RawSetString("schema_version", IntValue(1))
+	out.RawSetString("version", StringValue("fixture_index_validation.v1"))
+	out.RawSetString("ok", BoolValue(ok))
+	if ok {
+		out.RawSetString("status", StringValue("ok"))
+		out.RawSetString("result_status", StringValue("ok"))
+	} else {
+		out.RawSetString("status", StringValue("failed"))
+		out.RawSetString("result_status", StringValue("blocked"))
+	}
+	out.RawSetString("fixture_id", llmCloneValue(index.RawGetString("fixture_id")))
+	out.RawSetString("fixture_count", IntValue(int64(llmFixtureIndexLength(fixtures))))
+	out.RawSetString("finding_count", IntValue(int64(findings.Length())))
+	out.RawSetString("findings", TableValue(findings))
+	out.RawSetString("provider_free", BoolValue(llmReplayOptionBool(index, "provider_free", true)))
+	out.RawSetString("live_network", BoolValue(llmReplayOptionBool(index, "live_network", false)))
+	out.RawSetString("real_dependency_imports", BoolValue(llmReplayOptionBool(index, "real_dependency_imports", false)))
+	return out
+}
+
+func llmValidateFixtureIndexEntries(fixtures, opts, findings *Table) {
+	ordinal := 0
+	for _, item := range llmFixtureIndexEntryValues(fixtures) {
+		ordinal++
+		fixtureName := fmt.Sprintf("fixture:%d", ordinal)
+		if !item.IsTable() {
+			llmFixtureIndexFinding(findings, "fixture", "fixture must be a table", fixtureName)
+			continue
+		}
+		fixture := item.Table()
+		if id := llmReplayOptionString(fixture, "fixture_key", llmReplayOptionString(fixture, "key", llmReplayOptionString(fixture, "id", ""))); id != "" {
+			fixtureName = id
+		} else {
+			llmFixtureIndexFinding(findings, "fixture_key", "fixture must include id or fixture_key", fixtureName)
+		}
+		if path := fixture.RawGetString("path"); !path.IsNil() {
+			llmValidateFixtureIndexReference(findings, "path", path, fixtureName)
+		} else if llmReplayOptionBool(opts, "require_path", false) {
+			llmFixtureIndexFinding(findings, "path", "fixture must include a path", fixtureName)
+		}
+		for _, field := range []string{"schema", "schema_path", "schemas"} {
+			if value := fixture.RawGetString(field); !value.IsNil() {
+				llmValidateFixtureIndexReference(findings, field, value, fixtureName)
+			}
+		}
+		if llmReplayOptionBool(opts, "require_provider_free", true) && !llmReplayOptionBool(fixture, "provider_free", false) {
+			llmFixtureIndexFinding(findings, "provider_free", "fixture must be provider-free", fixtureName)
+		}
+		if llmReplayOptionBool(opts, "require_offline", true) {
+			if llmReplayOptionBool(fixture, "live_network", false) {
+				llmFixtureIndexFinding(findings, "live_network", "fixture must not require live network", fixtureName)
+			}
+			if llmReplayOptionBool(fixture, "real_dependency_imports", false) {
+				llmFixtureIndexFinding(findings, "real_dependency_imports", "fixture must not require real dependency imports", fixtureName)
+			}
+		}
+		if llmReplayOptionBool(opts, "require_replay_ready", false) {
+			metadata := fixture.RawGetString("metadata").Table()
+			if metadata == nil || !llmReplayOptionBool(metadata, "replay_ready", false) {
+				llmFixtureIndexFinding(findings, "replay_ready", "fixture metadata must be replay-ready", fixtureName)
+			}
+		}
+		if metadata := fixture.RawGetString("metadata"); metadata.IsTable() {
+			llmValidateFixtureIndexMetadata(metadata.Table(), findings, fixtureName)
+		}
+	}
+}
+
+func llmFixtureIndexEntryValues(fixtures *Table) []Value {
+	if fixtures == nil {
+		return nil
+	}
+	out := make([]Value, 0, fixtures.Length())
+	for i := 1; i <= fixtures.Length(); i++ {
+		out = append(out, fixtures.RawGet(IntValue(int64(i))))
+	}
+	if len(out) > 0 {
+		return out
+	}
+	for _, key := range fixtures.PairsKeysSnapshot() {
+		out = append(out, fixtures.RawGet(key))
+	}
+	return out
+}
+
+func llmValidateFixtureIndexMetadata(metadata, findings *Table, fixtureName string) {
+	for _, check := range []struct {
+		field string
+		want  bool
+	}{
+		{"provider_free", true},
+		{"live_network", false},
+		{"real_dependency_imports", false},
+		{"replay_ready", true},
+	} {
+		value := metadata.RawGetString(check.field)
+		if value.IsNil() {
+			continue
+		}
+		if !value.IsBool() || value.Bool() != check.want {
+			llmFixtureIndexFinding(findings, check.field, fmt.Sprintf("fixture metadata %s must be %v", check.field, check.want), fixtureName)
+		}
+	}
+}
+
+func llmValidateFixtureIndexReference(findings *Table, field string, value Value, fixtureName string) {
+	if value.IsString() {
+		llmValidateFixtureIndexReferenceString(findings, field, value.Str(), fixtureName)
+		return
+	}
+	if value.IsTable() {
+		for i := 1; i <= value.Table().Length(); i++ {
+			item := value.Table().RawGet(IntValue(int64(i)))
+			if !item.IsString() {
+				llmFixtureIndexFinding(findings, field, "fixture reference list entries must be strings", fixtureName)
+				continue
+			}
+			llmValidateFixtureIndexReferenceString(findings, field, item.Str(), fixtureName)
+		}
+		return
+	}
+	llmFixtureIndexFinding(findings, field, "fixture reference must be a string or string list", fixtureName)
+}
+
+func llmValidateFixtureIndexReferenceString(findings *Table, field, ref, fixtureName string) {
+	if ref == "" {
+		llmFixtureIndexFinding(findings, field, "fixture reference must be non-empty", fixtureName)
+		return
+	}
+	if strings.HasPrefix(ref, "/") || strings.HasPrefix(ref, "\\") || strings.Contains(ref, "../") || strings.Contains(ref, `..\`) || strings.Contains(ref, "://") {
+		llmFixtureIndexFinding(findings, field, "fixture reference must be relative metadata, not an absolute path, parent traversal, or URL", fixtureName)
+	}
+}
+
+func llmFixtureIndexFinding(findings *Table, kind, message, fixture string) {
+	finding := NewTable()
+	finding.RawSetString("kind", StringValue(kind))
+	finding.RawSetString("message", StringValue(message))
+	if fixture != "" {
+		finding.RawSetString("fixture", StringValue(fixture))
+	}
+	findings.RawSet(IntValue(int64(findings.Length()+1)), TableValue(finding))
+}
+
+func llmFixtureIndexLength(fixtures *Table) int {
+	if fixtures == nil {
+		return 0
+	}
+	return len(llmFixtureIndexEntryValues(fixtures))
 }
 
 func llmReplayRecordValue(src *Table) *Table {
@@ -459,6 +805,20 @@ func llmReplayOptionBool(opts *Table, key string, fallback bool) bool {
 		return fallback
 	}
 	return value.Truthy()
+}
+
+func llmReplayOptionInt(opts *Table, key string, fallback int) int {
+	if opts == nil {
+		return fallback
+	}
+	value := opts.RawGetString(key)
+	if value.IsNil() {
+		return fallback
+	}
+	if n := toInt(value); n != 0 {
+		return int(n)
+	}
+	return fallback
 }
 
 func llmReplayIdentityEqual(a, b Value) bool {
