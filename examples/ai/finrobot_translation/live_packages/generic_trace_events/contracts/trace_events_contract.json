@@ -121,5 +121,53 @@
     "live_network": false,
     "live_model": false,
     "credentials_required": false
-  }
+  },
+  "external_envelope_projections": [
+    {
+      "id": "generic-approval-trace-to-ai-trace-approval",
+      "source_package": "generic-ai-approval-policy",
+      "source_schema": "../generic_approval_policy/schemas/approval_trace_envelope_v1.schema.json",
+      "source_fixture": "../generic_approval_policy/fixtures/approval_trace_envelope_fixture.json",
+      "source_kind": "generic_ai_approval_trace",
+      "target_schema": "schemas/trace_event_v1.schema.json",
+      "target_fixture": "fixtures/approval_trace_projection_fixture.json",
+      "target_event_type": "approval",
+      "target_capability": "ai.trace.approval",
+      "required_source_paths": [
+        "trace_id",
+        "fixture_key",
+        "request.request_id",
+        "request.tool",
+        "request.capability",
+        "request.risk_level",
+        "decision.status",
+        "decision.approval_id",
+        "result.status",
+        "result.secret_values_present",
+        "replay.deterministic"
+      ],
+      "required_target_paths": [
+        "trace_id",
+        "event_id",
+        "event_type",
+        "capability",
+        "correlation.tool_call_id",
+        "correlation.approval_id",
+        "payload.operation",
+        "payload.decision",
+        "payload.policy_id",
+        "payload.capability",
+        "payload.risk_level",
+        "payload.result_status",
+        "redaction.secret_values_present",
+        "replay.deterministic"
+      ],
+      "null_policy": "preserve_source_nulls_in_payload_and_use_stable_trace_correlation_fallbacks",
+      "provider_free": true,
+      "live_network": false,
+      "live_model": false,
+      "credentials_required": false,
+      "real_dependency_imports": false
+    }
+  ]
 }

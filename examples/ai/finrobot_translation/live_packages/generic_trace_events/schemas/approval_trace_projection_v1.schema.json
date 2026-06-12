@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://never-labs.dev/schemas/finrobot/generic_trace_events/approval_trace_projection_v1.schema.json",
+  "title": "Generic Approval Trace Projection",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "projection_kind",
+    "provider_free",
+    "domain_specific",
+    "live_network",
+    "live_model",
+    "credentials_required",
+    "real_dependency_imports",
+    "source",
+    "target",
+    "field_mappings",
+    "fallbacks",
+    "projected_event"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "projection_kind": {
+      "const": "external_envelope_to_trace_event"
+    },
+    "provider_free": {
+      "const": true
+    },
+    "domain_specific": {
+      "const": false
+    },
+    "live_network": {
+      "const": false
+    },
+    "live_model": {
+      "const": false
+    },
+    "credentials_required": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "package_id",
+        "schema",
+        "fixture",
+        "kind",
+        "required_fields"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "package_id",
+        "schema",
+        "event_type",
+        "capability",
+        "required_fields"
+      ]
+    },
+    "field_mappings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ]
+      }
+    },
+    "fallbacks": {
+      "type": "object"
+    },
+    "projected_event": {
+      "$ref": "trace_event_v1.schema.json"
+    }
+  }
+}

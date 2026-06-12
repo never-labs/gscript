@@ -131,6 +131,27 @@ type genericTraceEventsContract struct {
 		LiveModel                   bool     `json:"live_model"`
 		CredentialsRequired         bool     `json:"credentials_required"`
 	} `json:"trace_envelope_contract"`
+	ExternalEnvelopeProjections []genericTraceEventsExternalProjection `json:"external_envelope_projections"`
+}
+
+type genericTraceEventsExternalProjection struct {
+	ID                    string   `json:"id"`
+	SourcePackage         string   `json:"source_package"`
+	SourceSchema          string   `json:"source_schema"`
+	SourceFixture         string   `json:"source_fixture"`
+	SourceKind            string   `json:"source_kind"`
+	TargetSchema          string   `json:"target_schema"`
+	TargetFixture         string   `json:"target_fixture"`
+	TargetEventType       string   `json:"target_event_type"`
+	TargetCapability      string   `json:"target_capability"`
+	RequiredSourcePaths   []string `json:"required_source_paths"`
+	RequiredTargetPaths   []string `json:"required_target_paths"`
+	NullPolicy            string   `json:"null_policy"`
+	ProviderFree          bool     `json:"provider_free"`
+	LiveNetwork           bool     `json:"live_network"`
+	LiveModel             bool     `json:"live_model"`
+	CredentialsRequired   bool     `json:"credentials_required"`
+	RealDependencyImports bool     `json:"real_dependency_imports"`
 }
 
 type genericTraceEventsSequenceFixture struct {
@@ -185,10 +206,11 @@ type genericTraceEventFixture struct {
 		ReplayID      string `json:"replay_id"`
 	} `json:"correlation"`
 	Redaction struct {
-		PolicyID       string   `json:"policy_id"`
-		Status         string   `json:"status"`
-		RedactedFields []string `json:"redacted_fields"`
-		HashAlgorithm  string   `json:"hash_algorithm"`
+		PolicyID            string   `json:"policy_id"`
+		Status              string   `json:"status"`
+		RedactedFields      []string `json:"redacted_fields"`
+		HashAlgorithm       string   `json:"hash_algorithm"`
+		SecretValuesPresent bool     `json:"secret_values_present"`
 	} `json:"redaction"`
 	Payload map[string]any `json:"payload"`
 	Replay  struct {
@@ -215,6 +237,88 @@ type genericTraceEventsRedactionPolicy struct {
 		ProviderRequestID string `json:"provider_request_id"`
 		ProviderEndpoint  string `json:"provider_endpoint"`
 	} `json:"provider_identity_policy"`
+}
+
+type genericTraceEventsApprovalProjectionFixture struct {
+	SchemaVersion         int    `json:"schema_version"`
+	ID                    string `json:"id"`
+	ProjectionKind        string `json:"projection_kind"`
+	ProviderFree          bool   `json:"provider_free"`
+	DomainSpecific        bool   `json:"domain_specific"`
+	LiveNetwork           bool   `json:"live_network"`
+	LiveModel             bool   `json:"live_model"`
+	CredentialsRequired   bool   `json:"credentials_required"`
+	RealDependencyImports bool   `json:"real_dependency_imports"`
+	Source                struct {
+		PackageID      string   `json:"package_id"`
+		PackageName    string   `json:"package_name"`
+		Schema         string   `json:"schema"`
+		Fixture        string   `json:"fixture"`
+		Kind           string   `json:"kind"`
+		RequiredFields []string `json:"required_fields"`
+	} `json:"source"`
+	Target struct {
+		PackageID      string   `json:"package_id"`
+		Schema         string   `json:"schema"`
+		EventType      string   `json:"event_type"`
+		Capability     string   `json:"capability"`
+		RequiredFields []string `json:"required_fields"`
+	} `json:"target"`
+	FieldMappings []struct {
+		Source     string `json:"source"`
+		Target     string `json:"target"`
+		NullPolicy string `json:"null_policy"`
+	} `json:"field_mappings"`
+	Fallbacks struct {
+		RunID                 string `json:"run_id"`
+		TurnID                string `json:"turn_id"`
+		ApprovalIDWhenMissing string `json:"approval_id_when_missing"`
+		EventIDTemplate       string `json:"event_id_template"`
+		Sequence              int    `json:"sequence"`
+		TimestampMS           int    `json:"timestamp_ms"`
+	} `json:"fallbacks"`
+	ProjectedEvent genericTraceEventFixture `json:"projected_event"`
+}
+
+type genericTraceEventsApprovalSourceFixture struct {
+	SchemaVersion         int    `json:"schema_version"`
+	Kind                  string `json:"kind"`
+	TraceID               string `json:"trace_id"`
+	FixtureKey            string `json:"fixture_key"`
+	ProviderFree          bool   `json:"provider_free"`
+	LiveNetwork           bool   `json:"live_network"`
+	RealDependencyImports bool   `json:"real_dependency_imports"`
+	Request               struct {
+		RequestID  string         `json:"request_id"`
+		Tool       string         `json:"tool"`
+		Capability string         `json:"capability"`
+		RiskLevel  string         `json:"risk_level"`
+		ArgsShape  map[string]any `json:"args_shape"`
+	} `json:"request"`
+	Policy struct {
+		Package                      string   `json:"package"`
+		DefaultDecision              string   `json:"default_decision"`
+		ExactCapabilityMatchRequired bool     `json:"exact_capability_match_required"`
+		AllowedCapabilities          []string `json:"allowed_capabilities"`
+	} `json:"policy"`
+	Decision struct {
+		Status           string  `json:"status"`
+		Reason           string  `json:"reason"`
+		ApprovalRequired bool    `json:"approval_required"`
+		ApprovalID       *string `json:"approval_id"`
+	} `json:"decision"`
+	Result struct {
+		Status              string `json:"status"`
+		Executed            bool   `json:"executed"`
+		SideEffects         bool   `json:"side_effects"`
+		SecretValuesPresent bool   `json:"secret_values_present"`
+	} `json:"result"`
+	Replay struct {
+		Mode                string `json:"mode"`
+		Deterministic       bool   `json:"deterministic"`
+		FixtureSHA256       string `json:"fixture_sha256"`
+		CreatedFromProvider bool   `json:"created_from_provider"`
+	} `json:"replay"`
 }
 
 func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
@@ -250,20 +354,20 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		manifest.DefaultPolicy.FixtureHook != "recorded_generic_trace_events_fixture" {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
-	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture"} {
+	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 		assertGenericTraceEventsEntrypointPath(t, manifest.Entrypoints[key])
 	}
-	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "redaction_policy", "correlation_ids"} {
+	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "redaction_policy", "correlation_ids"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericTraceEventsJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "redaction_policy"} {
+	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "redaction_policy"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -296,6 +400,8 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		"ai.trace.correlation_ids",
 		"ai.trace.sequence_marker",
 		"ai.trace.fixture_replay",
+		"ai.trace.approval_projection",
+		"ai.trace.external_envelope_projection",
 	} {
 		if !genericTraceEventsContains(manifest.Capabilities, want) {
 			t.Fatalf("manifest capabilities missing %q: %#v", want, manifest.Capabilities)
@@ -484,6 +590,88 @@ func TestGenericTraceEventsPackageLocalUnifiedEnvelope(t *testing.T) {
 			t.Fatalf("missing trace envelope event type %q; got %v", eventType, sortedGenericTraceKeys(seenTypes))
 		}
 	}
+}
+
+func TestGenericTraceEventsApprovalTraceProjection(t *testing.T) {
+	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
+	contract := loadGenericTraceEventsContract(t, base)
+	var projection genericTraceEventsApprovalProjectionFixture
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "approval_trace_projection_fixture.json"), &projection)
+
+	sourcePath := filepath.Join(base, filepath.FromSlash(projection.Source.Fixture))
+	var source genericTraceEventsApprovalSourceFixture
+	decodeGenericTraceEventsJSONFile(t, sourcePath, &source)
+
+	if manifest.Fixtures["approval_trace_projection"] != "fixtures/approval_trace_projection_fixture.json" ||
+		manifest.Schemas["approval_trace_projection"] != "schemas/approval_trace_projection_v1.schema.json" {
+		t.Fatalf("approval projection manifest entries missing: fixtures=%#v schemas=%#v", manifest.Fixtures, manifest.Schemas)
+	}
+	for _, want := range []string{"ai.trace.approval_projection", "ai.trace.external_envelope_projection"} {
+		if !genericTraceEventsContains(manifest.Capabilities, want) {
+			t.Fatalf("manifest capabilities missing %q: %#v", want, manifest.Capabilities)
+		}
+	}
+
+	projectionContract := genericTraceEventsFindExternalProjection(contract, "generic-approval-trace-to-ai-trace-approval")
+	if projectionContract.ID == "" {
+		t.Fatalf("missing approval external projection contract: %#v", contract.ExternalEnvelopeProjections)
+	}
+	if projectionContract.SourceFixture != projection.Source.Fixture ||
+		projectionContract.SourceSchema != projection.Source.Schema ||
+		projectionContract.TargetFixture != manifest.Fixtures["approval_trace_projection"] ||
+		projectionContract.TargetSchema != projection.Target.Schema ||
+		projectionContract.TargetEventType != projection.Target.EventType ||
+		projectionContract.TargetCapability != projection.Target.Capability {
+		t.Fatalf("approval projection manifest/contract/fixture disconnected: contract=%#v projection=%#v", projectionContract, projection)
+	}
+	if !projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork || projection.LiveModel ||
+		projection.CredentialsRequired || projection.RealDependencyImports ||
+		!projectionContract.ProviderFree || projectionContract.LiveNetwork || projectionContract.LiveModel ||
+		projectionContract.CredentialsRequired || projectionContract.RealDependencyImports {
+		t.Fatalf("approval projection must stay provider-free/offline: projection=%#v contract=%#v", projection, projectionContract)
+	}
+	if source.Kind != projection.Source.Kind || !source.ProviderFree || source.LiveNetwork || source.RealDependencyImports {
+		t.Fatalf("approval source fixture is not compatible with projection source: source=%#v projection=%#v", source, projection.Source)
+	}
+	assertGenericTraceEventsSameStrings(t, "approval projection source paths", projectionContract.RequiredSourcePaths, []string{
+		"trace_id",
+		"fixture_key",
+		"request.request_id",
+		"request.tool",
+		"request.capability",
+		"request.risk_level",
+		"decision.status",
+		"decision.approval_id",
+		"result.status",
+		"result.secret_values_present",
+		"replay.deterministic",
+	})
+
+	event := projection.ProjectedEvent
+	if event.SchemaVersion != 1 ||
+		!event.ProviderFree ||
+		event.LiveNetwork ||
+		event.RealDependencyImports ||
+		event.TraceID != source.TraceID ||
+		event.EventType != "approval" ||
+		event.Capability != "ai.trace.approval" {
+		t.Fatalf("projected trace event header invalid: event=%#v source=%#v", event, source)
+	}
+	if event.Correlation.TraceID != event.TraceID ||
+		event.Correlation.ToolCallID != source.Request.RequestID ||
+		event.Correlation.ApprovalID != projection.Fallbacks.ApprovalIDWhenMissing {
+		t.Fatalf("projected trace event correlation invalid: event=%#v source=%#v projection=%#v", event.Correlation, source.Request, projection.Fallbacks)
+	}
+	if event.Redaction.SecretValuesPresent || source.Result.SecretValuesPresent ||
+		event.Redaction.Status != "clean" ||
+		len(event.Redaction.RedactedFields) != 0 {
+		t.Fatalf("approval projection redaction is not clean/provider-free: event=%#v source=%#v", event.Redaction, source.Result)
+	}
+	if !event.Replay.Deterministic || event.Replay.LiveSink || !source.Replay.Deterministic || source.Replay.CreatedFromProvider {
+		t.Fatalf("approval projection replay must be deterministic and offline: event=%#v source=%#v", event.Replay, source.Replay)
+	}
+	assertGenericTraceProjectionPayload(t, event.Payload, source, projection.Fallbacks.ApprovalIDWhenMissing)
 }
 
 func TestGenericTraceEventsRedactionPolicy(t *testing.T) {
@@ -845,9 +1033,11 @@ func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
 		"main.leia",
 		"package.manifest.json",
 		"contracts/trace_events_contract.json",
+		"fixtures/approval_trace_projection_fixture.json",
 		"fixtures/provider_free_fixture_index.json",
 		"fixtures/redaction_policy_fixture.json",
 		"fixtures/trace_envelope_fixture.json",
+		"schemas/approval_trace_projection_v1.schema.json",
 		"fixtures/trace_sequence_ACME_fixture.json",
 		"schemas/correlation_ids_v1.schema.json",
 		"schemas/redaction_policy_v1.schema.json",
@@ -886,6 +1076,43 @@ func assertGenericTraceEventsTextHasNoRawLeak(t *testing.T, path, text string) {
 		if strings.Contains(lower, `"provider_name": "`+provider+`"`) ||
 			strings.Contains(lower, `"provider": "`+provider+`"`) {
 			t.Fatalf("%s contains raw provider identity %q", path, provider)
+		}
+	}
+}
+
+func genericTraceEventsFindExternalProjection(contract genericTraceEventsContract, id string) genericTraceEventsExternalProjection {
+	for _, projection := range contract.ExternalEnvelopeProjections {
+		if projection.ID == id {
+			return projection
+		}
+	}
+	return genericTraceEventsExternalProjection{}
+}
+
+func assertGenericTraceProjectionPayload(t *testing.T, payload map[string]any, source genericTraceEventsApprovalSourceFixture, fallbackApprovalID string) {
+	t.Helper()
+	wantStrings := map[string]string{
+		"approval_id":        fallbackApprovalID,
+		"operation":          source.Request.Tool,
+		"decision":           source.Decision.Status,
+		"policy_id":          source.Policy.Package,
+		"capability":         source.Request.Capability,
+		"risk_level":         source.Request.RiskLevel,
+		"result_status":      source.Result.Status,
+		"source_fixture_key": source.FixtureKey,
+		"provider_name":      "generic",
+	}
+	for key, want := range wantStrings {
+		if got, _ := payload[key].(string); got != want {
+			t.Fatalf("projected payload[%s] = %#v, want %q; payload=%#v", key, payload[key], want, payload)
+		}
+	}
+	if got, _ := payload["approval_required"].(bool); got != source.Decision.ApprovalRequired {
+		t.Fatalf("projected payload approval_required = %#v, want %v; payload=%#v", payload["approval_required"], source.Decision.ApprovalRequired, payload)
+	}
+	if source.Decision.ApprovalID == nil {
+		if value, ok := payload["source_approval_id"]; !ok || value != nil {
+			t.Fatalf("projected payload source_approval_id = %#v, want null; payload=%#v", value, payload)
 		}
 	}
 }

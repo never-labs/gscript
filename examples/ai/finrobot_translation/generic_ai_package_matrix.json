@@ -683,7 +683,9 @@
         "ai.trace.agent_turn_tool_dispatch",
         "ai.trace.agent_done",
         "ai.trace.workflow_correlation",
-        "ai.trace.agent_correlation"
+        "ai.trace.agent_correlation",
+        "ai.trace.approval_projection",
+        "ai.trace.external_envelope_projection"
       ],
       "backend_shape": "ai.trace.emit",
       "provider_free": true,

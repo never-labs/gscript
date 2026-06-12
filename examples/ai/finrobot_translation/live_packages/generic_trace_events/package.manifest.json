@@ -39,20 +39,23 @@
     "fixture_index": "fixtures/provider_free_fixture_index.json",
     "trace_sequence_fixture": "fixtures/trace_sequence_ACME_fixture.json",
     "redaction_policy_fixture": "fixtures/redaction_policy_fixture.json",
-    "trace_envelope_fixture": "fixtures/trace_envelope_fixture.json"
+    "trace_envelope_fixture": "fixtures/trace_envelope_fixture.json",
+    "approval_trace_projection_fixture": "fixtures/approval_trace_projection_fixture.json"
   },
   "schemas": {
     "trace_event": "schemas/trace_event_v1.schema.json",
     "trace_sequence": "schemas/trace_sequence_v1.schema.json",
     "redaction_policy": "schemas/redaction_policy_v1.schema.json",
     "correlation_ids": "schemas/correlation_ids_v1.schema.json",
-    "trace_envelope": "schemas/trace_envelope_v1.schema.json"
+    "trace_envelope": "schemas/trace_envelope_v1.schema.json",
+    "approval_trace_projection": "schemas/approval_trace_projection_v1.schema.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
     "trace_sequence": "fixtures/trace_sequence_ACME_fixture.json",
     "redaction_policy": "fixtures/redaction_policy_fixture.json",
-    "trace_envelope": "fixtures/trace_envelope_fixture.json"
+    "trace_envelope": "fixtures/trace_envelope_fixture.json",
+    "approval_trace_projection": "fixtures/approval_trace_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.trace.events",
@@ -77,7 +80,9 @@
     "ai.trace.agent_turn_tool_dispatch",
     "ai.trace.agent_done",
     "ai.trace.workflow_correlation",
-    "ai.trace.agent_correlation"
+    "ai.trace.agent_correlation",
+    "ai.trace.approval_projection",
+    "ai.trace.external_envelope_projection"
   ],
   "event_contracts": [
     {
@@ -316,7 +321,9 @@
     "provider request IDs and provider names are omitted, generic, or redacted",
     "fixture replay matches trace_id, event_id, sequence, and event_type without live telemetry sinks",
     "trace envelope fixture covers turn, tool, approval, workflow, replay, and agent correlation IDs under the generic trace events package boundary",
-    "workflow and agent trace envelope event types remain provider-free and live-network disabled"
+    "workflow and agent trace envelope event types remain provider-free and live-network disabled",
+    "approval trace projection maps generic approval policy envelopes into ai.trace.approval events without importing provider SDKs",
+    "approval projection preserves default-deny decision metadata while redacting secret-bearing source fields"
   ],
   "no_built_in_guarantee": {
     "required": true,
