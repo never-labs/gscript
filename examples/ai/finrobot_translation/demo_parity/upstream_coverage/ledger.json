@@ -1061,7 +1061,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/live_package_plan_manifest.json",
-          "sha256": "fb0605941ed82b63d86b7f0f3fce9315064889cbd9bf6f4506d14b536a567684"
+          "sha256": "bb0375c4a2ab3acbfb16ad3ec7f8cb7711ea87f435df33358757cd82a9777c92"
         }
       ],
       "next_action": "Split module parity into finance, valuation, catalyst, renderer, and UI snapshot package tests."

@@ -209,25 +209,12 @@ func TestGenericChartRenderContractsLivePackageExecutableSkeleton(t *testing.T) 
 }
 
 type genericChartRenderContractsFixture struct {
-	ProviderFree          bool `json:"provider_free"`
-	LiveNetwork           bool `json:"live_network"`
-	RealDependencyImports bool `json:"real_dependency_imports"`
-	LiveModelCalls        bool `json:"live_model_calls"`
-	ChartSpecs            []struct {
-		ChartID    string `json:"chart_id"`
-		ChartType  string `json:"chart_type"`
-		Series     []any  `json:"series"`
-		Dimensions struct {
-			Width  int `json:"width"`
-			Height int `json:"height"`
-		} `json:"dimensions"`
-		SourceMetadata struct {
-			Provider    string `json:"provider"`
-			FixtureKey  string `json:"fixture_key"`
-			ReplayReady bool   `json:"replay_ready"`
-		} `json:"source_metadata"`
-	} `json:"chart_specs"`
-	RecipeMatrix struct {
+	ProviderFree          bool                     `json:"provider_free"`
+	LiveNetwork           bool                     `json:"live_network"`
+	RealDependencyImports bool                     `json:"real_dependency_imports"`
+	LiveModelCalls        bool                     `json:"live_model_calls"`
+	ChartSpecs            []genericChartRenderSpec `json:"chart_specs"`
+	RecipeMatrix          struct {
 		Recipes []struct {
 			Family    string `json:"family"`
 			ChartType string `json:"chart_type"`
@@ -246,25 +233,8 @@ type genericChartRenderContractsFixture struct {
 			Height int `json:"height"`
 		} `json:"dimensions"`
 	} `json:"render_requests"`
-	RenderResults []struct {
-		RequestID string `json:"request_id"`
-		OK        bool   `json:"ok"`
-		Renderer  string `json:"renderer"`
-		Artifact  *struct {
-			ArtifactID string `json:"artifact_id"`
-			URI        string `json:"uri"`
-			MediaType  string `json:"media_type"`
-			Hash       string `json:"hash"`
-		} `json:"artifact"`
-		Snapshot struct {
-			HashAlgorithm       string   `json:"hash_algorithm"`
-			Hash                string   `json:"hash"`
-			DeterministicInputs []string `json:"deterministic_inputs"`
-		} `json:"snapshot"`
-		Warnings          []string `json:"warnings"`
-		SourceMetadataRef string   `json:"source_metadata_ref"`
-	} `json:"render_results"`
-	RendererSkips     []genericChartRenderSkip `json:"renderer_skips"`
+	RenderResults     []genericChartRenderResult `json:"render_results"`
+	RendererSkips     []genericChartRenderSkip   `json:"renderer_skips"`
 	AdapterBoundaries []struct {
 		ID                 string `json:"id"`
 		Capability         string `json:"capability"`
@@ -273,6 +243,45 @@ type genericChartRenderContractsFixture struct {
 		LiveNetwork        bool   `json:"live_network"`
 		CleanSkip          bool   `json:"clean_skip"`
 	} `json:"adapter_boundaries"`
+}
+
+type genericChartRenderSpec struct {
+	ChartID    string `json:"chart_id"`
+	ChartType  string `json:"chart_type"`
+	Series     []any  `json:"series"`
+	Dimensions struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"dimensions"`
+	SourceMetadata struct {
+		Provider    string `json:"provider"`
+		FixtureKey  string `json:"fixture_key"`
+		IsStale     bool   `json:"is_stale"`
+		ReplayReady bool   `json:"replay_ready"`
+	} `json:"source_metadata"`
+	StaleDataWarning *struct {
+		Code     string `json:"code"`
+		Severity string `json:"severity"`
+	} `json:"stale_data_warning"`
+}
+
+type genericChartRenderResult struct {
+	RequestID string `json:"request_id"`
+	OK        bool   `json:"ok"`
+	Renderer  string `json:"renderer"`
+	Artifact  *struct {
+		ArtifactID string `json:"artifact_id"`
+		URI        string `json:"uri"`
+		MediaType  string `json:"media_type"`
+		Hash       string `json:"hash"`
+	} `json:"artifact"`
+	Snapshot struct {
+		HashAlgorithm       string   `json:"hash_algorithm"`
+		Hash                string   `json:"hash"`
+		DeterministicInputs []string `json:"deterministic_inputs"`
+	} `json:"snapshot"`
+	Warnings          []string `json:"warnings"`
+	SourceMetadataRef string   `json:"source_metadata_ref"`
 }
 
 type genericChartRenderSkip struct {

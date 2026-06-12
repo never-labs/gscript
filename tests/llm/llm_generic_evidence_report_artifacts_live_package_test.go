@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -66,6 +67,7 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		"generic.ai.render.request",
 		"generic.ai.render.output_manifest",
 		"generic.ai.evidence.report.render_projection",
+		"generic.ai.evidence.report.chart_artifact_projection",
 		"generic.ai.render.clean_skip",
 	} {
 		if !genericLivePackageContains(manifest.Capabilities, want) {
@@ -114,7 +116,7 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		} `json:"fixtures"`
 	}
 	decodeDocumentPipelineJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &index)
-	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 2 {
+	if !index.ProviderFree || index.LiveNetwork || index.RealDependencyImports || len(index.Fixtures) != 3 {
 		t.Fatalf("fixture index header/count mismatch: %#v", index)
 	}
 	fixture := index.Fixtures[0]
@@ -134,6 +136,18 @@ func TestGenericEvidenceReportArtifactsLivePackageContractFixtureClosedLoop(t *t
 		projection.Metadata["source_mappings"] != float64(4) ||
 		projection.Metadata["render_request_mappings"] != float64(2) {
 		t.Fatalf("projection fixture index entry mismatch: %#v", projection)
+	}
+	chartProjection := index.Fixtures[2]
+	if chartProjection.FixtureKey != "generic:evidence_report_artifacts:chart_render_artifact_projection" ||
+		chartProjection.Capability != "generic.ai.evidence.report.chart_artifact_projection" ||
+		chartProjection.Path != manifest.Fixtures["chart_render_artifact_projection"] ||
+		chartProjection.Schema != manifest.Schemas["chart_render_artifact_projection"] ||
+		chartProjection.Metadata["replay_ready"] != true ||
+		chartProjection.Metadata["chart_artifact_mappings"] != float64(1) ||
+		chartProjection.Metadata["chart_warning_mappings"] != float64(2) ||
+		chartProjection.Metadata["source_metadata_mappings"] != float64(2) ||
+		chartProjection.Metadata["snapshot_mappings"] != float64(2) {
+		t.Fatalf("chart projection fixture index entry mismatch: %#v", chartProjection)
 	}
 }
 
@@ -238,6 +252,7 @@ func TestGenericEvidenceReportArtifactsLivePackageSchemaRequiredFields(t *testin
 	assertDocumentPipelineNestedSchemaRequired(t, schema, []string{"properties", "citation_envelopes", "items"}, []string{"id", "claim_id", "source_refs", "citation_refs", "evidence_quality", "provider_free", "unresolved_refs"})
 	assertDocumentPipelineNestedSchemaRequired(t, schema, []string{"properties", "snapshot_metadata", "items"}, []string{"snapshot_id", "format", "viewport", "dimensions", "status", "content_hash", "hash_algorithm", "source_refs", "warning_refs", "disclosure_refs"})
 	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "verification_render_projection_v1.schema.json"), []string{"schema_version", "id", "projection_kind", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model_calls", "real_dependency_imports", "source_fixture_refs", "canonical_report_id", "identity_policy", "source_mappings", "citation_mappings", "warning_mappings", "artifact_mappings", "render_request_mappings", "projection_assertions"})
+	assertDocumentPipelineSchemaRequired(t, filepath.Join(base, "schemas", "chart_render_artifact_projection_v1.schema.json"), []string{"schema_version", "id", "projection_kind", "package_boundary_id", "provider_free", "domain_specific", "live_network", "live_model_calls", "real_dependency_imports", "source_fixture_refs", "chart_artifact_mappings", "chart_warning_mappings", "source_metadata_mappings", "snapshot_mappings", "projection_assertions"})
 }
 
 func TestGenericEvidenceReportArtifactsVerificationRenderProjection(t *testing.T) {
@@ -387,6 +402,180 @@ func TestGenericEvidenceReportArtifactsVerificationRenderProjection(t *testing.T
 	}
 }
 
+func TestGenericEvidenceReportArtifactsChartRenderArtifactProjection(t *testing.T) {
+	base := genericEvidenceReportArtifactsPackageDir(t)
+	root := repoRoot(t)
+	report := loadGenericEvidenceReportArtifactsFixture(t, filepath.Join(base, "fixtures", "generic_evidence_report_artifacts_fixture.json"))
+	chart := loadGenericChartRenderContractsFixture(t, filepath.Join(root, "examples", "ai", "finrobot_translation", "live_packages", "generic_chart_render_contracts", "fixtures", "generic_chart_render_contracts_fixture.json"))
+
+	var projection struct {
+		SchemaVersion         int    `json:"schema_version"`
+		ID                    string `json:"id"`
+		ProjectionKind        string `json:"projection_kind"`
+		PackageBoundaryID     string `json:"package_boundary_id"`
+		ProviderFree          bool   `json:"provider_free"`
+		DomainSpecific        bool   `json:"domain_specific"`
+		LiveNetwork           bool   `json:"live_network"`
+		LiveModelCalls        bool   `json:"live_model_calls"`
+		RealDependencyImports bool   `json:"real_dependency_imports"`
+		SourceFixtureRefs     struct {
+			ChartRenderContracts   string `json:"chart_render_contracts"`
+			EvidenceReportArtifact string `json:"evidence_report_artifacts"`
+		} `json:"source_fixture_refs"`
+		ChartArtifactMappings []struct {
+			ChartResultRequestID string `json:"chart_result_request_id"`
+			ChartArtifactID      string `json:"chart_artifact_id"`
+			ReportArtifactID     string `json:"report_artifact_id"`
+			ReportArtifactKind   string `json:"report_artifact_kind"`
+			MediaType            string `json:"media_type"`
+			URIPolicy            string `json:"uri_policy"`
+			RemoteFetch          bool   `json:"remote_fetch"`
+			ProviderFree         bool   `json:"provider_free"`
+			ProjectedStatus      string `json:"projected_status"`
+			ContentHashSource    string `json:"content_hash_source"`
+		} `json:"chart_artifact_mappings"`
+		ChartWarningMappings []struct {
+			ChartResultRequestID string `json:"chart_result_request_id"`
+			ChartSpecID          string `json:"chart_spec_id"`
+			ChartWarningRef      string `json:"chart_warning_ref"`
+			ReportWarningRef     string `json:"report_warning_ref"`
+			Severity             string `json:"severity"`
+			CleanSkip            bool   `json:"clean_skip"`
+			ProviderFree         bool   `json:"provider_free"`
+		} `json:"chart_warning_mappings"`
+		SourceMetadataMappings []struct {
+			ChartSpecID           string `json:"chart_spec_id"`
+			ChartSourceFixtureKey string `json:"chart_source_fixture_key"`
+			ReportSourceID        string `json:"report_source_id"`
+			SourceLocatorPolicy   string `json:"source_locator_policy"`
+			Stale                 bool   `json:"stale"`
+			ReplayReady           bool   `json:"replay_ready"`
+		} `json:"source_metadata_mappings"`
+		SnapshotMappings []struct {
+			ChartResultRequestID         string   `json:"chart_result_request_id"`
+			ChartSnapshotHash            string   `json:"chart_snapshot_hash"`
+			ReportSnapshotID             string   `json:"report_snapshot_id"`
+			DeterministicInputsPreserved []string `json:"deterministic_inputs_preserved"`
+			ProviderFree                 bool     `json:"provider_free"`
+		} `json:"snapshot_mappings"`
+		ProjectionAssertions map[string]bool `json:"projection_assertions"`
+	}
+	decodeDocumentPipelineJSONFile(t, filepath.Join(base, "fixtures", "chart_render_artifact_projection_fixture.json"), &projection)
+	if projection.SchemaVersion != 1 ||
+		projection.ID != "generic-chart-render-artifact-projection-fixture" ||
+		projection.ProjectionKind != "chart_render_to_evidence_report_artifact_projection" ||
+		projection.PackageBoundaryID != "generic-ai-evidence-report-artifacts" ||
+		!projection.ProviderFree || projection.DomainSpecific || projection.LiveNetwork ||
+		projection.LiveModelCalls || projection.RealDependencyImports ||
+		projection.SourceFixtureRefs.ChartRenderContracts == "" ||
+		projection.SourceFixtureRefs.EvidenceReportArtifact == "" {
+		t.Fatalf("chart projection header/provider boundary mismatch: %#v", projection)
+	}
+
+	reportArtifacts := map[string]struct {
+		kind   string
+		status string
+	}{}
+	for _, artifact := range report.ArtifactManifest.Artifacts {
+		reportArtifacts[artifact.ArtifactID] = struct {
+			kind   string
+			status string
+		}{kind: artifact.Kind, status: artifact.Status}
+	}
+	reportWarnings := map[string]string{}
+	for _, warning := range report.Warnings {
+		reportWarnings[warning.ID] = warning.Severity
+	}
+	reportSources := map[string]bool{}
+	for _, source := range report.SourceAnnotations {
+		reportSources[source.ID] = true
+	}
+	reportSnapshots := map[string]bool{}
+	for _, snapshot := range report.SnapshotMetadata {
+		reportSnapshots[snapshot.SnapshotID] = true
+	}
+
+	chartResults := map[string]genericChartRenderResult{}
+	for _, result := range chart.RenderResults {
+		chartResults[result.RequestID] = result
+	}
+	chartSpecs := map[string]genericChartRenderSpec{}
+	for _, spec := range chart.ChartSpecs {
+		chartSpecs[spec.ChartID] = spec
+	}
+	chartSkipWarnings := map[string]bool{}
+	for _, skip := range chart.RendererSkips {
+		chartSkipWarnings[skip.ID] = skip.CleanSkip
+	}
+
+	if len(projection.ChartArtifactMappings) != 1 {
+		t.Fatalf("chart artifact mappings = %d, want 1", len(projection.ChartArtifactMappings))
+	}
+	for _, mapping := range projection.ChartArtifactMappings {
+		result := chartResults[mapping.ChartResultRequestID]
+		reportArtifact, ok := reportArtifacts[mapping.ReportArtifactID]
+		if !ok || !result.OK || result.Artifact == nil ||
+			mapping.ChartArtifactID != result.Artifact.ArtifactID ||
+			mapping.MediaType != result.Artifact.MediaType ||
+			mapping.ContentHashSource != result.Artifact.Hash ||
+			mapping.ReportArtifactKind != reportArtifact.kind ||
+			mapping.ProjectedStatus != reportArtifact.status ||
+			mapping.URIPolicy != "artifact_uri_only" ||
+			mapping.RemoteFetch || !mapping.ProviderFree {
+			t.Fatalf("chart artifact mapping does not resolve: %#v", mapping)
+		}
+	}
+	if len(projection.ChartWarningMappings) != 2 {
+		t.Fatalf("chart warning mappings = %d, want 2", len(projection.ChartWarningMappings))
+	}
+	for _, mapping := range projection.ChartWarningMappings {
+		if reportWarnings[mapping.ReportWarningRef] != mapping.Severity || !mapping.ProviderFree {
+			t.Fatalf("chart warning mapping report warning unresolved: %#v", mapping)
+		}
+		if mapping.ChartResultRequestID != "" {
+			result := chartResults[mapping.ChartResultRequestID]
+			if result.OK || !genericEvidenceReportStringSliceContains(result.Warnings, mapping.ChartWarningRef) || !chartSkipWarnings[mapping.ChartWarningRef] || !mapping.CleanSkip {
+				t.Fatalf("renderer clean-skip warning mapping invalid: %#v", mapping)
+			}
+		}
+		if mapping.ChartSpecID != "" {
+			spec := chartSpecs[mapping.ChartSpecID]
+			if spec.StaleDataWarning == nil ||
+				spec.StaleDataWarning.Code != mapping.ChartWarningRef ||
+				!spec.SourceMetadata.IsStale ||
+				mapping.CleanSkip {
+				t.Fatalf("stale chart source warning mapping invalid: %#v", mapping)
+			}
+		}
+	}
+	for _, mapping := range projection.SourceMetadataMappings {
+		spec := chartSpecs[mapping.ChartSpecID]
+		if spec.SourceMetadata.FixtureKey == "" ||
+			mapping.ChartSourceFixtureKey != spec.SourceMetadata.FixtureKey ||
+			mapping.Stale != spec.SourceMetadata.IsStale ||
+			mapping.ReplayReady != spec.SourceMetadata.ReplayReady ||
+			!reportSources[mapping.ReportSourceID] ||
+			mapping.SourceLocatorPolicy != "redacted_fixture_locator_only" {
+			t.Fatalf("chart source metadata mapping invalid: %#v", mapping)
+		}
+	}
+	for _, mapping := range projection.SnapshotMappings {
+		result := chartResults[mapping.ChartResultRequestID]
+		if result.Snapshot.Hash == "" ||
+			mapping.ChartSnapshotHash != result.Snapshot.Hash ||
+			!reportSnapshots[mapping.ReportSnapshotID] ||
+			!reflect.DeepEqual(mapping.DeterministicInputsPreserved, result.Snapshot.DeterministicInputs) ||
+			!mapping.ProviderFree {
+			t.Fatalf("chart snapshot mapping invalid: %#v", mapping)
+		}
+	}
+	for _, want := range []string{"successful_chart_artifacts_project_to_report_artifacts", "unsupported_renderer_projects_to_clean_skip_warning", "stale_chart_source_projects_to_report_warning", "chart_source_metadata_resolves_to_report_sources", "snapshot_hashes_are_preserved_as_metadata", "artifact_uris_remain_metadata_refs_only", "raw_chart_payloads_absent", "live_network_absent", "real_dependency_imports_absent"} {
+		if !projection.ProjectionAssertions[want] {
+			t.Fatalf("chart projection assertion missing %q: %#v", want, projection.ProjectionAssertions)
+		}
+	}
+}
+
 func TestGenericEvidenceReportArtifactsLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericEvidenceReportArtifactsPackageDir(t), "main.leia")
 	for _, tc := range []struct {
@@ -415,7 +604,7 @@ func TestGenericEvidenceReportArtifactsLivePackageExecutableSkeleton(t *testing.
 			if err != nil {
 				t.Fatalf("Get generic_evidence_report_artifacts_live_package_summary: %v", err)
 			}
-			want := "generic_evidence_report_artifacts_live_package capability=generic.ai.evidence.report.artifacts entrypoint=ai.evidence.report_artifacts sources=2 evidence=2 artifacts=3 snapshots=2 warnings=2 clean_skip=2 provider_free=true live_network=false imports=false model_calls=false"
+			want := "generic_evidence_report_artifacts_live_package capability=generic.ai.evidence.report.artifacts entrypoint=ai.evidence.report_artifacts sources=2 evidence=2 artifacts=3 snapshots=2 warnings=2 clean_skip=2 chart_artifact_projections=1 chart_warning_projections=2 provider_free=true live_network=false imports=false model_calls=false"
 			if got != want {
 				t.Fatalf("summary = %#v, want %#v", got, want)
 			}
@@ -502,6 +691,15 @@ func loadGenericEvidenceReportArtifactsFixture(t *testing.T, path string) generi
 	var fixture genericEvidenceReportArtifactsFixture
 	decodeDocumentPipelineJSONFile(t, path, &fixture)
 	return fixture
+}
+
+func genericEvidenceReportStringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func genericEvidenceReportArtifactsPackageDir(t *testing.T) string {

@@ -310,6 +310,7 @@
         "generic.ai.render.output_manifest",
         "generic.ai.render.warning",
         "generic.ai.evidence.report.render_projection",
+        "generic.ai.evidence.report.chart_artifact_projection",
         "generic.ai.render.clean_skip"
       ],
       "backend_shape": "ai.evidence.report_artifacts",
@@ -318,6 +319,10 @@
       "manifest": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/package.manifest.json",
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/contracts/generic_evidence_report_artifacts_contract.json"
+      ],
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/verification_render_projection_fixture.json",
+        "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/chart_render_artifact_projection_fixture.json"
       ],
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts/fixtures/provider_free_fixture_index.json"
     },

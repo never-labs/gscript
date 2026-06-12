@@ -13,7 +13,9 @@ generic_evidence_report_artifacts_live_package := {
     artifacts: 3,
     snapshots: 2,
     warnings: 2,
-    clean_skip_adapters: 2
+    clean_skip_adapters: 2,
+    chart_artifact_projections: 1,
+    chart_warning_projections: 2
 }
 
 assert(generic_evidence_report_artifacts_live_package.provider_free)
@@ -22,9 +24,11 @@ assert(!generic_evidence_report_artifacts_live_package.real_dependency_imports)
 assert(!generic_evidence_report_artifacts_live_package.live_model_calls)
 assert(generic_evidence_report_artifacts_live_package.sources == 2)
 assert(generic_evidence_report_artifacts_live_package.artifacts == 3)
+assert(generic_evidence_report_artifacts_live_package.chart_artifact_projections == 1)
+assert(generic_evidence_report_artifacts_live_package.chart_warning_projections == 2)
 
 generic_evidence_report_artifacts_live_package_summary := string.format(
-"generic_evidence_report_artifacts_live_package capability=%s entrypoint=%s sources=%d evidence=%d artifacts=%d snapshots=%d warnings=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
+"generic_evidence_report_artifacts_live_package capability=%s entrypoint=%s sources=%d evidence=%d artifacts=%d snapshots=%d warnings=%d clean_skip=%d chart_artifact_projections=%d chart_warning_projections=%d provider_free=%s live_network=%s imports=%s model_calls=%s",
 generic_evidence_report_artifacts_live_package.capability,
 generic_evidence_report_artifacts_live_package.entrypoint,
 generic_evidence_report_artifacts_live_package.sources,
@@ -33,6 +37,8 @@ generic_evidence_report_artifacts_live_package.artifacts,
 generic_evidence_report_artifacts_live_package.snapshots,
 generic_evidence_report_artifacts_live_package.warnings,
 generic_evidence_report_artifacts_live_package.clean_skip_adapters,
+generic_evidence_report_artifacts_live_package.chart_artifact_projections,
+generic_evidence_report_artifacts_live_package.chart_warning_projections,
 tostring(generic_evidence_report_artifacts_live_package.provider_free),
 tostring(generic_evidence_report_artifacts_live_package.live_network),
 tostring(generic_evidence_report_artifacts_live_package.real_dependency_imports),

@@ -1150,12 +1150,14 @@
         "generic.ai.render.output_manifest",
         "generic.ai.render.warning",
         "generic.ai.evidence.report.render_projection",
+        "generic.ai.evidence.report.chart_artifact_projection",
         "generic.ai.render.clean_skip"
       ],
       "test_gates": [
         "provider-free fixture contract parses",
         "contract JSON declares generic evidence/report/artifact backend boundary",
         "verification-to-render projection preserves explicit source, citation, warning, artifact, and render request mappings",
+        "chart-render artifact projection preserves chart artifacts, warnings, source metadata, and snapshot hashes",
         "registered example executes provider-free",
         "no renderer, browser, provider credentials, live network, provider SDK, or q runtime dependency"
       ],

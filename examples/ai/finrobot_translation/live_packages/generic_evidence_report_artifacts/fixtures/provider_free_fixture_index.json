@@ -46,6 +46,27 @@
         "artifact_mappings": 3,
         "render_request_mappings": 2
       }
+    },
+    {
+      "fixture_key": "generic:evidence_report_artifacts:chart_render_artifact_projection",
+      "capability": "generic.ai.evidence.report.chart_artifact_projection",
+      "path": "fixtures/chart_render_artifact_projection_fixture.json",
+      "schema": "schemas/chart_render_artifact_projection_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "replay_ready": true,
+        "domain_specific": false,
+        "source_fixtures": 2,
+        "chart_artifact_mappings": 1,
+        "chart_warning_mappings": 2,
+        "source_metadata_mappings": 2,
+        "snapshot_mappings": 2
+      }
     }
   ]
 }
