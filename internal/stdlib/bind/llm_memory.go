@@ -130,6 +130,7 @@ func registerLLMMemoryHelpers(t *Table) {
 	setLLMFunction(t, "llm", "retrieve", retrieveFn)
 	setLLMFunction(t, "llm", "search", retrieveFn)
 	registerLLMMemoryOutcomeHelpers(t)
+	registerLLMEvidenceOutcomeHelpers(t)
 }
 
 func llmApplyMemoryContext(opts *Table) {

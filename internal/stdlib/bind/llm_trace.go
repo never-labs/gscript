@@ -146,6 +146,28 @@ func (b *llmLibBuilder) registerTraceHelpers() {
 	b.set("retrieval_outcome_trace_event", memoryOutcomeEvent)
 	b.set("retrievalOutcomeTraceEvent", memoryOutcomeEvent)
 
+	evidenceOutcomeEvent := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.evidence_outcome_event' (evidence outcome table expected)")
+		}
+		opts := NewTable()
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.evidence_outcome_event' (options table expected)")
+			}
+			opts = args[1].Table()
+		}
+		return []Value{TableValue(llmEvidenceOutcomeTraceEventValue(args[0].Table(), opts))}, nil
+	}
+	b.set("evidence_outcome_event", evidenceOutcomeEvent)
+	b.set("evidenceOutcomeEvent", evidenceOutcomeEvent)
+	b.set("evidence_outcome_trace_event", evidenceOutcomeEvent)
+	b.set("evidenceOutcomeTraceEvent", evidenceOutcomeEvent)
+	b.set("citation_outcome_event", evidenceOutcomeEvent)
+	b.set("citationOutcomeEvent", evidenceOutcomeEvent)
+	b.set("citation_outcome_trace_event", evidenceOutcomeEvent)
+	b.set("citationOutcomeTraceEvent", evidenceOutcomeEvent)
+
 	toolOutcomeEvent := func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.tool_outcome_event' (tool outcome table expected)")
@@ -752,6 +774,89 @@ func llmMemoryOutcomeCopyCorrelation(outcome, src *Table) {
 		if value := outcome.RawGetString("query"); !value.IsNil() {
 			src.RawSetString("correlation_id", llmCloneValue(value))
 		} else if value := outcome.RawGetString("top_id"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		}
+	}
+}
+
+func llmEvidenceOutcomeTraceEventValue(outcome, opts *Table) *Table {
+	src := NewTable()
+	for _, key := range opts.PairsKeysSnapshot() {
+		src.RawSet(key, llmCloneValue(opts.RawGet(key)))
+	}
+	status := llmTraceString(outcome, "status", "cited")
+	src.RawSetString("event_type", StringValue(llmTraceString(opts, "event_type", "evidence_outcome")))
+	src.RawSetString("status", StringValue(llmTraceString(opts, "status", status)))
+	src.RawSetString("provider_free", BoolValue(llmTraceBool(opts, "provider_free", true)))
+	src.RawSetString("live_network", BoolValue(llmTraceBool(opts, "live_network", false)))
+	src.RawSetString("live_model", BoolValue(llmTraceBool(opts, "live_model", false)))
+	src.RawSetString("credentials_required", BoolValue(llmTraceBool(opts, "credentials_required", false)))
+	src.RawSetString("real_dependency_imports", BoolValue(llmTraceBool(opts, "real_dependency_imports", false)))
+	llmEvidenceOutcomeCopyCorrelation(outcome, src)
+
+	payload := NewTable()
+	for _, field := range []string{
+		"kind",
+		"schema_version",
+		"version",
+		"source_kind",
+		"status",
+		"result_status",
+		"query",
+		"label",
+		"evidence_count",
+		"citation_count",
+		"source_count",
+		"artifact_count",
+		"top_id",
+		"top_source",
+		"top_artifact_id",
+		"ok",
+		"empty",
+		"operation",
+		"component",
+		"report_id",
+		"section",
+		"artifact_id",
+	} {
+		if value := outcome.RawGetString(field); !value.IsNil() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	for _, field := range []string{"top_evidence", "evidence_refs"} {
+		if value := outcome.RawGetString(field); value.IsTable() {
+			payload.RawSetString(field, llmCloneValue(value))
+		}
+	}
+	if redaction := outcome.RawGetString("redaction"); redaction.IsTable() {
+		src.RawSetString("redaction", llmCloneValue(redaction))
+	}
+	src.RawSetString("payload", TableValue(payload))
+	return llmTraceEventValue(src)
+}
+
+func llmEvidenceOutcomeCopyCorrelation(outcome, src *Table) {
+	for _, field := range []string{
+		"workflow_run_id",
+		"workflow_step_id",
+		"agent_run_id",
+		"turn_id",
+		"tool_call_id",
+		"replay_session_id",
+		"correlation_id",
+	} {
+		if src.RawGetString(field).IsNil() {
+			if value := outcome.RawGetString(field); !value.IsNil() {
+				src.RawSetString(field, llmCloneValue(value))
+			}
+		}
+	}
+	if src.RawGetString("correlation_id").IsNil() {
+		if value := outcome.RawGetString("report_id"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		} else if value := outcome.RawGetString("top_id"); !value.IsNil() {
+			src.RawSetString("correlation_id", llmCloneValue(value))
+		} else if value := outcome.RawGetString("label"); !value.IsNil() {
 			src.RawSetString("correlation_id", llmCloneValue(value))
 		}
 	}

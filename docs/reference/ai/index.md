@@ -388,6 +388,8 @@ retrieval workflows:
 | `llm.evidence(matches, opts)` | Build an evidence message wrapper, default label `Evidence`. |
 | `llm.memory_outcome(context_or_matches, opts)` / `llm.retrieval_outcome(...)` | Project retrieval/context matches into a redacted, ref-only outcome table. |
 | `llm.memory_outcome_event(outcome, opts)` / `llm.memory_outcome_trace_event(...)` | Project that outcome into the generic trace event shape. |
+| `llm.evidence_outcome(evidence_or_refs, opts)` / `llm.citation_outcome(...)` | Project evidence refs into a redacted, ref-only outcome table. |
+| `llm.evidence_outcome_event(outcome, opts)` / `llm.evidence_outcome_trace_event(...)` | Project evidence outcome metadata into the generic trace event shape. |
 
 `context` and `evidence` fields on turn, agent, and section request tables are
 expanded into user messages before the provider call. These helpers are for
@@ -396,6 +398,10 @@ database, persistence layer, citation verifier, or permission boundary.
 `llm.memory_outcome` is observational: it records match count, query/label,
 top match identity, citation refs, and correlation fields without copying raw
 memory text, snippets, prompts, or provider results into the payload.
+`llm.evidence_outcome` is the evidence/report-facing equivalent: it records
+evidence refs, citation/source/artifact counts, top evidence identity, redaction
+metadata, and correlation fields without copying raw evidence text, snippets,
+prompts, completions, or credentials.
 
 ```leia
 docs := llm.collection({
@@ -410,6 +416,13 @@ docs := llm.collection({
 ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
 outcome := llm.memory_outcome(ctx, {workflow_run_id: "run-42"})
 event := llm.memory_outcome_event(outcome, {trace_id: "memory-review"})
+evidence_outcome := llm.evidence_outcome(llm.evidence(ctx.matches), {
+    report_id: "report-42"
+    section: "risk"
+})
+evidence_event := llm.evidence_outcome_event(evidence_outcome, {
+    trace_id: "evidence-review"
+})
 result, err := llm.turn({
     model: "fast"
     user: "Who owns the incident?"
