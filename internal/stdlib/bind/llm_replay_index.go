@@ -164,6 +164,7 @@ func llmReplayFixtureValue(input, opts *Table) (*Table, Value) {
 	fixture.RawSetString("identity_fields", session.RawGetString("identity_fields"))
 	fixture.RawSetString("match", session.RawGetString("match"))
 	fixture.RawSetString("summary", session.RawGetString("summary"))
+	fixture.RawSetString("replay", session.RawGetString("replay"))
 	return fixture, NilValue()
 }
 
@@ -237,7 +238,72 @@ func newLLMReplayIndex(records, opts *Table) (*Table, Value) {
 	session.RawSetString("summary", FunctionValue(&GoFunction{Name: "llm.replay_index.summary", Fn: func(args []Value) ([]Value, error) {
 		return []Value{state.summary()}, nil
 	}}))
+	session.RawSetString("replay", FunctionValue(&GoFunction{Name: "llm.replay_index.replay", Fn: func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.replay_index.replay' (request table expected)")
+		}
+		replayKey := ""
+		if len(args) >= 2 {
+			if !args[1].IsString() {
+				return nil, fmt.Errorf("bad argument #2 to 'llm.replay_index.replay' (replay_key string expected)")
+			}
+			replayKey = args[1].Str()
+		}
+		return state.replay(args[0].Table(), replayKey), nil
+	}}))
 	return session, NilValue()
+}
+
+func (s *llmReplayIndexState) replay(request *Table, replayKey string) []Value {
+	match := s.match(llmReplayRequestIdentityValue(request, replayKey))
+	matchTable := match.Table()
+	if matchTable == nil || !matchTable.RawGetString("ok").Truthy() {
+		return []Value{NilValue(), llmReplayMatchErrorValue(matchTable)}
+	}
+	record := matchTable.RawGetString("record")
+	if !record.IsTable() {
+		return []Value{NilValue(), llmErrorValue("validation", "llm.replay_fixture replay matched a non-table record")}
+	}
+	replay := record.Table().RawGetString("replay")
+	if !replay.IsTable() {
+		return []Value{llmReplayRecordTurnReplayValue(record.Table()), NilValue()}
+	}
+	return []Value{llmCloneValue(replay), NilValue()}
+}
+
+func llmReplayRequestIdentityValue(request *Table, replayKey string) *Table {
+	identity := NewTable()
+	identity.RawSetString("operation", StringValue(llmReplayOptionString(request, "operation", "llm.turn")))
+	identity.RawSetString("capability", StringValue(llmReplayOptionString(request, "capability", "generic.ai.turn")))
+	if replayKey == "" {
+		replayKey = llmReplayOptionString(request, "replay_key", llmReplayOptionString(request, "record_id", ""))
+	}
+	identity.RawSetString("replay_key", StringValue(replayKey))
+	if hash := llmReplayOptionString(request, "request_hash", ""); hash != "" {
+		identity.RawSetString("request_hash", StringValue(hash))
+	} else {
+		identity.RawSetString("request_hash", StringValue(llmReplayRecordRequestHash(TableValue(request))))
+	}
+	return identity
+}
+
+func llmReplayMatchErrorValue(match *Table) Value {
+	if match == nil {
+		return llmErrorValue("validation", "llm.replay_fixture replay failed")
+	}
+	status := llmReplayOptionString(match, "status", "mismatch")
+	message := llmReplayOptionString(match, "message", fmt.Sprintf("llm.replay_fixture replay %s", status))
+	err := llmErrorValue("validation", message)
+	if et := err.Table(); et != nil {
+		et.RawSetString("status", StringValue(status))
+		if finding := match.RawGetString("finding_kind"); !finding.IsNil() {
+			et.RawSetString("finding_kind", llmCloneValue(finding))
+		}
+		if summary := match.RawGetString("summary"); !summary.IsNil() {
+			et.RawSetString("summary", llmCloneValue(summary))
+		}
+	}
+	return err
 }
 
 func (s *llmReplayIndexState) match(request *Table) Value {
