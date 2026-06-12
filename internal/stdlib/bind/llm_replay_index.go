@@ -255,7 +255,11 @@ func newLLMReplayIndex(records, opts *Table) (*Table, Value) {
 }
 
 func (s *llmReplayIndexState) replay(request *Table, replayKey string) []Value {
-	match := s.match(llmReplayRequestIdentityValue(request, replayKey))
+	identity, errValue := llmReplayRequestIdentityValue(request, replayKey, s.identityNeedsField("request_hash"))
+	if !errValue.IsNil() {
+		return []Value{NilValue(), errValue}
+	}
+	match := s.match(identity)
 	matchTable := match.Table()
 	if matchTable == nil || !matchTable.RawGetString("ok").Truthy() {
 		return []Value{NilValue(), llmReplayMatchErrorValue(matchTable)}
@@ -271,9 +275,13 @@ func (s *llmReplayIndexState) replay(request *Table, replayKey string) []Value {
 	return []Value{llmCloneValue(replay), NilValue()}
 }
 
-func llmReplayRequestIdentityValue(request *Table, replayKey string) *Table {
+func llmReplayRequestIdentityValue(request *Table, replayKey string, needsRequestHash bool) (*Table, Value) {
 	identity := NewTable()
-	identity.RawSetString("operation", StringValue(llmReplayOptionString(request, "operation", "llm.turn")))
+	for _, key := range request.PairsKeysSnapshot() {
+		identity.RawSet(key, llmCloneValue(request.RawGet(key)))
+	}
+	operation := llmReplayOptionString(request, "operation", "llm.turn")
+	identity.RawSetString("operation", StringValue(operation))
 	identity.RawSetString("capability", StringValue(llmReplayOptionString(request, "capability", "generic.ai.turn")))
 	if replayKey == "" {
 		replayKey = llmReplayOptionString(request, "replay_key", llmReplayOptionString(request, "record_id", ""))
@@ -281,10 +289,25 @@ func llmReplayRequestIdentityValue(request *Table, replayKey string) *Table {
 	identity.RawSetString("replay_key", StringValue(replayKey))
 	if hash := llmReplayOptionString(request, "request_hash", ""); hash != "" {
 		identity.RawSetString("request_hash", StringValue(hash))
-	} else {
-		identity.RawSetString("request_hash", StringValue(llmReplayRecordRequestHash(TableValue(request))))
+	} else if needsRequestHash && operation == "llm.turn" {
+		req, err := llmRequestFromTable(request)
+		if err != nil {
+			return nil, llmErrorValue("validation", err.Error())
+		}
+		identity.RawSetString("request_hash", StringValue(llmTurnRequestHash(req)))
+	} else if needsRequestHash {
+		identity.RawSetString("request_hash", StringValue(llmStableValueHash(TableValue(request))))
 	}
-	return identity
+	return identity, NilValue()
+}
+
+func (s *llmReplayIndexState) identityNeedsField(field string) bool {
+	for _, identityField := range s.identityFields {
+		if identityField == field {
+			return true
+		}
+	}
+	return false
 }
 
 func llmReplayMatchErrorValue(match *Table) Value {
