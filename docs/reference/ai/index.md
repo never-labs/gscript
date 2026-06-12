@@ -594,6 +594,32 @@ direct helper calls. Trace is for operational visibility and may redact content;
 replay is for deterministic provider behavior and must be strict about request
 matching.
 
+Scripts can also build provider-free replay fixtures directly. `llm.replay_record`
+normalizes one record, fills `operation`, `capability`, `request_hash`,
+`response_hash`, and a `replay` table that can be passed to `llm.turn`.
+`llm.replay_fixture(records, opts)` wraps normalized records with the same
+strict ordered matcher used by `llm.replay_index`.
+
+```leia
+record, err := llm.replay_record({
+    replay_key: "turn:1"
+    request: {model: "fast", messages: {llm.user("hello")}}
+    response: {status: "final_answer", text: "fixture answer"}
+})
+fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+matched := fixture.match({
+    operation: record.operation
+    capability: record.capability
+    replay_key: record.replay_key
+    request_hash: record.request_hash
+})
+result, err := llm.turn({
+    model: "fast"
+    messages: {llm.user("hello")}
+    replay: record.replay
+})
+```
+
 ## Evaluation Harness
 
 `evaluate "name" { ... }` declares a regression case discovered by

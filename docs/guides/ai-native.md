@@ -531,6 +531,25 @@ test should keep working if you rewrite a direct `llm.turn` as `turn { ... }`
 without changing the resulting request. Trace is for audit and visibility;
 replay is for deterministic provider behavior.
 
+For compact script-owned fixtures, use `llm.replay_record` and
+`llm.replay_fixture`. A replay record fills stable identity fields and exposes a
+`record.replay` table that can drive `llm.turn` without contacting the
+provider.
+
+```leia
+record, err := llm.replay_record({
+    replay_key: "turn:1"
+    request: {model: "fast", messages: {llm.user("hello")}}
+    response: {status: "final_answer", text: "fixture answer"}
+})
+fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+result, err := llm.turn({
+    model: "fast"
+    messages: {llm.user("hello")}
+    replay: record.replay
+})
+```
+
 ## Human Review And Resume
 
 The lower-level loop helpers expose pause/resume hooks for human-in-the-loop

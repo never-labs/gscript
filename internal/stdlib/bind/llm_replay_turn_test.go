@@ -93,6 +93,48 @@ err_message := err.message
 	}
 }
 
+func TestLLMTurnAcceptsReplayRecordHelperOutput(t *testing.T) {
+	provider := &testLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: "live"}}
+	interp := runLLMTestProgram(t, `
+record, record_err := llm.replay_record({
+    replay_key: "turn:helper"
+    request: {
+        model: "mock"
+        messages: {llm.user("hello helper replay")}
+    }
+    response: {
+        status: "final_answer"
+        text: "fixture helper answer"
+        calls: {}
+        usage: {input_tokens: 1 output_tokens: 2 cost: 0.0 latency_ms: 0}
+    }
+})
+result, err := llm.turn({
+    model: "mock"
+    messages: {llm.user("hello helper replay")}
+    replay: record.replay
+})
+record_err_nil := record_err == nil
+err_nil := err == nil
+text := result.text
+mode := result.replay.mode
+replay_key := result.replay.replay_key
+`, provider)
+
+	if len(provider.requests) != 0 {
+		t.Fatalf("provider requests = %d, want 0", len(provider.requests))
+	}
+	if got := interp.GetGlobal("record_err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("record_err_nil = %v, want true", got)
+	}
+	if got := interp.GetGlobal("err_nil"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("err_nil = %v, want true", got)
+	}
+	assertGlobalString(t, interp, "text", "fixture helper answer")
+	assertGlobalString(t, interp, "mode", "fixture_replay")
+	assertGlobalString(t, interp, "replay_key", "turn:helper")
+}
+
 type testLLMReplayMatchProvider struct {
 	*testLLMProvider
 	match runtime.LLMReplayMatch

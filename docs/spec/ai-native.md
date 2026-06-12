@@ -569,6 +569,14 @@ visibility and may redact content. Replay is for deterministic execution and
 must contain enough normalized request/result data to satisfy the replay
 provider under the host's chosen recording policy.
 
+`llm.replay_record(spec)` and `llm.replay_fixture(records, opts)` are script
+helpers for provider-free fixtures. They construct ordinary tables around the
+same identity fields used by the strict ordered matcher: `operation`,
+`capability`, `replay_key`, and `request_hash`. They must not create hidden
+provider state, bypass host policy, or introduce a second matching algorithm.
+The fixture matcher must reuse the same `llm.replay_index` semantics as direct
+record/replay tests.
+
 ## Evaluate Blocks
 
 `evaluate "case name" { ... }` declares a source-level regression case. The
