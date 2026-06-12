@@ -37,7 +37,7 @@ import (
 // Shrink-only ratchets: counts may go down (promotions) but never up without
 // an explicit, reviewed bump.
 const (
-	canonicalQGapMax = 19
+	canonicalQGapMax = 0
 	// Reviewed bump 30 -> 32: the parse-tree spelling deviations (verbs are
 	// symbol names, not function atoms; see value_eval_parse.go).
 	// Reviewed bump 32 -> 35: the three width-only temporal entries (date
