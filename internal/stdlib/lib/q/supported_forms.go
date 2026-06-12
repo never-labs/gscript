@@ -27,9 +27,13 @@ func SupportedEvalForms() []string {
 		"over",       // f/
 		"scan",       // f\
 
-		// Apply forms.
-		"apply-at",  // @[x;i] / @[x;i;f;y]
-		"apply-dot", // .[f;args] / .[x;i;f;y]
+		// Apply forms. The 3-argument shapes (@[f;x;e] trap, @[x;i;f] unary
+		// amend, and the .[...] equivalents) and the 'x signal form ride the
+		// same evaluator entries; see trap_signal.go. They are intentionally
+		// not separate names here: this list feeds the benchmark coverage
+		// gate, and error-path forms are not benchmark surface.
+		"apply-at",  // @[x;i] / @[x;i;f] / @[x;i;f;y]
+		"apply-dot", // .[f;args] / .[x;i;f] / .[x;i;f;y]
 
 		// Literal constructors.
 		"dict-literal",  // `a`b!1 2

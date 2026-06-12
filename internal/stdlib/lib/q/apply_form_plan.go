@@ -29,6 +29,13 @@ const (
 	qApplyFormAmendAt
 	// qApplyFormDotApply is two-part `.[fn;args]`.
 	qApplyFormDotApply
+	// qApplyFormAtTriple is three-part `@[first;second;third]`: trap when
+	// first evaluates to a callable, unary amend when it is data
+	// (disambiguation documented in trap_signal.go).
+	qApplyFormAtTriple
+	// qApplyFormDotTriple is three-part `.[first;second;third]`: trap of a
+	// multi-argument apply or unary deep amend by the same rule.
+	qApplyFormDotTriple
 )
 
 type qApplyFormPlan struct {
@@ -77,6 +84,11 @@ func buildQApplyFormPlan(src string) *qApplyFormPlan {
 	if strings.HasPrefix(src, "@[") && strings.HasSuffix(src, "]") {
 		// Mirror evalAtApplyOrAmend's arity gate, then evalAmend's split.
 		inner := strings.TrimSpace(src[2 : len(src)-1])
+		if triple := splitTopLevelDelim(inner, ';'); len(triple) == 3 {
+			// Mirror evalAtTripleForm: trap/unary-amend on the runtime
+			// callability of the first operand.
+			return buildQApplyFormTriplePlan(qApplyFormAtTriple, triple)
+		}
 		if len(splitTopLevelDelim(inner, ';')) != 4 {
 			return qApplyFormPlanInvalidShared
 		}
@@ -105,6 +117,10 @@ func buildQApplyFormPlan(src string) *qApplyFormPlan {
 		// Mirror buildDotApplyPlan's two-part shape with compiled operands.
 		inner := strings.TrimSpace(src[2 : len(src)-1])
 		parts := splitTopLevelDelim(inner, ';')
+		if len(parts) == 3 {
+			// Mirror evalDotTripleForm.
+			return buildQApplyFormTriplePlan(qApplyFormDotTriple, parts)
+		}
 		if len(parts) != 2 {
 			return qApplyFormPlanInvalidShared
 		}
@@ -149,6 +165,20 @@ func buildQApplyFormPlan(src string) *qApplyFormPlan {
 	return qApplyFormPlanInvalidShared
 }
 
+// buildQApplyFormTriplePlan compiles the three operands of a 3-argument
+// @/. form. target/index/value carry first/second/third; the trap-vs-amend
+// branch resolves per call on the first operand's runtime callability,
+// exactly like the string-route evalAtTripleForm/evalDotTripleForm.
+func buildQApplyFormTriplePlan(kind qApplyFormKind, parts []string) *qApplyFormPlan {
+	target := compileQEvalExpr(parts[0], 0)
+	index := compileQEvalExpr(parts[1], 0)
+	value := compileQEvalExpr(parts[2], 0)
+	if target == nil || index == nil || value == nil {
+		return qApplyFormPlanInvalidShared
+	}
+	return &qApplyFormPlan{kind: kind, target: target, index: index, value: value}
+}
+
 // evalQApplyFormPlan executes the compiled apply-form plan for src.
 // handled=false (including unsupported sub-expressions) leaves the statement
 // on the per-call apply string walk.
@@ -180,6 +210,45 @@ func (s *EvalState) evalQApplyFormPlan(src string) (any, bool, error) {
 			return out, true, err
 		}
 		out, err := s.amendValueWithFunction(target, index, plan.op, value)
+		return out, true, err
+	case qApplyFormAtTriple, qApplyFormDotTriple:
+		// Mirror evalAtTripleForm/evalDotTripleForm: operands evaluate
+		// (unprotected) in order, then the first operand's callability picks
+		// trap or unary amend. Only the protected apply itself is trapped.
+		first, err := s.evalValueExpr(plan.target)
+		if err != nil {
+			return s.qApplyFormPlanError(err)
+		}
+		second, err := s.evalValueExpr(plan.index)
+		if err != nil {
+			return s.qApplyFormPlanError(err)
+		}
+		third, err := s.evalValueExpr(plan.value)
+		if err != nil {
+			return s.qApplyFormPlanError(err)
+		}
+		if isCallable(first) {
+			var out any
+			var applyErr error
+			if plan.kind == qApplyFormAtTriple {
+				out, applyErr = s.applyCallable1(first, second)
+			} else if array, ok := second.(data.Array); ok {
+				out, applyErr = s.applyCallableArrayArgs(first, array)
+			} else {
+				out, applyErr = s.applyCallable(first, qApplyArgs(second))
+			}
+			out, err := s.qTrapResult(out, applyErr, third)
+			return out, true, err
+		}
+		if plan.kind == qApplyFormAtTriple {
+			out, err := s.amendValueWithUnaryFunction(first, second, third)
+			return out, true, err
+		}
+		pathItems, err := amendPathItems(second)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := s.amendPathUnary(first, pathItems, third)
 		return out, true, err
 	case qApplyFormDotApply:
 		fn, err := s.evalValueExpr(plan.fn)
