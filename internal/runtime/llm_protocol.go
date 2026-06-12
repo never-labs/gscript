@@ -98,25 +98,32 @@ type LLMTurnResult struct {
 }
 
 type LLMTraceEvent struct {
-	Type         string
-	Model        string
-	Status       string
-	Tool         string
-	CallID       string
-	Token        string
-	ErrorKind    string
-	Message      string
-	Step         int64
-	Attempt      int64
-	MessageCount int
-	ToolCount    int
-	Store        bool
-	Usage        LLMTurnUsage
-	ReplayKey    string
-	RequestHash  string
-	ResponseHash string
-	ReplayMode   string
-	ProviderFree bool
+	TraceID         string
+	EventID         string
+	ParentEventID   string
+	TurnID          string
+	ReplaySessionID string
+	Sequence        int64
+	TimestampMS     int64
+	Type            string
+	Model           string
+	Status          string
+	Tool            string
+	CallID          string
+	Token           string
+	ErrorKind       string
+	Message         string
+	Step            int64
+	Attempt         int64
+	MessageCount    int
+	ToolCount       int
+	Store           bool
+	Usage           LLMTurnUsage
+	ReplayKey       string
+	RequestHash     string
+	ResponseHash    string
+	ReplayMode      string
+	ProviderFree    bool
 }
 
 type LLMTraceSink func(LLMTraceEvent)

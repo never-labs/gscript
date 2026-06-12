@@ -84,20 +84,32 @@ type TurnResult struct {
 }
 
 type TraceEvent struct {
-	Type         string
-	Model        string
-	Status       string
-	Tool         string
-	CallID       string
-	Token        string
-	ErrorKind    string
-	Message      string
-	Step         int64
-	Attempt      int64
-	MessageCount int
-	ToolCount    int
-	Store        bool
-	Usage        TurnUsage
+	TraceID         string
+	EventID         string
+	ParentEventID   string
+	TurnID          string
+	ReplaySessionID string
+	Sequence        int64
+	TimestampMS     int64
+	Type            string
+	Model           string
+	Status          string
+	Tool            string
+	CallID          string
+	Token           string
+	ErrorKind       string
+	Message         string
+	Step            int64
+	Attempt         int64
+	MessageCount    int
+	ToolCount       int
+	Store           bool
+	Usage           TurnUsage
+	ReplayKey       string
+	RequestHash     string
+	ResponseHash    string
+	ReplayMode      string
+	ProviderFree    bool
 }
 
 type TraceSink func(TraceEvent)
