@@ -135,22 +135,63 @@ assert(generic_record_replay_provider_free_ok(generic_record_replay_live_package
 assert(generic_record_replay_records_ok(generic_record_replay_live_package.records))
 assert(#generic_record_replay_live_package.replay_index.identity_fields == 4)
 assert(#generic_record_replay_live_package.replay_index.deterministic_summary_order == 11)
-assert(generic_record_replay_live_package.expected_partial_summary.matched == 2)
-assert(generic_record_replay_live_package.expected_partial_summary.unconsumed == 1)
-assert(generic_record_replay_live_package.expected_mismatch_summary.mismatches == 1)
-assert(generic_record_replay_live_package.expected_mismatch_summary.next_index == 1)
+
+runtime_partial_replay, runtime_partial_replay_err := llm.replay_index(
+    generic_record_replay_live_package.records,
+    generic_record_replay_live_package.replay_index
+)
+assert(runtime_partial_replay_err == nil)
+runtime_partial_replay.match({
+    operation: "llm.complete"
+    capability: "generic.ai.completion"
+    replay_key: "turn:000:llm.complete"
+    request_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+})
+runtime_partial_replay.match({
+    operation: "tool.call"
+    capability: "generic.ai.tool.invoke"
+    replay_key: "turn:001:tool.lookup"
+    request_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+})
+runtime_partial_summary := runtime_partial_replay.summary()
+
+runtime_mismatch_replay, runtime_mismatch_replay_err := llm.replay_index(
+    generic_record_replay_live_package.records,
+    generic_record_replay_live_package.replay_index
+)
+assert(runtime_mismatch_replay_err == nil)
+runtime_mismatch_replay.match({
+    operation: "llm.complete"
+    capability: "generic.ai.completion"
+    replay_key: "turn:000:llm.complete"
+    request_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+})
+runtime_mismatch_replay.match({
+    operation: "tool.call"
+    capability: "generic.ai.tool.invoke"
+    replay_key: "turn:001:tool.lookup"
+    request_hash: "sha256:not-the-recorded-request"
+})
+runtime_mismatch_summary := runtime_mismatch_replay.summary()
+
+assert(runtime_partial_summary.matched == generic_record_replay_live_package.expected_partial_summary.matched)
+assert(runtime_partial_summary.unconsumed == generic_record_replay_live_package.expected_partial_summary.unconsumed)
+assert(runtime_partial_summary.next_index == generic_record_replay_live_package.expected_partial_summary.next_index)
+assert(runtime_mismatch_summary.mismatches == generic_record_replay_live_package.expected_mismatch_summary.mismatches)
+assert(runtime_mismatch_summary.next_index == generic_record_replay_live_package.expected_mismatch_summary.next_index)
+assert(runtime_mismatch_summary.unconsumed == generic_record_replay_live_package.expected_mismatch_summary.unconsumed)
 
 generic_record_replay_live_package_summary := string.format(
 "generic_record_replay_live_package strategy=%s records=%d partial_matched=%d partial_unconsumed=%d mismatch_matched=%d mismatches=%d mismatch_unconsumed=%d next_index=%d findings=%d provider_free=%s domain_specific=%s live_network=%s imports=%s",
 generic_record_replay_live_package.replay_index.strategy,
 #generic_record_replay_live_package.records,
-generic_record_replay_live_package.expected_partial_summary.matched,
-generic_record_replay_live_package.expected_partial_summary.unconsumed,
-generic_record_replay_live_package.expected_mismatch_summary.matched,
-generic_record_replay_live_package.expected_mismatch_summary.mismatches,
-generic_record_replay_live_package.expected_mismatch_summary.unconsumed,
-generic_record_replay_live_package.expected_mismatch_summary.next_index,
-#generic_record_replay_live_package.expected_mismatch_summary.finding_kinds,
+runtime_partial_summary.matched,
+runtime_partial_summary.unconsumed,
+runtime_mismatch_summary.matched,
+runtime_mismatch_summary.mismatches,
+runtime_mismatch_summary.unconsumed,
+runtime_mismatch_summary.next_index,
+#runtime_mismatch_summary.finding_kinds,
 tostring(generic_record_replay_live_package.provider_free),
 tostring(generic_record_replay_live_package.domain_specific),
 tostring(generic_record_replay_live_package.live_network),

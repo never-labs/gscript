@@ -78,6 +78,7 @@ func (b *llmLibBuilder) set(name string, fn func([]Value) ([]Value, error)) {
 func (b *llmLibBuilder) register() {
 	registerLLMMessageConstructors(b.t, "llm")
 	registerLLMMemoryHelpers(b.t)
+	registerLLMReplayHelpers(b.t)
 	b.registerMessageHelpers()
 	b.registerToolHelpers()
 	b.registerSchemaHelpers()
