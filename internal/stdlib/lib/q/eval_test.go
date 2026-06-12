@@ -585,7 +585,7 @@ func TestQPipelinePlanRecognizesRuntimePrimitiveStatsAndWindows(t *testing.T) {
 		{expr: "ceiling 1.1", shape: "runtime-unary/ceiling", pipelineShape: "numeric_math", transform: "ceiling", want: int64(2)},
 		{expr: "2 xexp 3 4", shape: "runtime-dyadic/xexp", pipelineShape: "numeric_math", transform: "xexp", want: data.NewF64([]float64{8, 16})},
 		{expr: "2 xlog 8", shape: "runtime-dyadic/xlog", pipelineShape: "numeric_math", transform: "xlog", want: 3.0},
-		{expr: "1 2 3 wsum 10 20 30", shape: "runtime-dyadic/wsum", pipelineShape: "numeric_stats", transform: "wsum", want: 140.0},
+		{expr: "1 2 3 wsum 10 20 30", shape: "runtime-dyadic/wsum", pipelineShape: "numeric_stats", transform: "wsum", want: int64(140)},
 		{expr: "1 2 3 cov 1 2 3", shape: "runtime-dyadic/cov", pipelineShape: "numeric_stats", transform: "cov", want: float64(2) / 3},
 		{expr: "1 2 3 scov 1 2 3", shape: "runtime-dyadic/scov", pipelineShape: "numeric_stats", transform: "scov", want: 1.0},
 		{expr: "1 2 3 cor 1 2 3", shape: "runtime-dyadic/cor", pipelineShape: "numeric_stats", transform: "cor", want: 1.0},
@@ -864,8 +864,8 @@ func TestQPipelinePlanRecognizesCastEnvelope(t *testing.T) {
 	}
 
 	out, handled, err := ExecuteEvalPipelineDescriptor(descriptor)
-	if err != nil || !handled || out != int64(67) {
-		t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want 67,true,nil", out, handled, err)
+	if err != nil || !handled || out != int64(68) {
+		t.Fatalf("ExecuteEvalPipelineDescriptor = %#v,%v,%v; want 68,true,nil", out, handled, err)
 	}
 	backend, ok := DescribeEvalPipelineBackendPlan(src)
 	if !ok {
@@ -876,8 +876,8 @@ func TestQPipelinePlanRecognizesCastEnvelope(t *testing.T) {
 		t.Fatalf("CompileEvalPipelineBackendPlan(%#v) failed", backend)
 	}
 	out, handled, err = NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
-	if err != nil || !handled || out != int64(67) {
-		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v; want 67,true,nil", out, handled, err)
+	if err != nil || !handled || out != int64(68) {
+		t.Fatalf("ExecuteEvalPipelineExecutablePlan = %#v,%v,%v; want 68,true,nil", out, handled, err)
 	}
 
 	seenPipeline := false
@@ -2153,7 +2153,7 @@ func TestEvalTableFlipDictAndKeyedColumnOrder(t *testing.T) {
 		data.Symbol("sym"),
 		data.Symbol("size"),
 	})
-	assertEvalArray(t, "key ([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)", data.KindSymbol, []any{
+	assertEvalArray(t, "keys ([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)", data.KindSymbol, []any{
 		data.Symbol("venue"),
 		data.Symbol("sym"),
 	})
@@ -2344,7 +2344,8 @@ func TestEvalTypedCasts(t *testing.T) {
 	})
 
 	assertEvalErrorContains(t, "`short$40000", "q cast")
-	assertEvalValue(t, "`int$1.5", int32(1))
+	// Canonical q integer casts round half-to-even (1.5 -> 2).
+	assertEvalValue(t, "`int$1.5", int32(2))
 	// Canonical q: a failed string-to-number parse yields the target null.
 	if got, err := Eval("\"I\"$\"42.5\""); err != nil || !data.IsNull(got) {
 		t.Errorf("Eval(%q) = %#v, %v; want 0Ni (failed parses cast to null)", "\"I\"$\"42.5\"", got, err)
@@ -3679,18 +3680,17 @@ func TestEvalKeyedTableLiteral(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Eval(keyed lookup) returned error: %v", err)
 	}
-	frame, ok = got.(data.Frame)
+	// Canonical: a single-key lookup yields the value-row dictionary.
+	lookupDict, ok := got.(EvalDict)
 	if !ok {
-		t.Fatalf("keyed lookup = %#v, want data.Frame", got)
+		t.Fatalf("keyed lookup = %#v, want EvalDict", got)
 	}
-	if names := frame.Schema().Names(); !reflect.DeepEqual(names, []data.Symbol{"price", "size"}) {
-		t.Fatalf("keyed lookup names = %#v", names)
+	if !reflect.DeepEqual(lookupDict.Keys, []any{data.Symbol("price"), data.Symbol("size")}) {
+		t.Fatalf("keyed lookup keys = %#v", lookupDict.Keys)
 	}
-	if frame.Len() != 1 {
-		t.Fatalf("keyed lookup len = %d, want 1", frame.Len())
+	if !reflect.DeepEqual(lookupDict.Values, []any{int64(101), int64(20)}) {
+		t.Fatalf("keyed lookup values = %#v", lookupDict.Values)
 	}
-	assertFrameValue(t, frame, "price", 0, int64(101))
-	assertFrameValue(t, frame, "size", 0, int64(20))
 	assertEvalArray(t, "((flip `sym!enlist `AAPL`MSFT)!flip `price`size!(100 101;10 20))`price", data.KindI64, []any{int64(100), int64(101)})
 	assertEvalErrorContains(t, "([] sym:`AAPL`MSFT)!([] price:100 101 102)", "row length mismatch")
 
@@ -3729,15 +3729,9 @@ func TestEvalKeyedTableLiteral(t *testing.T) {
 	if keys := keyed.Keys(); !reflect.DeepEqual(keys, []data.Symbol{"sym", "venue"}) {
 		t.Fatalf("2!flip keys = %#v, want sym venue", keys)
 	}
-	got, err = Eval("(2!flip `sym`venue`price!(`AAPL`AAPL`MSFT;`XNYS`XNAS`XNYS;100 101 80))[`AAPL`XNAS]")
-	if err != nil {
-		t.Fatalf("Eval(2!flip lookup) returned error: %v", err)
-	}
-	frame, ok = got.(data.Frame)
-	if !ok {
-		t.Fatalf("2!flip lookup = %#v, want data.Frame", got)
-	}
-	assertFrameValue(t, frame, "price", 0, int64(101))
+	// Canonical: a composite single-key lookup yields the value-row dict.
+	assertKeyedLookupDict(t, "(2!flip `sym`venue`price!(`AAPL`AAPL`MSFT;`XNYS`XNAS`XNYS;100 101 80))[`AAPL`XNAS]",
+		[]any{data.Symbol("price")}, []any{int64(101)})
 
 	got, err = Eval("0!flip `sym`price!(`AAPL`MSFT;100 101)")
 	if err != nil {
@@ -3787,44 +3781,31 @@ func TestEvalQSQLStyleKeyedTableLiteral(t *testing.T) {
 	assertFrameValue(t, frame, "price", 0, int64(100))
 	assertFrameValue(t, frame, "size", 1, int64(20))
 
-	got, err = Eval("(([sym:`AAPL`MSFT] price:100 101; size:10 20))[`MSFT]")
-	if err != nil {
-		t.Fatalf("Eval(keyed table literal lookup) returned error: %v", err)
-	}
-	frame, ok = got.(data.Frame)
-	if !ok {
-		t.Fatalf("keyed literal lookup = %#v, want data.Frame", got)
-	}
-	if frame.Len() != 1 {
-		t.Fatalf("keyed literal lookup len = %d, want 1", frame.Len())
-	}
-	assertFrameValue(t, frame, "price", 0, int64(101))
-	assertFrameValue(t, frame, "size", 0, int64(20))
-	got, err = Eval("(([sym:`AAPL`MSFT; bucket:1 2] price:100 101))[(`MSFT;2)]")
-	if err != nil {
-		t.Fatalf("Eval(multi-key keyed table literal lookup) returned error: %v", err)
-	}
-	frame, ok = got.(data.Frame)
-	if !ok {
-		t.Fatalf("multi-key keyed literal lookup = %#v, want data.Frame", got)
-	}
-	if frame.Len() != 1 {
-		t.Fatalf("multi-key keyed literal lookup len = %d, want 1", frame.Len())
-	}
-	assertFrameValue(t, frame, "price", 0, int64(101))
+	// Canonical: single-key lookups yield the value-row dictionary.
+	assertKeyedLookupDict(t, "(([sym:`AAPL`MSFT] price:100 101; size:10 20))[`MSFT]",
+		[]any{data.Symbol("price"), data.Symbol("size")}, []any{int64(101), int64(20)})
+	assertKeyedLookupDict(t, "(([sym:`AAPL`MSFT; bucket:1 2] price:100 101))[(`MSFT;2)]",
+		[]any{data.Symbol("price")}, []any{int64(101)})
+	assertKeyedLookupDict(t, "(([sym:`AAPL`MSFT; bucket:1 2] price:100 101))[`bucket`sym!(2;`MSFT)]",
+		[]any{data.Symbol("price")}, []any{int64(101)})
+}
 
-	got, err = Eval("(([sym:`AAPL`MSFT; bucket:1 2] price:100 101))[`bucket`sym!(2;`MSFT)]")
+func assertKeyedLookupDict(t *testing.T, src string, keys []any, values []any) {
+	t.Helper()
+	got, err := Eval(src)
 	if err != nil {
-		t.Fatalf("Eval(multi-key keyed table dict lookup) returned error: %v", err)
+		t.Fatalf("Eval(%q) returned error: %v", src, err)
 	}
-	frame, ok = got.(data.Frame)
+	dict, ok := got.(EvalDict)
 	if !ok {
-		t.Fatalf("multi-key keyed dict lookup = %#v, want data.Frame", got)
+		t.Fatalf("Eval(%q) = %#v, want EvalDict", src, got)
 	}
-	if frame.Len() != 1 {
-		t.Fatalf("multi-key keyed dict lookup len = %d, want 1", frame.Len())
+	if !reflect.DeepEqual(dict.Keys, keys) {
+		t.Fatalf("Eval(%q) keys = %#v, want %#v", src, dict.Keys, keys)
 	}
-	assertFrameValue(t, frame, "price", 0, int64(101))
+	if !reflect.DeepEqual(dict.Values, values) {
+		t.Fatalf("Eval(%q) values = %#v, want %#v", src, dict.Values, values)
+	}
 }
 
 func TestEvalMetadataVerbs(t *testing.T) {
@@ -5743,8 +5724,8 @@ func TestEvalStatsWindowVerbs(t *testing.T) {
 	assertEvalValue(t, "svar 1 2 3", 1.0)
 	assertEvalValue(t, "sdev 1 2 3", 1.0)
 	assertEvalValue(t, "wsum 1 2 3", int64(6))
-	assertEvalValue(t, "1 2 3 wsum 10 20 30", 140.0)
-	assertEvalValue(t, "wsum[1 2 3;10 20 30]", 140.0)
+	assertEvalValue(t, "1 2 3 wsum 10 20 30", int64(140))
+	assertEvalValue(t, "wsum[1 2 3;10 20 30]", int64(140))
 	assertEvalValue(t, "1 2 3 cov 1 2 3", float64(2)/3)
 	assertEvalValue(t, "1 2 3 scov 1 2 3", 1.0)
 	assertEvalValue(t, "1 2 3 cor 1 2 3", 1.0)

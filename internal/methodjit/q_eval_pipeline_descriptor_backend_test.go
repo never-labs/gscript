@@ -210,8 +210,10 @@ func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing
 		name string
 		src  string
 		want float64
+		// wantInt: integer wsum kind-preserves to long (canonical q).
+		wantInt bool
 	}{
-		{name: "weighted_sum", src: "1 2 3 wsum 10 20 30", want: 140},
+		{name: "weighted_sum", src: "1 2 3 wsum 10 20 30", want: 140, wantInt: true},
 		{name: "correlation", src: "1 2 3 cor 1 2 3", want: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -231,7 +233,11 @@ func TestQEvalPipelineRuntimeBackendExecutesStatsPrimitiveBackendPlan(t *testing
 			if err != nil {
 				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
 			}
-			if !handled || !value.IsFloat() || value.Float() != tc.want {
+			if tc.wantInt {
+				if !handled || !value.IsInt() || value.Int() != int64(tc.want) {
+					t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want int %v handled", value, handled, tc.want)
+				}
+			} else if !handled || !value.IsFloat() || value.Float() != tc.want {
 				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want float %v handled", value, handled, tc.want)
 			}
 			if backendPlanCalls != 0 {

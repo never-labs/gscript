@@ -943,9 +943,11 @@ type qScriptStatement struct {
 	// (`name[i;j;...]: rhs`, the statement form of @/. amend). assign stays
 	// empty for them so plain-binding probes (assign pool, deferred scans,
 	// reduction bundles, pipeline descriptors) skip these statements; rhs
-	// and the rhs plans below are still populated.
+	// and the rhs plans below are still populated. idxAssignOp carries the
+	// compound operator for `name[i]op: rhs` (the @[;;op;] amend form).
 	idxAssignName  string
 	idxAssignIndex string
+	idxAssignOp    string
 	valueExpr      Expr
 	bindingPlan    qScriptBindingPlan
 	fastPlan       qEvalFastPlan
@@ -1166,9 +1168,10 @@ func buildQScriptPlan(src string) qScriptPlan {
 			if _, _, ok := parseDeferredScan(rhs); ok {
 				deferScanCandidates = true
 			}
-		} else if name, indexSrc, rhs, ok := splitTopLevelIndexedAssignment(part); ok {
+		} else if name, indexSrc, op, rhs, ok := splitTopLevelIndexedAssignment(part); ok {
 			stmt.idxAssignName = name
 			stmt.idxAssignIndex = indexSrc
+			stmt.idxAssignOp = op
 			stmt.rhs = rhs
 			stmt.valueExpr = parseCachedValueExpr(rhs)
 			stmt.bindingPlan = buildQScriptWarmBindingPlan(rhs, stmt.valueExpr)
@@ -1707,9 +1710,23 @@ func (s *EvalState) evalIndexedAssignStatement(stmt *qScriptStatement) (any, err
 		path[i] = axis
 	}
 	var amended any
-	if len(path) == 1 {
+	switch {
+	case stmt.idxAssignOp != "":
+		// Compound indexed amend `name[i]op: rhs` reuses the @[;;op;]
+		// machinery with the dyadic verb as the amend function.
+		fn, ok := lookupDyadicVerbFunc(stmt.idxAssignOp)
+		if !ok {
+			return nil, fmt.Errorf("indexed assignment operator %q is not a dyadic verb", stmt.idxAssignOp)
+		}
+		op := qDyadicFunction{name: stmt.idxAssignOp, fn: fn}
+		if len(path) == 1 {
+			amended, err = s.amendValueWithFunction(target, path[0], op, value)
+		} else {
+			amended, err = s.amendPath(target, path, op, value)
+		}
+	case len(path) == 1:
 		amended, err = amendValue(target, path[0], value)
-	} else {
+	default:
 		amended, err = s.amendPath(target, path, nil, value)
 	}
 	if err != nil {
@@ -3245,7 +3262,7 @@ func (s *EvalState) eval(src string) (any, error) {
 		{"null ", nullValue},
 		{"raze ", raze},
 		{"keys ", keys},
-		{"key ", keys},
+		{"key ", keyVerb},
 		{"value ", s.valueVerb},
 		{"eval ", s.evalTreeVerb},
 		{"parse ", qParseVerb},
@@ -3584,7 +3601,32 @@ func (s *EvalState) evalJuxtaposedIndexVector(x Vector) (any, bool, error) {
 		}
 		values[i] = value
 	}
-	return qJuxtaposedIndexVectorValue(values)
+	if out, handled, err := qJuxtaposedIndexVectorValue(values); handled || err != nil {
+		return out, handled, err
+	}
+	// A callable head juxtaposed onto literals is application, never list
+	// construction: `f 2 3` applies f to the vector 2 3, and a word verb
+	// head (`msum 2 1 3`) surfaces the verb's own arity error instead of
+	// silently building a list containing the function value.
+	if isCallable(values[0]) {
+		arg, err := qJuxtaposedTailArgument(values)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := s.applyCallable(values[0], []any{arg})
+		return out, true, err
+	}
+	return nil, false, nil
+}
+
+// qJuxtaposedTailArgument materializes the literal tail of a juxtaposed
+// application as the single argument value (atom for one item, vector
+// otherwise).
+func qJuxtaposedTailArgument(values []any) (any, error) {
+	if len(values) == 2 {
+		return values[1], nil
+	}
+	return evalValueVector(values[1:])
 }
 
 // qJuxtaposedIndexVectorShape reports the static juxtaposed-index shape: an
@@ -4632,36 +4674,43 @@ func splitTopLevelAssignment(src string) (string, string, bool) {
 	return name, rhs, rhs != ""
 }
 
-// splitTopLevelIndexedAssignment recognizes `name[i;j;...]: rhs` statements:
-// a bound name followed by exactly one bracket group spanning the rest of
-// the assignment target. Returns the name, the bracket interior (index
-// expressions separated by `;`), and the rhs source.
-func splitTopLevelIndexedAssignment(src string) (string, string, string, bool) {
+// splitTopLevelIndexedAssignment recognizes `name[i;j;...]: rhs` and the
+// compound spelling `name[i;j;...]op: rhs` (op one of + - * % ^ & |): a
+// bound name followed by exactly one bracket group spanning the rest of the
+// assignment target. Returns the name, the bracket interior (index
+// expressions separated by `;`), the compound operator ("" for plain
+// assignment), and the rhs source.
+func splitTopLevelIndexedAssignment(src string) (string, string, string, string, bool) {
 	colon := findTopLevel(src, ":")
 	if colon <= 0 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	left := strings.TrimSpace(src[:colon])
+	op := ""
+	if len(left) > 1 && strings.Contains("+-*%^&|", left[len(left)-1:]) {
+		op = left[len(left)-1:]
+		left = strings.TrimSpace(left[:len(left)-1])
+	}
 	if !strings.HasSuffix(left, "]") {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	open := strings.IndexByte(left, '[')
 	if open <= 0 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	name := strings.TrimSpace(left[:open])
 	if !isQAssignmentName(name) {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	if findMatchingDelimiter(left, open, '[', ']') != len(left)-1 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	indexSrc := strings.TrimSpace(left[open+1 : len(left)-1])
 	if indexSrc == "" {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	rhs := strings.TrimSpace(src[colon+1:])
-	return name, indexSrc, rhs, rhs != ""
+	return name, indexSrc, op, rhs, rhs != ""
 }
 
 func splitTopLevelAugmentedAssignment(src string) (string, string, string, bool) {
@@ -8808,7 +8857,7 @@ func lookupUnaryVerb(verb string) (func(any) (any, error), bool) {
 	case "keys":
 		return keys, true
 	case "key":
-		return keys, true
+		return keyVerb, true
 	case "value":
 		return value, true
 	case "parse":
@@ -9992,19 +10041,35 @@ func (s *EvalState) evalParenDerivedVerbJuxtaposed(src string) (any, bool, error
 	if end <= 0 || end == len(src)-1 {
 		return nil, false, nil
 	}
-	fn, ok := parseDyadicAdverbFunction(src[:end+1])
-	if !ok {
-		return nil, false, nil
-	}
 	rest := strings.TrimSpace(src[end+1:])
 	if rest == "" || !qDerivedVerbJuxtapositionLead(rest[0]) {
+		return nil, false, nil
+	}
+	if fn, ok := parseDyadicAdverbFunction(src[:end+1]); ok {
+		right, err := s.eval(rest)
+		if err != nil {
+			return nil, true, err
+		}
+		out, err := s.applyCallable(fn, []any{right})
+		return out, true, err
+	}
+	// `'`-derived monadic verbs spelled with parens: `(count') x`,
+	// `(reverse') x`. The bracket call count'[x] already rides the
+	// postfix-index path; this covers the juxtaposed spelling.
+	body := strings.TrimSpace(src[1:end])
+	if !strings.HasSuffix(body, "'") || strings.HasSuffix(body, "':") {
+		return nil, false, nil
+	}
+	verb := strings.TrimSpace(body[:len(body)-1])
+	unary, ok := lookupUnaryVerb(verb)
+	if !ok {
 		return nil, false, nil
 	}
 	right, err := s.eval(rest)
 	if err != nil {
 		return nil, true, err
 	}
-	out, err := s.applyCallable(fn, []any{right})
+	out, err := s.evalCallableAdverb(qUnaryFunction{name: verb, fn: unary}, "'", right)
 	return out, true, err
 }
 
@@ -11788,7 +11853,13 @@ func indexValue(v any, index any) (any, error) {
 		if frameHasLookupColumns(keyed.Frame(), index) {
 			return frameColumnLookup(keyed.Frame(), index)
 		}
-		return keyedTableLookup(keyed, index)
+		frame, err := keyedTableLookup(keyed, index)
+		if err != nil {
+			return nil, err
+		}
+		// Canonical keyed-table indexing: a single key yields the value-row
+		// DICT (column name -> cell), null-filled when the key is absent.
+		return keyedLookupResultDict(frame)
 	}
 	switch x := v.(type) {
 	case data.Array:
@@ -12014,6 +12085,23 @@ func keyedTableLookup(keyed data.KeyedFrame, key any) (data.Frame, error) {
 		return data.Frame{}, err
 	}
 	return frame, nil
+}
+
+// keyedLookupResultDict converts the (at most one row) value frame from a
+// keyed-table key lookup into the canonical value-row dictionary; an empty
+// frame (key miss) yields the null-filled dictionary over the value columns.
+func keyedLookupResultDict(frame data.Frame) (EvalDict, error) {
+	if frame.Len() > 0 {
+		return frameRowDict(frame, int64(frame.Len()-1))
+	}
+	names := frame.Schema().Names()
+	keys := make([]any, len(names))
+	values := make([]any, len(names))
+	for i, name := range names {
+		keys[i] = name
+		values[i] = data.NullValue
+	}
+	return EvalDict{Keys: keys, Values: values}, nil
 }
 
 func keyedLookupDictValues(keyed data.KeyedFrame, selector EvalDict) ([]any, error) {
@@ -14466,6 +14554,12 @@ func qStringScalar(v any) string {
 	switch x := v.(type) {
 	case data.Symbol:
 		return string(x)
+	case bool:
+		// Canonical q: string of a boolean is its digit ("1"/"0").
+		if x {
+			return "1"
+		}
+		return "0"
 	}
 	if s, ok := FormatTemporal(v); ok {
 		return s
@@ -15401,6 +15495,24 @@ func last(v any) (any, error) {
 		return nil, fmt.Errorf("last row %d out of range", array.Len()-1)
 	}
 	return item, nil
+}
+
+// keyVerb implements canonical `key` where it diverges from `keys`: key of a
+// keyed table is its key TABLE (keys returns the key column names) and key of
+// a typed vector is its type-name symbol. Dicts and the dialect introspection
+// wrappers share the keys behavior.
+func keyVerb(v any) (any, error) {
+	switch x := v.(type) {
+	case qAttributedVector, qEnumVector, EvalDict:
+		return keys(v)
+	case data.KeyedFrame:
+		return x.KeyFrame()
+	case data.Array:
+		if name, ok := qTypeNameForKind(x.Kind()); ok {
+			return name, nil
+		}
+	}
+	return keys(v)
 }
 
 func keys(v any) (any, error) {

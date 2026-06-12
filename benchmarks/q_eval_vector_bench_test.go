@@ -3523,7 +3523,8 @@ func appendQEvalTaskDListMathMatrixApplyIndexCases(cases []qEvalVectorCase) []qE
 				return "(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")"
 			},
 			goFn: func(rows int) int64 {
-				longValue := int64(math.Trunc(3.7))
+				// Canonical q integer casts round half-to-even.
+				longValue := int64(math.RoundToEven(3.7))
 				jValue := int64(42)
 				iValue := int64(17)
 				symbol := string([]byte{'A', 'A', 'P', 'L'})
@@ -4722,7 +4723,8 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "fb:sum 10 20 30 40 fby `a`a`b`b;(count key `sym xkey flip `sym`price!(`AAPL`MSFT;100 101))+(count ungroup (`sym xgroup flip `sym`price!(`AAPL`AAPL`MSFT;100 101 80)))+(+/fb)"
 			},
 			goFn: func(rows int) int64 {
-				return 1 + 3 + 200
+				// key of a keyed table is its 2-row key TABLE (canonical).
+				return 2 + 3 + 200
 			},
 		},
 		{
@@ -4793,7 +4795,8 @@ func appendQEvalSemanticCoverageCases(cases []qEvalVectorCase) []qEvalVectorCase
 				return "t:`time xasc flip `sym`time`venue!(`MSFT`AAPL`AAPL;09:31 09:30 09:32;`xnys`xnas`bats);k:`sym xkey (`venue`time`sym xcols t);(count key k)+(count meta k)+(count cols k)+(+/iasc t`time)+(count upper string t`sym)"
 			},
 			goFn: func(rows int) int64 {
-				return 1 + 3 + 3 + 3 + 3
+				// key of a keyed table is its 3-row key TABLE (canonical).
+				return 3 + 3 + 3 + 3 + 3
 			},
 		},
 	}

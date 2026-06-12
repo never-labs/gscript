@@ -2776,7 +2776,7 @@ func (p f64CastF32Producer) f64At(row int) (float64, bool, error) {
 }
 
 // f64CastI64Producer streams a lazy integer cast view: source values
-// truncated toward zero.
+// rounded half-to-even (canonical q integer cast).
 type f64CastI64Producer struct {
 	source f64NumericProducer
 }
@@ -2788,7 +2788,7 @@ func (p f64CastI64Producer) f64At(row int) (float64, bool, error) {
 	if err != nil || !ok {
 		return 0, ok, err
 	}
-	return float64(int64(value)), true, nil
+	return float64(int64(math.RoundToEven(value))), true, nil
 }
 
 func (p f64NullProducer) Len() int { return p.len }
@@ -4367,7 +4367,8 @@ func tryTypedCastBulk(kind Kind, array Array) (Array, bool, error) {
 						bulkI64Release(truncated, true)
 						return nil, false, nil
 					}
-					truncated[i] = int64(value)
+					// Canonical q integer casts round half-to-even.
+					truncated[i] = int64(math.RoundToEven(value))
 				}
 				bulkF64Release(values, owned)
 				out, handled, err := castBulkI64Values(kind, truncated)
@@ -4638,7 +4639,8 @@ func numericArrayTruncatedIntegerAt(array Array, row int) (int64, bool, error) {
 	if math.IsNaN(value) || math.IsInf(value, 0) || value < -9223372036854775808.0 || value >= 9223372036854775808.0 {
 		return 0, false, nil
 	}
-	return int64(value), true, nil
+	// Canonical q integer casts round half-to-even.
+	return int64(math.RoundToEven(value)), true, nil
 }
 
 func aggregateIndexedNumericValue(agg aggregateInput, row int) (float64, bool, error) {

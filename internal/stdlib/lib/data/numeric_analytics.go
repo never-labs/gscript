@@ -101,9 +101,37 @@ func NumericArrayStdDev(array Array, sample bool) (any, bool, error) {
 	return math.Sqrt(variance.(float64)), true, nil
 }
 
+// integerNumericInput reports whether v (an atom or Array) carries only
+// integer-typed numeric values, so weighted sums can keep the canonical
+// long result kind when both operands are integers.
+func integerNumericInput(v any) bool {
+	if arr, ok := v.(Array); ok {
+		switch arr.Kind() {
+		case KindI8, KindI16, KindI32, KindI64, KindU8, KindU16, KindU32, KindU64:
+			return true
+		}
+		return false
+	}
+	switch v.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return true
+	}
+	return false
+}
+
+// weightedSumResult converts the float accumulator back to long when both
+// wsum operands were integer-typed (canonical: int wsum int stays long).
+func weightedSumResult(total float64, integer bool) any {
+	if integer {
+		return int64(total)
+	}
+	return total
+}
+
 func NumericWeightedSum(weights, values any) (any, bool, error) {
 	weightArray, weightIsArray := weights.(Array)
 	valueArray, valueIsArray := values.(Array)
+	integer := integerNumericInput(weights) && integerNumericInput(values)
 	if !weightIsArray && !valueIsArray {
 		if IsNull(weights) || IsNull(values) {
 			return NullValue, true, nil
@@ -113,7 +141,7 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 		if !wok || !vok {
 			return nil, false, nil
 		}
-		return w * v, true, nil
+		return weightedSumResult(w*v, integer), true, nil
 	}
 	if weightIsArray && !isNumericArray(weightArray) {
 		return nil, false, nil
@@ -151,7 +179,7 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 					wv += wr.step
 					vv += vr.step
 				}
-				return total, true, nil
+				return weightedSumResult(total, integer), true, nil
 			}
 		}
 	}
@@ -167,7 +195,7 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 				}
 				bulkF64Release(vvs, vOwned)
 				bulkF64Release(wvs, wOwned)
-				return total, true, nil
+				return weightedSumResult(total, integer), true, nil
 			} else if ok {
 				bulkF64Release(vvs, vOwned)
 			}
@@ -199,7 +227,7 @@ func NumericWeightedSum(weights, values any) (any, bool, error) {
 		}
 		total += weight * value
 	}
-	return total, true, nil
+	return weightedSumResult(total, integer), true, nil
 }
 
 func numericWeightedScalar(value any, required bool) (float64, bool, bool) {

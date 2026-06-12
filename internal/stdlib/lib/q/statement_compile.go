@@ -710,7 +710,7 @@ func (s *EvalState) EvalScriptCompiledDifferential(src string) ([]EvalCompiledDi
 			target = name + op + rhs
 		} else if _, rhs, ok := splitTopLevelAssignment(part); ok {
 			target = rhs
-		} else if _, _, rhs, ok := splitTopLevelIndexedAssignment(part); ok {
+		} else if _, _, _, rhs, ok := splitTopLevelIndexedAssignment(part); ok {
 			// Indexed assignment: only the rhs is an ordinary expression;
 			// the amend itself runs through s.evalScript below.
 			target = rhs
