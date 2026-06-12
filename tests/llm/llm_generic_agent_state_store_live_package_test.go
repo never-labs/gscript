@@ -480,40 +480,23 @@ func TestGenericAgentStateStoreMemoryContextProjection(t *testing.T) {
 
 func TestGenericAgentStateStoreLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericAgentStateStorePackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_agent_state_store_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get generic_agent_state_store_live_package_summary: %v", err)
-			}
-			want := "generic_agent_state_store_live_package capability=generic.ai.agent_state.store fixture=generic:agent_state_store:offline snapshots=2 checkpoint=sha256 memory_context_projections=1 provider_free=true live_network=false imports=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_agent_state_store_live_package capability=generic.ai.agent_state.store fixture=generic:agent_state_store:offline snapshots=2 checkpoint=sha256 memory_context_projections=1 provider_free=true live_network=false imports=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_agent_state_store_live_package_summary", "generic_agent_state_store_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "capability", "fixture", "snapshots", "checkpoint", "memory_context_projections", "provider_free", "live_network", "imports")
+		if fields["capability"] != "generic.ai.agent_state.store" ||
+			fields["fixture"] != "generic:agent_state_store:offline" ||
+			fields["snapshots"] != "2" ||
+			fields["checkpoint"] != "sha256" ||
+			fields["memory_context_projections"] != "1" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

@@ -386,17 +386,22 @@ func TestFinRobotGenericToolContractsFixtureIndexAndSmoke(t *testing.T) {
 		}
 	}
 
-	vm := leia.New(leia.WithLibs(leia.LibAll), leia.WithVM())
-	if err := vm.ExecFile(mainPath); err != nil {
-		t.Fatalf("ExecFile main.leia: %v", err)
-	}
-	value, err := vm.Get("generic_tool_contracts_live_package_summary")
-	if err != nil {
-		t.Fatalf("get generic_tool_contracts_live_package_summary: %v", err)
-	}
-	summary, ok := value.(string)
-	if !ok || !strings.Contains(summary, "provider_free=true") || !strings.Contains(summary, "validation_error=validation") || !strings.Contains(summary, "projected_tools=2") {
-		t.Fatalf("summary = %#v", value)
+	want := "generic_tool_contracts dialect_exports=2 projection_exports=1 provider_free=true live_network=false success_artifacts=1 validation_error=validation projected_tools=2"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, mainPath, "generic_tool_contracts_live_package_summary", "generic_tool_contracts", leia.LibAll) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "dialect_exports", "projection_exports", "provider_free", "live_network", "success_artifacts", "validation_error", "projected_tools")
+		if fields["dialect_exports"] != "2" ||
+			fields["projection_exports"] != "1" ||
+			fields["provider_free"] != "true" ||
+			fields["live_network"] != "false" ||
+			fields["success_artifacts"] != "1" ||
+			fields["validation_error"] != "validation" ||
+			fields["projected_tools"] != "2" {
+			t.Fatalf("summary fields = %#v", fields)
+		}
 	}
 }
 

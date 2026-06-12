@@ -545,44 +545,41 @@ func TestGenericTurnRunnerSmokeAndNoProviderDependencies(t *testing.T) {
 	base := genericTurnRunnerPackageDir(t)
 	manifest := loadGenericTurnRunnerManifest(t, base)
 
-	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM|leia.LibDialect), leia.WithVM())
-	if err := vm.ExecFile(filepath.Join(base, "main.leia")); err != nil {
-		t.Fatalf("ExecFile: %v", err)
-	}
-	got, err := vm.Get("generic_turn_runner_live_package_summary")
-	if err != nil {
-		t.Fatalf("Get summary: %v", err)
-	}
 	want := "generic_turn_runner_live_package provider_free=true live_network=false capabilities=3 schemas=6 fixtures=6 replay_match=deterministic_request_hash memory_context_projection=true"
-	if got != want {
-		t.Fatalf("summary = %#v, want %#v", got, want)
-	}
-	summary := genericTurnRunnerSummaryFields(t, got.(string))
-	if summary["provider_free"] != "true" ||
-		summary["live_network"] != "false" ||
-		summary["capabilities"] != "3" ||
-		summary["schemas"] != "6" ||
-		summary["fixtures"] != "6" ||
-		summary["replay_match"] != manifest.ReplayMatchContract.MatchKey ||
-		summary["memory_context_projection"] != "true" {
-		t.Fatalf("summary fields do not match expected contract: %#v", summary)
-	}
-	if (summary["provider_free"] == "true") != manifest.ProviderFree ||
-		(summary["live_network"] == "true") != manifest.LiveNetworkDefault ||
-		summary["capabilities"] != "3" ||
-		len(manifest.Capabilities) != 3 ||
-		len(manifest.Schemas) != 6 ||
-		manifest.Schemas["memory_context_turn_projection"] == "" ||
-		manifest.Fixtures["memory_context_turn_projection"] == "" ||
-		manifest.MemoryContextProjectionContract.DialectCapability == "" {
-		t.Fatalf("summary is not aligned with manifest: summary=%#v manifest=%#v", summary, manifest)
+	var lastSummary map[string]string
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, filepath.Join(base, "main.leia"), "generic_turn_runner_live_package_summary", "generic_turn_runner_live_package", leia.LibString|leia.LibLLM|leia.LibDialect) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		summary := result.Fields
+		lastSummary = summary
+		requireFinRobotSummaryFields(t, summary, "provider_free", "live_network", "capabilities", "schemas", "fixtures", "replay_match", "memory_context_projection")
+		if summary["provider_free"] != "true" ||
+			summary["live_network"] != "false" ||
+			summary["capabilities"] != "3" ||
+			summary["schemas"] != "6" ||
+			summary["fixtures"] != "6" ||
+			summary["replay_match"] != manifest.ReplayMatchContract.MatchKey ||
+			summary["memory_context_projection"] != "true" {
+			t.Fatalf("summary fields do not match expected contract: %#v", summary)
+		}
+		if (summary["provider_free"] == "true") != manifest.ProviderFree ||
+			(summary["live_network"] == "true") != manifest.LiveNetworkDefault ||
+			summary["capabilities"] != "3" ||
+			len(manifest.Capabilities) != 3 ||
+			len(manifest.Schemas) != 6 ||
+			manifest.Schemas["memory_context_turn_projection"] == "" ||
+			manifest.Fixtures["memory_context_turn_projection"] == "" ||
+			manifest.MemoryContextProjectionContract.DialectCapability == "" {
+			t.Fatalf("summary is not aligned with manifest: summary=%#v manifest=%#v", summary, manifest)
+		}
 	}
 	var summaryIndex struct {
 		Fixtures []any `json:"fixtures"`
 	}
 	decodeGenericTurnRunnerJSONFile(t, filepath.Join(base, manifest.Fixtures["index"]), &summaryIndex)
-	if len(summaryIndex.Fixtures) != 6 || summary["fixtures"] != "6" {
-		t.Fatalf("summary fixture count does not match fixture index: summary=%#v index=%#v", summary, summaryIndex)
+	if len(summaryIndex.Fixtures) != 6 || lastSummary["fixtures"] != "6" {
+		t.Fatalf("summary fixture count does not match fixture index: summary=%#v index=%#v", lastSummary, summaryIndex)
 	}
 
 	var files []string
@@ -654,23 +651,6 @@ func decodeGenericTurnRunnerJSONFile(t *testing.T, path string, out any) {
 	if err := json.Unmarshal(data, out); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
-}
-
-func genericTurnRunnerSummaryFields(t *testing.T, summary string) map[string]string {
-	t.Helper()
-	fields := strings.Fields(summary)
-	if len(fields) == 0 || fields[0] != "generic_turn_runner_live_package" {
-		t.Fatalf("unexpected turn runner summary prefix: %q", summary)
-	}
-	out := map[string]string{}
-	for _, field := range fields[1:] {
-		parts := strings.SplitN(field, "=", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			t.Fatalf("invalid turn runner summary field %q in %q", field, summary)
-		}
-		out[parts[0]] = parts[1]
-	}
-	return out
 }
 
 func requireGenericTurnRunnerGuardEvidence(t *testing.T, name string, got map[string]any, wantCorrelationID, wantRequestHash string) {

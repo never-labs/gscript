@@ -245,33 +245,27 @@ func TestGenericRecordReplaySmokeExecutes(t *testing.T) {
 		}
 	}
 
-	vm := leia.New(leia.WithLibs(leia.LibAll), leia.WithVM())
-	if err := vm.ExecFile(mainPath); err != nil {
-		t.Fatalf("ExecFile main.leia: %v", err)
-	}
-	value, err := vm.Get("generic_record_replay_live_package_summary")
-	if err != nil {
-		t.Fatalf("get summary: %v", err)
-	}
-	summary := fmt.Sprint(value)
-	for _, want := range []string{
-		"generic_record_replay_live_package",
-		"strategy=strict_ordered",
-		"records=3",
-		"partial_matched=2",
-		"partial_unconsumed=1",
-		"mismatch_matched=1",
-		"mismatches=1",
-		"mismatch_unconsumed=2",
-		"next_index=1",
-		"findings=3",
-		"provider_free=true",
-		"domain_specific=false",
-		"live_network=false",
-		"imports=false",
-	} {
-		if !strings.Contains(summary, want) {
-			t.Fatalf("summary missing %q: %s", want, summary)
+	want := "generic_record_replay_live_package strategy=strict_ordered records=3 partial_matched=2 partial_unconsumed=1 mismatch_matched=1 mismatches=1 mismatch_unconsumed=2 next_index=1 findings=3 provider_free=true domain_specific=false live_network=false imports=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, mainPath, "generic_record_replay_live_package_summary", "generic_record_replay_live_package", leia.LibAll) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "strategy", "records", "partial_matched", "partial_unconsumed", "mismatch_matched", "mismatches", "mismatch_unconsumed", "next_index", "findings", "provider_free", "domain_specific", "live_network", "imports")
+		if fields["strategy"] != "strict_ordered" ||
+			fields["records"] != "3" ||
+			fields["partial_matched"] != "2" ||
+			fields["partial_unconsumed"] != "1" ||
+			fields["mismatch_matched"] != "1" ||
+			fields["mismatches"] != "1" ||
+			fields["mismatch_unconsumed"] != "2" ||
+			fields["next_index"] != "1" ||
+			fields["findings"] != "3" ||
+			fields["provider_free"] != "true" ||
+			fields["domain_specific"] != "false" ||
+			fields["live_network"] != "false" ||
+			fields["imports"] != "false" {
+			t.Fatalf("summary fields = %#v", fields)
 		}
 	}
 }
