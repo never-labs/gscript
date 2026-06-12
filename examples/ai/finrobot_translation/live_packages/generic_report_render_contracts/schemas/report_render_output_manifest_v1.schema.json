@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Report render output manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "output_manifests",
+    "artifact_manifest",
+    "snapshot_metadata"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "output_manifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "output_id",
+          "media_type",
+          "artifact_refs",
+          "uri_policy",
+          "remote_fetch"
+        ]
+      }
+    },
+    "artifact_manifest": {
+      "type": "object"
+    },
+    "snapshot_metadata": {
+      "type": "array"
+    }
+  }
+}

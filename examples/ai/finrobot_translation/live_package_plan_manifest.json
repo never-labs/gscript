@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 91,
-  "translation_directory_file_count": 715,
+  "registered_examples_count": 92,
+  "translation_directory_file_count": 725,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -257,6 +257,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
       "covers_package_ids": [
         "generic_record_replay"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_report_render_contracts",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
+      "covers_package_ids": [
+        "generic_report_render_contracts"
       ],
       "status": "checked_in_registered_example"
     },
@@ -1200,6 +1209,37 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_report_render_contracts",
+      "package_name": "leia-generic-ai-report-render-contracts",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "planned_directory": "packages/generic_ai/report_render_contracts",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/contracts/generic_report_render_contracts_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_report_render_contracts.source.txt",
+      "capabilities": [
+        "generic.ai.report.render.contracts",
+        "generic.ai.report.render.request",
+        "generic.ai.report.render.request_envelope",
+        "generic.ai.report.render.output_manifest",
+        "generic.ai.report.render.artifact_manifest",
+        "generic.ai.report.render.snapshot_metadata",
+        "generic.ai.report.render.snapshot_hash",
+        "generic.ai.report.render.warning",
+        "generic.ai.report.render.annotation",
+        "generic.ai.report.render.fixture_hash",
+        "generic.ai.report.render.clean_skip"
+      ],
+      "test_gates": [
+        "report render request contract fixtures decode without renderer dependencies",
+        "request and result envelope contract fixtures remain provider-free and replayable",
+        "output and artifact manifest contract fixtures use artifact URIs only",
+        "snapshot metadata, warning, and annotation contract fixtures are deterministic",
+        "renderer dependency gates produce clean-skip contract envelopes"
       ],
       "no_built_in_guarantee": true
     },

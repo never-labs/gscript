@@ -1,0 +1,8 @@
+// Generic report render contracts example source.
+// Declares report render requests, request/result envelopes, output manifests,
+// artifact manifests, snapshot metadata, warnings, annotations, fixture hashes,
+// and renderer clean skips without importing a renderer or writing files.
+
+capability generic.ai.report.render.contracts
+entrypoint ai.report.render_contracts
+fixture examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/report_render_contracts_fixture.json

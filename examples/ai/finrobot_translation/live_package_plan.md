@@ -7,14 +7,14 @@ web services are not Leia built-ins.
 
 ## Package Skeleton Status
 
-Current registered-example status: 91 runnable/checkable FinRobot translation
-examples are discovered by `go run ./cmd/leia examples list --json`. All 45
+Current registered-example status: 92 runnable/checkable FinRobot translation
+examples are discovered by `go run ./cmd/leia examples list --json`. All 46
 checked-in live-package skeletons are registered provider-free examples. The
 FinRobot package skeletons cover finance, reporting, product, and optional
 integration boundaries; the `generic_*` skeletons cover reusable generic AI
 model, model IO, memory, turn, tool, coding workspace, data provider boundaries, agent, workflow,
 evaluation, replay, trace, approval, document RAG, prompt/role catalogs,
-evidence/report artifacts, UI snapshot evaluation, chart render contracts,
+evidence/report artifacts, report render contracts, UI snapshot evaluation, chart render contracts,
 optional adapter boundaries, product app boundaries, and package-audit boundaries
 consumed by the translation.
 
@@ -54,6 +54,7 @@ consumed by the translation.
 | `live_packages/generic_planning_graph` | `live_packages/generic_planning_graph/main.leia` | `leia-generic-ai-planning-graph` | `packages/generic_ai/planning_graph` | `contracts/planning_graph_contract.json` |
 | `live_packages/generic_product_app_boundary` | `live_packages/generic_product_app_boundary/main.leia` | `leia-generic-ai-product-app-boundary` | `packages/generic_ai/product_app_boundary` | `contracts/generic_product_app_boundary_contract.json` |
 | `live_packages/generic_prompt_role_catalog` | `live_packages/generic_prompt_role_catalog/main.leia` | `leia-generic-ai-prompt-role-catalog` | `packages/generic_ai/prompt_role_catalog` | `contracts/generic_prompt_role_catalog_contract.json` |
+| `live_packages/generic_report_render_contracts` | `live_packages/generic_report_render_contracts/main.leia` | `leia-generic-ai-report-render-contracts` | `packages/generic_ai/report_render_contracts` | `contracts/generic_report_render_contracts_contract.json` |
 | `live_packages/generic_evidence_report_artifacts` | `live_packages/generic_evidence_report_artifacts/main.leia` | `leia-generic-ai-evidence-report-artifacts` | `packages/generic_ai/evidence_report_artifacts` | `contracts/generic_evidence_report_artifacts_contract.json` |
 | `live_packages/generic_workflow_orchestrator` | `live_packages/generic_workflow_orchestrator/main.leia` | `leia-generic-ai-workflow-orchestrator` | `packages/generic_ai/workflow_orchestrator` | `contracts/workflow_graph_contract.json` |
 | `live_packages/generic_evaluation_harness` | `live_packages/generic_evaluation_harness/main.leia` | `leia-generic-ai-evaluation-harness` | `packages/generic_ai/evaluation_harness` | `contracts/evaluation_harness_contract.json` |

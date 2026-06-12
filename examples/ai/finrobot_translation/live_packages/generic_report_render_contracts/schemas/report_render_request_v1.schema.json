@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Report render request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_free",
+    "live_network",
+    "real_dependency_imports",
+    "render_requests"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_free": {
+      "const": true
+    },
+    "live_network": {
+      "const": false
+    },
+    "real_dependency_imports": {
+      "const": false
+    },
+    "render_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "render_mode",
+          "formats",
+          "artifact_policy",
+          "fixture_key",
+          "live_network",
+          "real_dependency_imports",
+          "renderer_dependency_gate"
+        ]
+      }
+    }
+  }
+}

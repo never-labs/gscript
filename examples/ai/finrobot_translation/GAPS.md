@@ -23,8 +23,8 @@ replaces fixtures with vendor integrations is tracked in
 ## Open Gaps
 
 No open gaps remain for the provider-free Leia translation slice in this
-directory. The current provider-free surface is 91 registered examples plus
-45 checked-in live-package skeleton directories:
+directory. The current provider-free surface is 92 registered examples plus
+46 checked-in live-package skeleton directories:
 `live_packages/analytics_report`, `live_packages/analyzer_report`,
 `live_packages/backtest_strategy`, `live_packages/chart_renderer`,
 `live_packages/coding_notebook`, `live_packages/document_pipeline`,
@@ -44,6 +44,7 @@ directory. The current provider-free surface is 91 registered examples plus
 `live_packages/generic_package_boundary_auditor`, `live_packages/generic_planning_graph`,
 `live_packages/generic_product_app_boundary`,
 `live_packages/generic_prompt_role_catalog`, `live_packages/generic_record_replay`,
+`live_packages/generic_report_render_contracts`,
 `live_packages/generic_tool_contracts`,
 `live_packages/generic_tool_registry`, `live_packages/generic_trace_events`,
 `live_packages/generic_turn_runner`, `live_packages/generic_ui_snapshot_evaluator`,
@@ -64,6 +65,7 @@ The generic AI dialect convergence status is checked-in package boundary, not
 missing or planned. The `live_packages/generic_*` directories define reusable AI
 package contracts for model, model IO envelopes, coding workspaces, document
 RAG, data provider boundaries, evidence/report artifacts, UI snapshot evaluation, chart render contracts,
+report render contracts,
 optional adapter boundaries, prompt/role catalogs, memory stores, turn, tool, agent, workflow, evaluation, replay, trace,
 product app boundaries,
 approval, capability, and package-audit behavior. They are intentionally

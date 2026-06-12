@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "package_boundary_id": "generic-ai-report-render-contracts",
+  "package_name": "generic.ai.report.render.contracts",
+  "entrypoint": "ai.report.render_contracts",
+  "provider_free": true,
+  "domain_specific": false,
+  "live_network": false,
+  "live_model": false,
+  "live_model_calls": false,
+  "real_dependency_imports": false,
+  "requires_credentials": false,
+  "provider_sdks_required": false,
+  "capabilities": [
+    "generic.ai.report.render.contracts",
+    "generic.ai.report.render.request",
+    "generic.ai.report.render.request_envelope",
+    "generic.ai.report.render.output_manifest",
+    "generic.ai.report.render.artifact_manifest",
+    "generic.ai.report.render.snapshot_metadata",
+    "generic.ai.report.render.snapshot_hash",
+    "generic.ai.report.render.warning",
+    "generic.ai.report.render.annotation",
+    "generic.ai.report.render.fixture_hash",
+    "generic.ai.report.render.clean_skip"
+  ],
+  "modules": {
+    "request": {
+      "inputs": [
+        "report_outline",
+        "format",
+        "artifact_policy",
+        "renderer_dependency_gate"
+      ],
+      "outputs": [
+        "render_request",
+        "request_envelope"
+      ],
+      "required_fields": [
+        "request_id",
+        "render_mode",
+        "formats",
+        "artifact_policy",
+        "renderer_dependency_gate"
+      ]
+    },
+    "output": {
+      "inputs": [
+        "render_request",
+        "render_fixture"
+      ],
+      "outputs": [
+        "output_manifest",
+        "artifact_manifest",
+        "render_result"
+      ],
+      "required_fields": [
+        "request_id",
+        "status",
+        "output_manifest",
+        "artifact_manifest",
+        "snapshot_metadata",
+        "warnings",
+        "annotations"
+      ]
+    },
+    "snapshot": {
+      "inputs": [
+        "artifact_manifest",
+        "fixture_seed"
+      ],
+      "outputs": [
+        "snapshot_hash",
+        "fixture_hash",
+        "clean_skip"
+      ],
+      "required_fields": [
+        "snapshot_id",
+        "hash_algorithm",
+        "hash",
+        "deterministic_inputs"
+      ]
+    }
+  },
+  "field_contracts": {
+    "render_request": "render requests declare request id, render mode, formats, artifact policy, and renderer dependency gate without importing renderers",
+    "request_envelope": "request envelopes carry deterministic replay keys, fixture key, live network flag, and real dependency import flag",
+    "render_result": "render results carry status, output manifest, artifact manifest, snapshots, warnings, annotations, and clean-skip state",
+    "output_manifest": "output manifests declare logical output ids, media types, artifact refs, and fixture-only URI policy",
+    "artifact_manifest": "artifact manifests record artifact ids, URIs, hashes, media types, and remote-fetch=false policy",
+    "snapshot_metadata": "snapshot metadata records page/viewport ids, deterministic inputs, hash algorithm, and snapshot hash",
+    "warnings": "warnings normalize table, markdown, missing chart, stale content, and renderer-skip messages",
+    "annotations": "annotations normalize source, disclosure, accessibility, and risk notes without domain-specific report sections",
+    "fixture_hash": "fixture hashes are deterministic sha256 values derived from provider-free fixture seeds",
+    "clean_skip": "clean skips return skipped render envelopes for absent renderer, browser, writer, or disabled network states"
+  }
+}

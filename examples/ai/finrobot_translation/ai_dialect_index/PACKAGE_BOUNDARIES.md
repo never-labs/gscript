@@ -44,6 +44,7 @@ contracts, and fixtures for its boundary.
 - data-provider: `examples/ai/finrobot_translation/live_packages/generic_data_provider_boundary`
 - prompt-role: `examples/ai/finrobot_translation/live_packages/generic_prompt_role_catalog`
 - evidence-report-artifacts: `examples/ai/finrobot_translation/live_packages/generic_evidence_report_artifacts`
+- report-render: `examples/ai/finrobot_translation/live_packages/generic_report_render_contracts`
 - ui-snapshot: `examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator`
 - chart-render: `examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts`
 - memory: `examples/ai/finrobot_translation/live_packages/generic_memory_store`
@@ -86,6 +87,9 @@ orthogonal and layered:
   report outlines, section dependency DAGs, artifact manifests, render manifests,
   snapshot metadata, stale-data warnings, accessibility checks, and renderer
   clean-skip envelopes.
+- report-render owns report render requests, request/result envelopes, output
+  manifests, artifact manifests, snapshot metadata, warnings, annotations,
+  fixture hashes, and renderer clean-skip envelopes.
 - ui-snapshot owns route DOM schemas, viewport matrices, visual diff budgets,
   accessibility summaries, artifact URI manifests, redaction policy, static
   asset policy, and browser clean-skip envelopes.
@@ -142,6 +146,7 @@ language or specializing the dialect for one application domain.
 | Data providers | `generic_data_provider_boundary`, `generic_optional_adapter_boundary`, `generic_approval_policy` | Provider registries, request/response envelopes, pagination, rate limits, auth redaction, cache/retry policy, provenance, errors, and clean skips are package-owned data access contracts rather than domain-specific vendor syntax. |
 | Prompt and role catalogs | `generic_prompt_role_catalog`, `generic_agent_runner`, `generic_workflow_orchestrator` | Prompt templates, role profiles, output schemas, delegation triggers, evidence validation, and termination conventions are package-owned fixtures and contracts, not built-in language syntax. |
 | Evidence/report artifacts | `generic_evidence_report_artifacts`, `generic_document_rag_pipeline`, `generic_workflow_orchestrator`, `generic_trace_events` | Source annotations, citation envelopes, section DAGs, render manifests, snapshots, stale warnings, accessibility checks, and clean-skip renderer gates are package data shared by workflows, traces, replay, and reporting packages. |
+| Report rendering | `generic_report_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Render requests, output manifests, artifact manifests, page snapshots, warnings, annotations, fixture hashes, and renderer clean skips are reusable reporting contracts; concrete HTML/PDF renderers stay outside Leia core. |
 | Chart rendering | `generic_chart_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Chart specs, recipe matrices, render envelopes, source metadata, and deterministic snapshot hashes are produced by chart-render; evidence-report consumes chart artifacts; UI snapshot evaluates rendered routes and accessibility without owning chart semantics. |
 | UI snapshot evaluation | `generic_ui_snapshot_evaluator`, `generic_evidence_report_artifacts`, `generic_trace_events` | Route DOM schemas, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean-skip metadata stay generic UI package data rather than product-specific web code. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |

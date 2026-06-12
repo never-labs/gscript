@@ -428,6 +428,33 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_record_replay/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_report_render_contracts",
+      "package_name": "leia-generic-ai-report-render-contracts",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+      "capability": "generic.ai.report.render.contracts",
+      "capabilities": [
+        "generic.ai.report.render.contracts",
+        "generic.ai.report.render.request",
+        "generic.ai.report.render.request_envelope",
+        "generic.ai.report.render.output_manifest",
+        "generic.ai.report.render.artifact_manifest",
+        "generic.ai.report.render.snapshot_metadata",
+        "generic.ai.report.render.snapshot_hash",
+        "generic.ai.report.render.warning",
+        "generic.ai.report.render.annotation",
+        "generic.ai.report.render.fixture_hash",
+        "generic.ai.report.render.clean_skip"
+      ],
+      "backend_shape": "ai.report.render_contracts",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/contracts/generic_report_render_contracts_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_tool_contracts",
       "package_name": "leia-generic-ai-tool-contracts",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_tool_contracts",

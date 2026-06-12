@@ -38,6 +38,7 @@
     "product-app",
     "prompt-role-catalog",
     "replay",
+    "report-render",
     "tool",
     "trace",
     "turn",
@@ -586,6 +587,41 @@
         "package_id": "generic-record-replay",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_record_replay",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_record_replay/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "report-render",
+      "capability_id": "generic.ai.report.render.contracts",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "report.render.request",
+        "report.render.request_envelope",
+        "report.render.output_manifest",
+        "report.render.artifact_manifest",
+        "report.render.snapshot_metadata",
+        "report.render.warning",
+        "report.render.annotation",
+        "report.render.fixture_hash",
+        "report.render.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_report_render_contracts.source.txt",
+      "test": "tests/llm/llm_generic_report_render_contracts_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_report_render_contracts_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-report-render-contracts",
+        "boundary": "provider-free report render requests, request/result envelopes, output and artifact manifests, snapshot metadata and hashes, warnings, annotations, fixture hashes, and renderer clean skips",
+        "status": "resolved",
+        "reason": "report rendering behavior was promoted from application-specific report renderer metadata into a reusable provider-free package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-report-render-contracts",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_report_render_contracts/main.leia",
         "provider_free": true,
         "domain_specific": false
       }
