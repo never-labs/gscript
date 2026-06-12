@@ -971,8 +971,8 @@ trades := data.frame({
   qty: data.i64({10, 30, 20}),
   arrival: data.f64({99.0, 90.0, 100.0}),
 })
-projected := q.sql(trades, "select sym,ratio:price%qty,bps:(price-arrival)*10000%arrival from trades where price%qty>=6 order by price%qty desc")
-updated := q.sql(trades, "update ratio:price%qty from trades where price%qty>=6")
+projected := q.sql(trades, "select sym,ratio:price%qty,bps:(price-arrival)*10000%arrival from trades where (price%qty)>=6 order by price%qty desc")
+updated := q.sql(trades, "update ratio:price%qty from trades where (price%qty)>=6")
 scalar_div := q.eval("10%2")
 vector_div := q.eval("10 20 30%10")
 reciprocal_ok := q.eval("reciprocal 4")
@@ -7853,7 +7853,7 @@ func TestQSQLWherePredicates(t *testing.T) {
 			"    size: array.i64({10, 20, 30, 40}),\n"+
 			"    active: array.bool({true, false, true, true}),\n"+
 			"})\n"+
-			"filtered := q.sql(trades, \"select sym,price,size from trades where sym in `AAPL`NVDA and price within 100 220 and not active=false order by sym asc\")\n"+
+			"filtered := q.sql(trades, \"select sym,price,size from trades where (sym in `AAPL`NVDA) and (price within 100 220) and not active=false order by sym asc\")\n"+
 			"comma_filtered := q.sql(trades, \"select sym,price from trades where active=true,price>=190 order by sym asc\")\n"+
 			"semicolon_filtered := q.sql(trades, \"select sym,price from trades where active=true;price>=190 order by sym asc\")\n")
 

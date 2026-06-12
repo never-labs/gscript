@@ -53,7 +53,7 @@ trades = q.sql(trades, "update fee:notional*0.00025 from trades where venue=`ARC
 
 trades_xasc := q.sql(trades, "select trade_id,sym,ts,price,size,notional from trades order by sym asc,ts asc")
 trades_xdesc := q.sql(trades, "select trade_id,sym,ts,price,size,notional from trades order by notional desc")
-large_abs_flow := q.sql(trades, "select trade_id,sym,abs_qty:abs signed_qty from trades where abs signed_qty>25 order by abs signed_qty desc")
+large_abs_flow := q.sql(trades, "select trade_id,sym,abs_qty:abs signed_qty from trades where (abs signed_qty)>25 order by abs signed_qty desc")
 trade_groups := q.sql(trades, "select by sym from trades order by sym asc")
 venue_groups := q.sql(trades, "select fills:count i,qty:sum size,notional:sum notional by venue from trades order by venue asc")
 
