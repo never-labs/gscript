@@ -269,6 +269,55 @@
       "live_model": false,
       "credentials_required": false,
       "real_dependency_imports": false
+    },
+    {
+      "id": "generic-tool-approval-result-composition",
+      "source_packages": [
+        "generic-tool-registry-live-package",
+        "generic-ai-approval-policy",
+        "generic-tool-contracts-live-package"
+      ],
+      "source_fixtures": [
+        "../generic_tool_registry/fixtures/approval_edge_fixture.json",
+        "../generic_approval_policy/fixtures/approval_trace_envelope_fixture.json",
+        "../generic_tool_contracts/fixtures/invoke_validation_error_fixture.json"
+      ],
+      "target_schema": "schemas/tool_approval_result_composition_v1.schema.json",
+      "target_fixture": "fixtures/tool_approval_result_composition_fixture.json",
+      "target_event_types": [
+        "tool_call",
+        "approval_replay_trace",
+        "tool_result"
+      ],
+      "target_capability": "ai.trace.tool_approval_result_composition",
+      "required_source_paths": [
+        "tool_registry.trace.tool_name",
+        "tool_registry.trace.approval.decision",
+        "tool_registry.trace.result.status",
+        "approval_policy.request.tool",
+        "approval_policy.request.capability",
+        "approval_policy.decision.status",
+        "approval_policy.result.executed",
+        "tool_contracts.request.tool_name",
+        "tool_contracts.result.ok",
+        "tool_contracts.result.error.kind",
+        "tool_contracts.result.replay.replay_key"
+      ],
+      "required_target_paths": [
+        "identity_policy.canonical_tool_call_id",
+        "projected_events[0].event_type",
+        "projected_events[0].correlation.tool_call_id",
+        "projected_events[1].event_type",
+        "projected_events[1].payload.decision",
+        "projected_events[2].event_type",
+        "projected_events[2].payload.result_replay_key"
+      ],
+      "identity_policy": "explicit_canonical_keys_with_source_provenance_no_source_id_equality_assumption",
+      "provider_free": true,
+      "live_network": false,
+      "live_model": false,
+      "credentials_required": false,
+      "real_dependency_imports": false
     }
   ]
 }

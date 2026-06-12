@@ -357,6 +357,39 @@ type genericTraceEventsModelTurnReplayProjectionFixture struct {
 	ProjectedEvents []genericTraceEventsProjectedEnvelopeEvent `json:"projected_events"`
 }
 
+type genericTraceEventsToolApprovalResultCompositionFixture struct {
+	SchemaVersion         int    `json:"schema_version"`
+	ID                    string `json:"id"`
+	CompositionKind       string `json:"composition_kind"`
+	ProviderFree          bool   `json:"provider_free"`
+	DomainSpecific        bool   `json:"domain_specific"`
+	LiveNetwork           bool   `json:"live_network"`
+	LiveModel             bool   `json:"live_model"`
+	CredentialsRequired   bool   `json:"credentials_required"`
+	RealDependencyImports bool   `json:"real_dependency_imports"`
+	SourceRefs            map[string]struct {
+		PackageID string `json:"package_id"`
+		Fixture   string `json:"fixture"`
+		Schema    string `json:"schema"`
+		Role      string `json:"role"`
+	} `json:"source_refs"`
+	IdentityPolicy struct {
+		CanonicalToolCallID      string   `json:"canonical_tool_call_id"`
+		CanonicalToolName        string   `json:"canonical_tool_name"`
+		CanonicalCapability      string   `json:"canonical_capability"`
+		ApprovalIDWhenMissing    string   `json:"approval_id_when_missing"`
+		SourceIDsAreNotAssumedEq []string `json:"source_ids_are_not_assumed_equal"`
+		NormalizationPolicy      string   `json:"normalization_policy"`
+	} `json:"identity_policy"`
+	FieldMappings []struct {
+		Source string `json:"source"`
+		Target string `json:"target"`
+		Policy string `json:"policy"`
+	} `json:"field_mappings"`
+	SourceObservations map[string]map[string]any                  `json:"source_observations"`
+	ProjectedEvents    []genericTraceEventsProjectedEnvelopeEvent `json:"projected_events"`
+}
+
 type genericTraceEventsProjectedEnvelopeEvent struct {
 	TraceID     string            `json:"trace_id"`
 	EventID     string            `json:"event_id"`
@@ -401,20 +434,20 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		manifest.DefaultPolicy.FixtureHook != "recorded_generic_trace_events_fixture" {
 		t.Fatalf("default policy must stay fixture-only and clean-skip safe: %#v", manifest.DefaultPolicy)
 	}
-	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture", "tool_invocation_projection_fixture", "model_turn_replay_trace_projection_fixture"} {
+	for _, key := range []string{"smoke", "trace_events_contract", "fixture_index", "trace_sequence_fixture", "redaction_policy_fixture", "trace_envelope_fixture", "approval_trace_projection_fixture", "tool_invocation_projection_fixture", "model_turn_replay_trace_projection_fixture", "tool_approval_result_composition_fixture"} {
 		if manifest.Entrypoints[key] == "" {
 			t.Fatalf("missing entrypoint %q", key)
 		}
 		assertGenericTraceEventsEntrypointPath(t, manifest.Entrypoints[key])
 	}
-	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "model_turn_replay_trace_projection", "redaction_policy", "correlation_ids"} {
+	for _, key := range []string{"trace_event", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "model_turn_replay_trace_projection", "tool_approval_result_composition", "redaction_policy", "correlation_ids"} {
 		path := manifest.Schemas[key]
 		if path == "" {
 			t.Fatalf("missing schema %q", key)
 		}
 		assertGenericTraceEventsJSONFile(t, filepath.Join(base, path))
 	}
-	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "model_turn_replay_trace_projection", "redaction_policy"} {
+	for _, key := range []string{"index", "trace_sequence", "trace_envelope", "approval_trace_projection", "tool_invocation_projection", "model_turn_replay_trace_projection", "tool_approval_result_composition", "redaction_policy"} {
 		path := manifest.Fixtures[key]
 		if path == "" {
 			t.Fatalf("missing fixture %q", key)
@@ -450,6 +483,7 @@ func TestGenericTraceEventsLivePackageManifestAndContracts(t *testing.T) {
 		"ai.trace.approval_projection",
 		"ai.trace.tool_invocation_projection",
 		"ai.trace.model_turn_replay_projection",
+		"ai.trace.tool_approval_result_composition",
 		"ai.trace.external_envelope_projection",
 	} {
 		if !genericTraceEventsContains(manifest.Capabilities, want) {
@@ -886,6 +920,97 @@ func TestGenericTraceEventsModelTurnReplayProjection(t *testing.T) {
 	}
 }
 
+func TestGenericTraceEventsToolApprovalResultComposition(t *testing.T) {
+	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
+	contract := loadGenericTraceEventsContract(t, base)
+	var composition genericTraceEventsToolApprovalResultCompositionFixture
+	decodeGenericTraceEventsJSONFile(t, filepath.Join(base, "fixtures", "tool_approval_result_composition_fixture.json"), &composition)
+
+	if manifest.Fixtures["tool_approval_result_composition"] != "fixtures/tool_approval_result_composition_fixture.json" ||
+		manifest.Schemas["tool_approval_result_composition"] != "schemas/tool_approval_result_composition_v1.schema.json" {
+		t.Fatalf("tool approval result composition manifest entries missing: fixtures=%#v schemas=%#v", manifest.Fixtures, manifest.Schemas)
+	}
+	projectionContract := genericTraceEventsFindExternalProjection(contract, "generic-tool-approval-result-composition")
+	if projectionContract.ID == "" {
+		t.Fatalf("missing tool approval result composition contract: %#v", contract.ExternalEnvelopeProjections)
+	}
+	if projectionContract.TargetFixture != manifest.Fixtures["tool_approval_result_composition"] ||
+		projectionContract.TargetSchema != manifest.Schemas["tool_approval_result_composition"] ||
+		projectionContract.TargetCapability != "ai.trace.tool_approval_result_composition" {
+		t.Fatalf("tool approval result composition manifest/contract disconnected: contract=%#v manifest=%#v", projectionContract, manifest.Fixtures)
+	}
+	if !composition.ProviderFree || composition.DomainSpecific || composition.LiveNetwork || composition.LiveModel ||
+		composition.CredentialsRequired || composition.RealDependencyImports ||
+		!projectionContract.ProviderFree || projectionContract.LiveNetwork || projectionContract.LiveModel ||
+		projectionContract.CredentialsRequired || projectionContract.RealDependencyImports {
+		t.Fatalf("tool approval result composition must stay provider-free/offline: composition=%#v contract=%#v", composition, projectionContract)
+	}
+	assertGenericTraceEventsSameStrings(t, "tool approval result source packages", projectionContract.SourcePackages, []string{"generic-tool-registry-live-package", "generic-ai-approval-policy", "generic-tool-contracts-live-package"})
+	assertGenericTraceEventsSameStrings(t, "tool approval result event types", projectionContract.TargetEventTypes, []string{"tool_call", "approval_replay_trace", "tool_result"})
+	if composition.IdentityPolicy.CanonicalToolCallID == "" ||
+		composition.IdentityPolicy.CanonicalToolName != "fixture.lookup" ||
+		composition.IdentityPolicy.CanonicalCapability == "" ||
+		composition.IdentityPolicy.ApprovalIDWhenMissing == "" ||
+		len(composition.IdentityPolicy.SourceIDsAreNotAssumedEq) == 0 ||
+		!strings.Contains(projectionContract.IdentityPolicy, "no_source_id_equality") {
+		t.Fatalf("composition identity policy must use explicit canonical keys: identity=%#v contract=%q", composition.IdentityPolicy, projectionContract.IdentityPolicy)
+	}
+	for _, key := range []string{"tool_registry", "approval_policy", "tool_contracts"} {
+		ref := composition.SourceRefs[key]
+		if ref.PackageID == "" || ref.Fixture == "" || ref.Schema == "" || ref.Role == "" {
+			t.Fatalf("composition source ref %q incomplete: %#v", key, ref)
+		}
+		assertGenericTraceEventsJSONFile(t, filepath.Join(base, filepath.FromSlash(ref.Fixture)))
+	}
+	registry := composition.SourceObservations["tool_registry"]
+	approval := composition.SourceObservations["approval_policy"]
+	toolContracts := composition.SourceObservations["tool_contracts"]
+	if registry["approval_decision"] != "deny" || registry["clean_skip"] != true || registry["executed"] != false ||
+		approval["decision"] != "denied" || approval["secret_values_present"] != false ||
+		toolContracts["result_ok"] != false || toolContracts["result_error_kind"] != "validation" {
+		t.Fatalf("source observations do not prove denied/validation path: registry=%#v approval=%#v tool_contracts=%#v", registry, approval, toolContracts)
+	}
+
+	wantOrder := []string{"tool_call", "approval_replay_trace", "tool_result"}
+	seenIDs := map[string]bool{}
+	for i, event := range composition.ProjectedEvents {
+		if event.EventType != wantOrder[i] || event.Sequence != i+1 || event.TimestampMS == 0 || event.TraceID == "" || event.Status == "" {
+			t.Fatalf("composition projected event[%d] = %#v, want type %q seq %d", i, event, wantOrder[i], i+1)
+		}
+		if seenIDs[event.EventID] {
+			t.Fatalf("duplicate composition event id %q", event.EventID)
+		}
+		seenIDs[event.EventID] = true
+		if event.Correlation["tool_call_id"] != composition.IdentityPolicy.CanonicalToolCallID {
+			t.Fatalf("%s tool_call_id = %#v, want %q", event.EventID, event.Correlation, composition.IdentityPolicy.CanonicalToolCallID)
+		}
+	}
+	toolCall := composition.ProjectedEvents[0]
+	if toolCall.Payload["tool_call_id"] != composition.IdentityPolicy.CanonicalToolCallID ||
+		toolCall.Payload["tool_name"] != composition.IdentityPolicy.CanonicalToolName ||
+		toolCall.Payload["capability"] != composition.IdentityPolicy.CanonicalCapability ||
+		toolCall.Payload["input_digest"] == "" {
+		t.Fatalf("tool_call payload does not use canonical keys/digest: %#v", toolCall.Payload)
+	}
+	approvalEvent := composition.ProjectedEvents[1]
+	if approvalEvent.Correlation["approval_id"] != composition.IdentityPolicy.ApprovalIDWhenMissing ||
+		approvalEvent.Payload["decision"] != "denied" ||
+		approvalEvent.Payload["source_approval_id"] != nil ||
+		approvalEvent.Payload["secret_values_present"] != false {
+		t.Fatalf("approval event payload/correlation invalid: correlation=%#v payload=%#v", approvalEvent.Correlation, approvalEvent.Payload)
+	}
+	resultEvent := composition.ProjectedEvents[2]
+	if resultEvent.Payload["tool_name"] != composition.IdentityPolicy.CanonicalToolName ||
+		resultEvent.Payload["result_ok"] != false ||
+		resultEvent.Payload["result_error_kind"] != "validation" ||
+		resultEvent.Payload["result_replay_key"] != toolContracts["result_replay_key"] ||
+		resultEvent.Payload["output_digest"] == "" ||
+		resultEvent.Payload["deterministic"] != true {
+		t.Fatalf("tool_result payload invalid: %#v", resultEvent.Payload)
+	}
+}
+
 func TestGenericTraceEventsRedactionPolicy(t *testing.T) {
 	base := genericTraceEventsLivePackageDir(t)
 	var policy genericTraceEventsRedactionPolicy
@@ -1284,10 +1409,12 @@ func assertGenericTraceEventsPackageHasNoRawLeak(t *testing.T, base string) {
 		"fixtures/model_turn_replay_trace_projection_fixture.json",
 		"fixtures/provider_free_fixture_index.json",
 		"fixtures/redaction_policy_fixture.json",
+		"fixtures/tool_approval_result_composition_fixture.json",
 		"fixtures/trace_envelope_fixture.json",
 		"fixtures/tool_invocation_projection_fixture.json",
 		"schemas/approval_trace_projection_v1.schema.json",
 		"schemas/model_turn_replay_trace_projection_v1.schema.json",
+		"schemas/tool_approval_result_composition_v1.schema.json",
 		"schemas/tool_invocation_projection_v1.schema.json",
 		"fixtures/trace_sequence_ACME_fixture.json",
 		"schemas/correlation_ids_v1.schema.json",
