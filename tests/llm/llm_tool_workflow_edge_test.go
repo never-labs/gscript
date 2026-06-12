@@ -78,6 +78,63 @@ second_step_is_nil := result.steps[2] == nil
 	}
 }
 
+func TestLLMWorkflowGraphEdgeRejectsDuplicateAndInvalidOrder(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(mode.name+"/duplicate", func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)...)
+			err := vm.Exec(`
+graph := llm.workflow_graph({
+    stages: {
+        llm.stage("plan", func(ctx) { return ctx.input, nil }),
+        llm.stage("plan", func(ctx) { return ctx.input, nil }),
+    }
+})
+`)
+			if err == nil || !strings.Contains(err.Error(), `duplicate stage "plan"`) {
+				t.Fatalf("Exec error = %v, want duplicate stage validation", err)
+			}
+		})
+
+		t.Run(mode.name+"/depends_on_later_stage", func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)...)
+			err := vm.Exec(`
+graph := llm.workflow_graph({
+    stages: {
+        llm.stage("finalize", func(ctx) { return ctx.input, nil }, {depends_on: {"plan"}}),
+        llm.stage("plan", func(ctx) { return ctx.input, nil }),
+    }
+})
+`)
+			if err == nil || !strings.Contains(err.Error(), `depends on unknown or later stage "plan"`) {
+				t.Fatalf("Exec error = %v, want dependency order validation", err)
+			}
+		})
+
+		t.Run(mode.name+"/edge_unknown_stage", func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)...)
+			err := vm.Exec(`
+graph := llm.workflow_graph({
+    stages: {
+        llm.stage("plan", func(ctx) { return ctx.input, nil }),
+    }
+    edges: {
+        {from: "plan", to: "missing"}
+    }
+})
+`)
+			if err == nil || !strings.Contains(err.Error(), `edge references unknown stage "plan" -> "missing"`) {
+				t.Fatalf("Exec error = %v, want unknown edge validation", err)
+			}
+		})
+	}
+}
+
 func TestLLMAgentAsToolEdgePropagatesPendingAndExplicitErrors(t *testing.T) {
 	for _, mode := range []struct {
 		name string

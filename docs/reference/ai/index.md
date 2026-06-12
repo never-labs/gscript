@@ -412,8 +412,9 @@ control, tenant boundaries, licensing, freshness, or secret handling matter.
 ## Workflows
 
 `llm.workflow(steps)` creates a sequential runner for named AI or non-AI steps.
-Each step is built with `llm.step(name, fn, opts)` or supplied as a function. A
-workflow value exposes `run(input, opts)` and `mock(fixtures)`.
+Each step is built with `llm.step(name, fn, opts)`, with the stage-shaped alias
+`llm.stage(name, fn, opts)`, or supplied as a function. A workflow value exposes
+`run(input, opts)` and `mock(fixtures)`.
 
 ```leia
 flow := llm.workflow({
@@ -439,6 +440,34 @@ Use workflows for deterministic sequencing, replay, and test fixtures around
 agent calls. They are not parallel execution, durable orchestration, retries, or
 transaction management. `flow.mock({step_name: fixture})` replaces named steps
 with fixtures and is intended for tests and offline examples.
+
+`llm.workflow_graph(config)` adds a static graph contract around the same
+sequential runner. It accepts ordered `stages` and optional `edges`, validates
+that dependencies point to earlier stages, exposes `graph` metadata, and then
+runs the stages in the supplied order. This is useful when an AI dialect package
+needs stable stage ids, capability metadata, input/output refs, and replayable
+fixtures without introducing a separate scheduler.
+
+```leia
+graph := llm.workflow_graph({
+    workflow_id: "research-flow"
+    entrypoint: "ai.workflow.orchestrate"
+    stages: {
+        llm.stage("plan", plan_fn, {output_ref: "plan_result"})
+        llm.stage("finalize", final_fn, {
+            depends_on: {"plan"}
+            input_ref: "plan_result"
+            output_ref: "final_result"
+        })
+    }
+    edges: {{from: "plan", to: "finalize"}}
+})
+result, err := graph.run("topic")
+```
+
+The graph helper is intentionally conservative: it validates and records graph
+shape, but it does not perform DAG scheduling, parallel execution, retries,
+persistence, or hidden provider calls.
 
 ## Section Generation
 
