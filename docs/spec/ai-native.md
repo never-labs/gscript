@@ -616,7 +616,9 @@ findings}` and may require provider-free traces, deny live network/model flags,
 require event types, require correlation fields, require payload fields on all
 events, or require payload fields for specific event types via
 `require_event_payload_fields` or the equivalent
-`required_payload_fields_by_event_type`. It may also deny truthy redaction
+`required_payload_fields_by_event_type`. It may require minimum status counts
+with `require_status_counts` and maximum status counts with
+`limit_status_counts` or `max_status_counts`. It may also deny truthy redaction
 states on each event with `deny_secret_values_present` (alias:
 `deny_secret_values`), `deny_raw_prompt_stored`, and
 `deny_raw_completion_stored`. These helpers are provider-free; they inspect

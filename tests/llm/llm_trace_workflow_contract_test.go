@@ -285,6 +285,8 @@ check := llm.trace_assert(envelope, {
     deny_live_network: true
     deny_live_model: true
     required_event_types: {"turn_start", "turn_end"}
+    require_status_counts: {ok: 1}
+    limit_status_counts: {error: 1}
     require_correlation_fields: {"turn_id", "replay_session_id"}
     require_payload_fields: {"phase"}
     deny_secret_values_present: true
@@ -302,6 +304,9 @@ payload_bad := llm.trace_assert(envelope, {
     required_payload_fields_by_event_type: {
         turn_start: {"result"}
     }
+})
+status_bad := llm.trace_assert(envelope, {
+    max_status_counts: {error: 0}
 })
 leaky := llm.trace_event({
     trace_id: "trace-summary"
@@ -344,6 +349,10 @@ payload_bad_ok := payload_bad.ok
 payload_bad_status := payload_bad.status
 payload_bad_findings := #payload_bad.findings
 payload_bad_kind := payload_bad.findings[1].kind
+status_bad_ok := status_bad.ok
+status_bad_status := status_bad.status
+status_bad_findings := #status_bad.findings
+status_bad_kind := status_bad.findings[1].kind
 redaction_bad_ok := redaction_bad.ok
 redaction_bad_status := redaction_bad.status
 redaction_bad_findings := #redaction_bad.findings
@@ -372,6 +381,10 @@ redaction_bad_second_kind := redaction_bad.findings[2].kind
 				"payload_bad_status":        "failed",
 				"payload_bad_findings":      int64(1),
 				"payload_bad_kind":          "generic.ai.trace.missing_payload_field",
+				"status_bad_ok":             false,
+				"status_bad_status":         "failed",
+				"status_bad_findings":       int64(1),
+				"status_bad_kind":           "generic.ai.trace.status_count_above_limit",
 				"redaction_bad_ok":          false,
 				"redaction_bad_status":      "failed",
 				"redaction_bad_findings":    int64(2),
