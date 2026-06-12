@@ -232,6 +232,19 @@ Tool contracts are advisory metadata. They must not authorize side effects,
 coerce return values, or hide runtime tool errors. Host policy, capability
 checks, and explicit validation remain separate steps.
 
+`llm.tool_registry(tools, opts)` projects a tool list into a provider-free
+registry table with normalized descriptors, capability inventory, effect and
+approval counts, redaction metadata, and a compact summary. The registry
+helper does not execute tools, register host callbacks, contact providers, or
+authorize side effects. `llm.validate_tool_registry(registry, opts)` returns a
+validation table with `ok`, `status`, `findings`, and `finding_count`; it must
+flag live-network/provider-credential boundaries, duplicate tool names, missing
+descriptor fields, provider wire formats other than `none`, secret parameters,
+and effectful tools without explicit approval policy. `llm.tool_invocation_trace`
+projects a tool call/result boundary into the generic registry trace shape with
+ordered `registered`, `schema_validated`, `approval_checked`, `invoked`, and
+`result_recorded` events plus metadata-only result and provenance envelopes.
+
 ## Turns
 
 `turn { ... }` performs exactly one provider request and returns

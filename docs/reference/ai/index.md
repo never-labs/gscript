@@ -136,6 +136,25 @@ tool dispatch into a stable, metadata-only table. It records fields such as
 event. The projection is ref-only: it does not copy raw tool args, raw tool
 results, raw prompts, or provider completions into the trace payload.
 
+For package-level inventories, use `llm.tool_registry(tools, opts)`:
+
+```leia
+registry := llm.tool_registry({lookup}, {registry_id: "research-tools"})
+gate := llm.validate_tool_registry(registry)
+trace := llm.tool_invocation_trace({tool_name: "lookup"}, {answer: "ok"})
+```
+
+The registry is a provider-free metadata projection. It contains normalized
+descriptors, unique capabilities, effect/approval counts, redaction metadata,
+and a summary. Validation returns a table with `ok`, `status`, `findings`, and
+`finding_count`; it reports duplicate names, missing descriptor fields, live
+network/provider credential boundaries, provider wire formats other than
+`none`, secret parameters, and effectful tools without approval policy.
+`llm.tool_invocation_trace` builds the registry trace envelope with ordered
+`registered`, `schema_validated`, `approval_checked`, `invoked`, and
+`result_recorded` events. These helpers do not execute tools or authorize side
+effects.
+
 ## Messages And History
 
 `turn` and `llm.turn` receive ordinary message arrays. Use `llm.system`,

@@ -81,6 +81,7 @@ func (b *llmLibBuilder) register() {
 	registerLLMReplayHelpers(b.t)
 	b.registerMessageHelpers()
 	b.registerToolHelpers()
+	b.registerToolRegistryHelpers()
 	b.registerToolOutcomeHelpers()
 	b.registerSchemaHelpers()
 	b.registerModelIOEnvelopeHelpers()

@@ -128,6 +128,22 @@ ok, err := llm.validate_tools({lookup_runbook})
 `llm.tool_schema` and `llm.tool_info` are inventory helpers. They do not call
 the tool and they do not authorize side effects.
 
+When a package needs a portable tool inventory, wrap the same tools in a
+provider-free registry:
+
+```leia
+registry := llm.tool_registry({lookup_runbook}, {registry_id: "ops-tools"})
+gate := llm.validate_tool_registry(registry)
+trace := llm.tool_invocation_trace({
+    tool_name: "lookup_runbook"
+    fixture_key: "ops:lookup_runbook:fixture:v1"
+}, {service: "checkout"})
+```
+
+The registry and trace are metadata-only. They keep descriptor, capability,
+approval, result-shape, and provenance information without executing the tool
+or storing raw args/results.
+
 ## Agents
 
 `agent { ... }` returns a callable value. The `config` function builds the
