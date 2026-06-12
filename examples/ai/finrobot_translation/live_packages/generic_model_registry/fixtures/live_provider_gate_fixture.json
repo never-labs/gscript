@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "generic-model-registry-live-provider-gate-v1",
+  "capability": "generic.ai.model.live_provider_gate",
+  "provider_free": true,
+  "live_network": false,
+  "live_model_calls": false,
+  "enabled_by_default": false,
+  "requires_explicit_integration_env": true,
+  "integration_env": "LEIA_LLM_INTEGRATION",
+  "allowed_provider_env_refs": [
+    "env:LEIA_GLM_BASE_URL",
+    "env:LEIA_GLM_API_KEY",
+    "env:LEIA_GLM_MODEL",
+    "env:ANTHROPIC_BASE_URL",
+    "env:ANTHROPIC_AUTH_TOKEN",
+    "env:ANTHROPIC_MODEL"
+  ],
+  "secret_values_present": false,
+  "credential_values_allowed": false,
+  "redaction_policy_ref": "generic-model-registry-redaction-v1",
+  "clean_skip_without_credentials": true,
+  "default_skip_reason": "live provider smoke is disabled unless LEIA_LLM_INTEGRATION and provider credential env refs are explicitly configured",
+  "provider_protocols": [
+    "anthropic_compatible",
+    "openai_compatible"
+  ],
+  "live_smoke_contract": {
+    "prompt": "Reply exactly: leia glm smoke ok",
+    "expected_text": "leia glm smoke ok",
+    "max_tokens": 32,
+    "temperature": 0,
+    "timeout_seconds": 45,
+    "record_replay_required_for_ci": true
+  }
+}

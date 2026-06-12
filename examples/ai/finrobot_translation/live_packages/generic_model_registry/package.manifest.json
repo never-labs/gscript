@@ -25,19 +25,22 @@
     "main": "main.leia",
     "contract": "contracts/model_registry_contract.json",
     "fixture_index": "fixtures/provider_free_fixture_index.json",
-    "alias_registry": "fixtures/model_alias_registry_fixture.json"
+    "alias_registry": "fixtures/model_alias_registry_fixture.json",
+    "live_provider_gate": "fixtures/live_provider_gate_fixture.json"
   },
   "schemas": {
     "alias_registry": "schemas/model_alias_registry_v1.schema.json",
     "execution_descriptor": "schemas/execution_descriptor_v1.schema.json",
-    "redaction_policy": "schemas/redaction_policy_v1.schema.json"
+    "redaction_policy": "schemas/redaction_policy_v1.schema.json",
+    "live_provider_gate": "schemas/live_provider_gate_v1.schema.json"
   },
   "capabilities": [
     "generic.ai.model.registry",
     "generic.ai.model.alias.resolve",
     "generic.ai.model.descriptor.replay",
     "generic.ai.model.redaction.policy",
-    "generic.ai.model.routing.guard"
+    "generic.ai.model.routing.guard",
+    "generic.ai.model.live_provider_gate"
   ],
   "default_policy": {
     "mode": "fixture_replay",
@@ -54,6 +57,7 @@
   "provider_policy": {
     "id": "provider-free-model-policy-v1",
     "allow_named_providers": false,
+    "allow_live_provider_gate": true,
     "provider_credentials_required": false,
     "live_network": false,
     "live_model_calls": false,
@@ -62,7 +66,34 @@
     "deny_reasons": [
       "live_provider_disabled",
       "credential_material_forbidden",
-      "network_disabled"
+      "network_disabled",
+      "live_provider_requires_explicit_integration_env"
+    ]
+  },
+  "live_provider_gate": {
+    "id": "explicit-live-provider-gate-v1",
+    "capability": "generic.ai.model.live_provider_gate",
+    "enabled_by_default": false,
+    "provider_free_default": true,
+    "live_network_default": false,
+    "live_model_calls_default": false,
+    "requires_explicit_integration_env": true,
+    "integration_env": "LEIA_LLM_INTEGRATION",
+    "allowed_provider_env_refs": [
+      "env:LEIA_GLM_BASE_URL",
+      "env:LEIA_GLM_API_KEY",
+      "env:LEIA_GLM_MODEL",
+      "env:ANTHROPIC_BASE_URL",
+      "env:ANTHROPIC_AUTH_TOKEN",
+      "env:ANTHROPIC_MODEL"
+    ],
+    "secret_values_present": false,
+    "redaction_policy_ref": "generic-model-registry-redaction-v1",
+    "clean_skip_without_credentials": true,
+    "default_skip_reason": "live provider smoke is disabled unless LEIA_LLM_INTEGRATION and provider credential env refs are explicitly configured",
+    "provider_protocols": [
+      "anthropic_compatible",
+      "openai_compatible"
     ]
   },
   "routing_guard": {
@@ -78,7 +109,8 @@
     "denied_provider_kinds": [
       "future-live-provider",
       "request-scoped-live-provider",
-      "provider-sdk-import"
+      "provider-sdk-import",
+      "implicit-live-provider"
     ],
     "redirect_evidence": [
       {
@@ -121,7 +153,8 @@
     "streaming": false,
     "vision": false,
     "live_network": false,
-    "provider_credentials": false
+    "provider_credentials": false,
+    "live_provider_gate": true
   },
   "alias_registry": [
     {
@@ -202,6 +235,7 @@
     "routing guard redirects live provider candidates to replay descriptors",
     "alias registry resolves to replay-safe descriptors",
     "redaction policy forbids stored secret values",
+    "live provider gate is disabled by default and clean-skips without explicit integration env",
     "capability flags expose registry and replay boundaries"
   ],
   "no_built_in_guarantee": {

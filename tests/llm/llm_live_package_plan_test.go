@@ -111,9 +111,11 @@ func TestFinRobotLivePackagePlanSkeletons(t *testing.T) {
 				t.Fatalf("%s missing %s", pkg.ID, label)
 			}
 		}
-		if !strings.HasPrefix(pkg.PlannedDirectory, "packages/finrobot/") &&
-			!strings.HasPrefix(pkg.PlannedDirectory, "packages/ai/") &&
-			!strings.HasPrefix(pkg.PlannedDirectory, "packages/generic_ai/") {
+		if strings.HasPrefix(pkg.ID, "generic_") {
+			if !strings.HasPrefix(pkg.PlannedDirectory, "packages/generic_ai/") {
+				t.Fatalf("%s generic planned_directory = %q", pkg.ID, pkg.PlannedDirectory)
+			}
+		} else if !strings.HasPrefix(pkg.PlannedDirectory, "packages/finrobot/") {
 			t.Fatalf("%s planned_directory = %q", pkg.ID, pkg.PlannedDirectory)
 		}
 		if pkg.Status != "skeleton_contract_checked_in" {

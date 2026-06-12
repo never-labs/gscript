@@ -575,6 +575,22 @@ func assertGenericAIDialectProductionBoundaryGap(t *testing.T, entry genericAIDi
 		if entry.ProductionPackageBoundary == nil || entry.ProductionPackageBoundary.Status != "checked_in" {
 			t.Fatalf("%s resolved gap requires checked-in production boundary: gap=%#v boundary=%#v", entry.Capability, gap, entry.ProductionPackageBoundary)
 		}
+		lowerReason := strings.ToLower(gap.Reason)
+		for _, stale := range []string{
+			"currently only",
+			"not extracted",
+			"not promoted",
+			"no standalone",
+			"not packaged",
+			"lack a package-level",
+			"without a production package",
+			"not a reusable production",
+			"not a generic package boundary",
+		} {
+			if strings.Contains(lowerReason, stale) {
+				t.Fatalf("%s resolved gap reason still reads unresolved (%q): %q", entry.Capability, stale, gap.Reason)
+			}
+		}
 	default:
 		t.Fatalf("%s production package boundary gap has invalid status %q", entry.Capability, gap.Status)
 	}

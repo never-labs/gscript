@@ -135,7 +135,8 @@
         "generic.ai.model.alias.resolve",
         "generic.ai.model.descriptor.replay",
         "generic.ai.model.redaction.policy",
-        "generic.ai.model.routing.guard"
+        "generic.ai.model.routing.guard",
+        "generic.ai.model.live_provider_gate"
       ],
       "backend_shape": "generic.ai.model.registry",
       "provider_free": true,

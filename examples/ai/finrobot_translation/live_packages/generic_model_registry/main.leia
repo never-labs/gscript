@@ -18,8 +18,16 @@ generic_model_registry_package := {
     }
     provider_policy: {
         allow_named_providers: false
+        allow_live_provider_gate: true
         descriptor_provider: "fixture-replay"
         live_model_calls: false
+    }
+    live_provider_gate: {
+        enabled_by_default: false
+        requires_explicit_integration_env: true
+        integration_env: "LEIA_LLM_INTEGRATION"
+        clean_skip_without_credentials: true
+        secret_values_present: false
     }
     routing_guard: {
         request_provider_override: "ignored-when-replay-descriptor-present"
@@ -38,6 +46,7 @@ generic_model_registry_package := {
         vision: false
         live_network: false
         provider_credentials: false
+        live_provider_gate: true
     }
     redaction_policy: {
         id: "generic-model-registry-redaction-v1"

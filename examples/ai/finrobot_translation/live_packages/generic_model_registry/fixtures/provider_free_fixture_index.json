@@ -52,6 +52,24 @@
         "secret_values_present": false,
         "replay_ready": true
       }
+    },
+    {
+      "key": "model_registry:live_provider_gate:v1",
+      "path": "fixtures/live_provider_gate_fixture.json",
+      "schema": "schemas/live_provider_gate_v1.schema.json",
+      "provider_free": true,
+      "live_network": false,
+      "real_dependency_imports": false,
+      "secret_values_present": false,
+      "metadata": {
+        "provider_free": true,
+        "live_network": false,
+        "real_dependency_imports": false,
+        "secret_values_present": false,
+        "replay_ready": true,
+        "clean_skip_without_credentials": true,
+        "integration_env": "LEIA_LLM_INTEGRATION"
+      }
     }
   ],
   "real_dependency_imports": false

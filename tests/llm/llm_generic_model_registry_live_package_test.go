@@ -47,6 +47,7 @@ type genericModelRegistryManifest struct {
 	ProviderPolicy struct {
 		ID                          string   `json:"id"`
 		AllowNamedProviders         bool     `json:"allow_named_providers"`
+		AllowLiveProviderGate       bool     `json:"allow_live_provider_gate"`
 		ProviderCredentialsRequired bool     `json:"provider_credentials_required"`
 		LiveNetwork                 bool     `json:"live_network"`
 		LiveModelCalls              bool     `json:"live_model_calls"`
@@ -74,6 +75,22 @@ type genericModelRegistryManifest struct {
 			Reason         string `json:"reason"`
 		} `json:"redirect_evidence"`
 	} `json:"routing_guard"`
+	LiveProviderGate struct {
+		ID                             string   `json:"id"`
+		Capability                     string   `json:"capability"`
+		EnabledByDefault               bool     `json:"enabled_by_default"`
+		ProviderFreeDefault            bool     `json:"provider_free_default"`
+		LiveNetworkDefault             bool     `json:"live_network_default"`
+		LiveModelCallsDefault          bool     `json:"live_model_calls_default"`
+		RequiresExplicitIntegrationEnv bool     `json:"requires_explicit_integration_env"`
+		IntegrationEnv                 string   `json:"integration_env"`
+		AllowedProviderEnvRefs         []string `json:"allowed_provider_env_refs"`
+		SecretValuesPresent            bool     `json:"secret_values_present"`
+		RedactionPolicyRef             string   `json:"redaction_policy_ref"`
+		CleanSkipWithoutCredentials    bool     `json:"clean_skip_without_credentials"`
+		DefaultSkipReason              string   `json:"default_skip_reason"`
+		ProviderProtocols              []string `json:"provider_protocols"`
+	} `json:"live_provider_gate"`
 	RedactionPolicy struct {
 		ID                  string   `json:"id"`
 		Enabled             bool     `json:"enabled"`
@@ -140,6 +157,7 @@ func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
 		"generic.ai.model.descriptor.replay",
 		"generic.ai.model.redaction.policy",
 		"generic.ai.model.routing.guard",
+		"generic.ai.model.live_provider_gate",
 	} {
 		if !genericModelRegistryContains(manifest.Capabilities, want) {
 			t.Fatalf("capabilities missing %q: %#v", want, manifest.Capabilities)
@@ -154,9 +172,11 @@ func TestGenericModelRegistryLivePackageManifest(t *testing.T) {
 		manifest.Entrypoints["contract"],
 		manifest.Entrypoints["fixture_index"],
 		manifest.Entrypoints["alias_registry"],
+		manifest.Entrypoints["live_provider_gate"],
 		manifest.Schemas["alias_registry"],
 		manifest.Schemas["execution_descriptor"],
 		manifest.Schemas["redaction_policy"],
+		manifest.Schemas["live_provider_gate"],
 	} {
 		if rel == "" {
 			t.Fatalf("manifest contains empty referenced artifact")
@@ -184,6 +204,7 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 
 	if manifest.ProviderPolicy.ID != "provider-free-model-policy-v1" ||
 		manifest.ProviderPolicy.AllowNamedProviders ||
+		!manifest.ProviderPolicy.AllowLiveProviderGate ||
 		manifest.ProviderPolicy.ProviderCredentialsRequired ||
 		manifest.ProviderPolicy.LiveNetwork ||
 		manifest.ProviderPolicy.LiveModelCalls ||
@@ -191,7 +212,7 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 		manifest.ProviderPolicy.FallbackProvider != "fixture-replay" {
 		t.Fatalf("provider policy must deny live providers: %#v", manifest.ProviderPolicy)
 	}
-	for _, want := range []string{"live_provider_disabled", "credential_material_forbidden", "network_disabled"} {
+	for _, want := range []string{"live_provider_disabled", "credential_material_forbidden", "network_disabled", "live_provider_requires_explicit_integration_env"} {
 		if !genericModelRegistryContains(manifest.ProviderPolicy.DenyReasons, want) {
 			t.Fatalf("provider policy missing deny reason %q: %#v", want, manifest.ProviderPolicy.DenyReasons)
 		}
@@ -207,7 +228,7 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 		!manifest.RoutingGuard.DecisionReplayStable {
 		t.Fatalf("routing guard must be provider-free replay redirect policy: %#v", manifest.RoutingGuard)
 	}
-	for _, want := range []string{"future-live-provider", "request-scoped-live-provider", "provider-sdk-import"} {
+	for _, want := range []string{"future-live-provider", "request-scoped-live-provider", "provider-sdk-import", "implicit-live-provider"} {
 		if !genericModelRegistryContains(manifest.RoutingGuard.DeniedProviderKinds, want) {
 			t.Fatalf("routing guard missing denied provider kind %q: %#v", want, manifest.RoutingGuard.DeniedProviderKinds)
 		}
@@ -281,6 +302,10 @@ func TestGenericModelRegistryProviderPolicyRedactionAndCapabilities(t *testing.T
 			t.Fatalf("capability flag %q must remain false: %#v", wantFalse, manifest.CapabilityFlags)
 		}
 	}
+	if !manifest.CapabilityFlags["live_provider_gate"] {
+		t.Fatalf("capability flag live_provider_gate missing or false: %#v", manifest.CapabilityFlags)
+	}
+	assertGenericModelRegistryLiveProviderGate(t, base, manifest)
 }
 
 func TestGenericModelRegistryAliasResolutionToReplayDescriptors(t *testing.T) {
@@ -350,11 +375,23 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 		Inputs                []string `json:"inputs"`
 		Outputs               []string `json:"outputs"`
 		ProviderPolicy        struct {
-			AllowNamedProviders bool   `json:"allow_named_providers"`
-			DescriptorProvider  string `json:"descriptor_provider"`
-			CredentialMaterial  string `json:"credential_material"`
-			Network             string `json:"network"`
+			AllowNamedProviders   bool   `json:"allow_named_providers"`
+			AllowLiveProviderGate bool   `json:"allow_live_provider_gate"`
+			DescriptorProvider    string `json:"descriptor_provider"`
+			CredentialMaterial    string `json:"credential_material"`
+			Network               string `json:"network"`
+			LiveProviderDefault   string `json:"live_provider_default"`
 		} `json:"provider_policy"`
+		LiveProviderGate struct {
+			Required                       bool   `json:"required"`
+			EnabledByDefault               bool   `json:"enabled_by_default"`
+			RequiresExplicitIntegrationEnv bool   `json:"requires_explicit_integration_env"`
+			IntegrationEnv                 string `json:"integration_env"`
+			CredentialValuesAllowed        bool   `json:"credential_values_allowed"`
+			CredentialEnvRefsAllowed       bool   `json:"credential_env_refs_allowed"`
+			CleanSkipWithoutCredentials    bool   `json:"clean_skip_without_credentials"`
+			RedactionPolicyRequired        bool   `json:"redaction_policy_required"`
+		} `json:"live_provider_gate"`
 		RoutingGuard struct {
 			RequestProviderOverride string `json:"request_provider_override"`
 			ReplayDescriptorSource  string `json:"replay_descriptor_source"`
@@ -386,10 +423,22 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 		}
 	}
 	if contract.ProviderPolicy.AllowNamedProviders ||
+		!contract.ProviderPolicy.AllowLiveProviderGate ||
 		contract.ProviderPolicy.DescriptorProvider != "fixture-replay" ||
 		contract.ProviderPolicy.CredentialMaterial != "forbidden" ||
-		contract.ProviderPolicy.Network != "disabled" {
+		contract.ProviderPolicy.Network != "disabled" ||
+		contract.ProviderPolicy.LiveProviderDefault != "clean-skip" {
 		t.Fatalf("contract provider policy must deny live provider edges: %#v", contract.ProviderPolicy)
+	}
+	if !contract.LiveProviderGate.Required ||
+		contract.LiveProviderGate.EnabledByDefault ||
+		!contract.LiveProviderGate.RequiresExplicitIntegrationEnv ||
+		contract.LiveProviderGate.IntegrationEnv != "LEIA_LLM_INTEGRATION" ||
+		contract.LiveProviderGate.CredentialValuesAllowed ||
+		!contract.LiveProviderGate.CredentialEnvRefsAllowed ||
+		!contract.LiveProviderGate.CleanSkipWithoutCredentials ||
+		!contract.LiveProviderGate.RedactionPolicyRequired {
+		t.Fatalf("contract live provider gate must be explicit and clean-skip safe: %#v", contract.LiveProviderGate)
 	}
 	if contract.RoutingGuard.RequestProviderOverride != "ignored-when-replay-descriptor-present" ||
 		contract.RoutingGuard.ReplayDescriptorSource != "model_alias_registry" ||
@@ -403,9 +452,11 @@ func TestGenericModelRegistryContractAndFixtures(t *testing.T) {
 		"fixtures/model_alias_registry_fixture.json",
 		"fixtures/replay_execution_descriptor_fixture.json",
 		"fixtures/redaction_policy_fixture.json",
+		"fixtures/live_provider_gate_fixture.json",
 		"schemas/model_alias_registry_v1.schema.json",
 		"schemas/execution_descriptor_v1.schema.json",
 		"schemas/redaction_policy_v1.schema.json",
+		"schemas/live_provider_gate_v1.schema.json",
 	} {
 		assertGenericModelRegistryJSONFile(t, filepath.Join(base, rel))
 	}
@@ -437,6 +488,80 @@ func assertGenericModelRegistryFixtureIndexNoSecretGuard(t *testing.T, base stri
 		if fixture.Metadata["secret_values_present"] != false {
 			t.Fatalf("%s secret_values_present metadata = %#v, want false", fixture.Key, fixture.Metadata["secret_values_present"])
 		}
+	}
+}
+
+func assertGenericModelRegistryLiveProviderGate(t *testing.T, base string, manifest genericModelRegistryManifest) {
+	t.Helper()
+	gate := manifest.LiveProviderGate
+	if gate.ID != "explicit-live-provider-gate-v1" ||
+		gate.Capability != "generic.ai.model.live_provider_gate" ||
+		gate.EnabledByDefault ||
+		!gate.ProviderFreeDefault ||
+		gate.LiveNetworkDefault ||
+		gate.LiveModelCallsDefault ||
+		!gate.RequiresExplicitIntegrationEnv ||
+		gate.IntegrationEnv != "LEIA_LLM_INTEGRATION" ||
+		gate.SecretValuesPresent ||
+		gate.RedactionPolicyRef != manifest.RedactionPolicy.ID ||
+		!gate.CleanSkipWithoutCredentials ||
+		!strings.Contains(strings.ToLower(gate.DefaultSkipReason), "disabled") {
+		t.Fatalf("live provider gate must be explicit, provider-free by default, and clean-skip safe: %#v", gate)
+	}
+	for _, want := range []string{"env:LEIA_GLM_API_KEY", "env:LEIA_GLM_MODEL", "env:ANTHROPIC_AUTH_TOKEN"} {
+		if !genericModelRegistryContains(gate.AllowedProviderEnvRefs, want) {
+			t.Fatalf("live provider gate missing env ref %q: %#v", want, gate.AllowedProviderEnvRefs)
+		}
+	}
+	for _, envRef := range gate.AllowedProviderEnvRefs {
+		if !strings.HasPrefix(envRef, "env:") || strings.Contains(envRef, "=") {
+			t.Fatalf("live provider gate must store env refs only, not values: %q", envRef)
+		}
+	}
+	if !genericModelRegistryContains(gate.ProviderProtocols, "anthropic_compatible") ||
+		!genericModelRegistryContains(gate.ProviderProtocols, "openai_compatible") {
+		t.Fatalf("live provider gate protocols incomplete: %#v", gate.ProviderProtocols)
+	}
+
+	var fixture struct {
+		SchemaVersion                  int      `json:"schema_version"`
+		ID                             string   `json:"id"`
+		Capability                     string   `json:"capability"`
+		ProviderFree                   bool     `json:"provider_free"`
+		LiveNetwork                    bool     `json:"live_network"`
+		LiveModelCalls                 bool     `json:"live_model_calls"`
+		EnabledByDefault               bool     `json:"enabled_by_default"`
+		RequiresExplicitIntegrationEnv bool     `json:"requires_explicit_integration_env"`
+		IntegrationEnv                 string   `json:"integration_env"`
+		AllowedProviderEnvRefs         []string `json:"allowed_provider_env_refs"`
+		SecretValuesPresent            bool     `json:"secret_values_present"`
+		CredentialValuesAllowed        bool     `json:"credential_values_allowed"`
+		RedactionPolicyRef             string   `json:"redaction_policy_ref"`
+		CleanSkipWithoutCredentials    bool     `json:"clean_skip_without_credentials"`
+		LiveSmokeContract              struct {
+			Prompt                    string `json:"prompt"`
+			ExpectedText              string `json:"expected_text"`
+			RecordReplayRequiredForCI bool   `json:"record_replay_required_for_ci"`
+		} `json:"live_smoke_contract"`
+	}
+	readJSONFile(t, filepath.Join(base, "fixtures", "live_provider_gate_fixture.json"), &fixture)
+	if fixture.SchemaVersion != 1 ||
+		fixture.ID != "generic-model-registry-live-provider-gate-v1" ||
+		fixture.Capability != gate.Capability ||
+		!fixture.ProviderFree ||
+		fixture.LiveNetwork ||
+		fixture.LiveModelCalls ||
+		fixture.EnabledByDefault ||
+		!fixture.RequiresExplicitIntegrationEnv ||
+		fixture.IntegrationEnv != gate.IntegrationEnv ||
+		fixture.SecretValuesPresent ||
+		fixture.CredentialValuesAllowed ||
+		fixture.RedactionPolicyRef != gate.RedactionPolicyRef ||
+		!fixture.CleanSkipWithoutCredentials ||
+		fixture.LiveSmokeContract.Prompt == "" ||
+		fixture.LiveSmokeContract.ExpectedText == "" ||
+		!fixture.LiveSmokeContract.RecordReplayRequiredForCI {
+		t.Fatalf("live provider gate fixture mismatch: %#v", fixture)
 	}
 }
 

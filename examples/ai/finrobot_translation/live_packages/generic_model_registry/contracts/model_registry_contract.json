@@ -20,9 +20,21 @@
   ],
   "provider_policy": {
     "allow_named_providers": false,
+    "allow_live_provider_gate": true,
     "descriptor_provider": "fixture-replay",
     "credential_material": "forbidden",
-    "network": "disabled"
+    "network": "disabled",
+    "live_provider_default": "clean-skip"
+  },
+  "live_provider_gate": {
+    "required": true,
+    "enabled_by_default": false,
+    "requires_explicit_integration_env": true,
+    "integration_env": "LEIA_LLM_INTEGRATION",
+    "credential_values_allowed": false,
+    "credential_env_refs_allowed": true,
+    "clean_skip_without_credentials": true,
+    "redaction_policy_required": true
   },
   "routing_guard": {
     "request_provider_override": "ignored-when-replay-descriptor-present",

@@ -57,7 +57,7 @@
         "package_id": "generic-ai-agent-runner",
         "boundary": "declarative agent config, tool history, structured output, and replay policy",
         "status": "resolved",
-        "reason": "agent behavior is reusable but currently only represented through tests and examples"
+        "reason": "agent behavior was promoted from examples and tests into the generic_agent_runner provider-free package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -88,7 +88,7 @@
         "package_id": "generic-ai-approval-policy",
         "boundary": "capability-based approval decisions, clean skips, and replay trace envelopes",
         "status": "resolved",
-        "reason": "approval parity is fixture-backed but not extracted into a production package boundary"
+        "reason": "approval parity was promoted into the generic_approval_policy provider-free package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -118,7 +118,7 @@
         "package_id": "generic-ai-capability-gates",
         "boundary": "capability vocabulary, default-deny policy, approval evidence, and clean-skip semantics",
         "status": "resolved",
-        "reason": "capability gates are currently audited through parity ledgers and examples, not a generic package boundary"
+        "reason": "capability gates were consolidated into the generic_approval_policy package boundary and audit fixtures"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -149,7 +149,7 @@
         "package_id": "generic-ai-evaluation-harness",
         "boundary": "dataset manifest, judge replay, metrics, findings, and golden gates",
         "status": "resolved",
-        "reason": "evaluation harness parity is generic but has not been promoted to a production package boundary"
+        "reason": "evaluation harness parity was promoted into the generic_evaluation_harness provider-free package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -209,7 +209,7 @@
         "package_id": "generic-ai-model-registry",
         "boundary": "model alias registry with provider-free replay defaults",
         "status": "resolved",
-        "reason": "model alias behavior is covered by examples and tests but has no standalone provider-free production package boundary"
+        "reason": "model alias behavior was promoted from examples and tests into the generic_model_registry provider-free package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -271,7 +271,7 @@
         "package_id": "generic-ai-package-boundary-auditor",
         "boundary": "read-only manifest audit for provider-free package skeletons and no-built-in-language-feature guarantees",
         "status": "resolved",
-        "reason": "package boundary checks exist as an audit ledger and test but are not a reusable production package"
+        "reason": "package boundary checks were promoted from audit ledger coverage into the generic_package_boundary_auditor package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -300,7 +300,7 @@
         "package_id": "generic-ai-record-replay",
         "boundary": "record schema, replay matching, mismatch findings, and unconsumed record handling",
         "status": "resolved",
-        "reason": "record/replay fixtures are stable but not packaged as a generic production boundary"
+        "reason": "record/replay fixtures were promoted into the generic_record_replay provider-free package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -331,7 +331,7 @@
         "package_id": "generic-ai-tool-contracts",
         "boundary": "declarative tool schema, capability tags, and result envelope",
         "status": "resolved",
-        "reason": "tool metadata is proven by specimens but not packaged as a provider-neutral contract artifact"
+        "reason": "tool metadata specimens were promoted into the generic_tool_contracts provider-neutral package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -391,7 +391,7 @@
         "package_id": "generic-ai-trace-events",
         "boundary": "provider-neutral trace event schema for turns, streams, approvals, and replay",
         "status": "resolved",
-        "reason": "trace events are asserted by tests and fixtures but lack a package-level schema boundary"
+        "reason": "trace event tests and fixtures were promoted into the generic_trace_events package-level schema boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
@@ -451,7 +451,7 @@
         "package_id": "generic-ai-workflow-orchestrator",
         "boundary": "multi-step agent and review-turn orchestration with replayable state",
         "status": "resolved",
-        "reason": "workflow examples demonstrate orchestration without a production package boundary"
+        "reason": "workflow orchestration examples were promoted into the generic_workflow_orchestrator provider-free package boundary"
       },
       "production_package_boundary": {
         "status": "checked_in",
