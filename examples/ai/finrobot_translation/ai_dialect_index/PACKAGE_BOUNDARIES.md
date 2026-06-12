@@ -118,9 +118,10 @@ orthogonal and layered:
 - report-render owns report render requests, request/result envelopes, output
   manifests, artifact manifests, snapshot metadata, warnings, annotations,
   fixture hashes, and renderer clean-skip envelopes.
-- ui-snapshot owns route DOM schemas, viewport matrices, visual diff budgets,
-  accessibility summaries, artifact URI manifests, redaction policy, static
-  asset policy, and browser clean-skip envelopes.
+- ui-snapshot owns evidence-report projection, route DOM schemas, viewport
+  matrices, visual diff budgets, accessibility summaries, artifact URI
+  manifests, redaction policy, static asset policy, and browser clean-skip
+  envelopes.
 - chart-render owns chart specs, recipe semantic matrices, render requests and
   results, source metadata, deterministic snapshot hashes, and unsupported
   renderer clean-skip envelopes.
@@ -183,7 +184,7 @@ language or specializing the dialect for one application domain.
 | Evidence/report artifacts | `generic_evidence_report_artifacts`, `generic_document_rag_pipeline`, `generic_workflow_orchestrator`, `generic_chart_render_contracts`, `generic_trace_events` | Source annotations, citation envelopes, section DAGs, render manifests, chart artifact projections, snapshots, stale warnings, accessibility checks, and clean-skip renderer gates are package data shared by workflows, traces, replay, charting, and reporting packages. |
 | Report rendering | `generic_report_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Render requests, output manifests, artifact manifests, page snapshots, warnings, annotations, fixture hashes, and renderer clean skips are reusable reporting contracts; concrete HTML/PDF renderers stay outside Leia core. |
 | Chart rendering | `generic_chart_render_contracts`, `generic_evidence_report_artifacts`, `generic_ui_snapshot_evaluator` | Chart specs, recipe matrices, render envelopes, source metadata, and deterministic snapshot hashes are produced by chart-render; evidence-report consumes chart artifacts; UI snapshot evaluates rendered routes and accessibility without owning chart semantics. |
-| UI snapshot evaluation | `generic_ui_snapshot_evaluator`, `generic_evidence_report_artifacts`, `generic_trace_events` | Route DOM schemas, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean-skip metadata stay generic UI package data rather than product-specific web code. |
+| UI snapshot evaluation | `generic_ui_snapshot_evaluator`, `generic_evidence_report_artifacts`, `generic_trace_events` | Evidence-report projection, route DOM schemas, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean-skip metadata stay generic UI package data rather than product-specific web code. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
 | Optional adapters | `generic_optional_adapter_boundary`, `generic_approval_policy`, `generic_tool_contracts` | Optional package imports, missing credentials, disabled network, version metadata, terms metadata, and adapter result envelopes are normalized into provider-free clean skips before tool execution. |
 | Product app shell | `generic_product_app_boundary`, `generic_workflow_orchestrator`, `generic_ui_snapshot_evaluator`, `generic_approval_policy` | Routes, sessions, task logs, artifact downloads, CRUD fixture state, migration plans, deployment targets, approval boundaries, and clean skips are product package data rather than built-in language or framework behavior. |

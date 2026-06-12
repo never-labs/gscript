@@ -995,6 +995,7 @@
       "finrobot_specific_syntax_assumption": false,
       "dialect_surface": [
         "ui.route_dom_schema",
+        "ui.snapshot.evidence_report_projection",
         "ui.viewport_matrix",
         "ui.visual_diff_budget",
         "ui.accessibility_summary",
@@ -1008,7 +1009,7 @@
       "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_ui_snapshot_evaluator_fixture_index.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-ui-snapshot-evaluator",
-        "boundary": "provider-free route DOM snapshots, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips",
+        "boundary": "provider-free route DOM snapshots, evidence-report projection, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips",
         "status": "resolved",
         "reason": "generic UI snapshot evaluation behavior was promoted from HTML UI snapshot fixtures into a reusable package boundary"
       },

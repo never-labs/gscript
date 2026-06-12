@@ -788,6 +788,7 @@
       "capability": "generic.ai.ui.snapshot.evaluator",
       "capabilities": [
         "generic.ai.ui.snapshot.evaluator",
+        "generic.ai.ui.snapshot.evidence_report_projection",
         "generic.ai.ui.route_dom_schema",
         "generic.ai.ui.viewport_matrix",
         "generic.ai.ui.visual_diff_budget",
@@ -804,7 +805,10 @@
       "contracts": [
         "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/contracts/generic_ui_snapshot_evaluator_contract.json"
       ],
-      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json"
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/provider_free_fixture_index.json",
+      "fixtures": [
+        "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/fixtures/evidence_report_ui_snapshot_projection_fixture.json"
+      ]
     },
     {
       "id": "generic_workflow_orchestrator",

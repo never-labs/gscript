@@ -14,6 +14,7 @@
   "provider_sdks_required": false,
   "capabilities": [
     "generic.ai.ui.snapshot.evaluator",
+    "generic.ai.ui.snapshot.evidence_report_projection",
     "generic.ai.ui.route_dom_schema",
     "generic.ai.ui.viewport_matrix",
     "generic.ai.ui.visual_diff_budget",
@@ -80,8 +81,34 @@
       ]
     }
   },
+  "evidence_report_projection_contract": {
+    "source_package": "generic_evidence_report_artifacts",
+    "source_fixture": "../generic_evidence_report_artifacts/fixtures/generic_evidence_report_artifacts_fixture.json",
+    "target_fixture": "fixtures/generic_ui_snapshot_evaluator_fixture.json",
+    "target_capability": "generic.ai.ui.snapshot.evidence_report_projection",
+    "required_source_fields": [
+      "artifact_manifest.artifacts.artifact_id",
+      "artifact_manifest.artifacts.uri",
+      "snapshot_metadata.snapshot_id",
+      "snapshot_metadata.content_hash",
+      "warnings.id",
+      "accessibility_checklist.checks.id"
+    ],
+    "required_target_fields": [
+      "route_id",
+      "snapshot_ref",
+      "artifact_ref",
+      "viewport_id",
+      "accessibility_check"
+    ],
+    "raw_render_payloads_allowed": false,
+    "remote_fetch_allowed": false,
+    "browser_required": false,
+    "provider_free": true
+  },
   "field_contracts": {
     "route_dom_snapshots": "routes declare stable DOM selectors, required landmarks/regions, forbidden remote selectors, snapshot refs, and artifact refs",
+    "evidence_report_projection": "evidence report projection maps report artifact, snapshot, warning, and accessibility refs into UI snapshot evaluator refs without fetching remote resources",
     "viewport_matrix": "viewport rows include dimensions, device scale factor, color scheme, and reduced motion policy",
     "visual_diff_budgets": "diff budgets are deterministic thresholds keyed by route and viewport",
     "accessibility_summaries": "static accessibility summaries name standards, checks, violation budget, and manual review policy",

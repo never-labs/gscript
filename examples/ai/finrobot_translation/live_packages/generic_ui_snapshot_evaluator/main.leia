@@ -13,6 +13,7 @@ generic_ui_snapshot_evaluator_live_package := {
     budgets: 3
     accessibility: 2
     artifacts: 3
+    evidence_report_projections: 1
     clean_skip_adapters: 2
 }
 
@@ -25,7 +26,7 @@ assert(generic_ui_snapshot_evaluator_live_package.routes == 2)
 assert(generic_ui_snapshot_evaluator_live_package.viewports == 3)
 
 generic_ui_snapshot_evaluator_live_package_summary := string.format(
-"generic_ui_snapshot_evaluator_live_package capability=%s entrypoint=%s routes=%d viewports=%d budgets=%d accessibility=%d artifacts=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s browser=%s",
+"generic_ui_snapshot_evaluator_live_package capability=%s entrypoint=%s routes=%d viewports=%d budgets=%d accessibility=%d artifacts=%d evidence_report_projections=%d clean_skip=%d provider_free=%s live_network=%s imports=%s model_calls=%s browser=%s",
 generic_ui_snapshot_evaluator_live_package.capability,
 generic_ui_snapshot_evaluator_live_package.entrypoint,
 generic_ui_snapshot_evaluator_live_package.routes,
@@ -33,6 +34,7 @@ generic_ui_snapshot_evaluator_live_package.viewports,
 generic_ui_snapshot_evaluator_live_package.budgets,
 generic_ui_snapshot_evaluator_live_package.accessibility,
 generic_ui_snapshot_evaluator_live_package.artifacts,
+generic_ui_snapshot_evaluator_live_package.evidence_report_projections,
 generic_ui_snapshot_evaluator_live_package.clean_skip_adapters,
 tostring(generic_ui_snapshot_evaluator_live_package.provider_free),
 tostring(generic_ui_snapshot_evaluator_live_package.live_network),

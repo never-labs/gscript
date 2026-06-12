@@ -962,8 +962,9 @@
         "evidence-report-artifacts",
         "trace"
       ],
-      "contract": "Normalize provider-free route DOM snapshots, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips.",
+      "contract": "Normalize provider-free route DOM snapshots, evidence-report projection, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips.",
       "inputs": [
+        "evidence_report_projection",
         "route_dom_snapshots",
         "viewport_matrix",
         "visual_diff_budgets",
@@ -974,6 +975,7 @@
       "outputs": [
         "snapshot_refs",
         "artifact_refs",
+        "evidence_report_projection_refs",
         "diff_budget_results",
         "accessibility_summary_results",
         "browser_clean_skip"

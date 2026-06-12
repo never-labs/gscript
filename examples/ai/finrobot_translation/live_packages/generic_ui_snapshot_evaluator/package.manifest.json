@@ -5,7 +5,7 @@
   "package_boundary_id": "generic-ai-ui-snapshot-evaluator",
   "capability_id": "generic.ai.ui.snapshot.evaluator",
   "version": "0.1.0-skeleton",
-  "description": "Provider-free generic AI package for static UI route DOM snapshots, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips.",
+  "description": "Provider-free generic AI package for static UI route DOM snapshots, evidence-report projection, viewport matrices, visual diff budgets, accessibility summaries, artifact URI manifests, redaction policy, static asset policy, and browser clean skips.",
   "provider_free": true,
   "domain_specific": false,
   "live_network_default": false,
@@ -23,17 +23,20 @@
     "fixture_index": "fixtures/provider_free_fixture_index.json"
   },
   "schemas": {
-    "ui_snapshot_evaluator": "schemas/generic_ui_snapshot_evaluator_v1.schema.json"
+    "ui_snapshot_evaluator": "schemas/generic_ui_snapshot_evaluator_v1.schema.json",
+    "evidence_report_ui_snapshot_projection": "schemas/evidence_report_ui_snapshot_projection_v1.schema.json"
   },
   "contracts": {
     "contract": "contracts/generic_ui_snapshot_evaluator_contract.json"
   },
   "fixtures": {
     "index": "fixtures/provider_free_fixture_index.json",
-    "ui_snapshot_evaluator": "fixtures/generic_ui_snapshot_evaluator_fixture.json"
+    "ui_snapshot_evaluator": "fixtures/generic_ui_snapshot_evaluator_fixture.json",
+    "evidence_report_ui_snapshot_projection": "fixtures/evidence_report_ui_snapshot_projection_fixture.json"
   },
   "capabilities": [
     "generic.ai.ui.snapshot.evaluator",
+    "generic.ai.ui.snapshot.evidence_report_projection",
     "generic.ai.ui.route_dom_schema",
     "generic.ai.ui.viewport_matrix",
     "generic.ai.ui.visual_diff_budget",
@@ -45,6 +48,7 @@
   ],
   "capability_surfaces": [
     "route_dom_snapshots",
+    "evidence_report_projection",
     "viewport_matrix",
     "visual_diff_budgets",
     "accessibility_summaries",
@@ -67,6 +71,7 @@
   },
   "test_gates": [
     "route DOM snapshot fixtures decode without launching a browser",
+    "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
     "viewport matrix and visual diff budgets are deterministic fixture data",
     "accessibility summaries are static DOM summaries with zero live audits",
     "artifact URI manifest allows only fixture and artifact schemes",
@@ -76,6 +81,6 @@
   ],
   "no_built_in_guarantee": {
     "required": true,
-    "statement": "Leia core does not provide built-in leia-generic-ai-ui-snapshot-evaluator browser automation or visual diffing; this provider-free package boundary owns UI snapshot, viewport, diff budget, accessibility summary, artifact URI, redaction, static asset, and browser clean-skip contracts."
+    "statement": "Leia core does not provide built-in leia-generic-ai-ui-snapshot-evaluator browser automation or visual diffing; this provider-free package boundary owns UI snapshot, evidence-report projection, viewport, diff budget, accessibility summary, artifact URI, redaction, static asset, and browser clean-skip contracts."
   }
 }

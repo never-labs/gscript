@@ -55,7 +55,7 @@ Inventory and semantic-guard commands run on 2026-06-12 from
 
 | Command | Result |
 | --- | --- |
-| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `862` files |
+| `rg --files examples/ai/finrobot_translation \| wc -l \| tr -d ' '` | `864` files |
 | `go run ./cmd/leia examples list --json` filtered to `examples/ai/finrobot_translation/` | `99` examples |
 | Same example inventory grouped by runner | `88` `host-vm`, `6` `llm-replay`, `5` `evaluate` |
 | Same example inventory filtered to `/live_packages/` | `53` registered live-package examples, including the generic strategy backtest contracts package |
@@ -69,7 +69,7 @@ Inventory and semantic-guard commands run on 2026-06-12 from
 
 The inventory confirms the documented registered-example, runner,
 live-package, generic live-package, and tutorial runnable counts are current.
-The file-inventory count was refreshed to 862 `rg --files` inventory files. `AI_DIALECT_GAPS.md` is
+The file-inventory count was refreshed to 864 `rg --files` inventory files. `AI_DIALECT_GAPS.md` is
 absent in this worktree, so no AI-dialect gap document required updates.
 
 Semantic guard note: the recent generic AI boundary guard state is reflected
@@ -136,6 +136,8 @@ The current examples gate validated:
   `live_packages/generic_transcript_pipeline/main.leia`,
   `live_packages/generic_turn_runner/main.leia`,
   `live_packages/generic_ui_snapshot_evaluator/main.leia`,
+  `live_packages/generic_ui_snapshot_evaluator/fixtures/evidence_report_ui_snapshot_projection_fixture.json`,
+  `live_packages/generic_ui_snapshot_evaluator/schemas/evidence_report_ui_snapshot_projection_v1.schema.json`,
   `live_packages/generic_workflow_orchestrator/main.leia`,
   `live_packages/html_ui_snapshots/main.leia`,
   `live_packages/news_catalyst/main.leia`,
@@ -254,7 +256,7 @@ go run ./cmd/leia check --no-docs --no-editor --no-examples .
 
 The FinRobot documentation inventory is aligned with the current
 `codex/ai-dialect-polish` surface: 99 registered runnable/checkable
-examples, 862 files in the translation directory, and 53 checked-in
+examples, 864 files in the translation directory, and 53 checked-in
 provider-free live-package skeleton directories. The generic AI dialect entries
 are documented as checked-in package boundaries rather than missing or planned
 FinRobot-only work. The current validation pass above did not generate

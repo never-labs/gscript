@@ -5,7 +5,7 @@
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
   "registered_examples_count": 99,
-  "translation_directory_file_count": 862,
+  "translation_directory_file_count": 864,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -1652,6 +1652,7 @@
       "migration_source": "examples/ai/finrobot_translation/live_packages/generic_ui_snapshot_evaluator/main.leia",
       "capabilities": [
         "generic.ai.ui.snapshot.evaluator",
+        "generic.ai.ui.snapshot.evidence_report_projection",
         "generic.ai.ui.route_dom_schema",
         "generic.ai.ui.viewport_matrix",
         "generic.ai.ui.visual_diff_budget",
@@ -1664,6 +1665,7 @@
       "test_gates": [
         "provider-free fixture contract parses",
         "contract JSON declares generic UI snapshot evaluator backend boundary",
+        "evidence-report projection maps artifact, snapshot, warning, and accessibility refs into UI snapshot fixtures",
         "registered example executes provider-free",
         "no browser, network, provider SDK, renderer, or q runtime dependency"
       ],
