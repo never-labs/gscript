@@ -1,0 +1,131 @@
+# cacheable	constant	bindingText	valueExprText	source
+true	true	true	true	1+2
+true	true	true	true	2*3+4
+true	true	true	true	1 2 3+4 5 6
+true	true	true	false	til 10
+true	true	true	false	sum til 100
+true	true	true	false	avg til 8
+true	true	true	false	sums til 16
+true	true	false	false	+/til 10
+true	true	false	false	+\til 10
+true	true	true	false	(+/)til 10
+true	true	true	false	max 3 1 2
+true	true	true	false	min 3 1 2
+true	true	true	false	med 1 2 3 4
+true	true	true	false	dev til 10
+true	true	true	false	var til 10
+true	true	true	false	sqrt 16
+true	true	true	false	exp 1
+true	false	true	false	log 2.718
+true	true	true	true	abs -5
+true	true	true	true	signum -3 0 7
+true	false	true	false	floor 3.7
+true	false	true	false	ceiling 3.2
+true	true	true	false	reciprocal 4
+true	true	true	false	2 xexp 10
+true	true	true	false	2 xlog 8
+true	false	true	true	1.5*til 6
+true	true	true	true	100%7
+true	true	true	false	7 mod 3
+true	true	true	false	7 div 3
+true	true	true	false	neg til 5
+true	true	true	false	reverse til 5
+true	true	true	false	distinct 1 2 2 3
+true	true	true	false	asc 3 1 2
+true	true	true	false	desc 3 1 2
+true	true	true	false	iasc 3 1 2
+true	true	true	false	rank 30 10 20
+true	true	true	false	deltas 1 3 6
+true	true	true	false	ratios 1 2 4 8
+true	true	false	false	fills 1 0N 3
+true	true	true	false	count til 7
+true	true	true	false	first 1 2 3
+true	true	true	false	last 1 2 3
+true	true	true	true	3#til 10
+true	true	true	true	-3#til 10
+true	true	true	false	1_til 5
+true	true	true	false	til 10 within 2 6
+true	true	true	false	1 2 3 in 2 3
+true	true	true	false	2 4 6 bin 5
+true	true	true	false	3 xbar til 10
+true	true	true	false	3 msum til 10
+true	true	true	false	3 mavg til 10
+true	true	true	false	1 xprev til 5
+true	true	true	false	1 rotate til 5
+true	true	true	false	2 cut til 6
+true	true	true	false	0 2 sublist til 10
+true	true	true	false	1 2 cross 3 4
+true	true	true	false	1 2 3 union 3 4
+true	true	true	false	1 2 3 inter 2 3
+true	true	true	false	1 2 3 except 2
+true	true	true	false	all 1 1 1
+true	true	true	false	any 0 0 1
+true	true	true	false	not 0 1
+true	true	false	false	null 0N 1
+true	true	true	false	where 0 1 1 0
+true	true	true	false	group 1 1 2
+true	true	true	false	string 123
+true	true	false	false	upper "abc"
+true	true	false	false	lower "ABC"
+true	true	true	false	type 1 2 3
+true	true	true	false	enlist 5
+true	true	true	false	raze (1 2;3 4)
+true	false	true	true	{x*x}[4]
+true	false	true	true	{x+y}[3;4]
+true	false	true	false	{x+y}/[1 2 3]
+true	false	true	true	f:{x+1};f 3
+true	false	true	false	x:5
+true	false	true	false	x:til 10;sum x
+true	false	true	true	a:1;b:2;a+b
+true	false	true	false	x:1 2 3;x[0]
+true	true	true	false	$[1b;1;2]
+true	false	true	false	@[1 2 3;0;:;9]
+true	true	false	false	`a`b!1 2
+true	false	false	false	d:`a`b!1 2;d`a
+true	false	true	false	([] a:1 2;b:3 4)
+true	false	true	false	t:([] a:1 2;b:3 4);count t
+true	false	true	false	?[([] a:1 2);();0b;()]
+true	true	false	false	`a`b`c
+true	true	false	false	count `a`b
+true	true	false	false	"hello"
+true	true	false	false	`sym=`sym
+false	false	false	false	5?10
+false	false	false	false	-5?10
+false	false	false	false	rand 10
+false	false	false	false	rand 1f
+false	false	false	false	n?10
+false	false	false	false	x:5?10
+false	false	false	false	20?1000000
+false	false	false	false	1 2 3?2
+false	false	false	false	x:1 2 3;x?2
+false	false	false	false	2?`a`b`c
+false	false	false	false	-3?5
+false	false	false	false	`a set 5
+false	false	false	false	get `a
+false	false	false	false	x:get `a
+false	false	false	false	system "ls"
+false	false	false	false	\ts 1+1
+false	false	false	false	\l script.q
+false	false	false	false	hopen `:localhost:5001
+false	false	false	false	hsym `localhost
+false	false	false	false	t:([] a:1 2);`t insert (5;6)
+false	false	false	false	`t upsert (1;2)
+false	false	true	false	x insert (1;2)
+false	false	true	false	tab upsert row
+false	false	true	false	.z.p
+false	false	true	false	.z.d
+false	false	true	false	x:.z.p
+false	false	true	true	offset + 1
+false	false	true	false	target 5
+false	false	true	false	xinserted:1
+true	true	false	false	"insert"
+false	false	false	false	`insert
+true	false	true	false	set
+true	false	true	false	get
+false	false	false	true	
+false	false	false	true	   
+true	true	false	false	0W
+true	true	false	false	0N
+true	false	true	false	2024.01.01
+true	false	true	false	09:30:00
+true	true	true	true	1#2
