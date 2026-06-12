@@ -111,21 +111,25 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 	}
 }
 
+// buildQScriptBindingPlanForRHS builds the binding plan for one statement
+// right-hand side. The canonical text→Expr step is compileQEvalExpr — the
+// same front-end the compiled statement route uses — pattern-matched into a
+// binding plan by buildQScriptBindingPlanFromCompiled. Forms the compiled
+// front-end cannot express or the matcher declines fall back to the qSQL
+// parsed tree (the historical route for Pratt-only shapes) and finally to the
+// scalar dyadic composition probe.
 func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
-	if plan := buildQScriptPrefixBindingPlan(src); plan.kind != qScriptBindingInvalid {
+	src = strings.TrimSpace(src)
+	// `drop n v` is the one binding shape the compiled front-end cannot
+	// express (compileQEvalExpr reserves the `drop ` prefix for the
+	// deferred-state forms), so it keeps a dedicated probe.
+	if plan := buildQScriptDropBindingPlan(src); plan.kind != qScriptBindingInvalid {
 		return plan
 	}
-	if plan := buildQScriptTransformBindingPlan(src); plan.kind != qScriptBindingInvalid {
-		return plan
-	}
-	if plan := buildQScriptReshapeBindingPlan(src); plan.kind != qScriptBindingInvalid {
-		return plan
-	}
-	if plan := buildQScriptWordDyadicBindingPlan(src); plan.kind != qScriptBindingInvalid {
-		return plan
-	}
-	if plan := buildQScriptCutBindingPlan(src); plan.kind != qScriptBindingInvalid {
-		return plan
+	if compiled := compileQEvalExpr(src, 0); compiled != nil {
+		if plan := buildQScriptBindingPlanFromCompiled(compiled); plan.kind != qScriptBindingInvalid {
+			return plan
+		}
 	}
 	if expr == nil {
 		parsed, ok, err := parseValueExpr(src)
@@ -139,6 +143,106 @@ func buildQScriptBindingPlanForRHS(src string, expr Expr) qScriptBindingPlan {
 		return plan
 	}
 	return buildQScriptScalarDyadicCompositionPlan(src)
+}
+
+// buildQScriptBindingPlanFromCompiled maps a compiled Expr tree
+// (compileQEvalExpr output) onto a binding plan. Every mapped node executes
+// through the same terminal the compiled statement evaluator dispatches to
+// (evalValueBinary, lookupUnaryVerb plus the shared til/where branches,
+// indexValue/applyCallable), so a claimed plan is value-identical to the
+// compiled route, which the dual-route differential pins to the string
+// evaluator. Nodes whose binding execution could diverge decline and leave
+// the statement on the cascade:
+//
+//   - fused-probe reducer words over non-leaf arguments stay on the
+//     statement-level routes (the add-chain split gives `sum x+y` the string
+//     evaluator's (sum x)+y grouping, and the fused kernels outrun a generic
+//     unary plan); `where` is exempt because the unary binding evaluator
+//     carries its own typed where-compare/within kernels for exactly these
+//     shapes,
+//   - `?` splits (roll/deal is nondeterministic and must keep drawing through
+//     the string evaluator; the binding executor has no runtime decline for
+//     it),
+//   - word verbs without a lookupDyadicVerbFunc terminal (evalValueBinary
+//     would error instead of declining),
+//   - list/cast/dict/apply-at/fused forms the binding executor has no kind
+//     for (they keep their dedicated plan layers and the compiled statement
+//     route).
+func buildQScriptBindingPlanFromCompiled(expr Expr) qScriptBindingPlan {
+	switch x := expr.(type) {
+	case Const:
+		return qScriptBindingPlan{kind: qScriptBindingLiteral, literal: x.Value}
+	case Call:
+		if qFusedReducerWords[x.Func] && x.Func != "where" && !qCompiledLeafExpr(x.Arg) {
+			return qScriptBindingPlan{}
+		}
+		arg := buildQScriptBindingPlanFromCompiled(x.Arg)
+		if arg.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingPlan{kind: qScriptBindingUnary, op: x.Func, left: &arg}
+	case Binary:
+		if x.Op == "?" {
+			return qScriptBindingPlan{}
+		}
+		left := buildQScriptBindingPlanFromCompiled(x.Left)
+		if left.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		right := buildQScriptBindingPlanFromCompiled(x.Right)
+		if right.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingBinaryPlan(x.Op, left, right)
+	case DyadicWordExpr:
+		if _, ok := lookupDyadicVerbFunc(x.Word); !ok {
+			return qScriptBindingPlan{}
+		}
+		left := buildQScriptBindingPlanFromCompiled(x.Left)
+		if left.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		right := buildQScriptBindingPlanFromCompiled(x.Right)
+		if right.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingBinaryPlan(x.Word, left, right)
+	case IndexExpr:
+		collection := buildQScriptBindingPlanFromCompiled(x.Expr)
+		if collection.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		index := buildQScriptBindingPlanFromCompiled(x.Index)
+		if index.kind == qScriptBindingInvalid {
+			return qScriptBindingPlan{}
+		}
+		return qScriptBindingPlan{kind: qScriptBindingIndex, left: &collection, right: &index}
+	default:
+		// Leaves (Ident, Number, Vector, ...) share the parsed-tree mapping;
+		// every unsupported kind declines there too.
+		return buildQScriptBindingPlan(expr)
+	}
+}
+
+// buildQScriptDropBindingPlan plans prefix-dyadic `drop <n> <value>`
+// statements (the word form, not the `_` operator).
+func buildQScriptDropBindingPlan(src string) qScriptBindingPlan {
+	if !strings.HasPrefix(src, "drop ") || !wordBoundary(src, 0, len("drop")) {
+		return qScriptBindingPlan{}
+	}
+	countExpr, valueExpr, ok := splitQScriptPrefixDyadicArgs(strings.TrimSpace(src[len("drop "):]))
+	if !ok {
+		return qScriptBindingPlan{}
+	}
+	countPlan := buildQScriptScalarLiteralBindingPlan(countExpr)
+	if countPlan.kind == qScriptBindingInvalid {
+		return qScriptBindingPlan{}
+	}
+	valuePlan := buildQScriptBindingPlanForRHS(valueExpr, nil)
+	if valuePlan.kind == qScriptBindingInvalid {
+		return qScriptBindingPlan{}
+	}
+	return qScriptBindingBinaryPlan("drop", countPlan, valuePlan)
 }
 
 // buildQScriptScalarDyadicCompositionPlan plans `<scalar-literal> <op> <group>`
@@ -214,158 +318,6 @@ func qScriptScalarCompositionOperandPlan(src string) (plan qScriptBindingPlan, l
 		return groupPlan, false, true
 	}
 	return qScriptBindingPlan{}, false, false
-}
-
-func buildQScriptReshapeBindingPlan(src string) qScriptBindingPlan {
-	src = strings.TrimSpace(src)
-	if src == "" {
-		return qScriptBindingPlan{}
-	}
-	leftExpr, rightExpr, ok := splitTopLevelOperator(src, "#")
-	if !ok {
-		return qScriptBindingPlan{}
-	}
-	if strings.HasPrefix(strings.TrimSpace(leftExpr), "`") {
-		return qScriptBindingPlan{}
-	}
-	left := buildQScriptBindingPlanForRHS(leftExpr, nil)
-	if left.kind == qScriptBindingInvalid {
-		return qScriptBindingPlan{}
-	}
-	right := buildQScriptBindingPlanForRHS(rightExpr, nil)
-	if right.kind == qScriptBindingInvalid {
-		return qScriptBindingPlan{}
-	}
-	return qScriptBindingBinaryPlan("#", left, right)
-}
-
-func buildQScriptTransformBindingPlan(src string) qScriptBindingPlan {
-	src = strings.TrimSpace(src)
-	if src == "" {
-		return qScriptBindingPlan{}
-	}
-	if strings.HasPrefix(src, "reverse ") && wordBoundary(src, 0, len("reverse")) {
-		valuePlan := buildQScriptBindingPlanForRHS(strings.TrimSpace(src[len("reverse "):]), nil)
-		if valuePlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "reverse", left: &valuePlan}
-	}
-	if strings.HasPrefix(src, "flip ") && wordBoundary(src, 0, len("flip")) {
-		valuePlan := buildQScriptBindingPlanForRHS(strings.TrimSpace(src[len("flip "):]), nil)
-		if valuePlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		return qScriptBindingPlan{kind: qScriptBindingUnary, op: "flip", left: &valuePlan}
-	}
-	if strings.HasPrefix(src, "drop ") && wordBoundary(src, 0, len("drop")) {
-		countExpr, valueExpr, ok := splitQScriptPrefixDyadicArgs(strings.TrimSpace(src[len("drop "):]))
-		if !ok {
-			return qScriptBindingPlan{}
-		}
-		countPlan := buildQScriptScalarLiteralBindingPlan(countExpr)
-		if countPlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		valuePlan := buildQScriptBindingPlanForRHS(valueExpr, nil)
-		if valuePlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		return qScriptBindingBinaryPlan("drop", countPlan, valuePlan)
-	}
-	if left, right, ok := splitTopLevelWord(src, "rotate"); ok {
-		countPlan := buildQScriptBindingPlanForRHS(left, nil)
-		if countPlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		valuePlan := buildQScriptBindingPlanForRHS(right, nil)
-		if valuePlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		return qScriptBindingBinaryPlan("rotate", countPlan, valuePlan)
-	}
-	if left, right, ok := splitTopLevelWord(src, "sublist"); ok {
-		indexPlan := buildQScriptBindingPlanForRHS(left, nil)
-		if indexPlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		valuePlan := buildQScriptBindingPlanForRHS(right, nil)
-		if valuePlan.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		return qScriptBindingBinaryPlan("sublist", indexPlan, valuePlan)
-	}
-	return qScriptBindingPlan{}
-}
-
-// qScriptWordDyadicOps are pure infix word verbs the binary binding evaluator
-// already routes through the shared dyadic verb table (evalValueBinary →
-// lookupDyadicVerbFunc), so binding plans for them keep eval semantics while
-// gaining plan reuse and literal-operand caching.
-var qScriptWordDyadicOps = []string{"mod", "div", "min", "max", "xbar"}
-
-func buildQScriptWordDyadicBindingPlan(src string) qScriptBindingPlan {
-	src = strings.TrimSpace(src)
-	if src == "" {
-		return qScriptBindingPlan{}
-	}
-	for _, op := range qScriptWordDyadicOps {
-		leftExpr, rightExpr, ok := splitTopLevelWord(src, op)
-		if !ok {
-			continue
-		}
-		left := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(leftExpr)), nil)
-		if left.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		right := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(rightExpr)), nil)
-		if right.kind == qScriptBindingInvalid {
-			return qScriptBindingPlan{}
-		}
-		return qScriptBindingBinaryPlan(op, left, right)
-	}
-	return qScriptBindingPlan{}
-}
-
-// buildQScriptCutBindingPlan plans `<indexes> cut <vector>` statements with
-// simple operands (literals, literal vectors, names). Execution funnels into
-// evalValueBinary → qCutValue, the same terminal s.eval's dyadic word table
-// reaches; restricting operands to simple values keeps the split position
-// identical to s.eval's leftmost dyadic word split.
-func buildQScriptCutBindingPlan(src string) qScriptBindingPlan {
-	src = strings.TrimSpace(src)
-	leftExpr, rightExpr, ok := splitTopLevelWord(src, "cut")
-	if !ok {
-		return qScriptBindingPlan{}
-	}
-	left := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(leftExpr)), nil)
-	if !qScriptBindingPlanIsSimpleValue(left) {
-		return qScriptBindingPlan{}
-	}
-	right := buildQScriptBindingPlanForRHS(stripEnclosingParens(strings.TrimSpace(rightExpr)), nil)
-	if !qScriptBindingPlanIsSimpleValue(right) {
-		return qScriptBindingPlan{}
-	}
-	return qScriptBindingBinaryPlan("cut", left, right)
-}
-
-// qScriptBindingPlanIsSimpleValue reports whether a plan is a literal,
-// a literal vector, or a plain name — operand shapes that cannot embed
-// another dyadic word and therefore cannot change split precedence.
-func qScriptBindingPlanIsSimpleValue(plan qScriptBindingPlan) bool {
-	switch plan.kind {
-	case qScriptBindingLiteral, qScriptBindingName:
-		return true
-	case qScriptBindingVector:
-		for i := range plan.items {
-			if !qScriptBindingPlanIsSimpleValue(plan.items[i]) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
 }
 
 func splitQScriptPrefixDyadicArgs(src string) (string, string, bool) {
