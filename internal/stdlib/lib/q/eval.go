@@ -3038,6 +3038,12 @@ func (s *EvalState) eval(src string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Callable left (verb name or bound lambda) is application, not
+		// indexing — `med `sym` applies med, mirroring the compiled route's
+		// IndexExpr callable dispatch.
+		if isCallable(collection) {
+			return s.applyCallable(collection, []any{key})
+		}
 		return indexValue(collection, key)
 	}
 	if lambdaSrc, adverb, ok := findLambdaAdverbFunction(src); ok {
@@ -3463,12 +3469,15 @@ func (s *EvalState) eval(src string) (any, error) {
 			}
 			return attributeVector(marker, v)
 		}
-		leftSrc := strings.TrimSpace(src[:hash])
-		v, err := s.eval(strings.TrimSpace(src[hash+1:]))
+		// Left operand first: every other dyadic branch (and the compiled
+		// route's Binary execution) evaluates left before right, so the
+		// surfaced error must be the left one (`0$00#A` reports the cast
+		// error, not the unbound name).
+		leftValue, err := s.eval(strings.TrimSpace(src[:hash]))
 		if err != nil {
 			return nil, err
 		}
-		leftValue, err := s.eval(leftSrc)
+		v, err := s.eval(strings.TrimSpace(src[hash+1:]))
 		if err != nil {
 			return nil, err
 		}
@@ -3515,6 +3524,9 @@ func (s *EvalState) eval(src string) (any, error) {
 		right, err := s.eval(rightExpr)
 		if err != nil {
 			return nil, err
+		}
+		if isCallable(left) {
+			return s.applyCallable(left, []any{right})
 		}
 		return dictLookup(left, right)
 	}
@@ -4026,6 +4038,10 @@ func negateTypedNumeric(v any) (any, bool) {
 	case int32:
 		return -x, true
 	case float32:
+		if x == 0 {
+			// IEEE 754: 0 - (±0) is +0, while -x of +0 would be -0.
+			return float32(0), true
+		}
 		return -x, true
 	default:
 		return nil, false
@@ -5788,6 +5804,39 @@ func findAdverb(src string) (adverbExpr, bool) {
 		if right == "" {
 			continue
 		}
+		if left != "" {
+			// A top-level dyadic operator anywhere in the left part (`s$+\x`,
+			// `1+*/x`, `()!count +/or`) is the outermost (leftmost) split
+			// under canonical right-to-left grouping; the adverb belongs to
+			// its RIGHT argument, so the adverb claim must yield to the
+			// cascade's operator splits.
+			if _, _, ok := findDyadic(left); ok {
+				continue
+			}
+			if findTopLevel(left, "$#_!@?~") >= 0 {
+				continue
+			}
+			// Same yield for a stranded dyadic WORD (`00 in+/max`,
+			// `00000 except+/0`, glued `0:in+/0`): the word map's leftmost
+			// split is the outermost operation and the derived verb is its
+			// right argument. The trailing IDENT TOKEN decides (tokens, not
+			// whitespace fields, are what the word map scans).
+			if end := len(left); end > 0 {
+				start := end
+				for start > 0 && isQIdentRest(left[start-1]) {
+					start--
+				}
+				if start > 0 && start < end {
+					token := left[start:end]
+					if _, ok := qDyadicWordOps[token]; ok {
+						continue
+					}
+					if _, ok := qSetWordOps[token]; ok {
+						continue
+					}
+				}
+			}
+		}
 		verb := strings.TrimSpace(src[verbStart:verbEnd])
 		if _, ok := lookupDyadicVerbFunc(verb); !ok {
 			if _, ok := lookupUnaryVerb(verb); !ok {
@@ -5797,6 +5846,59 @@ func findAdverb(src string) (adverbExpr, bool) {
 		return adverbExpr{left: left, verb: verb, adverb: adverb, right: right}, true
 	}
 	return adverbExpr{}, false
+}
+
+// prefixVerbChain resolves a whitespace-separated run of bare builtin
+// unary-verb words (none shadowed by a session binding) to their application
+// functions. It mirrors the string evaluator's unary prefix branches: the
+// dedicated til/flip/enlist forms plus the unary verb registry.
+func (s *EvalState) prefixVerbChain(left string) ([]func(any) (any, error), bool) {
+	fields := strings.Fields(strings.TrimSpace(left))
+	if len(fields) == 0 {
+		return nil, false
+	}
+	fns := make([]func(any) (any, error), 0, len(fields))
+	for _, name := range fields {
+		if !isQBareName(name) {
+			return nil, false
+		}
+		if _, bound := s.lookupName(name); bound {
+			return nil, false
+		}
+		switch name {
+		case "til":
+			fns = append(fns, qTilValue)
+			continue
+		case "flip":
+			fns = append(fns, flip)
+			continue
+		case "enlist":
+			fns = append(fns, enlist)
+			continue
+		}
+		fn, ok := s.unaryVerbFunc(name)
+		if !ok {
+			return nil, false
+		}
+		fns = append(fns, fn)
+	}
+	return fns, true
+}
+
+// qTilValue is `til` applied to an already-evaluated operand (the same
+// contract as the compiled route's evalValueCall til case).
+func qTilValue(v any) (any, error) {
+	n, ok := v.(int64)
+	if !ok {
+		return nil, fmt.Errorf("til expects an integer")
+	}
+	if n < 0 {
+		return nil, fmt.Errorf("til expects a non-negative integer")
+	}
+	if int64(int(n)) != n {
+		return nil, fmt.Errorf("til count is too large")
+	}
+	return data.NewI64Range(0, 1, int(n)), nil
 }
 
 func adverbVerbBounds(src string, adverbStart int) (int, int, bool) {
@@ -5830,6 +5932,26 @@ func isDyadicOp(b byte) bool {
 }
 
 func (s *EvalState) evalAdverb(expr adverbExpr) (any, error) {
+	// A left operand made of bare builtin prefix-verb words is prefix
+	// application to the derived-verb expression, not a seed: canonical q
+	// evaluates right-to-left, so `til +/0` is til (+/0) and `count next/x`
+	// is count (next/x). Session bindings shadow verb words (bound names are
+	// nouns and stay seeds), mirroring the compiled route's prefix-word
+	// compilation order.
+	if expr.left != "" {
+		if fns, ok := s.prefixVerbChain(expr.left); ok {
+			out, err := s.evalAdverb(adverbExpr{verb: expr.verb, adverb: expr.adverb, right: expr.right})
+			if err != nil {
+				return nil, err
+			}
+			for i := len(fns) - 1; i >= 0; i-- {
+				if out, err = fns[i](out); err != nil {
+					return nil, err
+				}
+			}
+			return out, nil
+		}
+	}
 	if expr.left == "" && expr.adverb == "/" && expr.verb == "+" {
 		if out, handled, err := s.tryEvalSumFby(expr.right); err != nil || handled {
 			return out, err
@@ -6500,7 +6622,9 @@ func (s *EvalState) tryEvalTypedUnarySum(src string) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	if array, ok := value.(data.Array); ok {
+	if array, ok := value.(data.Array); ok && array.Len() > 0 {
+		// Empty inputs keep the generic empty-sum identity (typed zero of
+		// the SOURCE kind); the float-accumulating kernel must decline.
 		shape := "vector-reduce/sum-" + op + "/" + string(array.Kind())
 		out, handled, err := data.TryTypedQNumericUnarySum(op, array)
 		out, handled, err = qTypedRuntimeResult("ArrayNumericUnarySum", shape, out, handled, err)
@@ -6535,6 +6659,16 @@ func (s *EvalState) tryEvalTypedUnaryDyadicSum(unaryOp, src string) (any, bool, 
 	right, err := s.eval(rightExpr)
 	if err != nil {
 		return nil, true, err
+	}
+	if qPipelineFusedSumEmptyOperand(left, right) {
+		// Empty operands keep the generic empty-sum identity (typed zero of
+		// the SOURCE kind); the float-accumulating kernel must decline.
+		return nil, false, nil
+	}
+	if qTypedIntegerOperandOK(left) && qTypedIntegerOperandOK(right) {
+		// Integer-only operands sum to int64 on the generic route; the
+		// float-accumulating kernel would change the result type.
+		return nil, false, nil
 	}
 	out, handled, err := data.TryTypedQNumericUnaryDyadicSum(unaryOp, data.Op(string(dyadicOp)), left, right)
 	if err != nil || handled {
@@ -6714,24 +6848,29 @@ func (s *EvalState) tryEvalScalarAddChain(src string) (any, bool, error) {
 	if out, handled, err := s.tryEvalNamedScalarReducerAddChain(terms); err != nil || handled {
 		return out, handled, err
 	}
-	var acc any
+	// Terms evaluate left-to-right (the compiled Binary tree's operand
+	// order) but accumulate right-to-left (a+(b+c)): canonical q grouping,
+	// and the association the compiled route's split produces — float chains
+	// must be bit-identical across routes.
+	values := make([]any, len(terms))
 	for i, term := range terms {
 		value, err := s.evalScalarAddChainTerm(term)
 		if err != nil {
 			return nil, true, err
 		}
-		if i == 0 {
-			acc = value
-			continue
-		}
-		if out, ok := addScalarNumericFast(acc, value); ok {
+		values[i] = value
+	}
+	acc := values[len(values)-1]
+	for i := len(values) - 2; i >= 0; i-- {
+		if out, ok := addScalarNumericFast(values[i], acc); ok {
 			acc = out
 			continue
 		}
-		acc, err = applyDyadic('+', acc, value)
+		out, err := applyDyadic('+', values[i], acc)
 		if err != nil {
 			return nil, true, err
 		}
+		acc = out
 	}
 	return acc, true, nil
 }
@@ -6758,21 +6897,22 @@ func (s *EvalState) tryEvalNamedScalarReducerAddChain(terms []string) (any, bool
 	if !ok || isCallable(value) {
 		return nil, false, nil
 	}
-	var acc any
+	// Right-to-left accumulation: see tryEvalScalarAddChain.
+	parts := make([]any, len(reducers))
 	for i, reducer := range reducers {
 		part, err := namedScalarReducerValue(reducer, value)
 		if err != nil {
 			return nil, true, err
 		}
-		if i == 0 {
-			acc = part
-			continue
-		}
-		if out, ok := addScalarNumericFast(acc, part); ok {
+		parts[i] = part
+	}
+	acc := parts[len(parts)-1]
+	for i := len(parts) - 2; i >= 0; i-- {
+		if out, ok := addScalarNumericFast(parts[i], acc); ok {
 			acc = out
 			continue
 		}
-		out, err := applyDyadic('+', acc, part)
+		out, err := applyDyadic('+', parts[i], acc)
 		if err != nil {
 			return nil, true, err
 		}
@@ -6953,11 +7093,24 @@ func splitTopLevelPlusChain(src string) []string {
 			braceDepth++
 		case '}':
 			braceDepth--
+		case '!', '#', '_', '$', '@', '?', '~':
+			if parenDepth != 0 || bracketDepth != 0 || braceDepth != 0 {
+				continue
+			}
+			// A top-level non-arithmetic dyadic claims everything to its
+			// right ((count"")+count!+0 is (count"")+(count!(+0))), so the
+			// remainder is one term: stop splitting.
+			i = len(src)
 		case '+':
 			if parenDepth != 0 || bracketDepth != 0 || braceDepth != 0 || isSign(src, i) {
 				continue
 			}
 			if i+1 < len(src) && (src[i+1] == '/' || src[i+1] == '\\') {
+				// A derived +/ (sum-over) or +\ (running-sum) folds EVERYTHING
+				// to its right under canonical right-to-left grouping
+				// ((0)++/(0)+x is (0)+(+/((0)+x))), so the remainder is one
+				// term: stop splitting.
+				i = len(src)
 				continue
 			}
 			term := strings.TrimSpace(src[start:i])
@@ -6982,6 +7135,17 @@ func splitTopLevelPlusChain(src string) []string {
 func isScalarAddChainTerm(src string) bool {
 	src = strings.TrimSpace(stripEnclosingParens(src))
 	if src == "" {
+		return false
+	}
+	// A parenthesized expression list ((count 0;9)) is a LIST literal, not a
+	// scalar term: stripping its parens would change its meaning.
+	if parts := splitTopLevelDelim(src, ';'); len(parts) > 1 {
+		return false
+	}
+	// Temporal tokens that also lex as numbers (month 0000.01, minute 12:30)
+	// are temporals on the compiled route and in canonical q; the chain must
+	// not re-read them as floats.
+	if qScalarAddChainTermLooksTemporal(src) {
 		return false
 	}
 	for _, word := range []string{"plus", "minus", "times", "divide"} {
@@ -7012,6 +7176,30 @@ func isScalarAddChainTerm(src string) bool {
 	}
 	if qAddChainBareNameTerm(src) {
 		return true
+	}
+	return false
+}
+
+// qScalarAddChainTermLooksTemporal reports whether a chain term is really a
+// temporal literal (month 0000.01, time 12:30, ...), optionally signed. The
+// dot/colon gate keeps the temporal probe off plain integer/name terms.
+func qScalarAddChainTermLooksTemporal(src string) bool {
+	if !strings.ContainsAny(src, ".:") {
+		return false
+	}
+	probes := []string{src}
+	if len(src) > 1 && (src[0] == '+' || src[0] == '-') {
+		// Signed spellings: the temporal lexers accept some signed forms
+		// (+000.01) but not others (+0000.01), so probe both.
+		probes = append(probes, src[1:])
+	}
+	for _, probe := range probes {
+		if _, _, ok := parseTemporalToken(probe); ok {
+			return true
+		}
+		if value, ok, err := parseTemporalAtomOrVector(probe); ok && err == nil && value != nil {
+			return true
+		}
 	}
 	return false
 }
@@ -7089,6 +7277,17 @@ func (s *EvalState) tryEvalFirstLastDyadic(src string) (any, bool, error) {
 		if !strings.HasPrefix(src, spec.word) || !wordBoundary(src, 0, len(spec.word)) {
 			continue
 		}
+		if len(src) == len(spec.word) {
+			continue
+		}
+		if strings.IndexByte("=<>+-*%&|^,", src[len(spec.word)]) >= 0 {
+			// The operator glues directly onto the word (`last%x`,
+			// `last%0%0`): the word is the dyadic's LEFT OPERAND (a verb
+			// atom), not a unary prefix application. Decline so the generic
+			// dyadic split handles it, mirroring the compiled route's
+			// tokenisation.
+			continue
+		}
 		arg := strings.TrimSpace(src[len(spec.word):])
 		if arg == "" {
 			continue
@@ -7097,6 +7296,11 @@ func (s *EvalState) tryEvalFirstLastDyadic(src string) (any, bool, error) {
 		if !ok || op == ',' {
 			// Join changes the result length (l+r); the elementwise
 			// first/last shortcut below would be wrong for it.
+			continue
+		}
+		if idx == 0 || strings.TrimSpace(arg[:idx]) == "" {
+			// Operator-leading remainders (`first %x` via leading space) are
+			// the same operand shape; keep them on the generic split too.
 			continue
 		}
 		left, err := s.eval(strings.TrimSpace(arg[:idx]))
@@ -10978,9 +11182,9 @@ func qReduceIdentity(op byte, v any) (any, bool) {
 // typed inputs.
 func qSumIdentityForKind(kind data.Kind) any {
 	switch kind {
-	case data.KindF32:
-		return float32(0)
-	case data.KindF64:
+	case data.KindF32, data.KindF64:
+		// f32 sums accumulate in float64 on every route (generic walk and
+		// typed kernels), so the empty identity is float64 too.
 		return float64(0)
 	default:
 		return int64(0)
@@ -10991,9 +11195,9 @@ func qSumIdentityForKind(kind data.Kind) any {
 // element domain's one.
 func qProductIdentityForKind(kind data.Kind) any {
 	switch kind {
-	case data.KindF32:
-		return float32(1)
-	case data.KindF64:
+	case data.KindF32, data.KindF64:
+		// f32 products accumulate in float64 on every route (see
+		// qSumIdentityForKind), so the empty identity is float64 too.
 		return float64(1)
 	default:
 		return int64(1)
@@ -11317,6 +11521,12 @@ func looksLikeTemporalVector(src string) bool {
 	}
 	hasTemporal := false
 	for _, field := range fields {
+		if containsInternalDyadicSign(field) {
+			// `0000.+1 0` is an arithmetic split (0000. + 1 0), not a
+			// temporal vector; the lenient temporal lexer must not claim
+			// fields glued to a dyadic operator.
+			return false
+		}
 		if _, _, ok := parseTemporalToken(field); ok {
 			hasTemporal = true
 			continue
@@ -13200,6 +13410,13 @@ func applyDyadic(op byte, left, right any) (any, error) {
 	if out, handled, err := applyTemporalDyadic(op, left, right); handled || err != nil {
 		return out, err
 	}
+	// `0-x` preserves the sized numeric type of x (0-0e is real, 0-0i is
+	// int), the same shortcut the compiled route's evalValueBinary applies.
+	if op == '-' && isNumericZero(left) {
+		if value, ok := negateTypedNumeric(right); ok {
+			return value, nil
+		}
+	}
 	ln, lok := numeric(left)
 	rn, rok := numeric(right)
 	if !lok || !rok {
@@ -13426,9 +13643,9 @@ func minDyadic(left, right any) (any, error) {
 		return nil, err
 	}
 	if cmp <= 0 {
-		return left, nil
+		return qPromoteMinMaxResult(left, right), nil
 	}
-	return right, nil
+	return qPromoteMinMaxResult(right, left), nil
 }
 
 func maxDyadic(left, right any) (any, error) {
@@ -13443,9 +13660,26 @@ func maxDyadic(left, right any) (any, error) {
 		return nil, err
 	}
 	if cmp >= 0 {
-		return left, nil
+		return qPromoteMinMaxResult(left, right), nil
 	}
-	return right, nil
+	return qPromoteMinMaxResult(right, left), nil
+}
+
+// qPromoteMinMaxResult applies canonical q type promotion to a min/max
+// winner: long & float is FLOAT regardless of which operand wins (0 min .0
+// is 0f), matching the typed float kernels so generic and fused routes agree.
+func qPromoteMinMaxResult(winner, other any) any {
+	wi, ok := integerValue(winner)
+	if !ok {
+		return winner
+	}
+	switch other.(type) {
+	case float64:
+		return float64(wi)
+	case float32:
+		return float32(wi)
+	}
+	return winner
 }
 
 // equalsDictOrCallable handles q `=` (and the `<>` complement through
@@ -13965,6 +14199,15 @@ func qTryTypedArithmeticDyadic(op data.Op, left, right any) (any, bool, error) {
 }
 
 func qTryTypedCompareMask(op data.Op, left, right any, la, ra data.Array) (data.Array, bool, error) {
+	// Generic (any) and empty () lists keep the cascade's per-element
+	// comparison: its empty result stays kind-null and its error text is
+	// canonical, so every typed kernel must decline them up front.
+	if la != nil && (la.Kind() == data.KindAny || la.Kind() == data.KindNull) {
+		return nil, false, nil
+	}
+	if ra != nil && (ra.Kind() == data.KindAny || ra.Kind() == data.KindNull) {
+		return nil, false, nil
+	}
 	if out, handled, err := data.TryTypedDyadic(op, left, right); err != nil || handled {
 		if err != nil {
 			return nil, handled, err
@@ -13974,15 +14217,32 @@ func qTryTypedCompareMask(op data.Op, left, right any, la, ra data.Array) (data.
 	}
 	switch {
 	case la != nil && ra == nil:
+		if la.Kind() == data.KindAny || la.Kind() == data.KindNull {
+			// Generic and empty () lists keep the cascade's per-element
+			// comparison (its empty result stays kind-null, and its error
+			// text is canonical); the typed mask kernel must decline.
+			return nil, false, nil
+		}
 		out, err := data.CompareMask(la, op, right)
-		return out, err == nil, err
+		if err != nil {
+			// Decline on kernel errors too: the generic route raises the
+			// cascade's canonical error text for incomparable operands.
+			return nil, false, nil
+		}
+		return out, true, nil
 	case la == nil && ra != nil:
+		if ra.Kind() == data.KindAny || ra.Kind() == data.KindNull {
+			return nil, false, nil
+		}
 		reversed, ok := reverseDataCompareOp(op)
 		if !ok {
 			return nil, false, nil
 		}
 		out, err := data.CompareMask(ra, reversed, left)
-		return out, err == nil, err
+		if err != nil {
+			return nil, false, nil
+		}
+		return out, true, nil
 	default:
 		return nil, false, nil
 	}
@@ -16268,6 +16528,24 @@ func splitWhereCompareExpr(src string) (string, string, string, bool) {
 	if _, _, ok := splitTopLevelOperator(src, "|"); ok {
 		return "", "", "", false
 	}
+	// Same yield for the cascade splits that claim BEFORE the comparison
+	// dyadics (join, take, drop/cut, cast, dict-bang, apply, match, find):
+	// `0 0<count $A00000` is the cast ((0 0<count)$A00000), not a compare.
+	if findTopLevel(src, ",#_$!@?~") >= 0 {
+		return "", "", "", false
+	}
+	// The word-map split also precedes the symbol comparisons in the
+	// cascade: a registered dyadic word claims first (`0 0<count where 0` is
+	// (0 0<count) where 0). within keeps its compare spelling; every other
+	// word declines the compare probe. A declined word map (leftmost word
+	// with an empty side, e.g. a binding named `times`) mirrors the
+	// cascade's decline and keeps the compare/within probes below.
+	if op, left, right, ok := splitTopLevelDyadicWordMap(src, qDyadicWordOps); ok {
+		if op.word == "within" {
+			return left, right, "within", true
+		}
+		return "", "", "", false
+	}
 	for _, op := range []string{"<>", "<=", ">=", "=", "<", ">"} {
 		if left, right, ok := splitTopLevelOperator(src, op); ok {
 			return left, right, op, true
@@ -18357,11 +18635,20 @@ func matchValueBudget(left, right any, budget *int) bool {
 		r, ok := right.(qAdverbFunction)
 		return ok && l == r
 	case qLambda:
-		// Lambdas match on identical source text; closures with captured
-		// environments stay conservatively unmatched (envs can be
-		// self-referential, so recursing into them is not safe).
+		// Lambdas match on identical source text. Closures compare their
+		// captured environments by IDENTITY (the same env map): that makes a
+		// closure match itself (`f~f`, and the dual-route oracle comparing one
+		// session binding against itself) while distinct env maps stay
+		// conservatively unmatched (envs can be self-referential, so recursing
+		// into them is not safe).
 		r, ok := right.(qLambda)
-		return ok && l.body == r.body && l.namespace == r.namespace && len(l.env) == 0 && len(r.env) == 0
+		if !ok || l.body != r.body || l.namespace != r.namespace {
+			return false
+		}
+		if len(l.env) == 0 && len(r.env) == 0 {
+			return true
+		}
+		return len(l.env) == len(r.env) && reflect.ValueOf(l.env).Pointer() == reflect.ValueOf(r.env).Pointer()
 	case qComposition:
 		r, ok := right.(qComposition)
 		if !ok || len(l.funcs) != len(r.funcs) {

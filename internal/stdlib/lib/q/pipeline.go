@@ -290,6 +290,13 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 	if plan, ok := buildQPipelineApplyPathIndexPlan(src); ok {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
+	// A top-level apply-at the apply plans above declined belongs to the
+	// cascade's evalApplyIndexForm claim (and the compiled route's
+	// ApplyAtExpr split): `count where 0 within 0@0` splits at `@`, so the
+	// fused reducer/compare plan families below must yield.
+	if _, _, ok := splitTopLevelOperator(src, "@"); ok {
+		return qPipelinePlan{}
+	}
 	if plan, ok := buildQPipelineCastEnvelopePlan(src); ok {
 		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
@@ -679,28 +686,64 @@ func qPipelineRuntimePrimitiveCandidate(src string) bool {
 	if qPipelineDyadicWordShadowedByEarlierSplit(src) {
 		return false
 	}
-	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
-		left, right, ok := splitTopLevelWord(src, word)
-		if ok && qPipelineRuntimeDyadicPrimitiveOperands(word, left, right) {
+	if op, left, right, ok := splitTopLevelDyadicWordMap(src, qDyadicWordOps); ok && qPipelineRuntimePrimitiveDyadicWord(op.word) {
+		return qPipelineRuntimeDyadicPrimitiveOperands(op.word, left, right)
+	}
+	return false
+}
+
+// qPipelineDyadicWordShadowedByEarlierSplit reports whether s.eval would
+// split src at a probe that precedes its dyadic word map (apply-at, composite
+// compares, match, find/roll, join, postfix symbol lookup) or at a DIFFERENT
+// word: the word map splits at the LEFTMOST registered dyadic word, so a
+// dyadic-primitive plan may only claim when that leftmost word is its own
+// verb (`2 rotate where 0 1 1` splits at `rotate`, not `where`; `0 or wsum 0`
+// at `or`, not `wsum`; `count@where 0` is an apply, not a `where` split).
+func qPipelineDyadicWordShadowedByEarlierSplit(src string) bool {
+	// Unary prefix-word claims (til/where/count/... plus take/drop and the
+	// deferred-state prefixes) run before the cascade's dyadic word map:
+	// `til wsum 0` is til (wsum 0), never a wsum split.
+	if space := strings.IndexByte(src, ' '); space > 0 {
+		head := src[:space]
+		if qCompilePrefixWords[head] || head == "take" || head == "drop" ||
+			head == "lookup" || head == "get" || head == "set" || head == "rand" || head == "hopen" {
+			return true
+		}
+	}
+	if qPipelineWordSplitShadowedByEarlierClaim(src) {
+		return true
+	}
+	if op, _, _, ok := splitTopLevelDyadicWordMap(src, qDyadicWordOps); ok {
+		if !qPipelineRuntimePrimitiveDyadicWord(op.word) {
 			return true
 		}
 	}
 	return false
 }
 
-// qPipelineDyadicWordShadowedByEarlierSplit reports whether s.eval would
-// split src at a probe that precedes its dyadic word map (composite
-// compares, match, find/roll, postfix symbol lookup). A dyadic-primitive
-// word plan for such a statement would claim a split position the string
-// evaluator never takes (`0~cov""` splits at `~`, not at `cov`).
-func qPipelineDyadicWordShadowedByEarlierSplit(src string) bool {
-	for _, op := range []string{"<>", "<=", ">=", "~", "?"} {
+// qPipelineWordSplitShadowedByEarlierClaim reports whether a cascade probe
+// that precedes the dyadic word map (apply-at, composite compares, match,
+// find, join, postfix lookup) claims src, so word-keyed plans must yield.
+func qPipelineWordSplitShadowedByEarlierClaim(src string) bool {
+	for _, op := range []string{"@", "<>", "<=", ">=", "~", "?"} {
 		if _, _, ok := splitTopLevelOperator(src, op); ok {
 			return true
 		}
 	}
+	if _, ok := qTopLevelJoinSplit(src); ok {
+		return true
+	}
 	if _, _, ok := findPostfixLookup(src); ok {
 		return true
+	}
+	return false
+}
+
+func qPipelineRuntimePrimitiveDyadicWord(word string) bool {
+	for _, w := range qPipelineRuntimeDyadicPrimitiveVerbs() {
+		if w == word {
+			return true
+		}
 	}
 	return false
 }
@@ -736,21 +779,17 @@ func buildQPipelineRuntimePrimitivePlan(src string) (qPipelinePlan, bool) {
 	if qPipelineDyadicWordShadowedByEarlierSplit(src) {
 		return qPipelinePlan{}, false
 	}
-	for _, word := range qPipelineRuntimeDyadicPrimitiveVerbs() {
-		left, right, ok := splitTopLevelWord(src, word)
-		if !ok {
-			continue
-		}
+	if op, left, right, ok := splitTopLevelDyadicWordMap(src, qDyadicWordOps); ok && qPipelineRuntimePrimitiveDyadicWord(op.word) {
 		left = strings.TrimSpace(left)
 		right = strings.TrimSpace(right)
 		if left == "" || right == "" {
 			return qPipelinePlan{}, false
 		}
-		if !qPipelineRuntimeDyadicPrimitiveOperands(word, left, right) {
+		if !qPipelineRuntimeDyadicPrimitiveOperands(op.word, left, right) {
 			return qPipelinePlan{}, false
 		}
-		plan := qPipelineShapePlan(qPipelineDyadicPrimitive, word)
-		plan.compareOp = word
+		plan := qPipelineShapePlan(qPipelineDyadicPrimitive, op.word)
+		plan.compareOp = op.word
 		plan.leftExpr = left
 		plan.rightExpr = right
 		return plan, true
@@ -790,7 +829,9 @@ func qPipelineRuntimePrimitiveSimpleUnaryArg(arg string) bool {
 	if strings.Contains(arg, ";") {
 		return false
 	}
-	for _, op := range []string{"+", "*", "%"} {
+	// `@` apply claims before the unary prefix words in the cascade
+	// (`sin @0` is (sin)@0, not sin(@0)).
+	for _, op := range []string{"+", "*", "%", "@"} {
 		if strings.Contains(arg, op) {
 			return false
 		}
@@ -908,65 +949,41 @@ func qPipelineRuntimePrimitiveVerb(name string) bool {
 
 func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
-	for _, word := range []string{"msum", "mavg", "mcount", "mmin", "mmax"} {
-		left, right, ok := splitTopLevelWord(src, word)
-		if !ok {
-			continue
-		}
-		left = strings.TrimSpace(left)
-		right = strings.TrimSpace(right)
-		if left == "" || right == "" {
-			return qPipelinePlan{}, false
-		}
-		plan := qPipelineShapePlan(qPipelineSumMovingWindow, word)
-		plan.compareOp = word
-		plan.leftExpr = left
-		plan.rightExpr = right
-		return plan, true
+	word, left, right, ok := qPipelineLeftmostWordSplit(src, []string{"msum", "mavg", "mcount", "mmin", "mmax"}...)
+	if !ok || left == "" || right == "" {
+		return qPipelinePlan{}, false
 	}
-	return qPipelinePlan{}, false
+	plan := qPipelineShapePlan(qPipelineSumMovingWindow, word)
+	plan.compareOp = word
+	plan.leftExpr = left
+	plan.rightExpr = right
+	return plan, true
 }
 
 func buildQPipelineSumDyadicMinMaxPlan(src string) (qPipelinePlan, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
-	for _, word := range []string{"min", "max"} {
-		left, right, ok := splitTopLevelWord(src, word)
-		if !ok {
-			continue
-		}
-		left = strings.TrimSpace(left)
-		right = strings.TrimSpace(right)
-		if left == "" || right == "" {
-			return qPipelinePlan{}, false
-		}
-		plan := qPipelineShapePlan(qPipelineSumDyadicMinMax, word)
-		plan.compareOp = word
-		plan.leftExpr = left
-		plan.rightExpr = right
-		return plan, true
+	word, left, right, ok := qPipelineLeftmostWordSplit(src, []string{"min", "max"}...)
+	if !ok || left == "" || right == "" {
+		return qPipelinePlan{}, false
 	}
-	return qPipelinePlan{}, false
+	plan := qPipelineShapePlan(qPipelineSumDyadicMinMax, word)
+	plan.compareOp = word
+	plan.leftExpr = left
+	plan.rightExpr = right
+	return plan, true
 }
 
 func buildQPipelineSumDyadicFloatMathPlan(src string) (qPipelinePlan, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
-	for _, word := range []string{data.NumericDyadicXExp, data.NumericDyadicXLog} {
-		left, right, ok := splitTopLevelWord(src, word)
-		if !ok {
-			continue
-		}
-		left = strings.TrimSpace(left)
-		right = strings.TrimSpace(right)
-		if left == "" || right == "" {
-			return qPipelinePlan{}, false
-		}
-		plan := qPipelineShapePlan(qPipelineSumDyadicFloatMath, word)
-		plan.compareOp = word
-		plan.leftExpr = left
-		plan.rightExpr = right
-		return plan, true
+	word, left, right, ok := qPipelineLeftmostWordSplit(src, []string{data.NumericDyadicXExp, data.NumericDyadicXLog}...)
+	if !ok || left == "" || right == "" {
+		return qPipelinePlan{}, false
 	}
-	return qPipelinePlan{}, false
+	plan := qPipelineShapePlan(qPipelineSumDyadicFloatMath, word)
+	plan.compareOp = word
+	plan.leftExpr = left
+	plan.rightExpr = right
+	return plan, true
 }
 
 func buildQPipelineSumUnaryPrimitivePlan(src string) (qPipelinePlan, bool) {
@@ -1217,16 +1234,40 @@ func buildQPipelineSumGatherPlan(src string) (qPipelinePlan, bool) {
 }
 
 func buildQPipelineSumBinPlan(src string) (qPipelinePlan, bool) {
-	leftExpr, rightExpr, ok := splitTopLevelWord(src, "bin")
+	_, leftExpr, rightExpr, ok := qPipelineLeftmostWordSplit(src, "bin")
 	if !ok {
 		return qPipelinePlan{}, false
 	}
 	return qPipelinePlan{
 		kind:      qPipelineSumBin,
 		shape:     "bin-reduce/sum",
-		leftExpr:  strings.TrimSpace(leftExpr),
-		rightExpr: strings.TrimSpace(rightExpr),
+		leftExpr:  leftExpr,
+		rightExpr: rightExpr,
 	}, true
+}
+
+// qPipelineLeftmostWordSplit returns the LEFTMOST top-level registered
+// dyadic word split of src when that word is one of words. The string
+// evaluator's word map splits at the leftmost registered word, so a plan
+// keyed to a specific word must not claim a different (later) occurrence
+// (`0 max bin 0` splits at `max`, never at `bin`).
+func qPipelineLeftmostWordSplit(src string, words ...string) (string, string, string, bool) {
+	// Apply-at, composite compares, match, find, join, and postfix lookups
+	// all claim before the word map on every route (`0 0 xexp exp@0` nests
+	// the apply, `+/0~min 0` splits at `~`), so word-keyed plans must yield.
+	if qPipelineWordSplitShadowedByEarlierClaim(src) {
+		return "", "", "", false
+	}
+	op, left, right, ok := splitTopLevelDyadicWordMap(src, qDyadicWordOps)
+	if !ok {
+		return "", "", "", false
+	}
+	for _, word := range words {
+		if op.word == word {
+			return op.word, strings.TrimSpace(left), strings.TrimSpace(right), true
+		}
+	}
+	return "", "", "", false
 }
 
 func buildQPipelineWhereComparePlan(src string, kind qPipelineKind, prefix string) (qPipelinePlan, bool) {
@@ -1323,12 +1364,15 @@ func buildQPipelineWhereModuloComparePlan(leftExpr, rightExpr, op string, kind q
 
 func splitQPipelineModExpr(src string) (string, string, bool) {
 	src = stripEnclosedParens(strings.TrimSpace(src))
-	left, right, ok := splitTopLevelWord(src, "mod")
-	if !ok {
+	// Apply-at claims before the word map on every route (`0@mod 0` is
+	// 0@(mod 0)), so the mod plan must yield.
+	if _, _, ok := splitTopLevelOperator(src, "@"); ok {
 		return "", "", false
 	}
-	left = strings.TrimSpace(left)
-	right = strings.TrimSpace(right)
+	word, left, right, ok := qPipelineLeftmostWordSplit(src, "mod")
+	if !ok || word != "mod" {
+		return "", "", false
+	}
 	if left == "" || right == "" {
 		return "", "", false
 	}
@@ -1687,7 +1731,9 @@ func (s *EvalState) evalQPipelineSumUnaryPrimitive(plan *qPipelinePlan) (any, bo
 		return nil, true, err
 	}
 	array, ok := value.(data.Array)
-	if !ok {
+	if !ok || array.Len() == 0 {
+		// Empty inputs keep the generic empty-sum identity (typed zero of
+		// the SOURCE kind); the float-accumulating kernel must decline.
 		return nil, false, nil
 	}
 	shape := "vector-reduce/sum-unary-" + op + "/" + string(array.Kind())
@@ -1840,9 +1886,53 @@ func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error)
 		shape:          shape,
 		fallbackReason: RuntimeFallbackUnsupportedType,
 		call: func() (any, bool, error) {
+			// The kernel computes sum(raze value) as an all-levels scalar
+			// reduction, which is only faithful when ONE raze level fully
+			// flattens value. Deeper nesting (raze ((0;0 0);0) is (0;0 0;0))
+			// leaves array elements whose sum BROADCASTS on the generic
+			// route, so the kernel must decline.
+			if array, ok := value.(data.Array); ok && array.Kind() == data.KindAny && qSumRazeLeavesNestedArrays(array) {
+				return nil, false, nil
+			}
+			if _, isArray := value.(data.Array); !isArray {
+				if _, isMatrix := value.(data.Matrix); !isMatrix {
+					// Atom inputs (raze 0n is the null atom) keep the
+					// cascade's sum-verb semantics, including its errors.
+					return nil, false, nil
+				}
+			}
 			return data.TryTypedNestedNumericSum(value)
 		},
 	})
+}
+
+// qSumRazeLeavesNestedArrays reports whether razing array ONE level still
+// leaves array elements behind (any element is itself a generic list with
+// array elements): those shapes broadcast under sum instead of reducing.
+func qSumRazeLeavesNestedArrays(array data.Array) bool {
+	for row := 0; row < array.Len(); row++ {
+		item, ok := array.At(row)
+		if !ok {
+			return true
+		}
+		inner, isArray := item.(data.Array)
+		if !isArray {
+			continue
+		}
+		if inner.Kind() != data.KindAny && inner.Kind() != data.KindNull {
+			continue
+		}
+		for innerRow := 0; innerRow < inner.Len(); innerRow++ {
+			innerItem, ok := inner.At(innerRow)
+			if !ok {
+				return true
+			}
+			if _, nested := innerItem.(data.Array); nested {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *EvalState) tryEvalQPipelineMatrixOpSumRaze(input string) (any, bool, error) {
@@ -2717,10 +2807,34 @@ func (s *EvalState) evalQPipelineSumDyadicMinMax(plan *qPipelinePlan) (any, bool
 	if err != nil {
 		return nil, true, err
 	}
+	if qPipelineFusedSumEmptyOperand(left, right) {
+		// Empty operands collapse to the canonical empty-sum identity on the
+		// generic route (sum of an empty broadcast is the typed zero); the
+		// float-accumulating fused kernel must decline.
+		return nil, false, nil
+	}
+	if data.IsNull(left) || data.IsNull(right) {
+		// Null scalar operands keep the generic min/max null rules (the null
+		// yields to the other operand); the fused kernel propagates nulls and
+		// would sum a different vector.
+		return nil, false, nil
+	}
 	wantMax := plan.compareOp == "max"
 	shape := "vector-reduce/sum-dyadic-" + plan.compareOp + "/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(qRuntimeKernelOperandKind(right, nil))
 	out, handled, err := data.TryTypedDyadicMinMaxSum(left, right, wantMax)
 	return qTypedRuntimeResult("ArrayDyadicMinMaxSum", shape, out, handled, err)
+}
+
+// qPipelineFusedSumEmptyOperand reports whether either fused-sum operand is
+// an empty array (the generic route's empty-identity shapes).
+func qPipelineFusedSumEmptyOperand(left, right any) bool {
+	if la, ok := left.(data.Array); ok && la.Len() == 0 {
+		return true
+	}
+	if ra, ok := right.(data.Array); ok && ra.Len() == 0 {
+		return true
+	}
+	return false
 }
 
 func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan *qPipelinePlan) (any, bool, error) {
@@ -2731,6 +2845,9 @@ func (s *EvalState) evalQPipelineSumDyadicFloatMath(plan *qPipelinePlan) (any, b
 	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
 	if err != nil {
 		return nil, true, err
+	}
+	if qPipelineFusedSumEmptyOperand(left, right) {
+		return nil, false, nil
 	}
 	shape := qRuntimeKernelDyadicFloatSumShape(plan.compareOp, qRuntimeKernelOperandKind(left, nil), qRuntimeKernelOperandKind(right, nil))
 	out, handled, err := data.TryTypedQNumericDyadicFloatSum(plan.compareOp, left, right)

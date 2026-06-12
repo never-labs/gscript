@@ -1574,16 +1574,23 @@ func qScriptPipelineCountTerm(src string) (string, bool) {
 }
 
 func qScriptPipelinePlusTerms(src string) []string {
-	src = stripEnclosingParens(strings.TrimSpace(src))
-	if left, right, ok := splitTopLevelOperator(src, "+"); ok {
+	src = strings.TrimSpace(src)
+	stripped := stripEnclosingParens(src)
+	if left, right, ok := splitTopLevelOperator(stripped, "+"); ok {
 		terms := qScriptPipelinePlusTerms(left)
 		terms = append(terms, qScriptPipelinePlusTerms(right)...)
 		return terms
 	}
-	if src == "" {
-		return nil
+	if stripped == "" {
+		if src == "" {
+			return nil
+		}
+		// An empty-list literal (`()`) is a REAL term: dropping it would lose
+		// the empty-broadcast semantics of `()+x` (which is `()`). Term
+		// consumers that cannot represent it must decline the whole plan.
+		return []string{src}
 	}
-	return []string{src}
+	return []string{stripped}
 }
 
 func qScriptPipelineSequenceReducerTerm(src string) (string, string, bool) {

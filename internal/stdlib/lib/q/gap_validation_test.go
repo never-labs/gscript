@@ -121,7 +121,12 @@ func TestQGapValidationStringAndListVerbCompositions(t *testing.T) {
 	assertEvalValue(t, `f:{trim x};f["  AAPL  "]`, "AAPL")
 	assertEvalValue(t, "sym:`AAPL;\",\" sv (string sym;\"MSFT\";upper trim \" nvda \")", "AAPL,MSFT,NVDA")
 	assertEvalArray(t, `"," vs ("," sv ("AAPL";"MSFT";"NVDA"))`, data.KindString, []any{"AAPL", "MSFT", "NVDA"})
-	assertEvalArray(t, `where 1<"banana" ss "an"`, data.KindI64, []any{int64(1)})
+	// DIALECT GROUPING: a registered dyadic word claims the leftmost split
+	// before symbol comparisons on every route (`1<"banana" ss "an"` groups
+	// as (1<"banana") ss "an" and signals). The canonical 1<(...) grouping
+	// keeps the parenthesized spelling. This keeps `where <expr>` grouping
+	// identical to the bare <expr> statement (one consistent grammar).
+	assertEvalArray(t, `where 1<("banana" ss "an")`, data.KindI64, []any{int64(1)})
 	assertEvalValue(t, `s:" a-b-c ";trim s ssr ("-";":")`, "a:b:c")
 	assertEvalValue(t, `ssr["," sv ("AAPL";"MSFT");",";"|"]`, "AAPL|MSFT")
 

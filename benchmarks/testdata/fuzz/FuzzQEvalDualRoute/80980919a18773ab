@@ -1,0 +1,2 @@
+go test fuzz v1
+string("px:();sym:0 0;0 where(sym in 0)And(px in 0)")

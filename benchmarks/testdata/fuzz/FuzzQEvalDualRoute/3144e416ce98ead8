@@ -1,0 +1,2 @@
+go test fuzz v1
+string("count where 0 0<,0#0")

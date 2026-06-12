@@ -1600,7 +1600,10 @@ func isQLiteralPartAt(src string, start, pos int) bool {
 }
 
 func isDelimiter(r rune) bool {
-	return unicode.IsSpace(r) || r == '`' || r == ',' || r == ':' || r == ';' || r == '!' || r == '(' || r == ')' || r == '[' || r == ']' || r == '+' || r == '-' || r == '*' || r == '/' || r == '%' || r == '=' || r == '<' || r == '>' || r == '&' || r == '|'
+	// Keep `#` and `$` aligned with the string evaluator's symbol lexer
+	// (isQSymbolDelimiter): `` `$0 `` is the empty-symbol cast of 0, never a
+	// symbol named "$0".
+	return unicode.IsSpace(r) || r == '`' || r == ',' || r == ':' || r == ';' || r == '!' || r == '(' || r == ')' || r == '[' || r == ']' || r == '{' || r == '}' || r == '+' || r == '-' || r == '*' || r == '/' || r == '%' || r == '=' || r == '<' || r == '>' || r == '&' || r == '|' || r == '#' || r == '$'
 }
 
 func isPathSymbolDelimiter(r rune) bool {

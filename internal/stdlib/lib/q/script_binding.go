@@ -82,14 +82,15 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 			}
 			literals[i] = items[i].literal
 		}
-		if allLiterals {
+		juxtaposed := qJuxtaposedIndexVectorShape(x)
+		if allLiterals && !juxtaposed {
 			value, err := evalValueVector(literals)
 			if err != nil {
 				return qScriptBindingPlan{}
 			}
 			return qScriptBindingPlan{kind: qScriptBindingLiteral, literal: value}
 		}
-		return qScriptBindingPlan{kind: qScriptBindingVector, items: items, juxtaposedIndex: qJuxtaposedIndexVectorShape(x)}
+		return qScriptBindingPlan{kind: qScriptBindingVector, items: items, juxtaposedIndex: juxtaposed}
 	case Call:
 		// value/eval are session-routed (value of a string evaluates source
 		// against the live env); the binding executor's stateless unary
@@ -103,6 +104,14 @@ func buildQScriptBindingPlan(expr Expr) qScriptBindingPlan {
 		}
 		return qScriptBindingPlan{kind: qScriptBindingUnary, op: x.Func, left: &arg}
 	case Binary:
+		// Attribute application (`s#10 20 30) is the cascade's dedicated
+		// parseAttributeMarker branch, not a take; the binary executor must
+		// not claim it (the compiled front-end declines it the same way).
+		if x.Op == "#" {
+			if sym, ok := x.Left.(Symbol); ok && len(sym.Name) == 1 && isQAttributeMarker(sym.Name[0]) {
+				return qScriptBindingPlan{}
+			}
+		}
 		left := buildQScriptBindingPlan(x.Left)
 		right := buildQScriptBindingPlan(x.Right)
 		if left.kind == qScriptBindingInvalid || right.kind == qScriptBindingInvalid {
