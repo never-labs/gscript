@@ -5602,6 +5602,12 @@ func (s *EvalState) tryEvalSequenceTransformSum(src string) (any, bool, error) {
 
 func (s *EvalState) sequenceTransformExpr(src string) (string, []int, string, bool, error) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
+	// `,/x` is canonical raze (join over); `,/:` (join each-right) is not.
+	if strings.HasPrefix(src, ",/") && !strings.HasPrefix(src, ",/:") {
+		if arg := strings.TrimSpace(src[len(",/"):]); arg != "" {
+			return data.SequenceTransformRaze, nil, arg, true, nil
+		}
+	}
 	for _, spec := range []struct {
 		prefix    string
 		transform string
@@ -7686,7 +7692,29 @@ func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
 		return nil, true, err
 	}
 	array, ok := value.(data.Array)
-	if !ok || array.Kind() != data.KindBool {
+	if !ok {
+		return nil, false, nil
+	}
+	if array.Kind() != data.KindBool {
+		// Integer carriers: `count where v` is the replication total (the
+		// validated sum of the non-negative counts), so it streams over the
+		// bulk-flattened values — lazy min/max nodes fuse the combine into
+		// the accumulation — without materializing the index vector. Errors
+		// and limits are exactly the `where` replication loop's.
+		if total, bad, status, handled := data.TryTypedWhereReplicationTotal(array, qMaxListLength); handled {
+			var err error
+			switch status {
+			case data.WhereReplicationNegative:
+				err = fmt.Errorf("where expects non-negative integer counts")
+			case data.WhereReplicationLimit:
+				err = fmt.Errorf("where count %d exceeds the %d list limit", bad, int64(qMaxListLength))
+			}
+			recordRuntimeKernelProbe("ArrayWhereReplicationCount", "where-count/"+string(array.Kind()), err == nil, err)
+			if err != nil {
+				return nil, true, err
+			}
+			return total, true, nil
+		}
 		return nil, false, nil
 	}
 	out, handled, err := data.TryTypedTrueCount(array)

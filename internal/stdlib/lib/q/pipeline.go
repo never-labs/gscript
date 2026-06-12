@@ -629,6 +629,12 @@ func qPipelineRazeInput(src string) (string, bool) {
 		input := strings.TrimSpace(src[len("raze "):])
 		return input, input != ""
 	}
+	// `,/x` is canonical raze (join over): same one-level flatten, so the
+	// raze reduction plans apply. `,/:` (join each-right) is excluded.
+	if strings.HasPrefix(src, ",/") && !strings.HasPrefix(src, ",/:") {
+		input := strings.TrimSpace(src[len(",/"):])
+		return input, input != ""
+	}
 	args, ok := qFunctionCallArgs(src)
 	if !ok || strings.TrimSpace(src[:strings.Index(src, "[")]) != "raze" || len(args) != 1 {
 		if !strings.HasPrefix(src, "raze[") || !strings.HasSuffix(src, "]") || !enclosed(src[len("raze"):], '[', ']') {
