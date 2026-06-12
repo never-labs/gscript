@@ -438,8 +438,9 @@ workflow result includes `status`, `text`, `value`, ordered `steps`, and named
 
 Use workflows for deterministic sequencing, replay, and test fixtures around
 agent calls. They are not parallel execution, durable orchestration, retries, or
-transaction management. `flow.mock({step_name: fixture})` replaces named steps
-with fixtures and is intended for tests and offline examples.
+transaction management. `flow.mock(fixtures)` replaces steps with fixtures and
+is intended for tests and offline examples. Fixture lookup prefers a step or
+stage `fixture_key`, then the step name, then the 1-based numeric step index.
 
 `llm.workflow_graph(config)` adds a static graph contract around the same
 sequential runner. It accepts ordered `stages` and optional `edges`, validates

@@ -403,6 +403,8 @@ result, err := mocked.run("release notes")
 
 Workflow helpers sequence work inside one script run. They are not a durable
 queue, retry engine, or parallel scheduler.
+For offline tests, graph and stage fixtures can use stable `fixture_key` values
+such as `"turn:plan"` instead of depending on display names or step positions.
 
 When a package needs an explicit orchestration contract, wrap ordered stages
 with `llm.workflow_graph`. The graph helper validates that `depends_on` and
