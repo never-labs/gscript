@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,40 +168,11 @@ func TestGenericOptionalAdapterBoundaryLivePackageSchemaRequiredFields(t *testin
 
 func TestGenericOptionalAdapterBoundaryLivePackageExecutableSkeleton(t *testing.T) {
 	path := filepath.Join(genericOptionalAdapterBoundaryPackageDir(t), "main.leia")
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var prints []string
-			vm := leia.New(append([]leia.Option{
-				leia.WithLibs(leia.LibString),
-				leia.WithPrint(func(args ...any) {
-					var parts []string
-					for _, arg := range args {
-						parts = append(parts, fmt.Sprint(arg))
-					}
-					prints = append(prints, strings.Join(parts, " "))
-				}),
-			}, tc.opts...)...)
-			if err := vm.ExecFile(path); err != nil {
-				t.Fatalf("ExecFile: %v", err)
-			}
-			got, err := vm.Get("generic_optional_adapter_boundary_live_package_summary")
-			if err != nil {
-				t.Fatalf("Get summary: %v", err)
-			}
-			want := "generic_optional_adapter_boundary_live_package capability=generic.ai.optional_adapter.boundary entrypoint=ai.optional_adapter.boundary adapters=3 gates=3 results=3 versions=3 terms=3 redactions=2 clean_skip=3 provider_free=true live_network=false imports=false model_calls=false"
-			if got != want {
-				t.Fatalf("summary = %#v, want %#v", got, want)
-			}
-			if len(prints) != 1 || prints[0] != want {
-				t.Fatalf("prints = %#v, want %q", prints, want)
-			}
-		})
+	want := "generic_optional_adapter_boundary_live_package capability=generic.ai.optional_adapter.boundary entrypoint=ai.optional_adapter.boundary adapters=3 gates=3 results=3 versions=3 terms=3 redactions=2 clean_skip=3 provider_free=true live_network=false imports=false model_calls=false"
+	for _, result := range runFinRobotLivePackageSummarySmoke(t, path, "generic_optional_adapter_boundary_live_package_summary", "generic_optional_adapter_boundary_live_package", leia.LibString) {
+		if result.Summary != want {
+			t.Fatalf("summary = %#v, want %#v", result.Summary, want)
+		}
 	}
 }
 

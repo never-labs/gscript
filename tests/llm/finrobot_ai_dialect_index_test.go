@@ -160,6 +160,9 @@ func TestFinRobotGenericAIDialectPackageIndexAudit(t *testing.T) {
 			assertGenericAIDialectNoFinRobotSyntaxAssumption(t, entry)
 			assertGenericAIDialectProductionBoundaryGap(t, entry)
 			assertGenericAIDialectProductionBoundary(t, root, entry)
+			if entry.ProductionPackageBoundary != nil && entry.ProductionPackageBoundary.Status == "checked_in" {
+				assertGenericAIDialectPackageBoundaryTestPointer(t, entry.CapabilityID, entry.ProductionPackageBoundary.Directory, entry.Test)
+			}
 			if genericAIDialectRequiresSmokeCoverage(entry.CapabilityID) {
 				if entry.ProductionPackageBoundary == nil {
 					t.Fatalf("%s smoke coverage requires a production package boundary", entry.Capability)
@@ -225,6 +228,9 @@ func TestFinRobotGenericAIDialectBackendPlan(t *testing.T) {
 			assertGenericAIDialectBackendShapeGeneric(t, shape)
 			assertGenericAIDialectBackendBoundaryIndexed(t, shape, indexedBoundaries)
 			assertGenericAIDialectBackendPackageBoundary(t, root, shape)
+			if shape.PackageBoundary != nil {
+				assertGenericAIDialectPackageBoundaryTestPointer(t, shape.ShapeID, shape.PackageBoundary.Directory, shape.Test)
+			}
 			if shape.PackageBoundary != nil && genericAIDialectRequiresSmokeCoveragePackage(shape.PackageBoundary.PackageID) {
 				assertGenericAIDialectSmokeCoverage(t, root, shape.ShapeID, shape.Test, shape.PackageBoundary.Directory, shape.SmokeCoverage)
 			}
@@ -303,6 +309,34 @@ func assertGenericAIDialectSmokeCoverage(t *testing.T, root, owner, indexedTest,
 		if !strings.Contains(joinedGates, strings.ToLower(term)) {
 			t.Fatalf("%s smoke gates missing %q in %s: %s", owner, term, smoke.PackageManifest, joinedGates)
 		}
+	}
+}
+
+func assertGenericAIDialectPackageBoundaryTestPointer(t *testing.T, owner, boundaryDirectory, testPath string) {
+	t.Helper()
+	packageName := filepath.Base(filepath.FromSlash(boundaryDirectory))
+	expected := "tests/llm/llm_" + packageName + "_live_package_test.go"
+	if override := genericAIDialectPackageBoundaryTestPointerOverride(packageName); override != "" {
+		expected = override
+	}
+	if testPath == expected {
+		return
+	}
+	testFile := filepath.Base(filepath.FromSlash(testPath))
+	if strings.HasPrefix(testFile, "llm_"+packageName+"_") && strings.HasSuffix(testFile, "_test.go") {
+		return
+	}
+	t.Fatalf("%s package boundary %q test = %q, want package-level test %q", owner, boundaryDirectory, testPath, expected)
+}
+
+func genericAIDialectPackageBoundaryTestPointerOverride(packageName string) string {
+	switch packageName {
+	case "generic_model_io_envelope":
+		return "tests/llm/llm_generic_model_io_envelope_test.go"
+	case "generic_planning_graph":
+		return "tests/llm/llm_generic_planning_graph_contract_test.go"
+	default:
+		return ""
 	}
 }
 
@@ -638,8 +672,21 @@ func assertGenericAIDialectReference(t *testing.T, root, rel string, scanForQRun
 		if err != nil {
 			t.Fatalf("%s: %v", rel, err)
 		}
+		text := strings.ToLower(string(data))
+		if strings.HasPrefix(filepath.ToSlash(rel), "tests/") {
+			for _, forbidden := range []string{
+				`"github.com/never-labs/leia/internal/q`,
+				`"github.com/never-labs/leia/internal/runtime`,
+				`"github.com/never-labs/leia/runtime`,
+			} {
+				if strings.Contains(text, forbidden) {
+					t.Fatalf("reference %q must not import the q runtime package", rel)
+				}
+			}
+			return
+		}
 		forbiddenRuntime := "q/" + "runtime"
-		if strings.Contains(strings.ToLower(string(data)), forbiddenRuntime) {
+		if strings.Contains(text, forbiddenRuntime) {
 			t.Fatalf("reference %q must not depend on the q runtime package", rel)
 		}
 	}

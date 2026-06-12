@@ -100,7 +100,7 @@
         "max_steps"
       ],
       "example": "examples/ai/general_analysis_assistant.leia",
-      "test": "tests/llm/llm_agent_replay_test.go",
+      "test": "tests/llm/llm_generic_agent_runner_live_package_test.go",
       "fixture": "examples/ai/general_analysis_assistant.records.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-agent-runner",
@@ -164,7 +164,7 @@
         "llm.approval_trace"
       ],
       "example": "examples/ai/finrobot_translation/compliance_policy.leia",
-      "test": "tests/llm/llm_approval_policy_test.go",
+      "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
       "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-approval-policy",
@@ -194,7 +194,7 @@
         "clean_skip"
       ],
       "example": "examples/ai/finrobot_translation/compliance_policy.leia",
-      "test": "tests/llm/finrobot_policy_parity_test.go",
+      "test": "tests/llm/llm_generic_approval_policy_live_package_test.go",
       "fixture": "examples/ai/finrobot_translation/policy_parity/fixtures/policy_outcome_envelopes.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-capability-gates",
@@ -395,7 +395,7 @@
         "llm.replay"
       ],
       "example": "examples/ai/finrobot_translation/evaluation_harness/generic_ai_evaluation.source.txt",
-      "test": "tests/llm/finrobot_evaluation_harness_parity_test.go",
+      "test": "tests/llm/llm_generic_evaluation_harness_live_package_test.go",
       "fixture": "examples/ai/finrobot_translation/evaluation_harness/manifest.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-evaluation-harness",
@@ -598,7 +598,7 @@
         "provider_model_alias"
       ],
       "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_dialect_test.go",
+      "test": "tests/llm/llm_generic_model_registry_live_package_test.go",
       "fixture": "examples/ai/general_agent_workflow.records.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-model-registry",
@@ -662,7 +662,7 @@
         "registered_example"
       ],
       "example": "examples/ai/finrobot_translation/package_manifest_audit/README.md",
-      "test": "tests/llm/finrobot_package_manifest_audit_test.go",
+      "test": "tests/llm/llm_generic_package_boundary_auditor_live_package_test.go",
       "fixture": "examples/ai/finrobot_translation/package_manifest_audit/ledger.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-package-boundary-auditor",
@@ -759,7 +759,7 @@
         "strict_ordered_match"
       ],
       "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_agent_replay_test.go",
+      "test": "tests/llm/llm_generic_record_replay_live_package_test.go",
       "fixture": "examples/ai/coding_agent_replay.records.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-record-replay",
@@ -859,7 +859,7 @@
         "tool_result"
       ],
       "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_tool_contract_test.go",
+      "test": "tests/llm/llm_generic_tool_contracts_live_package_test.go",
       "fixture": "examples/ai/coding_agent_replay.records.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-tool-contracts",
@@ -930,7 +930,7 @@
         "approval_replay_trace"
       ],
       "example": "examples/ai/record_replay_trace_project.leia",
-      "test": "tests/llm/llm_trace_test.go",
+      "test": "tests/llm/llm_generic_trace_events_live_package_test.go",
       "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/stream_trace_fixture.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-trace-events",
@@ -992,7 +992,7 @@
         "usage"
       ],
       "example": "examples/ai/coding_agent_replay.leia",
-      "test": "tests/llm/llm_ai_dialect_contract_test.go",
+      "test": "tests/llm/llm_generic_turn_runner_live_package_test.go",
       "fixture": "examples/ai/coding_agent_replay.records.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-turn-runner",
@@ -1057,7 +1057,7 @@
         "workflow_state"
       ],
       "example": "examples/ai/general_agent_workflow.leia",
-      "test": "tests/llm/llm_ai_native_workflow_integration_test.go",
+      "test": "tests/llm/llm_generic_workflow_orchestrator_live_package_test.go",
       "fixture": "examples/ai/general_agent_workflow.records.json",
       "missing_production_package_boundary": {
         "package_id": "generic-ai-workflow-orchestrator",

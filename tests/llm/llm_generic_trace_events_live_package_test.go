@@ -1120,6 +1120,7 @@ func TestGenericTraceEventsEnvelopeSequenceCorrelationRedactionAreConnected(t *t
 
 func TestGenericTraceEventsMainLeiaSmoke(t *testing.T) {
 	base := genericTraceEventsLivePackageDir(t)
+	manifest := loadGenericTraceEventsManifest(t, base)
 	data, err := os.ReadFile(filepath.Join(base, "main.leia"))
 	if err != nil {
 		t.Fatal(err)
@@ -1136,23 +1137,67 @@ func TestGenericTraceEventsMainLeiaSmoke(t *testing.T) {
 		}
 	}
 
-	for _, tc := range []struct {
-		name string
-		opts []leia.Option
-	}{
-		{name: "interpreter"},
-		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString)}, tc.opts...)...)
-			if err := vm.ExecFile(filepath.Join(base, "main.leia")); err != nil {
-				t.Fatalf("ExecFile main.leia: %v", err)
-			}
-			valid, _ := vm.Get("generic_trace_events_contract_valid")
-			if valid != true {
-				t.Fatalf("generic_trace_events_contract_valid = %#v", valid)
-			}
-		})
+	for _, result := range runFinRobotLivePackageSummarySmoke(
+		t,
+		filepath.Join(base, "main.leia"),
+		"generic_trace_events_live_package_summary",
+		"generic_trace_events_live_package",
+		leia.LibString,
+		"generic_trace_events_contract_valid",
+		"generic_trace_events_live_package",
+	) {
+		if result.Globals["generic_trace_events_contract_valid"] != true {
+			t.Fatalf("generic_trace_events_contract_valid = %#v", result.Globals["generic_trace_events_contract_valid"])
+		}
+		fields := result.Fields
+		requireFinRobotSummaryFields(t, fields, "events", "envelope_events", "projections", "match_keys", "provider_free", "replay")
+		if fields["events"] != "6" ||
+			fields["envelope_events"] != "10" ||
+			fields["projections"] != "4" ||
+			fields["match_keys"] != strconv.Itoa(len(manifest.ReplayContract.MatchingKeys)) ||
+			(fields["provider_free"] == "true") != manifest.ProviderFree ||
+			fields["replay"] != manifest.ReplayContract.Mode {
+			t.Fatalf("summary does not align with trace manifest: summary=%#v manifest=%#v", fields, manifest)
+		}
+		global, ok := result.Globals["generic_trace_events_live_package"].(map[string]any)
+		if !ok {
+			t.Fatalf("generic_trace_events_live_package = %T %#v, want map", result.Globals["generic_trace_events_live_package"], result.Globals["generic_trace_events_live_package"])
+		}
+		if global["provider_free"] != true ||
+			global["live_network"] != false ||
+			global["real_dependency_imports"] != false ||
+			global["telemetry_sink_required"] != false ||
+			global["clean_skip_without_sink"] != true ||
+			global["default_mode"] != "fixture_replay" ||
+			global["capability"] != "generic.ai.trace.events" ||
+			global["emit_shape"] != "ai.trace.emit" {
+			t.Fatalf("generic_trace_events_live_package boundary drifted: %#v", global)
+		}
+		sequenceMarker, ok := global["sequence_marker"].(map[string]any)
+		if !ok ||
+			sequenceMarker["name"] != "fixture_sequence" ||
+			sequenceMarker["clock"] != "fixture_monotonic_ms" ||
+			sequenceMarker["strictly_increasing"] != true {
+			t.Fatalf("generic_trace_events_live_package sequence marker drifted: %#v", sequenceMarker)
+		}
+		redactionPolicy, ok := global["redaction_policy"].(map[string]any)
+		if !ok ||
+			redactionPolicy["default_action"] != "hash_or_drop" ||
+			redactionPolicy["provider_request_id_policy"] != "drop" ||
+			redactionPolicy["hash_algorithm"] != "sha256" {
+			t.Fatalf("generic_trace_events_live_package redaction policy drifted: %#v", redactionPolicy)
+		}
+		replay, ok := global["replay"].(map[string]any)
+		if !ok ||
+			replay["mode"] != manifest.ReplayContract.Mode ||
+			replay["fixture_key"] != "generic_trace_events:sequence:ACME:offline" ||
+			replay["expected_event_count"] != int64(6) ||
+			replay["expected_envelope_event_count"] != int64(10) ||
+			replay["expected_projection_count"] != int64(4) ||
+			replay["mismatch_policy"] != manifest.ReplayContract.MismatchPolicy ||
+			replay["allow_live_sink"] != false {
+			t.Fatalf("generic_trace_events_live_package replay contract drifted: %#v", replay)
+		}
 	}
 }
 
