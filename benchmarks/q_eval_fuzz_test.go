@@ -470,8 +470,8 @@ var qEvalKnownCrashers = map[string]string{}
 // string evaluator mis-probes `verb `sym...` shapes as name indexing and
 // fails with "index must be an integer..." class errors while the compiled
 // route binds the verb. Examples: med `sym (different error messages),
-// min trim `a (compiled returns "a", string route errors),
-// (2)<=(raze `a`a`b), 4 mcount (var `a`a`b).
+// (2)<=(raze `a`a`b), 4 mcount (var `a`a`b). (min trim `a was reconciled:
+// trim on symbols is now a type error on both routes.)
 //
 // Mismatching statements containing a symbol literal are therefore skipped
 // (counted, not failed) until the class is fixed; everything else must match.
@@ -614,7 +614,9 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 // allowlist (and promoting the class back to hard-failure).
 var qEvalKnownDivergenceRepresentatives = []string{
 	"med `sym",
-	"min trim `a",
+	// "min trim `a" was reconciled by rejecting symbols in the trim family
+	// at the data layer (both routes now signal the same type error, and the
+	// canonical-q harness pins the ERROR). Removed (shrink-only ratchet).
 	"(2)<=(raze `a`a`b)",
 	"x:((til 96) mod 5)%10;(+/asin x)+(+/acos x)+(+/atan x)",
 	"til +/0",               // string route rejects nested derived-verb arguments

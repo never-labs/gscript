@@ -50,7 +50,37 @@ func TransformStringValue(name string, value any, fn func(string) string) (any, 
 	return fn(text), nil
 }
 
+// trimOperandGuard rejects symbol operands for the trim family. Canonical q
+// signals a type error for trim on symbols (symbols are not char data); the
+// guard sits in the data layer so the compiled route, the string evaluator,
+// and the fused count kernels all agree (fuzzer finding: min trim `a).
+func trimOperandGuard(name string, value any) error {
+	if _, ok := value.(Symbol); ok {
+		return fmt.Errorf("%s expects string values, got symbol", name)
+	}
+	array, ok := value.(Array)
+	if !ok {
+		return nil
+	}
+	if array.Kind() == KindSymbol {
+		return fmt.Errorf("%s expects string values, got symbol", name)
+	}
+	if array.Kind() == KindAny {
+		for i := 0; i < array.Len(); i++ {
+			if item, ok := array.At(i); ok {
+				if _, isSym := item.(Symbol); isSym {
+					return fmt.Errorf("%s expects string values, got symbol", name)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func TrimStringValue(value any) (any, error) {
+	if err := trimOperandGuard("trim", value); err != nil {
+		return nil, err
+	}
 	return TransformStringValue("trim", value, strings.TrimSpace)
 }
 
@@ -58,42 +88,66 @@ func TrimStringValue(value any) (any, error) {
 // the transformed value. Array transforms preserve row count; scalar
 // string/symbol transforms count runes in the trimmed text.
 func TrimmedStringCount(value any) (int64, error) {
+	if err := trimOperandGuard("trim", value); err != nil {
+		return 0, err
+	}
 	return transformStringCount("trim", value, strings.TrimSpace)
 }
 
 func RepeatedTrimmedStringCount(n int, value any) (int64, error) {
+	if err := trimOperandGuard("trim", value); err != nil {
+		return 0, err
+	}
 	return repeatedTransformStringCount("trim", n, value, true, true)
 }
 
 func LTrimStringValue(value any) (any, error) {
+	if err := trimOperandGuard("ltrim", value); err != nil {
+		return nil, err
+	}
 	return TransformStringValue("ltrim", value, func(s string) string {
 		return strings.TrimLeftFunc(s, unicode.IsSpace)
 	})
 }
 
 func LTrimmedStringCount(value any) (int64, error) {
+	if err := trimOperandGuard("ltrim", value); err != nil {
+		return 0, err
+	}
 	return transformStringCount("ltrim", value, func(s string) string {
 		return strings.TrimLeftFunc(s, unicode.IsSpace)
 	})
 }
 
 func RepeatedLTrimmedStringCount(n int, value any) (int64, error) {
+	if err := trimOperandGuard("ltrim", value); err != nil {
+		return 0, err
+	}
 	return repeatedTransformStringCount("ltrim", n, value, true, false)
 }
 
 func RTrimStringValue(value any) (any, error) {
+	if err := trimOperandGuard("rtrim", value); err != nil {
+		return nil, err
+	}
 	return TransformStringValue("rtrim", value, func(s string) string {
 		return strings.TrimRightFunc(s, unicode.IsSpace)
 	})
 }
 
 func RTrimmedStringCount(value any) (int64, error) {
+	if err := trimOperandGuard("rtrim", value); err != nil {
+		return 0, err
+	}
 	return transformStringCount("rtrim", value, func(s string) string {
 		return strings.TrimRightFunc(s, unicode.IsSpace)
 	})
 }
 
 func RepeatedRTrimmedStringCount(n int, value any) (int64, error) {
+	if err := trimOperandGuard("rtrim", value); err != nil {
+		return 0, err
+	}
 	return repeatedTransformStringCount("rtrim", n, value, false, true)
 }
 

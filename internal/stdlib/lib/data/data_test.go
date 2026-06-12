@@ -195,8 +195,16 @@ func TestReusableStringHelpers(t *testing.T) {
 	if got, err := TrimStringValue("  abc \t"); err != nil || got != "abc" {
 		t.Fatalf("TrimStringValue = %#v,%v; want abc,nil", got, err)
 	}
-	if got, err := LTrimStringValue(Symbol("  abc")); err != nil || got != "abc" {
+	if got, err := LTrimStringValue("  abc"); err != nil || got != "abc" {
 		t.Fatalf("LTrimStringValue = %#v,%v; want abc,nil", got, err)
+	}
+	// The trim family rejects symbols (canonical q type error; both eval
+	// routes and the fused count kernels share this guard).
+	if _, err := LTrimStringValue(Symbol("  abc")); err == nil || !strings.Contains(err.Error(), "expects string values") {
+		t.Fatalf("LTrimStringValue(symbol) error = %v; want symbol type error", err)
+	}
+	if _, err := TrimStringValue(Symbol("a")); err == nil {
+		t.Fatalf("TrimStringValue(symbol) succeeded; want symbol type error")
 	}
 	if got, err := RTrimStringValue("abc  "); err != nil || got != "abc" {
 		t.Fatalf("RTrimStringValue = %#v,%v; want abc,nil", got, err)
@@ -227,8 +235,11 @@ func TestReusableStringHelpers(t *testing.T) {
 	if got, err := TrimmedStringCount("  åß \t"); err != nil || got != 2 {
 		t.Fatalf("TrimmedStringCount scalar = %d,%v; want 2,nil", got, err)
 	}
-	if got, err := LTrimmedStringCount(Symbol("  åß  ")); err != nil || got != 4 {
-		t.Fatalf("LTrimmedStringCount symbol = %d,%v; want 4,nil", got, err)
+	if got, err := LTrimmedStringCount("  åß  "); err != nil || got != 4 {
+		t.Fatalf("LTrimmedStringCount scalar = %d,%v; want 4,nil", got, err)
+	}
+	if _, err := LTrimmedStringCount(Symbol("  åß  ")); err == nil {
+		t.Fatalf("LTrimmedStringCount(symbol) succeeded; want symbol type error")
 	}
 	if got, err := RTrimmedStringCount("  åß  "); err != nil || got != 4 {
 		t.Fatalf("RTrimmedStringCount scalar = %d,%v; want 4,nil", got, err)

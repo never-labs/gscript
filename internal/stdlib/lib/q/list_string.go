@@ -160,6 +160,11 @@ func qSSRWithSourceValue(left, right any) (any, error) {
 }
 
 func qSVValue(left, right any) (any, error) {
+	// Numeric left atom dispatches base decode: 2 sv 1 0 1 0 is 10 in
+	// canonical q. String/symbol left keeps the join semantics.
+	if base, ok := qNumericBase(left); ok {
+		return qBaseDecode(base, right)
+	}
 	sep, err := qStringOperand("sv", left)
 	if err != nil {
 		return nil, err
@@ -169,6 +174,11 @@ func qSVValue(left, right any) (any, error) {
 }
 
 func qVSValue(left, right any) (any, error) {
+	// Numeric left atom dispatches base encode: 2 vs 10 is 1 0 1 0 and
+	// 10 vs 123 is 1 2 3 in canonical q. String/symbol left keeps split.
+	if base, ok := qNumericBase(left); ok {
+		return qBaseEncode(base, right)
+	}
 	sep, err := qStringOperand("vs", left)
 	if err != nil {
 		return nil, err
@@ -178,6 +188,75 @@ func qVSValue(left, right any) (any, error) {
 		return nil, err
 	}
 	return data.StringSplit(sep, text), nil
+}
+
+// qNumericBase recognizes an integer atom radix for numeric vs/sv. Bools and
+// bytes are excluded: 0b vs (bit decompose) and 0x0 vs (byte decompose) keep
+// their canonical meanings unimplemented rather than mis-binding here.
+func qNumericBase(v any) (int64, bool) {
+	switch x := v.(type) {
+	case int16:
+		return int64(x), true
+	case int32:
+		return int64(x), true
+	case int64:
+		return x, true
+	default:
+		return 0, false
+	}
+}
+
+// qBaseEncode is numeric vs: digits of value in the given base, most
+// significant first, as a long vector (2 vs 10 -> 1 0 1 0).
+func qBaseEncode(base int64, value any) (any, error) {
+	if base < 2 {
+		return nil, fmt.Errorf("vs base must be at least 2")
+	}
+	n, ok := integerValue(value)
+	if !ok || n < 0 {
+		return nil, fmt.Errorf("vs expects a non-negative integer value for base encode")
+	}
+	var digits []int64
+	for n > 0 {
+		digits = append(digits, n%base)
+		n /= base
+	}
+	if len(digits) == 0 {
+		digits = []int64{0}
+	}
+	for i, j := 0, len(digits)-1; i < j; i, j = i+1, j-1 {
+		digits[i], digits[j] = digits[j], digits[i]
+	}
+	return data.NewI64(digits), nil
+}
+
+// qBaseDecode is numeric sv: fold digits back into a long
+// (2 sv 1 0 1 0 -> 10).
+func qBaseDecode(base int64, value any) (any, error) {
+	if base < 2 {
+		return nil, fmt.Errorf("sv base must be at least 2")
+	}
+	array, ok := value.(data.Array)
+	if !ok {
+		n, ok := integerValue(value)
+		if !ok {
+			return nil, fmt.Errorf("sv expects integer digits for base decode")
+		}
+		return n, nil
+	}
+	var out int64
+	for i := 0; i < array.Len(); i++ {
+		item, ok := array.At(i)
+		if !ok {
+			return nil, fmt.Errorf("sv digit row %d out of range", i)
+		}
+		n, ok := integerValue(item)
+		if !ok {
+			return nil, fmt.Errorf("sv expects integer digits for base decode")
+		}
+		out = out*base + n
+	}
+	return out, nil
 }
 
 func qStringOperand(name string, value any) (string, error) {

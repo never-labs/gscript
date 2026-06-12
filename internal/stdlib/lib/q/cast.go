@@ -54,10 +54,76 @@ func castOrEnum(domain any, values any) (any, error) {
 	if out, handled, err := qTemporalAccessorCast(domain, values); handled || err != nil {
 		return out, err
 	}
+	// Pad ($ with an integer atom left and string values): canonical q pads
+	// 5$"ab" to "ab   " and -5$"ab" to "   ab". This outranks the type-code
+	// cast, which canonical q reserves for short atoms (5h$x) — the dialect
+	// promotes all ints to long, so a long left with string values is pad.
+	if out, handled, err := qPadCast(domain, values); handled || err != nil {
+		return out, err
+	}
 	if target, ok := qCastTargetFromDomain(domain); ok {
 		return castValue(target, values)
 	}
 	return enumCast(domain, values)
+}
+
+// qPadCast implements canonical int$string padding: n$s pads s with spaces to
+// width |n| (right-pad for n>=0, left-pad for n<0) and truncates to the first
+// |n| characters when s is longer. Applies to a string atom or a string list.
+// Short atoms (int16) are excluded: canonical q reserves 5h$x for the
+// type-code cast, and the dialect keeps its short-code string parsing there.
+func qPadCast(domain, values any) (any, bool, error) {
+	var width int64
+	switch x := domain.(type) {
+	case int32:
+		width = int64(x)
+	case int64:
+		width = x
+	default:
+		return nil, false, nil
+	}
+	switch v := values.(type) {
+	case string:
+		return qPadString(width, v), true, nil
+	case data.Array:
+		if v.Kind() != data.KindString {
+			return nil, false, nil
+		}
+		out := make([]string, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			item, ok := v.At(i)
+			if !ok {
+				return nil, true, fmt.Errorf("q cast %d row %d out of range", width, i+1)
+			}
+			text := ""
+			if !data.IsNull(item) {
+				s, ok := item.(string)
+				if !ok {
+					return nil, false, nil
+				}
+				text = s
+			}
+			out[i] = qPadString(width, text)
+		}
+		return data.NewString(out), true, nil
+	}
+	return nil, false, nil
+}
+
+func qPadString(width int64, s string) string {
+	w := width
+	if w < 0 {
+		w = -w
+	}
+	runes := []rune(s)
+	if int64(len(runes)) >= w {
+		return string(runes[:w])
+	}
+	pad := strings.Repeat(" ", int(w)-len(runes))
+	if width < 0 {
+		return pad + s
+	}
+	return s + pad
 }
 
 func qCastKindFromSymbol(sym data.Symbol) (data.Kind, bool) {
