@@ -54,6 +54,34 @@
       "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/fixtures/provider_free_fixture_index.json"
     },
     {
+      "id": "generic_coding_workspace",
+      "package_name": "leia-generic-ai-coding-workspace",
+      "package_dir": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "capability": "generic.ai.coding_workspace",
+      "capabilities": [
+        "generic.ai.coding_workspace",
+        "generic.ai.code.command.request",
+        "generic.ai.code.command.result",
+        "generic.ai.code.approval.gate",
+        "generic.ai.code.stdout.stderr",
+        "generic.ai.artifact.file_manifest",
+        "generic.ai.artifact.image_manifest",
+        "generic.ai.notebook.display",
+        "generic.ai.code.cleanup_policy",
+        "generic.ai.code.replay.deterministic",
+        "generic.ai.code.capability.metadata",
+        "generic.ai.code.clean_skip"
+      ],
+      "backend_shape": "ai.coding_workspace",
+      "provider_free": true,
+      "main_leia": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+      "contracts": [
+        "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/contracts/generic_coding_workspace_contract.json"
+      ],
+      "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/fixtures/provider_free_fixture_index.json"
+    },
+    {
       "id": "generic_document_rag_pipeline",
       "package_name": "leia-generic-ai-document-rag-pipeline",
       "package_dir": "examples/ai/finrobot_translation/live_packages/generic_document_rag_pipeline",

@@ -43,6 +43,44 @@
       }
     },
     {
+      "shape_id": "ai.coding_workspace",
+      "status": "checked_in_package_boundary",
+      "capabilities": [
+        "coding-workspace",
+        "approval",
+        "tool",
+        "replay"
+      ],
+      "contract": "Normalize provider-free coding workspace command envelopes, approval gates, stdout/stderr captures, file and image artifact manifests, notebook display metadata, cleanup policy, deterministic replay, and clean skips.",
+      "inputs": [
+        "command_request",
+        "approval_gate",
+        "artifact_specs",
+        "fixture_seed"
+      ],
+      "outputs": [
+        "command_result",
+        "stdout_capture",
+        "stderr_capture",
+        "file_artifact_manifest",
+        "image_artifact_manifest",
+        "notebook_display",
+        "cleanup_policy"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_coding_workspace.source.txt",
+      "test": "tests/llm/llm_generic_coding_workspace_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_coding_workspace_fixture_index.json",
+      "package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-coding-workspace",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+        "contract_path": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/contracts/generic_coding_workspace_contract.json",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
       "shape_id": "ai.document.rag_pipeline",
       "status": "checked_in_package_boundary",
       "capabilities": [

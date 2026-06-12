@@ -24,6 +24,7 @@
     "agent",
     "approval",
     "capability",
+    "coding-workspace",
     "document-rag",
     "evaluation",
     "evidence-report-artifacts",
@@ -128,6 +129,40 @@
         "package_id": "generic-approval-policy",
         "directory": "examples/ai/finrobot_translation/live_packages/generic_approval_policy",
         "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
+        "provider_free": true,
+        "domain_specific": false
+      }
+    },
+    {
+      "capability": "coding-workspace",
+      "capability_id": "generic.ai.coding_workspace",
+      "provider_free": true,
+      "domain_specific": false,
+      "finrobot_specific_syntax_assumption": false,
+      "dialect_surface": [
+        "code.sandbox_command",
+        "code.approval_gate",
+        "code.stdout_stderr_capture",
+        "artifact.file_manifest",
+        "artifact.image_manifest",
+        "notebook.display",
+        "code.cleanup_policy",
+        "code.clean_skip"
+      ],
+      "example": "examples/ai/finrobot_translation/ai_dialect_index/examples/generic_coding_workspace.source.txt",
+      "test": "tests/llm/llm_generic_coding_workspace_live_package_test.go",
+      "fixture": "examples/ai/finrobot_translation/ai_dialect_index/fixtures/generic_coding_workspace_fixture_index.json",
+      "missing_production_package_boundary": {
+        "package_id": "generic-ai-coding-workspace",
+        "boundary": "provider-free coding workspace command envelopes, approval gates, stdout/stderr captures, file and image artifact manifests, notebook display metadata, cleanup policy, deterministic replay, and clean skips",
+        "status": "resolved",
+        "reason": "coding workspace and artifact behavior was promoted from coding notebook fixtures into a reusable generic package boundary"
+      },
+      "production_package_boundary": {
+        "status": "checked_in",
+        "package_id": "generic-ai-coding-workspace",
+        "directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+        "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
         "provider_free": true,
         "domain_specific": false
       }

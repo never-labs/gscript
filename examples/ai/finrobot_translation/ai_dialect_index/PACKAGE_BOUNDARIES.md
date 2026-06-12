@@ -47,6 +47,7 @@ contracts, and fixtures for its boundary.
 - turn: `examples/ai/finrobot_translation/live_packages/generic_turn_runner`
 - tool: `examples/ai/finrobot_translation/live_packages/generic_tool_contracts`
 - tool-registry: `examples/ai/finrobot_translation/live_packages/generic_tool_registry`
+- coding-workspace: `examples/ai/finrobot_translation/live_packages/generic_coding_workspace`
 - agent: `examples/ai/finrobot_translation/live_packages/generic_agent_runner`
 - planning: `examples/ai/finrobot_translation/live_packages/generic_planning_graph`
 - workflow: `examples/ai/finrobot_translation/live_packages/generic_workflow_orchestrator`
@@ -86,6 +87,9 @@ orthogonal and layered:
   implementation, and returns a normalized result envelope.
 - tool-registry declares reusable tool descriptors, validates schemas, records
   invocation traces, and keeps effectful approval edges provider-free by default.
+- coding-workspace owns sandbox command envelopes, approval gates, stdout/stderr
+  captures, file and image artifact manifests, notebook display metadata,
+  cleanup policy, deterministic replay, and execution clean skips.
 - agent joins turns, tools, memory snapshots, structured output validation, and
   loop budgets into a declarative agent run.
 - planning turns goals into explicit nodes, dependencies, retry rules,
@@ -119,6 +123,7 @@ language or specializing the dialect for one application domain.
 | Evidence/report artifacts | `generic_evidence_report_artifacts`, `generic_document_rag_pipeline`, `generic_workflow_orchestrator`, `generic_trace_events` | Source annotations, citation envelopes, section DAGs, render manifests, snapshots, stale warnings, accessibility checks, and clean-skip renderer gates are package data shared by workflows, traces, replay, and reporting packages. |
 | Provider-free replay | `generic_turn_runner`, `generic_record_replay` | Default examples and tests read checked-in records and fixtures; live provider credentials, network calls, and provider SDK imports remain outside the boundary. |
 | Approval | `generic_approval_policy`, `generic_tool_contracts` | Capability checks produce pending, approved, denied, or clean-skip outcomes before side-effecting work; approval replay traces make the decision deterministic. |
+| Coding workspace | `generic_coding_workspace`, `generic_approval_policy`, `generic_tool_contracts`, `generic_record_replay` | Command envelopes, stdout/stderr captures, generated artifacts, notebook display metadata, cleanup intent, and sandbox clean skips are package-owned fixtures behind explicit approval gates. |
 | Trace | `generic_trace_events`, `generic_workflow_orchestrator`, `generic_agent_runner` | Runtime actions emit metadata-only event envelopes with correlation IDs, redaction policy, replay markers, and artifact references. |
 | Evaluation | `generic_evaluation_harness` | Evaluation cases consume replay records, metric specs, judge fixtures, and golden gates; they do not call live judges by default. |
 | Record/replay | `generic_record_replay` | Record files define ordered matching, mismatch findings, unconsumed-record checks, usage snapshots, and portable fixtures shared by turns, tools, approvals, trace, and evaluation. |

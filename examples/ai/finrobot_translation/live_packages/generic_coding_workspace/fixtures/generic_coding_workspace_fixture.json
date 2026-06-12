@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "provider_free": true,
+  "live_network": false,
+  "real_dependency_imports": false,
+  "live_model_calls": false,
+  "approval_gates": [
+    {
+      "id": "approval:execute:deny",
+      "capability": "generic.ai.code.command.request",
+      "operation": "execute_command",
+      "decision": "deny",
+      "reason": "execution requires an external sandbox approval fixture"
+    },
+    {
+      "id": "approval:file-write:deny",
+      "capability": "generic.ai.artifact.file_manifest",
+      "operation": "write_file",
+      "decision": "deny",
+      "reason": "file writes require explicit approval"
+    }
+  ],
+  "commands": [
+    {
+      "request_id": "command:request:denied",
+      "replay_key": "command:deny:fixture",
+      "argv": [
+        "python",
+        "-c",
+        "print(42)"
+      ],
+      "cwd": "workspace",
+      "env_allowlist": [],
+      "shell": false,
+      "timeout_bucket": "denied",
+      "network": false,
+      "filesystem_write": false,
+      "executed": false,
+      "approval_id": "approval:execute:deny",
+      "exit_code": 126,
+      "stdout": "",
+      "stderr": "denied: external sandbox execution is disabled in fixture mode",
+      "duration_bucket": "none"
+    },
+    {
+      "request_id": "command:request:replayed",
+      "replay_key": "command:replay:summary",
+      "argv": [
+        "python",
+        "script.py"
+      ],
+      "cwd": "workspace",
+      "env_allowlist": [
+        "PYTHONPATH"
+      ],
+      "shell": false,
+      "timeout_bucket": "short",
+      "network": false,
+      "filesystem_write": false,
+      "executed": false,
+      "approval_id": "approval:execute:deny",
+      "exit_code": 0,
+      "stdout": "rows=3 score=0.91",
+      "stderr": "",
+      "duration_bucket": "short"
+    }
+  ],
+  "channel_captures": [
+    {
+      "command_replay_key": "command:deny:fixture",
+      "channel": "stdout",
+      "text": "",
+      "bytes": 0,
+      "truncated": false
+    },
+    {
+      "command_replay_key": "command:deny:fixture",
+      "channel": "stderr",
+      "text": "denied: external sandbox execution is disabled in fixture mode",
+      "bytes": 61,
+      "truncated": false
+    },
+    {
+      "command_replay_key": "command:replay:summary",
+      "channel": "stdout",
+      "text": "rows=3 score=0.91",
+      "bytes": 17,
+      "truncated": false
+    }
+  ],
+  "file_artifact_manifest": {
+    "manifest_id": "manifest:file:generic-code",
+    "kind": "file",
+    "artifact_ids": [
+      "artifact:script",
+      "artifact:summary"
+    ],
+    "count": 2,
+    "total_bytes": 1536,
+    "sha256": "sha256:file-manifest-fixture"
+  },
+  "image_artifact_manifest": {
+    "manifest_id": "manifest:image:generic-code",
+    "kind": "image",
+    "artifact_ids": [
+      "artifact:plot"
+    ],
+    "count": 1,
+    "total_bytes": 4096,
+    "sha256": "sha256:image-manifest-fixture",
+    "displays": [
+      "display:plot"
+    ]
+  },
+  "artifacts": [
+    {
+      "artifact_id": "artifact:script",
+      "replay_key": "file:artifact:script",
+      "path": "artifacts/script.py",
+      "media_type": "text/x-python",
+      "sha256": "sha256:script-fixture",
+      "bytes": 512,
+      "provenance": "fixture_replay"
+    },
+    {
+      "artifact_id": "artifact:summary",
+      "replay_key": "file:artifact:summary",
+      "path": "artifacts/summary.json",
+      "media_type": "application/json",
+      "sha256": "sha256:summary-fixture",
+      "bytes": 1024,
+      "provenance": "fixture_replay"
+    },
+    {
+      "artifact_id": "artifact:plot",
+      "replay_key": "image:artifact:plot",
+      "path": "artifacts/plot.png",
+      "media_type": "image/png",
+      "sha256": "sha256:plot-fixture",
+      "bytes": 4096,
+      "provenance": "fixture_replay"
+    }
+  ],
+  "notebook_displays": [
+    {
+      "display_id": "display:plot",
+      "artifact_id": "artifact:plot",
+      "media_type": "image/png",
+      "width": 960,
+      "height": 540,
+      "live_kernel": false
+    }
+  ],
+  "cleanup_policy": {
+    "mode": "fixture_noop",
+    "delete_unapproved_outputs": true,
+    "preserve_fixture_artifacts": true,
+    "cleanup_replay_key": "cleanup:generic-coding-workspace:fixture-noop",
+    "paths": [
+      "artifacts/script.py",
+      "artifacts/summary.json",
+      "artifacts/plot.png"
+    ],
+    "executed": false
+  },
+  "adapter_boundaries": [
+    {
+      "id": "sandbox",
+      "capability": "generic.ai.code.clean_skip",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    },
+    {
+      "id": "notebook_display",
+      "capability": "generic.ai.notebook.display",
+      "dependency_imported": false,
+      "credential_required": false,
+      "live_network": false,
+      "clean_skip": true
+    }
+  ]
+}

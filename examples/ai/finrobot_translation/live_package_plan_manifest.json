@@ -4,8 +4,8 @@
   "base_package": "leia-finrobot-translation",
   "source_mode": "replay-slice",
   "target_mode": "live-external-packages",
-  "registered_examples_count": 85,
-  "translation_directory_file_count": 661,
+  "registered_examples_count": 86,
+  "translation_directory_file_count": 669,
   "skeleton_status": "provider-free skeleton contracts are checked in under examples/ai/finrobot_translation/live_packages; live external package implementations are not checked in",
   "live_package_skeletons": [
     {
@@ -122,6 +122,15 @@
       "registered_example": "examples/ai/finrobot_translation/live_packages/generic_approval_policy/main.leia",
       "covers_package_ids": [
         "generic_approval_policy"
+      ],
+      "status": "checked_in_registered_example"
+    },
+    {
+      "id": "generic_coding_workspace",
+      "directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "registered_example": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "covers_package_ids": [
+        "generic_coding_workspace"
       ],
       "status": "checked_in_registered_example"
     },
@@ -729,6 +738,37 @@
         "contract JSON declares generic AI backend boundary",
         "registered example executes provider-free",
         "no provider credentials or q runtime dependency"
+      ],
+      "no_built_in_guarantee": true
+    },
+    {
+      "id": "generic_coding_workspace",
+      "package_name": "leia-generic-ai-coding-workspace",
+      "status": "skeleton_contract_checked_in",
+      "skeleton_directory": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace",
+      "planned_directory": "packages/generic_ai/coding_workspace",
+      "manifest": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/package.manifest.json",
+      "contract": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/contracts/generic_coding_workspace_contract.json",
+      "migration_source": "examples/ai/finrobot_translation/live_packages/generic_coding_workspace/main.leia",
+      "capabilities": [
+        "generic.ai.coding_workspace",
+        "generic.ai.code.command.request",
+        "generic.ai.code.command.result",
+        "generic.ai.code.approval.gate",
+        "generic.ai.code.stdout.stderr",
+        "generic.ai.artifact.file_manifest",
+        "generic.ai.artifact.image_manifest",
+        "generic.ai.notebook.display",
+        "generic.ai.code.cleanup_policy",
+        "generic.ai.code.replay.deterministic",
+        "generic.ai.code.capability.metadata",
+        "generic.ai.code.clean_skip"
+      ],
+      "test_gates": [
+        "provider-free fixture contract parses",
+        "contract JSON declares generic coding workspace artifact backend boundary",
+        "registered example executes provider-free",
+        "no command execution host, notebook kernel, live network, provider SDK, or q runtime dependency"
       ],
       "no_built_in_guarantee": true
     },

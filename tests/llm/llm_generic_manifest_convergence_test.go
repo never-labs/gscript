@@ -38,6 +38,11 @@ func TestGenericAIManifestNamingAndDialectFieldConvergence(t *testing.T) {
 			packageName:       "leia-generic-ai-evidence-report-artifacts",
 			allowCapabilityID: true,
 		},
+		{
+			dir:               "generic_coding_workspace",
+			packageName:       "leia-generic-ai-coding-workspace",
+			allowCapabilityID: true,
+		},
 	} {
 		t.Run(tc.dir, func(t *testing.T) {
 			base := filepath.Join(repoRoot(t), "examples", "ai", "finrobot_translation", "live_packages", tc.dir)
