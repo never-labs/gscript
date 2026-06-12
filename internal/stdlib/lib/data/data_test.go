@@ -2125,7 +2125,7 @@ func TestQueryFilteredSingleColumnGroupBuildsTypedIndex(t *testing.T) {
 	}
 	assertColumnValues(t, got, "sym", []any{NullValue, Symbol("AAPL"), Symbol("MSFT")})
 	assertColumnValues(t, got, "fills", []any{int64(1), int64(2), int64(1)})
-	assertColumnValues(t, got, "qty_sum", []any{10.0, 60.0, 30.0})
+	assertColumnValues(t, got, "qty_sum", []any{int64(10), int64(60), int64(30)})
 	assertColumnValues(t, got, "px_avg", []any{100.0, 20.0, 20.0})
 	assertColumnValues(t, got, "px_min", []any{100.0, 10.0, 20.0})
 	assertColumnValues(t, got, "px_max", []any{100.0, 30.0, 20.0})
@@ -2243,7 +2243,7 @@ func TestTypedDyadicKernelsInFastWhereAndProjection(t *testing.T) {
 	}
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b"), Symbol("d")})
 	assertColumnValues(t, got, "notional", []any{10.0, NullValue, 200.0})
-	assertColumnValues(t, got, "bumped", []any{11.0, 15.0, 15.0})
+	assertColumnValues(t, got, "bumped", []any{int64(11), int64(15), int64(15)})
 	assertColumnValues(t, got, "recent", []any{false, true, true})
 }
 
@@ -2482,7 +2482,7 @@ func TestQueryComputedProjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Exec returned error: %v", err)
 	}
-	assertColumnValues(t, got, "notional", []any{30.0, 80.0})
+	assertColumnValues(t, got, "notional", []any{int64(30), int64(80)})
 }
 
 func TestQueryVectorTransformProjection(t *testing.T) {
@@ -2759,7 +2759,7 @@ func TestQueryGroupBySymbolSumCount(t *testing.T) {
 
 	assertColumnNames(t, got, []Symbol{"sym", "total_qty", "n"})
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
-	assertColumnValues(t, got, "total_qty", []any{12.0, 5.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(12), int64(5)})
 	assertColumnValues(t, got, "n", []any{int64(2), int64(2)})
 }
 
@@ -2785,7 +2785,7 @@ func TestQueryGroupBySumAvgSkipNulls(t *testing.T) {
 	}
 
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
-	assertColumnValues(t, got, "total_qty", []any{30.0, 5.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(30), int64(5)})
 	assertColumnValues(t, got, "avg_qty", []any{15.0, 5.0})
 	assertColumnValues(t, got, "fills", []any{int64(3), int64(2)})
 }
@@ -2817,7 +2817,7 @@ func TestQueryGroupByCommonAggregatesNullBoundaries(t *testing.T) {
 	}
 
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
-	assertColumnValues(t, got, "total_qty", []any{0.0, 10.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(0), int64(10)})
 	assertColumnValues(t, got, "avg_qty", []any{0.0, 10.0})
 	assertColumnValues(t, got, "lo_qty", []any{NullValue, int64(10)})
 	assertColumnValues(t, got, "hi_qty", []any{NullValue, int64(10)})
@@ -2885,7 +2885,7 @@ func TestQueryGroupByColumnRefFastPathPreservesTypedKeys(t *testing.T) {
 		TimestampFromUnixNanos(1_000),
 		TimestampFromUnixNanos(2_000),
 	})
-	assertColumnValues(t, got, "total_qty", []any{60.0, 10.0, 80.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(60), int64(10), int64(80)})
 	if kind, ok := got.Schema().Kind("channel"); !ok || kind != KindI32 {
 		t.Fatalf("channel kind = %s, ok %v; want %s", kind, ok, KindI32)
 	}
@@ -2943,7 +2943,7 @@ func TestQueryGroupByUsesSingleColumnAttributeIndexForKeys(t *testing.T) {
 		t.Fatalf("group-by key column At called %d times; want indexed key path", sym.ats)
 	}
 	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
-	assertColumnValues(t, got, "total_qty", []any{80.0, 70.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(80), int64(70)})
 	assertColumnValues(t, got, "n", []any{int64(3), int64(2)})
 }
 
@@ -2973,7 +2973,7 @@ func TestQueryGroupByTypedAggregateFrameSupportsSymbolAndIntKeys(t *testing.T) {
 		t.Fatalf("kernel Exec symbol grouped aggregate returned error: %v", err)
 	}
 	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT"), Symbol("NVDA")})
-	assertColumnValues(t, got, "qty", []any{40.0, 70.0, 40.0})
+	assertColumnValues(t, got, "qty", []any{int64(40), int64(70), int64(40)})
 	assertColumnValues(t, got, "n", []any{int64(2), int64(2), int64(1)})
 	assertColumnValues(t, got, "min_px", []any{100.0, 101.0, 103.0})
 	assertColumnValues(t, got, "max_px", []any{102.0, 104.0, 103.0})
@@ -2983,8 +2983,8 @@ func TestQueryGroupByTypedAggregateFrameSupportsSymbolAndIntKeys(t *testing.T) {
 	if col, _ := got.Column("n"); col.Kind() != KindI64 {
 		t.Fatalf("count kind = %s, want %s", col.Kind(), KindI64)
 	}
-	if col, _ := got.Column("qty"); col.Kind() != KindF64 {
-		t.Fatalf("sum kind = %s, want %s", col.Kind(), KindF64)
+	if col, _ := got.Column("qty"); col.Kind() != KindI64 {
+		t.Fatalf("sum kind = %s, want %s", col.Kind(), KindI64)
 	}
 
 	intPlan := QueryPlan{
@@ -3005,7 +3005,7 @@ func TestQueryGroupByTypedAggregateFrameSupportsSymbolAndIntKeys(t *testing.T) {
 		t.Fatalf("kernel Exec int grouped aggregate returned error: %v", err)
 	}
 	assertColumnValues(t, got, "bucket", []any{int64(1), int64(2)})
-	assertColumnValues(t, got, "qty", []any{40.0, 110.0})
+	assertColumnValues(t, got, "qty", []any{int64(40), int64(110)})
 	assertColumnValues(t, got, "min_px", []any{100.0, 101.0})
 	assertColumnValues(t, got, "max_px", []any{102.0, 104.0})
 	if col, _ := got.Column("bucket"); col.Kind() != KindI64 {
@@ -3068,7 +3068,7 @@ func TestQueryGroupByBucket(t *testing.T) {
 	}
 
 	assertColumnValues(t, got, "bucket", []any{NullValue, Timestamp(0), Timestamp(1000), Timestamp(2000)})
-	assertColumnValues(t, got, "total_qty", []any{11.0, 2.0, 8.0, 7.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(11), int64(2), int64(8), int64(7)})
 	assertColumnValues(t, got, "n", []any{int64(1), int64(1), int64(2), int64(1)})
 }
 
@@ -3272,7 +3272,7 @@ func TestQueryKernelExecMatchesQueryPlanAndRejectsSchemaDrift(t *testing.T) {
 		t.Fatalf("kernel schema = %#v, want %#v", got.Schema(), want.Schema())
 	}
 	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("NVDA")})
-	assertColumnValues(t, got, "score", []any{15.0, 12.0})
+	assertColumnValues(t, got, "score", []any{int64(15), int64(12)})
 
 	drifted := mustFrame(t,
 		NewColumn("sym", []any{Symbol("AAPL")}),
@@ -3455,7 +3455,7 @@ func TestQueryKernelCompileFallbackAndValidation(t *testing.T) {
 		t.Fatalf("mixed grouped QueryKernel Exec returned error: %v", err)
 	}
 	assertColumnValues(t, mixedGot, "sym", []any{Symbol("a"), Symbol("b"), Symbol("c")})
-	assertColumnValues(t, mixedGot, "total_qty", []any{5.0, 11.0, 9.0})
+	assertColumnValues(t, mixedGot, "total_qty", []any{int64(5), int64(11), int64(9)})
 	assertColumnValues(t, mixedGot, "avg_px", []any{10.0, 35.0, 50.0})
 	assertColumnValues(t, mixedGot, "lo_px", []any{10.0, 30.0, 50.0})
 	assertColumnValues(t, mixedGot, "hi_px", []any{10.0, 40.0, 50.0})
@@ -3590,10 +3590,10 @@ func TestQueryKernelFilteredGroupedAggregateSkipsNullableNumericNulls(t *testing
 		t.Fatalf("kernel schema/len = %#v/%d, want %#v/%d", got.Schema(), got.Len(), want.Schema(), want.Len())
 	}
 	assertColumnValues(t, got, "sym", []any{Symbol("AAPL"), Symbol("MSFT")})
-	assertColumnValues(t, got, "total_qty", []any{10.0, 20.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(10), int64(20)})
 	assertColumnValues(t, got, "avg_qty", []any{10.0, 20.0})
 	assertColumnValues(t, got, "fills", []any{int64(2), int64(2)})
-	assertColumnValues(t, want, "total_qty", []any{10.0, 20.0})
+	assertColumnValues(t, want, "total_qty", []any{int64(10), int64(20)})
 	assertColumnValues(t, want, "avg_qty", []any{10.0, 20.0})
 }
 
@@ -3906,7 +3906,7 @@ func TestDataFoundationGroupJoinAsofAndXbarBasics(t *testing.T) {
 	}
 	assertColumnValues(t, rollup, "bucket", []any{Timestamp(1_000), Timestamp(2_000), Timestamp(2_000)})
 	assertColumnValues(t, rollup, "sym", []any{Symbol("AAPL"), Symbol("AAPL"), Symbol("MSFT")})
-	assertColumnValues(t, rollup, "qty", []any{30.0, 7.0, 5.0})
+	assertColumnValues(t, rollup, "qty", []any{int64(30), int64(7), int64(5)})
 	assertColumnValues(t, rollup, "last_bid", []any{99.5, 100.5, 50.25})
 	assertColumnValues(t, rollup, "fills", []any{int64(2), int64(1), int64(1)})
 }
@@ -4996,7 +4996,7 @@ func TestUpdateWhereConditionalAssignment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateWhere returned error: %v", err)
 	}
-	assertColumnValues(t, got, "signed_qty", []any{10.0, -15.0, 20.0})
+	assertColumnValues(t, got, "signed_qty", []any{int64(10), int64(-15), int64(20)})
 }
 
 func TestUpdateByWritesGroupedAggregates(t *testing.T) {

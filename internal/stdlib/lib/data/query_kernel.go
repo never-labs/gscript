@@ -1036,6 +1036,8 @@ func queryKernelSupportSuccessReason(plan QueryPlan) string {
 	switch {
 	case len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0:
 		return queryKernelReason("grouped aggregate path", detail)
+	case len(plan.Aggregates) > 0:
+		return queryKernelReason("ungrouped aggregate path", detail)
 	case len(plan.By)+len(plan.ByExprs) > 0:
 		return queryKernelReason("grouped projection path", detail)
 	case plan.Distinct:
@@ -1109,6 +1111,8 @@ func queryKernelPlanPath(plan QueryPlan) string {
 	switch {
 	case len(plan.By)+len(plan.ByExprs) > 0 && len(plan.Aggregates) > 0:
 		return "grouped_aggregate"
+	case len(plan.Aggregates) > 0:
+		return "ungrouped_aggregate"
 	case len(plan.By)+len(plan.ByExprs) > 0:
 		return "grouped_projection"
 	case plan.Distinct:

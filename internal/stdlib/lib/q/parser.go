@@ -81,6 +81,18 @@ func (p *parser) parseQuery() (*Query, error) {
 		return p.parseInsertOrUpsert(kind, false, take)
 	}
 
+	// Canonical select[n] / select[>c] / select[n;>c] row-limit and sort
+	// forms map onto the take / order-by machinery shared with the dialect's
+	// trailing `order by` / `take` extensions.
+	var bracketOrder []OrderTerm
+	if kind == SelectQuery && p.peek().kind == tokenLBracket {
+		var err error
+		take, bracketOrder, err = p.parseSelectBracketForm(take)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var distinct bool
 	if kind == SelectQuery || kind == ExecQuery {
 		distinct = p.consumeKeyword("distinct")
@@ -122,9 +134,15 @@ func (p *parser) parseQuery() (*Query, error) {
 	fromTok := p.peek()
 	var from string
 	var fromExpr Expr
+	var fromQuery *Query
 	if fromTok.kind == tokenIdent && !strings.EqualFold(fromTok.text, "flip") {
 		from = fromTok.text
 		p.next()
+	} else if p.peekSubQueryStart() {
+		fromQuery, err = p.parseSubQuerySource()
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		fromExpr, err = p.parseExpr(0)
 		if err != nil {
@@ -154,15 +172,16 @@ func (p *parser) parseQuery() (*Query, error) {
 		}
 	}
 
-	var orderBy []OrderTerm
+	orderBy := bracketOrder
 	if (kind == SelectQuery || kind == ExecQuery) && p.consumeKeyword("order") {
 		if !p.consumeKeyword("by") {
 			return nil, p.errorf(p.peek(), "expected by after order")
 		}
-		orderBy, err = p.parseOrderBy()
+		trailing, err := p.parseOrderBy()
 		if err != nil {
 			return nil, err
 		}
+		orderBy = append(orderBy, trailing...)
 	}
 
 	var limit *int
@@ -192,19 +211,120 @@ func (p *parser) parseQuery() (*Query, error) {
 	}
 
 	return &Query{
-		Kind:     kind,
-		Distinct: distinct,
-		Columns:  columns,
-		By:       by,
-		From:     from,
-		FromExpr: fromExpr,
-		Join:     firstJoinPtr(joins),
-		Joins:    joins,
-		Where:    where,
-		OrderBy:  orderBy,
-		Limit:    limit,
-		Take:     take,
+		Kind:      kind,
+		Distinct:  distinct,
+		Columns:   columns,
+		By:        by,
+		From:      from,
+		FromExpr:  fromExpr,
+		FromQuery: fromQuery,
+		Join:      firstJoinPtr(joins),
+		Joins:     joins,
+		Where:     where,
+		OrderBy:   orderBy,
+		Limit:     limit,
+		Take:      take,
 	}, nil
+}
+
+// peekSubQueryStart reports whether the from position starts a parenthesized
+// sub-select: `select ... from (select ... from t)`.
+func (p *parser) peekSubQueryStart() bool {
+	if p.peek().kind != tokenLParen {
+		return false
+	}
+	next := p.look(1)
+	if next.kind != tokenIdent {
+		return false
+	}
+	switch strings.ToLower(next.text) {
+	case string(SelectQuery), string(ExecQuery):
+		return true
+	default:
+		return false
+	}
+}
+
+// parseSubQuerySource parses a parenthesized sub-select in from position by
+// re-parsing the bracketed token window with a fresh sub-parser, so every
+// clause grammar applies unchanged inside the subquery.
+func (p *parser) parseSubQuerySource() (*Query, error) {
+	open := p.peek()
+	if !p.consume(tokenLParen) {
+		return nil, p.errorf(open, "expected ( before subquery")
+	}
+	depth := 1
+	end := -1
+	for i := p.pos; i < len(p.tokens); i++ {
+		switch p.tokens[i].kind {
+		case tokenLParen:
+			depth++
+		case tokenRParen:
+			depth--
+			if depth == 0 {
+				end = i
+			}
+		case tokenEOF:
+			return nil, p.errorf(open, "unterminated subquery")
+		}
+		if end >= 0 {
+			break
+		}
+	}
+	if end < 0 {
+		return nil, p.errorf(open, "unterminated subquery")
+	}
+	subTokens := append(append([]token(nil), p.tokens[p.pos:end]...), token{kind: tokenEOF, pos: p.tokens[end].pos})
+	sub := parser{tokens: subTokens}
+	query, err := sub.parseQuery()
+	if err != nil {
+		return nil, err
+	}
+	p.pos = end + 1
+	return query, nil
+}
+
+// parseSelectBracketForm parses the canonical select[...] header: select[n]
+// limits rows, select[>c] / select[<c] sorts descending / ascending by c, and
+// select[n;>c] combines both (top-n by sort order).
+func (p *parser) parseSelectBracketForm(take *int) (*int, []OrderTerm, error) {
+	if !p.consume(tokenLBracket) {
+		return take, nil, nil
+	}
+	var order []OrderTerm
+	for {
+		tok := p.peek()
+		switch {
+		case tok.kind == tokenNumber:
+			if take != nil {
+				return nil, nil, p.errorf(tok, "select[n] row limit specified more than once")
+			}
+			n, err := p.parseLimit()
+			if err != nil {
+				return nil, nil, err
+			}
+			take = &n
+		case tok.kind == tokenOp && (tok.text == ">" || tok.text == "<"):
+			desc := tok.text == ">"
+			p.next()
+			columnTok := p.peek()
+			if columnTok.kind != tokenIdent || isClauseKeyword(columnTok.text) {
+				return nil, nil, p.errorf(columnTok, "expected sort column after %s in select[...]", tok.text)
+			}
+			p.next()
+			order = append(order, OrderTerm{Column: columnTok.text, Expr: Ident{Name: columnTok.text}, Desc: desc})
+		default:
+			return nil, nil, p.errorf(tok, "expected select[n], select[>c], or select[<c]")
+		}
+		if p.consume(tokenSemicolon) {
+			continue
+		}
+		break
+	}
+	if !p.consume(tokenRBracket) {
+		return nil, nil, p.errorf(p.peek(), "expected ] after select[...] form")
+	}
+	return take, order, nil
 }
 
 func (p *parser) parseInsertOrUpsert(kind QueryKind, distinct bool, take *int) (*Query, error) {
@@ -704,7 +824,7 @@ func (p *parser) parseExpr(minPrec int) (Expr, error) {
 				left = Call{Func: tok.text, Arg: Vector{Items: []Expr{left, right}}}
 				continue
 			}
-			if op != "in" && op != "within" && op != "and" && op != "or" && op != "mod" && op != "div" {
+			if op != "in" && op != "within" && op != "and" && op != "or" && op != "mod" && op != "div" && op != "like" {
 				break
 			}
 			prec := precedence(op)
@@ -850,6 +970,12 @@ func (p *parser) parsePrimary() (Expr, error) {
 		return Symbol{Name: tok.text}, nil
 	case tokenIdent:
 		p.next()
+		if strings.EqualFold(tok.text, "wavg") && p.peek().kind == tokenLBracket {
+			// Canonical weighted-average bracket application wavg[w;v]. Other
+			// verbs keep their established juxtaposed/infix spellings so the
+			// q.eval surface's own bracket-apply semantics stay untouched.
+			return p.parseVerbBracketCall(tok)
+		}
 		if qPrefixFunction(tok.text) && p.canStartCallArg() {
 			// Canonical q: a prefix (unary) verb takes everything to its right
 			// as its argument. `sum price*size` is sum(price*size), not
@@ -903,6 +1029,37 @@ func (p *parser) parsePrimary() (Expr, error) {
 	default:
 		return nil, p.errorf(tok, "expected expression")
 	}
+}
+
+// parseVerbBracketCall parses f[x] / f[x;y] applications of known q verbs.
+func (p *parser) parseVerbBracketCall(verb token) (Expr, error) {
+	if !p.consume(tokenLBracket) {
+		return nil, p.errorf(p.peek(), "expected [ after %s", verb.text)
+	}
+	var args []Expr
+	for {
+		arg, err := p.parseExpr(0)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+		if !p.consume(tokenSemicolon) {
+			break
+		}
+	}
+	if !p.consume(tokenRBracket) {
+		return nil, p.errorf(p.peek(), "expected ] after %s[...] arguments", verb.text)
+	}
+	if len(args) == 1 {
+		if qSQLDyadicFunction(verb.text) {
+			return nil, p.errorf(verb, "q dyadic function %q expects two bracket arguments", verb.text)
+		}
+		return Call{Func: verb.text, Arg: args[0]}, nil
+	}
+	if len(args) == 2 {
+		return Call{Func: verb.text, Arg: Vector{Items: args}}, nil
+	}
+	return nil, p.errorf(verb, "q verb %q expects one or two bracket arguments, got %d", verb.text, len(args))
 }
 
 func (p *parser) parseConditionalCall() (Expr, error) {
@@ -1243,7 +1400,7 @@ func precedence(op string) int {
 	// 2*(3+1)=8, `10-4-2` is 10-(4-2)=8, and `8%2%2` is 8%(2%2)=8f. The
 	// right-associativity is realized in parseExpr by recursing with the same
 	// minimum precedence (not prec+1) on the right operand.
-	case "or", "|", "and", "&", "mod", "div", "in", "within",
+	case "or", "|", "and", "&", "mod", "div", "in", "within", "like",
 		"=", "<", ">", "<=", ">=", "<>", "*", "/", "%", "+", "-":
 		return 10
 	// `#` (take/reshape) keeps a distinct, tighter level: R9 made same-operator

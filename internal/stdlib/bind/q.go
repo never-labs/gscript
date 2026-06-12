@@ -73,6 +73,28 @@ type qSQLPlanTemplate struct {
 	mutation     *stdq.MutationPlan
 	join         *stdq.JoinPlan
 	joins        []*stdq.JoinPlan
+	// subs are from-position subquery plans, innermost first; each executes
+	// against the previous stage's result before the outer plan runs.
+	subs []qSQLSubPlanTemplate
+}
+
+type qSQLSubPlanTemplate struct {
+	plan   data.QueryPlan
+	hidden []data.Symbol
+}
+
+func qCloneQSubPlans(subs []qSQLSubPlanTemplate) []qSQLSubPlanTemplate {
+	if subs == nil {
+		return nil
+	}
+	out := make([]qSQLSubPlanTemplate, len(subs))
+	for i, sub := range subs {
+		out[i] = qSQLSubPlanTemplate{
+			plan:   qCloneDataQueryPlan(sub.plan),
+			hidden: qCloneDataSymbols(sub.hidden),
+		}
+	}
+	return out
 }
 
 type qSQLPlanCacheStats struct {
@@ -2036,6 +2058,19 @@ func qRunSQLScoped(name string, args qSQLArgsResult) (Value, error) {
 		}
 		return qDataFrameValue(out)
 	}
+	for si := range tmpl.subs {
+		subSrc := fmt.Sprintf("%s\x00sub%d", args.source, si)
+		subPlan := qPrepareSQLPlanForFrame(subSrc, tmpl.subs[si].plan, frame, bindings, true)
+		subOut, err := qRunSQLPlan(subSrc, subPlan, frame)
+		if err != nil {
+			return NilValue(), fmt.Errorf("%s: subquery: %w", name, err)
+		}
+		subOut, err = qDropHiddenSQLColumns(subOut, tmpl.subs[si].hidden)
+		if err != nil {
+			return NilValue(), fmt.Errorf("%s: subquery: %w", name, err)
+		}
+		frame = subOut
+	}
 	joins := qSQLTemplateJoins(tmpl)
 	if len(joins) > 0 {
 		if !args.resolveSource {
@@ -2074,9 +2109,44 @@ func qRunSQLScoped(name string, args qSQLArgsResult) (Value, error) {
 		if tmpl.execDict != nil {
 			return qExecDictResultValue(out, tmpl.execDict)
 		}
+		if qSQLPlanIsUngroupedAggregate(tmpl.plan) && out.Len() == 1 {
+			return qExecUngroupedAggregateValue(out)
+		}
 		return qExecResultValue(out)
 	}
 	return qDataFrameValue(out)
+}
+
+// qSQLPlanIsUngroupedAggregate reports the whole-table aggregate shape
+// (canonical `exec sum v from t` returns atoms, not one-row vectors).
+func qSQLPlanIsUngroupedAggregate(plan data.QueryPlan) bool {
+	return len(plan.Aggregates) > 0 && len(plan.By)+len(plan.ByExprs) == 0
+}
+
+// qExecUngroupedAggregateValue unwraps a one-row ungrouped aggregate frame:
+// one aggregate yields its atom, several yield a dict of atoms.
+func qExecUngroupedAggregateValue(frame data.Frame) (Value, error) {
+	names := frame.Schema().Names()
+	atoms := make([]any, len(names))
+	for i, name := range names {
+		col, ok := frame.Column(name)
+		if !ok {
+			return NilValue(), fmt.Errorf("column %q not found", name)
+		}
+		v, ok := col.At(0)
+		if !ok {
+			return NilValue(), fmt.Errorf("aggregate column %q is empty", name)
+		}
+		atoms[i] = v
+	}
+	if len(names) == 1 {
+		return qEvalValueToValue(atoms[0])
+	}
+	keys := make([]any, len(names))
+	for i, name := range names {
+		keys[i] = name
+	}
+	return qEvalDictValue(stdq.Dict{Keys: keys, Values: atoms})
 }
 
 func qTryRunSQLJoinFastPath(sources Value, left data.Frame, tmpl qSQLPlanTemplate, joins []*stdq.JoinPlan) (data.Frame, bool, error) {
@@ -3369,6 +3439,7 @@ func qSQLCachedPlanTemplate(name, src string) (qSQLPlanTemplate, error) {
 		tmpl.mutation = qCloneQMutationPlan(tmpl.mutation)
 		tmpl.join = qCloneQJoinPlan(tmpl.join)
 		tmpl.joins = qCloneQJoinPlans(tmpl.joins)
+		tmpl.subs = qCloneQSubPlans(tmpl.subs)
 		return tmpl, nil
 	}
 	qSQLTemplateStats.TemplateMisses++
@@ -3421,6 +3492,7 @@ func qSQLCachedPlanTemplate(name, src string) (qSQLPlanTemplate, error) {
 		execDict:     qCloneQExecDictPlan(lowered.ExecDict),
 		join:         qCloneQJoinPlan(lowered.Join),
 		joins:        qCloneQJoinPlans(lowered.Joins),
+		subs:         qSQLSubPlanTemplatesFromLowered(lowered),
 	}
 
 	qSQLTemplateCacheMu.Lock()
@@ -3435,7 +3507,32 @@ func qSQLCachedPlanTemplate(name, src string) (qSQLPlanTemplate, error) {
 	tmpl.mutation = qCloneQMutationPlan(tmpl.mutation)
 	tmpl.join = qCloneQJoinPlan(tmpl.join)
 	tmpl.joins = qCloneQJoinPlans(tmpl.joins)
+	tmpl.subs = qCloneQSubPlans(tmpl.subs)
 	return tmpl, nil
+}
+
+// qSQLSubPlanTemplatesFromLowered flattens the lowered subquery chain into
+// execution order (innermost first).
+func qSQLSubPlanTemplatesFromLowered(lowered *stdq.Lowered) []qSQLSubPlanTemplate {
+	var subs []qSQLSubPlanTemplate
+	for sub := lowered.Sub; sub != nil; sub = sub.Sub {
+		plan := sub.Plan
+		if sub.Distinct {
+			plan.Distinct = true
+		}
+		qNormalizePlanLiterals(&plan)
+		plan.Source = data.Frame{}
+		subs = append(subs, qSQLSubPlanTemplate{
+			plan:   qCloneDataQueryPlan(plan),
+			hidden: qCloneDataSymbols(sub.HiddenCols),
+		})
+	}
+	// lowered.Sub chains outermost-subquery first; reverse to innermost-first
+	// execution order.
+	for i, j := 0, len(subs)-1; i < j; i, j = i+1, j-1 {
+		subs[i], subs[j] = subs[j], subs[i]
+	}
+	return subs
 }
 
 func qDropHiddenSQLColumns(frame data.Frame, hidden []data.Symbol) (data.Frame, error) {
@@ -3602,7 +3699,7 @@ func qRunSQLMutation(frame data.Frame, mutation *stdq.MutationPlan) (data.Frame,
 		if len(mutation.ByExprs) > 0 {
 			assignments := make([]data.GroupedAssignment, len(mutation.Assignments))
 			for i, assign := range mutation.Assignments {
-				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr}
+				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr, Weight: assign.Weight}
 			}
 			return data.UpdateBy(frame, mutation.Where, mutation.ByExprs, assignments)
 		}
@@ -3650,7 +3747,7 @@ func qRunSQLKeyedMutation(keyed data.KeyedFrame, mutation *stdq.MutationPlan) (d
 		if len(mutation.ByExprs) > 0 {
 			assignments := make([]data.GroupedAssignment, len(mutation.Assignments))
 			for i, assign := range mutation.Assignments {
-				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr}
+				assignments[i] = data.GroupedAssignment{Name: assign.Name, Func: assign.Func, Expr: assign.Expr, Weight: assign.Weight}
 			}
 			return data.UpdateByKeyed(keyed, mutation.Where, mutation.ByExprs, assignments)
 		}
@@ -6587,7 +6684,7 @@ func qCloneQMutationPlan(plan *stdq.MutationPlan) *stdq.MutationPlan {
 	if plan.Assignments != nil {
 		out.Assignments = make([]stdq.MutationAssignment, len(plan.Assignments))
 		for i, assign := range plan.Assignments {
-			out.Assignments[i] = stdq.MutationAssignment{Name: assign.Name, Func: assign.Func, Expr: qCloneDataExpr(assign.Expr)}
+			out.Assignments[i] = stdq.MutationAssignment{Name: assign.Name, Func: assign.Func, Expr: qCloneDataExpr(assign.Expr), Weight: qCloneDataExpr(assign.Weight)}
 		}
 	}
 	out.DeleteColumns = append([]data.Symbol(nil), plan.DeleteColumns...)

@@ -23,12 +23,15 @@ type Query struct {
 	By       []Column
 	From     string
 	FromExpr Expr
-	Join     *Join
-	Joins    []Join
-	Where    Expr
-	OrderBy  []OrderTerm
-	Limit    *int
-	Take     *int
+	// FromQuery is a parenthesized sub-select in from position; the outer
+	// query executes against the subquery's result.
+	FromQuery *Query
+	Join      *Join
+	Joins     []Join
+	Where     Expr
+	OrderBy   []OrderTerm
+	Limit     *int
+	Take      *int
 }
 
 type Join struct {

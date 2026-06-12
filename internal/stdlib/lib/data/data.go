@@ -5498,6 +5498,7 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 	if err != nil {
 		return Frame{}, err
 	}
+	hasWindowAssignments := false
 	aggs := make([]aggregateInput, len(assignments))
 	for i, assign := range assignments {
 		if assign.Name == "" {
@@ -5506,7 +5507,11 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 		if assign.Expr == nil {
 			return Frame{}, fmt.Errorf("grouped update assignment for column %q is nil", assign.Name)
 		}
-		if !isSupportedAggregate(assign.Func) {
+		if assign.Func == "" {
+			// Grouped window assignment: the expression is evaluated over each
+			// group's rows and scattered back row-by-row (e.g. s:sums v by g).
+			hasWindowAssignments = true
+		} else if !isSupportedAggregate(assign.Func) {
 			return Frame{}, fmt.Errorf("unsupported grouped update aggregate %q", assign.Func)
 		}
 		aggs[i].Aggregate = Aggregate{Name: assign.Name, Func: assign.Func, Expr: assign.Expr, Weight: assign.Weight}
@@ -5529,12 +5534,19 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 	if err != nil {
 		return Frame{}, err
 	}
-	if out, ok, err := updateByGroupedTyped(frame, indexes, byInputs, aggs, assignments); ok {
-		return out, err
+	if !hasWindowAssignments {
+		if out, ok, err := updateByGroupedTyped(frame, indexes, byInputs, aggs, assignments); ok {
+			return out, err
+		}
 	}
 	matched := make([]bool, frame.Len())
 	rowKeys := make([]string, frame.Len())
 	groups := map[string]*groupState{}
+	var groupRows map[string][]int
+	var groupOrder []string
+	if hasWindowAssignments {
+		groupRows = map[string][]int{}
+	}
 	var keyBuilder strings.Builder
 	for _, row := range indexes {
 		matched[row] = true
@@ -5557,12 +5569,23 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 				state.aggs[i].fn = agg.Func
 			}
 			groups[key] = state
+			groupOrder = append(groupOrder, key)
+		}
+		if groupRows != nil {
+			groupRows[key] = append(groupRows[key], row)
 		}
 		for i, agg := range aggs {
+			if agg.Func == "" {
+				continue
+			}
 			if err := accumulateAggregate(&state.aggs[i], agg, frame, row); err != nil {
 				return Frame{}, err
 			}
 		}
+	}
+	windowValues, err := updateByWindowValues(frame, assignments, groupOrder, groupRows)
+	if err != nil {
+		return Frame{}, err
 	}
 	assignmentByName := make(map[Symbol]int, len(assignments))
 	for i, assign := range assignments {
@@ -5570,6 +5593,12 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 			return Frame{}, fmt.Errorf("duplicate grouped update assignment for column %q", assign.Name)
 		}
 		assignmentByName[assign.Name] = i
+	}
+	assignedValue := func(assignIndex, row int) any {
+		if windowValues != nil && windowValues[assignIndex] != nil {
+			return windowValues[assignIndex][row]
+		}
+		return aggregateResult(groups[rowKeys[row]].aggs[assignIndex])
 	}
 	cols := make([]Column, 0, len(frame.schema.names)+len(assignments))
 	for _, name := range frame.schema.names {
@@ -5580,12 +5609,17 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 				if !matched[row] {
 					continue
 				}
-				values[row] = aggregateResult(groups[rowKeys[row]].aggs[assignIndex])
+				values[row] = assignedValue(assignIndex, row)
 			}
 		}
 		col, err := columnWithKind(name, frame.columns[name].Kind(), values)
 		if err != nil {
-			return Frame{}, err
+			if !ok {
+				return Frame{}, err
+			}
+			// Assigned values may change the column kind (e.g. sums over a
+			// float column written into an integer column).
+			col = NewColumn(name, values)
 		}
 		cols = append(cols, col)
 	}
@@ -5599,11 +5633,60 @@ func UpdateBy(frame Frame, where Expr, by []SelectItem, assignments []GroupedAss
 				values[row] = NullValue
 				continue
 			}
-			values[row] = aggregateResult(groups[rowKeys[row]].aggs[i])
+			values[row] = assignedValue(i, row)
 		}
 		cols = append(cols, NewColumn(assign.Name, values))
 	}
 	return newFrameTrusted(cols...)
+}
+
+// updateByWindowValues evaluates grouped window assignments (Func == "") per
+// group and scatters the per-row results into frame-length value vectors.
+// The outer slice is indexed by assignment; nil entries are aggregates.
+func updateByWindowValues(frame Frame, assignments []GroupedAssignment, groupOrder []string, groupRows map[string][]int) ([][]any, error) {
+	if groupRows == nil {
+		return nil, nil
+	}
+	var out [][]any
+	for i, assign := range assignments {
+		if assign.Func != "" {
+			continue
+		}
+		if out == nil {
+			out = make([][]any, len(assignments))
+		}
+		values := make([]any, frame.Len())
+		projector, isProjector := assign.Expr.(vectorProjector)
+		for _, key := range groupOrder {
+			rows := groupRows[key]
+			if isProjector {
+				array, err := projector.EvalRows(frame, rows)
+				if err != nil {
+					return nil, err
+				}
+				if array.Len() != len(rows) {
+					return nil, fmt.Errorf("grouped update assignment %q returned %d rows for a %d-row group", assign.Name, array.Len(), len(rows))
+				}
+				for k, row := range rows {
+					v, ok := array.At(k)
+					if !ok {
+						return nil, fmt.Errorf("grouped update assignment %q group row %d out of range", assign.Name, k)
+					}
+					values[row] = v
+				}
+				continue
+			}
+			for _, row := range rows {
+				v, err := assign.Expr.EvalRow(frame, row)
+				if err != nil {
+					return nil, err
+				}
+				values[row] = v
+			}
+		}
+		out[i] = values
+	}
+	return out, nil
 }
 
 func Delete(frame Frame, match func(row map[Symbol]any) (bool, error)) (Frame, error) {
@@ -7852,6 +7935,168 @@ type Literal struct {
 
 func (e Literal) EvalRow(Frame, int) (any, error) { return e.Value, nil }
 
+// RowIndexRef is the qSQL virtual column i: it resolves to the source column
+// named "i" when one exists and otherwise to the 0-based row index.
+type RowIndexRef struct{}
+
+func (RowIndexRef) EvalRow(frame Frame, row int) (any, error) {
+	if col, ok := frame.Column("i"); ok {
+		v, ok := col.At(row)
+		if !ok {
+			return nil, fmt.Errorf("column \"i\" row %d out of range", row)
+		}
+		return v, nil
+	}
+	if row < 0 || row >= frame.Len() {
+		return nil, fmt.Errorf("virtual row index %d out of range", row)
+	}
+	return int64(row), nil
+}
+
+// ScalarAggregateExpr is a whole-frame aggregate appearing as a scalar
+// subexpression (canonical qSQL `where v=max v`). filterIndexes resolves it
+// to a literal before row evaluation; the EvalRow fallback recomputes the
+// aggregate per call and exists only for correctness on uncommon paths.
+type ScalarAggregateExpr struct {
+	Func   string
+	Expr   Expr
+	Weight Expr
+}
+
+func (e ScalarAggregateExpr) EvalRow(frame Frame, _ int) (any, error) {
+	return evalScalarAggregateValue(frame, e)
+}
+
+func evalScalarAggregateValue(frame Frame, e ScalarAggregateExpr) (any, error) {
+	inner, err := resolveScalarAggregateExprs(frame, e.Expr)
+	if err != nil {
+		return nil, err
+	}
+	weight, err := resolveScalarAggregateExprs(frame, e.Weight)
+	if err != nil {
+		return nil, err
+	}
+	agg := Aggregate{Name: Symbol(e.Func), Func: e.Func, Expr: inner, Weight: weight}
+	inputs, err := bindAggregateInputs(frame, []Aggregate{agg})
+	if err != nil {
+		return nil, err
+	}
+	state := aggregateState{fn: e.Func}
+	for row := 0; row < frame.Len(); row++ {
+		if err := accumulateAggregate(&state, inputs[0], frame, row); err != nil {
+			return nil, err
+		}
+	}
+	value := aggregateResult(state)
+	if e.Func == "sum" && sumPreservesIntegerKind(frame, agg) {
+		if f, ok := value.(float64); ok {
+			if n := int64(f); float64(n) == f {
+				return n, nil
+			}
+		}
+	}
+	return value, nil
+}
+
+// hasScalarAggregateExpr reports whether the expression tree contains a
+// ScalarAggregateExpr, so the hot filter path can skip the resolving rewrite.
+func hasScalarAggregateExpr(expr Expr) bool {
+	switch e := expr.(type) {
+	case ScalarAggregateExpr:
+		return true
+	case Binary:
+		return hasScalarAggregateExpr(e.Left) || hasScalarAggregateExpr(e.Right)
+	case Logical:
+		return hasScalarAggregateExpr(e.Left) || hasScalarAggregateExpr(e.Right)
+	case Not:
+		return hasScalarAggregateExpr(e.Expr)
+	case Conditional:
+		return hasScalarAggregateExpr(e.Cond) || hasScalarAggregateExpr(e.Then) || hasScalarAggregateExpr(e.Else)
+	case In:
+		return hasScalarAggregateExpr(e.Expr)
+	case Within:
+		return hasScalarAggregateExpr(e.Expr)
+	default:
+		return false
+	}
+}
+
+// resolveScalarAggregateExprs replaces every ScalarAggregateExpr in the tree
+// with the literal aggregate value computed over the whole frame. It returns
+// the input expression unchanged when no scalar aggregates are present.
+func resolveScalarAggregateExprs(frame Frame, expr Expr) (Expr, error) {
+	switch e := expr.(type) {
+	case nil:
+		return nil, nil
+	case ScalarAggregateExpr:
+		value, err := evalScalarAggregateValue(frame, e)
+		if err != nil {
+			return nil, err
+		}
+		return Literal{Value: value}, nil
+	case Binary:
+		left, err := resolveScalarAggregateExprs(frame, e.Left)
+		if err != nil {
+			return nil, err
+		}
+		right, err := resolveScalarAggregateExprs(frame, e.Right)
+		if err != nil {
+			return nil, err
+		}
+		e.Left, e.Right = left, right
+		return e, nil
+	case Logical:
+		left, err := resolveScalarAggregateExprs(frame, e.Left)
+		if err != nil {
+			return nil, err
+		}
+		right, err := resolveScalarAggregateExprs(frame, e.Right)
+		if err != nil {
+			return nil, err
+		}
+		e.Left, e.Right = left, right
+		return e, nil
+	case Not:
+		inner, err := resolveScalarAggregateExprs(frame, e.Expr)
+		if err != nil {
+			return nil, err
+		}
+		e.Expr = inner
+		return e, nil
+	case Conditional:
+		cond, err := resolveScalarAggregateExprs(frame, e.Cond)
+		if err != nil {
+			return nil, err
+		}
+		then, err := resolveScalarAggregateExprs(frame, e.Then)
+		if err != nil {
+			return nil, err
+		}
+		elseExpr, err := resolveScalarAggregateExprs(frame, e.Else)
+		if err != nil {
+			return nil, err
+		}
+		e.Cond, e.Then, e.Else = cond, then, elseExpr
+		return e, nil
+	case In:
+		inner, err := resolveScalarAggregateExprs(frame, e.Expr)
+		if err != nil {
+			return nil, err
+		}
+		e.Expr = inner
+		return e, nil
+	case Within:
+		inner, err := resolveScalarAggregateExprs(frame, e.Expr)
+		if err != nil {
+			return nil, err
+		}
+		e.Expr = inner
+		return e, nil
+	default:
+		return expr, nil
+	}
+}
+
 type Conditional struct {
 	Cond Expr
 	Then Expr
@@ -9396,6 +9641,13 @@ func filterIndexes(frame Frame, where Expr) ([]int, error) {
 	if where == nil {
 		return allIndexes(frame.Len()), nil
 	}
+	if hasScalarAggregateExpr(where) {
+		resolved, err := resolveScalarAggregateExprs(frame, where)
+		if err != nil {
+			return nil, err
+		}
+		where = resolved
+	}
 	if indexes, ok, err := fastFilterIndexes(frame, where); ok || err != nil {
 		return indexes, err
 	}
@@ -9936,7 +10188,22 @@ func evalBinaryArray(frame Frame, expr Binary) (Array, bool, error) {
 	if err != nil || !rok {
 		return nil, rok, err
 	}
-	out, ok, err := typedKernels.Dyadic(expr.Op, left, right)
+	return applyProjectionDyadic(expr.Op, left, right)
+}
+
+// applyProjectionDyadic lowers a columnar binary projection, preserving
+// integer kinds for integer arithmetic operands (canonical q: long+long stays
+// long; % alone widens to float) before the f64-widening kernel fallback.
+func applyProjectionDyadic(op Op, left, right any) (Array, bool, error) {
+	if out, ok, err := tryProjectionIntegerDyadic(op, left, right); ok || err != nil {
+		if err != nil {
+			return nil, true, err
+		}
+		if array, isArray := out.(Array); isArray {
+			return array, true, nil
+		}
+	}
+	out, ok, err := typedKernels.Dyadic(op, left, right)
 	if err != nil || !ok {
 		return nil, ok, err
 	}
@@ -9945,6 +10212,15 @@ func evalBinaryArray(frame Frame, expr Binary) (Array, bool, error) {
 		return nil, false, nil
 	}
 	return array, true, nil
+}
+
+func tryProjectionIntegerDyadic(op Op, left, right any) (any, bool, error) {
+	switch op {
+	case OpAdd, OpSub, OpMul:
+		return typedKernels.IntegerDyadic(op, left, right)
+	default:
+		return nil, false, nil
+	}
 }
 
 func evalDyadicOperand(frame Frame, expr Expr) (any, bool, error) {
@@ -10137,15 +10413,7 @@ func evalBinaryByI64IndexArray(frame Frame, indexes Array, expr Binary) (Array, 
 	if err != nil || !rok {
 		return nil, rok, err
 	}
-	out, ok, err := typedKernels.Dyadic(expr.Op, left, right)
-	if err != nil || !ok {
-		return nil, ok, err
-	}
-	array, ok := out.(Array)
-	if !ok {
-		return nil, false, nil
-	}
-	return array, true, nil
+	return applyProjectionDyadic(expr.Op, left, right)
 }
 
 func evalDyadicOperandByI64IndexArray(frame Frame, indexes Array, expr Expr) (any, bool, error) {
@@ -10307,6 +10575,9 @@ type groupInput struct {
 func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 	byItems := groupByItems(plan)
 	if len(byItems) == 0 {
+		if len(plan.Aggregates) > 0 {
+			return execUngroupedAggregates(frame, indexes, plan)
+		}
 		return Frame{}, fmt.Errorf("aggregate queries require at least one by column")
 	}
 	if len(plan.Aggregates) == 0 {
@@ -10422,15 +10693,51 @@ func execGrouped(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
 		for row, key := range order {
 			values[row] = aggregateResult(groups[key].aggs[i])
 		}
-		if kind, ok := aggregateOutputKind(frame, agg); ok {
-			col, err := columnWithKind(agg.Name, kind, values)
-			if err != nil {
+		cols = append(cols, aggregateOutputColumn(frame, agg, values))
+	}
+	return NewFrame(cols...)
+}
+
+// execUngroupedAggregates executes whole-table (no-by) aggregates over the
+// filtered rows, producing the canonical one-row qSQL aggregate table.
+// indexes == nil means "all rows" (same contract as execGrouped).
+func execUngroupedAggregates(frame Frame, indexes []int, plan QueryPlan) (Frame, error) {
+	if len(plan.Select) > 0 {
+		return Frame{}, fmt.Errorf("ungrouped aggregate queries cannot mix aggregates with plain projections")
+	}
+	aggs, err := bindAggregateInputs(frame, plan.Aggregates)
+	if err != nil {
+		return Frame{}, err
+	}
+	states := make([]aggregateState, len(aggs))
+	for i, agg := range aggs {
+		states[i].fn = agg.Func
+	}
+	accumulateRow := func(row int) error {
+		for i := range aggs {
+			if err := accumulateAggregate(&states[i], aggs[i], frame, row); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if indexes == nil {
+		for row := 0; row < frame.Len(); row++ {
+			if err := accumulateRow(row); err != nil {
 				return Frame{}, err
 			}
-			cols = append(cols, col)
-			continue
 		}
-		cols = append(cols, NewColumn(agg.Name, values))
+	} else {
+		for _, row := range indexes {
+			if err := accumulateRow(row); err != nil {
+				return Frame{}, err
+			}
+		}
+	}
+	cols := make([]Column, 0, len(plan.Aggregates))
+	for i, agg := range plan.Aggregates {
+		values := []any{aggregateResult(states[i])}
+		cols = append(cols, aggregateOutputColumn(frame, agg, values))
 	}
 	return NewFrame(cols...)
 }
@@ -11127,7 +11434,7 @@ func typedGroupedAggregateOutputColumn(frame Frame, acc typedGroupedAggregateAcc
 		for row, group := range order {
 			values[row] = acc.sum[group]
 		}
-		return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: values}}, nil
+		return sumOutputColumnFromF64(frame, agg, values), nil
 	case "min", "max":
 		values := make([]any, len(order))
 		for row, group := range order {
@@ -11274,7 +11581,7 @@ func buildSimpleGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs [
 			for row, group := range order {
 				values[row] = state.sum[group]
 			}
-			cols = append(cols, Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: values}})
+			cols = append(cols, sumOutputColumnFromF64(frame, agg.Aggregate, values))
 		case "avg":
 			values := make([]float64, len(order))
 			for row, group := range order {
@@ -11304,15 +11611,7 @@ func buildGroupedAggregateFrame(frame Frame, byInputs []groupInput, aggs []aggre
 		for row, group := range order {
 			values[row] = aggregateResult(states[group].aggs[i])
 		}
-		if kind, ok := aggregateOutputKind(frame, agg.Aggregate); ok {
-			col, err := columnWithKind(agg.Name, kind, values)
-			if err != nil {
-				return Frame{}, err
-			}
-			cols = append(cols, col)
-			continue
-		}
-		cols = append(cols, NewColumn(agg.Name, values))
+		cols = append(cols, aggregateOutputColumn(frame, agg.Aggregate, values))
 	}
 	return newFrameTrusted(cols...)
 }
@@ -11633,9 +11932,85 @@ func aggregateOutputKind(frame Frame, agg Aggregate) (Kind, bool) {
 			return "", false
 		}
 		return frame.schema.Kind(ref.Name)
+	case "sum":
+		// Canonical q: sum over integer columns stays a long; only avg/var/
+		// dev/med widen to float.
+		if sumPreservesIntegerKind(frame, agg) {
+			return KindI64, true
+		}
+		return "", false
 	default:
 		return "", false
 	}
+}
+
+// sumPreservesIntegerKind reports whether a sum aggregate's accumulated f64
+// totals should be emitted as an i64 column (integer source expression).
+func sumPreservesIntegerKind(frame Frame, agg Aggregate) bool {
+	if agg.Func != "sum" || agg.Weight != nil {
+		return false
+	}
+	return aggregateExprIsIntegerKind(frame, agg.Expr)
+}
+
+func aggregateExprIsIntegerKind(frame Frame, expr Expr) bool {
+	switch e := expr.(type) {
+	case ColumnRef:
+		kind, ok := frame.schema.Kind(e.Name)
+		if !ok {
+			return false
+		}
+		switch kind {
+		case KindI8, KindI16, KindI32, KindI64:
+			return true
+		default:
+			return false
+		}
+	case Binary:
+		switch e.Op {
+		case OpAdd, OpSub, OpMul:
+			return aggregateExprIsIntegerKind(frame, e.Left) && aggregateExprIsIntegerKind(frame, e.Right)
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+// aggregateOutputColumn builds an aggregate result column, preserving the
+// kind-stable output (integer sums stay i64; min/max/first/last keep the
+// source kind) and falling back to a generic column when the values cannot be
+// represented in the preferred kind (e.g. integer sums beyond float exactness).
+func aggregateOutputColumn(frame Frame, agg Aggregate, values []any) Column {
+	if kind, ok := aggregateOutputKind(frame, agg); ok {
+		if col, err := columnWithKind(agg.Name, kind, values); err == nil {
+			return col
+		}
+	}
+	return NewColumn(agg.Name, values)
+}
+
+// sumOutputColumnFromF64 converts accumulated f64 group sums into the output
+// column, emitting i64 storage for integer source expressions when every
+// total is exactly representable. The caller hands over ownership of sums.
+func sumOutputColumnFromF64(frame Frame, agg Aggregate, sums []float64) Column {
+	if sumPreservesIntegerKind(frame, agg) {
+		out := make([]int64, len(sums))
+		exact := true
+		for i, v := range sums {
+			n := int64(v)
+			if float64(n) != v {
+				exact = false
+				break
+			}
+			out[i] = n
+		}
+		if exact {
+			return Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: out}}
+		}
+	}
+	return Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: sums}}
 }
 
 func groupByItems(plan QueryPlan) []SelectItem {

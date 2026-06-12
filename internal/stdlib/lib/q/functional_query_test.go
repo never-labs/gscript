@@ -87,8 +87,8 @@ func TestFunctionalSelectGrouped(t *testing.T) {
 	}
 	first, _ := column.At(0)
 	second, _ := column.At(1)
-	if first != 40.0 || second != 20.0 {
-		t.Fatalf("grouped sums = %v %v, want 40 20", first, second)
+	if first != int64(40) || second != int64(20) {
+		t.Fatalf("grouped sums = %v %v, want long 40 20", first, second)
 	}
 }
 

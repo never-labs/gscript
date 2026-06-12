@@ -627,7 +627,7 @@ func execGroupedTypedRowIDs(frame Frame, indexes []int, allRows bool, byInputs [
 		case "count":
 			cols = append(cols, Column{Name: agg.Name, Data: columnArray[int64]{kind: KindI64, data: acc.count[:outGroups]}})
 		case "sum":
-			cols = append(cols, Column{Name: agg.Name, Data: columnArray[float64]{kind: KindF64, data: acc.sum[:outGroups]}})
+			cols = append(cols, sumOutputColumnFromF64(frame, agg.Aggregate, acc.sum[:outGroups]))
 		case "avg":
 			values := make([]float64, outGroups)
 			for g := 0; g < outGroups; g++ {

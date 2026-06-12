@@ -4618,7 +4618,7 @@ func TestQueryWhereColumnLiteralAndTypedGroupAggregates(t *testing.T) {
 	}
 
 	assertColumnValues(t, got, "sym", []any{Symbol("a"), Symbol("b")})
-	assertColumnValues(t, got, "total_qty", []any{5.0, 11.0})
+	assertColumnValues(t, got, "total_qty", []any{int64(5), int64(11)})
 	assertColumnValues(t, got, "avg_px", []any{10.0, 35.0})
 	assertColumnValues(t, got, "fills", []any{int64(1), int64(2)})
 }

@@ -287,7 +287,7 @@ func TestParseDistinctAndTake(t *testing.T) {
 }
 
 func TestParseExtendedAggregateFunctions(t *testing.T) {
-	query := mustParse(t, "select v:var price,d:dev price,m:med price,w:wavg price by sym from trades")
+	query := mustParse(t, "select v:var price,d:dev price,m:med price,w:wavg[size;price] by sym from trades")
 
 	if len(query.Columns) != 4 {
 		t.Fatalf("columns = %#v", query.Columns)
@@ -309,6 +309,16 @@ func TestParseExtendedAggregateFunctions(t *testing.T) {
 		if lowered.Plan.Aggregates[i].Func != want {
 			t.Fatalf("aggregate %d func = %q, want %q", i, lowered.Plan.Aggregates[i].Func, want)
 		}
+	}
+	wavg := lowered.Plan.Aggregates[3]
+	if wavg.Weight == nil {
+		t.Fatalf("wavg aggregate is missing its weight expression: %#v", wavg)
+	}
+	if ref, ok := wavg.Weight.(data.ColumnRef); !ok || ref.Name != "size" {
+		t.Fatalf("wavg weight = %#v, want size column ref", wavg.Weight)
+	}
+	if ref, ok := wavg.Expr.(data.ColumnRef); !ok || ref.Name != "price" {
+		t.Fatalf("wavg expr = %#v, want price column ref", wavg.Expr)
 	}
 }
 
@@ -865,12 +875,17 @@ func TestParseMutationByBoundaries(t *testing.T) {
 	if _, err := Parse("delete from trades by sym"); err == nil {
 		t.Fatalf("Parse accepted delete by")
 	}
-	_, err := Lower(mustParse(t, "update price:price+1 by sym from trades"))
-	if err == nil {
-		t.Fatalf("Lower accepted grouped update without aggregate assignment")
+	// Non-aggregate grouped update assignments are grouped window updates:
+	// the expression evaluates over each group's rows and scatters back.
+	lowered, err := Lower(mustParse(t, "update price:price+1 by sym from trades"))
+	if err != nil {
+		t.Fatalf("Lower rejected grouped window update: %v", err)
 	}
-	if !strings.Contains(err.Error(), "requires an aggregate expression") {
-		t.Fatalf("Lower grouped update error = %q, want aggregate diagnostic", err.Error())
+	if lowered.Mutation == nil || len(lowered.Mutation.Assignments) != 1 {
+		t.Fatalf("grouped window mutation = %#v", lowered.Mutation)
+	}
+	if lowered.Mutation.Assignments[0].Func != "" {
+		t.Fatalf("grouped window assignment func = %q, want empty", lowered.Mutation.Assignments[0].Func)
 	}
 }
 
@@ -2214,7 +2229,7 @@ func TestLowerQSQLConditionalSelectAndUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("conditional select Exec returned error: %v", err)
 	}
-	assertQColumnValues(t, out, "signed_qty", []any{10.0, 20.0, -15.0})
+	assertQColumnValues(t, out, "signed_qty", []any{int64(10), int64(20), int64(-15)})
 	assertQColumnValues(t, out, "slip", []any{0.5, 1.0, 0.5})
 
 	updated, err := Lower(mustParse(t, "update signed_qty:?[side=`buy;size;0-size] from trades"))
@@ -2229,7 +2244,7 @@ func TestLowerQSQLConditionalSelectAndUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("conditional update returned error: %v", err)
 	}
-	assertQColumnValues(t, updatedFrame, "signed_qty", []any{10.0, -15.0, 20.0})
+	assertQColumnValues(t, updatedFrame, "signed_qty", []any{int64(10), int64(-15), int64(20)})
 }
 
 func TestLoweredQSQLXbarTemporalIntervalUsesColumnKind(t *testing.T) {
@@ -2255,9 +2270,9 @@ func TestLoweredQSQLXbarTemporalIntervalUsesColumnKind(t *testing.T) {
 		t.Fatalf("out len = %d, want 2", got)
 	}
 	assertColumnValue(t, out, "bucket", 0, data.SecondFromSeconds(34_200))
-	assertColumnValue(t, out, "qty", 0, 30.0)
+	assertColumnValue(t, out, "qty", 0, int64(30))
 	assertColumnValue(t, out, "bucket", 1, data.SecondFromSeconds(34_260))
-	assertColumnValue(t, out, "qty", 1, 30.0)
+	assertColumnValue(t, out, "qty", 1, int64(30))
 }
 
 func TestLoweredQSQLXbarTemporalUpdateSelectOrder(t *testing.T) {
