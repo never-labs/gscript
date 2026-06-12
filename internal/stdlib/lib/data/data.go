@@ -10508,6 +10508,12 @@ type projectionGroup struct {
 }
 
 func execGroupedProjection(frame Frame, indexes []int, plan QueryPlan, byItems []SelectItem) (Frame, error) {
+	// indexes == nil means "all rows": the kernel skips materializing an
+	// identity index vector for unfiltered grouped queries (same contract as
+	// the grouped-aggregate path in execGrouped).
+	if indexes == nil {
+		indexes = allIndexes(frame.Len())
+	}
 	if !selectItemsNeedGroupedRows(plan.Select) {
 		indexArray := queryIndexesArray(indexes, frame.Len())
 		return execProjectByI64IndexArray(frame, indexArray, plan.Select)

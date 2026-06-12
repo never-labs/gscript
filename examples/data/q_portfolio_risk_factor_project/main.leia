@@ -101,7 +101,7 @@ last_factor := q.sql(
 
 active_symbols := q.sql(
     risk_marked,
-    "select sym,sector,market_value,gross_value from trades where sym in `AAPL`MSFT`NVDA and sector in `tech`semis order by sym asc"
+    "select sym,sector,market_value,gross_value from trades where (sym in `AAPL`MSFT`NVDA) and sector in `tech`semis order by sym asc"
 )
 
 sector_rollup := q.sql(
