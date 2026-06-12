@@ -305,6 +305,12 @@ func qEvalFuzzInputSafe(src string) bool {
 	if len(src) > 400 || !utf8.ValidString(src) {
 		return false
 	}
+	// Console-write statements (digit handle juxtaposed to a string literal,
+	// `1 "text"`) print to stdout/stderr — stateful, out of differential
+	// scope like \x system commands.
+	if regexp.MustCompile(`(^|;)\s*-?[12]\s+"`).MatchString(src) {
+		return false
+	}
 	// Control characters (other than newline) tokenize differently between
 	// the two routes; crash-safety for them is FuzzQParse's job, value
 	// equivalence is not meaningful.
@@ -614,7 +620,8 @@ var (
 // representatives were reconciled (see qEvalKnownDivergenceRecord); the
 // remaining entries are post-R14 findings awaiting a production fix.
 var qEvalKnownDivergenceRepresentatives = []string{
-	`("J"$"0")+(B $"")$(0"")`, // bare-cast-name domain spelling differs in cast error text
+	// `("J"$"0")+(B $"")$(0"")` healed by the combined R15/R16 merges (cast
+	// error spelling unified). Removed (shrink-only ratchet).
 	"(count c$000 00 00000000000)!(Coun!A000000000000000)!su! raz! 00000000", // same spelling family via dict-bang
 	`x:0;count ""where 0<>0`, // glued empty-string juxtaposition splits differently
 	"x:til 0;sum 0 rotate,x", // glued ,-join after a word verb splits differently
