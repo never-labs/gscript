@@ -2897,7 +2897,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 
 // typedCompareBoolIndexesI64 selects matching rows of a dense bool column in
 // two passes (count, then exact-size fill) so the hot boolean where shapes
-// allocate the index vector once.
+// allocate the index vector once. The op/target dispatch is hoisted out of
+// the row loops: a bool comparison only ever partitions rows into the
+// true-keep / false-keep classes, so the per-row work is a single branch.
 func typedCompareBoolIndexesI64(array Array, op Op, value any) (Array, bool) {
 	a, isBool := unwrapAttributedArray(array).(columnArray[bool])
 	if !isBool {
@@ -2907,16 +2909,36 @@ func typedCompareBoolIndexesI64(array Array, op Op, value any) (Array, bool) {
 	if !isBool {
 		return nil, false
 	}
-	count := 0
+	keepTrue := boolCompare(op, target, compareBool(true, target))
+	keepFalse := boolCompare(op, !target, compareBool(false, target))
+	switch {
+	case keepTrue && keepFalse:
+		return i64RangeArray{start: 0, step: 1, len: len(a.data)}, true
+	case !keepTrue && !keepFalse:
+		return i64RangeArray{len: 0}, true
+	}
+	trues := 0
 	for _, v := range a.data {
-		if boolCompare(op, v == target, compareBool(v, target)) {
-			count++
+		if v {
+			trues++
 		}
 	}
+	count := trues
+	if keepFalse {
+		count = len(a.data) - trues
+	}
 	out := make([]int64, 0, count)
-	for i, v := range a.data {
-		if boolCompare(op, v == target, compareBool(v, target)) {
-			out = append(out, int64(i))
+	if keepTrue {
+		for i, v := range a.data {
+			if v {
+				out = append(out, int64(i))
+			}
+		}
+	} else {
+		for i, v := range a.data {
+			if !v {
+				out = append(out, int64(i))
+			}
 		}
 	}
 	return newI64Trusted(out), true
@@ -3343,6 +3365,11 @@ func typedCompareCarrierIndexesI64(array Array, op Op, value any) (Array, bool, 
 	if !typedCompareCarrierTargetCompatible(array.Kind(), target) {
 		return nil, false, nil
 	}
+	if view, ok := unwrapAttributedArray(array).(indexedArray); ok {
+		if out, handled, err := typedCompareIndexedDenseIndexesI64(view, op, target); handled || err != nil {
+			return out, handled, err
+		}
+	}
 	out := make([]int64, 0)
 	for row := 0; row < array.Len(); row++ {
 		keep, handled, err := typedCompareCarrierRow(array, row, op, target)
@@ -3354,6 +3381,149 @@ func typedCompareCarrierIndexesI64(array Array, op Op, value any) (Array, bool, 
 		}
 	}
 	return newI64Trusted(out), true, nil
+}
+
+// typedCompareIndexedDenseIndexesI64 short-circuits the boxed carrier row
+// loop for the canonical result-view carrier: an index view over a dense
+// i64/f64 column (the shape subquery and projection stages produce). Rows
+// resolve through the typed index vector and compare with the same
+// comparators as the dense CompareIndexes kernels; out-of-range source rows
+// surface the same error the boxed At walk would.
+func typedCompareIndexedDenseIndexesI64(view indexedArray, op Op, target any) (Array, bool, error) {
+	idx, owned, ok := tryBulkI64Values(view.indexes)
+	if !ok {
+		return nil, false, nil
+	}
+	if len(idx) != view.len {
+		bulkI64Release(idx, owned)
+		return nil, false, nil
+	}
+	var out []int64
+	var handled bool
+	var err error
+	switch src := unwrapAttributedArray(view.source).(type) {
+	case columnArray[float64]:
+		t, tok := numeric(target)
+		if !tok {
+			bulkI64Release(idx, owned)
+			return nil, false, nil
+		}
+		out, handled, err = indexedDenseCompareIndexesI64(src.data, idx, op, t)
+	case columnArray[int64]:
+		t, tok := coerceInt64Exact(target)
+		if !tok {
+			bulkI64Release(idx, owned)
+			return nil, false, nil
+		}
+		out, handled, err = indexedDenseCompareIndexesI64(src.data, idx, op, t)
+	default:
+		bulkI64Release(idx, owned)
+		return nil, false, nil
+	}
+	bulkI64Release(idx, owned)
+	if err != nil || !handled {
+		return nil, handled && err != nil, err
+	}
+	return newI64Trusted(out), true, nil
+}
+
+// indexedDenseCompareIndexesI64 runs the count+exact-fill compare over a
+// dense source resolved through a typed index vector. The op dispatch is
+// hoisted out of the row loops; LE/GE use the negated strict forms so float
+// NaN rows keep the same boolCompare(compareFloat64)==0 incomparable
+// semantics as the boxed carrier walk (NaN keeps for LE/GE, drops for
+// LT/GT, standard IEEE behavior for EQ/NE).
+func indexedDenseCompareIndexesI64[T int64 | float64](data []T, idx []int64, op Op, t T) ([]int64, bool, error) {
+	switch op {
+	case OpEQ, OpNE, OpLT, OpLE, OpGT, OpGE:
+	default:
+		return nil, false, nil
+	}
+	bound := int64(len(data))
+	for _, row := range idx {
+		if row < 0 || row >= bound {
+			return nil, true, fmt.Errorf("compare row %d out of range", row)
+		}
+	}
+	count := 0
+	switch op {
+	case OpEQ:
+		for _, row := range idx {
+			if data[row] == t {
+				count++
+			}
+		}
+	case OpNE:
+		for _, row := range idx {
+			if data[row] != t {
+				count++
+			}
+		}
+	case OpLT:
+		for _, row := range idx {
+			if data[row] < t {
+				count++
+			}
+		}
+	case OpLE:
+		for _, row := range idx {
+			if !(data[row] > t) {
+				count++
+			}
+		}
+	case OpGT:
+		for _, row := range idx {
+			if data[row] > t {
+				count++
+			}
+		}
+	case OpGE:
+		for _, row := range idx {
+			if !(data[row] < t) {
+				count++
+			}
+		}
+	}
+	out := make([]int64, 0, count)
+	switch op {
+	case OpEQ:
+		for i, row := range idx {
+			if data[row] == t {
+				out = append(out, int64(i))
+			}
+		}
+	case OpNE:
+		for i, row := range idx {
+			if data[row] != t {
+				out = append(out, int64(i))
+			}
+		}
+	case OpLT:
+		for i, row := range idx {
+			if data[row] < t {
+				out = append(out, int64(i))
+			}
+		}
+	case OpLE:
+		for i, row := range idx {
+			if !(data[row] > t) {
+				out = append(out, int64(i))
+			}
+		}
+	case OpGT:
+		for i, row := range idx {
+			if data[row] > t {
+				out = append(out, int64(i))
+			}
+		}
+	case OpGE:
+		for i, row := range idx {
+			if !(data[row] < t) {
+				out = append(out, int64(i))
+			}
+		}
+	}
+	return out, true, nil
 }
 
 func typedCompareCarrierIndexStatsI64(array Array, op Op, value any) (count, sum int64, handled bool, err error) {
@@ -9537,22 +9707,54 @@ func execPlan(frame Frame, plan QueryPlan, transferOwned bool) (Frame, error) {
 }
 
 func execTypedFilterProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
-	// Mirror TryExecuteQueryKernelTypedCarrier's plan-shape preconditions
-	// before paying for the full plan describe.
+	// Mirror TryExecuteQueryKernelTypedCarrier's plan-shape preconditions.
 	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
 		len(plan.By) > 0 || len(plan.ByExprs) > 0 || len(plan.Aggregates) > 0 {
 		return Frame{}, false, nil
 	}
-	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
-	if err != nil || !ok {
-		return Frame{}, ok, err
+	// Apply the same gates DescribeQueryKernelPlan applies, but per execution
+	// instead of per describe: skip the deep plan clone, the fingerprint /
+	// cache-key serialization, and — critically — the describe-time filter
+	// probe, which ran the full typed compare only to throw the index vector
+	// away before the carrier exec ran it a second time.
+	if !typedFilterProjectPlanSupported(plan) {
+		return Frame{}, false, nil
 	}
-	return TryExecuteQueryKernelTypedCarrier(frame, plan, described.Carrier)
+	if err := validateQueryKernelFrame(frame, plan); err != nil {
+		return Frame{}, true, err
+	}
+	if plan.Where != nil && queryKernelWherePipelineShape(plan.Where) == "" {
+		return Frame{}, false, nil
+	}
+	if !queryKernelProjectionUsesTypedCarrier(plan) {
+		return Frame{}, false, nil
+	}
+	indexes, handled, err := typedFilterIndexArray(frame, plan.Where)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	if !handled {
+		return Frame{}, false, nil
+	}
+	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
+	return out, true, err
+}
+
+// typedFilterProjectPlanSupported is the projection/where subset of
+// QueryKernelSupportReason for plans already known to carry no by/aggregate/
+// order/distinct/limit clauses, without building the success reason string.
+func typedFilterProjectPlanSupported(plan QueryPlan) bool {
+	for _, item := range plan.Select {
+		if queryKernelExprUnsupportedReason(item.Expr) != "" {
+			return false
+		}
+	}
+	return queryKernelWhereUnsupportedReason(plan.Where) == ""
 }
 
 func execTypedGroupedProjectionProject(frame Frame, plan QueryPlan) (Frame, bool, error) {
 	// Mirror TryExecuteQueryKernelGroupedProjectionCarrier's plan-shape
-	// preconditions before paying for the full plan describe.
+	// preconditions.
 	if plan.Distinct || plan.PreProjectOrder || plan.LimitN >= 0 || len(plan.OrderBy) > 0 ||
 		len(plan.Aggregates) > 0 || len(plan.Select) == 0 {
 		return Frame{}, false, nil
@@ -9560,11 +9762,34 @@ func execTypedGroupedProjectionProject(frame Frame, plan QueryPlan) (Frame, bool
 	if len(plan.By) == 0 && len(plan.ByExprs) == 0 {
 		return Frame{}, false, nil
 	}
-	described, ok, err := DescribeQueryKernelPlan("", frame, plan)
-	if err != nil || !ok {
-		return Frame{}, ok, err
+	// Same per-execution gating as execTypedFilterProject (see above), plus
+	// the by-expression support check DescribeQueryKernelPlan would apply.
+	for _, item := range plan.ByExprs {
+		if queryKernelExprUnsupportedReason(item.Expr) != "" {
+			return Frame{}, false, nil
+		}
 	}
-	return TryExecuteQueryKernelGroupedProjectionCarrier(frame, plan, described.Carrier)
+	if !typedFilterProjectPlanSupported(plan) {
+		return Frame{}, false, nil
+	}
+	if err := validateQueryKernelFrame(frame, plan); err != nil {
+		return Frame{}, true, err
+	}
+	if plan.Where != nil && queryKernelWherePipelineShape(plan.Where) == "" {
+		return Frame{}, false, nil
+	}
+	if !queryKernelProjectionUsesTypedCarrier(plan) {
+		return Frame{}, false, nil
+	}
+	indexes, handled, err := typedFilterIndexArray(frame, plan.Where)
+	if err != nil {
+		return Frame{}, true, err
+	}
+	if !handled {
+		return Frame{}, false, nil
+	}
+	out, err := execProjectByI64IndexArray(frame, indexes, plan.Select)
+	return out, true, err
 }
 
 func canLimitBeforeProjection(plan QueryPlan) bool {
@@ -10296,6 +10521,31 @@ func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) 
 		rows, rowsReady = out, true
 		return rows, nil
 	}
+	// The index vector is shared by every projected column, so its bounds
+	// check against the frame length is memoized instead of re-scanning the
+	// whole vector per column inside TryGatherByI64IndexArray.
+	frameLen := frame.Len()
+	frameLenValid := false
+	frameLenChecked := false
+	gatherFrameColumn := func(col Array) (Array, bool, error) {
+		if col.Len() != frameLen {
+			return TryGatherByI64IndexArray(col, indexes)
+		}
+		if out, ok, err := tryGatherRangeByI64IndexArray(col, indexes); ok || err != nil {
+			return out, ok, err
+		}
+		if !frameLenChecked {
+			ok, err := validateI64IndexArray(indexes, frameLen)
+			if err != nil {
+				return nil, true, err
+			}
+			frameLenValid, frameLenChecked = ok, true
+		}
+		if frameLenValid {
+			return indexedArray{source: col, indexes: indexes, len: indexes.Len()}, true, nil
+		}
+		return TryGatherByI64IndexArray(col, indexes)
+	}
 	cols := make([]Column, 0, len(items))
 	for _, item := range items {
 		if item.Name == "" {
@@ -10310,7 +10560,7 @@ func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) 
 				cols = append(cols, Column{Name: item.Name, Data: col})
 				continue
 			}
-			out, handled, err := TryGatherByI64IndexArray(col, indexes)
+			out, handled, err := gatherFrameColumn(col)
 			if err != nil {
 				return Frame{}, err
 			}
@@ -10357,7 +10607,7 @@ func execProjectByI64IndexArray(frame Frame, indexes Array, items []SelectItem) 
 				cols = append(cols, Column{Name: item.Name, Data: array})
 				continue
 			}
-			out, handled, err := TryGatherByI64IndexArray(array, indexes)
+			out, handled, err := gatherFrameColumn(array)
 			if err != nil {
 				return Frame{}, err
 			}
@@ -10713,24 +10963,26 @@ func execUngroupedAggregates(frame Frame, indexes []int, plan QueryPlan) (Frame,
 	for i, agg := range aggs {
 		states[i].fn = agg.Func
 	}
-	accumulateRow := func(row int) error {
-		for i := range aggs {
-			if err := accumulateAggregate(&states[i], aggs[i], frame, row); err != nil {
-				return err
+	if !ungroupedAggregateStatesTyped(frame, indexes, aggs, states) {
+		accumulateRow := func(row int) error {
+			for i := range aggs {
+				if err := accumulateAggregate(&states[i], aggs[i], frame, row); err != nil {
+					return err
+				}
 			}
+			return nil
 		}
-		return nil
-	}
-	if indexes == nil {
-		for row := 0; row < frame.Len(); row++ {
-			if err := accumulateRow(row); err != nil {
-				return Frame{}, err
+		if indexes == nil {
+			for row := 0; row < frame.Len(); row++ {
+				if err := accumulateRow(row); err != nil {
+					return Frame{}, err
+				}
 			}
-		}
-	} else {
-		for _, row := range indexes {
-			if err := accumulateRow(row); err != nil {
-				return Frame{}, err
+		} else {
+			for _, row := range indexes {
+				if err := accumulateRow(row); err != nil {
+					return Frame{}, err
+				}
 			}
 		}
 	}

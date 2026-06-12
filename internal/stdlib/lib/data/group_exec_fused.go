@@ -40,9 +40,12 @@ type fusedSumSlot struct {
 // fusedAggPlan maps one aggregate to its output recipe over the shared row
 // count and the sum slots.
 type fusedAggPlan struct {
-	fn   string // count, sum, avg, var, dev
+	fn   string // count, sum, avg, var, dev, wavg
 	name Symbol
-	slot int // primary sum slot (-1 for count)
+	slot int // primary sum slot (-1 for count); weight*value product for wavg
+	// wslot is the weight sum slot for wavg (-1 otherwise): the per-group
+	// result is sums[slot]/sums[wslot].
+	wslot int
 }
 
 // fusedGroupSource returns a dense []float64 view of an aggregate source
@@ -146,6 +149,29 @@ func fusedGroupBinarySource(agg aggregateInput, rows int) ([]float64, bool) {
 	return out, true
 }
 
+// fusedWavgProductSource computes the pooled weight*value product stream for
+// a wavg aggregate. Both operands convert to float64 before multiplying,
+// mirroring the generic per-row accumulation (state.sum += n * w with n and w
+// from numericAt), so integer columns do not multiply in integer space.
+func fusedWavgProductSource(value, weight Array, rows int) ([]float64, bool) {
+	left, leftOwned, ok := fusedGroupSource(value, rows)
+	if !ok {
+		return nil, false
+	}
+	right, rightOwned, ok := fusedGroupSource(weight, rows)
+	if !ok {
+		bulkF64Release(left, leftOwned)
+		return nil, false
+	}
+	out := bulkF64Get(rows)
+	for i := range out {
+		out[i] = left[i] * right[i]
+	}
+	bulkF64Release(left, leftOwned)
+	bulkF64Release(right, rightOwned)
+	return out, true
+}
+
 // fusedSlotIndex returns the slot index for src, reusing an existing slot
 // when the same backing storage is already registered.
 func fusedSlotIndex(slots []fusedSumSlot, src []float64, owned bool) ([]fusedSumSlot, int) {
@@ -176,11 +202,17 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 		return Frame{}, false, nil
 	}
 	for _, agg := range aggs {
-		if agg.Weight != nil {
-			return Frame{}, false, nil
-		}
 		switch agg.Func {
 		case "count", "sum", "avg", "var", "dev":
+			if agg.Weight != nil {
+				return Frame{}, false, nil
+			}
+		case "wavg":
+			// wavg fuses as two sum streams: sum(weight*value)/sum(weight)
+			// per group, mirroring the generic per-row float accumulation.
+			if agg.column == nil || agg.weightColumn == nil {
+				return Frame{}, false, nil
+			}
 		default:
 			return Frame{}, false, nil
 		}
@@ -228,8 +260,27 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 	var slots []fusedSumSlot
 	plans := make([]fusedAggPlan, len(aggs))
 	for i, agg := range aggs {
-		plans[i] = fusedAggPlan{fn: agg.Func, name: agg.Name, slot: -1}
+		plans[i] = fusedAggPlan{fn: agg.Func, name: agg.Name, slot: -1, wslot: -1}
 		if agg.Func == "count" {
+			continue
+		}
+		if agg.Func == "wavg" {
+			src, ok := fusedWavgProductSource(agg.column, agg.weightColumn, rows)
+			if !ok {
+				fusedReleaseSlots(slots)
+				return Frame{}, false, nil
+			}
+			slots, plans[i].slot = fusedSlotIndex(slots, src, true)
+			wsrc, wowned, ok := fusedGroupSource(agg.weightColumn, rows)
+			if !ok {
+				fusedReleaseSlots(slots)
+				return Frame{}, false, nil
+			}
+			slots, plans[i].wslot = fusedSlotIndex(slots, wsrc, wowned)
+			if len(slots) > fusedGroupMaxSumSlots {
+				fusedReleaseSlots(slots)
+				return Frame{}, false, nil
+			}
 			continue
 		}
 		var src []float64
@@ -403,6 +454,33 @@ func execGroupedFusedNumeric(frame Frame, indexes []int, allRows bool, byInputs 
 				values[g] = v
 			}
 			cols = append(cols, Column{Name: plan.name, Data: columnArray[float64]{kind: KindF64, data: values}})
+		case "wavg":
+			prods := slots[plan.slot].sums
+			weights := slots[plan.wslot].sums
+			hasNull := false
+			values := make([]float64, groups)
+			for g := 0; g < groups; g++ {
+				if count[g] == 0 || weights[g] == 0 {
+					// Matches aggregateResult: zero participating weight is a
+					// null result, not a division.
+					hasNull = true
+					continue
+				}
+				values[g] = prods[g] / weights[g]
+			}
+			if hasNull {
+				boxed := make([]any, groups)
+				for g := 0; g < groups; g++ {
+					if count[g] == 0 || weights[g] == 0 {
+						boxed[g] = NullValue
+						continue
+					}
+					boxed[g] = values[g]
+				}
+				cols = append(cols, NewColumn(plan.name, boxed))
+			} else {
+				cols = append(cols, Column{Name: plan.name, Data: columnArray[float64]{kind: KindF64, data: values}})
+			}
 		}
 	}
 	bulkI64Release(count, true)

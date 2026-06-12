@@ -6,6 +6,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type typedKernelRegistry struct{}
@@ -6221,6 +6222,26 @@ func typedIntegerSumWhereMask(array, mask Array) (any, bool, error) {
 		}
 		bulkBoolRelease(dense, true)
 	}
+	// Dense bool mask over a dense integer source: one fused slice pass
+	// instead of a per-true-row closure call with boxed integerArrayAt
+	// dispatch (the canonical `+/v where v>x` shape).
+	if m, isDense := unwrapAttributedArray(mask).(columnArray[bool]); isDense {
+		if vals, owned, ok := tryBulkI64Values(array); ok && len(vals) >= len(m.data) {
+			var total int64
+			count := 0
+			for row, keep := range m.data {
+				if keep {
+					total += vals[row]
+					count++
+				}
+			}
+			bulkI64Release(vals, owned)
+			if count == 0 {
+				return NullValue, true, nil
+			}
+			return total, true, nil
+		}
+	}
 	var total int64
 	count := 0
 	if err := forEachTypedBoolMask(mask, func(row int) error {
@@ -8683,6 +8704,34 @@ func (a fbyF64TiledBroadcastArray) total() float64 {
 }
 
 func fbySumTotalIntegral[T signedScalar | unsignedScalar](values []T, groups Array) (any, bool, error) {
+	// Dense comparable group carriers: pooled id vector plus a tight slice
+	// loop (no per-row closure dispatch, no per-call id allocation).
+	if ids, groupCount, ok, err := fbySumRowGroupIDs(groups); ok || err != nil {
+		if err != nil {
+			return nil, true, err
+		}
+		if len(ids) != len(values) {
+			bulkIntRelease(ids)
+			return nil, true, fmt.Errorf("fby sum group ids length mismatch: %d != %d", len(ids), len(values))
+		}
+		sums := bulkI64Get(groupCount)
+		clear(sums)
+		counts := bulkI64Get(groupCount)
+		clear(counts)
+		for row, value := range values {
+			group := ids[row]
+			sums[group] += int64(value)
+			counts[group]++
+		}
+		var total int64
+		for group, sum := range sums {
+			total += sum * counts[group]
+		}
+		bulkI64Release(sums, true)
+		bulkI64Release(counts, true)
+		bulkIntRelease(ids)
+		return total, true, nil
+	}
 	lookup, groupCount, ok, err := fbyGroupLookup(groups)
 	if err != nil || !ok {
 		return nil, ok, err
@@ -8727,6 +8776,34 @@ func fbySumTotalI64Range(values i64RangeArray, groups Array) (any, bool, error) 
 }
 
 func fbySumTotalFloat[T floatScalar](values []T, groups Array) (any, bool, error) {
+	// Dense comparable group carriers: pooled id vector plus a tight slice
+	// loop (no per-row closure dispatch, no per-call id allocation).
+	if ids, groupCount, ok, err := fbySumRowGroupIDs(groups); ok || err != nil {
+		if err != nil {
+			return nil, true, err
+		}
+		if len(ids) != len(values) {
+			bulkIntRelease(ids)
+			return nil, true, fmt.Errorf("fby sum group ids length mismatch: %d != %d", len(ids), len(values))
+		}
+		sums := bulkF64Get(groupCount)
+		clear(sums)
+		counts := bulkI64Get(groupCount)
+		clear(counts)
+		for row, value := range values {
+			group := ids[row]
+			sums[group] += float64(value)
+			counts[group]++
+		}
+		var total float64
+		for group, sum := range sums {
+			total += sum * float64(counts[group])
+		}
+		bulkF64Release(sums, true)
+		bulkI64Release(counts, true)
+		bulkIntRelease(ids)
+		return total, true, nil
+	}
 	lookup, groupCount, ok, err := fbyGroupLookup(groups)
 	if err != nil || !ok {
 		return nil, ok, err
@@ -9233,7 +9310,13 @@ func fbyGroupIDsI64Computed(values interface {
 }
 
 func fbyGroupIDsComparable[T comparable](values []T) ([]int, int, error) {
-	rowGroups := make([]int, len(values))
+	return fbyGroupIDsComparableInto(values, make([]int, len(values)))
+}
+
+// fbyGroupIDsComparableInto is fbyGroupIDsComparable writing into a
+// caller-provided id vector (len(values) long), so single-call consumers can
+// hand in a pooled buffer instead of allocating one per evaluation.
+func fbyGroupIDsComparableInto[T comparable](values []T, rowGroups []int) ([]int, int, error) {
 	// Small-cardinality fast path: market-data style group columns carry a
 	// handful of distinct values, so a linear probe over the seen slice (with
 	// a last-value run check) beats hashing every row. Falls over to the map
@@ -9266,12 +9349,27 @@ func fbyGroupIDsComparable[T comparable](values []T) ([]int, int, error) {
 	if row == len(values) {
 		return rowGroups, len(seen), nil
 	}
-	groupIDs := make(map[T]int, 64)
+	// Cardinality already outgrew the linear probe window, so size the map
+	// for a high-cardinality column up front: repeated power-of-two grows
+	// (and their full rehashes) measure ~20% of the whole group-id pass on
+	// kilo-group symbol columns.
+	hint := (len(values) - row) / 4
+	if hint < 64 {
+		hint = 64
+	} else if hint > 1<<14 {
+		hint = 1 << 14
+	}
+	groupIDs := make(map[T]int, hint)
 	for g := range seen {
 		groupIDs[seen[g]] = g
 	}
 	for ; row < len(values); row++ {
 		value := values[row]
+		// Run check mirrors the linear phase: adjacent repeats skip the hash.
+		if value == values[row-1] {
+			rowGroups[row] = rowGroups[row-1]
+			continue
+		}
 		id, ok := groupIDs[value]
 		if !ok {
 			id = len(groupIDs)
@@ -9281,6 +9379,110 @@ func fbyGroupIDsComparable[T comparable](values []T) ([]int, int, error) {
 	}
 	return rowGroups, len(groupIDs), nil
 }
+
+// fbySumRowGroupIDs resolves per-row group ids into a pooled vector for the
+// dense comparable group carriers the fby total-sum kernels see in practice.
+// pooled ids must be released with bulkIntRelease by the caller; ok=false
+// defers to the closure-based fbyGroupLookup with no side effects.
+func fbySumRowGroupIDs(groups Array) (ids []int, count int, ok bool, err error) {
+	switch g := unwrapAttributedArray(groups).(type) {
+	case columnArray[Symbol]:
+		return fbyPooledGroupIDsText(g.data)
+	case columnArray[string]:
+		return fbyPooledGroupIDsText(g.data)
+	case columnArray[int64]:
+		return fbyPooledGroupIDs(g.data)
+	case columnArray[int32]:
+		return fbyPooledGroupIDs(g.data)
+	case columnArray[int16]:
+		return fbyPooledGroupIDs(g.data)
+	case columnArray[int8]:
+		return fbyPooledGroupIDs(g.data)
+	case columnArray[bool]:
+		return fbyPooledGroupIDs(g.data)
+	default:
+		return nil, 0, false, nil
+	}
+}
+
+func fbyPooledGroupIDs[T comparable](values []T) ([]int, int, bool, error) {
+	ids, count, err := fbyGroupIDsComparableInto(values, bulkIntGetLen(len(values)))
+	if err != nil {
+		bulkIntRelease(ids)
+		return nil, 0, true, err
+	}
+	return ids, count, true, nil
+}
+
+func fbyPooledGroupIDsText[T ~string](values []T) ([]int, int, bool, error) {
+	ids, count, err := fbyGroupIDsTextInto(values, bulkIntGetLen(len(values)))
+	if err != nil {
+		bulkIntRelease(ids)
+		return nil, 0, true, err
+	}
+	return ids, count, true, nil
+}
+
+// fbyTextGroupIDMapPool recycles the high-cardinality content map for the
+// text group-id pass: clear() keeps the grown bucket array, so a warm fby
+// over a kilo-group symbol column skips both the per-call map allocation and
+// the incremental rehash-to-capacity it would otherwise pay every call.
+var fbyTextGroupIDMapPool = sync.Pool{New: func() any { return make(map[string]int, 1<<11) }}
+
+// fbyGroupIDsTextInto is fbyGroupIDsComparableInto for string-like columns
+// with a pooled content map. Group ids are identical to the generic path.
+func fbyGroupIDsTextInto[T ~string](values []T, rowGroups []int) ([]int, int, error) {
+	const linearMaxGroups = 16
+	seen := make([]T, 0, linearMaxGroups)
+	row := 0
+	for ; row < len(values); row++ {
+		value := values[row]
+		if row > 0 && value == values[row-1] {
+			rowGroups[row] = rowGroups[row-1]
+			continue
+		}
+		id := -1
+		for g := range seen {
+			if seen[g] == value {
+				id = g
+				break
+			}
+		}
+		if id < 0 {
+			if len(seen) == linearMaxGroups {
+				break
+			}
+			id = len(seen)
+			seen = append(seen, value)
+		}
+		rowGroups[row] = id
+	}
+	if row == len(values) {
+		return rowGroups, len(seen), nil
+	}
+	groupIDs := fbyTextGroupIDMapPool.Get().(map[string]int)
+	for g := range seen {
+		groupIDs[string(seen[g])] = g
+	}
+	for ; row < len(values); row++ {
+		value := values[row]
+		if value == values[row-1] {
+			rowGroups[row] = rowGroups[row-1]
+			continue
+		}
+		id, ok := groupIDs[string(value)]
+		if !ok {
+			id = len(groupIDs)
+			groupIDs[string(value)] = id
+		}
+		rowGroups[row] = id
+	}
+	count := len(groupIDs)
+	clear(groupIDs)
+	fbyTextGroupIDMapPool.Put(groupIDs)
+	return rowGroups, count, nil
+}
+
 
 func (typedKernelRegistry) NumericSumRows(array Array, rows []int) (float64, int64, bool, error) {
 	switch a := array.(type) {
