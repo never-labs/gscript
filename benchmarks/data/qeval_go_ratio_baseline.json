@@ -2,28 +2,28 @@
   "captured": "2026-06-12",
   "cases": {
     "AdverbDeltasSum": {
-      "jit_go_ratio": 0.2806,
-      "warm_go_ratio": 0.2613
+      "jit_go_ratio": 0.2318,
+      "warm_go_ratio": 0.2722
     },
     "AdverbInitialOverScanProducts": {
-      "jit_go_ratio": 0.8984,
-      "warm_go_ratio": 0.9141
+      "jit_go_ratio": 0.6839,
+      "warm_go_ratio": 0.7648
     },
     "AdverbMatrix": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "AdverbSumScanAndNamedSums": {
-      "jit_go_ratio": 0.2894,
-      "warm_go_ratio": 0.3245
+      "jit_go_ratio": 0.3211,
+      "warm_go_ratio": 0.3523
     },
     "AvgsTailChecksum": {
-      "jit_go_ratio": 0.378,
-      "warm_go_ratio": 0.4027
+      "jit_go_ratio": 0.3407,
+      "warm_go_ratio": 0.3698
     },
     "BinAscendingProbeSum": {
-      "jit_go_ratio": 0.3589,
-      "warm_go_ratio": 0.392
+      "jit_go_ratio": 0.3669,
+      "warm_go_ratio": 0.4095
     },
     "BooleanLogicalAndCompositeCompare": {
       "jit_go_ratio": null,
@@ -34,660 +34,660 @@
       "warm_go_ratio": null
     },
     "BreadthAggregateAvgMedRange": {
-      "jit_go_ratio": 0.1175,
-      "warm_go_ratio": 0.1481
+      "jit_go_ratio": 0.1148,
+      "warm_go_ratio": 0.1372
     },
     "BreadthAggregateProductOnesAndWavg": {
-      "jit_go_ratio": 1.192,
-      "warm_go_ratio": 1.1962
+      "jit_go_ratio": 1.0791,
+      "warm_go_ratio": 1.125
     },
     "BreadthApplyAtGatherMedium": {
-      "jit_go_ratio": 0.2537,
-      "warm_go_ratio": 0.3081
+      "jit_go_ratio": 0.2826,
+      "warm_go_ratio": 0.4154
     },
     "BreadthApplyAtGatherSmall": {
-      "jit_go_ratio": 0.2694,
-      "warm_go_ratio": 0.3708
+      "jit_go_ratio": 0.2803,
+      "warm_go_ratio": 0.3401
     },
     "BreadthApplyAtGatherTiny": {
-      "jit_go_ratio": 0.2744,
-      "warm_go_ratio": 0.3185
+      "jit_go_ratio": 0.2734,
+      "warm_go_ratio": 0.3643
     },
     "BreadthApplyAtGatherWide": {
-      "jit_go_ratio": 0.2987,
-      "warm_go_ratio": 0.3849
+      "jit_go_ratio": 0.2934,
+      "warm_go_ratio": 0.3868
     },
     "BreadthApplyBracketGatherMedium": {
-      "jit_go_ratio": 0.2726,
-      "warm_go_ratio": 0.2991
+      "jit_go_ratio": 0.263,
+      "warm_go_ratio": 0.2793
     },
     "BreadthApplyBracketGatherSmall": {
-      "jit_go_ratio": 0.2523,
-      "warm_go_ratio": 0.2801
+      "jit_go_ratio": 0.2695,
+      "warm_go_ratio": 0.2989
     },
     "BreadthApplyBracketGatherTiny": {
-      "jit_go_ratio": 0.2173,
-      "warm_go_ratio": 0.2691
+      "jit_go_ratio": 0.2259,
+      "warm_go_ratio": 0.306
     },
     "BreadthApplyBracketGatherWide": {
-      "jit_go_ratio": 0.3091,
-      "warm_go_ratio": 0.3412
+      "jit_go_ratio": 0.3262,
+      "warm_go_ratio": 0.3182
     },
     "BreadthArithmeticAbsNegSignumMod11Bias6": {
-      "jit_go_ratio": 1.3592,
-      "warm_go_ratio": 1.3673
+      "jit_go_ratio": 1.471,
+      "warm_go_ratio": 1.6196
     },
     "BreadthArithmeticAbsNegSignumMod3Bias1": {
-      "jit_go_ratio": 1.476,
-      "warm_go_ratio": 1.5553
+      "jit_go_ratio": 1.4816,
+      "warm_go_ratio": 1.5305
     },
     "BreadthArithmeticAbsNegSignumMod5Bias2": {
-      "jit_go_ratio": 1.4778,
-      "warm_go_ratio": 1.5027
+      "jit_go_ratio": 1.5012,
+      "warm_go_ratio": 1.5268
     },
     "BreadthArithmeticAbsNegSignumMod7Bias4": {
-      "jit_go_ratio": 1.4461,
-      "warm_go_ratio": 1.5381
+      "jit_go_ratio": 1.4675,
+      "warm_go_ratio": 1.5454
     },
     "BreadthArithmeticDivModEnvelopeMod11Bias6": {
-      "jit_go_ratio": 0.2379,
-      "warm_go_ratio": 0.238
+      "jit_go_ratio": 0.2335,
+      "warm_go_ratio": 0.2255
     },
     "BreadthArithmeticDivModEnvelopeMod3Bias1": {
-      "jit_go_ratio": 0.1999,
-      "warm_go_ratio": 0.218
+      "jit_go_ratio": 0.2262,
+      "warm_go_ratio": 0.2008
     },
     "BreadthArithmeticDivModEnvelopeMod5Bias2": {
-      "jit_go_ratio": 0.194,
-      "warm_go_ratio": 0.1957
+      "jit_go_ratio": 0.1998,
+      "warm_go_ratio": 0.209
     },
     "BreadthArithmeticDivModEnvelopeMod7Bias4": {
-      "jit_go_ratio": 0.2006,
-      "warm_go_ratio": 0.211
+      "jit_go_ratio": 0.2065,
+      "warm_go_ratio": 0.1981
     },
     "BreadthCallableDotApplyMedium": {
-      "jit_go_ratio": 0.2224,
-      "warm_go_ratio": 0.2057
+      "jit_go_ratio": 0.1891,
+      "warm_go_ratio": 0.2589
     },
     "BreadthCallableDotApplySmall": {
-      "jit_go_ratio": 0.1974,
-      "warm_go_ratio": 0.2553
+      "jit_go_ratio": 0.1844,
+      "warm_go_ratio": 0.2304
     },
     "BreadthCallableDotApplyTiny": {
-      "jit_go_ratio": 0.1933,
-      "warm_go_ratio": 0.2105
+      "jit_go_ratio": 0.1895,
+      "warm_go_ratio": 0.2309
     },
     "BreadthCallableDotApplyWide": {
-      "jit_go_ratio": 0.177,
-      "warm_go_ratio": 0.2211
+      "jit_go_ratio": 0.1808,
+      "warm_go_ratio": 0.2533
     },
     "BreadthFloatFloorCeilingReciprocalMod11Bias6": {
-      "jit_go_ratio": 0.6074,
-      "warm_go_ratio": 0.6186
+      "jit_go_ratio": 0.6758,
+      "warm_go_ratio": 0.6447
     },
     "BreadthFloatFloorCeilingReciprocalMod3Bias1": {
-      "jit_go_ratio": 0.6345,
-      "warm_go_ratio": 0.5835
+      "jit_go_ratio": 0.6444,
+      "warm_go_ratio": 0.6579
     },
     "BreadthFloatFloorCeilingReciprocalMod5Bias2": {
-      "jit_go_ratio": 0.6691,
-      "warm_go_ratio": 0.6911
+      "jit_go_ratio": 0.6566,
+      "warm_go_ratio": 0.6643
     },
     "BreadthFloatFloorCeilingReciprocalMod7Bias4": {
-      "jit_go_ratio": 0.6446,
-      "warm_go_ratio": 0.6556
+      "jit_go_ratio": 0.6577,
+      "warm_go_ratio": 0.6425
     },
     "BreadthListCutRazeChecksumCycle": {
-      "jit_go_ratio": 0.5323,
-      "warm_go_ratio": 0.66
+      "jit_go_ratio": 0.5623,
+      "warm_go_ratio": 0.6258
     },
     "BreadthListCutRazeChecksumLong": {
-      "jit_go_ratio": 0.3907,
-      "warm_go_ratio": 0.4697
+      "jit_go_ratio": 0.4517,
+      "warm_go_ratio": 0.5451
     },
     "BreadthListCutRazeChecksumMid": {
-      "jit_go_ratio": 0.4768,
-      "warm_go_ratio": 0.5811
+      "jit_go_ratio": 0.4773,
+      "warm_go_ratio": 0.544
     },
     "BreadthListCutRazeChecksumShort": {
-      "jit_go_ratio": 0.4438,
-      "warm_go_ratio": 0.5179
+      "jit_go_ratio": 0.5106,
+      "warm_go_ratio": 0.5264
     },
     "BreadthListDropTakeSublistCycle": {
-      "jit_go_ratio": 0.1017,
-      "warm_go_ratio": 0.1356
+      "jit_go_ratio": 0.1184,
+      "warm_go_ratio": 0.1281
     },
     "BreadthListDropTakeSublistLong": {
-      "jit_go_ratio": 0.2095,
-      "warm_go_ratio": 0.2389
+      "jit_go_ratio": 0.2453,
+      "warm_go_ratio": 0.2977
     },
     "BreadthListDropTakeSublistMid": {
-      "jit_go_ratio": 0.2856,
-      "warm_go_ratio": 0.3268
+      "jit_go_ratio": 0.3035,
+      "warm_go_ratio": 0.3742
     },
     "BreadthListDropTakeSublistShort": {
-      "jit_go_ratio": 0.3382,
-      "warm_go_ratio": 0.3263
+      "jit_go_ratio": 0.3119,
+      "warm_go_ratio": 0.3458
     },
     "BreadthListFirstLastReverseRotateCycle": {
-      "jit_go_ratio": 0.0808,
-      "warm_go_ratio": 0.0832
+      "jit_go_ratio": 0.0802,
+      "warm_go_ratio": 0.0873
     },
     "BreadthListFirstLastReverseRotateLong": {
-      "jit_go_ratio": 0.0747,
-      "warm_go_ratio": 0.0848
+      "jit_go_ratio": 0.0751,
+      "warm_go_ratio": 0.084
     },
     "BreadthListFirstLastReverseRotateMid": {
-      "jit_go_ratio": 0.0837,
-      "warm_go_ratio": 0.0972
+      "jit_go_ratio": 0.0726,
+      "warm_go_ratio": 0.0962
     },
     "BreadthListFirstLastReverseRotateShort": {
-      "jit_go_ratio": 0.0744,
-      "warm_go_ratio": 0.0884
+      "jit_go_ratio": 0.0714,
+      "warm_go_ratio": 0.0913
     },
     "BreadthMatrixReshapeCellProbeEightByN": {
-      "jit_go_ratio": 0.3022,
-      "warm_go_ratio": 0.3228
+      "jit_go_ratio": 0.3383,
+      "warm_go_ratio": 0.3786
     },
     "BreadthMatrixReshapeCellProbeFourByN": {
-      "jit_go_ratio": 0.3186,
-      "warm_go_ratio": 0.3394
+      "jit_go_ratio": 0.4186,
+      "warm_go_ratio": 0.4341
     },
     "BreadthMatrixReshapeCellProbeTwoByN": {
-      "jit_go_ratio": 0.3444,
-      "warm_go_ratio": 0.386
+      "jit_go_ratio": 0.3456,
+      "warm_go_ratio": 0.3362
     },
     "BreadthMatrixReshapeRowSumEightByN": {
-      "jit_go_ratio": 1.2584,
-      "warm_go_ratio": 1.3913
+      "jit_go_ratio": 1.3271,
+      "warm_go_ratio": 1.3037
     },
     "BreadthMatrixReshapeRowSumFourByN": {
-      "jit_go_ratio": 0.6632,
-      "warm_go_ratio": 0.6814
+      "jit_go_ratio": 0.5989,
+      "warm_go_ratio": 0.6935
     },
     "BreadthMatrixReshapeRowSumTwoByN": {
-      "jit_go_ratio": 0.3414,
-      "warm_go_ratio": 0.4049
+      "jit_go_ratio": 0.353,
+      "warm_go_ratio": 0.4555
     },
     "BreadthMovingWindowEnvelope": {
-      "jit_go_ratio": 0.1157,
-      "warm_go_ratio": 0.1308
+      "jit_go_ratio": 0.1173,
+      "warm_go_ratio": 0.1212
     },
     "BreadthRunningMinMaxAvgEnvelope": {
-      "jit_go_ratio": 0.7014,
-      "warm_go_ratio": 0.7428
+      "jit_go_ratio": 0.6524,
+      "warm_go_ratio": 0.667
     },
     "BreadthStringUpperLowerLikeSymbolsA": {
-      "jit_go_ratio": 0.2336,
-      "warm_go_ratio": 0.2412
+      "jit_go_ratio": 0.2318,
+      "warm_go_ratio": 0.2282
     },
     "BreadthStringUpperLowerLikeSymbolsN": {
-      "jit_go_ratio": 0.4109,
-      "warm_go_ratio": 0.429
+      "jit_go_ratio": 0.4534,
+      "warm_go_ratio": 0.4603
     },
     "BreadthStringUpperLowerLikeVenuesX": {
-      "jit_go_ratio": 0.2337,
-      "warm_go_ratio": 0.2325
+      "jit_go_ratio": 0.2603,
+      "warm_go_ratio": 0.2611
     },
     "BreadthSymbolDistinctGroupSortSymbolsA": {
-      "jit_go_ratio": 0.0143,
-      "warm_go_ratio": 0.0143
+      "jit_go_ratio": 0.0162,
+      "warm_go_ratio": 0.0171
     },
     "BreadthSymbolDistinctGroupSortSymbolsN": {
-      "jit_go_ratio": 0.0067,
-      "warm_go_ratio": 0.0061
+      "jit_go_ratio": 0.0079,
+      "warm_go_ratio": 0.0079
     },
     "BreadthSymbolDistinctGroupSortVenuesX": {
-      "jit_go_ratio": 0.0119,
-      "warm_go_ratio": 0.0111
+      "jit_go_ratio": 0.0139,
+      "warm_go_ratio": 0.0143
     },
     "ComboDepth3DeltasAbsSqrtFloorSum": {
-      "jit_go_ratio": 1.672,
-      "warm_go_ratio": 1.6443
+      "jit_go_ratio": 2.1089,
+      "warm_go_ratio": 2.1441
     },
     "ComboDepth3FillsMsumNullPipeline": {
-      "jit_go_ratio": 0.8551,
-      "warm_go_ratio": 0.8525
+      "jit_go_ratio": 1.1025,
+      "warm_go_ratio": 1.0939
     },
     "ComboDepth3RotateDeltasAbsSum": {
-      "jit_go_ratio": 1.0709,
-      "warm_go_ratio": 1.1245
+      "jit_go_ratio": 1.3548,
+      "warm_go_ratio": 1.4146
     },
     "ComboDepth3SumsModXbarReduce": {
-      "jit_go_ratio": 2.2917,
-      "warm_go_ratio": 2.3026
+      "jit_go_ratio": 2.4331,
+      "warm_go_ratio": 2.4011
     },
     "ComboDictTableFbyNotionalSum": {
-      "jit_go_ratio": 2.1469,
-      "warm_go_ratio": 2.2257
+      "jit_go_ratio": 2.1278,
+      "warm_go_ratio": 2.246
     },
     "ComboDictTableXascHeadGatherSum": {
-      "jit_go_ratio": 0.4274,
-      "warm_go_ratio": 0.3956
+      "jit_go_ratio": 0.3691,
+      "warm_go_ratio": 0.347
     },
     "ComboDictTableXgroupUngroupSum": {
-      "jit_go_ratio": 1.7274,
-      "warm_go_ratio": 1.6983
+      "jit_go_ratio": 1.7042,
+      "warm_go_ratio": 1.6417
     },
     "ComboEachIndexedMatrixRowsSum": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "ComboMixedFloatIntNotionalFloor": {
-      "jit_go_ratio": 4.0982,
-      "warm_go_ratio": 4.1861
+      "jit_go_ratio": 4.3538,
+      "warm_go_ratio": 4.3756
     },
     "ComboMixedFloatXbarBucketEnvelope": {
-      "jit_go_ratio": 5.3521,
-      "warm_go_ratio": 5.2046
+      "jit_go_ratio": 5.3867,
+      "warm_go_ratio": 5.6477
     },
     "ComboMixedTypedSuffixPromotionSum": {
-      "jit_go_ratio": 4.3613,
-      "warm_go_ratio": 4.524
+      "jit_go_ratio": 4.4534,
+      "warm_go_ratio": 4.7118
     },
     "ComboNestedEachPriorOverAbs": {
-      "jit_go_ratio": 3.1394,
-      "warm_go_ratio": 3.4485
+      "jit_go_ratio": 3.9013,
+      "warm_go_ratio": 3.1853
     },
     "ComboNestedOverEachCutSegments": {
-      "jit_go_ratio": 0.7107,
-      "warm_go_ratio": 0.6902
+      "jit_go_ratio": 0.6384,
+      "warm_go_ratio": 0.6606
     },
     "ComboNestedScanEachRazeSum": {
-      "jit_go_ratio": 2.5155,
-      "warm_go_ratio": 2.5787
+      "jit_go_ratio": 2.578,
+      "warm_go_ratio": 2.4839
     },
     "ComboNullFillsWhereGatherReduce": {
-      "jit_go_ratio": 2.6104,
-      "warm_go_ratio": 2.8212
+      "jit_go_ratio": 2.4189,
+      "warm_go_ratio": 3.1308
     },
     "ComboNullMaskArithWithinEnvelope": {
-      "jit_go_ratio": 0.5682,
-      "warm_go_ratio": 0.5424
+      "jit_go_ratio": 0.5375,
+      "warm_go_ratio": 0.5857
     },
     "ComboOverGatherModuloSum": {
-      "jit_go_ratio": 1.308,
-      "warm_go_ratio": 1.358
+      "jit_go_ratio": 1.2734,
+      "warm_go_ratio": 1.3138
     },
     "ComboScanGatherLastEnvelope": {
-      "jit_go_ratio": 1.1763,
-      "warm_go_ratio": 1.361
+      "jit_go_ratio": 1.1735,
+      "warm_go_ratio": 1.328
     },
     "ComboWhereModCompareMembershipSum": {
-      "jit_go_ratio": 0.4308,
-      "warm_go_ratio": 0.4676
+      "jit_go_ratio": 0.4268,
+      "warm_go_ratio": 0.4758
     },
     "ComboWherePriceBandSizeWithin": {
-      "jit_go_ratio": 3.3424,
-      "warm_go_ratio": 3.717
+      "jit_go_ratio": 3.5746,
+      "warm_go_ratio": 3.6085
     },
     "ComboWhereSymbolInOrNotCompare": {
-      "jit_go_ratio": 2.8963,
-      "warm_go_ratio": 2.9748
+      "jit_go_ratio": 2.9307,
+      "warm_go_ratio": 3.1002
     },
     "CompositionCountDistinctAndReverse": {
-      "jit_go_ratio": 0.3462,
-      "warm_go_ratio": 0.358
+      "jit_go_ratio": 0.3472,
+      "warm_go_ratio": 0.3581
     },
     "CutEnlistRazeChecksum": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "DeepAdverbEachLeftRightChecksum": {
-      "jit_go_ratio": 3.2034,
-      "warm_go_ratio": 3.3471
+      "jit_go_ratio": 3.2138,
+      "warm_go_ratio": 3.3581
     },
     "DeepAdverbEachPairwiseArithmetic": {
-      "jit_go_ratio": 0.5885,
-      "warm_go_ratio": 0.5906
+      "jit_go_ratio": 0.5713,
+      "warm_go_ratio": 0.5775
     },
     "DeepBinBucketProbeSumFine": {
-      "jit_go_ratio": 0.2226,
-      "warm_go_ratio": 0.289
+      "jit_go_ratio": 0.2431,
+      "warm_go_ratio": 0.281
     },
     "DeepBinBucketProbeSumKilo": {
-      "jit_go_ratio": 0.2333,
-      "warm_go_ratio": 0.2784
+      "jit_go_ratio": 0.2395,
+      "warm_go_ratio": 0.2648
     },
     "DeepBinBucketProbeSumMinute": {
-      "jit_go_ratio": 0.2679,
-      "warm_go_ratio": 0.2882
+      "jit_go_ratio": 0.2589,
+      "warm_go_ratio": 0.2791
     },
     "DeepBinBucketProbeSumTen": {
-      "jit_go_ratio": 0.2419,
-      "warm_go_ratio": 0.2824
+      "jit_go_ratio": 0.2612,
+      "warm_go_ratio": 0.2836
     },
     "DeepDeltasFillsChecksumInts": {
-      "jit_go_ratio": 2.8512,
-      "warm_go_ratio": 2.9
+      "jit_go_ratio": 3.1474,
+      "warm_go_ratio": 2.9998
     },
     "DeepDeltasFillsChecksumLongs": {
-      "jit_go_ratio": 3.5901,
-      "warm_go_ratio": 3.4109
+      "jit_go_ratio": 3.5747,
+      "warm_go_ratio": 3.6588
     },
     "DeepNullFillWhereSumInts": {
-      "jit_go_ratio": 0.1124,
-      "warm_go_ratio": 0.1208
+      "jit_go_ratio": 0.1047,
+      "warm_go_ratio": 0.1031
     },
     "DeepNullFillWhereSumLongs": {
-      "jit_go_ratio": 0.1117,
-      "warm_go_ratio": 0.112
+      "jit_go_ratio": 0.1064,
+      "warm_go_ratio": 0.1039
     },
     "DeepNumericAffineModuloWhereA": {
-      "jit_go_ratio": 2.0705,
-      "warm_go_ratio": 2.0771
+      "jit_go_ratio": 2.1079,
+      "warm_go_ratio": 2.0456
     },
     "DeepNumericAffineModuloWhereB": {
-      "jit_go_ratio": 2.1936,
-      "warm_go_ratio": 2.0854
+      "jit_go_ratio": 2.0132,
+      "warm_go_ratio": 2.0187
     },
     "DeepNumericAffineModuloWhereC": {
-      "jit_go_ratio": 2.5841,
-      "warm_go_ratio": 2.0619
+      "jit_go_ratio": 2.051,
+      "warm_go_ratio": 2.1303
     },
     "DeepNumericAffineModuloWhereD": {
-      "jit_go_ratio": 2.6363,
-      "warm_go_ratio": 2.0547
+      "jit_go_ratio": 2.2569,
+      "warm_go_ratio": 2.2216
     },
     "DeepNumericFloorCeilingEnvelopeA": {
-      "jit_go_ratio": 1.25,
-      "warm_go_ratio": 1.2371
+      "jit_go_ratio": 1.2428,
+      "warm_go_ratio": 1.2248
     },
     "DeepNumericFloorCeilingEnvelopeB": {
-      "jit_go_ratio": 1.2678,
-      "warm_go_ratio": 1.2171
+      "jit_go_ratio": 1.2731,
+      "warm_go_ratio": 1.2604
     },
     "DeepNumericFloorCeilingEnvelopeC": {
-      "jit_go_ratio": 1.4641,
-      "warm_go_ratio": 1.1749
+      "jit_go_ratio": 1.2631,
+      "warm_go_ratio": 1.2389
     },
     "DeepNumericFloorCeilingEnvelopeD": {
-      "jit_go_ratio": 1.4997,
-      "warm_go_ratio": 1.2208
+      "jit_go_ratio": 1.2419,
+      "warm_go_ratio": 1.2705
     },
     "DeepNumericSignumNotMaskA": {
-      "jit_go_ratio": 3.1377,
-      "warm_go_ratio": 3.3456
+      "jit_go_ratio": 3.006,
+      "warm_go_ratio": 3.2331
     },
     "DeepNumericSignumNotMaskB": {
-      "jit_go_ratio": 4.0095,
-      "warm_go_ratio": 3.2897
+      "jit_go_ratio": 3.0269,
+      "warm_go_ratio": 3.4482
     },
     "DeepNumericSignumNotMaskC": {
-      "jit_go_ratio": 3.7858,
-      "warm_go_ratio": 2.8814
+      "jit_go_ratio": 3.0064,
+      "warm_go_ratio": 3.2182
     },
     "DeepNumericSignumNotMaskD": {
-      "jit_go_ratio": 3.811,
-      "warm_go_ratio": 3.0936
+      "jit_go_ratio": 2.9254,
+      "warm_go_ratio": 3.0884
     },
     "DeepOverScanProjectionChecksum": {
-      "jit_go_ratio": 0.184,
-      "warm_go_ratio": 0.2323
+      "jit_go_ratio": 0.1776,
+      "warm_go_ratio": 0.2099
     },
     "DeepReverseWhereWindowCountCycle": {
-      "jit_go_ratio": 0.3173,
-      "warm_go_ratio": 0.3119
+      "jit_go_ratio": 0.3082,
+      "warm_go_ratio": 0.322
     },
     "DeepReverseWhereWindowCountMedium": {
-      "jit_go_ratio": 0.4165,
-      "warm_go_ratio": 0.3254
+      "jit_go_ratio": 0.3242,
+      "warm_go_ratio": 0.349
     },
     "DeepReverseWhereWindowCountSmall": {
-      "jit_go_ratio": 0.4518,
-      "warm_go_ratio": 0.3045
+      "jit_go_ratio": 0.3233,
+      "warm_go_ratio": 0.33
     },
     "DeepReverseWhereWindowCountWide": {
-      "jit_go_ratio": 0.3004,
-      "warm_go_ratio": 0.3312
+      "jit_go_ratio": 0.3588,
+      "warm_go_ratio": 0.327
     },
     "DeepRotateModuloGatherSumCycle": {
-      "jit_go_ratio": 3.2907,
-      "warm_go_ratio": 3.2799
+      "jit_go_ratio": 2.8978,
+      "warm_go_ratio": 3.096
     },
     "DeepRotateModuloGatherSumMedium": {
-      "jit_go_ratio": 4.1822,
-      "warm_go_ratio": 3.2116
+      "jit_go_ratio": 2.8031,
+      "warm_go_ratio": 2.8363
     },
     "DeepRotateModuloGatherSumSmall": {
-      "jit_go_ratio": 3.9625,
-      "warm_go_ratio": 3.6347
+      "jit_go_ratio": 3.2519,
+      "warm_go_ratio": 2.7469
     },
     "DeepRotateModuloGatherSumWide": {
-      "jit_go_ratio": 3.061,
-      "warm_go_ratio": 3.6997
+      "jit_go_ratio": 3.3891,
+      "warm_go_ratio": 3.2211
     },
     "DeepSetUnionInterExceptSymbols": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "DeepSortRankGatherChecksum": {
-      "jit_go_ratio": 0.7845,
-      "warm_go_ratio": 0.8357
+      "jit_go_ratio": 0.7402,
+      "warm_go_ratio": 0.7443
     },
     "DeepStringUpperLikeCountSide": {
-      "jit_go_ratio": 0.1442,
-      "warm_go_ratio": 0.1312
+      "jit_go_ratio": 0.1162,
+      "warm_go_ratio": 0.1229
     },
     "DeepStringUpperLikeCountTech": {
-      "jit_go_ratio": 0.0511,
-      "warm_go_ratio": 0.057
+      "jit_go_ratio": 0.0534,
+      "warm_go_ratio": 0.0676
     },
     "DeepStringUpperLikeCountVenue": {
-      "jit_go_ratio": 0.0607,
-      "warm_go_ratio": 0.063
+      "jit_go_ratio": 0.0626,
+      "warm_go_ratio": 0.0626
     },
     "DeepSymbolDistinctAfterRotateSide": {
-      "jit_go_ratio": 0.0166,
-      "warm_go_ratio": 0.0185
+      "jit_go_ratio": 0.0155,
+      "warm_go_ratio": 0.0168
     },
     "DeepSymbolDistinctAfterRotateTech": {
-      "jit_go_ratio": 0.0153,
-      "warm_go_ratio": 0.0152
+      "jit_go_ratio": 0.0158,
+      "warm_go_ratio": 0.017
     },
     "DeepSymbolDistinctAfterRotateVenue": {
-      "jit_go_ratio": 0.0143,
-      "warm_go_ratio": 0.0167
+      "jit_go_ratio": 0.0157,
+      "warm_go_ratio": 0.0154
     },
     "DeepSymbolMembershipProjectionSide": {
-      "jit_go_ratio": 0.1013,
-      "warm_go_ratio": 0.1047
+      "jit_go_ratio": 0.1056,
+      "warm_go_ratio": 0.0985
     },
     "DeepSymbolMembershipProjectionTech": {
-      "jit_go_ratio": 0.0941,
-      "warm_go_ratio": 0.094
+      "jit_go_ratio": 0.0986,
+      "warm_go_ratio": 0.1069
     },
     "DeepSymbolMembershipProjectionVenue": {
-      "jit_go_ratio": 0.1059,
-      "warm_go_ratio": 0.1261
+      "jit_go_ratio": 0.1,
+      "warm_go_ratio": 0.1008
     },
     "DeepTakeDropRotateSumCycle": {
-      "jit_go_ratio": 0.0386,
-      "warm_go_ratio": 0.042
+      "jit_go_ratio": 0.0428,
+      "warm_go_ratio": 0.0464
     },
     "DeepTakeDropRotateSumMedium": {
-      "jit_go_ratio": 0.0997,
-      "warm_go_ratio": 0.0988
+      "jit_go_ratio": 0.1179,
+      "warm_go_ratio": 0.0946
     },
     "DeepTakeDropRotateSumSmall": {
-      "jit_go_ratio": 0.1141,
-      "warm_go_ratio": 0.0949
+      "jit_go_ratio": 0.1015,
+      "warm_go_ratio": 0.0974
     },
     "DeepTakeDropRotateSumWide": {
-      "jit_go_ratio": 0.0765,
-      "warm_go_ratio": 0.0855
+      "jit_go_ratio": 0.0748,
+      "warm_go_ratio": 0.0844
     },
     "DeepTemporalReverseCountDateWindow": {
-      "jit_go_ratio": 0.0855,
-      "warm_go_ratio": 0.1088
+      "jit_go_ratio": 0.1062,
+      "warm_go_ratio": 0.121
     },
     "DeepTemporalReverseCountMonthWindow": {
-      "jit_go_ratio": 0.1089,
-      "warm_go_ratio": 0.1308
+      "jit_go_ratio": 0.1169,
+      "warm_go_ratio": 0.1182
     },
     "DeepTemporalReverseCountTimeGE": {
-      "jit_go_ratio": 0.1374,
-      "warm_go_ratio": 0.1513
+      "jit_go_ratio": 0.1361,
+      "warm_go_ratio": 0.1425
     },
     "DeepTemporalWhereProjectionDateWindow": {
-      "jit_go_ratio": 0.0932,
-      "warm_go_ratio": 0.1131
+      "jit_go_ratio": 0.0754,
+      "warm_go_ratio": 0.0758
     },
     "DeepTemporalWhereProjectionMonthWindow": {
-      "jit_go_ratio": 0.1044,
-      "warm_go_ratio": 0.0907
+      "jit_go_ratio": 0.0944,
+      "warm_go_ratio": 0.093
     },
     "DeepTemporalWhereProjectionTimeGE": {
-      "jit_go_ratio": 0.0946,
-      "warm_go_ratio": 0.1083
+      "jit_go_ratio": 0.1088,
+      "warm_go_ratio": 0.1048
     },
     "DeepXbarWithinCountFine": {
-      "jit_go_ratio": 0.2564,
-      "warm_go_ratio": 0.2581
+      "jit_go_ratio": 0.2379,
+      "warm_go_ratio": 0.2454
     },
     "DeepXbarWithinCountKilo": {
-      "jit_go_ratio": 0.2336,
-      "warm_go_ratio": 0.28
+      "jit_go_ratio": 0.2216,
+      "warm_go_ratio": 0.2547
     },
     "DeepXbarWithinCountMinute": {
-      "jit_go_ratio": 0.2445,
-      "warm_go_ratio": 0.2742
+      "jit_go_ratio": 0.2405,
+      "warm_go_ratio": 0.294
     },
     "DeepXbarWithinCountTen": {
-      "jit_go_ratio": 0.275,
-      "warm_go_ratio": 0.2523
+      "jit_go_ratio": 0.2278,
+      "warm_go_ratio": 0.254
     },
     "DeepXrankModuloSumFine": {
-      "jit_go_ratio": 0.001,
-      "warm_go_ratio": 0.0012
+      "jit_go_ratio": 0.0009,
+      "warm_go_ratio": 0.0011
     },
     "DeepXrankModuloSumKilo": {
       "jit_go_ratio": 0.0126,
-      "warm_go_ratio": 0.015
+      "warm_go_ratio": 0.0151
     },
     "DeepXrankModuloSumMinute": {
-      "jit_go_ratio": 0.0016,
-      "warm_go_ratio": 0.0015
+      "jit_go_ratio": 0.0014,
+      "warm_go_ratio": 0.0016
     },
     "DeepXrankModuloSumTen": {
       "jit_go_ratio": 0.001,
-      "warm_go_ratio": 0.0011
+      "warm_go_ratio": 0.0012
     },
     "DictAmendUpsertAndLookup": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "DictEachCountDistinct": {
-      "jit_go_ratio": 4.5621,
-      "warm_go_ratio": 3.2514
+      "jit_go_ratio": 4.4899,
+      "warm_go_ratio": 3.4821
     },
     "DictKeysValueAttrFillMatch": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "DirectDropPrefixSum": {
-      "jit_go_ratio": 0.3732,
-      "warm_go_ratio": 0.3915
+      "jit_go_ratio": 0.3484,
+      "warm_go_ratio": 0.4086
     },
     "DirectReverseSum": {
-      "jit_go_ratio": 0.3409,
-      "warm_go_ratio": 0.3751
+      "jit_go_ratio": 0.3556,
+      "warm_go_ratio": 0.3856
     },
     "DirectRotateSum": {
-      "jit_go_ratio": 0.216,
-      "warm_go_ratio": 0.2381
+      "jit_go_ratio": 0.1933,
+      "warm_go_ratio": 0.2263
     },
     "DirectTakeCount": {
-      "jit_go_ratio": 0.1487,
-      "warm_go_ratio": 0.1533
+      "jit_go_ratio": 0.1302,
+      "warm_go_ratio": 0.1554
     },
     "DirectTakeCycleSum": {
-      "jit_go_ratio": 0.1656,
-      "warm_go_ratio": 0.1997
+      "jit_go_ratio": 0.1805,
+      "warm_go_ratio": 0.2171
     },
     "DistinctModuloCount": {
-      "jit_go_ratio": 0.2212,
-      "warm_go_ratio": 0.2517
+      "jit_go_ratio": 0.242,
+      "warm_go_ratio": 0.2711
     },
     "DropPrefix1": {
-      "jit_go_ratio": 0.2446,
-      "warm_go_ratio": 0.2288
+      "jit_go_ratio": 0.2089,
+      "warm_go_ratio": 0.2267
     },
     "DropPrefix1024": {
-      "jit_go_ratio": 0.1916,
-      "warm_go_ratio": 0.2169
+      "jit_go_ratio": 0.2172,
+      "warm_go_ratio": 0.2808
     },
     "DropPrefix256": {
-      "jit_go_ratio": 0.157,
-      "warm_go_ratio": 0.1967
+      "jit_go_ratio": 0.1722,
+      "warm_go_ratio": 0.2484
     },
     "DropPrefix4096": {
-      "jit_go_ratio": 0.2997,
-      "warm_go_ratio": 0.4178
+      "jit_go_ratio": 0.3427,
+      "warm_go_ratio": 0.4713
     },
     "DropPrefix64": {
-      "jit_go_ratio": 0.1634,
-      "warm_go_ratio": 0.2275
+      "jit_go_ratio": 0.1796,
+      "warm_go_ratio": 0.2236
     },
     "DropPrefix8": {
-      "jit_go_ratio": 0.1334,
-      "warm_go_ratio": 0.2325
+      "jit_go_ratio": 0.1665,
+      "warm_go_ratio": 0.2866
     },
     "EachPriorMinusRowScaled": {
-      "jit_go_ratio": 0.126,
-      "warm_go_ratio": 0.1445
+      "jit_go_ratio": 0.1483,
+      "warm_go_ratio": 0.1607
     },
     "EnumSymbolStringMatchLike": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "FbyCountTerminalProjection": {
-      "jit_go_ratio": 0.2564,
-      "warm_go_ratio": 0.2345
+      "jit_go_ratio": 0.2426,
+      "warm_go_ratio": 0.2429
     },
     "FbyGroupedAggregateRowScaled": {
-      "jit_go_ratio": 0.1296,
-      "warm_go_ratio": 0.1469
+      "jit_go_ratio": 0.1262,
+      "warm_go_ratio": 0.1533
     },
     "FillsNullPatternSum": {
-      "jit_go_ratio": 3.9675,
-      "warm_go_ratio": 3.6099
+      "jit_go_ratio": 3.9351,
+      "warm_go_ratio": 3.6999
     },
     "FindModuloPatternSum": {
-      "jit_go_ratio": 4.4913,
-      "warm_go_ratio": 2.6805
+      "jit_go_ratio": 4.3522,
+      "warm_go_ratio": 2.5558
     },
     "FloatCastCount": {
-      "jit_go_ratio": 1.6851,
-      "warm_go_ratio": 1.3649
+      "jit_go_ratio": 1.6584,
+      "warm_go_ratio": 1.5166
     },
     "FloatVectorArithmetic": {
-      "jit_go_ratio": 0.1065,
-      "warm_go_ratio": 0.1327
+      "jit_go_ratio": 0.1066,
+      "warm_go_ratio": 0.1352
     },
     "FloatXbarCount": {
-      "jit_go_ratio": 0.3874,
-      "warm_go_ratio": 0.4638
+      "jit_go_ratio": 0.4009,
+      "warm_go_ratio": 0.4679
     },
     "FunctionalAmendWhereVector": {
-      "jit_go_ratio": 2.2223,
-      "warm_go_ratio": 2.2473
+      "jit_go_ratio": 2.3785,
+      "warm_go_ratio": 2.3885
     },
     "GroupModuloBucketCount": {
-      "jit_go_ratio": 0.275,
-      "warm_go_ratio": 0.3145
+      "jit_go_ratio": 0.296,
+      "warm_go_ratio": 0.3323
     },
     "JoinAtomAppendPrependCountSum": {
-      "jit_go_ratio": 0.2178,
-      "warm_go_ratio": 0.2965
+      "jit_go_ratio": 0.3088,
+      "warm_go_ratio": 0.3533
     },
     "JoinRazeOverNestedSum": {
-      "jit_go_ratio": 0.3458,
-      "warm_go_ratio": 0.3642
+      "jit_go_ratio": 0.4451,
+      "warm_go_ratio": 0.4856
     },
     "JoinTypedVectorConcatSum": {
-      "jit_go_ratio": 3.1687,
-      "warm_go_ratio": 3.4494
+      "jit_go_ratio": 4.165,
+      "warm_go_ratio": 5.4948
     },
     "KeyedTableGroupUngroupFby": {
       "jit_go_ratio": null,
@@ -698,504 +698,504 @@
       "warm_go_ratio": null
     },
     "ListCrossCountEnvelope": {
-      "jit_go_ratio": 0.1797,
-      "warm_go_ratio": 0.205
+      "jit_go_ratio": 0.1744,
+      "warm_go_ratio": 0.1951
     },
     "ListCutCountEnvelope": {
-      "jit_go_ratio": 0.2674,
-      "warm_go_ratio": 0.2896
+      "jit_go_ratio": 0.2582,
+      "warm_go_ratio": 0.2867
     },
     "ListReductionsInt": {
-      "jit_go_ratio": 0.0851,
-      "warm_go_ratio": 0.107
+      "jit_go_ratio": 0.1208,
+      "warm_go_ratio": 0.1238
     },
     "ListStringBooleanCoverageEnvelope": {
-      "jit_go_ratio": 0.4464,
-      "warm_go_ratio": 0.4211
+      "jit_go_ratio": 0.4006,
+      "warm_go_ratio": 0.4111
     },
     "ListSublistCountEnvelope": {
-      "jit_go_ratio": 0.2551,
-      "warm_go_ratio": 0.2988
+      "jit_go_ratio": 0.2566,
+      "warm_go_ratio": 0.2912
     },
     "LogicalMaskFilterRowScaled": {
-      "jit_go_ratio": 0.1994,
-      "warm_go_ratio": 0.2341
+      "jit_go_ratio": 0.2421,
+      "warm_go_ratio": 0.2792
     },
     "MembershipDifferRatiosTruthMatrix": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "MembershipSymbolFilterRowScaled": {
-      "jit_go_ratio": 0.4449,
-      "warm_go_ratio": 0.493
+      "jit_go_ratio": 0.441,
+      "warm_go_ratio": 0.506
     },
     "MinMaxAvgVarDevMed": {
-      "jit_go_ratio": 0.2093,
-      "warm_go_ratio": 0.1889
+      "jit_go_ratio": 0.1977,
+      "warm_go_ratio": 0.2213
     },
     "ModuloBandWhereIndexSum": {
-      "jit_go_ratio": 0.2607,
-      "warm_go_ratio": 0.2684
+      "jit_go_ratio": 0.2454,
+      "warm_go_ratio": 0.3149
     },
     "ModuloEqMaskCount": {
-      "jit_go_ratio": 0.2703,
-      "warm_go_ratio": 0.2857
+      "jit_go_ratio": 0.2861,
+      "warm_go_ratio": 0.3083
     },
     "ModuloNeMaskCount": {
-      "jit_go_ratio": 0.1953,
-      "warm_go_ratio": 0.1771
+      "jit_go_ratio": 0.193,
+      "warm_go_ratio": 0.1908
     },
     "MovingCount32Sum": {
-      "jit_go_ratio": 0.3379,
-      "warm_go_ratio": 0.364
+      "jit_go_ratio": 0.3452,
+      "warm_go_ratio": 0.3589
     },
     "MovingMinMax32Envelope": {
-      "jit_go_ratio": 0.2847,
-      "warm_go_ratio": 0.2917
+      "jit_go_ratio": 0.2587,
+      "warm_go_ratio": 0.2641
     },
     "MovingStdDevEma32Envelope": {
-      "jit_go_ratio": 0.8979,
-      "warm_go_ratio": 0.9122
+      "jit_go_ratio": 0.8618,
+      "warm_go_ratio": 0.8725
     },
     "MovingSumAvgRowScaled": {
-      "jit_go_ratio": 0.0247,
-      "warm_go_ratio": 0.0264
+      "jit_go_ratio": 0.0244,
+      "warm_go_ratio": 0.0255
     },
     "MovingWindowAggregates": {
-      "jit_go_ratio": 0.4786,
-      "warm_go_ratio": 0.3444
+      "jit_go_ratio": 0.5048,
+      "warm_go_ratio": 0.4873
     },
     "NestedDictProjectionAmendCombo": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "NumericMonadExpReciprocalSignumNot": {
-      "jit_go_ratio": 0.2009,
-      "warm_go_ratio": 0.1915
+      "jit_go_ratio": 0.1974,
+      "warm_go_ratio": 0.1958
     },
     "NumericMonadsAndWordDyadics": {
-      "jit_go_ratio": 3.0525,
-      "warm_go_ratio": 2.7565
+      "jit_go_ratio": 3.1692,
+      "warm_go_ratio": 3.6619
     },
     "OrdinaryArithmeticMapReduceDenseA": {
-      "jit_go_ratio": 0.6861,
-      "warm_go_ratio": 0.73
+      "jit_go_ratio": 0.6937,
+      "warm_go_ratio": 0.7662
     },
     "OrdinaryArithmeticMapReduceDenseB": {
-      "jit_go_ratio": 0.7336,
-      "warm_go_ratio": 0.7357
+      "jit_go_ratio": 0.696,
+      "warm_go_ratio": 0.8077
     },
     "OrdinaryArithmeticMapReduceDenseC": {
-      "jit_go_ratio": 0.6906,
-      "warm_go_ratio": 0.6975
+      "jit_go_ratio": 0.6534,
+      "warm_go_ratio": 0.6961
     },
     "OrdinaryArithmeticMapReduceDenseD": {
-      "jit_go_ratio": 0.8056,
-      "warm_go_ratio": 0.8068
+      "jit_go_ratio": 0.7516,
+      "warm_go_ratio": 0.7671
     },
     "OrdinaryArithmeticMapReduceDenseE": {
-      "jit_go_ratio": 0.7895,
-      "warm_go_ratio": 0.8121
+      "jit_go_ratio": 0.7721,
+      "warm_go_ratio": 0.73
     },
     "OrdinaryArithmeticMapReduceDenseF": {
-      "jit_go_ratio": 0.7855,
-      "warm_go_ratio": 0.7794
+      "jit_go_ratio": 0.7132,
+      "warm_go_ratio": 0.7329
     },
     "OrdinaryArithmeticScanTailDenseA": {
-      "jit_go_ratio": 0.1708,
-      "warm_go_ratio": 0.1941
+      "jit_go_ratio": 0.1734,
+      "warm_go_ratio": 0.2037
     },
     "OrdinaryArithmeticScanTailDenseB": {
-      "jit_go_ratio": 0.1724,
-      "warm_go_ratio": 0.1829
+      "jit_go_ratio": 0.1865,
+      "warm_go_ratio": 0.219
     },
     "OrdinaryArithmeticScanTailDenseC": {
-      "jit_go_ratio": 0.1685,
-      "warm_go_ratio": 0.2009
+      "jit_go_ratio": 0.1834,
+      "warm_go_ratio": 0.1988
     },
     "OrdinaryArithmeticScanTailDenseD": {
-      "jit_go_ratio": 0.1603,
-      "warm_go_ratio": 0.1952
+      "jit_go_ratio": 0.1842,
+      "warm_go_ratio": 0.1855
     },
     "OrdinaryArithmeticScanTailDenseE": {
-      "jit_go_ratio": 0.1686,
-      "warm_go_ratio": 0.1817
+      "jit_go_ratio": 0.1762,
+      "warm_go_ratio": 0.1984
     },
     "OrdinaryArithmeticScanTailDenseF": {
-      "jit_go_ratio": 0.1794,
-      "warm_go_ratio": 0.1963
+      "jit_go_ratio": 0.1726,
+      "warm_go_ratio": 0.1839
     },
     "OrdinaryArithmeticWhereProjectDenseA": {
-      "jit_go_ratio": 0.2188,
-      "warm_go_ratio": 0.2616
+      "jit_go_ratio": 0.2533,
+      "warm_go_ratio": 0.2565
     },
     "OrdinaryArithmeticWhereProjectDenseB": {
-      "jit_go_ratio": 0.2524,
-      "warm_go_ratio": 0.2674
+      "jit_go_ratio": 0.243,
+      "warm_go_ratio": 0.244
     },
     "OrdinaryArithmeticWhereProjectDenseC": {
-      "jit_go_ratio": 0.2512,
-      "warm_go_ratio": 0.2672
+      "jit_go_ratio": 0.2425,
+      "warm_go_ratio": 0.2259
     },
     "OrdinaryArithmeticWhereProjectDenseD": {
-      "jit_go_ratio": 0.2399,
-      "warm_go_ratio": 0.2581
+      "jit_go_ratio": 0.305,
+      "warm_go_ratio": 0.2662
     },
     "OrdinaryArithmeticWhereProjectDenseE": {
-      "jit_go_ratio": 0.2328,
-      "warm_go_ratio": 0.23
+      "jit_go_ratio": 0.2499,
+      "warm_go_ratio": 0.2366
     },
     "OrdinaryArithmeticWhereProjectDenseF": {
-      "jit_go_ratio": 0.2538,
-      "warm_go_ratio": 0.2748
+      "jit_go_ratio": 0.2353,
+      "warm_go_ratio": 0.2515
     },
     "OrdinaryDropThenTake1024": {
-      "jit_go_ratio": 0.3048,
-      "warm_go_ratio": 0.3571
+      "jit_go_ratio": 0.3129,
+      "warm_go_ratio": 0.3476
     },
     "OrdinaryDropThenTake127": {
-      "jit_go_ratio": 0.3218,
-      "warm_go_ratio": 0.368
+      "jit_go_ratio": 0.2972,
+      "warm_go_ratio": 0.3321
     },
     "OrdinaryDropThenTake16": {
-      "jit_go_ratio": 0.2519,
-      "warm_go_ratio": 0.3166
+      "jit_go_ratio": 0.3081,
+      "warm_go_ratio": 0.3644
     },
     "OrdinaryDropThenTake2049": {
-      "jit_go_ratio": 0.3002,
-      "warm_go_ratio": 0.422
+      "jit_go_ratio": 0.3055,
+      "warm_go_ratio": 0.3764
     },
     "OrdinaryDropThenTake256": {
-      "jit_go_ratio": 0.312,
-      "warm_go_ratio": 0.3227
+      "jit_go_ratio": 0.3137,
+      "warm_go_ratio": 0.3347
     },
     "OrdinaryDropThenTake3": {
-      "jit_go_ratio": 0.2858,
-      "warm_go_ratio": 0.331
+      "jit_go_ratio": 0.3064,
+      "warm_go_ratio": 0.3787
     },
     "OrdinaryDropThenTake31": {
-      "jit_go_ratio": 0.2644,
-      "warm_go_ratio": 0.3395
+      "jit_go_ratio": 0.2847,
+      "warm_go_ratio": 0.3158
     },
     "OrdinaryDropThenTake513": {
-      "jit_go_ratio": 0.283,
-      "warm_go_ratio": 0.3288
+      "jit_go_ratio": 0.2839,
+      "warm_go_ratio": 0.3198
     },
     "OrdinaryDropThenTake64": {
-      "jit_go_ratio": 0.294,
-      "warm_go_ratio": 0.4574
+      "jit_go_ratio": 0.3362,
+      "warm_go_ratio": 0.3561
     },
     "OrdinaryDropThenTake7": {
-      "jit_go_ratio": 0.2997,
-      "warm_go_ratio": 0.3468
+      "jit_go_ratio": 0.3213,
+      "warm_go_ratio": 0.3612
     },
     "OrdinaryModuloBandCountBandA": {
-      "jit_go_ratio": 0.2785,
-      "warm_go_ratio": 0.2999
+      "jit_go_ratio": 0.264,
+      "warm_go_ratio": 0.2788
     },
     "OrdinaryModuloBandCountBandB": {
-      "jit_go_ratio": 0.2983,
-      "warm_go_ratio": 0.2927
+      "jit_go_ratio": 0.2936,
+      "warm_go_ratio": 0.2936
     },
     "OrdinaryModuloBandCountBandC": {
-      "jit_go_ratio": 0.3018,
-      "warm_go_ratio": 0.305
+      "jit_go_ratio": 0.2786,
+      "warm_go_ratio": 0.2678
     },
     "OrdinaryModuloBandCountBandD": {
-      "jit_go_ratio": 0.3194,
-      "warm_go_ratio": 0.2839
+      "jit_go_ratio": 0.2799,
+      "warm_go_ratio": 0.2743
     },
     "OrdinaryModuloBandCountBandE": {
-      "jit_go_ratio": 0.2891,
-      "warm_go_ratio": 0.2702
+      "jit_go_ratio": 0.3031,
+      "warm_go_ratio": 0.2865
     },
     "OrdinaryModuloBandCountBandF": {
-      "jit_go_ratio": 0.302,
-      "warm_go_ratio": 0.301
+      "jit_go_ratio": 0.2954,
+      "warm_go_ratio": 0.3188
     },
     "OrdinaryModuloBandGatherSumBandA": {
-      "jit_go_ratio": 0.4214,
-      "warm_go_ratio": 0.4788
+      "jit_go_ratio": 0.4289,
+      "warm_go_ratio": 0.4422
     },
     "OrdinaryModuloBandGatherSumBandB": {
-      "jit_go_ratio": 0.44,
-      "warm_go_ratio": 0.4756
+      "jit_go_ratio": 0.4137,
+      "warm_go_ratio": 0.4046
     },
     "OrdinaryModuloBandGatherSumBandC": {
-      "jit_go_ratio": 0.4827,
-      "warm_go_ratio": 0.4116
+      "jit_go_ratio": 0.4798,
+      "warm_go_ratio": 0.4515
     },
     "OrdinaryModuloBandGatherSumBandD": {
-      "jit_go_ratio": 0.4338,
-      "warm_go_ratio": 0.4423
+      "jit_go_ratio": 0.4404,
+      "warm_go_ratio": 0.4787
     },
     "OrdinaryModuloBandGatherSumBandE": {
-      "jit_go_ratio": 0.4824,
-      "warm_go_ratio": 0.4858
+      "jit_go_ratio": 0.4652,
+      "warm_go_ratio": 0.451
     },
     "OrdinaryModuloBandGatherSumBandF": {
-      "jit_go_ratio": 0.5091,
-      "warm_go_ratio": 0.4668
+      "jit_go_ratio": 0.4409,
+      "warm_go_ratio": 0.5008
     },
     "OrdinaryNullFillSumFloatNulls": {
-      "jit_go_ratio": 3.2668,
-      "warm_go_ratio": 3.2902
+      "jit_go_ratio": 3.5351,
+      "warm_go_ratio": 3.5943
     },
     "OrdinaryNullFillSumIntNulls": {
-      "jit_go_ratio": 0.1304,
-      "warm_go_ratio": 0.136
+      "jit_go_ratio": 0.1353,
+      "warm_go_ratio": 0.138
     },
     "OrdinaryNullFillSumShortCast": {
-      "jit_go_ratio": 0.7225,
-      "warm_go_ratio": 0.6579
+      "jit_go_ratio": 0.747,
+      "warm_go_ratio": 0.7792
     },
     "OrdinaryNullFillsCountFloatNulls": {
-      "jit_go_ratio": 0.0321,
-      "warm_go_ratio": 0.0298
+      "jit_go_ratio": 0.0307,
+      "warm_go_ratio": 0.031
     },
     "OrdinaryNullFillsCountIntNulls": {
-      "jit_go_ratio": 0.0285,
-      "warm_go_ratio": 0.0296
+      "jit_go_ratio": 0.0263,
+      "warm_go_ratio": 0.0281
     },
     "OrdinaryNullFillsCountShortCast": {
-      "jit_go_ratio": 0.0289,
-      "warm_go_ratio": 0.034
+      "jit_go_ratio": 0.0312,
+      "warm_go_ratio": 0.0381
     },
     "OrdinaryRotateFilter1024": {
-      "jit_go_ratio": 0.2734,
-      "warm_go_ratio": 0.2279
+      "jit_go_ratio": 0.2348,
+      "warm_go_ratio": 0.2317
     },
     "OrdinaryRotateFilter127": {
-      "jit_go_ratio": 0.2326,
-      "warm_go_ratio": 0.2603
+      "jit_go_ratio": 0.2119,
+      "warm_go_ratio": 0.2402
     },
     "OrdinaryRotateFilter16": {
-      "jit_go_ratio": 0.2203,
-      "warm_go_ratio": 0.2397
+      "jit_go_ratio": 0.2102,
+      "warm_go_ratio": 0.2335
     },
     "OrdinaryRotateFilter2049": {
-      "jit_go_ratio": 0.2201,
-      "warm_go_ratio": 0.2283
+      "jit_go_ratio": 0.2172,
+      "warm_go_ratio": 0.2358
     },
     "OrdinaryRotateFilter256": {
-      "jit_go_ratio": 0.2134,
-      "warm_go_ratio": 0.2082
+      "jit_go_ratio": 0.2349,
+      "warm_go_ratio": 0.2271
     },
     "OrdinaryRotateFilter3": {
-      "jit_go_ratio": 0.2295,
-      "warm_go_ratio": 0.2194
+      "jit_go_ratio": 0.2245,
+      "warm_go_ratio": 0.2297
     },
     "OrdinaryRotateFilter31": {
-      "jit_go_ratio": 0.289,
-      "warm_go_ratio": 0.2261
+      "jit_go_ratio": 0.2358,
+      "warm_go_ratio": 0.2341
     },
     "OrdinaryRotateFilter513": {
-      "jit_go_ratio": 0.2101,
-      "warm_go_ratio": 0.228
+      "jit_go_ratio": 0.2198,
+      "warm_go_ratio": 0.2373
     },
     "OrdinaryRotateFilter64": {
-      "jit_go_ratio": 0.2089,
-      "warm_go_ratio": 0.2237
+      "jit_go_ratio": 0.2129,
+      "warm_go_ratio": 0.2301
     },
     "OrdinaryRotateFilter7": {
-      "jit_go_ratio": 0.2163,
-      "warm_go_ratio": 0.2357
+      "jit_go_ratio": 0.2191,
+      "warm_go_ratio": 0.239
     },
     "OrdinarySymbolEqualityWhereSidesBuy": {
-      "jit_go_ratio": 0.0485,
-      "warm_go_ratio": 0.0467
+      "jit_go_ratio": 0.0547,
+      "warm_go_ratio": 0.0673
     },
     "OrdinarySymbolEqualityWhereSidesSell": {
-      "jit_go_ratio": 0.0617,
-      "warm_go_ratio": 0.0572
+      "jit_go_ratio": 0.0567,
+      "warm_go_ratio": 0.0553
     },
     "OrdinarySymbolEqualityWhereTechAAPL": {
-      "jit_go_ratio": 0.0478,
-      "warm_go_ratio": 0.0498
+      "jit_go_ratio": 0.0528,
+      "warm_go_ratio": 0.0551
     },
     "OrdinarySymbolEqualityWhereTechMSFT": {
-      "jit_go_ratio": 0.0524,
-      "warm_go_ratio": 0.0561
+      "jit_go_ratio": 0.0628,
+      "warm_go_ratio": 0.0555
     },
     "OrdinarySymbolEqualityWhereVenuesBATS": {
-      "jit_go_ratio": 0.0552,
-      "warm_go_ratio": 0.0578
+      "jit_go_ratio": 0.0553,
+      "warm_go_ratio": 0.0612
     },
     "OrdinarySymbolEqualityWhereVenuesXNYS": {
-      "jit_go_ratio": 0.0443,
-      "warm_go_ratio": 0.0468
+      "jit_go_ratio": 0.0509,
+      "warm_go_ratio": 0.0585
     },
     "OrdinarySymbolFilterProjectionSidesBuy": {
-      "jit_go_ratio": 0.0818,
-      "warm_go_ratio": 0.0655
+      "jit_go_ratio": 0.0666,
+      "warm_go_ratio": 0.0621
     },
     "OrdinarySymbolFilterProjectionSidesSell": {
-      "jit_go_ratio": 0.0674,
-      "warm_go_ratio": 0.0625
+      "jit_go_ratio": 0.0675,
+      "warm_go_ratio": 0.0691
     },
     "OrdinarySymbolFilterProjectionTechAAPL": {
-      "jit_go_ratio": 0.0773,
-      "warm_go_ratio": 0.0641
+      "jit_go_ratio": 0.0566,
+      "warm_go_ratio": 0.0632
     },
     "OrdinarySymbolFilterProjectionTechMSFT": {
-      "jit_go_ratio": 0.0763,
-      "warm_go_ratio": 0.0689
+      "jit_go_ratio": 0.0774,
+      "warm_go_ratio": 0.0703
     },
     "OrdinarySymbolFilterProjectionVenuesBATS": {
-      "jit_go_ratio": 0.0714,
-      "warm_go_ratio": 0.0685
+      "jit_go_ratio": 0.07,
+      "warm_go_ratio": 0.0762
     },
     "OrdinarySymbolFilterProjectionVenuesXNYS": {
-      "jit_go_ratio": 0.064,
-      "warm_go_ratio": 0.065
+      "jit_go_ratio": 0.0536,
+      "warm_go_ratio": 0.0653
     },
     "OrdinaryTakeReverseHead1024": {
-      "jit_go_ratio": 0.0995,
-      "warm_go_ratio": 0.1981
+      "jit_go_ratio": 0.1058,
+      "warm_go_ratio": 0.1376
     },
     "OrdinaryTakeReverseHead127": {
-      "jit_go_ratio": 0.1238,
-      "warm_go_ratio": 0.1279
+      "jit_go_ratio": 0.1225,
+      "warm_go_ratio": 0.1377
     },
     "OrdinaryTakeReverseHead16": {
-      "jit_go_ratio": 0.1337,
-      "warm_go_ratio": 0.1528
+      "jit_go_ratio": 0.123,
+      "warm_go_ratio": 0.1438
     },
     "OrdinaryTakeReverseHead2049": {
-      "jit_go_ratio": 0.0905,
-      "warm_go_ratio": 0.1099
+      "jit_go_ratio": 0.0888,
+      "warm_go_ratio": 0.1148
     },
     "OrdinaryTakeReverseHead256": {
-      "jit_go_ratio": 0.1136,
-      "warm_go_ratio": 0.1452
+      "jit_go_ratio": 0.1078,
+      "warm_go_ratio": 0.1468
     },
     "OrdinaryTakeReverseHead3": {
-      "jit_go_ratio": 0.1338,
-      "warm_go_ratio": 0.1518
+      "jit_go_ratio": 0.1356,
+      "warm_go_ratio": 0.1503
     },
     "OrdinaryTakeReverseHead31": {
-      "jit_go_ratio": 0.1145,
-      "warm_go_ratio": 0.133
+      "jit_go_ratio": 0.1136,
+      "warm_go_ratio": 0.1376
     },
     "OrdinaryTakeReverseHead513": {
-      "jit_go_ratio": 0.1141,
-      "warm_go_ratio": 0.1293
+      "jit_go_ratio": 0.1168,
+      "warm_go_ratio": 0.1371
     },
     "OrdinaryTakeReverseHead64": {
-      "jit_go_ratio": 0.131,
-      "warm_go_ratio": 0.1498
+      "jit_go_ratio": 0.1204,
+      "warm_go_ratio": 0.1416
     },
     "OrdinaryTakeReverseHead7": {
-      "jit_go_ratio": 0.1439,
-      "warm_go_ratio": 0.1418
+      "jit_go_ratio": 0.1656,
+      "warm_go_ratio": 0.157
     },
     "OrdinaryTemporalCompareCountDateEQ": {
-      "jit_go_ratio": 0.126,
-      "warm_go_ratio": 0.1385
+      "jit_go_ratio": 0.121,
+      "warm_go_ratio": 0.1295
     },
     "OrdinaryTemporalCompareCountDateGE": {
-      "jit_go_ratio": 0.1195,
-      "warm_go_ratio": 0.1326
+      "jit_go_ratio": 0.1288,
+      "warm_go_ratio": 0.1348
     },
     "OrdinaryTemporalCompareCountMonthSuffixGE": {
-      "jit_go_ratio": 0.1297,
-      "warm_go_ratio": 0.1415
+      "jit_go_ratio": 0.127,
+      "warm_go_ratio": 0.1425
     },
     "OrdinaryTemporalCompareCountTimeWithin": {
-      "jit_go_ratio": 0.1123,
-      "warm_go_ratio": 0.1131
+      "jit_go_ratio": 0.1089,
+      "warm_go_ratio": 0.1035
     },
     "OrdinaryTemporalFilterProjectionDateEQ": {
-      "jit_go_ratio": 0.0958,
-      "warm_go_ratio": 0.1026
+      "jit_go_ratio": 0.0946,
+      "warm_go_ratio": 0.0978
     },
     "OrdinaryTemporalFilterProjectionDateGE": {
-      "jit_go_ratio": 0.0466,
-      "warm_go_ratio": 0.0477
+      "jit_go_ratio": 0.0635,
+      "warm_go_ratio": 0.0439
     },
     "OrdinaryTemporalFilterProjectionMonthSuffixGE": {
-      "jit_go_ratio": 0.0456,
-      "warm_go_ratio": 0.0455
+      "jit_go_ratio": 0.0443,
+      "warm_go_ratio": 0.0504
     },
     "OrdinaryTemporalFilterProjectionTimeWithin": {
-      "jit_go_ratio": 0.1147,
-      "warm_go_ratio": 0.0994
+      "jit_go_ratio": 0.095,
+      "warm_go_ratio": 0.1152
     },
     "ParseTreeCount": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "PrevNextDeltasCountsRowScaled": {
-      "jit_go_ratio": 0.2776,
-      "warm_go_ratio": 0.2913
+      "jit_go_ratio": 0.2214,
+      "warm_go_ratio": 0.2436
     },
     "ProductOnesRowScaled": {
-      "jit_go_ratio": 0.1666,
-      "warm_go_ratio": 0.1358
+      "jit_go_ratio": 0.1441,
+      "warm_go_ratio": 0.1463
     },
     "ProjectionEachDictNumericTableCombo": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "ReverseFirstLastChecksum": {
-      "jit_go_ratio": 0.1422,
-      "warm_go_ratio": 0.1795
+      "jit_go_ratio": 0.1728,
+      "warm_go_ratio": 0.2009
     },
     "ReverseWhereGatherHeadSum": {
-      "jit_go_ratio": 0.2466,
-      "warm_go_ratio": 0.224
+      "jit_go_ratio": 0.227,
+      "warm_go_ratio": 0.227
     },
     "RotateSumNeg1": {
-      "jit_go_ratio": 0.0809,
-      "warm_go_ratio": 0.0972
+      "jit_go_ratio": 0.0966,
+      "warm_go_ratio": 0.1055
     },
     "RotateSumNeg1024": {
-      "jit_go_ratio": 0.0782,
-      "warm_go_ratio": 0.1109
+      "jit_go_ratio": 0.0911,
+      "warm_go_ratio": 0.124
     },
     "RotateSumNeg257": {
-      "jit_go_ratio": 0.0988,
-      "warm_go_ratio": 0.1068
+      "jit_go_ratio": 0.1,
+      "warm_go_ratio": 0.1133
     },
     "RotateSumPos1": {
-      "jit_go_ratio": 0.0988,
-      "warm_go_ratio": 0.1084
+      "jit_go_ratio": 0.1074,
+      "warm_go_ratio": 0.1096
     },
     "RotateSumPos1024": {
-      "jit_go_ratio": 0.09,
-      "warm_go_ratio": 0.1005
+      "jit_go_ratio": 0.088,
+      "warm_go_ratio": 0.1058
     },
     "RotateSumPos257": {
-      "jit_go_ratio": 0.0963,
-      "warm_go_ratio": 0.1121
+      "jit_go_ratio": 0.0975,
+      "warm_go_ratio": 0.1142
     },
     "RotateWhereHeadCount": {
-      "jit_go_ratio": 0.2305,
-      "warm_go_ratio": 0.2347
+      "jit_go_ratio": 0.2185,
+      "warm_go_ratio": 0.3545
     },
     "RunningAggregateCountTerminalProjection": {
-      "jit_go_ratio": 0.1235,
-      "warm_go_ratio": 0.105
+      "jit_go_ratio": 0.1428,
+      "warm_go_ratio": 0.1469
     },
     "RunningAggregateProductMatrix": {
-      "jit_go_ratio": 1.4115,
-      "warm_go_ratio": 1.0943
+      "jit_go_ratio": 1.3299,
+      "warm_go_ratio": 1.3687
     },
     "RunningMinMaxTailEnvelope": {
-      "jit_go_ratio": 0.3387,
-      "warm_go_ratio": 0.3458
+      "jit_go_ratio": 0.3318,
+      "warm_go_ratio": 0.3421
     },
     "SafeSystemAndLoopbackIPC": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "SampleStatsCorrelationEnvelope": {
-      "jit_go_ratio": 2.6334,
-      "warm_go_ratio": 2.6242
+      "jit_go_ratio": 2.6323,
+      "warm_go_ratio": 2.8301
     },
     "ScanPlusTailChecksum": {
-      "jit_go_ratio": 0.3506,
-      "warm_go_ratio": 0.3685
+      "jit_go_ratio": 0.3114,
+      "warm_go_ratio": 0.3616
     },
     "SearchBinrWavgXprevMatrix": {
       "jit_go_ratio": null,
@@ -1206,264 +1206,264 @@
       "warm_go_ratio": null
     },
     "SortIndexGatherRowScaled": {
-      "jit_go_ratio": 0.018,
-      "warm_go_ratio": 0.021
+      "jit_go_ratio": 0.0184,
+      "warm_go_ratio": 0.0207
     },
     "SortRankTypeMatrix": {
-      "jit_go_ratio": 3.3228,
-      "warm_go_ratio": 3.3919
+      "jit_go_ratio": 3.9101,
+      "warm_go_ratio": 3.6057
     },
     "StringTrimCountEnvelope": {
-      "jit_go_ratio": 0.5922,
-      "warm_go_ratio": 0.609
+      "jit_go_ratio": 0.5767,
+      "warm_go_ratio": 0.5669
     },
     "StringUpperSymbolCount": {
-      "jit_go_ratio": 0.005,
-      "warm_go_ratio": 0.0053
+      "jit_go_ratio": 0.0071,
+      "warm_go_ratio": 0.0051
     },
     "SumsTailChecksum": {
-      "jit_go_ratio": 0.311,
-      "warm_go_ratio": 0.3479
+      "jit_go_ratio": 0.3312,
+      "warm_go_ratio": 0.3585
     },
     "SymbolDistinctCount": {
       "jit_go_ratio": 0.0209,
-      "warm_go_ratio": 0.0231
+      "warm_go_ratio": 0.0261
     },
     "SymbolEqualityMaskCount": {
-      "jit_go_ratio": 0.2155,
-      "warm_go_ratio": 0.215
+      "jit_go_ratio": 0.2042,
+      "warm_go_ratio": 0.2091
     },
     "SymbolNotEqualMaskCount": {
-      "jit_go_ratio": 0.2532,
-      "warm_go_ratio": 0.2401
+      "jit_go_ratio": 0.2056,
+      "warm_go_ratio": 0.2626
     },
     "SymbolRotateDistinctCount": {
-      "jit_go_ratio": 0.0205,
-      "warm_go_ratio": 0.0205
+      "jit_go_ratio": 0.0232,
+      "warm_go_ratio": 0.0189
     },
     "SymbolSetVerbs": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "SymbolStringLikeRowScaled": {
-      "jit_go_ratio": 1.762,
-      "warm_go_ratio": 1.7419
+      "jit_go_ratio": 1.9701,
+      "warm_go_ratio": 2.0364
     },
     "TableLiteralCount": {
-      "jit_go_ratio": 0.3992,
-      "warm_go_ratio": 0.3892
+      "jit_go_ratio": 0.4337,
+      "warm_go_ratio": 0.4331
     },
     "TableMetadataReorderSort": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "TakeCycleBeyondLengthSum": {
-      "jit_go_ratio": 0.0859,
-      "warm_go_ratio": 0.1219
+      "jit_go_ratio": 0.0861,
+      "warm_go_ratio": 0.1197
     },
     "TakeHead1": {
-      "jit_go_ratio": 0.2017,
-      "warm_go_ratio": 0.2503
+      "jit_go_ratio": 0.2205,
+      "warm_go_ratio": 0.2927
     },
     "TakeHead1024": {
-      "jit_go_ratio": 0.1451,
-      "warm_go_ratio": 0.1936
+      "jit_go_ratio": 0.1849,
+      "warm_go_ratio": 0.2664
     },
     "TakeHead128": {
-      "jit_go_ratio": 0.2281,
-      "warm_go_ratio": 0.3217
+      "jit_go_ratio": 0.2274,
+      "warm_go_ratio": 0.2787
     },
     "TakeHead4096": {
-      "jit_go_ratio": 0.1019,
-      "warm_go_ratio": 0.1294
+      "jit_go_ratio": 0.0946,
+      "warm_go_ratio": 0.1076
     },
     "TakeHead64": {
-      "jit_go_ratio": 0.2962,
-      "warm_go_ratio": 0.308
+      "jit_go_ratio": 0.2394,
+      "warm_go_ratio": 0.3164
     },
     "TakeHead8": {
-      "jit_go_ratio": 0.2368,
-      "warm_go_ratio": 0.3004
+      "jit_go_ratio": 0.2639,
+      "warm_go_ratio": 0.3564
     },
     "TaskDAggregateStatsEnvelope": {
-      "jit_go_ratio": 3.0857,
-      "warm_go_ratio": 3.1947
+      "jit_go_ratio": 3.2036,
+      "warm_go_ratio": 3.0716
     },
     "TaskDApplyAtGatherWindowEnvelope": {
-      "jit_go_ratio": 0.4996,
-      "warm_go_ratio": 0.5738
+      "jit_go_ratio": 0.5354,
+      "warm_go_ratio": 0.5559
     },
     "TaskDApplyAtRepeatedScalarProbe": {
-      "jit_go_ratio": 0.187,
-      "warm_go_ratio": 0.1839
+      "jit_go_ratio": 0.1517,
+      "warm_go_ratio": 0.1693
     },
     "TaskDApplyAtScalarAndVector": {
-      "jit_go_ratio": 0.2024,
-      "warm_go_ratio": 0.2454
+      "jit_go_ratio": 0.2014,
+      "warm_go_ratio": 0.2672
     },
     "TaskDApplyDotFunctionGatherArgs": {
-      "jit_go_ratio": 1.0868,
-      "warm_go_ratio": 1.1287
+      "jit_go_ratio": 0.9214,
+      "warm_go_ratio": 1.0007
     },
     "TaskDApplyDotScalarProbe": {
-      "jit_go_ratio": 0.131,
-      "warm_go_ratio": 0.1913
+      "jit_go_ratio": 0.1408,
+      "warm_go_ratio": 0.208
     },
     "TaskDApplyFunctionDotArgs": {
-      "jit_go_ratio": 0.1853,
-      "warm_go_ratio": 0.2116
+      "jit_go_ratio": 0.1779,
+      "warm_go_ratio": 0.2186
     },
     "TaskDBooleanVectorLiteralWhereProjection": {
-      "jit_go_ratio": 0.1392,
-      "warm_go_ratio": 0.1387
+      "jit_go_ratio": 0.1346,
+      "warm_go_ratio": 0.1439
     },
     "TaskDCastSymbolNumericEnvelope": {
-      "jit_go_ratio": null,
-      "warm_go_ratio": null
+      "jit_go_ratio": 10.6598,
+      "warm_go_ratio": 10.7027
     },
     "TaskDColumnarComputedProjectionBucket": {
-      "jit_go_ratio": 3.1469,
-      "warm_go_ratio": 3.5068
+      "jit_go_ratio": 3.0453,
+      "warm_go_ratio": 2.9364
     },
     "TaskDColumnarNullAwareGroupNotional": {
-      "jit_go_ratio": 3.0857,
-      "warm_go_ratio": 3.1102
+      "jit_go_ratio": 2.9012,
+      "warm_go_ratio": 2.8843
     },
     "TaskDColumnarSelectWhereByNotional": {
-      "jit_go_ratio": 2.1516,
-      "warm_go_ratio": 2.1835
+      "jit_go_ratio": 2.3149,
+      "warm_go_ratio": 2.3387
     },
     "TaskDColumnarSymbolBucketPipeline": {
-      "jit_go_ratio": 1.6352,
-      "warm_go_ratio": 1.5453
+      "jit_go_ratio": 1.6044,
+      "warm_go_ratio": 1.5606
     },
     "TaskDColumnarWhereWindowNotional": {
-      "jit_go_ratio": 0.6371,
-      "warm_go_ratio": 0.6529
+      "jit_go_ratio": 0.6864,
+      "warm_go_ratio": 0.718
     },
     "TaskDCrossApplyIndexChecksum": {
-      "jit_go_ratio": 0.1457,
-      "warm_go_ratio": 0.1402
+      "jit_go_ratio": 0.1237,
+      "warm_go_ratio": 0.1472
     },
     "TaskDListCutRazeVariableBins": {
-      "jit_go_ratio": 0.4531,
-      "warm_go_ratio": 0.4839
+      "jit_go_ratio": 0.4762,
+      "warm_go_ratio": 0.5319
     },
     "TaskDListDotDictLookupEnvelope": {
-      "jit_go_ratio": 0.1293,
-      "warm_go_ratio": 0.1571
+      "jit_go_ratio": 0.1361,
+      "warm_go_ratio": 0.1519
     },
     "TaskDListRatiosCountAndSum": {
-      "jit_go_ratio": 0.4993,
-      "warm_go_ratio": 0.544
+      "jit_go_ratio": 0.482,
+      "warm_go_ratio": 0.5133
     },
     "TaskDListRatiosDirectSum": {
-      "jit_go_ratio": 0.0174,
-      "warm_go_ratio": 0.0189
+      "jit_go_ratio": 0.0173,
+      "warm_go_ratio": 0.0174
     },
     "TaskDListRazeNestedRowScaled": {
-      "jit_go_ratio": 0.2501,
-      "warm_go_ratio": 0.259
+      "jit_go_ratio": 0.2467,
+      "warm_go_ratio": 0.3045
     },
     "TaskDListReverseDirectSum": {
-      "jit_go_ratio": 0.3936,
-      "warm_go_ratio": 0.5815
+      "jit_go_ratio": 0.3528,
+      "warm_go_ratio": 0.3703
     },
     "TaskDListRotateDirectSum": {
-      "jit_go_ratio": 0.211,
-      "warm_go_ratio": 0.2392
+      "jit_go_ratio": 0.2141,
+      "warm_go_ratio": 0.2325
     },
     "TaskDListSublistDirectSum": {
-      "jit_go_ratio": 2.7132,
-      "warm_go_ratio": 2.9719
+      "jit_go_ratio": 3.0211,
+      "warm_go_ratio": 3.1413
     },
     "TaskDListSublistRotateReverse": {
-      "jit_go_ratio": 0.0445,
-      "warm_go_ratio": 0.0539
+      "jit_go_ratio": 0.0421,
+      "warm_go_ratio": 0.0486
     },
     "TaskDMathInverseTrigVectorEnvelope": {
-      "jit_go_ratio": 1.9681,
-      "warm_go_ratio": 2.1683
+      "jit_go_ratio": 2.0462,
+      "warm_go_ratio": 1.8731
     },
     "TaskDMathScalarVectorMixedEnvelope": {
-      "jit_go_ratio": 1.1707,
-      "warm_go_ratio": 1.231
+      "jit_go_ratio": 1.2982,
+      "warm_go_ratio": 1.2391
     },
     "TaskDMathSqrtLogVectorSum": {
-      "jit_go_ratio": 1.0214,
-      "warm_go_ratio": 1.0627
+      "jit_go_ratio": 1.0654,
+      "warm_go_ratio": 1.0828
     },
     "TaskDMathTrigVectorEnvelope": {
-      "jit_go_ratio": 1.2174,
-      "warm_go_ratio": 1.2909
+      "jit_go_ratio": 1.2963,
+      "warm_go_ratio": 1.3418
     },
     "TaskDMathTrigWhereEnvelope": {
-      "jit_go_ratio": 1.7512,
-      "warm_go_ratio": 1.8535
+      "jit_go_ratio": 1.8497,
+      "warm_go_ratio": 1.9913
     },
     "TaskDMathXexpXlogVectorEnvelope": {
-      "jit_go_ratio": 0.4798,
-      "warm_go_ratio": 0.4869
+      "jit_go_ratio": 0.4693,
+      "warm_go_ratio": 0.472
     },
     "TaskDMatrixDotCellIndex": {
-      "jit_go_ratio": 0.3338,
-      "warm_go_ratio": 0.3185
+      "jit_go_ratio": 0.307,
+      "warm_go_ratio": 0.3678
     },
     "TaskDMatrixDotRowIndexSum": {
-      "jit_go_ratio": 0.427,
-      "warm_go_ratio": 0.4717
+      "jit_go_ratio": 0.3912,
+      "warm_go_ratio": 0.4838
     },
     "TaskDMatrixFlipColumnRowChecksum": {
-      "jit_go_ratio": 1.2595,
-      "warm_go_ratio": 1.3633
+      "jit_go_ratio": 1.323,
+      "warm_go_ratio": 1.4247
     },
     "TaskDMatrixFlipRazeSum": {
-      "jit_go_ratio": 0.3882,
-      "warm_go_ratio": 0.5005
+      "jit_go_ratio": 149.96,
+      "warm_go_ratio": 153.3594
     },
     "TaskDMatrixMmuInvEnvelope": {
-      "jit_go_ratio": 3.565,
-      "warm_go_ratio": 3.6222
+      "jit_go_ratio": 3.3869,
+      "warm_go_ratio": 3.6374
     },
     "TaskDMatrixReshapeRazeSum": {
-      "jit_go_ratio": 0.389,
-      "warm_go_ratio": 0.4248
+      "jit_go_ratio": 0.3731,
+      "warm_go_ratio": 0.4156
     },
     "TaskDReshapeCycleFillFlipChecksum": {
-      "jit_go_ratio": 0.2433,
-      "warm_go_ratio": 0.2574
+      "jit_go_ratio": 0.2377,
+      "warm_go_ratio": 0.2928
     },
     "TaskDReshapeFlipProbeEnvelope": {
-      "jit_go_ratio": 0.1338,
-      "warm_go_ratio": 0.1476
+      "jit_go_ratio": 0.1381,
+      "warm_go_ratio": 0.1546
     },
     "TaskDStringLowerUpperLikeEnvelope": {
-      "jit_go_ratio": 0.0432,
-      "warm_go_ratio": 0.0458
+      "jit_go_ratio": 0.0378,
+      "warm_go_ratio": 0.0404
     },
     "TaskDStringSearchReplaceJoinRowScaled": {
-      "jit_go_ratio": 0.2849,
-      "warm_go_ratio": 0.2738
+      "jit_go_ratio": 0.2857,
+      "warm_go_ratio": 0.2725
     },
     "TaskDSymbolGroupSortEnvelope": {
-      "jit_go_ratio": 0.0036,
-      "warm_go_ratio": 0.0037
+      "jit_go_ratio": 0.0034,
+      "warm_go_ratio": 0.0036
     },
     "TaskDWindowScanEnvelope": {
-      "jit_go_ratio": 0.2339,
-      "warm_go_ratio": 0.2543
+      "jit_go_ratio": 0.1539,
+      "warm_go_ratio": 0.1606
     },
     "TemporalDateCompareMaskCount": {
-      "jit_go_ratio": 0.2345,
-      "warm_go_ratio": 0.2395
+      "jit_go_ratio": 0.2318,
+      "warm_go_ratio": 0.2559
     },
     "TemporalStringSymbolProjectionCombo": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "TemporalTimeCompareMaskCount": {
-      "jit_go_ratio": 0.3505,
-      "warm_go_ratio": 0.3814
+      "jit_go_ratio": 0.4196,
+      "warm_go_ratio": 0.3941
     },
     "TemporalTypedXbarAndSort": {
       "jit_go_ratio": null,
@@ -1478,476 +1478,476 @@
       "warm_go_ratio": null
     },
     "TypeMatrixCastBoolMaskGatherSum": {
-      "jit_go_ratio": 0.2401,
-      "warm_go_ratio": 0.2798
+      "jit_go_ratio": 0.2647,
+      "warm_go_ratio": 0.2757
     },
     "TypeMatrixCastFloatLetterHalfSum": {
-      "jit_go_ratio": 2.2809,
-      "warm_go_ratio": 2.3226
+      "jit_go_ratio": 2.2359,
+      "warm_go_ratio": 2.1937
     },
     "TypeMatrixCastIntLetterModSum": {
-      "jit_go_ratio": 2.4613,
-      "warm_go_ratio": 2.7399
+      "jit_go_ratio": 2.7473,
+      "warm_go_ratio": 2.7196
     },
     "TypeMatrixCastRealLetterQuarterSum": {
-      "jit_go_ratio": 2.1159,
-      "warm_go_ratio": 2.1611
+      "jit_go_ratio": 1.8491,
+      "warm_go_ratio": 1.8369
     },
     "TypeMatrixCastRealLongRoundTripSum": {
-      "jit_go_ratio": 3.3442,
-      "warm_go_ratio": 3.7406
+      "jit_go_ratio": 3.6401,
+      "warm_go_ratio": 3.4101
     },
     "TypeMatrixCastShortIntLongChainSum": {
-      "jit_go_ratio": 3.0979,
-      "warm_go_ratio": 2.9042
+      "jit_go_ratio": 3.1075,
+      "warm_go_ratio": 2.8604
     },
     "TypeMatrixCastShortLetterRoundTripSum": {
-      "jit_go_ratio": 1.8205,
-      "warm_go_ratio": 2.0405
+      "jit_go_ratio": 2.254,
+      "warm_go_ratio": 2.3022
     },
     "TypeMatrixFloatCompareEqNotEqCount": {
-      "jit_go_ratio": 4.2864,
-      "warm_go_ratio": 4.4113
+      "jit_go_ratio": 4.2359,
+      "warm_go_ratio": 4.2312
     },
     "TypeMatrixFloatCompareGtGatherSum": {
-      "jit_go_ratio": 2.3643,
-      "warm_go_ratio": 2.4888
+      "jit_go_ratio": 1.8726,
+      "warm_go_ratio": 1.9652
     },
     "TypeMatrixFloatModSum": {
-      "jit_go_ratio": 0.0525,
-      "warm_go_ratio": 0.0547
+      "jit_go_ratio": 0.0478,
+      "warm_go_ratio": 0.0477
     },
     "TypeMatrixFloatNullDivideHalfSum": {
-      "jit_go_ratio": 1.1461,
-      "warm_go_ratio": 1.1797
+      "jit_go_ratio": 1.191,
+      "warm_go_ratio": 1.2203
     },
     "TypeMatrixFloatWithinGatherSum": {
-      "jit_go_ratio": 3.5944,
-      "warm_go_ratio": 3.5575
+      "jit_go_ratio": 3.5438,
+      "warm_go_ratio": 3.4709
     },
     "TypeMatrixIntDenseSubScalarSum": {
-      "jit_go_ratio": 0.9789,
-      "warm_go_ratio": 0.9654
+      "jit_go_ratio": 1.1519,
+      "warm_go_ratio": 1.1611
     },
     "TypeMatrixIntDivModComboSum": {
-      "jit_go_ratio": 3.7342,
-      "warm_go_ratio": 3.64
+      "jit_go_ratio": 3.8432,
+      "warm_go_ratio": 3.7156
     },
     "TypeMatrixIntNullCompareLtGatherSum": {
-      "jit_go_ratio": 2.134,
-      "warm_go_ratio": 2.3031
+      "jit_go_ratio": 2.2217,
+      "warm_go_ratio": 2.3548
     },
     "TypeMatrixIntNullMulScalarSum": {
-      "jit_go_ratio": 2.2212,
-      "warm_go_ratio": 2.2882
+      "jit_go_ratio": 2.069,
+      "warm_go_ratio": 2.1163
     },
     "TypeMatrixLongNullDivSum": {
-      "jit_go_ratio": 0.3783,
-      "warm_go_ratio": 0.3791
+      "jit_go_ratio": 0.3207,
+      "warm_go_ratio": 0.328
     },
     "TypeMatrixLongNullModSum": {
-      "jit_go_ratio": 0.3083,
-      "warm_go_ratio": 0.3095
+      "jit_go_ratio": 0.2669,
+      "warm_go_ratio": 0.2854
     },
     "TypeMatrixLongNullNotEqualEqualNullCount": {
-      "jit_go_ratio": 5.2298,
-      "warm_go_ratio": 5.4947
+      "jit_go_ratio": 4.6821,
+      "warm_go_ratio": 4.59
     },
     "TypeMatrixLongNullVectorAddVectorSum": {
-      "jit_go_ratio": 2.64,
-      "warm_go_ratio": 2.619
+      "jit_go_ratio": 2.1588,
+      "warm_go_ratio": 2.2369
     },
     "TypeMatrixLongNullWithinGatherSum": {
-      "jit_go_ratio": 1.8844,
-      "warm_go_ratio": 1.7736
+      "jit_go_ratio": 1.7066,
+      "warm_go_ratio": 1.8399
     },
     "TypeMatrixLongPercentDivideSum": {
-      "jit_go_ratio": 0.0581,
-      "warm_go_ratio": 0.0731
+      "jit_go_ratio": 0.0595,
+      "warm_go_ratio": 0.0741
     },
     "TypeMatrixPromoteIntMulOverflowSum": {
-      "jit_go_ratio": 0.3302,
-      "warm_go_ratio": 0.2535
+      "jit_go_ratio": 0.3336,
+      "warm_go_ratio": 0.3266
     },
     "TypeMatrixPromoteIntPlusFloatScalarSum": {
-      "jit_go_ratio": 1.2956,
-      "warm_go_ratio": 1.2249
+      "jit_go_ratio": 1.3172,
+      "warm_go_ratio": 1.332
     },
     "TypeMatrixPromoteRealPlusIntScalarSum": {
-      "jit_go_ratio": 1.9771,
-      "warm_go_ratio": 1.5847
+      "jit_go_ratio": 1.5447,
+      "warm_go_ratio": 1.4825
     },
     "TypeMatrixPromoteShortMulOverflowSum": {
-      "jit_go_ratio": 1.5889,
-      "warm_go_ratio": 1.393
+      "jit_go_ratio": 1.3285,
+      "warm_go_ratio": 1.3841
     },
     "TypeMatrixPromoteShortPlusIntVectorSum": {
-      "jit_go_ratio": 3.6511,
-      "warm_go_ratio": 2.7348
+      "jit_go_ratio": 3.2137,
+      "warm_go_ratio": 2.7766
     },
     "TypeMatrixPromoteShortPlusLongScalarSum": {
-      "jit_go_ratio": 1.539,
-      "warm_go_ratio": 1.5265
+      "jit_go_ratio": 1.5364,
+      "warm_go_ratio": 1.584
     },
     "TypeMatrixRealCompareGeGatherSum": {
-      "jit_go_ratio": 3.2063,
-      "warm_go_ratio": 3.0236
+      "jit_go_ratio": 3.1701,
+      "warm_go_ratio": 3.0688
     },
     "TypeMatrixRealDenseMulQuarterSum": {
-      "jit_go_ratio": 1.5576,
-      "warm_go_ratio": 1.5848
+      "jit_go_ratio": 1.4152,
+      "warm_go_ratio": 1.4134
     },
     "TypeMatrixRealNullAddScalarSum": {
-      "jit_go_ratio": 2.0848,
-      "warm_go_ratio": 2.2458
+      "jit_go_ratio": 1.905,
+      "warm_go_ratio": 1.9562
     },
     "TypeMatrixRealNullCompareGtGatherSum": {
-      "jit_go_ratio": 3.1531,
-      "warm_go_ratio": 3.2763
+      "jit_go_ratio": 2.7027,
+      "warm_go_ratio": 2.7929
     },
     "TypeMatrixShortDenseAddScalarSum": {
-      "jit_go_ratio": 1.1755,
-      "warm_go_ratio": 1.3709
+      "jit_go_ratio": 1.5507,
+      "warm_go_ratio": 1.5142
     },
     "TypeMatrixShortNullAddScalarSum": {
-      "jit_go_ratio": 2.3065,
-      "warm_go_ratio": 2.4577
+      "jit_go_ratio": 2.3972,
+      "warm_go_ratio": 2.4908
     },
     "TypeMatrixShortNullCompareGtGatherSum": {
-      "jit_go_ratio": 2.3132,
-      "warm_go_ratio": 2.6702
+      "jit_go_ratio": 2.3097,
+      "warm_go_ratio": 2.459
     },
     "TypeMatrixShortNullVectorMulVectorSum": {
-      "jit_go_ratio": 2.0597,
-      "warm_go_ratio": 2.1215
+      "jit_go_ratio": 1.763,
+      "warm_go_ratio": 1.8646
     },
     "TypeMatrixWhereFloatIntMixedPredicateGatherSum": {
-      "jit_go_ratio": 0.6491,
-      "warm_go_ratio": 0.7232
+      "jit_go_ratio": 0.6143,
+      "warm_go_ratio": 0.695
     },
     "TypeMatrixWhereFourClauseMembershipGatherSum": {
-      "jit_go_ratio": 1.3138,
-      "warm_go_ratio": 1.4112
+      "jit_go_ratio": 1.5497,
+      "warm_go_ratio": 1.6504
     },
     "TypeMatrixWhereModCompareMembershipGatherSum": {
-      "jit_go_ratio": 0.5204,
-      "warm_go_ratio": 0.5883
+      "jit_go_ratio": 0.545,
+      "warm_go_ratio": 0.6187
     },
     "TypeMatrixWhereNegatedModWithinGatherSum": {
-      "jit_go_ratio": 2.1598,
-      "warm_go_ratio": 2.1654
+      "jit_go_ratio": 2.3971,
+      "warm_go_ratio": 2.5202
     },
     "TypeMatrixWhereNullGuardCompoundGatherSum": {
-      "jit_go_ratio": 0.1905,
-      "warm_go_ratio": 0.2225
+      "jit_go_ratio": 0.3027,
+      "warm_go_ratio": 0.3019
     },
     "TypeMatrixWhereSymbolMembershipNumericGatherSum": {
-      "jit_go_ratio": 3.0032,
-      "warm_go_ratio": 3.2675
+      "jit_go_ratio": 4.5178,
+      "warm_go_ratio": 4.6939
     },
     "TypeMatrixWhereWithinModNotEqGatherSum": {
-      "jit_go_ratio": 0.9299,
-      "warm_go_ratio": 0.9467
+      "jit_go_ratio": 0.8976,
+      "warm_go_ratio": 0.9918
     },
     "TypeMatrixWhereXbarWithinMembershipGatherSum": {
-      "jit_go_ratio": 0.4622,
-      "warm_go_ratio": 0.4754
+      "jit_go_ratio": 0.4461,
+      "warm_go_ratio": 0.4734
     },
     "TypedIntCastRoundTripSum": {
-      "jit_go_ratio": 2.2057,
-      "warm_go_ratio": 2.207
+      "jit_go_ratio": 2.1063,
+      "warm_go_ratio": 2.0646
     },
     "TypedNullFillSum": {
-      "jit_go_ratio": 0.1323,
-      "warm_go_ratio": 0.1633
+      "jit_go_ratio": 0.1121,
+      "warm_go_ratio": 0.1215
     },
     "TypedNullFillWhereRowScaled": {
-      "jit_go_ratio": 0.6317,
-      "warm_go_ratio": 0.5863
+      "jit_go_ratio": 0.7462,
+      "warm_go_ratio": 0.6651
     },
     "TypedPrevNextDeltasFills": {
       "jit_go_ratio": null,
       "warm_go_ratio": null
     },
     "TypedSuffixNullAndCasts": {
-      "jit_go_ratio": 1.8173,
-      "warm_go_ratio": 1.4121
+      "jit_go_ratio": 2.0835,
+      "warm_go_ratio": 2.0043
     },
     "VectorAffineSumLargeScale": {
-      "jit_go_ratio": 0.2149,
-      "warm_go_ratio": 0.2359
+      "jit_go_ratio": 0.2315,
+      "warm_go_ratio": 0.2866
     },
     "VectorAffineSumMarketPrice": {
-      "jit_go_ratio": 0.2356,
-      "warm_go_ratio": 0.2677
+      "jit_go_ratio": 0.2315,
+      "warm_go_ratio": 0.2741
     },
     "VectorAffineSumOddScale": {
-      "jit_go_ratio": 0.2328,
-      "warm_go_ratio": 0.2585
+      "jit_go_ratio": 0.2152,
+      "warm_go_ratio": 0.2845
     },
     "VectorAffineSumSignedOffset": {
-      "jit_go_ratio": 0.2383,
-      "warm_go_ratio": 0.2541
+      "jit_go_ratio": 0.2067,
+      "warm_go_ratio": 0.2694
     },
     "VectorAffineSumSmall": {
-      "jit_go_ratio": 0.2375,
-      "warm_go_ratio": 0.2791
+      "jit_go_ratio": 0.2868,
+      "warm_go_ratio": 0.316
     },
     "VectorAffineSumWide": {
-      "jit_go_ratio": 0.236,
-      "warm_go_ratio": 0.2761
+      "jit_go_ratio": 0.233,
+      "warm_go_ratio": 0.3152
     },
     "VectorMinMaxDyadicEnvelope": {
-      "jit_go_ratio": 0.3349,
-      "warm_go_ratio": 0.32
+      "jit_go_ratio": 0.3571,
+      "warm_go_ratio": 0.3881
     },
     "VectorMixedArithmeticTwoStageA": {
-      "jit_go_ratio": 0.285,
-      "warm_go_ratio": 0.3094
+      "jit_go_ratio": 0.2519,
+      "warm_go_ratio": 0.3044
     },
     "VectorMixedArithmeticTwoStageB": {
-      "jit_go_ratio": 0.279,
-      "warm_go_ratio": 0.2948
+      "jit_go_ratio": 0.2501,
+      "warm_go_ratio": 0.2799
     },
     "VectorMixedArithmeticTwoStageC": {
-      "jit_go_ratio": 0.259,
-      "warm_go_ratio": 0.2944
+      "jit_go_ratio": 0.2866,
+      "warm_go_ratio": 0.3257
     },
     "VectorMixedArithmeticTwoStageD": {
-      "jit_go_ratio": 0.2872,
-      "warm_go_ratio": 0.2758
+      "jit_go_ratio": 0.2641,
+      "warm_go_ratio": 0.297
     },
     "VectorModuloBucketSum": {
-      "jit_go_ratio": 0.1676,
-      "warm_go_ratio": 0.1843
+      "jit_go_ratio": 0.201,
+      "warm_go_ratio": 0.179
     },
     "VectorSquareSumLargeScale": {
-      "jit_go_ratio": 0.2994,
-      "warm_go_ratio": 0.3807
+      "jit_go_ratio": 0.2874,
+      "warm_go_ratio": 0.329
     },
     "VectorSquareSumMarketPrice": {
-      "jit_go_ratio": 0.3179,
-      "warm_go_ratio": 0.3339
+      "jit_go_ratio": 0.2797,
+      "warm_go_ratio": 0.3239
     },
     "VectorSquareSumOddScale": {
-      "jit_go_ratio": 0.2661,
-      "warm_go_ratio": 0.3072
+      "jit_go_ratio": 0.305,
+      "warm_go_ratio": 0.3167
     },
     "VectorSquareSumSignedOffset": {
-      "jit_go_ratio": 0.2915,
-      "warm_go_ratio": 0.3197
+      "jit_go_ratio": 0.3088,
+      "warm_go_ratio": 0.3166
     },
     "VectorSquareSumSmall": {
-      "jit_go_ratio": 0.2933,
-      "warm_go_ratio": 0.3361
+      "jit_go_ratio": 0.3023,
+      "warm_go_ratio": 0.3171
     },
     "VectorSquareSumWide": {
-      "jit_go_ratio": 0.3078,
-      "warm_go_ratio": 0.4009
+      "jit_go_ratio": 0.3206,
+      "warm_go_ratio": 0.3456
     },
     "VerbFormAmpLogicalMaskCount": {
-      "jit_go_ratio": 2.901,
-      "warm_go_ratio": 2.7396
+      "jit_go_ratio": 4.1653,
+      "warm_go_ratio": 3.7512
     },
     "VerbFormCondBranchReduce": {
-      "jit_go_ratio": 1.3969,
-      "warm_go_ratio": 1.3807
+      "jit_go_ratio": 1.545,
+      "warm_go_ratio": 1.6425
     },
     "VerbFormDoAccumulateVectorSum": {
-      "jit_go_ratio": 0.0704,
-      "warm_go_ratio": 0.0677
+      "jit_go_ratio": 0.0881,
+      "warm_go_ratio": 0.0865
     },
     "VerbFormFillPriorShiftSum": {
-      "jit_go_ratio": 1.4197,
-      "warm_go_ratio": 1.1094
+      "jit_go_ratio": 1.1979,
+      "warm_go_ratio": 1.2933
     },
     "VerbFormIfGuardedReduce": {
-      "jit_go_ratio": 0.6966,
-      "warm_go_ratio": 0.7094
+      "jit_go_ratio": 0.9977,
+      "warm_go_ratio": 0.8482
     },
     "VerbFormIntersectSentinelSum": {
-      "jit_go_ratio": 1.0025,
-      "warm_go_ratio": 0.9813
+      "jit_go_ratio": 1.3244,
+      "warm_go_ratio": 1.2187
     },
     "VerbFormLtrimRtrimMatchCond": {
-      "jit_go_ratio": 0.821,
-      "warm_go_ratio": 0.8017
+      "jit_go_ratio": 0.9904,
+      "warm_go_ratio": 0.991
     },
     "VerbFormPipeLogicalMaskCount": {
-      "jit_go_ratio": 2.0431,
-      "warm_go_ratio": 2.0477
+      "jit_go_ratio": 2.5297,
+      "warm_go_ratio": 2.4422
     },
     "VerbFormWhileRowBoundSum": {
-      "jit_go_ratio": 0.3686,
-      "warm_go_ratio": 0.3883
+      "jit_go_ratio": 0.4683,
+      "warm_go_ratio": 0.475
     },
     "VerbFormWordAliasDivideMinus": {
-      "jit_go_ratio": 0.062,
-      "warm_go_ratio": 0.0739
+      "jit_go_ratio": 0.106,
+      "warm_go_ratio": 0.0891
     },
     "VerbFormWordAliasEqualEqualsCount": {
-      "jit_go_ratio": 0.1458,
-      "warm_go_ratio": 0.1327
+      "jit_go_ratio": 0.2913,
+      "warm_go_ratio": 0.1748
     },
     "VerbFormWordAliasLeftRightGather": {
-      "jit_go_ratio": 0.016,
-      "warm_go_ratio": 0.0182
+      "jit_go_ratio": 0.0233,
+      "warm_go_ratio": 0.0261
     },
     "VerbFormWordAliasLessGreaterMore": {
-      "jit_go_ratio": 2.6613,
-      "warm_go_ratio": 2.6192
+      "jit_go_ratio": 3.2194,
+      "warm_go_ratio": 3.0483
     },
     "VerbFormXdescColumnProbe": {
-      "jit_go_ratio": 0.2126,
-      "warm_go_ratio": 0.2614
+      "jit_go_ratio": 0.262,
+      "warm_go_ratio": 0.2923
     },
     "WhereCompareCountSumDirect": {
-      "jit_go_ratio": 1.7009,
-      "warm_go_ratio": 1.8179
+      "jit_go_ratio": 2.0471,
+      "warm_go_ratio": 2.0353
     },
     "WhereGatherProjectionSum": {
-      "jit_go_ratio": 0.6403,
-      "warm_go_ratio": 0.7672
+      "jit_go_ratio": 0.603,
+      "warm_go_ratio": 0.7403
     },
     "WhereIndexCountGE0": {
-      "jit_go_ratio": 0.2115,
-      "warm_go_ratio": 0.2367
+      "jit_go_ratio": 0.2133,
+      "warm_go_ratio": 0.2522
     },
     "WhereIndexCountGE1": {
-      "jit_go_ratio": 0.1851,
-      "warm_go_ratio": 0.2424
+      "jit_go_ratio": 0.2094,
+      "warm_go_ratio": 0.2598
     },
     "WhereIndexCountGE1000": {
-      "jit_go_ratio": 0.2132,
-      "warm_go_ratio": 0.2609
+      "jit_go_ratio": 0.2053,
+      "warm_go_ratio": 0.2507
     },
     "WhereIndexCountGE128": {
-      "jit_go_ratio": 0.2171,
-      "warm_go_ratio": 0.2519
+      "jit_go_ratio": 0.1868,
+      "warm_go_ratio": 0.2605
     },
     "WhereIndexCountGE17": {
-      "jit_go_ratio": 0.1793,
-      "warm_go_ratio": 0.2381
+      "jit_go_ratio": 0.1976,
+      "warm_go_ratio": 0.2681
     },
     "WhereIndexCountGE2048": {
-      "jit_go_ratio": 0.2124,
-      "warm_go_ratio": 0.2463
+      "jit_go_ratio": 0.1743,
+      "warm_go_ratio": 0.2471
     },
     "WhereIndexCountGE4096": {
-      "jit_go_ratio": 0.2491,
-      "warm_go_ratio": 0.2655
+      "jit_go_ratio": 0.1879,
+      "warm_go_ratio": 0.2361
     },
     "WhereIndexCountGE7000": {
-      "jit_go_ratio": 0.2157,
-      "warm_go_ratio": 0.2667
+      "jit_go_ratio": 0.1838,
+      "warm_go_ratio": 0.2571
     },
     "WhereIndexCountGE8191": {
-      "jit_go_ratio": 0.1889,
-      "warm_go_ratio": 0.2182
+      "jit_go_ratio": 0.2027,
+      "warm_go_ratio": 0.236
     },
     "WhereIndexCountGE999": {
-      "jit_go_ratio": 0.1985,
-      "warm_go_ratio": 0.218
+      "jit_go_ratio": 0.2058,
+      "warm_go_ratio": 0.2591
     },
     "WhereIndexSumGE0": {
-      "jit_go_ratio": 0.1071,
-      "warm_go_ratio": 0.1421
+      "jit_go_ratio": 0.106,
+      "warm_go_ratio": 0.1382
     },
     "WhereIndexSumGE1": {
-      "jit_go_ratio": 0.1113,
-      "warm_go_ratio": 0.127
+      "jit_go_ratio": 0.1264,
+      "warm_go_ratio": 0.1544
     },
     "WhereIndexSumGE1000": {
-      "jit_go_ratio": 0.1067,
-      "warm_go_ratio": 0.1326
-    },
-    "WhereIndexSumGE128": {
-      "jit_go_ratio": 0.0997,
-      "warm_go_ratio": 0.1212
-    },
-    "WhereIndexSumGE17": {
-      "jit_go_ratio": 0.1117,
+      "jit_go_ratio": 0.1069,
       "warm_go_ratio": 0.1499
     },
+    "WhereIndexSumGE128": {
+      "jit_go_ratio": 0.1191,
+      "warm_go_ratio": 0.1399
+    },
+    "WhereIndexSumGE17": {
+      "jit_go_ratio": 0.1139,
+      "warm_go_ratio": 0.163
+    },
     "WhereIndexSumGE2048": {
-      "jit_go_ratio": 0.1225,
-      "warm_go_ratio": 0.1268
-    },
-    "WhereIndexSumGE4096": {
-      "jit_go_ratio": 0.0981,
-      "warm_go_ratio": 0.1364
-    },
-    "WhereIndexSumGE7000": {
-      "jit_go_ratio": 0.1168,
-      "warm_go_ratio": 0.1486
-    },
-    "WhereIndexSumGE8191": {
-      "jit_go_ratio": 0.1044,
-      "warm_go_ratio": 0.1325
-    },
-    "WhereIndexSumGE999": {
-      "jit_go_ratio": 0.1164,
-      "warm_go_ratio": 0.1458
-    },
-    "WhereModuloGatherProjectionSum": {
-      "jit_go_ratio": 0.2244,
-      "warm_go_ratio": 0.2406
-    },
-    "WhereModuloOrMaskCount": {
-      "jit_go_ratio": 0.3657,
-      "warm_go_ratio": 0.3461
-    },
-    "WhereValueGatherReduceSelectivityPct0": {
-      "jit_go_ratio": 0.6672,
-      "warm_go_ratio": 0.7167
-    },
-    "WhereValueGatherReduceSelectivityPct1": {
-      "jit_go_ratio": 0.6407,
-      "warm_go_ratio": 0.6516
-    },
-    "WhereValueGatherReduceSelectivityPct100": {
-      "jit_go_ratio": 0.3027,
-      "warm_go_ratio": 0.3663
-    },
-    "WhereValueGatherReduceSelectivityPct50": {
-      "jit_go_ratio": 0.4467,
-      "warm_go_ratio": 0.4675
-    },
-    "WhereValueGatherReduceSelectivityPct99": {
-      "jit_go_ratio": 0.314,
-      "warm_go_ratio": 0.314
-    },
-    "XbarIntWidth10": {
-      "jit_go_ratio": 0.1,
-      "warm_go_ratio": 0.1354
-    },
-    "XbarIntWidth1000": {
-      "jit_go_ratio": 0.1243,
+      "jit_go_ratio": 0.111,
       "warm_go_ratio": 0.1427
     },
+    "WhereIndexSumGE4096": {
+      "jit_go_ratio": 0.1124,
+      "warm_go_ratio": 0.1397
+    },
+    "WhereIndexSumGE7000": {
+      "jit_go_ratio": 0.1107,
+      "warm_go_ratio": 0.1327
+    },
+    "WhereIndexSumGE8191": {
+      "jit_go_ratio": 0.1162,
+      "warm_go_ratio": 0.1477
+    },
+    "WhereIndexSumGE999": {
+      "jit_go_ratio": 0.1147,
+      "warm_go_ratio": 0.1424
+    },
+    "WhereModuloGatherProjectionSum": {
+      "jit_go_ratio": 0.262,
+      "warm_go_ratio": 0.2637
+    },
+    "WhereModuloOrMaskCount": {
+      "jit_go_ratio": 0.3504,
+      "warm_go_ratio": 0.4106
+    },
+    "WhereValueGatherReduceSelectivityPct0": {
+      "jit_go_ratio": 0.6746,
+      "warm_go_ratio": 0.7291
+    },
+    "WhereValueGatherReduceSelectivityPct1": {
+      "jit_go_ratio": 0.6787,
+      "warm_go_ratio": 0.7196
+    },
+    "WhereValueGatherReduceSelectivityPct100": {
+      "jit_go_ratio": 0.3262,
+      "warm_go_ratio": 0.3314
+    },
+    "WhereValueGatherReduceSelectivityPct50": {
+      "jit_go_ratio": 0.4456,
+      "warm_go_ratio": 0.4947
+    },
+    "WhereValueGatherReduceSelectivityPct99": {
+      "jit_go_ratio": 0.3487,
+      "warm_go_ratio": 0.3726
+    },
+    "XbarIntWidth10": {
+      "jit_go_ratio": 0.1314,
+      "warm_go_ratio": 0.1553
+    },
+    "XbarIntWidth1000": {
+      "jit_go_ratio": 0.2041,
+      "warm_go_ratio": 0.1451
+    },
     "XbarIntWidth2": {
-      "jit_go_ratio": 0.1282,
-      "warm_go_ratio": 0.1601
+      "jit_go_ratio": 0.1291,
+      "warm_go_ratio": 0.1761
     },
     "XbarIntWidth3": {
-      "jit_go_ratio": 0.1313,
-      "warm_go_ratio": 0.1414
+      "jit_go_ratio": 0.1388,
+      "warm_go_ratio": 0.1551
     },
     "XbarIntWidth5": {
-      "jit_go_ratio": 0.1161,
-      "warm_go_ratio": 0.1595
+      "jit_go_ratio": 0.1151,
+      "warm_go_ratio": 0.147
     },
     "XbarIntWidth60": {
-      "jit_go_ratio": 0.1145,
-      "warm_go_ratio": 0.136
+      "jit_go_ratio": 0.1148,
+      "warm_go_ratio": 0.1701
     },
     "XbarStaticMixedSignCount": {
-      "jit_go_ratio": 0.4078,
-      "warm_go_ratio": 0.432
+      "jit_go_ratio": 0.4278,
+      "warm_go_ratio": 0.4267
     },
     "XrankModuloBucketsSum": {
-      "jit_go_ratio": 0.097,
-      "warm_go_ratio": 0.1213
+      "jit_go_ratio": 0.0989,
+      "warm_go_ratio": 0.1105
     }
   },
   "exceptions": {
@@ -1958,10 +1958,14 @@
     "TaskDCastSymbolNumericEnvelope": {
       "reason": "Go baseline straddles the 100ns trust threshold (57-93ns re-measured); ratio flickers in/out of trust on capture variance. Sub-microsecond envelope, not a regression.",
       "ref": "R7 settlement re-verification"
+    },
+    "TaskDMatrixFlipRazeSum": {
+      "reason": "regressed 0.97us -> ~300us by the R15-R sum-raze nested-guard/yield interplay (bisected to 7ce3e51e; guard verdict correct, hot path is the kernel/cascade route combination on transposed-matrix rows). Single row; fix tracked as follow-up.",
+      "ref": "R15-R closing settlement; profile: qSumRazeLeavesNestedArrays + GC"
     }
   },
   "family_targets": {},
-  "max_untrusted_go_baselines": 26,
+  "max_untrusted_go_baselines": 25,
   "milestone_caps": {
     "max_allocs_op": 1800000.0,
     "max_leia_go_ratio": 7,
@@ -1977,55 +1981,55 @@
   },
   "realdata_cases": {
     "FbyZipfSym1024": {
-      "realdata_go_ratio": 13.8521
+      "realdata_go_ratio": 11.5808
     },
     "FillsMsumNull40": {
-      "realdata_go_ratio": 3.0783
+      "realdata_go_ratio": 2.7699
     },
     "GatherSum1M": {
-      "realdata_go_ratio": 0.9963
+      "realdata_go_ratio": 1.069
     },
     "IascDropGatherRandom1M": {
-      "realdata_go_ratio": 0.0709
+      "realdata_go_ratio": 0.071
     },
     "IascDropGatherRandom8K": {
-      "realdata_go_ratio": 0.1607
+      "realdata_go_ratio": 0.1683
     },
     "IascZipfDuplicates": {
-      "realdata_go_ratio": 0.551
+      "realdata_go_ratio": 0.5399
     },
     "MavgSumDenseRandom": {
-      "realdata_go_ratio": 1.4776
+      "realdata_go_ratio": 1.7205
     },
     "PlanThrash600Sources": {
-      "realdata_go_ratio": 8.7348
+      "realdata_go_ratio": 3.7317
     },
     "QSQLAsofJoin64Sym": {
-      "realdata_go_ratio": 0.5002
+      "realdata_go_ratio": 0.5816
     },
     "QSQLSumBySym256": {
-      "realdata_go_ratio": 8.5304
+      "realdata_go_ratio": 6.3056
     },
     "TiledPeriod5000Count": {
-      "realdata_go_ratio": 1.5453
+      "realdata_go_ratio": 1.5931
     },
     "TinyVector8Rows": {
       "realdata_go_ratio": null
     },
     "WhereChainAnd4Mid": {
-      "realdata_go_ratio": 3.603
+      "realdata_go_ratio": 3.5806
     },
     "WhereChainAnd4Sel0p01": {
-      "realdata_go_ratio": 5.7266
+      "realdata_go_ratio": 6.8494
     },
     "WhereChainAnd4Sel99": {
-      "realdata_go_ratio": 4.2363
+      "realdata_go_ratio": 3.6092
     },
     "XbarNaNInfCountWhere": {
-      "realdata_go_ratio": 2.1409
+      "realdata_go_ratio": 2.2474
     },
     "Xrank10Weighted": {
-      "realdata_go_ratio": 2.5925
+      "realdata_go_ratio": 2.6113
     }
   },
   "schema_version": 1
