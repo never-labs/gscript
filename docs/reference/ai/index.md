@@ -633,7 +633,10 @@ identity hashes and summary counters, not raw prompts or response bodies.
 event types, replay keys, and ordering diagnostics. `llm.trace_assert(input,
 opts)` turns those checks into `{ok, status, summary, findings}` without
 contacting a provider, so replay and workflow packages can gate trace evidence
-with ordinary assertions.
+with ordinary assertions. Trace assertions may require event types, correlation
+fields, payload fields on all events, or event-type-specific payload fields with
+`require_event_payload_fields` or the equivalent
+`required_payload_fields_by_event_type`.
 
 ```leia
 record, err := llm.replay_record({
@@ -655,12 +658,16 @@ event := llm.trace_event({
     replay_key: "turn:1"
     request_hash: replay.request_hash
     response_hash: replay.response_hash
+    payload: {status: result.status}
 })
 trace := llm.trace_envelope({event}, {trace_id: "unit-trace"})
 gate := llm.trace_assert(trace, {
     require_provider_free: true
     deny_live_network: true
     required_event_types: {"turn_end"}
+    require_event_payload_fields: {
+        turn_end: {"status"}
+    }
 })
 match := fixture.match({
     operation: "llm.turn"

@@ -613,9 +613,11 @@ Scripts may validate trace evidence without a host trace sink.
 ordered event types, replay keys, status counts, and ordering/correlation
 diagnostics. `llm.trace_assert(input, opts)` returns `{ok, status, summary,
 findings}` and may require provider-free traces, deny live network/model flags,
-require event types, or require correlation fields. These helpers are
-provider-free; they inspect ordinary trace tables and must not persist telemetry
-or call providers.
+require event types, require correlation fields, require payload fields on all
+events, or require payload fields for specific event types via
+`require_event_payload_fields` or the equivalent
+`required_payload_fields_by_event_type`. These helpers are provider-free; they
+inspect ordinary trace tables and must not persist telemetry or call providers.
 
 `llm.replay_trace_event(match, opts)` projects the result of
 `llm.replay_index(...).match(...)` or a replay fixture matcher into a standard
