@@ -196,20 +196,24 @@ if err != nil {
             bls_payroll_json_error = json_err
         } else {
             bls_payroll_status = data.status
-            series := data.Results.series
-            bls_payroll_series_count = #series
-            if bls_payroll_series_count > 0 {
-                row := series[1]
-                bls_payroll_series_id = row.seriesID
-                observations := row.data
-                bls_payroll_observation_count = #observations
-                if bls_payroll_observation_count > 0 {
-                    obs := observations[1]
-                    bls_payroll_year = obs.year
-                    bls_payroll_period = obs.period
-                    bls_payroll_period_name = obs.periodName
-                    bls_payroll_value = obs.value
-                    bls_payroll_latest = obs.latest
+            if data.Results != nil && data.Results.series != nil {
+                series := data.Results.series
+                bls_payroll_series_count = #series
+                if bls_payroll_series_count > 0 {
+                    row := series[1]
+                    bls_payroll_series_id = row.seriesID
+                    observations := row.data
+                    if observations != nil {
+                        bls_payroll_observation_count = #observations
+                        if bls_payroll_observation_count > 0 {
+                            obs := observations[1]
+                            bls_payroll_year = obs.year
+                            bls_payroll_period = obs.period
+                            bls_payroll_period_name = obs.periodName
+                            bls_payroll_value = obs.value
+                            bls_payroll_latest = obs.latest
+                        }
+                    }
                 }
             }
         }
@@ -224,6 +228,9 @@ if err != nil {
 	assertFinRobotPublicLiveDataOK(t, vm, "BLS total nonfarm payroll", "bls_payroll_status_code", "bls_payroll_request_error", "bls_payroll_json_error", "bls_payroll_ok")
 	status := mustGetString(t, vm, "bls_payroll_status")
 	seriesCount := mustGetInt(t, vm, "bls_payroll_series_count")
+	if status != "REQUEST_SUCCEEDED" && seriesCount == 0 {
+		t.Skipf("BLS total nonfarm payroll business response unavailable: status=%q", status)
+	}
 	seriesID := mustGetString(t, vm, "bls_payroll_series_id")
 	observationCount := mustGetInt(t, vm, "bls_payroll_observation_count")
 	year := mustGetString(t, vm, "bls_payroll_year")
