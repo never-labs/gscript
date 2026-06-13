@@ -20,6 +20,7 @@ gdelt_news_seendate := ""
 gdelt_news_url := ""
 
 headers := {}
+headers["User-Agent"] = "Mozilla/5.0 Leia FinRobot live data smoke"
 headers["Accept"] = "application/json"
 
 resp, err := net.get("https://api.gdeltproject.org/api/v2/doc/doc?query=AAPL&mode=artlist&format=json&maxrecords=5&sort=hybridrel", {
