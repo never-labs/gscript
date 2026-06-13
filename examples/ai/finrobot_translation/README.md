@@ -90,15 +90,20 @@ FinRobot-specific overrides are also supported and take precedence when set:
 `LEIA_FINROBOT_LIVE_LLM=0` to force the live gate to skip. Provider-free example
 checks should continue to run without any of these variables.
 
-The live data gate uses Leia's `net.get` and `resp.json()` path against the
-public SEC XBRL API with a fair-access User-Agent:
+The SEC live data smoke gate uses Leia's `net.get` and `resp.json()` path
+against the public SEC XBRL API. It is a direct public-data smoke check: no
+paid data-provider account, API key, or token is required. The gate supplies a
+fair-access User-Agent for the SEC request; package surfaces that accept a
+caller-provided SEC User-Agent can also use an environment value such as
+`LEIA_SEC_USER_AGENT` or `SEC_USER_AGENT` when present.
 
 ```bash
-go test ./tests/integration/llm -run '^TestFinRobotLiveSECCompanyConceptDataIntegration$' -count=1 -v
+go test ./tests/integration/llm -run '^TestFinRobotLiveSEC.*DataIntegration$' -count=1 -v
 ```
 
-Set `LEIA_FINROBOT_LIVE_DATA=0` to force this gate to skip. It does not require
-a paid account or token.
+Set `LEIA_FINROBOT_LIVE_DATA=0` to force this gate to skip. Provider-free
+example checks remain unchanged and continue to run without live network access
+or provider credentials.
 
 ## Scope
 

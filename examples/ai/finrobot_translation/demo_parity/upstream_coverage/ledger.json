@@ -104,7 +104,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/README.md",
-          "sha256": "4d29f7be97be40c826b9eeaed2e512437c7240aa3cb40231935b8db2cafb7b9a"
+          "sha256": "42344b4045b2e3db8d54e1ca393e4cb13446521c20ea913f07b0e471b7bdfd68"
         }
       ],
       "next_action": "Refresh coverage prose when upstream README changes product or package scope."
@@ -1218,7 +1218,7 @@
       "fixture_hashes": [
         {
           "path": "examples/ai/finrobot_translation/README.md",
-          "sha256": "4d29f7be97be40c826b9eeaed2e512437c7240aa3cb40231935b8db2cafb7b9a"
+          "sha256": "42344b4045b2e3db8d54e1ca393e4cb13446521c20ea913f07b0e471b7bdfd68"
         }
       ],
       "next_action": "Only add asset snapshots when UI/product visual parity requires them."
