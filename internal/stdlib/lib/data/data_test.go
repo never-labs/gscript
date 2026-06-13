@@ -683,6 +683,79 @@ func TestTryTypedCompareNullableTemporalCarrier(t *testing.T) {
 	}
 }
 
+func TestTryTypedCompareCountNullableIntegerCarrier(t *testing.T) {
+	column, err := NewColumnWithKind("_", KindI64, []any{
+		NullValue,
+		int64(1),
+		int64(2),
+		int64(1),
+	})
+	if err != nil {
+		t.Fatalf("NewColumnWithKind nullable long returned error: %v", err)
+	}
+
+	count, sum, handled, err := TryTypedCompareIndexStatsI64(column.Data, OpNE, int64(1))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 nullable long <> returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 nullable long <> did not handle")
+	}
+	if count != 2 || sum != 2 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 nullable long <> = count %d sum %d; want 2, 2", count, sum)
+	}
+
+	count, handled, err = TryTypedCompareCount(column.Data, OpNE, int64(1))
+	if err != nil {
+		t.Fatalf("TryTypedCompareCount nullable long <> returned error: %v", err)
+	}
+	if !handled || count != 2 {
+		t.Fatalf("TryTypedCompareCount nullable long <> = %d,%v; want 2,true", count, handled)
+	}
+
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(column.Data, OpEQ, NullValue)
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 nullable long null returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 nullable long null did not handle")
+	}
+	if count != 1 || sum != 0 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 nullable long null = count %d sum %d; want 1, 0", count, sum)
+	}
+
+	count, handled, err = TryTypedCompareCount(column.Data, OpEQ, NullValue)
+	if err != nil {
+		t.Fatalf("TryTypedCompareCount nullable long null returned error: %v", err)
+	}
+	if !handled || count != 1 {
+		t.Fatalf("TryTypedCompareCount nullable long null = %d,%v; want 1,true", count, handled)
+	}
+
+	tiled, err := TakeRepeat(column.Data, 12)
+	if err != nil {
+		t.Fatalf("TakeRepeat nullable long returned error: %v", err)
+	}
+	count, sum, handled, err = TryTypedCompareIndexStatsI64(tiled, OpNE, int64(1))
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexStatsI64 tiled nullable long <> returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexStatsI64 tiled nullable long <> did not handle")
+	}
+	if count != 6 || sum != 30 {
+		t.Fatalf("TryTypedCompareIndexStatsI64 tiled nullable long <> = count %d sum %d; want 6, 30", count, sum)
+	}
+
+	count, handled, err = TryTypedCompareCount(tiled, OpEQ, NullValue)
+	if err != nil {
+		t.Fatalf("TryTypedCompareCount tiled nullable long null returned error: %v", err)
+	}
+	if !handled || count != 3 {
+		t.Fatalf("TryTypedCompareCount tiled nullable long null = %d,%v; want 3,true", count, handled)
+	}
+}
+
 func TestTryTypedCompareIndexedNullableTemporalCarrier(t *testing.T) {
 	column, err := NewColumnWithKind("_", KindDate, []any{
 		DateFromDays(20610),

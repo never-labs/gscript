@@ -3738,6 +3738,24 @@ func typedCompareTiledCanHandle(source Array, op Op, value any) bool {
 	switch s := source.(type) {
 	case attributedArray:
 		return typedCompareTiledCanHandle(s.array, op, value)
+	case nullableArray:
+		if IsNull(value) {
+			return true
+		}
+		target := normalizeScalar(s.Kind(), value)
+		return typedCompareCarrierTargetCompatible(s.Kind(), target)
+	case nullBitmapArray[int8]:
+		return IsNull(value) || typedCompareCarrierTargetCompatible(s.Kind(), normalizeScalar(s.Kind(), value))
+	case nullBitmapArray[int16]:
+		return IsNull(value) || typedCompareCarrierTargetCompatible(s.Kind(), normalizeScalar(s.Kind(), value))
+	case nullBitmapArray[int32]:
+		return IsNull(value) || typedCompareCarrierTargetCompatible(s.Kind(), normalizeScalar(s.Kind(), value))
+	case nullBitmapArray[int64]:
+		return IsNull(value) || typedCompareCarrierTargetCompatible(s.Kind(), normalizeScalar(s.Kind(), value))
+	case nullBitmapArray[float32]:
+		return IsNull(value) || typedCompareCarrierTargetCompatible(s.Kind(), normalizeScalar(s.Kind(), value))
+	case nullBitmapArray[float64]:
+		return IsNull(value) || typedCompareCarrierTargetCompatible(s.Kind(), normalizeScalar(s.Kind(), value))
 	case columnArray[bool]:
 		_, ok := value.(bool)
 		return ok

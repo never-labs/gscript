@@ -1094,22 +1094,85 @@ func nullBitmapCompareIndexesI64(array Array, op Op, value any) (Array, bool, er
 // nullBitmapCompareIndexStatsI64 mirrors nullBitmapCompareIndexesI64 but only
 // accumulates count and index sum.
 func nullBitmapCompareIndexStatsI64(array Array, op Op, value any) (count, sum int64, handled bool, err error) {
-	indexes, handled, err := nullBitmapCompareIndexesI64(array, op, value)
-	if err != nil || !handled {
-		return 0, 0, handled, err
+	if !nullBitmapBackedArray(array) {
+		return 0, 0, false, nil
 	}
-	switch idx := indexes.(type) {
-	case columnArray[int64]:
-		for _, row := range idx.data {
-			count++
-			sum += row
-		}
-		return count, sum, true, nil
-	case i64RangeArray:
-		return int64(idx.len), i64RangeSum(idx), true, nil
+	switch op {
+	case OpEQ, OpNE, OpLT, OpLE, OpGT, OpGE:
 	default:
 		return 0, 0, false, nil
 	}
+	length := array.Len()
+	if IsNull(value) {
+		values, nulls, owned, ok := tryBulkI64NullableValues(array)
+		release := func() { bulkI64Release(values, owned) }
+		if !ok {
+			var fvalues []float64
+			var fowned bool
+			fvalues, nulls, fowned, ok = tryBulkF64NullableValues(array)
+			if !ok {
+				return 0, 0, false, nil
+			}
+			release = func() { bulkF64Release(fvalues, fowned) }
+			length = len(fvalues)
+		} else {
+			length = len(values)
+		}
+		for i := 0; i < length; i++ {
+			isNull := nulls != nil && nullBitGet(nulls, i)
+			if nullOrderedCompare(op, isNull, true) {
+				count++
+				sum += int64(i)
+			}
+		}
+		release()
+		return count, sum, true, nil
+	}
+	if values, nulls, owned, ok := tryBulkI64NullableValues(array); ok {
+		target, exact := coerceInt64Exact(value)
+		if !exact {
+			bulkI64Release(values, owned)
+			return 0, 0, false, nil
+		}
+		for i, v := range values[:length] {
+			if nulls != nil && nullBitGet(nulls, i) {
+				if nullOrderedCompare(op, true, false) {
+					count++
+					sum += int64(i)
+				}
+				continue
+			}
+			if boolCompare(op, v == target, compareInt64(v, target)) {
+				count++
+				sum += int64(i)
+			}
+		}
+		bulkI64Release(values, owned)
+		return count, sum, true, nil
+	}
+	if values, nulls, owned, ok := tryBulkF64NullableValues(array); ok {
+		target, numericOK := numeric(value)
+		if !numericOK {
+			bulkF64Release(values, owned)
+			return 0, 0, false, nil
+		}
+		for i, v := range values[:length] {
+			if nulls != nil && nullBitGet(nulls, i) {
+				if nullOrderedCompare(op, true, false) {
+					count++
+					sum += int64(i)
+				}
+				continue
+			}
+			if boolCompare(op, v == target, compareFloat64(v, target)) {
+				count++
+				sum += int64(i)
+			}
+		}
+		bulkF64Release(values, owned)
+		return count, sum, true, nil
+	}
+	return 0, 0, false, nil
 }
 
 // nullBitmapWithinIndexesI64 returns rows inside [low, high] (high open when
