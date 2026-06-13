@@ -95,3 +95,30 @@ func TestQScriptBindingBinaryTypedRuntimeStatsUseSharedHelper(t *testing.T) {
 		}
 	}
 }
+
+func TestQTypedWhereCompareIndexesDescriptorFallbackReason(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	desc := qTypedWhereCompareDescriptor{
+		kernel:         "ArrayWhereCompare",
+		shape:          "compare-to-index/test/i64/i64",
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		kind:           "compare",
+		array:          data.NewI64([]int64{1, 2, 3}),
+	}
+	if _, handled, err := evalQTypedWhereCompareIndexes(desc); err != nil || handled {
+		t.Fatalf("evalQTypedWhereCompareIndexes handled=%v err=%v, want fallback", handled, err)
+	}
+
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "ArrayWhereCompare" || stat.Shape != "compare-to-index/test/i64/i64" || stat.Outcome != "fallback" {
+			continue
+		}
+		if stat.ReasonCode != RuntimeFallbackUnsupportedType {
+			t.Fatalf("fallback reason = %q, want %q; stats=%#v", stat.ReasonCode, RuntimeFallbackUnsupportedType, RuntimeKernelExecutionStats())
+		}
+		return
+	}
+	t.Fatalf("missing descriptor fallback stat; stats=%#v", RuntimeKernelExecutionStats())
+}

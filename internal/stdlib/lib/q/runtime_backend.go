@@ -63,14 +63,15 @@ func evalQTypedRuntimeKernel2[A, B any](kernel qTypedRuntimeKernel2[A, B]) (A, B
 }
 
 type qTypedWhereCompareDescriptor struct {
-	kernel string
-	shape  string
-	kind   string
-	array  data.Array
-	op     data.Op
-	scalar any
-	low    any
-	high   any
+	kernel         string
+	shape          string
+	fallbackReason string
+	kind           string
+	array          data.Array
+	op             data.Op
+	scalar         any
+	low            any
+	high           any
 }
 
 func qTypedWhereCompareStatsDescriptor(left, right any, op, comparePrefix, withinStatsPrefix string) (qTypedWhereCompareDescriptor, bool, error) {
@@ -177,8 +178,9 @@ func qTypedWhereCompareIndexesDescriptor(left, right any, op, comparePrefix, wit
 
 func evalQTypedWhereCompareIndexStats(desc qTypedWhereCompareDescriptor) (int64, int64, bool, error) {
 	return evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
-		kernel: desc.kernel,
-		shape:  desc.shape,
+		kernel:         desc.kernel,
+		shape:          desc.shape,
+		fallbackReason: desc.fallbackReason,
 		call: func() (int64, int64, bool, error) {
 			if desc.kind == "within" {
 				return data.TryTypedWithinIndexStatsI64(desc.array, desc.low, desc.high, true)
@@ -190,8 +192,9 @@ func evalQTypedWhereCompareIndexStats(desc qTypedWhereCompareDescriptor) (int64,
 
 func evalQTypedWhereCompareCount(desc qTypedWhereCompareDescriptor) (int64, bool, error) {
 	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
-		kernel: desc.kernel,
-		shape:  desc.shape,
+		kernel:         desc.kernel,
+		shape:          desc.shape,
+		fallbackReason: desc.fallbackReason,
 		call: func() (int64, bool, error) {
 			if desc.kind == "within" {
 				return data.TryTypedWithinCount(desc.array, desc.low, desc.high, true)
@@ -203,8 +206,9 @@ func evalQTypedWhereCompareCount(desc qTypedWhereCompareDescriptor) (int64, bool
 
 func evalQTypedWhereCompareIndexes(desc qTypedWhereCompareDescriptor) (data.Array, bool, error) {
 	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
-		kernel: desc.kernel,
-		shape:  desc.shape,
+		kernel:         desc.kernel,
+		shape:          desc.shape,
+		fallbackReason: desc.fallbackReason,
 		call: func() (data.Array, bool, error) {
 			if desc.kind == "within" {
 				return data.TryTypedWithinIndexesI64(desc.array, desc.low, desc.high, true)

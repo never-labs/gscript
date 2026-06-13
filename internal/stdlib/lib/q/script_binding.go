@@ -590,13 +590,12 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver q
 		if err != nil || !handled {
 			return nil, handled, err
 		}
-		array, low, high, ok, err := qWithinOperands(left, right)
+		desc, ok, err := qTypedWhereCompareIndexesDescriptor(left, right, plan.left.op, "compare-to-index", "within-to-index")
 		if err != nil || !ok {
 			return nil, ok, err
 		}
-		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
-		out, handled, err = qTypedRuntimeResultReason("ArrayWhereWithin", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+		desc.fallbackReason = RuntimeFallbackUnsupportedType
+		out, handled, err := evalQTypedWhereCompareIndexes(desc)
 		if err != nil || handled {
 			return out, true, err
 		}
@@ -611,10 +610,13 @@ func (s *EvalState) evalQScriptUnaryBinding(plan *qScriptBindingPlan, resolver q
 			if err != nil || !handled {
 				return nil, handled, err
 			}
-			if array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.left.op); ok {
-				shape := "compare-to-index/" + plan.left.op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-				out, handled, err := data.TryTypedCompareIndexesI64(array, dataOp, scalar)
-				out, handled, err = qTypedRuntimeResultReason("ArrayWhereCompare", shape, RuntimeFallbackUnsupportedType, out, handled, err)
+			desc, ok, err := qTypedWhereCompareIndexesDescriptor(left, right, plan.left.op, "compare-to-index", "within-to-index")
+			if err != nil || ok {
+				if err != nil {
+					return nil, ok, err
+				}
+				desc.fallbackReason = RuntimeFallbackUnsupportedType
+				out, handled, err := evalQTypedWhereCompareIndexes(desc)
 				if err != nil || handled {
 					return out, true, err
 				}
