@@ -353,6 +353,9 @@ func newQEvalPipelinePlanHelpers(refs []QEvalPipelinePlanRef, backend qRuntimeEv
 			continue
 		}
 		backendPlan, hasBackendPlan := backend.lookupBackendPlan(ref)
+		if !hasBackendPlan {
+			continue
+		}
 		descriptor, hasDescriptor := backend.lookupDescriptor(ref)
 		executablePlan, hasExecutablePlan := backend.lookupExecutablePlan(ref)
 		helpers[ref.ID] = qEvalPipelinePlanHelper{
@@ -433,14 +436,14 @@ func sameQEvalPipelineSourceExecutor(a, b func(string) (any, bool, error)) bool 
 }
 
 func (h *qEvalPipelinePlanHelper) validForID(id int) bool {
-	return h != nil && h.ref.ID == id && h.ref.Valid() && qEvalPipelineBackendNameFromRef(h.ref) == qEvalPipelineTypedRuntimeBackend
+	return h != nil && h.ref.ID == id && (h.hasExecutablePlan || h.hasBackendPlan) && qEvalPipelineBackendNameFromRef(h.ref) == qEvalPipelineTypedRuntimeBackend
 }
 
 func (h *qEvalPipelinePlanHelper) execute() (runtime.Value, bool, error) {
 	if h == nil {
 		return runtime.NilValue(), false, nil
 	}
-	if !h.ref.Valid() || qEvalPipelineBackendNameFromRef(h.ref) != qEvalPipelineTypedRuntimeBackend {
+	if !h.validForID(h.ref.ID) {
 		return runtime.NilValue(), false, nil
 	}
 	if h.hasExecutablePlan && h.executeExecutable != nil {

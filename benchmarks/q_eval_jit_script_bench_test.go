@@ -140,6 +140,7 @@ const qEvalJITScriptWarmupCalls = 8
 // parameter range guard and queues a relaxed Tier 2 recompile; a few more
 // calls let the recompile land and re-enter native code before timing starts.
 const qEvalJITScriptSettleCalls = 5
+const qEvalJITScriptRouteMetricSampleIters = 64
 
 func qEvalJITScriptCaseByName(name string) (qEvalVectorCase, bool) {
 	for _, tc := range qEvalVectorCases {
@@ -270,8 +271,98 @@ func qEvalJITScriptBenchmark(b *testing.B, useJIT bool) {
 			if got := qEvalJITScriptResultInt64(b, out); got != want {
 				b.Fatalf("run(%d) = %d, want Go baseline %d", b.N, got, want)
 			}
+			if useJIT {
+				qEvalJITScriptReportRouteMetrics(b, src, want)
+			}
 		})
 	}
+}
+
+func qEvalJITScriptReportRouteMetrics(b *testing.B, qSrc string, want int64) {
+	b.Helper()
+	const iters = qEvalJITScriptRouteMetricSampleIters
+	proto := qEvalJITScriptCompileTop(b, qEvalJITScriptSource(qSrc))
+	globals := vmtest.NewInterpreterGlobals()
+	v := bytecodevm.New(globals)
+	defer v.Close()
+	tm := methodjit.NewTieringManager()
+	v.SetMethodJIT(tm)
+	if _, err := v.Execute(proto); err != nil {
+		b.Fatalf("route metrics Execute(top): %v", err)
+	}
+	runProto := qEvalJITScriptRunProto(b, proto)
+	for i := 0; i < qEvalJITScriptWarmupCalls; i++ {
+		if _, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(4)}); err != nil {
+			b.Fatalf("route metrics warm CallValue(run): %v", err)
+		}
+	}
+	if err := tm.CompileTier2(runProto); err != nil {
+		b.Fatalf("route metrics CompileTier2(run): %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(iters)}); err != nil {
+			b.Fatalf("route metrics settle CallValue(run, %d): %v", iters, err)
+		}
+	}
+	before := qEvalJITScriptSessionRouteCounts(tm.QKernelExecutionStatsFor(runProto))
+	results, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(iters)})
+	if err != nil {
+		b.Fatalf("route metrics CallValue(run, %d): %v", iters, err)
+	}
+	if len(results) != 1 || !results[0].IsInt() || results[0].Int() != want {
+		b.Fatalf("route metrics run(%d) = %v, want %d", iters, results, want)
+	}
+	after := qEvalJITScriptSessionRouteCounts(tm.QKernelExecutionStatsFor(runProto))
+	delta := after.minus(before)
+	denom := float64(iters)
+	b.ReportMetric(float64(delta.planned)/denom, "q_session_planned_op_exit/op")
+	b.ReportMetric(float64(delta.shell)/denom, "q_session_shell_fallback/op")
+	b.ReportMetric(float64(delta.errors)/denom, "q_session_eval_errors/op")
+	b.ReportMetric(float64(len(delta.shapes)), "q_session_backend_shapes")
+}
+
+type qEvalJITScriptSessionRouteSummary struct {
+	planned uint64
+	shell   uint64
+	errors  uint64
+	shapes  map[string]struct{}
+}
+
+func (s qEvalJITScriptSessionRouteSummary) minus(before qEvalJITScriptSessionRouteSummary) qEvalJITScriptSessionRouteSummary {
+	out := qEvalJITScriptSessionRouteSummary{
+		planned: s.planned - before.planned,
+		shell:   s.shell - before.shell,
+		errors:  s.errors - before.errors,
+		shapes:  make(map[string]struct{}, len(s.shapes)),
+	}
+	for shape := range s.shapes {
+		out.shapes[shape] = struct{}{}
+	}
+	return out
+}
+
+func qEvalJITScriptSessionRouteCounts(stats []methodjit.QKernelExecutionStat) qEvalJITScriptSessionRouteSummary {
+	out := qEvalJITScriptSessionRouteSummary{shapes: make(map[string]struct{})}
+	for _, stat := range stats {
+		if stat.Source != "methodjit_q_eval_runtime" {
+			continue
+		}
+		switch stat.Route {
+		case "session_planned_op_exit":
+			out.planned += stat.Count
+		case "typed_runtime_op_exit":
+			out.shell += stat.Count
+		default:
+			continue
+		}
+		if stat.Outcome == "error" {
+			out.errors += stat.Count
+		}
+		if stat.Shape != "" {
+			out.shapes[stat.Shape] = struct{}{}
+		}
+	}
+	return out
 }
 
 func BenchmarkQEvalJITScriptWarm(b *testing.B) {
@@ -352,7 +443,7 @@ func TestQEvalJITScriptCaseNamesExist(t *testing.T) {
 	}
 }
 
-func qEvalJITScriptCompileTop(t *testing.T, src string) *bytecodevm.FuncProto {
+func qEvalJITScriptCompileTop(t testing.TB, src string) *bytecodevm.FuncProto {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
@@ -367,6 +458,20 @@ func qEvalJITScriptCompileTop(t *testing.T, src string) *bytecodevm.FuncProto {
 		t.Fatalf("compile: %v", err)
 	}
 	return proto
+}
+
+func qEvalJITScriptRunProto(tb testing.TB, proto *bytecodevm.FuncProto) *bytecodevm.FuncProto {
+	tb.Helper()
+	if proto == nil {
+		tb.Fatal("top-level proto is nil")
+	}
+	for _, p := range proto.Protos {
+		if p.Name == "run" {
+			return p
+		}
+	}
+	tb.Fatal("run proto not found among top-level protos")
+	return nil
 }
 
 func qEvalJITScriptKernelAttempts() uint64 {
@@ -393,16 +498,7 @@ func qEvalJITScriptForcedTier2(t *testing.T, script string, iterations int64) (i
 	if _, err := v.Execute(proto); err != nil {
 		t.Fatalf("Execute(top): %v", err)
 	}
-	var runProto *bytecodevm.FuncProto
-	for _, p := range proto.Protos {
-		if p.Name == "run" {
-			runProto = p
-			break
-		}
-	}
-	if runProto == nil {
-		t.Fatal("run proto not found among top-level protos")
-	}
+	runProto := qEvalJITScriptRunProto(t, proto)
 	if err := tm.CompileTier2(runProto); err != nil {
 		t.Fatalf("CompileTier2(run): %v", err)
 	}
@@ -576,16 +672,7 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 	// must stay Tier 1 until a real direct typed backend route exists.
 	{
 		proto := qEvalJITScriptCompileTop(t, qEvalJITScriptDirectEvalSource(src))
-		var runProto *bytecodevm.FuncProto
-		for _, p := range proto.Protos {
-			if p.Name == "run" {
-				runProto = p
-				break
-			}
-		}
-		if runProto == nil {
-			t.Fatal("run proto not found among direct-eval top-level protos")
-		}
+		runProto := qEvalJITScriptRunProto(t, proto)
 		tm := methodjit.NewTieringManager()
 		err := tm.CompileTier2(runProto)
 		if err == nil {

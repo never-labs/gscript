@@ -116,6 +116,29 @@ func TestQEvalPipelinePlanDirectReturnExecutesTypedPlanRef(t *testing.T) {
 	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(cf.QEvalPipelinePlans[0]), "typed_runtime_direct_entry", "success", 1)
 }
 
+func TestQEvalPipelineDirectReturnRejectsLegacyMirrorOnlyRef(t *testing.T) {
+	fn := &Function{}
+	block := &Block{ID: 0}
+	fn.Entry = block
+	fn.Blocks = []*Block{block}
+	fn.QEvalPipelinePlans = []QEvalPipelinePlanRef{{
+		ID:            0,
+		Kernel:        "QPipelinePlan",
+		Shape:         "vector-reduce/sum",
+		PipelineShape: "expression",
+		Backend:       qEvalPipelineTypedRuntimeBackend,
+		Kind:          "expression",
+	}}
+	plan := &Instr{ID: fn.newValueID(), Op: OpQEvalPipelinePlan, Type: TypeAny, Aux: 0, Block: block}
+	retValue := &Value{ID: plan.ID, Def: plan}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{retValue}, Block: block}
+	block.Instrs = []*Instr{plan, ret}
+
+	if got := qEvalPipelineDirectReturnPlanID(fn); got != -1 {
+		t.Fatalf("qEvalPipelineDirectReturnPlanID = %d, want -1 for legacy mirror-only ref", got)
+	}
+}
+
 func TestQEvalPipelineTieringEntryUsesDirectReturn(t *testing.T) {
 	t.Setenv(exitResumeCheckEnv, "")
 	cf := compileQEvalPipelineNativeExitBenchmark(t, "count where (til 64 mod 4)=1")

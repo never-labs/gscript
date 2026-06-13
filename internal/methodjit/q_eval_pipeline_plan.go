@@ -171,6 +171,17 @@ func qEvalPipelinePlanRefByID(refs []QEvalPipelinePlanRef, id int) (QEvalPipelin
 	return ref, ref.Valid()
 }
 
+func qEvalPipelineExecutablePlanRefByID(refs []QEvalPipelinePlanRef, id int) (QEvalPipelinePlanRef, bool) {
+	ref, ok := qEvalPipelinePlanRefByID(refs, id)
+	if !ok {
+		return QEvalPipelinePlanRef{}, false
+	}
+	if _, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); !ok {
+		return QEvalPipelinePlanRef{}, false
+	}
+	return ref, true
+}
+
 func formatQEvalPipelinePlanRefs(refs []QEvalPipelinePlanRef) string {
 	if len(refs) == 0 {
 		return "0 q.eval pipeline plan(s)\n"
@@ -194,7 +205,7 @@ func (cf *CompiledFunction) executeQEvalPipelinePlanBackendValue(id int) (runtim
 	if helper := cf.qEvalPipelinePlanHelper(id); helper != nil {
 		return helper.execute()
 	}
-	ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, id)
+	ref, ok := qEvalPipelineExecutablePlanRefByID(cf.QEvalPipelinePlans, id)
 	if !ok {
 		return runtime.NilValue(), false, nil
 	}
@@ -254,7 +265,7 @@ func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturnValue() (runtime.
 	}
 	out, handled, err := cf.qEvalPipelineExecutionAdapter().executeValue(cf.QEvalPipelineDirectReturnID, qEvalPipelineExecutionRouteDirectEntry)
 	if !handled {
-		return runtime.NilValue(), true, err
+		return runtime.NilValue(), false, err
 	}
 	return out, true, err
 }
@@ -268,7 +279,7 @@ func (cf *CompiledFunction) executeQEvalPipelinePlanExit(ctx *ExecContext, regs 
 }
 
 func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipelinePlanRef) (runtime.Value, bool, error) {
-	if backend == nil || !ref.Valid() {
+	if backend == nil {
 		return runtime.NilValue(), false, nil
 	}
 	if _, ok := backend.LookupQEvalPipelinePlan(ref); !ok {
@@ -277,6 +288,14 @@ func executeQEvalPipelinePlanValue(backend QEvalPipelineBackend, ref QEvalPipeli
 	executor, ok := backend.(QEvalPipelineExecutor)
 	if !ok {
 		return runtime.NilValue(), false, nil
+	}
+	type qEvalPipelineBackendPlanLookup interface {
+		lookupBackendPlan(QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool)
+	}
+	if runtimeBackend, ok := backend.(qEvalPipelineBackendPlanLookup); ok {
+		if _, ok := runtimeBackend.lookupBackendPlan(ref); !ok {
+			return runtime.NilValue(), false, nil
+		}
 	}
 	out, handled, err := executor.ExecuteQEvalPipelinePlan(ref)
 	if err != nil || !handled {
@@ -400,7 +419,7 @@ func qEvalPipelineDirectReturnPlanID(fn *Function) int {
 		return -1
 	}
 	id := int(plan.Aux)
-	if _, ok := qEvalPipelinePlanRefByID(fn.QEvalPipelinePlans, id); !ok {
+	if _, ok := qEvalPipelineExecutablePlanRefByID(fn.QEvalPipelinePlans, id); !ok {
 		return -1
 	}
 	return id

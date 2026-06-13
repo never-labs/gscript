@@ -511,6 +511,16 @@ func TestQEvalPipelineBackendPlanFromRefKeepsDescriptorOnlyLegacyFallback(t *tes
 	if plan, ok := backend.lookupBackendPlan(ref); ok {
 		t.Fatalf("runtime backend accepted legacy mirror plan: %+v", plan)
 	}
+	if value, handled, err := executeQEvalPipelinePlanValue(backend, ref); handled || err != nil {
+		t.Fatalf("executeQEvalPipelinePlanValue legacy mirror = %v handled %v err %v, want unhandled nil error", value, handled, err)
+	}
+	helpers := newQEvalPipelinePlanHelpers([]QEvalPipelinePlanRef{ref}, backend)
+	if len(helpers) != 1 {
+		t.Fatalf("helper slice length = %d, want 1", len(helpers))
+	}
+	if helpers[0].validForID(ref.ID) {
+		t.Fatalf("legacy mirror helper reported valid: %+v", helpers[0])
+	}
 }
 
 func TestQEvalPipelineTypedRuntimeBackendPlanRejectsHeuristicPlan(t *testing.T) {
