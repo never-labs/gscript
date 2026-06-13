@@ -62,6 +62,44 @@ provider-free `.leia` examples. The `generic_*` skeletons are reusable generic
 AI package boundaries consumed by this translation; they are not
 FinRobot-specific language features.
 
+## Optional Live GLM Gate
+
+The default FinRobot examples remain provider-free: they use fixtures, replay
+records, and package manifests, and they do not require network access or
+model-provider credentials. Real FinRobot gates live in integration tests, not
+ordinary examples.
+
+The live LLM gate runs by default when a GLM-compatible key is available.
+
+Run it with GLM-compatible environment variables set outside the repository:
+
+```bash
+export LEIA_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic
+export LEIA_GLM_API_KEY
+export LEIA_GLM_MODEL=glm-5.1
+
+go test ./tests/integration/llm -run '^TestFinRobotLiveLLMGateGLMIntegration$' -count=1 -v
+```
+
+`LEIA_GLM_API_KEY` must already be present in the shell or injected by a secret
+manager; do not write the value into docs, fixtures, manifests, or scripts.
+FinRobot-specific overrides are also supported and take precedence when set:
+`LEIA_FINROBOT_LLM_BASE_URL`, `LEIA_FINROBOT_LLM_API_KEY`, and
+`LEIA_FINROBOT_LLM_MODEL`. The gate also accepts the local glm_cc-compatible
+`SENTINEL_GLM_API_KEY` and `GLM_API_KEY` fallbacks. Set
+`LEIA_FINROBOT_LIVE_LLM=0` to force the live gate to skip. Provider-free example
+checks should continue to run without any of these variables.
+
+The live data gate uses Leia's `net.get` and `resp.json()` path against the
+public SEC XBRL API with a fair-access User-Agent:
+
+```bash
+go test ./tests/integration/llm -run '^TestFinRobotLiveSECCompanyConceptDataIntegration$' -count=1 -v
+```
+
+Set `LEIA_FINROBOT_LIVE_DATA=0` to force this gate to skip. It does not require
+a paid account or token.
+
 ## Scope
 
 FinRobot should translate into ordinary Leia packages that compose existing
