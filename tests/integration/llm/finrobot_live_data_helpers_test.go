@@ -29,6 +29,11 @@ func requireFinRobotFMPAPIKey(t *testing.T) string {
 	return finRobotOptionalLiveDataToken(t, "FMP", "LEIA_FMP_API_KEY", "FMP_API_KEY")
 }
 
+func requireFinRobotFinnhubToken(t *testing.T) string {
+	t.Helper()
+	return finRobotOptionalLiveDataToken(t, "Finnhub", "LEIA_FINNHUB_TOKEN", "FINNHUB_TOKEN", "FINNHUB_API_KEY")
+}
+
 func finRobotOptionalLiveDataToken(t *testing.T, provider string, envNames ...string) string {
 	t.Helper()
 	token := firstNonEmptyEnv(envNames...)
@@ -42,6 +47,13 @@ func newFinRobotFMPLiveDataVM(t *testing.T) *leia.VM {
 	t.Helper()
 	apiKey := requireFinRobotFMPAPIKey(t)
 	t.Setenv("LEIA_FMP_API_KEY", apiKey)
+	return newFinRobotLiveDataVM(t)
+}
+
+func newFinRobotFinnhubLiveDataVM(t *testing.T) *leia.VM {
+	t.Helper()
+	token := requireFinRobotFinnhubToken(t)
+	t.Setenv("LEIA_FINNHUB_TOKEN", token)
 	return newFinRobotLiveDataVM(t)
 }
 
