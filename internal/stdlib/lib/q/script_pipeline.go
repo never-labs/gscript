@@ -2921,49 +2921,15 @@ func (s *EvalState) evalQScriptGatherSumCountWhereIndexPipeline(descriptor *qScr
 	if err != nil {
 		return nil, true, err
 	}
-	shape := "where-index-reduce/sum-count/" + string(array.Kind())
 	// When the gathered value expression is the same pure expression as the
 	// predicate source, the data layer can share one bulk carrier flatten
 	// between the selection mask and the reduction.
 	selfPredicate := strings.TrimSpace(plan.leftExpr) == strings.TrimSpace(descriptor.valueExpr)
-	var sum any
-	var count int64
-	var handled bool
-	if plan.compareOp == "within" {
-		predicate, low, high, ok, err := qWithinOperands(left, right)
-		if err != nil || !ok {
-			return nil, ok, err
-		}
-		shape += "/within/" + string(predicate.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		sum, count, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[any, int64]{
-			kernel:         "ArrayWhereGatherSumCount",
-			shape:          shape,
-			fallbackReason: RuntimeFallbackUnsupportedType,
-			call: func() (any, int64, bool, error) {
-				if selfPredicate {
-					return data.TryTypedNumericSumCountWhereWithinSelf(array, low, high, true)
-				}
-				return data.TryTypedNumericSumCountWhereWithin(array, predicate, low, high, true)
-			},
-		})
-	} else {
-		predicate, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
-		if !ok {
-			return nil, false, nil
-		}
-		shape += "/" + plan.compareOp + "/" + string(predicate.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-		sum, count, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[any, int64]{
-			kernel:         "ArrayWhereGatherSumCount",
-			shape:          shape,
-			fallbackReason: RuntimeFallbackUnsupportedType,
-			call: func() (any, int64, bool, error) {
-				if selfPredicate {
-					return data.TryTypedNumericSumCountWhereCompareSelf(array, dataOp, scalar)
-				}
-				return data.TryTypedNumericSumCountWhereCompare(array, predicate, dataOp, scalar)
-			},
-		})
+	runtimePlan, ok, err := qTypedWhereGatherSumCountDescriptorFor(array, left, right, plan.compareOp, "where-index-reduce/sum-count", selfPredicate)
+	if err != nil || !ok {
+		return nil, ok, err
 	}
+	sum, count, handled, err := evalQTypedWhereGatherSumCount(runtimePlan)
 	if err != nil || !handled {
 		return nil, handled, err
 	}

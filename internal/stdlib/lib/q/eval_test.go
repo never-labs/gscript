@@ -2198,6 +2198,64 @@ func TestExecuteEvalPipelineUsesWhereGatherSumCountWithLazyPredicate(t *testing.
 	}
 }
 
+func TestExecuteEvalPipelineUsesWhereGatherSumCountSelfPredicate(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	const rows = 8192
+	var want int64
+	for i := int64(0); i < rows; i++ {
+		x := i * 2
+		if x > 10 {
+			want += x + 1
+		}
+	}
+	src := "x:(til 8192)*2;idx:where x>10;(+/x[idx])+count idx"
+	got, handled, err := ExecuteEvalPipeline(src)
+	if err != nil || !handled || got != want {
+		t.Fatalf("ExecuteEvalPipeline self predicate gather sum-count = %#v,%v,%v; want %d,true,nil", got, handled, err, want)
+	}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected self predicate gather sum-count fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayWhereGatherSumCount" && stat.Shape == "where-index-reduce/sum-count/i64/>/i64/i64" &&
+			stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing self predicate ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
+}
+
+func TestExecuteEvalPipelineUsesWhereGatherSumCountWithinPredicate(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	const rows = 8192
+	var want int64
+	for i := int64(0); i < rows; i++ {
+		y := i*2 + 7
+		if i%10 >= 3 && i%10 <= 6 {
+			want += y + 1
+		}
+	}
+	src := "x:til 8192;y:(x*2)+7;idx:where (x mod 10) within 3 6;(+/y[idx])+count idx"
+	got, handled, err := ExecuteEvalPipeline(src)
+	if err != nil || !handled || got != want {
+		t.Fatalf("ExecuteEvalPipeline within predicate gather sum-count = %#v,%v,%v; want %d,true,nil", got, handled, err, want)
+	}
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected within predicate gather sum-count fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayWhereGatherSumCount" && stat.Shape == "where-index-reduce/sum-count/i64/within/i64/i64/i64" &&
+			stat.Outcome == "hit" && stat.Count > 0 {
+			return
+		}
+	}
+	t.Fatalf("missing within predicate ArrayWhereGatherSumCount hit: %#v", RuntimeKernelExecutionStats())
+}
+
 func TestEvalNumericReductionBundleRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

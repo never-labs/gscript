@@ -74,6 +74,18 @@ type qTypedWhereCompareDescriptor struct {
 	high           any
 }
 
+type qTypedWhereGatherSumCountDescriptor struct {
+	shape         string
+	kind          string
+	values        data.Array
+	predicate     data.Array
+	op            data.Op
+	scalar        any
+	low           any
+	high          any
+	selfPredicate bool
+}
+
 func qTypedWhereCompareStatsDescriptor(left, right any, op, comparePrefix, withinStatsPrefix string) (qTypedWhereCompareDescriptor, bool, error) {
 	if op == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
@@ -176,6 +188,37 @@ func qTypedWhereCompareIndexesDescriptor(left, right any, op, comparePrefix, wit
 	}, true, nil
 }
 
+func qTypedWhereGatherSumCountDescriptorFor(values data.Array, left, right any, op, shapePrefix string, selfPredicate bool) (qTypedWhereGatherSumCountDescriptor, bool, error) {
+	if op == "within" {
+		predicate, low, high, ok, err := qWithinOperands(left, right)
+		if err != nil || !ok {
+			return qTypedWhereGatherSumCountDescriptor{}, ok, err
+		}
+		return qTypedWhereGatherSumCountDescriptor{
+			shape:         shapePrefix + "/" + string(values.Kind()) + "/within/" + string(predicate.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil)),
+			kind:          "within",
+			values:        values,
+			predicate:     predicate,
+			low:           low,
+			high:          high,
+			selfPredicate: selfPredicate,
+		}, true, nil
+	}
+	predicate, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
+	if !ok {
+		return qTypedWhereGatherSumCountDescriptor{}, false, nil
+	}
+	return qTypedWhereGatherSumCountDescriptor{
+		shape:         shapePrefix + "/" + string(values.Kind()) + "/" + op + "/" + string(predicate.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil)),
+		kind:          "compare",
+		values:        values,
+		predicate:     predicate,
+		op:            dataOp,
+		scalar:        scalar,
+		selfPredicate: selfPredicate,
+	}, true, nil
+}
+
 func evalQTypedWhereCompareIndexStats(desc qTypedWhereCompareDescriptor) (int64, int64, bool, error) {
 	return evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
 		kernel:         desc.kernel,
@@ -186,6 +229,26 @@ func evalQTypedWhereCompareIndexStats(desc qTypedWhereCompareDescriptor) (int64,
 				return data.TryTypedWithinIndexStatsI64(desc.array, desc.low, desc.high, true)
 			}
 			return data.TryTypedCompareIndexStatsI64(desc.array, desc.op, desc.scalar)
+		},
+	})
+}
+
+func evalQTypedWhereGatherSumCount(desc qTypedWhereGatherSumCountDescriptor) (any, int64, bool, error) {
+	return evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[any, int64]{
+		kernel:         "ArrayWhereGatherSumCount",
+		shape:          desc.shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, int64, bool, error) {
+			if desc.kind == "within" {
+				if desc.selfPredicate {
+					return data.TryTypedNumericSumCountWhereWithinSelf(desc.values, desc.low, desc.high, true)
+				}
+				return data.TryTypedNumericSumCountWhereWithin(desc.values, desc.predicate, desc.low, desc.high, true)
+			}
+			if desc.selfPredicate {
+				return data.TryTypedNumericSumCountWhereCompareSelf(desc.values, desc.op, desc.scalar)
+			}
+			return data.TryTypedNumericSumCountWhereCompare(desc.values, desc.predicate, desc.op, desc.scalar)
 		},
 	})
 }
