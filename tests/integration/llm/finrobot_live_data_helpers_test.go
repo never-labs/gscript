@@ -24,6 +24,27 @@ func newFinRobotLiveDataVM(t *testing.T) *leia.VM {
 	return leia.New(leia.WithLibs(leia.LibString | leia.LibNet | leia.LibJSON | leia.LibOS))
 }
 
+func requireFinRobotFMPAPIKey(t *testing.T) string {
+	t.Helper()
+	return finRobotOptionalLiveDataToken(t, "FMP", "LEIA_FMP_API_KEY", "FMP_API_KEY")
+}
+
+func finRobotOptionalLiveDataToken(t *testing.T, provider string, envNames ...string) string {
+	t.Helper()
+	token := firstNonEmptyEnv(envNames...)
+	if token == "" {
+		t.Skipf("set %s to run optional %s live data gates", strings.Join(envNames, " or "), provider)
+	}
+	return token
+}
+
+func newFinRobotFMPLiveDataVM(t *testing.T) *leia.VM {
+	t.Helper()
+	apiKey := requireFinRobotFMPAPIKey(t)
+	t.Setenv("LEIA_FMP_API_KEY", apiKey)
+	return newFinRobotLiveDataVM(t)
+}
+
 func execFinRobotLiveDataScript(t *testing.T, vm *leia.VM, script string) error {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
@@ -39,7 +60,7 @@ func skipUnavailableFinRobotLiveData(t *testing.T, provider string, status int64
 	if status == 403 || status == 408 || status == 429 || status >= 500 {
 		t.Skipf("%s live data endpoint unavailable for this run: status=%d error=%v", provider, status, requestErr)
 	}
-	if requestErr != nil {
+	if status == 0 && requestErr != nil {
 		t.Skipf("%s live data request failed: status=%d error=%v", provider, status, requestErr)
 	}
 }
@@ -70,6 +91,22 @@ func mustGetInt(t *testing.T, vm *leia.VM, name string) int64 {
 		return int64(v)
 	default:
 		t.Fatalf("%s = %#v (%T), want integer", name, got, got)
+		return 0
+	}
+}
+
+func mustGetFloat(t *testing.T, vm *leia.VM, name string) float64 {
+	t.Helper()
+	got := getOrNil(t, vm, name)
+	switch v := got.(type) {
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case float64:
+		return v
+	default:
+		t.Fatalf("%s = %#v (%T), want number", name, got, got)
 		return 0
 	}
 }
