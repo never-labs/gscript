@@ -1217,50 +1217,72 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 			if instr == nil || instr.Op != OpCall || !qCallIsQEvalEntrypoint(fn, instr) {
 				continue
 			}
-			source, ok := qCallEvalSourceString(fn, instr)
+			candidate, ok := describeQEvalPipelineBackendCandidate(fn, instr)
 			if !ok {
-				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackDynamicSource, "q-eval/dynamic-source")
+				qEvalHotPlanFallbackRemark(fn, instr, candidate.FallbackReason, candidate.FallbackShape)
 				continue
 			}
-			plan, reason, ok := qClassifyEvalHotPlan(source)
-			if !ok {
-				qEvalHotPlanFallbackRemark(fn, instr, reason, "q-eval/unsupported")
-				continue
-			}
-			backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
-			if !backendPlan.Valid() || backendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
-				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, plan.Shape)
-				continue
-			}
-			ref := fn.addQEvalPipelinePlan(source, plan)
+			ref := fn.addQEvalPipelinePlan(candidate.Source, candidate.Plan)
 			if _, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); !ok {
-				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, plan.Shape)
+				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, candidate.Plan.Shape)
 				continue
 			}
-			qEvalHotPlanSupportedRemark(fn, instr, plan, ref)
+			qEvalHotPlanSupportedRemark(fn, instr, candidate.Plan, ref)
 		}
 	}
 	return fn, nil
 }
 
-func qCallIsLowerableQEvalPipelinePlan(fn *Function, call *Instr) bool {
+type qEvalPipelineBackendCandidate struct {
+	Source         string
+	Plan           qEvalHotPlan
+	BackendPlan    stdq.EvalPipelineBackendPlan
+	FallbackReason string
+	FallbackShape  string
+}
+
+func describeQEvalPipelineBackendCandidate(fn *Function, call *Instr) (qEvalPipelineBackendCandidate, bool) {
 	if call == nil || call.Op != OpCall || !qCallIsQEvalEntrypoint(fn, call) {
-		return false
+		return qEvalPipelineBackendCandidate{}, false
 	}
 	source, ok := qCallEvalSourceString(fn, call)
 	if !ok {
-		return false
+		return qEvalPipelineBackendCandidate{
+			FallbackReason: qEvalHotPlanFallbackDynamicSource,
+			FallbackShape:  "q-eval/dynamic-source",
+		}, false
 	}
-	plan, _, ok := qClassifyEvalHotPlan(source)
+	plan, reason, ok := qClassifyEvalHotPlan(source)
 	if !ok {
-		return false
+		return qEvalPipelineBackendCandidate{
+			FallbackReason: reason,
+			FallbackShape:  "q-eval/unsupported",
+		}, false
 	}
 	backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
 	if !backendPlan.Valid() || backendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
+		return qEvalPipelineBackendCandidate{
+			Source:         source,
+			Plan:           plan,
+			BackendPlan:    backendPlan,
+			FallbackReason: qEvalHotPlanFallbackHeuristicOnly,
+			FallbackShape:  plan.Shape,
+		}, false
+	}
+	return qEvalPipelineBackendCandidate{
+		Source:      source,
+		Plan:        plan,
+		BackendPlan: backendPlan,
+	}, true
+}
+
+func qCallIsLowerableQEvalPipelinePlan(fn *Function, call *Instr) bool {
+	candidate, ok := describeQEvalPipelineBackendCandidate(fn, call)
+	if !ok {
 		return false
 	}
-	ref := qEvalPipelinePlanRefFromHotPlan(-1, source, plan)
-	ref.BackendPlan = &backendPlan
+	ref := qEvalPipelinePlanRefFromHotPlan(-1, candidate.Source, candidate.Plan)
+	ref.BackendPlan = &candidate.BackendPlan
 	_, ok = qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
 	return ok
 }
@@ -1311,19 +1333,11 @@ func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
 			if instr == nil || instr.Op != OpCall || !qCallIsQEvalEntrypoint(fn, instr) {
 				continue
 			}
-			source, ok := qCallEvalSourceString(fn, instr)
+			candidate, ok := describeQEvalPipelineBackendCandidate(fn, instr)
 			if !ok {
 				continue
 			}
-			plan, _, ok := qClassifyEvalHotPlan(source)
-			if !ok {
-				continue
-			}
-			backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
-			if !backendPlan.Valid() || backendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
-				continue
-			}
-			ref := fn.addQEvalPipelinePlan(source, plan)
+			ref := fn.addQEvalPipelinePlan(candidate.Source, candidate.Plan)
 			if !ref.Valid() {
 				continue
 			}

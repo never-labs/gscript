@@ -136,6 +136,17 @@ func (qRuntimeEvalPipelinePlanner) DescribeQEvalPipeline(source string) (QEvalPi
 	return plan.methodDescriptor(), true
 }
 
+func qEvalTypedRuntimeBackendPlanForCacheableSource(source string) (stdq.EvalPipelineBackendPlan, bool) {
+	if !stdq.EvalSourceCacheable(source) {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	plan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(source)
+	if !ok || !plan.valid() || plan.plan.Backend != qEvalPipelineTypedRuntimeBackend {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	return plan.plan, true
+}
+
 func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 	backendPlan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(source)
 	if !ok {

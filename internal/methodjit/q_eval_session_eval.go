@@ -261,8 +261,7 @@ func QEvalSessionEvalLoweringPass(fn *Function) (*Function, error) {
 					})
 				continue
 			}
-			plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
-			if !ok || !plan.Valid() || plan.Backend != stdq.EvalPipelineTypedRuntimeBackend {
+			if _, ok := qEvalTypedRuntimeBackendPlanForCacheableSource(source); !ok {
 				blockID, valueID := qRemarkLocation(instr)
 				functionRemarks(fn).AddWithFields("QEvalSessionEvalLowering", "missed", blockID, valueID, OpCall,
 					"constant q session eval source has no typed-runtime backend plan; staying on generic call path",
@@ -301,11 +300,8 @@ func QEvalSessionEvalLoweringPass(fn *Function) (*Function, error) {
 }
 
 func qEvalSourceHasTypedRuntimeBackendPlan(source string) bool {
-	if !stdq.EvalSourceCacheable(source) {
-		return false
-	}
-	plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
-	return ok && plan.Valid() && plan.Backend == stdq.EvalPipelineTypedRuntimeBackend
+	_, ok := qEvalTypedRuntimeBackendPlanForCacheableSource(source)
+	return ok
 }
 
 // qCallSessionEvalReceiver matches OpCall instructions whose callee is a
@@ -482,8 +478,8 @@ func qEvalSessionEvalSiteFromInstr(fn *Function, instr *Instr) *qEvalSessionEval
 	if !ok {
 		return site
 	}
-	plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
-	if !ok || !plan.Valid() || plan.Backend != stdq.EvalPipelineTypedRuntimeBackend {
+	plan, ok := qEvalTypedRuntimeBackendPlanForCacheableSource(source)
+	if !ok {
 		return site
 	}
 	site.kernel = plan.Descriptor.Kernel
