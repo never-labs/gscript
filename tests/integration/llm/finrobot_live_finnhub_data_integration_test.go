@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFinRobotLiveFinnhubProfileDataIntegration(t *testing.T) {
@@ -159,5 +160,65 @@ if err != nil {
 	fmt.Printf("finnhub_metrics symbol=%q metric_type=%q 52w_high=%f 52w_low=%f market_cap=%f\n", symbol, metricType, high52, low52, marketCap)
 	if symbol != "AAPL" || metricType != "all" || high52 <= 0 || low52 <= 0 || low52 > high52 || marketCap <= 0 {
 		t.Fatalf("unexpected Finnhub metrics payload: symbol=%q metric_type=%q 52w_high=%f 52w_low=%f market_cap=%f", symbol, metricType, high52, low52, marketCap)
+	}
+}
+
+func TestFinRobotLiveFinnhubCompanyNewsDataIntegration(t *testing.T) {
+	vm := newFinRobotFinnhubLiveDataVM(t)
+	to := time.Now().UTC().Format("2006-01-02")
+	from := time.Now().UTC().AddDate(0, 0, -14).Format("2006-01-02")
+	if err := execFinRobotLiveDataScript(t, vm, fmt.Sprintf(`
+finnhub_news_request_error := nil
+finnhub_news_json_error := nil
+finnhub_news_status := 0
+finnhub_news_ok := false
+finnhub_news_count := 0
+finnhub_news_category := ""
+finnhub_news_datetime := 0
+finnhub_news_headline := ""
+finnhub_news_source := ""
+finnhub_news_summary := ""
+finnhub_news_url := ""
+
+url := "https://finnhub.io/api/v1/company-news?symbol=AAPL&from=%s&to=%s&token=" .. os.getenv("LEIA_FINNHUB_TOKEN")
+resp, err := net.get(url, {timeout: 30})
+if err != nil {
+    finnhub_news_request_error = err
+} else {
+    finnhub_news_status = resp.status
+    finnhub_news_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            finnhub_news_json_error = json_err
+        } else {
+            finnhub_news_count = #data
+            row := data[1]
+            finnhub_news_category = row.category
+            finnhub_news_datetime = row.datetime
+            finnhub_news_headline = row.headline
+            finnhub_news_source = row.source
+            finnhub_news_summary = row.summary
+            finnhub_news_url = row.url
+        }
+    } else {
+        finnhub_news_request_error = resp.statusText
+    }
+}
+`, from, to)); err != nil {
+		t.Fatal(err)
+	}
+
+	assertFinRobotLiveDataOK(t, vm, "Finnhub company-news", "finnhub_news_status", "finnhub_news_request_error", "finnhub_news_json_error", "finnhub_news_ok")
+	count := mustGetInt(t, vm, "finnhub_news_count")
+	category := mustGetString(t, vm, "finnhub_news_category")
+	datetime := mustGetInt(t, vm, "finnhub_news_datetime")
+	headline := mustGetString(t, vm, "finnhub_news_headline")
+	source := mustGetString(t, vm, "finnhub_news_source")
+	summary := mustGetString(t, vm, "finnhub_news_summary")
+	url := mustGetString(t, vm, "finnhub_news_url")
+	fmt.Printf("finnhub_news from=%q to=%q count=%d category=%q source=%q headline=%q\n", from, to, count, category, source, headline)
+	if count <= 0 || category == "" || datetime <= 0 || headline == "" || source == "" || summary == "" || !strings.HasPrefix(url, "http") {
+		t.Fatalf("unexpected Finnhub company-news payload: count=%d category=%q datetime=%d headline=%q source=%q summary=%q url=%q", count, category, datetime, headline, source, summary, url)
 	}
 }
