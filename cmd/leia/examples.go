@@ -565,19 +565,6 @@ func cliExampleModuleRoot(path string) (string, bool) {
 
 func applyCLIExampleRunner(example *cliExample) {
 	switch {
-	case cliExampleIsFinRobotTranslation(example.Path):
-		example.Runnable = true
-		example.Checkable = true
-		example.Requires = ""
-		switch {
-		case cliExampleCompanionRecordsExist(example.Path):
-			example.Runner = "llm-replay"
-		case cliExampleHasEvaluateBlock(example.Path):
-			example.Runner = "evaluate"
-		default:
-			example.Runner = "host-vm"
-		}
-		return
 	case strings.Contains(example.Path, "/evaluate/"):
 		if cliExampleCompanionRecordsExist(example.Path) {
 			example.Runnable = true
@@ -667,10 +654,6 @@ func applyCLIExampleRunner(example *cliExample) {
 	if example.Runner == "" {
 		example.Runner = "playground"
 	}
-}
-
-func cliExampleIsFinRobotTranslation(path string) bool {
-	return strings.Contains(filepath.ToSlash(path), "/ai/finrobot_translation/")
 }
 
 func cliExampleHasEvaluateBlock(path string) bool {

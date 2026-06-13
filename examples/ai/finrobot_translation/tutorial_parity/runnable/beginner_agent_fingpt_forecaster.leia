@@ -1,6 +1,0 @@
-row := {id: "beginner-agent-fingpt-forecaster" provider_free: true live_network: false credentials_required: false artifacts: {"forecast_prompt_contract", "normalizer_fixture_manifest", "optional_fingpt_gate"}}
-assert(row.provider_free == true)
-assert(row.live_network == false)
-assert(row.credentials_required == false)
-assert(#row.artifacts == 3)
-print("tutorial_parity_matrix row=beginner-agent-fingpt-forecaster artifacts=3 provider_free=true live_network=false credentials_required=false")

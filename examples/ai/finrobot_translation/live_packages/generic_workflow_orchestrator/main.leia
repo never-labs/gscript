@@ -1,6 +1,0 @@
-// Provider-free generic workflow orchestrator live package skeleton.
-// No live provider SDKs, network calls, credentials, or runtime imports are used here.
-
-generic_workflow_orchestrator_live_package_summary := "generic_workflow_orchestrator_live_package package=generic.ai.workflow.orchestration entrypoint=ai.workflow.orchestrate stages=4 fixtures=6 schemas=7 provider_free=true live_network=false imports=false graph=true stage_io=true planning_projection=true handoff_trace=true retry_cache=true workflow_result=true trace_hooks=true"
-
-print(generic_workflow_orchestrator_live_package_summary)

@@ -1,8 +1,0 @@
-{
-  "schema_version": 1,
-  "package_id": "generic-ai-chart-render-contracts",
-  "provider_free": true,
-  "live_network": false,
-  "fixture_index": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/fixtures/provider_free_fixture_index.json",
-  "registered_example": "examples/ai/finrobot_translation/live_packages/generic_chart_render_contracts/main.leia"
-}

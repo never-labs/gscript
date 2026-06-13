@@ -1,6 +1,0 @@
-row := {id: "advanced-lmm-agent-mplfinance" provider_free: true live_network: false credentials_required: false artifacts: {"chart_spec", "image_artifact_manifest", "multimodal_gate_record"}}
-assert(row.provider_free == true)
-assert(row.live_network == false)
-assert(row.credentials_required == false)
-assert(#row.artifacts == 3)
-print("tutorial_parity_matrix row=advanced-lmm-agent-mplfinance artifacts=3 provider_free=true live_network=false credentials_required=false")

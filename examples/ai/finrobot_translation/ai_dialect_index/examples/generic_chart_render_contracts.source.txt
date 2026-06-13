@@ -1,1 +1,0 @@
-ai.chart.render_contracts { chart_spec, recipe_matrix, render_request, render_result, source_metadata, snapshot_hash, renderer_clean_skip }

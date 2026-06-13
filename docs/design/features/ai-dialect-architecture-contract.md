@@ -4,7 +4,7 @@
 
 Leia's AI surface should be a small set of general dialects that make models,
 turns, tools, agents, evaluation, memory, trace, and replay inspectable in Leia
-source. Domain systems such as FinRobot should be built from these dialects,
+source. Domain systems should be built from these dialects,
 ordinary Leia packages, and Leia-native data/workflow/document capabilities.
 
 This contract narrows the boundary of the general AI dialect layer. It is not a
@@ -33,8 +33,8 @@ The general AI layer owns provider-neutral orchestration:
 The layer does not own domain knowledge:
 
 - no finance, legal, medical, support, coding, or research-specific syntax;
-- no built-in FinRobot roles, report sections, valuation formulas, data vendors,
-  SEC heuristics, or prompt templates;
+- no built-in domain roles, report sections, formulas, data vendors, domain
+  heuristics, or prompt templates;
 - no provider-specific response objects as the public contract;
 - no automatic hidden tool dispatch in `turn`;
 - no hidden network, filesystem, process, or credential access outside declared
@@ -132,13 +132,13 @@ Required behavior:
 Group chat, leader-directed teams, reflection loops, shadow assistants, and
 planner/executor patterns should be expressed as libraries over this contract.
 
-## FinRobot Migration Route
+## External Package Migration Route
 
-FinRobot-like workloads should migrate in stages:
+Complex AI workloads should migrate in stages:
 
 1. Model and credential mapping: declare provider aliases with `model`, move API
    keys to env/host secrets, and record selected provider/model per turn.
-2. Tool inventory: translate each data source, SEC helper, document parser,
+2. Tool inventory: translate each data source, external helper, document parser,
    chart generator, code executor, and report writer into a `tool` or ordinary
    package function with schemas, capabilities, rate limits, and structured
    errors.
@@ -148,22 +148,22 @@ FinRobot-like workloads should migrate in stages:
 4. Multi-agent flows: express group chat, leader-directed workflows, shadow
    assistants, and role libraries as agent libraries using agent-as-tool
    composition or explicit custom `flow` functions.
-5. Data pipeline extraction: move Yahoo/Finnhub/FMP/SEC fetches, statement
-   normalization, metrics, peer tables, forecasts, backtests, and provenance
-   into finance/data packages, not AI dialect syntax.
+5. Data pipeline extraction: move provider fetches, domain normalization,
+   metrics, peer tables, forecasts, simulations, and provenance into domain
+   and data packages, not AI dialect syntax.
 6. Report pipeline extraction: generate HTML/PDF/charts from data and section
    metadata through document/report packages. AI-written sections must carry
    source provenance, generation trace IDs, timestamps, and disclosure markers.
-7. Evaluation and replay: build fixtures from recorded FinRobot runs, add
+7. Evaluation and replay: build fixtures from recorded package runs, add
    provider-free replay for CI, and keep real-provider evaluations optional and
    capability-gated.
 8. Production hardening: add workflow artifacts, approval gates for trading,
    generated code, or high-risk actions, package-level service declarations,
    and deployment-specific routing policies.
 
-This route keeps FinRobot as a package family and workload benchmark. It should
-not introduce `finrobot`, `finance`, `equity`, `sec`, or `trading` dialects in
-the core language.
+This route keeps domain applications as package families and workload
+benchmarks. It should not introduce application-specific dialects in the core
+language.
 
 ## Performance Requirements
 
@@ -245,6 +245,6 @@ test mode that claims to be deterministic.
 - Do not design the parser, VM, JIT, provider adapters, or storage format here.
 - Do not make AI dialects a privileged runtime that bypasses ordinary Leia
   values, modules, capabilities, or tests.
-- Do not encode FinRobot or any other domain application as core syntax.
+- Do not encode domain applications as core syntax.
 - Do not require real model calls for CI tests.
 - Do not make traces require secret-bearing raw payloads.

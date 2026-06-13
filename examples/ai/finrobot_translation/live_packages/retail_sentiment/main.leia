@@ -1,5 +1,0 @@
-// Provider-free FinRobot retail sentiment live package skeleton.
-
-retail_sentiment_live_package_summary := "retail_sentiment_live_package sources=4 schemas=5 fixtures=4 provider_free=true live_network=false imports=false clean_skip=true redaction=true terms=true stale_warning=true"
-
-print(retail_sentiment_live_package_summary)

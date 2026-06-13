@@ -1,8 +1,0 @@
-// Generic event intelligence boundary example source.
-// Declares source snapshots, event extraction, taxonomies, freshness, dedupe,
-// relevance, sentiment, impact, prompt contracts, and adapter clean skips
-// without source SDK imports or live network access.
-
-capability generic.ai.event_intelligence.boundary
-entrypoint ai.event_intelligence.boundary
-fixture examples/ai/finrobot_translation/live_packages/generic_event_intelligence_boundary/fixtures/event_intelligence_boundary_fixture.json

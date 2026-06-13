@@ -1,1 +1,0 @@
-ai.coding_workspace { command, approval_gate, stdout_stderr, file_artifact_manifest, image_artifact_manifest, notebook_display, cleanup_policy }

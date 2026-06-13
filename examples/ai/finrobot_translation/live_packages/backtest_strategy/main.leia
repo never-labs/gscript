@@ -1,6 +1,0 @@
-// Provider-free FinRobot backtest strategy live package skeleton.
-// No live broker, market data SDK, network calls, or credentials are used here.
-
-backtest_strategy_live_package_summary := "backtest_strategy_live_package strategies=1 data_feeds=1 seed=finrobot-backtest-strategy-offline-v1 ledgers=1 weights=1 returns=1 metrics=1 risk_limits=4 provider_free=true live_network=false imports=false fixtures=6"
-
-print(backtest_strategy_live_package_summary)

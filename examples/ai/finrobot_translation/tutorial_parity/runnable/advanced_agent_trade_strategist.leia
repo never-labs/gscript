@@ -1,6 +1,0 @@
-row := {id: "advanced-agent-trade-strategist" provider_free: true live_network: false credentials_required: false artifacts: {"strategy_manifest", "risk_limit_contract", "trade_ledger_fixture", "sandbox_gate_record"}}
-assert(row.provider_free == true)
-assert(row.live_network == false)
-assert(row.credentials_required == false)
-assert(#row.artifacts == 4)
-print("tutorial_parity_matrix row=advanced-agent-trade-strategist artifacts=4 provider_free=true live_network=false credentials_required=false")

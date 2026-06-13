@@ -1,8 +1,0 @@
-// Generic transcript pipeline example source.
-// Declares source envelopes, speaker normalization, event-time correction,
-// segment provenance, turn-aware chunking, and adapter clean skips without
-// speech provider SDK imports or live network access.
-
-capability generic.ai.transcript.pipeline
-entrypoint ai.transcript.pipeline
-fixture examples/ai/finrobot_translation/live_packages/generic_transcript_pipeline/fixtures/provider_free_fixture_index.json

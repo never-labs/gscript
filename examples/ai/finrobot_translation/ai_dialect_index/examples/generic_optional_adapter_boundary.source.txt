@@ -1,8 +1,0 @@
-// Generic optional adapter boundary example source.
-// Declares optional dependency registry entries, clean-skip gates, adapter
-// result envelopes, version/terms metadata, and credential redaction without
-// importing optional packages or using live network access.
-
-capability generic.ai.optional_adapter.boundary
-entrypoint ai.optional_adapter.boundary
-fixture examples/ai/finrobot_translation/live_packages/generic_optional_adapter_boundary/fixtures/optional_adapter_boundary_fixture.json

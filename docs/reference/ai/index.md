@@ -747,7 +747,7 @@ fixture/capability counts, and a summary table. `llm.validate_package_contract`
 returns a validation table for offline defaults, credential-free policy, and
 safe relative reference strings in `entrypoints`, `schemas`, and `fixtures`.
 These helpers do not load package files, resolve directories, inspect schemas,
-or require FinRobot-style names.
+or require application-specific names.
 `llm.replay_http_record(spec, opts)` and `llm.replay_artifact_record(spec,
 opts)` normalize caller-supplied HTTP/API and downloaded-artifact replay
 metadata. They fill provider-free/offline flags, replay identity, request and
