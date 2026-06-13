@@ -4947,6 +4947,9 @@ func TestQEvalVectorRuntimeFallbackReport(t *testing.T) {
 		if row.key.kernel == "ArrayWhereCompare" {
 			t.Fatalf("ArrayWhereCompare fallback remains: %+v", row)
 		}
+		if row.key.kernel == "ArrayWhereWithinStats" {
+			t.Fatalf("ArrayWhereWithinStats fallback remains: %+v", row)
+		}
 		if row.key.kernel == "ArrayScalarIndex" {
 			t.Fatalf("ArrayScalarIndex fallback remains: %+v", row)
 		}

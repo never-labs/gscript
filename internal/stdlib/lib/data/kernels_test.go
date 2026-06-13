@@ -350,6 +350,26 @@ func TestTryTypedWithinIndexesAndStatsTiledTime(t *testing.T) {
 	if !handled || count != 5 {
 		t.Fatalf("within count handled=%v count=%d, want handled=true count=5", handled, count)
 	}
+
+	nullableInts, err := TakeRepeat(newNullableArray(KindI64, []any{NullValue, int64(2), int64(5), int64(9)}), 10)
+	if err != nil {
+		t.Fatalf("TakeRepeat nullable int returned error: %v", err)
+	}
+	indexes, handled, err = TryTypedWithinIndexesI64(nullableInts, int64(2), int64(8), true)
+	if err != nil || !handled {
+		t.Fatalf("TryTypedWithinIndexesI64 nullable tiled int handled=%v err=%v; want true,nil", handled, err)
+	}
+	if got, want := indexes.Values(), []any{int64(1), int64(2), int64(5), int64(6), int64(9)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("nullable tiled int within indexes = %v, want %v", got, want)
+	}
+	count, sum, handled, err = TryTypedWithinIndexStatsI64(nullableInts, int64(2), int64(8), true)
+	if err != nil || !handled || count != 5 || sum != 23 {
+		t.Fatalf("nullable tiled int within stats = %d,%d,%v,%v; want 5,23,true,nil", count, sum, handled, err)
+	}
+	count, handled, err = TryTypedWithinCount(nullableInts, int64(2), int64(8), true)
+	if err != nil || !handled || count != 5 {
+		t.Fatalf("nullable tiled int within count = %d,%v,%v; want 5,true,nil", count, handled, err)
+	}
 }
 
 func TestTryTypedWithinIndexStatsBucketViews(t *testing.T) {

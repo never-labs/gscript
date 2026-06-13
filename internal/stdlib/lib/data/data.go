@@ -3364,7 +3364,23 @@ func typedWithinTiledResidues(array tiledArray, low, high any, highClosed bool) 
 	low = normalizeScalar(array.source.Kind(), low)
 	high = normalizeScalar(array.source.Kind(), high)
 	if ok := typedKernels.WithinMask(array.source, low, high, highClosed, sourceMask); !ok {
-		return nil, false, nil
+		sourceIndexes, handled, err := TryTypedWithinIndexesI64(array.source, low, high, highClosed)
+		if err != nil || !handled {
+			return nil, handled, err
+		}
+		residues := make([]int64, 0, sourceIndexes.Len())
+		for row := 0; row < sourceIndexes.Len(); row++ {
+			value, ok := sourceIndexes.At(row)
+			if !ok {
+				return nil, true, fmt.Errorf("within tiled source index row %d out of range", row)
+			}
+			sourceRow, ok := coerceInt64Exact(value)
+			if !ok {
+				return nil, false, nil
+			}
+			residues = append(residues, int64(positiveModInt(int(sourceRow)-array.start, period)))
+		}
+		return residues, true, nil
 	}
 	residues := make([]int64, 0)
 	for sourceRow, keep := range sourceMask {
