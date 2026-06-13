@@ -404,6 +404,89 @@ if sec_filing_doc_url != "" {
 	}
 }
 
+func TestFinRobotLiveSECFilingArchiveIndexDataIntegration(t *testing.T) {
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_archive_index_request_error := nil
+sec_archive_index_json_error := nil
+sec_archive_index_status := 0
+sec_archive_index_ok := false
+sec_archive_index_item_count := 0
+sec_archive_index_has_primary_html := false
+sec_archive_index_has_complete_text := false
+sec_archive_index_has_xbrl_payload := false
+sec_archive_index_sized_item := ""
+sec_archive_index_sized_item_size := ""
+
+headers := {}
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
+headers["Accept"] = "application/json"
+
+resp, err := net.get("https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/index.json", {
+    headers: headers
+    timeout: 30
+})
+if err != nil {
+    sec_archive_index_request_error = err
+} else {
+    sec_archive_index_status = resp.status
+    sec_archive_index_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            sec_archive_index_json_error = json_err
+        } else {
+            items := data.directory.item
+            sec_archive_index_item_count = #items
+            for _, item := range pairs(items) {
+                name := item.name
+                size := item.size
+                if name == "aapl-20250927.htm" {
+                    sec_archive_index_has_primary_html = true
+                }
+                if name == "0000320193-25-000079.txt" {
+                    sec_archive_index_has_complete_text = true
+                }
+                if string.hasSuffix(name, "_htm.xml") || string.hasSuffix(name, "-xbrl.zip") {
+                    sec_archive_index_has_xbrl_payload = true
+                }
+                if sec_archive_index_sized_item == "" && size != "" {
+                    sec_archive_index_sized_item = name
+                    sec_archive_index_sized_item_size = size
+                }
+            }
+        }
+    } else {
+        sec_archive_index_request_error = resp.statusText
+    }
+}
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	status := mustGetInt(t, vm, "sec_archive_index_status")
+	skipUnavailableFinRobotLiveData(t, "SEC filing archive index", status, getOrNil(t, vm, "sec_archive_index_request_error"))
+	if status != 200 {
+		t.Fatalf("SEC filing archive index status = %d, want 200", status)
+	}
+	if got := getOrNil(t, vm, "sec_archive_index_json_error"); got != nil {
+		t.Fatalf("SEC filing archive index JSON decode failed: %v", got)
+	}
+	if ok := mustGetBool(t, vm, "sec_archive_index_ok"); !ok {
+		t.Fatalf("SEC filing archive index ok = false")
+	}
+	itemCount := mustGetInt(t, vm, "sec_archive_index_item_count")
+	hasPrimaryHTML := mustGetBool(t, vm, "sec_archive_index_has_primary_html")
+	hasCompleteText := mustGetBool(t, vm, "sec_archive_index_has_complete_text")
+	hasXBRLPayload := mustGetBool(t, vm, "sec_archive_index_has_xbrl_payload")
+	sizedItem := mustGetString(t, vm, "sec_archive_index_sized_item")
+	sizedItemSize := mustGetString(t, vm, "sec_archive_index_sized_item_size")
+	fmt.Printf("sec_archive_index items=%d primary_html=%v complete_text=%v xbrl_payload=%v sized_item=%q size=%q\n", itemCount, hasPrimaryHTML, hasCompleteText, hasXBRLPayload, sizedItem, sizedItemSize)
+	if itemCount <= 0 || !hasPrimaryHTML || !hasCompleteText || !hasXBRLPayload || sizedItem == "" || sizedItemSize == "" {
+		t.Fatalf("unexpected SEC archive index payload: items=%d primary_html=%v complete_text=%v xbrl_payload=%v sized_item=%q size=%q", itemCount, hasPrimaryHTML, hasCompleteText, hasXBRLPayload, sizedItem, sizedItemSize)
+	}
+}
+
 func TestFinRobotLiveSECFramesDataIntegration(t *testing.T) {
 	vm := newFinRobotLiveDataVM(t)
 	if err := execFinRobotLiveDataScript(t, vm, `
