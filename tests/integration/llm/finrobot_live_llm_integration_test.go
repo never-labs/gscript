@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -106,7 +107,7 @@ finrobot_live_gate_text := result.text
 }
 
 func TestFinRobotLiveLLMGateGLMIntegration(t *testing.T) {
-	cfg := glmAnthropicCompatibleSmokeConfig(t)
+	cfg := finRobotLiveLLMSmokeConfig(t)
 	t.Setenv("LEIA_GLM_BASE_URL", cfg.Endpoint)
 	t.Setenv("LEIA_GLM_API_KEY", cfg.APIKey)
 	t.Setenv("LEIA_GLM_MODEL", cfg.Model)
@@ -155,4 +156,24 @@ if err != nil {
 	fmt.Printf("model=%s\n", cfg.Model)
 	fmt.Printf("text=%q\n", text)
 	assertLLMSmokeText(t, fmt.Sprint(text), "finrobot live llm gate ok")
+}
+
+func finRobotLiveLLMSmokeConfig(t *testing.T) glmSmokeConfig {
+	t.Helper()
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("LEIA_FINROBOT_LIVE_LLM")), "0") {
+		t.Skip("set LEIA_FINROBOT_LIVE_LLM to a non-zero value to run the FinRobot live LLM gate")
+	}
+	endpoint := firstNonEmptyEnv("LEIA_FINROBOT_LLM_BASE_URL", "LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL")
+	if endpoint == "" {
+		endpoint = defaultGLMAnthropicCompatibleBaseURL
+	}
+	apiKey := firstNonEmptyEnv("LEIA_FINROBOT_LLM_API_KEY", "LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+	model := firstNonEmptyEnv("LEIA_FINROBOT_LLM_MODEL", "LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL")
+	if model == "" {
+		model = "glm-5.1"
+	}
+	if apiKey == "" {
+		t.Skip("set LEIA_FINROBOT_LLM_API_KEY, LEIA_GLM_API_KEY, SENTINEL_GLM_API_KEY, or GLM_API_KEY to run the FinRobot live LLM gate")
+	}
+	return glmSmokeConfig{Endpoint: endpoint, APIKey: apiKey, Model: model}
 }
