@@ -129,6 +129,17 @@ type qPipelineBoundPlan struct {
 	fallbackReason string
 }
 
+func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, resultClass string, resultKind data.Kind, kernel, kernelShape string) {
+	qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
+		key:            key,
+		resultClass:    resultClass,
+		resultKind:     resultKind,
+		kernel:         kernel,
+		kernelShape:    kernelShape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+	})
+}
+
 var qPipelinePlanInvalidShared = &qPipelinePlan{}
 
 // qPipelinePlanRef returns the session-cached plan for src, or a shared
@@ -2288,13 +2299,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool
 	_, sum, handled, err := s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
-				key:            bindingKey,
-				resultClass:    "compare_stats_sum",
-				kernel:         "ArrayWhereCompareStats",
-				kernelShape:    qPipelineWhereCompareStatsShape(plan, left, right),
-				fallbackReason: RuntimeFallbackUnsupportedType,
-			})
+			qPipelineStoreWhereCompareBound(bindingKey, "compare_stats_sum", "", "ArrayWhereCompareStats", qPipelineWhereCompareStatsShape(plan, left, right))
 		}
 		return sum, handled, err
 	}
@@ -2302,14 +2307,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
-		key:            bindingKey,
-		resultClass:    "compare_index_sum",
-		resultKind:     indexes.Kind(),
-		kernel:         "ArrayWhereCompareSum",
-		kernelShape:    "index-sum/" + string(indexes.Kind()),
-		fallbackReason: RuntimeFallbackUnsupportedType,
-	})
+	qPipelineStoreWhereCompareBound(bindingKey, "compare_index_sum", indexes.Kind(), "ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()))
 	return qPipelineWhereCompareIndexesSum(indexes)
 }
 
@@ -2328,26 +2326,14 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bo
 	count, handled, err := s.evalQPipelineWhereCompareCountForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
-				key:            bindingKey,
-				resultClass:    "compare_count",
-				kernel:         "ArrayWhereCompareCount",
-				kernelShape:    qPipelineWhereCompareCountShape(plan, left, right),
-				fallbackReason: RuntimeFallbackUnsupportedType,
-			})
+			qPipelineStoreWhereCompareBound(bindingKey, "compare_count", "", "ArrayWhereCompareCount", qPipelineWhereCompareCountShape(plan, left, right))
 		}
 		return count, handled, err
 	}
 	count, _, handled, err = s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
-				key:            bindingKey,
-				resultClass:    "compare_stats_count",
-				kernel:         "ArrayWhereCompareStats",
-				kernelShape:    qPipelineWhereCompareStatsShape(plan, left, right),
-				fallbackReason: RuntimeFallbackUnsupportedType,
-			})
+			qPipelineStoreWhereCompareBound(bindingKey, "compare_stats_count", "", "ArrayWhereCompareStats", qPipelineWhereCompareStatsShape(plan, left, right))
 		}
 		return count, handled, err
 	}
@@ -2355,13 +2341,7 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bo
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
-		key:         bindingKey,
-		resultClass: "compare_index_count",
-		resultKind:  indexes.Kind(),
-		kernel:      "ArrayWhereCompare",
-		kernelShape: qPipelineWhereCompareIndexShape(plan, left, right),
-	})
+	qPipelineStoreWhereCompareBound(bindingKey, "compare_index_count", indexes.Kind(), "ArrayWhereCompare", qPipelineWhereCompareIndexShape(plan, left, right))
 	return int64(indexes.Len()), true, nil
 }
 

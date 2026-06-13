@@ -14031,42 +14031,31 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		}
 	}
 	if dataOp, ok := qDataArithmeticOp(op); ok {
-		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
-		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
+		out, handled, err := qTryTypedRuntimeVectorArithmeticDyadic(op, dataOp, left, right, la, ra, true)
 		if err != nil {
-			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "error", "runtime_error")
 			return nil, err
 		}
-		if !canUse || !qVectorDyadicCanUseTypedArithmetic(typedLeft, typedRight) {
-			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "attempt", "attempt")
-			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "fallback", RuntimeFallbackUnsupportedType)
-		} else if out, handled, err := qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight); err != nil || handled {
-			out, handled, err = qTypedRuntimeResult("ArrayDyadicArithmetic", shape, out, handled, err)
-			if err != nil {
-				return nil, err
-			}
+		if handled {
 			if array, ok := out.(data.Array); ok {
 				return array, nil
 			}
-		} else {
-			_, _, _ = qTypedRuntimeResult("ArrayDyadicArithmetic", shape, out, handled, err)
 		}
 	}
 	if dataOp, ok := qDataComparisonOp(op); ok {
-		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 		if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
+			shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
 			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
-		} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
-			out, handled, err = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
+		} else {
+			out, handled, err := qTryTypedRuntimeVectorCompareDyadic(string(op), dataOp, left, right, la, ra)
 			if err != nil {
 				return nil, err
 			}
-			if array, ok := out.(data.Array); ok {
-				return array, nil
+			if handled {
+				if array, ok := out.(data.Array); ok {
+					return array, nil
+				}
 			}
-		} else {
-			_, _, _ = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
 		}
 	}
 	out := make([]any, n)

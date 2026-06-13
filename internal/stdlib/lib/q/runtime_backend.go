@@ -67,6 +67,50 @@ func evalQTypedRuntimeKernel2[A, B any](kernel qTypedRuntimeKernel2[A, B]) (A, B
 	return a, b, handled, err
 }
 
+func qTryTypedRuntimeVectorCompareDyadic(op string, dataOp data.Op, left, right any, la, ra data.Array) (any, bool, error) {
+	if la == nil && ra == nil {
+		return nil, false, nil
+	}
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayDyadicCompare",
+		shape:          qRuntimeKernelCompositeVectorDyadicShape(op, left, right, la, ra),
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra)
+			return out, handled, err
+		},
+	})
+}
+
+func qTryTypedRuntimeVectorArithmeticDyadic(op byte, dataOp data.Op, left, right any, la, ra data.Array, recordUnsupportedProbe bool) (any, bool, error) {
+	if la == nil && ra == nil {
+		return nil, false, nil
+	}
+	shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+	typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
+	if err != nil {
+		if recordUnsupportedProbe {
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "error", "runtime_error")
+		}
+		return nil, true, err
+	}
+	if !canUse || !qVectorDyadicCanUseTypedArithmetic(typedLeft, typedRight) {
+		if recordUnsupportedProbe {
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "attempt", "attempt")
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "fallback", RuntimeFallbackUnsupportedType)
+		}
+		return nil, false, nil
+	}
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayDyadicArithmetic",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return qTryTypedArithmeticDyadic(dataOp, typedLeft, typedRight)
+		},
+	})
+}
+
 type qTypedWhereCompareDescriptor struct {
 	kernel         string
 	shape          string
