@@ -144,7 +144,11 @@ const (
 	qPipelineBoundResultCompareIndexCount
 )
 
-func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, resultClass qPipelineBoundResultClass, resultKind data.Kind, kernel, kernelShape string) {
+func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, plan *qPipelinePlan, left, right any, resultClass qPipelineBoundResultClass, resultKind data.Kind) bool {
+	kernel, kernelShape, ok := qPipelineWhereCompareBoundMetadata(plan, left, right, resultClass, resultKind)
+	if !ok {
+		return false
+	}
 	qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
 		key:            key,
 		resultClass:    resultClass,
@@ -153,6 +157,7 @@ func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, resultClass q
 		kernelShape:    kernelShape,
 		fallbackReason: RuntimeFallbackUnsupportedType,
 	})
+	return true
 }
 
 var qPipelinePlanInvalidShared = &qPipelinePlan{}
@@ -2314,8 +2319,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool
 	_, sum, handled, err := s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			kernel, shape, _ := qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareStatsSum, "")
-			qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareStatsSum, "", kernel, shape)
+			qPipelineStoreWhereCompareBound(bindingKey, plan, left, right, qPipelineBoundResultCompareStatsSum, "")
 		}
 		return sum, handled, err
 	}
@@ -2323,8 +2327,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	kernel, shape, _ := qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareIndexSum, indexes.Kind())
-	qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareIndexSum, indexes.Kind(), kernel, shape)
+	qPipelineStoreWhereCompareBound(bindingKey, plan, left, right, qPipelineBoundResultCompareIndexSum, indexes.Kind())
 	return qPipelineWhereCompareIndexesSum(indexes)
 }
 
@@ -2343,16 +2346,14 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bo
 	count, handled, err := s.evalQPipelineWhereCompareCountForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			kernel, shape, _ := qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareCount, "")
-			qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareCount, "", kernel, shape)
+			qPipelineStoreWhereCompareBound(bindingKey, plan, left, right, qPipelineBoundResultCompareCount, "")
 		}
 		return count, handled, err
 	}
 	count, _, handled, err = s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			kernel, shape, _ := qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareStatsCount, "")
-			qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareStatsCount, "", kernel, shape)
+			qPipelineStoreWhereCompareBound(bindingKey, plan, left, right, qPipelineBoundResultCompareStatsCount, "")
 		}
 		return count, handled, err
 	}
@@ -2360,8 +2361,7 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bo
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	kernel, shape, _ := qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareIndexCount, indexes.Kind())
-	qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareIndexCount, indexes.Kind(), kernel, shape)
+	qPipelineStoreWhereCompareBound(bindingKey, plan, left, right, qPipelineBoundResultCompareIndexCount, indexes.Kind())
 	return int64(indexes.Len()), true, nil
 }
 

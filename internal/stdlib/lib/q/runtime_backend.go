@@ -142,6 +142,52 @@ func qTryTypedRuntimeDyadicMinMax(logical string, wantMax bool, left, right any,
 	})
 }
 
+func qTryTypedRuntimeScalarFill(scalar any, array data.Array) (data.Array, bool, error) {
+	if array == nil {
+		return nil, false, nil
+	}
+	shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(scalar, nil)) + "/" + string(array.Kind())
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel:         "ArrayScalarFill",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (data.Array, bool, error) {
+			return data.TryTypedScalarFill(scalar, array)
+		},
+	})
+}
+
+func qTryTypedRuntimeIntegerFloorDivide(op byte, left, right any, la, ra data.Array, n int) (data.Array, bool, error) {
+	shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel:         "ArrayDyadicArithmetic",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (data.Array, bool, error) {
+			return data.TryTypedIntegerFloorDivide(left, right, n)
+		},
+	})
+}
+
+func qTryTypedRuntimeTemporalDyadic(op byte, dataOp data.Op, left, right any, la, ra data.Array) (data.Array, bool, error) {
+	typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
+	if err != nil {
+		return nil, true, err
+	}
+	if !canUse || !qVectorDyadicHasTemporalOperand(typedLeft, typedRight) {
+		return nil, false, nil
+	}
+	shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel:         "ArrayDyadicArithmetic",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (data.Array, bool, error) {
+			return data.TryTypedTemporalDyadic(dataOp, typedLeft, typedRight)
+		},
+	})
+}
+
 type qTypedWhereCompareDescriptor struct {
 	kernel         string
 	shape          string

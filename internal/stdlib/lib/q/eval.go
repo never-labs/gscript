@@ -13963,9 +13963,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 	}
 	if op == '^' {
 		if la == nil && ra != nil {
-			out, handled, err := data.TryTypedScalarFill(left, ra)
-			shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(left, nil)) + "/" + string(ra.Kind())
-			out, handled, err = qTypedRuntimeResult("ArrayScalarFill", shape, out, handled, err)
+			out, handled, err := qTryTypedRuntimeScalarFill(left, ra)
 			if err != nil {
 				return nil, err
 			}
@@ -13974,9 +13972,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 			}
 		}
 		if la != nil && ra == nil {
-			out, handled, err := data.TryTypedScalarFill(right, la)
-			shape := "scalar-fill/" + string(qRuntimeKernelOperandKind(right, nil)) + "/" + string(la.Kind())
-			out, handled, err = qTypedRuntimeResult("ArrayScalarFill", shape, out, handled, err)
+			out, handled, err := qTryTypedRuntimeScalarFill(right, la)
 			if err != nil {
 				return nil, err
 			}
@@ -13986,9 +13982,7 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		}
 	}
 	if op == 'd' {
-		shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
-		if out, handled, err := data.TryTypedIntegerFloorDivide(left, right, n); err != nil || handled {
-			out, handled, err = qTypedRuntimeResult("ArrayDyadicArithmetic", shape, out, handled, err)
+		if out, handled, err := qTryTypedRuntimeIntegerFloorDivide(op, left, right, la, ra, n); err != nil || handled {
 			if err != nil {
 				return nil, err
 			}
@@ -13998,18 +13992,11 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		}
 	}
 	if op == '+' || op == '-' {
-		typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
-		if err != nil {
-			return nil, err
+		dataOp := data.OpAdd
+		if op == '-' {
+			dataOp = data.OpSub
 		}
-		if canUse && qVectorDyadicHasTemporalOperand(typedLeft, typedRight) {
-			dataOp := data.OpAdd
-			if op == '-' {
-				dataOp = data.OpSub
-			}
-			shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
-			typed, handled, err := data.TryTypedTemporalDyadic(dataOp, typedLeft, typedRight)
-			out, handled, err := qTypedRuntimeResult("ArrayDyadicArithmetic", shape, any(typed), handled, err)
+		if out, handled, err := qTryTypedRuntimeTemporalDyadic(op, dataOp, left, right, la, ra); err != nil || handled {
 			if err != nil {
 				return nil, err
 			}

@@ -2958,6 +2958,31 @@ func TestEvalGlobalPipelineBindingCacheKeysByOperandKind(t *testing.T) {
 	}
 }
 
+func TestQPipelineWhereCompareBoundMetadata(t *testing.T) {
+	plan := &qPipelinePlan{
+		compareOp:     ">",
+		comparePrefix: "compare-to-index",
+	}
+	left := data.NewI64([]int64{1, 2, 3})
+	right := int64(1)
+
+	kernel, shape, ok := qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareCount, "")
+	if !ok || kernel != "ArrayWhereCompareCount" || !strings.HasPrefix(shape, "compare-count/>/i64/i64") {
+		t.Fatalf("compare count metadata = %q,%q,%v", kernel, shape, ok)
+	}
+	kernel, shape, ok = qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareStatsSum, "")
+	if !ok || kernel != "ArrayWhereCompareStats" || !strings.HasPrefix(shape, "compare-to-index-stats/>/i64/i64") {
+		t.Fatalf("compare stats metadata = %q,%q,%v", kernel, shape, ok)
+	}
+	kernel, shape, ok = qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareIndexSum, data.KindI64)
+	if !ok || kernel != "ArrayWhereCompareSum" || shape != "index-sum/i64" {
+		t.Fatalf("compare index sum metadata = %q,%q,%v", kernel, shape, ok)
+	}
+	if kernel, shape, ok = qPipelineWhereCompareBoundMetadata(plan, left, right, qPipelineBoundResultCompareIndexSum, ""); ok {
+		t.Fatalf("empty index result kind metadata = %q,%q,%v; want !ok", kernel, shape, ok)
+	}
+}
+
 func TestEvalGlobalPipelineBindingCacheMoreShapes(t *testing.T) {
 	cases := []struct {
 		name  string
