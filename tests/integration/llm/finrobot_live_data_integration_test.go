@@ -206,3 +206,132 @@ if err != nil {
 		t.Fatalf("unexpected SEC submissions payload: name=%q ticker=%q exchange=%q recent_count=%d recent_form=%q", name, ticker, exchange, recentCount, recentForm)
 	}
 }
+
+func TestFinRobotLiveSECFilingDocumentDataIntegration(t *testing.T) {
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_filing_doc_submissions_error := nil
+sec_filing_doc_submissions_json_error := nil
+sec_filing_doc_submissions_status := 0
+sec_filing_doc_submissions_ok := false
+sec_filing_doc_company := ""
+sec_filing_doc_ticker := ""
+sec_filing_doc_recent_count := 0
+sec_filing_doc_form := ""
+sec_filing_doc_accession := ""
+sec_filing_doc_accession_path := ""
+sec_filing_doc_primary_document := ""
+sec_filing_doc_filing_date := ""
+sec_filing_doc_url := ""
+sec_filing_doc_request_error := nil
+sec_filing_doc_status := 0
+sec_filing_doc_ok := false
+sec_filing_doc_content_type := ""
+sec_filing_doc_body := ""
+
+headers := {}
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
+headers["Accept"] = "application/json"
+
+resp, err := net.get("https://data.sec.gov/submissions/CIK0000320193.json", {
+    headers: headers
+    timeout: 30
+})
+if err != nil {
+    sec_filing_doc_submissions_error = err
+} else {
+    sec_filing_doc_submissions_status = resp.status
+    sec_filing_doc_submissions_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            sec_filing_doc_submissions_json_error = json_err
+        } else {
+            sec_filing_doc_company = data.name
+            sec_filing_doc_ticker = data.tickers[1]
+            sec_filing_doc_recent_count = #data.filings.recent.accessionNumber
+            for i := 1; i <= sec_filing_doc_recent_count; i++ {
+                form := data.filings.recent.form[i]
+                accession := data.filings.recent.accessionNumber[i]
+                primary := data.filings.recent.primaryDocument[i]
+                filing_date := data.filings.recent.filingDate[i]
+                if sec_filing_doc_accession == "" && (form == "10-K" || form == "10-Q") && accession != "" && primary != "" && filing_date != "" && (string.hasSuffix(primary, ".htm") || string.hasSuffix(primary, ".html")) {
+                    sec_filing_doc_form = form
+                    sec_filing_doc_accession = accession
+                    sec_filing_doc_accession_path = string.replaceAll(accession, "-", "")
+                    sec_filing_doc_primary_document = primary
+                    sec_filing_doc_filing_date = filing_date
+                    sec_filing_doc_url = "https://www.sec.gov/Archives/edgar/data/320193/" .. sec_filing_doc_accession_path .. "/" .. primary
+                }
+            }
+        }
+    } else {
+        sec_filing_doc_submissions_error = resp.statusText
+    }
+}
+
+if sec_filing_doc_url != "" {
+    headers["Accept"] = "text/html,application/xhtml+xml"
+    doc_resp, doc_err := net.get(sec_filing_doc_url, {
+        headers: headers
+        timeout: 30
+    })
+    if doc_err != nil {
+        sec_filing_doc_request_error = doc_err
+    } else {
+        sec_filing_doc_status = doc_resp.status
+        sec_filing_doc_ok = doc_resp.ok
+        if doc_resp.ok {
+            sec_filing_doc_body = doc_resp.body
+            sec_filing_doc_content_type = doc_resp.headers["Content-Type"]
+        } else {
+            sec_filing_doc_request_error = doc_resp.statusText
+        }
+    }
+}
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	submissionsStatus := mustGetInt(t, vm, "sec_filing_doc_submissions_status")
+	skipUnavailableFinRobotLiveData(t, "SEC filing submissions", submissionsStatus, getOrNil(t, vm, "sec_filing_doc_submissions_error"))
+	if submissionsStatus != 200 {
+		t.Fatalf("SEC filing submissions status = %d, want 200", submissionsStatus)
+	}
+	if got := getOrNil(t, vm, "sec_filing_doc_submissions_json_error"); got != nil {
+		t.Fatalf("SEC filing submissions JSON decode failed: %v", got)
+	}
+	if ok := mustGetBool(t, vm, "sec_filing_doc_submissions_ok"); !ok {
+		t.Fatalf("SEC filing submissions ok = false")
+	}
+	company := mustGetString(t, vm, "sec_filing_doc_company")
+	ticker := mustGetString(t, vm, "sec_filing_doc_ticker")
+	recentCount := mustGetInt(t, vm, "sec_filing_doc_recent_count")
+	form := mustGetString(t, vm, "sec_filing_doc_form")
+	accession := mustGetString(t, vm, "sec_filing_doc_accession")
+	accessionPath := mustGetString(t, vm, "sec_filing_doc_accession_path")
+	primaryDocument := mustGetString(t, vm, "sec_filing_doc_primary_document")
+	filingDate := mustGetString(t, vm, "sec_filing_doc_filing_date")
+	url := mustGetString(t, vm, "sec_filing_doc_url")
+	if !strings.Contains(company, "Apple") || ticker != "AAPL" || recentCount <= 0 || (form != "10-K" && form != "10-Q") || accession == "" || accessionPath == "" || primaryDocument == "" || filingDate == "" || url == "" {
+		t.Fatalf("unexpected SEC filing selection: company=%q ticker=%q recent_count=%d form=%q accession=%q accession_path=%q primary=%q filing_date=%q url=%q", company, ticker, recentCount, form, accession, accessionPath, primaryDocument, filingDate, url)
+	}
+
+	status := mustGetInt(t, vm, "sec_filing_doc_status")
+	skipUnavailableFinRobotLiveData(t, "SEC filing document", status, getOrNil(t, vm, "sec_filing_doc_request_error"))
+	if status != 200 {
+		t.Fatalf("SEC filing document status = %d, want 200", status)
+	}
+	if ok := mustGetBool(t, vm, "sec_filing_doc_ok"); !ok {
+		t.Fatalf("SEC filing document ok = false")
+	}
+	contentType := mustGetString(t, vm, "sec_filing_doc_content_type")
+	body := mustGetString(t, vm, "sec_filing_doc_body")
+	fmt.Printf("sec_filing_doc_form=%q accession=%q primary=%q filing_date=%q content_type=%q body_bytes=%d\n", form, accession, primaryDocument, filingDate, contentType, len(body))
+	if !strings.Contains(contentType, "text/html") {
+		t.Fatalf("SEC filing document content type = %q, want text/html", contentType)
+	}
+	if len(body) < 1024 || !strings.Contains(body, "Apple Inc.") || !strings.Contains(body, form) {
+		t.Fatalf("unexpected SEC filing document payload: content_type=%q body_bytes=%d", contentType, len(body))
+	}
+}
