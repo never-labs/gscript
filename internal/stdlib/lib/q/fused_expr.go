@@ -517,98 +517,42 @@ func (s *EvalState) evalFusedCountWhereCompare(x FusedCountWhere) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if x.Op == "within" {
-		array, low, high, ok, err := qWithinOperands(left, right)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, unsupportedEvalValueExpr{expr: x}
-		}
-		shape := "compare-count/within/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		count, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
-			kernel: "ArrayWhereWithinCount",
-			shape:  shape,
-			call: func() (int64, bool, error) {
-				return data.TryTypedWithinCount(array, low, high, true)
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		if handled {
-			return count, nil
-		}
-		shape = "compare-to-index-count-stats/within/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		count, _, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
-			kernel: "ArrayWhereWithinStats",
-			shape:  shape,
-			call: func() (int64, int64, bool, error) {
-				return data.TryTypedWithinIndexStatsI64(array, low, high, true)
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		if handled {
-			return count, nil
-		}
-		shape = "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		indexes, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
-			kernel: "ArrayWhereWithin",
-			shape:  shape,
-			call: func() (data.Array, bool, error) {
-				return data.TryTypedWithinIndexesI64(array, low, high, true)
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		if !handled {
-			return nil, unsupportedEvalValueExpr{expr: x}
-		}
-		return int64(indexes.Len()), nil
+	countDesc, ok, err := qTypedWhereCompareCountDescriptor(left, right, x.Op, "compare-count", "compare-count/within")
+	if err != nil {
+		return nil, err
 	}
-	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, x.Op)
 	if !ok {
 		return nil, unsupportedEvalValueExpr{expr: x}
 	}
-	shape := "compare-count/" + x.Op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	count, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
-		kernel: "ArrayWhereCompareCount",
-		shape:  shape,
-		call: func() (int64, bool, error) {
-			return data.TryTypedCompareCount(array, dataOp, scalar)
-		},
-	})
+	count, handled, err := evalQTypedWhereCompareCount(countDesc)
 	if err != nil {
 		return nil, err
 	}
 	if handled {
 		return count, nil
 	}
-	shape = "compare-to-index-count-stats/" + x.Op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	count, _, handled, err = evalQTypedRuntimeKernel2(qTypedRuntimeKernel2[int64, int64]{
-		kernel: "ArrayWhereCompareStats",
-		shape:  shape,
-		call: func() (int64, int64, bool, error) {
-			return data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
-		},
-	})
+	statsDesc, ok, err := qTypedWhereCompareStatsDescriptor(left, right, x.Op, "compare-to-index-count", "compare-to-index-count-stats/within")
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, unsupportedEvalValueExpr{expr: x}
+	}
+	count, _, handled, err = evalQTypedWhereCompareIndexStats(statsDesc)
 	if err != nil {
 		return nil, err
 	}
 	if handled {
 		return count, nil
 	}
-	shape = "compare-to-index-count/" + x.Op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	indexes, handled, err := evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
-		kernel: "ArrayWhereCompare",
-		shape:  shape,
-		call: func() (data.Array, bool, error) {
-			return data.TryTypedCompareIndexesI64(array, dataOp, scalar)
-		},
-	})
+	indexDesc, ok, err := qTypedWhereCompareIndexesDescriptor(left, right, x.Op, "compare-to-index-count", "within-to-index")
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, unsupportedEvalValueExpr{expr: x}
+	}
+	indexes, handled, err := evalQTypedWhereCompareIndexes(indexDesc)
 	if err != nil {
 		return nil, err
 	}
