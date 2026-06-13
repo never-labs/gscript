@@ -554,6 +554,25 @@ Stage metadata fields such as `capability`, `fixture_key`, `input_ref`,
 into each executed step's `trace.metadata`, so replay trace events and workflow
 trace nodes can be correlated without inspecting raw step inputs or outputs.
 
+For provider-free planning contracts that should not execute, use
+`llm.plan_node`, `llm.planning_graph`, `llm.validate_planning_graph`, and
+`llm.planning_trace`:
+
+```leia
+plan := llm.plan_node("plan", {
+    node_type: "transform"
+    retry_policy: {max_attempts: 1 retryable: false backoff: "none"}
+})
+contract := llm.planning_graph({plan}, {}, {id: "research-plan"})
+gate := llm.validate_planning_graph(contract)
+trace := llm.planning_trace(contract, {}, {run_id: "research-plan:1"})
+```
+
+These helpers normalize plan nodes, edges, retry policy, branch/merge metadata,
+trace evidence, validation findings, and trace summaries. They do not schedule
+work, run branches, sleep for retries, call providers, persist state, or
+authorize side effects.
+
 ## Section Generation
 
 `llm.sections(config)` and `llm.generate_sections(config)` run the same agent

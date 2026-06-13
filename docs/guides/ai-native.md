@@ -442,6 +442,20 @@ graph := llm.workflow_graph({
 result, err := graph.run("release notes")
 ```
 
+When you only need a portable planning contract and trace evidence, use the
+metadata-only planning helpers:
+
+```leia
+node := llm.plan_node("plan", {node_type: "transform"})
+graph := llm.planning_graph({node}, {}, {id: "research-plan"})
+gate := llm.validate_planning_graph(graph)
+trace := llm.planning_trace(graph, {}, {run_id: "research-plan:1"})
+```
+
+These helpers do not run the plan. They normalize nodes, edges, retry policy,
+branch/merge metadata, trace evidence, and summaries for replay and package
+contracts.
+
 ## Sections
 
 Use `llm.sections` when a report or response has independent parts that should
