@@ -119,6 +119,29 @@ func qTryTypedRuntimeVectorArithmeticDyadic(op byte, dataOp data.Op, left, right
 	})
 }
 
+func qTryTypedRuntimeBoolLogical(logical, shape string, left, right any) (any, bool, error) {
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayBoolLogical",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedBoolLogical(logical, left, right)
+		},
+	})
+}
+
+func qTryTypedRuntimeDyadicMinMax(logical string, wantMax bool, left, right any, la, ra data.Array) (any, bool, error) {
+	shape := "minmax/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
+		kernel:         "ArrayDyadicMinMax",
+		shape:          shape,
+		fallbackReason: RuntimeFallbackUnsupportedType,
+		call: func() (any, bool, error) {
+			return data.TryTypedDyadicMinMax(left, right, wantMax)
+		},
+	})
+}
+
 type qTypedWhereCompareDescriptor struct {
 	kernel         string
 	shape          string

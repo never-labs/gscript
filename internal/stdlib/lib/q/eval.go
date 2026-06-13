@@ -13936,32 +13936,29 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		// mask carrier and the periodic where/count fast paths.
 		if qLogicalOperandCouldBeBool(left, la) && qLogicalOperandCouldBeBool(right, ra) {
 			shape := "bool-logical/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
-			if out, handled, err := data.TryTypedBoolLogical(logical, left, right); err != nil || handled {
-				out, handled, err = qTypedRuntimeResult("ArrayBoolLogical", shape, out, handled, err)
+			if out, handled, err := qTryTypedRuntimeBoolLogical(logical, shape, left, right); err != nil || handled {
 				if err != nil {
 					return nil, err
 				}
 				if handled {
-					return out, nil
+					if array, ok := out.(data.Array); ok {
+						return array, nil
+					}
 				}
-			} else {
-				recordRuntimeKernelProbeReason("ArrayBoolLogical", shape, handled, err, RuntimeFallbackUnsupportedType)
 			}
 		}
 		// Numeric operands materialize the typed elementwise min/max; null
 		// carriers fall through to the boxed loop, which applies canonical
 		// null ordering per row (null&x is null, null|x is x).
-		minMaxShape := "minmax/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
-		if out, handled, err := data.TryTypedDyadicMinMax(left, right, op == '|'); err != nil || handled {
-			out, handled, err = qTypedRuntimeResult("ArrayDyadicMinMax", minMaxShape, out, handled, err)
+		if out, handled, err := qTryTypedRuntimeDyadicMinMax(logical, op == '|', left, right, la, ra); err != nil || handled {
 			if err != nil {
 				return nil, err
 			}
 			if handled {
-				return out, nil
+				if array, ok := out.(data.Array); ok {
+					return array, nil
+				}
 			}
-		} else {
-			recordRuntimeKernelProbeReason("ArrayDyadicMinMax", minMaxShape, handled, err, RuntimeFallbackUnsupportedType)
 		}
 	}
 	if op == '^' {

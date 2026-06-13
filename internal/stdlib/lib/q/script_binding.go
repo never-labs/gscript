@@ -696,8 +696,7 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver 
 		return out, true, err
 	}
 	if plan.op == "and" || plan.op == "or" {
-		if out, handled, err := data.TryTypedBoolLogical(plan.op, left, right); err != nil || handled {
-			out, handled, err = qTypedRuntimeResultReason("ArrayBoolLogical", qScriptBoolLogicalShape(plan.op), RuntimeFallbackUnsupportedType, out, handled, err)
+		if out, handled, err := qTryTypedRuntimeBoolLogical(plan.op, qScriptBoolLogicalShape(plan.op), left, right); err != nil || handled {
 			if err != nil {
 				return nil, true, err
 			}
