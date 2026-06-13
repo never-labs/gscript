@@ -403,3 +403,89 @@ if sec_filing_doc_url != "" {
 		t.Fatalf("unexpected SEC filing document payload: content_type=%q body_bytes=%d", contentType, len(body))
 	}
 }
+
+func TestFinRobotLiveSECFramesDataIntegration(t *testing.T) {
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_frames_request_error := nil
+sec_frames_json_error := nil
+sec_frames_status := 0
+sec_frames_ok := false
+sec_frames_taxonomy := ""
+sec_frames_tag := ""
+sec_frames_uom := ""
+sec_frames_ccp := ""
+sec_frames_row_count := 0
+sec_frames_found_apple_assets := false
+sec_frames_match_cik := 0
+sec_frames_match_entity := ""
+sec_frames_match_val := 0
+
+headers := {}
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
+headers["Accept"] = "application/json"
+
+resp, err := net.get("https://data.sec.gov/api/xbrl/frames/us-gaap/Assets/USD/CY2024Q4I.json", {
+    headers: headers
+    timeout: 30
+})
+if err != nil {
+    sec_frames_request_error = err
+} else {
+    sec_frames_status = resp.status
+    sec_frames_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            sec_frames_json_error = json_err
+        } else {
+            sec_frames_taxonomy = data.taxonomy
+            sec_frames_tag = data.tag
+            sec_frames_uom = data.uom
+            sec_frames_ccp = data.ccp
+            sec_frames_row_count = #data.data
+            for _, row := range pairs(data.data) {
+                if !sec_frames_found_apple_assets && row.val > 0 && (row.cik == 320193 || string.contains(row.entityName, "Apple")) {
+                    sec_frames_found_apple_assets = true
+                    sec_frames_match_cik = row.cik
+                    sec_frames_match_entity = row.entityName
+                    sec_frames_match_val = row.val
+                }
+            }
+        }
+    } else {
+        sec_frames_request_error = resp.statusText
+    }
+}
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	status := mustGetInt(t, vm, "sec_frames_status")
+	skipUnavailableFinRobotLiveData(t, "SEC frames", status, getOrNil(t, vm, "sec_frames_request_error"))
+	if status != 200 {
+		t.Fatalf("SEC frames status = %d, want 200", status)
+	}
+	if got := getOrNil(t, vm, "sec_frames_json_error"); got != nil {
+		t.Fatalf("SEC frames JSON decode failed: %v", got)
+	}
+	if ok := mustGetBool(t, vm, "sec_frames_ok"); !ok {
+		t.Fatalf("SEC frames ok = false")
+	}
+	taxonomy := mustGetString(t, vm, "sec_frames_taxonomy")
+	tag := mustGetString(t, vm, "sec_frames_tag")
+	uom := mustGetString(t, vm, "sec_frames_uom")
+	ccp := mustGetString(t, vm, "sec_frames_ccp")
+	rowCount := mustGetInt(t, vm, "sec_frames_row_count")
+	foundAppleAssets := mustGetBool(t, vm, "sec_frames_found_apple_assets")
+	matchCik := mustGetInt(t, vm, "sec_frames_match_cik")
+	matchEntity := mustGetString(t, vm, "sec_frames_match_entity")
+	matchVal := mustGetInt(t, vm, "sec_frames_match_val")
+	fmt.Printf("sec_frames taxonomy=%q tag=%q uom=%q ccp=%q rows=%d match_cik=%d match_entity=%q match_val=%d\n", taxonomy, tag, uom, ccp, rowCount, matchCik, matchEntity, matchVal)
+	if taxonomy != "us-gaap" || tag != "Assets" || uom != "USD" || ccp != "CY2024Q4I" || rowCount <= 0 {
+		t.Fatalf("unexpected SEC frames metadata: taxonomy=%q tag=%q uom=%q ccp=%q rows=%d", taxonomy, tag, uom, ccp, rowCount)
+	}
+	if !foundAppleAssets || matchVal <= 0 || (matchCik != 320193 && !strings.Contains(matchEntity, "Apple")) {
+		t.Fatalf("unexpected SEC frames Apple asset row: found=%v cik=%d entity=%q val=%d", foundAppleAssets, matchCik, matchEntity, matchVal)
+	}
+}
