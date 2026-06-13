@@ -471,6 +471,24 @@ func TestTryTypedCompareIndexesI64(t *testing.T) {
 		t.Fatalf("TryTypedCompareIndexesI64 lazy mod values = %#v", values)
 	}
 
+	scaledRange, ok, err := TryTypedQNumericDyadicFloat(string(OpMul), NewI64Range(0, 1, 80), 0.25)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericDyadicFloat range scale returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericDyadicFloat range scale did not handle")
+	}
+	got, handled, err = TryTypedCompareIndexesI64(scaledRange, OpGT, 16.5)
+	if err != nil {
+		t.Fatalf("TryTypedCompareIndexesI64 lazy float scale returned error: %v", err)
+	}
+	if !handled {
+		t.Fatal("TryTypedCompareIndexesI64 lazy float scale did not handle")
+	}
+	if values := got.Values(); !reflect.DeepEqual(values, []any{int64(67), int64(68), int64(69), int64(70), int64(71), int64(72), int64(73), int64(74), int64(75), int64(76), int64(77), int64(78), int64(79)}) {
+		t.Fatalf("TryTypedCompareIndexesI64 lazy float scale values = %#v", values)
+	}
+
 	got, handled, err = TryTypedCompareIndexesI64(NewI64Range(math.MaxInt64-1, 1, 4), OpLT, int64(0))
 	if err != nil {
 		t.Fatalf("TryTypedCompareIndexesI64 wrapped ascending returned error: %v", err)

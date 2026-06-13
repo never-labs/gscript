@@ -2882,6 +2882,9 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	if out, ok, err := typedCompareCarrierIndexesI64(array, op, value); ok || err != nil {
 		return out, ok, err
 	}
+	if out, ok, err := typedCompareBulkIndexesI64(array, op, value); ok || err != nil {
+		return out, ok, err
+	}
 	if out, ok := typedCompareBoolIndexesI64(array, op, value); ok {
 		return out, true, nil
 	}
@@ -2893,6 +2896,41 @@ func TryTypedCompareIndexesI64(array Array, op Op, value any) (Array, bool, erro
 	for i, index := range indexes {
 		out[i] = int64(index)
 	}
+	return newI64Trusted(out), true, nil
+}
+
+func typedCompareBulkIndexesI64(array Array, op Op, value any) (Array, bool, error) {
+	if IsNull(value) {
+		return nil, false, nil
+	}
+	if target, ok := coerceInt64Exact(value); ok {
+		values, owned, ok := TryBulkI64(array)
+		if ok {
+			out := make([]int64, 0, len(values))
+			for row, item := range values {
+				if boolCompare(op, item == target, compareInt64(item, target)) {
+					out = append(out, int64(row))
+				}
+			}
+			BulkI64Release(values, owned)
+			return newI64Trusted(out), true, nil
+		}
+	}
+	target, ok := numeric(value)
+	if !ok {
+		return nil, false, nil
+	}
+	values, owned, ok := TryBulkF64(array)
+	if !ok {
+		return nil, false, nil
+	}
+	out := make([]int64, 0, len(values))
+	for row, item := range values {
+		if boolCompare(op, item == target, compareFloat64(item, target)) {
+			out = append(out, int64(row))
+		}
+	}
+	BulkF64Release(values, owned)
 	return newI64Trusted(out), true, nil
 }
 
