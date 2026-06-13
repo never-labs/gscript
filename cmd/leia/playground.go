@@ -1207,7 +1207,7 @@ print(result.text)`,
     }
 }, nil, {params: {"topic"}})
 
-result, err := summarize("Leia is a Go-native, hot-reloadable scripting language with AI-native agents.")
+result, err := summarize("Leia is a Go-native, hot-reloadable scripting language with an AI dialect.")
 if err != nil { print(err.message); return }
 print(result.text)`,
 		},
@@ -1684,7 +1684,7 @@ coding_agent := llm.agent("coding_agent", coding_agent_config, func(task) {
     }, nil
 }, {params: {"task"}})
 
-result, err := coding_agent("Implement slugify(title) for blog URLs and include evaluate regression cases.")
+result, err := coding_agent("Implement slugify(title) for document URLs and include evaluate regression cases.")
 if err != nil { print(err.message); return }
 print("attempts", result.attempts)
 print("tests", result.tests)
@@ -2441,7 +2441,7 @@ const tabConfig = {
     url: "/api/evaluate"
   },
   ai: {
-    title: "AI-Native Leia",
+    title: "AI Dialect",
     note: "From a one-line turn to tool-using and coding-agent shapes.",
     url: "/api/ai"
   }

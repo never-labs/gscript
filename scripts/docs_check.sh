@@ -14,12 +14,12 @@ Checks README/docs Markdown for:
   - relative .md/.html links whose target file exists;
   - fenced code blocks that mention repository gate scripts whose files exist and are executable.
   - non-archive docs do not reintroduce retired project names.
-  - release-readiness docs keep machine-checkable language and AI-native gates.
-  - README stable contract and docs/spec stability contract stay synchronized.
+  - release-readiness docs keep machine-checkable language and AI dialect gates.
+  - README spec link and docs/spec stability contract stay synchronized.
   - docs/spec runnable Leia examples use stable all-mode fence tags and execute.
   - docs examples index lists each registered top-level example directory and
     keeps documented examples CLI selectors registered.
-  - README documented capabilities stay tied to examples docs, manifests, and playground gates.
+  - README concise examples stay tied to detailed docs, manifests, and focused gates.
   - README Quick Start, install, and Embedding snippets keep focused execution gates.
   - reference entrypoints stay linked from the docs home.
   - generated reference docs and the checked-in language spec HTML are fresh.
@@ -455,15 +455,15 @@ def check_spec_contract_docs() -> None:
             docs_check,
             [
                 "go test ./tests/docs/spec -count=1",
-                "README stable contract and docs/spec stability contract",
+                "README spec link and docs/spec stability contract",
             ],
         ),
         (
             "README.md",
             readme,
             [
-                "The stable contract is the language spec plus\nfeature matrix and release gates.",
-                "(docs/spec/index.md)",
+                "[Language specification](docs/spec/index.md)",
+                "Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
             ],
         ),
         (
@@ -519,7 +519,7 @@ def check_examples_capability_drift_gates() -> None:
             root / "tests" / "release_matrix_test.go",
             [
                 "TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples",
-                "Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
+                "TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples",
                 "leia examples list --json",
                 "TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples",
                 "TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates",

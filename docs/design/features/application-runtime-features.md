@@ -2,9 +2,9 @@
 
 ## Goal
 
-Leia should support larger, long-running scripts and AI-driven applications.
-These features are not all first-phase language changes, but they shape the
-future application model.
+Leia should support larger, long-running embedded applications and explicit
+agent workflows. These features are not all first-phase language changes, but
+they shape the future application model.
 
 ## Actor Model
 

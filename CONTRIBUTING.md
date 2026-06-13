@@ -49,7 +49,7 @@ go run ./cmd/leia ci smoke
 Use short imperative commit messages with a prefix when useful, for example:
 
 ```text
-docs: update AI-native reference
+docs: update AI dialect reference
 runtime: fix channel close handling
 bench: add soa column kernel case
 ```

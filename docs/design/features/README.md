@@ -21,7 +21,7 @@ contracts are reviewed.
 | [Dialect System](dialect-system.md) | Unified `tag` literal/block DSL mechanism. |
 | [Shell and Host Automation](shell-and-host-automation.md) | Shell ergonomics, commands, glob, paths, env/cwd scopes. |
 | [Go-Style Imports](go-style-imports.md) | Import declarations and module naming, replacing Lua-like `require` as the primary style. |
-| [AI Dialects](ai-dialects.md) | LLM/agent/model/tool/evaluate as official dialects over the existing AI runtime. |
+| [AI Dialects](ai-dialects.md) | Optional LLM/agent/model/tool/evaluate dialect forms over the existing AI runtime. |
 | [AI Dialect Architecture Contract](ai-dialect-architecture-contract.md) | Boundary, composition, external package migration, and trace/replay/performance contract for the general AI dialect layer. |
 | [Composition Features](composition-features.md) | Pipeline, `try`, destructuring, optional chaining, comprehensions, match, using. |
 | [AI Coding Features](ai-coding-features.md) | Plan, patch, code query, record/replay, approval, transactions. |

@@ -31,7 +31,7 @@ Use the RFC process for changes that affect stable contracts:
 - Public Go API changes.
 - Standard-library module additions, removals, or capability changes.
 - Package manager behavior.
-- AI-native agent/evaluate semantics.
+- AI dialect agent/evaluate semantics.
 - Compatibility-breaking behavior.
 
 See [RFC process](contributing/rfcs.md).
@@ -63,4 +63,3 @@ A release candidate should have:
 GitHub CODEOWNERS should be added once the repository has a stable public
 maintainer user or team name. Do not add placeholder owners: invalid CODEOWNERS
 files create false confidence and noisy GitHub diagnostics.
-

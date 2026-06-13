@@ -10,7 +10,7 @@ Write an RFC for:
 
 - New syntax, contextual keywords, or grammar changes.
 - Semantic changes to declarations, expressions, statements, modules, errors,
-  concurrency, or AI-native constructs.
+  concurrency, or AI dialect constructs.
 - Public Go API changes.
 - Standard-library capability or safety changes.
 - Package manager resolution behavior.
@@ -48,4 +48,3 @@ contract real.
 
 Rejected or withdrawn RFCs should remain in the repository when they capture a
 useful design tradeoff. Mark their status clearly.
-

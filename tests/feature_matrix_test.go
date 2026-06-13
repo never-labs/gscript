@@ -419,21 +419,18 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is a Go-native, AI-native, hot-reloadable scripting language.",
-		"repeatable tests, package metadata, and source-level hot reload.",
-		"Go-flavored syntax with dynamic values, Lua-compatible table and multi-return",
-		"semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT\nfor supported hot paths.",
-		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
-		"AI-native syntax and stdlib support for models, tools, messages, turns,",
-		"DSL-native tagged dialects for shell commands, data formats, web routes,",
-		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers",
-		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
-		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,",
-		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
-		"The stable contract is the language spec plus\nfeature matrix and release gates.",
+		"Go-native scripting runtime",
+		"ARM64 JIT",
+		"q-style columnar analytics",
+		"q := require(\"q\")",
+		"trades := q.sql(",
+		"cmd := $`git status --short`",
+		"answer, err := turn {",
+		"leia.New(leia.WithLibs(leia.LibSafe))",
+		"Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
 	} {
 		if !strings.Contains(readme, snippet) {
-			t.Fatalf("README stable contract changed or missing expected snippet %q", snippet)
+			t.Fatalf("README concise surface changed or missing expected snippet %q", snippet)
 		}
 	}
 	embeddingRef := readFileString(t, filepath.Join(root, "docs", "reference", "embedding", "index.md"))
@@ -606,7 +603,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 			t.Fatalf("llm_native_integration name must expose README AI evidence scope; missing %q in %q", snippet, aiName)
 		}
 	}
-	requireFeatureSpecSections(t, ai, "llm_native_integration", "Grammar Appendix", "AI-Native Syntax", "Values And Types")
+	requireFeatureSpecSections(t, ai, "llm_native_integration", "Grammar Appendix", "AI Dialect Syntax", "Values And Types")
 	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
 		"tests/llm/llm_runtime_test.go",
 		"tests/llm/llm_agent_examples_test.go",
@@ -671,7 +668,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"on_stream: func(event)",
 	} {
 		if !strings.Contains(aiDialect, snippet) {
-			t.Fatalf("tests/llm/llm_ai_dialect_test.go must keep README AI-native syntax evidence snippet %q", snippet)
+			t.Fatalf("tests/llm/llm_ai_dialect_test.go must keep README AI dialect syntax evidence snippet %q", snippet)
 		}
 	}
 	aiExamples := readFileString(t, filepath.Join(root, "tests", "llm", "llm_agent_examples_test.go"))
@@ -868,9 +865,8 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
 		"go run ./cmd/leia lint tests/smoke/01_basic.leia",
 		"go run ./cmd/leia test tests/smoke/01_basic.leia",
-		"go run ./cmd/leia doc check",
-		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
-		"go run ./cmd/leia playground --help",
+		"go run ./cmd/leia check --quick .",
+		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 		"TestReadmeToolingCommandsMapToCLI",
 	} {
 		if !strings.Contains(readmeToolingGate, snippet) {
@@ -1183,11 +1179,12 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"AI-native syntax and stdlib support for models, tools, messages, turns,",
-		"agents, replay, and provider adapters.",
+		"answer, err := turn {",
+		"model: \"fast\"",
+		"[AI dialect reference](docs/reference/ai/index.md)",
 	} {
 		if !strings.Contains(readme, snippet) {
-			t.Fatalf("README AI-native contract missing %q", snippet)
+			t.Fatalf("README AI dialect contract missing %q", snippet)
 		}
 	}
 
@@ -1289,7 +1286,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 			data := readFileString(t, filepath.Join(root, filepath.FromSlash(rel)))
 			for _, snippet := range snippets {
 				if !strings.Contains(data, snippet) {
-					t.Fatalf("README AI-native %s gate %s missing snippet %q", label, rel, snippet)
+					t.Fatalf("README AI dialect %s gate %s missing snippet %q", label, rel, snippet)
 				}
 			}
 		}

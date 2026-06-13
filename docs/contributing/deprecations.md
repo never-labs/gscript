@@ -12,7 +12,7 @@ Deprecation applies to public contracts:
 - Public Go APIs.
 - CLI commands and flags.
 - Module resolution behavior.
-- AI-native provider, agent, turn, replay, and evaluate report shapes.
+- AI dialect provider, agent, turn, replay, and evaluate report shapes.
 
 Internal package names, tests, and private implementation details can change
 without deprecation when they are not part of the public contract.
@@ -48,4 +48,3 @@ Machine-readable schemas, such as `leia test --json` and `leia evaluate --json`,
 should carry explicit schema fields when they become externally consumed. Adding
 fields is compatible. Renaming or removing fields requires a deprecation note or
 a schema version bump.
-

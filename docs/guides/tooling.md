@@ -10,6 +10,7 @@ go run ./cmd/leia lint tests/smoke/01_basic.leia
 go run ./cmd/leia test tests/smoke/01_basic.leia
 go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia
 go run ./cmd/leia check --no-docs --no-editor --no-examples .
+go run ./cmd/leia check --quick .
 ```
 
 `leia check` runs formatter, linter, `.leia` tests, manifest coverage, and docs
@@ -149,6 +150,7 @@ evidence gates as command-line examples.
 ```bash
 go run ./cmd/leia bench --quick
 go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1
+go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3
 go run ./cmd/leia bench strict --bench table/table_array_access --runs 3 --warmup 1 \
   --json /tmp/leia-strict.json \
   --markdown /tmp/leia-strict.md

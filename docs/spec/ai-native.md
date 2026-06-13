@@ -1,6 +1,6 @@
-# AI-Native Syntax
+# AI Dialect Syntax
 
-Leia's AI-native surface is a standard-library runtime exposed through
+Leia's AI dialect is an optional standard-library runtime exposed through
 tagged dialect forms and ordinary modules. The language implementation must
 route these forms through the same `llm`, `msg`, `history`, `dialect`, and
 host-provider paths as direct library calls. There is no separate AI execution
@@ -12,10 +12,10 @@ use host-side replay records or mock providers.
 
 ## Design Principle
 
-Leia is AI native, but AI is not language intrinsic. The grammar may provide
-small tagged forms for common AI workflows, yet the language core does not gain
+AI is a dialect layer, not language intrinsic. The grammar may provide small
+tagged forms for common AI workflows, yet the language core does not gain
 model-specific evaluation rules, hidden prompt state, or a privileged AI
-scheduler. Every AI-native form must lower to ordinary runtime helpers and
+scheduler. Every AI dialect form must lower to ordinary runtime helpers and
 ordinary values before provider I/O occurs.
 
 This principle has four consequences:
@@ -37,7 +37,7 @@ This principle has four consequences:
 
 ## Stable Contract
 
-The stable AI-native contract is the following lowering boundary:
+The stable AI dialect contract is the following lowering boundary:
 
 | Source construct | Stable runtime meaning |
 |---|---|

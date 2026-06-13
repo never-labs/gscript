@@ -1,16 +1,16 @@
-# Leia AI-Native Reference
+# Leia AI Dialect Reference
 
-Leia's AI-native feature is a standard-library layer over host-installed LLM
-providers. The language-level surface is intentionally small: tagged `model`,
-`tool`, `agent`, and `turn` blocks plus ordinary `llm.*`, `msg.*`, and
-`history.*` helpers.
+Leia's AI support is an optional standard-library layer over host-installed LLM
+providers. The dialect surface is intentionally small: tagged `model`, `tool`,
+`agent`, and `turn` blocks plus ordinary `llm.*`, `msg.*`, and `history.*`
+helpers.
 
-AI native does not mean AI intrinsic. The tagged forms are syntax for building
-ordinary values and calling ordinary runtime helpers; they do not add hidden
-prompt memory, model-specific evaluation rules, or a separate agent engine.
-Provider I/O, tool dispatch, budgets, trace, record, and replay all pass through
-the same host-visible `llm` runtime paths whether the source uses dialect syntax
-or direct helper calls.
+AI dialect syntax is not language intrinsic behavior. The tagged forms build
+ordinary values and call ordinary runtime helpers; they do not add hidden prompt
+memory, model-specific evaluation rules, or a separate agent engine. Provider
+I/O, tool dispatch, budgets, trace, record, and replay all pass through the
+same host-visible `llm` runtime paths whether the source uses dialect syntax or
+direct helper calls.
 
 ## Host Contract
 
@@ -916,7 +916,7 @@ requires both `LEIA_LLM_INTEGRATION=1` and a configured GLM key.
 
 ## Evidence
 
-Stable AI-native coverage is tracked in `tests/feature_matrix.json` under
+Stable AI dialect coverage is tracked in `tests/feature_matrix.json` under
 `llm_native_integration`. The main evidence set includes:
 
 | Surface | Evidence |

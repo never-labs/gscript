@@ -1,15 +1,13 @@
-# AI-Native Leia
+# AI Dialect Guide
 
-Leia's AI surface is a standard-library runtime exposed through a small set of
+Leia's AI support is an optional standard-library runtime exposed through
 tagged dialect forms and ordinary modules. Scripts use concise `model`, `tool`,
-`agent`, and `turn` blocks; the Go host still controls providers, credentials,
+`agent`, and `turn` blocks; the Go host controls providers, credentials,
 capabilities, tracing, recording, and replay.
 
-The design rule is: AI native, but not language intrinsic. The syntax helps you
-write agent-shaped programs without making prompts, model calls, or traces
-special language semantics. Everything lowers to `llm`, `msg`, `history`, and
-host-provider APIs, so the same code can be tested with mocks, replayed from
-records, or embedded under host policy.
+The design rule is: AI is a dialect layer, not language intrinsic. Everything
+lowers to `llm`, `msg`, `history`, and host-provider APIs, so the same code can
+be tested with mocks, replayed from records, or embedded under host policy.
 
 ## Mental Model
 
@@ -22,7 +20,7 @@ Use the simplest layer that fits the workflow:
 | `tool { ... }` | Tool descriptor backed by a Leia function. |
 | `llm.*`, `msg.*`, `history.*` | Lower-level runtime helpers for custom loops. |
 
-The stable contract is in the [AI-native reference](../reference/ai/index.md).
+The stable contract is in the [AI dialect reference](../reference/ai/index.md).
 
 ## Model Defaults
 
@@ -829,7 +827,7 @@ go test ./tests/integration/llm -run 'Test(GLMAnthropicCompatibleLLMIntegration|
 
 ## Evidence
 
-The README AI-native promise is tied to deterministic tests and examples:
+The AI dialect contract is tied to deterministic tests and examples:
 
 - `tests/llm/llm_runtime_test.go`, `tests/llm/llm_agent_tools_test.go`,
   `tests/llm/llm_record_replay_test.go`, and

@@ -2,10 +2,11 @@
 
 ## Goal
 
-Leia's AI surface should be a small set of general dialects that make models,
-turns, tools, agents, evaluation, memory, trace, and replay inspectable in Leia
-source. Domain systems should be built from these dialects,
-ordinary Leia packages, and Leia-native data/workflow/document capabilities.
+The optional AI dialect layer should be a small set of general dialects that
+make models, turns, tools, agents, evaluation, memory, trace, and replay
+inspectable in Leia source. Domain systems should be built from these dialects,
+ordinary Leia packages, and ordinary Leia data, workflow, and document
+capabilities.
 
 This contract narrows the boundary of the general AI dialect layer. It is not a
 runtime implementation plan.
@@ -76,7 +77,7 @@ allowed, metric emission, and regression comparison.
 
 ## Composition With Leia Native Features
 
-AI dialects should reuse Leia-native features instead of cloning them:
+AI dialects should reuse ordinary Leia features instead of cloning them:
 
 - `api`, `web`, `db`, `mail`, `sh`, and file/path dialects remain the way tools
   reach external systems;

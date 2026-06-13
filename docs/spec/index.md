@@ -2,12 +2,14 @@
 
 This is the normative reference for the Leia programming language. It defines
 the source syntax, value model, execution semantics, module behavior,
-AI-native syntax, and implementation obligations that user-facing tools,
+tagged dialect syntax, and implementation obligations that user-facing tools,
 interpreters, bytecode VMs, JITs, and embedding APIs must preserve.
 
 Leia uses Go-flavored syntax with dynamic values, Lua-compatible table and
 multi-return behavior where useful, explicit host capabilities, Go-native
-embedding, source-level hot reload, and AI-native agent syntax.
+embedding, source-level hot reload, and a small tagged-dialect surface for
+domain-specific syntax such as q analytics, shell/data/web forms, and optional
+AI workflows.
 
 ## Version
 
@@ -42,9 +44,9 @@ truth.
   sequence behavior, metatables, and metamethods.
 - [Concurrency](concurrency.md): goroutine-like tasks, channels, select, sync,
   cancellation, and host scheduling boundaries.
-- [AI-Native Syntax](ai-native.md): model, tool, agent, and turn dialects;
-  messages, budgets, output validation, providers, trace, replay, and
-  evaluation.
+- [AI Dialect Syntax](ai-native.md): model, tool, agent, and turn dialects as
+  an optional standard-library layer; messages, budgets, output validation,
+  providers, trace, replay, and evaluation.
 - [Modules And Loading](modules.md): `require`, `import "go:..."`, `leia.mod`,
   `leia.sum`, vendoring, module caches, and capabilities.
 - [Errors And Diagnostics](errors.md): runtime errors, recoverable errors,

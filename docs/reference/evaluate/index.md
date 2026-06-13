@@ -4,7 +4,7 @@
 versioned report and runs each discovered evaluate block body as ordinary Leia
 code under the evaluation harness.
 
-The command parses Leia source, runs existing AI-native source validation, and
+The command parses Leia source, runs existing AI dialect source validation, and
 discovers `evaluate "case name" { ... }` blocks. For each case it executes the
 file's top-level setup code and then the evaluate body, so normal Leia
 assertions such as `assert(result == "ok")` determine whether the case passes.

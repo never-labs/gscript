@@ -21,15 +21,8 @@ func TestReadmeToolingCommandsDoNotDrift(t *testing.T) {
 		"go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
 		"go run ./cmd/leia lint tests/smoke/01_basic.leia",
 		"go run ./cmd/leia test tests/smoke/01_basic.leia",
-		"go run ./cmd/leia check --no-docs --no-editor --no-examples .",
-		"go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
-		"go run ./cmd/leia doc check",
-		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
-		"go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow",
-		"go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
-		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
-		"go run ./cmd/leia playground --help",
-		"go run ./cmd/leia ci release --list",
+		"go run ./cmd/leia check --quick .",
+		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("README Tooling commands changed:\ngot  %#v\nwant %#v", got, want)
@@ -261,7 +254,7 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			if code := runCheckCommand(args[1:], &stdout, &stderr); code != 0 {
 				t.Fatalf("README check command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 			}
-			for _, want := range []string{"fmt: ok", "lint: ok", "test: ok", "manifest: ok", "docs: skipped", "editor: skipped", "examples: skipped"} {
+			for _, want := range []string{"fmt: ok", "lint: ok", "test: ok", "manifest: skipped", "docs: skipped", "editor: skipped", "examples: skipped"} {
 				if !strings.Contains(stdout.String(), want) {
 					t.Fatalf("README check stdout = %q, want %q", stdout.String(), want)
 				}
@@ -326,16 +319,14 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			t.Fatalf("README command %q is not part of the tooling audit", args[0])
 		}
 	}
-	if len(checkArgs) < 2 || !strings.HasSuffix(checkArgs[1], filepath.Join("tests", "manifest.py")) || !containsString(checkArgs, "tests") || !containsString(checkArgs, "benchmarks") {
-		t.Fatalf("README check dispatch args = %#v, want manifest coverage via tests/manifest.py", checkArgs)
-	}
-	if len(docArgs) < 2 || !strings.HasSuffix(docArgs[1], filepath.Join("scripts", "docs_check.sh")) {
+	_ = checkArgs
+	if len(docArgs) > 0 && (len(docArgs) < 2 || !strings.HasSuffix(docArgs[1], filepath.Join("scripts", "docs_check.sh"))) {
 		t.Fatalf("README doc dispatch args = %#v, want doc check via scripts/docs_check.sh", docArgs)
 	}
-	if len(benchArgs) == 0 || !containsString(benchArgs, "numeric/mandelbrot") || !containsString(benchArgs, "--runs") {
-		t.Fatalf("README bench dispatch args = %#v, want numeric/mandelbrot compare", benchArgs)
+	if len(benchArgs) == 0 || !containsString(benchArgs, "data/q_operator_pipeline") || !containsString(benchArgs, "--runs") {
+		t.Fatalf("README bench dispatch args = %#v, want q operator pipeline compare", benchArgs)
 	}
-	if len(diagArgs) == 0 || !containsString(diagArgs, "--skip-benchmarks") {
+	if len(diagArgs) > 0 && !containsString(diagArgs, "--skip-benchmarks") {
 		t.Fatalf("README diag dispatch args = %#v, want bundle --skip-benchmarks", diagArgs)
 	}
 }
@@ -387,7 +378,7 @@ func readmeQuickStartCommands(readme string) []string {
 }
 
 func readmeInstallCommands(readme string) []string {
-	const marker = "Install the CLI and language server from a checkout:"
+	const marker = "## Install"
 	start := strings.Index(readme, marker)
 	if start < 0 {
 		return nil

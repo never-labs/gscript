@@ -44,7 +44,7 @@ set.
 | `examples/database/` | Package-managed database capability examples. |
 | `examples/concurrency/` | Goroutines, channels, select, sync primitives, context cancellation, and process cancellation. |
 | `examples/ai/` | Tagged AI dialect workflows, replay/trace projects, and coding-agent replay examples. |
-| `examples/llm/` | AI-native models, tools, agents, direct agent-as-tool, custom flow, and live provider smoke scripts. |
+| `examples/llm/` | AI dialect models, tools, agents, direct agent-as-tool, custom flow, and live provider smoke scripts. |
 | `examples/embedding/` | Go embedding examples as executable Go doc tests. |
 | `examples/evaluate/` | Deterministic evaluation and replay examples. |
 | `examples/macos/` | Package-managed macOS automation capability examples. |
@@ -119,7 +119,7 @@ scripts. They require a host-injected mock/replay provider or explicit
 live-provider environment variables, so they are not first-run smoke commands.
 Never run live-provider examples with committed secrets.
 
-See [AI-native Leia](../guides/ai-native.md).
+See [AI dialect guide](../guides/ai-native.md).
 
 ## Evaluate Examples
 

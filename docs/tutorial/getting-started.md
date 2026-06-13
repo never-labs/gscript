@@ -34,15 +34,18 @@ go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_de
 go run ./cmd/leia examples run repo-hello-fib
 ```
 
-Then try the product-direction examples:
+Then try examples for concurrency, data-oriented code, and q-style analytics:
 
 ```bash
 go run ./cmd/leia examples run examples/concurrency/goroutines_channels.leia
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
+go run ./cmd/leia examples run examples/data/q_trade_analytics_project.leia
 ```
 
-AI examples require a host provider or model configuration. Keep API keys in
-environment variables, not source files.
+Leia's larger examples emphasize DSLs: q-style analytics, shell/data/web
+dialects, spreadsheets, and optional AI workflows. AI examples require a host
+provider or replay fixture; keep API keys in environment variables, not source
+files.
 
 ## Check Code
 
@@ -125,4 +128,5 @@ Next steps:
 - Use [concurrency](../reference/concurrency/index.md) and
   [data-oriented programming](../reference/data-oriented/index.md) for the
   main language extensions.
-- Use [AI-native Leia](../guides/ai-native.md) for model providers and agents.
+- Use the [AI dialect guide](../guides/ai-native.md) when a project needs model
+  providers, tools, agents, or replay.

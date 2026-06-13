@@ -2,9 +2,9 @@
 
 ## Goal
 
-Leia should become a strong language for AI-assisted coding. The user should be
-able to inspect, approve, replay, and roll back automated changes without
-building a custom harness for every project.
+Leia should support auditable coding-agent workflows. The user should be able
+to inspect, approve, replay, and roll back automated changes without building a
+custom harness for every project.
 
 ## Plan / Explain / Run
 

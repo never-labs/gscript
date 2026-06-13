@@ -95,7 +95,7 @@ file directives.
 
 ```leia
 //leia:cap fs.read,llm.turn
-//leia:feature ai-native
+//leia:feature ai-dialect
 ```
 
 For tools, keep the public name, parameter list, capability requirements, and
@@ -114,7 +114,7 @@ lookup_order := tool {
 }
 ```
 
-## AI-Native Code
+## AI Dialect Code
 
 Use the simplest AI construct that fits the job:
 

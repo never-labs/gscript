@@ -2,10 +2,10 @@
 
 ## Goal
 
-Leia should expose AI as official dialects, not only as `llm.*` function calls.
-The existing `llm` runtime remains the substrate, but user-facing code should be
-able to express models, turns, tools, agents, memory, replay, and evaluation as
-DSL-native Leia.
+Leia should expose optional AI dialect forms over the existing `llm` runtime,
+not only as direct `llm.*` function calls. User-facing code should be able to
+express models, turns, tools, agents, memory, replay, and evaluation through
+the same tagged dialect boundary used by other domain forms.
 
 ## Core Dialects
 

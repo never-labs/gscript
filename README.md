@@ -1,21 +1,9 @@
 # Leia
 
-Leia is a Go-native, AI-native, hot-reloadable scripting language. It uses
-Go-flavored syntax with dynamic values, Lua-compatible table and multi-return
-semantics where useful, an embeddable Go API, a bytecode VM, and an ARM64 JIT
-for supported hot paths.
-
-Leia is designed for host applications that need scriptability without giving up
-Go operational habits: explicit capabilities, small deployment surface,
-repeatable tests, package metadata, and source-level hot reload.
-
-The JIT accelerates supported hot paths and falls back to the VM/runtime for
-unsupported operations. The language contract is the shared interpreter/VM
-semantics enforced by the spec, feature matrix, and release gates.
+Go-native scripting runtime with dynamic values, host capabilities, hot reload,
+bytecode VM, ARM64 JIT, tagged DSLs, and q-style columnar analytics.
 
 ## Quick Start
-
-From a checkout:
 
 ```bash
 go run ./cmd/leia help
@@ -24,7 +12,7 @@ go run ./cmd/leia run tests/smoke/01_basic.leia
 go run ./cmd/leia run examples/hello/fib.leia
 ```
 
-Install the CLI and language server from a checkout:
+## Install
 
 ```bash
 go install ./cmd/leia ./cmd/leia-lsp
@@ -32,42 +20,62 @@ leia version
 leia run tests/smoke/01_basic.leia
 ```
 
-## What It Includes
+## Small Scripts
 
-- Go embedding API with sandbox, resource budgets, host bindings, and hot reload.
-- AI-native syntax and stdlib support for models, tools, messages, turns,
-  agents, replay, and provider adapters.
-- DSL-native tagged dialects for shell commands, data formats, web routes,
-  q-style analytics, spreadsheets, and AI workflows.
-- Go-style concurrency primitives: `go`, channels, `select`, sync helpers, and
-  cancellation-oriented host integration.
-- Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.
-- CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,
-  playground, examples, and release evidence.
-- Browser playground with runnable Tour, Examples, Evaluate, and AI tabs backed
-  by the repository examples and local execution APIs.
+```leia
+func fib(n) {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
 
-## Tooling
-
-```bash
-go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
-go run ./cmd/leia lint tests/smoke/01_basic.leia
-go run ./cmd/leia test tests/smoke/01_basic.leia
-go run ./cmd/leia check --no-docs --no-editor --no-examples .
-go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia
-go run ./cmd/leia doc check
-go run ./cmd/leia mod verify --json examples/ui/package_managed
-go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow
-go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1
-go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks
-go run ./cmd/leia playground --help
-go run ./cmd/leia ci release --list
+print(fib(10))
 ```
 
-Use `leia check .` before submitting changes. It runs formatting, linting,
-manifest checks, tests, documentation checks, editor asset checks, and runnable
-example checks unless a skip flag is supplied. Use `leia check --quick .` for a
-fast local loop that skips the slower release-evidence steps.
+## q-Style Analytics
+
+```leia
+q := require("q")
+
+result := q.eval(`
+    px:100 101 103 99 104f;
+    sz:10 20 15 30 25;
+    idx:where px>100;
+    +/sz[idx]
+`)
+
+print(result)
+```
+
+```leia
+q := require("q")
+trades := q.sql("([] sym:`AAPL`MSFT`AAPL; px:190.5 410.0 191.2; sz:100 50 125)")
+
+out := q.sql(trades, "select notional:sum px*sz by sym from trades")
+print(out)
+```
+
+## Tagged Dialects
+
+```leia
+text := markdown`
+# Release note
+- q analytics uses typed runtime kernels
+- host applications choose enabled capabilities
+`
+
+cmd := $`git status --short`
+```
+
+```leia
+answer, err := turn {
+    model: "fast"
+    messages: {
+        prompt { role: "user", text: "Summarize this in one sentence." }
+    }
+}
+```
 
 ## Embedding
 
@@ -84,39 +92,42 @@ func main() {
 }
 ```
 
-For untrusted scripts, start with `leia.SecuritySandbox()` and explicit budgets.
-Host APIs and Go bindings should be added deliberately through the embedding
-surface.
+For untrusted scripts, start with `leia.SecuritySandbox()` and explicit
+budgets.
+
+## Tooling
+
+```bash
+go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
+go run ./cmd/leia lint tests/smoke/01_basic.leia
+go run ./cmd/leia test tests/smoke/01_basic.leia
+go run ./cmd/leia check --quick .
+go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3
+```
 
 ## Documentation
-
-Start with:
 
 - [Documentation home](docs/index.md)
 - [Language specification](docs/spec/index.md)
 - [Language specification HTML](docs/spec/index.html)
 - [Getting started](docs/tutorial/getting-started.md)
+- [Embedding guide](docs/guides/embedding.md)
+- [Modules](docs/reference/modules/index.md)
+- [Packages and modules](docs/guides/packages.md)
+- [CLI reference](docs/reference/cli/index.md)
 - [Standard library](docs/reference/stdlib/index.md)
 - [Tagged dialects](docs/reference/dialects/index.md)
 - [Data-oriented programming](docs/reference/data-oriented/index.md)
-- [CLI reference](docs/reference/cli/index.md)
-- [Embedding guide](docs/guides/embedding.md)
-- [Package guide](docs/guides/packages.md)
-- [Modules reference](docs/reference/modules/index.md)
-- [AI-native guide](docs/guides/ai-native.md)
-- [Security reference](docs/reference/security/index.md)
+- [q conformance matrix](docs/design/q-conformance.md)
 - [Performance reference](docs/reference/performance/index.md)
-- [Platforms and execution modes](docs/reference/platforms/index.md)
-- [Examples](docs/examples/index.md)
+- [AI dialect reference](docs/reference/ai/index.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## Project Status
 
-Leia is under active development. The stable contract is the language spec plus
-feature matrix and release gates. Experimental behavior should be documented as
-such before users depend on it.
+Active development. Stable behavior is defined by spec, matrices, tests, and
+release gates.
 
-No license has been selected in this repository yet. Do not assume redistribution
-or production adoption rights until a root `LICENSE` file is added.
+No license has been selected in this repository yet.

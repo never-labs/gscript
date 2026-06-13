@@ -1,84 +1,61 @@
-# Leia Documentation
+# Leia
 
-Leia is a Go-native, AI-native, hot-reloadable scripting language with dynamic
-semantics, an embeddable Go API, a bytecode VM, and an ARM64 JIT.
+Go-native scripting runtime with tagged DSLs, q-style columnar analytics,
+bytecode execution, ARM64 JIT, and an embeddable Go API.
 
-This directory is the current documentation surface. Older design notes,
-compiler journals, audits, and pre-rename documents are archived under
-[`archive/2026-06-pre-rewrite/`](archive/2026-06-pre-rewrite/) for reference
-only.
+```bash
+go run ./cmd/leia eval 'print("hello from leia")'
+go run ./cmd/leia playground --help
+```
 
-## Start Here
+## Language
 
-- [Language specification](spec/index.md): the normative syntax and behavior
-  contract for users, tooling, VM, JIT, and embedding APIs. A checked-in
-  [single-page HTML edition](spec/index.html) is available for browser reading.
-- [Getting started](tutorial/getting-started.md): install, run, test, and embed
-  Leia in a small Go program.
-- [Standard library](reference/stdlib/index.md): generated-style module index
-  organized from `internal/stdlib/catalog`.
-- [Tagged dialects](reference/dialects/index.md): shell, data, web, q,
-  spreadsheet, and AI dialect forms.
-- [CLI reference](reference/cli/index.md): stable command surface.
-- [File directives](reference/directives/index.md): `//leia:` metadata consumed
-  by tooling.
-- [Modules](reference/modules/index.md): `leia.mod`, `leia.sum`, vendoring, and
-  Go-native binding metadata.
-- [Concurrency](reference/concurrency/index.md): goroutines, channels, select,
-  sync primitives, contexts, and concurrency budgets.
-- [Data-oriented programming](reference/data-oriented/index.md): dense arrays,
-  SoA layouts, masks, column kernels, and numeric performance model.
-- [Go embedding API](reference/embedding/index.md): public Go package surface,
-  host bindings, sandbox options, and VM lifetime rules.
-- [Security and sandboxing](reference/security/index.md): library selection,
-  host capabilities, resource budgets, and Go binding rules.
-- [Hot reload](reference/hot-reload/index.md): loader handles, persistent
-  instances, automatic state preservation, and rollback behavior.
-- [Errors and diagnostics](reference/diagnostics/index.md): Go error types,
-  CLI JSON/SARIF outputs, and diagnostic bundle entrypoints.
-- [Performance and benchmarks](reference/performance/index.md): benchmark
-  selectors, timing modes, strict guards, and release artifacts.
-- [Platforms and execution modes](reference/platforms/index.md): interpreter,
-  bytecode VM, JIT, and hosted runner expectations.
-- [AI-native reference](reference/ai/index.md): models, tools, messages, turns,
-  agents, budgets, providers, and replay.
-- [Evaluate reference](reference/evaluate/index.md): replay records, judge
-  workflows, drift reports, and regression evaluation commands.
-- [Embedding guide](guides/embedding.md): host integration, sandboxing, and
-  reload-oriented runtime usage.
-- [AI-native guide](guides/ai-native.md): agents, tools, models, message
-  history, and provider setup.
-- [Editors and LSP](guides/editors.md): `leia-lsp`, syntax highlighting,
-  tree-sitter, VS Code, Emacs, Neovim, Helix, and Zed integration.
-- [Packages and modules](guides/packages.md): decentralized GitHub-path modules,
-  `leia.mod`, `leia.sum`, vendoring, verification, and capability summaries.
-- [Tooling guide](guides/tooling.md): formatting, linting, testing, examples,
-  evaluation, diagnostics, playground, LSP, and release evidence commands.
-- [Style guide](guides/style.md): naming, errors, capabilities, AI-native
-  patterns, concurrency, and test conventions.
-- [Cookbook](cookbook/index.md): short recipes for testing, evaluate replay,
-  Go embedding, concurrency, SoA, and tooling.
-- [Examples](examples/index.md): runnable scripts and embedding examples by
-  product area.
-- [Example tree README](../examples/README.md): local example dependency and
-  release expectations.
-- [Testing and release gates](testing.md): correctness, docs, and release
-  evidence.
-- [Release process](release/index.md): versioning, release readiness, evidence
-  gates, and distribution checklist.
-- [Governance](governance.md): maintainer responsibilities, RFC scope,
-  compatibility, and release readiness.
-- [Security policy](../SECURITY.md): supported versions, reporting route, and
-  untrusted-script baseline.
-- [Contributing](../CONTRIBUTING.md): local checks, change expectations, and PR
-  checklist.
-- [Code of conduct](../CODE_OF_CONDUCT.md): baseline collaboration policy.
-- [Performance contribution guide](contributing/performance.md): benchmark
-  evidence format for optimization work.
+- [Language specification](spec/index.md)
+- [Language specification HTML](spec/index.html)
+- [Language overview](spec/language.md)
+- [Grammar appendix](spec/grammar.ebnf)
+- [Getting started](tutorial/getting-started.md)
+- [Style guide](guides/style.md)
+- [Editors and LSP](guides/editors.md)
 
-## Documentation Policy
+## Core Runtime
 
-The docs are split into user-facing reference, tutorials, guides, release
-process, and internals. Generated reference should come from code-owned metadata
-where practical. Hand-written prose should explain concepts and tradeoffs, not
-duplicate long API tables that the runtime can emit.
+- [Standard library](reference/stdlib/index.md)
+- [CLI reference](reference/cli/index.md)
+- [Go embedding API](reference/embedding/index.md)
+- [Embedding guide](guides/embedding.md)
+- [Modules](reference/modules/index.md)
+- [Packages and modules](guides/packages.md)
+- [File directives](reference/directives/index.md)
+- [Security and sandboxing](reference/security/index.md)
+- [Hot reload](reference/hot-reload/index.md)
+- [Platforms and execution modes](reference/platforms/index.md)
+- [Errors and diagnostics](reference/diagnostics/index.md)
+
+## DSLs And Data
+
+- [Tagged dialects](reference/dialects/index.md)
+- [Data-oriented programming](reference/data-oriented/index.md)
+- [q conformance matrix](design/q-conformance.md)
+- [Performance and benchmarks](reference/performance/index.md)
+- [Concurrency](reference/concurrency/index.md)
+
+## AI Dialect
+
+- [AI dialect reference](reference/ai/index.md)
+- [AI dialect guide](guides/ai-native.md)
+- [Evaluate reference](reference/evaluate/index.md)
+
+## Examples And Release
+
+- [Examples](examples/index.md)
+- [Example tree README](../examples/README.md)
+- [Cookbook](cookbook/index.md)
+- [Tooling guide](guides/tooling.md)
+- [Testing and release gates](testing.md)
+- [Release process](release/index.md)
+- [Governance](governance.md)
+- [Contributing](../CONTRIBUTING.md)
+- [Security policy](../SECURITY.md)
+- [Code of conduct](../CODE_OF_CONDUCT.md)
+- [Performance contribution guide](contributing/performance.md)

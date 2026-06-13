@@ -23,7 +23,7 @@ Use this template for release candidates and public tags.
 
 ## Highlights
 
-- AI-native:
+- AI dialect:
 - Go embedding:
 - Hot reload:
 - Concurrency:

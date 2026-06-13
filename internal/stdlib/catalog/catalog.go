@@ -28,7 +28,7 @@ var modules = []ModuleInfo{
 	{Name: "bit32", Layer: LayerCompat, Description: "Lua-compatible 32-bit bit operations.", SafeDefault: true},
 	{Name: "bits", Layer: LayerBase, Description: "Go math/bits-style integer bit counting and rotation helpers.", SafeDefault: true},
 	{Name: "bytes", Layer: LayerBase, Description: "Byte-string transforms, buffers, hex helpers, and byte comparisons.", SafeDefault: true},
-	{Name: "chat", Layer: LayerLLM, Description: "Lightweight chat and conversation helpers for AI-native scripts.", Capabilities: []string{"llm.turn"}},
+	{Name: "chat", Layer: LayerLLM, Description: "Lightweight chat and conversation helpers for AI dialect scripts.", Capabilities: []string{"llm.turn"}},
 	{Name: "color", Layer: LayerBase, Description: "RGBA colors, color-space conversion, interpolation, and common constants.", SafeDefault: true},
 	{Name: "compress", Layer: LayerBase, Description: "Compression and decompression helpers over strings.", SafeDefault: true},
 	{Name: "container", Layer: LayerBase, Description: "Sets, queues, stacks, deques, and heaps implemented in process.", SafeDefault: true},

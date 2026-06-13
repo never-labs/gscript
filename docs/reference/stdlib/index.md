@@ -39,7 +39,7 @@ Generated from `internal/stdlib/catalog`, the code-owned standard-library metada
 | `host` | `script` | Script compilation, evaluation, loader, source, and entrypoint helpers. | false | script.eval, module.load |
 | `host` | `serve` | High-level HTTP application router with parameter routes and automatic responses. | false | net.listen |
 | `host` | `testkit` | Conformance and diagnostic helpers intended for tests. | false | testkit |
-| `llm` | `chat` | Lightweight chat and conversation helpers for AI-native scripts. | false | llm.turn |
+| `llm` | `chat` | Lightweight chat and conversation helpers for AI dialect scripts. | false | llm.turn |
 | `llm` | `history` | Conversation history search, append, and recall helpers. | false | none |
 | `llm` | `llm` | Model turns, tools, validation, record/replay, and provider-backed AI calls. | false | llm.turn |
 | `llm` | `loop` | Reusable AI agent loop drivers such as react and plan/execute. | false | llm.turn |

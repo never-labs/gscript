@@ -109,11 +109,11 @@ expr_list     = expr { "," expr } ;
 ```
 
 Tables, calls, member selection, indexing, anonymous functions, dense arrays,
-imports, and tagged dialect forms are layered on this core grammar. AI workflows
-use the `llm`, `msg`, `history`, and `loop` standard-library modules. Dialect
-tags and blocks are generic syntax and are not special-cased for AI forms.
+imports, and tagged dialect forms are layered on this core grammar. Dialect
+tags and blocks are generic syntax; q analytics, shell/data/web forms,
+spreadsheets, and AI workflows all use the same dialect boundary.
 
-## Dialects And AI-Native Syntax
+## Tagged Dialects And AI Syntax
 
 Leia supports tagged dialect forms. A tagged string has the shape
 `tag`...`` or `tag!`...``; `$`...`` is shorthand for the shell dialect. A
@@ -122,8 +122,8 @@ returns the dialect result and any structured error according to the dialect
 contract. The bang form is fail-fast and raises a runtime error when the dialect
 cannot parse or execute the form.
 
-The AI surface is a standard-library layer rather than a separate execution
-engine. Use `turn { ... }` or `llm.turn({...})` for model calls and
+The AI surface is an optional standard-library layer rather than a separate
+execution engine. Use `turn { ... }` or `llm.turn({...})` for model calls and
 `model { ... }` or `llm.register_models({...})` for model configuration. Tools,
 agents, messages, history manipulation, output validation, record/replay,
 tracing, and cancellation are ordinary values and calls on the `llm`, `msg`,
@@ -309,7 +309,7 @@ Leia differs from Lua when Go-native embedding, safety, or product clarity wins:
 
 - Go-style `//` comments and `func` syntax are canonical.
 - Host capabilities are explicit and can be sandboxed.
-- `defer`, `go`, channels, AI-native agents, SOA, and module tooling are Leia
+- `defer`, `go`, channels, AI dialect helpers, SOA, and module tooling are Leia
   features, not Lua compatibility features.
 - Debug and GC internals are not promised to match Lua.
 

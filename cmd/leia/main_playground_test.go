@@ -131,18 +131,16 @@ func TestPlaygroundPageSyntaxSurfaceMatchesLeia(t *testing.T) {
 
 func TestReadmePlaygroundTabsMatchAPISurface(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
-	readme, err := os.ReadFile(filepath.Join(root, "README.md"))
+	cliRef, err := os.ReadFile(filepath.Join(root, "docs", "reference", "cli", "index.md"))
 	if err != nil {
-		t.Fatalf("read README: %v", err)
+		t.Fatalf("read CLI reference: %v", err)
 	}
-	readmeText := string(readme)
+	cliText := string(cliRef)
 	for _, want := range []string{
-		"playground, examples, and release evidence",
-		"Browser playground with runnable Tour, Examples, Evaluate, and AI tabs",
-		"go run ./cmd/leia playground --help",
+		"| `playground` |",
 	} {
-		if !strings.Contains(readmeText, want) {
-			t.Fatalf("README missing playground claim %q", want)
+		if !strings.Contains(cliText, want) {
+			t.Fatalf("CLI reference missing playground entry %q", want)
 		}
 	}
 
@@ -390,8 +388,8 @@ func TestPlaygroundAIExamplesCoverReadmeAINativeSurface(t *testing.T) {
 	}
 	readmeText := string(readme)
 	for _, claim := range []string{
-		"AI-native syntax and stdlib support for models, tools, messages, turns,\n  agents, replay, and provider adapters.",
-		"Browser playground with runnable Tour, Examples, Evaluate, and AI tabs",
+		"answer, err := turn {",
+		"[AI dialect reference](docs/reference/ai/index.md)",
 	} {
 		if !strings.Contains(readmeText, claim) {
 			t.Fatalf("README missing AI playground claim %q", claim)
@@ -965,18 +963,11 @@ func TestReadmeFacingFeatureMatrixClaimsKeepRunnableExamples(t *testing.T) {
 		featureID     string
 		exampleRef    string
 	}{
-		{"Go embedding API", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
-		{"sandbox, resource budgets, host bindings, and hot reload", "sandbox_capabilities_module_loading", "examples/embedding/embedding_test.go"},
-		{"sandbox, resource budgets, host bindings, and hot reload", "embedding_resource_budgets", "examples/embedding/embedding_test.go"},
-		{"source-level hot reload", "embedding_hot_reload", "examples/embedding/embedding_test.go"},
-		{"AI-native syntax", "llm_native_integration", "examples/llm/agent.leia"},
-		{"DSL-native tagged dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
-		{"web routes", "host_stdlibs", "examples/web/route_workbench.leia"},
-		{"Go-style concurrency primitives", "go_style_concurrency", "examples/concurrency/select_timeout.leia"},
-		{"Data-oriented helpers", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
-		{"playground, examples", "cli_repository_tooling", "examples/tooling/release_gate_project/main.leia"},
-		{"an ARM64 JIT", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
-		{"release evidence", "release_evidence_gates", "examples/tooling/release_evidence_pipeline.leia"},
+		{"leia.New(leia.WithLibs(leia.LibSafe))", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
+		{"answer, err := turn {", "llm_native_integration", "examples/llm/agent.leia"},
+		{"cmd := $`git status --short`", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
+		{"q-style columnar analytics", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
+		{"ARM64 JIT", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
 	}
 
 	for _, claim := range claims {

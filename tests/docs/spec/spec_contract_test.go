@@ -17,7 +17,7 @@ func TestDocsSpecGateEntrypointsStaySynchronized(t *testing.T) {
 	for _, snippet := range []string{
 		"go test ./tests/docs/spec -count=1",
 		"go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1",
-		"README stable contract and docs/spec stability contract",
+		"README spec link and docs/spec stability contract",
 	} {
 		if !strings.Contains(docsCheck, snippet) {
 			t.Fatalf("scripts/docs_check.sh must keep docs/spec contract gate snippet %q", snippet)
@@ -30,12 +30,10 @@ func TestReadmeAndSpecStableContractStayAligned(t *testing.T) {
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	specIndex := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
 	stability := markdownSection(t, specIndex, "Stability Contract")
-	stableContractSource := `The stable contract is the language spec plus\nfeature matrix and release gates.`
 
 	for _, snippet := range []string{
-		strings.ReplaceAll(stableContractSource, `\n`, "\n"),
-		"(docs/spec/index.md)",
-		"Experimental behavior should be documented as\nsuch before users depend on it.",
+		"[Language specification](docs/spec/index.md)",
+		"Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md stable contract must keep snippet %q", snippet)
@@ -109,7 +107,7 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 	}
 
 	var runAll, failAll int
-	var aiNativeRunAll int
+	var aiDialectRunAll int
 	var bad []string
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
@@ -125,7 +123,7 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 			case "leia run all":
 				runAll++
 				if entry.Name() == "ai-native.md" {
-					aiNativeRunAll++
+					aiDialectRunAll++
 				}
 			case "leia fail all":
 				failAll++
@@ -142,8 +140,8 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 	if runAll == 0 || failAll == 0 {
 		t.Fatalf("docs/spec runnable fence coverage must include success and failure examples; got %d run all, %d fail all", runAll, failAll)
 	}
-	if aiNativeRunAll == 0 {
-		t.Fatal("docs/spec/ai-native.md must include at least one stable runnable Leia example")
+	if aiDialectRunAll == 0 {
+		t.Fatal("docs/spec/ai-native.md must include at least one stable runnable AI dialect example")
 	}
 }
 

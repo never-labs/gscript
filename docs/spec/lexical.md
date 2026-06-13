@@ -84,9 +84,9 @@ assert(iffoo == 7)
 func := "reserved"
 ```
 
-AI-native words such as `model`, `tool`, `turn`, `agent`, and `evaluate` are
+Dialect words such as `model`, `tool`, `turn`, `agent`, and `evaluate` are
 contextual syntax words, not lexical keywords. They scan as identifiers outside
-grammar positions that assign them AI-native or dialect meaning.
+grammar positions that assign them dialect meaning.
 
 ```leia run all
 agent := "identifier"
@@ -101,7 +101,7 @@ assert(turn + model == 3)
 
 In grammar positions that define tagged dialect forms or evaluate blocks,
 contextual words are consumed by that syntax rather than bound as ordinary
-identifiers. See [AI-Native Constructs](ai-native.md) for the stable forms.
+identifiers. See [AI Dialect Syntax](ai-native.md) for the stable forms.
 
 ## Numeric Literals
 
@@ -229,7 +229,7 @@ assert(x == 3)
 File directives are line comments whose text begins with `leia:` after `//`.
 Directives attach to the following token when they are in the leading comment
 group for that token; blank-line separation starts a new group. Stable directive
-names and their semantic effects are specified by the directive and AI-native
+names and their semantic effects are specified by the directive and dialect
 chapters. Lexically, a directive is still a line comment.
 
 ```text

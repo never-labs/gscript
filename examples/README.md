@@ -44,7 +44,7 @@ Directories:
 | `concurrency/` | Goroutine-like tasks, channels, select, sync, and context helpers. |
 | `embedding/` | Go embedding examples as executable Go doc tests and hot-reload project tests. |
 | `evaluate/` | Deterministic evaluation and replay examples. |
-| `llm/` | AI-native models, tools, agents, direct turns, streaming, and provider smoke scripts. |
+| `llm/` | LLM models, tools, agents, direct turns, streaming, and provider smoke scripts. |
 | `macos/` | Package-managed macOS automation capability examples. |
 | `security/` | Supply-chain and vendor security workflow examples. |
 | `site/` | Static site and release dashboard generation examples. |

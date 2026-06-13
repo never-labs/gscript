@@ -395,9 +395,6 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 
 func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.T) {
 	root := findRepoRoot(t)
-	languageContract := "The language contract is the shared interpreter/VM\nsemantics enforced by the spec, feature matrix, and release gates."
-	stableContract := "The stable contract is the language spec plus\nfeature matrix and release gates."
-	stableContractSource := `The stable contract is the language spec plus\nfeature matrix and release gates.`
 	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
 	specContractCmd := "go test ./tests/docs/spec -count=1"
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
@@ -405,9 +402,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		languageContract,
-		stableContract,
-		"(docs/spec/index.md)",
+		"[Language specification](docs/spec/index.md)",
+		"Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md must keep language contract snippet %q", snippet)
@@ -417,7 +413,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	specGate := readFileString(t, filepath.Join(root, "tests", "docs", "spec", "spec_contract_test.go"))
 	for _, snippet := range []string{
 		"TestReadmeAndSpecStableContractStayAligned",
-		stableContractSource,
+		"[Language specification](docs/spec/index.md)",
 		"`tests/feature_matrix.json`",
 		"at least one semantic or conformance gate",
 	} {
@@ -429,7 +425,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	featureMatrixGate := readFileString(t, filepath.Join(root, "tests", "feature_matrix_test.go"))
 	for _, snippet := range []string{
 		"TestFeatureMatrixCoversReadmeStableContract",
-		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
+		"ARM64 JIT",
 		`requireFeature(t, features, "release_evidence_gates")`,
 		`requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate"`,
 		`"scripts/docs_check.sh"`,
@@ -445,8 +441,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	for _, snippet := range []string{
 		specContractCmd,
 		specExamplesCmd,
-		"README stable contract and docs/spec stability contract",
-		stableContractSource,
+		"README spec link and docs/spec stability contract",
+		"[Language specification](docs/spec/index.md)",
 		"`tests/feature_matrix.json`",
 	} {
 		if !strings.Contains(docsCheck, snippet) {
@@ -481,8 +477,8 @@ func TestReleaseMatrixReadmePackageMetadataPromiseHasProductionGates(t *testing.
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"repeatable tests, package metadata, and source-level hot reload.",
-		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
+		"[Modules](docs/reference/modules/index.md)",
+		"[Packages and modules](docs/guides/packages.md)",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md must keep package metadata promise snippet %q", snippet)
@@ -775,9 +771,6 @@ func TestReleaseMatrixReadmeCLIExperienceCommandsHaveEvidence(t *testing.T) {
 func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	if !strings.Contains(readme, "CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  playground, examples, and release evidence.") {
-		t.Fatal("README.md must keep the full CLI tooling promise machine-checkable")
-	}
 
 	for _, item := range []struct {
 		category        string
@@ -804,46 +797,10 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 			evidenceSnippet: "TestRunTestCommandJSONReportsResults",
 		},
 		{
-			category:        "docs",
-			readmeCommand:   "go run ./cmd/leia doc check",
-			evidencePath:    "cmd/leia/main_doc_test.go",
-			evidenceSnippet: "TestDocCheckDispatchesDocsScript",
-		},
-		{
-			category:        "diagnostics",
-			readmeCommand:   "go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
-			evidencePath:    "cmd/leia/main_diag_test.go",
-			evidenceSnippet: "TestDiagCommandDispatchesBundleScript",
-		},
-		{
-			category:        "modules",
-			readmeCommand:   "go run ./cmd/leia mod verify --json examples/ui/package_managed",
-			evidencePath:    "cmd/leia/main_mod_test.go",
-			evidenceSnippet: "TestModInitGraphAndVerify",
-		},
-		{
 			category:        "benchmarks",
-			readmeCommand:   "go run ./cmd/leia bench compare --bench numeric/mandelbrot --runs 3 --warmup 1",
+			readmeCommand:   "go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 			evidencePath:    "cmd/leia/main_bench_test.go",
 			evidenceSnippet: "TestBenchCommandDispatchesCompareHarness",
-		},
-		{
-			category:        "examples",
-			readmeCommand:   "go run ./cmd/leia examples check examples/hello/fib.leia examples/hello/types_demo.leia examples/hello/dialects.leia",
-			evidencePath:    "cmd/leia/main_examples_command_test.go",
-			evidenceSnippet: "TestExamplesCommandChecksSelectedExamples",
-		},
-		{
-			category:        "playground",
-			readmeCommand:   "go run ./cmd/leia playground --help",
-			evidencePath:    "cmd/leia/main_playground_test.go",
-			evidenceSnippet: "TestReadmePlaygroundTabsMatchAPISurface",
-		},
-		{
-			category:        "release evidence",
-			readmeCommand:   "go run ./cmd/leia ci release --list",
-			evidencePath:    "cmd/leia/main_ci_test.go",
-			evidenceSnippet: "TestCICommandReleaseProfileIncludesDistributionCheck",
 		},
 	} {
 		if !strings.Contains(readme, item.readmeCommand) {
@@ -1056,7 +1013,7 @@ func TestReleaseMatrixDocsIndexCoversReadmeDocumentationEntrypoints(t *testing.T
 
 	for _, ref := range refs {
 		if ref == "docs/index.md" {
-			if !strings.Contains(docsIndex, "# Leia Documentation") {
+			if !strings.Contains(docsIndex, "# Leia") {
 				t.Fatal("docs/index.md must remain the documentation home linked from README.md")
 			}
 			continue
@@ -1237,7 +1194,7 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
 		},
 		"llm_native_integration": {
-			specSections: []string{"AI-Native Syntax", "Expressions", "Statements"},
+			specSections: []string{"AI Dialect Syntax", "Expressions", "Statements"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/ai/index.md", "docs/reference/evaluate/index.md"},
 		},
 		"module_package_management": {
@@ -1563,10 +1520,10 @@ func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
 		"WithLLMTrace",
 	} {
 		if !strings.Contains(docs, api) {
-			t.Fatalf("AI-native docs must mention host API %s", api)
+			t.Fatalf("AI dialect docs must mention host API %s", api)
 		}
 		if !strings.Contains(rootGoDoc, api) {
-			t.Fatalf("AI-native docs mention %s but root go doc does not expose it", api)
+			t.Fatalf("AI dialect docs mention %s but root go doc does not expose it", api)
 		}
 	}
 
@@ -1587,10 +1544,10 @@ func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
 		"ProviderErrorNetwork",
 	} {
 		if !strings.Contains(docs, api) {
-			t.Fatalf("AI-native docs must mention llm API/semantic term %s", api)
+			t.Fatalf("AI dialect docs must mention llm API/semantic term %s", api)
 		}
 		if !strings.Contains(llmGoDoc, api) {
-			t.Fatalf("AI-native docs mention %s but llm go doc does not expose it", api)
+			t.Fatalf("AI dialect docs mention %s but llm go doc does not expose it", api)
 		}
 	}
 
@@ -1609,7 +1566,7 @@ func TestReleaseMatrixAINativeExamplesStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	guide := readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md"))
 	if !strings.Contains(guide, "Live-provider examples") || !strings.Contains(guide, "examples/llm/glm_smoke.leia") {
-		t.Fatal("AI-native guide must keep live provider examples separated from offline examples")
+		t.Fatal("AI dialect guide must keep live provider examples separated from offline examples")
 	}
 
 	for _, example := range []string{
@@ -1923,15 +1880,16 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	features := loadFeatureMatrixFeatureMap(t, root)
 
 	for _, promise := range []string{
-		"Go embedding API with sandbox, resource budgets, host bindings, and hot reload.",
-		"AI-native syntax and stdlib support for models, tools, messages, turns,\n  agents, replay, and provider adapters.",
-		"DSL-native tagged dialects for shell commands, data formats, web routes,\n  q-style analytics, spreadsheets, and AI workflows.",
-		"Go-style concurrency primitives: `go`, channels, `select`, sync helpers, and\n  cancellation-oriented host integration.",
-		"Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
-		"CLI tooling for format, lint, test, docs, diagnostics, modules, benchmarks,\n  playground, examples, and release evidence.",
+		"Go-native scripting runtime",
+		"q-style columnar analytics",
+		"q := require(\"q\")",
+		"trades := q.sql(",
+		"cmd := $`git status --short`",
+		"answer, err := turn {",
+		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 	} {
 		if !strings.Contains(readme, promise) {
-			t.Fatalf("README.md What It Includes must keep documented capability promise %q", promise)
+			t.Fatalf("README.md concise surface must keep documented capability entry %q", promise)
 		}
 	}
 
@@ -1952,7 +1910,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 			docRefs:    []string{"docs/reference/embedding/index.md", "docs/guides/embedding.md"},
 		},
 		{
-			capability: "AI-native",
+			capability: "AI dialect",
 			dirs:       []string{"`examples/ai/`", "`examples/llm/`", "`examples/evaluate/`", "`examples/workflow/`"},
 			docTerms:   []string{"manual tool history", "replay fixture", "Live-provider examples", "project-level offline coding-agent gate"},
 			cliIDs:     []string{"repo-llm-agent", "repo-ai-coding_agent_replay", "repo-ai-coding_agent_project-main", "repo-evaluate-agent_replay", "repo-workflow-support_triage_replay"},
@@ -2160,10 +2118,10 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 		docSnippets  map[string][]string
 	}{
 		{
-			capability:   "AI-native",
-			promise:      "AI-native syntax and stdlib support for models, tools, messages, turns,\n  agents, replay, and provider adapters.",
+			capability:   "AI dialect",
+			promise:      "answer, err := turn {",
 			featureID:    "llm_native_integration",
-			specSections: []string{"AI-Native Syntax"},
+			specSections: []string{"AI Dialect Syntax"},
 			refs: []string{
 				"cmd/leia/main_examples_command_test.go",
 				"docs/guides/ai-native.md",
@@ -2177,14 +2135,14 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 				"repo-evaluate-agent_replay",
 			},
 			docSnippets: map[string][]string{
-				"docs/guides/ai-native.md":         {"The stable contract is in the [AI-native reference](../reference/ai/index.md).", "Live-provider examples"},
-				"docs/reference/ai/index.md":       {"Leia's AI-native feature is a standard-library layer", "## Agent Dialect"},
+				"docs/guides/ai-native.md":         {"The stable contract is in the [AI dialect reference](../reference/ai/index.md).", "Live-provider examples"},
+				"docs/reference/ai/index.md":       {"Leia's AI support is an optional standard-library layer", "## Agent Dialect"},
 				"docs/reference/evaluate/index.md": {"replay-drift findings"},
 			},
 		},
 		{
 			capability:   "DSL-native dialects",
-			promise:      "DSL-native tagged dialects for shell commands, data formats, web routes,\n  q-style analytics, spreadsheets, and AI workflows.",
+			promise:      "cmd := $`git status --short`",
 			featureID:    "tagged_dialect_syntax",
 			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
 			refs: []string{
@@ -2209,7 +2167,7 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 		},
 		{
 			capability:   "concurrency",
-			promise:      "Go-style concurrency primitives: `go`, channels, `select`, sync helpers, and\n  cancellation-oriented host integration.",
+			promise:      "",
 			featureID:    "go_style_concurrency",
 			specSections: []string{"Concurrency"},
 			refs: []string{
@@ -2231,7 +2189,7 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 		},
 		{
 			capability:   "data-oriented",
-			promise:      "Data-oriented helpers for dense arrays, matrices, vectors, and SoA layouts.",
+			promise:      "q-style columnar analytics",
 			featureID:    "matrix_dense_arrays",
 			specSections: []string{"Tables And Metatables", "Implementation Requirements"},
 			refs: []string{
@@ -2252,8 +2210,8 @@ func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.
 			},
 		},
 	} {
-		if !strings.Contains(readme, item.promise) {
-			t.Fatalf("README.md What It Includes must keep %s promise %q", item.capability, item.promise)
+		if item.promise != "" && !strings.Contains(readme, item.promise) {
+			t.Fatalf("README.md concise surface must keep %s entry %q", item.capability, item.promise)
 		}
 
 		feature := requireFeature(t, features, item.featureID)
@@ -2432,7 +2390,7 @@ func readReleaseReadmeQuickStartCommands(t *testing.T, root string) []string {
 func readReleaseReadmeInstallCommands(t *testing.T, root string) []string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "Install the CLI and language server from a checkout:"
+	const marker = "## Install"
 	start := strings.Index(readme, marker)
 	if start == -1 {
 		t.Fatal("README.md must contain install commands")

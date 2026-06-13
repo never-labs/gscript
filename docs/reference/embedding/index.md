@@ -240,7 +240,7 @@ category metadata, capability labels, and a separate block handler.
 
 ## AI Providers
 
-The root package exposes host options for AI-native scripts, while provider
+The root package exposes host options for AI dialect scripts, while provider
 implementations live under `github.com/never-labs/leia/llm/...`.
 
 | API | Purpose |
