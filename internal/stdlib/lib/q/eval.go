@@ -1768,23 +1768,21 @@ func (s *EvalState) evalQCompareIndexStatsPlan(plan *qPipelinePlan) (any, bool, 
 	if err != nil {
 		return nil, true, err
 	}
-	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, plan.compareOp)
+	desc, ok := qTypedWhereCompareIndexViewStatsDescriptor(left, right, plan.compareOp, "compare-to-index-view")
 	if !ok {
 		return nil, false, nil
 	}
-	if array.Kind() != data.KindSymbol && array.Kind() != data.KindString {
+	if desc.array.Kind() != data.KindSymbol && desc.array.Kind() != data.KindString {
 		return nil, false, nil
 	}
-	count, sum, handled, err := data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
-	shape := "compare-to-index-view/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	recordRuntimeKernelProbe("ArrayWhereCompareIndexView", shape, handled, err)
+	count, sum, handled, err := evalQTypedWhereCompareIndexStats(desc)
 	if err != nil || !handled {
 		return nil, handled, err
 	}
 	if count > int64(int(count)) {
 		return nil, true, fmt.Errorf("where index count %d exceeds int range", count)
 	}
-	return qCompareIndexStatsView{source: array, op: dataOp, scalar: scalar, count: count, sum: sum}, true, nil
+	return qCompareIndexStatsView{source: desc.array, op: desc.op, scalar: desc.scalar, count: count, sum: sum}, true, nil
 }
 
 func deferredScanAssignments(statements []qScriptStatement, state *EvalState) map[string]bool {
@@ -16473,29 +16471,11 @@ func (s *EvalState) evalWhereCompare(src string) (any, bool, error) {
 	if err != nil {
 		return nil, true, err
 	}
-	if op == "within" {
-		array, low, high, ok, err := qWithinOperands(left, right)
-		if err != nil || !ok {
-			return nil, ok, err
-		}
-		shape := "within-to-index/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(low, nil)) + "/" + string(qRuntimeKernelOperandKind(high, nil))
-		out, handled, err := data.TryTypedWithinIndexesI64(array, low, high, true)
-		recordRuntimeKernelProbe("ArrayWhereWithin", shape, handled, err)
-		if err != nil {
-			return nil, true, err
-		}
-		if !handled {
-			return nil, false, nil
-		}
-		return out, true, nil
+	desc, ok, err := qTypedWhereCompareIndexesDescriptor(left, right, op, "compare-to-index", "within-to-index")
+	if err != nil || !ok {
+		return nil, ok, err
 	}
-	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
-	if !ok {
-		return nil, false, nil
-	}
-	shape := "compare-to-index/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	out, handled, err := data.TryTypedCompareIndexesI64(array, dataOp, scalar)
-	recordRuntimeKernelProbe("ArrayWhereCompare", shape, handled, err)
+	out, handled, err := evalQTypedWhereCompareIndexes(desc)
 	if err != nil {
 		return nil, true, err
 	}

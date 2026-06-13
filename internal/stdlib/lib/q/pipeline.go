@@ -2167,8 +2167,7 @@ func (s *EvalState) evalQPipelineCompareIndexStatsForMask(maskExpr string) (coun
 	if !ok {
 		return 0, 0, false, nil
 	}
-	dataOp, ok := qDataCompareOpString(op)
-	if !ok {
+	if _, ok := qDataCompareOpString(op); !ok {
 		return 0, 0, false, nil
 	}
 	left, err := s.evalQPipelinePlannedExpr(leftExpr, nil)
@@ -2179,13 +2178,11 @@ func (s *EvalState) evalQPipelineCompareIndexStatsForMask(maskExpr string) (coun
 	if err != nil {
 		return 0, 0, true, err
 	}
-	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
-	if !ok {
-		return 0, 0, false, nil
+	desc, ok, err := qTypedWhereCompareStatsDescriptor(left, right, op, "where-index", "")
+	if err != nil || !ok {
+		return 0, 0, ok, err
 	}
-	shape := "where-index-stats/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil))
-	count, sum, handled, err = data.TryTypedCompareIndexStatsI64(array, dataOp, scalar)
-	count, sum, handled, err = qTypedRuntimeResult2("ArrayWhereCompareStats", shape, count, sum, handled, err)
+	count, sum, handled, err = evalQTypedWhereCompareIndexStats(desc)
 	return count, sum, handled, err
 }
 

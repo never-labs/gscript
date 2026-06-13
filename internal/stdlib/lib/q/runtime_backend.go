@@ -102,6 +102,21 @@ func qTypedWhereCompareStatsDescriptor(left, right any, op, comparePrefix, withi
 	}, true, nil
 }
 
+func qTypedWhereCompareIndexViewStatsDescriptor(left, right any, op, shapePrefix string) (qTypedWhereCompareDescriptor, bool) {
+	array, scalar, dataOp, ok := qWhereCompareOperands(left, right, op)
+	if !ok {
+		return qTypedWhereCompareDescriptor{}, false
+	}
+	return qTypedWhereCompareDescriptor{
+		kernel: "ArrayWhereCompareIndexView",
+		shape:  shapePrefix + "/" + op + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(scalar, nil)),
+		kind:   "compare",
+		array:  array,
+		op:     dataOp,
+		scalar: scalar,
+	}, true
+}
+
 func qTypedWhereCompareCountDescriptor(left, right any, op, comparePrefix, withinPrefix string) (qTypedWhereCompareDescriptor, bool, error) {
 	if op == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
