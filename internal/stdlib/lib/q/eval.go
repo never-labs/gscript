@@ -16771,21 +16771,18 @@ func (s *EvalState) tryEvalFindSum(src string) (any, bool, error) {
 	if err != nil {
 		return nil, false, nil
 	}
-	domainArray, ok := left.(data.Array)
-	if !ok {
-		return nil, false, nil
-	}
 	right, err := s.eval(rightExpr)
 	if err != nil {
 		return nil, false, nil
 	}
-	queryArray, ok := right.(data.Array)
+	desc, ok := qTypedFindDescriptorFor(left, right)
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled := data.TryTypedFindComparableSum(domainArray, queryArray)
-	shape := "vector-reduce/find-sum/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
-	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
+	out, handled, err := evalQTypedFindSum(desc)
+	if err != nil {
+		return nil, false, err
+	}
 	if !handled {
 		return nil, false, nil
 	}
@@ -16969,14 +16966,13 @@ func findValue(left, right any) (any, error) {
 	if dict, ok := left.(EvalDict); ok {
 		return dictFindValue(dict, right)
 	}
-	if domainArray, ok := left.(data.Array); ok {
-		if queryArray, ok := right.(data.Array); ok {
-			out, handled := data.TryTypedFindComparable(domainArray, queryArray)
-			shape := "find/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
-			recordRuntimeKernelProbe("ArrayFind", shape, handled, nil)
-			if handled {
-				return out, nil
-			}
+	if desc, ok := qTypedFindDescriptorFor(left, right); ok {
+		out, handled, err := evalQTypedFind(desc)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			return out, nil
 		}
 	}
 	domain, err := findDomainValues(left)

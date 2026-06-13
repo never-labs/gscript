@@ -1959,17 +1959,14 @@ func (s *EvalState) evalQPipelineFindIndexes(plan *qPipelinePlan) (any, bool, er
 	if err != nil {
 		return nil, true, err
 	}
-	domain, ok := left.(data.Array)
+	desc, ok := qTypedFindDescriptorFor(left, right)
 	if !ok {
 		return nil, false, nil
 	}
-	query, ok := right.(data.Array)
-	if !ok {
-		return nil, false, nil
+	out, handled, err := evalQTypedFind(desc)
+	if err != nil {
+		return nil, true, err
 	}
-	out, handled := data.TryTypedFindComparable(domain, query)
-	shape := "find/" + string(domain.Kind()) + "/" + string(query.Kind())
-	recordRuntimeKernelProbe("ArrayFind", shape, handled, nil)
 	if !handled {
 		return nil, false, nil
 	}
@@ -1985,17 +1982,14 @@ func (s *EvalState) evalQPipelineFindSum(plan *qPipelinePlan) (any, bool, error)
 	if err != nil {
 		return nil, true, err
 	}
-	domain, ok := left.(data.Array)
+	desc, ok := qTypedFindDescriptorFor(left, right)
 	if !ok {
 		return nil, false, nil
 	}
-	query, ok := right.(data.Array)
-	if !ok {
-		return nil, false, nil
+	out, handled, err := evalQTypedFindSum(desc)
+	if err != nil {
+		return nil, true, err
 	}
-	out, handled := data.TryTypedFindComparableSum(domain, query)
-	shape := "vector-reduce/find-sum/" + string(domain.Kind()) + "/" + string(query.Kind())
-	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
 	if !handled {
 		return nil, false, nil
 	}

@@ -86,6 +86,31 @@ type qTypedWhereGatherSumCountDescriptor struct {
 	selfPredicate bool
 }
 
+type qTypedFindDescriptor struct {
+	domain data.Array
+	query  data.Array
+}
+
+func qTypedFindDescriptorFor(left, right any) (qTypedFindDescriptor, bool) {
+	domain, ok := left.(data.Array)
+	if !ok {
+		return qTypedFindDescriptor{}, false
+	}
+	query, ok := right.(data.Array)
+	if !ok {
+		return qTypedFindDescriptor{}, false
+	}
+	return qTypedFindDescriptor{domain: domain, query: query}, true
+}
+
+func qTypedFindShape(desc qTypedFindDescriptor) string {
+	return "find/" + string(desc.domain.Kind()) + "/" + string(desc.query.Kind())
+}
+
+func qTypedFindSumShape(desc qTypedFindDescriptor) string {
+	return "vector-reduce/find-sum/" + string(desc.domain.Kind()) + "/" + string(desc.query.Kind())
+}
+
 func qTypedWhereCompareStatsDescriptor(left, right any, op, comparePrefix, withinStatsPrefix string) (qTypedWhereCompareDescriptor, bool, error) {
 	if op == "within" {
 		array, low, high, ok, err := qWithinOperands(left, right)
@@ -249,6 +274,28 @@ func evalQTypedWhereGatherSumCount(desc qTypedWhereGatherSumCountDescriptor) (an
 				return data.TryTypedNumericSumCountWhereCompareSelf(desc.values, desc.op, desc.scalar)
 			}
 			return data.TryTypedNumericSumCountWhereCompare(desc.values, desc.predicate, desc.op, desc.scalar)
+		},
+	})
+}
+
+func evalQTypedFind(desc qTypedFindDescriptor) (data.Array, bool, error) {
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[data.Array]{
+		kernel: "ArrayFind",
+		shape:  qTypedFindShape(desc),
+		call: func() (data.Array, bool, error) {
+			out, handled := data.TryTypedFindComparable(desc.domain, desc.query)
+			return out, handled, nil
+		},
+	})
+}
+
+func evalQTypedFindSum(desc qTypedFindDescriptor) (int64, bool, error) {
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
+		kernel: "ArrayFindSum",
+		shape:  qTypedFindSumShape(desc),
+		call: func() (int64, bool, error) {
+			out, handled := data.TryTypedFindComparableSum(desc.domain, desc.query)
+			return out, handled, nil
 		},
 	})
 }

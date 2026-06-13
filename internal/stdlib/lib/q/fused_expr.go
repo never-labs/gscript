@@ -783,13 +783,14 @@ func (s *EvalState) evalFusedSumFind(x FusedSumFind) (any, error) {
 		}
 		return nil, unsupportedEvalValueExpr{expr: x}
 	}
-	queryArray, ok := right.(data.Array)
+	desc, ok := qTypedFindDescriptorFor(domainArray, right)
 	if !ok {
 		return nil, unsupportedEvalValueExpr{expr: x}
 	}
-	out, handled := data.TryTypedFindComparableSum(domainArray, queryArray)
-	shape := "vector-reduce/find-sum/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
-	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
+	out, handled, err := evalQTypedFindSum(desc)
+	if err != nil {
+		return nil, err
+	}
 	if !handled {
 		return nil, unsupportedEvalValueExpr{expr: x}
 	}
