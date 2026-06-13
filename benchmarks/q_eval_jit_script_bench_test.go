@@ -136,6 +136,8 @@ func qEvalJITScriptCases() []qEvalVectorCase {
 }
 
 const qEvalJITScriptWarmupCalls = 8
+const qEvalJITTypedRuntimeSmokeSource = "count where (til 64 mod 4)=1"
+const qEvalJITTypedRuntimeSmokeWant int64 = 16
 
 // qEvalJITScriptSettleCalls is the number of untimed full-size run(b.N) calls
 // after warmup. The first full-size call entry-deopts on the warmup-observed
@@ -544,13 +546,8 @@ func qEvalJITScriptForcedTier2(t *testing.T, script string, iterations int64) (i
 //     loop-call gate and lower to OpQEvalPipelinePlan. Unsupported or
 //     heuristic-only q.eval calls remain residual-call blocked.
 func TestQEvalJITScriptRouting(t *testing.T) {
-	const caseName = "VectorAffineSumSmall"
-	tc, ok := qEvalJITScriptCaseByName(caseName)
-	if !ok {
-		t.Fatalf("routing smoke case %q is missing from qEvalVectorCases", caseName)
-	}
-	src := tc.expr(qEvalVectorRows)
-	want := tc.goFn(qEvalVectorRows)
+	const src = qEvalJITTypedRuntimeSmokeSource
+	const want = qEvalJITTypedRuntimeSmokeWant
 
 	// (1) Public-API session-route harness: correctness + per-iteration work.
 	vm := qEvalJITScriptVM(t, true, qEvalJITScriptSource(src))
@@ -672,8 +669,8 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 	// q.session route, but it pins that the general q.eval hot path can reach
 	// OpQEvalPipelinePlan instead of being blocked as a residual field call.
 	{
-		const directSrc = "count where (til 64 mod 4)=1"
-		const directWant = 16
+		const directSrc = qEvalJITTypedRuntimeSmokeSource
+		const directWant = qEvalJITTypedRuntimeSmokeWant
 		got, directRunProto, directTM := qEvalJITScriptForcedTier2(t, qEvalJITScriptDirectEvalSource(directSrc), iters)
 		if got != directWant {
 			t.Fatalf("direct q.eval(const) run(%d) = %d, want %d", iters, got, directWant)

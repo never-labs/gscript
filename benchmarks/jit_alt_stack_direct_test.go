@@ -26,13 +26,8 @@ import (
 func TestJITAltStackDirectHelperEngagement(t *testing.T) {
 	altStack := os.Getenv("LEIA_JIT_ALT_STACK") == "1"
 
-	const caseName = "VectorAffineSumSmall"
-	tc, ok := qEvalJITScriptCaseByName(caseName)
-	if !ok {
-		t.Fatalf("case %q missing from qEvalVectorCases", caseName)
-	}
-	src := tc.expr(qEvalVectorRows)
-	want := tc.goFn(qEvalVectorRows)
+	const src = qEvalJITTypedRuntimeSmokeSource
+	const want = qEvalJITTypedRuntimeSmokeWant
 
 	vm := qEvalJITScriptVM(t, true, qEvalJITScriptSource(src))
 	qEvalJITScriptWarmup(t, vm, want)
@@ -79,12 +74,8 @@ func TestJITAltStackDirectHelperEngagement(t *testing.T) {
 // run(b.N)). Compare default (slim exit lane) vs LEIA_JIT_ALT_STACK=1
 // (direct BLR helper lane); ns/eval is the per-iteration cost.
 func BenchmarkQEvalJITSessionEvalLane(b *testing.B) {
-	tc, ok := qEvalJITScriptCaseByName("VectorAffineSumSmall")
-	if !ok {
-		b.Fatal("case VectorAffineSumSmall missing")
-	}
-	src := tc.expr(qEvalVectorRows)
-	want := tc.goFn(qEvalVectorRows)
+	const src = qEvalJITTypedRuntimeSmokeSource
+	const want = qEvalJITTypedRuntimeSmokeWant
 	vm := qEvalJITScriptVM(b, true, qEvalJITScriptSource(src))
 	const evalsPerCall = 512
 	for i := 0; i < 8; i++ {

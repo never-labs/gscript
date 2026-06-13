@@ -1,7 +1,8 @@
 package methodjit
 
-// q_eval_session_eval.go lowers constant-source q session eval calls inside
-// Tier 2 candidates to OpQEvalSessionEval, a result-producing op-exit.
+// q_eval_session_eval.go lowers typed-runtime constant-source q session eval
+// calls inside Tier 2 candidates to OpQEvalSessionEval, a result-producing
+// op-exit.
 //
 // Recognized shape (per call site, no whole-session analysis required):
 //
@@ -24,20 +25,16 @@ package methodjit
 //     exactly what the generic call path does.
 //
 // Both routes preserve session state, q plan caching, and result/error
-// semantics for every constant source, and both re-execute the typed q
-// kernels per iteration (no result memoization). The exit itself is emitted
-// with selective spill (emit_q_eval_session_eval.go): only values live across
-// the exit are spilled/reloaded, mirroring the OpQEvalPipelinePlan native
-// exit. Unlike OpQEvalPipelinePlan (zero-arg, pure-read, limited to
-// typed-runtime describable sources), this op:
-//
-//   - covers any constant q source the session evaluator accepts,
-//   - is effectful (OpSideEffectCall): never hoisted/CSE'd, so a hot loop
-//     re-evaluates per iteration (q.session.eval has no result cache;
-//     EvalSession caches parse/plan artifacts only), and
-//   - removes the per-iteration generic Call from the loop, which lifts the
-//     Tier 2 "performance-blocked op Call inside loop" gate for loops whose
-//     only call was the recognized session eval.
+// semantics for typed-runtime describable constant sources, and both
+// re-execute the typed q kernels per iteration (no result memoization). The
+// exit itself is emitted with selective spill (emit_q_eval_session_eval.go):
+// only values live across the exit are spilled/reloaded, mirroring the
+// OpQEvalPipelinePlan native exit. The op is effectful (OpSideEffectCall):
+// never hoisted/CSE'd, so a hot loop re-evaluates per iteration
+// (q.session.eval has no result cache; EvalSession caches parse/plan
+// artifacts only). Constant q sources that are not recognized by
+// stdq.DescribeEvalPipelineBackendPlan as typed-runtime backend plans stay on
+// the generic call path.
 //
 // Sources that fail stdq.EvalSourceCacheable (system/file/handle effects) are
 // deliberately left on the generic call path: an op-exit error falls back by
@@ -180,7 +177,8 @@ func appendQEvalSessionEvalSiteCounter(out map[qKernelExecutionKey]uint64, site 
 }
 
 // qCallIsLowerableQSessionEval reports whether a call instruction matches the
-// full lowerable shape: session receiver, constant cacheable source.
+// full lowerable shape: session receiver, constant cacheable typed-runtime
+// backend source.
 func qCallIsLowerableQSessionEval(fn *Function, call *Instr) bool {
 	if call == nil || call.Op != OpCall {
 		return false
@@ -189,7 +187,7 @@ func qCallIsLowerableQSessionEval(fn *Function, call *Instr) bool {
 		return false
 	}
 	_, source, ok := qCallEvalSourceConstIndex(fn, call)
-	return ok && stdq.EvalSourceCacheable(source)
+	return ok && qEvalSourceHasTypedRuntimeBackendPlan(source)
 }
 
 // protoLoopCallsAreLowerableQSessionEval reports whether every call-like op
@@ -224,9 +222,10 @@ func protoLoopCallsAreLowerableQSessionEval(proto *vm.FuncProto) bool {
 	return found
 }
 
-// QEvalSessionEvalLoweringPass rewrites recognized constant-source q session
-// eval calls to OpQEvalSessionEval. Dynamic sources, non-session receivers,
-// and uncacheable sources remain generic OpCall fallbacks.
+// QEvalSessionEvalLoweringPass rewrites recognized typed-runtime
+// constant-source q session eval calls to OpQEvalSessionEval. Dynamic sources,
+// non-session receivers, uncacheable sources, and sources that do not describe
+// a typed-runtime backend plan remain generic OpCall fallbacks.
 func QEvalSessionEvalLoweringPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
@@ -262,6 +261,21 @@ func QEvalSessionEvalLoweringPass(fn *Function) (*Function, error) {
 					})
 				continue
 			}
+			plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
+			if !ok || !plan.Valid() || plan.Backend != stdq.EvalPipelineTypedRuntimeBackend {
+				blockID, valueID := qRemarkLocation(instr)
+				functionRemarks(fn).AddWithFields("QEvalSessionEvalLowering", "missed", blockID, valueID, OpCall,
+					"constant q session eval source has no typed-runtime backend plan; staying on generic call path",
+					map[string]string{
+						"kind":        "fallback",
+						"kernel":      "QEvalSessionEval",
+						"shape":       "q-eval/session-eval",
+						"reason_code": "no_typed_runtime_backend_plan",
+						"route":       "lowering",
+						"outcome":     "fallback",
+					})
+				continue
+			}
 			instr.Op = OpQEvalSessionEval
 			instr.Type = TypeAny
 			instr.Args = []*Value{receiver}
@@ -284,6 +298,14 @@ func QEvalSessionEvalLoweringPass(fn *Function) (*Function, error) {
 		qEvalSessionEvalNopDeadEvalFields(fn)
 	}
 	return fn, nil
+}
+
+func qEvalSourceHasTypedRuntimeBackendPlan(source string) bool {
+	if !stdq.EvalSourceCacheable(source) {
+		return false
+	}
+	plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
+	return ok && plan.Valid() && plan.Backend == stdq.EvalPipelineTypedRuntimeBackend
 }
 
 // qCallSessionEvalReceiver matches OpCall instructions whose callee is a
@@ -461,7 +483,7 @@ func qEvalSessionEvalSiteFromInstr(fn *Function, instr *Instr) *qEvalSessionEval
 		return site
 	}
 	plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
-	if !ok || !plan.Valid() {
+	if !ok || !plan.Valid() || plan.Backend != stdq.EvalPipelineTypedRuntimeBackend {
 		return site
 	}
 	site.kernel = plan.Descriptor.Kernel

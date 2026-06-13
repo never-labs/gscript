@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -25,6 +26,58 @@ func qSessionEvalPlannedTestSession(t *testing.T) runtime.Value {
 		t.Fatalf("q.session returned %#v, want one table", out)
 	}
 	return out[0]
+}
+
+func TestQEvalSessionEvalLoweringRequiresTypedRuntimeBackendPlan(t *testing.T) {
+	const typedSource = "+/til 8"
+	if plan, ok := stdq.DescribeEvalPipelineBackendPlan(typedSource); !ok || !plan.Valid() || plan.Backend != stdq.EvalPipelineTypedRuntimeBackend {
+		t.Fatalf("typed test source has no typed-runtime backend plan: plan=%#v ok=%v", plan, ok)
+	}
+	const untypedSource = "`a`b!10 20"
+	if !stdq.EvalSourceCacheable(untypedSource) {
+		t.Fatalf("untyped test source must be cacheable to isolate the backend-plan gate")
+	}
+	if plan, ok := stdq.DescribeEvalPipelineBackendPlan(untypedSource); ok && plan.Valid() && plan.Backend == stdq.EvalPipelineTypedRuntimeBackend {
+		t.Fatalf("untyped test source unexpectedly has typed-runtime backend plan: %#v", plan)
+	}
+
+	for _, tc := range []struct {
+		name        string
+		receiver    string
+		source      string
+		wantLowered bool
+	}{
+		{name: "session typed source lowers", receiver: "q.session()", source: typedSource, wantLowered: true},
+		{name: "workspace typed source lowers", receiver: "q.workspace()", source: typedSource, wantLowered: true},
+		{name: "session non typed source stays call", receiver: "q.session()", source: untypedSource, wantLowered: false},
+		{name: "workspace non typed source stays call", receiver: "q.workspace()", source: untypedSource, wantLowered: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proto := compile(t, fmt.Sprintf(`
+func run() {
+	qs := %s
+	return qs.eval(%q)
+}
+`, tc.receiver, tc.source))
+			fn, _, err := RunTier2Pipeline(BuildGraph(proto), nil)
+			if err != nil {
+				t.Fatalf("RunTier2Pipeline: %v", err)
+			}
+			counts := countOps(fn)
+			if tc.wantLowered {
+				if got := counts[OpQEvalSessionEval]; got != 1 {
+					t.Fatalf("OpQEvalSessionEval count = %d, want 1\n%s", got, Print(fn))
+				}
+				return
+			}
+			if got := counts[OpQEvalSessionEval]; got != 0 {
+				t.Fatalf("OpQEvalSessionEval count = %d, want 0\n%s", got, Print(fn))
+			}
+			if got := counts[OpCall]; got == 0 {
+				t.Fatalf("OpCall count = %d, want q.session/eval calls preserved\n%s", got, Print(fn))
+			}
+		})
+	}
 }
 
 // TestExecuteQEvalSessionEvalPlannedRoute pins the op-exit handler contract:
