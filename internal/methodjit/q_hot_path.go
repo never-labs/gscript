@@ -30,6 +30,7 @@ const (
 	qEvalHotPlanFallbackDynamicSource             = "dynamic_source"
 	qEvalHotPlanFallbackEmptySource               = "empty_source"
 	qEvalHotPlanFallbackUnsupportedShape          = "unsupported_shape"
+	qEvalHotPlanFallbackHeuristicOnly             = "heuristic_only"
 )
 
 // QQueryHotPath describes an IR pattern for the q query primitive pipeline:
@@ -1225,7 +1226,16 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 				qEvalHotPlanFallbackRemark(fn, instr, reason, "q-eval/unsupported")
 				continue
 			}
+			backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
+			if !backendPlan.Valid() || backendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
+				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, plan.Shape)
+				continue
+			}
 			ref := fn.addQEvalPipelinePlan(source, plan)
+			if _, ok := qEvalPipelineTypedRuntimeBackendPlanFromRef(ref); !ok {
+				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, plan.Shape)
+				continue
+			}
 			qEvalHotPlanSupportedRemark(fn, instr, plan, ref)
 		}
 	}
@@ -1255,8 +1265,16 @@ func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
 			if !ok {
 				continue
 			}
+			backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
+			if !backendPlan.Valid() || backendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
+				continue
+			}
 			ref := fn.addQEvalPipelinePlan(source, plan)
 			if !ref.Valid() {
+				continue
+			}
+			typedBackendPlan, ok := qEvalPipelineTypedRuntimeBackendPlanFromRef(ref)
+			if !ok || !typedBackendPlan.Valid() {
 				continue
 			}
 			instr.Op = OpQEvalPipelinePlan

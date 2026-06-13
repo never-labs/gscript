@@ -481,14 +481,102 @@ func TestQEvalPipelinePlanRefPrefersBackendPlanDescriptor(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineBackendPlanFromRefRejectsStaleMirrorWhenSourceRecognized(t *testing.T) {
+	const src = "+/til 8"
+	ref := qEvalPipelineDescriptorBackendTestRef(t, src)
+	ref.BackendPlan = nil
+	ref.Source = src
+	ref.Kernel = "stale-kernel"
+	ref.Shape = "stale-shape"
+	ref.PipelineShape = "stale-pipeline"
+
+	if plan, ok := qEvalPipelineBackendPlanFromRef(ref); ok {
+		t.Fatalf("qEvalPipelineBackendPlanFromRef accepted stale mirror plan: %+v", plan)
+	}
+}
+
+func TestQEvalPipelineBackendPlanFromRefKeepsDescriptorOnlyLegacyFallback(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "+/til 8")
+	ref.BackendPlan = nil
+	ref.Source = ""
+
+	plan, ok := qEvalPipelineBackendPlanFromRef(ref)
+	if !ok || !plan.Valid() || plan.Shape() != qEvalPipelinePlanRefShape(ref) {
+		t.Fatalf("qEvalPipelineBackendPlanFromRef legacy descriptor = %+v/%v, want valid mirror plan", plan, ok)
+	}
+}
+
+func TestQEvalPipelineTypedRuntimeBackendPlanRejectsHeuristicPlan(t *testing.T) {
+	fn := &Function{}
+	ref := fn.addQEvalPipelinePlan("+/unknown", qEvalHeuristicHotPlan("QEvalVectorReduce", "vector-reduce/sum"))
+
+	if ref.BackendPlan != nil {
+		t.Fatalf("heuristic ref embedded backend plan: %+v", ref.BackendPlan)
+	}
+	if plan, ok := qEvalPipelineTypedRuntimeBackendPlanFromRef(ref); ok {
+		t.Fatalf("heuristic ref accepted as typed runtime plan: %+v", plan)
+	}
+}
+
 func TestQEvalPipelineHotPlanPreservesFullBackendDescriptorRoundTrip(t *testing.T) {
-	for _, src := range []string{
-		"where sqrt 1 4 9 16>2",
-		"(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")",
-		"x:til 1024;y:x+1;(+/y div 3)+(+/y mod 3)+count y",
-		"x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]",
+	for _, tc := range []struct {
+		name   string
+		src    string
+		assert func(*testing.T, stdq.EvalPipelineDescriptor)
+	}{
+		{
+			name: "unary_compare",
+			src:  "where sqrt 1 4 9 16>2",
+			assert: func(t *testing.T, descriptor stdq.EvalPipelineDescriptor) {
+				t.Helper()
+				if descriptor.UnaryOp != "sqrt" || descriptor.ComparePrefix == "" || descriptor.CompareOp != ">" {
+					t.Fatalf("unary descriptor = %+v, want sqrt compare descriptor", descriptor)
+				}
+			},
+		},
+		{
+			name: "casts",
+			src:  "(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")",
+			assert: func(t *testing.T, descriptor stdq.EvalPipelineDescriptor) {
+				t.Helper()
+				if len(descriptor.CastTerms) != 5 {
+					t.Fatalf("cast terms = %+v, want 5 terms", descriptor.CastTerms)
+				}
+			},
+		},
+		{
+			name: "integer_terms",
+			src:  "x:til 1024;y:x+1;(+/y div 3)+(+/y mod 3)+count y",
+			assert: func(t *testing.T, descriptor stdq.EvalPipelineDescriptor) {
+				t.Helper()
+				if len(descriptor.IntegerTerms) != 2 || !descriptor.IncludeCount || descriptor.ValueBinding != "x+1" {
+					t.Fatalf("integer descriptor = %+v, want div/mod/count binding descriptor", descriptor)
+				}
+			},
+		},
+		{
+			name: "assignment_gather",
+			src:  "x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]",
+			assert: func(t *testing.T, descriptor stdq.EvalPipelineDescriptor) {
+				t.Helper()
+				if len(descriptor.Assignments) != 3 || descriptor.IndexBinding == "" {
+					t.Fatalf("assignment descriptor = %+v, want assignments plus index binding", descriptor)
+				}
+			},
+		},
+		{
+			name: "callable_dot",
+			src:  "f:{(+/x)+count y};.[f;(til 8;10#1)]",
+			assert: func(t *testing.T, descriptor stdq.EvalPipelineDescriptor) {
+				t.Helper()
+				if descriptor.CallableExpr != "f" || !descriptor.IncludeCount {
+					t.Fatalf("callable descriptor = %+v, want callable count descriptor", descriptor)
+				}
+			},
+		},
 	} {
-		t.Run(src, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			src := tc.src
 			want, ok := stdq.DescribeEvalPipelineBackendPlan(src)
 			if !ok {
 				t.Fatalf("DescribeEvalPipelineBackendPlan(%q) failed", src)
@@ -512,6 +600,7 @@ func TestQEvalPipelineHotPlanPreservesFullBackendDescriptorRoundTrip(t *testing.
 			if ref.BackendPlan == nil || !ref.BackendPlan.Valid() {
 				t.Fatalf("qEvalPipelinePlanRefFromHotPlan(%q) did not embed backend plan: %+v", src, ref)
 			}
+			tc.assert(t, got.Descriptor)
 		})
 	}
 }

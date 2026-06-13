@@ -5850,6 +5850,19 @@ func TestQEvalHotPlanRecognizesConstantVectorWhereReduce(t *testing.T) {
 	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "runtime_kernel", "QScriptPipelinePlan", "script-pipeline/where-reduce/sum/assignments", "hot_plan", "supported", "")
 }
 
+func TestQEvalHotPlanRemarkSkipsHeuristicOnlyCandidate(t *testing.T) {
+	fn := BuildGraph(qEvalHotPlanConstProto("+/unknown"))
+	fn.Remarks = &OptimizationRemarks{}
+	if _, err := QEvalHotPlanRemarkPass(fn); err != nil {
+		t.Fatalf("QEvalHotPlanRemarkPass: %v", err)
+	}
+	if len(fn.QEvalPipelinePlans) != 0 {
+		t.Fatalf("QEvalPipelinePlans = %+v, want no typed runtime plan for heuristic-only candidate", fn.QEvalPipelinePlans)
+	}
+	descriptors := BuildQKernelDescriptors(nil, nil, nil, fn.Remarks.List())
+	assertQKernelDescriptor(t, descriptors, "methodjit_q_eval_lowering", "fallback", "QEvalVectorPlan", "vector-reduce/sum", "hot_plan", "fallback", qEvalHotPlanFallbackHeuristicOnly)
+}
+
 func TestQEvalPipelineLoweringExecutesInInterpreter(t *testing.T) {
 	fn := BuildGraph(qEvalHotPlanConstProto("x:til 64;y:x+1;idx:where x>10;+/y[idx]"))
 	fn.Remarks = &OptimizationRemarks{}
@@ -5866,6 +5879,21 @@ func TestQEvalPipelineLoweringExecutesInInterpreter(t *testing.T) {
 	}
 	if len(out) != 1 || !out[0].IsInt() || out[0].Int() != 2014 {
 		t.Fatalf("Interpret lowered q eval pipeline = %#v, want int 2014", out)
+	}
+}
+
+func TestQEvalPipelineLoweringSkipsHeuristicOnlyCandidate(t *testing.T) {
+	fn := BuildGraph(qEvalHotPlanConstProto("+/unknown"))
+	fn.Remarks = &OptimizationRemarks{}
+	lowered, err := QEvalPipelineLoweringPass(fn)
+	if err != nil {
+		t.Fatalf("QEvalPipelineLoweringPass: %v", err)
+	}
+	if counts := countOps(lowered); counts[OpQEvalPipelinePlan] != 0 || counts[OpCall] != 1 {
+		t.Fatalf("op counts after heuristic q eval lowering: QEvalPipelinePlan=%d OpCall=%d\n%s", counts[OpQEvalPipelinePlan], counts[OpCall], Print(lowered))
+	}
+	if len(lowered.QEvalPipelinePlans) != 0 {
+		t.Fatalf("QEvalPipelinePlans = %+v, want no typed runtime plan for heuristic-only candidate", lowered.QEvalPipelinePlans)
 	}
 }
 

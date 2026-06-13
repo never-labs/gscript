@@ -626,36 +626,57 @@ func qEvalPipelineBackendPlanFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipelin
 	if ref.BackendPlan != nil && ref.BackendPlan.Valid() {
 		return *ref.BackendPlan, true
 	}
-	if descriptor, ok := qEvalPipelineDescriptorViewFromRef(ref); ok && descriptor.Kind != "" {
-		plan := stdq.EvalPipelineBackendPlan{
-			Backend:    qEvalPipelineBackendNameFromRef(ref),
-			Detail:     "kind=" + descriptor.Kind,
-			Descriptor: descriptor,
-		}
-		if plan.Valid() {
-			return plan, true
+	source := qEvalPipelinePlanRefMirroredSource(ref)
+	if source != "" {
+		plan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(source)
+		if ok && plan.valid() {
+			return qEvalPipelineBackendPlanFromRefSourcePlan(ref, plan.plan)
 		}
 	}
-	if qEvalPipelinePlanRefSource(ref) == "" {
+	return qEvalPipelineLegacyBackendPlanFromMirroredDescriptor(ref)
+}
+
+func qEvalPipelineTypedRuntimeBackendPlanFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool) {
+	plan, ok := qEvalPipelineBackendPlanFromRef(ref)
+	if !ok || !plan.Valid() || plan.Backend != qEvalPipelineTypedRuntimeBackend {
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
-	plan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(qEvalPipelinePlanRefSource(ref))
-	if !ok || !plan.valid() {
+	return plan, true
+}
+
+func qEvalPipelineBackendPlanFromRefSourcePlan(ref QEvalPipelinePlanRef, plan stdq.EvalPipelineBackendPlan) (stdq.EvalPipelineBackendPlan, bool) {
+	if !plan.Valid() {
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
-	if backend := qEvalPipelineBackendNameFromRef(ref); backend != "" && backend != plan.plan.Backend {
+	if backend := qEvalPipelineBackendNameFromRef(ref); backend != "" && backend != plan.Backend {
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
-	if kind := qEvalPipelinePlanRefKind(ref); kind != "" && kind != plan.plan.Kind() {
+	if kind := qEvalPipelinePlanRefKind(ref); kind != "" && kind != plan.Kind() {
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
-	if shape := qEvalPipelinePlanRefShape(ref); shape != "" && shape != plan.plan.Shape() {
+	if shape := qEvalPipelinePlanRefShape(ref); shape != "" && shape != plan.Shape() {
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
-	if pipelineShape := qEvalPipelinePlanRefPipelineShape(ref); pipelineShape != "" && pipelineShape != plan.plan.PipelineShape() {
+	if pipelineShape := qEvalPipelinePlanRefPipelineShape(ref); pipelineShape != "" && pipelineShape != plan.PipelineShape() {
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
-	return plan.plan, true
+	return plan, true
+}
+
+func qEvalPipelineLegacyBackendPlanFromMirroredDescriptor(ref QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool) {
+	descriptor, ok := qEvalPipelineMirroredDescriptorFromRef(ref)
+	if !ok || descriptor.Kind == "" {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	plan := stdq.EvalPipelineBackendPlan{
+		Backend:    ref.Backend,
+		Detail:     "kind=" + descriptor.Kind,
+		Descriptor: descriptor,
+	}
+	if !plan.Valid() {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	return plan, true
 }
 
 func qEvalPipelineDescriptorViewFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipelineDescriptor, bool) {
@@ -721,6 +742,13 @@ func qEvalPipelinePlanRefSource(ref QEvalPipelinePlanRef) string {
 		return descriptor.Source
 	}
 	return ref.Source
+}
+
+func qEvalPipelinePlanRefMirroredSource(ref QEvalPipelinePlanRef) string {
+	if ref.Source != "" {
+		return ref.Source
+	}
+	return qEvalPipelinePlanRefSource(ref)
 }
 
 func qEvalPipelinePlanRefKind(ref QEvalPipelinePlanRef) string {

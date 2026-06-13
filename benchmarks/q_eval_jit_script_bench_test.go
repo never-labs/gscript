@@ -20,13 +20,10 @@
 //     result of any EvalSourceCacheable constant source. Every benchmark
 //     expression in qEvalVectorCases is cacheable, so iterations after the
 //     first are ~500ns map hits.
-//  2. Tier 2 short-circuit: methodjit lowers a constant q.eval source to
-//     OpQEvalPipelinePlan even when classification only produced a heuristic
-//     (non-executable) plan; the first in-loop exit then fails ("plan was not
-//     handled") and the call falls back to the interpreter, where bind's
-//     result cache serves every iteration. Empirically (forced Tier 2, 64
-//     loop iterations): ExitQEvalPipelinePlan == 1 and ~zero stdq kernel
-//     attempts recorded inside the loop.
+//  2. Tier 2 eligibility: methodjit only lowers q.eval constants that carry a
+//     real typed runtime backend plan. A bare q.eval field call that remains in
+//     the loop is rejected by Tier 2's residual call gate instead of pretending
+//     to be an executable typed-pipeline op.
 //
 // Both effects were confirmed empirically: with the bare-q.eval harness,
 // stdq.RuntimeKernelExecutionStats() recorded 0 kernel attempts across 1000
@@ -62,8 +59,8 @@
 // TestQEvalJITScriptRouting pins all of the above: per-iteration kernel
 // attempts scale with N on the session route, Tier 2 accepts the session
 // loop and performs one session eval op-exit per iteration, and the
-// direct-q.eval route is pinned as memoized/short-circuited so a future
-// per-iteration-capable direct route will be noticed.
+// direct-q.eval route is pinned as not Tier2-lowerable in this harness so a
+// future per-iteration-capable direct route will be noticed.
 //
 // Harness choice: the hot loop lives in the Leia script (func run(n) { ... })
 // and each benchmark performs a single amortized vm.Call("run", b.N) after
@@ -573,24 +570,30 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 		v.Close()
 	}
 
-	// (3) Pinned counter-example: bare q.eval(const) is hoisted + memoized.
-	stdq.ClearRuntimeKernelExecutionStats()
-	got, runProto, tm := qEvalJITScriptForcedTier2(t, qEvalJITScriptDirectEvalSource(src), iters)
-	if got != want {
-		t.Fatalf("Tier 2 direct-eval run(%d) = %d, want Go baseline %d", iters, got, want)
+	// (3) Pinned counter-example: bare q.eval(const) is not the benchmark
+	// route. With the stricter handoff contract, heuristic-only q.eval
+	// candidates are no longer lowered to OpQEvalPipelinePlan, so this loop
+	// must stay Tier 1 until a real direct typed backend route exists.
+	{
+		proto := qEvalJITScriptCompileTop(t, qEvalJITScriptDirectEvalSource(src))
+		var runProto *bytecodevm.FuncProto
+		for _, p := range proto.Protos {
+			if p.Name == "run" {
+				runProto = p
+				break
+			}
+		}
+		if runProto == nil {
+			t.Fatal("run proto not found among direct-eval top-level protos")
+		}
+		tm := methodjit.NewTieringManager()
+		err := tm.CompileTier2(runProto)
+		if err == nil {
+			t.Fatalf("direct q.eval(const) unexpectedly became Tier 2 lowerable; re-point BenchmarkQEvalJITScriptWarm at the direct route and update this routing test")
+		}
+		if !strings.Contains(err.Error(), "residual GetField callee call") {
+			t.Fatalf("direct q.eval(const) CompileTier2 error = %v, want residual GetField call gate", err)
+		}
+		t.Logf("direct q.eval(const) route pinned as Tier1 residual call: %v", err)
 	}
-	if runProto.EnteredTier2 != 1 {
-		t.Fatalf("direct-eval run did not enter Tier 2 native code (EnteredTier2=%d)", runProto.EnteredTier2)
-	}
-	snap := tm.ExitStats()
-	if snap.ByExitCode["ExitQEvalPipelinePlan"] == 0 {
-		t.Fatalf("direct q.eval(const) no longer routes through ExitQEvalPipelinePlan (exit stats: %v); routing assumptions changed", snap.ByExitCode)
-	}
-	directAttempts := qEvalJITScriptKernelAttempts()
-	if directAttempts >= minAttempts {
-		t.Fatalf("direct q.eval(const) route now performs per-iteration work (%d attempts for %d iterations); "+
-			"re-point BenchmarkQEvalJITScriptWarm at the direct route and update the file header", directAttempts, iters)
-	}
-	t.Logf("direct q.eval(const) route pinned: ExitQEvalPipelinePlan=%d, kernel attempts=%d for %d iterations (memoized/hoisted as documented)",
-		snap.ByExitCode["ExitQEvalPipelinePlan"], directAttempts, iters)
 }
