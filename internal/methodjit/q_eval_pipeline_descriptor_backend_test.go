@@ -481,6 +481,41 @@ func TestQEvalPipelinePlanRefPrefersBackendPlanDescriptor(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineHotPlanPreservesFullBackendDescriptorRoundTrip(t *testing.T) {
+	for _, src := range []string{
+		"where sqrt 1 4 9 16>2",
+		"(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")",
+		"x:til 1024;y:x+1;(+/y div 3)+(+/y mod 3)+count y",
+		"x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]",
+	} {
+		t.Run(src, func(t *testing.T) {
+			want, ok := stdq.DescribeEvalPipelineBackendPlan(src)
+			if !ok {
+				t.Fatalf("DescribeEvalPipelineBackendPlan(%q) failed", src)
+			}
+			hot, ok := qEvalRuntimePipelinePlan(src)
+			if !ok {
+				t.Fatalf("qEvalRuntimePipelinePlan(%q) failed", src)
+			}
+			ref := qEvalPipelinePlanRefFromHotPlan(0, src, hot)
+			got, ok := qEvalPipelineBackendPlanFromRef(ref)
+			if !ok {
+				t.Fatalf("qEvalPipelineBackendPlanFromRef(%q) failed; ref=%+v", src, ref)
+			}
+			if !reflect.DeepEqual(got.Descriptor, want.Descriptor) {
+				t.Fatalf("descriptor round trip mismatch for %q:\n got: %#v\nwant: %#v", src, got.Descriptor, want.Descriptor)
+			}
+			if got.Backend != want.Backend || got.Detail != want.Detail {
+				t.Fatalf("backend plan round trip mismatch for %q: got backend/detail %q/%q want %q/%q",
+					src, got.Backend, got.Detail, want.Backend, want.Detail)
+			}
+			if ref.BackendPlan == nil || !ref.BackendPlan.Valid() {
+				t.Fatalf("qEvalPipelinePlanRefFromHotPlan(%q) did not embed backend plan: %+v", src, ref)
+			}
+		})
+	}
+}
+
 func TestCompiledFunctionHelperExecutesCallableDotCountExecutablePlan(t *testing.T) {
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "f:{(+/x)+count y};.[f;(til 8;10#1)]")
 	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
@@ -757,10 +792,7 @@ func BenchmarkQEvalPipelineArrayRuntimeBridge(b *testing.B) {
 				}
 				qEvalPipelineDescriptorBenchmarkSink = value
 			}
-			b.ReportMetric(float64(bulkHits)/float64(b.N), "q_array_bridge_bulk_hits/op")
-			b.ReportMetric(float64(fallbacks)/float64(b.N), "q_array_bridge_fallbacks/op")
-			b.ReportMetric(float64(errors)/float64(b.N), "q_array_bridge_errors/op")
-			b.ReportMetric(float64(tc.array.Len()), "q_array_bridge_rows/op")
+			reportQEvalArrayBridgeBenchmarkStats(b, b.N, bulkHits, fallbacks, errors, tc.array.Len())
 		})
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
+	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
 const (
@@ -181,6 +182,7 @@ type QKernelExecutionRouteSummaryJSONRow struct {
 }
 
 type qEvalHotPlan struct {
+	BackendPlan            *stdq.EvalPipelineBackendPlan
 	Kernel                 string
 	Shape                  string
 	PipelineShape          string

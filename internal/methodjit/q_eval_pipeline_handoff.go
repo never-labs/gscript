@@ -146,7 +146,9 @@ func qEvalRuntimePipelinePlan(source string) (qEvalHotPlan, bool) {
 
 func qEvalHotPlanFromBackendPlan(backendPlan qEvalPipelineBackendPlan) qEvalHotPlan {
 	descriptor := backendPlan.plan.Descriptor
+	planValue := backendPlan.plan
 	return qEvalHotPlan{
+		BackendPlan:            &planValue,
 		Kernel:                 descriptor.Kernel,
 		Shape:                  descriptor.Shape,
 		PipelineShape:          descriptor.PipelineShape,
@@ -237,6 +239,9 @@ func qEvalPipelinePlanRefFromHotPlan(id int, source string, plan qEvalHotPlan) Q
 }
 
 func qEvalPipelineBackendPlanFromHotPlan(source string, plan qEvalHotPlan) stdq.EvalPipelineBackendPlan {
+	if plan.BackendPlan != nil && plan.BackendPlan.Valid() {
+		return *plan.BackendPlan
+	}
 	if plan.Backend == "" || plan.Kind == "" || plan.Kernel == "" || plan.Shape == "" {
 		return stdq.EvalPipelineBackendPlan{}
 	}

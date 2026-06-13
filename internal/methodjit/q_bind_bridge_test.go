@@ -349,31 +349,7 @@ func BenchmarkQFrameVectorMethodJITRoute(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-	var frameSuccess, frameErrors, vectorSuccess, vectorErrors uint64
-	accumulateMethodJITRouteBenchmarkStats(cf.QKernelExecutionStats(), &frameSuccess, &frameErrors, &vectorSuccess, &vectorErrors)
-	b.ReportMetric(float64(frameSuccess)/float64(b.N), "methodjit_frame_runtime_success/op")
-	b.ReportMetric(float64(frameErrors)/float64(b.N), "methodjit_frame_runtime_errors/op")
-	b.ReportMetric(float64(vectorSuccess)/float64(b.N), "methodjit_vector_runtime_success/op")
-	b.ReportMetric(float64(vectorErrors)/float64(b.N), "methodjit_vector_runtime_errors/op")
-}
-
-func accumulateMethodJITRouteBenchmarkStats(stats []QKernelExecutionStat, frameSuccess, frameErrors, vectorSuccess, vectorErrors *uint64) {
-	for _, stat := range stats {
-		switch stat.Source {
-		case "methodjit_q_frame_runtime":
-			if stat.Outcome == "success" {
-				*frameSuccess += stat.Count
-			} else if stat.Outcome == "error" {
-				*frameErrors += stat.Count
-			}
-		case "methodjit_q_vector_runtime":
-			if stat.Outcome == "success" {
-				*vectorSuccess += stat.Count
-			} else if stat.Outcome == "error" {
-				*vectorErrors += stat.Count
-			}
-		}
-	}
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, cf.QKernelExecutionStats())
 }
 
 func qMethodJITBridgeFrame(t testing.TB) *runtime.Table {
