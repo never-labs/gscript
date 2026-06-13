@@ -6701,18 +6701,34 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 		{word: "mcount"},
 		{word: "mmin"},
 		{word: "mmax", wantMax: true},
+		{word: "mdev"},
+		{word: "ema"},
 	} {
 		leftExpr, rightExpr, ok := splitTopLevelWord(src, spec.word)
 		if !ok {
 			continue
 		}
-		widthValue, err := s.eval(leftExpr)
+		leftValue, err := s.eval(leftExpr)
 		if err != nil {
 			return nil, true, err
 		}
-		width, ok := integerValue(widthValue)
-		if !ok || width <= 0 || int64(int(width)) != width {
-			return nil, true, fmt.Errorf("%s width must be a positive integer", spec.word)
+		width := int64(0)
+		alpha := 0.0
+		if spec.word == "ema" {
+			var ok bool
+			alpha, ok = numeric(leftValue)
+			if !ok {
+				return nil, true, fmt.Errorf("ema alpha must be numeric")
+			}
+			if alpha < 0 || alpha > 1 {
+				return nil, true, fmt.Errorf("ema alpha must be in range 0..1")
+			}
+		} else {
+			var ok bool
+			width, ok = integerValue(leftValue)
+			if !ok || width <= 0 || int64(int(width)) != width {
+				return nil, true, fmt.Errorf("%s width must be a positive integer", spec.word)
+			}
 		}
 		value, err := s.eval(rightExpr)
 		if err != nil {
@@ -6723,15 +6739,19 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 			var moving any
 			switch spec.word {
 			case "msum":
-				moving, err = msum(widthValue, value)
+				moving, err = msum(leftValue, value)
 			case "mavg":
-				moving, err = mavg(widthValue, value)
+				moving, err = mavg(leftValue, value)
 			case "mcount":
-				moving, err = mcount(widthValue, value)
+				moving, err = mcount(leftValue, value)
 			case "mmin":
-				moving, err = mmin(widthValue, value)
+				moving, err = mmin(leftValue, value)
 			case "mmax":
-				moving, err = mmax(widthValue, value)
+				moving, err = mmax(leftValue, value)
+			case "mdev":
+				moving, err = mdevValue(leftValue, value)
+			case "ema":
+				moving, err = emaValue(leftValue, value)
 			}
 			if err != nil {
 				return nil, true, err
@@ -6759,6 +6779,26 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 			} else {
 				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-"+spec.word+"/"+string(array.Kind()), handled, err)
 			}
+		} else if spec.word == "mdev" {
+			if out, handled, err := data.NumericMovingStdDevSum(array, int(width), false); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-mdev/"+string(array.Kind()), handled, err)
+				if err != nil {
+					return nil, true, fmt.Errorf("sum mdev: %w", err)
+				}
+				return out, true, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-mdev/"+string(array.Kind()), handled, err)
+			}
+		} else if spec.word == "ema" {
+			if out, handled, err := data.NumericExponentialMovingAverageSum(array, alpha); err != nil || handled {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-ema/"+string(array.Kind()), handled, err)
+				if err != nil {
+					return nil, true, fmt.Errorf("sum ema: %w", err)
+				}
+				return out, true, nil
+			} else {
+				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-ema/"+string(array.Kind()), handled, err)
+			}
 		} else {
 			if out, handled, err := data.TryTypedMovingMinMaxSum(array, int(width), spec.wantMax); err != nil || handled {
 				recordRuntimeKernelProbe("ArrayMovingWindowSum", "vector-reduce/sum-"+spec.word+"/"+string(array.Kind()), handled, err)
@@ -6773,15 +6813,19 @@ func (s *EvalState) tryEvalTypedMovingWindowSum(src string) (any, bool, error) {
 		var moving any
 		switch spec.word {
 		case "msum":
-			moving, err = msum(widthValue, value)
+			moving, err = msum(leftValue, value)
 		case "mavg":
-			moving, err = mavg(widthValue, value)
+			moving, err = mavg(leftValue, value)
 		case "mcount":
-			moving, err = mcount(widthValue, value)
+			moving, err = mcount(leftValue, value)
 		case "mmin":
-			moving, err = mmin(widthValue, value)
+			moving, err = mmin(leftValue, value)
 		case "mmax":
-			moving, err = mmax(widthValue, value)
+			moving, err = mmax(leftValue, value)
+		case "mdev":
+			moving, err = mdevValue(leftValue, value)
+		case "ema":
+			moving, err = emaValue(leftValue, value)
 		}
 		if err != nil {
 			return nil, true, err

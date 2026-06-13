@@ -1882,6 +1882,42 @@ func TestDescribeEvalPipelineExposesReadOnlyRuntimeDescriptor(t *testing.T) {
 		t.Fatalf("ExecuteEvalPipelineDescriptor moving sum = %#v,%v,%v; want 31,true,nil", got, handled, err)
 	}
 
+	descriptor, ok = DescribeEvalPipeline("+/2 mdev 1 2 3")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize moving stddev sum pipeline")
+	}
+	if descriptor.Shape != "vector-reduce/sum-mdev" ||
+		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ShapeFamily != "vector" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "mdev" ||
+		descriptor.LeftExpr != "2" ||
+		descriptor.RightExpr != "1 2 3" ||
+		descriptor.CompareOp != "mdev" {
+		t.Fatalf("moving stddev descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != 1.0 {
+		t.Fatalf("ExecuteEvalPipelineDescriptor moving stddev sum = %#v,%v,%v; want 1,true,nil", got, handled, err)
+	}
+
+	descriptor, ok = DescribeEvalPipeline("+/0.5 ema 1 2 3")
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline did not recognize ema sum pipeline")
+	}
+	if descriptor.Shape != "vector-reduce/sum-ema" ||
+		descriptor.PipelineShape != "vector_reduce" ||
+		descriptor.ShapeFamily != "vector" ||
+		descriptor.ShapeReducer != "sum" ||
+		descriptor.ShapeTransform != "ema" ||
+		descriptor.LeftExpr != "0.5" ||
+		descriptor.RightExpr != "1 2 3" ||
+		descriptor.CompareOp != "ema" {
+		t.Fatalf("ema descriptor = %#v", descriptor)
+	}
+	if got, handled, err := ExecuteEvalPipelineDescriptor(descriptor); err != nil || !handled || got != 4.75 {
+		t.Fatalf("ExecuteEvalPipelineDescriptor ema sum = %#v,%v,%v; want 4.75,true,nil", got, handled, err)
+	}
+
 	descriptor, ok = DescribeEvalPipeline("count sums 8#til 4")
 	if !ok {
 		t.Fatalf("DescribeEvalPipeline did not recognize count running scan pipeline")

@@ -18,9 +18,13 @@ func TestQApplyIndexCoreSemantics(t *testing.T) {
 
 	t.Run("dot index", func(t *testing.T) {
 		assertEvalValue(t, "x:10 20 30;x . 1", int64(20))
+		assertEvalValue(t, "x:10 20 30;.[x;1]", int64(20))
 		assertEvalValue(t, "x:(10 20;30 40);x . (1;0)", int64(30))
+		assertEvalValue(t, "x:(10 20;30 40);.[x;(1;0)]", int64(30))
 		assertEvalValue(t, "d:`a`b!(10;`c`d!20 30);d . (`b;`d)", int64(30))
+		assertEvalValue(t, "d:`a`b!(10;`c`d!20 30);.[d;(`b;`d)]", int64(30))
 		assertEvalArray(t, "t:flip `sym`px!(`AAPL`MSFT;100 200);t . `px", data.KindI64, []any{int64(100), int64(200)})
+		assertEvalArray(t, "t:flip `sym`px!(`AAPL`MSFT;100 200);.[t;`px]", data.KindI64, []any{int64(100), int64(200)})
 	})
 
 	t.Run("callable apply", func(t *testing.T) {

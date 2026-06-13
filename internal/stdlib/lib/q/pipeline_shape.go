@@ -73,6 +73,8 @@ var qPipelineDescriptorShapeRegistry = []qPipelineShapeRegistryEntry{
 	{ID: "vector-reduce/sum-mcount", Kind: qPipelineSumMovingWindow, Variant: "mcount", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-reduce/sum-mmin", Kind: qPipelineSumMovingWindow, Variant: "mmin", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-reduce/sum-mmax", Kind: qPipelineSumMovingWindow, Variant: "mmax", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-mdev", Kind: qPipelineSumMovingWindow, Variant: "mdev", VariantField: qPipelineShapeVariantCompareOp},
+	{ID: "vector-reduce/sum-ema", Kind: qPipelineSumMovingWindow, Variant: "ema", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-count/sums", Kind: qPipelineCountRunningScan, Variant: "sums", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-count/prds", Kind: qPipelineCountRunningScan, Variant: "prds", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-count/mins", Kind: qPipelineCountRunningScan, Variant: "mins", VariantField: qPipelineShapeVariantCompareOp},

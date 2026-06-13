@@ -461,6 +461,43 @@ func NumericMovingStdDev(array Array, width int, sample bool) (Array, bool, erro
 	return newF64Trusted(out), true, nil
 }
 
+func NumericMovingStdDevSum(array Array, width int, sample bool) (float64, bool, error) {
+	if width <= 0 {
+		return 0, true, fmt.Errorf("moving stddev width must be positive")
+	}
+	if !isNumericArray(array) {
+		return 0, false, nil
+	}
+	var total float64
+	var moments NumericMoments
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return 0, true, err
+		}
+		if ok {
+			moments.Sum += value
+			moments.SumSquares += value * value
+			moments.Count++
+		}
+		if remove := row - width; remove >= 0 {
+			value, ok, err := typedKernels.NumericAt(array, remove)
+			if err != nil {
+				return 0, true, err
+			}
+			if ok {
+				moments.Sum -= value
+				moments.SumSquares -= value * value
+				moments.Count--
+			}
+		}
+		if variance, ok := NumericVarianceFromMoments(moments, sample); ok {
+			total += math.Sqrt(variance)
+		}
+	}
+	return total, true, nil
+}
+
 func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, error) {
 	if alpha < 0 || alpha > 1 {
 		return nil, true, fmt.Errorf("ema alpha must be in range 0..1")
@@ -497,6 +534,35 @@ func NumericExponentialMovingAverage(array Array, alpha float64) (Array, bool, e
 		return NewColumn("_", nullable).Data, true, nil
 	}
 	return newF64Trusted(out), true, nil
+}
+
+func NumericExponentialMovingAverageSum(array Array, alpha float64) (float64, bool, error) {
+	if alpha < 0 || alpha > 1 {
+		return 0, true, fmt.Errorf("ema alpha must be in range 0..1")
+	}
+	if !isNumericArray(array) {
+		return 0, false, nil
+	}
+	var total float64
+	var prev float64
+	hasPrev := false
+	for row := 0; row < array.Len(); row++ {
+		value, ok, err := typedKernels.NumericAt(array, row)
+		if err != nil {
+			return 0, true, err
+		}
+		if !ok {
+			continue
+		}
+		if !hasPrev {
+			prev = value
+			hasPrev = true
+		} else {
+			prev = alpha*value + (1-alpha)*prev
+		}
+		total += prev
+	}
+	return total, true, nil
 }
 
 // I64RangeView reports the affine parameters of an integer range carrier,

@@ -255,6 +255,31 @@ func (s *EvalState) evalQApplyFormPlan(src string) (any, bool, error) {
 		if err != nil {
 			return s.qApplyFormPlanError(err)
 		}
+		if !isCallable(fn) {
+			switch len(plan.args) {
+			case 0:
+				out, err := dotIndexValue(fn, data.NewAny(nil))
+				return out, true, err
+			case 1:
+				arg, err := s.evalValueExpr(plan.args[0])
+				if err != nil {
+					return s.qApplyFormPlanError(err)
+				}
+				out, err := dotIndexValue(fn, arg)
+				return out, true, err
+			default:
+				path := make([]any, len(plan.args))
+				for i := range plan.args {
+					value, err := s.evalValueExpr(plan.args[i])
+					if err != nil {
+						return s.qApplyFormPlanError(err)
+					}
+					path[i] = value
+				}
+				out, err := dotIndexValue(fn, data.NewAny(path))
+				return out, true, err
+			}
+		}
 		switch len(plan.args) {
 		case 0:
 			out, err := s.applyCallable(fn, nil)

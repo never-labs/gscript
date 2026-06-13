@@ -949,7 +949,7 @@ func qPipelineRuntimePrimitiveVerb(name string) bool {
 
 func buildQPipelineSumMovingWindowPlan(src string) (qPipelinePlan, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
-	word, left, right, ok := qPipelineLeftmostWordSplit(src, []string{"msum", "mavg", "mcount", "mmin", "mmax"}...)
+	word, left, right, ok := qPipelineLeftmostWordSplit(src, []string{"msum", "mavg", "mcount", "mmin", "mmax", "mdev", "ema"}...)
 	if !ok || left == "" || right == "" {
 		return qPipelinePlan{}, false
 	}
@@ -2743,13 +2743,27 @@ func (s *EvalState) evalQPipelineSumVectorExprBound(bound qPipelineBoundPlan, va
 }
 
 func (s *EvalState) evalQPipelineSumMovingWindow(plan *qPipelinePlan) (any, bool, error) {
-	widthValue, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	leftValue, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
 	if err != nil {
 		return nil, true, err
 	}
-	width, ok := integerValue(widthValue)
-	if !ok || width <= 0 || int64(int(width)) != width {
-		return nil, true, errMovingWindowWidth(plan.compareOp)
+	width := int64(0)
+	alpha := 0.0
+	if plan.compareOp == "ema" {
+		var ok bool
+		alpha, ok = numeric(leftValue)
+		if !ok {
+			return nil, true, fmt.Errorf("ema alpha must be numeric")
+		}
+		if alpha < 0 || alpha > 1 {
+			return nil, true, fmt.Errorf("ema alpha must be in range 0..1")
+		}
+	} else {
+		var ok bool
+		width, ok = integerValue(leftValue)
+		if !ok || width <= 0 || int64(int(width)) != width {
+			return nil, true, errMovingWindowWidth(plan.compareOp)
+		}
 	}
 	value, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
 	if err != nil {
@@ -2767,10 +2781,10 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan *qPipelinePlan) (any, bool
 		kernelShape:    shape,
 		fallbackReason: RuntimeFallbackUnsupportedType,
 	}
-	return evalQPipelineSumMovingWindowBound(plan, bound, array, int(width))
+	return evalQPipelineSumMovingWindowBound(plan, bound, array, int(width), alpha)
 }
 
-func evalQPipelineSumMovingWindowBound(plan *qPipelinePlan, bound qPipelineBoundPlan, array data.Array, width int) (any, bool, error) {
+func evalQPipelineSumMovingWindowBound(plan *qPipelinePlan, bound qPipelineBoundPlan, array data.Array, width int, alpha float64) (any, bool, error) {
 	if bound.resultClass != "moving_sum" || array.Kind() != bound.resultKind {
 		return nil, false, nil
 	}
@@ -2790,6 +2804,10 @@ func evalQPipelineSumMovingWindowBound(plan *qPipelinePlan, bound qPipelineBound
 		out, handled, err = data.TryTypedMovingMinMaxSum(array, width, false)
 	case "mmax":
 		out, handled, err = data.TryTypedMovingMinMaxSum(array, width, true)
+	case "mdev":
+		out, handled, err = data.NumericMovingStdDevSum(array, width, false)
+	case "ema":
+		out, handled, err = data.NumericExponentialMovingAverageSum(array, alpha)
 	default:
 		return nil, false, nil
 	}

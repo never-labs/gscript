@@ -97,6 +97,14 @@ func (s *EvalState) evalDotApplyOrAmend(src string) (any, bool, error) {
 		if err != nil {
 			return nil, true, err
 		}
+		if !isCallable(fn) {
+			index, err := s.eval(strings.TrimSpace(parts[1]))
+			if err != nil {
+				return nil, true, err
+			}
+			out, err := dotIndexValue(fn, index)
+			return out, true, err
+		}
 		args, err := s.evalDotApplyArgs(parts[1])
 		if err != nil {
 			return nil, true, err
@@ -124,6 +132,9 @@ func (s *EvalState) tryEvalDotApplyPlan(src string) (any, bool, error) {
 	fn, err := s.eval(plan.fnExpr)
 	if err != nil {
 		return nil, true, err
+	}
+	if !isCallable(fn) {
+		return nil, false, nil
 	}
 	switch len(plan.argExprs) {
 	case 0:
