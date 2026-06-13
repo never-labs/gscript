@@ -67,6 +67,8 @@ var qPipelineDescriptorShapeRegistry = []qPipelineShapeRegistryEntry{
 	{ID: "vector-reduce/sum-sublist", Kind: qPipelineSumSequenceTransform, Variant: data.SequenceTransformSublist, VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-reduce/sum-ratios", Kind: qPipelineSumSequenceTransform, Variant: data.SequenceTransformRatios, VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-reduce/sum-raze", Kind: qPipelineSumRaze},
+	{ID: "vector-reduce/find-sum", Kind: qPipelineFindSum},
+	{ID: "find", Kind: qPipelineFindIndexes},
 	{ID: "vector-count/expr", Kind: qPipelineCountVectorExpr},
 	{ID: "vector-reduce/sum-msum", Kind: qPipelineSumMovingWindow, Variant: "msum", VariantField: qPipelineShapeVariantCompareOp},
 	{ID: "vector-reduce/sum-mavg", Kind: qPipelineSumMovingWindow, Variant: "mavg", VariantField: qPipelineShapeVariantCompareOp},
@@ -257,6 +259,21 @@ func qPipelineShapeSpecForPlan(kind qPipelineKind, variant string) (qPipelineSha
 			Reducer:       "sum",
 			Transform:     "raze",
 			PipelineShape: "vector_reduce",
+		}, true
+	case qPipelineFindSum:
+		return qPipelineShapeSpec{
+			ID:            "vector-reduce/find-sum",
+			Family:        qPipelineShapeFamilyVector,
+			Reducer:       "sum",
+			Transform:     "find",
+			PipelineShape: "vector_reduce",
+		}, true
+	case qPipelineFindIndexes:
+		return qPipelineShapeSpec{
+			ID:            "find",
+			Family:        qPipelineShapeFamilyVector,
+			Selector:      "find",
+			PipelineShape: "find",
 		}, true
 	case qPipelineCountVectorExpr:
 		return qPipelineShapeSpec{

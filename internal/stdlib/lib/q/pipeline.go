@@ -38,6 +38,8 @@ const (
 	qPipelineLastRunningScan
 	qPipelineCountSequencePrimitive
 	qPipelineSumRaze
+	qPipelineFindIndexes
+	qPipelineFindSum
 	qPipelineUnaryPrimitive
 	qPipelineDyadicPrimitive
 	qPipelineApplyScalarIndex
@@ -251,6 +253,9 @@ func qPipelinePlanCandidate(src string) bool {
 	if strings.HasPrefix(src, "where ") && wordBoundary(src, 0, len("where")) {
 		return true
 	}
+	if qPipelineFindCandidate(src) {
+		return true
+	}
 	if qPipelineRuntimePrimitiveCandidate(src) {
 		return true
 	}
@@ -313,6 +318,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 		if plan, ok := buildQPipelineSumGatherPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
+		if plan, ok := buildQPipelineFindPlan(right, qPipelineFindSum, "vector-reduce/find-sum"); ok {
+			return qPipelinePlanWithBindingPlans(withSource(plan))
+		}
 		if plan, ok := buildQPipelineSumBinPlan(right); ok {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
@@ -345,6 +353,9 @@ func buildQPipelinePlan(src string) qPipelinePlan {
 			return qPipelinePlanWithBindingPlans(withSource(plan))
 		}
 		return qPipelinePlan{}
+	}
+	if plan, ok := buildQPipelineFindPlan(src, qPipelineFindIndexes, "find"); ok {
+		return qPipelinePlanWithBindingPlans(withSource(plan))
 	}
 	if strings.HasPrefix(src, "sum ") && wordBoundary(src, 0, len("sum")) {
 		inputExpr := strings.TrimSpace(src[len("sum "):])
@@ -1379,6 +1390,35 @@ func splitQPipelineModExpr(src string) (string, string, bool) {
 	return left, right, true
 }
 
+func qPipelineFindCandidate(src string) bool {
+	src = strings.TrimSpace(src)
+	if src == "" {
+		return false
+	}
+	if strings.HasPrefix(src, "+/") {
+		src = strings.TrimSpace(src[2:])
+	}
+	left, right, ok := splitTopLevelOperator(src, "?")
+	return ok && strings.TrimSpace(left) != "" && strings.TrimSpace(right) != ""
+}
+
+func buildQPipelineFindPlan(src string, kind qPipelineKind, shape string) (qPipelinePlan, bool) {
+	left, right, ok := splitTopLevelOperator(strings.TrimSpace(src), "?")
+	if !ok {
+		return qPipelinePlan{}, false
+	}
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return qPipelinePlan{}, false
+	}
+	plan := qPipelineShapePlan(kind, "")
+	plan.shape = shape
+	plan.leftExpr = left
+	plan.rightExpr = right
+	return plan, true
+}
+
 func qPipelineDeltasInput(src string) (string, bool) {
 	src = stripEnclosingParens(strings.TrimSpace(src))
 	if strings.HasPrefix(src, "deltas ") && wordBoundary(src, 0, len("deltas")) {
@@ -1478,6 +1518,10 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 		out, handled, err = s.evalQPipelineCountSequencePrimitive(plan)
 	case qPipelineSumRaze:
 		out, handled, err = s.evalQPipelineSumRaze(plan)
+	case qPipelineFindIndexes:
+		out, handled, err = s.evalQPipelineFindIndexes(plan)
+	case qPipelineFindSum:
+		out, handled, err = s.evalQPipelineFindSum(plan)
 	case qPipelineUnaryPrimitive, qPipelineDyadicPrimitive:
 		out, handled, err = s.evalQPipelineRuntimePrimitive(*plan)
 	case qPipelineApplyScalarIndex:
@@ -1904,6 +1948,58 @@ func (s *EvalState) evalQPipelineSumRaze(plan *qPipelinePlan) (any, bool, error)
 			return data.TryTypedNestedNumericSum(value)
 		},
 	})
+}
+
+func (s *EvalState) evalQPipelineFindIndexes(plan *qPipelinePlan) (any, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	domain, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	query, ok := right.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled := data.TryTypedFindComparable(domain, query)
+	shape := "find/" + string(domain.Kind()) + "/" + string(query.Kind())
+	recordRuntimeKernelProbe("ArrayFind", shape, handled, nil)
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
+}
+
+func (s *EvalState) evalQPipelineFindSum(plan *qPipelinePlan) (any, bool, error) {
+	left, err := s.evalQPipelinePlannedExpr(plan.leftExpr, &plan.leftPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	right, err := s.evalQPipelinePlannedExpr(plan.rightExpr, &plan.rightPlan)
+	if err != nil {
+		return nil, true, err
+	}
+	domain, ok := left.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	query, ok := right.(data.Array)
+	if !ok {
+		return nil, false, nil
+	}
+	out, handled := data.TryTypedFindComparableSum(domain, query)
+	shape := "vector-reduce/find-sum/" + string(domain.Kind()) + "/" + string(query.Kind())
+	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
+	if !handled {
+		return nil, false, nil
+	}
+	return out, true, nil
 }
 
 // qSumRazeLeavesNestedArrays reports whether razing array ONE level still

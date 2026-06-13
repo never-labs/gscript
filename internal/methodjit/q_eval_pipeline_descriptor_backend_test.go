@@ -757,6 +757,59 @@ func TestQEvalPipelineLoweringRecognizesFusedRuntimeShapes(t *testing.T) {
 	}
 }
 
+func TestQEvalPipelineLoweringCoversRuntimeFallbackClearedShapes(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		src           string
+		pipelineShape string
+	}{
+		{
+			name:          "bulk_float_compare_indexes",
+			src:           "x:(til 80)*0.25;idx:where x>16.5;(+/x[idx])+count idx",
+			pipelineShape: "script_pipeline",
+		},
+		{
+			name:          "nullable_tiled_within_stats",
+			src:           "x:80#0N 2 5 9;v:til 80;idx:where x within 2 8;(+/v[idx])+count idx",
+			pipelineShape: "script_pipeline",
+		},
+		{
+			name:          "symbol_find_sum",
+			src:           "+/`AAPL`MSFT`NVDA?`MSFT`TSLA",
+			pipelineShape: "vector_reduce",
+		},
+		{
+			name:          "symbol_find_indexes",
+			src:           "`AAPL`MSFT`NVDA?`MSFT`TSLA",
+			pipelineShape: "find",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := BuildGraph(qEvalPipelineDescriptorBackendConstProto(tc.src))
+			lowered, err := QEvalPipelineLoweringPass(fn)
+			if err != nil {
+				t.Fatalf("QEvalPipelineLoweringPass: %v", err)
+			}
+			if counts := countOps(lowered); counts[OpQEvalPipelinePlan] != 1 || counts[OpCall] != 0 {
+				t.Fatalf("op counts after q eval pipeline lowering: QEvalPipelinePlan=%d OpCall=%d\n%s", counts[OpQEvalPipelinePlan], counts[OpCall], Print(lowered))
+			}
+			if len(lowered.QEvalPipelinePlans) != 1 {
+				t.Fatalf("QEvalPipelinePlans = %+v, want one runtime fallback-cleared plan", lowered.QEvalPipelinePlans)
+			}
+			ref := lowered.QEvalPipelinePlans[0]
+			assertQEvalPipelinePlanRefView(t, ref, "", "", tc.pipelineShape, qEvalPipelineTypedRuntimeBackend)
+			backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+			value, handled, err := executeQEvalPipelinePlanValue(backend, ref)
+			if err != nil {
+				t.Fatalf("executeQEvalPipelinePlanValue: %v", err)
+			}
+			if !handled || value.IsNil() {
+				t.Fatalf("executeQEvalPipelinePlanValue = %v handled %v, want handled non-nil", value, handled)
+			}
+		})
+	}
+}
+
 func TestCompiledFunctionUsesPredecodedQEvalPipelineBackend(t *testing.T) {
 	ref := qEvalPipelineDescriptorBackendTestRef(t, "x:til 8192;y:x+1;idx:where (x mod 4)=1;+/y[idx]")
 	cf := &CompiledFunction{

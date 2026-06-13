@@ -2019,6 +2019,7 @@ func TestEvalPipelineBackendEntrypointsShareExecutablePlan(t *testing.T) {
 	}{
 		{name: "expression", src: "+/deltas til 8", want: int64(7)},
 		{name: "script", src: "x:til 16;y:x*3;idx:where x>=8;+/y[idx]", want: int64(276)},
+		{name: "find_sum", src: "+/`AAPL`MSFT`NVDA?`MSFT`TSLA", want: int64(4)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			descriptor, ok := DescribeEvalPipeline(tc.src)
@@ -2051,6 +2052,48 @@ func TestEvalPipelineBackendEntrypointsShareExecutablePlan(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEvalPipelineBackendEntrypointsRestoreFindIndexes(t *testing.T) {
+	src := "`AAPL`MSFT`NVDA?`MSFT`TSLA"
+	descriptor, ok := DescribeEvalPipeline(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipeline(%q) did not recognize find pipeline", src)
+	}
+	if descriptor.Shape != "find" || descriptor.PipelineShape != "find" || descriptor.LeftExpr == "" || descriptor.RightExpr == "" {
+		t.Fatalf("find descriptor = %#v, want find shape with operands", descriptor)
+	}
+	backend, ok := DescribeEvalPipelineBackendPlan(src)
+	if !ok {
+		t.Fatalf("DescribeEvalPipelineBackendPlan(%q) did not recognize find pipeline", src)
+	}
+	executable, ok := CompileEvalPipelineBackendPlan(backend)
+	if !ok {
+		t.Fatalf("CompileEvalPipelineBackendPlan(%q) failed", src)
+	}
+	for _, run := range []struct {
+		name string
+		call func() (any, bool, error)
+	}{
+		{name: "source", call: func() (any, bool, error) { return ExecuteEvalPipeline(src) }},
+		{name: "descriptor", call: func() (any, bool, error) { return ExecuteEvalPipelineDescriptor(descriptor) }},
+		{name: "backend", call: func() (any, bool, error) { return ExecuteEvalPipelineBackendPlan(backend) }},
+		{name: "executable", call: func() (any, bool, error) {
+			return NewEvalState(nil).ExecuteEvalPipelineExecutablePlan(executable)
+		}},
+	} {
+		got, handled, err := run.call()
+		if err != nil || !handled {
+			t.Fatalf("%s find pipeline run = %#v,%v,%v; want handled nil error", run.name, got, handled, err)
+		}
+		array, ok := got.(data.Array)
+		if !ok {
+			t.Fatalf("%s find pipeline result = %T, want data.Array", run.name, got)
+		}
+		if values := array.Values(); !reflect.DeepEqual(values, []any{int64(1), int64(3)}) {
+			t.Fatalf("%s find pipeline values = %#v, want 1 3", run.name, values)
+		}
 	}
 }
 
