@@ -65,6 +65,21 @@ func skipUnavailableFinRobotLiveData(t *testing.T, provider string, status int64
 	}
 }
 
+func assertFinRobotLiveDataOK(t *testing.T, vm *leia.VM, provider, statusName, requestErrName, jsonErrName, okName string) {
+	t.Helper()
+	status := mustGetInt(t, vm, statusName)
+	skipUnavailableFinRobotLiveData(t, provider, status, getOrNil(t, vm, requestErrName))
+	if status != 200 {
+		t.Fatalf("%s status = %d, want 200", provider, status)
+	}
+	if got := getOrNil(t, vm, jsonErrName); got != nil {
+		t.Fatalf("%s JSON decode failed: %v", provider, got)
+	}
+	if ok := mustGetBool(t, vm, okName); !ok {
+		t.Fatalf("%s ok = false", provider)
+	}
+}
+
 func getOrNil(t *testing.T, vm *leia.VM, name string) any {
 	t.Helper()
 	got, err := vm.Get(name)
