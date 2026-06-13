@@ -4938,6 +4938,9 @@ func TestQEvalVectorRuntimeFallbackReport(t *testing.T) {
 		if row.key.kernel == "ArrayNumericUnaryMultiSum" {
 			t.Fatalf("ArrayNumericUnaryMultiSum fallback remains: %+v", row)
 		}
+		if row.key.kernel == "ArrayBoolLogical" {
+			t.Fatalf("ArrayBoolLogical fallback remains: %+v", row)
+		}
 	}
 }
 

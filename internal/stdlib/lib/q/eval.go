@@ -14021,17 +14021,19 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		// Canonical `&`/`|` are elementwise min/max. On booleans min/max IS
 		// logical and/or, so strictly-boolean operands keep the lazy logical
 		// mask carrier and the periodic where/count fast paths.
-		shape := "bool-logical/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
-		if out, handled, err := data.TryTypedBoolLogical(logical, left, right); err != nil || handled {
-			out, handled, err = qTypedRuntimeResult("ArrayBoolLogical", shape, out, handled, err)
-			if err != nil {
-				return nil, err
+		if qLogicalOperandCouldBeBool(left, la) && qLogicalOperandCouldBeBool(right, ra) {
+			shape := "bool-logical/" + logical + "/" + string(qRuntimeKernelOperandKind(left, la)) + "/" + string(qRuntimeKernelOperandKind(right, ra))
+			if out, handled, err := data.TryTypedBoolLogical(logical, left, right); err != nil || handled {
+				out, handled, err = qTypedRuntimeResult("ArrayBoolLogical", shape, out, handled, err)
+				if err != nil {
+					return nil, err
+				}
+				if handled {
+					return out, nil
+				}
+			} else {
+				recordRuntimeKernelProbeReason("ArrayBoolLogical", shape, handled, err, RuntimeFallbackUnsupportedType)
 			}
-			if handled {
-				return out, nil
-			}
-		} else {
-			recordRuntimeKernelProbeReason("ArrayBoolLogical", shape, handled, err, RuntimeFallbackUnsupportedType)
 		}
 		// Numeric operands materialize the typed elementwise min/max; null
 		// carriers fall through to the boxed loop, which applies canonical
@@ -14441,6 +14443,22 @@ func qRuntimeKernelOperandKind(value any, array data.Array) data.Kind {
 
 func qVectorDyadicCanUseTypedArithmetic(left, right any) bool {
 	return qTypedArithmeticOperandOK(left) && qTypedArithmeticOperandOK(right)
+}
+
+func qLogicalOperandCouldBeBool(value any, array data.Array) bool {
+	if array != nil {
+		return array.Kind() == data.KindBool
+	}
+	if a, ok := value.(data.Array); ok {
+		return a.Kind() == data.KindBool
+	}
+	if _, ok := value.(bool); ok {
+		return true
+	}
+	if kind, ok := data.NullKind(value); ok {
+		return kind == data.KindBool
+	}
+	return false
 }
 
 // qVectorDyadicHasTemporalOperand reports whether either broadcast operand

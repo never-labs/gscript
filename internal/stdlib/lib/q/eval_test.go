@@ -4446,6 +4446,28 @@ func TestEvalBoolAggregateUsesTypedRuntime(t *testing.T) {
 	}
 }
 
+func TestEvalNumericLogicalSkipsBoolLogicalFallback(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalArray(t, "1 0 1 and 1 1 0", data.KindI64, []any{int64(1), int64(0), int64(0)})
+	assertEvalArray(t, "1 0 1 or 0 1 0", data.KindI64, []any{int64(1), int64(1), int64(1)})
+	assertEvalArray(t, "(til 8) and 3", data.KindI64, []any{int64(0), int64(1), int64(2), int64(3), int64(3), int64(3), int64(3), int64(3)})
+
+	seenMinMax := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayBoolLogical" {
+			t.Fatalf("numeric logical recorded bool-logical runtime stat: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Kernel == "ArrayDyadicMinMax" && stat.Outcome == "hit" {
+			seenMinMax = true
+		}
+	}
+	if !seenMinMax {
+		t.Fatalf("missing ArrayDyadicMinMax hit for numeric logical: %#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestEvalWhereRecordsTypedRuntimeKernel(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)
