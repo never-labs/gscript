@@ -6,6 +6,74 @@ import (
 	"testing"
 )
 
+func TestFinRobotLiveSECCompanyTickersDataIntegration(t *testing.T) {
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_company_tickers_request_error := nil
+sec_company_tickers_json_error := nil
+sec_company_tickers_status := 0
+sec_company_tickers_ok := false
+sec_company_tickers_entry_key := ""
+sec_company_tickers_cik := 0
+sec_company_tickers_ticker := ""
+sec_company_tickers_title := ""
+
+headers := {}
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
+headers["Accept"] = "application/json"
+
+resp, err := net.get("https://www.sec.gov/files/company_tickers.json", {
+    headers: headers
+    timeout: 30
+})
+if err != nil {
+    sec_company_tickers_request_error = err
+} else {
+    sec_company_tickers_status = resp.status
+    sec_company_tickers_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            sec_company_tickers_json_error = json_err
+        } else {
+            for key, company := range pairs(data) {
+                if sec_company_tickers_ticker == "" && company.ticker == "AAPL" {
+                    sec_company_tickers_entry_key = tostring(key)
+                    sec_company_tickers_cik = company.cik_str
+                    sec_company_tickers_ticker = company.ticker
+                    sec_company_tickers_title = company.title
+                }
+            }
+        }
+    } else {
+        sec_company_tickers_request_error = resp.statusText
+    }
+}
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	status := mustGetInt(t, vm, "sec_company_tickers_status")
+	skipUnavailableFinRobotLiveData(t, "SEC company tickers", status, getOrNil(t, vm, "sec_company_tickers_request_error"))
+	if status != 200 {
+		t.Fatalf("SEC company tickers status = %d, want 200", status)
+	}
+	if got := getOrNil(t, vm, "sec_company_tickers_json_error"); got != nil {
+		t.Fatalf("SEC company tickers JSON decode failed: %v", got)
+	}
+	if ok := mustGetBool(t, vm, "sec_company_tickers_ok"); !ok {
+		t.Fatalf("SEC company tickers ok = false")
+	}
+	key := mustGetString(t, vm, "sec_company_tickers_entry_key")
+	cik := mustGetInt(t, vm, "sec_company_tickers_cik")
+	ticker := mustGetString(t, vm, "sec_company_tickers_ticker")
+	title := mustGetString(t, vm, "sec_company_tickers_title")
+	fmt.Printf("sec_company_tickers_key=%q cik=%d ticker=%q title=%q\n", key, cik, ticker, title)
+	if key == "" || ticker != "AAPL" || !strings.Contains(title, "Apple") || cik != 320193 {
+		t.Fatalf("unexpected SEC company tickers payload: key=%q cik=%d ticker=%q title=%q", key, cik, ticker, title)
+	}
+}
+
 func TestFinRobotLiveSECCompanyConceptDataIntegration(t *testing.T) {
 	vm := newFinRobotLiveDataVM(t)
 	if err := execFinRobotLiveDataScript(t, vm, `
