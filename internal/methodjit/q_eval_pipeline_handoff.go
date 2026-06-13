@@ -321,7 +321,7 @@ func newQRuntimeEvalPipelineBackend(refs []QEvalPipelinePlanRef) qRuntimeEvalPip
 	backendPlanByID := make(map[int]stdq.EvalPipelineBackendPlan, len(refs))
 	executablePlanByID := make(map[int]stdq.EvalPipelineExecutablePlan, len(refs))
 	for _, ref := range refs {
-		if plan, ok := qEvalPipelineBackendPlanFromRef(ref); ok {
+		if plan, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); ok {
 			descriptorByID[ref.ID] = plan.Descriptor
 			backendPlanByID[ref.ID] = plan
 			if executable, ok := stdq.CompileEvalPipelineBackendPlan(plan); ok {
@@ -562,7 +562,7 @@ func (b qRuntimeEvalPipelineBackend) lookupBackendPlan(ref QEvalPipelinePlanRef)
 			return plan, true
 		}
 	}
-	return qEvalPipelineBackendPlanFromRef(ref)
+	return qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
 }
 
 func (b qRuntimeEvalPipelineBackend) lookupDescriptor(ref QEvalPipelinePlanRef) (stdq.EvalPipelineDescriptor, bool) {
@@ -571,7 +571,7 @@ func (b qRuntimeEvalPipelineBackend) lookupDescriptor(ref QEvalPipelinePlanRef) 
 			return descriptor, true
 		}
 	}
-	return qEvalPipelineDescriptorFromRef(ref)
+	return stdq.EvalPipelineDescriptor{}, false
 }
 
 func (b qRuntimeEvalPipelineBackend) executeEvalPipelineBackendPlan(plan stdq.EvalPipelineBackendPlan) (any, bool, error) {
@@ -642,6 +642,21 @@ func qEvalPipelineTypedRuntimeBackendPlanFromRef(ref QEvalPipelinePlanRef) (stdq
 		return stdq.EvalPipelineBackendPlan{}, false
 	}
 	return plan, true
+}
+
+func qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref QEvalPipelinePlanRef) (stdq.EvalPipelineBackendPlan, bool) {
+	if ref.BackendPlan != nil && ref.BackendPlan.Valid() && ref.BackendPlan.Backend == qEvalPipelineTypedRuntimeBackend {
+		return *ref.BackendPlan, true
+	}
+	source := qEvalPipelinePlanRefMirroredSource(ref)
+	if source == "" {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	plan, ok := qRuntimeEvalPipelinePlanner{}.DescribeQEvalPipelineBackendPlan(source)
+	if !ok || !plan.valid() || plan.plan.Backend != qEvalPipelineTypedRuntimeBackend {
+		return stdq.EvalPipelineBackendPlan{}, false
+	}
+	return qEvalPipelineBackendPlanFromRefSourcePlan(ref, plan.plan)
 }
 
 func qEvalPipelineBackendPlanFromRefSourcePlan(ref QEvalPipelinePlanRef, plan stdq.EvalPipelineBackendPlan) (stdq.EvalPipelineBackendPlan, bool) {

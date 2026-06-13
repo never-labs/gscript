@@ -1232,7 +1232,7 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 				continue
 			}
 			ref := fn.addQEvalPipelinePlan(source, plan)
-			if _, ok := qEvalPipelineTypedRuntimeBackendPlanFromRef(ref); !ok {
+			if _, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); !ok {
 				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, plan.Shape)
 				continue
 			}
@@ -1273,7 +1273,7 @@ func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
 			if !ref.Valid() {
 				continue
 			}
-			typedBackendPlan, ok := qEvalPipelineTypedRuntimeBackendPlanFromRef(ref)
+			typedBackendPlan, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
 			if !ok || !typedBackendPlan.Valid() {
 				continue
 			}

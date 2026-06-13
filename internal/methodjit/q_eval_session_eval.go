@@ -93,10 +93,38 @@ func (cf *CompiledFunction) appendQEvalSessionEvalExecutionStats(out map[qKernel
 	if cf == nil {
 		return
 	}
+	if cf.appendQEvalSessionEvalSiteExecutionStats(out) {
+		return
+	}
 	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRouteShell, "success", cf.QEvalSessionEvalStats.success.Load())
 	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRouteShell, "error", cf.QEvalSessionEvalStats.errors.Load())
 	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRoutePlanned, "success", cf.QEvalSessionEvalStats.plannedSuccess.Load())
 	appendQEvalSessionEvalCounter(out, qEvalSessionEvalRoutePlanned, "error", cf.QEvalSessionEvalStats.plannedErrors.Load())
+}
+
+func (cf *CompiledFunction) appendQEvalSessionEvalSiteExecutionStats(out map[qKernelExecutionKey]uint64) bool {
+	if cf == nil || len(cf.QEvalSessionEvalSites) == 0 {
+		return false
+	}
+	appended := false
+	for _, site := range cf.QEvalSessionEvalSites {
+		if site == nil {
+			continue
+		}
+		if appendQEvalSessionEvalSiteCounter(out, site, qEvalSessionEvalRouteShell, "success", site.stats.success.Load()) {
+			appended = true
+		}
+		if appendQEvalSessionEvalSiteCounter(out, site, qEvalSessionEvalRouteShell, "error", site.stats.errors.Load()) {
+			appended = true
+		}
+		if appendQEvalSessionEvalSiteCounter(out, site, qEvalSessionEvalRoutePlanned, "success", site.stats.plannedSuccess.Load()) {
+			appended = true
+		}
+		if appendQEvalSessionEvalSiteCounter(out, site, qEvalSessionEvalRoutePlanned, "error", site.stats.plannedErrors.Load()) {
+			appended = true
+		}
+	}
+	return appended
 }
 
 const (
@@ -121,6 +149,34 @@ func appendQEvalSessionEvalCounter(out map[qKernelExecutionKey]uint64, route, ou
 		outcome:       outcome,
 		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
 	}] += count
+}
+
+func appendQEvalSessionEvalSiteCounter(out map[qKernelExecutionKey]uint64, site *qEvalSessionEvalSite, route, outcome string, count uint64) bool {
+	if count == 0 || site == nil {
+		return false
+	}
+	shape := site.shape
+	if shape == "" {
+		shape = "q-eval/session-eval"
+	}
+	pipelineShape := site.pipelineShape
+	if pipelineShape == "" {
+		pipelineShape = "unknown"
+	}
+	kernel := site.kernel
+	if kernel == "" {
+		kernel = "QEvalSessionEval"
+	}
+	out[qKernelExecutionKey{
+		source:        "methodjit_q_eval_runtime",
+		kernel:        kernel,
+		shape:         shape,
+		pipelineShape: pipelineShape,
+		route:         route,
+		outcome:       outcome,
+		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
+	}] += count
+	return true
 }
 
 // qCallIsLowerableQSessionEval reports whether a call instruction matches the
@@ -330,6 +386,12 @@ func qEvalSessionEvalNopDeadEvalFields(fn *Function) {
 // correct (they re-resolve and overwrite each other without corruption).
 type qEvalSessionEvalSite struct {
 	planned atomic.Pointer[qEvalSessionEvalPlanned]
+	stats   qEvalSessionEvalExecutionCounters
+	kernel  string
+	shape   string
+	// pipelineShape records the q runtime descriptor family for typed sources.
+	// Untyped session sources keep the generic "unknown" session-eval row.
+	pipelineShape string
 	// resumeOff/resumeOffNumeric memoize the native resume code offset for
 	// the slim exit lane (tiering_exit_fast_q_eval.go): 0 = unresolved,
 	// -1 = known-missing, >0 = offset into cf.Code. Fills are idempotent
@@ -379,10 +441,36 @@ func qEvalSessionEvalSiteTable(fn *Function) []*qEvalSessionEvalSite {
 			if instr == nil || instr.Op != OpQEvalSessionEval {
 				continue
 			}
-			sites[instr.ID] = &qEvalSessionEvalSite{}
+			sites[instr.ID] = qEvalSessionEvalSiteFromInstr(fn, instr)
 		}
 	}
 	return sites
+}
+
+func qEvalSessionEvalSiteFromInstr(fn *Function, instr *Instr) *qEvalSessionEvalSite {
+	site := &qEvalSessionEvalSite{
+		kernel:        "QEvalSessionEval",
+		shape:         "q-eval/session-eval",
+		pipelineShape: "unknown",
+	}
+	if fn == nil || instr == nil {
+		return site
+	}
+	source, ok := qConstStringAt(fn, int(instr.Aux))
+	if !ok {
+		return site
+	}
+	plan, ok := stdq.DescribeEvalPipelineBackendPlan(source)
+	if !ok || !plan.Valid() {
+		return site
+	}
+	site.kernel = plan.Descriptor.Kernel
+	site.shape = plan.Descriptor.Shape
+	site.pipelineShape = plan.Descriptor.PipelineShape
+	if site.pipelineShape == "" {
+		site.pipelineShape = qKernelExecutionPipelineShape(site.kernel, site.shape)
+	}
+	return site
 }
 
 // qEvalSessionEvalSite returns the planned-executor cache for an
@@ -425,13 +513,40 @@ func (cf *CompiledFunction) executeQEvalSessionEval(instrID, aux int, receiver r
 			if planned != nil {
 				out, err := planned.exec(runtime.NilValue())
 				cf.recordQEvalSessionEvalPlannedExecution(err)
+				site.recordPlannedExecution(err)
 				return out, err
 			}
+			out, err := executeQEvalSessionEvalValue(cf.protoConstants(), aux, receiver)
+			cf.recordQEvalSessionEvalExecution(err)
+			site.recordShellExecution(err)
+			return out, err
 		}
 	}
 	out, err := executeQEvalSessionEvalValue(cf.protoConstants(), aux, receiver)
 	cf.recordQEvalSessionEvalExecution(err)
 	return out, err
+}
+
+func (site *qEvalSessionEvalSite) recordShellExecution(err error) {
+	if site == nil {
+		return
+	}
+	if err != nil {
+		site.stats.errors.Add(1)
+		return
+	}
+	site.stats.success.Add(1)
+}
+
+func (site *qEvalSessionEvalSite) recordPlannedExecution(err error) {
+	if site == nil {
+		return
+	}
+	if err != nil {
+		site.stats.plannedErrors.Add(1)
+		return
+	}
+	site.stats.plannedSuccess.Add(1)
 }
 
 // protoConstants returns the compiled proto's constant pool (nil-safe).

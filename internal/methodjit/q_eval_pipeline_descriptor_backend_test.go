@@ -504,6 +504,13 @@ func TestQEvalPipelineBackendPlanFromRefKeepsDescriptorOnlyLegacyFallback(t *tes
 	if !ok || !plan.Valid() || plan.Shape() != qEvalPipelinePlanRefShape(ref) {
 		t.Fatalf("qEvalPipelineBackendPlanFromRef legacy descriptor = %+v/%v, want valid mirror plan", plan, ok)
 	}
+	if plan, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); ok {
+		t.Fatalf("qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef accepted legacy mirror plan: %+v", plan)
+	}
+	backend := newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref})
+	if plan, ok := backend.lookupBackendPlan(ref); ok {
+		t.Fatalf("runtime backend accepted legacy mirror plan: %+v", plan)
+	}
 }
 
 func TestQEvalPipelineTypedRuntimeBackendPlanRejectsHeuristicPlan(t *testing.T) {

@@ -527,7 +527,7 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 		}
 		sessionEvalCounts := func() (planned, shell uint64) {
 			for _, stat := range tm.QKernelExecutionStatsFor(runProto) {
-				if stat.Kernel != "QEvalSessionEval" {
+				if stat.Source != "methodjit_q_eval_runtime" {
 					continue
 				}
 				switch stat.Route {

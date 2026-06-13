@@ -86,6 +86,35 @@ func TestExecuteQEvalSessionEvalPlannedRoute(t *testing.T) {
 	}
 }
 
+func TestExecuteQEvalSessionEvalStatsUseSiteBackendShape(t *testing.T) {
+	receiver := qSessionEvalPlannedTestSession(t)
+	const source = "x:til 64;y:x+1;idx:where (x mod 4)=1;+/y[idx]"
+	cf := &CompiledFunction{
+		Proto: &vm.FuncProto{Constants: []runtime.Value{runtime.StringValue(source)}},
+		QEvalSessionEvalSites: []*qEvalSessionEvalSite{7: {
+			kernel:        "QScriptPipelinePlan",
+			shape:         "script-pipeline/where-index-reduce/sum-mod/assignments",
+			pipelineShape: "script_pipeline",
+		}},
+	}
+
+	out, err := cf.executeQEvalSessionEval(7, 0, receiver)
+	if err != nil || !out.IsInt() || out.Int() != 512 {
+		t.Fatalf("executeQEvalSessionEval = %s,%v; want 512,nil", out.String(), err)
+	}
+	for _, stat := range cf.QKernelExecutionStats() {
+		if stat.Kernel == "QScriptPipelinePlan" &&
+			stat.Shape == "script-pipeline/where-index-reduce/sum-mod/assignments" &&
+			stat.PipelineShape == "script_pipeline" &&
+			stat.Route == "session_planned_op_exit" &&
+			stat.Outcome == "success" &&
+			stat.Count == 1 {
+			return
+		}
+	}
+	t.Fatalf("QKernelExecutionStats missing site backend shape row: %#v", cf.QKernelExecutionStats())
+}
+
 // TestExecuteQEvalSessionEvalShellFallback pins the fallback: receivers
 // without the reserved planned-eval resolver (plain tables exposing only an
 // eval function) keep working through the host-eval shell, and sites missing
