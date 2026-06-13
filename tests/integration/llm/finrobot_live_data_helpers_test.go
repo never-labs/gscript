@@ -89,7 +89,7 @@ func skipUnavailableFinRobotCredentialedLiveData(t *testing.T, provider string, 
 
 func skipUnavailableFinRobotPublicLiveData(t *testing.T, provider string, status int64, requestErr any) {
 	t.Helper()
-	if status == 401 {
+	if status == 401 || status == 404 {
 		t.Skipf("%s public live data endpoint requires auth or blocked this run: status=%d error=%v", provider, status, requestErr)
 	}
 	skipUnavailableFinRobotLiveData(t, provider, status, requestErr)
