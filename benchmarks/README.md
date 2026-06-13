@@ -341,7 +341,13 @@ families first, then feed it to the report:
     -bench 'Benchmark(QEvalVector|QSessionEvalVector)' \
     -benchmem -benchtime=100x
   go test ./internal/methodjit -run '^$' \
-    -bench 'BenchmarkQEvalPipeline(NativeExitCallpath|ArrayRuntimeBridge)' \
+    -bench 'BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit' \
+    -benchmem -benchtime=100x
+  go test ./internal/methodjit -run '^$' \
+    -bench 'BenchmarkQEvalPipelineArrayRuntimeBridge/Bulk' \
+    -benchmem -benchtime=100x
+  go test ./internal/methodjit -run '^$' \
+    -bench 'BenchmarkQFrameVectorMethodJITRoute' \
     -benchmem -benchtime=100x
 } | tee /tmp/qbench.txt
 

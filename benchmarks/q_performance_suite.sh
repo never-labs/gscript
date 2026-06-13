@@ -41,3 +41,21 @@ go test ./benchmarks -run '^$' \
   -benchmem \
   -benchtime="${LEIA_GO_BENCHTIME}" \
   -count="${LEIA_GO_BENCHCOUNT}"
+
+go test ./internal/methodjit -run '^$' \
+  -bench 'BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit' \
+  -benchmem \
+  -benchtime="${LEIA_GO_BENCHTIME}" \
+  -count="${LEIA_GO_BENCHCOUNT}"
+
+go test ./internal/methodjit -run '^$' \
+  -bench 'BenchmarkQEvalPipelineArrayRuntimeBridge/Bulk' \
+  -benchmem \
+  -benchtime="${LEIA_GO_BENCHTIME}" \
+  -count="${LEIA_GO_BENCHCOUNT}"
+
+go test ./internal/methodjit -run '^$' \
+  -bench 'BenchmarkQFrameVectorMethodJITRoute' \
+  -benchmem \
+  -benchtime="${LEIA_GO_BENCHTIME}" \
+  -count="${LEIA_GO_BENCHCOUNT}"

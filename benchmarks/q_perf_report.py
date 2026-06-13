@@ -105,7 +105,11 @@ QEVAL_BENCH = (
     ")"
 )
 
-QJIT_BENCH = "BenchmarkQEvalPipeline(NativeExitCallpath|ArrayRuntimeBridge)"
+QJIT_BENCHES = (
+    ("qjit-typed-runtime-callpath", "BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit"),
+    ("qjit-array-runtime-bridge", "BenchmarkQEvalPipelineArrayRuntimeBridge/Bulk"),
+    ("qjit-backend-route", "BenchmarkQFrameVectorMethodJITRoute"),
+)
 
 Q_EVAL_FAMILY_DEFS = (
     (
@@ -3119,15 +3123,16 @@ def main(argv: list[str]) -> int:
         rows.update(qeval_rows)
         pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qeval.output))
 
-        qjit = run_command(
-            "qjit-typed-runtime-callpath",
-            ["go", "test", "./internal/methodjit", "-run", "^$", "-bench", QJIT_BENCH, "-benchmem", f"-benchtime={args.benchtime}"],
-        )
-        qjit_rows = parse_go_benchmarks(qjit.output)
-        qjit.parsed_benchmark_count = len(qjit_rows)
-        commands.append(qjit)
-        rows.update(qjit_rows)
-        pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qjit.output))
+        for label, bench in QJIT_BENCHES:
+            qjit = run_command(
+                label,
+                ["go", "test", "./internal/methodjit", "-run", "^$", "-bench", bench, "-benchmem", f"-benchtime={args.benchtime}"],
+            )
+            qjit_rows = parse_go_benchmarks(qjit.output)
+            qjit.parsed_benchmark_count = len(qjit_rows)
+            commands.append(qjit)
+            rows.update(qjit_rows)
+            pipeline_fallback_rows.extend(parse_q_pipeline_fallback_reports(qjit.output))
 
     for path in args.timing_json:
         current_vs_old.extend(parse_timing_compare_json(path))

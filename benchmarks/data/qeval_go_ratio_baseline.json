@@ -1969,10 +1969,10 @@
     "max_leia_realdata_go_ratio": 15,
     "max_pipeline_fallback_shapes": 20.0,
     "max_typed_fallbacks_op": 50.0,
-    "min_runtime_array_bridge_benchmarks": 0,
-    "min_runtime_backend_route_benchmarks": 0,
-    "min_runtime_backend_route_hits_op": 0,
-    "min_runtime_jit_backend_benchmarks": 0,
+    "min_runtime_array_bridge_benchmarks": 5,
+    "min_runtime_backend_route_benchmarks": 1,
+    "min_runtime_backend_route_hits_op": 2,
+    "min_runtime_jit_backend_benchmarks": 3,
     "min_typed_hit_pct": 8.0
   },
   "realdata_cases": {

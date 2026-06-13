@@ -323,7 +323,60 @@ func TestQSQLKernelPipelineShapeHandoffFeedsMethodJITDescriptorStats(t *testing.
 	qBindAssertIntField(t, nested, "misses", 1)
 }
 
-func qMethodJITBridgeFrame(t *testing.T) *runtime.Table {
+func BenchmarkQFrameVectorMethodJITRoute(b *testing.B) {
+	cf := &CompiledFunction{}
+	adapter := cf.qFrameVectorRuntimeExecutionAdapter()
+	mask := runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true, false, true, false, true, false}))
+	trueValues := runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30, 40, 50, 60, 70, 80}))
+	falseValues := runtime.IntValue(0)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cf.recordQRuntimePrimitiveExecution(OpFrameColumn, "success")
+		out, err := adapter.executeQVectorWhereReduce(
+			0,
+			int(runtime.DenseArrayReduceSum),
+			mask,
+			trueValues,
+			falseValues,
+			qTypedRuntimeExecutionRouteOpExit,
+		)
+		if err != nil {
+			b.Fatalf("executeQVectorWhereReduce: %v", err)
+		}
+		if !out.IsInt() || out.Int() != 160 {
+			b.Fatalf("executeQVectorWhereReduce = %v, want int 160", out)
+		}
+	}
+	b.StopTimer()
+	var frameSuccess, frameErrors, vectorSuccess, vectorErrors uint64
+	accumulateMethodJITRouteBenchmarkStats(cf.QKernelExecutionStats(), &frameSuccess, &frameErrors, &vectorSuccess, &vectorErrors)
+	b.ReportMetric(float64(frameSuccess)/float64(b.N), "methodjit_frame_runtime_success/op")
+	b.ReportMetric(float64(frameErrors)/float64(b.N), "methodjit_frame_runtime_errors/op")
+	b.ReportMetric(float64(vectorSuccess)/float64(b.N), "methodjit_vector_runtime_success/op")
+	b.ReportMetric(float64(vectorErrors)/float64(b.N), "methodjit_vector_runtime_errors/op")
+}
+
+func accumulateMethodJITRouteBenchmarkStats(stats []QKernelExecutionStat, frameSuccess, frameErrors, vectorSuccess, vectorErrors *uint64) {
+	for _, stat := range stats {
+		switch stat.Source {
+		case "methodjit_q_frame_runtime":
+			if stat.Outcome == "success" {
+				*frameSuccess += stat.Count
+			} else if stat.Outcome == "error" {
+				*frameErrors += stat.Count
+			}
+		case "methodjit_q_vector_runtime":
+			if stat.Outcome == "success" {
+				*vectorSuccess += stat.Count
+			} else if stat.Outcome == "error" {
+				*vectorErrors += stat.Count
+			}
+		}
+	}
+}
+
+func qMethodJITBridgeFrame(t testing.TB) *runtime.Table {
 	t.Helper()
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
