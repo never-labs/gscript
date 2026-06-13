@@ -477,7 +477,7 @@ can preserve source identity before prompt assembly:
 policy_doc := llm.document({
     id: "policy"
     title: "Release policy"
-    source: "docs/release.md"
+    source: "docs/release/index.md"
     sections: {
         approvals: "Production releases require owner approval."
         rollback: "Rollback plans must name the on-call."

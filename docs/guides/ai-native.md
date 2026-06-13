@@ -368,7 +368,7 @@ pipelines:
 policy_doc := llm.document({
     id: "release_policy"
     title: "Release policy"
-    source: "docs/release.md"
+    source: "docs/release/index.md"
     sections: {
         approval: "Production releases require owner approval."
         rollback: "Rollback plans must name the on-call."
