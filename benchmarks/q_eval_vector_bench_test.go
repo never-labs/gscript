@@ -4934,6 +4934,11 @@ func TestQEvalVectorRuntimeFallbackReport(t *testing.T) {
 	for _, line := range report.LogLines(10) {
 		t.Log(line)
 	}
+	for _, row := range report.Rows() {
+		if row.key.kernel == "ArrayNumericUnaryMultiSum" {
+			t.Fatalf("ArrayNumericUnaryMultiSum fallback remains: %+v", row)
+		}
+	}
 }
 
 func TestQEvalVectorTargetGoBaselinesDoRealWork(t *testing.T) {

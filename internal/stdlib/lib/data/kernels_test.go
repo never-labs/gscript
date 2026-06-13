@@ -3409,6 +3409,51 @@ func TestTypedNumericUnaryBinaryAndAggregates(t *testing.T) {
 		t.Fatalf("TryTypedQNumericUnarySum abs = %v, %v; want 5, true", value, ok)
 	}
 
+	multi, ok, err := TryTypedQNumericUnaryMultiSum(
+		[]string{NumericUnaryAbs, NumericUnaryNeg, NumericUnaryFloor, NumericUnaryCeiling, NumericUnarySqrt},
+		NewI64([]int64{1, 4, 9}),
+	)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryMultiSum dense int returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnaryMultiSum dense int did not match")
+	}
+	wantMulti := []any{int64(14), int64(-14), int64(14), int64(14), float64(6)}
+	if len(multi) != len(wantMulti) {
+		t.Fatalf("TryTypedQNumericUnaryMultiSum dense int returned %d values, want %d: %#v", len(multi), len(wantMulti), multi)
+	}
+	for i, want := range wantMulti {
+		switch want := want.(type) {
+		case float64:
+			if math.Abs(multi[i].(float64)-want) > 1e-12 {
+				t.Fatalf("TryTypedQNumericUnaryMultiSum dense int[%d] = %.17g, want %.17g", i, multi[i].(float64), want)
+			}
+		default:
+			if multi[i] != want {
+				t.Fatalf("TryTypedQNumericUnaryMultiSum dense int[%d] = %#v, want %#v", i, multi[i], want)
+			}
+		}
+	}
+	crossZeroRange := NewI64Range(-3, 1, 7)
+	rangeOps := []string{NumericUnaryAbs, NumericUnaryNeg, NumericUnarySignum}
+	rangeMulti, ok, err := TryTypedQNumericUnaryMultiSum(rangeOps, crossZeroRange)
+	if err != nil {
+		t.Fatalf("TryTypedQNumericUnaryMultiSum cross-zero range returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("TryTypedQNumericUnaryMultiSum cross-zero range did not match")
+	}
+	for i, op := range rangeOps {
+		want, ok, err := TryTypedQNumericUnarySum(op, crossZeroRange)
+		if err != nil || !ok {
+			t.Fatalf("TryTypedQNumericUnarySum(%s) cross-zero range = %#v,%v,%v; want handled", op, want, ok, err)
+		}
+		if rangeMulti[i] != want {
+			t.Fatalf("TryTypedQNumericUnaryMultiSum cross-zero range[%d/%s] = %#v, want %#v", i, op, rangeMulti[i], want)
+		}
+	}
+
 	value, ok, err = TryTypedQNumericUnarySum(NumericUnaryNeg, NewI64Range(0, 1, 5))
 	if err != nil {
 		t.Fatalf("TryTypedQNumericUnarySum neg range returned error: %v", err)

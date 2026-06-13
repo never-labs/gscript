@@ -840,6 +840,34 @@ func TestQPipelinePlanRecognizesNumericUnaryComposedShapes(t *testing.T) {
 	}
 }
 
+func TestQNumericUnaryMultiSumHandlesDenseIntegerAndCrossZeroRange(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	got, err := NewEvalState(nil).Eval("x:(til 16)-8;(+/abs x)+(+/neg x)+(+/signum x)")
+	if err != nil {
+		t.Fatalf("Eval(numeric unary multi-sum cross-zero range) returned error: %v", err)
+	}
+	if got != int64(71) {
+		t.Fatalf("Eval(numeric unary multi-sum cross-zero range) = %#v, want 71", got)
+	}
+	seenHit := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel != "ArrayNumericUnaryMultiSum" {
+			continue
+		}
+		if stat.Outcome == "fallback" || stat.Outcome == "error" {
+			t.Fatalf("unexpected ArrayNumericUnaryMultiSum fallback/error: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+		if stat.Outcome == "hit" {
+			seenHit = true
+		}
+	}
+	if !seenHit {
+		t.Fatalf("missing ArrayNumericUnaryMultiSum hit; stats=%#v", RuntimeKernelExecutionStats())
+	}
+}
+
 func TestQPipelinePlanRecognizesCastEnvelope(t *testing.T) {
 	src := "(`long$3.7)+(\"J\"$\"42\")+(\"I\"$\"17\")+(count `$\"AAPL\")+(count string `$\"MSFT\")"
 	ClearRuntimeKernelExecutionStats()

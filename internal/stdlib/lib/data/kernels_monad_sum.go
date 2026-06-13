@@ -166,12 +166,16 @@ func TryTypedQNumericUnaryMultiSumPlanned(plan *QNumericUnaryMultiSumPlan, array
 		array = attributed.array
 	}
 	if values, ok := array.(i64RangeArray); ok {
-		return monadMultiSumI64Range(ops, codes, values)
+		if out, handled, err := monadMultiSumI64Range(ops, codes, values); err != nil || handled {
+			return out, handled, err
+		}
 	}
 	if kind := array.Kind(); kind != KindF64 && kind != KindF32 {
-		// Integer-kind arrays route through integer single-op kernels with
-		// integer accumulators; the float64 flatten below would not be
-		// bit-identical for them.
+		if values, owned, ok := tryBulkI64Values(array); ok {
+			out, handled, err := monadMultiSumI64Values(ops, codes, values)
+			bulkI64Release(values, owned)
+			return out, handled, err
+		}
 		return nil, false, nil
 	}
 	if values, ok := array.(f64RangeArray); ok {
@@ -220,6 +224,27 @@ func monadMultiSumFloatValues(ops []string, codes []monadSumOpcode, values []flo
 			return nil, handled, err
 		}
 		out[i] = value
+	}
+	return out, true, nil
+}
+
+func monadMultiSumI64Values(ops []string, codes []monadSumOpcode, values []int64) ([]any, bool, error) {
+	out := make([]any, len(codes))
+	for i := range codes {
+		switch codes[i] {
+		case monadSumFloor, monadSumCeiling:
+			var sum int64
+			for _, value := range values {
+				sum += value
+			}
+			out[i] = sum
+		default:
+			value, handled, err := qNumericUnarySumI64Values(ops[i], values)
+			if err != nil || !handled {
+				return nil, handled, err
+			}
+			out[i] = value
+		}
 	}
 	return out, true, nil
 }
