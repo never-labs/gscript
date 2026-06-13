@@ -122,14 +122,29 @@ type qPipelineBindingCacheKey struct {
 
 type qPipelineBoundPlan struct {
 	key            qPipelineBindingCacheKey
-	resultClass    string
+	resultClass    qPipelineBoundResultClass
 	resultKind     data.Kind
 	kernel         string
 	kernelShape    string
 	fallbackReason string
 }
 
-func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, resultClass string, resultKind data.Kind, kernel, kernelShape string) {
+type qPipelineBoundResultClass uint8
+
+const (
+	qPipelineBoundResultInvalid qPipelineBoundResultClass = iota
+	qPipelineBoundResultArray
+	qPipelineBoundResultScalar
+	qPipelineBoundResultMovingSum
+	qPipelineBoundResultArrayCount
+	qPipelineBoundResultCompareStatsSum
+	qPipelineBoundResultCompareIndexSum
+	qPipelineBoundResultCompareCount
+	qPipelineBoundResultCompareStatsCount
+	qPipelineBoundResultCompareIndexCount
+)
+
+func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, resultClass qPipelineBoundResultClass, resultKind data.Kind, kernel, kernelShape string) {
 	qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
 		key:            key,
 		resultClass:    resultClass,
@@ -1749,7 +1764,7 @@ func (s *EvalState) evalQPipelineSumSequenceTransform(plan *qPipelinePlan) (any,
 	}
 	bound := qPipelineBoundPlan{
 		key:            bindingKey,
-		resultClass:    "array",
+		resultClass:    qPipelineBoundResultArray,
 		resultKind:     qRuntimeKernelOperandKind(value, nil),
 		kernel:         "SequenceTransformSum",
 		kernelShape:    shape,
@@ -2299,7 +2314,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool
 	_, sum, handled, err := s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			qPipelineStoreWhereCompareBound(bindingKey, "compare_stats_sum", "", "ArrayWhereCompareStats", qPipelineWhereCompareStatsShape(plan, left, right))
+			qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareStatsSum, "", "ArrayWhereCompareStats", qPipelineWhereCompareStatsShape(plan, left, right))
 		}
 		return sum, handled, err
 	}
@@ -2307,7 +2322,7 @@ func (s *EvalState) evalQPipelineSumWhereCompare(plan *qPipelinePlan) (any, bool
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	qPipelineStoreWhereCompareBound(bindingKey, "compare_index_sum", indexes.Kind(), "ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()))
+	qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareIndexSum, indexes.Kind(), "ArrayWhereCompareSum", "index-sum/"+string(indexes.Kind()))
 	return qPipelineWhereCompareIndexesSum(indexes)
 }
 
@@ -2326,14 +2341,14 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bo
 	count, handled, err := s.evalQPipelineWhereCompareCountForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			qPipelineStoreWhereCompareBound(bindingKey, "compare_count", "", "ArrayWhereCompareCount", qPipelineWhereCompareCountShape(plan, left, right))
+			qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareCount, "", "ArrayWhereCompareCount", qPipelineWhereCompareCountShape(plan, left, right))
 		}
 		return count, handled, err
 	}
 	count, _, handled, err = s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 	if err != nil || handled {
 		if handled {
-			qPipelineStoreWhereCompareBound(bindingKey, "compare_stats_count", "", "ArrayWhereCompareStats", qPipelineWhereCompareStatsShape(plan, left, right))
+			qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareStatsCount, "", "ArrayWhereCompareStats", qPipelineWhereCompareStatsShape(plan, left, right))
 		}
 		return count, handled, err
 	}
@@ -2341,16 +2356,16 @@ func (s *EvalState) evalQPipelineCountWhereCompare(plan *qPipelinePlan) (any, bo
 	if err != nil || !handled {
 		return nil, handled, err
 	}
-	qPipelineStoreWhereCompareBound(bindingKey, "compare_index_count", indexes.Kind(), "ArrayWhereCompare", qPipelineWhereCompareIndexShape(plan, left, right))
+	qPipelineStoreWhereCompareBound(bindingKey, qPipelineBoundResultCompareIndexCount, indexes.Kind(), "ArrayWhereCompare", qPipelineWhereCompareIndexShape(plan, left, right))
 	return int64(indexes.Len()), true, nil
 }
 
 func (s *EvalState) evalQPipelineSumWhereCompareBound(plan *qPipelinePlan, bound qPipelineBoundPlan, left, right any) (any, bool, error) {
 	switch bound.resultClass {
-	case "compare_stats_sum":
+	case qPipelineBoundResultCompareStatsSum:
 		_, sum, handled, err := s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 		return sum, handled, err
-	case "compare_index_sum":
+	case qPipelineBoundResultCompareIndexSum:
 		indexes, handled, err := s.evalQPipelineWhereCompareIndexesArrayForOperands(plan, left, right)
 		if err != nil || !handled {
 			return nil, handled, err
@@ -2366,13 +2381,13 @@ func (s *EvalState) evalQPipelineSumWhereCompareBound(plan *qPipelinePlan, bound
 
 func (s *EvalState) evalQPipelineCountWhereCompareBound(plan *qPipelinePlan, bound qPipelineBoundPlan, left, right any) (any, bool, error) {
 	switch bound.resultClass {
-	case "compare_count":
+	case qPipelineBoundResultCompareCount:
 		count, handled, err := s.evalQPipelineWhereCompareCountForOperands(plan, left, right)
 		return count, handled, err
-	case "compare_stats_count":
+	case qPipelineBoundResultCompareStatsCount:
 		count, _, handled, err := s.evalQPipelineWhereCompareIndexStatsForOperands(plan, left, right)
 		return count, handled, err
-	case "compare_index_count":
+	case qPipelineBoundResultCompareIndexCount:
 		indexes, handled, err := s.evalQPipelineWhereCompareIndexesArrayForOperands(plan, left, right)
 		if err != nil || !handled {
 			return nil, handled, err
@@ -2672,7 +2687,7 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, 
 	if _, ok := numeric(value); ok {
 		qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
 			key:         bindingKey,
-			resultClass: "scalar",
+			resultClass: qPipelineBoundResultScalar,
 			resultKind:  qRuntimeKernelOperandKind(value, nil),
 		})
 		return value, true, nil
@@ -2684,7 +2699,7 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, 
 	shape := "vector-reduce/sum-expr/" + string(array.Kind())
 	bound := qPipelineBoundPlan{
 		key:            bindingKey,
-		resultClass:    "array",
+		resultClass:    qPipelineBoundResultArray,
 		resultKind:     array.Kind(),
 		kernel:         "ArraySumExpr",
 		kernelShape:    shape,
@@ -2695,7 +2710,7 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, 
 }
 
 func (s *EvalState) evalQPipelineSumVectorExprBound(bound qPipelineBoundPlan, value any) (any, bool, error) {
-	if bound.resultClass == "scalar" {
+	if bound.resultClass == qPipelineBoundResultScalar {
 		if _, ok := numeric(value); !ok {
 			return nil, false, nil
 		}
@@ -2748,7 +2763,7 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan *qPipelinePlan) (any, bool
 	}
 	shape := "vector-reduce/sum-" + plan.compareOp + "/" + string(array.Kind())
 	bound := qPipelineBoundPlan{
-		resultClass:    "moving_sum",
+		resultClass:    qPipelineBoundResultMovingSum,
 		resultKind:     array.Kind(),
 		kernel:         "ArrayMovingWindowSum",
 		kernelShape:    shape,
@@ -2758,7 +2773,7 @@ func (s *EvalState) evalQPipelineSumMovingWindow(plan *qPipelinePlan) (any, bool
 }
 
 func evalQPipelineSumMovingWindowBound(plan *qPipelinePlan, bound qPipelineBoundPlan, array data.Array, width int, alpha float64) (any, bool, error) {
-	if bound.resultClass != "moving_sum" || array.Kind() != bound.resultKind {
+	if bound.resultClass != qPipelineBoundResultMovingSum || array.Kind() != bound.resultKind {
 		return nil, false, nil
 	}
 	var (
@@ -2969,7 +2984,7 @@ func (s *EvalState) evalQPipelineCountVectorExpr(plan *qPipelinePlan) (any, bool
 	}
 	bound := qPipelineBoundPlan{
 		key:         bindingKey,
-		resultClass: "array_count",
+		resultClass: qPipelineBoundResultArrayCount,
 		resultKind:  array.Kind(),
 		kernel:      "ArrayCountExpr",
 		kernelShape: "vector-count/expr/" + string(array.Kind()),
@@ -2979,7 +2994,7 @@ func (s *EvalState) evalQPipelineCountVectorExpr(plan *qPipelinePlan) (any, bool
 }
 
 func evalQPipelineCountVectorExprBound(bound qPipelineBoundPlan, array data.Array) (any, bool, error) {
-	if bound.resultClass != "array_count" || array.Kind() != bound.resultKind {
+	if bound.resultClass != qPipelineBoundResultArrayCount || array.Kind() != bound.resultKind {
 		return nil, false, nil
 	}
 	shape := bound.kernelShape

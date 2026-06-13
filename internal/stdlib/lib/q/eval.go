@@ -13759,18 +13759,11 @@ func applyCompositeDyadic(op string, left, right any) (any, error) {
 		la, lok := left.(data.Array)
 		ra, rok := right.(data.Array)
 		if lok || rok {
-			shape := qRuntimeKernelCompositeVectorDyadicShape(op, left, right, la, ra)
-			if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
-				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
-				recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
-			} else if out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra); err != nil || handled {
-				out, handled, err = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
+			if out, handled, err := qTryTypedRuntimeVectorCompareDyadic(op, dataOp, left, right, la, ra, true); err != nil || handled {
 				if err != nil {
 					return nil, err
 				}
 				return out, nil
-			} else {
-				_, _, _ = qTypedRuntimeResult("ArrayDyadicCompare", shape, out, handled, err)
 			}
 		} else if out, err := data.ApplyBinary(dataOp, left, right); err == nil {
 			return out, nil
@@ -14042,19 +14035,13 @@ func applyVectorDyadic(op byte, left, right any, la, ra data.Array) (data.Array,
 		}
 	}
 	if dataOp, ok := qDataComparisonOp(op); ok {
-		if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
-			shape := qRuntimeKernelVectorDyadicShape(op, left, right, la, ra)
-			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
-			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
-		} else {
-			out, handled, err := qTryTypedRuntimeVectorCompareDyadic(string(op), dataOp, left, right, la, ra)
-			if err != nil {
-				return nil, err
-			}
-			if handled {
-				if array, ok := out.(data.Array); ok {
-					return array, nil
-				}
+		out, handled, err := qTryTypedRuntimeVectorCompareDyadic(string(op), dataOp, left, right, la, ra, true)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			if array, ok := out.(data.Array); ok {
+				return array, nil
 			}
 		}
 	}

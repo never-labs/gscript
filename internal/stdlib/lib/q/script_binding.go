@@ -730,7 +730,7 @@ func (s *EvalState) evalQScriptBinaryBinding(plan *qScriptBindingPlan, resolver 
 		la, _ := left.(data.Array)
 		ra, _ := right.(data.Array)
 		if la != nil || ra != nil {
-			out, handled, err := qTryTypedRuntimeVectorCompareDyadic(plan.op, dataOp, left, right, la, ra)
+			out, handled, err := qTryTypedRuntimeVectorCompareDyadic(plan.op, dataOp, left, right, la, ra, true)
 			if err != nil {
 				return nil, true, err
 			}

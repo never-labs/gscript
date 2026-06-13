@@ -67,13 +67,21 @@ func evalQTypedRuntimeKernel2[A, B any](kernel qTypedRuntimeKernel2[A, B]) (A, B
 	return a, b, handled, err
 }
 
-func qTryTypedRuntimeVectorCompareDyadic(op string, dataOp data.Op, left, right any, la, ra data.Array) (any, bool, error) {
+func qTryTypedRuntimeVectorCompareDyadic(op string, dataOp data.Op, left, right any, la, ra data.Array, recordUnsupportedProbe bool) (any, bool, error) {
 	if la == nil && ra == nil {
+		return nil, false, nil
+	}
+	shape := qRuntimeKernelCompositeVectorDyadicShape(op, left, right, la, ra)
+	if !qVectorDyadicCanUseTypedCompare(left, right, la, ra) {
+		if recordUnsupportedProbe {
+			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "attempt", "attempt")
+			recordRuntimeKernelExecution("ArrayDyadicCompare", shape, "fallback", RuntimeFallbackUnsupportedType)
+		}
 		return nil, false, nil
 	}
 	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[any]{
 		kernel:         "ArrayDyadicCompare",
-		shape:          qRuntimeKernelCompositeVectorDyadicShape(op, left, right, la, ra),
+		shape:          shape,
 		fallbackReason: RuntimeFallbackUnsupportedType,
 		call: func() (any, bool, error) {
 			out, handled, err := qTryTypedCompareMask(dataOp, left, right, la, ra)

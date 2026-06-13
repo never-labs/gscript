@@ -557,14 +557,6 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 		// that corpus, not chased one regex at a time.
 		return true
 	}
-	// FINDING (this fuzzer): an empty string literal GLUED to a word or
-	// digit (`count ""where 0<>0`) still splits differently between the
-	// routes (the R14 string-juxtaposition family's error-message variant).
-	// Skipped on mismatch until glued string-literal tokenisation is
-	// reconciled.
-	if qEvalGluedEmptyStringPattern.MatchString(stmt) {
-		return true
-	}
 	// FINDING (this fuzzer): digit/string-literal juxtaposition (1 " ",
 	// asc 1 " ", ""0 where 0) differs between routes — the compiled route
 	// folds the juxtaposition while the string route rejects or
@@ -631,7 +623,6 @@ func qEvalKnownDivergenceRecord(record stdq.EvalCompiledDifferentialRecord, src 
 
 var (
 	qEvalNamedBracketCallPattern = regexp.MustCompile(`[A-Za-z]\w*\[`)
-	qEvalGluedEmptyStringPattern = regexp.MustCompile(`""[A-Za-z0-9]|[A-Za-z0-9]""`)
 	qEvalDigitStringJuxtaposed   = regexp.MustCompile(`[0-9]\s*"|"\s*[0-9]`)
 	qEvalPrefixEnlistOpPattern   = regexp.MustCompile(`(^|[ ;(]),\S*[#_$!?%*+&|<>=~^-]`)
 	qEvalGluedOpWordPattern      = regexp.MustCompile(`[A-Za-z][%^_#,!.<>=*+&|-]|[%^_#,!.<>=*+&|-][A-Za-z]`)
@@ -647,7 +638,6 @@ var qEvalKnownDivergenceRepresentatives = []string{
 	// `("J"$"0")+(B $"")$(0"")` healed by the combined R15/R16 merges (cast
 	// error spelling unified). Removed (shrink-only ratchet).
 	"(count c$000 00 00000000000)!(Coun!A000000000000000)!su! raz! 00000000", // same spelling family via dict-bang
-	`x:0;count ""where 0<>0`, // glued empty-string juxtaposition splits differently
 	"x:til 0;sum 0 rotate,x", // glued ,-join after a word verb splits differently
 	"x:`0 0;sum 1 rotate x",  // two-verb chain over non-numeric operands: fused error text differs
 	"+/,00`_",                // glued symbol-literal tokenisation differs
