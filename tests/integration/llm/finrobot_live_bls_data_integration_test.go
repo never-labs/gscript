@@ -42,20 +42,24 @@ if err != nil {
             bls_cpi_json_error = json_err
         } else {
             bls_cpi_status = data.status
-            series := data.Results.series
-            bls_cpi_series_count = #series
-            if bls_cpi_series_count > 0 {
-                row := series[1]
-                bls_cpi_series_id = row.seriesID
-                observations := row.data
-                bls_cpi_observation_count = #observations
-                if bls_cpi_observation_count > 0 {
-                    obs := observations[1]
-                    bls_cpi_year = obs.year
-                    bls_cpi_period = obs.period
-                    bls_cpi_period_name = obs.periodName
-                    bls_cpi_value = obs.value
-                    bls_cpi_latest = obs.latest
+            if data.Results != nil && data.Results.series != nil {
+                series := data.Results.series
+                bls_cpi_series_count = #series
+                if bls_cpi_series_count > 0 {
+                    row := series[1]
+                    bls_cpi_series_id = row.seriesID
+                    observations := row.data
+                    if observations != nil {
+                        bls_cpi_observation_count = #observations
+                        if bls_cpi_observation_count > 0 {
+                            obs := observations[1]
+                            bls_cpi_year = obs.year
+                            bls_cpi_period = obs.period
+                            bls_cpi_period_name = obs.periodName
+                            bls_cpi_value = obs.value
+                            bls_cpi_latest = obs.latest
+                        }
+                    }
                 }
             }
         }
@@ -70,6 +74,9 @@ if err != nil {
 	assertFinRobotPublicLiveDataOK(t, vm, "BLS CPI", "bls_cpi_status_code", "bls_cpi_request_error", "bls_cpi_json_error", "bls_cpi_ok")
 	status := mustGetString(t, vm, "bls_cpi_status")
 	seriesCount := mustGetInt(t, vm, "bls_cpi_series_count")
+	if status != "REQUEST_SUCCEEDED" && seriesCount == 0 {
+		t.Skipf("BLS CPI business response unavailable: status=%q", status)
+	}
 	seriesID := mustGetString(t, vm, "bls_cpi_series_id")
 	observationCount := mustGetInt(t, vm, "bls_cpi_observation_count")
 	year := mustGetString(t, vm, "bls_cpi_year")
@@ -119,20 +126,24 @@ if err != nil {
             bls_unemployment_json_error = json_err
         } else {
             bls_unemployment_status = data.status
-            series := data.Results.series
-            bls_unemployment_series_count = #series
-            if bls_unemployment_series_count > 0 {
-                row := series[1]
-                bls_unemployment_series_id = row.seriesID
-                observations := row.data
-                bls_unemployment_observation_count = #observations
-                if bls_unemployment_observation_count > 0 {
-                    obs := observations[1]
-                    bls_unemployment_year = obs.year
-                    bls_unemployment_period = obs.period
-                    bls_unemployment_period_name = obs.periodName
-                    bls_unemployment_value = obs.value
-                    bls_unemployment_latest = obs.latest
+            if data.Results != nil && data.Results.series != nil {
+                series := data.Results.series
+                bls_unemployment_series_count = #series
+                if bls_unemployment_series_count > 0 {
+                    row := series[1]
+                    bls_unemployment_series_id = row.seriesID
+                    observations := row.data
+                    if observations != nil {
+                        bls_unemployment_observation_count = #observations
+                        if bls_unemployment_observation_count > 0 {
+                            obs := observations[1]
+                            bls_unemployment_year = obs.year
+                            bls_unemployment_period = obs.period
+                            bls_unemployment_period_name = obs.periodName
+                            bls_unemployment_value = obs.value
+                            bls_unemployment_latest = obs.latest
+                        }
+                    }
                 }
             }
         }
@@ -147,6 +158,9 @@ if err != nil {
 	assertFinRobotPublicLiveDataOK(t, vm, "BLS unemployment rate", "bls_unemployment_status_code", "bls_unemployment_request_error", "bls_unemployment_json_error", "bls_unemployment_ok")
 	status := mustGetString(t, vm, "bls_unemployment_status")
 	seriesCount := mustGetInt(t, vm, "bls_unemployment_series_count")
+	if status != "REQUEST_SUCCEEDED" && seriesCount == 0 {
+		t.Skipf("BLS unemployment rate business response unavailable: status=%q", status)
+	}
 	seriesID := mustGetString(t, vm, "bls_unemployment_series_id")
 	observationCount := mustGetInt(t, vm, "bls_unemployment_observation_count")
 	year := mustGetString(t, vm, "bls_unemployment_year")
