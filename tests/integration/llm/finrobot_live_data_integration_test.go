@@ -1,26 +1,16 @@
 package leia_test
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
-	"time"
-
-	leia "github.com/never-labs/leia"
 )
 
 func TestFinRobotLiveSECCompanyConceptDataIntegration(t *testing.T) {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("LEIA_FINROBOT_LIVE_DATA")), "0") {
-		t.Skip("set LEIA_FINROBOT_LIVE_DATA to a non-zero value to run the FinRobot live data gate")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibNet | leia.LibJSON))
-	if err := vm.ExecContext(ctx, `
-sec_live_data_error := nil
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_live_data_request_error := nil
+sec_live_data_json_error := nil
 sec_live_data_status := 0
 sec_live_data_ok := false
 sec_live_data_entity := ""
@@ -29,7 +19,7 @@ sec_live_data_taxonomy := ""
 sec_live_data_unit_count := 0
 
 headers := {}
-headers["User-Agent"] = "Leia FinRobot live data smoke contact=opensource@example.invalid"
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
 headers["Accept"] = "application/json"
 
 resp, err := net.get("https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/Assets.json", {
@@ -37,14 +27,14 @@ resp, err := net.get("https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193
     timeout: 30
 })
 if err != nil {
-    sec_live_data_error = err
+    sec_live_data_request_error = err
 } else {
     sec_live_data_status = resp.status
     sec_live_data_ok = resp.ok
     if resp.ok {
         data, json_err := resp.json()
         if json_err != nil {
-            sec_live_data_error = json_err
+            sec_live_data_json_error = json_err
         } else {
             sec_live_data_entity = data.entityName
             sec_live_data_tag = data.tag
@@ -52,22 +42,20 @@ if err != nil {
             sec_live_data_unit_count = #data.units.USD
         }
     } else {
-        sec_live_data_error = resp.statusText
+        sec_live_data_request_error = resp.statusText
     }
 }
 `); err != nil {
-		t.Fatalf("ExecContext: %v", err)
+		t.Fatal(err)
 	}
 
 	status := mustGetInt(t, vm, "sec_live_data_status")
-	if status == 403 || status == 429 || status >= 500 {
-		t.Skipf("SEC live data endpoint unavailable for this run: status=%d error=%v", status, getOrNil(t, vm, "sec_live_data_error"))
-	}
-	if got := getOrNil(t, vm, "sec_live_data_error"); got != nil {
-		t.Skipf("SEC live data request failed: status=%d error=%v", status, got)
-	}
+	skipUnavailableFinRobotLiveData(t, "SEC companyconcept", status, getOrNil(t, vm, "sec_live_data_request_error"))
 	if status != 200 {
 		t.Fatalf("SEC live data status = %d, want 200", status)
+	}
+	if got := getOrNil(t, vm, "sec_live_data_json_error"); got != nil {
+		t.Fatalf("SEC companyconcept JSON decode failed: %v", got)
 	}
 	if ok := mustGetBool(t, vm, "sec_live_data_ok"); !ok {
 		t.Fatalf("SEC live data ok = false")
@@ -82,42 +70,139 @@ if err != nil {
 	}
 }
 
-func getOrNil(t *testing.T, vm *leia.VM, name string) any {
-	t.Helper()
-	got, err := vm.Get(name)
-	if err != nil {
-		t.Fatalf("Get %s: %v", name, err)
+func TestFinRobotLiveSECCompanyFactsDataIntegration(t *testing.T) {
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_companyfacts_request_error := nil
+sec_companyfacts_json_error := nil
+sec_companyfacts_status := 0
+sec_companyfacts_ok := false
+sec_companyfacts_entity := ""
+sec_companyfacts_cik := 0
+sec_companyfacts_assets_unit_count := 0
+sec_companyfacts_revenue_unit_count := 0
+sec_companyfacts_asset_form := ""
+
+headers := {}
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
+headers["Accept"] = "application/json"
+
+resp, err := net.get("https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json", {
+    headers: headers
+    timeout: 30
+})
+if err != nil {
+    sec_companyfacts_request_error = err
+} else {
+    sec_companyfacts_status = resp.status
+    sec_companyfacts_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            sec_companyfacts_json_error = json_err
+        } else {
+            us_gaap := data.facts["us-gaap"]
+            assets := us_gaap.Assets.units.USD
+            revenues := us_gaap.Revenues.units.USD
+            sec_companyfacts_entity = data.entityName
+            sec_companyfacts_cik = data.cik
+            sec_companyfacts_assets_unit_count = #assets
+            sec_companyfacts_revenue_unit_count = #revenues
+            sec_companyfacts_asset_form = assets[1].form
+        }
+    } else {
+        sec_companyfacts_request_error = resp.statusText
+    }
+}
+`); err != nil {
+		t.Fatal(err)
 	}
-	return got
+
+	status := mustGetInt(t, vm, "sec_companyfacts_status")
+	skipUnavailableFinRobotLiveData(t, "SEC companyfacts", status, getOrNil(t, vm, "sec_companyfacts_request_error"))
+	if status != 200 {
+		t.Fatalf("SEC companyfacts status = %d, want 200", status)
+	}
+	if got := getOrNil(t, vm, "sec_companyfacts_json_error"); got != nil {
+		t.Fatalf("SEC companyfacts JSON decode failed: %v", got)
+	}
+	if ok := mustGetBool(t, vm, "sec_companyfacts_ok"); !ok {
+		t.Fatalf("SEC companyfacts ok = false")
+	}
+	entity := mustGetString(t, vm, "sec_companyfacts_entity")
+	cik := mustGetInt(t, vm, "sec_companyfacts_cik")
+	assetCount := mustGetInt(t, vm, "sec_companyfacts_assets_unit_count")
+	revenueCount := mustGetInt(t, vm, "sec_companyfacts_revenue_unit_count")
+	assetForm := mustGetString(t, vm, "sec_companyfacts_asset_form")
+	fmt.Printf("sec_companyfacts_entity=%q cik=%d assets=%d revenues=%d first_asset_form=%q\n", entity, cik, assetCount, revenueCount, assetForm)
+	if !strings.Contains(entity, "Apple") || cik != 320193 || assetCount <= 0 || revenueCount <= 0 || assetForm == "" {
+		t.Fatalf("unexpected SEC companyfacts payload: entity=%q cik=%d assets=%d revenues=%d first_asset_form=%q", entity, cik, assetCount, revenueCount, assetForm)
+	}
 }
 
-func mustGetString(t *testing.T, vm *leia.VM, name string) string {
-	t.Helper()
-	return fmt.Sprint(getOrNil(t, vm, name))
-}
+func TestFinRobotLiveSECSubmissionsDataIntegration(t *testing.T) {
+	vm := newFinRobotLiveDataVM(t)
+	if err := execFinRobotLiveDataScript(t, vm, `
+sec_submissions_request_error := nil
+sec_submissions_json_error := nil
+sec_submissions_status := 0
+sec_submissions_ok := false
+sec_submissions_name := ""
+sec_submissions_ticker := ""
+sec_submissions_exchange := ""
+sec_submissions_recent_count := 0
+sec_submissions_recent_form := ""
 
-func mustGetInt(t *testing.T, vm *leia.VM, name string) int64 {
-	t.Helper()
-	got := getOrNil(t, vm, name)
-	switch v := got.(type) {
-	case int:
-		return int64(v)
-	case int64:
-		return v
-	case float64:
-		return int64(v)
-	default:
-		t.Fatalf("%s = %#v (%T), want integer", name, got, got)
-		return 0
-	}
-}
+headers := {}
+headers["User-Agent"] = os.getenv("LEIA_SEC_USER_AGENT")
+headers["Accept"] = "application/json"
 
-func mustGetBool(t *testing.T, vm *leia.VM, name string) bool {
-	t.Helper()
-	got := getOrNil(t, vm, name)
-	value, ok := got.(bool)
-	if !ok {
-		t.Fatalf("%s = %#v (%T), want bool", name, got, got)
+resp, err := net.get("https://data.sec.gov/submissions/CIK0000320193.json", {
+    headers: headers
+    timeout: 30
+})
+if err != nil {
+    sec_submissions_request_error = err
+} else {
+    sec_submissions_status = resp.status
+    sec_submissions_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            sec_submissions_json_error = json_err
+        } else {
+            sec_submissions_name = data.name
+            sec_submissions_ticker = data.tickers[1]
+            sec_submissions_exchange = data.exchanges[1]
+            sec_submissions_recent_count = #data.filings.recent.accessionNumber
+            sec_submissions_recent_form = data.filings.recent.form[1]
+        }
+    } else {
+        sec_submissions_request_error = resp.statusText
+    }
+}
+`); err != nil {
+		t.Fatal(err)
 	}
-	return value
+
+	status := mustGetInt(t, vm, "sec_submissions_status")
+	skipUnavailableFinRobotLiveData(t, "SEC submissions", status, getOrNil(t, vm, "sec_submissions_request_error"))
+	if status != 200 {
+		t.Fatalf("SEC submissions status = %d, want 200", status)
+	}
+	if got := getOrNil(t, vm, "sec_submissions_json_error"); got != nil {
+		t.Fatalf("SEC submissions JSON decode failed: %v", got)
+	}
+	if ok := mustGetBool(t, vm, "sec_submissions_ok"); !ok {
+		t.Fatalf("SEC submissions ok = false")
+	}
+	name := mustGetString(t, vm, "sec_submissions_name")
+	ticker := mustGetString(t, vm, "sec_submissions_ticker")
+	exchange := mustGetString(t, vm, "sec_submissions_exchange")
+	recentCount := mustGetInt(t, vm, "sec_submissions_recent_count")
+	recentForm := mustGetString(t, vm, "sec_submissions_recent_form")
+	fmt.Printf("sec_submissions_name=%q ticker=%q exchange=%q recent_count=%d recent_form=%q\n", name, ticker, exchange, recentCount, recentForm)
+	if !strings.Contains(name, "Apple") || ticker != "AAPL" || exchange == "" || recentCount <= 0 || recentForm == "" {
+		t.Fatalf("unexpected SEC submissions payload: name=%q ticker=%q exchange=%q recent_count=%d recent_form=%q", name, ticker, exchange, recentCount, recentForm)
+	}
 }
