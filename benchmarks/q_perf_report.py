@@ -60,6 +60,7 @@ MILESTONE_CAP_KEYS = (
     "min_runtime_backend_route_hits_op",
     "max_runtime_backend_route_errors_op",
     "min_q_eval_family_cases",
+    "min_q_session_planned_op_exit_op",
 )
 MILESTONE_CAP_HELP = (
     "When this flag is omitted, milestone_caps.%s in the ratio baseline JSON "
@@ -343,6 +344,7 @@ class QEvalCaseDiagnosticRow:
     q_session_planned_op_exit_op: float | None
     q_session_shell_fallback_op: float | None
     q_session_eval_errors_op: float | None
+    q_session_planned_route_pct: float | None
     q_session_backend_shapes: float | None
     primary_pressure: str
     note: str = ""
@@ -374,6 +376,7 @@ class GatePolicy:
     min_runtime_backend_route_hits_op: float = 1.0
     max_runtime_backend_route_errors_op: float = 0.0
     min_q_eval_family_cases: int = 1
+    min_q_session_planned_op_exit_op: float = 0.9
 
 
 @dataclass
@@ -1176,6 +1179,8 @@ def qeval_diagnostic_note(row: QEvalCaseDiagnosticRow) -> str:
         parts.append(f"session_shell/op={row.q_session_shell_fallback_op:.3f}")
     if row.q_session_eval_errors_op is not None:
         parts.append(f"session_errors/op={row.q_session_eval_errors_op:.3f}")
+    if row.q_session_planned_route_pct is not None:
+        parts.append(f"session_planned_route={row.q_session_planned_route_pct:.1f}%")
     if row.session_allocs_op is not None:
         parts.append(f"session_allocs/op={row.session_allocs_op:.0f}")
     return "; ".join(parts)
@@ -1210,8 +1215,10 @@ def build_qeval_case_diagnostics(rows: dict[str, BenchRow]) -> list[QEvalCaseDia
         jit_route_total = (jit_direct or 0.0) + (jit_native or 0.0) + (jit_op_exit or 0.0)
         q_session_route_total = (q_session_planned or 0.0) + (q_session_shell or 0.0) + (q_session_errors or 0.0)
         jit_slow_route_pct = None
+        q_session_planned_route_pct = None
         if q_session_route_total > 0:
             jit_slow_route_pct = 100 * ((q_session_shell or 0.0) + (q_session_errors or 0.0)) / q_session_route_total
+            q_session_planned_route_pct = 100 * (q_session_planned or 0.0) / q_session_route_total
         elif jit_route_total > 0:
             jit_slow_route_pct = 100 * ((jit_native or 0.0) + (jit_op_exit or 0.0)) / jit_route_total
         typed_fallbacks = row_metric(rows, session, "typed_kernel_fallbacks/op")
@@ -1254,6 +1261,7 @@ def build_qeval_case_diagnostics(rows: dict[str, BenchRow]) -> list[QEvalCaseDia
             q_session_planned_op_exit_op=q_session_planned,
             q_session_shell_fallback_op=q_session_shell,
             q_session_eval_errors_op=q_session_errors,
+            q_session_planned_route_pct=q_session_planned_route_pct,
             q_session_backend_shapes=row_metric(rows, jit, "q_session_backend_shapes"),
             primary_pressure="",
         )
@@ -2065,6 +2073,49 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     note=note,
                 )
             )
+        if item.benchmark.startswith("BenchmarkQEvalJITScriptWarm/"):
+            route_metrics_present = (
+                item.q_session_planned_op_exit_op is not None
+                and item.q_session_shell_fallback_op is not None
+                and item.q_session_eval_errors_op is not None
+                and item.q_session_backend_shapes is not None
+            )
+            checks.append(
+                GateCheck(
+                    signal="q_session_route_metrics_present",
+                    benchmark=item.benchmark,
+                    value=1.0 if route_metrics_present else 0.0,
+                    threshold="present",
+                    status="pass" if route_metrics_present else "fail",
+                    note=note,
+                )
+            )
+            if item.q_session_planned_op_exit_op is not None:
+                checks.append(
+                    GateCheck(
+                        signal="q_session_planned_op_exit_op",
+                        benchmark=item.benchmark,
+                        value=item.q_session_planned_op_exit_op,
+                        threshold=f">= {policy.min_q_session_planned_op_exit_op:g}",
+                        status=(
+                            "pass"
+                            if item.q_session_planned_op_exit_op >= policy.min_q_session_planned_op_exit_op
+                            else "fail"
+                        ),
+                        note=note,
+                    )
+                )
+            if item.q_session_backend_shapes is not None:
+                checks.append(
+                    GateCheck(
+                        signal="q_session_backend_shapes",
+                        benchmark=item.benchmark,
+                        value=item.q_session_backend_shapes,
+                        threshold=">= 1",
+                        status="pass" if item.q_session_backend_shapes >= 1 else "fail",
+                        note=note,
+                    )
+                )
         if item.q_session_eval_errors_op is not None:
             checks.append(
                 GateCheck(
@@ -2758,8 +2809,8 @@ def markdown_report(
             "",
             "One row per ordinary q case, joining Leia warm/cold/JIT, Go baseline, typed runtime route, JIT route, and allocation signals.",
             "",
-            "| Case | Pressure | Go ns/op | Session ns/op | Session/Go | Cold/Session | JIT ns/op | JIT/Go | Typed hit pct | typed fallbacks/op | pipeline fallback shapes | JIT direct/op | JIT slow route pct | session planned/op | session shell/op | session errors/op | session backend shapes | session allocs/op | JIT allocs/op | Note |",
-            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+            "| Case | Pressure | Go ns/op | Session ns/op | Session/Go | Cold/Session | JIT ns/op | JIT/Go | Typed hit pct | typed fallbacks/op | pipeline fallback shapes | JIT direct/op | JIT slow route pct | session planned/op | session shell/op | session errors/op | session planned pct | session backend shapes | session allocs/op | JIT allocs/op | Note |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
         ]
     )
     if qeval_diagnostics:
@@ -2780,13 +2831,14 @@ def markdown_report(
                 f"{format_metric(item.q_session_planned_op_exit_op, 3)} | "
                 f"{format_metric(item.q_session_shell_fallback_op, 3)} | "
                 f"{format_metric(item.q_session_eval_errors_op, 3)} | "
+                f"{format_metric(item.q_session_planned_route_pct, 1)} | "
                 f"{format_metric(item.q_session_backend_shapes, 0)} | "
                 f"{format_metric(item.session_allocs_op, 0)} | "
                 f"{format_metric(item.jit_warm_allocs_op, 0)} | "
                 f"{item.note} |"
             )
     else:
-        lines.append("| missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | no q.eval rows parsed |")
+        lines.append("| missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | no q.eval rows parsed |")
     lines.extend(
         [
             "",
@@ -3123,6 +3175,15 @@ def main(argv: list[str]) -> int:
     )
     parser.add_argument("--max-jit-typed-errors-op", type=float, default=0.0)
     parser.add_argument("--max-jit-backend-slow-route-pct", type=float, default=0.0)
+    parser.add_argument(
+        "--min-q-session-planned-op-exit-op",
+        type=float,
+        default=0.9,
+        help=(
+            "Minimum planned q.session eval op-exit calls per JIT-script op. "
+            + MILESTONE_CAP_HELP % "min_q_session_planned_op_exit_op"
+        ),
+    )
     parser.add_argument("--min-runtime-direct-bridge-share-pct", type=float, default=95.0)
     parser.add_argument("--max-runtime-allocs-per-direct-call", type=float, default=32.0)
     parser.add_argument("--min-q-array-bridge-bulk-hit-pct", type=float, default=95.0)
@@ -3265,6 +3326,7 @@ def main(argv: list[str]) -> int:
         min_runtime_backend_route_hits_op=args.min_runtime_backend_route_hits_op,
         max_runtime_backend_route_errors_op=args.max_runtime_backend_route_errors_op,
         min_q_eval_family_cases=args.min_q_eval_family_cases,
+        min_q_session_planned_op_exit_op=args.min_q_session_planned_op_exit_op,
     )
     gate_checks = build_gate_checks(rows, policy, ratio_baseline) if args.check else []
     pipeline_fallback_rows.sort(key=lambda row: (-row.count, row.category, row.pipeline_shape, row.kernel, row.reason, row.outcome))

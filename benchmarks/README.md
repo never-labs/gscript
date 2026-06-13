@@ -246,6 +246,7 @@ python3 benchmarks/q_perf_report.py \
   --max-allocs-op=64 \
   --max-jit-typed-errors-op=0 \
   --max-jit-backend-slow-route-pct=0 \
+  --min-q-session-planned-op-exit-op=0.9 \
   --min-runtime-direct-bridge-share-pct=95 \
   --max-runtime-allocs-per-direct-call=32 \
   --min-runtime-typed-primitive-benchmarks=1 \
@@ -349,7 +350,7 @@ families first, then feed it to the report:
     -bench 'BenchmarkQSQL(Bind|DataRuntime|NativeGo)' \
     -benchmem -benchtime=100x
   go test ./benchmarks -run '^$' \
-    -bench 'Benchmark(QEvalVector|QSessionEvalVector)' \
+    -bench 'Benchmark(QEvalVector|QSessionEvalVector|QEvalJITScriptWarm)' \
     -benchmem -benchtime=100x
   go test ./internal/methodjit -run '^$' \
     -bench 'BenchmarkQEvalPipelineNativeExitCallpath/CodegenNativeExit' \
@@ -369,6 +370,7 @@ python3 benchmarks/q_perf_report.py \
   --max-runtime-allocs-per-direct-call=32 \
   --min-q-array-bridge-bulk-hit-pct=95 \
   --max-q-array-bridge-fallbacks-op=0 \
+  --min-q-session-planned-op-exit-op=0.9 \
   --markdown /tmp/q_perf_report.md \
   --json /tmp/q_perf_report.json
 ```
