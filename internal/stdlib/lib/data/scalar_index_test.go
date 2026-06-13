@@ -1,6 +1,9 @@
 package data
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestTryTypedScalarIndexCoversColumnarCarriers(t *testing.T) {
 	encoded, err := NewEncoded(KindSymbol, []any{Symbol("AAPL"), Symbol("MSFT")}, []int32{0, 1})
@@ -15,6 +18,7 @@ func TestTryTypedScalarIndexCoversColumnarCarriers(t *testing.T) {
 	if err != nil || !handled {
 		t.Fatalf("TryTypedFills = %T,%v,%v; want handled nil error", filled, handled, err)
 	}
+	crossed := Cross(NewI64([]int64{1, 2}), NewI64([]int64{10, 20, 30}))
 
 	tests := []struct {
 		name  string
@@ -31,11 +35,12 @@ func TestTryTypedScalarIndexCoversColumnarCarriers(t *testing.T) {
 		{name: "gathered range", array: gathered, row: 0, want: int64(16)},
 		{name: "encoded symbol", array: encoded, row: 1, want: Symbol("MSFT")},
 		{name: "filled nullable", array: filled, row: 1, want: int64(1)},
+		{name: "cross row", array: crossed, row: 4, want: NewI64([]int64{2, 20})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok, err := TryTypedScalarIndex(tt.array, tt.row)
-			if err != nil || !ok || got != tt.want {
+			if err != nil || !ok || !scalarIndexTestEqual(got, tt.want) {
 				t.Fatalf("TryTypedScalarIndex(%s,row=%d) = %#v,%v,%v; want %#v,true,nil", tt.array.Kind(), tt.row, got, ok, err, tt.want)
 			}
 		})
@@ -47,4 +52,22 @@ func TestTryTypedScalarIndexReportsRuntimeErrors(t *testing.T) {
 	if err == nil || !ok || got != nil {
 		t.Fatalf("out of range = %#v,%v,%v; want nil,true,error", got, ok, err)
 	}
+
+	crossed := Cross(NewI64([]int64{1}), NewI64([]int64{2}))
+	got, ok, err = TryTypedScalarIndex(crossed, 1)
+	if err == nil || !ok || got != nil {
+		t.Fatalf("cross out of range = %#v,%v,%v; want nil,true,error", got, ok, err)
+	}
+}
+
+func scalarIndexTestEqual(got, want any) bool {
+	gotArray, gotIsArray := got.(Array)
+	wantArray, wantIsArray := want.(Array)
+	if gotIsArray || wantIsArray {
+		if !gotIsArray || !wantIsArray {
+			return false
+		}
+		return gotArray.Kind() == wantArray.Kind() && reflect.DeepEqual(gotArray.Values(), wantArray.Values())
+	}
+	return got == want
 }

@@ -176,6 +176,15 @@ func TryTypedScalarIndex(array Array, row int) (any, bool, error) {
 			return nil, true, fmt.Errorf("encoded array code %d at row %d outside domain length %d", code, row, len(a.domain))
 		}
 		return a.domain[code], true, nil
+	case crossArray:
+		if row < 0 || row >= a.Len() {
+			return nil, true, scalarIndexOutOfRange(row)
+		}
+		value, ok := a.At(row)
+		if !ok {
+			return nil, true, scalarIndexOutOfRange(row)
+		}
+		return value, true, nil
 	default:
 		return nil, false, nil
 	}
