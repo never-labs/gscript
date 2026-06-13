@@ -80,6 +80,11 @@ func assertFinRobotLiveDataOK(t *testing.T, vm *leia.VM, provider, statusName, r
 	}
 }
 
+func assertFinRobotLiveDataPrefixOK(t *testing.T, vm *leia.VM, provider, prefix string) {
+	t.Helper()
+	assertFinRobotLiveDataOK(t, vm, provider, prefix+"_status", prefix+"_request_error", prefix+"_json_error", prefix+"_ok")
+}
+
 func getOrNil(t *testing.T, vm *leia.VM, name string) any {
 	t.Helper()
 	got, err := vm.Get(name)

@@ -4,7 +4,52 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	leia "github.com/never-labs/leia"
 )
+
+type finRobotFMPRowField struct {
+	name string
+	init string
+	expr string
+}
+
+func execFinRobotFMPStableRowScript(t *testing.T, vm *leia.VM, prefix, endpoint string, fields []finRobotFMPRowField) error {
+	t.Helper()
+	var initializers strings.Builder
+	var extraction strings.Builder
+	for _, field := range fields {
+		fmt.Fprintf(&initializers, "%s_%s := %s\n", prefix, field.name, field.init)
+		fmt.Fprintf(&extraction, "            %s_%s = %s\n", prefix, field.name, field.expr)
+	}
+	return execFinRobotLiveDataScript(t, vm, fmt.Sprintf(`
+%s_request_error := nil
+%s_json_error := nil
+%s_status := 0
+%s_ok := false
+%s
+
+url := "https://financialmodelingprep.com/stable/%s?symbol=AAPL&apikey=" .. os.getenv("LEIA_FMP_API_KEY")
+resp, err := net.get(url, {timeout: 30})
+if err != nil {
+    %s_request_error = err
+} else {
+    %s_status = resp.status
+    %s_ok = resp.ok
+    if resp.ok {
+        data, json_err := resp.json()
+        if json_err != nil {
+            %s_json_error = json_err
+        } else {
+            row := data[1]
+%s
+        }
+    } else {
+        %s_request_error = resp.statusText
+    }
+}
+`, prefix, prefix, prefix, prefix, initializers.String(), endpoint, prefix, prefix, prefix, prefix, extraction.String(), prefix))
+}
 
 func TestFinRobotLiveFMPCompanyProfileDataIntegration(t *testing.T) {
 	vm := newFinRobotFMPLiveDataVM(t)
@@ -355,5 +400,85 @@ if err != nil {
 	fmt.Printf("fmp_price_target symbol=%q low=%f high=%f median=%f consensus=%f\n", symbol, low, high, median, consensus)
 	if symbol != "AAPL" || low <= 0 || high <= 0 || median <= 0 || consensus <= 0 || low > high || median > high || consensus > high {
 		t.Fatalf("unexpected FMP price-target-consensus payload: symbol=%q low=%f high=%f median=%f consensus=%f", symbol, low, high, median, consensus)
+	}
+}
+
+func TestFinRobotLiveFMPIncomeStatementDataIntegration(t *testing.T) {
+	vm := newFinRobotFMPLiveDataVM(t)
+	if err := execFinRobotFMPStableRowScript(t, vm, "fmp_income", "income-statement", []finRobotFMPRowField{
+		{name: "symbol", init: `""`, expr: "row.symbol"},
+		{name: "date", init: `""`, expr: "row.date"},
+		{name: "currency", init: `""`, expr: "row.reportedCurrency"},
+		{name: "revenue", init: "0.0", expr: "row.revenue"},
+		{name: "gross_profit", init: "0.0", expr: "row.grossProfit"},
+		{name: "net_income", init: "0.0", expr: "row.netIncome"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertFinRobotLiveDataPrefixOK(t, vm, "FMP income-statement", "fmp_income")
+	symbol := mustGetString(t, vm, "fmp_income_symbol")
+	date := mustGetString(t, vm, "fmp_income_date")
+	currency := mustGetString(t, vm, "fmp_income_currency")
+	revenue := mustGetFloat(t, vm, "fmp_income_revenue")
+	grossProfit := mustGetFloat(t, vm, "fmp_income_gross_profit")
+	netIncome := mustGetFloat(t, vm, "fmp_income_net_income")
+	fmt.Printf("fmp_income symbol=%q date=%q currency=%q revenue=%f gross_profit=%f net_income=%f\n", symbol, date, currency, revenue, grossProfit, netIncome)
+	if symbol != "AAPL" || date == "" || currency == "" || revenue <= 0 || grossProfit <= 0 || netIncome <= 0 || grossProfit > revenue || netIncome > revenue {
+		t.Fatalf("unexpected FMP income-statement payload: symbol=%q date=%q currency=%q revenue=%f gross_profit=%f net_income=%f", symbol, date, currency, revenue, grossProfit, netIncome)
+	}
+}
+
+func TestFinRobotLiveFMPBalanceSheetStatementDataIntegration(t *testing.T) {
+	vm := newFinRobotFMPLiveDataVM(t)
+	if err := execFinRobotFMPStableRowScript(t, vm, "fmp_balance", "balance-sheet-statement", []finRobotFMPRowField{
+		{name: "symbol", init: `""`, expr: "row.symbol"},
+		{name: "date", init: `""`, expr: "row.date"},
+		{name: "currency", init: `""`, expr: "row.reportedCurrency"},
+		{name: "cash", init: "0.0", expr: "row.cashAndCashEquivalents"},
+		{name: "assets", init: "0.0", expr: "row.totalAssets"},
+		{name: "liabilities", init: "0.0", expr: "row.totalLiabilities"},
+		{name: "equity", init: "0.0", expr: "row.totalStockholdersEquity"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertFinRobotLiveDataPrefixOK(t, vm, "FMP balance-sheet-statement", "fmp_balance")
+	symbol := mustGetString(t, vm, "fmp_balance_symbol")
+	date := mustGetString(t, vm, "fmp_balance_date")
+	currency := mustGetString(t, vm, "fmp_balance_currency")
+	cash := mustGetFloat(t, vm, "fmp_balance_cash")
+	assets := mustGetFloat(t, vm, "fmp_balance_assets")
+	liabilities := mustGetFloat(t, vm, "fmp_balance_liabilities")
+	equity := mustGetFloat(t, vm, "fmp_balance_equity")
+	fmt.Printf("fmp_balance symbol=%q date=%q currency=%q cash=%f assets=%f liabilities=%f equity=%f\n", symbol, date, currency, cash, assets, liabilities, equity)
+	if symbol != "AAPL" || date == "" || currency == "" || cash < 0 || assets <= 0 || liabilities <= 0 || equity <= 0 || assets < liabilities {
+		t.Fatalf("unexpected FMP balance-sheet payload: symbol=%q date=%q currency=%q cash=%f assets=%f liabilities=%f equity=%f", symbol, date, currency, cash, assets, liabilities, equity)
+	}
+}
+
+func TestFinRobotLiveFMPCashFlowStatementDataIntegration(t *testing.T) {
+	vm := newFinRobotFMPLiveDataVM(t)
+	if err := execFinRobotFMPStableRowScript(t, vm, "fmp_cashflow", "cash-flow-statement", []finRobotFMPRowField{
+		{name: "symbol", init: `""`, expr: "row.symbol"},
+		{name: "date", init: `""`, expr: "row.date"},
+		{name: "currency", init: `""`, expr: "row.reportedCurrency"},
+		{name: "operating", init: "0.0", expr: "row.netCashProvidedByOperatingActivities"},
+		{name: "capex", init: "0.0", expr: "row.capitalExpenditure"},
+		{name: "free", init: "0.0", expr: "row.freeCashFlow"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertFinRobotLiveDataPrefixOK(t, vm, "FMP cash-flow-statement", "fmp_cashflow")
+	symbol := mustGetString(t, vm, "fmp_cashflow_symbol")
+	date := mustGetString(t, vm, "fmp_cashflow_date")
+	currency := mustGetString(t, vm, "fmp_cashflow_currency")
+	operatingCashFlow := mustGetFloat(t, vm, "fmp_cashflow_operating")
+	capex := mustGetFloat(t, vm, "fmp_cashflow_capex")
+	freeCashFlow := mustGetFloat(t, vm, "fmp_cashflow_free")
+	fmt.Printf("fmp_cashflow symbol=%q date=%q currency=%q operating_cf=%f capex=%f free_cf=%f\n", symbol, date, currency, operatingCashFlow, capex, freeCashFlow)
+	if symbol != "AAPL" || date == "" || currency == "" || operatingCashFlow <= 0 || freeCashFlow <= 0 || freeCashFlow > operatingCashFlow || capex == 0 {
+		t.Fatalf("unexpected FMP cash-flow payload: symbol=%q date=%q currency=%q operating_cf=%f capex=%f free_cf=%f", symbol, date, currency, operatingCashFlow, capex, freeCashFlow)
 	}
 }
