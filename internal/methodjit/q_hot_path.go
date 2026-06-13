@@ -9,6 +9,7 @@ import (
 
 	"github.com/never-labs/leia/internal/runtime"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
+	vm "github.com/never-labs/leia/internal/vm"
 )
 
 const (
@@ -1240,6 +1241,59 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 		}
 	}
 	return fn, nil
+}
+
+func qCallIsLowerableQEvalPipelinePlan(fn *Function, call *Instr) bool {
+	if call == nil || call.Op != OpCall || !qCallIsQEvalEntrypoint(fn, call) {
+		return false
+	}
+	source, ok := qCallEvalSourceString(fn, call)
+	if !ok {
+		return false
+	}
+	plan, _, ok := qClassifyEvalHotPlan(source)
+	if !ok {
+		return false
+	}
+	backendPlan := qEvalPipelineBackendPlanFromHotPlan(source, plan)
+	if !backendPlan.Valid() || backendPlan.Backend != qEvalPipelineTypedRuntimeBackend {
+		return false
+	}
+	ref := qEvalPipelinePlanRefFromHotPlan(-1, source, plan)
+	ref.BackendPlan = &backendPlan
+	_, ok = qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
+	return ok
+}
+
+// protoLoopCallsAreLowerableQEvalPipelinePlan reports whether every call-like
+// op inside the proto's loops is a constant-source q.eval call that will lower
+// to OpQEvalPipelinePlan with a real typed runtime backend. Tier promotion can
+// then ignore the bytecode-level loop call: QEvalPipelineLoweringPass removes
+// it before native codegen, and unsupported/heuristic-only q.eval shapes remain
+// pinned behind the generic residual-call gate.
+func protoLoopCallsAreLowerableQEvalPipelinePlan(proto *vm.FuncProto) bool {
+	fn := BuildGraph(proto)
+	if fn == nil || fn.Entry == nil || fn.Unpromotable {
+		return false
+	}
+	li := computeLoopInfo(fn)
+	found := false
+	for _, block := range fn.Blocks {
+		if block == nil || !li.loopBlocks[block.ID] {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || !tier2LoopCallOp(instr.Op) {
+				continue
+			}
+			if qCallIsLowerableQEvalPipelinePlan(fn, instr) {
+				found = true
+				continue
+			}
+			return false
+		}
+	}
+	return found
 }
 
 // QEvalPipelineLoweringPass rewrites constant q.eval hot plans to a backend

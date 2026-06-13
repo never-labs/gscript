@@ -12,18 +12,20 @@
 //   - BenchmarkQEvalVMScriptWarm/<case>   — bytecode VM only (leia.WithVM())
 //
 // Route choice — q.session().eval, NOT bare q.eval (validity-critical):
-// a bare q.eval(<constant source>) call CANNOT measure per-iteration columnar
-// work, for two independently verified reasons:
+// a bare q.eval(<constant source>) call is not used for the benchmark harness
+// even though eligible typed-runtime sources can now lower through
+// OpQEvalPipelinePlan under Tier 2. The session route remains the measured
+// route because q.eval's public semantics include bind-level result
+// memoization:
 //
 //  1. bind-level result memoization: q.eval routes through bind's qEvalCache
 //     (internal/stdlib/bind/q.go qEvalSymbolicSource), which memoizes the
-//     result of any EvalSourceCacheable constant source. Every benchmark
-//     expression in qEvalVectorCases is cacheable, so iterations after the
-//     first are ~500ns map hits.
-//  2. Tier 2 eligibility: methodjit only lowers q.eval constants that carry a
-//     real typed runtime backend plan. A bare q.eval field call that remains in
-//     the loop is rejected by Tier 2's residual call gate instead of pretending
-//     to be an executable typed-pipeline op.
+//     result of any EvalSourceCacheable constant source on the ordinary public
+//     route. Every benchmark expression in qEvalVectorCases is cacheable, so
+//     a non-lowered q.eval loop measures memoization, not repeated work.
+//  2. Shape contract: methodjit only lowers q.eval constants that carry a real
+//     executable typed runtime backend plan; unsupported or heuristic-only
+//     q.eval calls still stay behind the residual-call gate.
 //
 // Both effects were confirmed empirically: with the bare-q.eval harness,
 // stdq.RuntimeKernelExecutionStats() recorded 0 kernel attempts across 1000
@@ -58,9 +60,9 @@
 //
 // TestQEvalJITScriptRouting pins all of the above: per-iteration kernel
 // attempts scale with N on the session route, Tier 2 accepts the session
-// loop and performs one session eval op-exit per iteration, and the
-// direct-q.eval route is pinned as not Tier2-lowerable in this harness so a
-// future per-iteration-capable direct route will be noticed.
+// loop and performs one session eval op-exit per iteration, and eligible
+// direct q.eval constants are Tier2-lowerable only when they carry an
+// executable typed-runtime backend plan.
 //
 // Harness choice: the hot loop lives in the Leia script (func run(n) { ... })
 // and each benchmark performs a single amortized vm.Call("run", b.N) after
@@ -153,8 +155,10 @@ func qEvalJITScriptCaseByName(name string) (qEvalVectorCase, bool) {
 
 // qEvalJITScriptSource builds the hot-loop Leia script for one q expression.
 // The loop evaluates through a q session so every iteration performs real
-// columnar work (see file header: bare q.eval(const) is memoized at the bind
-// layer and short-circuited under Tier 2).
+// columnar work through the session plan chain. The direct q.eval(const)
+// Tier 2 route is pinned separately below for eligible typed-runtime sources,
+// but the benchmark harness keeps using q.session.eval to avoid public
+// q.eval result-cache semantics.
 //
 // The session is created inside run (not at module level) so the loop call
 // matches the methodjit-recognized shape `<local from q.session()>.eval(<const
@@ -536,11 +540,9 @@ func qEvalJITScriptForcedTier2(t *testing.T, script string, iterations int64) (i
 //     planned route still performs full per-iteration typed-kernel work — it
 //     runs the same cached plan chain as q.session.eval with no result
 //     memoization, which assertion (1) independently verifies.
-//  3. Pinned counter-example: the bare-q.eval(const) route is memoized and
-//     loop-hoisted (ExitQEvalPipelinePlan fires but kernel attempts stay ~0
-//     for 64 iterations). If this assertion ever fails because attempts start
-//     scaling, the JIT route became per-iteration capable and the benchmarks
-//     should be re-pointed at it.
+//  3. Direct q.eval(const): eligible typed-runtime sources pass the Tier 2
+//     loop-call gate and lower to OpQEvalPipelinePlan. Unsupported or
+//     heuristic-only q.eval calls remain residual-call blocked.
 func TestQEvalJITScriptRouting(t *testing.T) {
 	const caseName = "VectorAffineSumSmall"
 	tc, ok := qEvalJITScriptCaseByName(caseName)
@@ -665,21 +667,42 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 		v.Close()
 	}
 
-	// (3) Pinned counter-example: bare q.eval(const) is not the benchmark
-	// route. With the stricter handoff contract, heuristic-only q.eval
-	// candidates are no longer lowered to OpQEvalPipelinePlan, so this loop
-	// must stay Tier 1 until a real direct typed backend route exists.
+	// (3) Direct q.eval(const) is now Tier2-lowerable when the source carries
+	// a real typed runtime backend plan. This does not replace the benchmark's
+	// q.session route, but it pins that the general q.eval hot path can reach
+	// OpQEvalPipelinePlan instead of being blocked as a residual field call.
 	{
-		proto := qEvalJITScriptCompileTop(t, qEvalJITScriptDirectEvalSource(src))
-		runProto := qEvalJITScriptRunProto(t, proto)
-		tm := methodjit.NewTieringManager()
-		err := tm.CompileTier2(runProto)
-		if err == nil {
-			t.Fatalf("direct q.eval(const) unexpectedly became Tier 2 lowerable; re-point BenchmarkQEvalJITScriptWarm at the direct route and update this routing test")
+		const directSrc = "count where (til 64 mod 4)=1"
+		const directWant = 16
+		got, directRunProto, directTM := qEvalJITScriptForcedTier2(t, qEvalJITScriptDirectEvalSource(directSrc), iters)
+		if got != directWant {
+			t.Fatalf("direct q.eval(const) run(%d) = %d, want %d", iters, got, directWant)
 		}
-		if !strings.Contains(err.Error(), "residual GetField callee call") {
-			t.Fatalf("direct q.eval(const) CompileTier2 error = %v, want residual GetField call gate", err)
+		if directRunProto.EnteredTier2 == 0 {
+			t.Fatalf("direct q.eval(const) run never entered Tier 2 native code (EnteredTier2=%d)", directRunProto.EnteredTier2)
 		}
-		t.Logf("direct q.eval(const) route pinned as Tier1 residual call: %v", err)
+		var typedPipelineSuccesses, typedPipelineErrors uint64
+		for _, stat := range directTM.QKernelExecutionStatsFor(directRunProto) {
+			if stat.Source != "methodjit_q_eval_runtime" || stat.Kernel != "QEvalPipelinePlan" {
+				continue
+			}
+			if stat.Outcome == "error" {
+				typedPipelineErrors += stat.Count
+				continue
+			}
+			switch stat.Route {
+			case "typed_runtime_direct_entry", "typed_runtime_native_exit", "typed_runtime_op_exit":
+				typedPipelineSuccesses += stat.Count
+			}
+		}
+		if typedPipelineSuccesses < minAttempts {
+			t.Fatalf("direct q.eval(const) typed pipeline successes = %d for %d Tier 2 iterations (< %d); stats=%+v",
+				typedPipelineSuccesses, iters, minAttempts, directTM.QKernelExecutionStatsFor(directRunProto))
+		}
+		if typedPipelineErrors != 0 {
+			t.Fatalf("direct q.eval(const) typed pipeline reported %d errors; stats=%+v",
+				typedPipelineErrors, directTM.QKernelExecutionStatsFor(directRunProto))
+		}
+		t.Logf("Tier 2 direct q.eval route: %d typed pipeline executions over %d iterations", typedPipelineSuccesses, iters)
 	}
 }
