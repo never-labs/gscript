@@ -422,6 +422,17 @@ Stage metadata that is useful for replay and audit evidence, including
 `output_schema`, and `depends_on`, is preserved in graph metadata and in each
 executed step's `trace.metadata`.
 
+For graph contracts that should not execute anything, `llm.plan_node(id, opts)`,
+`llm.planning_graph(nodes, edges, opts)`,
+`llm.validate_planning_graph(graph, opts)`, and
+`llm.planning_trace(graph, events, opts)` build provider-free planning metadata
+only. These helpers normalize plan nodes, dependency edges, retry policy,
+branch/merge metadata, trace evidence refs, validation findings, and trace
+summaries. They do not schedule work, sleep for retries, run branches in
+parallel, call providers, or persist state. `planning_graph` is therefore a
+portable contract and replay-evidence shape; `workflow_graph` remains the
+sequential execution helper.
+
 These helpers are sequencing helpers, not durable orchestration. They do not
 imply parallelism, retry policy, persistence, transactions, approval storage, or
 provider calls outside the step functions. Provider replay still observes only
