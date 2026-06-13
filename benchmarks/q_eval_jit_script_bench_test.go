@@ -621,21 +621,7 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 				t.Fatalf("settle CallValue(run, %d): %v", iters, err)
 			}
 		}
-		sessionEvalCounts := func() (planned, shell uint64) {
-			for _, stat := range tm.QKernelExecutionStatsFor(runProto) {
-				if stat.Source != "methodjit_q_eval_runtime" {
-					continue
-				}
-				switch stat.Route {
-				case "session_planned_op_exit":
-					planned += stat.Count
-				case "typed_runtime_op_exit":
-					shell += stat.Count
-				}
-			}
-			return planned, shell
-		}
-		beforePlanned, beforeShell := sessionEvalCounts()
+		before := qEvalJITScriptSessionRouteCounts(tm.QKernelExecutionStatsFor(runProto))
 		results, err := v.CallValue(v.GetGlobal("run"), []runtime.Value{runtime.IntValue(iters)})
 		if err != nil {
 			v.Close()
@@ -653,13 +639,26 @@ func TestQEvalJITScriptRouting(t *testing.T) {
 		// work must run through the planned route (pinned session plan chain,
 		// resolved once per receiver+source), not the host-eval string shell,
 		// and it must scale with the iteration count (no result memoization).
-		afterPlanned, afterShell := sessionEvalCounts()
-		plannedExecs := afterPlanned - beforePlanned
-		shellExecs := afterShell - beforeShell
+		after := qEvalJITScriptSessionRouteCounts(tm.QKernelExecutionStatsFor(runProto))
+		delta := after.minus(before)
+		plannedExecs := delta.planned
+		shellExecs := delta.shell
 		if plannedExecs < minAttempts {
 			v.Close()
 			t.Fatalf("planned session eval executions = %d (shell fallback = %d) for %d Tier 2 iterations (< %d); "+
 				"the session eval exit is no longer executing the pinned plan chain per iteration", plannedExecs, shellExecs, iters, minAttempts)
+		}
+		if shellExecs != 0 {
+			v.Close()
+			t.Fatalf("planned session eval fell back to shell %d times on the steady Tier 2 route", shellExecs)
+		}
+		if delta.errors != 0 {
+			v.Close()
+			t.Fatalf("planned session eval reported %d backend errors on the steady Tier 2 route", delta.errors)
+		}
+		if len(delta.shapes) == 0 {
+			v.Close()
+			t.Fatal("planned session eval did not report a backend shape")
 		}
 		t.Logf("Tier 2 session route: %d planned session eval executions over %d iterations (shell execs: %d, tier2 compiled: %d)",
 			plannedExecs, iters, shellExecs, tm.Tier2Count())

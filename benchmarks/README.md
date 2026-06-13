@@ -184,7 +184,7 @@ go test ./internal/stdlib/bind -run '^$' \
   -bench 'BenchmarkQSQL(...)' -benchmem -benchtime=100x
 
 go test ./benchmarks -run '^$' \
-  -bench 'Benchmark(QEvalVector|QSessionEvalVector)(...)' -benchmem -benchtime=100x
+  -bench 'Benchmark(QEvalVector|QSessionEvalVector|QEvalJITScriptWarm)(...)' -benchmem -benchtime=100x
 ```
 
 It intentionally separates qSQL from ordinary `q.eval` list/vector/math/adverb
@@ -194,6 +194,9 @@ adverb/running/moving aggregate, symbol/string/temporal, typed/null/cast, and
 composition shapes. qSQL bind benchmarks expose `kernel_hit_pct` and
 `fallbacks/op`; ordinary `q.eval` session benchmarks also report
 `typed_kernel_*` counters where runtime kernel instrumentation is available.
+The ordinary q benchmark rows also include the JIT script layer through
+`BenchmarkQEvalJITScriptWarm`, so report output can join the same case across
+session-warm, Go baseline, warm/cold result-cache, and JIT-script measurements.
 
 Read the q performance baseline through these ratios:
 
@@ -203,6 +206,7 @@ Read the q performance baseline through these ratios:
 | Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for qSQL; compare `BenchmarkQSessionEvalVectorWarmExecution/...` with `BenchmarkQEvalVectorGoBaseline/...` for ordinary q compute |
 | Warm vs cold | compare `BenchmarkQSQLBindRunSQLWarmCache...` with `BenchmarkQSQLBindRunSQLColdCache...` |
 | Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in bind benchmark output; use `typed_kernel_hit_pct` and `typed_kernel_fallbacks/op` in ordinary q session rows |
+| JIT q.session route health | use `q_session_planned_op_exit/op`, `q_session_shell_fallback/op`, `q_session_eval_errors/op`, and `q_session_backend_shapes` on `BenchmarkQEvalJITScriptWarm` rows |
 | Allocation pressure | use `B/op` and `allocs/op`; q columnar hot paths should trend toward low per-row allocation |
 
 Generate a machine-readable q performance report from the focused qSQL and
@@ -215,7 +219,10 @@ python3 benchmarks/q_perf_report.py --benchtime=100x
 The report writes `benchmarks/data/q_perf_report_latest.md` and
 `benchmarks/data/q_perf_report_latest.json`, including Leia-vs-Go ratios,
 warm/cold ratios, typed kernel hit/fallback counters, allocation metrics, and
-fallback shape summary rows.
+fallback shape summary rows. For the JIT-script layer it records the
+`q_session_planned_op_exit/op`, `q_session_shell_fallback/op`,
+`q_session_eval_errors/op`, and `q_session_backend_shapes` counters emitted by
+`BenchmarkQEvalJITScriptWarm`.
 
 The `q.eval Case Diagnostics` section is the first stop for runtime/JIT backend
 triage. It joins each ordinary q case across `BenchmarkQSessionEvalVectorWarmExecution`,
@@ -280,6 +287,10 @@ layers: ordinary q typed primitive counters, JIT backend route counters, and
 MethodJIT array bridge counters. This prevents a partial benchmark output from
 looking healthy merely because one layer was not run. For intentionally partial
 local checks, set the corresponding `--min-runtime-*-benchmarks=0` flag.
+`BenchmarkQEvalJITScriptWarm` contributes JIT backend route evidence through
+the q session counters: planned op-exit calls are the direct route, shell
+fallbacks are the slow route, eval errors must remain zero, and backend shapes
+show how many distinct q session lowerings were observed.
 
 The `Runtime Primitive Registry Routes` section is the lower-level backend
 contract. It accepts either VM runtime primitive registry counters such as
@@ -365,8 +376,8 @@ python3 benchmarks/q_perf_report.py \
 ## q.eval Vector/List Compute
 
 `benchmarks/q_eval_vector_bench_test.go` covers ordinary q expressions outside
-qSQL. This suite is the main non-qSQL q performance matrix and now has 235 cases
-plus required coverage-tag, matrix, and semantic-shape gates. It spans numeric
+qSQL. This suite is the main non-qSQL q performance matrix and now has **483
+cases** plus required coverage-tag, matrix, and semantic-shape gates. It spans numeric
 vector arithmetic, typed suffix/null/cast/promotion behavior, compare masks to
 `where`, selectivity changes, `take`/`drop`/`cut`/`reverse`/`rotate`,
 reductions, adverbs, running and moving aggregates, list/set/search verbs,
@@ -377,7 +388,7 @@ for `take`/`drop`/`reverse`/`rotate`, arithmetic map/reduce/scan, modulo
 where/filter/project, symbol filters, temporal filters, and null/fill/cast
 shapes. Every case is checked against a same-semantics Go checksum before it is
 benchmarked.
-Each shape has four benchmark rows:
+Each shape has five synthetic benchmark rows:
 
 | Row | Signal |
 |---|---|
@@ -385,11 +396,14 @@ Each shape has four benchmark rows:
 | `BenchmarkQEvalVectorCold/...` | equivalent `q.eval` expressions with distinct cache keys, exercising parse/lower and execution cost |
 | `BenchmarkQSessionEvalVectorWarmExecution/...` | repeated execution through `q.session.eval`, bypassing the global q.eval result cache |
 | `BenchmarkQEvalVectorGoBaseline/...` | hand-written Go loop for the same checksum |
+| `BenchmarkQEvalJITScriptWarm/...` | the same ordinary q case inside a JIT-compiled Leia loop, including q session route counters |
 
 Use `-benchmem` to compare `B/op` and `allocs/op`; use result-cache warm vs
 cold ratios to judge q.eval cache value; use `QSessionEvalVectorWarmExecution`
 vs Go baseline to see how much ordinary vector/list execution still pays in
-bridge, allocation, and dynamic dispatch overhead.
+bridge, allocation, and dynamic dispatch overhead; use `QEvalJITScriptWarm`
+rows to confirm the JIT script layer is still taking the planned q session
+op-exit route instead of the shell fallback route.
 
 `benchmarks/q_general_compute_suite.sh` is the short wrapper for this ordinary
 q compute suite. It keeps the benchmarks under `benchmarks/` while still

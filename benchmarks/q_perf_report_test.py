@@ -68,8 +68,12 @@ BenchmarkQEvalJITScriptWarm/ComboNestedAdverb-16                 100  1600 ns/op
 """
 
 SAMPLE_JIT_SCRIPT = """
-BenchmarkQEvalJITScriptWarm/MaskWhere-16    100  1500 ns/op  128 B/op  4 allocs/op
+BenchmarkQEvalJITScriptWarm/MaskWhere-16    100  1500 ns/op  128 B/op  4 allocs/op  1 q_session_planned_op_exit/op  0 q_session_shell_fallback/op  0 q_session_eval_errors/op  1 q_session_backend_shapes
 BenchmarkQEvalVMScriptWarm/MaskWhere-16     100  4000 ns/op  256 B/op  9 allocs/op
+"""
+
+SAMPLE_JIT_SESSION_SLOW_ROUTE = """
+BenchmarkQEvalJITScriptWarm/MaskWhere-16    100  1800 ns/op  96 B/op  3 allocs/op  1 q_session_planned_op_exit/op  1 q_session_shell_fallback/op  1 q_session_eval_errors/op  1 q_session_backend_shapes
 """
 
 SAMPLE_UNTRUSTED_GO_BASELINE = """
@@ -204,7 +208,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(coverage["current Leia vs old Leia"]["qSQL"], "covered")
 
     def test_runtime_metrics_structures_allocs_kernel_and_fallback_values(self):
-        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_ARRAY_BRIDGE)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT + SAMPLE_ARRAY_BRIDGE)
         metrics = {row.benchmark: row for row in report.build_runtime_metric_rows(rows)}
 
         qsql = metrics["BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject"]
@@ -225,6 +229,11 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(qjit.jit_typed_kernel_success_op, 1)
         self.assertEqual(qjit.jit_typed_kernel_errors_op, 0)
         self.assertEqual(qjit.jit_typed_pipeline_shapes, 1)
+        qsession = metrics["BenchmarkQEvalJITScriptWarm/MaskWhere"]
+        self.assertEqual(qsession.q_session_planned_op_exit_op, 1)
+        self.assertEqual(qsession.q_session_shell_fallback_op, 0)
+        self.assertEqual(qsession.q_session_eval_errors_op, 0)
+        self.assertEqual(qsession.q_session_backend_shapes, 1)
         bridge = metrics["BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range"]
         self.assertEqual(bridge.q_array_bridge_bulk_hits_op, 1)
         self.assertEqual(bridge.q_array_bridge_fallbacks_op, 0)
@@ -366,6 +375,27 @@ class QPerfReportTest(unittest.TestCase):
         failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
 
         self.assertIn(("jit_typed_errors_op", "BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute"), failed)
+        self.assertIn(("jit_backend_errors_op", "jit_backend"), failed)
+        self.assertIn(("jit_backend_slow_route_pct", "jit_backend"), failed)
+        self.assertIn(("runtime_health_typed_errors_op", "q_runtime_hotpath"), failed)
+        self.assertIn(("runtime_health_jit_slow_route_pct", "q_runtime_hotpath"), failed)
+
+    def test_gate_checks_cover_jit_session_shell_fallback_and_errors(self):
+        rows = report.parse_go_benchmarks(SAMPLE_JIT_SESSION_SLOW_ROUTE)
+        policy = report.GatePolicy(
+            max_leia_go_ratio=5,
+            min_typed_hit_pct=95,
+            max_typed_fallbacks_op=0,
+            max_pipeline_fallback_shapes=0,
+            max_allocs_op=64,
+            max_jit_typed_errors_op=0,
+            max_jit_backend_slow_route_pct=50,
+        )
+        checks = report.build_gate_checks(rows, policy)
+        failed = {(check.signal, check.benchmark) for check in checks if check.status == "fail"}
+
+        self.assertIn(("q_session_shell_fallback_op", "BenchmarkQEvalJITScriptWarm/MaskWhere"), failed)
+        self.assertIn(("q_session_eval_errors_op", "BenchmarkQEvalJITScriptWarm/MaskWhere"), failed)
         self.assertIn(("jit_backend_errors_op", "jit_backend"), failed)
         self.assertIn(("jit_backend_slow_route_pct", "jit_backend"), failed)
         self.assertIn(("runtime_health_typed_errors_op", "q_runtime_hotpath"), failed)
@@ -572,8 +602,13 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(mask.typed_fallbacks_op, 0)
         self.assertEqual(mask.session_allocs_op, 8)
         self.assertEqual(mask.jit_warm_allocs_op, 4)
+        self.assertEqual(mask.q_session_planned_op_exit_op, 1)
+        self.assertEqual(mask.q_session_shell_fallback_op, 0)
+        self.assertEqual(mask.q_session_eval_errors_op, 0)
+        self.assertEqual(mask.q_session_backend_shapes, 1)
         self.assertEqual(mask.primary_pressure, "healthy_or_ratio_only")
         self.assertIn("session/go=2.000x", mask.note)
+        self.assertIn("session_planned/op=1.000", mask.note)
 
     def test_qeval_case_diagnostics_classify_jit_slow_route(self):
         sample = SAMPLE + """
@@ -584,6 +619,15 @@ BenchmarkQEvalJITScriptWarm/MaskWhere-16  100  1800 ns/op  96 B/op  3 allocs/op 
 
         self.assertEqual(diagnostics["MaskWhere"].primary_pressure, "jit_slow_route")
         self.assertEqual(diagnostics["MaskWhere"].jit_backend_slow_route_pct, 75)
+
+    def test_qeval_case_diagnostics_classify_session_shell_and_error_routes(self):
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SESSION_SLOW_ROUTE)
+        diagnostics = {row.case: row for row in report.build_qeval_case_diagnostics(rows)}
+
+        self.assertEqual(diagnostics["MaskWhere"].primary_pressure, "jit_backend_errors")
+        self.assertAlmostEqual(diagnostics["MaskWhere"].jit_backend_slow_route_pct, 100 * 2 / 3)
+        self.assertIn("session_shell/op=1.000", diagnostics["MaskWhere"].note)
+        self.assertIn("session_errors/op=1.000", diagnostics["MaskWhere"].note)
 
     def test_gate_checks_gate_jit_script_family_but_never_vm(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT)

@@ -133,6 +133,11 @@ Leia-vs-Go is measured at two layers, both pinned by routing tests:
    execution: typed-kernel attempts scale exactly with iteration count, Tier 2
    accepts the loop, and the bare-`q.eval` route stays pinned as memoized so a
    future per-iteration-capable direct route is noticed.
+   The benchmark rows also report q session route counters:
+   `q_session_planned_op_exit/op` for the planned JIT op-exit route,
+   `q_session_shell_fallback/op` for shell fallback execution,
+   `q_session_eval_errors/op` for eval failures, and
+   `q_session_backend_shapes` for distinct backend-lowered session shapes.
 
 ### Why benchmarks use session eval (result-cache semantics)
 
@@ -179,6 +184,9 @@ output: ordinary list/adverb rows, `TypeMatrix*` rows, and `Combo*` rows must
 have matching session, Go baseline, and JIT-script rows. This catches partial
 perf runs that accidentally omit ordinary q breadth while still producing
 healthy qSQL or single-shape ratios.
+The q.eval benchmark rows therefore include the JIT script layer, not only
+session-warm and Go-baseline measurements; route-health gates read the
+`q_session_*` metrics from those `BenchmarkQEvalJITScriptWarm` rows.
 
 See `benchmarks/q_breadth_perf_audit.md` for the worst remaining rows and the
 wave-3 priorities.
@@ -206,7 +214,7 @@ through the gates above.
 | qSQL grouped analytics | `by`, computed keys, `xbar`, aggregate aliases, extended aggregates | Covered: multi-key, xbar temporal key, and var/dev/med/min/max/first/last matrix rows with Go baselines; `wavg` is backlogged (qSQL lowering emits no weight expression) |
 | qSQL joins | inner, left, asof variants, union, plus, window joins, chained joins, aliased keys | Covered: all ten parser join kinds (inner/left/union/plus/asof/asof0/asof_fill/asof_fill0/window/window1) plus chained and aliased-key rows have warm + cold + Go-baseline matrix rows |
 | qSQL mutation | update, delete, insert, upsert, grouped mutation, keyed mutation | Covered: update/delete/insert/upsert x {plain, keyed, grouped update, empty-match boundary} matrix rows with Go baselines |
-| Cache/fallback/runtime stats | plan cache, query kernel cache, schema-stable keys, explain/fallback stats | qSQL metric rows plus q.eval session typed-kernel counters per op |
+| Cache/fallback/runtime stats | plan cache, query kernel cache, schema-stable keys, explain/fallback stats | qSQL metric rows plus q.eval session typed-kernel counters per op and JIT-script q session route counters |
 | IPC/system/session | loopback IPC, safe system commands, session state | Not core to in-memory analytics performance; benchmark only if it becomes a product target |
 
 ## Current Benchmark Case Dimensions

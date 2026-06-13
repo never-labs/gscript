@@ -184,6 +184,10 @@ class RuntimeMetricRow:
     jit_typed_kernel_success_op: float | None
     jit_typed_kernel_errors_op: float | None
     jit_typed_pipeline_shapes: float | None
+    q_session_planned_op_exit_op: float | None
+    q_session_shell_fallback_op: float | None
+    q_session_eval_errors_op: float | None
+    q_session_backend_shapes: float | None
     q_array_bridge_bulk_hits_op: float | None
     q_array_bridge_fallbacks_op: float | None
     q_array_bridge_errors_op: float | None
@@ -336,6 +340,10 @@ class QEvalCaseDiagnosticRow:
     jit_op_exit_op: float | None
     jit_backend_slow_route_pct: float | None
     jit_kernel_errors_op: float | None
+    q_session_planned_op_exit_op: float | None
+    q_session_shell_fallback_op: float | None
+    q_session_eval_errors_op: float | None
+    q_session_backend_shapes: float | None
     primary_pressure: str
     note: str = ""
 
@@ -652,6 +660,10 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 jit_typed_kernel_success_op=metrics.get("jit_typed_kernel_success/op"),
                 jit_typed_kernel_errors_op=metrics.get("jit_typed_kernel_errors/op"),
                 jit_typed_pipeline_shapes=metrics.get("jit_typed_pipeline_shapes"),
+                q_session_planned_op_exit_op=metrics.get("q_session_planned_op_exit/op"),
+                q_session_shell_fallback_op=metrics.get("q_session_shell_fallback/op"),
+                q_session_eval_errors_op=metrics.get("q_session_eval_errors/op"),
+                q_session_backend_shapes=metrics.get("q_session_backend_shapes"),
                 q_array_bridge_bulk_hits_op=metrics.get("q_array_bridge_bulk_hits/op"),
                 q_array_bridge_fallbacks_op=metrics.get("q_array_bridge_fallbacks/op"),
                 q_array_bridge_errors_op=metrics.get("q_array_bridge_errors/op"),
@@ -774,6 +786,9 @@ def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[Runti
         or row.jit_typed_op_exit_op is not None
         or row.jit_typed_kernel_success_op is not None
         or row.jit_typed_kernel_errors_op is not None
+        or row.q_session_planned_op_exit_op is not None
+        or row.q_session_shell_fallback_op is not None
+        or row.q_session_eval_errors_op is not None
     ]
     if jit_rows:
         direct = sum(row.jit_typed_direct_return_op or 0.0 for row in jit_rows)
@@ -781,8 +796,16 @@ def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[Runti
         op_exit = sum(row.jit_typed_op_exit_op or 0.0 for row in jit_rows)
         success = sum(row.jit_typed_kernel_success_op or 0.0 for row in jit_rows)
         errors = sum(row.jit_typed_kernel_errors_op or 0.0 for row in jit_rows)
+        session_planned = sum(row.q_session_planned_op_exit_op or 0.0 for row in jit_rows)
+        session_shell = sum(row.q_session_shell_fallback_op or 0.0 for row in jit_rows)
+        session_errors = sum(row.q_session_eval_errors_op or 0.0 for row in jit_rows)
         route_total = direct + native + op_exit
+        session_route_total = session_planned + session_shell + session_errors
         kernel_total = success + errors
+        if kernel_total == 0 and (session_planned + session_shell + session_errors) > 0:
+            kernel_total = session_planned + session_shell + session_errors
+            success = session_planned
+            errors = session_errors
         out.append(
             RuntimeObservabilityRow(
                 layer="jit_backend",
@@ -791,12 +814,16 @@ def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[Runti
                 hits_op=success,
                 errors_op=errors,
                 hit_pct=(100 * success / kernel_total) if kernel_total > 0 else None,
-                shapes=sum(row.jit_typed_pipeline_shapes or 0.0 for row in jit_rows),
-                direct_return_op=direct,
+                shapes=sum((row.jit_typed_pipeline_shapes or 0.0) + (row.q_session_backend_shapes or 0.0) for row in jit_rows),
+                direct_return_op=direct + session_planned,
                 native_exit_op=native,
-                op_exit_op=op_exit,
-                slow_route_pct=(100 * (native + op_exit) / route_total) if route_total > 0 else None,
-                note="JIT typed backend route split; native/op exits indicate bridge work outside direct return",
+                op_exit_op=op_exit + session_shell,
+                slow_route_pct=(
+                    (100 * (session_shell + session_errors) / session_route_total)
+                    if session_route_total > 0
+                    else ((100 * (native + op_exit) / route_total) if route_total > 0 else None)
+                ),
+                note="JIT typed backend route split; session planned exits are the steady q session hot route",
             )
         )
 
@@ -841,6 +868,9 @@ def build_runtime_health_summary(rows: dict[str, BenchRow]) -> list[RuntimeHealt
         or row.jit_typed_op_exit_op is not None
         or row.jit_typed_kernel_success_op is not None
         or row.jit_typed_kernel_errors_op is not None
+        or row.q_session_planned_op_exit_op is not None
+        or row.q_session_shell_fallback_op is not None
+        or row.q_session_eval_errors_op is not None
         or row.q_array_bridge_bulk_hits_op is not None
         or row.q_array_bridge_fallbacks_op is not None
         or row.q_array_bridge_errors_op is not None
@@ -850,7 +880,11 @@ def build_runtime_health_summary(rows: dict[str, BenchRow]) -> list[RuntimeHealt
     direct = sum(row.jit_typed_direct_return_op or 0.0 for row in health_rows)
     native = sum(row.jit_typed_native_exit_op or 0.0 for row in health_rows)
     op_exit = sum(row.jit_typed_op_exit_op or 0.0 for row in health_rows)
+    session_planned = sum(row.q_session_planned_op_exit_op or 0.0 for row in health_rows)
+    session_shell = sum(row.q_session_shell_fallback_op or 0.0 for row in health_rows)
+    session_errors = sum(row.q_session_eval_errors_op or 0.0 for row in health_rows)
     route_total = direct + native + op_exit
+    session_route_total = session_planned + session_shell + session_errors
     alloc_values = [row.allocs_op for row in health_rows if row.allocs_op is not None]
     return [
         RuntimeHealthRow(
@@ -860,12 +894,17 @@ def build_runtime_health_summary(rows: dict[str, BenchRow]) -> list[RuntimeHealt
             max_allocs_op=max(alloc_values) if alloc_values else None,
             typed_fallbacks_op=sum(row.typed_kernel_fallbacks_op or 0.0 for row in health_rows),
             typed_errors_op=sum(row.typed_kernel_errors_op or 0.0 for row in health_rows)
-            + sum(row.jit_typed_kernel_errors_op or 0.0 for row in health_rows),
+            + sum(row.jit_typed_kernel_errors_op or 0.0 for row in health_rows)
+            + sum(row.q_session_eval_errors_op or 0.0 for row in health_rows),
             pipeline_fallback_shapes=sum(row.typed_pipeline_fallback_shapes or 0.0 for row in health_rows),
-            jit_direct_return_op=direct,
+            jit_direct_return_op=direct + session_planned,
             jit_native_exit_op=native,
-            jit_op_exit_op=op_exit,
-            jit_slow_route_pct=(100 * (native + op_exit) / route_total) if route_total > 0 else None,
+            jit_op_exit_op=op_exit + session_shell,
+            jit_slow_route_pct=(
+                (100 * (session_shell + session_errors) / session_route_total)
+                if session_route_total > 0
+                else ((100 * (native + op_exit) / route_total) if route_total > 0 else None)
+            ),
             note=(
                 "combined health of typed primitive fallback, pipeline fallback, "
                 "JIT route split, and allocation pressure"
@@ -885,6 +924,9 @@ def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[R
         or row.jit_typed_op_exit_op is not None
         or row.jit_typed_kernel_success_op is not None
         or row.jit_typed_kernel_errors_op is not None
+        or row.q_session_planned_op_exit_op is not None
+        or row.q_session_shell_fallback_op is not None
+        or row.q_session_eval_errors_op is not None
         or row.q_array_bridge_bulk_hits_op is not None
         or row.q_array_bridge_fallbacks_op is not None
         or row.q_array_bridge_errors_op is not None
@@ -898,6 +940,9 @@ def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[R
     jit_slow = sum(row.jit_typed_native_exit_op or 0.0 for row in bridge_rows)
     jit_slow += sum(row.jit_typed_op_exit_op or 0.0 for row in bridge_rows)
     jit_slow += sum(row.jit_typed_kernel_errors_op or 0.0 for row in bridge_rows)
+    jit_direct += sum(row.q_session_planned_op_exit_op or 0.0 for row in bridge_rows)
+    jit_slow += sum(row.q_session_shell_fallback_op or 0.0 for row in bridge_rows)
+    jit_slow += sum(row.q_session_eval_errors_op or 0.0 for row in bridge_rows)
     array_direct = sum(row.q_array_bridge_bulk_hits_op or 0.0 for row in bridge_rows)
     array_slow = sum(row.q_array_bridge_fallbacks_op or 0.0 for row in bridge_rows)
     array_slow += sum(row.q_array_bridge_errors_op or 0.0 for row in bridge_rows)
@@ -916,8 +961,8 @@ def build_runtime_bridge_efficiency_summary(rows: dict[str, BenchRow]) -> list[R
             avg_allocs_op=avg_allocs,
             allocs_per_direct_call=(avg_allocs / direct) if avg_allocs is not None and direct > 0 else None,
             note=(
-                "direct calls combine typed primitive hits and JIT direct returns; slow bridge calls combine "
-                "typed fallback/error plus JIT native/op exits and errors"
+                "direct calls combine typed primitive hits, JIT direct returns, and q session planned exits; "
+                "slow bridge calls combine typed fallback/error, JIT native/op exits, session shell fallback, and errors"
             ),
         )
     ]
@@ -1125,6 +1170,12 @@ def qeval_diagnostic_note(row: QEvalCaseDiagnosticRow) -> str:
         parts.append(f"typed_fallbacks/op={row.typed_fallbacks_op:.3f}")
     if row.jit_backend_slow_route_pct is not None:
         parts.append(f"jit_slow_route={row.jit_backend_slow_route_pct:.1f}%")
+    if row.q_session_planned_op_exit_op is not None:
+        parts.append(f"session_planned/op={row.q_session_planned_op_exit_op:.3f}")
+    if row.q_session_shell_fallback_op is not None:
+        parts.append(f"session_shell/op={row.q_session_shell_fallback_op:.3f}")
+    if row.q_session_eval_errors_op is not None:
+        parts.append(f"session_errors/op={row.q_session_eval_errors_op:.3f}")
     if row.session_allocs_op is not None:
         parts.append(f"session_allocs/op={row.session_allocs_op:.0f}")
     return "; ".join(parts)
@@ -1153,9 +1204,15 @@ def build_qeval_case_diagnostics(rows: dict[str, BenchRow]) -> list[QEvalCaseDia
         jit_direct = row_metric(rows, jit, "jit_typed_direct_return/op")
         jit_native = row_metric(rows, jit, "jit_typed_native_exit/op")
         jit_op_exit = row_metric(rows, jit, "jit_typed_op_exit/op")
+        q_session_planned = row_metric(rows, jit, "q_session_planned_op_exit/op")
+        q_session_shell = row_metric(rows, jit, "q_session_shell_fallback/op")
+        q_session_errors = row_metric(rows, jit, "q_session_eval_errors/op")
         jit_route_total = (jit_direct or 0.0) + (jit_native or 0.0) + (jit_op_exit or 0.0)
+        q_session_route_total = (q_session_planned or 0.0) + (q_session_shell or 0.0) + (q_session_errors or 0.0)
         jit_slow_route_pct = None
-        if jit_route_total > 0:
+        if q_session_route_total > 0:
+            jit_slow_route_pct = 100 * ((q_session_shell or 0.0) + (q_session_errors or 0.0)) / q_session_route_total
+        elif jit_route_total > 0:
             jit_slow_route_pct = 100 * ((jit_native or 0.0) + (jit_op_exit or 0.0)) / jit_route_total
         typed_fallbacks = row_metric(rows, session, "typed_kernel_fallbacks/op")
         typed_errors = row_metric(rows, session, "typed_kernel_errors/op")
@@ -1194,6 +1251,10 @@ def build_qeval_case_diagnostics(rows: dict[str, BenchRow]) -> list[QEvalCaseDia
             jit_op_exit_op=jit_op_exit,
             jit_backend_slow_route_pct=jit_slow_route_pct,
             jit_kernel_errors_op=row_metric(rows, jit, "jit_typed_kernel_errors/op"),
+            q_session_planned_op_exit_op=q_session_planned,
+            q_session_shell_fallback_op=q_session_shell,
+            q_session_eval_errors_op=q_session_errors,
+            q_session_backend_shapes=row_metric(rows, jit, "q_session_backend_shapes"),
             primary_pressure="",
         )
         row.primary_pressure = classify_qeval_pressure(
@@ -1207,7 +1268,7 @@ def build_qeval_case_diagnostics(rows: dict[str, BenchRow]) -> list[QEvalCaseDia
             session_allocs=row.session_allocs_op,
             jit_ratio=jit_ratio,
             jit_slow_route_pct=jit_slow_route_pct,
-            jit_errors=row.jit_kernel_errors_op,
+            jit_errors=(row.jit_kernel_errors_op or 0.0) + (q_session_errors or 0.0),
         )
         row.note = qeval_diagnostic_note(row)
         out.append(row)
@@ -1993,6 +2054,28 @@ def runtime_gate_checks(rows: dict[str, BenchRow], policy: GatePolicy) -> list[G
                     note=note,
                 )
             )
+        if item.q_session_shell_fallback_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="q_session_shell_fallback_op",
+                    benchmark=item.benchmark,
+                    value=item.q_session_shell_fallback_op,
+                    threshold=f"<= {policy.max_typed_fallbacks_op:g}",
+                    status="pass" if item.q_session_shell_fallback_op <= policy.max_typed_fallbacks_op else "fail",
+                    note=note,
+                )
+            )
+        if item.q_session_eval_errors_op is not None:
+            checks.append(
+                GateCheck(
+                    signal="q_session_eval_errors_op",
+                    benchmark=item.benchmark,
+                    value=item.q_session_eval_errors_op,
+                    threshold=f"<= {policy.max_jit_typed_errors_op:g}",
+                    status="pass" if item.q_session_eval_errors_op <= policy.max_jit_typed_errors_op else "fail",
+                    note=note,
+                )
+            )
     return checks
 
 
@@ -2675,8 +2758,8 @@ def markdown_report(
             "",
             "One row per ordinary q case, joining Leia warm/cold/JIT, Go baseline, typed runtime route, JIT route, and allocation signals.",
             "",
-            "| Case | Pressure | Go ns/op | Session ns/op | Session/Go | Cold/Session | JIT ns/op | JIT/Go | Typed hit pct | typed fallbacks/op | pipeline fallback shapes | JIT direct/op | JIT slow route pct | session allocs/op | JIT allocs/op | Note |",
-            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+            "| Case | Pressure | Go ns/op | Session ns/op | Session/Go | Cold/Session | JIT ns/op | JIT/Go | Typed hit pct | typed fallbacks/op | pipeline fallback shapes | JIT direct/op | JIT slow route pct | session planned/op | session shell/op | session errors/op | session backend shapes | session allocs/op | JIT allocs/op | Note |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
         ]
     )
     if qeval_diagnostics:
@@ -2694,19 +2777,23 @@ def markdown_report(
                 f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} | "
                 f"{format_metric(item.jit_direct_return_op, 3)} | "
                 f"{format_metric(item.jit_backend_slow_route_pct, 1)} | "
+                f"{format_metric(item.q_session_planned_op_exit_op, 3)} | "
+                f"{format_metric(item.q_session_shell_fallback_op, 3)} | "
+                f"{format_metric(item.q_session_eval_errors_op, 3)} | "
+                f"{format_metric(item.q_session_backend_shapes, 0)} | "
                 f"{format_metric(item.session_allocs_op, 0)} | "
                 f"{format_metric(item.jit_warm_allocs_op, 0)} | "
                 f"{item.note} |"
             )
     else:
-        lines.append("| missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | no q.eval rows parsed |")
+        lines.append("| missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | missing | no q.eval rows parsed |")
     lines.extend(
         [
             "",
             "## Runtime Metrics",
             "",
-            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes | jit_typed_direct_return/op | jit_typed_native_exit/op | jit_typed_op_exit/op | jit_typed_kernel_success/op | jit_typed_kernel_errors/op | jit_typed_pipeline_shapes |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes | jit_typed_direct_return/op | jit_typed_native_exit/op | jit_typed_op_exit/op | jit_typed_kernel_success/op | jit_typed_kernel_errors/op | jit_typed_pipeline_shapes | q_session_planned_op_exit/op | q_session_shell_fallback/op | q_session_eval_errors/op | q_session_backend_shapes |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for item in runtime_metrics:
@@ -2727,7 +2814,11 @@ def markdown_report(
             f"{format_metric(item.jit_typed_op_exit_op, 3)} | "
             f"{format_metric(item.jit_typed_kernel_success_op, 3)} | "
             f"{format_metric(item.jit_typed_kernel_errors_op, 3)} | "
-            f"{format_metric(item.jit_typed_pipeline_shapes, 0)} |"
+            f"{format_metric(item.jit_typed_pipeline_shapes, 0)} | "
+            f"{format_metric(item.q_session_planned_op_exit_op, 3)} | "
+            f"{format_metric(item.q_session_shell_fallback_op, 3)} | "
+            f"{format_metric(item.q_session_eval_errors_op, 3)} | "
+            f"{format_metric(item.q_session_backend_shapes, 0)} |"
         )
     if any(item.benchmark_count > 0 for item in jit_routes):
         lines.extend(

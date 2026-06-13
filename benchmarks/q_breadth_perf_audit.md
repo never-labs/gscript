@@ -2,15 +2,23 @@
 
 Date: 2026-06-11
 
+Status: **historical snapshot**. This audit records the post-wave-2 state from
+2026-06-11 and is kept as a worklist reference, not as the current coverage
+contract. Current ordinary `q.eval` performance reporting treats the synthetic
+suite as **483 cases** and includes the JIT script layer through
+`BenchmarkQEvalJITScriptWarm` rows in the q.eval benchmark/report join.
+
 Baseline: `0844e0ef benchmarks: refresh q go-ratio baseline after wave-2, ratchet caps 320/56 -> 64/8`
 
 Data sources:
 
 - `/tmp/q_suite_run3.txt` — canonical post-wave-2 run of
   `benchmarks/q_performance_suite.sh` (qSQL bind/native rows, the four
-  483-case q.eval families, and the 44-case JIT/VM script layer)
+  483-case q.eval families, and, at this snapshot date, the 44-case JIT/VM
+  script layer)
 - `benchmarks/data/qeval_go_ratio_baseline.json` — per-case Go ratios captured
-  from the same run (483 cases; 459 trusted warm ratios, 44 jit ratios)
+  from the same run (483 cases; 459 trusted warm ratios, 44 jit ratios in this
+  historical capture)
 
 Machine:
 
@@ -45,7 +53,8 @@ in. The wave-1+2 fixes that landed:
   plan-cache probe reorder, and lazy-carrier materialization; statements now
   execute through pointers so per-statement fast plans actually persist.
 
-Where that leaves the suite (459 trusted warm cases, 44 jit cases):
+Where that left the suite in this historical snapshot (459 trusted warm cases,
+44 jit cases):
 
 | Layer | Geomean Leia/Go | Beat Go | >= 10x slower |
 |---|---:|---:|---:|
@@ -106,9 +115,17 @@ Families, not cases, are the units here:
 
 ## Worst JIT-Script vs Go Ratios
 
-All 44 rows are now under the 8x hard cap (was 56). VM column included to
-show the JIT loop itself is not the gap — the residual cost is in the q
-runtime work per op-exit.
+All 44 rows in this snapshot were under the 8x hard cap (was 56). VM column
+included to show the JIT loop itself was not the gap — the residual cost was in
+the q runtime work per op-exit. Current `BenchmarkQEvalJITScriptWarm` rows also
+emit q session route metrics:
+
+| Metric | Meaning |
+|---|---|
+| `q_session_planned_op_exit/op` | per-iteration planned `OpQEvalSessionEval` JIT op-exit route |
+| `q_session_shell_fallback/op` | fallback to shell eval instead of the planned route |
+| `q_session_eval_errors/op` | eval failures seen through the q session route |
+| `q_session_backend_shapes` | distinct backend-lowered q session shapes observed by the benchmark row |
 
 | Case | JIT ns/op | VM ns/op | Go ns/op | JIT/Go | B/op | allocs/op |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
