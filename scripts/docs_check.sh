@@ -20,7 +20,7 @@ Checks README/docs Markdown for:
   - docs examples index lists each registered top-level example directory and
     keeps documented examples CLI selectors registered.
   - README concise examples stay tied to detailed docs, manifests, and focused gates.
-  - README Quick Start, install, and Embedding snippets keep focused execution gates.
+  - README Surface, Tooling, References, and Embedding snippets keep focused execution gates.
   - reference entrypoints stay linked from the docs home.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
@@ -95,7 +95,7 @@ if ! go test ./tests/docs/spec -count=1; then
     echo "error: docs/spec contract gate failed" >&2
     exit 1
 fi
-if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeDocumentationEntrypointsStayGated' -count=1; then
+if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeReferencesEntrypointsStayGated' -count=1; then
     echo "error: docs release/spec reference gate failed" >&2
     exit 1
 fi
@@ -120,7 +120,7 @@ doc_files.extend(
 )
 
 link_re = re.compile(r"(?<!!)\[[^\]\n]*\]\(([^)\n]+)\)")
-fence_re = re.compile(r"^\s*(```+|~~~+)")
+fence_re = re.compile(r"^\s*(`{3,}|~{3,})")
 script_names = {
     "production_check": root / "scripts" / "production_check.sh",
     "performance_gate": root / "scripts" / "performance_gate.sh",
@@ -144,7 +144,7 @@ checked_spec_contract_docs = 0
 checked_examples_index_dirs = 0
 checked_examples_capability_drift_gates = 0
 checked_readme_user_facing_gates = 0
-checked_readme_documentation_entrypoints = 0
+checked_readme_reference_entrypoints = 0
 checked_reference_entrypoints = 0
 spec_runnable_report = ""
 
@@ -235,6 +235,8 @@ def check_script_mentions(path: Path) -> None:
     global checked_script_mentions
     in_fence = False
     fence_start = 0
+    fence_char = ""
+    fence_len = 0
     block = []
 
     def flush(end_line: int) -> None:
@@ -255,14 +257,19 @@ def check_script_mentions(path: Path) -> None:
                 )
 
     for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if fence_re.match(line):
+        match = fence_re.match(line)
+        if match:
+            marker = match.group(1)
             if in_fence:
-                flush(line_no)
-                block = []
-                in_fence = False
+                if marker[0] == fence_char and len(marker) >= fence_len:
+                    flush(line_no)
+                    block = []
+                    in_fence = False
             else:
                 in_fence = True
                 fence_start = line_no
+                fence_char = marker[0]
+                fence_len = len(marker)
                 block = []
             continue
         if in_fence:
@@ -272,14 +279,14 @@ def check_script_mentions(path: Path) -> None:
         errors.append(f"{path.relative_to(root)}:{fence_start}: unclosed fenced code block")
 
 
-def read_readme_documentation_entrypoints() -> list[str]:
+def read_readme_reference_entrypoints() -> list[str]:
     readme = root / "README.md"
     text = readme.read_text(encoding="utf-8")
-    start = text.find("## Documentation")
+    start = text.find("## References")
     if start == -1:
-        errors.append("README.md: missing Documentation section")
+        errors.append("README.md: missing References section")
         return []
-    end = text.find("\n## ", start + len("## Documentation"))
+    end = text.find("\n## ", start + len("## References"))
     section = text[start:] if end == -1 else text[start:end]
 
     refs = []
@@ -298,22 +305,22 @@ def read_readme_documentation_entrypoints() -> list[str]:
     return refs
 
 
-def check_readme_documentation_entrypoints() -> None:
-    global checked_readme_documentation_entrypoints
-    refs = read_readme_documentation_entrypoints()
+def check_readme_reference_entrypoints() -> None:
+    global checked_readme_reference_entrypoints
+    refs = read_readme_reference_entrypoints()
     if not refs:
-        errors.append("README.md Documentation section must list documentation entrypoints")
+        errors.append("README.md References section must list documentation entrypoints")
         return
     for ref in refs:
-        checked_readme_documentation_entrypoints += 1
+        checked_readme_reference_entrypoints += 1
         resolved = (root / unquote(ref)).resolve()
         try:
             resolved.relative_to(root)
         except ValueError:
-            errors.append(f"README.md Documentation entrypoint escapes repo: {ref}")
+            errors.append(f"README.md References entrypoint escapes repo: {ref}")
             continue
         if not resolved.is_file():
-            errors.append(f"README.md Documentation entrypoint target is missing: {ref}")
+            errors.append(f"README.md References entrypoint target is missing: {ref}")
 
 
 def check_reference_entrypoints() -> None:
@@ -463,7 +470,9 @@ def check_spec_contract_docs() -> None:
             readme,
             [
                 "[Language specification](docs/spec/index.md)",
-                "Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
+                "Leia is an embeddable scripting language for Go systems.",
+                "## Surface",
+                "## References",
             ],
         ),
         (
@@ -522,7 +531,7 @@ def check_examples_capability_drift_gates() -> None:
                 "TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples",
                 "leia examples list --json",
                 "TestExamplesCommandManifestMatchesPlaygroundRepositoryExamples",
-                "TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates",
+                "TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates",
             ],
         ),
         (
@@ -537,7 +546,7 @@ def check_examples_capability_drift_gates() -> None:
             root / "cmd" / "leia" / "main_playground_test.go",
             [
                 "TestPlaygroundRepositoryCoreExampleCoverage",
-                "TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates",
+                "TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates",
                 "TestPlaygroundRepositoryGameEngineExampleClassification",
             ],
         ),
@@ -557,24 +566,23 @@ def check_readme_user_facing_gates() -> None:
         (
             root / "cmd" / "leia" / "main_readme_tooling_test.go",
             [
-                "TestReadmeQuickStartCommandsStayRunnable",
-                "readmeQuickStartCommands",
-                "README Quick Start command `go run ./cmd/leia %s` failed",
-                'exec.Command("go", append([]string{"run", "./cmd/leia"}, command.args...)...)',
-                "go run ./cmd/leia help",
-                "go run ./cmd/leia eval 'print(\"hello from leia\")'",
-                "go run ./cmd/leia run tests/smoke/01_basic.leia",
-                "go run ./cmd/leia run examples/hello/fib.leia",
-                "TestReadmeInstallCommandsStayRunnable",
-                "readmeInstallCommands",
-                "README install command `go install ./cmd/leia ./cmd/leia-lsp` failed",
-                "README install command `leia %s` failed",
-                'exec.Command("go", "install", "./cmd/leia", "./cmd/leia-lsp")',
-                "README install command did not install leia-lsp",
-                "exec.Command(leia, args...)",
-                "go install ./cmd/leia ./cmd/leia-lsp",
-                "leia version",
-                "leia run tests/smoke/01_basic.leia",
+                "TestReadmeIntroStaysFocused",
+                "Leia is an embeddable scripting language for Go systems.",
+                "Go-style syntax",
+                "typed hot-path optimization",
+                "native q-style columnar analytics",
+                "AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+                "## Surface",
+                "## Tooling",
+                "## References",
+                "TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
+                "readmeFirstLeiaSnippet",
+                "README Leia example failed before provider boundary",
+                "llm provider not configured",
+                'exec.Command("go", "run", "./cmd/leia", "run", file)',
+                "TestReadmeToolingCommandsMapToCLI",
+                "readmeToolingCommands",
+                "README Tooling commands are empty",
                 "TestReadmeEmbeddingSnippetStaysRunnable",
                 "readmeEmbeddingGoSnippet",
                 "README embedding snippet failed",
@@ -587,14 +595,13 @@ def check_readme_user_facing_gates() -> None:
             root / "tests" / "release_matrix_test.go",
             [
                 "TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate",
-                "readReleaseReadmeQuickStartCommands",
-                "readReleaseReadmeInstallCommands",
+                "readReleaseReadmeSurfaceLeiaSnippet",
+                "readReleaseReadmeToolingCommands",
                 "readReleaseReadmeEmbeddingGoSnippet",
-                "README.md Quick Start commands changed",
-                "cmd/leia/main_readme_tooling_test.go must keep README Quick Start focused gate",
-                "README.md install commands changed",
-                "cmd/leia/main_readme_tooling_test.go must keep README install focused gate",
-                "README.md Embedding snippet changed or lost executable public SDK surface",
+                "README.md Surface snippet changed or lost product surface",
+                "README Tooling command must use `go run ./cmd/leia ...`",
+                "cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate",
+                "cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate",
                 "cmd/leia/main_readme_tooling_test.go must keep README Embedding focused gate",
             ],
         ),
@@ -615,7 +622,7 @@ for doc_file in doc_files:
         check_retired_names(doc_file)
 
 check_release_gate_docs()
-check_readme_documentation_entrypoints()
+check_readme_reference_entrypoints()
 check_reference_entrypoints()
 check_spec_runnable_coverage()
 check_spec_contract_docs()
@@ -634,7 +641,7 @@ print(
     f"{checked_links} relative documentation links, "
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
-    f"{checked_readme_documentation_entrypoints} README Documentation entrypoints, "
+    f"{checked_readme_reference_entrypoints} README References entrypoints, "
     f"{checked_reference_entrypoints} reference entrypoints, "
     f"{checked_spec_contract_docs} spec/stable-contract docs, "
     f"{checked_examples_index_dirs} examples index directories, "

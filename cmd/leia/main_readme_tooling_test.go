@@ -5,27 +5,39 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 )
 
-func TestReadmeToolingCommandsDoNotDrift(t *testing.T) {
+func TestReadmeIntroStaysFocused(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := readmeToolingCommands(string(data))
-	want := []string{
-		"go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
-		"go run ./cmd/leia lint tests/smoke/01_basic.leia",
-		"go run ./cmd/leia test tests/smoke/01_basic.leia",
-		"go run ./cmd/leia check --quick .",
-		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
+	readme := string(data)
+	for _, want := range []string{
+		"Leia is an embeddable scripting language for Go systems.",
+		"Go-style syntax",
+		"typed hot-path optimization",
+		"native q-style columnar analytics",
+		"high-performance in-memory data",
+		"tagged dialects",
+		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+		"## Surface",
+		"## Tooling",
+		"## References",
+		"model: \"claude\"",
+		"q```",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Fatalf("README missing focused positioning snippet %q", want)
+		}
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("README Tooling commands changed:\ngot  %#v\nwant %#v", got, want)
+	for _, forbidden := range []string{"## Quick Start", "## Install", "## Project Status", "AI-native syntax", "Go-native runtime"} {
+		if strings.Contains(readme, forbidden) {
+			t.Fatalf("README must not contain template section %q", forbidden)
+		}
 	}
 }
 
@@ -38,98 +50,35 @@ func readFileString(t *testing.T, path string) string {
 	return string(data)
 }
 
-func TestReadmeQuickStartCommandsStayRunnable(t *testing.T) {
+func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := readmeQuickStartCommands(string(data))
-	want := []string{
-		"go run ./cmd/leia help",
-		`go run ./cmd/leia eval 'print("hello from leia")'`,
-		"go run ./cmd/leia run tests/smoke/01_basic.leia",
-		"go run ./cmd/leia run examples/hello/fib.leia",
+	snippet := readmeFirstLeiaSnippet(string(data))
+	if snippet == "" {
+		t.Fatal("README must contain a Leia example")
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("README Quick Start commands changed:\ngot  %#v\nwant %#v", got, want)
-	}
-
-	commands := []struct {
-		args       []string
-		wantStdout string
-	}{
-		{args: []string{"help"}, wantStdout: "usage: leia"},
-		{args: []string{"eval", `print("hello from leia")`}, wantStdout: "hello from leia"},
-		{args: []string{"run", "tests/smoke/01_basic.leia"}},
-		{args: []string{"run", "examples/hello/fib.leia"}},
-	}
-	for _, command := range commands {
-		cmd := exec.Command("go", append([]string{"run", "./cmd/leia"}, command.args...)...)
-		cmd.Dir = root
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("README Quick Start command `go run ./cmd/leia %s` failed: %v\nstdout:\n%s\nstderr:\n%s",
-				strings.Join(command.args, " "), err, stdout.String(), stderr.String())
-		}
-		if command.wantStdout != "" && !strings.Contains(stdout.String(), command.wantStdout) {
-			t.Fatalf("README Quick Start command `go run ./cmd/leia %s` stdout = %q, want %q",
-				strings.Join(command.args, " "), stdout.String(), command.wantStdout)
+	for _, want := range []string{"q```", "model {", "agent {", "prompt {", "model: \"claude\""} {
+		if !strings.Contains(snippet, want) {
+			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}
 	}
-}
-
-func TestReadmeInstallCommandsStayRunnable(t *testing.T) {
-	root := repoRootForBoundaryTest(t)
-	data, err := os.ReadFile(filepath.Join(root, "README.md"))
-	if err != nil {
+	file := filepath.Join(t.TempDir(), "readme.leia")
+	if err := os.WriteFile(file, []byte(snippet), 0644); err != nil {
 		t.Fatal(err)
 	}
-	got := readmeInstallCommands(string(data))
-	want := []string{
-		"go install ./cmd/leia ./cmd/leia-lsp",
-		"leia version",
-		"leia run tests/smoke/01_basic.leia",
+	cmd := exec.Command("go", "run", "./cmd/leia", "run", file)
+	cmd.Dir = root
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("README Leia example failed before provider boundary: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("README install commands changed:\ngot  %#v\nwant %#v", got, want)
-	}
-
-	gobin := t.TempDir()
-	env := append(os.Environ(), "GOBIN="+gobin)
-	install := exec.Command("go", "install", "./cmd/leia", "./cmd/leia-lsp")
-	install.Dir = root
-	install.Env = env
-	var installStdout, installStderr bytes.Buffer
-	install.Stdout = &installStdout
-	install.Stderr = &installStderr
-	if err := install.Run(); err != nil {
-		t.Fatalf("README install command `go install ./cmd/leia ./cmd/leia-lsp` failed: %v\nstdout:\n%s\nstderr:\n%s",
-			err, installStdout.String(), installStderr.String())
-	}
-
-	leia := filepath.Join(gobin, "leia")
-	leiaLSP := filepath.Join(gobin, "leia-lsp")
-	if _, err := os.Stat(leiaLSP); err != nil {
-		t.Fatalf("README install command did not install leia-lsp at %s: %v", leiaLSP, err)
-	}
-	commands := [][]string{
-		{"version"},
-		{"run", "tests/smoke/01_basic.leia"},
-	}
-	for _, args := range commands {
-		cmd := exec.Command(leia, args...)
-		cmd.Dir = root
-		cmd.Env = env
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("README install command `leia %s` failed: %v\nstdout:\n%s\nstderr:\n%s",
-				strings.Join(args, " "), err, stdout.String(), stderr.String())
-		}
+	if !strings.Contains(stdout.String(), "llm provider not configured") {
+		t.Fatalf("README Leia example stdout = %q, want provider boundary message", stdout.String())
 	}
 }
 
@@ -350,58 +299,21 @@ func readmeEmbeddingGoSnippet(readme string) string {
 	return strings.TrimSpace(rest[:blockEnd]) + "\n"
 }
 
-func readmeQuickStartCommands(readme string) []string {
-	const marker = "## Quick Start"
-	start := strings.Index(readme, marker)
-	if start < 0 {
-		return nil
-	}
-	rest := readme[start+len(marker):]
-	blockStart := strings.Index(rest, "```bash")
-	if blockStart < 0 {
-		return nil
-	}
-	rest = rest[blockStart+len("```bash"):]
-	blockEnd := strings.Index(rest, "```")
-	if blockEnd < 0 {
-		return nil
-	}
-	lines := strings.Split(rest[:blockEnd], "\n")
-	var commands []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			commands = append(commands, line)
+func readmeFirstLeiaSnippet(readme string) string {
+	for _, marker := range []string{"````leia", "```leia"} {
+		start := strings.Index(readme, marker)
+		if start < 0 {
+			continue
 		}
-	}
-	return commands
-}
-
-func readmeInstallCommands(readme string) []string {
-	const marker = "## Install"
-	start := strings.Index(readme, marker)
-	if start < 0 {
-		return nil
-	}
-	rest := readme[start+len(marker):]
-	blockStart := strings.Index(rest, "```bash")
-	if blockStart < 0 {
-		return nil
-	}
-	rest = rest[blockStart+len("```bash"):]
-	blockEnd := strings.Index(rest, "```")
-	if blockEnd < 0 {
-		return nil
-	}
-	lines := strings.Split(rest[:blockEnd], "\n")
-	var commands []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			commands = append(commands, line)
+		rest := readme[start+len(marker):]
+		endMarker := strings.Repeat("`", strings.Count(marker, "`"))
+		blockEnd := strings.Index(rest, endMarker)
+		if blockEnd < 0 {
+			return ""
 		}
+		return strings.TrimSpace(rest[:blockEnd]) + "\n"
 	}
-	return commands
+	return ""
 }
 
 func readmeToolingCommands(readme string) []string {

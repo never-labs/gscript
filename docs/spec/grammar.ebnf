@@ -2,9 +2,9 @@
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as sh, json, re, prompt, and user-defined names are
-   ordinary identifiers until they appear directly before a tagged string or
-   tagged block.
+   Dialect tags such as q, sh, json, re, prompt, AI workflow tags, and
+   user-defined names are ordinary identifiers until they appear directly
+   before a tagged string or tagged block.
 *)
 
 program        = { separator | statement } EOF ;
@@ -104,7 +104,7 @@ primary        = identifier
                | dense_lit ;
 
 func_lit       = "func" param_list block ;
-tagged_string  = [ identifier | "$" ] [ "!" ] raw_string_lit ;
+tagged_string  = ( identifier | "$" ) [ "!" ] tagged_raw_string_lit ;
 tagged_block   = identifier [ "!" ] config_block ;
 
 config_block   = "{" [ config_field { field_sep config_field } [ field_sep ] ] "}" ;
@@ -134,16 +134,38 @@ float_lit      = decimal_lit "." decimal_lit [ exponent ]
 exponent       = ( "e" | "E" ) [ "+" | "-" ] decimal_lit ;
 digit          = "0".."9" ;
 hex_digit      = digit | "A".."F" | "a".."f" ;
-string_lit     = quoted_string | raw_string ;
-quoted_string  = '"' { escaped_char | any_char_except_quote_or_newline } '"' ;
-raw_string     = "`" { any_char_except_backtick } "`" ;
-escaped_char   = "\\" ( "\\" | '"' | "a" | "b" | "f" | "n" | "r" | "t" | "v"
+string_lit     = double_quoted_string | single_quoted_string | raw_string_lit ;
+double_quoted_string
+               = '"' { escaped_char | interpolation | any_char_except_double_quote_or_newline } '"' ;
+single_quoted_string
+               = "'" { escaped_char | any_char_except_single_quote_or_newline } "'" ;
+raw_string_lit = short_raw_string | fenced_raw_string ;
+short_raw_string
+               = "`" { any_char_except_backtick } "`" ;
+fenced_raw_string
+               = "```" { any_char_except_three_backticks } "```" ;
+tagged_raw_string_lit
+               = tagged_short_raw_string | tagged_fenced_raw_string ;
+tagged_short_raw_string
+               = "`" { tagged_raw_char | interpolation } "`" ;
+tagged_fenced_raw_string
+               = "```" { tagged_fenced_raw_char | interpolation } "```" ;
+interpolation  = "${" expr "}" ;
+escaped_char   = "\\" ( "\\" | '"' | "'" | "a" | "b" | "f" | "n" | "r" | "t" | "v"
                     | "x" hex_digit hex_digit
                     | "u" hex_digit hex_digit hex_digit hex_digit
                     | "U" hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
                     | decimal_escape ) ;
 decimal_escape = digit [ digit [ digit ] ] ;
-any_char_except_quote_or_newline
+any_char_except_double_quote_or_newline
                = ? any Unicode scalar value except '"' and newline ? ;
+any_char_except_single_quote_or_newline
+               = ? any Unicode scalar value except "'" and newline ? ;
 any_char_except_backtick
                = ? any Unicode scalar value except "`" ? ;
+any_char_except_three_backticks
+               = ? any Unicode scalar sequence not containing "```" ? ;
+tagged_raw_char
+               = ? any Unicode scalar value except "`" and the start of "${" ? ;
+tagged_fenced_raw_char
+               = ? any Unicode scalar sequence not containing "```" or the start of "${" ? ;

@@ -12,7 +12,7 @@ const (
 
 	// Literals
 	TOKEN_NUMBER // 123, 1.5, 1e10
-	TOKEN_STRING // "hello" or `hello`
+	TOKEN_STRING // "hello", 'hello', or `hello`
 	TOKEN_TRUE   // true
 	TOKEN_FALSE  // false
 	TOKEN_NIL    // nil
@@ -196,6 +196,7 @@ type Token struct {
 	Type            TokenType
 	Value           string
 	IsRawString     bool
+	IsSingleQuoted  bool
 	Line            int
 	Column          int
 	LeadingComments []Comment

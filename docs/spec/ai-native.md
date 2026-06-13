@@ -4,7 +4,8 @@ Leia's AI dialect is an optional standard-library runtime exposed through
 tagged dialect forms and ordinary modules. The language implementation must
 route these forms through the same `llm`, `msg`, `history`, `dialect`, and
 host-provider paths as direct library calls. There is no separate AI execution
-engine.
+engine, and Leia is not an AI-native language. AI is one DSL implementation on
+top of the generic tagged-dialect mechanism.
 
 An AI operation is deterministic until it reaches a provider, host callback, or
 tool body with side effects. Conformance tests that need stable behavior should
@@ -16,7 +17,8 @@ AI is a dialect layer, not language intrinsic. The grammar may provide small
 tagged forms for common AI workflows, yet the language core does not gain
 model-specific evaluation rules, hidden prompt state, or a privileged AI
 scheduler. Every AI dialect form must lower to ordinary runtime helpers and
-ordinary values before provider I/O occurs.
+ordinary values before provider I/O occurs. This is the same extension boundary
+used by other dialects, including `q` for columnar analytics.
 
 This principle has four consequences:
 

@@ -138,8 +138,8 @@ func TestStringLiteral(t *testing.T) {
 	}
 }
 
-func TestRawStringInterpolationParses(t *testing.T) {
-	prog := mustParse(t, "name := \"Ada\"\ns := `hello ${name}`")
+func TestQuotedStringInterpolationParses(t *testing.T) {
+	prog := mustParse(t, "name := \"Ada\"\ns := \"hello ${name}\"")
 	decl := prog.Stmts[1].(*ast.DeclareStmt)
 	interp, ok := decl.Values[0].(*ast.InterpolatedStringExpr)
 	if !ok {
@@ -154,15 +154,75 @@ func TestRawStringInterpolationParses(t *testing.T) {
 	}
 }
 
-func TestQuotedStringDoesNotInterpolate(t *testing.T) {
-	prog := mustParse(t, `s := "hello ${name}"`)
+func TestDoubleQuotedStringEscapesQuoteAndInterpolates(t *testing.T) {
+	prog := mustParse(t, `name := "Ada"; s := "hello \"${name}\""`)
+	decl := prog.Stmts[1].(*ast.DeclareStmt)
+	interp, ok := decl.Values[0].(*ast.InterpolatedStringExpr)
+	if !ok {
+		t.Fatalf("expected InterpolatedStringExpr, got %T", decl.Values[0])
+	}
+	if len(interp.Parts) != 3 || interp.Parts[0].Text != "hello \"" || interp.Parts[2].Text != "\"" {
+		t.Fatalf("unexpected interpolation parts: %#v", interp.Parts)
+	}
+}
+
+func TestInterpolationExpressionSkipsSingleQuotedString(t *testing.T) {
+	prog := mustParse(t, `s := "value ${choose({right: '}'}).right}"`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	interp, ok := decl.Values[0].(*ast.InterpolatedStringExpr)
+	if !ok {
+		t.Fatalf("expected InterpolatedStringExpr, got %T", decl.Values[0])
+	}
+	if len(interp.Parts) != 2 || interp.Parts[0].Text != "value " {
+		t.Fatalf("unexpected interpolation parts: %#v", interp.Parts)
+	}
+}
+
+func TestInterpolationExpressionSkipsFencedRawString(t *testing.T) {
+	prog := mustParse(t, "s := \"value ${choose(```}```)}\"")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	interp, ok := decl.Values[0].(*ast.InterpolatedStringExpr)
+	if !ok {
+		t.Fatalf("expected InterpolatedStringExpr, got %T", decl.Values[0])
+	}
+	if len(interp.Parts) != 2 || interp.Parts[0].Text != "value " {
+		t.Fatalf("unexpected interpolation parts: %#v", interp.Parts)
+	}
+}
+
+func TestSingleQuotedStringDoesNotInterpolate(t *testing.T) {
+	prog := mustParse(t, `s := 'hello ${name}'`)
 	decl := prog.Stmts[0].(*ast.DeclareStmt)
 	str, ok := decl.Values[0].(*ast.StringLit)
 	if !ok {
 		t.Fatalf("expected StringLit, got %T", decl.Values[0])
 	}
 	if str.Value != "hello ${name}" {
-		t.Fatalf("quoted string = %q, want literal interpolation marker", str.Value)
+		t.Fatalf("single quoted string = %q, want literal interpolation marker", str.Value)
+	}
+}
+
+func TestSingleQuotedStringEscapesQuoteWithoutInterpolating(t *testing.T) {
+	prog := mustParse(t, `s := 'hello \'${name}\''`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	str, ok := decl.Values[0].(*ast.StringLit)
+	if !ok {
+		t.Fatalf("expected StringLit, got %T", decl.Values[0])
+	}
+	if str.Value != "hello '${name}'" {
+		t.Fatalf("single quoted string = %q, want escaped quote with literal interpolation marker", str.Value)
+	}
+}
+
+func TestStandaloneRawStringDoesNotInterpolate(t *testing.T) {
+	prog := mustParse(t, "s := `hello ${name}`")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	str, ok := decl.Values[0].(*ast.StringLit)
+	if !ok {
+		t.Fatalf("expected StringLit, got %T", decl.Values[0])
+	}
+	if str.Value != "hello ${name}" {
+		t.Fatalf("raw string = %q, want literal interpolation marker", str.Value)
 	}
 }
 

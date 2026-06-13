@@ -1713,10 +1713,10 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 
 	case lexer.TOKEN_STRING:
 		p.advance()
-		if tok.IsRawString {
-			return p.interpolatedStringExpr(p.tokenPos(tok), tok.Value)
+		if tok.IsRawString || tok.IsSingleQuoted {
+			return &ast.StringLit{P: p.tokenPos(tok), Value: tok.Value}, nil
 		}
-		return &ast.StringLit{P: p.tokenPos(tok), Value: tok.Value}, nil
+		return p.interpolatedStringExpr(p.tokenPos(tok), tok.Value)
 
 	case lexer.TOKEN_TRUE:
 		p.advance()
@@ -1937,18 +1937,18 @@ func scanInterpolationEnd(value string, start int) (int, bool) {
 	depth := 1
 	for i := start; i < len(value); i++ {
 		switch value[i] {
-		case '"':
+		case '"', '\'':
 			next, ok := skipQuotedString(value, i)
 			if !ok {
 				return 0, false
 			}
 			i = next
 		case '`':
-			next := strings.IndexByte(value[i+1:], '`')
-			if next < 0 {
+			next, ok := skipRawString(value, i)
+			if !ok {
 				return 0, false
 			}
-			i += next + 1
+			i = next
 		case '/':
 			if i+1 >= len(value) {
 				continue
@@ -1979,13 +1979,38 @@ func scanInterpolationEnd(value string, start int) (int, bool) {
 	return 0, false
 }
 
+func skipRawString(value string, start int) (int, bool) {
+	if start >= len(value) || value[start] != '`' {
+		return 0, false
+	}
+	delimLen := 1
+	if start+2 < len(value) && value[start+1] == '`' && value[start+2] == '`' {
+		delimLen = 3
+	}
+	for i := start + delimLen; i+delimLen <= len(value); i++ {
+		if strings.HasPrefix(value[i:], strings.Repeat("`", delimLen)) {
+			return i + delimLen - 1, true
+		}
+	}
+	return 0, false
+}
+
 func skipQuotedString(value string, start int) (int, bool) {
+	if start >= len(value) {
+		return 0, false
+	}
+	quote := value[start]
+	if quote != '"' && quote != '\'' {
+		return 0, false
+	}
 	for i := start + 1; i < len(value); i++ {
 		switch value[i] {
 		case '\\':
 			i++
-		case '"':
-			return i, true
+		default:
+			if value[i] == quote {
+				return i, true
+			}
 		}
 	}
 	return 0, false

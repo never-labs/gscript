@@ -2,9 +2,10 @@
 
 Leia includes data-oriented standard libraries for numeric scripts that need
 columnar layout, typed dense arrays, vectors, matrices, masks, and hot-loop
-kernels. This is a language feature area, not only a library convenience:
-runtime and JIT paths can specialize these shapes while preserving normal
-script semantics.
+kernels. The `q` dialect is the core high-performance in-memory columnar
+analytics DSL in this area. This is a language feature area, not only a library
+convenience: runtime and JIT paths can specialize these shapes while preserving
+normal script semantics.
 
 ## Dense Arrays
 

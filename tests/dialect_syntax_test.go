@@ -203,10 +203,12 @@ func TestUserRegisteredDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 					},
 				})
 
-				name := "leia"
-				literal := wrap` + "`" + `hello-${name}` + "`" + `
-				alias_literal := bracket` + "`" + `ok` + "`" + `
-				explicit := dialect.eval("wrap", "plain", {prefix: "[", suffix: "]"})
+					name := "leia"
+					literal := wrap` + "`" + `hello-${name}` + "`" + `
+					fenced_literal := wrap` + "```" + `hello-${name}
+raw` + "```" + `
+					alias_literal := bracket` + "`" + `ok` + "`" + `
+					explicit := dialect.eval("wrap", "plain", {prefix: "[", suffix: "]"})
 				block := record {
 					name: "jobs"
 					count: 3
@@ -222,6 +224,7 @@ func TestUserRegisteredDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 				t.Fatalf("Exec: %v", err)
 			}
 			assertGet(t, vm, "literal", "<hello-leia>")
+			assertGet(t, vm, "fenced_literal", "<hello-leia\nraw>")
 			assertGet(t, vm, "alias_literal", "<ok>")
 			assertGet(t, vm, "explicit", "[plain]")
 			assertGet(t, vm, "block_kind", "block")
@@ -614,6 +617,7 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 				"first_two := dialect.eval(\"q\", \"2#10 20 30\")\n" +
 				"book := dialect.eval(\"q\", \"`bid`ask!(99.5 100;100.5 101)\")\n" +
 				"trades := dialect.eval(\"q\", \"flip `sym`side`price`size!(`AAPL`MSFT`AAPL;`buy`sell`buy;100.5 200 101;10 15 20)\")\n" +
+				"fenced_trades := q```flip `sym`price`size!(`AAPL`MSFT`AAPL;100.5 200 101;10 15 20)```\n" +
 				"v1 := v[1]\n" +
 				"v_sum := array.sum(v)\n" +
 				"plus3 := plus[3]\n" +
@@ -626,7 +630,9 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 				"first_two2 := first_two[2]\n" +
 				"book_ask2 := book.ask[2]\n" +
 				"trade2_sym := trades[2].sym\n" +
-				"trade3_price := trades[3].price\n"
+				"trade3_price := trades[3].price\n" +
+				"fenced_sym2 := fenced_trades[2].sym\n" +
+				"fenced_price3 := fenced_trades[3].price\n"
 			if err := vm.Exec(src); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -644,6 +650,8 @@ func TestQSymbolicDialectMilestone1ExecutesThroughStdlib(t *testing.T) {
 			assertGet(t, vm, "book_ask2", float64(101))
 			assertGet(t, vm, "trade2_sym", "MSFT")
 			assertGet(t, vm, "trade3_price", float64(101))
+			assertGet(t, vm, "fenced_sym2", "MSFT")
+			assertGet(t, vm, "fenced_price3", float64(101))
 		})
 	}
 }
@@ -911,7 +919,7 @@ func TestCommandDialectBangFailsFast(t *testing.T) {
 	}
 }
 
-func TestRawStringInterpolationExecutesThroughInterpreterAndBytecode(t *testing.T) {
+func TestStringInterpolationFormsExecuteThroughInterpreterAndBytecode(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -921,11 +929,12 @@ func TestRawStringInterpolationExecutesThroughInterpreterAndBytecode(t *testing.
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(tc.opts...)
-			if err := vm.Exec("name := \"Ada\"\nscore := 42\nraw := `user=${name};score=${score};next=${score + 1}`\nquoted := \"user=${name}\""); err != nil {
+			if err := vm.Exec("name := \"Ada\"\nscore := 42\nquoted := \"user=${name};score=${score};next=${score + 1}\"\nsingle := 'user=${name}'\nraw := `user=${name}`"); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
-			assertGet(t, vm, "raw", "user=Ada;score=42;next=43")
-			assertGet(t, vm, "quoted", "user=${name}")
+			assertGet(t, vm, "quoted", "user=Ada;score=42;next=43")
+			assertGet(t, vm, "single", "user=${name}")
+			assertGet(t, vm, "raw", "user=${name}")
 		})
 	}
 }

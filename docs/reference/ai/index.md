@@ -1,9 +1,10 @@
 # Leia AI Dialect Reference
 
 Leia's AI support is an optional standard-library layer over host-installed LLM
-providers. The dialect surface is intentionally small: tagged `model`, `tool`,
-`agent`, and `turn` blocks plus ordinary `llm.*`, `msg.*`, and `history.*`
-helpers.
+providers. It is one DSL implementation on Leia's generic tagged-dialect
+mechanism, not the language itself and not an AI-native runtime. The dialect
+surface is intentionally small: tagged `model`, `tool`, `agent`, and `turn`
+blocks plus ordinary `llm.*`, `msg.*`, and `history.*` helpers.
 
 AI dialect syntax is not language intrinsic behavior. The tagged forms build
 ordinary values and call ordinary runtime helpers; they do not add hidden prompt

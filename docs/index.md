@@ -1,7 +1,11 @@
 # Leia
 
-Go-native scripting runtime with tagged DSLs, q-style columnar analytics,
-bytecode execution, ARM64 JIT, and an embeddable Go API.
+Leia is an embeddable scripting language for Go systems. It uses Go-style
+syntax, typed hot-path optimization, q-style in-memory columnar analytics, and
+tagged dialects for domain extension. Performance claims are benchmark-bound;
+the release gates compare supported hot workloads against the configured LuaJIT
+baseline where a useful reference exists. AI is a dialect/stdlib layer, not an
+AI-native runtime or the language core.
 
 ```bash
 go run ./cmd/leia eval 'print("hello from leia")'

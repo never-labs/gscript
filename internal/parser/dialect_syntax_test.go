@@ -66,8 +66,12 @@ func TestTaggedDialectStringsRequireRawStringLiteral(t *testing.T) {
 	for _, src := range []string{
 		`msg := prompt"hello"`,
 		`msg := prompt!"hello"`,
+		`msg := prompt'hello'`,
+		`msg := prompt!'hello'`,
 		`shell := $"printf hello"`,
 		`shell := $!"printf hello"`,
+		`shell := $'printf hello'`,
+		`shell := $!'printf hello'`,
 	} {
 		t.Run(src, func(t *testing.T) {
 			mustFail(t, src)
@@ -99,6 +103,41 @@ func TestTaggedDialectStringFormsParse(t *testing.T) {
 	encoded := prog.Stmts[1].(*ast.DeclareStmt).Values[0].(*ast.TaggedStringExpr)
 	if encoded.Tag != "base64" || encoded.FailFast {
 		t.Fatalf("encoded tag/failFast = %q/%v, want base64/false", encoded.Tag, encoded.FailFast)
+	}
+}
+
+func TestTaggedDialectFencedStringParsesEmbeddedBackticks(t *testing.T) {
+	prog := mustParse(t, "trades := q```flip `sym`price!(`AAPL`MSFT;100 101)```")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedStringExpr)
+	if tagged.Tag != "q" {
+		t.Fatalf("tag = %q, want q", tagged.Tag)
+	}
+	body, ok := tagged.Body.(*ast.StringLit)
+	if !ok {
+		t.Fatalf("body = %T, want StringLit", tagged.Body)
+	}
+	if body.Value != "flip `sym`price!(`AAPL`MSFT;100 101)" {
+		t.Fatalf("body = %q", body.Value)
+	}
+}
+
+func TestTaggedDialectFencedStringInterpolates(t *testing.T) {
+	prog := mustParse(t, "name := \"Ada\"\nmsg := prompt```hello ${name}```")
+	decl := prog.Stmts[1].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedStringExpr)
+	if tagged.Tag != "prompt" {
+		t.Fatalf("tag = %q, want prompt", tagged.Tag)
+	}
+	body, ok := tagged.Body.(*ast.InterpolatedStringExpr)
+	if !ok || len(body.Parts) != 2 {
+		t.Fatalf("body = %#v, want interpolated text/expr", tagged.Body)
+	}
+	if body.Parts[0].Text != "hello " {
+		t.Fatalf("text part = %q", body.Parts[0].Text)
+	}
+	if ident, ok := body.Parts[1].Expr.(*ast.IdentExpr); !ok || ident.Name != "name" {
+		t.Fatalf("expr part = %#v, want name ident", body.Parts[1].Expr)
 	}
 }
 

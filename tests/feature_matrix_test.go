@@ -262,7 +262,7 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 	for _, snippet := range []string{
 		"[`grammar.ebnf`](grammar.ebnf)",
 		"Leia supports tagged dialect forms.",
-		"The AI surface is a standard-library layer",
+		"The AI surface is an optional standard-library layer",
 		"[`../reference/directives/index.md`](../reference/directives/index.md)",
 		"all configuration values that the body needs\nmust be passed or closed over explicitly",
 		"logical `&&`",
@@ -277,7 +277,7 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 	requiredProductions := []string{
 		`import_decl    = "import" ( import_spec | "(" { import_spec } ")" ) ;`,
 		`const_decl     = "const" identifier ( "=" | ":=" ) expr ;`,
-		`tagged_string  = [ identifier | "$" ] [ "!" ] raw_string_lit ;`,
+		`tagged_string  = ( identifier | "$" ) [ "!" ] tagged_raw_string_lit ;`,
 		`tagged_block   = identifier [ "!" ] config_block ;`,
 		`select_stmt    = "select" "{" { select_case } "}" ;`,
 		`dense_lit      = "[" [ integer_lit ] "]" dense_type "{"`,
@@ -419,15 +419,20 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Go-native scripting runtime",
+		"Leia is an embeddable scripting language for Go systems.",
+		"Go-style syntax",
 		"ARM64 JIT",
+		"typed hot-path optimization",
 		"q-style columnar analytics",
-		"q := require(\"q\")",
-		"trades := q.sql(",
+		"high-performance in-memory data",
+		"rollup := q.sql(",
 		"cmd := $`git status --short`",
 		"answer, err := turn {",
+		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
 		"leia.New(leia.WithLibs(leia.LibSafe))",
-		"Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
+		"## Surface",
+		"## Tooling",
+		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README concise surface changed or missing expected snippet %q", snippet)
@@ -861,13 +866,11 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	)
 	readmeToolingGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
 	for _, snippet := range []string{
-		"TestReadmeToolingCommandsDoNotDrift",
-		"go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
-		"go run ./cmd/leia lint tests/smoke/01_basic.leia",
-		"go run ./cmd/leia test tests/smoke/01_basic.leia",
-		"go run ./cmd/leia check --quick .",
-		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 		"TestReadmeToolingCommandsMapToCLI",
+		"readmeToolingCommands",
+		"data/q_operator_pipeline",
+		"--runs",
+		"want doc check via scripts/docs_check.sh",
 	} {
 		if !strings.Contains(readmeToolingGate, snippet) {
 			t.Fatalf("README tooling guard must keep CLI command evidence snippet %q", snippet)
@@ -1088,8 +1091,8 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	benchmarkGateTest := readFileString(t, filepath.Join(root, "benchmarks", "performance_gate_test.py"))
 
 	for _, snippet := range []string{
-		"The JIT accelerates supported hot paths and falls back to the VM/runtime",
-		"semantics enforced by the spec, feature matrix, and release gates.",
+		"Performance claims are benchmark-bound.",
+		"JIT paths must preserve VM/runtime semantics.",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README execution/performance contract missing %q", snippet)
@@ -1180,8 +1183,9 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
 		"answer, err := turn {",
-		"model: \"fast\"",
-		"[AI dialect reference](docs/reference/ai/index.md)",
+		"model: \"claude\"",
+		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+		"[AI dialect](docs/reference/ai/index.md)",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README AI dialect contract missing %q", snippet)

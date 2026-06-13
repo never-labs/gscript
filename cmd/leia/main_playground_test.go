@@ -380,7 +380,7 @@ func TestPlaygroundTourAndAIAPI(t *testing.T) {
 	}
 }
 
-func TestPlaygroundAIExamplesCoverReadmeAINativeSurface(t *testing.T) {
+func TestPlaygroundAIExamplesCoverReadmeAIDialectSurface(t *testing.T) {
 	root := filepath.Dir(playgroundExamplesRoot())
 	readme, err := os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {
@@ -389,7 +389,7 @@ func TestPlaygroundAIExamplesCoverReadmeAINativeSurface(t *testing.T) {
 	readmeText := string(readme)
 	for _, claim := range []string{
 		"answer, err := turn {",
-		"[AI dialect reference](docs/reference/ai/index.md)",
+		"[AI dialect](docs/reference/ai/index.md)",
 	} {
 		if !strings.Contains(readmeText, claim) {
 			t.Fatalf("README missing AI playground claim %q", claim)
@@ -1134,7 +1134,7 @@ func TestPlaygroundRepositoryWorkflowReplayExampleIsManualRunOnly(t *testing.T) 
 	t.Fatal("repo-workflow-support_triage_replay example not found")
 }
 
-func TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates(t *testing.T) {
+func TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates(t *testing.T) {
 	examples, err := playgroundRepositoryExamples(playgroundExamplesRoot())
 	if err != nil {
 		t.Fatalf("load repository examples: %v", err)

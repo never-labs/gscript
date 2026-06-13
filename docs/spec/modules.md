@@ -303,6 +303,12 @@ through the public Go API and the active capability policy may still reject use.
 The compatibility spelling `import "go:..." as name` is also accepted, but new
 source should prefer the alias-first form.
 
+Leia's module system is designed for Go embedding: scripts can name explicit
+host bindings, but the host owns registration, capability checks, sandboxing,
+and lifetime. Tagged dialects follow the same rule. A source tag such as `q`,
+`sh`, or `turn` selects a registered dialect implementation; it does not import
+ambient packages, grant host access, or create a private runtime.
+
 The following declaration is host-only syntax, not a runnable local spec
 example:
 

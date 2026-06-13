@@ -127,8 +127,8 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <p class="subtitle">A Go-spec-inspired preview generated from <code>docs/spec/</code>. Markdown remains the source of truth.</p>
 </header>
 <section><h2 id="introduction">Leia Language Specification</h2>
-<p>This is the normative reference for the Leia programming language. It defines the source syntax, value model, execution semantics, module behavior, tagged dialect syntax, and implementation obligations that user-facing tools, interpreters, bytecode VMs, JITs, and embedding APIs must preserve.</p>
-<p>Leia uses Go-flavored syntax with dynamic values, Lua-compatible table and multi-return behavior where useful, explicit host capabilities, Go-native embedding, source-level hot reload, and a small tagged-dialect surface for domain-specific syntax such as q analytics, shell/data/web forms, and optional AI workflows.</p>
+<p>This is the normative reference for Leia, a Go-embedded scripting language with Go-like syntax. It defines the source syntax, value model, execution semantics, module behavior, tagged dialect syntax, and implementation obligations that user-facing tools, interpreters, bytecode VMs, JITs, and embedding APIs must preserve.</p>
+<p>Leia uses Go-like syntax with dynamic values, Lua-compatible table and multi-return behavior where useful, explicit host capabilities, Go-native embedding, source-level hot reload, and a generic tagged-dialect mechanism for domain-specific syntax. <code>q</code> is the core high-performance in-memory columnar analytics dialect; shell/data/web forms, spreadsheets, and optional AI workflows use the same dialect boundary.</p>
 <h3 id="introduction-version">Version</h3>
 <p>This specification describes the language surface implemented by the current repository version. A release may label a subset as stable, experimental, or implementation-defined in release notes. Stable behavior is behavior covered by this specification and by the release feature matrix.</p>
 <p>The same content is also available as a checked-in <a href="#">single-page HTML edition</a> generated from these Markdown chapters. The Markdown chapters and <a href="#">grammar appendix</a> remain the source of truth.</p>
@@ -144,7 +144,7 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <li><a href="#">Functions</a>: functions, closures, varargs, multi-return, tail behavior, and callable values.</li>
 <li><a href="#">Tables And Metatables</a>: table identity, constructors, raw access, sequence behavior, metatables, and metamethods.</li>
 <li><a href="#">Concurrency</a>: goroutine-like tasks, channels, select, sync, cancellation, and host scheduling boundaries.</li>
-<li><a href="#">AI Dialect Syntax</a>: model, tool, agent, and turn dialects as an optional standard-library layer; messages, budgets, output validation, providers, trace, replay, and evaluation.</li>
+<li><a href="#">AI Dialect Syntax</a>: model, tool, agent, and turn dialects as one optional standard-library dialect implementation; messages, budgets, output validation, providers, trace, replay, and evaluation. AI is not a privileged language mode.</li>
 <li><a href="#">Modules And Loading</a>: <code>require</code>, <code>import &quot;go:...&quot;</code>, <code>leia.mod</code>, <code>leia.sum</code>, vendoring, module caches, and capabilities.</li>
 <li><a href="#">Errors And Diagnostics</a>: runtime errors, recoverable errors, diagnostics, protected calls, and host failure reporting.</li>
 <li><a href="#">Implementation Requirements</a>: interpreter baseline, bytecode VM, JIT, optimization correctness, sandboxing, and release gates.</li>
@@ -247,7 +247,7 @@ iffoo <span class="tok-operator">:=</span> <span class="tok-number">7</span>
 <span class="tok-builtin">assert</span>(returning <span class="tok-operator">==</span> <span class="tok-constant">true</span>)
 <span class="tok-builtin">assert</span>(iffoo <span class="tok-operator">==</span> <span class="tok-number">7</span>)</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-keyword">func</span> <span class="tok-operator">:=</span> <span class="tok-string">&quot;reserved&quot;</span></code></pre>
-<p>Dialect words such as <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them dialect meaning.</p>
+<p>Dialect words such as <code>q</code>, <code>model</code>, <code>tool</code>, <code>turn</code>, <code>agent</code>, and <code>evaluate</code> are contextual syntax words, not lexical keywords. They scan as identifiers outside grammar positions that assign them dialect meaning.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">agent <span class="tok-operator">:=</span> <span class="tok-string">&quot;identifier&quot;</span>
 tool <span class="tok-operator">:=</span> <span class="tok-string">&quot;identifier&quot;</span>
 turn <span class="tok-operator">:=</span> <span class="tok-number">1</span>
@@ -256,7 +256,7 @@ model <span class="tok-operator">:=</span> <span class="tok-number">2</span>
 <span class="tok-builtin">assert</span>(agent <span class="tok-operator">==</span> <span class="tok-string">&quot;identifier&quot;</span>)
 <span class="tok-builtin">assert</span>(tool <span class="tok-operator">==</span> <span class="tok-string">&quot;identifier&quot;</span>)
 <span class="tok-builtin">assert</span>(turn <span class="tok-operator">+</span> model <span class="tok-operator">==</span> <span class="tok-number">3</span>)</code></pre>
-<p>In grammar positions that define tagged dialect forms or evaluate blocks, contextual words are consumed by that syntax rather than bound as ordinary identifiers. See <a href="#">AI Dialect Syntax</a> for the stable forms.</p>
+<p>In grammar positions that define tagged dialect forms or evaluate blocks, contextual words are consumed by that syntax rather than bound as ordinary identifiers. See <a href="#">Expressions</a> for the generic tagged-dialect boundary and <a href="#">AI Dialect Syntax</a> for one standard dialect family.</p>
 <h3 id="lexical-elements-numeric-literals">Numeric Literals</h3>
 <p>Numeric literals are unsigned tokens. Unary <code>+</code> and <code>-</code> are separate operators. The stable v1.0 numeric forms are decimal integers, decimal floats, and base-prefixed integers.</p>
 <pre class="language-ebnf"><code class="language-ebnf">number_lit  = decimal_int [ fraction ] [ exponent ]
@@ -293,29 +293,51 @@ float <span class="tok-operator">:=</span> <span class="tok-number">1.25e2</span
 <pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-number">1</span>__2</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-number">1</span>e_2</code></pre>
 <h3 id="lexical-elements-string-literals">String Literals</h3>
-<p>Quoted string literals use double quotes and process escapes. Raw string literals use backticks and do not process escapes.</p>
-<pre class="language-ebnf"><code class="language-ebnf">quoted_string = &#x27;&quot;&#x27; { quoted_char | escape } &#x27;&quot;&#x27; ;
-raw_string    = &#x27;`&#x27; { any_byte_except_backtick } &#x27;`&#x27; ;
-escape        = &quot;\\&quot; | &quot;\&quot;&quot; | &quot;\a&quot; | &quot;\b&quot; | &quot;\f&quot; | &quot;\n&quot; | &quot;\r&quot; | &quot;\t&quot; | &quot;\v&quot;
-              | &quot;\x&quot; hex hex
-              | &quot;\u&quot; hex hex hex hex
-              | &quot;\U&quot; hex hex hex hex hex hex hex hex
-              | &quot;\&quot; decimal_escape ;
+<p>String literals have three untagged source forms. Double-quoted strings process escapes and support <code>${expr}</code> interpolation. Single-quoted strings process escapes but do not interpolate; <code>${</code> has no special meaning inside them. Backtick raw strings use Go raw-string behavior: they preserve their contents and do not process escapes or interpolation.</p>
+<p>The same raw delimiter syntax is also used by tagged dialect expressions. For example, a q dialect expression places the raw body immediately after <code>q</code>, and a shell dialect expression places the raw body immediately after <code>$</code>. Tagged raw bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both tagged forms may contain <code>${expr}</code> interpolation tokens that are evaluated by Leia and encoded according to the dialect contract. The fenced form is for embedded DSL source that contains single backticks or spans multiple lines.</p>
+<pre class="language-ebnf"><code class="language-ebnf">double_quoted_string = &#x27;&quot;&#x27; { any_char_except_quote_newline_dollar_backslash
+                           | escape
+                           | interpolation } &#x27;&quot;&#x27; ;
+single_quoted_string = &quot;&#x27;&quot; { any_char_except_single_quote_newline_backslash
+                           | escape } &quot;&#x27;&quot; ;
+raw_string           = short_raw_body | fenced_raw_body ;
+short_raw_body       = &#x27;`&#x27; { any_byte_except_backtick } &#x27;`&#x27; ;
+fenced_raw_body      = &#x27;```&#x27; { any_byte_except_three_backticks } &#x27;```&#x27; ;
+tagged_raw_body      = tagged_short_raw_body | tagged_fenced_raw_body ;
+tagged_short_raw_body = &#x27;`&#x27; { any_byte_except_backtick_or_interpolation
+                            | interpolation } &#x27;`&#x27; ;
+tagged_fenced_raw_body = &#x27;```&#x27; { any_byte_except_three_backticks_or_interpolation
+                               | interpolation } &#x27;```&#x27; ;
+interpolation = &quot;${&quot; expr &quot;}&quot; ;
+escape        = backslash ( backslash | &#x27;&quot;&#x27; | &quot;&#x27;&quot; | &quot;a&quot; | &quot;b&quot; | &quot;f&quot; | &quot;n&quot;
+                          | &quot;r&quot; | &quot;t&quot; | &quot;v&quot;
+                          | &quot;x&quot; hex hex
+                          | &quot;u&quot; hex hex hex hex
+                          | &quot;U&quot; hex hex hex hex hex hex hex hex
+                          | decimal_escape ) ;
 decimal_escape = digit [ digit [ digit ] ] ;
-hex           = &quot;0&quot;..&quot;9&quot; | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&quot; ;</code></pre>
-<p>Stable quoted-string escapes are <code>\\</code>, <code>\&quot;</code>, <code>\a</code>, <code>\b</code>, <code>\f</code>, <code>\n</code>, <code>\r</code>, <code>\t</code>, <code>\v</code>, <code>\xNN</code>, <code>\uNNNN</code>, <code>\UNNNNNNNN</code>, and decimal byte escapes from <code>\0</code> through <code>\255</code>. Hex and Unicode escapes require exactly the specified number of hex digits. Unicode escapes must encode a valid Unicode scalar value.</p>
+hex           = &quot;0&quot;..&quot;9&quot; | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&quot; ;
+backslash     = &quot;\\&quot; ;</code></pre>
+<p>Stable quoted-string escapes are <code>\\</code>, <code>\&quot;</code>, <code>\&#x27;</code>, <code>\a</code>, <code>\b</code>, <code>\f</code>, <code>\n</code>, <code>\r</code>, <code>\t</code>, <code>\v</code>, <code>\xNN</code>, <code>\uNNNN</code>, <code>\UNNNNNNNN</code>, and decimal byte escapes from <code>\0</code> through <code>\255</code>. Hex and Unicode escapes require exactly the specified number of hex digits. Unicode escapes must encode a valid Unicode scalar value.</p>
 <p>Strings are byte strings; UTF-8 interpretation is provided by library helpers. <code>&quot;\uNNNN&quot;</code> and <code>&quot;\UNNNNNNNN&quot;</code> append the UTF-8 bytes for the escaped rune.</p>
-<p>Raw strings may span lines, preserve every byte between the delimiters, and may not contain a backtick byte. Quoted strings may not contain an unescaped newline.</p>
+<p>Untagged raw strings preserve every byte between the delimiters. Tagged raw bodies preserve uninterpolated bytes exactly and replace <code>${expr}</code> segments with dialect-encoded values. A short raw body cannot contain a backtick. A fenced raw body can contain single or double backticks, but not three consecutive backticks. Quoted strings may not contain an unescaped newline.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">quoted <span class="tok-operator">:=</span> <span class="tok-string">&quot;line\n&quot;</span>
+literal <span class="tok-operator">:=</span> &#x27;line\n&#x27;
 raw <span class="tok-operator">:=</span> <span class="tok-string">`line\n`</span>
+name <span class="tok-operator">:=</span> <span class="tok-string">&quot;Leia&quot;</span>
+interpolated <span class="tok-operator">:=</span> <span class="tok-string">&quot;hello ${name}&quot;</span>
+literal_interp <span class="tok-operator">:=</span> &#x27;hello ${name}&#x27;
 unicode <span class="tok-operator">:=</span> <span class="tok-string">&quot;\u0041\U00000042&quot;</span>
 byte_escape <span class="tok-operator">:=</span> <span class="tok-string">&quot;\065&quot;</span>
 
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>quoted <span class="tok-operator">==</span> <span class="tok-number">5</span>)
+<span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>literal <span class="tok-operator">==</span> <span class="tok-number">5</span>)
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>raw <span class="tok-operator">==</span> <span class="tok-number">6</span>)
+<span class="tok-builtin">assert</span>(interpolated <span class="tok-operator">==</span> <span class="tok-string">&quot;hello Leia&quot;</span>)
+<span class="tok-builtin">assert</span>(literal_interp <span class="tok-operator">==</span> &#x27;hello ${name}&#x27;)
 <span class="tok-builtin">assert</span>(unicode <span class="tok-operator">==</span> <span class="tok-string">&quot;AB&quot;</span>)
 <span class="tok-builtin">assert</span>(byte_escape <span class="tok-operator">==</span> <span class="tok-string">&quot;A&quot;</span>)</code></pre>
-<p>The first string contains a newline byte. The second contains the two bytes backslash and <code>n</code>.</p>
+<p>The first two strings contain a newline byte because quoted strings process escapes. The raw string contains the two bytes backslash and <code>n</code>. The double-quoted string interpolates <code>name</code>; the single-quoted spelling contains the literal bytes <code>${name}</code>.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">bad <span class="tok-operator">:=</span> <span class="tok-string">&quot;line
 break&quot;</span></code></pre>
 <p>Boolean and nil literals are <code>true</code>, <code>false</code>, and <code>nil</code>.</p>
@@ -855,6 +877,10 @@ child <span class="tok-operator">:=</span> {}
 holder <span class="tok-operator">:=</span> { child: child }
 <span class="tok-builtin">assert</span>(holder.child <span class="tok-operator">==</span> child)
 <span class="tok-builtin">assert</span>(holder[<span class="tok-string">&quot;child&quot;</span>] <span class="tok-operator">==</span> child)</code></pre>
+<h3 id="expressions-tagged-dialect-forms">Tagged Dialect Forms</h3>
+<p>Tagged dialects are Leia&#x27;s generic DSL extension mechanism. A tagged string has the form `<code> tag</code>...<code> </code><code> or </code><code> tag</code>`<code>...</code>`<code> </code><code>; </code>tag!<code> selects the fail-fast variant when the dialect supports recoverable errors. </code>$<code> is shorthand for the shell dialect. A tagged block has the form </code>tag { ... }<code> or </code>tag! { ... }` and uses the dialect&#x27;s block contract.</p>
+<p>Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged raw strings may contain <code>${expr}</code> interpolation segments. Leia evaluates each interpolation expression in the surrounding lexical scope, then passes the raw body and interpolated values to the dialect. The dialect, not the lexer, decides whether the interpolated value is escaped as text, encoded as JSON, bound as a parameter, or rejected.</p>
+<p>The dialect boundary never creates a second language runtime. Dialects return ordinary Leia values, <code>(value, err)</code> pairs, or runtime errors according to their contract. <code>q</code> is the core dialect for high-performance in-memory columnar analytics over vectors, dictionaries, tables, and SoA-backed query plans. AI forms such as <code>model</code>, <code>tool</code>, <code>turn</code>, and <code>agent</code> are another dialect family built on the same mechanism; they are not language-intrinsic behavior.</p>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
 <p>Within an expression list, subexpressions are evaluated left-to-right unless a specific expression form short-circuits. Implementations may optimize execution but must preserve observable side effects and error behavior.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
@@ -1788,10 +1814,10 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <h3 id="concurrency-optimization-contract">Optimization Contract</h3>
 <p>JIT, bytecode, and interpreter execution must preserve concurrency-visible behavior: communication order, channel close behavior, synchronization results, select readiness, protected error boundaries, and host cancellation boundaries must not change when optimizations are enabled. Optimizers must not move ordinary reads, writes, calls, defers, channel operations, <code>select</code>, <code>close</code>, task start, or protected-call boundaries across a synchronization or error boundary in a way that changes the behavior described in this chapter.</p>
 <p>Optimizations may change timing, scheduling, batching, or whether a task reaches a cancellation checkpoint before another task, except where the program has established ordering through channels or a specified synchronization library. JIT side exits and deoptimization must resume with the same observable channel, defer, cancellation, and protected-error state as interpreter execution.</p></section><section><h2 id="ai-dialect-syntax">AI Dialect Syntax</h2>
-<p>Leia&#x27;s AI dialect is an optional standard-library runtime exposed through tagged dialect forms and ordinary modules. The language implementation must route these forms through the same <code>llm</code>, <code>msg</code>, <code>history</code>, <code>dialect</code>, and host-provider paths as direct library calls. There is no separate AI execution engine.</p>
+<p>Leia&#x27;s AI dialect is an optional standard-library runtime exposed through tagged dialect forms and ordinary modules. The language implementation must route these forms through the same <code>llm</code>, <code>msg</code>, <code>history</code>, <code>dialect</code>, and host-provider paths as direct library calls. There is no separate AI execution engine, and Leia is not an AI-native language. AI is one DSL implementation on top of the generic tagged-dialect mechanism.</p>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Conformance tests that need stable behavior should use host-side replay records or mock providers.</p>
 <h3 id="ai-dialect-syntax-design-principle">Design Principle</h3>
-<p>AI is a dialect layer, not language intrinsic. The grammar may provide small tagged forms for common AI workflows, yet the language core does not gain model-specific evaluation rules, hidden prompt state, or a privileged AI scheduler. Every AI dialect form must lower to ordinary runtime helpers and ordinary values before provider I/O occurs.</p>
+<p>AI is a dialect layer, not language intrinsic. The grammar may provide small tagged forms for common AI workflows, yet the language core does not gain model-specific evaluation rules, hidden prompt state, or a privileged AI scheduler. Every AI dialect form must lower to ordinary runtime helpers and ordinary values before provider I/O occurs. This is the same extension boundary used by other dialects, including <code>q</code> for columnar analytics.</p>
 <p>This principle has four consequences:</p>
 <ul>
 <li>Dialect syntax is a convenience boundary, not a semantic fork. <code>agent</code>, <code>turn</code>, <code>tool</code>, <code>model</code>, prompt message objects, output schemas, budgets, trace, and replay all use the same <code>llm</code>, <code>msg</code>, <code>history</code>, and host-provider paths that direct library calls use.</li>
@@ -2242,6 +2268,7 @@ module PATH VERSION TARGET h1:BASE64_SHA256</code></pre>
 <p>The stable package-management boundary is local-first. Module paths may be GitHub-style repository paths because current tooling can cache GitHub archives, but a GitHub-looking path is still only a string in <code>leia.mod</code> until tooling or the user has placed content in a local replace, vendor directory, or module cache. Leia does not require or define a central registry for basic module use.</p>
 <h3 id="modules-and-loading-go-host-imports">Go Host Imports</h3>
 <p><code>import name &quot;go:...&quot;</code> is explicit host binding syntax. It does not automatically reflect arbitrary Go packages; embedders must provide bindings through the public Go API and the active capability policy may still reject use. The compatibility spelling <code>import &quot;go:...&quot; as name</code> is also accepted, but new source should prefer the alias-first form.</p>
+<p>Leia&#x27;s module system is designed for Go embedding: scripts can name explicit host bindings, but the host owns registration, capability checks, sandboxing, and lifetime. Tagged dialects follow the same rule. A source tag such as <code>q</code>, <code>sh</code>, or <code>turn</code> selects a registered dialect implementation; it does not import ambient packages, grant host access, or create a private runtime.</p>
 <p>The following declaration is host-only syntax, not a runnable local spec example:</p>
 <pre class="language-text"><code class="language-text">import http &quot;go:net/http&quot;</code></pre>
 <p>The declaration above is only valid when the embedder has allowlisted and registered the <code>go:net/http</code> binding. Source syntax alone never grants host access.</p>
@@ -2470,9 +2497,9 @@ fails(<span class="tok-keyword">func</span>() { coroutine.yield() })</code></pre
 
    This file is the syntax appendix for docs/spec/index.md. It describes
    stable source syntax, not parser helper productions or internal AST shapes.
-   Dialect tags such as sh, json, re, prompt, and user-defined names are
-   ordinary identifiers until they appear directly before a tagged string or
-   tagged block.
+   Dialect tags such as q, sh, json, re, prompt, AI workflow tags, and
+   user-defined names are ordinary identifiers until they appear directly
+   before a tagged string or tagged block.
 *)
 
 program        = { separator | statement } EOF ;
@@ -2572,7 +2599,7 @@ primary        = identifier
                | dense_lit ;
 
 func_lit       = &quot;func&quot; param_list block ;
-tagged_string  = [ identifier | &quot;$&quot; ] [ &quot;!&quot; ] raw_string_lit ;
+tagged_string  = ( identifier | &quot;$&quot; ) [ &quot;!&quot; ] tagged_raw_string_lit ;
 tagged_block   = identifier [ &quot;!&quot; ] config_block ;
 
 config_block   = &quot;{&quot; [ config_field { field_sep config_field } [ field_sep ] ] &quot;}&quot; ;
@@ -2602,19 +2629,41 @@ float_lit      = decimal_lit &quot;.&quot; decimal_lit [ exponent ]
 exponent       = ( &quot;e&quot; | &quot;E&quot; ) [ &quot;+&quot; | &quot;-&quot; ] decimal_lit ;
 digit          = &quot;0&quot;..&quot;9&quot; ;
 hex_digit      = digit | &quot;A&quot;..&quot;F&quot; | &quot;a&quot;..&quot;f&quot; ;
-string_lit     = quoted_string | raw_string ;
-quoted_string  = &#x27;&quot;&#x27; { escaped_char | any_char_except_quote_or_newline } &#x27;&quot;&#x27; ;
-raw_string     = &quot;`&quot; { any_char_except_backtick } &quot;`&quot; ;
-escaped_char   = &quot;\\&quot; ( &quot;\\&quot; | &#x27;&quot;&#x27; | &quot;a&quot; | &quot;b&quot; | &quot;f&quot; | &quot;n&quot; | &quot;r&quot; | &quot;t&quot; | &quot;v&quot;
+string_lit     = double_quoted_string | single_quoted_string | raw_string_lit ;
+double_quoted_string
+               = &#x27;&quot;&#x27; { escaped_char | interpolation | any_char_except_double_quote_or_newline } &#x27;&quot;&#x27; ;
+single_quoted_string
+               = &quot;&#x27;&quot; { escaped_char | any_char_except_single_quote_or_newline } &quot;&#x27;&quot; ;
+raw_string_lit = short_raw_string | fenced_raw_string ;
+short_raw_string
+               = &quot;`&quot; { any_char_except_backtick } &quot;`&quot; ;
+fenced_raw_string
+               = &quot;```&quot; { any_char_except_three_backticks } &quot;```&quot; ;
+tagged_raw_string_lit
+               = tagged_short_raw_string | tagged_fenced_raw_string ;
+tagged_short_raw_string
+               = &quot;`&quot; { tagged_raw_char | interpolation } &quot;`&quot; ;
+tagged_fenced_raw_string
+               = &quot;```&quot; { tagged_fenced_raw_char | interpolation } &quot;```&quot; ;
+interpolation  = &quot;${&quot; expr &quot;}&quot; ;
+escaped_char   = &quot;\\&quot; ( &quot;\\&quot; | &#x27;&quot;&#x27; | &quot;&#x27;&quot; | &quot;a&quot; | &quot;b&quot; | &quot;f&quot; | &quot;n&quot; | &quot;r&quot; | &quot;t&quot; | &quot;v&quot;
                     | &quot;x&quot; hex_digit hex_digit
                     | &quot;u&quot; hex_digit hex_digit hex_digit hex_digit
                     | &quot;U&quot; hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit hex_digit
                     | decimal_escape ) ;
 decimal_escape = digit [ digit [ digit ] ] ;
-any_char_except_quote_or_newline
+any_char_except_double_quote_or_newline
                = ? any Unicode scalar value except &#x27;&quot;&#x27; and newline ? ;
+any_char_except_single_quote_or_newline
+               = ? any Unicode scalar value except &quot;&#x27;&quot; and newline ? ;
 any_char_except_backtick
                = ? any Unicode scalar value except &quot;`&quot; ? ;
+any_char_except_three_backticks
+               = ? any Unicode scalar sequence not containing &quot;```&quot; ? ;
+tagged_raw_char
+               = ? any Unicode scalar value except &quot;`&quot; and the start of &quot;${&quot; ? ;
+tagged_fenced_raw_char
+               = ? any Unicode scalar sequence not containing &quot;```&quot; or the start of &quot;${&quot; ? ;
 </code></pre></section>
 <footer>Generated locally from the current worktree: <code>docs/spec/</code>.</footer>
 </main>

@@ -1,15 +1,17 @@
 # Leia Language Specification
 
-This is the normative reference for the Leia programming language. It defines
-the source syntax, value model, execution semantics, module behavior,
-tagged dialect syntax, and implementation obligations that user-facing tools,
-interpreters, bytecode VMs, JITs, and embedding APIs must preserve.
+This is the normative reference for Leia, a Go-embedded scripting language with
+Go-like syntax. It defines the source syntax, value model, execution semantics,
+module behavior, tagged dialect syntax, and implementation obligations that
+user-facing tools, interpreters, bytecode VMs, JITs, and embedding APIs must
+preserve.
 
-Leia uses Go-flavored syntax with dynamic values, Lua-compatible table and
+Leia uses Go-like syntax with dynamic values, Lua-compatible table and
 multi-return behavior where useful, explicit host capabilities, Go-native
-embedding, source-level hot reload, and a small tagged-dialect surface for
-domain-specific syntax such as q analytics, shell/data/web forms, and optional
-AI workflows.
+embedding, source-level hot reload, and a generic tagged-dialect mechanism for
+domain-specific syntax. `q` is the core high-performance in-memory columnar
+analytics dialect; shell/data/web forms, spreadsheets, and optional AI
+workflows use the same dialect boundary.
 
 ## Version
 
@@ -45,8 +47,9 @@ truth.
 - [Concurrency](concurrency.md): goroutine-like tasks, channels, select, sync,
   cancellation, and host scheduling boundaries.
 - [AI Dialect Syntax](ai-native.md): model, tool, agent, and turn dialects as
-  an optional standard-library layer; messages, budgets, output validation,
-  providers, trace, replay, and evaluation.
+  one optional standard-library dialect implementation; messages, budgets,
+  output validation, providers, trace, replay, and evaluation. AI is not a
+  privileged language mode.
 - [Modules And Loading](modules.md): `require`, `import "go:..."`, `leia.mod`,
   `leia.sum`, vendoring, module caches, and capabilities.
 - [Errors And Diagnostics](errors.md): runtime errors, recoverable errors,

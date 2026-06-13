@@ -31,6 +31,17 @@ func TestStdlibHostDriverRuntimeSpecialization(t *testing.T) {
 	}
 }
 
+func TestStdlibHostDriverFallbackMatchesSpecialization(t *testing.T) {
+	src, err := os.ReadFile("../../benchmarks/app/stdlib_host.leia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LEIA_DISABLE_RUNTIME_SPECIALIZATIONS", "stdlib_host_driver")
+
+	globals := compileAndRun(t, string(src))
+	expectGlobalInt(t, globals, "checksum", 913531730)
+}
+
 func TestStdlibHostDriverRejectsNameOnly(t *testing.T) {
 	top := compileProto(t, `
 func run_hot(n) {

@@ -733,6 +733,24 @@ func TestSemanticTokensClassifyLeiaSemanticRoles(t *testing.T) {
 	assertSemanticToken(t, tokens, "run", semanticMethod, 0)
 }
 
+func TestSemanticTokensDialectStringsRequireRawPayload(t *testing.T) {
+	src := strings.Join([]string{
+		`bad_prompt := prompt"hello"`,
+		`bad_single := prompt'hello'`,
+		`bad_shell := $"printf no"`,
+		"table := q```flip `sym!`AAPL```",
+		"",
+	}, "\n")
+	tokens := decodedSemanticTokens(src)
+
+	assertSemanticToken(t, tokens, "prompt", semanticVariable, 0)
+	assertSemanticToken(t, tokens, "hello", semanticString, 0)
+	assertNoSemanticToken(t, tokens, "hello", semanticString, semanticDialectModifier)
+	assertNoSemanticToken(t, tokens, "printf no", semanticString, semanticDialectModifier)
+	assertSemanticToken(t, tokens, "q", semanticNamespace, semanticDialectModifier)
+	assertSemanticToken(t, tokens, "flip `sym!`AAPL", semanticString, semanticDialectModifier)
+}
+
 func TestSemanticTokensTreatLegacyAIWordsAsVariables(t *testing.T) {
 	src := strings.Join([]string{
 		`agent := tool + evaluate`,
@@ -1229,6 +1247,15 @@ func assertSemanticToken(t *testing.T, tokens []semanticTokenForTest, text strin
 		}
 	}
 	t.Fatalf("missing semantic token %q type=%d modifier=%d in %#v", text, tokenType, modifier, tokens)
+}
+
+func assertNoSemanticToken(t *testing.T, tokens []semanticTokenForTest, text string, tokenType int, modifier int) {
+	t.Helper()
+	for _, tok := range tokens {
+		if tok.Text == text && tok.TokenType == tokenType && tok.Modifier == modifier {
+			t.Fatalf("unexpected semantic token %q type=%d modifier=%d in %#v", text, tokenType, modifier, tokens)
+		}
+	}
 }
 
 func assertSemanticTokenSequence(t *testing.T, tokens []semanticTokenForTest, want ...semanticTokenForTest) {

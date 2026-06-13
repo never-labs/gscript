@@ -68,7 +68,7 @@ func run_hot(n) {
         assert(parseErr == nil)
         checksum = mix(checksum, parsed.year + parsed.month * 31 + parsed.day + #formatted)
 
-        expanded := os.expand("$LEIA_STDLIB_HOST_A/${LEIA_STDLIB_HOST_B}/" .. name)
+        expanded := os.expand('$LEIA_STDLIB_HOST_A/${LEIA_STDLIB_HOST_B}/' .. name)
         checksum = mix(checksum, #expanded)
 
         line := string.format("svc=api status=%d route=/v1/items/%d trace=%s", 200 + (i % 5) * 100, id, name)

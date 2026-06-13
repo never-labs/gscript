@@ -547,9 +547,9 @@ func tokenLooksLikeDialectTag(tokens []lexer.Token, index int) bool {
 	if tokens[index].Type != lexer.TOKEN_IDENT || !tokenCanStartDialectExpression(tokens, index) {
 		return false
 	}
-	return index+1 < len(tokens) && (tokens[index+1].Type == lexer.TOKEN_STRING || tokens[index+1].Type == lexer.TOKEN_LBRACE ||
+	return index+1 < len(tokens) && (tokenIsRawString(tokens[index+1]) || tokens[index+1].Type == lexer.TOKEN_LBRACE ||
 		(tokens[index+1].Type == lexer.TOKEN_NOT && index+2 < len(tokens) &&
-			(tokens[index+2].Type == lexer.TOKEN_STRING || tokens[index+2].Type == lexer.TOKEN_LBRACE)))
+			(tokenIsRawString(tokens[index+2]) || tokens[index+2].Type == lexer.TOKEN_LBRACE)))
 }
 
 func tokenCanStartDialectExpression(tokens []lexer.Token, index int) bool {
@@ -577,16 +577,19 @@ func tokenLooksLikeDialectBang(tokens []lexer.Token, index int) bool {
 	}
 	switch tokens[index-1].Type {
 	case lexer.TOKEN_IDENT:
-		return (tokens[index+1].Type == lexer.TOKEN_STRING || tokens[index+1].Type == lexer.TOKEN_LBRACE) &&
+		return (tokenIsRawString(tokens[index+1]) || tokens[index+1].Type == lexer.TOKEN_LBRACE) &&
 			tokenLooksLikeDialectTag(tokens, index-1)
 	case lexer.TOKEN_DOLLAR:
-		return tokens[index+1].Type == lexer.TOKEN_STRING && tokenLooksLikeShellDialectTag(tokens, index-1)
+		return tokenIsRawString(tokens[index+1]) && tokenLooksLikeShellDialectTag(tokens, index-1)
 	default:
 		return false
 	}
 }
 
 func tokenLooksLikeDialectBody(tokens []lexer.Token, index int) bool {
+	if !tokenIsRawString(tokens[index]) {
+		return false
+	}
 	if index > 0 && tokens[index-1].Type == lexer.TOKEN_IDENT && tokenLooksLikeDialectTag(tokens, index-1) {
 		return true
 	}
@@ -599,8 +602,12 @@ func tokenLooksLikeDialectBody(tokens []lexer.Token, index int) bool {
 
 func tokenLooksLikeShellDialectTag(tokens []lexer.Token, index int) bool {
 	return tokens[index].Type == lexer.TOKEN_DOLLAR && index+1 < len(tokens) &&
-		(tokens[index+1].Type == lexer.TOKEN_STRING ||
-			(tokens[index+1].Type == lexer.TOKEN_NOT && index+2 < len(tokens) && tokens[index+2].Type == lexer.TOKEN_STRING))
+		(tokenIsRawString(tokens[index+1]) ||
+			(tokens[index+1].Type == lexer.TOKEN_NOT && index+2 < len(tokens) && tokenIsRawString(tokens[index+2])))
+}
+
+func tokenIsRawString(tok lexer.Token) bool {
+	return tok.Type == lexer.TOKEN_STRING && tok.IsRawString
 }
 
 func tokenLooksLikeContextualKeyword(tokens []lexer.Token, index int) bool {
@@ -1496,15 +1503,19 @@ func sourceStringLiteralContentRange(src string, tok lexer.Token) (lspRange, boo
 	if quote != '"' && quote != '`' {
 		return stringLiteralContentRange(tok), true
 	}
-	for i := colIdx + 1; i < len(line); i++ {
+	delimLen := 1
+	if quote == '`' && colIdx+2 < len(line) && line[colIdx+1] == '`' && line[colIdx+2] == '`' {
+		delimLen = 3
+	}
+	for i := colIdx + delimLen; i+delimLen <= len(line); i++ {
 		ch := line[i]
 		if quote == '"' && ch == '\\' {
 			i++
 			continue
 		}
-		if ch == quote {
+		if ch == quote && strings.HasPrefix(line[i:], strings.Repeat(string(quote), delimLen)) {
 			return lspRange{
-				Start: position{Line: lineIdx, Character: colIdx + 1},
+				Start: position{Line: lineIdx, Character: colIdx + delimLen},
 				End:   position{Line: lineIdx, Character: i},
 			}, true
 		}

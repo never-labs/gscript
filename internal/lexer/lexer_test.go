@@ -186,7 +186,7 @@ func TestGoStyleUnderscoreFloatLiterals(t *testing.T) {
 }
 
 func TestStringLiterals(t *testing.T) {
-	expectTokens(t, `"hello" "world"`, []Token{
+	expectTokens(t, `"hello" 'world'`, []Token{
 		{Type: TOKEN_STRING, Value: "hello"},
 		{Type: TOKEN_STRING, Value: "world"},
 	})
@@ -218,6 +218,20 @@ func TestStringEscapeSequences(t *testing.T) {
 	}
 }
 
+func TestSingleQuotedStringEscapeSequences(t *testing.T) {
+	lex := New(`'a\'b\nc'`)
+	tokens, err := lex.Tokenize()
+	if err != nil {
+		t.Fatalf("Tokenize returned error: %v", err)
+	}
+	if tokens[0].Value != "a'b\nc" {
+		t.Fatalf("single quoted value = %q", tokens[0].Value)
+	}
+	if !tokens[0].IsSingleQuoted {
+		t.Fatal("single quoted token IsSingleQuoted = false, want true")
+	}
+}
+
 func TestRawStringLiterals(t *testing.T) {
 	expectTokens(t, "`hello\\nworld`", []Token{
 		{Type: TOKEN_STRING, Value: `hello\nworld`, Line: 1, Column: 1},
@@ -229,7 +243,7 @@ func TestRawStringLiterals(t *testing.T) {
 }
 
 func TestRawStringTokenMarksSourceForm(t *testing.T) {
-	tokens, err := New("`raw` \"quoted\"").Tokenize()
+	tokens, err := New("`raw` \"quoted\" 'single'").Tokenize()
 	if err != nil {
 		t.Fatalf("Tokenize returned error: %v", err)
 	}
@@ -238,6 +252,9 @@ func TestRawStringTokenMarksSourceForm(t *testing.T) {
 	}
 	if tokens[1].IsRawString {
 		t.Fatalf("quoted string token IsRawString = true, want false")
+	}
+	if !tokens[2].IsSingleQuoted {
+		t.Fatalf("single quoted string token IsSingleQuoted = false, want true")
 	}
 }
 
@@ -470,6 +487,30 @@ func TestUnterminatedStringNewline(t *testing.T) {
 	_, err := lex.Tokenize()
 	if err == nil {
 		t.Fatal("expected error for string with unescaped newline")
+	}
+}
+
+func TestTripleBacktickRawStringAllowsEmbeddedBackticks(t *testing.T) {
+	input := "q```flip `sym`price!(`AAPL`MSFT;100 101)```"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_STRING, Value: "flip `sym`price!(`AAPL`MSFT;100 101)"},
+	})
+}
+
+func TestTripleBacktickRawStringAllowsNewlines(t *testing.T) {
+	input := "q```\nline `one`\nline two\n```"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_STRING, Value: "\nline `one`\nline two\n"},
+	})
+}
+
+func TestUnterminatedTripleBacktickRawString(t *testing.T) {
+	lex := New("q```unterminated ` raw")
+	_, err := lex.Tokenize()
+	if err == nil {
+		t.Fatal("expected error for unterminated fenced raw string")
 	}
 }
 

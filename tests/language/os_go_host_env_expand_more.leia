@@ -5,7 +5,7 @@ os.unsetenv(name)
 assert(os.getenv(name) == nil)
 assert(os.setenv(name, "ok-value") == true)
 assert(os.getenv(name) == "ok-value")
-assert(os.expand("x=$LEIA_OFFICIAL_OS_CASE/${LEIA_OFFICIAL_OS_CASE}") == "x=ok-value/ok-value")
+assert(os.expand('x=$LEIA_OFFICIAL_OS_CASE/${LEIA_OFFICIAL_OS_CASE}') == "x=ok-value/ok-value")
 assert(os.unsetenv(name) == true)
 assert(os.getenv(name) == nil)
 

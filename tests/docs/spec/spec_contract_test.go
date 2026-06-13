@@ -33,7 +33,9 @@ func TestReadmeAndSpecStableContractStayAligned(t *testing.T) {
 
 	for _, snippet := range []string{
 		"[Language specification](docs/spec/index.md)",
-		"Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
+		"Leia is an embeddable scripting language for Go systems.",
+		"## Surface",
+		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md stable contract must keep snippet %q", snippet)

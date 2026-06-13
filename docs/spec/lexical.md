@@ -84,9 +84,9 @@ assert(iffoo == 7)
 func := "reserved"
 ```
 
-Dialect words such as `model`, `tool`, `turn`, `agent`, and `evaluate` are
-contextual syntax words, not lexical keywords. They scan as identifiers outside
-grammar positions that assign them dialect meaning.
+Dialect words such as `q`, `model`, `tool`, `turn`, `agent`, and `evaluate`
+are contextual syntax words, not lexical keywords. They scan as identifiers
+outside grammar positions that assign them dialect meaning.
 
 ```leia run all
 agent := "identifier"
@@ -101,7 +101,8 @@ assert(turn + model == 3)
 
 In grammar positions that define tagged dialect forms or evaluate blocks,
 contextual words are consumed by that syntax rather than bound as ordinary
-identifiers. See [AI Dialect Syntax](ai-native.md) for the stable forms.
+identifiers. See [Expressions](expressions.md) for the generic tagged-dialect
+boundary and [AI Dialect Syntax](ai-native.md) for one standard dialect family.
 
 ## Numeric Literals
 
@@ -165,46 +166,83 @@ bad := 1e_2
 
 ## String Literals
 
-Quoted string literals use double quotes and process escapes. Raw string
-literals use backticks and do not process escapes.
+String literals have three untagged source forms. Double-quoted strings process
+escapes and support `${expr}` interpolation. Single-quoted strings process
+escapes but do not interpolate; `${` has no special meaning inside them.
+Backtick raw strings use Go raw-string behavior: they preserve their contents
+and do not process escapes or interpolation.
+
+The same raw delimiter syntax is also used by tagged dialect expressions. For
+example, a q dialect expression places the raw body immediately after `q`, and a
+shell dialect expression places the raw body immediately after `$`. Tagged raw
+bodies may use one backtick delimiter or a fenced three-backtick delimiter. Both
+tagged forms may contain `${expr}` interpolation tokens that are evaluated by
+Leia and encoded according to the dialect contract. The fenced form is for
+embedded DSL source that contains single backticks or spans multiple lines.
 
 ```ebnf
-quoted_string = '"' { quoted_char | escape } '"' ;
-raw_string    = '`' { any_byte_except_backtick } '`' ;
-escape        = "\\" | "\"" | "\a" | "\b" | "\f" | "\n" | "\r" | "\t" | "\v"
-              | "\x" hex hex
-              | "\u" hex hex hex hex
-              | "\U" hex hex hex hex hex hex hex hex
-              | "\" decimal_escape ;
+double_quoted_string = '"' { any_char_except_quote_newline_dollar_backslash
+                           | escape
+                           | interpolation } '"' ;
+single_quoted_string = "'" { any_char_except_single_quote_newline_backslash
+                           | escape } "'" ;
+raw_string           = short_raw_body | fenced_raw_body ;
+short_raw_body       = '`' { any_byte_except_backtick } '`' ;
+fenced_raw_body      = '```' { any_byte_except_three_backticks } '```' ;
+tagged_raw_body      = tagged_short_raw_body | tagged_fenced_raw_body ;
+tagged_short_raw_body = '`' { any_byte_except_backtick_or_interpolation
+                            | interpolation } '`' ;
+tagged_fenced_raw_body = '```' { any_byte_except_three_backticks_or_interpolation
+                               | interpolation } '```' ;
+interpolation = "${" expr "}" ;
+escape        = backslash ( backslash | '"' | "'" | "a" | "b" | "f" | "n"
+                          | "r" | "t" | "v"
+                          | "x" hex hex
+                          | "u" hex hex hex hex
+                          | "U" hex hex hex hex hex hex hex hex
+                          | decimal_escape ) ;
 decimal_escape = digit [ digit [ digit ] ] ;
 hex           = "0".."9" | "A".."F" | "a".."f" ;
+backslash     = "\\" ;
 ```
 
-Stable quoted-string escapes are `\\`, `\"`, `\a`, `\b`, `\f`, `\n`, `\r`,
-`\t`, `\v`, `\xNN`, `\uNNNN`, `\UNNNNNNNN`, and decimal byte escapes from
-`\0` through `\255`. Hex and Unicode escapes require exactly the specified
+Stable quoted-string escapes are `\\`, `\"`, `\'`, `\a`, `\b`, `\f`, `\n`,
+`\r`, `\t`, `\v`, `\xNN`, `\uNNNN`, `\UNNNNNNNN`, and decimal byte escapes
+from `\0` through `\255`. Hex and Unicode escapes require exactly the specified
 number of hex digits. Unicode escapes must encode a valid Unicode scalar value.
 
 Strings are byte strings; UTF-8 interpretation is provided by library helpers.
 `"\uNNNN"` and `"\UNNNNNNNN"` append the UTF-8 bytes for the escaped rune.
 
-Raw strings may span lines, preserve every byte between the delimiters, and may
-not contain a backtick byte. Quoted strings may not contain an unescaped newline.
+Untagged raw strings preserve every byte between the delimiters. Tagged raw
+bodies preserve uninterpolated bytes exactly and replace `${expr}` segments
+with dialect-encoded values. A short raw body cannot contain a backtick. A
+fenced raw body can contain single or double backticks, but not three
+consecutive backticks. Quoted strings may not contain an unescaped newline.
 
 ```leia run all
 quoted := "line\n"
+literal := 'line\n'
 raw := `line\n`
+name := "Leia"
+interpolated := "hello ${name}"
+literal_interp := 'hello ${name}'
 unicode := "\u0041\U00000042"
 byte_escape := "\065"
 
 assert(#quoted == 5)
+assert(#literal == 5)
 assert(#raw == 6)
+assert(interpolated == "hello Leia")
+assert(literal_interp == 'hello ${name}')
 assert(unicode == "AB")
 assert(byte_escape == "A")
 ```
 
-The first string contains a newline byte. The second contains the two bytes
-backslash and `n`.
+The first two strings contain a newline byte because quoted strings process
+escapes. The raw string contains the two bytes backslash and `n`. The
+double-quoted string interpolates `name`; the single-quoted spelling contains
+the literal bytes `${name}`.
 
 ```leia fail all
 bad := "line

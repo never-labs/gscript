@@ -121,8 +121,8 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 	startCol := l.col
 
 	// String literal
-	if ch == '"' {
-		tok, err := l.readString()
+	if ch == '"' || ch == '\'' {
+		tok, err := l.readString(ch)
 		if err != nil {
 			return Token{}, err
 		}
@@ -205,11 +205,11 @@ func (l *Lexer) skipBlockComment() error {
 	return fmt.Errorf("unterminated block comment starting at %d:%d", startLine, startCol)
 }
 
-// readString reads a double-quoted string literal with escape sequences.
-func (l *Lexer) readString() (Token, error) {
+// readString reads a quoted string literal with escape sequences.
+func (l *Lexer) readString(quote byte) (Token, error) {
 	startLine := l.line
 	startCol := l.col
-	l.advance() // consume opening "
+	l.advance() // consume opening quote
 
 	var result []byte
 	for l.pos < len(l.source) {
@@ -217,9 +217,9 @@ func (l *Lexer) readString() (Token, error) {
 		if ch == '\n' {
 			return Token{}, fmt.Errorf("unterminated string at %d:%d: newline in string literal", startLine, startCol)
 		}
-		if ch == '"' {
-			l.advance() // consume closing "
-			return Token{Type: TOKEN_STRING, Value: string(result), Line: startLine, Column: startCol}, nil
+		if ch == quote {
+			l.advance() // consume closing quote
+			return Token{Type: TOKEN_STRING, Value: string(result), IsSingleQuoted: quote == '\'', Line: startLine, Column: startCol}, nil
 		}
 		if ch == '\\' {
 			l.advance() // consume backslash
@@ -246,6 +246,8 @@ func (l *Lexer) readString() (Token, error) {
 				result = append(result, '\\')
 			case '"':
 				result = append(result, '"')
+			case '\'':
+				result = append(result, '\'')
 			case 'x':
 				b, err := l.readFixedHexEscape(2, startLine, startCol)
 				if err != nil {
@@ -318,22 +320,42 @@ func (l *Lexer) readDecimalByteEscape(first byte, startLine, startCol int) (int6
 	return v, nil
 }
 
-// readRawString reads a Go-style backtick string literal.
+// readRawString reads a backtick-delimited raw string token. The parser accepts
+// it as a standalone raw string or as the payload for a tagged dialect or shell
+// shortcut. Triple-backtick payloads are fenced so embedded DSLs can contain
+// single backticks.
 func (l *Lexer) readRawString() (Token, error) {
 	startLine := l.line
 	startCol := l.col
-	l.advance() // consume opening `
+	delimLen := 1
+	if l.peekAt(1) == '`' && l.peekAt(2) == '`' {
+		delimLen = 3
+	}
+	for i := 0; i < delimLen; i++ {
+		l.advance()
+	}
 
 	startPos := l.pos
 	for l.pos < len(l.source) {
-		if l.peek() == '`' {
+		if l.rawStringDelimiterAt(delimLen) {
 			value := l.source[startPos:l.pos]
-			l.advance() // consume closing `
+			for i := 0; i < delimLen; i++ {
+				l.advance()
+			}
 			return Token{Type: TOKEN_STRING, Value: value, IsRawString: true, Line: startLine, Column: startCol}, nil
 		}
 		l.advance()
 	}
 	return Token{}, fmt.Errorf("unterminated raw string at %d:%d", startLine, startCol)
+}
+
+func (l *Lexer) rawStringDelimiterAt(n int) bool {
+	for i := 0; i < n; i++ {
+		if l.peekAt(i) != '`' {
+			return false
+		}
+	}
+	return true
 }
 
 // readNumber reads a Go-style integer or floating-point number.

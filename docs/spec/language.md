@@ -9,10 +9,10 @@ parser, interpreter, bytecode VM, JIT, formatter, linter, sandboxing, and
 embedding APIs must either implement the stable behavior or mark a feature as
 experimental before exposing it to users.
 
-Leia uses Go-flavored syntax with dynamic values and Lua-compatible table and
-multi-return behavior where that compatibility is useful. It is not a Lua clone:
-the stable language is defined here, and Lua-derived tests are compatibility
-oracles rather than the source of truth.
+Leia is a Go-embedded scripting language with Go-like syntax, dynamic values,
+and Lua-compatible table and multi-return behavior where that compatibility is
+useful. It is not a Lua clone: the stable language is defined here, and
+Lua-derived tests are compatibility oracles rather than the source of truth.
 
 ## Phase 0 Hard Deliverables
 
@@ -61,8 +61,14 @@ true false nil
 ```
 
 Numeric literals support decimal integers/floats and `0x`, `0b`, `0o` integer
-forms with `_` separators. String literals support quoted strings with escapes
-and raw backtick strings.
+forms with `_` separators. String literal forms are:
+
+- `"..."`: escapes plus `${expr}` interpolation;
+- `'...'`: escapes, no interpolation;
+- `` `...` ``: Go-style raw string, no escapes and no interpolation;
+- `` tag`...` ``: tagged raw dialect body, with dialect interpolation support;
+- `` tag```...``` ``: fenced tagged/raw dialect body, with multiline content
+  and embedded single backticks.
 
 ## Syntactic Grammar
 
@@ -110,25 +116,36 @@ expr_list     = expr { "," expr } ;
 
 Tables, calls, member selection, indexing, anonymous functions, dense arrays,
 imports, and tagged dialect forms are layered on this core grammar. Dialect
-tags and blocks are generic syntax; q analytics, shell/data/web forms,
-spreadsheets, and AI workflows all use the same dialect boundary.
+tags and blocks are the generic extension mechanism; q columnar analytics,
+shell/data/web forms, spreadsheets, and AI workflows all use the same dialect
+boundary.
 
 ## Tagged Dialects And AI Syntax
 
 Leia supports tagged dialect forms. A tagged string has the shape
-`tag`...`` or `tag!`...``; `$`...`` is shorthand for the shell dialect. A
-tagged block has the shape `tag { ... }` or `tag! { ... }`. The non-bang form
-returns the dialect result and any structured error according to the dialect
-contract. The bang form is fail-fast and raises a runtime error when the dialect
-cannot parse or execute the form.
+<code>tag`...`</code>, <code>tag!`...`</code>, <code>tag```...```</code>, or
+<code>tag!```...```</code>; <code>$`...`</code> is shorthand for the shell dialect. Tagged
+raw bodies may contain `${expr}` interpolation; each dialect owns encoding of
+the interpolated value. Untagged raw strings do not interpolate. A tagged block
+has the shape `tag { ... }` or `tag! { ... }`. The non-bang form returns the
+dialect result and any structured error according to the dialect contract. The
+bang form is fail-fast and raises a runtime error when the dialect cannot parse
+or execute the form.
+
+`q` is Leia's core dialect for high-performance in-memory columnar analytics.
+It works with q-style vectors, dictionaries, tables, and SoA-backed query plans;
+it is a dialect implementation over ordinary Leia values, not a second
+language runtime.
 
 The AI surface is an optional standard-library layer rather than a separate
-execution engine. Use `turn { ... }` or `llm.turn({...})` for model calls and
-`model { ... }` or `llm.register_models({...})` for model configuration. Tools,
-agents, messages, history manipulation, output validation, record/replay,
-tracing, and cancellation are ordinary values and calls on the `llm`, `msg`,
-`history`, and `loop` modules. This keeps scripted and embedded agents on the
-same runtime path.
+execution engine or an "AI native" language mode. It is one dialect
+implementation built on the same tagged dialect mechanism as q and other DSLs.
+Use `turn { ... }` or `llm.turn({...})` for model calls and `model { ... }` or
+`llm.register_models({...})` for model configuration. Tools, agents, messages,
+history manipulation, output validation, record/replay, tracing, and
+cancellation are ordinary values and calls on the `llm`, `msg`, `history`, and
+`loop` modules. This keeps scripted and embedded agents on the same runtime
+path.
 
 An agent is a callable value produced by `agent { ... }` or `llm.agent`. Its
 configuration function returns the turn fields for each call. There is no
@@ -309,8 +326,9 @@ Leia differs from Lua when Go-native embedding, safety, or product clarity wins:
 
 - Go-style `//` comments and `func` syntax are canonical.
 - Host capabilities are explicit and can be sandboxed.
-- `defer`, `go`, channels, AI dialect helpers, SOA, and module tooling are Leia
-  features, not Lua compatibility features.
+- `defer`, `go`, channels, tagged dialect helpers, SOA and q columnar
+  analytics, and module tooling are Leia features, not Lua compatibility
+  features.
 - Debug and GC internals are not promised to match Lua.
 
 ## Production Roadmap

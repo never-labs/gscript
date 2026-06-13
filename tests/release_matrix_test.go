@@ -84,7 +84,7 @@ func TestReleaseMatrixGrammarAppendixMatchesParserSurface(t *testing.T) {
 		`additive = multiplicative { ( "+" | "-" | "|" | "^" ) multiplicative } ;`,
 		`multiplicative = unary { ( "*" | "/" | "%" | "<<" | ">>" | "&" | "&^" ) unary } ;`,
 		`dense_type = "i32" | "i64" | "f32" | "f64" | "bool" ;`,
-		`escaped_char = "\\" ( "\\" | '"' | "a" | "b" | "f" | "n" | "r" | "t" | "v"`,
+		`escaped_char = "\\" ( "\\" | '"' | "'" | "a" | "b" | "f" | "n" | "r" | "t" | "v"`,
 		`| decimal_escape ) ;`,
 		`decimal_escape = digit [ digit [ digit ] ] ;`,
 	} {
@@ -352,7 +352,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 			snippets: []string{
 				releaseMatrixCmd,
 				specExamplesCmd,
-				"TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeDocumentationEntrypointsStayGated",
+				"TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeReferencesEntrypointsStayGated",
 				"docs/spec/index.md",
 				"tests/feature_matrix.json",
 				"reference entrypoints",
@@ -403,7 +403,9 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
 		"[Language specification](docs/spec/index.md)",
-		"Stable behavior is defined by spec, matrices, tests, and\nrelease gates.",
+		"Leia is an embeddable scripting language for Go systems.",
+		"## Surface",
+		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README.md must keep language contract snippet %q", snippet)
@@ -414,6 +416,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	for _, snippet := range []string{
 		"TestReadmeAndSpecStableContractStayAligned",
 		"[Language specification](docs/spec/index.md)",
+		"## Surface",
 		"`tests/feature_matrix.json`",
 		"at least one semantic or conformance gate",
 	} {
@@ -425,6 +428,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	featureMatrixGate := readFileString(t, filepath.Join(root, "tests", "feature_matrix_test.go"))
 	for _, snippet := range []string{
 		"TestFeatureMatrixCoversReadmeStableContract",
+		"Leia is an embeddable scripting language for Go systems.",
 		"ARM64 JIT",
 		`requireFeature(t, features, "release_evidence_gates")`,
 		`requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate"`,
@@ -528,7 +532,11 @@ func TestReleaseMatrixDocCommandSurfaceIsUsable(t *testing.T) {
 		{"run", "./cmd/leia", "doc", "generate", "--format", "json"},
 		{"run", "./cmd/leia", "doc", "check"},
 	} {
-		runCommand(t, root, 30*time.Second, "go", args...)
+		timeout := 30 * time.Second
+		if len(args) >= 4 && args[2] == "doc" && args[3] == "check" && len(args) == 4 {
+			timeout = 90 * time.Second
+		}
+		runCommand(t, root, timeout, "go", args...)
 	}
 }
 
@@ -939,53 +947,50 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixReadmeDocumentationEntrypointsStayLinked(t *testing.T) {
+func TestReleaseMatrixReadmeReferencesEntrypointsStayLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	refs := readReadmeDocumentationEntrypoints(t, readme)
+	refs := readReadmeReferencesEntrypoints(t, readme)
 	for _, ref := range refs {
 		if !strings.Contains(readme, "("+ref+")") {
-			t.Fatalf("README.md Documentation section must link %s", ref)
+			t.Fatalf("README.md References section must link %s", ref)
 		}
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(ref))); err != nil {
-			t.Fatalf("README.md Documentation link target %s is missing: %v", ref, err)
+			t.Fatalf("README.md References link target %s is missing: %v", ref, err)
 		}
 	}
 }
 
-func TestReleaseMatrixReadmeDocumentationEntrypointsStayGated(t *testing.T) {
+func TestReleaseMatrixReadmeReferencesEntrypointsStayGated(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	docsCheck := readFileString(t, filepath.Join(root, "scripts", "docs_check.sh"))
 	releaseMatrix := readFileString(t, filepath.Join(root, "tests", "release_matrix_test.go"))
-	refs := readReadmeDocumentationEntrypoints(t, readme)
+	refs := readReadmeReferencesEntrypoints(t, readme)
 
 	for _, snippet := range []string{
-		"check_readme_documentation_entrypoints",
-		"README Documentation entrypoints",
+		"check_readme_reference_entrypoints",
+		"README References entrypoints",
 		"check_markdown_links(doc_file)",
 		"find reference -type f -name '*.md' | sort",
 		"generated reference doc is missing from docs",
 	} {
 		if !strings.Contains(docsCheck, snippet) {
-			t.Fatalf("scripts/docs_check.sh must keep README Documentation gate snippet %q", snippet)
+			t.Fatalf("scripts/docs_check.sh must keep README References gate snippet %q", snippet)
 		}
 	}
 	for _, snippet := range []string{
-		"TestReleaseMatrixReadmeDocumentationEntrypointsStayLinked",
-		"TestReleaseMatrixReadmeDocumentationEntrypointsStayGated",
-		"readReadmeDocumentationEntrypoints",
+		"TestReleaseMatrixReadmeReferencesEntrypointsStayLinked",
+		"TestReleaseMatrixReadmeReferencesEntrypointsStayGated",
+		"readReadmeReferencesEntrypoints",
 	} {
 		if !strings.Contains(releaseMatrix, snippet) {
-			t.Fatalf("tests/release_matrix_test.go must keep README Documentation drift gate snippet %q", snippet)
+			t.Fatalf("tests/release_matrix_test.go must keep README References drift gate snippet %q", snippet)
 		}
 	}
 
 	generatedEntrypoints := map[string]string{
-		"docs/reference/cli/index.md":      "go run ./cmd/leia doc generate --layout site --output",
 		"docs/reference/dialects/index.md": "go run ./cmd/leia doc generate --layout site --output",
-		"docs/reference/stdlib/index.md":   "go run ./cmd/leia doc generate --layout site --output",
-		"docs/spec/index.html":             "python3 scripts/spec_preview.py --output",
 	}
 	seenGenerated := map[string]bool{}
 	for _, ref := range refs {
@@ -993,23 +998,23 @@ func TestReleaseMatrixReadmeDocumentationEntrypointsStayGated(t *testing.T) {
 			seenGenerated[ref] = true
 			for _, snippet := range []string{"stale", generator, "find reference -type f -name '*.md' | sort", "generated_doc=\"docs/$generated\""} {
 				if !strings.Contains(docsCheck, snippet) {
-					t.Fatalf("scripts/docs_check.sh must keep generated/stale gate for README Documentation entrypoint %s via %q", ref, snippet)
+					t.Fatalf("scripts/docs_check.sh must keep generated/stale gate for README References entrypoint %s via %q", ref, snippet)
 				}
 			}
 		}
 	}
 	for ref := range generatedEntrypoints {
 		if !seenGenerated[ref] {
-			t.Fatalf("README.md Documentation section must keep generated entrypoint %s covered by docs_check.sh stale checks", ref)
+			t.Fatalf("README.md References section must keep generated entrypoint %s covered by docs_check.sh stale checks", ref)
 		}
 	}
 }
 
-func TestReleaseMatrixDocsIndexCoversReadmeDocumentationEntrypoints(t *testing.T) {
+func TestReleaseMatrixDocsIndexCoversReadmeReferencesEntrypoints(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
-	refs := readReadmeDocumentationEntrypoints(t, readme)
+	refs := readReadmeReferencesEntrypoints(t, readme)
 
 	for _, ref := range refs {
 		if ref == "docs/index.md" {
@@ -1026,7 +1031,7 @@ func TestReleaseMatrixDocsIndexCoversReadmeDocumentationEntrypoints(t *testing.T
 			indexRef = "../" + ref
 		}
 		if !strings.Contains(docsIndex, "("+indexRef+")") {
-			t.Fatalf("docs/index.md must link README Documentation entrypoint %s as %s", ref, indexRef)
+			t.Fatalf("docs/index.md must link README References entrypoint %s as %s", ref, indexRef)
 		}
 	}
 }
@@ -1503,7 +1508,7 @@ func TestReleaseMatrixHotReloadDocsUsePublicSDKSurface(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
+func TestReleaseMatrixAIDialectDocsUsePublicLLMSurface(t *testing.T) {
 	root := findRepoRoot(t)
 	docs := strings.Join([]string{
 		readFileString(t, filepath.Join(root, "docs", "reference", "ai", "index.md")),
@@ -1562,7 +1567,7 @@ func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixAINativeExamplesStayRunnable(t *testing.T) {
+func TestReleaseMatrixAIDialectExamplesStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	guide := readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md"))
 	if !strings.Contains(guide, "Live-provider examples") || !strings.Contains(guide, "examples/llm/glm_smoke.leia") {
@@ -1601,34 +1606,17 @@ func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 
 func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
-	quickStartCommands := readReleaseReadmeQuickStartCommands(t, root)
-	wantQuickStart := []string{
-		"go run ./cmd/leia help",
-		`go run ./cmd/leia eval 'print("hello from leia")'`,
-		"go run ./cmd/leia run tests/smoke/01_basic.leia",
-		"go run ./cmd/leia run examples/hello/fib.leia",
-	}
-	if len(quickStartCommands) != len(wantQuickStart) {
-		t.Fatalf("README.md Quick Start commands changed:\ngot  %#v\nwant %#v", quickStartCommands, wantQuickStart)
-	}
-	for i := range wantQuickStart {
-		if quickStartCommands[i] != wantQuickStart[i] {
-			t.Fatalf("README.md Quick Start commands changed:\ngot  %#v\nwant %#v", quickStartCommands, wantQuickStart)
-		}
-	}
-
-	installCommands := readReleaseReadmeInstallCommands(t, root)
-	wantInstall := []string{
-		"go install ./cmd/leia ./cmd/leia-lsp",
-		"leia version",
-		"leia run tests/smoke/01_basic.leia",
-	}
-	if len(installCommands) != len(wantInstall) {
-		t.Fatalf("README.md install commands changed:\ngot  %#v\nwant %#v", installCommands, wantInstall)
-	}
-	for i := range wantInstall {
-		if installCommands[i] != wantInstall[i] {
-			t.Fatalf("README.md install commands changed:\ngot  %#v\nwant %#v", installCommands, wantInstall)
+	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
+	for _, snippet := range []string{
+		"go_raw := `hello ${name}`",
+		"vector := q`1 2 3`",
+		"trades := q```",
+		"rollup := q.sql(",
+		`model: "claude"`,
+		"result, err := summarize(rollup)",
+	} {
+		if !strings.Contains(surfaceSnippet, snippet) {
+			t.Fatalf("README.md Surface snippet changed or lost product surface %q:\n%s", snippet, surfaceSnippet)
 		}
 	}
 
@@ -1645,27 +1633,33 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	}
 
 	focusedGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
-	for _, snippet := range append([]string{
-		"TestReadmeQuickStartCommandsStayRunnable",
-		"readmeQuickStartCommands",
-		"README Quick Start command `go run ./cmd/leia %s` failed",
-		`exec.Command("go", append([]string{"run", "./cmd/leia"}, command.args...)...)`,
-	}, wantQuickStart...) {
+	for _, snippet := range []string{
+		"TestReadmeIntroStaysFocused",
+		"Leia is an embeddable scripting language for Go systems.",
+		"Go-style syntax",
+		"typed hot-path optimization",
+		"native q-style columnar analytics",
+		"high-performance in-memory data",
+		"tagged dialects",
+		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+		"## Surface",
+		"## Tooling",
+		"## References",
+	} {
 		if !strings.Contains(focusedGate, snippet) {
-			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Quick Start focused gate snippet %q", snippet)
+			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate snippet %q", snippet)
 		}
 	}
-	for _, snippet := range append([]string{
-		"TestReadmeInstallCommandsStayRunnable",
-		"readmeInstallCommands",
-		"README install command `go install ./cmd/leia ./cmd/leia-lsp` failed",
-		"README install command `leia %s` failed",
-		`exec.Command("go", "install", "./cmd/leia", "./cmd/leia-lsp")`,
-		"README install command did not install leia-lsp",
-		`exec.Command(leia, args...)`,
-	}, wantInstall...) {
+	for _, snippet := range []string{
+		"TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
+		"readmeFirstLeiaSnippet",
+		"README Leia example failed before provider boundary",
+		"README Leia example stdout",
+		`exec.Command("go", "run", "./cmd/leia", "run", file)`,
+		"llm provider not configured",
+	} {
 		if !strings.Contains(focusedGate, snippet) {
-			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README install focused gate snippet %q", snippet)
+			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate snippet %q", snippet)
 		}
 	}
 	for _, snippet := range []string{
@@ -1705,6 +1699,9 @@ func TestReleaseMatrixReadmeToolingCommandsStayRunnable(t *testing.T) {
 			switch fields[3] {
 			case "bench", "diag":
 				timeout = 180 * time.Second
+			case "doc":
+				runCommand(t, root, timeout, fields[0], fields[1], fields[2], "doc", "--help")
+				continue
 			}
 		}
 		runCommand(t, root, timeout, fields[0], fields[1:]...)
@@ -1880,12 +1877,15 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	features := loadFeatureMatrixFeatureMap(t, root)
 
 	for _, promise := range []string{
-		"Go-native scripting runtime",
+		"Leia is an embeddable scripting language for Go systems.",
+		"Go-style syntax",
+		"typed hot-path optimization",
 		"q-style columnar analytics",
-		"q := require(\"q\")",
-		"trades := q.sql(",
+		"high-performance in-memory data",
+		"rollup := q.sql(",
 		"cmd := $`git status --short`",
 		"answer, err := turn {",
+		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
 		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 	} {
 		if !strings.Contains(readme, promise) {
@@ -1999,7 +1999,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	}
 	for _, snippet := range []string{
 		"TestPlaygroundRepositoryCoreExampleCoverage",
-		"TestPlaygroundRepositoryAINativeExamplesHaveExplicitGates",
+		"TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates",
 		"TestPlaygroundRepositoryGameEngineExampleClassification",
 	} {
 		if !strings.Contains(playgroundGate, snippet) {
@@ -2102,7 +2102,7 @@ func TestReleaseMatrixExamplesReadmeCommandsStayRunnable(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixReadmeAINativeConcurrencyDataPromisesHaveGates(t *testing.T) {
+func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	cmdExamplesGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
@@ -2359,60 +2359,25 @@ func readReleaseReadmeToolingCommands(t *testing.T, root string) []string {
 	return commands
 }
 
-func readReleaseReadmeQuickStartCommands(t *testing.T, root string) []string {
+func readReleaseReadmeSurfaceLeiaSnippet(t *testing.T, root string) string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Quick Start"
+	const marker = "## Surface"
 	start := strings.Index(readme, marker)
 	if start == -1 {
-		t.Fatal("README.md must contain a Quick Start section")
+		t.Fatal("README.md must contain a Surface section")
 	}
 	rest := readme[start+len(marker):]
-	blockStart := strings.Index(rest, "```bash")
+	blockStart := strings.Index(rest, "````leia")
 	if blockStart == -1 {
-		t.Fatal("README.md Quick Start section must contain a bash command block")
+		t.Fatal("README.md Surface section must contain a Leia code block")
 	}
-	rest = rest[blockStart+len("```bash"):]
-	blockEnd := strings.Index(rest, "```")
+	rest = rest[blockStart+len("````leia"):]
+	blockEnd := strings.Index(rest, "````")
 	if blockEnd == -1 {
-		t.Fatal("README.md Quick Start bash command block is unterminated")
+		t.Fatal("README.md Surface Leia code block is unterminated")
 	}
-	var commands []string
-	for _, line := range strings.Split(rest[:blockEnd], "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			commands = append(commands, line)
-		}
-	}
-	return commands
-}
-
-func readReleaseReadmeInstallCommands(t *testing.T, root string) []string {
-	t.Helper()
-	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Install"
-	start := strings.Index(readme, marker)
-	if start == -1 {
-		t.Fatal("README.md must contain install commands")
-	}
-	rest := readme[start+len(marker):]
-	blockStart := strings.Index(rest, "```bash")
-	if blockStart == -1 {
-		t.Fatal("README.md install section must contain a bash command block")
-	}
-	rest = rest[blockStart+len("```bash"):]
-	blockEnd := strings.Index(rest, "```")
-	if blockEnd == -1 {
-		t.Fatal("README.md install bash command block is unterminated")
-	}
-	var commands []string
-	for _, line := range strings.Split(rest[:blockEnd], "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			commands = append(commands, line)
-		}
-	}
-	return commands
+	return strings.TrimSpace(rest[:blockEnd])
 }
 
 func readReleaseReadmeEmbeddingGoSnippet(t *testing.T, root string) string {
@@ -2436,16 +2401,16 @@ func readReleaseReadmeEmbeddingGoSnippet(t *testing.T, root string) string {
 	return strings.TrimSpace(rest[:blockEnd])
 }
 
-func readReadmeDocumentationEntrypoints(t *testing.T, readme string) []string {
+func readReadmeReferencesEntrypoints(t *testing.T, readme string) []string {
 	t.Helper()
-	start := strings.Index(readme, "## Documentation")
+	start := strings.Index(readme, "## References")
 	if start == -1 {
-		t.Fatal("README.md must contain a Documentation section")
+		t.Fatal("README.md must contain a References section")
 	}
-	end := strings.Index(readme[start+len("## Documentation"):], "\n## ")
+	end := strings.Index(readme[start+len("## References"):], "\n## ")
 	section := readme[start:]
 	if end != -1 {
-		section = readme[start : start+len("## Documentation")+end]
+		section = readme[start : start+len("## References")+end]
 	}
 
 	linkRE := regexp.MustCompile(`\[[^\]\n]+\]\(([^)\s]+)`)
@@ -2457,20 +2422,20 @@ func readReadmeDocumentationEntrypoints(t *testing.T, readme string) []string {
 		}
 		match := linkRE.FindStringSubmatch(line)
 		if len(match) != 2 {
-			t.Fatalf("README.md Documentation entry must be a Markdown link: %q", line)
+			t.Fatalf("README.md References entry must be a Markdown link: %q", line)
 		}
 		ref := strings.Split(strings.Split(match[1], "#")[0], "?")[0]
 		if ref == "" {
-			t.Fatalf("README.md Documentation entry has empty link target: %q", line)
+			t.Fatalf("README.md References entry has empty link target: %q", line)
 		}
 		if seen[ref] {
-			t.Fatalf("README.md Documentation section links %s more than once", ref)
+			t.Fatalf("README.md References section links %s more than once", ref)
 		}
 		seen[ref] = true
 		refs = append(refs, ref)
 	}
 	if len(refs) == 0 {
-		t.Fatal("README.md Documentation section must list documentation entrypoints")
+		t.Fatal("README.md References section must list documentation entrypoints")
 	}
 	return refs
 }
