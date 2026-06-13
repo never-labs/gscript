@@ -1222,8 +1222,8 @@ func QEvalHotPlanRemarkPass(fn *Function) (*Function, error) {
 				qEvalHotPlanFallbackRemark(fn, instr, candidate.FallbackReason, candidate.FallbackShape)
 				continue
 			}
-			ref := fn.addQEvalPipelinePlan(candidate.Source, candidate.Plan)
-			if _, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); !ok {
+			ref, _, ok := addExecutableQEvalPipelineBackendPlan(fn, candidate)
+			if !ok {
 				qEvalHotPlanFallbackRemark(fn, instr, qEvalHotPlanFallbackHeuristicOnly, candidate.Plan.Shape)
 				continue
 			}
@@ -1281,10 +1281,32 @@ func qCallIsLowerableQEvalPipelinePlan(fn *Function, call *Instr) bool {
 	if !ok {
 		return false
 	}
+	_, ok = executableQEvalPipelineBackendCandidateRef(candidate)
+	return ok
+}
+
+func addExecutableQEvalPipelineBackendPlan(fn *Function, candidate qEvalPipelineBackendCandidate) (QEvalPipelinePlanRef, stdq.EvalPipelineBackendPlan, bool) {
+	if fn == nil {
+		return QEvalPipelinePlanRef{}, stdq.EvalPipelineBackendPlan{}, false
+	}
+	ref := fn.addQEvalPipelinePlan(candidate.Source, candidate.Plan)
+	if !ref.Valid() {
+		return QEvalPipelinePlanRef{}, stdq.EvalPipelineBackendPlan{}, false
+	}
+	typedBackendPlan, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
+	if !ok || !typedBackendPlan.Valid() {
+		return QEvalPipelinePlanRef{}, stdq.EvalPipelineBackendPlan{}, false
+	}
+	return ref, typedBackendPlan, true
+}
+
+func executableQEvalPipelineBackendCandidateRef(candidate qEvalPipelineBackendCandidate) (QEvalPipelinePlanRef, bool) {
 	ref := qEvalPipelinePlanRefFromHotPlan(-1, candidate.Source, candidate.Plan)
 	ref.BackendPlan = &candidate.BackendPlan
-	_, ok = qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
-	return ok
+	if _, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref); !ok {
+		return QEvalPipelinePlanRef{}, false
+	}
+	return ref, true
 }
 
 // protoLoopCallsAreLowerableQEvalPipelinePlan reports whether every call-like
@@ -1294,28 +1316,7 @@ func qCallIsLowerableQEvalPipelinePlan(fn *Function, call *Instr) bool {
 // it before native codegen, and unsupported/heuristic-only q.eval shapes remain
 // pinned behind the generic residual-call gate.
 func protoLoopCallsAreLowerableQEvalPipelinePlan(proto *vm.FuncProto) bool {
-	fn := BuildGraph(proto)
-	if fn == nil || fn.Entry == nil || fn.Unpromotable {
-		return false
-	}
-	li := computeLoopInfo(fn)
-	found := false
-	for _, block := range fn.Blocks {
-		if block == nil || !li.loopBlocks[block.ID] {
-			continue
-		}
-		for _, instr := range block.Instrs {
-			if instr == nil || !tier2LoopCallOp(instr.Op) {
-				continue
-			}
-			if qCallIsLowerableQEvalPipelinePlan(fn, instr) {
-				found = true
-				continue
-			}
-			return false
-		}
-	}
-	return found
+	return protoLoopCallsAreAllLowerableBy(proto, qCallIsLowerableQEvalPipelinePlan)
 }
 
 // QEvalPipelineLoweringPass rewrites constant q.eval hot plans to a backend
@@ -1337,12 +1338,8 @@ func QEvalPipelineLoweringPass(fn *Function) (*Function, error) {
 			if !ok {
 				continue
 			}
-			ref := fn.addQEvalPipelinePlan(candidate.Source, candidate.Plan)
-			if !ref.Valid() {
-				continue
-			}
-			typedBackendPlan, ok := qEvalPipelineExecutableTypedRuntimeBackendPlanFromRef(ref)
-			if !ok || !typedBackendPlan.Valid() {
+			ref, _, ok := addExecutableQEvalPipelineBackendPlan(fn, candidate)
+			if !ok {
 				continue
 			}
 			instr.Op = OpQEvalPipelinePlan

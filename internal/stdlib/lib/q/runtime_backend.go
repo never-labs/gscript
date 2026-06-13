@@ -28,6 +28,11 @@ func qTypedRuntimeResult2[A, B any](kernel, shape string, a A, b B, handled bool
 	return a, b, handled, err
 }
 
+func qTypedRuntimeResult2Reason[A, B any](kernel, shape, fallbackReason string, a A, b B, handled bool, err error) (A, B, bool, error) {
+	recordQTypedRuntimeKernelReason(kernel, shape, handled, err, fallbackReason)
+	return a, b, handled, err
+}
+
 type qTypedRuntimeKernel[T any] struct {
 	kernel         string
 	shape          string

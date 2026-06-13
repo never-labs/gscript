@@ -2462,7 +2462,7 @@ func (s *EvalState) evalQPipelineWhereModuloCompareIndexStats(plan *qPipelinePla
 	}
 	shape := plan.comparePrefix + "-stats/" + plan.compareOp + "/" + string(array.Kind()) + "/" + string(qRuntimeKernelOperandKind(modulus, nil)) + "/" + string(qRuntimeKernelOperandKind(target, nil))
 	count, sum, handled, err = data.TryTypedModuloCompareIndexStatsI64(array, modulus, dataOp, target)
-	count, sum, handled, err = qTypedRuntimeResult2("ArrayModuloCompareStats", shape, count, sum, handled, err)
+	count, sum, handled, err = qTypedRuntimeResult2Reason("ArrayModuloCompareStats", shape, RuntimeFallbackUnsupportedType, count, sum, handled, err)
 	if err != nil || !handled {
 		return 0, 0, handled, err
 	}

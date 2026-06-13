@@ -198,28 +198,7 @@ func qCallIsLowerableQSessionEval(fn *Function, call *Instr) bool {
 // heuristics would otherwise misclassify the loop as a generic host-call loop
 // and pin it at Tier 0/Tier 1.
 func protoLoopCallsAreLowerableQSessionEval(proto *vm.FuncProto) bool {
-	fn := BuildGraph(proto)
-	if fn == nil || fn.Entry == nil || fn.Unpromotable {
-		return false
-	}
-	li := computeLoopInfo(fn)
-	found := false
-	for _, block := range fn.Blocks {
-		if block == nil || !li.loopBlocks[block.ID] {
-			continue
-		}
-		for _, instr := range block.Instrs {
-			if instr == nil || !tier2LoopCallOp(instr.Op) {
-				continue
-			}
-			if qCallIsLowerableQSessionEval(fn, instr) {
-				found = true
-				continue
-			}
-			return false
-		}
-	}
-	return found
+	return protoLoopCallsAreAllLowerableBy(proto, qCallIsLowerableQSessionEval)
 }
 
 // QEvalSessionEvalLoweringPass rewrites recognized typed-runtime
