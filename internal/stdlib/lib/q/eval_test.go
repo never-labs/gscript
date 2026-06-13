@@ -87,6 +87,38 @@ func TestRuntimeKernelExecutionStatsReportHitAndFallbackOutcomes(t *testing.T) {
 	}
 }
 
+func TestEvalTypedFindComparableStringSymbolRuntime(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	assertEvalArray(t, "d:`AAPL`MSFT`AAPL`NVDA;q:`MSFT`IBM`AAPL;d?q", data.KindI64, []any{int64(1), int64(4), int64(0)})
+	assertEvalValue(t, "+/`AAPL`MSFT`AAPL`NVDA?`NVDA`IBM`AAPL", int64(7))
+	assertEvalArray(t, "d:`AAPL`MSFT`AAPL`NVDA;q:(\"MSFT\";\"IBM\";\"AAPL\");d?q", data.KindI64, []any{int64(1), int64(4), int64(0)})
+
+	seenFindSymbol := false
+	seenFindMixed := false
+	seenFindSumSymbol := false
+	for _, stat := range RuntimeKernelExecutionStats() {
+		if stat.Kernel == "ArrayFind" && stat.Shape == "find/symbol/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenFindSymbol = true
+		}
+		if stat.Kernel == "ArrayFind" && stat.Shape == "find/symbol/string" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenFindMixed = true
+		}
+		if stat.Kernel == "ArrayFindSum" && stat.Shape == "vector-reduce/find-sum/symbol/symbol" && stat.Outcome == "hit" && stat.ReasonCode == "typed_kernel" && stat.Count > 0 {
+			seenFindSumSymbol = true
+		}
+		if (stat.Kernel == "ArrayFind" && stat.Shape == "find/symbol/symbol" ||
+			stat.Kernel == "ArrayFindSum" && stat.Shape == "vector-reduce/find-sum/symbol/symbol") &&
+			stat.Outcome == "fallback" {
+			t.Fatalf("unexpected symbol find fallback stat: %#v all=%#v", stat, RuntimeKernelExecutionStats())
+		}
+	}
+	if !seenFindSymbol || !seenFindMixed || !seenFindSumSymbol {
+		t.Fatalf("missing typed find stats: findSymbol=%v findMixed=%v findSumSymbol=%v stats=%#v", seenFindSymbol, seenFindMixed, seenFindSumSymbol, RuntimeKernelExecutionStats())
+	}
+}
+
 func TestRuntimeKernelExecutionStatsAggregateStableFallbackReasons(t *testing.T) {
 	ClearRuntimeKernelExecutionStats()
 	t.Cleanup(ClearRuntimeKernelExecutionStats)

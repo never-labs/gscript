@@ -843,7 +843,7 @@ func (s *EvalState) evalFusedSumFind(x FusedSumFind) (any, error) {
 	if !ok {
 		return nil, unsupportedEvalValueExpr{expr: x}
 	}
-	out, handled := data.TryTypedFindI64Sum(domainArray, queryArray)
+	out, handled := data.TryTypedFindComparableSum(domainArray, queryArray)
 	shape := "vector-reduce/find-sum/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
 	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
 	if !handled {

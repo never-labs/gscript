@@ -4403,6 +4403,44 @@ func TestTypedDyadicSymbolAndTemporalComparisons(t *testing.T) {
 	}
 }
 
+func TestTypedFindComparableStringSymbol(t *testing.T) {
+	symbolDomain := NewSymbols([]string{"AAPL", "MSFT", "AAPL", "NVDA"})
+	symbolQuery := NewSymbols([]string{"MSFT", "IBM", "AAPL"})
+	out, handled := TryTypedFindComparable(symbolDomain, symbolQuery)
+	if !handled {
+		t.Fatal("TryTypedFindComparable did not handle symbol/symbol")
+	}
+	if got, want := out.Values(), []any{int64(1), int64(4), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("symbol/symbol find = %v, want %v", got, want)
+	}
+	sum, handled := TryTypedFindComparableSum(symbolDomain, symbolQuery)
+	if !handled || sum != 5 {
+		t.Fatalf("symbol/symbol find sum = %d, %v; want 5, true", sum, handled)
+	}
+
+	stringQuery := NewString([]string{"NVDA", "AAPL", "IBM"})
+	out, handled = TryTypedFindComparable(symbolDomain, stringQuery)
+	if !handled {
+		t.Fatal("TryTypedFindComparable did not handle symbol/string")
+	}
+	if got, want := out.Values(), []any{int64(3), int64(0), int64(4)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("symbol/string find = %v, want %v", got, want)
+	}
+	sum, handled = TryTypedFindComparableSum(symbolDomain, stringQuery)
+	if !handled || sum != 7 {
+		t.Fatalf("symbol/string find sum = %d, %v; want 7, true", sum, handled)
+	}
+
+	encodedDomain := WithArrayAttribute(NewEncodedSymbols([]Symbol{"AAPL", "MSFT", "AAPL", "NVDA"}), ArrayAttributeGrouped)
+	out, handled = TryTypedFindComparable(encodedDomain, symbolQuery)
+	if !handled {
+		t.Fatal("TryTypedFindComparable did not handle encoded symbol domain")
+	}
+	if got, want := out.Values(), []any{int64(1), int64(4), int64(0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("encoded symbol find = %v, want %v", got, want)
+	}
+}
+
 func TestTypedJoinRowsByKeyIncludesNullAndDuplicateKeys(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), nil, Symbol("a"), NullValue}),

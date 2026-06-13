@@ -2196,6 +2196,89 @@ func TryTypedFindI64(domain, query Array) (Array, bool) {
 	return newI64Trusted(out), true
 }
 
+// TryTypedFindComparable vectorizes q find (`?`) for the common typed
+// comparable families. Integer arrays keep the dedicated i64 fast path;
+// string/symbol arrays share a comparable string key so symbol and string
+// values with the same text match each other.
+func TryTypedFindComparable(domain, query Array) (Array, bool) {
+	if out, ok := TryTypedFindI64(domain, query); ok {
+		return out, true
+	}
+	domainValues, queryValues, ok := typedFindStringSymbolValues(domain, query)
+	if !ok {
+		return nil, false
+	}
+	return typedFindComparable(domainValues, queryValues), true
+}
+
+func typedFindStringSymbolValues(domain, query Array) ([]string, []string, bool) {
+	if domain == nil || query == nil {
+		return nil, nil, false
+	}
+	if !isStringSymbolKind(domain.Kind()) || !isStringSymbolKind(query.Kind()) {
+		return nil, nil, false
+	}
+	domainValues, ok := stringSymbolArrayValues(domain)
+	if !ok {
+		return nil, nil, false
+	}
+	queryValues, ok := stringSymbolArrayValues(query)
+	if !ok {
+		return nil, nil, false
+	}
+	return domainValues, queryValues, true
+}
+
+func isStringSymbolKind(kind Kind) bool {
+	return kind == KindString || kind == KindSymbol
+}
+
+func stringSymbolArrayValues(array Array) ([]string, bool) {
+	out := make([]string, array.Len())
+	for i := range out {
+		value, ok := array.At(i)
+		if !ok {
+			return nil, false
+		}
+		text, ok := coerceComparableString(value)
+		if !ok {
+			return nil, false
+		}
+		out[i] = text
+	}
+	return out, true
+}
+
+func typedFindComparable[T comparable](domain, query []T) Array {
+	miss := int64(len(domain))
+	out := make([]int64, len(query))
+	if len(domain) <= 8 {
+		for i, v := range query {
+			index := miss
+			for j, candidate := range domain {
+				if candidate == v {
+					index = int64(j)
+					break
+				}
+			}
+			out[i] = index
+		}
+		return newI64Trusted(out)
+	}
+	lookup := make(map[T]int64, len(domain))
+	for j := len(domain) - 1; j >= 0; j-- {
+		lookup[domain[j]] = int64(j)
+	}
+	for i, v := range query {
+		index, found := lookup[v]
+		if !found {
+			index = miss
+		}
+		out[i] = index
+	}
+	return newI64Trusted(out)
+}
+
 // findI64DenseTable builds a value→first-index table for small-span integer
 // find domains (first occurrence wins, mirroring the linear scan). -1 marks
 // absent values. ok=false when the domain is empty, too large, or too
@@ -2288,6 +2371,50 @@ func TryTypedFindI64Sum(domain, query Array) (int64, bool) {
 	bulkI64Release(domainValues, domainOwned)
 	bulkI64Release(queryValues, queryOwned)
 	return sum, true
+}
+
+// TryTypedFindComparableSum reduces +/domain?query for the same shapes as
+// TryTypedFindComparable without materializing the index vector. Empty queries
+// decline so the staged route keeps its empty-sum semantics.
+func TryTypedFindComparableSum(domain, query Array) (int64, bool) {
+	if sum, ok := TryTypedFindI64Sum(domain, query); ok {
+		return sum, true
+	}
+	domainValues, queryValues, ok := typedFindStringSymbolValues(domain, query)
+	if !ok || len(queryValues) == 0 {
+		return 0, false
+	}
+	return typedFindComparableSum(domainValues, queryValues), true
+}
+
+func typedFindComparableSum[T comparable](domain, query []T) int64 {
+	miss := int64(len(domain))
+	var sum int64
+	if len(domain) <= 8 {
+		for _, v := range query {
+			index := miss
+			for j, candidate := range domain {
+				if candidate == v {
+					index = int64(j)
+					break
+				}
+			}
+			sum += index
+		}
+		return sum
+	}
+	lookup := make(map[T]int64, len(domain))
+	for j := len(domain) - 1; j >= 0; j-- {
+		lookup[domain[j]] = int64(j)
+	}
+	for _, v := range query {
+		index, found := lookup[v]
+		if !found {
+			index = miss
+		}
+		sum += index
+	}
+	return sum
 }
 
 // TryTypedSetOpIndexes returns left-side row indexes for the q set verbs

@@ -16857,7 +16857,7 @@ func (s *EvalState) tryEvalCastChainSum(src string) (any, bool, error) {
 }
 
 // tryEvalFindSum fuses +/domain?query into a single pass through
-// data.TryTypedFindI64Sum, skipping the index-vector materialization the
+// data.TryTypedFindComparableSum, skipping the index-vector materialization the
 // staged find-then-sum route pays. Non-array operands and kernel declines
 // keep the staged route (the find cascade re-evaluates the expression).
 func (s *EvalState) tryEvalFindSum(src string) (any, bool, error) {
@@ -16881,7 +16881,7 @@ func (s *EvalState) tryEvalFindSum(src string) (any, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	out, handled := data.TryTypedFindI64Sum(domainArray, queryArray)
+	out, handled := data.TryTypedFindComparableSum(domainArray, queryArray)
 	shape := "vector-reduce/find-sum/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
 	recordRuntimeKernelProbe("ArrayFindSum", shape, handled, nil)
 	if !handled {
@@ -17069,7 +17069,7 @@ func findValue(left, right any) (any, error) {
 	}
 	if domainArray, ok := left.(data.Array); ok {
 		if queryArray, ok := right.(data.Array); ok {
-			out, handled := data.TryTypedFindI64(domainArray, queryArray)
+			out, handled := data.TryTypedFindComparable(domainArray, queryArray)
 			shape := "find/" + string(domainArray.Kind()) + "/" + string(queryArray.Kind())
 			recordRuntimeKernelProbe("ArrayFind", shape, handled, nil)
 			if handled {
