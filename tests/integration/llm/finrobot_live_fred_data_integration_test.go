@@ -26,7 +26,7 @@ headers["Accept"] = "text/csv,text/plain,*/*"
 
 resp, err := net.get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10", {
     headers: headers
-    timeout: 30
+    timeout: 10
 })
 if err != nil {
     fred_dgs10_request_error = err
