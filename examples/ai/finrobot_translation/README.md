@@ -105,6 +105,10 @@ Set `LEIA_FINROBOT_LIVE_DATA=0` to force this gate to skip. Provider-free
 example checks remain unchanged and continue to run without live network access
 or provider credentials.
 
+Optional-token FMP live gates clean-skip when neither `FMP_API_KEY` nor
+`LEIA_FMP_API_KEY` is present. They do not require secrets to be committed to
+the repo, and provider-free examples remain unchanged.
+
 ## Scope
 
 FinRobot should translate into ordinary Leia packages that compose existing
