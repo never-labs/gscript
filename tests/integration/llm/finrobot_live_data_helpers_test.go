@@ -65,10 +65,43 @@ func skipUnavailableFinRobotLiveData(t *testing.T, provider string, status int64
 	}
 }
 
+func skipUnavailableFinRobotCredentialedLiveData(t *testing.T, provider string, status int64, requestErr any) {
+	t.Helper()
+	if status == 408 || status == 429 || status >= 500 {
+		t.Skipf("%s live data endpoint unavailable for this run: status=%d error=%v", provider, status, requestErr)
+	}
+	if status == 0 && requestErr != nil {
+		t.Skipf("%s live data request failed: status=%d error=%v", provider, status, requestErr)
+	}
+}
+
+func skipUnavailableFinRobotPublicLiveData(t *testing.T, provider string, status int64, requestErr any) {
+	t.Helper()
+	if status == 401 {
+		t.Skipf("%s public live data endpoint requires auth or blocked this run: status=%d error=%v", provider, status, requestErr)
+	}
+	skipUnavailableFinRobotLiveData(t, provider, status, requestErr)
+}
+
+func assertFinRobotPublicLiveDataOK(t *testing.T, vm *leia.VM, provider, statusName, requestErrName, jsonErrName, okName string) {
+	t.Helper()
+	status := mustGetInt(t, vm, statusName)
+	skipUnavailableFinRobotPublicLiveData(t, provider, status, getOrNil(t, vm, requestErrName))
+	if status != 200 {
+		t.Fatalf("%s status = %d, want 200", provider, status)
+	}
+	if got := getOrNil(t, vm, jsonErrName); got != nil {
+		t.Fatalf("%s JSON decode failed: %v", provider, got)
+	}
+	if ok := mustGetBool(t, vm, okName); !ok {
+		t.Fatalf("%s ok = false", provider)
+	}
+}
+
 func assertFinRobotLiveDataOK(t *testing.T, vm *leia.VM, provider, statusName, requestErrName, jsonErrName, okName string) {
 	t.Helper()
 	status := mustGetInt(t, vm, statusName)
-	skipUnavailableFinRobotLiveData(t, provider, status, getOrNil(t, vm, requestErrName))
+	skipUnavailableFinRobotCredentialedLiveData(t, provider, status, getOrNil(t, vm, requestErrName))
 	if status != 200 {
 		t.Fatalf("%s status = %d, want 200", provider, status)
 	}
