@@ -254,7 +254,7 @@ func TestExecuteQEvalSessionEvalRecordsPlannedErrorStats(t *testing.T) {
 		t.Fatalf("site planned error counter = %d, want 1", got)
 	}
 	stats := cf.QKernelExecutionStats()
-	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRoutePlanned, "error", "runtime_error", 1)
+	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRoutePlanned, "error", qEvalSessionEvalReasonPlannedError, 1)
 	if got := qKernelExecutionCount(stats, "methodjit_q_eval_runtime", "QEvalSessionEval", qEvalSessionEvalRouteShell, "error"); got != 0 {
 		t.Fatalf("shell error route count = %d, want 0", got)
 	}
@@ -293,9 +293,30 @@ func TestExecuteQEvalSessionEvalRecordsShellErrorStats(t *testing.T) {
 		t.Fatalf("site shell error counter = %d, want 1", got)
 	}
 	stats := cf.QKernelExecutionStats()
-	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRouteShell, "error", "runtime_error", 1)
+	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRouteShell, "error", qEvalSessionEvalReasonShellError, 1)
 	if got := qKernelExecutionCount(stats, "methodjit_q_eval_runtime", "QEvalSessionEval", qEvalSessionEvalRoutePlanned, "error"); got != 0 {
 		t.Fatalf("planned error route count = %d, want 0", got)
+	}
+}
+
+func TestQEvalSessionEvalReasonCodeBucketsRoutes(t *testing.T) {
+	tests := []struct {
+		name    string
+		route   string
+		outcome string
+		want    string
+	}{
+		{name: "planned error", route: qEvalSessionEvalRoutePlanned, outcome: "error", want: qEvalSessionEvalReasonPlannedError},
+		{name: "shell error", route: qEvalSessionEvalRouteShell, outcome: "error", want: qEvalSessionEvalReasonShellError},
+		{name: "success", route: qEvalSessionEvalRoutePlanned, outcome: "success", want: "typed_kernel"},
+		{name: "unknown error", route: "custom", outcome: "error", want: "runtime_error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := qEvalSessionEvalReasonCode(tt.route, tt.outcome); got != tt.want {
+				t.Fatalf("qEvalSessionEvalReasonCode(%q, %q) = %q, want %q", tt.route, tt.outcome, got, tt.want)
+			}
+		})
 	}
 }
 

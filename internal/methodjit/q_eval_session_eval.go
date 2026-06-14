@@ -133,6 +133,11 @@ const (
 	qEvalSessionEvalRoutePlanned = "session_planned_op_exit"
 )
 
+const (
+	qEvalSessionEvalReasonShellError   = "session_shell_error"
+	qEvalSessionEvalReasonPlannedError = "session_planned_error"
+)
+
 func appendQEvalSessionEvalCounter(out map[qKernelExecutionKey]uint64, route, outcome string, count uint64) {
 	if count == 0 {
 		return
@@ -144,7 +149,7 @@ func appendQEvalSessionEvalCounter(out map[qKernelExecutionKey]uint64, route, ou
 		pipelineShape: "unknown",
 		route:         route,
 		outcome:       outcome,
-		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
+		reasonCode:    qEvalSessionEvalReasonCode(route, outcome),
 	}] += count
 }
 
@@ -171,9 +176,23 @@ func appendQEvalSessionEvalSiteCounter(out map[qKernelExecutionKey]uint64, site 
 		pipelineShape: pipelineShape,
 		route:         route,
 		outcome:       outcome,
-		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
+		reasonCode:    qEvalSessionEvalReasonCode(route, outcome),
 	}] += count
 	return true
+}
+
+func qEvalSessionEvalReasonCode(route, outcome string) string {
+	if outcome != "error" {
+		return qKernelExecutionReasonCode(outcome, "")
+	}
+	switch route {
+	case qEvalSessionEvalRoutePlanned:
+		return qEvalSessionEvalReasonPlannedError
+	case qEvalSessionEvalRouteShell:
+		return qEvalSessionEvalReasonShellError
+	default:
+		return qKernelExecutionReasonCode(outcome, "")
+	}
 }
 
 // qCallIsLowerableQSessionEval reports whether a call instruction matches the
