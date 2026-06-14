@@ -406,8 +406,8 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 
 
 def check_release_gate_docs() -> None:
-    release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
-    release_profile_cmd = "bash scripts/production_check.sh --full --release-profile"
+    release_matrix_cmd = "go test ./tests -run 'TestReleaseMatrix' -count=1"
+    release_profile_cmd = "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
     release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
@@ -416,10 +416,10 @@ def check_release_gate_docs() -> None:
             "## Machine-Checkable Release Evidence",
             "go run ./cmd/leia ci release --list",
             release_profile_cmd,
-            "profile is the release gate source of truth",
+            "profile is the release validation source of truth",
             "q conformance",
             "local artifact installation evidence",
-            "tests/feature_matrix.json",
+            "feature coverage records under `tests/`",
             "docs/spec/index.md",
             "tests/language/MISSING_CAPABILITIES.md",
             "docs/reference/stdlib/index.md",
@@ -478,7 +478,7 @@ def check_release_gate_docs() -> None:
             release_matrix_cmd,
             spec_examples_cmd,
             "bash scripts/docs_check.sh",
-            "tests/feature_matrix.json",
+            "feature coverage records under `tests/`",
             "docs/spec/index.md",
         ],
     )

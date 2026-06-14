@@ -7,12 +7,13 @@ Leia releases need machine-checkable evidence, not hand-written claims.
 Run at least:
 
 ```bash
-bash scripts/production_check.sh --full --release-profile
+bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z
 go run ./cmd/leia ci release --list
+bash scripts/performance_gate.sh --full
 ```
 
 `leia ci release` delegates to the same production release profile. That
-profile is the release gate source of truth: correctness, documentation,
+profile is the release validation source of truth: correctness, documentation,
 performance, q conformance, language conformance, public blockers,
 distribution configuration, and local artifact installation evidence are all
 listed there. Documentation evidence is produced by `scripts/docs_check.sh`
@@ -21,7 +22,7 @@ inside that profile.
 The release evidence should cite:
 
 - `docs/spec/index.md`
-- `tests/feature_matrix.json`
+- feature coverage records under `tests/`
 - `tests/language/MANIFEST.md`
 - `tests/language/KNOWN_FAILURES.md`
 - `tests/language/MISSING_CAPABILITIES.md`
@@ -49,7 +50,7 @@ be inferred from tests, local release evidence, or implementation defaults.
 
 Distribution checks are split between local artifacts and hosted workflow
 presence. The local check validates GoReleaser metadata, the install script
-dry-run matrix, and local `file://` tar.gz/zip install fixtures even when
+dry-run combinations, and local `file://` tar.gz/zip install fixtures even when
 GitHub workflow files are intentionally absent:
 
 ```bash
@@ -73,7 +74,8 @@ recorded consistently and can be passed to GoReleaser.
 
 Every public tag must have release notes. The notes must identify:
 
-- stable behavior covered by the specification, feature matrix, and gates;
+- stable behavior covered by the specification, feature coverage, and release
+  validation;
 - experimental behavior that can change or disappear without compatibility
   guarantees;
 - implementation-defined behavior that depends on host capabilities, execution
@@ -83,8 +85,8 @@ Every public tag must have release notes. The notes must identify:
   coverage;
 - disabled capabilities, live providers, or external integrations;
 - release artifacts, including `leia`, `leia-lsp`, and SHA256 checksums;
-- evidence links for the spec, feature matrix, security reference, platform
-  reference, and performance gates.
+- evidence links for the spec, feature coverage, security reference, platform
+  reference, and performance validation.
 
 ## Public Release Blockers
 

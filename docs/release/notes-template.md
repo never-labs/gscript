@@ -53,8 +53,8 @@ bash scripts/performance_gate.sh --full
 
 ```bash
 go run ./cmd/leia ci release --list
-bash scripts/production_check.sh --full --release-profile
-go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z
+go test ./tests -run 'TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
 bash scripts/public_release_blockers_check.sh --require-resolved

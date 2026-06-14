@@ -100,6 +100,31 @@ func TestSpecIndexNormativeDocumentsMatchFiles(t *testing.T) {
 	}
 }
 
+func TestSpecIndexNormativeDocumentsMatchPreviewChapters(t *testing.T) {
+	root := findRepoRoot(t)
+	specIndex := readFileString(t, filepath.Join(root, "docs", "spec", "index.md"))
+	specPreview := readFileString(t, filepath.Join(root, "scripts", "spec_preview.py"))
+
+	var want []string
+	for _, chapter := range specPreviewChapters(t, specPreview) {
+		if chapter == "index.md" {
+			continue
+		}
+		want = append(want, chapter)
+	}
+	want = append(want, "grammar.ebnf")
+
+	normative := markdownSection(t, specIndex, "Normative Documents")
+	got := normativeDocumentTargets(t, normative)
+
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("docs/spec/index.md Normative Documents must match scripts/spec_preview.py CHAPTERS order plus grammar.ebnf\n got: %s\nwant: %s", strings.Join(got, ", "), strings.Join(want, ", "))
+	}
+	if got[len(got)-1] != "grammar.ebnf" {
+		t.Fatal("docs/spec/index.md Normative Documents must retain grammar.ebnf as an additional normative document")
+	}
+}
+
 func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 	root := findRepoRoot(t)
 	specDir := filepath.Join(root, "docs", "spec")
@@ -145,6 +170,40 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 	if aiDialectRunAll == 0 {
 		t.Fatal("docs/spec/ai-dialect.md must include at least one stable runnable AI dialect example")
 	}
+}
+
+func specPreviewChapters(t *testing.T, script string) []string {
+	t.Helper()
+	blockRE := regexp.MustCompile(`(?s)CHAPTERS\s*=\s*\[(.*?)\]`)
+	blockMatch := blockRE.FindStringSubmatch(script)
+	if len(blockMatch) != 2 {
+		t.Fatal("scripts/spec_preview.py must define CHAPTERS")
+	}
+	chapterRE := regexp.MustCompile(`\(\s*"([^"]+)"\s*,\s*"[^"]+"\s*\)`)
+	var chapters []string
+	for _, match := range chapterRE.FindAllStringSubmatch(blockMatch[1], -1) {
+		chapters = append(chapters, match[1])
+	}
+	if len(chapters) == 0 {
+		t.Fatal("scripts/spec_preview.py CHAPTERS must list chapters")
+	}
+	return chapters
+}
+
+func normativeDocumentTargets(t *testing.T, section string) []string {
+	t.Helper()
+	targetRE := regexp.MustCompile(`^\- \[[^\]]+\]\(([^)]+)\):`)
+	var targets []string
+	for _, line := range strings.Split(section, "\n") {
+		match := targetRE.FindStringSubmatch(line)
+		if len(match) == 2 {
+			targets = append(targets, match[1])
+		}
+	}
+	if len(targets) == 0 {
+		t.Fatal("docs/spec/index.md must list normative documents")
+	}
+	return targets
 }
 
 func findRepoRoot(t *testing.T) string {

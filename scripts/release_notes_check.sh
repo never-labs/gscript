@@ -66,6 +66,15 @@ require_contains() {
   fi
 }
 
+require_not_matching() {
+  local file="$1"
+  local pattern="$2"
+  local description="$3"
+  if grep -Eq -- "$pattern" "$file"; then
+    add_failure "$file still contains template placeholder: $description"
+  fi
+}
+
 check_template() {
   local template="docs/release/notes-template.md"
   if [[ ! -f "$template" ]]; then
@@ -106,14 +115,14 @@ check_version() {
     "vX.Y.Z" \
     "| | |" \
     "List known issues, or write" \
-    "- License:" \
-    "- Security reporting:" \
     "TODO" \
     "TBD"; do
     if grep -Fq -- "$placeholder" "$notes"; then
       add_failure "$notes still contains template placeholder: $placeholder"
     fi
   done
+  require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*License:[[:space:]]*$' "- License:"
+  require_not_matching "$notes" '^[[:space:]]*-[[:space:]]*Security reporting:[[:space:]]*$' "- Security reporting:"
 }
 
 check_template

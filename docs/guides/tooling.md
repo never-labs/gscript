@@ -45,9 +45,9 @@ Profiles:
 
 | Profile | Use |
 |---|---|
-| `smoke` | Fast local sanity: selected Go tests, manifest coverage, module path gate, tooling check, worktree audit. |
+| `smoke` | Fast local sanity: selected Go tests, manifest coverage, module path validation, and tooling checks. |
 | `pr` | Full Go tests, manifest coverage, docs check, and performance smoke. |
-| `perf` | Full performance gate. |
+| `perf` | Full performance validation. |
 | `release` | Production and release artifact checks. |
 
 Use `--list` before running a profile when you want to see exactly which shell
@@ -66,15 +66,14 @@ go run ./cmd/leia ci release --list
 Run `smoke` before small changes, `pr` before review, and `release` only when
 preparing a tag or release candidate.
 
-## Manifest And Worktree Checks
+## Manifest Checks
 
 ```bash
 python3 tests/manifest.py check tests benchmarks
-bash scripts/worktree_audit.sh
 ```
 
-The manifest check keeps test and benchmark discovery explicit. The worktree
-audit catches stale or confusing local worktrees before large refactors.
+The manifest check keeps test and benchmark discovery explicit so local and
+hosted validation run the same discovered coverage.
 
 ## Modules
 
@@ -115,7 +114,7 @@ bash scripts/editor_check.sh --require-tree-sitter
 python3 -m unittest tools.editor.smoke.editor_check_test
 ```
 
-The editor gate validates shared TextMate grammars, VS Code syntax assets,
+The editor check validates shared TextMate grammars, VS Code syntax assets,
 snippets, language configuration, extension JavaScript syntax, the spec preview
 helper, editor smoke fixtures, and tree-sitter corpus tests when the CLI is
 available. Use `--require-tree-sitter` in environments where the tree-sitter
@@ -148,7 +147,7 @@ go run ./cmd/leia playground --addr 127.0.0.1:8080
 The browser playground serves local execution APIs plus runnable Playground,
 Tour, Examples, Evaluate, and AI tabs. It is backed by checked-in repository
 examples, so playground content is exercised by the same example and release
-evidence gates as command-line examples.
+validation as command-line examples.
 
 ## Performance
 
@@ -163,9 +162,9 @@ bash scripts/performance_gate.sh --feature-smoke
 ```
 
 Use `--no-luajit` when LuaJIT is not installed or when a benchmark has no useful
-Lua reference. When LuaJIT data is present and script-timed, the gate also
+Lua reference. When LuaJIT data is present and script-timed, the check also
 enforces `--luajit-threshold` so published performance claims remain tied to
-measured gates instead of report-only comparisons. See the
+measured validation instead of report-only comparisons. See the
 [performance reference](../reference/performance/index.md).
 
 ## Diagnostics
@@ -182,7 +181,7 @@ collect environment, docs/test status, and optional benchmark summaries.
 
 ```bash
 bash scripts/production_check.sh --quick
-go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
+go test ./tests -run 'TestReleaseMatrix' -count=1
 bash scripts/release_artifacts_check.sh --build
 ```
 

@@ -10,6 +10,7 @@ MODE="full"
 LIST_ONLY=0
 OUT_DIR=""
 RELEASE_PROFILE=0
+RELEASE_VERSION=""
 ARTIFACT_PLAN=""
 ARTIFACT_COMMAND_LOG=""
 SMOKE_SCRIPT="tests/smoke/01_basic.leia"
@@ -17,7 +18,7 @@ EXPECTED_MODULE_PATH="github.com/never-labs/leia"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--list] [--out-dir DIR] [--help]
+Usage: scripts/production_check.sh [--quick] [--full] [--release-profile] [--release-version VERSION] [--list] [--out-dir DIR] [--help]
 
 Runs the release-gate commands from docs/release/index.md.
 
@@ -31,6 +32,9 @@ Options:
             corpus, distribution configuration, and artifact dry-run evidence.
             This avoids silent skips for local release validation while keeping
             ordinary contributor machines able to run --full.
+  --release-version VERSION
+            Validate release artifacts and notes for VERSION, such as v0.1.0,
+            when --release-profile is enabled.
   --list    Print the commands that would run without executing them.
   --out-dir DIR
             Write the resolved plan and command logs to DIR. Defaults to no
@@ -50,6 +54,15 @@ while [ "$#" -gt 0 ]; do
         --release-profile)
             MODE="full"
             RELEASE_PROFILE=1
+            ;;
+        --release-version)
+            if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+                echo "--release-version requires a version argument" >&2
+                usage >&2
+                exit 2
+            fi
+            RELEASE_VERSION="$2"
+            shift
             ;;
         --list)
             LIST_ONLY=1
@@ -349,7 +362,7 @@ add_release_artifacts_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Artifacts" "artifact_args=(--build --require-clean); if [ -n \"\${LEIA_RELEASE_REQUIRE_TAG:-}\" ]; then artifact_args+=(--require-tag --version \"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"); fi; bash scripts/release_artifacts_check.sh \"\${artifact_args[@]}\""
+        add_run "Release Artifacts" "artifact_args=(--build --require-clean); if [ -n \"$RELEASE_VERSION\" ]; then artifact_args+=(--require-tag --version \"$RELEASE_VERSION\"); elif [ -n \"\${LEIA_RELEASE_REQUIRE_TAG:-}\" ]; then artifact_args+=(--require-tag --version \"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"); fi; bash scripts/release_artifacts_check.sh \"\${artifact_args[@]}\""
         return
     fi
     if ! have_cmd go; then
@@ -362,6 +375,10 @@ add_release_artifacts_gate() {
 add_release_notes_gate() {
     if [ ! -f scripts/release_notes_check.sh ]; then
         add_skip "Release Notes" "missing scripts/release_notes_check.sh"
+        return
+    fi
+    if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "$RELEASE_VERSION" ]; then
+        add_run "Release Notes" "bash scripts/release_notes_check.sh --require-ready --version \"$RELEASE_VERSION\""
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "${LEIA_RELEASE_REQUIRE_TAG:-}" ]; then

@@ -299,11 +299,12 @@ func TestReleaseMatrixCoveredReleaseCellsHaveExecutableEvidence(t *testing.T) {
 
 func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	root := findRepoRoot(t)
-	releaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
+	releaseMatrixCmd := "go test ./tests -run 'TestReleaseMatrix' -count=1"
+	internalReleaseMatrixCmd := "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
 	specExamplesCmd := "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
 	docsCheckCmd := "bash scripts/docs_check.sh"
 	ciReleaseListCmd := "go run ./cmd/leia ci release --list"
-	productionFullCmd := "bash scripts/production_check.sh --full --release-profile"
+	productionFullCmd := "bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
@@ -321,7 +322,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				releaseMatrixCmd,
 				specExamplesCmd,
 				docsCheckCmd,
-				"tests/feature_matrix.json",
+				"feature coverage records under `tests/`",
 				"docs/spec/index.md",
 			},
 		},
@@ -331,11 +332,11 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				"## Machine-Checkable Release Evidence",
 				ciReleaseListCmd,
 				productionFullCmd,
-				"profile is the release gate source of truth",
+				"profile is the release validation source of truth",
 				"q conformance",
 				"local artifact installation evidence",
 				releaseDistributionCmd,
-				"tests/feature_matrix.json",
+				"feature coverage records under `tests/`",
 				"docs/spec/index.md",
 			},
 		},
@@ -381,7 +382,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--quick", "--list")
 	for _, snippet := range []string{
-		releaseMatrixCmd,
+		internalReleaseMatrixCmd,
 		specExamplesCmd,
 		docsCheckCmd,
 		performanceSmokeCmd,
@@ -1466,8 +1467,8 @@ func TestReleaseMatrixLicenseNoticeMatchesRepositoryState(t *testing.T) {
 	if hasLicense && strings.Contains(readme, unlicensedNotice) {
 		t.Fatal("README.md still says no license has been selected even though LICENSE exists")
 	}
-	if !hasLicense && !strings.Contains(readme, unlicensedNotice) {
-		t.Fatal("README.md must keep the no-license notice until a root LICENSE exists")
+	if !hasLicense && strings.Contains(readme, unlicensedNotice) {
+		t.Fatal("README.md must not expose repository-internal release blockers; scripts/public_release_blockers_check.sh owns the missing-license gate")
 	}
 }
 

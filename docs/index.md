@@ -3,7 +3,7 @@
 Leia is a Go-native scripting language built for DSLs, dialects, and embedded
 automation. It keeps the core language small, puts domain syntax behind tagged
 dialects, and backs q-style analytics and numeric hot paths with measured
-runtime and JIT gates.
+runtime and JIT validation.
 
 ```bash
 go run ./cmd/leia eval 'print("hello from leia")'
@@ -37,7 +37,7 @@ go run ./cmd/leia playground --help
 
 - [Tagged dialects](reference/dialects/index.md)
 - [Data-oriented programming](reference/data-oriented/index.md)
-- [q conformance matrix](design/q-conformance.md)
+- [q conformance](design/q-conformance.md)
 - [Performance and benchmarks](reference/performance/index.md)
 - [Concurrency](reference/concurrency/index.md)
 - [Evaluate reference](reference/evaluate/index.md)
@@ -50,7 +50,7 @@ go run ./cmd/leia playground --help
 - [Example tree README](https://github.com/never-labs/leia/blob/main/examples/README.md)
 - [Cookbook](cookbook/index.md)
 - [Tooling guide](guides/tooling.md)
-- [Testing and release gates](testing.md)
+- [Testing and release validation](testing.md)
 - [Release process](release/index.md)
 - [Release decisions](release/decisions.md)
 - [Governance](governance.md)

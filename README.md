@@ -5,7 +5,7 @@ Leia is a Go-native scripting language built for DSLs, dialects, and embedded au
 - Go-native: small host API, Go-shaped syntax, and direct embedding in Go
   services.
 - Performance-oriented: bytecode execution plus ARM64 JIT hot paths, with
-  release gates tracking LuaJIT-class workloads and VM equivalence.
+  reproducible checks tracking LuaJIT-class workloads and VM equivalence.
 - Analytics-native: q-style vector syntax, qSQL, typed runtime kernels, and
   high-throughput in-memory columnar computation.
 - Dialect-native: `q`, `sql`, `json`, `yaml`, shell/data tags, and
@@ -13,7 +13,7 @@ Leia is a Go-native scripting language built for DSLs, dialects, and embedded au
 
 The goal is a small language core with specialized runtime backends. Supported
 columnar and numeric hot paths are benchmarked against handwritten Go baselines
-and external runtimes; performance claims stay tied to reproducible gates.
+and external runtimes. Performance claims are benchmark-bound. JIT paths must preserve VM/runtime semantics.
 
 ## Example
 
@@ -72,5 +72,3 @@ go run ./cmd/leia doc check
 - [Security](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
-
-No license has been selected in this repository yet.
