@@ -4998,6 +4998,107 @@ func TestQFrameSelectColumnRuntimeDescriptorCacheWarmHit(t *testing.T) {
 	assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 3)
 }
 
+func TestQFrameVectorRuntimeAdapterRecordsFrameErrorStats(t *testing.T) {
+	tests := []struct {
+		name    string
+		run     func(qFrameVectorRuntimeExecutionAdapter) error
+		wantErr string
+	}{
+		{
+			name: "bad frame",
+			run: func(adapter qFrameVectorRuntimeExecutionAdapter) error {
+				_, err := adapter.executeFrameColumn(runtime.IntValue(1), runtime.StringValue("price"), qTypedRuntimeExecutionRouteOpExit)
+				return err
+			},
+			wantErr: "FrameColumn operand must be native frame",
+		},
+		{
+			name: "bad column name",
+			run: func(adapter qFrameVectorRuntimeExecutionAdapter) error {
+				_, err := adapter.executeFrameColumn(runtime.TableValue(qHotPathTestFrame(t)), runtime.IntValue(1), qTypedRuntimeExecutionRouteOpExit)
+				return err
+			},
+			wantErr: "FrameColumn column name must be a string constant",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cf := &CompiledFunction{}
+			err := tt.run(cf.qFrameVectorRuntimeExecutionAdapter())
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("FrameColumn error = %v, want %q", err, tt.wantErr)
+			}
+			assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "FrameColumn", "column", "typed_runtime_op_exit", "error", 1)
+		})
+	}
+}
+
+func TestQFrameVectorRuntimeAdapterRecordsQFrameSelectColumnAndVectorReduceErrorStats(t *testing.T) {
+	t.Run("QFrameSelectColumn plan error", func(t *testing.T) {
+		constants := []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			runtime.IntValue(1),
+			runtime.StringValue("size"),
+		}
+		spec := QFrameSelectColumnSpec{
+			Shape:              "compare/filter/project/column",
+			SourceColumnConst:  0,
+			ProjectConst:       2,
+			ResultColumnConst:  3,
+			CompareOp:          runtime.DenseArrayGE,
+			DynamicArgRole:     QFrameSelectColumnArgNone,
+			CompareRHSConst:    constants[1],
+			HasCompareRHSConst: true,
+			MaskSpecConst:      -1,
+			RowOrderConst:      -1,
+			MaskRoot:           -1,
+			HasRowValueConst:   false,
+		}
+		cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
+		_, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQFrameSelectColumn(
+			constants,
+			0,
+			runtime.TableValue(qHotPathTestFrame(t)),
+			runtime.NilValue(),
+			false,
+			qTypedRuntimeExecutionRouteOpExit,
+		)
+		if err == nil {
+			t.Fatalf("QFrameSelectColumn plan error = nil, want error")
+		}
+		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "error", 1)
+	})
+
+	t.Run("VectorReduce non-dense", func(t *testing.T) {
+		cf := &CompiledFunction{}
+		_, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorReduce(
+			42,
+			int(runtime.DenseArrayReduceSum),
+			runtime.IntValue(10),
+			qTypedRuntimeExecutionRouteOpExit,
+		)
+		if err == nil || !strings.Contains(err.Error(), "VectorReduce operand must be dense array") {
+			t.Fatalf("VectorReduce non-dense error = %v, want operand error", err)
+		}
+		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", "typed_runtime_op_exit", "error", 1)
+	})
+
+	t.Run("VectorReduce bad op", func(t *testing.T) {
+		cf := &CompiledFunction{}
+		_, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorReduce(
+			43,
+			99,
+			runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1})),
+			qTypedRuntimeExecutionRouteOpExit,
+		)
+		if err == nil || !strings.Contains(err.Error(), runtime.ErrDenseArrayReduceOp.Error()) {
+			t.Fatalf("VectorReduce bad op error = %v, want reduce op error", err)
+		}
+		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", "typed_runtime_op_exit", "error", 1)
+	})
+}
+
 func TestQFrameSelectColumnPlannedRuntimeExecutesBoolColumnCombine(t *testing.T) {
 	boolMask := runtime.NewTable()
 	boolMask.RawSetString("column", runtime.StringValue("active"))
