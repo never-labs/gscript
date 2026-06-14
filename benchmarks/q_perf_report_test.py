@@ -55,6 +55,10 @@ BenchmarkRuntimePrimitiveRegistry/DenseArrayGather-16  100  800 ns/op  64 B/op  
 BenchmarkQFrameVectorMethodJITRoute/FrameVector-16    100  900 ns/op  96 B/op  3 allocs/op  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  3 methodjit_vector_runtime_success/op  1 methodjit_vector_runtime_errors/op
 """
 
+SAMPLE_DATA_RUNTIME = """
+BenchmarkQSessionEvalVectorWarmExecution/LinalgFacade-16  100  1100 ns/op  96 B/op  3 allocs/op  100.0 data_runtime_hit_pct  4 data_runtime_attempts/op  4 data_runtime_hits/op  0 data_runtime_fallbacks/op  0 data_runtime_errors/op  2 data_runtime_pipeline_shapes  2 linalg_vector_attempts/op  2 linalg_vector_hits/op  0 linalg_vector_fallbacks/op  0 linalg_vector_errors/op  2 linalg_matrix_attempts/op  2 linalg_matrix_hits/op  0 linalg_matrix_fallbacks/op  0 linalg_matrix_errors/op
+"""
+
 SAMPLE_QEVAL_FAMILY_COVERAGE = """
 BenchmarkQSessionEvalVectorWarmExecution/ListAdverbScan-16       100  2100 ns/op  128 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  1 typed_kernel_attempts/op  1 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  1 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_ordinary_list_adverb
 BenchmarkQEvalVectorGoBaseline/ListAdverbScan-16                 100  1900 ns/op  0 B/op  0 allocs/op
@@ -209,7 +213,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(coverage["current Leia vs old Leia"]["qSQL"], "covered")
 
     def test_runtime_metrics_structures_allocs_kernel_and_fallback_values(self):
-        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT + SAMPLE_ARRAY_BRIDGE)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT + SAMPLE_ARRAY_BRIDGE + SAMPLE_DATA_RUNTIME)
         metrics = {row.benchmark: row for row in report.build_runtime_metric_rows(rows)}
 
         qsql = metrics["BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject"]
@@ -238,6 +242,13 @@ class QPerfReportTest(unittest.TestCase):
         bridge = metrics["BenchmarkQEvalPipelineArrayRuntimeBridge/BulkI64Range"]
         self.assertEqual(bridge.q_array_bridge_bulk_hits_op, 1)
         self.assertEqual(bridge.q_array_bridge_fallbacks_op, 0)
+        data_runtime = metrics["BenchmarkQSessionEvalVectorWarmExecution/LinalgFacade"]
+        self.assertEqual(data_runtime.data_runtime_hit_pct, 100)
+        self.assertEqual(data_runtime.data_runtime_attempts_op, 4)
+        self.assertEqual(data_runtime.data_runtime_fallbacks_op, 0)
+        self.assertEqual(data_runtime.data_runtime_pipeline_shapes, 2)
+        self.assertEqual(data_runtime.linalg_vector_hits_op, 2)
+        self.assertEqual(data_runtime.linalg_matrix_hits_op, 2)
         self.assertEqual(bridge.q_array_bridge_errors_op, 0)
         self.assertEqual(bridge.q_array_bridge_rows_op, 8192)
 
@@ -268,7 +279,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["error"].calls_per_op, 0)
 
     def test_runtime_observability_summary_rolls_up_pipeline_primitive_and_jit(self):
-        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE + SAMPLE_ARRAY_BRIDGE)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE + SAMPLE_ARRAY_BRIDGE + SAMPLE_DATA_RUNTIME)
         summary = {row.layer: row for row in report.build_runtime_observability_summary(rows)}
 
         self.assertEqual(summary["qsql_kernel"].benchmark_count, 2)
@@ -289,6 +300,27 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(summary["methodjit_array_bridge"].hits_op, 2)
         self.assertEqual(summary["methodjit_array_bridge"].fallbacks_op, 1)
         self.assertAlmostEqual(summary["methodjit_array_bridge"].hit_pct, 100 * 2 / 3)
+        self.assertEqual(summary["data_runtime"].attempts_op, 4)
+        self.assertEqual(summary["data_runtime"].hits_op, 4)
+        self.assertEqual(summary["data_runtime"].hit_pct, 100)
+        self.assertEqual(summary["data_runtime"].shapes, 2)
+        self.assertEqual(summary["linalg_vector"].hits_op, 2)
+        self.assertEqual(summary["linalg_matrix"].hits_op, 2)
+
+    def test_data_runtime_metrics_are_report_only_not_gate_signals(self):
+        rows = report.parse_go_benchmarks(SAMPLE_DATA_RUNTIME)
+        checks = report.runtime_gate_checks(
+            rows,
+            report.GatePolicy(
+                max_leia_go_ratio=5,
+                min_typed_hit_pct=95,
+                max_typed_fallbacks_op=0,
+                max_pipeline_fallback_shapes=0,
+                max_allocs_op=64,
+            ),
+        )
+
+        self.assertFalse(any(check.signal.startswith(("data_runtime", "linalg_")) for check in checks))
 
     def test_runtime_health_summary_combines_jit_fallback_and_alloc_pressure(self):
         rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_WITH_FALLBACK + SAMPLE_JIT_SLOW_ROUTE)
@@ -1279,6 +1311,7 @@ BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op
             self.assertIn("q_eval_case_diagnostics", payload)
             self.assertEqual(payload["q_eval_case_diagnostics"][0]["case"], "MaskWhere")
             self.assertIn("runtime_metrics", payload)
+            self.assertIn("data_runtime_hit_pct", payload["runtime_metrics"][0])
             self.assertIn("jit_route_summary", payload)
             self.assertEqual(payload["jit_route_summary"][0]["route"], "direct_return")
             self.assertIn("runtime_observability_summary", payload)
@@ -1300,6 +1333,7 @@ BenchmarkQEvalJITScriptWarm/TypeMatrixShortNull-16               100  1700 ns/op
             self.assertIn("Gate Summary", markdown)
             self.assertIn("q.eval Case Diagnostics", markdown)
             self.assertIn("JIT Typed Runtime Routes", markdown)
+            self.assertIn("data_runtime_attempts/op", markdown)
             self.assertIn("Runtime Observability Summary", markdown)
             self.assertIn("Runtime Health Summary", markdown)
             self.assertIn("Runtime Bridge Efficiency", markdown)

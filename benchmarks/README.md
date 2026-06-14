@@ -206,6 +206,7 @@ Read the q performance baseline through these ratios:
 | Current Leia vs hand-written Go | compare `BenchmarkQSQLBind...` rows with `BenchmarkQSQLNativeGo...` rows for qSQL; compare `BenchmarkQSessionEvalVectorWarmExecution/...` with `BenchmarkQEvalVectorGoBaseline/...` for ordinary q compute |
 | Warm vs cold | compare `BenchmarkQSQLBindRunSQLWarmCache...` with `BenchmarkQSQLBindRunSQLColdCache...` |
 | Typed kernel hit/fallback rate | use `kernel_hit_pct`, `template_hit_pct`, `aligned_hit_pct`, and `fallbacks/op` in bind benchmark output; use `typed_kernel_hit_pct` and `typed_kernel_fallbacks/op` in ordinary q session rows |
+| Shared data runtime coverage | use `data_runtime_*` and `linalg_vector_*`/`linalg_matrix_*` report fields when benchmark rows exercise shared data-runtime kernels; these are report-only by default |
 | JIT q.session route health | use `q_session_planned_op_exit/op`, `q_session_shell_fallback/op`, `q_session_eval_errors/op`, and `q_session_backend_shapes` on `BenchmarkQEvalJITScriptWarm` rows |
 | Allocation pressure | use `B/op` and `allocs/op`; q columnar hot paths should trend toward low per-row allocation |
 
@@ -219,7 +220,10 @@ python3 benchmarks/q_perf_report.py --benchtime=100x
 The report writes `benchmarks/data/q_perf_report_latest.md` and
 `benchmarks/data/q_perf_report_latest.json`, including Leia-vs-Go ratios,
 warm/cold ratios, typed kernel hit/fallback counters, allocation metrics, and
-fallback shape summary rows. For the JIT-script layer it records the
+fallback shape summary rows. Shared data-runtime counters such as
+`data_runtime_attempts/op`, `data_runtime_hits/op`, `linalg_vector_hits/op`, and
+`linalg_matrix_hits/op` are surfaced as report-only observability signals. For
+the JIT-script layer it records the
 `q_session_planned_op_exit/op`, `q_session_shell_fallback/op`,
 `q_session_eval_errors/op`, and `q_session_backend_shapes` counters emitted by
 `BenchmarkQEvalJITScriptWarm`.

@@ -179,6 +179,20 @@ class RuntimeMetricRow:
     typed_kernel_errors_op: float | None
     typed_pipeline_shapes: float | None
     typed_pipeline_fallback_shapes: float | None
+    data_runtime_hit_pct: float | None
+    data_runtime_attempts_op: float | None
+    data_runtime_hits_op: float | None
+    data_runtime_fallbacks_op: float | None
+    data_runtime_errors_op: float | None
+    data_runtime_pipeline_shapes: float | None
+    linalg_vector_attempts_op: float | None
+    linalg_vector_hits_op: float | None
+    linalg_vector_fallbacks_op: float | None
+    linalg_vector_errors_op: float | None
+    linalg_matrix_attempts_op: float | None
+    linalg_matrix_hits_op: float | None
+    linalg_matrix_fallbacks_op: float | None
+    linalg_matrix_errors_op: float | None
     jit_typed_direct_return_op: float | None
     jit_typed_native_exit_op: float | None
     jit_typed_op_exit_op: float | None
@@ -657,6 +671,20 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 typed_kernel_errors_op=metrics.get("typed_kernel_errors/op"),
                 typed_pipeline_shapes=metrics.get("typed_pipeline_shapes"),
                 typed_pipeline_fallback_shapes=metrics.get("typed_pipeline_fallback_shapes"),
+                data_runtime_hit_pct=metrics.get("data_runtime_hit_pct"),
+                data_runtime_attempts_op=metrics.get("data_runtime_attempts/op"),
+                data_runtime_hits_op=metrics.get("data_runtime_hits/op"),
+                data_runtime_fallbacks_op=metrics.get("data_runtime_fallbacks/op"),
+                data_runtime_errors_op=metrics.get("data_runtime_errors/op"),
+                data_runtime_pipeline_shapes=metrics.get("data_runtime_pipeline_shapes"),
+                linalg_vector_attempts_op=metrics.get("linalg_vector_attempts/op"),
+                linalg_vector_hits_op=metrics.get("linalg_vector_hits/op"),
+                linalg_vector_fallbacks_op=metrics.get("linalg_vector_fallbacks/op"),
+                linalg_vector_errors_op=metrics.get("linalg_vector_errors/op"),
+                linalg_matrix_attempts_op=metrics.get("linalg_matrix_attempts/op"),
+                linalg_matrix_hits_op=metrics.get("linalg_matrix_hits/op"),
+                linalg_matrix_fallbacks_op=metrics.get("linalg_matrix_fallbacks/op"),
+                linalg_matrix_errors_op=metrics.get("linalg_matrix_errors/op"),
                 jit_typed_direct_return_op=metrics.get("jit_typed_direct_return/op"),
                 jit_typed_native_exit_op=metrics.get("jit_typed_native_exit/op"),
                 jit_typed_op_exit_op=metrics.get("jit_typed_op_exit/op"),
@@ -778,6 +806,47 @@ def build_runtime_observability_summary(rows: dict[str, BenchRow]) -> list[Runti
                 shapes=shapes,
                 fallback_shapes=fallback_shapes,
                 note="recognized q expression pipeline shapes and shapes that still fell back",
+            )
+        )
+
+    data_runtime_rows = [row for row in runtime_rows if row.data_runtime_attempts_op is not None]
+    if data_runtime_rows:
+        attempts = sum(row.data_runtime_attempts_op or 0.0 for row in data_runtime_rows)
+        hits = sum(row.data_runtime_hits_op or 0.0 for row in data_runtime_rows)
+        fallbacks = sum(row.data_runtime_fallbacks_op or 0.0 for row in data_runtime_rows)
+        errors = sum(row.data_runtime_errors_op or 0.0 for row in data_runtime_rows)
+        out.append(
+            RuntimeObservabilityRow(
+                layer="data_runtime",
+                benchmark_count=len(data_runtime_rows),
+                attempts_op=attempts,
+                hits_op=hits,
+                fallbacks_op=fallbacks,
+                errors_op=errors,
+                hit_pct=(100 * hits / attempts) if attempts > 0 else None,
+                shapes=sum(row.data_runtime_pipeline_shapes or 0.0 for row in data_runtime_rows),
+                note="shared data-runtime typed kernels, reported separately from q typed primitive gates",
+            )
+        )
+
+    for layer, prefix in (("linalg_vector", "linalg_vector"), ("linalg_matrix", "linalg_matrix")):
+        layer_rows = [row for row in runtime_rows if getattr(row, f"{prefix}_attempts_op") is not None]
+        if not layer_rows:
+            continue
+        attempts = sum(getattr(row, f"{prefix}_attempts_op") or 0.0 for row in layer_rows)
+        hits = sum(getattr(row, f"{prefix}_hits_op") or 0.0 for row in layer_rows)
+        fallbacks = sum(getattr(row, f"{prefix}_fallbacks_op") or 0.0 for row in layer_rows)
+        errors = sum(getattr(row, f"{prefix}_errors_op") or 0.0 for row in layer_rows)
+        out.append(
+            RuntimeObservabilityRow(
+                layer=layer,
+                benchmark_count=len(layer_rows),
+                attempts_op=attempts,
+                hits_op=hits,
+                fallbacks_op=fallbacks,
+                errors_op=errors,
+                hit_pct=(100 * hits / attempts) if attempts > 0 else None,
+                note="linalg data-runtime family; report-only until dedicated scientific gates are enabled",
             )
         )
 
@@ -2844,8 +2913,8 @@ def markdown_report(
             "",
             "## Runtime Metrics",
             "",
-            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes | jit_typed_direct_return/op | jit_typed_native_exit/op | jit_typed_op_exit/op | jit_typed_kernel_success/op | jit_typed_kernel_errors/op | jit_typed_pipeline_shapes | q_session_planned_op_exit/op | q_session_shell_fallback/op | q_session_eval_errors/op | q_session_backend_shapes |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| Benchmark | ns/op | B/op | allocs/op | kernel_hit_pct | fallbacks/op | typed_kernel_hit_pct | typed_kernel_attempts/op | typed_kernel_fallbacks/op | typed_kernel_errors/op | typed_pipeline_shapes | typed_pipeline_fallback_shapes | data_runtime_hit_pct | data_runtime_attempts/op | data_runtime_fallbacks/op | data_runtime_errors/op | data_runtime_pipeline_shapes | linalg_vector_hits/op | linalg_matrix_hits/op | jit_typed_direct_return/op | jit_typed_native_exit/op | jit_typed_op_exit/op | jit_typed_kernel_success/op | jit_typed_kernel_errors/op | jit_typed_pipeline_shapes | q_session_planned_op_exit/op | q_session_shell_fallback/op | q_session_eval_errors/op | q_session_backend_shapes |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for item in runtime_metrics:
@@ -2861,6 +2930,13 @@ def markdown_report(
             f"{format_metric(item.typed_kernel_errors_op, 3)} | "
             f"{format_metric(item.typed_pipeline_shapes, 0)} | "
             f"{format_metric(item.typed_pipeline_fallback_shapes, 0)} | "
+            f"{format_metric(item.data_runtime_hit_pct, 1)} | "
+            f"{format_metric(item.data_runtime_attempts_op, 3)} | "
+            f"{format_metric(item.data_runtime_fallbacks_op, 3)} | "
+            f"{format_metric(item.data_runtime_errors_op, 3)} | "
+            f"{format_metric(item.data_runtime_pipeline_shapes, 0)} | "
+            f"{format_metric(item.linalg_vector_hits_op, 3)} | "
+            f"{format_metric(item.linalg_matrix_hits_op, 3)} | "
             f"{format_metric(item.jit_typed_direct_return_op, 3)} | "
             f"{format_metric(item.jit_typed_native_exit_op, 3)} | "
             f"{format_metric(item.jit_typed_op_exit_op, 3)} | "

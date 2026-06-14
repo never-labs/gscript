@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/leia/internal/stdlib/bind"
+	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 	stdq "github.com/never-labs/leia/internal/stdlib/lib/q"
 )
 
@@ -4847,6 +4848,7 @@ func TestQEvalVectorListStringBooleanFallbackCharacterization(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			stdq.ClearRuntimeKernelExecutionStats()
+			stddata.ClearRuntimeKernelExecutionStats()
 			got := qEvalVectorRun(t, eval, tc.src)
 			if got != tc.want {
 				t.Fatalf("q.eval checksum = %d, want %d", got, tc.want)
@@ -4856,6 +4858,7 @@ func TestQEvalVectorListStringBooleanFallbackCharacterization(t *testing.T) {
 		})
 	}
 	stdq.ClearRuntimeKernelExecutionStats()
+	stddata.ClearRuntimeKernelExecutionStats()
 
 	if fallbacks["sublist"] != 0 || fallbacks["cut"] != 0 || fallbacks["cross"] != 0 || fallbacks["where"] != 0 {
 		t.Fatalf("unexpected split primitive fallback counts: %#v", fallbacks)
@@ -5185,6 +5188,7 @@ func BenchmarkQSessionEvalVectorWarmExecution(b *testing.B) {
 			src := tc.expr(qEvalVectorRows)
 			qEvalVectorBenchSink = qEvalVectorRun(b, eval, src)
 			stdq.ClearRuntimeKernelExecutionStats()
+			stddata.ClearRuntimeKernelExecutionStats()
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -5317,6 +5321,63 @@ func qEvalVectorReportRuntimeKernelStats(b *testing.B) {
 		b.ReportMetric(float64(len(pipelineShapes)), "typed_pipeline_shapes")
 		b.ReportMetric(float64(len(fallbackPipelineShapes)), "typed_pipeline_fallback_shapes")
 	}
+	qEvalVectorReportDataRuntimeKernelStats(b)
+}
+
+func qEvalVectorReportDataRuntimeKernelStats(b *testing.B) {
+	b.Helper()
+	var attempts, hits, fallbacks, errors uint64
+	pipelineShapes := map[string]struct{}{}
+	type pipelineCounters struct {
+		attempts, hits, fallbacks, errors uint64
+	}
+	pipelineCounts := map[string]*pipelineCounters{}
+	for _, stat := range stddata.RuntimeKernelExecutionStats() {
+		if stat.PipelineShape != "" {
+			pipelineShapes[stat.PipelineShape] = struct{}{}
+		}
+		if _, ok := pipelineCounts[stat.PipelineShape]; !ok {
+			pipelineCounts[stat.PipelineShape] = &pipelineCounters{}
+		}
+		counter := pipelineCounts[stat.PipelineShape]
+		switch stat.Outcome {
+		case "attempt":
+			attempts += stat.Count
+			counter.attempts += stat.Count
+		case "hit", "success":
+			hits += stat.Count
+			counter.hits += stat.Count
+		case "fallback":
+			fallbacks += stat.Count
+			counter.fallbacks += stat.Count
+		case "error":
+			errors += stat.Count
+			counter.errors += stat.Count
+		}
+	}
+	if attempts == 0 && hits == 0 && fallbacks == 0 && errors == 0 {
+		return
+	}
+	if attempts > 0 {
+		b.ReportMetric(100*float64(hits)/float64(attempts), "data_runtime_hit_pct")
+	}
+	if b.N > 0 {
+		b.ReportMetric(float64(attempts)/float64(b.N), "data_runtime_attempts/op")
+		b.ReportMetric(float64(hits)/float64(b.N), "data_runtime_hits/op")
+		b.ReportMetric(float64(fallbacks)/float64(b.N), "data_runtime_fallbacks/op")
+		b.ReportMetric(float64(errors)/float64(b.N), "data_runtime_errors/op")
+		b.ReportMetric(float64(len(pipelineShapes)), "data_runtime_pipeline_shapes")
+		for _, shape := range []string{"linalg_vector", "linalg_matrix"} {
+			counter := pipelineCounts[shape]
+			if counter == nil {
+				continue
+			}
+			b.ReportMetric(float64(counter.attempts)/float64(b.N), shape+"_attempts/op")
+			b.ReportMetric(float64(counter.hits)/float64(b.N), shape+"_hits/op")
+			b.ReportMetric(float64(counter.fallbacks)/float64(b.N), shape+"_fallbacks/op")
+			b.ReportMetric(float64(counter.errors)/float64(b.N), shape+"_errors/op")
+		}
+	}
 }
 
 func qEvalVectorRuntimeFallbackCount() uint64 {
@@ -5370,6 +5431,7 @@ func qEvalVectorRuntimeFallbackReportForCases(tb testing.TB, eval *bind.GoFuncti
 			report.categories[category] = struct{}{}
 		}
 		stdq.ClearRuntimeKernelExecutionStats()
+		stddata.ClearRuntimeKernelExecutionStats()
 		qEvalVectorBenchSink = qEvalVectorRun(tb, eval, tc.expr(rows))
 		report.caseCount++
 		for _, stat := range stdq.RuntimeKernelExecutionStats() {
@@ -5390,6 +5452,7 @@ func qEvalVectorRuntimeFallbackReportForCases(tb testing.TB, eval *bind.GoFuncti
 		}
 	}
 	stdq.ClearRuntimeKernelExecutionStats()
+	stddata.ClearRuntimeKernelExecutionStats()
 	return report
 }
 
