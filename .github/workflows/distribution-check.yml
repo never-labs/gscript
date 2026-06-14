@@ -5,8 +5,18 @@ on:
     paths:
       - .github/workflows/release.yml
       - .github/workflows/distribution-check.yml
+      - .github/workflows/pages.yml
+      - docs/_config.yml
+      - docs/release/**
+      - docs/reference/platforms/index.md
+      - README.md
+      - SECURITY.md
+      - LICENSE
       - .goreleaser.yaml
       - scripts/install.sh
+      - scripts/production_check.sh
+      - scripts/public_release_blockers_check.sh
+      - scripts/release_notes_check.sh
       - scripts/release_distribution_check.sh
       - scripts/release_artifacts*.sh
       - go.mod
@@ -32,5 +42,6 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
+      - run: '"$(go env GOPATH)/bin/goreleaser" --version'
       - run: bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
-      - run: goreleaser release --snapshot --clean --skip=publish
+      - run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'

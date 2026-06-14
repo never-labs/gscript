@@ -1,6 +1,6 @@
 # Leia Standard Library Inventory
 
-Generated from `internal/stdlib/catalog`, the code-owned standard-library metadata.
+This inventory is generated from the standard-library metadata used by the current `leia` binary.
 
 | Layer | Module | Description | Safe default | Capabilities |
 |---|---|---|---|---|

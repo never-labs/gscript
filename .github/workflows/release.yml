@@ -34,9 +34,16 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: tools/tree-sitter-leia/package-lock.json
+      - if: github.ref_type == 'tag'
+        run: |
+          if ! [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "release tags must match vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
       - run: sudo apt-get update && sudo apt-get install -y luajit
       - run: npm ci --prefix tools/tree-sitter-leia
       - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
+      - run: '"$(go env GOPATH)/bin/goreleaser" --version'
       - run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             export LEIA_RELEASE_REQUIRE_TAG=1
@@ -44,6 +51,6 @@ jobs:
           fi
           go run ./cmd/leia ci release
       - if: github.event_name == 'workflow_dispatch'
-        run: goreleaser release --snapshot --clean --skip=publish
+        run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
       - if: github.event_name == 'push'
-        run: goreleaser release --clean
+        run: '"$(go env GOPATH)/bin/goreleaser" release --clean'

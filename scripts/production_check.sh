@@ -93,6 +93,7 @@ RELEASE_CRITICAL_SKIP_NAMES=(
     "CLI Experience"
     "Public Release Blockers"
     "Release Distribution"
+    "Release Notes"
     "Release Artifacts"
 )
 
@@ -358,6 +359,18 @@ add_release_artifacts_gate() {
     add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh"
 }
 
+add_release_notes_gate() {
+    if [ ! -f scripts/release_notes_check.sh ]; then
+        add_skip "Release Notes" "missing scripts/release_notes_check.sh"
+        return
+    fi
+    if [ "$RELEASE_PROFILE" -eq 1 ] && [ -n "${LEIA_RELEASE_REQUIRE_TAG:-}" ]; then
+        add_run "Release Notes" "notes_version=\"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"; bash scripts/release_notes_check.sh --require-ready --version \"\$notes_version\""
+        return
+    fi
+    add_run "Release Notes" "bash scripts/release_notes_check.sh"
+}
+
 add_public_release_blockers_gate() {
     if [ ! -f scripts/public_release_blockers_check.sh ]; then
         add_skip "Public Release Blockers" "missing scripts/public_release_blockers_check.sh"
@@ -522,6 +535,7 @@ build_full_plan() {
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
         add_public_release_blockers_gate
         add_release_distribution_gate
+        add_release_notes_gate
         add_release_artifacts_gate
     fi
 }

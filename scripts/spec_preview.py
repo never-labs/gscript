@@ -182,7 +182,11 @@ def slug(text: str) -> str:
 def inline_markdown(text: str) -> str:
     text = escape(text)
     text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r'<a href="#">\1</a>', text)
+    text = re.sub(
+        r"\[([^\]]+)\]\(([^)]+)\)",
+        lambda match: f'<a href="{escape(match.group(2), quote=True)}">{match.group(1)}</a>',
+        text,
+    )
     return text
 
 

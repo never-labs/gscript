@@ -96,5 +96,6 @@ Do not cut a public release until these repository-level decisions are complete:
 - state tested platforms and execution modes;
 - run release evidence on the target platforms;
 - fill out `docs/release/notes-template.md` for the candidate;
+- commit the candidate notes at `docs/release/notes/vX.Y.Z.md`;
 - document any experimental language, stdlib, AI, package, or JIT behavior that
   is intentionally outside the compatibility promise.

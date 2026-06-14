@@ -56,12 +56,13 @@ bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
 bash scripts/public_release_blockers_check.sh --require-resolved
 bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
-bash scripts/release_artifacts_check.sh --build --require-clean
+bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z
+bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z
 ```
 
 ## Known Issues
 
-- 
+List known issues, or write `None known` after release validation.
 
 ## Checksums And Artifacts
 

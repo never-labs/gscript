@@ -308,7 +308,8 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
 	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
-	strictReleaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build --require-clean"
+	releaseNotesCmd := "bash scripts/release_notes_check.sh --require-ready --version vX.Y.Z"
+	strictReleaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version vX.Y.Z"
 
 	for _, item := range []struct {
 		path     string
@@ -348,7 +349,9 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				fullPerfGateCmd,
 				publicReleaseBlockersCmd,
 				releaseDistributionCmd,
+				releaseNotesCmd,
 				strictReleaseArtifactsCmd,
+				"List known issues, or write `None known` after release validation.",
 			},
 		},
 		{
@@ -413,6 +416,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 		`"Q Conformance Gate"`,
 		`"Public Release Blockers"`,
 		`"Release Distribution"`,
+		`"Release Notes"`,
 		`"Release Artifacts"`,
 	} {
 		if !strings.Contains(criticalList, critical) {
@@ -774,9 +778,15 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			path: ".github/workflows/distribution-check.yml",
 			snippets: []string{
 				"name: Distribution Check",
+				".github/workflows/pages.yml",
+				"docs/_config.yml",
+				"scripts/production_check.sh",
+				"scripts/public_release_blockers_check.sh",
+				"scripts/release_notes_check.sh",
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
+				`"$(go env GOPATH)/bin/goreleaser" --version`,
 				"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
-				"goreleaser release --snapshot --clean --skip=publish",
+				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
 			},
 		},
 		{
@@ -785,10 +795,12 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"name: Release",
 				"go run ./cmd/leia ci release",
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
+				"release tags must match vMAJOR.MINOR.PATCH",
+				`"$(go env GOPATH)/bin/goreleaser" --version`,
 				"LEIA_RELEASE_REQUIRE_TAG=1",
 				"LEIA_RELEASE_ARTIFACT_VERSION=\"${GITHUB_REF_NAME}\"",
-				"goreleaser release --snapshot --clean --skip=publish",
-				"goreleaser release --clean",
+				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
+				`"$(go env GOPATH)/bin/goreleaser" release --clean`,
 				"secrets.GITHUB_TOKEN",
 			},
 		},
@@ -991,6 +1003,7 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		{path: "scripts/production_check.sh", snippet: "RELEASE_CRITICAL_SKIP_NAMES"},
 		{path: "scripts/production_check.sh", snippet: "Release profile requires these checks to run instead of skip:"},
 		{path: "scripts/public_release_blockers_check.sh", snippet: "--require-resolved"},
+		{path: "scripts/release_notes_check.sh", snippet: "--require-ready"},
 		{path: "scripts/release_artifacts_check.sh", snippet: "Default mode runs a dry-run"},
 	} {
 		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))

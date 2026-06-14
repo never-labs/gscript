@@ -31,6 +31,7 @@ The repository-script mention check covers:
   scripts/docs_check.sh
   scripts/editor_check.sh
   scripts/public_release_blockers_check.sh
+  scripts/release_notes_check.sh
   scripts/release_artifacts.sh
   scripts/release_artifacts_check.sh
   scripts/release_distribution_check.sh
@@ -137,6 +138,7 @@ script_names = {
     "docs_check": root / "scripts" / "docs_check.sh",
     "editor_check": root / "scripts" / "editor_check.sh",
     "public_release_blockers_check": root / "scripts" / "public_release_blockers_check.sh",
+    "release_notes_check": root / "scripts" / "release_notes_check.sh",
     "release_artifacts": root / "scripts" / "release_artifacts.sh",
     "release_artifacts_check": root / "scripts" / "release_artifacts_check.sh",
     "release_distribution_check": root / "scripts" / "release_distribution_check.sh",

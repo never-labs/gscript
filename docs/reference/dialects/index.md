@@ -127,14 +127,14 @@ reviewer := agent {
 | `turn` | `(result, err)` for a single LLM provider request. |
 | `agent` | Callable agent value. |
 
-## Examples And Gates
+## Examples
 
 ```bash
 go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia
 go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 ```
 
-The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. It is tracked by the feature matrix so published dialect coverage stays tied to executable evidence.
+The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. The focused examples below show the same dialect surface in smaller programs.
 
 Additional focused evidence lives in:
 
