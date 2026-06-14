@@ -1,6 +1,6 @@
 # Leia
 
-Leia is a Go-native embedded scripting language with JIT execution, q-style in-memory analytics, and first-class extensible dialects.
+Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.
 
 - Go-native: small host API, Go-shaped syntax, and direct embedding in Go
   services.
