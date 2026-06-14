@@ -8,14 +8,6 @@ import (
 	"github.com/never-labs/leia/internal/runtime"
 )
 
-type qTypedRuntimeExecutionRoute string
-
-const (
-	qTypedRuntimeExecutionRouteOpExit       qTypedRuntimeExecutionRoute = "typed_runtime_op_exit"
-	qTypedRuntimeExecutionRouteNativeExit   qTypedRuntimeExecutionRoute = "typed_runtime_native_exit"
-	qTypedRuntimeExecutionRouteDirectHelper qTypedRuntimeExecutionRoute = "typed_runtime_direct_helper"
-)
-
 const (
 	qFrameRuntimeExecutionSource  = "methodjit_q_frame_runtime"
 	qVectorRuntimeExecutionSource = "methodjit_q_vector_runtime"

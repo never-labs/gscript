@@ -155,6 +155,42 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 			return
 		}
 		ctx.HelperErrFlag = 0
+	case OpQVectorWhereReduce:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		tempBase := base + int(ctx.OpExitArg1)
+		nArgs := int(ctx.OpExitArg2)
+		if slot < 0 || slot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: QVectorWhereReduce register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQVectorWhereReduce(
+			int(ctx.OpExitID),
+			int(ctx.OpExitAux),
+			regs[tempBase],
+			regs[tempBase+1],
+			regs[tempBase+2],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
 	default:
 		ctx.HelperErr = fmt.Errorf("tier2: direct helper: unsupported op %v", Op(ctx.OpExitOp))
 		ctx.HelperErrFlag = 1

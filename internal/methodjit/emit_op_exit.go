@@ -177,6 +177,8 @@ func (ec *emitContext) emitConcatExit(instr *Instr) {
 	asm.LoadImm64(jit.X0, int64(instr.ID))
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
+	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
+
 	ec.emitSetResumeNumericPass()
 	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
@@ -186,7 +188,6 @@ func (ec *emitContext) emitConcatExit(instr *Instr) {
 		asm.B("deopt_epilogue")
 	}
 
-	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 	asm.Label(continueLabel)
 
 	ec.emitReloadAllActiveRegs()
@@ -253,6 +254,30 @@ func (ec *emitContext) emitVectorWhereExit(instr *Instr) {
 	asm.LoadImm64(jit.X0, int64(instr.ID))
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
+	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
+
+	if tier2AltStackEnabled() && ec.selfCFCell != nil {
+		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_vector_helper_err_%d", instr.ID))
+		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_vector_helper_exit_%d", instr.ID))
+		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)
+		asm.CBZ(jit.X0, genericExitLabel)
+		ec.emitDirectHelperSelfCF()
+		asm.LoadImm64(jit.X16, int64(jit.JITHelperEntryPC()))
+		asm.BLR(jit.X16)
+		asm.LDR(jit.X16, mRegCtx, execCtxOffHelperErrFlag)
+		asm.CBNZ(jit.X16, helperErrLabel)
+		asm.B(continueLabel)
+		asm.Label(helperErrLabel)
+		asm.LoadImm64(jit.X0, int64(ExitQEvalHelperErr))
+		asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
+		if ec.numericMode {
+			asm.B("num_deopt_epilogue")
+		} else {
+			asm.B("deopt_epilogue")
+		}
+		asm.Label(genericExitLabel)
+	}
+
 	ec.emitSetResumeNumericPass()
 	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
@@ -262,7 +287,6 @@ func (ec *emitContext) emitVectorWhereExit(instr *Instr) {
 		asm.B("deopt_epilogue")
 	}
 
-	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 	asm.Label(continueLabel)
 
 	ec.emitReloadAllActiveRegs()

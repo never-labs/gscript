@@ -87,3 +87,29 @@ func TestQEvalPipelinePlanExecutionShapeUsesPlanRefShape(t *testing.T) {
 		t.Fatalf("qEvalPipelinePlanExecutionShape for missing ref = %q, want fallback", got)
 	}
 }
+
+func TestQVectorWhereReduceCallpathContracts(t *testing.T) {
+	spec, ok := OpQVectorWhereReduce.Spec()
+	if !ok {
+		t.Fatalf("OpQVectorWhereReduce has no OpSpec")
+	}
+	if spec.Name != "QVectorWhereReduce" ||
+		spec.EmitterFamily != OpEmitterTable ||
+		spec.ArgPolicy != OpArgFixedAux ||
+		!spec.ArgCount.Set ||
+		spec.ArgCount.Min != 3 ||
+		spec.ArgCount.Max != 3 ||
+		spec.SideEffect != OpSideEffectRead {
+		t.Fatalf("OpQVectorWhereReduce spec = %+v, want three-arg read-side typed runtime op", spec)
+	}
+
+	source, kernel, shape, route, ok := qRuntimePrimitiveExecutionMetadata(OpQVectorWhereReduce)
+	if !ok ||
+		source != "methodjit_q_vector_runtime" ||
+		kernel != "QVectorWhereReduce" ||
+		shape != "compare/vector-where/vector-reduce" ||
+		route != string(qTypedRuntimeExecutionRouteOpExit) {
+		t.Fatalf("qRuntimePrimitiveExecutionMetadata(OpQVectorWhereReduce) = %q/%q/%q/%q/%v, want q vector typed runtime op-exit metadata",
+			source, kernel, shape, route, ok)
+	}
+}

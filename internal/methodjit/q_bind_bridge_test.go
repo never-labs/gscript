@@ -2,7 +2,9 @@ package methodjit
 
 import (
 	"testing"
+	"unsafe"
 
+	"github.com/never-labs/leia/internal/jit"
 	"github.com/never-labs/leia/internal/runtime"
 	qbind "github.com/never-labs/leia/internal/stdlib/bind"
 	"github.com/never-labs/leia/internal/vm"
@@ -350,6 +352,42 @@ func BenchmarkQFrameVectorMethodJITRoute(b *testing.B) {
 	}
 	b.StopTimer()
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, cf.QKernelExecutionStats())
+}
+
+func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
+	cf := &CompiledFunction{
+		QVectorRuntimeKernelShapesByID: map[int]string{
+			42: "mask-combine/vector-where/vector-reduce",
+		},
+	}
+	regs := make([]runtime.Value, 5)
+	const base = 1
+	regs[base+1] = runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true, false}))
+	regs[base+2] = runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30, 40}))
+	regs[base+3] = runtime.IntValue(0)
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQVectorWhereReduce),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 3,
+		OpExitAux:  int64(runtime.DenseArrayReduceSum),
+		OpExitID:   42,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QVectorWhereReduce error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := regs[base]; !got.IsInt() || got.Int() != 40 {
+		t.Fatalf("QVectorWhereReduce direct helper result = %v, want int 40", got)
+	}
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "mask-combine/vector-where/vector-reduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 }
 
 func qMethodJITBridgeFrame(t testing.TB) *runtime.Table {

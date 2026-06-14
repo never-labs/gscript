@@ -1,7 +1,15 @@
 package methodjit
 
+type qTypedRuntimeExecutionRoute string
+
+const (
+	qTypedRuntimeExecutionRouteOpExit       qTypedRuntimeExecutionRoute = "typed_runtime_op_exit"
+	qTypedRuntimeExecutionRouteNativeExit   qTypedRuntimeExecutionRoute = "typed_runtime_native_exit"
+	qTypedRuntimeExecutionRouteDirectHelper qTypedRuntimeExecutionRoute = "typed_runtime_direct_helper"
+)
+
 func qRuntimePrimitiveExecutionMetadata(op Op) (source, kernel, shape, route string, ok bool) {
-	route = "typed_runtime_op_exit"
+	route = string(qTypedRuntimeExecutionRouteOpExit)
 	switch op {
 	case OpFrameLen:
 		return "methodjit_q_frame_runtime", "FrameLen", "len", route, true
@@ -41,6 +49,8 @@ func qRuntimePrimitiveExecutionMetadata(op Op) (source, kernel, shape, route str
 		return "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", route, true
 	case OpQVectorGatherReduce:
 		return "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", route, true
+	case OpQVectorWhereReduce:
+		return "methodjit_q_vector_runtime", "QVectorWhereReduce", "compare/vector-where/vector-reduce", route, true
 	case OpQEvalPipelinePlan:
 		return "methodjit_q_eval_runtime", "QEvalPipelinePlan", "q-eval/pipeline-plan", route, true
 	case OpQSQLKernelPlan:
