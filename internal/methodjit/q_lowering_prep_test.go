@@ -4951,6 +4951,53 @@ func TestQFrameSelectColumnRuntimePlanCachesBySchema(t *testing.T) {
 	assertQKernelDescriptorCacheStat(t, publicStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", qFrameSelectColumnPlanCacheRoute, "q-hot-path-string-test", 1, 0, 1, 0)
 }
 
+func TestQFrameSelectColumnRuntimeDescriptorCacheWarmHit(t *testing.T) {
+	constants := []runtime.Value{
+		runtime.StringValue("price"),
+		runtime.FloatValue(100),
+		qHotPathNamesValue("size"),
+		runtime.StringValue("size"),
+	}
+	spec := QFrameSelectColumnSpec{
+		Shape:              "compare/filter/project/column",
+		SourceColumnConst:  0,
+		ProjectConst:       2,
+		ResultColumnConst:  3,
+		CompareOp:          runtime.DenseArrayGE,
+		DynamicArgRole:     QFrameSelectColumnArgNone,
+		CompareRHSConst:    constants[1],
+		HasCompareRHSConst: true,
+		MaskSpecConst:      -1,
+		RowOrderConst:      -1,
+		MaskRoot:           -1,
+		HasRowValueConst:   false,
+	}
+	cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
+	adapter := cf.qFrameVectorRuntimeExecutionAdapter()
+	frame := runtime.TableValue(qHotPathTestFrame(t))
+	otherFrame := runtime.TableValue(qHotPathSameColumnsFrame(t, "q-hot-path-test-alt"))
+
+	for i := 0; i < 2; i++ {
+		out, err := adapter.executeQFrameSelectColumn(constants, 0, frame, runtime.NilValue(), false, qTypedRuntimeExecutionRouteOpExit)
+		if err != nil {
+			t.Fatalf("execute QFrameSelectColumn warm run %d: %v", i, err)
+		}
+		got, ok := out.DenseArray().I64()
+		if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
+			t.Fatalf("QFrameSelectColumn warm run %d = %#v, want [10 20]", i, got)
+		}
+	}
+	if _, err := adapter.executeQFrameSelectColumn(constants, 0, otherFrame, runtime.NilValue(), false, qTypedRuntimeExecutionRouteOpExit); err != nil {
+		t.Fatalf("execute QFrameSelectColumn alternate schema: %v", err)
+	}
+
+	assertQKernelDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "q-hot-path-test", 1, 1, 1, 0)
+	assertQKernelDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "q-hot-path-test-alt", 1, 0, 1, 0)
+	assertQKernelDescriptorCacheStat(t, cf.QFrameSelectColumnPlanCacheStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", qFrameSelectColumnPlanCacheRoute, "q-hot-path-test", 1, 1, 1, 0)
+	assertQKernelDescriptorCacheStat(t, cf.QFrameSelectColumnPlanCacheStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", qFrameSelectColumnPlanCacheRoute, "q-hot-path-test-alt", 1, 0, 1, 0)
+	assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 3)
+}
+
 func TestQFrameSelectColumnPlannedRuntimeExecutesBoolColumnCombine(t *testing.T) {
 	boolMask := runtime.NewTable()
 	boolMask.RawSetString("column", runtime.StringValue("active"))
@@ -5750,6 +5797,25 @@ func qHotPathTestFrame(t *testing.T) *runtime.Table {
 		Rows:       soa.Len(),
 		Columns:    2,
 		SchemaHash: "q-hot-path-test",
+	})
+	return frame
+}
+
+func qHotPathSameColumnsFrame(t *testing.T, schemaHash string) *runtime.Table {
+	t.Helper()
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{100.25, 102}),
+		"size":  runtime.NewDenseArrayI64([]int64{30, 40}),
+	})
+	if err != nil {
+		t.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: schemaHash,
 	})
 	return frame
 }
