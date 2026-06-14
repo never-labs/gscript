@@ -5,7 +5,9 @@ package methodjit
 import (
 	"errors"
 	"testing"
+	"unsafe"
 
+	"github.com/never-labs/leia/internal/jit"
 	"github.com/never-labs/leia/internal/runtime"
 )
 
@@ -127,7 +129,51 @@ func TestQSQLKernelPlanOpExitRecordsBackendError(t *testing.T) {
 	assertQSQLKernelExecutionStat(t, cf.QKernelExecutionStats(), plan.Ref, "error", 1)
 }
 
+func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRoute(t *testing.T) {
+	plan := QSQLKernelRuntimeBackendPlan(QSQLKernelPipelineRef{
+		Shape:         "select/where/project",
+		PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column:1",
+		SchemaHash:    "schema-direct",
+	})
+	executor := &testQSQLKernelBackendExecutor{out: int64(64), handled: true}
+	cf := &CompiledFunction{
+		QSQLKernelPlans:   []QSQLKernelBackendPlan{plan},
+		QSQLKernelBackend: executor,
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[0])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQSQLKernelPlan),
+		OpExitSlot: 0,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QSQLKernelPlan error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QSQLKernelPlan direct helper calls = %d, want 1", got)
+	}
+	if !regs[0].IsInt() || regs[0].Int() != 64 {
+		t.Fatalf("QSQLKernelPlan direct helper result = %v, want int 64", regs[0])
+	}
+	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	if got := qKernelExecutionCount(cf.QKernelExecutionStats(), QSQLKernelRuntimeSource, plan.Ref.Kernel, "typed_runtime_op_exit", "success"); got != 0 {
+		t.Fatalf("QSQLKernelPlan op-exit route count = %d, want 0", got)
+	}
+}
+
 func assertQSQLKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, ref QSQLKernelPipelineRef, outcome string, count uint64) {
+	t.Helper()
+	assertQSQLKernelExecutionStatWithRoute(t, rows, ref, "typed_runtime_op_exit", outcome, count)
+}
+
+func assertQSQLKernelExecutionStatWithRoute(t *testing.T, rows []QKernelExecutionStat, ref QSQLKernelPipelineRef, route, outcome string, count uint64) {
 	t.Helper()
 	ref = ref.normalized(QSQLKernelRuntimeSource)
 	for _, row := range rows {
@@ -135,7 +181,7 @@ func assertQSQLKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, re
 			row.Kernel == ref.Kernel &&
 			row.Shape == ref.Shape &&
 			row.PipelineShape == ref.PipelineShape &&
-			row.Route == "typed_runtime_op_exit" &&
+			row.Route == route &&
 			row.Outcome == outcome &&
 			row.Count == count {
 			return

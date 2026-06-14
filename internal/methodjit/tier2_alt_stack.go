@@ -155,6 +155,36 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 			return
 		}
 		ctx.HelperErrFlag = 0
+	case OpQSQLKernelPlan:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		if slot < 0 || slot >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: QSQLKernelPlan register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		if err := cf.executeQSQLKernelPlanSlotWithRoute(
+			int(ctx.OpExitAux),
+			slot,
+			regs,
+			string(qTypedRuntimeExecutionRouteDirectHelper),
+		); err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		ctx.HelperErrFlag = 0
 	case OpQVectorWhereReduce:
 		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
 		if cf == nil {

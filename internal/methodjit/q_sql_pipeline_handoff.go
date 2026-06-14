@@ -211,6 +211,10 @@ func (cf *CompiledFunction) RecordQSQLKernelPlanExecutionWithRoute(ref QSQLKerne
 }
 
 func (cf *CompiledFunction) ExecuteQSQLKernelPlanValue(id int) (runtime.Value, bool, error) {
+	return cf.ExecuteQSQLKernelPlanValueWithRoute(id, "typed_runtime_op_exit")
+}
+
+func (cf *CompiledFunction) ExecuteQSQLKernelPlanValueWithRoute(id int, route string) (runtime.Value, bool, error) {
 	if cf == nil || cf.QSQLKernelBackend == nil {
 		return runtime.NilValue(), false, nil
 	}
@@ -220,23 +224,27 @@ func (cf *CompiledFunction) ExecuteQSQLKernelPlanValue(id int) (runtime.Value, b
 	}
 	out, handled, err := cf.QSQLKernelBackend.ExecuteQSQLKernelBackendPlan(plan)
 	if err != nil || !handled {
-		cf.RecordQSQLKernelPlanExecution(plan.Ref, "error")
+		cf.RecordQSQLKernelPlanExecutionWithRoute(plan.Ref, route, "error")
 		return runtime.NilValue(), handled, err
 	}
 	value, err := qEvalPipelineRuntimeValue(out)
 	if err != nil {
-		cf.RecordQSQLKernelPlanExecution(plan.Ref, "error")
+		cf.RecordQSQLKernelPlanExecutionWithRoute(plan.Ref, route, "error")
 		return runtime.NilValue(), false, err
 	}
-	cf.RecordQSQLKernelPlanExecution(plan.Ref, "success")
+	cf.RecordQSQLKernelPlanExecutionWithRoute(plan.Ref, route, "success")
 	return value, true, nil
 }
 
 func (cf *CompiledFunction) executeQSQLKernelPlanSlot(planID, absSlot int, regs []runtime.Value) error {
+	return cf.executeQSQLKernelPlanSlotWithRoute(planID, absSlot, regs, "typed_runtime_op_exit")
+}
+
+func (cf *CompiledFunction) executeQSQLKernelPlanSlotWithRoute(planID, absSlot int, regs []runtime.Value, route string) error {
 	if absSlot < 0 || absSlot >= len(regs) {
 		return fmt.Errorf("QSQLKernelPlan op-exit out of register range")
 	}
-	out, handled, err := cf.ExecuteQSQLKernelPlanValue(planID)
+	out, handled, err := cf.ExecuteQSQLKernelPlanValueWithRoute(planID, route)
 	if err != nil {
 		return err
 	}
