@@ -91,6 +91,10 @@ if ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
     echo "error: docs/spec/index.html is stale; run: python3 scripts/spec_preview.py --output docs/spec/index.html" >&2
     exit 1
 fi
+if ! grep -Fq "spec/index.html" docs/_config.yml; then
+    echo "error: docs/spec/index.html is a checked-in local preview; docs/_config.yml must exclude it from GitHub Pages" >&2
+    exit 1
+fi
 
 if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1; then
     echo "error: docs/spec runnable Leia example gate failed" >&2

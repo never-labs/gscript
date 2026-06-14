@@ -808,9 +808,7 @@ LEIA_ANTHROPIC_COMPAT_MODEL=...
 ```
 
 The GLM smoke path also accepts `LEIA_GLM_BASE_URL`, `LEIA_GLM_API_KEY`, and
-`LEIA_GLM_MODEL`. It also accepts the local convenience aliases
-`SENTINEL_GLM_API_KEY`, `GLM_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `GLM_MODEL`, and
-`ANTHROPIC_MODEL`.
+`LEIA_GLM_MODEL`.
 
 Offline examples such as `examples/llm/agent.leia` and
 `examples/llm/incident_response.leia` are runnable without network access.

@@ -3,11 +3,6 @@ name: Pages
 on:
   push:
     branches: [main]
-    paths:
-      - docs/**
-      - cmd/leia/doc.go
-      - scripts/spec_preview.py
-      - .github/workflows/pages.yml
   workflow_dispatch:
 
 permissions:

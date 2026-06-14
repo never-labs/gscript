@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -307,7 +308,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
 	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
 	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
-	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build"
+	strictReleaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build --require-clean"
 
 	for _, item := range []struct {
 		path     string
@@ -347,7 +348,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				fullPerfGateCmd,
 				publicReleaseBlockersCmd,
 				releaseDistributionCmd,
-				releaseArtifactsCmd,
+				strictReleaseArtifactsCmd,
 			},
 		},
 		{
@@ -357,6 +358,8 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				specExamplesCmd,
 				"TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeReferencesEntrypointsStayGated",
 				"docs/spec/index.md",
+				"checked-in local preview",
+				"docs/_config.yml must exclude it from GitHub Pages",
 				"tests/feature_matrix.json",
 				"reference entrypoints",
 				"find reference -type f -name '*.md' | sort",
@@ -393,6 +396,61 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	}
 	if strings.Contains(fullOut, "--no-luajit") {
 		t.Fatalf("production_check.sh --full --list must not weaken release performance gates with --no-luajit; got:\n%s", fullOut)
+	}
+	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
+	criticalStart := strings.Index(productionCheck, "RELEASE_CRITICAL_SKIP_NAMES=(")
+	if criticalStart < 0 {
+		t.Fatal("scripts/production_check.sh must define RELEASE_CRITICAL_SKIP_NAMES")
+	}
+	criticalRest := productionCheck[criticalStart:]
+	criticalEnd := strings.Index(criticalRest, "\n)")
+	if criticalEnd < 0 {
+		t.Fatal("scripts/production_check.sh RELEASE_CRITICAL_SKIP_NAMES block must be closed")
+	}
+	criticalList := criticalRest[:criticalEnd]
+	for _, critical := range []string{
+		`"Language Conformance Surface"`,
+		`"Q Conformance Gate"`,
+		`"Public Release Blockers"`,
+		`"Release Distribution"`,
+		`"Release Artifacts"`,
+	} {
+		if !strings.Contains(criticalList, critical) {
+			t.Fatalf("scripts/production_check.sh release-critical skip list must include %s", critical)
+		}
+	}
+}
+
+func TestReleaseMatrixReleaseProfileFailsCriticalSkips(t *testing.T) {
+	root := findRepoRoot(t)
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		t.Skipf("go not available: %v", err)
+	}
+	tmpBin := t.TempDir()
+	if err := os.Symlink(goPath, filepath.Join(tmpBin, "go")); err != nil {
+		t.Fatalf("symlink go into test PATH: %v", err)
+	}
+
+	cmd := exec.Command("bash", "scripts/production_check.sh", "--full", "--release-profile")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "PATH="+tmpBin+":/usr/bin:/bin")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("release profile unexpectedly passed with luajit absent from PATH:\n%s", out)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Runnable checks:",
+		"Language Conformance Surface: missing luajit",
+		"Release profile requires these checks to run instead of skip:",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release profile critical-skip output missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "=== RUN Correctness ===") {
+		t.Fatalf("release profile should fail before running checks when critical skips exist:\n%s", text)
 	}
 }
 
@@ -738,6 +796,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			path: ".github/workflows/pages.yml",
 			snippets: []string{
 				"name: Pages",
+				"branches: [main]",
 				"go run ./cmd/leia doc check",
 				"actions/jekyll-build-pages",
 				"source: ./docs",
@@ -777,6 +836,10 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				t.Fatalf("%s must keep shared LSP release evidence snippet %q", item.path, snippet)
 			}
 		}
+	}
+	pagesWorkflow := readFileString(t, filepath.Join(root, ".github", "workflows", "pages.yml"))
+	if strings.Contains(pagesWorkflow, "paths:") {
+		t.Fatal(".github/workflows/pages.yml must not use a narrow paths filter; generated docs depend on code and registry inputs")
 	}
 }
 

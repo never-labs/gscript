@@ -14,7 +14,7 @@ and Lua-compatible table and multi-return behavior where that compatibility is
 useful. It is not a Lua clone: the stable language is defined here, and
 Lua-derived tests are compatibility oracles rather than the source of truth.
 
-## Phase 0 Hard Deliverables
+## Specification Baseline
 
 The hard deliverable is a written, testable semantic baseline:
 
@@ -331,11 +331,11 @@ Leia differs from Lua when Go-native embedding, safety, or product clarity wins:
   features.
 - Debug and GC internals are not promised to match Lua.
 
-## Production Roadmap
+## Release Readiness
 
-Production readiness requires a stable spec, generated reference docs,
-repeatable tests, package management, security policy, and examples. The current
-docs tree is organized around those release surfaces.
+Release readiness is tracked by the chaptered spec, generated reference docs,
+repeatable tests, package management, security policy, and examples. The docs
+tree is organized around those release surfaces.
 
 ## Change-Control Checklist
 

@@ -311,7 +311,7 @@ func generateDialectReferenceMarkdown() []byte {
 	fmt.Fprintln(&b, "go run ./cmd/leia examples run repo-tooling-release_gate_project-main")
 	fmt.Fprintln(&b, "```")
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. It is tracked by the feature matrix so the README dialect promise stays tied to executable evidence.")
+	fmt.Fprintln(&b, "The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. It is tracked by the feature matrix so published dialect coverage stays tied to executable evidence.")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "Additional focused evidence lives in:")
 	fmt.Fprintln(&b)

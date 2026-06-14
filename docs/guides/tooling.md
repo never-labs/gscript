@@ -164,8 +164,8 @@ bash scripts/performance_gate.sh --feature-smoke
 
 Use `--no-luajit` when LuaJIT is not installed or when a benchmark has no useful
 Lua reference. When LuaJIT data is present and script-timed, the gate also
-enforces `--luajit-threshold` so README performance claims cannot drift into a
-report-only comparison. See the
+enforces `--luajit-threshold` so published performance claims remain tied to
+measured gates instead of report-only comparisons. See the
 [performance reference](../reference/performance/index.md).
 
 ## Diagnostics
