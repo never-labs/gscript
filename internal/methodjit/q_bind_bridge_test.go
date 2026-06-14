@@ -839,6 +839,10 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.
 	stats := cf.QKernelExecutionStats()
 	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertNoQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameMask")
+	assertNoQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameFilter")
+	assertNoQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameProjectColumn")
+	assertNoQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "VectorCompare")
 	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
 		t.Fatalf("QFrameSelectColumn op-exit route count = %d, want 0", got)
 	}
@@ -1506,6 +1510,15 @@ func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, o
 		}
 	}
 	return count
+}
+
+func assertNoQKernelExecutionStat(tb testing.TB, rows []QKernelExecutionStat, source, kernel string) {
+	tb.Helper()
+	for _, row := range rows {
+		if row.Source == source && row.Kernel == kernel {
+			tb.Fatalf("unexpected q kernel execution stat for %s/%s: %+v in %+v", source, kernel, row, rows)
+		}
+	}
 }
 
 func qVectorWhereReduceRouteProto() *vm.FuncProto {

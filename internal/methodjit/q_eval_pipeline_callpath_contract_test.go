@@ -113,3 +113,57 @@ func TestQVectorWhereReduceCallpathContracts(t *testing.T) {
 			source, kernel, shape, route, ok)
 	}
 }
+
+func TestQTypedRuntimeOpsDeclareExecutionRouteContracts(t *testing.T) {
+	ops := []Op{
+		OpFrameLen,
+		OpFrameColumn,
+		OpFrameMask,
+		OpFrameProject,
+		OpFrameFilter,
+		OpFrameFilterProject,
+		OpFrameGather,
+		OpFrameSlice,
+		OpFrameOrder,
+		OpFrameOrderGather,
+		OpFrameProjectColumn,
+		OpFrameFilterProjectColumn,
+		OpFrameGroupAggregate,
+		OpVectorGather,
+		OpVectorCompare,
+		OpVectorMask,
+		OpVectorWhere,
+		OpVectorReduce,
+		OpQVectorGatherReduce,
+		OpQVectorWhereReduce,
+		OpQEvalPipelinePlan,
+		OpQSQLKernelPlan,
+		OpQEvalSessionEval,
+		OpVectorScan,
+	}
+	seen := make(map[Op]bool, len(ops))
+	for _, op := range ops {
+		if seen[op] {
+			t.Fatalf("duplicate q typed runtime op in contract list: %s", op)
+		}
+		seen[op] = true
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if spec.EmitterFamily != OpEmitterTable {
+			t.Fatalf("%s emitter family = %s, want table/runtime family", op, spec.EmitterFamily)
+		}
+		if _, _, _, route, ok := qRuntimePrimitiveExecutionMetadata(op); !ok || route == "" {
+			t.Fatalf("%s missing q runtime execution metadata: route=%q ok=%v", op, route, ok)
+		}
+		if !qTypedRuntimeOpHasTier2DirectHelper(op) && !tier2OpMayExitForNativeReplay(&Instr{Op: op}) {
+			t.Fatalf("%s has q runtime metadata but no Tier2 direct helper or native-replay exit policy", op)
+		}
+	}
+	for op := Op(0); op < OpMax; op++ {
+		if _, _, _, _, ok := qRuntimePrimitiveExecutionMetadata(op); ok && !seen[op] {
+			t.Fatalf("%s has q runtime metadata but is missing from q typed runtime route contract list", op)
+		}
+	}
+}

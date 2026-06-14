@@ -105,7 +105,7 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 
 	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 
-	if (instr.Op == OpQVectorGatherReduce || instr.Op == OpVectorGather || instr.Op == OpVectorCompare || instr.Op == OpVectorMask || instr.Op == OpVectorWhere || instr.Op == OpVectorReduce || instr.Op == OpVectorScan || instr.Op == OpFrameLen || instr.Op == OpFrameColumn || instr.Op == OpFrameMask || instr.Op == OpFrameProject || instr.Op == OpFrameFilter || instr.Op == OpFrameFilterProject || instr.Op == OpFrameGather || instr.Op == OpFrameSlice || instr.Op == OpFrameOrder || instr.Op == OpFrameOrderGather || instr.Op == OpFrameProjectColumn || instr.Op == OpFrameFilterProjectColumn || instr.Op == OpFrameGroupAggregate || instr.Op == OpQFrameSelectColumn || instr.Op == OpQSQLKernelPlan) && tier2AltStackEnabled() && ec.selfCFCell != nil {
+	if qTypedRuntimeOpUsesGenericDirectHelper(instr.Op) && tier2AltStackEnabled() && ec.selfCFCell != nil {
 		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_op_helper_err_%d", instr.ID))
 		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_op_helper_exit_%d", instr.ID))
 		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)
@@ -155,6 +155,50 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 		continueLabel: continueLabel,
 		numericPass:   ec.numericMode,
 	})
+}
+
+func qTypedRuntimeOpUsesGenericDirectHelper(op Op) bool {
+	switch op {
+	case OpQVectorGatherReduce,
+		OpVectorGather,
+		OpVectorCompare,
+		OpVectorMask,
+		OpVectorWhere,
+		OpVectorReduce,
+		OpVectorScan,
+		OpFrameLen,
+		OpFrameColumn,
+		OpFrameMask,
+		OpFrameProject,
+		OpFrameFilter,
+		OpFrameFilterProject,
+		OpFrameGather,
+		OpFrameSlice,
+		OpFrameOrder,
+		OpFrameOrderGather,
+		OpFrameProjectColumn,
+		OpFrameFilterProjectColumn,
+		OpFrameGroupAggregate,
+		OpQFrameSelectColumn,
+		OpQSQLKernelPlan:
+		return true
+	default:
+		return false
+	}
+}
+
+func qTypedRuntimeOpHasTier2DirectHelper(op Op) bool {
+	if qTypedRuntimeOpUsesGenericDirectHelper(op) {
+		return true
+	}
+	switch op {
+	case OpQEvalSessionEval,
+		OpQEvalPipelinePlan,
+		OpQVectorWhereReduce:
+		return true
+	default:
+		return false
+	}
 }
 
 // emitConcatExit emits OpConcat through exit-resume with all concat operands.
