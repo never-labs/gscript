@@ -50,15 +50,19 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecution(id int, outcome str
 }
 
 func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRoute(id int, route, outcome string) {
+	cf.recordQEvalPipelinePlanExecutionWithRouteAndReason(id, route, outcome, "")
+}
+
+func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRouteAndReason(id int, route, outcome, reasonCode string) {
 	if cf == nil {
 		return
 	}
-	if cf.recordQEvalPipelinePlanExecutionCounter(id, route, outcome) {
+	if reasonCode == "" && cf.recordQEvalPipelinePlanExecutionCounter(id, route, outcome) {
 		cf.recordQEvalPipelinePlanDescriptorCacheLookup(id, route)
 		return
 	}
 	shape := qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id)
-	cf.recordQKernelExecutionWithPipelineShape(
+	cf.recordQKernelExecutionWithPipelineShapeAndReason(
 		"methodjit_q_eval_runtime",
 		"QEvalPipelinePlan",
 		shape,
@@ -66,6 +70,7 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRoute(id int, ro
 		route,
 		outcome,
 		"unknown",
+		reasonCode,
 	)
 }
 
@@ -195,6 +200,10 @@ func (cf *CompiledFunction) recordQKernelExecutionWithSchema(source, kernel, sha
 }
 
 func (cf *CompiledFunction) recordQKernelExecutionWithPipelineShape(source, kernel, shape, pipelineShape, route, outcome, schemaHash string) {
+	cf.recordQKernelExecutionWithPipelineShapeAndReason(source, kernel, shape, pipelineShape, route, outcome, schemaHash, "")
+}
+
+func (cf *CompiledFunction) recordQKernelExecutionWithPipelineShapeAndReason(source, kernel, shape, pipelineShape, route, outcome, schemaHash, reasonCode string) {
 	if cf == nil {
 		return
 	}
@@ -226,7 +235,7 @@ func (cf *CompiledFunction) recordQKernelExecutionWithPipelineShape(source, kern
 		pipelineShape: pipelineShape,
 		route:         route,
 		outcome:       outcome,
-		reasonCode:    qKernelExecutionReasonCode(outcome, ""),
+		reasonCode:    qKernelExecutionReasonCode(outcome, reasonCode),
 	}
 	cf.qKernelStatsMu.Lock()
 	if cf.qKernelStats == nil {

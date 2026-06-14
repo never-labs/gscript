@@ -114,6 +114,7 @@ func TestQEvalPipelinePlanOpExitRecordsErrorRoute(t *testing.T) {
 		t.Fatalf("executeQEvalPipelinePlanExit op-exit error = %v, want %q", err, want)
 	}
 	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_op_exit", "error", 1)
+	assertQEvalPipelineExecutionReason(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_op_exit", "error", qEvalPipelineReasonPlanUnhandled, 1)
 	if got := qEvalPipelineExecutionCount(cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_native_exit", "error"); got != 0 {
 		t.Fatalf("native-exit error count = %d, want 0", got)
 	}
@@ -135,6 +136,7 @@ func TestQEvalPipelinePlanNativeExitRecordsErrorRoute(t *testing.T) {
 		t.Fatalf("executeQEvalPipelinePlanExit native-exit error = %v, want %q", err, want)
 	}
 	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_native_exit", "error", 1)
+	assertQEvalPipelineExecutionReason(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_native_exit", "error", qEvalPipelineReasonPlanUnhandled, 1)
 	if got := qEvalPipelineExecutionCount(cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_op_exit", "error"); got != 0 {
 		t.Fatalf("op-exit error count = %d, want 0", got)
 	}
@@ -520,6 +522,25 @@ func qEvalPipelineExecutionCount(stats []QKernelExecutionStat, shape, route, out
 		}
 	}
 	return 0
+}
+
+func assertQEvalPipelineExecutionReason(t *testing.T, stats []QKernelExecutionStat, shape, route, outcome, reasonCode string, count uint64) {
+	t.Helper()
+	for _, stat := range stats {
+		if stat.Source == "methodjit_q_eval_runtime" &&
+			stat.Kernel == "QEvalPipelinePlan" &&
+			stat.Shape == shape &&
+			stat.Route == route &&
+			stat.Outcome == outcome &&
+			stat.ReasonCode == reasonCode {
+			if stat.Count != count {
+				t.Fatalf("QEvalPipelinePlan execution reason %s/%s/%s/%s count = %d, want %d; stats=%+v",
+					shape, route, outcome, reasonCode, stat.Count, count, stats)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing QEvalPipelinePlan execution reason shape=%s route=%s outcome=%s reason=%s; stats=%+v", shape, route, outcome, reasonCode, stats)
 }
 
 func assertQEvalPipelineDescriptorCacheStat(t *testing.T, stats []QKernelDescriptorCacheStat, ref QEvalPipelinePlanRef, route string, entries, hits, misses, evictions uint64) {

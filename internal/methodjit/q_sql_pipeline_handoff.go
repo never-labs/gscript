@@ -12,6 +12,11 @@ const (
 	QSQLKernelLoweringRoute  = "lowering"
 )
 
+const (
+	QSQLKernelReasonPlanUnhandled  = "plan_unhandled"
+	QSQLKernelReasonExecutionError = "plan_execution_error"
+)
+
 // QSQLKernelPipelineRef is MethodJIT's stable metadata-only handoff for qSQL
 // column pipelines. The q frontend/data layer owns parsing and
 // QueryKernelPlanPipelineShape; MethodJIT only keeps enough schema-stable
@@ -188,6 +193,10 @@ func (cf *CompiledFunction) RecordQSQLKernelPlanExecution(ref QSQLKernelPipeline
 }
 
 func (cf *CompiledFunction) RecordQSQLKernelPlanExecutionWithRoute(ref QSQLKernelPipelineRef, route, outcome string) {
+	cf.RecordQSQLKernelPlanExecutionWithRouteAndReason(ref, route, outcome, "")
+}
+
+func (cf *CompiledFunction) RecordQSQLKernelPlanExecutionWithRouteAndReason(ref QSQLKernelPipelineRef, route, outcome, reasonCode string) {
 	if cf == nil {
 		return
 	}
@@ -195,7 +204,7 @@ func (cf *CompiledFunction) RecordQSQLKernelPlanExecutionWithRoute(ref QSQLKerne
 	if route == "" {
 		route = "typed_runtime_op_exit"
 	}
-	cf.recordQKernelExecutionWithPipelineShape(
+	cf.recordQKernelExecutionWithPipelineShapeAndReason(
 		QSQLKernelRuntimeSource,
 		ref.Kernel,
 		ref.Shape,
@@ -203,6 +212,7 @@ func (cf *CompiledFunction) RecordQSQLKernelPlanExecutionWithRoute(ref QSQLKerne
 		route,
 		outcome,
 		ref.SchemaHash,
+		reasonCode,
 	)
 }
 
@@ -220,12 +230,16 @@ func (cf *CompiledFunction) ExecuteQSQLKernelPlanValueWithRoute(id int, route st
 	}
 	out, handled, err := cf.QSQLKernelBackend.ExecuteQSQLKernelBackendPlan(plan)
 	if err != nil || !handled {
-		cf.RecordQSQLKernelPlanExecutionWithRoute(plan.Ref, route, "error")
+		reasonCode := QSQLKernelReasonExecutionError
+		if !handled {
+			reasonCode = QSQLKernelReasonPlanUnhandled
+		}
+		cf.RecordQSQLKernelPlanExecutionWithRouteAndReason(plan.Ref, route, "error", reasonCode)
 		return runtime.NilValue(), handled, err
 	}
 	value, err := qEvalPipelineRuntimeValue(out)
 	if err != nil {
-		cf.RecordQSQLKernelPlanExecutionWithRoute(plan.Ref, route, "error")
+		cf.RecordQSQLKernelPlanExecutionWithRouteAndReason(plan.Ref, route, "error", QSQLKernelReasonExecutionError)
 		return runtime.NilValue(), false, err
 	}
 	cf.RecordQSQLKernelPlanExecutionWithRoute(plan.Ref, route, "success")

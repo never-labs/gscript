@@ -127,6 +127,7 @@ func TestQSQLKernelPlanOpExitRecordsBackendError(t *testing.T) {
 		t.Fatalf("executeOpExit(QSQLKernelPlan) error = %v, want boom", err)
 	}
 	assertQSQLKernelExecutionStat(t, cf.QKernelExecutionStats(), plan.Ref, "error", 1)
+	assertQSQLKernelExecutionReason(t, cf.QKernelExecutionStats(), plan.Ref, "typed_runtime_op_exit", "error", QSQLKernelReasonExecutionError, 1)
 }
 
 func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRoute(t *testing.T) {
@@ -236,6 +237,7 @@ func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRouteBackendUnhandled
 		t.Fatalf("QSQLKernelPlan backend executions = %d, want 1", len(executor.seen))
 	}
 	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+	assertQSQLKernelExecutionReason(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "error", QSQLKernelReasonPlanUnhandled, 1)
 	if got := qKernelExecutionCount(cf.QKernelExecutionStats(), QSQLKernelRuntimeSource, plan.Ref.Kernel, "typed_runtime_op_exit", "error"); got != 0 {
 		t.Fatalf("QSQLKernelPlan op-exit error route count = %d, want 0", got)
 	}
@@ -272,6 +274,7 @@ func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRouteConversionError(
 		t.Fatalf("QSQLKernelPlan conversion error register = %v, want original int 7", regs[0])
 	}
 	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+	assertQSQLKernelExecutionReason(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "error", QSQLKernelReasonExecutionError, 1)
 	if got := qKernelExecutionCount(cf.QKernelExecutionStats(), QSQLKernelRuntimeSource, plan.Ref.Kernel, "typed_runtime_op_exit", "error"); got != 0 {
 		t.Fatalf("QSQLKernelPlan op-exit error route count = %d, want 0", got)
 	}
@@ -336,6 +339,24 @@ func assertQSQLKernelExecutionStatWithRoute(t *testing.T, rows []QKernelExecutio
 		}
 	}
 	t.Fatalf("missing qSQL execution stat for outcome=%s count=%d ref=%+v rows=%+v", outcome, count, ref, rows)
+}
+
+func assertQSQLKernelExecutionReason(t *testing.T, rows []QKernelExecutionStat, ref QSQLKernelPipelineRef, route, outcome, reasonCode string, count uint64) {
+	t.Helper()
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	for _, row := range rows {
+		if row.Source == QSQLKernelRuntimeSource &&
+			row.Kernel == ref.Kernel &&
+			row.Shape == ref.Shape &&
+			row.PipelineShape == ref.PipelineShape &&
+			row.Route == route &&
+			row.Outcome == outcome &&
+			row.ReasonCode == reasonCode &&
+			row.Count == count {
+			return
+		}
+	}
+	t.Fatalf("missing qSQL execution reason outcome=%s reason=%s count=%d ref=%+v rows=%+v", outcome, reasonCode, count, ref, rows)
 }
 
 func assertQSQLKernelDescriptorCacheStat(t *testing.T, rows []QKernelDescriptorCacheStat, ref QSQLKernelPipelineRef, entries, hits, misses, evictions uint64) {

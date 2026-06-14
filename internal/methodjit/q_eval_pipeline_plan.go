@@ -105,6 +105,11 @@ const (
 	qEvalPipelineExecutionRouteDirectEntry qEvalPipelineExecutionRoute = "typed_runtime_direct_entry"
 )
 
+const (
+	qEvalPipelineReasonPlanUnhandled  = "plan_unhandled"
+	qEvalPipelineReasonExecutionError = "plan_execution_error"
+)
+
 type qEvalPipelineExecutionAdapter struct {
 	cf *CompiledFunction
 }
@@ -226,7 +231,11 @@ func (a qEvalPipelineExecutionAdapter) executeValue(planID int, route qEvalPipel
 	}
 	out, handled, err := a.cf.executeQEvalPipelinePlanBackendValue(planID)
 	if err != nil || !handled {
-		a.cf.recordQEvalPipelinePlanExecutionWithRoute(planID, string(route), "error")
+		reasonCode := qEvalPipelineReasonExecutionError
+		if !handled {
+			reasonCode = qEvalPipelineReasonPlanUnhandled
+		}
+		a.cf.recordQEvalPipelinePlanExecutionWithRouteAndReason(planID, string(route), "error", reasonCode)
 		return runtime.NilValue(), handled, err
 	}
 	a.cf.recordQEvalPipelinePlanExecutionWithRoute(planID, string(route), "success")
