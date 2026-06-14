@@ -226,6 +226,221 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		}
 		regs[slot] = out
 		ctx.HelperErrFlag = 0
+	case OpFrameLen:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameLen register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameLen(regs[arg1], qTypedRuntimeExecutionRouteDirectHelper)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpFrameColumn:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		aux := int(ctx.OpExitAux)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameColumn register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		if cf.Proto == nil || aux < 0 || aux >= len(cf.Proto.Constants) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameColumn column name constant is out of range")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameColumn(
+			regs[arg1],
+			cf.Proto.Constants[aux],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpFrameMask:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		aux := int(ctx.OpExitAux)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameMask register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		if cf.Proto == nil || aux < 0 || aux >= len(cf.Proto.Constants) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameMask spec constant is out of range")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameMask(
+			regs[arg1],
+			cf.Proto.Constants[aux],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpFrameProject:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		aux := int(ctx.OpExitAux)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameProject register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		if cf.Proto == nil || aux < 0 || aux >= len(cf.Proto.Constants) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameProject column list constant is out of range")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameProject(
+			regs[arg1],
+			cf.Proto.Constants[aux],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpFrameFilter:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		arg2 := base + int(ctx.OpExitArg2)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) || arg2 < 0 || arg2 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameFilter register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilter(
+			regs[arg1],
+			regs[arg2],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpFrameFilterProject:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		arg2 := base + int(ctx.OpExitArg2)
+		aux := int(ctx.OpExitAux)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) || arg2 < 0 || arg2 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameFilterProject register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		if cf.Proto == nil || aux < 0 || aux >= len(cf.Proto.Constants) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: FrameFilterProject column list constant is out of range")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilterProject(
+			regs[arg1],
+			regs[arg2],
+			cf.Proto.Constants[aux],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
 	case OpFrameGather:
 		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
 		if cf == nil {

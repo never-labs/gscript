@@ -1013,27 +1013,24 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameLen op-exit out of register range")
 		}
-		out, err := executeFrameLenValue(regs[arg1])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameLen(regs[arg1], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameLen, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameLen, "success")
 		regs[slot] = out
 
 	case OpFrameColumn:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameColumn op-exit out of register range")
 		}
-		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) || !cf.Proto.Constants[aux].IsString() {
+		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameColumn column name must be a string constant")
 		}
-		out, err := executeFrameColumnValue(regs[arg1], cf.Proto.Constants[aux].Str())
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameColumn(
+			regs[arg1], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameColumn, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameColumn, "success")
 		regs[slot] = out
 
 	case OpFrameMask:
@@ -1043,12 +1040,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameMask spec constant is out of range")
 		}
-		out, err := executeFrameMaskValue(regs[arg1], cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameMask(
+			regs[arg1], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameMask, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameMask, "success")
 		regs[slot] = out
 
 	case OpFrameProject:
@@ -1058,28 +1054,22 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameProject column list constant is out of range")
 		}
-		names, err := frameProjectColumnNames(cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameProject(
+			regs[arg1], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
-		out, err := executeFrameProjectValue(regs[arg1], names)
-		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameProject, "error")
-			return err
-		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameProject, "success")
 		regs[slot] = out
 
 	case OpFrameFilter:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameFilter op-exit out of register range")
 		}
-		out, err := executeFrameFilterValue(regs[arg1], regs[arg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilter(
+			regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameFilter, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameFilter, "success")
 		regs[slot] = out
 
 	case OpFrameFilterProject:
@@ -1089,16 +1079,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameFilterProject column list constant is out of range")
 		}
-		names, err := frameProjectColumnNames(cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilterProject(
+			regs[arg1], regs[arg2], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
-		out, err := executeFrameFilterProjectValue(regs[arg1], regs[arg2], names)
-		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameFilterProject, "error")
-			return err
-		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameFilterProject, "success")
 		regs[slot] = out
 
 	case OpFrameGather:

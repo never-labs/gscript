@@ -330,27 +330,32 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameLen op-exit out of register range")
 		}
-		out, err := executeFrameLenValue(regs[absArg1])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameLen op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameLen(regs[absArg1], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameLen, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameLen, "success")
 		regs[absSlot] = out
 
 	case OpFrameColumn:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameColumn op-exit out of register range")
 		}
-		if aux < 0 || proto == nil || aux >= len(proto.Constants) || !proto.Constants[aux].IsString() {
+		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameColumn column name must be a string constant")
 		}
-		out, err := executeFrameColumnValue(regs[absArg1], proto.Constants[aux].Str())
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameColumn op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameColumn(
+			regs[absArg1], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameColumn, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameColumn, "success")
 		regs[absSlot] = out
 
 	case OpFrameMask:
@@ -360,12 +365,15 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameMask spec constant is out of range")
 		}
-		out, err := executeFrameMaskValue(regs[absArg1], proto.Constants[aux])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameMask op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameMask(
+			regs[absArg1], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameMask, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameMask, "success")
 		regs[absSlot] = out
 
 	case OpFrameProject:
@@ -375,28 +383,30 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameProject column list constant is out of range")
 		}
-		names, err := frameProjectColumnNames(proto.Constants[aux])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameProject op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameProject(
+			regs[absArg1], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
-		out, err := executeFrameProjectValue(regs[absArg1], names)
-		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameProject, "error")
-			return err
-		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameProject, "success")
 		regs[absSlot] = out
 
 	case OpFrameFilter:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameFilter op-exit out of register range")
 		}
-		out, err := executeFrameFilterValue(regs[absArg1], regs[absArg2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameFilter op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilter(
+			regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilter, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilter, "success")
 		regs[absSlot] = out
 
 	case OpFrameFilterProject:
@@ -406,16 +416,15 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameFilterProject column list constant is out of range")
 		}
-		names, err := frameProjectColumnNames(proto.Constants[aux])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameFilterProject op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilterProject(
+			regs[absArg1], regs[absArg2], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
-		out, err := executeFrameFilterProjectValue(regs[absArg1], regs[absArg2], names)
-		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProject, "error")
-			return err
-		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameFilterProject, "success")
 		regs[absSlot] = out
 
 	case OpFrameGather:
