@@ -221,6 +221,15 @@ type qRuntimeKernelExecutionReasonStat struct {
 	Count      uint64
 }
 
+type qRuntimeKernelExecutionReasonRouteStat struct {
+	Source     string
+	Kernel     string
+	Route      string
+	Outcome    string
+	ReasonCode string
+	Count      uint64
+}
+
 type qRuntimeKernelExecutionReasonShapeStat struct {
 	Source        string
 	Kernel        string
@@ -249,6 +258,18 @@ type qRuntimeKernelDescriptorCacheKernelStat struct {
 	Hits      uint64
 	Misses    uint64
 	Evictions uint64
+}
+
+type qRuntimeKernelDescriptorCacheSchemaStat struct {
+	Source        string
+	Kernel        string
+	Shape         string
+	PipelineShape string
+	SchemaHash    string
+	Entries       uint64
+	Hits          uint64
+	Misses        uint64
+	Evictions     uint64
 }
 
 type qRuntimeKernelDescriptorCacheRouteStat struct {
@@ -4146,6 +4167,7 @@ func qRuntimeKernelExecutionStatsRow() *Table {
 	row.RawSetString("kernels", TableValue(qRuntimeKernelExecutionKernelStatsTable(qRuntimeKernelExecutionKernelStats(stats))))
 	row.RawSetString("routes", TableValue(qRuntimeKernelExecutionRouteStatsTable(qRuntimeKernelExecutionRouteStats(stats))))
 	row.RawSetString("fallback_reasons", TableValue(qRuntimeKernelExecutionReasonStatsTable(qRuntimeKernelExecutionReasonStats(stats))))
+	row.RawSetString("fallback_reason_routes", TableValue(qRuntimeKernelExecutionReasonRouteStatsTable(qRuntimeKernelExecutionReasonRouteStats(stats))))
 	row.RawSetString("fallback_reason_shapes", TableValue(qRuntimeKernelExecutionReasonShapeStatsTable(qRuntimeKernelExecutionReasonShapeStats(stats))))
 	return row
 }
@@ -4280,6 +4302,7 @@ func qRuntimeKernelDescriptorCacheStatsRow() *Table {
 	row.RawSetString("stats", TableValue(qRuntimeKernelDescriptorCacheStatsTable(stats)))
 	row.RawSetString("shapes", TableValue(qRuntimeKernelDescriptorCacheShapeStatsTable(qRuntimeKernelDescriptorCacheShapeStats(stats))))
 	row.RawSetString("kernels", TableValue(qRuntimeKernelDescriptorCacheKernelStatsTable(qRuntimeKernelDescriptorCacheKernelStats(stats))))
+	row.RawSetString("schemas", TableValue(qRuntimeKernelDescriptorCacheSchemaStatsTable(qRuntimeKernelDescriptorCacheSchemaStats(stats))))
 	row.RawSetString("routes", TableValue(qRuntimeKernelDescriptorCacheRouteStatsTable(qRuntimeKernelDescriptorCacheRouteStats(stats))))
 	return row
 }
@@ -4978,6 +5001,79 @@ func qRuntimeKernelDescriptorCacheKernelStatsTable(stats []qRuntimeKernelDescrip
 	return rows
 }
 
+func qRuntimeKernelDescriptorCacheSchemaStats(stats []QRuntimeKernelDescriptorCacheStat) []qRuntimeKernelDescriptorCacheSchemaStat {
+	type schemaKey struct {
+		source        string
+		kernel        string
+		shape         string
+		pipelineShape string
+		schemaHash    string
+	}
+	counts := make(map[schemaKey]qRuntimeKernelDescriptorCacheSchemaStat, len(stats))
+	for _, stat := range stats {
+		key := schemaKey{
+			source:        stat.Source,
+			kernel:        stat.Kernel,
+			shape:         stat.Shape,
+			pipelineShape: stat.PipelineShape,
+			schemaHash:    stat.SchemaHash,
+		}
+		row := counts[key]
+		row.Source = key.source
+		row.Kernel = key.kernel
+		row.Shape = key.shape
+		row.PipelineShape = key.pipelineShape
+		row.SchemaHash = key.schemaHash
+		row.Entries += stat.Entries
+		row.Hits += stat.Hits
+		row.Misses += stat.Misses
+		row.Evictions += stat.Evictions
+		counts[key] = row
+	}
+	out := make([]qRuntimeKernelDescriptorCacheSchemaStat, 0, len(counts))
+	for _, row := range counts {
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Hits+a.Misses != b.Hits+b.Misses {
+			return a.Hits+a.Misses > b.Hits+b.Misses
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Shape != b.Shape {
+			return a.Shape < b.Shape
+		}
+		if a.PipelineShape != b.PipelineShape {
+			return a.PipelineShape < b.PipelineShape
+		}
+		return a.SchemaHash < b.SchemaHash
+	})
+	return out
+}
+
+func qRuntimeKernelDescriptorCacheSchemaStatsTable(stats []qRuntimeKernelDescriptorCacheSchemaStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("shape", StringValue(stat.Shape))
+		row.RawSetString("pipeline_shape", StringValue(stat.PipelineShape))
+		row.RawSetString("schema_hash", StringValue(stat.SchemaHash))
+		row.RawSetString("entries", qUint64IntValue(stat.Entries))
+		row.RawSetString("hits", qUint64IntValue(stat.Hits))
+		row.RawSetString("misses", qUint64IntValue(stat.Misses))
+		row.RawSetString("evictions", qUint64IntValue(stat.Evictions))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
 func qRuntimeKernelDescriptorCacheRouteStats(stats []QRuntimeKernelDescriptorCacheStat) []qRuntimeKernelDescriptorCacheRouteStat {
 	type routeKey struct {
 		source string
@@ -5143,6 +5239,76 @@ func qRuntimeKernelExecutionReasonStatsTable(stats []qRuntimeKernelExecutionReas
 	for i, stat := range stats {
 		row := NewTable()
 		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("outcome", StringValue(stat.Outcome))
+		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
+		row.RawSetString("count", qUint64IntValue(stat.Count))
+		rows.RawSetInt(int64(i+1), TableValue(row))
+	}
+	return rows
+}
+
+func qRuntimeKernelExecutionReasonRouteStats(stats []QRuntimeKernelExecutionStat) []qRuntimeKernelExecutionReasonRouteStat {
+	type reasonRouteKey struct {
+		source     string
+		kernel     string
+		route      string
+		outcome    string
+		reasonCode string
+	}
+	counts := make(map[reasonRouteKey]uint64, len(stats))
+	for _, stat := range stats {
+		if stat.Outcome != "fallback" && stat.Outcome != "error" {
+			continue
+		}
+		key := reasonRouteKey{
+			source:     stat.Source,
+			kernel:     stat.Kernel,
+			route:      stat.Route,
+			outcome:    stat.Outcome,
+			reasonCode: stat.ReasonCode,
+		}
+		counts[key] += stat.Count
+	}
+	out := make([]qRuntimeKernelExecutionReasonRouteStat, 0, len(counts))
+	for key, count := range counts {
+		out = append(out, qRuntimeKernelExecutionReasonRouteStat{
+			Source:     key.source,
+			Kernel:     key.kernel,
+			Route:      key.route,
+			Outcome:    key.outcome,
+			ReasonCode: key.reasonCode,
+			Count:      count,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.Kernel != b.Kernel {
+			return a.Kernel < b.Kernel
+		}
+		if a.Route != b.Route {
+			return a.Route < b.Route
+		}
+		if a.Outcome != b.Outcome {
+			return a.Outcome < b.Outcome
+		}
+		return a.ReasonCode < b.ReasonCode
+	})
+	return out
+}
+
+func qRuntimeKernelExecutionReasonRouteStatsTable(stats []qRuntimeKernelExecutionReasonRouteStat) *Table {
+	rows := NewAppendArrayTable(len(stats))
+	for i, stat := range stats {
+		row := NewTable()
+		row.RawSetString("source", StringValue(stat.Source))
+		row.RawSetString("kernel", StringValue(stat.Kernel))
+		row.RawSetString("route", StringValue(stat.Route))
 		row.RawSetString("outcome", StringValue(stat.Outcome))
 		row.RawSetString("reason_code", StringValue(stat.ReasonCode))
 		row.RawSetString("count", qUint64IntValue(stat.Count))

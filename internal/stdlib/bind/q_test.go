@@ -3671,6 +3671,16 @@ func TestQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T) {
 	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("q_runtime_kernel_execution fallback_reasons missing_kernel count = %v, want 2", got)
 	}
+	reasonRoute := qTestNestedRowByFields(t, row, "fallback_reason_routes", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"route":       "typed_runtime_op_exit",
+		"outcome":     "fallback",
+		"reason_code": "missing_kernel",
+	})
+	if got := reasonRoute.RawGetString("count"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reason_routes missing_kernel count = %v, want 2", got)
+	}
 	reasonShapes := row.RawGetString("fallback_reason_shapes").Table()
 	if reasonShapes == nil || reasonShapes.Length() != 2 {
 		t.Fatalf("q_runtime_kernel_execution fallback_reason_shapes = %v, want fallback and error rows", reasonShapes)
@@ -3811,6 +3821,16 @@ func TestQRuntimeKernelExecutionStatsExposeRuntimeErrorBuckets(t *testing.T) {
 		if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != tc.count {
 			t.Fatalf("q_runtime_kernel_execution reason %s count = %v, want %d", tc.reasonCode, got, tc.count)
 		}
+		reasonRoute := qTestNestedRowByFields(t, row, "fallback_reason_routes", map[string]string{
+			"source":      tc.source,
+			"kernel":      tc.kernel,
+			"route":       tc.route,
+			"outcome":     "error",
+			"reason_code": tc.reasonCode,
+		})
+		if got := reasonRoute.RawGetString("count"); !got.IsInt() || got.Int() != tc.count {
+			t.Fatalf("q_runtime_kernel_execution reason route %s count = %v, want %d", tc.reasonCode, got, tc.count)
+		}
 		reasonShape := qTestNestedRowByFields(t, row, "fallback_reason_shapes", map[string]string{
 			"source":         tc.source,
 			"kernel":         tc.kernel,
@@ -3926,6 +3946,30 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T)
 	})
 	if got := opRoute.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("descriptor cache op-exit route hits = %v, want 5", got)
+	}
+	schema := qTestNestedRowByFields(t, row, "schemas", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"schema_hash": "schema-a",
+	})
+	if got := schema.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("descriptor cache schema entries = %v, want 2", got)
+	}
+	if got := schema.RawGetString("hits"); !got.IsInt() || got.Int() != 12 {
+		t.Fatalf("descriptor cache schema hits = %v, want 12", got)
+	}
+	if got := schema.RawGetString("misses"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("descriptor cache schema misses = %v, want 2", got)
+	}
+	groupSchema := qTestNestedRowByFields(t, row, "schemas", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "FrameGroupAggregate",
+		"shape":       "filter/group/aggregate",
+		"schema_hash": "schema-b",
+	})
+	if got := groupSchema.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("descriptor cache group schema misses = %v, want 1", got)
 	}
 	shape := qTestNestedRowByFields(t, row, "shapes", map[string]string{
 		"source": "methodjit_q_frame_runtime",
