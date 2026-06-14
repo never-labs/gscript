@@ -329,6 +329,96 @@ func TestMappedQRuntimeKernelExecutionStatsProviderFeedsCacheStats(t *testing.T)
 	}
 }
 
+func TestMappedQRuntimeKernelExecutionStatsProviderFeedsFallbackSummaries(t *testing.T) {
+	qClearCaches()
+	const pipelineShape = "scan=frame|where=compare_mask:column_literal|filter=index|project=column"
+	restore := SetMappedQRuntimeKernelExecutionStatsProvider(func() []qRuntimeKernelExecutionExternalStatForTest {
+		return []qRuntimeKernelExecutionExternalStatForTest{
+			{
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: pipelineShape,
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "fallback",
+				ReasonCode:    "missing_kernel",
+				Count:         2,
+			},
+			{
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: pipelineShape,
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "fallback",
+				ReasonCode:    "missing_kernel",
+				Count:         3,
+			},
+			{
+				Source:        "methodjit_q_frame_runtime",
+				Kernel:        "QFrameSelectColumn",
+				Shape:         "compare/filter/project/column",
+				PipelineShape: pipelineShape,
+				Route:         "typed_runtime_op_exit",
+				Outcome:       "success",
+				Count:         4,
+			},
+		}
+	}, qRuntimeKernelExecutionExternalStatToBindForTest)
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("executions"); !got.IsInt() || got.Int() != 9 {
+		t.Fatalf("q_runtime_kernel_execution executions = %v, want 9", got)
+	}
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("q_runtime_kernel_execution hits = %v, want success count 4", got)
+	}
+	if got := row.RawGetString("successes"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("q_runtime_kernel_execution successes = %v, want 4", got)
+	}
+	if got := row.RawGetString("fallbacks"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution fallbacks = %v, want 5", got)
+	}
+	if got := row.RawGetString("errors"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_execution errors = %v, want 0", got)
+	}
+	stats := row.RawGetString("stats").Table()
+	if stats == nil || stats.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_execution stats table = %v, want success and fallback rows", stats)
+	}
+	reason := qTestNestedRowByFields(t, row, "fallback_reasons", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"outcome":     "fallback",
+		"reason_code": "missing_kernel",
+	})
+	if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reasons count = %v, want 5", got)
+	}
+	reasonRoute := qTestNestedRowByFields(t, row, "fallback_reason_routes", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"route":       "typed_runtime_op_exit",
+		"outcome":     "fallback",
+		"reason_code": "missing_kernel",
+	})
+	if got := reasonRoute.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reason_routes count = %v, want 5", got)
+	}
+	reasonShape := qTestNestedRowByFields(t, row, "fallback_reason_shapes", map[string]string{
+		"source":         "methodjit_q_frame_runtime",
+		"kernel":         "QFrameSelectColumn",
+		"shape":          "compare/filter/project/column",
+		"pipeline_shape": pipelineShape,
+		"route":          "typed_runtime_op_exit",
+		"outcome":        "fallback",
+		"reason_code":    "missing_kernel",
+	})
+	if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_execution fallback_reason_shapes count = %v, want 5", got)
+	}
+}
+
 func TestMappedQRuntimeKernelExecutionStatsProviderFilteredFeedsCacheStats(t *testing.T) {
 	qClearCaches()
 	restore := SetMappedQRuntimeKernelExecutionStatsProviderFiltered(func() []qRuntimeKernelExecutionExternalStatForTest {
@@ -427,6 +517,30 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *test
 	if got := stat.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache mapped misses = %v, want 1", got)
 	}
+	schema := qTestNestedRowByFields(t, row, "schemas", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"schema_hash": "schema-a",
+	})
+	if got := schema.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache mapped schema hits = %v, want 5", got)
+	}
+	if got := schema.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache mapped schema misses = %v, want 1", got)
+	}
+	schema = qTestNestedRowByFields(t, row, "schemas", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"schema_hash": "schema-b",
+	})
+	if got := schema.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache mapped probe schema entries = %v, want 2", got)
+	}
+	if got := schema.RawGetString("evictions"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache mapped probe schema evictions = %v, want 1", got)
+	}
 	routes := row.RawGetString("routes").Table()
 	if routes == nil || routes.Length() != 2 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache routes table = %v, want two mixed-route rows", routes)
@@ -506,6 +620,23 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFilteredFeedsCacheStats
 	})
 	if got := stat.RawGetString("entries"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache filtered entries = %v, want 1", got)
+	}
+	schema := qTestNestedRowByFields(t, row, "schemas", map[string]string{
+		"kernel":      "FrameGroupAggregate",
+		"schema_hash": "schema-b",
+	})
+	if got := schema.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered schema misses = %v, want 1", got)
+	}
+	schema = qTestNestedRowByFields(t, row, "schemas", map[string]string{
+		"kernel":      "FrameGroupAggregate",
+		"schema_hash": "schema-c",
+	})
+	if got := schema.RawGetString("hits"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered schema hits = %v, want 3", got)
+	}
+	if got := schema.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered schema entries = %v, want 2", got)
 	}
 	routes := row.RawGetString("routes").Table()
 	if routes == nil || routes.Length() != 2 {

@@ -11,6 +11,9 @@ import (
 const (
 	qFrameRuntimeExecutionSource  = "methodjit_q_frame_runtime"
 	qVectorRuntimeExecutionSource = "methodjit_q_vector_runtime"
+
+	qFrameSelectColumnReasonPlanBuildError = "plan_build_error"
+	qFrameSelectColumnReasonExecutionError = "plan_execution_error"
 )
 
 type qFrameVectorRuntimeExecutionAdapter struct {
@@ -195,12 +198,12 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeQFrameSelectColumn(constants
 	shape := qFrameSelectColumnExecutionShape(a.cf.QFrameSelectColumnSpecs, specIdx)
 	plan, err := a.cf.qFrameSelectColumnRuntimePlan(constants, specIdx, frameVal)
 	if err != nil {
-		a.recordFrame("QFrameSelectColumn", shape, route, "error", frameVal)
+		a.recordFrameWithReason("QFrameSelectColumn", shape, route, "error", qFrameSelectColumnReasonPlanBuildError, frameVal)
 		return runtime.NilValue(), err
 	}
 	out, err := executeQFrameSelectColumnPlannedValue(constants, a.cf.QFrameSelectColumnSpecs, specIdx, plan, frameVal, argVal, hasArg)
 	if err != nil {
-		a.recordFrame("QFrameSelectColumn", shape, route, "error", frameVal)
+		a.recordFrameWithReason("QFrameSelectColumn", shape, route, "error", qFrameSelectColumnReasonExecutionError, frameVal)
 		return runtime.NilValue(), err
 	}
 	a.recordFrame("QFrameSelectColumn", shape, route, "success", frameVal)
@@ -300,6 +303,13 @@ func (a qFrameVectorRuntimeExecutionAdapter) recordFrame(kernel, shape string, r
 		return
 	}
 	a.cf.recordQKernelExecutionForFrame(qFrameRuntimeExecutionSource, kernel, shape, string(route), outcome, frameVal)
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) recordFrameWithReason(kernel, shape string, route qTypedRuntimeExecutionRoute, outcome, reasonCode string, frameVal runtime.Value) {
+	if a.cf == nil {
+		return
+	}
+	a.cf.recordQKernelExecutionWithPipelineShapeAndReason(qFrameRuntimeExecutionSource, kernel, shape, "", string(route), outcome, qKernelSchemaHashForValue(frameVal), reasonCode)
 }
 
 func (a qFrameVectorRuntimeExecutionAdapter) recordVector(kernel, shape string, route qTypedRuntimeExecutionRoute, outcome string) {

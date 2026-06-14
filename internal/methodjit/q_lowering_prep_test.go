@@ -5068,6 +5068,44 @@ func TestQFrameVectorRuntimeAdapterRecordsQFrameSelectColumnAndVectorReduceError
 			t.Fatalf("QFrameSelectColumn plan error = nil, want error")
 		}
 		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "error", 1)
+		assertQKernelExecutionStatReason(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "error", qFrameSelectColumnReasonPlanBuildError, 1)
+	})
+
+	t.Run("QFrameSelectColumn execution error", func(t *testing.T) {
+		constants := []runtime.Value{
+			runtime.StringValue("missing"),
+			runtime.FloatValue(100),
+			qHotPathNamesValue("price"),
+			runtime.StringValue("price"),
+		}
+		spec := QFrameSelectColumnSpec{
+			Shape:              "compare/filter/project/column",
+			SourceColumnConst:  0,
+			ProjectConst:       2,
+			ResultColumnConst:  3,
+			CompareOp:          runtime.DenseArrayGE,
+			DynamicArgRole:     QFrameSelectColumnArgNone,
+			CompareRHSConst:    constants[1],
+			HasCompareRHSConst: true,
+			MaskSpecConst:      -1,
+			RowOrderConst:      -1,
+			MaskRoot:           -1,
+			HasRowValueConst:   false,
+		}
+		cf := &CompiledFunction{QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec}}
+		_, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQFrameSelectColumn(
+			constants,
+			0,
+			runtime.TableValue(qHotPathTestFrame(t)),
+			runtime.NilValue(),
+			false,
+			qTypedRuntimeExecutionRouteOpExit,
+		)
+		if err == nil {
+			t.Fatalf("QFrameSelectColumn execution error = nil, want error")
+		}
+		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "error", 1)
+		assertQKernelExecutionStatReason(t, cf.QKernelExecutionStats(), "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "error", qFrameSelectColumnReasonExecutionError, 1)
 	})
 
 	t.Run("VectorReduce non-dense", func(t *testing.T) {
@@ -6521,6 +6559,21 @@ func assertQKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, sourc
 	}
 	t.Fatalf("QKernelExecutionStat missing source=%s kernel=%s shape=%s route=%s outcome=%s; rows=%+v",
 		source, kernel, shape, route, outcome, rows)
+}
+
+func assertQKernelExecutionStatReason(t *testing.T, rows []QKernelExecutionStat, source, kernel, shape, route, outcome, reasonCode string, count uint64) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Source == source && row.Kernel == kernel && row.Shape == shape && row.Route == route && row.Outcome == outcome && row.ReasonCode == reasonCode {
+			if row.Count != count {
+				t.Fatalf("QKernelExecutionStat %s/%s/%s/%s/%s/%s count = %d, want %d; rows=%+v",
+					source, kernel, shape, route, outcome, reasonCode, row.Count, count, rows)
+			}
+			return
+		}
+	}
+	t.Fatalf("QKernelExecutionStat missing source=%s kernel=%s shape=%s route=%s outcome=%s reason=%s; rows=%+v",
+		source, kernel, shape, route, outcome, reasonCode, rows)
 }
 
 func assertQKernelDescriptorCacheStat(t *testing.T, rows []QKernelDescriptorCacheStat, source, kernel, shape, route, schemaHash string, entries, hits, misses, evictions uint64) {
