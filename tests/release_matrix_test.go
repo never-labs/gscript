@@ -694,6 +694,8 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				".github/workflows/release.yml",
 				".github/workflows/distribution-check.yml",
 				".github/workflows/pages.yml",
+				"require_file docs/_config.yml",
+				"require_contains docs/_config.yml \"spec/index.html\"",
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
 				"check_local_install_fixture",
 				"install accepted archive with unexpected entry",
@@ -738,7 +740,17 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"name: Pages",
 				"go run ./cmd/leia doc check",
 				"actions/jekyll-build-pages",
+				"source: ./docs",
+				"destination: ./_site",
 				"actions/deploy-pages",
+			},
+		},
+		{
+			path: "docs/_config.yml",
+			snippets: []string{
+				"title: Leia",
+				"exclude:",
+				"spec/index.html",
 			},
 		},
 		{
@@ -913,6 +925,8 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		{path: "scripts/diagnostics_bundle.sh", snippet: "Collects git revision/status"},
 		{path: "scripts/performance_gate.sh", snippet: "benchmarks/timing_compare.py"},
 		{path: "scripts/production_check.sh", snippet: "add_release_smoke"},
+		{path: "scripts/production_check.sh", snippet: "RELEASE_CRITICAL_SKIP_NAMES"},
+		{path: "scripts/production_check.sh", snippet: "Release profile requires these checks to run instead of skip:"},
 		{path: "scripts/public_release_blockers_check.sh", snippet: "--require-resolved"},
 		{path: "scripts/release_artifacts_check.sh", snippet: "Default mode runs a dry-run"},
 	} {
@@ -1708,9 +1722,8 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
 	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
 	for _, snippet := range []string{
-		"prices := q`100 101.5 100.75 102.25`",
-		"notional := q`100 101.5 100.75 102.25 * 100 120 80 150`",
-		"trades := q.eval(",
+		"trades := q```flip `sym`price`size`notional!",
+		"total := q`+/10000 12180 8060 15337.5`",
 		"leaders := q.sql(",
 		"note := prompt`Top symbol ${leaders[1].sym}",
 		"print(note.text)",
@@ -1742,6 +1755,7 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"Analytics-native:",
 		"q-style vector syntax",
 		"Dialect-native:",
+		"AI tags such",
 		"AI support lives in dialects and libraries, not in the core language runtime.",
 		"## Example",
 		"## Tooling",
@@ -2245,7 +2259,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "DSL-native dialects",
-			promise:      "Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, `llm`",
+			promise:      "Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, AI tags",
 			featureID:    "tagged_dialect_syntax",
 			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
 			refs: []string{

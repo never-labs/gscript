@@ -79,6 +79,22 @@ done
 RUN_NAMES=()
 RUN_CMDS=()
 SKIP_REASONS=()
+RELEASE_CRITICAL_SKIP_NAMES=(
+    "Correctness"
+    "Manifest Coverage"
+    "Module Path Gate"
+    "Documentation References"
+    "Editor Assets"
+    "Performance Gate"
+    "Q Performance Gate"
+    "Language Conformance Surface"
+    "Q Conformance Gate"
+    "Release Smoke"
+    "CLI Experience"
+    "Public Release Blockers"
+    "Release Distribution"
+    "Release Artifacts"
+)
 
 add_run() {
     RUN_NAMES+=("$1")
@@ -87,6 +103,28 @@ add_run() {
 
 add_skip() {
     SKIP_REASONS+=("$1: $2")
+}
+
+is_release_critical_skip() {
+    local name="$1"
+    local critical
+    for critical in "${RELEASE_CRITICAL_SKIP_NAMES[@]}"; do
+        if [ "$name" = "$critical" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+release_critical_skips() {
+    local reason
+    local name
+    for reason in "${SKIP_REASONS[@]}"; do
+        name="${reason%%:*}"
+        if is_release_critical_skip "$name"; then
+            printf '%s\n' "$reason"
+        fi
+    done
 }
 
 have_cmd() {
@@ -541,6 +579,20 @@ fi
 if [ "$LIST_ONLY" -eq 1 ]; then
     artifact_log "list-only mode; no commands executed"
     exit 0
+fi
+
+if [ "$RELEASE_PROFILE" -eq 1 ]; then
+    critical_skips="$(release_critical_skips)"
+    if [ -n "$critical_skips" ]; then
+        echo
+        echo "Release profile requires these checks to run instead of skip:"
+        while IFS= read -r reason; do
+            [ -n "$reason" ] || continue
+            echo "  - $reason"
+            artifact_log "RELEASE-CRITICAL-SKIP $reason"
+        done <<< "$critical_skips"
+        exit 1
+    fi
 fi
 
 echo

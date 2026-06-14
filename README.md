@@ -8,8 +8,9 @@ Leia is a Go-native scripting language built for DSLs, dialects, and embedded au
   release gates tracking LuaJIT-class workloads and VM equivalence.
 - Analytics-native: q-style vector syntax, qSQL, typed runtime kernels, and
   high-throughput in-memory columnar computation.
-- Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, `llm`, and
-  host-defined dialects extend the language without expanding the core.
+- Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, AI tags such
+  as `model` and `turn`, and host-defined dialects extend the language without
+  expanding the core.
 
 The goal is a small language core with specialized runtime backends. Supported
 columnar and numeric hot paths are benchmarked against handwritten Go baselines
@@ -18,12 +19,8 @@ and external runtimes; performance claims stay tied to reproducible gates.
 ## Example
 
 ````leia
-prices := q`100 101.5 100.75 102.25`
-sizes := q`100 120 80 150`
-notional := q`100 101.5 100.75 102.25 * 100 120 80 150`
+trades := q```flip `sym`price`size`notional!(`AAPL`MSFT`AAPL`NVDA;100 101.5 100.75 102.25;100 120 80 150;10000 12180 8060 15337.5)```
 total := q`+/10000 12180 8060 15337.5`
-
-trades := q.eval("flip `sym`price`size`notional!(`AAPL`MSFT`AAPL`NVDA;100 101.5 100.75 102.25;100 120 80 150;10000 12180 8060 15337.5)")
 leaders := q.sql(trades, "select notional:sum notional, fills:count i by sym from trades order by notional desc")
 
 note := prompt`Top symbol ${leaders[1].sym}; notional ${leaders[1].notional}; total ${total}.`

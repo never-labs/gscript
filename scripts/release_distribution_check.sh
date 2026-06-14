@@ -208,6 +208,14 @@ optional_workflow .github/workflows/release.yml
 optional_workflow .github/workflows/distribution-check.yml
 optional_workflow .github/workflows/pages.yml
 
+if [[ -f .github/workflows/pages.yml ]]; then
+  require_file docs/_config.yml
+  require_contains docs/_config.yml "exclude:"
+  require_contains docs/_config.yml "spec/index.html"
+  require_contains .github/workflows/pages.yml "source: ./docs"
+  require_contains .github/workflows/pages.yml "destination: ./_site"
+fi
+
 require_contains .goreleaser.yaml "version: 2"
 require_contains .goreleaser.yaml "id: leia"
 require_contains .goreleaser.yaml "main: ./cmd/leia"

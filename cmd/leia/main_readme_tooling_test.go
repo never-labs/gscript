@@ -26,13 +26,14 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 		"Analytics-native:",
 		"q-style vector syntax",
 		"Dialect-native:",
+		"AI tags such",
 		"AI support lives in dialects and libraries, not in the core language runtime.",
 		"## Example",
 		"## Tooling",
 		"## References",
 		"[Documentation](docs/index.md)",
 		"[CLI and playground](docs/reference/cli/index.md)",
-		"q.eval(",
+		"q```",
 		"q.sql(",
 		"prompt`",
 	} {
@@ -89,7 +90,7 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("README must contain a Leia example")
 	}
-	for _, want := range []string{"q`", "q.eval(", "q.sql(", "prompt`", "print(note.text)"} {
+	for _, want := range []string{"q```", "q`", "q.sql(", "prompt`", "print(note.text)"} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}

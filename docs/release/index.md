@@ -53,7 +53,7 @@ dry-run matrix, and local `file://` tar.gz/zip install fixtures even when
 GitHub workflow files are intentionally absent:
 
 ```bash
-bash scripts/public_release_blockers_check.sh
+bash scripts/public_release_blockers_check.sh --require-resolved
 bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 bash scripts/install.sh --version v0.1.0 --base-url file:///tmp/leia-release --bin-dir /tmp/leia-bin
