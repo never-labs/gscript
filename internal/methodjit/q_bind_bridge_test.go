@@ -580,6 +580,48 @@ func BenchmarkQFrameVectorMethodJITRouteTier2FrameFilterProjectColumn(b *testing
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
 }
 
+func BenchmarkQFrameVectorMethodJITRouteTier2FrameRowPrimitives(b *testing.B) {
+	for _, tc := range qFrameRowPrimitiveRouteCases() {
+		b.Run(tc.name, func(b *testing.B) {
+			proto := tc.proto()
+			cl := vm.NewClosure(proto)
+			fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+			v := vm.New(map[string]runtime.Value{})
+			defer v.Close()
+			tm := NewTieringManager()
+			v.SetMethodJIT(tm)
+			args := tc.args(b)
+			if _, err := v.CallValue(fn, args); err != nil {
+				b.Fatalf("warm %s closure: %v", tc.kernel, err)
+			}
+			if err := tm.CompileTier2(proto); err != nil {
+				b.Fatalf("CompileTier2(%s): %v", tc.kernel, err)
+			}
+			for i := 0; i < 4; i++ {
+				if _, err := v.CallValue(fn, args); err != nil {
+					b.Fatalf("settle %s closure: %v", tc.kernel, err)
+				}
+			}
+
+			before := tm.QKernelExecutionStatsFor(proto)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				results, err := v.CallValue(fn, args)
+				if err != nil {
+					b.Fatalf("Tier2 %s: %v", tc.kernel, err)
+				}
+				if len(results) != 1 {
+					b.Fatalf("Tier2 %s results = %v, want one result", tc.kernel, results)
+				}
+				tc.assert(b, results[0])
+			}
+			b.StopTimer()
+			reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+		})
+	}
+}
+
 func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -785,6 +827,46 @@ func TestTier2DirectHelperBridgeFrameFilterProjectColumnRecordsDirectRoute(t *te
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "FrameFilterProjectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameFilterProjectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
 		t.Fatalf("FrameFilterProjectColumn op-exit route count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeFrameRowPrimitivesRecordDirectRoute(t *testing.T) {
+	for _, tc := range qFrameRowPrimitiveRouteCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			proto := tc.proto()
+			cf := &CompiledFunction{Proto: proto}
+			args := tc.args(t)
+			regs := make([]runtime.Value, 1+len(args)+1)
+			const base = 1
+			copy(regs[base+1:], args)
+			ctx := &ExecContext{
+				HelperCF:   uintptr(unsafe.Pointer(cf)),
+				RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+				Regs:       uintptr(unsafe.Pointer(&regs[base])),
+				RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+				OpExitOp:   int64(tc.op),
+				OpExitSlot: 0,
+				OpExitArg1: 1,
+				OpExitArg2: 2,
+				OpExitAux:  0,
+			}
+
+			beforeDirect := Tier2DirectHelperCallCount()
+			tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+			if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+				t.Fatalf("tier2JITHelperBridge %s error flag=%d err=%v", tc.kernel, ctx.HelperErrFlag, ctx.HelperErr)
+			}
+			if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+				t.Fatalf("%s direct helper calls = %d, want 1", tc.kernel, got)
+			}
+			tc.assert(t, regs[base])
+			stats := cf.QKernelExecutionStats()
+			assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", tc.kernel, tc.shape, string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+			assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", tc.kernel, string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+			if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", tc.kernel, string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
+				t.Fatalf("%s op-exit route count = %d, want 0", tc.kernel, got)
+			}
+		})
 	}
 }
 
@@ -1086,6 +1168,60 @@ func TestTier2FrameFilterProjectColumnUsesExpectedRuntimeRoute(t *testing.T) {
 	}
 }
 
+func TestTier2FrameRowPrimitivesUseExpectedRuntimeRoute(t *testing.T) {
+	for _, tc := range qFrameRowPrimitiveRouteCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			proto := tc.proto()
+			cl := vm.NewClosure(proto)
+			fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+			v := vm.New(map[string]runtime.Value{})
+			defer v.Close()
+			tm := NewTieringManager()
+			v.SetMethodJIT(tm)
+			args := tc.args(t)
+			if _, err := v.CallValue(fn, args); err != nil {
+				t.Fatalf("warm %s closure: %v", tc.kernel, err)
+			}
+			if err := tm.CompileTier2(proto); err != nil {
+				t.Fatalf("CompileTier2(%s): %v", tc.kernel, err)
+			}
+
+			beforeDirect := Tier2DirectHelperCallCount()
+			const calls = 8
+			for i := 0; i < calls; i++ {
+				results, err := v.CallValue(fn, args)
+				if err != nil {
+					t.Fatalf("Tier2 %s call %d: %v", tc.kernel, i, err)
+				}
+				if len(results) != 1 {
+					t.Fatalf("Tier2 %s results = %v, want one result", tc.kernel, results)
+				}
+				tc.assert(t, results[0])
+			}
+			if proto.EnteredTier2 == 0 {
+				t.Fatalf("%s closure never entered Tier2", tc.kernel)
+			}
+
+			stats := tm.QKernelExecutionStatsFor(proto)
+			directCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", tc.kernel, string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+			opExitCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", tc.kernel, string(qTypedRuntimeExecutionRouteOpExit), "success")
+			if tier2AltStackEnabled() {
+				if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+					t.Fatalf("%s direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", tc.kernel, stats)
+				}
+				if directCount == 0 {
+					t.Fatalf("%s direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", tc.kernel, stats)
+				}
+			} else if directCount != 0 {
+				t.Fatalf("%s direct helper route recorded with alt-stack disabled; stats=%+v", tc.kernel, stats)
+			}
+			if directCount+opExitCount == 0 {
+				t.Fatalf("%s runtime route stats missing; stats=%+v", tc.kernel, stats)
+			}
+		})
+	}
+}
+
 func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, outcome string) uint64 {
 	var count uint64
 	for _, row := range rows {
@@ -1233,6 +1369,119 @@ func qFrameFilterProjectColumnRouteProto() *vm.FuncProto {
 	}
 }
 
+type qFrameRowPrimitiveRouteCase struct {
+	name   string
+	kernel string
+	shape  string
+	op     Op
+	proto  func() *vm.FuncProto
+	args   func(testing.TB) []runtime.Value
+	assert func(testing.TB, runtime.Value)
+}
+
+func qFrameRowPrimitiveRouteCases() []qFrameRowPrimitiveRouteCase {
+	return []qFrameRowPrimitiveRouteCase{
+		{
+			name:   "gather",
+			kernel: "FrameGather",
+			shape:  "gather",
+			op:     OpFrameGather,
+			proto:  qFrameGatherRouteProto,
+			args:   qFrameGatherRouteArgs,
+			assert: assertFrameGatherRouteResult,
+		},
+		{
+			name:   "slice",
+			kernel: "FrameSlice",
+			shape:  "slice",
+			op:     OpFrameSlice,
+			proto:  qFrameSliceRouteProto,
+			args:   qFrameSliceRouteArgs,
+			assert: assertFrameSliceRouteResult,
+		},
+		{
+			name:   "order",
+			kernel: "FrameOrder",
+			shape:  "order",
+			op:     OpFrameOrder,
+			proto:  qFrameOrderRouteProto,
+			args:   qFrameOrderRouteArgs,
+			assert: assertFrameOrderRouteResult,
+		},
+		{
+			name:   "order_gather",
+			kernel: "FrameOrderGather",
+			shape:  "order/gather",
+			op:     OpFrameOrderGather,
+			proto:  qFrameOrderGatherRouteProto,
+			args:   qFrameOrderGatherRouteArgs,
+			assert: assertFrameOrderGatherRouteResult,
+		},
+	}
+}
+
+func qFrameGatherRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_gather_tier2_route",
+		NumParams: 2,
+		MaxStack:  2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_GATHER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qFrameSliceRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_slice_tier2_route",
+		NumParams: 2,
+		MaxStack:  2,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_SLICE, 0, 0, 1),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qFrameOrderRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_order_tier2_route",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			qFrameOrderSpecValue("price", true, 2),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qFrameOrderGatherRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_order_gather_tier2_route",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			qFrameOrderSpecValue("price", true, 2),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_ORDER_GATHER, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qFrameOrderSpecValue(column string, desc bool, limit int64) runtime.Value {
+	spec := runtime.NewTable()
+	spec.RawSetString("column", runtime.StringValue(column))
+	spec.RawSetString("desc", runtime.BoolValue(desc))
+	spec.RawSetString("limit", runtime.IntValue(limit))
+	return runtime.TableValue(spec)
+}
+
 func qFrameProjectColumnSpecValue(name string) runtime.Value {
 	spec := runtime.NewTable()
 	spec.RawSetString("project", runtime.StringValue(name))
@@ -1275,6 +1524,32 @@ func qFrameFilterProjectColumnRouteArgs(tb testing.TB) []runtime.Value {
 	}
 }
 
+func qFrameGatherRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{
+		runtime.TableValue(qVectorGatherReduceRouteFrame(tb)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	}
+}
+
+func qFrameSliceRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{
+		runtime.TableValue(qVectorGatherReduceRouteFrame(tb)),
+		runtime.IntValue(2),
+	}
+}
+
+func qFrameOrderRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(tb))}
+}
+
+func qFrameOrderGatherRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(tb))}
+}
+
 func assertQFrameSelectColumnRouteResult(tb testing.TB, value runtime.Value) {
 	tb.Helper()
 	if !value.IsDenseArray() {
@@ -1284,6 +1559,32 @@ func assertQFrameSelectColumnRouteResult(tb testing.TB, value runtime.Value) {
 	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
 		tb.Fatalf("QFrameSelectColumn values = %#v, want [10 20]", got)
 	}
+}
+
+func assertFrameGatherRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	assertFrameSizeColumn(tb, value, []int64{20, 5})
+}
+
+func assertFrameSliceRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	assertFrameSizeColumn(tb, value, []int64{5, 10})
+}
+
+func assertFrameOrderRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	if !value.IsDenseArray() {
+		tb.Fatalf("FrameOrder result = %v, want dense array", value)
+	}
+	got, ok := value.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 3 || got[1] != 2 {
+		tb.Fatalf("FrameOrder indexes = %#v, want [3 2]", got)
+	}
+}
+
+func assertFrameOrderGatherRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	assertFrameSizeColumn(tb, value, []int64{20, 10})
 }
 
 func assertFrameProjectColumnRouteResult(tb testing.TB, value runtime.Value) {
@@ -1305,6 +1606,26 @@ func assertFrameFilterProjectColumnRouteResult(tb testing.TB, value runtime.Valu
 	got, ok := value.DenseArray().I64()
 	if !ok || len(got) != 2 || got[0] != 5 || got[1] != 20 {
 		tb.Fatalf("FrameFilterProjectColumn values = %#v, want [5 20]", got)
+	}
+}
+
+func assertFrameSizeColumn(tb testing.TB, value runtime.Value, want []int64) {
+	tb.Helper()
+	col, err := executeFrameColumnValue(value, "size")
+	if err != nil {
+		tb.Fatalf("frame size column: %v", err)
+	}
+	if !col.IsDenseArray() {
+		tb.Fatalf("frame size column result = %v, want dense array", col)
+	}
+	got, ok := col.DenseArray().I64()
+	if !ok || len(got) != len(want) {
+		tb.Fatalf("frame size values = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			tb.Fatalf("frame size values = %#v, want %#v", got, want)
+		}
 	}
 }
 

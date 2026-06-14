@@ -422,24 +422,30 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameGather op-exit out of register range")
 		}
-		out, err := executeFrameGatherValue(regs[absArg1], regs[absArg2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameGather op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameGather(
+			regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameGather, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameGather, "success")
 		regs[absSlot] = out
 
 	case OpFrameSlice:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("FrameSlice op-exit out of register range")
 		}
-		out, err := executeFrameSliceValue(regs[absArg1], regs[absArg2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameSlice op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameSlice(
+			regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameSlice, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameSlice, "success")
 		regs[absSlot] = out
 
 	case OpFrameOrder:
@@ -449,12 +455,15 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameOrder spec constant is out of range")
 		}
-		out, err := executeFrameOrderValue(regs[absArg1], proto.Constants[aux])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameOrder op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameOrder(
+			regs[absArg1], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrder, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrder, "success")
 		regs[absSlot] = out
 
 	case OpFrameOrderGather:
@@ -464,12 +473,15 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if aux < 0 || proto == nil || aux >= len(proto.Constants) {
 			return fmt.Errorf("FrameOrderGather spec constant is out of range")
 		}
-		out, err := executeFrameOrderGatherValue(regs[absArg1], proto.Constants[aux])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("FrameOrderGather op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameOrderGather(
+			regs[absArg1], proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrderGather, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpFrameOrderGather, "success")
 		regs[absSlot] = out
 
 	case OpFrameProjectColumn:

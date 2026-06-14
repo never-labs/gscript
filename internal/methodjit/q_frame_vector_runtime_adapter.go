@@ -53,6 +53,50 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeFrameFilterProjectColumn(fra
 	return out, nil
 }
 
+func (a qFrameVectorRuntimeExecutionAdapter) executeFrameGather(frameVal, indexVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "gather"
+	out, err := executeFrameGatherValue(frameVal, indexVal)
+	if err != nil {
+		a.recordFrame("FrameGather", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	a.recordFrame("FrameGather", shape, route, "success", frameVal)
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeFrameSlice(frameVal, endVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "slice"
+	out, err := executeFrameSliceValue(frameVal, endVal)
+	if err != nil {
+		a.recordFrame("FrameSlice", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	a.recordFrame("FrameSlice", shape, route, "success", frameVal)
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeFrameOrder(frameVal, specVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "order"
+	out, err := executeFrameOrderValue(frameVal, specVal)
+	if err != nil {
+		a.recordFrame("FrameOrder", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	a.recordFrame("FrameOrder", shape, route, "success", frameVal)
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeFrameOrderGather(frameVal, specVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "order/gather"
+	out, err := executeFrameOrderGatherValue(frameVal, specVal)
+	if err != nil {
+		a.recordFrame("FrameOrderGather", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	a.recordFrame("FrameOrderGather", shape, route, "success", frameVal)
+	return out, nil
+}
+
 func (a qFrameVectorRuntimeExecutionAdapter) executeFrameGroupAggregate(frameVal, maskVal, specVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
 	shape := qFrameGroupAggregateRuntimeShapeFromMaskValue(maskVal)
 	out, err := executeFrameGroupAggregateValue(frameVal, maskVal, specVal)

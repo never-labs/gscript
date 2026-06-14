@@ -1105,24 +1105,22 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameGather op-exit out of register range")
 		}
-		out, err := executeFrameGatherValue(regs[arg1], regs[arg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameGather(
+			regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameGather, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameGather, "success")
 		regs[slot] = out
 
 	case OpFrameSlice:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("FrameSlice op-exit out of register range")
 		}
-		out, err := executeFrameSliceValue(regs[arg1], regs[arg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameSlice(
+			regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameSlice, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameSlice, "success")
 		regs[slot] = out
 
 	case OpFrameOrder:
@@ -1132,12 +1130,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameOrder spec constant is out of range")
 		}
-		out, err := executeFrameOrderValue(regs[arg1], cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameOrder(
+			regs[arg1], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameOrder, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameOrder, "success")
 		regs[slot] = out
 
 	case OpFrameOrderGather:
@@ -1147,12 +1144,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameOrderGather spec constant is out of range")
 		}
-		out, err := executeFrameOrderGatherValue(regs[arg1], cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameOrderGather(
+			regs[arg1], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameOrderGather, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameOrderGather, "success")
 		regs[slot] = out
 
 	case OpFrameProjectColumn:
