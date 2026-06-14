@@ -102,9 +102,9 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 
 	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 
-	if instr.Op == OpQVectorGatherReduce && tier2AltStackEnabled() && ec.selfCFCell != nil {
-		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_gather_helper_err_%d", instr.ID))
-		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_gather_helper_exit_%d", instr.ID))
+	if (instr.Op == OpQVectorGatherReduce || instr.Op == OpFrameGroupAggregate) && tier2AltStackEnabled() && ec.selfCFCell != nil {
+		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_op_helper_err_%d", instr.ID))
+		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_op_helper_exit_%d", instr.ID))
 		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)
 		asm.CBZ(jit.X0, genericExitLabel)
 		ec.emitDirectHelperSelfCF()

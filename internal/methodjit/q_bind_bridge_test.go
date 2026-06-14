@@ -428,6 +428,44 @@ func BenchmarkQFrameVectorMethodJITRouteTier2QVectorGatherReduce(b *testing.B) {
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
 }
 
+func BenchmarkQFrameVectorMethodJITRouteTier2FrameGroupAggregate(b *testing.B) {
+	proto := qFrameGroupAggregateRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameGroupAggregateRouteArgs(b)
+	if _, err := v.CallValue(fn, args); err != nil {
+		b.Fatalf("warm FrameGroupAggregate closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		b.Fatalf("CompileTier2(FrameGroupAggregate): %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatalf("settle FrameGroupAggregate closure: %v", err)
+		}
+	}
+
+	before := tm.QKernelExecutionStatsFor(proto)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatalf("Tier2 FrameGroupAggregate: %v", err)
+		}
+		if len(results) != 1 {
+			b.Fatalf("Tier2 FrameGroupAggregate results = %v, want one result", results)
+		}
+		assertFrameGroupAggregateRouteResult(b, results[0])
+	}
+	b.StopTimer()
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+}
+
 func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -497,6 +535,35 @@ func TestTier2DirectHelperBridgeQVectorGatherReduceRecordsDirectRoute(t *testing
 	stats := cf.QKernelExecutionStats()
 	assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_vector_runtime", "QVectorGatherReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+}
+
+func TestTier2DirectHelperBridgeFrameGroupAggregateRecordsDirectRoute(t *testing.T) {
+	proto := qFrameGroupAggregateRouteProto()
+	cf := &CompiledFunction{Proto: proto}
+	regs := make([]runtime.Value, 4)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	regs[base+2] = runtime.NilValue()
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpFrameGroupAggregate),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+		OpExitAux:  0,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge FrameGroupAggregate error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	assertFrameGroupAggregateRouteResult(t, regs[base])
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "group/aggregate", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "FrameGroupAggregate", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 }
 
 func TestTier2QVectorWhereReduceUsesExpectedRuntimeRoute(t *testing.T) {
@@ -597,6 +664,56 @@ func TestTier2QVectorGatherReduceUsesExpectedRuntimeRoute(t *testing.T) {
 	}
 }
 
+func TestTier2FrameGroupAggregateUsesExpectedRuntimeRoute(t *testing.T) {
+	proto := qFrameGroupAggregateRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameGroupAggregateRouteArgs(t)
+	if _, err := v.CallValue(fn, args); err != nil {
+		t.Fatalf("warm FrameGroupAggregate closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		t.Fatalf("CompileTier2(FrameGroupAggregate): %v", err)
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	const calls = 8
+	for i := 0; i < calls; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			t.Fatalf("Tier2 FrameGroupAggregate call %d: %v", i, err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("Tier2 FrameGroupAggregate results = %v, want one result", results)
+		}
+		assertFrameGroupAggregateRouteResult(t, results[0])
+	}
+	if proto.EnteredTier2 == 0 {
+		t.Fatalf("FrameGroupAggregate closure never entered Tier2")
+	}
+
+	stats := tm.QKernelExecutionStatsFor(proto)
+	directCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameGroupAggregate", string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+	opExitCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameGroupAggregate", string(qTypedRuntimeExecutionRouteOpExit), "success")
+	if tier2AltStackEnabled() {
+		if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+			t.Fatalf("FrameGroupAggregate direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+		if directCount == 0 {
+			t.Fatalf("FrameGroupAggregate direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+	} else if directCount != 0 {
+		t.Fatalf("FrameGroupAggregate direct helper route recorded with alt-stack disabled; stats=%+v", stats)
+	}
+	if directCount+opExitCount == 0 {
+		t.Fatalf("FrameGroupAggregate runtime route stats missing; stats=%+v", stats)
+	}
+}
+
 func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, outcome string) uint64 {
 	var count uint64
 	for _, row := range rows {
@@ -671,6 +788,71 @@ func qVectorGatherReduceRouteFrame(tb testing.TB) *runtime.Table {
 		SchemaHash: "q-vector-gather-route",
 	})
 	return frame
+}
+
+func qFrameGroupAggregateRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_group_aggregate_tier2_route",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.TableValue(qFrameGroupAggregateSpec("size", []runtime.FrameAggregateSpec{
+				{Name: "total", Op: "sum", Column: "price"},
+				{Name: "fills", Op: "count"},
+			})),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+}
+
+func qFrameGroupAggregateRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{
+		runtime.TableValue(qVectorGatherReduceRouteFrame(tb)),
+		runtime.NilValue(),
+	}
+}
+
+func assertFrameGroupAggregateRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	if !value.IsTable() {
+		tb.Fatalf("FrameGroupAggregate result = %v, want table", value)
+	}
+	payload, info, ok := value.Table().NativeFramePayload()
+	if !ok || info.Rows != 3 || info.Columns != 3 {
+		tb.Fatalf("FrameGroupAggregate payload = %#v info=%#v ok=%v, want 3x3 native frame", payload, info, ok)
+	}
+	soa, ok := payload.(*runtime.SoA)
+	if !ok {
+		tb.Fatalf("FrameGroupAggregate payload type = %T, want *runtime.SoA", payload)
+	}
+	size, ok := soa.Column("size")
+	if !ok {
+		tb.Fatalf("FrameGroupAggregate result missing size column")
+	}
+	total, ok := soa.Column("total")
+	if !ok {
+		tb.Fatalf("FrameGroupAggregate result missing total column")
+	}
+	fills, ok := soa.Column("fills")
+	if !ok {
+		tb.Fatalf("FrameGroupAggregate result missing fills column")
+	}
+	sizeVals, _ := size.I64()
+	totalVals, _ := total.F64()
+	fillVals, _ := fills.I64()
+	if len(sizeVals) != 3 || sizeVals[0] != 5 || sizeVals[1] != 10 || sizeVals[2] != 20 {
+		tb.Fatalf("FrameGroupAggregate size values = %#v, want [5 10 20]", sizeVals)
+	}
+	if len(totalVals) != 3 || totalVals[0] != 99 || totalVals[1] != 100.5 || totalVals[2] != 101.25 {
+		tb.Fatalf("FrameGroupAggregate total values = %#v, want [99 100.5 101.25]", totalVals)
+	}
+	if len(fillVals) != 3 || fillVals[0] != 1 || fillVals[1] != 1 || fillVals[2] != 1 {
+		tb.Fatalf("FrameGroupAggregate fills values = %#v, want [1 1 1]", fillVals)
+	}
 }
 
 func qKernelExecutionStatsDelta(before, after []QKernelExecutionStat) []QKernelExecutionStat {
