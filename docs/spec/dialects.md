@@ -45,6 +45,12 @@ body plus the evaluated values. The dialect decides whether an interpolated
 value is escaped as text, encoded as JSON, bound as a parameter, converted to a
 q value, or rejected.
 
+Literal source text and interpolated values are distinct at the dialect
+boundary. Source text is preserved byte-for-byte; only `${expr}` results pass
+through the dialect's value encoder. This lets a dialect safely treat a tagged
+body such as `sum ${xs}` as raw dialect source `sum ` plus an encoded Leia
+value, instead of forcing every value through generic string conversion.
+
 Interpolation must preserve normal Leia evaluation order and error behavior.
 If evaluating an interpolation expression fails, the dialect implementation is
 not invoked.

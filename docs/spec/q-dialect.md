@@ -74,6 +74,40 @@ assert(leader[1].qty == 18)
 assert(leader[1].avg_px == 100.375)
 ```
 
+## Interpolation
+
+q tagged strings use the generic dialect interpolation boundary with a q-aware
+encoder for `${expr}` values. Literal q source remains raw q text; interpolated
+Leia values are rendered as q source fragments before the q parser runs.
+
+Stable q interpolation encodings are:
+
+| Leia value | q source fragment |
+|---|---|
+| Integer or float | Numeric literal. |
+| Boolean | `1b` or `0b`. |
+| String | q string literal with escapes. |
+| `nil` | `0N`. |
+| Dense sequential list/table | Space-separated q list, recursively encoded. |
+
+Non-sequential tables are not implicitly stringified for q interpolation.
+Implementations must reject them with a diagnostic instead of emitting pointer
+text such as `table: ...`.
+
+```leia run all
+a := [1,2,3,4,5,6,7,8,6]
+x := q`sum ${a}`
+assert(x == 42)
+
+name := "abc"
+n := q`count ${name}`
+assert(n == 3)
+
+flag := true
+choice := q`$[${flag};10;20]`
+assert(choice == 10)
+```
+
 ## qSQL
 
 qSQL is part of the q dialect, not a separate language runtime. qSQL forms

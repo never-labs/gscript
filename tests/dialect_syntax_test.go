@@ -939,6 +939,33 @@ func TestStringInterpolationFormsExecuteThroughInterpreterAndBytecode(t *testing
 	}
 }
 
+func TestQTaggedInterpolationEncodesLeiaLists(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibAll)}, tc.opts...)...)
+			if err := vm.Exec(`
+a := [1,2,3,4,5,6,7,8,6]
+x := q` + "`sum ${a}`" + `
+name := "abc"
+n := q` + "`count ${name}`" + `
+flag := true
+choice := q` + "`$[${flag};10;20]`" + `
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "x", int64(42))
+			assertGet(t, vm, "n", int64(3))
+			assertGet(t, vm, "choice", int64(10))
+		})
+	}
+}
+
 func assertGet(t *testing.T, vm *leia.VM, name string, want any) {
 	t.Helper()
 	got, err := vm.Get(name)

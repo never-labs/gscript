@@ -1864,6 +1864,7 @@ tag! { fields }</code></pre>
 <h3 id="tagged-dialects-interpolation">Interpolation</h3>
 <p>Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged raw strings may contain <code>${expr}</code> interpolation segments.</p>
 <p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a q value, or rejected.</p>
+<p>Literal source text and interpolated values are distinct at the dialect boundary. Source text is preserved byte-for-byte; only <code>${expr}</code> results pass through the dialect&#x27;s value encoder. This lets a dialect safely treat a tagged body such as <code>sum ${xs}</code> as raw dialect source <code>sum </code> plus an encoded Leia value, instead of forcing every value through generic string conversion.</p>
 <p>Interpolation must preserve normal Leia evaluation order and error behavior. If evaluating an interpolation expression fails, the dialect implementation is not invoked.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&quot;Ada&quot;</span>
 profile <span class="tok-operator">:=</span> <span class="tok-dialect">json</span><span class="tok-string">`</span><span class="tok-string">{&quot;name&quot;: &quot;${name}&quot;, &quot;score&quot;: ${40 + 2}}</span><span class="tok-string">`</span>
@@ -1960,6 +1961,30 @@ leader <span class="tok-operator">:=</span> q.sql(trades, <span class="tok-strin
 <span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].sym <span class="tok-operator">==</span> <span class="tok-string">&quot;AAPL&quot;</span>)
 <span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].qty <span class="tok-operator">==</span> <span class="tok-number">18</span>)
 <span class="tok-builtin">assert</span>(leader[<span class="tok-number">1</span>].avg_px <span class="tok-operator">==</span> <span class="tok-number">100.375</span>)</code></pre>
+<h3 id="q-dialect-interpolation">Interpolation</h3>
+<p>q tagged strings use the generic dialect interpolation boundary with a q-aware encoder for <code>${expr}</code> values. Literal q source remains raw q text; interpolated Leia values are rendered as q source fragments before the q parser runs.</p>
+<p>Stable q interpolation encodings are:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Leia value</th><th>q source fragment</th></tr></thead>
+<tbody>
+<tr><td>Integer or float</td><td>Numeric literal.</td></tr>
+<tr><td>Boolean</td><td><code>1b</code> or <code>0b</code>.</td></tr>
+<tr><td>String</td><td>q string literal with escapes.</td></tr>
+<tr><td><code>nil</code></td><td><code>0N</code>.</td></tr>
+<tr><td>Dense sequential list/table</td><td>Space-separated q list, recursively encoded.</td></tr>
+</tbody></table></div>
+<p>Non-sequential tables are not implicitly stringified for q interpolation. Implementations must reject them with a diagnostic instead of emitting pointer text such as <code>table: ...</code>.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">a <span class="tok-operator">:=</span> [<span class="tok-number">1</span>,<span class="tok-number">2</span>,<span class="tok-number">3</span>,<span class="tok-number">4</span>,<span class="tok-number">5</span>,<span class="tok-number">6</span>,<span class="tok-number">7</span>,<span class="tok-number">8</span>,<span class="tok-number">6</span>]
+x <span class="tok-operator">:=</span> <span class="tok-dialect">q</span><span class="tok-string">`</span><span class="tok-q-keyword">sum</span> ${a}<span class="tok-string">`</span>
+<span class="tok-builtin">assert</span>(x <span class="tok-operator">==</span> <span class="tok-number">42</span>)
+
+name <span class="tok-operator">:=</span> <span class="tok-string">&quot;abc&quot;</span>
+n <span class="tok-operator">:=</span> <span class="tok-dialect">q</span><span class="tok-string">`</span><span class="tok-q-keyword">count</span> ${name}<span class="tok-string">`</span>
+<span class="tok-builtin">assert</span>(n <span class="tok-operator">==</span> <span class="tok-number">3</span>)
+
+flag <span class="tok-operator">:=</span> <span class="tok-constant">true</span>
+choice <span class="tok-operator">:=</span> <span class="tok-dialect">q</span><span class="tok-string">`</span>$[${flag}<span class="tok-operator">;</span><span class="tok-number">10</span><span class="tok-operator">;</span><span class="tok-number">20</span>]<span class="tok-string">`</span>
+<span class="tok-builtin">assert</span>(choice <span class="tok-operator">==</span> <span class="tok-number">10</span>)</code></pre>
 <h3 id="q-dialect-qsql">qSQL</h3>
 <p>qSQL is part of the q dialect, not a separate language runtime. qSQL forms lower to query plans over frame-like values. The implementation may execute a plan with interpreter helpers, typed runtime kernels, cached shape plans, or JIT handoff, but the visible result must be the same for supported shapes.</p>
 <p>Stable qSQL behavior includes:</p>

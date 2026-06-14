@@ -2992,6 +2992,12 @@ body plus the evaluated values. The dialect decides whether an interpolated
 value is escaped as text, encoded as JSON, bound as a parameter, converted to a
 q value, or rejected.
 
+Literal source text and interpolated values are distinct at the dialect
+boundary. Source text is preserved byte-for-byte; only `${expr}` results pass
+through the dialect's value encoder. This lets a dialect safely treat a tagged
+body such as `sum ${xs}` as raw dialect source `sum ` plus an encoded Leia
+value, instead of forcing every value through generic string conversion.
+
 Interpolation must preserve normal Leia evaluation order and error behavior.
 If evaluating an interpolation expression fails, the dialect implementation is
 not invoked.
@@ -3159,6 +3165,40 @@ leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades or
 assert(leader[1].sym == "AAPL")
 assert(leader[1].qty == 18)
 assert(leader[1].avg_px == 100.375)
+```
+
+### Interpolation
+
+q tagged strings use the generic dialect interpolation boundary with a q-aware
+encoder for `${expr}` values. Literal q source remains raw q text; interpolated
+Leia values are rendered as q source fragments before the q parser runs.
+
+Stable q interpolation encodings are:
+
+| Leia value | q source fragment |
+|---|---|
+| Integer or float | Numeric literal. |
+| Boolean | `1b` or `0b`. |
+| String | q string literal with escapes. |
+| `nil` | `0N`. |
+| Dense sequential list/table | Space-separated q list, recursively encoded. |
+
+Non-sequential tables are not implicitly stringified for q interpolation.
+Implementations must reject them with a diagnostic instead of emitting pointer
+text such as `table: ...`.
+
+```leia
+a := [1,2,3,4,5,6,7,8,6]
+x := q`sum ${a}`
+assert(x == 42)
+
+name := "abc"
+n := q`count ${name}`
+assert(n == 3)
+
+flag := true
+choice := q`$[${flag};10;20]`
+assert(choice == 10)
 ```
 
 ### qSQL

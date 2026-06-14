@@ -3,6 +3,7 @@ package bind
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -51,6 +52,17 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 			return nil, fmt.Errorf("bad arguments to 'dialect.eval' (tag and body expected)")
 		}
 		return eval(args[0].Str(), args[1], optionalTableArg(args, 2))
+	})
+
+	set("interpolate", func(args []Value) ([]Value, error) {
+		if len(args) < 3 || !args[0].IsString() || !args[1].IsTable() || !args[2].IsTable() {
+			return nil, fmt.Errorf("bad arguments to 'dialect.interpolate' (tag, raw parts, and values expected)")
+		}
+		text, err := dialectInterpolate(args[0].Str(), args[1].Table(), args[2].Table())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(text)}, nil
 	})
 
 	set("tags", func(args []Value) ([]Value, error) {
@@ -116,6 +128,110 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 	})
 
 	return t
+}
+
+func dialectInterpolate(tag string, rawParts, values *Table) (string, error) {
+	if rawParts == nil || values == nil {
+		return "", fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts and values must be tables)")
+	}
+	rawCount := rawParts.Len()
+	valueCount := values.Len()
+	if rawCount != valueCount+1 {
+		return "", fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts must contain exactly one more entry than values)")
+	}
+	var b strings.Builder
+	for i := 1; i <= rawCount; i++ {
+		raw := rawParts.RawGetInt(int64(i))
+		if !raw.IsString() {
+			return "", fmt.Errorf("bad arguments to 'dialect.interpolate' (raw part %d must be a string)", i)
+		}
+		b.WriteString(raw.Str())
+		if i > valueCount {
+			continue
+		}
+		text, err := dialectInterpolationPart(tag, values.RawGetInt(int64(i)))
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(text)
+	}
+	return b.String(), nil
+}
+
+func dialectInterpolationPart(tag string, part Value) (string, error) {
+	switch tag {
+	case "q", "qsql":
+		return dialectQInterpolationValue(part)
+	default:
+		return part.String(), nil
+	}
+}
+
+func dialectQInterpolationValue(v Value) (string, error) {
+	switch {
+	case v.IsNil():
+		return "0N", nil
+	case v.IsBool():
+		if v.Bool() {
+			return "1b", nil
+		}
+		return "0b", nil
+	case v.IsInt():
+		return strconv.FormatInt(v.Int(), 10), nil
+	case v.IsFloat():
+		return strconv.FormatFloat(v.Float(), 'g', -1, 64), nil
+	case v.IsString():
+		return dialectQString(v.Str()), nil
+	case v.IsTable():
+		return dialectQInterpolationTable(v.Table())
+	default:
+		return v.String(), nil
+	}
+}
+
+func dialectQInterpolationTable(t *Table) (string, error) {
+	if t == nil {
+		return "()", nil
+	}
+	n := t.Len()
+	if n == 0 {
+		return "()", nil
+	}
+	parts := make([]string, 0, n)
+	for i := 1; i <= n; i++ {
+		v := t.RawGetInt(int64(i))
+		if v.IsNil() {
+			return "", fmt.Errorf("q interpolation expects a dense sequential list; missing index %d", i)
+		}
+		text, err := dialectQInterpolationValue(v)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, " "), nil
+}
+
+func dialectQString(s string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '\\', '"':
+			b.WriteByte('\\')
+			b.WriteRune(r)
+		case '\n':
+			b.WriteString("\\n")
+		case '\r':
+			b.WriteString("\\r")
+		case '\t':
+			b.WriteString("\\t")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func dialectMode(opts *Table) string {

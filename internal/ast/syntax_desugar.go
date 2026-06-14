@@ -122,7 +122,7 @@ func desugarExpr(expr Expr) Expr {
 	case *InterpolatedStringExpr:
 		return interpolatedStringConcat(e)
 	case *TaggedStringExpr:
-		return dialectCall(e.P, "eval", e.Tag, e.Body, nil, e.FailFast)
+		return dialectCall(e.P, "eval", e.Tag, taggedStringBody(e.P, e.Tag, e.Body), nil, e.FailFast)
 	case *TaggedBlockExpr:
 		if e.Body != nil {
 			return dialectCall(e.P, "eval_raw", e.Tag, &FuncLitExpr{P: e.P, Body: desugarBlock(e.Body)}, nil, e.FailFast)
@@ -157,6 +157,39 @@ func desugarExpr(expr Expr) Expr {
 	default:
 		return expr
 	}
+}
+
+func taggedStringBody(pos Pos, tag string, body Expr) Expr {
+	interp, ok := body.(*InterpolatedStringExpr)
+	if !ok {
+		return body
+	}
+	rawParts := make([]Expr, 0, len(interp.Parts)+1)
+	values := make([]Expr, 0, len(interp.Parts))
+	rawParts = append(rawParts, &StringLit{P: pos, Value: ""})
+	for _, part := range interp.Parts {
+		if part.Expr != nil {
+			values = append(values, desugarExpr(part.Expr))
+			rawParts = append(rawParts, &StringLit{P: pos, Value: ""})
+			continue
+		}
+		if part.Text != "" {
+			rawParts[len(rawParts)-1] = &StringLit{P: interp.P, Value: part.Text}
+		}
+	}
+	return runtimeTableCall(pos, "dialect", "interpolate",
+		&StringLit{P: pos, Value: tag},
+		dialectInterpolationArray(pos, rawParts),
+		dialectInterpolationArray(pos, values),
+	)
+}
+
+func dialectInterpolationArray(pos Pos, values []Expr) Expr {
+	fields := make([]TableField, 0, len(values))
+	for _, value := range values {
+		fields = append(fields, TableField{Value: value})
+	}
+	return &TableLitExpr{P: pos, Fields: fields}
 }
 
 func interpolatedStringConcat(e *InterpolatedStringExpr) Expr {
