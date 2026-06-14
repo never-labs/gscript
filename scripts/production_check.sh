@@ -310,7 +310,7 @@ add_release_artifacts_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh --build --require-clean"
+        add_run "Release Artifacts" "artifact_args=(--build --require-clean); if [ -n \"\${LEIA_RELEASE_REQUIRE_TAG:-}\" ]; then artifact_args+=(--require-tag --version \"\${LEIA_RELEASE_ARTIFACT_VERSION:-\$(git describe --tags --exact-match)}\"); fi; bash scripts/release_artifacts_check.sh \"\${artifact_args[@]}\""
         return
     fi
     if ! have_cmd go; then

@@ -100,7 +100,7 @@ Editor integration files are checked in:
 
 These should point to the local tree-sitter grammar until a public
 `tree-sitter-leia` package is published. See
-[`tools/tree-sitter-leia/README.md`](../../tools/tree-sitter-leia/README.md).
+[`tools/tree-sitter-leia/README.md`](https://github.com/never-labs/leia/blob/main/tools/tree-sitter-leia/README.md).
 
 ## Release Expectations
 

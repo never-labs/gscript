@@ -13,7 +13,6 @@ go run ./cmd/leia playground --help
 ## Language
 
 - [Language specification](spec/index.md)
-- [Language specification HTML](spec/index.html)
 - [Language overview](spec/language.md)
 - [Grammar appendix](spec/grammar.ebnf)
 - [Getting started](tutorial/getting-started.md)
@@ -51,14 +50,14 @@ go run ./cmd/leia playground --help
 ## Examples And Release
 
 - [Examples](examples/index.md)
-- [Example tree README](../examples/README.md)
+- [Example tree README](https://github.com/never-labs/leia/blob/main/examples/README.md)
 - [Cookbook](cookbook/index.md)
 - [Tooling guide](guides/tooling.md)
 - [Testing and release gates](testing.md)
 - [Release process](release/index.md)
 - [Release decisions](release/decisions.md)
 - [Governance](governance.md)
-- [Contributing](../CONTRIBUTING.md)
-- [Security policy](../SECURITY.md)
-- [Code of conduct](../CODE_OF_CONDUCT.md)
+- [Contributing](https://github.com/never-labs/leia/blob/main/CONTRIBUTING.md)
+- [Security policy](https://github.com/never-labs/leia/blob/main/SECURITY.md)
+- [Code of conduct](https://github.com/never-labs/leia/blob/main/CODE_OF_CONDUCT.md)
 - [Performance contribution guide](contributing/performance.md)

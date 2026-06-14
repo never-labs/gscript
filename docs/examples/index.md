@@ -4,8 +4,8 @@ The `examples/` tree is part of the product surface. It shows how the language
 is meant to feel for small scripts, host embeddings, AI agents, data-oriented
 code, concurrency, web scripts, and game-style programs.
 
-The repository-local example policy and dependency notes live in
-[`../../examples/README.md`](../../examples/README.md).
+The repository-local example policy and dependency notes live in the
+[example tree README](https://github.com/never-labs/leia/blob/main/examples/README.md).
 Commands on this page assume the current directory is the repository root.
 
 ## First Examples

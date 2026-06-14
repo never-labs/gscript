@@ -697,6 +697,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
 				"check_local_install_fixture",
 				"install accepted archive with unexpected entry",
+				"install accepted zip archive with unexpected entry",
 				"--base-url \"file://$release_dir\"",
 				"local install fixture verified",
 			},
@@ -724,6 +725,8 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"name: Release",
 				"go run ./cmd/leia ci release",
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
+				"LEIA_RELEASE_REQUIRE_TAG=1",
+				"LEIA_RELEASE_ARTIFACT_VERSION=\"${GITHUB_REF_NAME}\"",
 				"goreleaser release --snapshot --clean --skip=publish",
 				"goreleaser release --clean",
 				"secrets.GITHUB_TOKEN",
@@ -890,6 +893,7 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		"## Release Evidence",
 		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
 		"go run ./cmd/leia doc check",
+		"GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`",
 		"go run ./cmd/leia diag bundle --output /tmp/leia-diag --skip-benchmarks",
 		"go run ./cmd/leia playground --help",
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
@@ -985,13 +989,19 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
 	for _, ref := range []string{
-		"../SECURITY.md",
-		"../CONTRIBUTING.md",
-		"../CODE_OF_CONDUCT.md",
-		"../examples/README.md",
 		"contributing/performance.md",
 		"reference/platforms/index.md",
 		"release/decisions.md",
+	} {
+		if !strings.Contains(docsIndex, ref) {
+			t.Fatalf("docs/index.md must link %s", ref)
+		}
+	}
+	for _, ref := range []string{
+		"https://github.com/never-labs/leia/blob/main/SECURITY.md",
+		"https://github.com/never-labs/leia/blob/main/CONTRIBUTING.md",
+		"https://github.com/never-labs/leia/blob/main/CODE_OF_CONDUCT.md",
+		"https://github.com/never-labs/leia/blob/main/examples/README.md",
 	} {
 		if !strings.Contains(docsIndex, ref) {
 			t.Fatalf("docs/index.md must link %s", ref)
@@ -1120,8 +1130,9 @@ func TestReleaseMatrixDocsIndexCoversReadmeReferencesEntrypoints(t *testing.T) {
 		} else {
 			indexRef = "../" + ref
 		}
-		if !strings.Contains(docsIndex, "("+indexRef+")") {
-			t.Fatalf("docs/index.md must link README References entrypoint %s as %s", ref, indexRef)
+		githubRef := "https://github.com/never-labs/leia/blob/main/" + ref
+		if !strings.Contains(docsIndex, "("+indexRef+")") && !strings.Contains(docsIndex, "("+githubRef+")") {
+			t.Fatalf("docs/index.md must link README References entrypoint %s as %s or %s", ref, indexRef, githubRef)
 		}
 	}
 }

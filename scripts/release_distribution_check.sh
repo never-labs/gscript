@@ -159,6 +159,28 @@ check_local_install_fixture() {
       echo "error: local zip install fixture did not install both Windows executables" >&2
       exit 1
     fi
+    rm -rf "$bad_release_dir" "$bad_bin_dir"
+    mkdir -p "$bad_release_dir" "$bad_bin_dir" "$archive_dir/windows-bad"
+    cp "$archive_dir/leia" "$archive_dir/windows-bad/leia.exe"
+    cp "$archive_dir/leia-lsp" "$archive_dir/windows-bad/leia-lsp.exe"
+    printf 'unexpected\n' >"$archive_dir/windows-bad/unexpected.txt"
+    (
+      cd "$archive_dir/windows-bad"
+      zip -q "$bad_release_dir/leia_${version}_windows_amd64.zip" leia.exe leia-lsp.exe unexpected.txt
+    )
+    (
+      cd "$bad_release_dir"
+      printf '%s  %s\n' "$(sha256_file "leia_${version}_windows_amd64.zip")" "leia_${version}_windows_amd64.zip" >SHA256SUMS
+    )
+    if bash scripts/install.sh \
+      --version "$version" \
+      --os windows \
+      --arch amd64 \
+      --bin-dir "$bad_bin_dir" \
+      --base-url "file://$bad_release_dir" >/dev/null 2>&1; then
+      echo "error: install accepted zip archive with unexpected entry" >&2
+      exit 1
+    fi
   else
     echo "release_distribution_check.sh: zip or unzip not installed; skipping local zip install fixture"
   fi
@@ -199,8 +221,12 @@ require_contains .goreleaser.yaml "- amd64"
 require_contains .goreleaser.yaml "- arm64"
 require_contains .goreleaser.yaml "name_template: \"{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}\""
 require_contains .goreleaser.yaml "- leia-lsp"
-require_contains .github/workflows/release.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
-require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
+if [[ -f .github/workflows/release.yml ]]; then
+  require_contains .github/workflows/release.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
+fi
+if [[ -f .github/workflows/distribution-check.yml ]]; then
+  require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
+fi
 
 bash -n scripts/install.sh
 

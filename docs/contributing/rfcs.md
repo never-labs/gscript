@@ -23,8 +23,8 @@ refactors, or benchmark additions that do not change the public contract.
 ## File Layout
 
 Use `rfcs/NNNN-short-name.md`. Start from
-[`rfcs/0000-template.md`](../../rfcs/0000-template.md). Reserve `0000` for the
-template.
+[`rfcs/0000-template.md`](https://github.com/never-labs/leia/blob/main/rfcs/0000-template.md).
+Reserve `0000` for the template.
 
 ## Review Checklist
 

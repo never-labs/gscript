@@ -26,6 +26,7 @@ node_modules/
 
 # Local Codex/agent worktrees and scratch output
 /.worktrees/
+/.tmp/
 /cmd/leia/.tmp/
 
 # IDE / editor

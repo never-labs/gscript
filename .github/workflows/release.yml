@@ -37,7 +37,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y luajit
       - run: npm ci --prefix tools/tree-sitter-leia
       - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
-      - run: go run ./cmd/leia ci release
+      - run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            export LEIA_RELEASE_REQUIRE_TAG=1
+            export LEIA_RELEASE_ARTIFACT_VERSION="${GITHUB_REF_NAME}"
+          fi
+          go run ./cmd/leia ci release
       - if: github.event_name == 'workflow_dispatch'
         run: goreleaser release --snapshot --clean --skip=publish
       - if: github.event_name == 'push'

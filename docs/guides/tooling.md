@@ -104,6 +104,9 @@ generated CLI/stdlib/dialect references, spec HTML freshness, spec runnable exam
 Markdown links, release reference coverage, retired naming, and documented
 repository script entrypoints.
 
+GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`. The
+workflow runs `go run ./cmd/leia doc check` before building the site.
+
 ## Editors
 
 ```bash
