@@ -962,6 +962,79 @@ func TestTier2DirectHelperBridgeVectorPrimitivesRecordDirectRoute(t *testing.T) 
 	}
 }
 
+func TestTier2DirectHelperBridgeVectorPrimitivesReportStableErrors(t *testing.T) {
+	t.Run("nil compiled function", func(t *testing.T) {
+		ctx := &ExecContext{OpExitOp: int64(OpVectorGather)}
+		beforeDirect := Tier2DirectHelperCallCount()
+		tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+		if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+			t.Fatalf("direct helper calls = %d, want 1", got)
+		}
+		if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != "tier2: direct helper: nil CompiledFunction" {
+			t.Fatalf("error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+		}
+	})
+
+	t.Run("invalid register window", func(t *testing.T) {
+		cf := &CompiledFunction{}
+		ctx := &ExecContext{
+			HelperCF: uintptr(unsafe.Pointer(cf)),
+			OpExitOp: int64(OpVectorGather),
+		}
+		beforeDirect := Tier2DirectHelperCallCount()
+		tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+		if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+			t.Fatalf("direct helper calls = %d, want 1", got)
+		}
+		if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != "tier2: direct helper: invalid register window" {
+			t.Fatalf("error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+		}
+	})
+
+	rangeCases := []struct {
+		name string
+		op   Op
+		err  string
+	}{
+		{name: "gather", op: OpVectorGather, err: "tier2: direct helper: VectorGather register range out of bounds"},
+		{name: "compare", op: OpVectorCompare, err: "tier2: direct helper: VectorCompare register range out of bounds"},
+		{name: "mask", op: OpVectorMask, err: "tier2: direct helper: VectorMask register range out of bounds"},
+		{name: "where", op: OpVectorWhere, err: "tier2: direct helper: VectorWhere register range out of bounds"},
+		{name: "reduce", op: OpVectorReduce, err: "tier2: direct helper: VectorReduce register range out of bounds"},
+		{name: "scan", op: OpVectorScan, err: "tier2: direct helper: VectorScan register range out of bounds"},
+	}
+	for _, tc := range rangeCases {
+		t.Run(tc.name+" range", func(t *testing.T) {
+			cf := &CompiledFunction{}
+			regs := make([]runtime.Value, 3)
+			const base = 1
+			ctx := &ExecContext{
+				HelperCF:   uintptr(unsafe.Pointer(cf)),
+				RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+				Regs:       uintptr(unsafe.Pointer(&regs[base])),
+				RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+				OpExitOp:   int64(tc.op),
+				OpExitSlot: -2,
+				OpExitArg1: 1,
+				OpExitArg2: 2,
+			}
+			if tc.op == OpVectorWhere {
+				ctx.OpExitSlot = 0
+				ctx.OpExitArg1 = 2
+				ctx.OpExitArg2 = 3
+			}
+			beforeDirect := Tier2DirectHelperCallCount()
+			tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+			if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+				t.Fatalf("direct helper calls = %d, want 1", got)
+			}
+			if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != tc.err {
+				t.Fatalf("error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, tc.err)
+			}
+		})
+	}
+}
+
 func TestTier2DirectHelperBridgeFrameRowPrimitivesRecordDirectRoute(t *testing.T) {
 	for _, tc := range qFrameRowPrimitiveRouteCases() {
 		t.Run(tc.name, func(t *testing.T) {
