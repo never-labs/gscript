@@ -504,6 +504,82 @@ func BenchmarkQFrameVectorMethodJITRouteTier2QFrameSelectColumn(b *testing.B) {
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
 }
 
+func BenchmarkQFrameVectorMethodJITRouteTier2FrameProjectColumn(b *testing.B) {
+	proto := qFrameProjectColumnRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameProjectColumnRouteArgs(b)
+	if _, err := v.CallValue(fn, args); err != nil {
+		b.Fatalf("warm FrameProjectColumn closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		b.Fatalf("CompileTier2(FrameProjectColumn): %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatalf("settle FrameProjectColumn closure: %v", err)
+		}
+	}
+
+	before := tm.QKernelExecutionStatsFor(proto)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatalf("Tier2 FrameProjectColumn: %v", err)
+		}
+		if len(results) != 1 {
+			b.Fatalf("Tier2 FrameProjectColumn results = %v, want one result", results)
+		}
+		assertFrameProjectColumnRouteResult(b, results[0])
+	}
+	b.StopTimer()
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+}
+
+func BenchmarkQFrameVectorMethodJITRouteTier2FrameFilterProjectColumn(b *testing.B) {
+	proto := qFrameFilterProjectColumnRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameFilterProjectColumnRouteArgs(b)
+	if _, err := v.CallValue(fn, args); err != nil {
+		b.Fatalf("warm FrameFilterProjectColumn closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		b.Fatalf("CompileTier2(FrameFilterProjectColumn): %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatalf("settle FrameFilterProjectColumn closure: %v", err)
+		}
+	}
+
+	before := tm.QKernelExecutionStatsFor(proto)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatalf("Tier2 FrameFilterProjectColumn: %v", err)
+		}
+		if len(results) != 1 {
+			b.Fatalf("Tier2 FrameFilterProjectColumn results = %v, want one result", results)
+		}
+		assertFrameFilterProjectColumnRouteResult(b, results[0])
+	}
+	b.StopTimer()
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+}
+
 func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -639,6 +715,76 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
 		t.Fatalf("QFrameSelectColumn op-exit route count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeFrameProjectColumnRecordsDirectRoute(t *testing.T) {
+	proto := qFrameProjectColumnRouteProto()
+	cf := &CompiledFunction{Proto: proto}
+	regs := make([]runtime.Value, 3)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpFrameProjectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge FrameProjectColumn error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("FrameProjectColumn direct helper calls = %d, want 1", got)
+	}
+	assertFrameProjectColumnRouteResult(t, regs[base])
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameProjectColumn", "project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "FrameProjectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameProjectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
+		t.Fatalf("FrameProjectColumn op-exit route count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeFrameFilterProjectColumnRecordsDirectRoute(t *testing.T) {
+	proto := qFrameFilterProjectColumnRouteProto()
+	cf := &CompiledFunction{Proto: proto}
+	regs := make([]runtime.Value, 4)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	regs[base+2] = runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true}))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpFrameFilterProjectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge FrameFilterProjectColumn error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("FrameFilterProjectColumn direct helper calls = %d, want 1", got)
+	}
+	assertFrameFilterProjectColumnRouteResult(t, regs[base])
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameFilterProjectColumn", "filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "FrameFilterProjectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameFilterProjectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
+		t.Fatalf("FrameFilterProjectColumn op-exit route count = %d, want 0", got)
 	}
 }
 
@@ -840,6 +986,106 @@ func TestTier2QFrameSelectColumnUsesExpectedRuntimeRoute(t *testing.T) {
 	}
 }
 
+func TestTier2FrameProjectColumnUsesExpectedRuntimeRoute(t *testing.T) {
+	proto := qFrameProjectColumnRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameProjectColumnRouteArgs(t)
+	if _, err := v.CallValue(fn, args); err != nil {
+		t.Fatalf("warm FrameProjectColumn closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		t.Fatalf("CompileTier2(FrameProjectColumn): %v", err)
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	const calls = 8
+	for i := 0; i < calls; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			t.Fatalf("Tier2 FrameProjectColumn call %d: %v", i, err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("Tier2 FrameProjectColumn results = %v, want one result", results)
+		}
+		assertFrameProjectColumnRouteResult(t, results[0])
+	}
+	if proto.EnteredTier2 == 0 {
+		t.Fatalf("FrameProjectColumn closure never entered Tier2")
+	}
+
+	stats := tm.QKernelExecutionStatsFor(proto)
+	directCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameProjectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+	opExitCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameProjectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success")
+	if tier2AltStackEnabled() {
+		if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+			t.Fatalf("FrameProjectColumn direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+		if directCount == 0 {
+			t.Fatalf("FrameProjectColumn direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+	} else if directCount != 0 {
+		t.Fatalf("FrameProjectColumn direct helper route recorded with alt-stack disabled; stats=%+v", stats)
+	}
+	if directCount+opExitCount == 0 {
+		t.Fatalf("FrameProjectColumn runtime route stats missing; stats=%+v", stats)
+	}
+}
+
+func TestTier2FrameFilterProjectColumnUsesExpectedRuntimeRoute(t *testing.T) {
+	proto := qFrameFilterProjectColumnRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameFilterProjectColumnRouteArgs(t)
+	if _, err := v.CallValue(fn, args); err != nil {
+		t.Fatalf("warm FrameFilterProjectColumn closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		t.Fatalf("CompileTier2(FrameFilterProjectColumn): %v", err)
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	const calls = 8
+	for i := 0; i < calls; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			t.Fatalf("Tier2 FrameFilterProjectColumn call %d: %v", i, err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("Tier2 FrameFilterProjectColumn results = %v, want one result", results)
+		}
+		assertFrameFilterProjectColumnRouteResult(t, results[0])
+	}
+	if proto.EnteredTier2 == 0 {
+		t.Fatalf("FrameFilterProjectColumn closure never entered Tier2")
+	}
+
+	stats := tm.QKernelExecutionStatsFor(proto)
+	directCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameFilterProjectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+	opExitCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "FrameFilterProjectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success")
+	if tier2AltStackEnabled() {
+		if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+			t.Fatalf("FrameFilterProjectColumn direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+		if directCount == 0 {
+			t.Fatalf("FrameFilterProjectColumn direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+	} else if directCount != 0 {
+		t.Fatalf("FrameFilterProjectColumn direct helper route recorded with alt-stack disabled; stats=%+v", stats)
+	}
+	if directCount+opExitCount == 0 {
+		t.Fatalf("FrameFilterProjectColumn runtime route stats missing; stats=%+v", stats)
+	}
+}
+
 func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, outcome string) uint64 {
 	var count uint64
 	for _, row := range rows {
@@ -957,6 +1203,43 @@ func qFrameSelectColumnRouteProto() *vm.FuncProto {
 	}
 }
 
+func qFrameProjectColumnRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_project_column_tier2_route",
+		NumParams: 1,
+		MaxStack:  1,
+		Constants: []runtime.Value{
+			qFrameProjectColumnSpecValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_PROJECT_COLUMN, 0, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qFrameFilterProjectColumnRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_filter_project_column_tier2_route",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			qFrameProjectColumnSpecValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_FILTER_PROJECT_COLUMN, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+}
+
+func qFrameProjectColumnSpecValue(name string) runtime.Value {
+	spec := runtime.NewTable()
+	spec.RawSetString("project", runtime.StringValue(name))
+	spec.RawSetString("column", runtime.StringValue(name))
+	return runtime.TableValue(spec)
+}
+
 func qFrameSelectColumnRouteSpec() QFrameSelectColumnSpec {
 	return QFrameSelectColumnSpec{
 		Shape:              "compare/filter/project/column",
@@ -979,6 +1262,19 @@ func qFrameSelectColumnRouteArgs(tb testing.TB) []runtime.Value {
 	return []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(tb))}
 }
 
+func qFrameProjectColumnRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(tb))}
+}
+
+func qFrameFilterProjectColumnRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{
+		runtime.TableValue(qVectorGatherReduceRouteFrame(tb)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true, false, true})),
+	}
+}
+
 func assertQFrameSelectColumnRouteResult(tb testing.TB, value runtime.Value) {
 	tb.Helper()
 	if !value.IsDenseArray() {
@@ -987,6 +1283,28 @@ func assertQFrameSelectColumnRouteResult(tb testing.TB, value runtime.Value) {
 	got, ok := value.DenseArray().I64()
 	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
 		tb.Fatalf("QFrameSelectColumn values = %#v, want [10 20]", got)
+	}
+}
+
+func assertFrameProjectColumnRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	if !value.IsDenseArray() {
+		tb.Fatalf("FrameProjectColumn result = %v, want dense array", value)
+	}
+	got, ok := value.DenseArray().I64()
+	if !ok || len(got) != 3 || got[0] != 5 || got[1] != 10 || got[2] != 20 {
+		tb.Fatalf("FrameProjectColumn values = %#v, want [5 10 20]", got)
+	}
+}
+
+func assertFrameFilterProjectColumnRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	if !value.IsDenseArray() {
+		tb.Fatalf("FrameFilterProjectColumn result = %v, want dense array", value)
+	}
+	got, ok := value.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 5 || got[1] != 20 {
+		tb.Fatalf("FrameFilterProjectColumn values = %#v, want [5 20]", got)
 	}
 }
 

@@ -21,6 +21,38 @@ func (cf *CompiledFunction) qFrameVectorRuntimeExecutionAdapter() qFrameVectorRu
 	return qFrameVectorRuntimeExecutionAdapter{cf: cf}
 }
 
+func (a qFrameVectorRuntimeExecutionAdapter) executeFrameProjectColumn(frameVal, specVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "project/column"
+	names, resultName, err := frameProjectColumnSpec(specVal)
+	if err != nil {
+		a.recordFrame("FrameProjectColumn", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	out, err := executeFrameProjectColumnValue(frameVal, names, resultName)
+	if err != nil {
+		a.recordFrame("FrameProjectColumn", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	a.recordFrame("FrameProjectColumn", shape, route, "success", frameVal)
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeFrameFilterProjectColumn(frameVal, maskVal, specVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "filter/project/column"
+	names, resultName, err := frameProjectColumnSpec(specVal)
+	if err != nil {
+		a.recordFrame("FrameFilterProjectColumn", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	out, err := executeFrameFilterProjectColumnValue(frameVal, maskVal, names, resultName)
+	if err != nil {
+		a.recordFrame("FrameFilterProjectColumn", shape, route, "error", frameVal)
+		return runtime.NilValue(), err
+	}
+	a.recordFrame("FrameFilterProjectColumn", shape, route, "success", frameVal)
+	return out, nil
+}
+
 func (a qFrameVectorRuntimeExecutionAdapter) executeFrameGroupAggregate(frameVal, maskVal, specVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
 	shape := qFrameGroupAggregateRuntimeShapeFromMaskValue(maskVal)
 	out, err := executeFrameGroupAggregateValue(frameVal, maskVal, specVal)

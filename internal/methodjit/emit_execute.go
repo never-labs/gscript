@@ -1162,16 +1162,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameProjectColumn spec constant is out of range")
 		}
-		names, resultName, err := frameProjectColumnSpec(cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameProjectColumn(
+			regs[arg1], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
-		out, err := executeFrameProjectColumnValue(regs[arg1], names, resultName)
-		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameProjectColumn, "error")
-			return err
-		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameProjectColumn, "success")
 		regs[slot] = out
 
 	case OpFrameFilterProjectColumn:
@@ -1181,16 +1176,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if aux < 0 || cf.Proto == nil || aux >= len(cf.Proto.Constants) {
 			return fmt.Errorf("FrameFilterProjectColumn spec constant is out of range")
 		}
-		names, resultName, err := frameProjectColumnSpec(cf.Proto.Constants[aux])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeFrameFilterProjectColumn(
+			regs[arg1], regs[arg2], cf.Proto.Constants[aux], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
-		out, err := executeFrameFilterProjectColumnValue(regs[arg1], regs[arg2], names, resultName)
-		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpFrameFilterProjectColumn, "error")
-			return err
-		}
-		cf.recordQRuntimePrimitiveExecution(OpFrameFilterProjectColumn, "success")
 		regs[slot] = out
 
 	case OpFrameGroupAggregate:
