@@ -62,14 +62,14 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorWhereReduce(instrID, 
 	return out, nil
 }
 
-func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorGatherReduce(opCode int, vectorVal, indexVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorGatherReduce(instrID, opCode int, vectorVal, indexVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
 	const shape = "gather/vector-reduce"
 	out, err := executeQVectorGatherReduceValue(opCode, vectorVal, indexVal)
 	if err != nil {
-		a.recordVector("QVectorGatherReduce", shape, route, "error")
+		a.recordVectorByInstrID(instrID, "QVectorGatherReduce", shape, route, "error")
 		return runtime.NilValue(), err
 	}
-	a.recordVector("QVectorGatherReduce", shape, route, "success")
+	a.recordVectorByInstrID(instrID, "QVectorGatherReduce", shape, route, "success")
 	return out, nil
 }
 

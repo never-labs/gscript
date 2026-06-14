@@ -631,7 +631,7 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		}
 		cf, _ := tm.tier2CompiledFor(proto)
 		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQVectorGatherReduce(
-			aux, regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
+			int(ctx.OpExitID), aux, regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}

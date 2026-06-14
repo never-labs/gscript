@@ -100,6 +100,30 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 	asm.LoadImm64(jit.X0, int64(instr.ID))
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
+	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
+
+	if instr.Op == OpQVectorGatherReduce && tier2AltStackEnabled() && ec.selfCFCell != nil {
+		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_gather_helper_err_%d", instr.ID))
+		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_gather_helper_exit_%d", instr.ID))
+		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)
+		asm.CBZ(jit.X0, genericExitLabel)
+		ec.emitDirectHelperSelfCF()
+		asm.LoadImm64(jit.X16, int64(jit.JITHelperEntryPC()))
+		asm.BLR(jit.X16)
+		asm.LDR(jit.X16, mRegCtx, execCtxOffHelperErrFlag)
+		asm.CBNZ(jit.X16, helperErrLabel)
+		asm.B(continueLabel)
+		asm.Label(helperErrLabel)
+		asm.LoadImm64(jit.X0, int64(ExitQEvalHelperErr))
+		asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
+		if ec.numericMode {
+			asm.B("num_deopt_epilogue")
+		} else {
+			asm.B("deopt_epilogue")
+		}
+		asm.Label(genericExitLabel)
+	}
+
 	// Set ExitCode = ExitOpExit and return to Go.
 	ec.emitSetResumeNumericPass()
 	asm.LoadImm64(jit.X0, int64(ExitOpExit))
@@ -111,7 +135,6 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 	}
 
 	// Continue label: the resume entry jumps here after Go handles the op.
-	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 	asm.Label(continueLabel)
 
 	// Reload all active registers from memory (Go may have modified the

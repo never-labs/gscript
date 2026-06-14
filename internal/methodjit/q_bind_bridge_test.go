@@ -391,6 +391,43 @@ func BenchmarkQFrameVectorMethodJITRouteTier2QVectorWhereReduce(b *testing.B) {
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
 }
 
+func BenchmarkQFrameVectorMethodJITRouteTier2QVectorGatherReduce(b *testing.B) {
+	proto := qVectorGatherReduceRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qVectorGatherReduceRouteArgs(b)
+	if _, err := v.CallValue(fn, args); err != nil {
+		b.Fatalf("warm QVectorGatherReduce closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		b.Fatalf("CompileTier2(QVectorGatherReduce): %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatalf("settle QVectorGatherReduce closure: %v", err)
+		}
+	}
+
+	before := tm.QKernelExecutionStatsFor(proto)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatalf("Tier2 QVectorGatherReduce: %v", err)
+		}
+		if len(results) != 1 || !results[0].IsFloat() || results[0].Float() != 200.25 {
+			b.Fatalf("Tier2 QVectorGatherReduce result = %v, want float 200.25", results)
+		}
+	}
+	b.StopTimer()
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+}
+
 func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -425,6 +462,41 @@ func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.
 	stats := cf.QKernelExecutionStats()
 	assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "mask-combine/vector-where/vector-reduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+}
+
+func TestTier2DirectHelperBridgeQVectorGatherReduceRecordsDirectRoute(t *testing.T) {
+	cf := &CompiledFunction{
+		QVectorRuntimeKernelShapesByID: map[int]string{
+			43: "gather/vector-reduce",
+		},
+	}
+	regs := make([]runtime.Value, 4)
+	const base = 1
+	regs[base+1] = runtime.DenseArrayValue(runtime.NewDenseArrayF64([]float64{10, 20.25, 30}))
+	regs[base+2] = runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1}))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQVectorGatherReduce),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+		OpExitAux:  int64(runtime.DenseArrayReduceSum),
+		OpExitID:   43,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QVectorGatherReduce error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := regs[base]; !got.IsFloat() || got.Float() != 40 {
+		t.Fatalf("QVectorGatherReduce direct helper result = %v, want float 40", got)
+	}
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_vector_runtime", "QVectorGatherReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 }
 
 func TestTier2QVectorWhereReduceUsesExpectedRuntimeRoute(t *testing.T) {
@@ -476,6 +548,55 @@ func TestTier2QVectorWhereReduceUsesExpectedRuntimeRoute(t *testing.T) {
 	}
 }
 
+func TestTier2QVectorGatherReduceUsesExpectedRuntimeRoute(t *testing.T) {
+	proto := qVectorGatherReduceRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qVectorGatherReduceRouteArgs(t)
+	if _, err := v.CallValue(fn, args); err != nil {
+		t.Fatalf("warm QVectorGatherReduce closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		t.Fatalf("CompileTier2(QVectorGatherReduce): %v", err)
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	const calls = 8
+	for i := 0; i < calls; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			t.Fatalf("Tier2 QVectorGatherReduce call %d: %v", i, err)
+		}
+		if len(results) != 1 || !results[0].IsFloat() || results[0].Float() != 200.25 {
+			t.Fatalf("Tier2 QVectorGatherReduce result = %v, want float 200.25", results)
+		}
+	}
+	if proto.EnteredTier2 == 0 {
+		t.Fatalf("QVectorGatherReduce closure never entered Tier2")
+	}
+
+	stats := tm.QKernelExecutionStatsFor(proto)
+	directCount := qKernelExecutionCount(stats, "methodjit_q_vector_runtime", "QVectorGatherReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+	opExitCount := qKernelExecutionCount(stats, "methodjit_q_vector_runtime", "QVectorGatherReduce", string(qTypedRuntimeExecutionRouteOpExit), "success")
+	if tier2AltStackEnabled() {
+		if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+			t.Fatalf("QVectorGatherReduce direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+		if directCount == 0 {
+			t.Fatalf("QVectorGatherReduce direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+	} else if directCount != 0 {
+		t.Fatalf("QVectorGatherReduce direct helper route recorded with alt-stack disabled; stats=%+v", stats)
+	}
+	if directCount+opExitCount == 0 {
+		t.Fatalf("QVectorGatherReduce runtime route stats missing; stats=%+v", stats)
+	}
+}
+
 func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, outcome string) uint64 {
 	var count uint64
 	for _, row := range rows {
@@ -506,6 +627,50 @@ func qVectorWhereReduceRouteArgs() []runtime.Value {
 		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
 		runtime.IntValue(7),
 	}
+}
+
+func qVectorGatherReduceRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "q_vector_gather_reduce_tier2_route",
+		NumParams: 2,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 2, 0, 0),
+			vm.EncodeABC(vm.OP_VECTOR_GATHER, 2, 1, 0),
+			vm.EncodeABC(vm.OP_VECTOR_REDUCE, 2, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 2, 2, 0),
+		},
+	}
+}
+
+func qVectorGatherReduceRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{
+		runtime.TableValue(qVectorGatherReduceRouteFrame(tb)),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1})),
+	}
+}
+
+func qVectorGatherReduceRouteFrame(tb testing.TB) *runtime.Table {
+	tb.Helper()
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"price": runtime.NewDenseArrayF64([]float64{99, 100.5, 101.25}),
+		"size":  runtime.NewDenseArrayI64([]int64{5, 10, 20}),
+	})
+	if err != nil {
+		tb.Fatalf("NewSoA: %v", err)
+	}
+	frame := runtime.NewTable()
+	frame.SetNativePayloadWithInfo(soa, runtime.NativePayloadInfo{
+		Kind:       runtime.NativePayloadDataFrame,
+		Rows:       soa.Len(),
+		Columns:    2,
+		SchemaHash: "q-vector-gather-route",
+	})
+	return frame
 }
 
 func qKernelExecutionStatsDelta(before, after []QKernelExecutionStat) []QKernelExecutionStat {

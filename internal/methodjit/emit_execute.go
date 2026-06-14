@@ -1310,7 +1310,7 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 			return fmt.Errorf("QVectorGatherReduce op-exit out of register range")
 		}
 		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQVectorGatherReduce(
-			aux, regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
+			int(ctx.OpExitID), aux, regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
 			return err
 		}
