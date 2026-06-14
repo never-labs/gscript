@@ -44,7 +44,7 @@ go run ./cmd/leia playground --help
 ## AI Dialect
 
 - [AI dialect reference](reference/ai/index.md)
-- [AI dialect guide](guides/ai-native.md)
+- [AI dialect guide](guides/ai-dialect.md)
 - [Evaluate reference](reference/evaluate/index.md)
 
 ## Examples And Release

@@ -102,7 +102,7 @@ assert(turn + model == 3)
 In grammar positions that define tagged dialect forms or evaluate blocks,
 contextual words are consumed by that syntax rather than bound as ordinary
 identifiers. See [Expressions](expressions.md) for the generic tagged-dialect
-boundary and [AI Dialect Syntax](ai-native.md) for one standard dialect family.
+boundary and [AI Dialect Syntax](ai-dialect.md) for one standard dialect family.
 
 ## Numeric Literals
 

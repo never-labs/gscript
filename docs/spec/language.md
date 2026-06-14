@@ -138,7 +138,7 @@ it is a dialect implementation over ordinary Leia values, not a second
 language runtime.
 
 The AI surface is an optional standard-library layer rather than a separate
-execution engine or an "AI native" language mode. It is one dialect
+execution engine or an "AI-intrinsic" language mode. It is one dialect
 implementation built on the same tagged dialect mechanism as q and other DSLs.
 Use `turn { ... }` or `llm.turn({...})` for model calls and `model { ... }` or
 `llm.register_models({...})` for model configuration. Tools, agents, messages,

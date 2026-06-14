@@ -4,7 +4,7 @@ Leia's AI dialect is an optional standard-library runtime exposed through
 tagged dialect forms and ordinary modules. The language implementation must
 route these forms through the same `llm`, `msg`, `history`, `dialect`, and
 host-provider paths as direct library calls. There is no separate AI execution
-engine, and Leia is not an AI-native language. AI is one DSL implementation on
+engine, and Leia is not an AI-intrinsic language. AI is one DSL implementation on
 top of the generic tagged-dialect mechanism.
 
 An AI operation is deterministic until it reaches a provider, host callback, or

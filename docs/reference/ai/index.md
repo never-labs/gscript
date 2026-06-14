@@ -2,7 +2,7 @@
 
 Leia's AI support is an optional standard-library layer over host-installed LLM
 providers. It is one DSL implementation on Leia's generic tagged-dialect
-mechanism, not the language itself and not an AI-native runtime. The dialect
+mechanism, not the language itself and not a privileged AI runtime. The dialect
 surface is intentionally small: tagged `model`, `tool`, `agent`, and `turn`
 blocks plus ordinary `llm.*`, `msg.*`, and `history.*` helpers.
 
@@ -918,7 +918,7 @@ requires both `LEIA_LLM_INTEGRATION=1` and a configured GLM key.
 ## Evidence
 
 Stable AI dialect coverage is tracked in `tests/feature_matrix.json` under
-`llm_native_integration`. The main evidence set includes:
+`ai_dialect_integration`. The main evidence set includes:
 
 | Surface | Evidence |
 |---|---|

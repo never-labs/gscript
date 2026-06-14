@@ -124,7 +124,7 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 			switch info {
 			case "leia run all":
 				runAll++
-				if entry.Name() == "ai-native.md" {
+				if entry.Name() == "ai-dialect.md" {
 					aiDialectRunAll++
 				}
 			case "leia fail all":
@@ -143,7 +143,7 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 		t.Fatalf("docs/spec runnable fence coverage must include success and failure examples; got %d run all, %d fail all", runAll, failAll)
 	}
 	if aiDialectRunAll == 0 {
-		t.Fatal("docs/spec/ai-native.md must include at least one stable runnable AI dialect example")
+		t.Fatal("docs/spec/ai-dialect.md must include at least one stable runnable AI dialect example")
 	}
 }
 

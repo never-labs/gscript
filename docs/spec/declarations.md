@@ -272,4 +272,4 @@ script needs a reusable value.
 
 `evaluate "name" { ... }` is a source-level regression declaration discovered
 by `leia evaluate`; it has no effect during ordinary script execution. Detailed
-semantics are specified in [AI Dialect Syntax](ai-native.md).
+semantics are specified in [AI Dialect Syntax](ai-dialect.md).

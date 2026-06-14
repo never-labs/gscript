@@ -8,7 +8,7 @@ import (
 	"github.com/never-labs/leia/llm"
 )
 
-func aiNativeResearchAssistantWorkflowSource() string {
+func aiDialectResearchAssistantWorkflowSource() string {
 	return `
 model {
     json: {provider_model: "mock-json"}
@@ -135,7 +135,7 @@ handoff_output_summary := handoff_review.output.summary
 `
 }
 
-func TestAINativeResearchAssistantWorkflowIntegrationRecordReplay(t *testing.T) {
+func TestAIDialectResearchAssistantWorkflowIntegrationRecordReplay(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -165,7 +165,7 @@ func TestAINativeResearchAssistantWorkflowIntegrationRecordReplay(t *testing.T) 
 				leia.WithLLMRecorder(recorder.Record),
 			}, tc.opts...)
 			vm := leia.New(opts...)
-			source := aiNativeResearchAssistantWorkflowSource()
+			source := aiDialectResearchAssistantWorkflowSource()
 			if err := vm.Exec(source); err != nil {
 				t.Fatalf("record Exec: %v", err)
 			}

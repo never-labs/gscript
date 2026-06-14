@@ -45,7 +45,7 @@ go run ./cmd/leia evaluate --format=text --update-golden examples/evaluate/agent
 Related references:
 
 - [Evaluate reference](../reference/evaluate/index.md)
-- [AI dialect guide](../guides/ai-native.md)
+- [AI dialect guide](../guides/ai-dialect.md)
 
 ## Embed Leia In A Go Service
 

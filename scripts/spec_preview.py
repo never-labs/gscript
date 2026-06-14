@@ -26,7 +26,7 @@ CHAPTERS = [
     ("functions.md", "Functions"),
     ("tables.md", "Tables and metatables"),
     ("concurrency.md", "Concurrency"),
-    ("ai-native.md", "AI Dialect Syntax"),
+    ("ai-dialect.md", "AI Dialect Syntax"),
     ("modules.md", "Modules and loading"),
     ("errors.md", "Errors and diagnostics"),
     ("implementation.md", "Implementation requirements"),

@@ -40,7 +40,13 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 			t.Fatalf("README missing focused positioning snippet %q", want)
 		}
 	}
-	for _, forbidden := range []string{"## Quick Start", "## Install", "## Project Status", "AI-native syntax", "AI-native runtime"} {
+	for _, forbidden := range []string{
+		"## Quick Start",
+		"## Install",
+		"## Project Status",
+		"AI" + "-native syntax",
+		"AI" + "-native runtime",
+	} {
 		if strings.Contains(readme, forbidden) {
 			t.Fatalf("README must not contain template section %q", forbidden)
 		}

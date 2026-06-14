@@ -119,7 +119,7 @@ scripts. They require a host-injected mock/replay provider or explicit
 live-provider environment variables, so they are not first-run smoke commands.
 Never run live-provider examples with committed secrets.
 
-See [AI dialect guide](../guides/ai-native.md).
+See [AI dialect guide](../guides/ai-dialect.md).
 
 ## Evaluate Examples
 

@@ -600,15 +600,15 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		}
 	}
 
-	ai := requireFeature(t, features, "llm_native_integration")
+	ai := requireFeature(t, features, "ai_dialect_integration")
 	aiName := decodeRequiredString(t, ai, -1, "name")
 	for _, snippet := range []string{"model", "turn", "tool", "msg", "chat", "loop", "agent", "stream", "replay", "provider"} {
 		if !strings.Contains(aiName, snippet) {
-			t.Fatalf("llm_native_integration name must expose README AI evidence scope; missing %q in %q", snippet, aiName)
+			t.Fatalf("ai_dialect_integration name must expose README AI evidence scope; missing %q in %q", snippet, aiName)
 		}
 	}
-	requireFeatureSpecSections(t, ai, "llm_native_integration", "Grammar Appendix", "AI Dialect Syntax", "Values And Types")
-	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
+	requireFeatureSpecSections(t, ai, "ai_dialect_integration", "Grammar Appendix", "AI Dialect Syntax", "Values And Types")
+	requireFeatureCellRefs(t, ai, "ai_dialect_integration", "semantic_gate",
 		"tests/llm/llm_runtime_test.go",
 		"tests/llm/llm_agent_examples_test.go",
 		"tests/llm/llm_agent_tools_test.go",
@@ -646,7 +646,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/evaluate/project_agent_regression.records.json",
 		"examples/workflow/support_triage_replay.leia",
 		"examples/embedding/embedding_test.go",
-		"docs/guides/ai-native.md",
+		"docs/guides/ai-dialect.md",
 		"docs/reference/ai/index.md",
 		"docs/reference/evaluate/index.md",
 	)
@@ -1181,7 +1181,7 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	)
 }
 
-func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
+func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
@@ -1193,8 +1193,8 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		}
 	}
 
-	ai := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "llm_native_integration")
-	requireFeatureCellRefs(t, ai, "llm_native_integration", "interpreter",
+	ai := requireFeature(t, loadFeatureMatrixFeatureMap(t, root), "ai_dialect_integration")
+	requireFeatureCellRefs(t, ai, "ai_dialect_integration", "interpreter",
 		"tests/llm/llm_runtime_test.go",
 		"tests/llm/llm_loop_test.go",
 		"tests/llm/llm_agent_tools_test.go",
@@ -1204,7 +1204,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"tests/integration/llm/llm_openai_provider_test.go",
 		"tests/integration/llm/llm_provider_test.go",
 	)
-	requireFeatureCellRefs(t, ai, "llm_native_integration", "semantic_gate",
+	requireFeatureCellRefs(t, ai, "ai_dialect_integration", "semantic_gate",
 		"cmd/leia/main_examples_command_test.go",
 		"cmd/leia/main_evaluate_llm_test.go",
 		"cmd/leia/main_playground_test.go",
@@ -1222,7 +1222,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 		"examples/evaluate/project_agent_regression.leia",
 		"examples/evaluate/project_agent_regression.records.json",
 		"examples/tooling/release_gate_project/main.leia",
-		"docs/guides/ai-native.md",
+		"docs/guides/ai-dialect.md",
 		"docs/reference/ai/index.md",
 		"docs/reference/evaluate/index.md",
 	)

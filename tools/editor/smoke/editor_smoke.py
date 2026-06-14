@@ -167,7 +167,7 @@ def check_textmate() -> None:
     assert_any_match(leia, "entity.name.namespace.import.leia", 'import "go:net/http" as http')
     assert_any_match(leia, "entity.name.namespace.import.leia", 'import p "path"')
     if has_pattern(leia, "keyword.control.ai.leia"):
-        fail("Leia TextMate grammar still exposes old AI-native keyword scope")
+        fail("Leia TextMate grammar still exposes old AI dialect keyword scope")
     assert_any_match(leia, "entity.name.tag.dialect.leia", "rows := csv`a,b\\n1,2\\n`")
     assert_match(leia, "meta.dialect.tagged-string.leia", "rows := csv`a,b\\n1,2\\n`")
     assert_match(leia, "meta.dialect.tagged-string.leia", "rows := csv!`a,b\\n1,2\\n`")
@@ -294,7 +294,7 @@ def check_emacs() -> None:
     for old_keyword in ("agent", "tool", "evaluate", "models", "messages", "budget"):
         for const_name in ("leia--keywords", "leia--declarations", "leia--contextual-keywords"):
             if old_keyword in elisp_string_list(mode, const_name):
-                fail(f"Emacs {const_name} still exposes old AI-native keyword {old_keyword}")
+                fail(f"Emacs {const_name} still exposes old AI dialect keyword {old_keyword}")
 
 
 def check_tree_sitter_assets() -> None:
@@ -344,7 +344,7 @@ def check_tree_sitter_assets() -> None:
         "turn_expression",
     ):
         if old_node_type in named_types:
-            fail(f"tree-sitter node-types still expose old AI-native node {old_node_type}")
+            fail(f"tree-sitter node-types still expose old AI dialect node {old_node_type}")
 
     query = (ROOT / "tools/tree-sitter-leia/queries/highlights.scm").read_text(encoding="utf-8")
     for editor_query in (
@@ -375,7 +375,7 @@ def check_tree_sitter_assets() -> None:
             fail(f"tree-sitter highlight query still uses stale generic marker {stale_marker}")
     for old_marker in ("(evaluate_block", "(agent_declaration", "(tool_declaration", "(message_field"):
         if old_marker in query:
-            fail(f"tree-sitter highlight query still references old AI-native marker {old_marker}")
+            fail(f"tree-sitter highlight query still references old AI dialect marker {old_marker}")
 
     for unsupported in ('"%="', '"i8"', '"i16"', '"u8"', '"u16"', '"u32"', '"u64"'):
         if unsupported in grammar_js or unsupported in query:

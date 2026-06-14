@@ -147,7 +147,7 @@ func TestReleaseMatrixSpecIndexDocumentsChapteredReference(t *testing.T) {
 		"functions.md",
 		"tables.md",
 		"concurrency.md",
-		"ai-native.md",
+		"ai-dialect.md",
 		"modules.md",
 		"errors.md",
 		"implementation.md",
@@ -1299,7 +1299,7 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 			specSections: []string{"Expressions", "Values And Types"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
 		},
-		"llm_native_integration": {
+		"ai_dialect_integration": {
 			specSections: []string{"AI Dialect Syntax", "Expressions", "Statements"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/ai/index.md", "docs/reference/evaluate/index.md"},
 		},
@@ -1613,7 +1613,7 @@ func TestReleaseMatrixAIDialectDocsUsePublicLLMSurface(t *testing.T) {
 	root := findRepoRoot(t)
 	docs := strings.Join([]string{
 		readFileString(t, filepath.Join(root, "docs", "reference", "ai", "index.md")),
-		readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md")),
+		readFileString(t, filepath.Join(root, "docs", "guides", "ai-dialect.md")),
 	}, "\n")
 	rootGoDoc := runCommand(t, root, 30*time.Second, "go", "doc", "-all", ".")
 	llmGoDoc := runCommand(t, root, 30*time.Second, "go", "doc", "-all", "./llm")
@@ -1670,7 +1670,7 @@ func TestReleaseMatrixAIDialectDocsUsePublicLLMSurface(t *testing.T) {
 
 func TestReleaseMatrixAIDialectExamplesStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
-	guide := readFileString(t, filepath.Join(root, "docs", "guides", "ai-native.md"))
+	guide := readFileString(t, filepath.Join(root, "docs", "guides", "ai-dialect.md"))
 	if !strings.Contains(guide, "Live-provider examples") || !strings.Contains(guide, "examples/llm/glm_smoke.leia") {
 		t.Fatal("AI dialect guide must keep live provider examples separated from offline examples")
 	}
@@ -2017,8 +2017,8 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 			dirs:       []string{"`examples/ai/`", "`examples/llm/`", "`examples/evaluate/`", "`examples/workflow/`"},
 			docTerms:   []string{"manual tool history", "replay fixture", "Live-provider examples", "project-level offline coding-agent gate"},
 			cliIDs:     []string{"repo-llm-agent", "repo-ai-coding_agent_replay", "repo-ai-coding_agent_project-main", "repo-evaluate-agent_replay", "repo-workflow-support_triage_replay"},
-			featureIDs: []string{"llm_native_integration"},
-			docRefs:    []string{"docs/reference/ai/index.md", "docs/guides/ai-native.md", "docs/reference/evaluate/index.md"},
+			featureIDs: []string{"ai_dialect_integration"},
+			docRefs:    []string{"docs/reference/ai/index.md", "docs/guides/ai-dialect.md", "docs/reference/evaluate/index.md"},
 		},
 		{
 			capability: "DSL-native dialects",
@@ -2223,11 +2223,11 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		{
 			capability:   "AI dialect",
 			promise:      "AI support lives in dialects and libraries, not in the core language runtime.",
-			featureID:    "llm_native_integration",
+			featureID:    "ai_dialect_integration",
 			specSections: []string{"AI Dialect Syntax"},
 			refs: []string{
 				"cmd/leia/main_examples_command_test.go",
-				"docs/guides/ai-native.md",
+				"docs/guides/ai-dialect.md",
 				"docs/reference/ai/index.md",
 				"docs/reference/evaluate/index.md",
 			},
@@ -2238,7 +2238,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 				"repo-evaluate-agent_replay",
 			},
 			docSnippets: map[string][]string{
-				"docs/guides/ai-native.md":         {"The stable contract is in the [AI dialect reference](../reference/ai/index.md).", "Live-provider examples"},
+				"docs/guides/ai-dialect.md":        {"The stable contract is in the [AI dialect reference](../reference/ai/index.md).", "Live-provider examples"},
 				"docs/reference/ai/index.md":       {"Leia's AI support is an optional standard-library layer", "## Agent Dialect"},
 				"docs/reference/evaluate/index.md": {"replay-drift findings"},
 			},

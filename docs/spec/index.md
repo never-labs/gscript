@@ -46,7 +46,7 @@ truth.
   sequence behavior, metatables, and metamethods.
 - [Concurrency](concurrency.md): goroutine-like tasks, channels, select, sync,
   cancellation, and host scheduling boundaries.
-- [AI Dialect Syntax](ai-native.md): model, tool, agent, and turn dialects as
+- [AI Dialect Syntax](ai-dialect.md): model, tool, agent, and turn dialects as
   one optional standard-library dialect implementation; messages, budgets,
   output validation, providers, trace, replay, and evaluation. AI is not a
   privileged language mode.

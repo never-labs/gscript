@@ -44,7 +44,7 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 		{
 			name:      "exact_text",
 			system:    "You are a concise test assistant. Return plain text only.",
-			user:      "Reply with exactly: leia llm native ok",
+			user:      "Reply with exactly: leia ai dialect ok",
 			maxTokens: 32,
 		},
 		{
@@ -56,7 +56,7 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 		{
 			name:      "json_answer",
 			system:    "Return only valid compact JSON. Do not wrap it in Markdown.",
-			user:      `Return {"language":"leia","llm_native":true,"provider":"anthropic-compatible"}.`,
+			user:      `Return {"language":"leia","ai_dialect":true,"provider":"anthropic-compatible"}.`,
 			maxTokens: 96,
 		},
 	} {

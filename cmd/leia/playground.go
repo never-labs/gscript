@@ -681,7 +681,7 @@ func playgroundMockSlugifyPatch() string {
 }
 
 	assert(slugify("Hello Leia") == "hello-leia")
-	assert(slugify("AI Native Script") == "ai-native-script")`
+	assert(slugify("AI Dialect Script") == "ai-dialect-script")`
 	return jsonEncodeObject(map[string]string{
 		"code": code,
 		"risk": "mock proposal only",
@@ -1508,7 +1508,7 @@ print(checked.text)`,
         return "func slugify(title) { return title }", nil
     }
     if path == "tests/slugify_cases.txt" {
-        return "Hello Leia => hello-leia; AI Native Script => ai-native-script", nil
+        return "Hello Leia => hello-leia; AI Dialect Script => ai-dialect-script", nil
     }
     return "missing file: " .. path, nil
 }
@@ -1533,7 +1533,7 @@ func run_tests_impl(patch) {
     lower := string.lower(patch)
     has_function := string.find(lower, "func slugify") != nil
     has_asserts := string.find(lower, "assert") != nil
-    has_cases := string.find(lower, "hello%-leia") != nil && string.find(lower, "ai%-native%-script") != nil
+    has_cases := string.find(lower, "hello%-leia") != nil && string.find(lower, "ai%-dialect%-script") != nil
     uses_supported_string_api := string.find(lower, "string.lower") != nil && string.find(lower, "string.trim") != nil && string.find(lower, "string.gsub") != nil
     has_leia_binding := string.find(lower, ":=") != nil
     uses_invalid_syntax := string.find(lower, "var ") != nil ||
@@ -1548,7 +1548,7 @@ func run_tests_impl(patch) {
     if has_function && has_asserts && has_cases && uses_supported_string_api && has_leia_binding && !uses_invalid_syntax {
         return { ok: true, output: "2 slugify cases passed" }, nil
     }
-    return { ok: false, output: "patch must be raw Leia code only. Use := locals, // comments, nil, func slugify, string.lower/trim/gsub, and assert checks for hello-leia and ai-native-script. Do not use markdown, import, var, let, while, # comments, null, string.at, string.length, or string.substring" }, nil
+    return { ok: false, output: "patch must be raw Leia code only. Use := locals, // comments, nil, func slugify, string.lower/trim/gsub, and assert checks for hello-leia and ai-dialect-script. Do not use markdown, import, var, let, while, # comments, null, string.at, string.length, or string.substring" }, nil
 }
 
 func propose_file_impl(path, body) {
