@@ -26,5 +26,5 @@ Generated from the current `leia` binary capabilities.
 | `playground` | `usage: leia playground [--addr ADDR] [--timeout DURATION] [--max-source-bytes N] [--max-steps N]` | Serve the local backend-powered Leia playground. |
 | `repl` | `usage: leia repl` | Start the interactive shell. |
 | `run` | `usage: leia run [--vm] [--jit=true|false] [--mod=readonly|vendor|mod] <file.leia> [args...]` | Run a script file. |
-| `test` | `usage: leia test [--manifest-check] [--json|--format=text|json] [--output FILE] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]` | Run Leia test files and stdout goldens. |
+| `test` | `usage: leia test [--manifest-check] [--json|--format=text|json] [--output FILE] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]` | Run Leia test files and expected stdout checks. |
 | `version` | `usage: leia version [--json]` | Report binary version and build metadata. |

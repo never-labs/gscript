@@ -1104,10 +1104,9 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	for _, snippet := range []string{
 		"supported hot paths may run natively, but unsupported",
 		"operations must fall back to the VM/runtime without changing visible results",
-		"The LuaJIT comparison is a release bottom line",
+		"The LuaJIT comparison is a validation baseline",
 		"`--luajit-threshold` (default `0.80`)",
-		"Production and release plans keep this bottom line active",
-		"`go run ./cmd/leia ci release --list`",
+		"write JSON and Markdown reports from the full and strict benchmark commands",
 	} {
 		if !strings.Contains(performance, snippet) {
 			t.Fatalf("performance reference must stay synced with README execution contract; missing %q", snippet)
@@ -1276,14 +1275,14 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 			"examples/evaluate/multiturn_replay.leia":                 {"evaluate \"multiturn replay consumes every turn\"", "llm.turn({"},
 			"examples/evaluate/project_agent_regression.leia":         {"evaluate \"project agent regression consumes replay\"", "eval.usage().stream_events"},
 			"examples/evaluate/project_agent_regression.records.json": {"\"StreamEvents\"", "Checkout sev2 owned by ops"},
-			"docs/reference/evaluate/index.md":                        {"--replay tests/agent.records.json tests/agent.leia", "replay-drift findings"},
+			"docs/reference/evaluate/index.md":                        {"--replay records/agent.records.json examples/evaluate/agent_replay.leia", "replay-drift findings"},
 		},
 		"provider adapters": {
 			"tests/integration/llm/llm_provider_test.go":        {"TestAnthropicCompatibleLLMProvider", "command.Provider"},
 			"tests/integration/llm/llm_openai_provider_test.go": {"TestOpenAICompatibleLLMProvider", "openai.Provider"},
 			"tests/integration/llm/llm_glm_integration_test.go": {"TestGLMExamplesRunAgainstLocalAnthropicCompatibleProvider", "glm_direct_agent_tools.leia"},
 			"cmd/leia/main_playground_test.go":                  {"TestPlaygroundExecAIProfileUsesGLMEnv", "LEIA_GLM_MODEL"},
-			"docs/reference/ai/index.md":                        {"Live Provider Tests", "LEIA_ANTHROPIC_COMPAT_BASE_URL"},
+			"docs/reference/ai/index.md":                        {"Run a live GLM example explicitly", "LEIA_ANTHROPIC_COMPAT_BASE_URL"},
 		},
 	}
 	for label, files := range requiredEvidence {

@@ -1140,6 +1140,24 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixPublicReleaseBlockersExplainDecisionWork(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/public_release_blockers_check.sh")
+
+	for _, snippet := range []string{
+		"unresolved release decision: License: Choose the repository license and whether a `NOTICE` file is required. (Open.)",
+		"unresolved release decision: Security reporting: Confirm the private reporting route, contact path, and disclosure policy. (Open.)",
+		"unresolved release decision: Platform support: Define tested and supported OS/architecture combinations for the release. (Open.)",
+		"unresolved release decision: Release channels: Decide which channels are public: GitHub Releases, install script, `go install`, package managers, or others. (Open.)",
+		"unresolved release decision: Artifact signing: Decide whether SHA256 checksums are sufficient or whether cosign, GPG, or another signing flow is required. (Open.)",
+		"unresolved release decision: Compatibility policy: Define the pre-1.0 compatibility promise and the intended v1.0 stable surface. (Open.)",
+	} {
+		if !strings.Contains(out, snippet) {
+			t.Fatalf("public release blocker output must include actionable release decision detail %q; got:\n%s", snippet, out)
+		}
+	}
+}
+
 func TestReleaseMatrixReadmeReferencesEntrypointsStayLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))

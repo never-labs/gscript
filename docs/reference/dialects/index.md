@@ -16,7 +16,7 @@ data := json`{"name": ${name}}`
 summarizer := agent {
     name: "summary_agent"
     config: func(summary) {
-        return {model: "mock-fast", user: summary}, nil
+        return {model: "example-model", user: summary}, nil
     }
     params: {"summary"}
 }
@@ -110,7 +110,7 @@ summarizer := agent {
 - Host automation tags such as `sh`, `cmd`, `glob`, and `env` use host filesystem, process, or environment capabilities.
 - Web and network-facing tags such as `serve` must be denied when the embedding host has not granted the relevant network capability.
 - Optional LLM tags such as `model`, `turn`, `tool`, and `agent` use the same `llm.turn` policy as the `llm` standard library.
-- Pure text, protocol, and data tags return ordinary values and should be covered by examples before being promoted in README-facing claims.
+- Pure text, protocol, and data tags return ordinary values and should be documented with runnable examples before being treated as stable public surface.
 
 ## Important Result Shapes
 
@@ -131,15 +131,15 @@ summarizer := agent {
 
 ```bash
 go run ./cmd/leia examples check examples/hello/dialects.leia examples/dialects/text_parsing.leia
-go run ./cmd/leia examples run repo-tooling-release_gate_project-main
+go run ./cmd/leia examples run repo-dialects-data_aggregation_report
 ```
 
-The release gate project combines fixture discovery, shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, a mocked AI agent, and a loopback web route. The focused examples below show the same dialect surface in smaller programs.
+The larger tooling workflow combines shell/process dialects, SQLite frames, q-style aggregation, spreadsheet round-tripping, an LLM-style agent boundary, and a loopback web route. The focused examples below show the same dialect surface in smaller programs.
 
 Additional focused evidence lives in:
 
 - `examples/dialects/ai_prompt_quote.leia` for prompt and quote tags.
 - `examples/dialects/data_aggregation_report.leia` for mixed data-format tags.
-- `examples/dialects/http_protocol_trace.leia`, `examples/dialects/sse_stream_fixture.leia`, and `examples/dialects/multipart_form_fixture.leia` for web/protocol tags.
+- `examples/dialects/http_protocol_trace.leia` and `examples/dialects/network_protocols.leia` for web/protocol tags.
 - `examples/data/q_trade_analytics_project/main.leia` for q-style vectors, dictionaries, scans, filters, and table rollups.
 - `examples/web/serve_dialect_app.leia` and `examples/web/route_workbench.leia` for route/server evidence.

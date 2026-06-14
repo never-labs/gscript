@@ -19,14 +19,14 @@ leia evaluate --json path/to/script.leia
 leia evaluate --json --report eval-report.json path/to/project
 leia evaluate --format=text path/to/project
 leia evaluate --format=html --report eval-report.html path/to/project
-leia evaluate --gate tests/agents
-leia evaluate --parallel=8 tests/agents
-leia evaluate --baseline baseline.json --regression-threshold 0.05 tests/agents
+leia evaluate --gate examples/evaluate
+leia evaluate --parallel=8 examples/evaluate
+leia evaluate --baseline baseline.json --regression-threshold 0.05 examples/evaluate
 leia evaluate --compare baseline.json current.json --format=text
-leia evaluate --list --filter "refund flow" tests/agents
-leia evaluate --filter "refund flow" tests/agents
-leia evaluate --replay tests/agent.records.json tests/agent.leia
-leia evaluate --update-golden tests/agent.records.json tests/agent.leia
+leia evaluate --list --filter "refund flow" examples/evaluate
+leia evaluate --filter "refund flow" examples/evaluate
+leia evaluate --replay records/agent.records.json examples/evaluate/agent_replay.leia
+leia evaluate --update-golden records/agent.records.json examples/evaluate/agent_replay.leia
 ```
 
 `--list` discovers evaluate cases without executing their bodies. Listed cases
@@ -51,7 +51,7 @@ package:
 | `--regression-threshold N` | Allow bool pass-rate regressions up to `N` when `--baseline` is used. Summary pass-rate and bool metric pass-rate regressions beyond the threshold fail the report. Number and string metrics are compared but not treated as regressions because directionality is metric-specific. |
 | `--replay FILE` | Use `FILE` as a deterministic provider transcript. Request mismatches, exhausted replay, or unconsumed turns fail the report. |
 | `--record FILE` | Run against the configured provider and write observed turns to `FILE`. |
-| `--update-golden FILE` | Run against the configured provider and rewrite `FILE` as the new golden transcript. This is intentionally explicit so CI can forbid it. |
+| `--update-golden FILE` | Run against the configured provider and explicitly rewrite `FILE` as the new replay transcript. |
 
 The three LLM fixture modes are mutually exclusive. The explicit
 `--llm-replay` and `--llm-record` spellings are also accepted when a script or

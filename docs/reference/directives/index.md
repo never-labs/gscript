@@ -22,7 +22,7 @@ such as `//@leia:build` are ignored.
 | Directive | Meaning | Argument form |
 |---|---|---|
 | `//leia:build` | Platform, environment, or feature build selection. | comma or whitespace separated tags |
-| `//leia:test` | Test classification for the CLI and release gates. | comma or whitespace separated labels |
+| `//leia:test` | Test classification for the CLI and validation workflows. | comma or whitespace separated labels |
 | `//leia:cap` | Host capabilities expected by the file. | comma or whitespace separated capability names |
 | `//leia:feature` | Language or product feature used by the file. | free text plus parsed words |
 

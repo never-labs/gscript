@@ -38,7 +38,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "playground", Usage: "usage: leia playground [--addr ADDR] [--timeout DURATION] [--max-source-bytes N] [--max-steps N]", Summary: "Serve the local backend-powered Leia playground.", Run: runPlaygroundCommand},
 		{Name: "repl", Usage: "usage: leia repl", Summary: "Start the interactive shell.", Run: runREPLCommand},
 		{Name: "run", Usage: "usage: leia run [--vm] [--jit=true|false] [--mod=readonly|vendor|mod] <file.leia> [args...]", Summary: "Run a script file.", Run: runRunCommand},
-		{Name: "test", Usage: "usage: leia test [--manifest-check] [--json|--format=text|json] [--output FILE] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]", Summary: "Run Leia test files and stdout goldens.", Run: runDefaultTestCommand},
+		{Name: "test", Usage: "usage: leia test [--manifest-check] [--json|--format=text|json] [--output FILE] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]", Summary: "Run Leia test files and expected stdout checks.", Run: runDefaultTestCommand},
 		{Name: "version", Usage: "usage: leia version [--json]", Summary: "Report binary version and build metadata.", Run: runVersionCommand},
 	}
 }

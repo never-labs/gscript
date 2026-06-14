@@ -47,6 +47,8 @@ notes, known issues, benchmark caveats, and security notes.
 
 Use [`decisions.md`](decisions.md) to record maintainer decisions that cannot
 be inferred from tests, local release evidence, or implementation defaults.
+`scripts/public_release_blockers_check.sh` reports each unresolved release
+decision with its area and the short action recorded in that table.
 
 Distribution checks are split between local artifacts and hosted workflow
 presence. The local check validates GoReleaser metadata, the install script

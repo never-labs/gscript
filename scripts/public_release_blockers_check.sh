@@ -76,11 +76,16 @@ if [[ -f docs/release/decisions.md ]]; then
   while IFS= read -r line; do
     [[ "$line" == \|* ]] || continue
     area="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2 }' <<<"$line")"
+    decision_needed="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $3); print $3 }' <<<"$line")"
     status="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $4); print $4 }' <<<"$line")"
     [[ -n "$area" && -n "$status" ]] || continue
     [[ "$area" != "Area" && "$area" != "---" ]] || continue
     if ! grep -Eq '^(Resolved|Accepted|N/A)([:.]|$)' <<<"$status"; then
-      add_blocker "unresolved release decision: $area ($status)"
+      if [[ -n "$decision_needed" && "$decision_needed" != "---" ]]; then
+        add_blocker "unresolved release decision: $area: $decision_needed ($status)"
+      else
+        add_blocker "unresolved release decision: $area ($status)"
+      fi
     fi
   done < docs/release/decisions.md
 fi

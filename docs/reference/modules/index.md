@@ -92,7 +92,7 @@ or `vendor/` tree, including transitive dependencies recorded in each resolved
 dependency's `leia.mod`. A missing transitive dependency is therefore reported
 as a local resolution error instead of silently falling back to network access.
 
-## Example Evidence
+## Runnable Examples
 
 Package-managed examples exercise module metadata, capability summaries, and
 native binding declarations:
@@ -101,16 +101,13 @@ native binding declarations:
 go run ./cmd/leia mod verify --json examples/database/package_managed
 go run ./cmd/leia mod verify --json examples/macos/package_managed
 go run ./cmd/leia mod verify --json examples/ui/package_managed
-go run ./cmd/leia mod verify --json examples/tooling/release_gate_project
 go run ./cmd/leia mod verify --json examples/tooling/package_manager_workflow
 ```
 
-The same projects are referenced from `tests/feature_matrix.json` under
-`module_package_management`, alongside `internal/modpkg/modpkg_test.go`,
-`tests/architecture/package_boundary_test.go`, and `cmd/leia/main_mod_test.go`.
-The `module_download_vendor_cache` row also points at the CLI/runtime resolver
-tests that cover `leia mod download`, `leia mod vendor`, `leia mod verify`,
-`leia run --mod=readonly`, and `leia run --mod=vendor`.
+The same command surface is exercised by the module CLI, runtime resolver, and
+package-boundary tests. Public examples should use `leia mod verify`,
+`leia mod graph`, and readonly or vendor mode when documenting reproducible
+module execution.
 
 ## Design Contract
 

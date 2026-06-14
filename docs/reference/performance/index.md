@@ -2,7 +2,7 @@
 
 Leia keeps performance evidence in the repository instead of treating it as an
 external benchmark notebook. The benchmark harnesses are intended for local
-optimization, release gates, and regression diagnosis.
+optimization, public validation, and regression diagnosis.
 
 ## Benchmark Layout
 
@@ -35,41 +35,25 @@ leia bench --quick
 leia bench numeric/matmul --runs 5 --warmup 1
 leia bench --full --runs 5 --warmup 1 --sort luajit-gap
 leia bench strict --runs 3 --warmup 1 \
-  --json /tmp/leia_strict_guard.json \
-  --markdown /tmp/leia_strict_guard.md
+  --json /tmp/leia_strict.json \
+  --markdown /tmp/leia_strict.md
 leia diagnose table/table_array_access --out-dir /tmp/leia-diag
 ```
 
-The shell gate wraps the same harnesses with repository defaults:
-
-```bash
-bash scripts/performance_gate.sh --syntax-smoke --no-luajit
-bash scripts/performance_gate.sh --smoke
-bash scripts/performance_gate.sh --feature-smoke
-bash scripts/performance_gate.sh --full
-```
-
 Use `--no-luajit` when LuaJIT is not installed or the workload has no useful
-Lua reference. Without `--no-luajit`, script-timed current/LuaJIT rows are a
-hard gate: `scripts/performance_gate.sh` fails when `current / LuaJIT` exceeds
-`--luajit-threshold` (default `0.80`).
+Lua reference. Without `--no-luajit`, script-timed current/LuaJIT rows are
+validated against `--luajit-threshold` (default `0.80`).
 
-`--syntax-smoke` is the fastest guard for lexer, parser, or grammar-only
-changes. It runs a small current-vs-HEAD hot-path subset across control, calls,
-table, string, and data workloads, uses shorter calibration, and skips the
-strict truth pass unless `--strict` is added.
-
-`--feature-smoke` covers newer feature families such as concurrency, AI runtime
-smoke, loopback serving, sqlite, q-style data processing, and SoA kernels. It
-uses longer script samples and runs the mixed workload set serially by default
-so current-vs-HEAD-vs-LuaJIT comparisons measure the hot paths instead of local
-CPU contention. Pass `--jobs N` explicitly only for exploratory timing runs.
+For fast local checks, use `leia bench --quick`. For release-quality evidence,
+write JSON and Markdown reports from the full and strict benchmark commands.
+Pass `--jobs N` explicitly only for exploratory timing runs where local CPU
+contention is acceptable.
 
 ## Timing Modes
 
 `timing_compare.py` is the main optimization harness. It compares:
 
-- the current worktree binary;
+- the local checkout binary;
 - a clean baseline binary built from `--head-ref`;
 - optional LuaJIT reference timing.
 
@@ -82,8 +66,8 @@ is below the timer resolution.
 
 ## Strict Guard
 
-`strict_guard.py` is the release/regression truth pass. It runs selected
-benchmarks in these modes:
+Strict benchmark mode is the regression truth pass. It runs selected benchmarks
+in these modes:
 
 | Mode | Meaning |
 |---|---|
@@ -103,17 +87,11 @@ runs as native code: supported hot paths may run natively, but unsupported
 operations must fall back to the VM/runtime without changing visible results,
 errors, capability checks, resource-budget behavior, or deoptimization behavior.
 
-The LuaJIT comparison is a release bottom line, not a marketing claim. For
-script-timed rows with a Lua reference, `scripts/performance_gate.sh` runs the
-performance submit guard and fails when `current / LuaJIT` exceeds the configured
-`--luajit-threshold` (default `0.80`). Use `--no-luajit` only when LuaJIT is
-unavailable or the selected workload has no meaningful Lua reference, and record
-that limitation in release evidence.
-
-Production and release plans keep this bottom line active through
-`bash scripts/production_check.sh --full --release-profile`,
-`go run ./cmd/leia ci release --list`, and
-`bash scripts/performance_gate.sh --full`.
+The LuaJIT comparison is a validation baseline, not a marketing claim. For
+script-timed rows with a Lua reference, `leia bench --full` and strict reports
+record the configured `--luajit-threshold` (default `0.80`). Use `--no-luajit`
+only when LuaJIT is unavailable or the selected workload has no meaningful Lua
+reference, and record that limitation with the benchmark artifact.
 
 ## Artifacts
 
@@ -125,8 +103,8 @@ leia bench --full \
   --markdown /tmp/leia_timing.md
 
 leia bench strict \
-  --json /tmp/leia_strict_guard.json \
-  --markdown /tmp/leia_strict_guard.md
+  --json /tmp/leia_strict.json \
+  --markdown /tmp/leia_strict.md
 ```
 
 Release and diagnostic scripts collect these artifacts into evidence bundles.

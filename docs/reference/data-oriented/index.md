@@ -92,11 +92,10 @@ roundtrip := dialect.eval("excel", workbook, {headers: true})
 
 The runnable project `examples/data/db_q_frame_project` exercises SQLite
 `db.frame`, SoA-backed `q.query`, and `xlsx`/`excel` import/export together. It
-is intentionally tracked by the feature matrix so published data-oriented claims stay tied
-to an executable example. The larger
-`examples/tooling/release_gate_project` workflow uses the same bridge alongside
-shell, AI, and web dialects; string categories are mapped to stable numeric ids
-before entering the SoA/q aggregation path.
+keeps published data-oriented claims tied to an executable example. Larger
+tooling workflows use the same bridge alongside shell, optional LLM, and web
+dialects; string categories are mapped to stable numeric ids before entering the
+SoA/q aggregation path.
 
 ## Shape And Schema
 
@@ -192,7 +191,7 @@ Run:
 
 ```bash
 leia bench --bench data/soa_affine_many --runs 5 --warmup 1
-bash scripts/performance_gate.sh --feature-smoke
+leia bench --quick --bench data
 ```
 
 ## Related Modules

@@ -703,15 +703,15 @@ event with the default `event_type: "approval_replay_trace"`, correlation IDs,
 decision/result status, and policy summary fields. It does not copy approval
 tokens, raw tool arguments, or raw result values into the event payload.
 
-Use host-side record/replay for deterministic tests:
+Use host-side record/replay for deterministic provider behavior:
 
 ```go
 rec := llm.NewRecorder()
 vm := leia.New(leia.WithLLMProvider(provider), leia.WithLLMRecorder(rec.Record))
 // run script
-_ = llm.SaveRecords("testdata/turns.json", rec.Records())
+_ = llm.SaveRecords("records/turns.json", rec.Records())
 
-records, _ := llm.LoadRecords("testdata/turns.json")
+records, _ := llm.LoadRecords("records/turns.json")
 vm = leia.New(leia.WithLLMReplay(records))
 replay := llm.NewReplayProvider(records)
 _ = replay
@@ -897,31 +897,32 @@ LEIA_ANTHROPIC_COMPAT_API_KEY=...
 LEIA_ANTHROPIC_COMPAT_MODEL=...
 ```
 
-The GLM smoke path also accepts `LEIA_GLM_BASE_URL`, `LEIA_GLM_API_KEY`, and
-`LEIA_GLM_MODEL`.
+The GLM live-provider path also accepts `LEIA_GLM_BASE_URL`,
+`LEIA_GLM_API_KEY`, and `LEIA_GLM_MODEL`.
 
-Run the live GLM smoke suite explicitly:
+Run a live GLM example explicitly:
 
 ```bash
 LEIA_LLM_INTEGRATION=1 \
 LEIA_GLM_API_KEY=... \
 LEIA_GLM_MODEL=glm-5.1 \
-go test ./tests/integration/llm -run 'Test(GLMAnthropicCompatibleLLMIntegration|LLMSyntaxGLMIntegration|LLMSyntaxGLMStreamingIntegration|LLMSyntaxGLMDirectAgentToolsIntegration|GLMExamplesRunWithRealProviderIntegration)$' -count=1 -v
+go run ./cmd/leia examples run repo-llm-glm_smoke
 ```
 
 `leia examples check` skips live-provider examples by default. Directly running
 `examples/llm/glm_smoke.leia` or `examples/llm/glm_direct_agent_tools.leia`
 requires both `LEIA_LLM_INTEGRATION=1` and a configured GLM key.
 
-## Evidence
+## Validation
 
-Stable AI dialect coverage is tracked in `tests/feature_matrix.json` under
-`ai_dialect_integration`. The main evidence set includes:
+The optional LLM dialect is validated through provider-free examples,
+record/replay examples, and opt-in live provider runs. The main coverage areas
+are:
 
-| Surface | Evidence |
+| Surface | Validation surface |
 |---|---|
-| Models and provider adapters | `tests/llm/llm_ai_dialect_test.go`, `tests/integration/llm/llm_provider_test.go`, `tests/integration/llm/llm_openai_provider_test.go`, `tests/integration/llm/llm_glm_integration_test.go`, `examples/llm/glm_smoke.leia`, `examples/llm/glm_direct_agent_tools.leia` |
-| Tools and agents | `tests/llm/llm_agent_examples_test.go`, `tests/llm/llm_agent_tools_test.go`, `examples/llm/agent.leia`, `examples/llm/agent_as_tool.leia`, `examples/ai/coding_agent_replay.leia` |
-| Messages, turns, and streaming | `tests/llm/llm_runtime_test.go`, `tests/llm/llm_loop_test.go`, `examples/llm/direct_turn.leia`, `examples/llm/prompt_tagged_messages.leia`, `examples/llm/streaming_turn.leia` |
-| Record, replay, and trace | `tests/llm/llm_record_replay_test.go`, `tests/llm/llm_trace_test.go`, `cmd/leia/main_examples_test.go`, `examples/ai/record_replay_trace_project.leia`, `examples/evaluate/llm_replay.leia`, `examples/evaluate/judge_replay.leia`, `examples/evaluate/multiturn_replay.leia`, `examples/evaluate/project_agent_regression.leia` |
+| Models and provider adapters | Provider-free dialect examples plus opt-in GLM/OpenAI-compatible live runs. |
+| Tools and agents | Agent-as-tool examples, tool dispatch examples, and coding-agent replay examples. |
+| Messages, turns, and streaming | Direct-turn, prompt-tagged-message, history, and streaming examples. |
+| Record, replay, and trace | Replay fixtures, trace envelopes, judge replay, multiturn replay, and project regression examples. |
 | Tagged AI dialects | `examples/ai/tagged_agent_workflow.leia`, `examples/dialects/ai_prompt_quote.leia` |
