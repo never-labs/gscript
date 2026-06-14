@@ -1,3 +1,8 @@
+---
+layout: spec
+title: Leia Language Specification
+---
+
 # Leia Language Specification
 
 This is the normative reference for Leia, a Go-embedded scripting language with

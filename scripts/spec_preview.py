@@ -191,6 +191,15 @@ def strip_generated_spec_chapters(text: str) -> str:
     return text[:start].rstrip() + "\n"
 
 
+def strip_front_matter(text: str) -> str:
+    if not text.startswith("---\n"):
+        return text
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return text
+    return text[end + len("\n---\n") :]
+
+
 def shift_markdown_headings(text: str, levels: int = 1) -> str:
     out: list[str] = []
     for line in text.splitlines():
@@ -406,7 +415,7 @@ def render(spec_dir: Path) -> str:
         path = spec_dir / filename
         text = path.read_text(encoding="utf-8")
         if filename == "index.md":
-            text = strip_generated_spec_chapters(text)
+            text = strip_front_matter(strip_generated_spec_chapters(text))
         ident = slug(title)
         nav.append(f'  <li><a href="#{ident}">{escape(title)}</a></li>')
         sections.append(f"<section>{markdown_to_html(text, ident)}</section>")

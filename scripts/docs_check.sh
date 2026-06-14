@@ -91,6 +91,14 @@ if ! cmp -s "$TMP_SPEC_DIR/index.md" "docs/spec/index.md"; then
     echo "error: docs/spec/index.md is stale; run: python3 scripts/spec_preview.py --write-index --output docs/spec/index.html" >&2
     exit 1
 fi
+if [ ! -f "docs/_layouts/spec.html" ]; then
+    echo "error: docs/spec/index.md uses the spec layout, but docs/_layouts/spec.html is missing" >&2
+    exit 1
+fi
+if ! grep -Fq "layout: spec" docs/spec/index.md; then
+    echo "error: docs/spec/index.md must use layout: spec so GitHub Pages renders the long-form spec page" >&2
+    exit 1
+fi
 if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
     echo "error: spec preview generator produced no output" >&2
     exit 1
