@@ -34,6 +34,14 @@ go run ./cmd/leia doc generate --format json
 `scripts/docs_check.sh` compares the checked-in Markdown reference pages with
 the current generated output, so stale generated docs fail the docs gate.
 
+The public spec entrypoint `docs/spec/index.md` is a generated single-page
+specification assembled from the chapter files in `docs/spec/`. Edit the chapter
+files first, then refresh the published spec and local preview with:
+
+```bash
+python3 scripts/spec_preview.py --write-index --output docs/spec/index.html
+```
+
 Run the same gate through the CLI when checking documentation locally:
 
 ```bash

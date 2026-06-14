@@ -83,13 +83,20 @@ if [ "$generated_reference_count" -eq 0 ]; then
     exit 1
 fi
 export GENERATED_REFERENCE_COUNT="$generated_reference_count"
-python3 scripts/spec_preview.py --output "$TMP_DOCS/spec-preview.html" >/dev/null
+TMP_SPEC_DIR="$TMP_DOCS/spec"
+mkdir -p "$TMP_SPEC_DIR"
+cp docs/spec/*.md docs/spec/grammar.ebnf "$TMP_SPEC_DIR/"
+python3 scripts/spec_preview.py --spec-dir "$TMP_SPEC_DIR" --write-index --output "$TMP_DOCS/spec-preview.html" >/dev/null
+if ! cmp -s "$TMP_SPEC_DIR/index.md" "docs/spec/index.md"; then
+    echo "error: docs/spec/index.md is stale; run: python3 scripts/spec_preview.py --write-index --output docs/spec/index.html" >&2
+    exit 1
+fi
 if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
     echo "error: spec preview generator produced no output" >&2
     exit 1
 fi
 if ! cmp -s "$TMP_DOCS/spec-preview.html" "docs/spec/index.html"; then
-    echo "error: docs/spec/index.html is stale; run: python3 scripts/spec_preview.py --output docs/spec/index.html" >&2
+    echo "error: docs/spec/index.html is stale; run: python3 scripts/spec_preview.py --write-index --output docs/spec/index.html" >&2
     exit 1
 fi
 if ! grep -Fq "spec/index.html" docs/_config.yml; then
