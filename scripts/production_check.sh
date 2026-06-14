@@ -287,6 +287,18 @@ add_release_artifacts_gate() {
     add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh"
 }
 
+add_public_release_blockers_gate() {
+    if [ ! -f scripts/public_release_blockers_check.sh ]; then
+        add_skip "Public Release Blockers" "missing scripts/public_release_blockers_check.sh"
+        return
+    fi
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_run "Public Release Blockers" "bash scripts/public_release_blockers_check.sh --require-resolved"
+    else
+        add_run "Public Release Blockers" "bash scripts/public_release_blockers_check.sh"
+    fi
+}
+
 add_manifest_coverage() {
     if [ ! -f tests/manifest.py ]; then
         add_skip "Manifest Coverage" "missing tests/manifest.py"
@@ -435,6 +447,7 @@ build_full_plan() {
     add_release_smoke
     add_cli_experience_gate
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_public_release_blockers_gate
         add_release_distribution_gate
         add_release_artifacts_gate
     fi

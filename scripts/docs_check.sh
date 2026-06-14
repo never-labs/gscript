@@ -30,6 +30,7 @@ The repository-script mention check covers:
   scripts/diagnostics_bundle.sh
   scripts/docs_check.sh
   scripts/editor_check.sh
+  scripts/public_release_blockers_check.sh
   scripts/release_artifacts.sh
   scripts/release_artifacts_check.sh
   scripts/release_distribution_check.sh
@@ -127,6 +128,7 @@ script_names = {
     "diagnostics_bundle": root / "scripts" / "diagnostics_bundle.sh",
     "docs_check": root / "scripts" / "docs_check.sh",
     "editor_check": root / "scripts" / "editor_check.sh",
+    "public_release_blockers_check": root / "scripts" / "public_release_blockers_check.sh",
     "release_artifacts": root / "scripts" / "release_artifacts.sh",
     "release_artifacts_check": root / "scripts" / "release_artifacts_check.sh",
     "release_distribution_check": root / "scripts" / "release_distribution_check.sh",
@@ -348,6 +350,7 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
     release_profile_cmd = "bash scripts/production_check.sh --full --release-profile"
+    public_release_blockers_cmd = "bash scripts/public_release_blockers_check.sh --require-resolved"
     release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
@@ -358,6 +361,7 @@ def check_release_gate_docs() -> None:
             release_profile_cmd,
             release_matrix_cmd,
             "bash scripts/performance_gate.sh --full",
+            public_release_blockers_cmd,
             release_distribution_cmd,
             "bash scripts/release_artifacts_check.sh --build",
             "tests/feature_matrix.json",
@@ -369,6 +373,7 @@ def check_release_gate_docs() -> None:
             "docs/reference/platforms/index.md",
             "choose a license and add a root `LICENSE` file",
             "docs/release/notes-template.md",
+            "docs/release/decisions.md",
         ],
     )
     require_snippets(
@@ -380,6 +385,7 @@ def check_release_gate_docs() -> None:
             release_matrix_cmd,
             "scripts/docs_check.sh",
             "bash scripts/performance_gate.sh --full",
+            public_release_blockers_cmd,
             release_distribution_cmd,
             "bash scripts/release_artifacts_check.sh --build",
             "tests/language/MANIFEST.md",
@@ -388,7 +394,30 @@ def check_release_gate_docs() -> None:
             "docs/reference/ai/index.md",
             "docs/reference/data-oriented/index.md",
             "examples/README.md",
+            "scripts/public_release_blockers_check.sh",
             "state tested platforms and execution modes",
+            "complete the release decisions recorded in `docs/release/decisions.md`",
+        ],
+    )
+    require_snippets(
+        root / "docs" / "release" / "decisions.md",
+        [
+            "Public releases require explicit maintainer decisions",
+            "## Required Before Public Release",
+            "| Area | Decision Needed | Current Status |",
+            "| License | Choose the repository license",
+            "| Security reporting | Confirm the private reporting route",
+            "| Platform support | Define tested and supported OS/architecture combinations",
+            "| Release channels | Decide which channels are public",
+            "| Artifact signing | Decide whether SHA256 checksums are sufficient",
+            "| Compatibility policy | Define the pre-1.0 compatibility promise",
+            "The repository has no selected license until a root `LICENSE` file exists.",
+            "whether GitHub private security advisories are enabled",
+            "tested OS/architecture combinations",
+            "whether `scripts/install.sh` is a supported install path",
+            "whether SHA256 checksums are sufficient",
+            "checksum and signing requirements",
+            "Optimizations, JIT availability, typed kernels, and provider integrations are not compatibility guarantees",
         ],
     )
     require_snippets(

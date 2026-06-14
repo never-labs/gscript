@@ -445,7 +445,7 @@
       "interpreter": {"status": "not_applicable", "refs": []},
       "tier1": {"status": "not_applicable", "refs": []},
       "tier2": {"status": "not_applicable", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/release_matrix_test.go", "scripts/docs_check.sh", "scripts/production_check.sh", "scripts/performance_gate.sh", "benchmarks/performance_gate_test.py", "scripts/release_artifacts_check.sh", "scripts/release_distribution_check.sh", "cmd/leia/main_ci_test.go", "cmd/leia/main_examples_command_test.go", "examples/tooling/release_evidence_pipeline.leia", "examples/tooling/release_gate_project/main.leia", "examples/automation/release_fixture_matrix.leia", "examples/automation/release_risk_digest.leia", "docs/release/index.md", "docs/testing.md"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/release_matrix_test.go", "scripts/docs_check.sh", "scripts/production_check.sh", "scripts/public_release_blockers_check.sh", "scripts/performance_gate.sh", "benchmarks/performance_gate_test.py", "scripts/release_artifacts_check.sh", "scripts/release_distribution_check.sh", "cmd/leia/main_ci_test.go", "cmd/leia/main_examples_command_test.go", "examples/tooling/release_evidence_pipeline.leia", "examples/tooling/release_gate_project/main.leia", "examples/automation/release_fixture_matrix.leia", "examples/automation/release_risk_digest.leia", "docs/release/index.md", "docs/release/decisions.md", "docs/testing.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "semantic_only", "refs": []}
     },
@@ -459,7 +459,7 @@
       "interpreter": {"status": "not_applicable", "refs": []},
       "tier1": {"status": "not_applicable", "refs": []},
       "tier2": {"status": "not_applicable", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["README.md", ".goreleaser.yaml", "scripts/install.sh", "scripts/release_distribution_check.sh", "scripts/release_artifacts_check.sh", "cmd/leia/main_readme_tooling_test.go", "tests/release_matrix_test.go"]},
+      "semantic_gate": {"status": "covered", "refs": ["README.md", ".goreleaser.yaml", "scripts/install.sh", "scripts/public_release_blockers_check.sh", "scripts/release_distribution_check.sh", "scripts/release_artifacts_check.sh", "cmd/leia/main_readme_tooling_test.go", "tests/release_matrix_test.go", "docs/release/decisions.md"]},
       "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },

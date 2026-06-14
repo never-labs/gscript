@@ -12,6 +12,7 @@ bash scripts/production_check.sh --full --release-profile
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
+bash scripts/public_release_blockers_check.sh --require-resolved
 bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
 bash scripts/release_artifacts_check.sh --build
 ```
@@ -36,15 +37,21 @@ The release evidence should cite:
 - `docs/reference/platforms/index.md`
 - `docs/reference/diagnostics/index.md`
 - `examples/README.md`
+- `docs/release/decisions.md`
+- `scripts/public_release_blockers_check.sh`
 
 Before a public tag, update install instructions, examples, compatibility
 notes, known issues, benchmark caveats, and security notes.
+
+Use [`decisions.md`](decisions.md) to record maintainer decisions that cannot
+be inferred from tests, local release evidence, or implementation defaults.
 
 Distribution checks are split between local artifacts and hosted workflow
 presence. The local check validates GoReleaser metadata and the install script
 dry-run matrix even when GitHub workflow files are intentionally absent:
 
 ```bash
+bash scripts/public_release_blockers_check.sh
 bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 ```
@@ -81,6 +88,7 @@ Do not cut a public release until these repository-level decisions are complete:
 
 - choose a license and add a root `LICENSE` file;
 - confirm the vulnerability reporting route in `SECURITY.md`;
+- complete the release decisions recorded in `docs/release/decisions.md`;
 - verify install commands against the published module path;
 - state tested platforms and execution modes;
 - run release evidence on the target platforms;

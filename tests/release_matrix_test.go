@@ -305,6 +305,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	productionFullCmd := "bash scripts/production_check.sh --full --release-profile"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
+	publicReleaseBlockersCmd := "bash scripts/public_release_blockers_check.sh --require-resolved"
 	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
 	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build"
 
@@ -331,6 +332,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				releaseMatrixCmd,
 				docsCheckCmd,
 				fullPerfGateCmd,
+				publicReleaseBlockersCmd,
 				releaseDistributionCmd,
 				releaseArtifactsCmd,
 				"tests/feature_matrix.json",
@@ -345,6 +347,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				releaseMatrixCmd,
 				docsCheckCmd,
 				fullPerfGateCmd,
+				publicReleaseBlockersCmd,
 				releaseDistributionCmd,
 				releaseArtifactsCmd,
 			},
@@ -754,6 +757,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	for _, want := range []string{
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full --release-profile",
+		"bash scripts/public_release_blockers_check.sh --require-resolved",
 		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"bash scripts/release_artifacts_check.sh --build",
 	} {
@@ -882,6 +886,7 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		{path: "scripts/diagnostics_bundle.sh", snippet: "Collects git revision/status"},
 		{path: "scripts/performance_gate.sh", snippet: "benchmarks/timing_compare.py"},
 		{path: "scripts/production_check.sh", snippet: "add_release_smoke"},
+		{path: "scripts/public_release_blockers_check.sh", snippet: "--require-resolved"},
 		{path: "scripts/release_artifacts_check.sh", snippet: "Default mode runs a dry-run"},
 	} {
 		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
@@ -939,6 +944,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		".github/pull_request_template.md",
 		"examples/README.md",
 		"docs/release/notes-template.md",
+		"docs/release/decisions.md",
 		"docs/contributing/performance.md",
 		"docs/reference/platforms/index.md",
 	} {
@@ -962,6 +968,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"../examples/README.md",
 		"contributing/performance.md",
 		"reference/platforms/index.md",
+		"release/decisions.md",
 	} {
 		if !strings.Contains(docsIndex, ref) {
 			t.Fatalf("docs/index.md must link %s", ref)
@@ -972,11 +979,37 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	for _, snippet := range []string{
 		"choose a license and add a root `LICENSE` file",
 		"docs/release/notes-template.md",
+		"docs/release/decisions.md",
+		"complete the release decisions recorded in `docs/release/decisions.md`",
 		"examples/README.md",
 		"docs/reference/platforms/index.md",
 	} {
 		if !strings.Contains(release, snippet) {
 			t.Fatalf("docs/release/index.md must mention %q", snippet)
+		}
+	}
+
+	decisions := readFileString(t, filepath.Join(root, "docs", "release", "decisions.md"))
+	for _, snippet := range []string{
+		"Public releases require explicit maintainer decisions",
+		"## Required Before Public Release",
+		"| Area | Decision Needed | Current Status |",
+		"| License | Choose the repository license",
+		"| Security reporting | Confirm the private reporting route",
+		"| Platform support | Define tested and supported OS/architecture combinations",
+		"| Release channels | Decide which channels are public",
+		"| Artifact signing | Decide whether SHA256 checksums are sufficient",
+		"| Compatibility policy | Define the pre-1.0 compatibility promise",
+		"The repository has no selected license until a root `LICENSE` file exists.",
+		"whether GitHub private security advisories are enabled",
+		"tested OS/architecture combinations",
+		"whether `scripts/install.sh` is a supported install path",
+		"whether SHA256 checksums are sufficient",
+		"checksum and signing requirements",
+		"Optimizations, JIT availability, typed kernels, and provider integrations are not compatibility guarantees",
+	} {
+		if !strings.Contains(decisions, snippet) {
+			t.Fatalf("docs/release/decisions.md must keep maintainer decision snippet %q", snippet)
 		}
 	}
 }
@@ -1262,11 +1295,11 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 		},
 		"release_evidence_gates": {
 			specSections: []string{"Implementation Requirements", "Stability Contract"},
-			docPaths:     []string{"docs/spec/index.md", "docs/testing.md", "docs/release/index.md"},
+			docPaths:     []string{"docs/spec/index.md", "docs/testing.md", "docs/release/index.md", "docs/release/decisions.md"},
 		},
 		"release_distribution_surface": {
 			specSections: []string{"Implementation Requirements", "Stability Contract"},
-			docPaths:     []string{"docs/spec/index.md", "docs/release/index.md", "docs/reference/platforms/index.md"},
+			docPaths:     []string{"docs/spec/index.md", "docs/release/index.md", "docs/release/decisions.md", "docs/reference/platforms/index.md"},
 		},
 		"embedding_host_bindings": {
 			specSections: []string{"Modules And Loading", "Values And Types", "Functions", "Errors And Diagnostics"},

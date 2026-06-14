@@ -1061,10 +1061,12 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"tests/release_matrix_test.go",
 		"scripts/docs_check.sh",
 		"scripts/production_check.sh",
+		"scripts/public_release_blockers_check.sh",
 		"scripts/release_artifacts_check.sh",
 		"scripts/release_distribution_check.sh",
 		"cmd/leia/main_ci_test.go",
 		"docs/release/index.md",
+		"docs/release/decisions.md",
 	)
 
 	distribution := requireFeature(t, features, "release_distribution_surface")
@@ -1072,10 +1074,12 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"README.md",
 		".goreleaser.yaml",
 		"scripts/install.sh",
+		"scripts/public_release_blockers_check.sh",
 		"scripts/release_distribution_check.sh",
 		"scripts/release_artifacts_check.sh",
 		"cmd/leia/main_readme_tooling_test.go",
 		"tests/release_matrix_test.go",
+		"docs/release/decisions.md",
 	)
 }
 
