@@ -584,7 +584,7 @@ def check_spec_contract_docs() -> None:
             readme,
             [
                 "[Language specification](docs/spec/index.md)",
-                "Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+                "Leia is a Go-native embedded scripting language with JIT execution, q-style in-memory analytics, and first-class extensible dialects.",
                 "## Example",
                 "## References",
             ],
@@ -681,7 +681,7 @@ def check_readme_user_facing_gates() -> None:
             root / "cmd" / "leia" / "main_readme_tooling_test.go",
             [
                 "TestReadmeIntroStaysFocused",
-                "Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+                "Leia is a Go-native embedded scripting language with JIT execution, q-style in-memory analytics, and first-class extensible dialects.",
                 "Performance-oriented:",
                 "LuaJIT-class workloads",
                 "Analytics-native:",

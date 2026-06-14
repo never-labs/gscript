@@ -419,7 +419,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"Leia is a Go-native embedded scripting language with JIT execution, q-style in-memory analytics, and first-class extensible dialects.",
 		"Go-native:",
 		"ARM64 JIT",
 		"LuaJIT-class workloads",

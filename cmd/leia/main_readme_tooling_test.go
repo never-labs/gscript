@@ -17,7 +17,7 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 	}
 	readme := string(data)
 	for _, want := range []string{
-		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"Leia is a Go-native embedded scripting language with JIT execution, q-style in-memory analytics, and first-class extensible dialects.",
 		"Go-native:",
 		"Performance-oriented:",
 		"LuaJIT-class workloads",
