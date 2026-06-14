@@ -1,6 +1,7 @@
 package methodjit
 
 import (
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -1218,6 +1219,109 @@ func TestTier2DirectHelperBridgeVectorPrimitivesReportStableErrors(t *testing.T)
 			}
 			if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != tc.err {
 				t.Fatalf("error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, tc.err)
+			}
+		})
+	}
+
+	runtimeCases := []struct {
+		name    string
+		kernel  string
+		shape   string
+		op      Op
+		aux     int64
+		args    []runtime.Value
+		wantErr string
+	}{
+		{
+			name:    "gather runtime",
+			kernel:  "VectorGather",
+			shape:   "vector-gather",
+			op:      OpVectorGather,
+			args:    []runtime.Value{runtime.IntValue(10), runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1}))},
+			wantErr: "VectorGather operand must be dense array",
+		},
+		{
+			name:    "compare runtime",
+			kernel:  "VectorCompare",
+			shape:   "vector-compare",
+			op:      OpVectorCompare,
+			aux:     99,
+			args:    []runtime.Value{runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10})), runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1}))},
+			wantErr: "VectorCompare op 99 is not a comparison",
+		},
+		{
+			name:    "mask runtime",
+			kernel:  "VectorMask",
+			shape:   "vector-mask",
+			op:      OpVectorMask,
+			aux:     int64(runtime.DenseArrayMaskAndNot),
+			args:    []runtime.Value{runtime.IntValue(10), runtime.DenseArrayValue(runtime.NewDenseArrayBool([]bool{true}))},
+			wantErr: "scalar is not supported for dense array operation",
+		},
+		{
+			name:    "where runtime",
+			kernel:  "VectorWhere",
+			shape:   "vector-where",
+			op:      OpVectorWhere,
+			args:    []runtime.Value{runtime.IntValue(10), runtime.IntValue(1), runtime.IntValue(0)},
+			wantErr: "VectorWhere mask must be dense array",
+		},
+		{
+			name:    "reduce runtime",
+			kernel:  "VectorReduce",
+			shape:   "vector/vector-reduce",
+			op:      OpVectorReduce,
+			aux:     int64(runtime.DenseArrayReduceSum),
+			args:    []runtime.Value{runtime.IntValue(10)},
+			wantErr: "VectorReduce operand must be dense array",
+		},
+		{
+			name:    "scan runtime",
+			kernel:  "VectorScan",
+			shape:   "vector-scan",
+			op:      OpVectorScan,
+			args:    []runtime.Value{runtime.IntValue(10)},
+			wantErr: "VectorScan operand must be dense array",
+		},
+	}
+	for _, tc := range runtimeCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cf := &CompiledFunction{
+				QVectorRuntimeKernelShapesByID: map[int]string{
+					42: tc.shape,
+				},
+			}
+			regs := make([]runtime.Value, 8)
+			const base = 1
+			copy(regs[base+1:], tc.args)
+			ctx := &ExecContext{
+				HelperCF:   uintptr(unsafe.Pointer(cf)),
+				RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+				Regs:       uintptr(unsafe.Pointer(&regs[base])),
+				RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+				OpExitOp:   int64(tc.op),
+				OpExitSlot: 0,
+				OpExitArg1: 1,
+				OpExitArg2: 2,
+				OpExitAux:  tc.aux,
+				OpExitID:   42,
+			}
+			if tc.op == OpVectorWhere {
+				ctx.OpExitArg2 = 3
+			}
+
+			beforeDirect := Tier2DirectHelperCallCount()
+			tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+			if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+				t.Fatalf("%s direct helper calls = %d, want 1", tc.kernel, got)
+			}
+			if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || !strings.Contains(ctx.HelperErr.Error(), tc.wantErr) {
+				t.Fatalf("%s runtime error flag=%d err=%v, want %q", tc.kernel, ctx.HelperErrFlag, ctx.HelperErr, tc.wantErr)
+			}
+			stats := cf.QKernelExecutionStats()
+			assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", tc.kernel, tc.shape, string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+			if got := qKernelExecutionCount(stats, "methodjit_q_vector_runtime", tc.kernel, string(qTypedRuntimeExecutionRouteOpExit), "error"); got != 0 {
+				t.Fatalf("%s op-exit error route count = %d, want 0", tc.kernel, got)
 			}
 		})
 	}
