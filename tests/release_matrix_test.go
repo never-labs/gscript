@@ -1395,15 +1395,15 @@ func releaseFeatureDocCoverageMap() map[string]releaseFeatureDocCoverage {
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/stdlib/index.md", "docs/reference/security/index.md"},
 		},
 		"tagged_dialect_syntax": {
-			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
+			specSections: []string{"Grammar Appendix", "Tagged Dialects", "Expressions", "Statements"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/dialects/index.md"},
 		},
 		"q_analytics_dialect": {
-			specSections: []string{"Grammar Appendix", "Expressions", "Values And Types"},
+			specSections: []string{"Grammar Appendix", "Tagged Dialects", "q Dialect", "Expressions", "Values And Types"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/dialects/index.md"},
 		},
 		"data_stdlib_qsql": {
-			specSections: []string{"Expressions", "Values And Types", "Tables And Metatables", "Implementation Requirements"},
+			specSections: []string{"Expressions", "q Dialect", "Values And Types", "Tables And Metatables", "Implementation Requirements"},
 			docPaths:     []string{"docs/spec/index.md", "docs/reference/data-oriented/index.md", "docs/reference/stdlib/index.md"},
 		},
 		"spreadsheet_dialects": {

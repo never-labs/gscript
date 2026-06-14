@@ -274,25 +274,11 @@ assert(holder["child"] == child)
 
 ## Tagged Dialect Forms
 
-Tagged dialects are Leia's generic DSL extension mechanism. A tagged string has
-the form `` tag`...` `` or `` tag```...``` ``; `tag!` selects the fail-fast
-variant when the dialect supports recoverable errors. `$` is shorthand for the
-shell dialect. A tagged block has the form `tag { ... }` or `tag! { ... }` and
-uses the dialect's block contract.
-
-Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged
-raw strings may contain `${expr}` interpolation segments. Leia evaluates each
-interpolation expression in the surrounding lexical scope, then passes the raw
-body and interpolated values to the dialect. The dialect, not the lexer, decides
-whether the interpolated value is escaped as text, encoded as JSON, bound as a
-parameter, or rejected.
-
-The dialect boundary never creates a second language runtime. Dialects return
-ordinary Leia values, `(value, err)` pairs, or runtime errors according to their
-contract. `q` is the core dialect for high-performance in-memory columnar
-analytics over vectors, dictionaries, tables, and SoA-backed query plans. AI
-forms such as `model`, `tool`, `turn`, and `agent` are another dialect family
-built on the same mechanism; they are not language-intrinsic behavior.
+Tagged dialect forms are expressions. The generic syntax, interpolation rules,
+bang behavior, registration model, and runtime boundary are specified in
+[Tagged Dialects](dialects.md). The core q analytics dialect is specified in
+[q Dialect](q-dialect.md). The optional standard AI dialect family is specified
+in [AI Dialect Syntax](ai-dialect.md).
 
 ## Evaluation Order
 

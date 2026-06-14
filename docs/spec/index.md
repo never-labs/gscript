@@ -45,6 +45,10 @@ review. GitHub Pages publishes the Markdown chapters. The Markdown chapters and
   sequence behavior, metatables, and metamethods.
 - [Concurrency](concurrency.md): goroutine-like tasks, channels, select, sync,
   cancellation, and host scheduling boundaries.
+- [Tagged Dialects](dialects.md): generic DSL extension syntax, interpolation,
+  bang forms, runtime boundaries, registration, and standard dialect families.
+- [q Dialect](q-dialect.md): q-style vectors, dictionaries, tables, qSQL,
+  functional query forms, and columnar runtime/JIT contracts.
 - [AI Dialect Syntax](ai-dialect.md): model, tool, agent, and turn dialects as
   one optional standard-library dialect implementation; messages, budgets,
   output validation, providers, trace, replay, and evaluation. AI is not a

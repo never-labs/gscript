@@ -120,32 +120,21 @@ tags and blocks are the generic extension mechanism; q columnar analytics,
 shell/data/web forms, spreadsheets, and AI workflows all use the same dialect
 boundary.
 
-## Tagged Dialects And AI Syntax
+## Tagged Dialects
 
-Leia supports tagged dialect forms. A tagged string has the shape
-<code>tag`...`</code>, <code>tag!`...`</code>, <code>tag```...```</code>, or
-<code>tag!```...```</code>; <code>$`...`</code> is shorthand for the shell dialect. Tagged
-raw bodies may contain `${expr}` interpolation; each dialect owns encoding of
-the interpolated value. Untagged raw strings do not interpolate. A tagged block
-has the shape `tag { ... }` or `tag! { ... }`. The non-bang form returns the
-dialect result and any structured error according to the dialect contract. The
-bang form is fail-fast and raises a runtime error when the dialect cannot parse
-or execute the form.
+Leia supports tagged dialect forms. The generic syntax, interpolation,
+fail-fast bang behavior, registration rules, and host capability boundary are
+specified in [Tagged Dialects](dialects.md).
 
 `q` is Leia's core dialect for high-performance in-memory columnar analytics.
 It works with q-style vectors, dictionaries, tables, and SoA-backed query plans;
-it is a dialect implementation over ordinary Leia values, not a second
-language runtime.
+it is specified in [q Dialect](q-dialect.md). q is a dialect implementation over
+ordinary Leia values, not a second language runtime.
 
 The AI surface is an optional standard-library layer rather than a separate
 execution engine or an "AI-intrinsic" language mode. It is one dialect
-implementation built on the same tagged dialect mechanism as q and other DSLs.
-Use `turn { ... }` or `llm.turn({...})` for model calls and `model { ... }` or
-`llm.register_models({...})` for model configuration. Tools, agents, messages,
-history manipulation, output validation, record/replay, tracing, and
-cancellation are ordinary values and calls on the `llm`, `msg`, `history`, and
-`loop` modules. This keeps scripted and embedded agents on the same runtime
-path.
+implementation built on the same tagged dialect mechanism as q and other DSLs;
+it is specified in [AI Dialect Syntax](ai-dialect.md).
 
 An agent is a callable value produced by `agent { ... }` or `llm.agent`. Its
 configuration function returns the turn fields for each call. There is no
