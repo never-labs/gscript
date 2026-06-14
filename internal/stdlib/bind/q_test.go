@@ -3737,6 +3737,95 @@ func TestQRuntimeKernelExecutionStatsExposeEvalFallbackReasons(t *testing.T) {
 	}
 }
 
+func TestQRuntimeKernelExecutionStatsExposeRuntimeErrorBuckets(t *testing.T) {
+	qClearCaches()
+	restore := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {
+		return []QRuntimeKernelExecutionStat{
+			{
+				Source:        "q_eval_vector_runtime",
+				Kernel:        "ArrayCallableArgs",
+				Shape:         "apply/callable-args",
+				PipelineShape: "apply_args",
+				Route:         "typed_data_kernel",
+				Outcome:       "error",
+				ReasonCode:    stdq.RuntimeFallbackApplyError,
+				Count:         2,
+			},
+			{
+				Source:        "q_eval_vector_runtime",
+				Kernel:        "QPipelinePlan",
+				Shape:         "vector-reduce/sum",
+				PipelineShape: "vector_reduce",
+				Route:         "typed_data_kernel",
+				Outcome:       "error",
+				ReasonCode:    stdq.RuntimeFallbackPipelineError,
+				Count:         3,
+			},
+			{
+				Source:        "q_sql_runtime",
+				Kernel:        "QSQLPlan",
+				Shape:         "qsql/select/query",
+				PipelineShape: "scan=frame|project=column",
+				Route:         "typed_query_backend",
+				Outcome:       "error",
+				ReasonCode:    stdq.RuntimeFallbackBackendCompile,
+				Count:         1,
+			},
+			{
+				Source:        "q_sql_runtime",
+				Kernel:        "QSQLPlan",
+				Shape:         "qsql/select/query",
+				PipelineShape: "scan=frame|project=column",
+				Route:         "typed_query_backend",
+				Outcome:       "error",
+				ReasonCode:    stdq.RuntimeFallbackBackendExec,
+				Count:         4,
+			},
+		}
+	})
+	defer restore()
+
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("errors"); !got.IsInt() || got.Int() != 10 {
+		t.Fatalf("q_runtime_kernel_execution errors = %v, want 10", got)
+	}
+	for _, tc := range []struct {
+		source     string
+		kernel     string
+		shape      string
+		pipeline   string
+		route      string
+		reasonCode string
+		count      int64
+	}{
+		{source: "q_eval_vector_runtime", kernel: "ArrayCallableArgs", shape: "apply/callable-args", pipeline: "apply_args", route: "typed_data_kernel", reasonCode: stdq.RuntimeFallbackApplyError, count: 2},
+		{source: "q_eval_vector_runtime", kernel: "QPipelinePlan", shape: "vector-reduce/sum", pipeline: "vector_reduce", route: "typed_data_kernel", reasonCode: stdq.RuntimeFallbackPipelineError, count: 3},
+		{source: "q_sql_runtime", kernel: "QSQLPlan", shape: "qsql/select/query", pipeline: "scan=frame|project=column", route: "typed_query_backend", reasonCode: stdq.RuntimeFallbackBackendCompile, count: 1},
+		{source: "q_sql_runtime", kernel: "QSQLPlan", shape: "qsql/select/query", pipeline: "scan=frame|project=column", route: "typed_query_backend", reasonCode: stdq.RuntimeFallbackBackendExec, count: 4},
+	} {
+		reason := qTestNestedRowByFields(t, row, "fallback_reasons", map[string]string{
+			"source":      tc.source,
+			"outcome":     "error",
+			"reason_code": tc.reasonCode,
+		})
+		if got := reason.RawGetString("count"); !got.IsInt() || got.Int() != tc.count {
+			t.Fatalf("q_runtime_kernel_execution reason %s count = %v, want %d", tc.reasonCode, got, tc.count)
+		}
+		reasonShape := qTestNestedRowByFields(t, row, "fallback_reason_shapes", map[string]string{
+			"source":         tc.source,
+			"kernel":         tc.kernel,
+			"shape":          tc.shape,
+			"pipeline_shape": tc.pipeline,
+			"route":          tc.route,
+			"outcome":        "error",
+			"reason_code":    tc.reasonCode,
+		})
+		if got := reasonShape.RawGetString("count"); !got.IsInt() || got.Int() != tc.count {
+			t.Fatalf("q_runtime_kernel_execution reason shape %s count = %v, want %d", tc.reasonCode, got, tc.count)
+		}
+	}
+}
+
 func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T) {
 	qClearCaches()
 	restore := SetQRuntimeKernelDescriptorCacheStatsProvider(func() []QRuntimeKernelDescriptorCacheStat {
