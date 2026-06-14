@@ -137,6 +137,46 @@ func TestTier2DirectHelperBridgeQEvalPipelinePlanRecordsNativeExitStats(t *testi
 	}
 }
 
+func TestTier2DirectHelperBridgeQEvalPipelinePlanRecordsNativeExitErrorStats(t *testing.T) {
+	cf := &CompiledFunction{
+		Proto:                  &vm.FuncProto{Name: "q_eval_pipeline_plan_direct_helper_error", MaxStack: 1},
+		QEvalPipelinePlanStats: newQEvalPipelinePlanExecutionCounters(nil),
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	tm := NewTieringManager()
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		HelperTM:   tm,
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[0])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQEvalPipelinePlan),
+		OpExitSlot: 0,
+		OpExitAux:  7,
+		OpExitID:   17,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QEvalPipelinePlan direct helper calls = %d, want 1", got)
+	}
+	const want = "QEvalPipelinePlan exit plan 7 was not handled"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QEvalPipelinePlan direct helper error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_native_exit", "error", 1)
+	if got := qEvalPipelineExecutionCount(cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_op_exit", "error"); got != 0 {
+		t.Fatalf("op-exit error count = %d, want 0", got)
+	}
+	if got := qEvalPipelineExecutionCount(cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_direct_entry", "error"); got != 0 {
+		t.Fatalf("direct-entry error count = %d, want 0", got)
+	}
+	if got := tm.ExitStats().ByExitCode["ExitQEvalPipelinePlan"]; got != 1 {
+		t.Fatalf("ExitQEvalPipelinePlan stats = %d, want 1", got)
+	}
+}
+
 func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
 	withExitResumeCheck(t, func() {
 		fn := &Function{

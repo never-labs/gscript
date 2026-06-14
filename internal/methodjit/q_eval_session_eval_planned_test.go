@@ -215,3 +215,107 @@ func TestExecuteQEvalSessionEvalShellFallback(t *testing.T) {
 		t.Fatalf("resolveQEvalSessionPlannedExec failed for a real q session table (field %q)", stdq.SessionPlannedEvalField)
 	}
 }
+
+func TestExecuteQEvalSessionEvalRecordsPlannedErrorStats(t *testing.T) {
+	const source = "x:til 64;+/x"
+	const wantErr = "planned eval failed"
+	tbl := runtime.NewTable()
+	tbl.RawSetString(stdq.SessionPlannedEvalField, runtime.FunctionValue(&runtime.GoFunction{
+		Name: "test.planned_eval",
+		FastArg1: func(src runtime.Value) (runtime.Value, error) {
+			if !src.IsString() || src.Str() != source {
+				t.Fatalf("planned resolver received %s, want constant source %q", src.String(), source)
+			}
+			return runtime.FunctionValue(&runtime.GoFunction{
+				Name: "test.planned_eval.exec",
+				FastArg1: func(runtime.Value) (runtime.Value, error) {
+					return runtime.NilValue(), fmt.Errorf(wantErr)
+				},
+			}), nil
+		},
+	}))
+	receiver := runtime.TableValue(tbl)
+	cf := &CompiledFunction{
+		Proto:                 &vm.FuncProto{Constants: []runtime.Value{runtime.StringValue(source)}},
+		QEvalSessionEvalSites: []*qEvalSessionEvalSite{7: {}},
+	}
+
+	out, err := cf.executeQEvalSessionEval(7, 0, receiver)
+	if err == nil || err.Error() != wantErr || !out.IsNil() {
+		t.Fatalf("executeQEvalSessionEval planned error = %s,%v; want nil,%q", out.String(), err, wantErr)
+	}
+	if got := cf.QEvalSessionEvalStats.plannedErrors.Load(); got != 1 {
+		t.Fatalf("planned error counter = %d, want 1", got)
+	}
+	if got := cf.QEvalSessionEvalStats.errors.Load(); got != 0 {
+		t.Fatalf("shell error counter = %d, want 0", got)
+	}
+	if got := cf.QEvalSessionEvalSites[7].stats.plannedErrors.Load(); got != 1 {
+		t.Fatalf("site planned error counter = %d, want 1", got)
+	}
+	stats := cf.QKernelExecutionStats()
+	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRoutePlanned, "error", "runtime_error", 1)
+	if got := qKernelExecutionCount(stats, "methodjit_q_eval_runtime", "QEvalSessionEval", qEvalSessionEvalRouteShell, "error"); got != 0 {
+		t.Fatalf("shell error route count = %d, want 0", got)
+	}
+}
+
+func TestExecuteQEvalSessionEvalRecordsShellErrorStats(t *testing.T) {
+	const source = "1+2"
+	const wantErr = "shell eval failed"
+	tbl := runtime.NewTable()
+	tbl.RawSetString("eval", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "test.eval",
+		FastArg1: func(src runtime.Value) (runtime.Value, error) {
+			if !src.IsString() || src.Str() != source {
+				t.Fatalf("shell eval received %s, want constant source %q", src.String(), source)
+			}
+			return runtime.NilValue(), fmt.Errorf(wantErr)
+		},
+	}))
+	receiver := runtime.TableValue(tbl)
+	cf := &CompiledFunction{
+		Proto:                 &vm.FuncProto{Constants: []runtime.Value{runtime.StringValue(source)}},
+		QEvalSessionEvalSites: []*qEvalSessionEvalSite{7: {}},
+	}
+
+	out, err := cf.executeQEvalSessionEval(7, 0, receiver)
+	if err == nil || err.Error() != wantErr || !out.IsNil() {
+		t.Fatalf("executeQEvalSessionEval shell error = %s,%v; want nil,%q", out.String(), err, wantErr)
+	}
+	if got := cf.QEvalSessionEvalStats.errors.Load(); got != 1 {
+		t.Fatalf("shell error counter = %d, want 1", got)
+	}
+	if got := cf.QEvalSessionEvalStats.plannedErrors.Load(); got != 0 {
+		t.Fatalf("planned error counter = %d, want 0", got)
+	}
+	if got := cf.QEvalSessionEvalSites[7].stats.errors.Load(); got != 1 {
+		t.Fatalf("site shell error counter = %d, want 1", got)
+	}
+	stats := cf.QKernelExecutionStats()
+	assertQEvalSessionEvalStat(t, stats, "QEvalSessionEval", "q-eval/session-eval", "unknown", qEvalSessionEvalRouteShell, "error", "runtime_error", 1)
+	if got := qKernelExecutionCount(stats, "methodjit_q_eval_runtime", "QEvalSessionEval", qEvalSessionEvalRoutePlanned, "error"); got != 0 {
+		t.Fatalf("planned error route count = %d, want 0", got)
+	}
+}
+
+func assertQEvalSessionEvalStat(t *testing.T, stats []QKernelExecutionStat, kernel, shape, pipelineShape, route, outcome, reasonCode string, count uint64) {
+	t.Helper()
+	for _, stat := range stats {
+		if stat.Source == "methodjit_q_eval_runtime" &&
+			stat.Kernel == kernel &&
+			stat.Shape == shape &&
+			stat.PipelineShape == pipelineShape &&
+			stat.Route == route &&
+			stat.Outcome == outcome &&
+			stat.ReasonCode == reasonCode {
+			if stat.Count != count {
+				t.Fatalf("QEvalSessionEval stat %s/%s/%s/%s count = %d, want %d; stats=%+v",
+					shape, pipelineShape, route, outcome, stat.Count, count, stats)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing QEvalSessionEval stat kernel=%s shape=%s pipeline=%s route=%s outcome=%s reason=%s; stats=%+v",
+		kernel, shape, pipelineShape, route, outcome, reasonCode, stats)
+}
