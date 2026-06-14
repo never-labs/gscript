@@ -1205,36 +1205,33 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")
 		}
-		out, err := executeVectorGatherValue(regs[arg1], regs[arg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorGather(
+			int(ctx.OpExitID), regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpVectorGather, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpVectorGather, "success")
 		regs[slot] = out
 
 	case OpVectorCompare:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorCompare op-exit out of register range")
 		}
-		out, err := executeVectorCompareValue(aux, regs[arg1], regs[arg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorCompare(
+			int(ctx.OpExitID), aux, regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpVectorCompare, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpVectorCompare, "success")
 		regs[slot] = out
 
 	case OpVectorMask:
 		if arg1 >= len(regs) || arg2 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorMask op-exit out of register range")
 		}
-		out, err := executeVectorMaskValue(aux, regs[arg1], regs[arg2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorMask(
+			int(ctx.OpExitID), aux, regs[arg1], regs[arg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpVectorMask, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpVectorMask, "success")
 		regs[slot] = out
 
 	case OpVectorWhere:
@@ -1243,24 +1240,22 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if slot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
 			return fmt.Errorf("VectorWhere op-exit out of register range")
 		}
-		out, err := executeVectorWhereValue(regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorWhere(
+			int(ctx.OpExitID), regs[tempBase], regs[tempBase+1], regs[tempBase+2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpVectorWhere, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpVectorWhere, "success")
 		regs[slot] = out
 
 	case OpVectorReduce:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorReduce op-exit out of register range")
 		}
-		out, err := executeVectorReduceValue(aux, regs[arg1])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorReduce(
+			int(ctx.OpExitID), aux, regs[arg1], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpVectorReduce, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpVectorReduce, "success")
 		regs[slot] = out
 
 	case OpQVectorWhereReduce:
@@ -1312,12 +1307,11 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")
 		}
-		out, err := executeVectorScanValue(regs[arg1])
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorScan(
+			int(ctx.OpExitID), regs[arg1], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			cf.recordQRuntimePrimitiveExecution(OpVectorScan, "error")
 			return err
 		}
-		cf.recordQRuntimePrimitiveExecution(OpVectorScan, "success")
 		regs[slot] = out
 
 	case OpEq:

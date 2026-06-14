@@ -229,6 +229,72 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorGatherReduce(instrID,
 	return out, nil
 }
 
+func (a qFrameVectorRuntimeExecutionAdapter) executeVectorGather(instrID int, vectorVal, indexVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "vector-gather"
+	out, err := executeVectorGatherValue(vectorVal, indexVal)
+	if err != nil {
+		a.recordVectorByInstrID(instrID, "VectorGather", shape, route, "error")
+		return runtime.NilValue(), err
+	}
+	a.recordVectorByInstrID(instrID, "VectorGather", shape, route, "success")
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeVectorCompare(instrID, opCode int, leftVal, rightVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "vector-compare"
+	out, err := executeVectorCompareValue(opCode, leftVal, rightVal)
+	if err != nil {
+		a.recordVectorByInstrID(instrID, "VectorCompare", shape, route, "error")
+		return runtime.NilValue(), err
+	}
+	a.recordVectorByInstrID(instrID, "VectorCompare", shape, route, "success")
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeVectorMask(instrID, opCode int, leftVal, rightVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "vector-mask"
+	out, err := executeVectorMaskValue(opCode, leftVal, rightVal)
+	if err != nil {
+		a.recordVectorByInstrID(instrID, "VectorMask", shape, route, "error")
+		return runtime.NilValue(), err
+	}
+	a.recordVectorByInstrID(instrID, "VectorMask", shape, route, "success")
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeVectorWhere(instrID int, maskVal, trueVal, falseVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "vector-where"
+	out, err := executeVectorWhereValue(maskVal, trueVal, falseVal)
+	if err != nil {
+		a.recordVectorByInstrID(instrID, "VectorWhere", shape, route, "error")
+		return runtime.NilValue(), err
+	}
+	a.recordVectorByInstrID(instrID, "VectorWhere", shape, route, "success")
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeVectorReduce(instrID, opCode int, vectorVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "vector/vector-reduce"
+	out, err := executeVectorReduceValue(opCode, vectorVal)
+	if err != nil {
+		a.recordVectorByInstrID(instrID, "VectorReduce", shape, route, "error")
+		return runtime.NilValue(), err
+	}
+	a.recordVectorByInstrID(instrID, "VectorReduce", shape, route, "success")
+	return out, nil
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) executeVectorScan(instrID int, vectorVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
+	const shape = "vector-scan"
+	out, err := executeVectorScanValue(vectorVal)
+	if err != nil {
+		a.recordVectorByInstrID(instrID, "VectorScan", shape, route, "error")
+		return runtime.NilValue(), err
+	}
+	a.recordVectorByInstrID(instrID, "VectorScan", shape, route, "success")
+	return out, nil
+}
+
 func (a qFrameVectorRuntimeExecutionAdapter) recordFrame(kernel, shape string, route qTypedRuntimeExecutionRoute, outcome string, frameVal runtime.Value) {
 	if a.cf == nil {
 		return

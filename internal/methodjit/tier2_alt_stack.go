@@ -226,6 +226,210 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		}
 		regs[slot] = out
 		ctx.HelperErrFlag = 0
+	case OpVectorGather:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		arg2 := base + int(ctx.OpExitArg2)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) || arg2 < 0 || arg2 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorGather register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorGather(
+			int(ctx.OpExitID),
+			regs[arg1],
+			regs[arg2],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpVectorCompare:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		arg2 := base + int(ctx.OpExitArg2)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) || arg2 < 0 || arg2 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorCompare register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorCompare(
+			int(ctx.OpExitID),
+			int(ctx.OpExitAux),
+			regs[arg1],
+			regs[arg2],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpVectorMask:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		arg2 := base + int(ctx.OpExitArg2)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) || arg2 < 0 || arg2 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorMask register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorMask(
+			int(ctx.OpExitID),
+			int(ctx.OpExitAux),
+			regs[arg1],
+			regs[arg2],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpVectorWhere:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		tempBase := base + int(ctx.OpExitArg1)
+		nArgs := int(ctx.OpExitArg2)
+		if slot < 0 || slot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorWhere register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorWhere(
+			int(ctx.OpExitID),
+			regs[tempBase],
+			regs[tempBase+1],
+			regs[tempBase+2],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpVectorReduce:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorReduce register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorReduce(
+			int(ctx.OpExitID),
+			int(ctx.OpExitAux),
+			regs[arg1],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
+	case OpVectorScan:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorScan register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorScan(
+			int(ctx.OpExitID),
+			regs[arg1],
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
 	case OpFrameLen:
 		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
 		if cf == nil {

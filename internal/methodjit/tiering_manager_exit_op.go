@@ -572,36 +572,45 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorGather op-exit out of register range")
 		}
-		out, err := executeVectorGatherValue(regs[absArg1], regs[absArg2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("VectorGather op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorGather(
+			int(ctx.OpExitID), regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpVectorGather, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpVectorGather, "success")
 		regs[absSlot] = out
 
 	case OpVectorCompare:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorCompare op-exit out of register range")
 		}
-		out, err := executeVectorCompareValue(aux, regs[absArg1], regs[absArg2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("VectorCompare op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorCompare(
+			int(ctx.OpExitID), aux, regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpVectorCompare, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpVectorCompare, "success")
 		regs[absSlot] = out
 
 	case OpVectorMask:
 		if absArg1 >= len(regs) || absArg2 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorMask op-exit out of register range")
 		}
-		out, err := executeVectorMaskValue(aux, regs[absArg1], regs[absArg2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("VectorMask op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorMask(
+			int(ctx.OpExitID), aux, regs[absArg1], regs[absArg2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpVectorMask, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpVectorMask, "success")
 		regs[absSlot] = out
 
 	case OpVectorWhere:
@@ -610,24 +619,30 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absSlot >= len(regs) || tempBase < 0 || nArgs != 3 || tempBase+nArgs > len(regs) {
 			return fmt.Errorf("VectorWhere op-exit out of register range")
 		}
-		out, err := executeVectorWhereValue(regs[tempBase], regs[tempBase+1], regs[tempBase+2])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("VectorWhere op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorWhere(
+			int(ctx.OpExitID), regs[tempBase], regs[tempBase+1], regs[tempBase+2], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpVectorWhere, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpVectorWhere, "success")
 		regs[absSlot] = out
 
 	case OpVectorReduce:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorReduce op-exit out of register range")
 		}
-		out, err := executeVectorReduceValue(aux, regs[absArg1])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("VectorReduce op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorReduce(
+			int(ctx.OpExitID), aux, regs[absArg1], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpVectorReduce, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpVectorReduce, "success")
 		regs[absSlot] = out
 
 	case OpQVectorWhereReduce:
@@ -700,12 +715,15 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("VectorScan op-exit out of register range")
 		}
-		out, err := executeVectorScanValue(regs[absArg1])
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("VectorScan op-exit missing compiled function")
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeVectorScan(
+			int(ctx.OpExitID), regs[absArg1], qTypedRuntimeExecutionRouteOpExit)
 		if err != nil {
-			tm.recordQRuntimePrimitiveExecution(proto, OpVectorScan, "error")
 			return err
 		}
-		tm.recordQRuntimePrimitiveExecution(proto, OpVectorScan, "success")
 		regs[absSlot] = out
 
 	case OpEq:
