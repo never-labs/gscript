@@ -855,6 +855,82 @@ func TestTier2DirectHelperBridgeFrameGroupAggregateRecordsDirectRoute(t *testing
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "FrameGroupAggregate", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 }
 
+func TestTier2DirectHelperBridgeFramePrimitivesRecordRuntimeErrorRoute(t *testing.T) {
+	tests := []struct {
+		name    string
+		kernel  string
+		shape   string
+		op      Op
+		aux     int64
+		proto   func() *vm.FuncProto
+		args    []runtime.Value
+		wantErr string
+	}{
+		{
+			name:    "filter bad mask",
+			kernel:  "FrameFilter",
+			shape:   "filter",
+			op:      OpFrameFilter,
+			proto:   qFrameFilterRouteProto,
+			args:    []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(t)), runtime.IntValue(1)},
+			wantErr: "FrameFilter mask must be dense array",
+		},
+		{
+			name:    "gather bad indexes",
+			kernel:  "FrameGather",
+			shape:   "gather",
+			op:      OpFrameGather,
+			proto:   qFrameGatherRouteProto,
+			args:    []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(t)), runtime.IntValue(1)},
+			wantErr: "FrameGather indexes must be dense array",
+		},
+		{
+			name:    "group aggregate bad spec",
+			kernel:  "FrameGroupAggregate",
+			shape:   "group/aggregate",
+			op:      OpFrameGroupAggregate,
+			aux:     0,
+			proto:   qFrameGroupAggregateBadSpecRouteProto,
+			args:    []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(t)), runtime.NilValue()},
+			wantErr: "FRAME_GROUP_AGGREGATE spec must be a table",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			proto := tc.proto()
+			cf := &CompiledFunction{Proto: proto}
+			regs := make([]runtime.Value, 1+len(tc.args)+1)
+			const base = 1
+			copy(regs[base+1:], tc.args)
+			ctx := &ExecContext{
+				HelperCF:   uintptr(unsafe.Pointer(cf)),
+				RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+				Regs:       uintptr(unsafe.Pointer(&regs[base])),
+				RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+				OpExitOp:   int64(tc.op),
+				OpExitSlot: 0,
+				OpExitArg1: 1,
+				OpExitArg2: 2,
+				OpExitAux:  tc.aux,
+			}
+
+			beforeDirect := Tier2DirectHelperCallCount()
+			tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+			if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+				t.Fatalf("%s direct helper calls = %d, want 1", tc.kernel, got)
+			}
+			if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || !strings.Contains(ctx.HelperErr.Error(), tc.wantErr) {
+				t.Fatalf("%s runtime error flag=%d err=%v, want %q", tc.kernel, ctx.HelperErrFlag, ctx.HelperErr, tc.wantErr)
+			}
+			stats := cf.QKernelExecutionStats()
+			assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", tc.kernel, tc.shape, string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+			if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", tc.kernel, string(qTypedRuntimeExecutionRouteOpExit), "error"); got != 0 {
+				t.Fatalf("%s op-exit error route count = %d, want 0", tc.kernel, got)
+			}
+		})
+	}
+}
+
 func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.T) {
 	proto := qFrameSelectColumnRouteProto()
 	cf := &CompiledFunction{
@@ -894,6 +970,92 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.
 	assertNoQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "VectorCompare")
 	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
 		t.Fatalf("QFrameSelectColumn op-exit route count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsRuntimeErrorRoute(t *testing.T) {
+	tests := []struct {
+		name    string
+		proto   func() *vm.FuncProto
+		spec    func() QFrameSelectColumnSpec
+		wantErr string
+	}{
+		{
+			name: "plan error",
+			proto: func() *vm.FuncProto {
+				proto := qFrameSelectColumnRouteProto()
+				proto.Constants = []runtime.Value{
+					runtime.StringValue("price"),
+					runtime.FloatValue(100),
+					runtime.IntValue(1),
+					runtime.StringValue("size"),
+				}
+				return proto
+			},
+			spec: func() QFrameSelectColumnSpec {
+				return qFrameSelectColumnRouteSpec()
+			},
+			wantErr: "FrameProject column list must be a string or string array",
+		},
+		{
+			name: "planned execution error",
+			proto: func() *vm.FuncProto {
+				proto := qFrameSelectColumnRouteProto()
+				proto.Constants = []runtime.Value{
+					runtime.StringValue("price"),
+					runtime.FloatValue(100),
+					qHotPathNamesValue("size"),
+					runtime.StringValue("size"),
+				}
+				return proto
+			},
+			spec: func() QFrameSelectColumnSpec {
+				spec := qFrameSelectColumnRouteSpec()
+				spec.HasCompareRHSConst = false
+				spec.CompareRHSConst = runtime.NilValue()
+				spec.DynamicArgRole = QFrameSelectColumnArgCompareRHS
+				return spec
+			},
+			wantErr: "QFrameSelectColumn compare path requires rhs",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			proto := tc.proto()
+			cf := &CompiledFunction{
+				Proto:                   proto,
+				QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{tc.spec()},
+			}
+			regs := make([]runtime.Value, 3)
+			const base = 1
+			regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+			ctx := &ExecContext{
+				HelperCF:   uintptr(unsafe.Pointer(cf)),
+				RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+				Regs:       uintptr(unsafe.Pointer(&regs[base])),
+				RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+				OpExitOp:   int64(OpQFrameSelectColumn),
+				OpExitSlot: 0,
+				OpExitArg1: 1,
+				OpExitArg2: -1,
+				OpExitAux:  0,
+			}
+
+			beforeDirect := Tier2DirectHelperCallCount()
+			tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+			if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+				t.Fatalf("QFrameSelectColumn direct helper calls = %d, want 1", got)
+			}
+			if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || !strings.Contains(ctx.HelperErr.Error(), tc.wantErr) {
+				t.Fatalf("QFrameSelectColumn runtime error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, tc.wantErr)
+			}
+			stats := cf.QKernelExecutionStats()
+			assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+			assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+			if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "error"); got != 0 {
+				t.Fatalf("QFrameSelectColumn op-exit error route count = %d, want 0", got)
+			}
+		})
 	}
 }
 
@@ -1962,6 +2124,21 @@ func qFrameGroupAggregateRouteProto() *vm.FuncProto {
 				{Name: "total", Op: "sum", Column: "price"},
 				{Name: "fills", Op: "count"},
 			})),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
+			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
+		},
+	}
+}
+
+func qFrameGroupAggregateBadSpecRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "frame_group_aggregate_bad_spec_tier2_route",
+		NumParams: 2,
+		MaxStack:  2,
+		Constants: []runtime.Value{
+			runtime.IntValue(1),
 		},
 		Code: []uint32{
 			vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
