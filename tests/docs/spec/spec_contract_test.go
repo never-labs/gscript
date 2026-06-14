@@ -33,7 +33,7 @@ func TestReadmeAndSpecStableContractStayAligned(t *testing.T) {
 
 	for _, snippet := range []string{
 		"[Language specification](docs/spec/index.md)",
-		"Leia is a Go-native, DSL-native, dialect-native, analytics-native high-performance scripting language.",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
 		"## Example",
 		"## References",
 	} {
