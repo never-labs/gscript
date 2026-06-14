@@ -1,83 +1,35 @@
 # Leia
 
-Leia is an embeddable scripting language for Go systems.
+Leia is a Go-native, DSL-native, dialect-native, analytics-native high-performance scripting language.
 
-Go-like syntax. Go-style syntax where it matters: blocks, functions, control
-flow, and host-facing code. A small host API. Runtime work focuses on
-typed hot-path optimization. Leia has native q-style columnar analytics for
-high-performance in-memory data. Its tagged dialects are the language
-extension mechanism.
+It gives Go applications an embeddable runtime, Go-shaped syntax, bytecode
+execution, ARM64 JIT hot paths, and q-style in-memory columnar analytics.
+Domain syntax is added with tagged dialects: q for analytics, sql/json/yaml for
+data, prompt/quote/llm for AI workflows, and host-defined dialects for product
+logic.
 
-The runtime includes interpreter and bytecode execution, with an ARM64 JIT path
-for supported hot code.
+The core stays small. The power lives in typed runtime kernels, Go embedding,
+and reusable DSLs. Performance claims are tied to release gates, VM equivalence
+tests, and configured external baselines.
 
-Performance claims are benchmark-bound. Release gates compare supported hot
-workloads against the configured LuaJIT baseline where a useful reference
-exists, and JIT paths must preserve VM/runtime semantics.
-
-## Surface
+## Example
 
 ````leia
-name := "Leia"
+prices := q`100 101.5 100.75 102.25`
+sizes := q`100 120 80 150`
+notional := q`100 101.5 100.75 102.25 * 100 120 80 150`
+total := q`+/10000 12180 8060 15337.5`
 
-interpolated := "hello ${name}"
-single_quoted := 'hello ${name}'
-go_raw := `hello ${name}`
-vector := q`1 2 3`
+trades := q.eval("flip `sym`price`size`notional!(`AAPL`MSFT`AAPL`NVDA;100 101.5 100.75 102.25;100 120 80 150;10000 12180 8060 15337.5)")
+leaders := q.sql(trades, "select notional:sum notional, fills:count i by sym from trades order by notional desc")
 
-trades := q```
-flip `sym`price`size!(
-  `AAPL`MSFT`AAPL`NVDA;
-  100 101.5 100.75 102.25;
-  100 120 80 150
-)
-```
-
-rollup := q.sql(
-    "select notional:sum price*size, fills:count i by sym from trades order by notional desc",
-    {trades: trades}
-)
-
-model {
-    default: "claude"
-}
-
-summarize := agent {
-    name: "market_summary"
-    model: "claude"
-    instructions: prompt { role: "system", text: "Write concise market notes." }
-    params: {"table"}
-    output: {summary: "short"}
-}
-
-result, err := summarize(rollup)
-if err != nil {
-    print(err.message)
-} else {
-    print(result.value.summary)
-}
+note := prompt`Top symbol ${leaders[1].sym}; notional ${leaders[1].notional}; total ${total}.`
+print(note.text)
 ````
 
-String rules are deliberately simple:
-
-- `"..."` processes escapes and `${expr}` interpolation.
-- `'...'` processes escapes and never interpolates.
-- `` `...` `` is Go-style raw text and never interpolates.
-- <code>q`...`</code> and <code>q```...```</code> are tagged dialect forms; `q`
-  receives the embedded source and returns ordinary Leia values.
-
-AI is a dialect/stdlib layer, not an AI-native runtime or the language core.
-
-```leia
-answer, err := turn {
-    model: "claude"
-    messages: {prompt { role: "user", text: "Summarize this table." }}
-    max_tokens: 64
-}
-```
-
-Host dialects are opt-in capabilities; a shell form such as
-<code>cmd := $`git status --short`</code> is syntax, not ambient permission.
+Tagged forms such as `q`, `json`, `sql`, `prompt`, and `quote` are ordinary
+extension points. AI support lives in dialects and libraries, not in the core
+language runtime.
 
 ## Embedding
 
@@ -88,7 +40,7 @@ import leia "github.com/never-labs/leia"
 
 func main() {
 	vm := leia.New(leia.WithLibs(leia.LibSafe))
-	if err := vm.Exec(`print("hello from embedded leia")`); err != nil {
+	if err := vm.Exec(`print(q` + "`+/1 2 3`" + `)`); err != nil {
 		panic(err)
 	}
 }
@@ -99,9 +51,8 @@ Use `leia.SecuritySandbox()` and explicit budgets for untrusted scripts.
 ## Tooling
 
 ```bash
-go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
-go run ./cmd/leia lint tests/smoke/01_basic.leia
-go run ./cmd/leia test tests/smoke/01_basic.leia
+go run ./cmd/leia eval 'print(q`+/1 2 3`)'
+go run ./cmd/leia examples check examples/hello/dialects.leia
 go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3
 go run ./cmd/leia doc check
 ```
