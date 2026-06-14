@@ -354,6 +354,43 @@ func BenchmarkQFrameVectorMethodJITRoute(b *testing.B) {
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, cf.QKernelExecutionStats())
 }
 
+func BenchmarkQFrameVectorMethodJITRouteTier2QVectorWhereReduce(b *testing.B) {
+	proto := qVectorWhereReduceRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qVectorWhereReduceRouteArgs()
+	if _, err := v.CallValue(fn, args); err != nil {
+		b.Fatalf("warm QVectorWhereReduce closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		b.Fatalf("CompileTier2(QVectorWhereReduce): %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatalf("settle QVectorWhereReduce closure: %v", err)
+		}
+	}
+
+	before := tm.QKernelExecutionStatsFor(proto)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatalf("Tier2 QVectorWhereReduce: %v", err)
+		}
+		if len(results) != 1 || !results[0].IsInt() || results[0].Int() != 57 {
+			b.Fatalf("Tier2 QVectorWhereReduce result = %v, want int 57", results)
+		}
+	}
+	b.StopTimer()
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+}
+
 func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -391,28 +428,14 @@ func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.
 }
 
 func TestTier2QVectorWhereReduceUsesExpectedRuntimeRoute(t *testing.T) {
-	proto := &vm.FuncProto{
-		Name:      "q_vector_where_reduce_tier2_route",
-		NumParams: 4,
-		MaxStack:  4,
-		Code: []uint32{
-			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
-			vm.EncodeABC(vm.OP_VECTOR_WHERE_REDUCE, 0, 2, int(runtime.DenseArrayReduceSum)),
-			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
-		},
-	}
+	proto := qVectorWhereReduceRouteProto()
 	cl := vm.NewClosure(proto)
 	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
 	v := vm.New(map[string]runtime.Value{})
 	defer v.Close()
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
-	args := []runtime.Value{
-		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 4, 6})),
-		runtime.IntValue(4),
-		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
-		runtime.IntValue(7),
-	}
+	args := qVectorWhereReduceRouteArgs()
 	if _, err := v.CallValue(fn, args); err != nil {
 		t.Fatalf("warm QVectorWhereReduce closure: %v", err)
 	}
@@ -461,6 +484,51 @@ func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, o
 		}
 	}
 	return count
+}
+
+func qVectorWhereReduceRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "q_vector_where_reduce_tier2_route",
+		NumParams: 4,
+		MaxStack:  4,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE_REDUCE, 0, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qVectorWhereReduceRouteArgs() []runtime.Value {
+	return []runtime.Value{
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 4, 6})),
+		runtime.IntValue(4),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+		runtime.IntValue(7),
+	}
+}
+
+func qKernelExecutionStatsDelta(before, after []QKernelExecutionStat) []QKernelExecutionStat {
+	counts := make(map[QKernelExecutionStat]int64, len(after))
+	for _, row := range after {
+		key := row
+		key.Count = 0
+		counts[key] += int64(row.Count)
+	}
+	for _, row := range before {
+		key := row
+		key.Count = 0
+		counts[key] -= int64(row.Count)
+	}
+	out := make([]QKernelExecutionStat, 0, len(counts))
+	for key, count := range counts {
+		if count <= 0 {
+			continue
+		}
+		key.Count = uint64(count)
+		out = append(out, key)
+	}
+	return out
 }
 
 func qMethodJITBridgeFrame(t testing.TB) *runtime.Table {
