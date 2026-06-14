@@ -18,4 +18,11 @@ go test ./...
 ## Security
 
 List any changed host capabilities, Go bindings, network/process/file access,
-AI provider behavior, or resource-budget behavior.
+AI provider behavior, sandbox defaults, execution-mode differences, or
+resource-budget behavior. State whether untrusted scripts can reach the changed
+behavior.
+
+## Release Impact
+
+- [ ] Release artifacts, platform support, compatibility notes, and security
+      posture are unchanged, or release docs/checklists are updated.

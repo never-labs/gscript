@@ -34,7 +34,9 @@ go run ./cmd/leia ci smoke
 
 ## Change Expectations
 
-- Language-visible behavior needs a spec update in `docs/spec/language.md`.
+- Language-visible behavior needs a spec update in the relevant
+  `docs/spec/*.md` chapter. Update `docs/spec/language.md` only when the
+  overview must stay aligned.
 - Stable syntax needs `docs/spec/grammar.ebnf` and parser tests.
 - Stable features need coverage in `tests/feature_matrix.json`.
 - Standard-library module changes need `internal/stdlib/catalog` metadata when
@@ -65,7 +67,10 @@ go test ./...
 ```
 
 Security-sensitive changes should also mention enabled capabilities, host APIs,
-and whether untrusted scripts can reach the changed behavior.
+resource budgets, sandbox defaults, and whether untrusted scripts can reach the
+changed behavior. Release-facing changes should update release notes or
+checklists when compatibility, platform support, artifacts, or security posture
+changes.
 
 Issue and pull request templates live under `.github/`. Use the language
 proposal template for syntax or semantic changes so spec, grammar, feature

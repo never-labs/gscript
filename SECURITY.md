@@ -6,16 +6,21 @@ budgets, and Go bindings.
 
 ## Supported Versions
 
-Leia is under active development. Until the first stable release, only the
-current `main` branch and the latest published tag, when one exists, receive
-security fixes.
+Leia is under active development before its first stable release.
+
+| Version | Security support |
+|---|---|
+| `main` | Supported. |
+| Latest published tag | Supported when a public tag exists. |
+| Older tags | Unsupported unless the release notes say otherwise. |
 
 ## Reporting A Vulnerability
 
-Do not file public issues for vulnerabilities. Use GitHub's private security
-advisory flow for this repository when available. If that is unavailable, open a
-minimal public issue that says a private security report is needed, without
-including exploit details.
+Do not file public issues for vulnerabilities or exploit details. Use GitHub's
+private security advisory flow for this repository when available. If that is
+unavailable, open a minimal public issue that says a private security report is
+needed, without including reproduction steps, payloads, credentials, or exploit
+details.
 
 Include:
 
@@ -27,6 +32,11 @@ Include:
 - expected and observed impact.
 
 ## Runtime Security Model
+
+`leia.New()` is a trusted-local runtime constructor. It is not a sandbox by
+itself. The security boundary is the combination of enabled libraries,
+capabilities, resource budgets, module loading policy, and Go bindings exposed
+by the host process.
 
 For untrusted scripts:
 

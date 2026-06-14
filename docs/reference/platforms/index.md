@@ -55,6 +55,19 @@ untrusted-script sandboxing, or deterministic fallback may disable JIT.
 JIT-sensitive changes need correctness tests and performance evidence. See
 [`../../contributing/performance.md`](../../contributing/performance.md).
 
+## Support Levels
+
+| Level | Meaning |
+|---|---|
+| Tested | The current release notes include evidence for this OS, architecture, Go version, and execution mode. |
+| Supported | Release blockers cover the combination and maintainers intend to fix regressions. |
+| Available | The project can build or run there, but the release does not include full evidence. |
+| Unknown | No current release evidence exists. |
+
+ARM64 JIT support is only claimed when `leia capabilities --json` and the
+release notes both show it enabled for that build. Otherwise the interpreter and
+VM remain the semantic baseline.
+
 ## Platform Policy
 
 Release notes should state:

@@ -76,3 +76,10 @@ Stable behavior requires:
 
 Experimental behavior may exist in examples, feature flags, or implementation
 packages, but it must not be advertised as stable.
+
+Before the first stable release, compatibility is explicit rather than implied.
+The interpreter is the semantic baseline. Bytecode VM and JIT execution must
+preserve observable interpreter behavior unless `tests/feature_matrix.json`
+marks a surface as unsupported for that mode. Optimizations, caches, typed
+kernels, and native code generation are implementation details, not independent
+language guarantees.

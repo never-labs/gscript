@@ -265,7 +265,7 @@ add_release_distribution_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Distribution" "bash scripts/release_distribution_check.sh --require-goreleaser"
+        add_run "Release Distribution" "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
     else
         add_run "Release Distribution" "bash scripts/release_distribution_check.sh"
     fi
@@ -277,7 +277,7 @@ add_release_artifacts_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh"
+        add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh --build"
         return
     fi
     if ! have_cmd go; then

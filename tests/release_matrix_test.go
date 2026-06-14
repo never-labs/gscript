@@ -305,7 +305,7 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 	productionFullCmd := "bash scripts/production_check.sh --full --release-profile"
 	performanceSmokeCmd := "bash scripts/performance_gate.sh --smoke"
 	fullPerfGateCmd := "bash scripts/performance_gate.sh --full"
-	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser"
+	releaseDistributionCmd := "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
 	releaseArtifactsCmd := "bash scripts/release_artifacts_check.sh --build"
 
 	for _, item := range []struct {
@@ -405,8 +405,8 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
 		"[Language specification](docs/spec/index.md)",
-		"Leia is an embeddable scripting language for Go systems.",
-		"## Surface",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"## Example",
 		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {
@@ -418,7 +418,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	for _, snippet := range []string{
 		"TestReadmeAndSpecStableContractStayAligned",
 		"[Language specification](docs/spec/index.md)",
-		"## Surface",
+		"## Example",
 		"`tests/feature_matrix.json`",
 		"at least one semantic or conformance gate",
 	} {
@@ -430,7 +430,7 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	featureMatrixGate := readFileString(t, filepath.Join(root, "tests", "feature_matrix_test.go"))
 	for _, snippet := range []string{
 		"TestFeatureMatrixCoversReadmeStableContract",
-		"Leia is an embeddable scripting language for Go systems.",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
 		"ARM64 JIT",
 		`requireFeature(t, features, "release_evidence_gates")`,
 		`requireFeatureCellRefs(t, releaseEvidence, "release_evidence_gates", "semantic_gate"`,
@@ -674,6 +674,36 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			snippets: []string{
 				"expected_lsp_path=",
 				"lsp_install_path=/tmp/leia-bin/leia-lsp",
+				"--require-workflows",
+				".github/workflows/release.yml",
+				".github/workflows/distribution-check.yml",
+			},
+		},
+		{
+			path: ".github/workflows/ci.yml",
+			snippets: []string{
+				"name: CI",
+				"go run ./cmd/leia ci pr --no-luajit",
+				"go-version-file: go.mod",
+			},
+		},
+		{
+			path: ".github/workflows/distribution-check.yml",
+			snippets: []string{
+				"name: Distribution Check",
+				"go install github.com/goreleaser/goreleaser/v2@latest",
+				"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
+				"goreleaser release --snapshot --clean --skip=publish",
+			},
+		},
+		{
+			path: ".github/workflows/release.yml",
+			snippets: []string{
+				"name: Release",
+				"go run ./cmd/leia ci release",
+				"goreleaser release --snapshot --clean --skip=publish",
+				"goreleaser release --clean",
+				"secrets.GITHUB_TOKEN",
 			},
 		},
 		{
@@ -724,7 +754,7 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	for _, want := range []string{
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full --release-profile",
-		"bash scripts/release_distribution_check.sh --require-goreleaser",
+		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !strings.Contains(releaseOut, want) {

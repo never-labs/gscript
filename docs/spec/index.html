@@ -160,7 +160,8 @@ footer { color:var(--muted); border-top:1px solid var(--line); margin-top:42px; 
 <li>at least one semantic or conformance gate;</li>
 <li>release notes or migration notes for user-visible changes.</li>
 </ol>
-<p>Experimental behavior may exist in examples, feature flags, or implementation packages, but it must not be advertised as stable.</p></section><section><h2 id="notation">Notation</h2>
+<p>Experimental behavior may exist in examples, feature flags, or implementation packages, but it must not be advertised as stable.</p>
+<p>Before the first stable release, compatibility is explicit rather than implied. The interpreter is the semantic baseline. Bytecode VM and JIT execution must preserve observable interpreter behavior unless <code>tests/feature_matrix.json</code> marks a surface as unsupported for that mode. Optimizations, caches, typed kernels, and native code generation are implementation details, not independent language guarantees.</p></section><section><h2 id="notation">Notation</h2>
 <p>Leia syntax is specified with Extended Backus-Naur Form.</p>
 <pre class="language-ebnf"><code class="language-ebnf">Production  = production_name &quot;=&quot; Expression &quot;.&quot; ;
 Expression  = Term { &quot;|&quot; Term } ;

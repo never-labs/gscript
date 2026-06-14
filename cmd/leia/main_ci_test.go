@@ -48,7 +48,7 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 	for _, want := range []string{
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full --release-profile",
-		"bash scripts/release_distribution_check.sh --require-goreleaser",
+		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !strings.Contains(out, want) {
@@ -112,7 +112,7 @@ func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
 	for _, want := range []string{
 		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full --release-profile",
-		"bash scripts/release_distribution_check.sh --require-goreleaser",
+		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !containsCommand(commands, want) {

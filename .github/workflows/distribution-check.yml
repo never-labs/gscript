@@ -1,0 +1,36 @@
+name: Distribution Check
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/distribution-check.yml
+      - .goreleaser.yaml
+      - scripts/install.sh
+      - scripts/release_distribution_check.sh
+      - scripts/release_artifacts*.sh
+      - go.mod
+      - go.sum
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  distribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go install github.com/goreleaser/goreleaser/v2@latest
+      - run: bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
+      - run: goreleaser release --snapshot --clean --skip=publish

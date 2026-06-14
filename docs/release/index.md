@@ -12,7 +12,7 @@ bash scripts/production_check.sh --full --release-profile
 go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
 bash scripts/docs_check.sh
 bash scripts/performance_gate.sh --full
-bash scripts/release_distribution_check.sh --require-goreleaser
+bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
 bash scripts/release_artifacts_check.sh --build
 ```
 
@@ -45,7 +45,7 @@ presence. The local check validates GoReleaser metadata and the install script
 dry-run matrix even when GitHub workflow files are intentionally absent:
 
 ```bash
-bash scripts/release_distribution_check.sh --require-goreleaser
+bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
 ```
 
@@ -57,6 +57,23 @@ Release archives must include both executables:
 Use [`notes-template.md`](notes-template.md) for release candidates and public
 tags so compatibility, security, performance, validation, and artifact evidence
 are recorded consistently.
+
+## Release Compatibility Checklist
+
+Every public tag must have release notes. The notes must identify:
+
+- stable behavior covered by the specification, feature matrix, and gates;
+- experimental behavior that can change or disappear without compatibility
+  guarantees;
+- implementation-defined behavior that depends on host capabilities, execution
+  mode, platform, provider, or build configuration;
+- tested OS/architecture combinations and Go version;
+- execution modes used for validation, including interpreter, VM, and any JIT
+  coverage;
+- disabled capabilities, live providers, or external integrations;
+- release artifacts, including `leia`, `leia-lsp`, and SHA256 checksums;
+- evidence links for the spec, feature matrix, security reference, platform
+  reference, and performance gates.
 
 ## Public Release Blockers
 

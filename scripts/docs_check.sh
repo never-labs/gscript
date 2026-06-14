@@ -348,7 +348,7 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
     release_profile_cmd = "bash scripts/production_check.sh --full --release-profile"
-    release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser"
+    release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
         root / "docs" / "release" / "index.md",
@@ -470,8 +470,8 @@ def check_spec_contract_docs() -> None:
             readme,
             [
                 "[Language specification](docs/spec/index.md)",
-                "Leia is an embeddable scripting language for Go systems.",
-                "## Surface",
+                "Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+                "## Example",
                 "## References",
             ],
         ),
@@ -567,18 +567,19 @@ def check_readme_user_facing_gates() -> None:
             root / "cmd" / "leia" / "main_readme_tooling_test.go",
             [
                 "TestReadmeIntroStaysFocused",
-                "Leia is an embeddable scripting language for Go systems.",
-                "Go-style syntax",
-                "typed hot-path optimization",
-                "native q-style columnar analytics",
-                "AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
-                "## Surface",
+                "Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+                "Performance-oriented:",
+                "LuaJIT-class workloads",
+                "Analytics-native:",
+                "q-style vector syntax",
+                "AI support lives in dialects and libraries, not in the core language runtime.",
+                "## Example",
                 "## Tooling",
                 "## References",
                 "TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
                 "readmeFirstLeiaSnippet",
-                "README Leia example failed before provider boundary",
-                "llm provider not configured",
+                "README Leia example failed",
+                "Top symbol",
                 'exec.Command("go", "run", "./cmd/leia", "run", file)',
                 "TestReadmeToolingCommandsMapToCLI",
                 "readmeToolingCommands",
@@ -598,7 +599,7 @@ def check_readme_user_facing_gates() -> None:
                 "readReleaseReadmeSurfaceLeiaSnippet",
                 "readReleaseReadmeToolingCommands",
                 "readReleaseReadmeEmbeddingGoSnippet",
-                "README.md Surface snippet changed or lost product surface",
+                "README.md Example snippet changed or lost product surface",
                 "README Tooling command must use `go run ./cmd/leia ...`",
                 "cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate",
                 "cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate",
