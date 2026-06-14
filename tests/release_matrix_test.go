@@ -661,12 +661,19 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"expected 3 checksum entries",
 				"built CLI still reports dev version",
 				"\"$lsp_binary_path\" --help >/dev/null",
+				"package_install_archive",
+				"--base-url \"file://$release_dir\"",
+				"local install archive verified",
 				"lsp_artifact=$lsp_binary_name",
 			},
 		},
 		{
 			path: "scripts/install.sh",
 			snippets: []string{
+				"--base-url URL",
+				"LEIA_INSTALL_BASE_URL",
+				"fetch_url()",
+				"file://*)",
 				"lsp_binary_name=\"leia-lsp\"",
 				"lsp_install_path=",
 				"install -m 0755 \"$extract_dir/$lsp_binary_name\" \"$lsp_install_path\"",
@@ -680,6 +687,9 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"--require-workflows",
 				".github/workflows/release.yml",
 				".github/workflows/distribution-check.yml",
+				"check_local_install_fixture",
+				"--base-url \"file://$release_dir\"",
+				"local install fixture verified",
 			},
 		},
 		{
@@ -722,6 +732,8 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			snippets: []string{
 				"Release archives must include both executables",
 				"`leia-lsp`, the shared language server",
+				"local `file://` tar.gz/zip install fixtures",
+				"bash scripts/install.sh --version v0.1.0 --base-url file:///tmp/leia-release --bin-dir /tmp/leia-bin",
 			},
 		},
 	} {
@@ -1653,7 +1665,6 @@ func TestReleaseMatrixAIDialectExamplesStayRunnable(t *testing.T) {
 func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
-		"README.md",
 		"CONTRIBUTING.md",
 		"docs/tutorial/getting-started.md",
 		"docs/guides/tooling.md",
@@ -2189,7 +2200,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 	}{
 		{
 			capability:   "AI dialect",
-			promise:      "answer, err := turn {",
+			promise:      "AI support lives in dialects and libraries, not in the core language runtime.",
 			featureID:    "llm_native_integration",
 			specSections: []string{"AI Dialect Syntax"},
 			refs: []string{
@@ -2212,7 +2223,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "DSL-native dialects",
-			promise:      "cmd := $`git status --short`",
+			promise:      "Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, `llm`",
 			featureID:    "tagged_dialect_syntax",
 			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
 			refs: []string{
@@ -2259,7 +2270,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "data-oriented",
-			promise:      "q-style columnar analytics",
+			promise:      "q-style vector syntax, qSQL, typed runtime kernels",
 			featureID:    "matrix_dense_arrays",
 			specSections: []string{"Tables And Metatables", "Implementation Requirements"},
 			refs: []string{

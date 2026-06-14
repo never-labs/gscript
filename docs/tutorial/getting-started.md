@@ -24,6 +24,13 @@ checksummed release artifact containing both `leia` and `leia-lsp`:
 bash scripts/install.sh --version v0.1.0 --bin-dir "$HOME/bin" --dry-run
 ```
 
+Use `--base-url` when installing from a release mirror or local artifact
+fixture that contains the archive and `SHA256SUMS`:
+
+```bash
+bash scripts/install.sh --version v0.1.0 --base-url file:///tmp/leia-release --bin-dir "$HOME/bin"
+```
+
 ## Run Examples
 
 Start with the repository example entrypoints:

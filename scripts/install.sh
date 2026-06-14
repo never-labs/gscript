@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/install.sh [--version VERSION] [--bin-dir DIR] [--repo OWNER/REPO] [--dry-run]
+Usage: scripts/install.sh [--version VERSION] [--bin-dir DIR] [--repo OWNER/REPO] [--base-url URL] [--dry-run]
 
 Install the Leia CLI and LSP from GitHub release artifacts.
 
@@ -12,6 +12,8 @@ Options:
                          Defaults to the latest GitHub release.
       --bin-dir DIR      Install directory. Default: /usr/local/bin
       --repo OWNER/REPO  GitHub repository. Default: never-labs/leia
+      --base-url URL     Release asset directory URL. Defaults to the GitHub
+                         release download URL for --repo and --version.
       --os GOOS          Override detected OS for validation.
       --arch GOARCH      Override detected arch for validation.
       --dry-run          Print the planned download and install paths only.
@@ -22,12 +24,14 @@ Environment:
   LEIA_INSTALL_VERSION   Default version when --version is omitted.
   LEIA_INSTALL_DIR       Default install directory when --bin-dir is omitted.
   LEIA_INSTALL_REPO      Default repository when --repo is omitted.
+  LEIA_INSTALL_BASE_URL  Default release asset directory URL.
 USAGE
 }
 
 repo="${LEIA_INSTALL_REPO:-never-labs/leia}"
 version="${LEIA_INSTALL_VERSION:-}"
 bin_dir="${LEIA_INSTALL_DIR:-/usr/local/bin}"
+base_url_override="${LEIA_INSTALL_BASE_URL:-}"
 goos=""
 goarch=""
 dry_run="false"
@@ -48,6 +52,11 @@ while [[ $# -gt 0 ]]; do
     --repo)
       [[ $# -ge 2 && -n "$2" ]] || { echo "error: --repo requires OWNER/REPO" >&2; exit 2; }
       repo="$2"
+      shift 2
+      ;;
+    --base-url)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "error: --base-url requires a URL" >&2; exit 2; }
+      base_url_override="${2%/}"
       shift 2
       ;;
     --os)
@@ -124,6 +133,25 @@ latest_version() {
     head -n 1
 }
 
+fetch_url() {
+  local url="$1"
+  local out="$2"
+  case "$url" in
+    file://*)
+      local path="${url#file://}"
+      if [[ ! -f "$path" ]]; then
+        echo "error: local release asset not found: $path" >&2
+        exit 1
+      fi
+      cp "$path" "$out"
+      ;;
+    *)
+      require_cmd curl
+      curl -fL "$url" -o "$out"
+      ;;
+  esac
+}
+
 goos="${goos:-$(detect_os)}"
 goarch="${goarch:-$(detect_arch)}"
 
@@ -136,6 +164,11 @@ case "$goarch" in
   amd64|arm64) ;;
   *) echo "error: unsupported GOARCH: $goarch" >&2; exit 1 ;;
 esac
+
+if [[ -z "$version" && -n "$base_url_override" ]]; then
+  echo "error: --version is required when --base-url is used" >&2
+  exit 2
+fi
 
 if [[ -z "$version" ]]; then
   version="$(latest_version)"
@@ -155,7 +188,11 @@ if [[ "$goos" == "windows" ]]; then
 fi
 
 asset="leia_${version}_${goos}_${goarch}.${archive_ext}"
-base_url="https://github.com/${repo}/releases/download/${version}"
+if [[ -n "$base_url_override" ]]; then
+  base_url="$base_url_override"
+else
+  base_url="https://github.com/${repo}/releases/download/${version}"
+fi
 asset_url="${base_url}/${asset}"
 checksums_url="${base_url}/SHA256SUMS"
 install_path="${bin_dir}/${binary_name}"
@@ -173,7 +210,6 @@ if [[ "$dry_run" == "true" ]]; then
   exit 0
 fi
 
-require_cmd curl
 require_cmd awk
 if [[ "$archive_ext" == "tar.gz" ]]; then
   require_cmd tar
@@ -190,10 +226,10 @@ trap cleanup EXIT
 archive_path="$tmp_dir/$asset"
 checksums_path="$tmp_dir/SHA256SUMS"
 
-curl -fL "$asset_url" -o "$archive_path"
+fetch_url "$asset_url" "$archive_path"
 
 if [[ "$verify" == "true" ]]; then
-  curl -fsSL "$checksums_url" -o "$checksums_path"
+  fetch_url "$checksums_url" "$checksums_path"
   expected="$(awk -v name="$asset" '$2 == name { print $1 }' "$checksums_path")"
   if [[ -z "$expected" ]]; then
     echo "error: checksum for $asset not found in SHA256SUMS" >&2

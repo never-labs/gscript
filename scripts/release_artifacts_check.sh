@@ -12,7 +12,8 @@ Checks scripts/release_artifacts.sh without changing its implementation.
 Default mode runs a dry-run and verifies the planned artifact names and metadata.
 With --build, the script builds into a temporary output directory unless
 --output-dir is provided, then verifies SHA256SUMS, runs the built CLI against
-tests/smoke/01_basic.leia, and checks that the LSP binary starts in help mode.
+tests/smoke/01_basic.leia, checks that the LSP binary starts in help mode, and
+verifies scripts/install.sh from a local tar.gz/zip release fixture.
 
 Options:
       --build           Run a real local build after the dry-run check
@@ -26,6 +27,7 @@ USAGE
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 release_script="$repo_root/scripts/release_artifacts.sh"
+install_script="$repo_root/scripts/install.sh"
 smoke_script="tests/smoke/01_basic.leia"
 expected_module_path="github.com/never-labs/leia"
 
@@ -150,11 +152,46 @@ verify_checksums() {
   fi
 }
 
+write_checksum_line() {
+  local dir="$1"
+  local name="$2"
+  (
+    cd "$dir"
+    printf '%s  %s\n' "$(sha256_file "$name")" "$name"
+  )
+}
+
+package_install_archive() {
+  local release_dir="$1"
+  local archive_name="$2"
+  local source_binary="$3"
+  local source_lsp_binary="$4"
+  local archive_ext="$5"
+  local package_dir="$release_dir/package"
+
+  rm -rf "$package_dir"
+  mkdir -p "$package_dir"
+  cp "$source_binary" "$package_dir/$install_binary_name"
+  cp "$source_lsp_binary" "$package_dir/$lsp_install_binary_name"
+  chmod 0755 "$package_dir/$install_binary_name" "$package_dir/$lsp_install_binary_name"
+
+  if [[ "$archive_ext" == "tar.gz" ]]; then
+    tar -C "$package_dir" -czf "$release_dir/$archive_name" "$install_binary_name" "$lsp_install_binary_name"
+  else
+    require_cmd zip
+    (
+      cd "$package_dir"
+      zip -q "$release_dir/$archive_name" "$install_binary_name" "$lsp_install_binary_name"
+    )
+  fi
+}
+
 require_cmd git
 require_cmd go
 require_cmd grep
 require_cmd awk
 require_file "$release_script"
+require_file "$install_script"
 require_file "$repo_root/$smoke_script"
 
 goos="$(go env GOOS)"
@@ -165,8 +202,10 @@ if [[ "$module_path" != "$expected_module_path" ]]; then
   exit 1
 fi
 exe_ext=""
+archive_ext="tar.gz"
 if [[ "$goos" == "windows" ]]; then
   exe_ext=".exe"
+  archive_ext="zip"
 fi
 
 artifact_base="leia_${version}_${goos}_${goarch}"
@@ -174,6 +213,9 @@ binary_name="${artifact_base}${exe_ext}"
 lsp_artifact_base="leia-lsp_${version}_${goos}_${goarch}"
 lsp_binary_name="${lsp_artifact_base}${exe_ext}"
 metadata_name="${artifact_base}_metadata.txt"
+install_archive_name="${artifact_base}.${archive_ext}"
+install_binary_name="leia${exe_ext}"
+lsp_install_binary_name="leia-lsp${exe_ext}"
 
 dry_run_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-artifacts-check-dry-run.XXXXXX")"
 dry_run_log="$(mktemp "${TMPDIR:-/tmp}/leia-release-artifacts-dry-run.XXXXXX")"
@@ -265,5 +307,43 @@ fi
 "$binary_path" "$smoke_script" >/dev/null
 "$lsp_binary_path" --help >/dev/null
 
+release_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-install.XXXXXX")"
+install_bin_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-release-install-bin.XXXXXX")"
+cleanup_install_fixture() {
+  rm -rf "$release_dir" "$install_bin_dir"
+}
+trap 'cleanup; cleanup_install_fixture' EXIT
+
+package_install_archive "$release_dir" "$install_archive_name" "$binary_path" "$lsp_binary_path" "$archive_ext"
+write_checksum_line "$release_dir" "$install_archive_name" >"$release_dir/SHA256SUMS"
+
+bash "$install_script" \
+  --version "$version" \
+  --os "$goos" \
+  --arch "$goarch" \
+  --bin-dir "$install_bin_dir" \
+  --base-url "file://$release_dir" >/dev/null
+
+installed_binary="$install_bin_dir/$install_binary_name"
+installed_lsp_binary="$install_bin_dir/$lsp_install_binary_name"
+require_file "$installed_binary"
+require_file "$installed_lsp_binary"
+if [[ ! -x "$installed_binary" ]]; then
+  echo "error: installed CLI is not executable: $installed_binary" >&2
+  exit 1
+fi
+if [[ ! -x "$installed_lsp_binary" ]]; then
+  echo "error: installed LSP is not executable: $installed_lsp_binary" >&2
+  exit 1
+fi
+installed_version_json="$("$installed_binary" version --json)"
+if ! grep -Fq "\"version\": \"$version\"" <<<"$installed_version_json"; then
+  echo "error: installed CLI version metadata did not include version $version" >&2
+  echo "$installed_version_json" >&2
+  exit 1
+fi
+"$installed_lsp_binary" --help >/dev/null
+
 echo "release_artifacts_check.sh: build artifacts verified in $out_dir"
+echo "release_artifacts_check.sh: local install archive verified from $release_dir"
 echo "release_artifacts_check.sh: pass"

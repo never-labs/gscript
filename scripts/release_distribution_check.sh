@@ -59,6 +59,95 @@ require_contains() {
   fi
 }
 
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 -r "$1" | awk '{print $1}'
+  else
+    echo "error: need sha256sum, shasum, or openssl for checksum verification" >&2
+    exit 1
+  fi
+}
+
+check_local_install_fixture() {
+  local version="v0.0.0-local"
+  local tmp_dir
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/leia-install-fixture.XXXXXX")"
+  local release_dir="$tmp_dir/release"
+  local archive_dir="$tmp_dir/archive"
+  local bin_dir="$tmp_dir/bin"
+  mkdir -p "$release_dir" "$archive_dir" "$bin_dir"
+
+  cleanup_local_fixture() {
+    rm -rf "$tmp_dir"
+  }
+  trap cleanup_local_fixture RETURN
+
+  printf '#!/usr/bin/env sh\nprintf "fixture leia\\n"\n' >"$archive_dir/leia"
+  printf '#!/usr/bin/env sh\nprintf "fixture leia-lsp\\n"\n' >"$archive_dir/leia-lsp"
+  chmod 0755 "$archive_dir/leia" "$archive_dir/leia-lsp"
+
+  local asset="leia_${version}_linux_amd64.tar.gz"
+  tar -C "$archive_dir" -czf "$release_dir/$asset" leia leia-lsp
+  (
+    cd "$release_dir"
+    printf '%s  %s\n' "$(sha256_file "$asset")" "$asset" >SHA256SUMS
+  )
+
+  bash scripts/install.sh \
+    --version "$version" \
+    --os linux \
+    --arch amd64 \
+    --bin-dir "$bin_dir" \
+    --base-url "file://$release_dir" >/dev/null
+
+  if [[ ! -x "$bin_dir/leia" || ! -x "$bin_dir/leia-lsp" ]]; then
+    echo "error: local install fixture did not install both executables" >&2
+    exit 1
+  fi
+  if [[ "$("$bin_dir/leia")" != "fixture leia" ]]; then
+    echo "error: installed leia fixture did not execute as expected" >&2
+    exit 1
+  fi
+  if [[ "$("$bin_dir/leia-lsp")" != "fixture leia-lsp" ]]; then
+    echo "error: installed leia-lsp fixture did not execute as expected" >&2
+    exit 1
+  fi
+
+  if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
+    rm -rf "$release_dir" "$bin_dir"
+    mkdir -p "$release_dir" "$bin_dir" "$archive_dir/windows"
+    cp "$archive_dir/leia" "$archive_dir/windows/leia.exe"
+    cp "$archive_dir/leia-lsp" "$archive_dir/windows/leia-lsp.exe"
+    (
+      cd "$archive_dir/windows"
+      zip -q "$release_dir/leia_${version}_windows_amd64.zip" leia.exe leia-lsp.exe
+    )
+    (
+      cd "$release_dir"
+      printf '%s  %s\n' "$(sha256_file "leia_${version}_windows_amd64.zip")" "leia_${version}_windows_amd64.zip" >SHA256SUMS
+    )
+    bash scripts/install.sh \
+      --version "$version" \
+      --os windows \
+      --arch amd64 \
+      --bin-dir "$bin_dir" \
+      --base-url "file://$release_dir" >/dev/null
+    if [[ ! -x "$bin_dir/leia.exe" || ! -x "$bin_dir/leia-lsp.exe" ]]; then
+      echo "error: local zip install fixture did not install both Windows executables" >&2
+      exit 1
+    fi
+  else
+    echo "release_distribution_check.sh: zip or unzip not installed; skipping local zip install fixture"
+  fi
+
+  trap - RETURN
+  rm -rf "$tmp_dir"
+}
+
 require_file .goreleaser.yaml
 require_file scripts/install.sh
 
@@ -127,6 +216,9 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 wi
 done
 
 echo "release_distribution_check.sh: install script dry-run matrix verified"
+
+check_local_install_fixture
+echo "release_distribution_check.sh: local install fixture verified"
 
 if command -v goreleaser >/dev/null 2>&1; then
   goreleaser check

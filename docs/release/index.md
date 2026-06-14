@@ -47,13 +47,15 @@ Use [`decisions.md`](decisions.md) to record maintainer decisions that cannot
 be inferred from tests, local release evidence, or implementation defaults.
 
 Distribution checks are split between local artifacts and hosted workflow
-presence. The local check validates GoReleaser metadata and the install script
-dry-run matrix even when GitHub workflow files are intentionally absent:
+presence. The local check validates GoReleaser metadata, the install script
+dry-run matrix, and local `file://` tar.gz/zip install fixtures even when
+GitHub workflow files are intentionally absent:
 
 ```bash
 bash scripts/public_release_blockers_check.sh
 bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
 bash scripts/install.sh --version v0.1.0 --os darwin --arch arm64 --dry-run
+bash scripts/install.sh --version v0.1.0 --base-url file:///tmp/leia-release --bin-dir /tmp/leia-bin
 ```
 
 Release archives must include both executables:
