@@ -52,6 +52,12 @@ func recordDataRuntimeKernelProbe(kernel, shape string, handled bool, err error)
 	}
 }
 
+// RecordRuntimeKernelProbe records a typed data-runtime kernel probe for
+// callers outside this package that execute shared columnar/numeric kernels.
+func RecordRuntimeKernelProbe(kernel, shape string, handled bool, err error) {
+	recordDataRuntimeKernelProbe(kernel, shape, handled, err)
+}
+
 func recordDataRuntimeKernelExecution(kernel, shape, outcome, reasonCode string) {
 	key := runtimeKernelExecutionKey{
 		source:     normalizeDataRuntimeStatField("data_query_runtime", "data_runtime"),
@@ -153,6 +159,10 @@ func RuntimeKernelPipelineShape(kernel, shape string) string {
 		return "vector_transform"
 	case strings.HasPrefix(shape, "query/"):
 		return "query_kernel"
+	case strings.HasPrefix(shape, "linalg/vector/"):
+		return "linalg_vector"
+	case strings.HasPrefix(shape, "linalg/matrix/"):
+		return "linalg_matrix"
 	default:
 		return "unknown"
 	}

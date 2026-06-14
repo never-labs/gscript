@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
+	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 func linalgInterp(t *testing.T, src string) *runtime.Interpreter {
@@ -222,6 +223,37 @@ selfDot := linalg.dot(v, v)
 			}
 		})
 	}
+}
+
+func TestLinalgDenseRuntimeStatsFeedQCacheStats(t *testing.T) {
+	qClearCaches()
+	stddata.ClearRuntimeKernelExecutionStats()
+	t.Cleanup(qClearCaches)
+	t.Cleanup(stddata.ClearRuntimeKernelExecutionStats)
+
+	interp := linalgMigrationInterp(t, `
+v := linalg.vector(1, 2, 3)
+scaled := linalg.scale(v, 2)
+m := linalg.matmul(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.eye(2))
+stats := q.cache_stats()
+`)
+	assertTableFloat(t, interp.GetGlobal("scaled"), 3, 6)
+	assertMatrixFloat(t, interp.GetGlobal("m"), 2, 2, 3, 3)
+
+	row := qTestCacheStatsRowTable(t, interp.GetGlobal("stats").Table(), "q_runtime_kernel_execution")
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() < 5 {
+		t.Fatalf("q_runtime_kernel_execution hits = %v, want at least 5", got)
+	}
+	stats := row.RawGetString("stats").Table()
+	if stats == nil {
+		t.Fatal("q_runtime_kernel_execution stats table is nil")
+	}
+	assertQSQLDataRuntimeKernelStat(t, stats, "LinalgVectorConstruct", "linalg/vector/construct/f64/3", "attempt", 1)
+	assertQSQLDataRuntimeKernelStat(t, stats, "LinalgVectorConstruct", "linalg/vector/construct/f64/3", "hit", 1)
+	assertQSQLDataRuntimeKernelStat(t, stats, "LinalgVectorScale", "linalg/vector/scale/f64/3", "hit", 1)
+	assertQSQLDataRuntimeKernelStat(t, stats, "LinalgMatrixConstruct", "linalg/matrix/construct/f64/2x2", "hit", 1)
+	assertQSQLDataRuntimeKernelStat(t, stats, "LinalgMatrixEye", "linalg/matrix/eye/f64/2x2", "hit", 1)
+	assertQSQLDataRuntimeKernelStat(t, stats, "LinalgMatrixMatmul", "linalg/matrix/matmul/2x2/f64/2x2", "hit", 1)
 }
 
 func assertFloat(t *testing.T, got runtime.Value, want float64) {

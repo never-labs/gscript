@@ -3,6 +3,8 @@ package bind
 import (
 	"fmt"
 	"math"
+
+	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 // BuildLinalg creates the "linalg" standard library table.
@@ -36,6 +38,7 @@ func linalgVector(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
+	linalgRecordVectorKernel("LinalgVectorConstruct", "construct", len(values))
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(values))}, nil
 }
 
@@ -54,6 +57,7 @@ func linalgMatrix(args []Value) ([]Value, error) {
 	if len(values) != rows*cols {
 		return nil, fmt.Errorf("linalg.matrix: values length %d does not match %dx%d", len(values), rows, cols)
 	}
+	linalgRecordMatrixKernel("LinalgMatrixConstruct", "construct", rows, cols)
 	return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
 }
 
@@ -64,6 +68,7 @@ func linalgZeros(args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		linalgRecordVectorKernel("LinalgVectorZeros", "zeros", n)
 		return []Value{DenseArrayValue(NewDenseArrayF64Owned(make([]float64, n)))}, nil
 	default:
 		if len(args) < 2 {
@@ -73,6 +78,7 @@ func linalgZeros(args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		linalgRecordMatrixKernel("LinalgMatrixZeros", "zeros", rows, cols)
 		return []Value{linalgMatrixDenseValue(rows, cols, make([]float64, rows*cols))}, nil
 	}
 }
@@ -89,6 +95,7 @@ func linalgEye(args []Value) ([]Value, error) {
 	for i := 0; i < n; i++ {
 		values[i*n+i] = 1
 	}
+	linalgRecordMatrixKernel("LinalgMatrixEye", "eye", n, n)
 	return []Value{linalgMatrixDenseValue(n, n, values)}, nil
 }
 
@@ -105,6 +112,7 @@ func linalgDiag(args []Value) ([]Value, error) {
 	for i, v := range values {
 		out[i*n+i] = v
 	}
+	linalgRecordMatrixKernel("LinalgMatrixDiag", "diag", n, n)
 	return []Value{linalgMatrixDenseValue(n, n, out)}, nil
 }
 
@@ -198,12 +206,14 @@ func linalgScale(args []Value) ([]Value, error) {
 	if rows, cols, values, ok, err := linalgMatrixValue("linalg.scale", args[0]); err != nil {
 		return nil, err
 	} else if ok {
+		linalgRecordMatrixKernel("LinalgMatrixScale", "scale", rows, cols)
 		return []Value{linalgMatrixDenseValue(rows, cols, linalgMap(values, func(v float64) float64 { return v * s }))}, nil
 	}
 	values, err := linalgVectorValue("linalg.scale", args[0])
 	if err != nil {
 		return nil, err
 	}
+	linalgRecordVectorKernel("LinalgVectorScale", "scale", len(values))
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(linalgMap(values, func(v float64) float64 { return v * s })))}, nil
 }
 
@@ -226,6 +236,7 @@ func linalgDot(args []Value) ([]Value, error) {
 	for i := range a {
 		sum += a[i] * b[i]
 	}
+	linalgRecordVectorKernel("LinalgVectorDot", "dot", len(a))
 	return []Value{FloatValue(sum)}, nil
 }
 
@@ -253,6 +264,7 @@ func linalgMatvec(args []Value) ([]Value, error) {
 			out[r] += m[r*cols+c] * v[c]
 		}
 	}
+	linalgRecordVectorKernel("LinalgMatrixVector", fmt.Sprintf("matvec/%dx%d", rows, cols), rows)
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
@@ -285,6 +297,7 @@ func linalgMatmul(args []Value) ([]Value, error) {
 			}
 		}
 	}
+	linalgRecordMatrixKernel("LinalgMatrixMatmul", fmt.Sprintf("matmul/%dx%d", ac, br), ar, bc)
 	return []Value{linalgMatrixDenseValue(ar, bc, out)}, nil
 }
 
@@ -305,6 +318,7 @@ func linalgTranspose(args []Value) ([]Value, error) {
 			out[c*rows+r] = values[r*cols+c]
 		}
 	}
+	linalgRecordMatrixKernel("LinalgMatrixTranspose", "transpose", cols, rows)
 	return []Value{linalgMatrixDenseValue(cols, rows, out)}, nil
 }
 
@@ -320,6 +334,7 @@ func linalgNorm(args []Value) ([]Value, error) {
 	for _, v := range values {
 		sum += v * v
 	}
+	linalgRecordVectorKernel("LinalgVectorNorm", "norm", len(values))
 	return []Value{FloatValue(math.Sqrt(sum))}, nil
 }
 
@@ -345,6 +360,7 @@ func linalgSolve2(args []Value) ([]Value, error) {
 	if det == 0 {
 		return nil, fmt.Errorf("linalg.solve2: singular matrix")
 	}
+	linalgRecordVectorKernel("LinalgMatrixSolve2", "solve2", 2)
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned([]float64{
 		(b[0]*a[3] - a[1]*b[1]) / det,
 		(a[0]*b[1] - b[0]*a[2]) / det,
@@ -369,6 +385,7 @@ func linalgBinary(args []Value, name string, op func(float64, float64) float64) 
 		for i := range a {
 			out[i] = op(a[i], b[i])
 		}
+		linalgRecordMatrixKernel("LinalgMatrixBinary", name, ar, ac)
 		return []Value{linalgMatrixDenseValue(ar, ac, out)}, nil
 	}
 	a, err := linalgVectorValue(name, args[0])
@@ -386,7 +403,16 @@ func linalgBinary(args []Value, name string, op func(float64, float64) float64) 
 	for i := range a {
 		out[i] = op(a[i], b[i])
 	}
+	linalgRecordVectorKernel("LinalgVectorBinary", name, len(a))
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
+func linalgRecordVectorKernel(kernel, op string, n int) {
+	stddata.RecordRuntimeKernelProbe(kernel, fmt.Sprintf("linalg/vector/%s/f64/%d", op, n), true, nil)
+}
+
+func linalgRecordMatrixKernel(kernel, op string, rows, cols int) {
+	stddata.RecordRuntimeKernelProbe(kernel, fmt.Sprintf("linalg/matrix/%s/f64/%dx%d", op, rows, cols), true, nil)
 }
 
 func linalgVectorArgs(name string, args []Value) ([]float64, error) {

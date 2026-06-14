@@ -2685,6 +2685,15 @@ func TestQueryVectorTransformProjectionRuntimeKernelStats(t *testing.T) {
 	}
 }
 
+func TestRuntimeKernelPipelineShapeRecognizesLinalgFamilies(t *testing.T) {
+	if got := RuntimeKernelPipelineShape("LinalgVectorScale", "linalg/vector/scale/f64/3"); got != "linalg_vector" {
+		t.Fatalf("vector linalg pipeline shape = %q, want linalg_vector", got)
+	}
+	if got := RuntimeKernelPipelineShape("LinalgMatrixMatmul", "linalg/matrix/matmul/2x2/f64/2x2"); got != "linalg_matrix" {
+		t.Fatalf("matrix linalg pipeline shape = %q, want linalg_matrix", got)
+	}
+}
+
 func TestQueryVectorTransformProjectionUsesFilteredAndOrderedRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),
