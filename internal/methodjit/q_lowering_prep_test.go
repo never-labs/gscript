@@ -5647,6 +5647,23 @@ func TestQVectorWhereReduceRuntimeHelperUsesRuntimePrimitives(t *testing.T) {
 	}
 }
 
+func TestQVectorWhereReduceRuntimeStatsUseInstrShapeAcrossRoutes(t *testing.T) {
+	cf := &CompiledFunction{
+		QVectorRuntimeKernelShapesByID: map[int]string{
+			42: "mask-combine/vector-where/vector-reduce",
+		},
+	}
+	cf.recordQVectorRuntimeKernelExecution(42, "QVectorWhereReduce", "compare/vector-where/vector-reduce", qTypedRuntimeExecutionRouteDirectHelper, "success")
+	cf.recordQVectorRuntimeKernelExecution(42, "QVectorWhereReduce", "compare/vector-where/vector-reduce", qTypedRuntimeExecutionRouteNativeExit, "success")
+
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "mask-combine/vector-where/vector-reduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "QVectorWhereReduce", "mask-combine/vector-where/vector-reduce", string(qTypedRuntimeExecutionRouteNativeExit), "success", 1)
+	routes := BuildQKernelExecutionRouteSummary(stats)
+	assertQKernelExecutionRouteSummary(t, routes, "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, routes, "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteNativeExit), "success", 1)
+}
+
 func TestQVectorGatherReduceRuntimeHelperUsesRuntimePrimitives(t *testing.T) {
 	result, err := executeQVectorGatherReduceValue(
 		int(runtime.DenseArrayReduceSum),

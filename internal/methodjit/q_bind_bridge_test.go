@@ -390,6 +390,79 @@ func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 }
 
+func TestTier2QVectorWhereReduceUsesExpectedRuntimeRoute(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:      "q_vector_where_reduce_tier2_route",
+		NumParams: 4,
+		MaxStack:  4,
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 0, 1, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_VECTOR_WHERE_REDUCE, 0, 2, int(runtime.DenseArrayReduceSum)),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := []runtime.Value{
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{1, 4, 6})),
+		runtime.IntValue(4),
+		runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{10, 20, 30})),
+		runtime.IntValue(7),
+	}
+	if _, err := v.CallValue(fn, args); err != nil {
+		t.Fatalf("warm QVectorWhereReduce closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		t.Fatalf("CompileTier2(QVectorWhereReduce): %v", err)
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	const calls = 8
+	for i := 0; i < calls; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			t.Fatalf("Tier2 QVectorWhereReduce call %d: %v", i, err)
+		}
+		if len(results) != 1 || !results[0].IsInt() || results[0].Int() != 57 {
+			t.Fatalf("Tier2 QVectorWhereReduce result = %v, want int 57", results)
+		}
+	}
+	if proto.EnteredTier2 == 0 {
+		t.Fatalf("QVectorWhereReduce closure never entered Tier2")
+	}
+
+	stats := tm.QKernelExecutionStatsFor(proto)
+	directCount := qKernelExecutionCount(stats, "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+	opExitCount := qKernelExecutionCount(stats, "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteOpExit), "success")
+	if tier2AltStackEnabled() {
+		if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+			t.Fatalf("QVectorWhereReduce direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+		if directCount == 0 {
+			t.Fatalf("QVectorWhereReduce direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+	} else if directCount != 0 {
+		t.Fatalf("QVectorWhereReduce direct helper route recorded with alt-stack disabled; stats=%+v", stats)
+	}
+	if directCount+opExitCount == 0 {
+		t.Fatalf("QVectorWhereReduce runtime route stats missing; stats=%+v", stats)
+	}
+}
+
+func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, outcome string) uint64 {
+	var count uint64
+	for _, row := range rows {
+		if row.Source == source && row.Kernel == kernel && row.Route == route && row.Outcome == outcome {
+			count += row.Count
+		}
+	}
+	return count
+}
+
 func qMethodJITBridgeFrame(t testing.TB) *runtime.Table {
 	t.Helper()
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{

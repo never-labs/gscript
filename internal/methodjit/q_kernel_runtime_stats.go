@@ -132,6 +132,13 @@ func (cf *CompiledFunction) qVectorRuntimeKernelShape(instrID int, fallback stri
 	return fallback
 }
 
+func (cf *CompiledFunction) recordQVectorRuntimeKernelExecution(instrID int, kernel, fallbackShape string, route qTypedRuntimeExecutionRoute, outcome string) {
+	if cf == nil {
+		return
+	}
+	cf.recordQKernelExecution(qVectorRuntimeExecutionSource, kernel, cf.qVectorRuntimeKernelShape(instrID, fallbackShape), string(route), outcome)
+}
+
 func (cf *CompiledFunction) recordQKernelExecution(source, kernel, shape, route, outcome string) {
 	if cf == nil {
 		return

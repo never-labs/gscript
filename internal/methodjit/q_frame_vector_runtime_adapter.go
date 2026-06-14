@@ -52,16 +52,13 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeQFrameSelectColumn(constants
 }
 
 func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorWhereReduce(instrID, opCode int, maskVal, trueVal, falseVal runtime.Value, route qTypedRuntimeExecutionRoute) (runtime.Value, error) {
-	shape := "compare/vector-where/vector-reduce"
-	if a.cf != nil {
-		shape = a.cf.qVectorRuntimeKernelShape(instrID, shape)
-	}
+	const shape = "compare/vector-where/vector-reduce"
 	out, err := executeQVectorWhereReduceValue(opCode, maskVal, trueVal, falseVal)
 	if err != nil {
-		a.recordVector("QVectorWhereReduce", shape, route, "error")
+		a.recordVectorByInstrID(instrID, "QVectorWhereReduce", shape, route, "error")
 		return runtime.NilValue(), err
 	}
-	a.recordVector("QVectorWhereReduce", shape, route, "success")
+	a.recordVectorByInstrID(instrID, "QVectorWhereReduce", shape, route, "success")
 	return out, nil
 }
 
@@ -88,4 +85,11 @@ func (a qFrameVectorRuntimeExecutionAdapter) recordVector(kernel, shape string, 
 		return
 	}
 	a.cf.recordQKernelExecution(qVectorRuntimeExecutionSource, kernel, shape, string(route), outcome)
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) recordVectorByInstrID(instrID int, kernel, fallbackShape string, route qTypedRuntimeExecutionRoute, outcome string) {
+	if a.cf == nil {
+		return
+	}
+	a.cf.recordQVectorRuntimeKernelExecution(instrID, kernel, fallbackShape, route, outcome)
 }
