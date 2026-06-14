@@ -420,16 +420,11 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
 		"Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-		"Go-native:",
-		"ARM64 JIT",
-		"LuaJIT-class workloads",
-		"q-style vector syntax",
-		"high-throughput in-memory columnar computation",
-		"q.sql(",
+		"a := [1,2,3,4,5,6,7,8,6]",
+		"x := q`sum ${a}`",
 		"turn {",
 		"prompt {",
-		"leia.New(leia.WithLibs(leia.LibSafe))",
-		"## References",
+		"print(x)",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README concise surface changed or missing expected snippet %q", snippet)

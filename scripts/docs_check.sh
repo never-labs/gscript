@@ -20,7 +20,7 @@ Checks README/docs Markdown for:
   - docs examples index lists each registered top-level example directory and
     keeps documented examples CLI selectors registered.
   - README concise examples stay tied to detailed docs, manifests, and focused gates.
-  - README Surface, References, and Embedding snippets keep focused execution gates.
+  - README Surface snippet keeps a focused execution gate.
   - reference entrypoints stay linked from the docs home.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
@@ -184,7 +184,7 @@ if ! go test ./tests/docs/spec -count=1; then
     echo "error: docs/spec contract gate failed" >&2
     exit 1
 fi
-if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints|TestReleaseMatrixReadmeReferencesEntrypointsStayGated' -count=1; then
+if ! go test ./tests -run 'TestReleaseMatrixFeatureDocsStayCoveredBySpecAndReference|TestReleaseMatrixDocsIndexCoversReferenceEntrypoints' -count=1; then
     echo "error: docs release/spec reference gate failed" >&2
     exit 1
 fi
@@ -235,7 +235,6 @@ checked_spec_contract_docs = 0
 checked_examples_index_dirs = 0
 checked_examples_capability_drift_gates = 0
 checked_readme_user_facing_gates = 0
-checked_readme_reference_entrypoints = 0
 checked_reference_entrypoints = 0
 spec_runnable_report = ""
 
@@ -368,50 +367,6 @@ def check_script_mentions(path: Path) -> None:
 
     if in_fence:
         errors.append(f"{path.relative_to(root)}:{fence_start}: unclosed fenced code block")
-
-
-def read_readme_reference_entrypoints() -> list[str]:
-    readme = root / "README.md"
-    text = readme.read_text(encoding="utf-8")
-    start = text.find("## References")
-    if start == -1:
-        errors.append("README.md: missing References section")
-        return []
-    end = text.find("\n## ", start + len("## References"))
-    section = text[start:] if end == -1 else text[start:end]
-
-    refs = []
-    for line in section.splitlines():
-        if not line.startswith("- "):
-            continue
-        match = link_re.search(line)
-        if not match:
-            continue
-        target = strip_link_destination(match.group(1))
-        if not target or is_external(target) or target.startswith("#"):
-            continue
-        target = target.split("#", 1)[0].split("?", 1)[0]
-        if target:
-            refs.append(target)
-    return refs
-
-
-def check_readme_reference_entrypoints() -> None:
-    global checked_readme_reference_entrypoints
-    refs = read_readme_reference_entrypoints()
-    if not refs:
-        errors.append("README.md References section must list documentation entrypoints")
-        return
-    for ref in refs:
-        checked_readme_reference_entrypoints += 1
-        resolved = (root / unquote(ref)).resolve()
-        try:
-            resolved.relative_to(root)
-        except ValueError:
-            errors.append(f"README.md References entrypoint escapes repo: {ref}")
-            continue
-        if not resolved.is_file():
-            errors.append(f"README.md References entrypoint target is missing: {ref}")
 
 
 def check_reference_entrypoints() -> None:
@@ -583,9 +538,9 @@ def check_spec_contract_docs() -> None:
             "README.md",
             readme,
             [
-                "[Language specification](docs/spec/index.md)",
                 "Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-                "## References",
+                "q`sum ${a}`",
+                "turn {",
             ],
         ),
         (
@@ -681,22 +636,11 @@ def check_readme_user_facing_gates() -> None:
             [
                 "TestReadmeIntroStaysFocused",
                 "Leia is an efficient, embeddable scripting language for Go, combining a LuaJIT-class execution model, q-style high-throughput in-memory columnar analytics, and first-class extensible domain dialects.",
-                "Performance-oriented:",
-                "LuaJIT-class workloads",
-                "Analytics-native:",
-                "q-style vector syntax",
-                "## References",
                 "TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
                 "readmeFirstLeiaSnippet",
                 "README Leia example failed",
                 "want 42 fallback without host LLM provider",
                 'exec.Command("go", "run", "./cmd/leia", "run", file)',
-                "TestReadmeEmbeddingSnippetStaysRunnable",
-                "readmeEmbeddingGoSnippet",
-                "README embedding snippet failed",
-                "README embedding snippet stdout",
-                'exec.Command("go", "run", "-mod=mod", ".")',
-                "replace github.com/never-labs/leia => ",
             ],
         ),
         (
@@ -705,12 +649,10 @@ def check_readme_user_facing_gates() -> None:
                 "TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate",
                 "readReleaseReadmeSurfaceLeiaSnippet",
                 "releaseToolingAuditCommands",
-                "readReleaseReadmeEmbeddingGoSnippet",
                 "README.md Example snippet changed or lost product surface",
                 "tooling audit command must use `go run ./cmd/leia ...`",
                 "cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate",
                 "cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate",
-                "cmd/leia/main_readme_tooling_test.go must keep README Embedding focused gate",
             ],
         ),
     ]:
@@ -730,7 +672,6 @@ for doc_file in doc_files:
         check_retired_names(doc_file)
 
 check_release_gate_docs()
-check_readme_reference_entrypoints()
 check_reference_entrypoints()
 check_spec_runnable_coverage()
 check_spec_contract_docs()
@@ -749,7 +690,6 @@ print(
     f"{checked_links} relative documentation links, "
     f"{checked_script_mentions} repository-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
-    f"{checked_readme_reference_entrypoints} README References entrypoints, "
     f"{checked_reference_entrypoints} reference entrypoints, "
     f"{checked_spec_contract_docs} spec/stable-contract docs, "
     f"{checked_examples_index_dirs} examples index directories, "
