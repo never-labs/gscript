@@ -396,6 +396,16 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *test
 				SchemaHash: "schema-a",
 				Hits:       3,
 			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "descriptor_cache_probe",
+				SchemaHash: "schema-b",
+				Entries:    2,
+				Misses:     4,
+				Evictions:  1,
+			},
 		}
 	}, qRuntimeKernelDescriptorCacheExternalStatToBindForTest)
 	defer restore()
@@ -403,6 +413,9 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *test
 	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
 	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache hits = %v, want 5", got)
+	}
+	if got := row.RawGetString("misses"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache misses = %v, want 5", got)
 	}
 	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
 		"source":      "methodjit_q_frame_runtime",
@@ -413,6 +426,35 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *test
 	})
 	if got := stat.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache mapped misses = %v, want 1", got)
+	}
+	routes := row.RawGetString("routes").Table()
+	if routes == nil || routes.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache routes table = %v, want two mixed-route rows", routes)
+	}
+	route := qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+		"route":  "typed_runtime_op_exit",
+	})
+	if got := route.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache typed route hits = %v, want 5", got)
+	}
+	if got := route.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache typed route misses = %v, want 1", got)
+	}
+	route = qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+		"route":  "descriptor_cache_probe",
+	})
+	if got := route.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache probe route entries = %v, want 2", got)
+	}
+	if got := route.RawGetString("misses"); !got.IsInt() || got.Int() != 4 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache probe route misses = %v, want 4", got)
+	}
+	if got := route.RawGetString("evictions"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache probe route evictions = %v, want 1", got)
 	}
 }
 
@@ -433,6 +475,15 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFilteredFeedsCacheStats
 				Entries:    1,
 				Misses:     1,
 			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "FrameGroupAggregate",
+				Shape:      "filter/group/aggregate",
+				Route:      "descriptor_cache_probe",
+				SchemaHash: "schema-c",
+				Entries:    2,
+				Hits:       3,
+			},
 		}
 	}, func(stat qRuntimeKernelDescriptorCacheExternalStatForTest) (QRuntimeKernelDescriptorCacheStat, bool) {
 		if stat.Kernel != "FrameGroupAggregate" {
@@ -446,12 +497,36 @@ func TestMappedQRuntimeKernelDescriptorCacheStatsProviderFilteredFeedsCacheStats
 	if got := row.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache filtered misses = %v, want 1", got)
 	}
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered hits = %v, want 3", got)
+	}
 	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
 		"kernel":      "FrameGroupAggregate",
 		"schema_hash": "schema-b",
 	})
 	if got := stat.RawGetString("entries"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("q_runtime_kernel_descriptor_cache filtered entries = %v, want 1", got)
+	}
+	routes := row.RawGetString("routes").Table()
+	if routes == nil || routes.Length() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered routes table = %v, want two mixed-route rows", routes)
+	}
+	route := qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"kernel": "FrameGroupAggregate",
+		"route":  "typed_runtime_op_exit",
+	})
+	if got := route.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered typed route misses = %v, want 1", got)
+	}
+	route = qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"kernel": "FrameGroupAggregate",
+		"route":  "descriptor_cache_probe",
+	})
+	if got := route.RawGetString("hits"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered probe route hits = %v, want 3", got)
+	}
+	if got := route.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache filtered probe route entries = %v, want 2", got)
 	}
 }
 

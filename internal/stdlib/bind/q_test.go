@@ -3854,6 +3854,76 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T)
 	}
 }
 
+func TestQRuntimeKernelDescriptorCacheStatsProviderCleanupIsGenerationGuarded(t *testing.T) {
+	qClearCaches()
+	restoreA := SetQRuntimeKernelDescriptorCacheStatsProvider(func() []QRuntimeKernelDescriptorCacheStat {
+		return []QRuntimeKernelDescriptorCacheStat{{
+			Source:     "methodjit_q_frame_runtime",
+			Kernel:     "QFrameSelectColumn",
+			Shape:      "compare/filter/project/column",
+			Route:      "typed_runtime_op_exit",
+			SchemaHash: "schema-a",
+			Entries:    1,
+			Misses:     1,
+		}}
+	})
+	restoreB := SetQRuntimeKernelDescriptorCacheStatsProvider(func() []QRuntimeKernelDescriptorCacheStat {
+		return []QRuntimeKernelDescriptorCacheStat{
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-b",
+				Entries:    1,
+				Hits:       2,
+				Misses:     1,
+			},
+			{
+				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_op_exit",
+				SchemaHash: "schema-b",
+				Hits:       3,
+			},
+		}
+	})
+	defer restoreB()
+
+	restoreA()
+	row := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
+	if got := row.RawGetString("entries"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache entries after stale restore = %v, want provider B entry", got)
+	}
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache hits after stale restore = %v, want provider B total 5", got)
+	}
+	routes := row.RawGetString("routes").Table()
+	if routes == nil || routes.Length() != 1 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache routes after stale restore = %v, want one aggregated route", routes)
+	}
+	route := routes.RawGetInt(1).Table()
+	if route == nil {
+		t.Fatal("q_runtime_kernel_descriptor_cache routes[1] is nil")
+	}
+	if got := route.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache routes[1].hits = %v, want duplicate provider rows aggregated to 5", got)
+	}
+
+	qClearCaches()
+	cleared := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
+	if got := cleared.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache hits after q.cache_clear-equivalent = %v, want provider stats retained", got)
+	}
+
+	restoreB()
+	empty := qTestCacheStatsRowTable(t, qCacheStatsTable(), "q_runtime_kernel_descriptor_cache")
+	if got := empty.RawGetString("hits"); !got.IsInt() || got.Int() != 0 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache hits after current restore = %v, want 0", got)
+	}
+}
+
 func TestQRuntimeKernelExecutionStatsProviderCleanupIsGenerationGuarded(t *testing.T) {
 	qClearCaches()
 	restoreA := SetQRuntimeKernelExecutionStatsProvider(func() []QRuntimeKernelExecutionStat {

@@ -232,9 +232,15 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *t
 	if len(report.QKernelDescriptorCacheStats) == 0 {
 		t.Fatalf("Diagnose QKernelDescriptorCacheStats empty:\n%s", report.String())
 	}
+	if len(report.QKernelPlanCacheStats) == 0 {
+		t.Fatalf("Diagnose QKernelPlanCacheStats empty:\n%s", report.String())
+	}
 
 	restore := qbind.SetMappedQRuntimeKernelDescriptorCacheStatsProvider(func() []QKernelDescriptorCacheStat {
-		return report.QKernelDescriptorCacheStats
+		stats := make([]QKernelDescriptorCacheStat, 0, len(report.QKernelDescriptorCacheStats)+len(report.QKernelPlanCacheStats))
+		stats = append(stats, report.QKernelDescriptorCacheStats...)
+		stats = append(stats, report.QKernelPlanCacheStats...)
+		return stats
 	}, func(stat QKernelDescriptorCacheStat) qbind.QRuntimeKernelDescriptorCacheStat {
 		return qbind.QRuntimeKernelDescriptorCacheStat{
 			Source:        stat.Source,
@@ -252,9 +258,9 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *t
 	defer restore()
 
 	row := qBindCacheStatsRow(t, qBindCacheStats(t), "q_runtime_kernel_descriptor_cache")
-	qBindAssertIntField(t, row, "entries", 1)
+	qBindAssertIntField(t, row, "entries", 2)
 	qBindAssertIntField(t, row, "hits", 0)
-	qBindAssertIntField(t, row, "misses", 1)
+	qBindAssertIntField(t, row, "misses", 2)
 	stat := qBindNestedRowByFields(t, row, "stats", map[string]string{
 		"source":      "methodjit_q_frame_runtime",
 		"kernel":      "QFrameSelectColumn",
@@ -264,6 +270,27 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderMapsMethodJITSchemaStats(t *t
 	})
 	qBindAssertIntField(t, stat, "entries", 1)
 	qBindAssertIntField(t, stat, "misses", 1)
+	planStat := qBindNestedRowByFields(t, row, "stats", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"route":       qFrameSelectColumnPlanCacheRoute,
+		"schema_hash": "q-methodjit-bridge-test",
+	})
+	qBindAssertIntField(t, planStat, "entries", 1)
+	qBindAssertIntField(t, planStat, "misses", 1)
+	runtimeRoute := qBindNestedRowByFields(t, row, "routes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+		"route":  "typed_runtime_op_exit",
+	})
+	qBindAssertIntField(t, runtimeRoute, "misses", 1)
+	planRoute := qBindNestedRowByFields(t, row, "routes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+		"route":  qFrameSelectColumnPlanCacheRoute,
+	})
+	qBindAssertIntField(t, planRoute, "misses", 1)
 }
 
 func TestQSQLKernelPipelineShapeHandoffFeedsMethodJITDescriptorStats(t *testing.T) {
