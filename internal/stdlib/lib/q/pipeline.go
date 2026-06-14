@@ -1573,7 +1573,7 @@ func (s *EvalState) evalQPipelinePlan(plan *qPipelinePlan) (any, bool, error) {
 	}
 	switch {
 	case err != nil:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", "runtime_error")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
 	case handled:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "hit", "typed_pipeline")
 	default:
@@ -2294,7 +2294,7 @@ func recordQPipelinePlanOutcome(plan *qPipelinePlan, handled bool, err error) {
 	shape := plan.stableShape()
 	switch {
 	case err != nil:
-		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", "runtime_error")
+		recordRuntimeKernelExecution("QPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
 	case handled:
 		recordRuntimeKernelExecution("QPipelinePlan", shape, "hit", "typed_pipeline")
 	default:

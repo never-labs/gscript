@@ -128,6 +128,9 @@ func TestRuntimeKernelExecutionStatsAggregateStableFallbackReasons(t *testing.T)
 	recordRuntimeKernelExecution("TestKernel", "shape", "fallback", "unsupported plan")
 	recordRuntimeKernelExecution("TestKernel", "shape", "fallback", "semantic guard")
 	recordRuntimeKernelExecution("TestKernel", "shape", "error", "typed helper failed")
+	recordRuntimeKernelExecution("TestKernel", "shape", "error", RuntimeFallbackUnsupportedType)
+	recordRuntimeKernelExecution("TestKernel", "shape", "error", RuntimeFallbackApplyError)
+	recordRuntimeKernelExecution("TestKernel", "shape", "error", RuntimeFallbackPipelineError)
 	recordRuntimeKernelProbeReason("TestProbe", "shape", false, nil, "type mismatch")
 
 	counts := map[string]uint64{}
@@ -141,6 +144,9 @@ func TestRuntimeKernelExecutionStatsAggregateStableFallbackReasons(t *testing.T)
 		"TestKernel/fallback/planner_unhandled": 1,
 		"TestKernel/fallback/semantic_guard":    1,
 		"TestKernel/error/runtime_error":        1,
+		"TestKernel/error/unsupported_type":     1,
+		"TestKernel/error/apply_error":          1,
+		"TestKernel/error/pipeline_error":       1,
 		"TestProbe/attempt/attempt":             1,
 		"TestProbe/fallback/unsupported_type":   1,
 	}

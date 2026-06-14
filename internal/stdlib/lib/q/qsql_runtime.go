@@ -233,7 +233,7 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 	}
 	executable, ok, err := backend.Compile(frame, plan, descriptor)
 	if err != nil {
-		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "error", err.Error())
+		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "error", RuntimeFallbackBackendCompile)
 		return data.Frame{}, err
 	}
 	if !ok {
@@ -243,7 +243,7 @@ func (l *Lowered) execRuntime(frame data.Frame, backend qSQLRuntimeBackend) (dat
 	}
 	out, err := executable.Exec(plan, frame)
 	if err != nil {
-		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "error", err.Error())
+		recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "error", RuntimeFallbackBackendExec)
 		return data.Frame{}, err
 	}
 	recordRuntimeExecutionWithPipelineShape(qSQLRuntimeSource, qSQLPlanKernel, descriptor.Shape, descriptor.PipelineShape, backend.Route(), "hit", "typed_kernel")

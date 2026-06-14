@@ -1,6 +1,7 @@
 package q
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -225,6 +226,55 @@ func TestQSQLExecRuntimeBackendUnsupportedFallbackStatsAreExplicit(t *testing.T)
 	}
 }
 
+func TestQSQLExecRuntimeBackendErrorStatsArePhaseSpecific(t *testing.T) {
+	tests := []struct {
+		name       string
+		backend    qSQLRuntimeBackend
+		wantReason string
+	}{
+		{name: "compile", backend: qSQLRuntimeCompileErrorBackend{}, wantReason: RuntimeFallbackBackendCompile},
+		{name: "exec", backend: qSQLRuntimeExecErrorBackend{}, wantReason: RuntimeFallbackBackendExec},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ClearRuntimeKernelExecutionStats()
+			t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+			frame := mustQSQLRuntimeFrame(t)
+			lowered, err := Lower(mustParse(t, "select price from trades where size>=20"))
+			if err != nil {
+				t.Fatalf("Lower returned error: %v", err)
+			}
+			descriptor := lowered.RuntimeDescriptor()
+			if _, err := lowered.execRuntime(frame, tt.backend); err == nil {
+				t.Fatal("ExecRuntime succeeded, want backend error")
+			}
+
+			var attempts, errors uint64
+			for _, stat := range RuntimeKernelExecutionStats() {
+				if stat.Source != qSQLRuntimeSource || stat.Kernel != qSQLPlanKernel || stat.Shape != descriptor.Shape {
+					continue
+				}
+				switch stat.Outcome {
+				case "attempt":
+					attempts += stat.Count
+				case "error":
+					if stat.Route != tt.backend.Route() {
+						t.Fatalf("error route = %q, want %q", stat.Route, tt.backend.Route())
+					}
+					if stat.ReasonCode != tt.wantReason {
+						t.Fatalf("error reason code = %q, want %q; stats=%#v", stat.ReasonCode, tt.wantReason, RuntimeKernelExecutionStats())
+					}
+					errors += stat.Count
+				}
+			}
+			if attempts != 1 || errors != 1 {
+				t.Fatalf("backend attempts=%d errors=%d stats=%#v", attempts, errors, RuntimeKernelExecutionStats())
+			}
+		})
+	}
+}
+
 type qSQLRuntimeUnsupportedExpr struct {
 	Value any
 }
@@ -241,6 +291,32 @@ func (qSQLRuntimeUnsupportedBackend) Route() string {
 
 func (qSQLRuntimeUnsupportedBackend) Compile(data.Frame, data.QueryPlan, QSQLRuntimeDescriptor) (qSQLRuntimeExecutable, bool, error) {
 	return nil, false, nil
+}
+
+type qSQLRuntimeCompileErrorBackend struct{}
+
+func (qSQLRuntimeCompileErrorBackend) Route() string {
+	return "test_backend"
+}
+
+func (qSQLRuntimeCompileErrorBackend) Compile(data.Frame, data.QueryPlan, QSQLRuntimeDescriptor) (qSQLRuntimeExecutable, bool, error) {
+	return nil, false, fmt.Errorf("compile failed")
+}
+
+type qSQLRuntimeExecErrorBackend struct{}
+
+func (qSQLRuntimeExecErrorBackend) Route() string {
+	return "test_backend"
+}
+
+func (qSQLRuntimeExecErrorBackend) Compile(data.Frame, data.QueryPlan, QSQLRuntimeDescriptor) (qSQLRuntimeExecutable, bool, error) {
+	return qSQLRuntimeExecErrorExecutable{}, true, nil
+}
+
+type qSQLRuntimeExecErrorExecutable struct{}
+
+func (qSQLRuntimeExecErrorExecutable) Exec(data.QueryPlan, data.Frame) (data.Frame, error) {
+	return data.Frame{}, fmt.Errorf("exec failed")
 }
 
 func mustQSQLRuntimeFrame(t *testing.T) data.Frame {

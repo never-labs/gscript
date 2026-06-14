@@ -1758,13 +1758,13 @@ func (s *EvalState) tryEvalQScriptPipeline(descriptor *qScriptPipelineDescriptor
 		}
 		value, handled, err := s.evalQScriptBindingPlan(&assignment.binding)
 		if err != nil {
-			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+			recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
 			return nil, true, err
 		}
 		if !handled {
 			value, err = s.evalCachedOrString(assignment.rhs, assignment.valueExpr, &assignment.binding, nil)
 			if err != nil {
-				recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", "runtime_error")
+				recordRuntimeKernelExecution("QScriptPipelinePlan", shape, "error", RuntimeFallbackPipelineError)
 				return nil, true, err
 			}
 		}

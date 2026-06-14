@@ -354,7 +354,7 @@ func (s *EvalState) applyCallableArrayArgs(fn any, args data.Array) (any, error)
 		out, err = s.applyCallable(fn, args.Values())
 	}
 	if err != nil {
-		recordRuntimeKernelExecution("ArrayCallableArgs", shape, "error", "runtime_error")
+		recordRuntimeKernelExecution("ArrayCallableArgs", shape, "error", RuntimeFallbackApplyError)
 		return nil, err
 	}
 	if arity <= 3 {

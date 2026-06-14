@@ -194,7 +194,10 @@ func normalizeRuntimeKernelReasonCode(outcome, reasonCode string) string {
 	case "fallback":
 		return RuntimeFallbackReasonCode(reasonCode)
 	case "error":
-		return RuntimeFallbackRuntimeError
+		if reasonCode == "" {
+			return RuntimeFallbackRuntimeError
+		}
+		return RuntimeErrorReasonCode(reasonCode)
 	default:
 		return reasonCode
 	}

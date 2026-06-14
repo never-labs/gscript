@@ -24,6 +24,10 @@ const (
 	RuntimeFallbackRuntimeError     = "runtime_error"
 	RuntimeFallbackPlannerUnhandled = "planner_unhandled"
 	RuntimeFallbackSemanticGuard    = "semantic_guard"
+	RuntimeFallbackApplyError       = "apply_error"
+	RuntimeFallbackPipelineError    = "pipeline_error"
+	RuntimeFallbackBackendCompile   = "backend_compile_error"
+	RuntimeFallbackBackendExec      = "backend_exec_error"
 )
 
 // KernelFallbackReasonCode converts kernel fallback text into a stable bucket
@@ -77,18 +81,83 @@ func RuntimeFallbackReasonCode(reason string) string {
 		return RuntimeFallbackPlannerUnhandled
 	case RuntimeFallbackSemanticGuard, "semantic", "semantic_path", "semantic_fallback":
 		return RuntimeFallbackSemanticGuard
+	case RuntimeFallbackApplyError, "apply", "call", "call_error", "callable_error":
+		return RuntimeFallbackApplyError
+	case RuntimeFallbackPipelineError, "pipeline", "script_pipeline_error":
+		return RuntimeFallbackPipelineError
 	default:
 		switch {
-		case strings.Contains(reason, "type") || strings.Contains(reason, "kind"):
+		case strings.Contains(reason, "type mismatch") ||
+			strings.Contains(reason, "unsupported type") ||
+			strings.Contains(reason, "unsupported_type") ||
+			strings.Contains(reason, "kind mismatch") ||
+			strings.Contains(reason, "unsupported kind") ||
+			strings.Contains(reason, "unsupported_kind"):
 			return RuntimeFallbackUnsupportedType
 		case strings.Contains(reason, "runtime error") || strings.Contains(reason, "error"):
-			return RuntimeFallbackRuntimeError
+			switch {
+			case strings.Contains(reason, "apply") || strings.Contains(reason, "call"):
+				return RuntimeFallbackApplyError
+			case strings.Contains(reason, "pipeline"):
+				return RuntimeFallbackPipelineError
+			default:
+				return RuntimeFallbackRuntimeError
+			}
 		case strings.Contains(reason, "planner") || strings.Contains(reason, "plan"):
 			return RuntimeFallbackPlannerUnhandled
 		case strings.Contains(reason, "semantic") || strings.Contains(reason, "guard"):
 			return RuntimeFallbackSemanticGuard
 		default:
 			return RuntimeFallbackUnsupportedShape
+		}
+	}
+}
+
+// RuntimeErrorReasonCode converts q.eval typed-runtime error text into a
+// stable bucket. Unlike fallback normalization, unknown errors remain
+// runtime_error rather than unsupported_shape.
+func RuntimeErrorReasonCode(reason string) string {
+	reason = strings.ToLower(strings.Join(strings.Fields(reason), " "))
+	switch reason {
+	case RuntimeFallbackUnsupportedType, "type", "type_mismatch", "unsupported_kind", "unsupported_value_type":
+		return RuntimeFallbackUnsupportedType
+	case RuntimeFallbackPlannerUnhandled, "planner", "planner_unhandled_shape", "unsupported_plan":
+		return RuntimeFallbackPlannerUnhandled
+	case RuntimeFallbackSemanticGuard, "semantic", "semantic_path", "semantic_fallback":
+		return RuntimeFallbackSemanticGuard
+	case RuntimeFallbackApplyError, "apply", "call", "call_error", "callable_error":
+		return RuntimeFallbackApplyError
+	case RuntimeFallbackPipelineError, "pipeline", "script_pipeline_error":
+		return RuntimeFallbackPipelineError
+	case RuntimeFallbackBackendCompile, "backend_compile":
+		return RuntimeFallbackBackendCompile
+	case RuntimeFallbackBackendExec, "backend_exec":
+		return RuntimeFallbackBackendExec
+	case "", RuntimeFallbackRuntimeError, "error":
+		return RuntimeFallbackRuntimeError
+	default:
+		switch {
+		case strings.Contains(reason, "type mismatch") ||
+			strings.Contains(reason, "unsupported type") ||
+			strings.Contains(reason, "unsupported_type") ||
+			strings.Contains(reason, "kind mismatch") ||
+			strings.Contains(reason, "unsupported kind") ||
+			strings.Contains(reason, "unsupported_kind"):
+			return RuntimeFallbackUnsupportedType
+		case strings.Contains(reason, "planner") || strings.Contains(reason, "plan"):
+			return RuntimeFallbackPlannerUnhandled
+		case strings.Contains(reason, "semantic") || strings.Contains(reason, "guard"):
+			return RuntimeFallbackSemanticGuard
+		case strings.Contains(reason, "apply") || strings.Contains(reason, "call"):
+			return RuntimeFallbackApplyError
+		case strings.Contains(reason, "pipeline"):
+			return RuntimeFallbackPipelineError
+		case strings.Contains(reason, "backend") && strings.Contains(reason, "compile"):
+			return RuntimeFallbackBackendCompile
+		case strings.Contains(reason, "backend") && strings.Contains(reason, "exec"):
+			return RuntimeFallbackBackendExec
+		default:
+			return RuntimeFallbackRuntimeError
 		}
 	}
 }

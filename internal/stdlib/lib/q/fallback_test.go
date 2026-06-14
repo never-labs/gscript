@@ -117,3 +117,29 @@ func TestRuntimeFallbackReasonCodeBucketsStableRuntimeReasons(t *testing.T) {
 		})
 	}
 }
+
+func TestRuntimeErrorReasonCodeBucketsStableRuntimeReasons(t *testing.T) {
+	tests := []struct {
+		name   string
+		reason string
+		want   string
+	}{
+		{name: "empty", reason: "", want: RuntimeFallbackRuntimeError},
+		{name: "unknown", reason: "typed helper failed", want: RuntimeFallbackRuntimeError},
+		{name: "runtime error", reason: "runtime error: divide by zero", want: RuntimeFallbackRuntimeError},
+		{name: "type mismatch", reason: "typed helper kind mismatch", want: RuntimeFallbackUnsupportedType},
+		{name: "planner", reason: "unsupported plan for terminal", want: RuntimeFallbackPlannerUnhandled},
+		{name: "semantic guard", reason: "semantic guard: symbol cast", want: RuntimeFallbackSemanticGuard},
+		{name: "apply error", reason: "callable apply failed", want: RuntimeFallbackApplyError},
+		{name: "pipeline error", reason: "script pipeline failed", want: RuntimeFallbackPipelineError},
+		{name: "backend compile", reason: "backend compile failed", want: RuntimeFallbackBackendCompile},
+		{name: "backend exec", reason: "backend exec failed", want: RuntimeFallbackBackendExec},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RuntimeErrorReasonCode(tt.reason); got != tt.want {
+				t.Fatalf("RuntimeErrorReasonCode(%q) = %q, want %q", tt.reason, got, tt.want)
+			}
+		})
+	}
+}

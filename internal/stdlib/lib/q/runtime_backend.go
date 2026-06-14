@@ -108,7 +108,7 @@ func qTryTypedRuntimeVectorArithmeticDyadic(op byte, dataOp data.Op, left, right
 	typedLeft, typedRight, canUse, err := qVectorDyadicTypedOperands(left, right, la, ra)
 	if err != nil {
 		if recordUnsupportedProbe {
-			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "error", "runtime_error")
+			recordRuntimeKernelExecution("ArrayDyadicArithmetic", shape, "error", RuntimeFallbackUnsupportedType)
 		}
 		return nil, true, err
 	}
