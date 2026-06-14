@@ -7438,9 +7438,7 @@ func (s *EvalState) tryEvalCountGroup(src string) (any, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	shape := "group-count/" + string(array.Kind())
-	out, handled, err := data.TryTypedGroupCount(array)
-	out, handled, err = qTypedRuntimeResult("ArrayGroupCount", shape, out, handled, err)
+	out, handled, err := evalQTypedRuntimeArrayInt64("ArrayGroupCount", "group-count", array, data.TryTypedGroupCount)
 	if err != nil || handled {
 		return out, true, err
 	}
@@ -8154,9 +8152,7 @@ func (s *EvalState) tryEvalCountWhereNull(src string) (any, bool, error) {
 		}
 		return int64(0), true, nil
 	}
-	shape := "null-count/" + string(array.Kind())
-	out, handled, err := data.TryTypedNullCount(array)
-	out, handled, err = qTypedRuntimeResult("ArrayNullCount", shape, out, handled, err)
+	out, handled, err := evalQTypedRuntimeArrayInt64("ArrayNullCount", "null-count", array, data.TryTypedNullCount)
 	if err != nil || handled {
 		if err != nil {
 			return nil, true, err
@@ -8306,8 +8302,7 @@ func (s *EvalState) tryEvalCountWhereMask(src string) (any, bool, error) {
 		}
 		return nil, false, nil
 	}
-	out, handled, err := data.TryTypedTrueCount(array)
-	out, handled, err = qTypedRuntimeResult("ArrayTrueCount", "true-count/"+string(array.Kind()), out, handled, err)
+	out, handled, err := evalQTypedRuntimeArrayInt64("ArrayTrueCount", "true-count", array, data.TryTypedTrueCount)
 	if err != nil {
 		return nil, true, err
 	}

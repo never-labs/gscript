@@ -149,15 +149,21 @@ func qPipelineStoreWhereCompareBound(key qPipelineBindingCacheKey, plan *qPipeli
 	if !ok {
 		return false
 	}
-	qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
+	qPipelineStoreBound(key, resultClass, resultKind, kernel, kernelShape, RuntimeFallbackUnsupportedType)
+	return true
+}
+
+func qPipelineStoreBound(key qPipelineBindingCacheKey, resultClass qPipelineBoundResultClass, resultKind data.Kind, kernel, kernelShape, fallbackReason string) qPipelineBoundPlan {
+	bound := qPipelineBoundPlan{
 		key:            key,
 		resultClass:    resultClass,
 		resultKind:     resultKind,
 		kernel:         kernel,
 		kernelShape:    kernelShape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-	})
-	return true
+		fallbackReason: fallbackReason,
+	}
+	qGlobalPipelineBindingCacheStore(bound)
+	return bound
 }
 
 var qPipelinePlanInvalidShared = &qPipelinePlan{}
@@ -1767,15 +1773,7 @@ func (s *EvalState) evalQPipelineSumSequenceTransform(plan *qPipelinePlan) (any,
 	if bound, ok := qGlobalPipelineBindingCacheProbe(bindingKey); ok {
 		return evalQPipelineSumSequenceTransformBound(plan, bound, args, value)
 	}
-	bound := qPipelineBoundPlan{
-		key:            bindingKey,
-		resultClass:    qPipelineBoundResultArray,
-		resultKind:     qRuntimeKernelOperandKind(value, nil),
-		kernel:         "SequenceTransformSum",
-		kernelShape:    shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-	}
-	qGlobalPipelineBindingCacheStore(bound)
+	bound := qPipelineStoreBound(bindingKey, qPipelineBoundResultArray, qRuntimeKernelOperandKind(value, nil), "SequenceTransformSum", shape, RuntimeFallbackUnsupportedType)
 	return evalQPipelineSumSequenceTransformBound(plan, bound, args, value)
 }
 
@@ -2723,11 +2721,7 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, 
 		return s.evalQPipelineSumVectorExprBound(bound, value)
 	}
 	if _, ok := numeric(value); ok {
-		qGlobalPipelineBindingCacheStore(qPipelineBoundPlan{
-			key:         bindingKey,
-			resultClass: qPipelineBoundResultScalar,
-			resultKind:  qRuntimeKernelOperandKind(value, nil),
-		})
+		qPipelineStoreBound(bindingKey, qPipelineBoundResultScalar, qRuntimeKernelOperandKind(value, nil), "", "", "")
 		return value, true, nil
 	}
 	array, ok := value.(data.Array)
@@ -2735,15 +2729,7 @@ func (s *EvalState) evalQPipelineSumVectorExpr(plan *qPipelinePlan) (any, bool, 
 		return nil, false, nil
 	}
 	shape := "vector-reduce/sum-expr/" + string(array.Kind())
-	bound := qPipelineBoundPlan{
-		key:            bindingKey,
-		resultClass:    qPipelineBoundResultArray,
-		resultKind:     array.Kind(),
-		kernel:         "ArraySumExpr",
-		kernelShape:    shape,
-		fallbackReason: RuntimeFallbackUnsupportedType,
-	}
-	qGlobalPipelineBindingCacheStore(bound)
+	bound := qPipelineStoreBound(bindingKey, qPipelineBoundResultArray, array.Kind(), "ArraySumExpr", shape, RuntimeFallbackUnsupportedType)
 	return s.evalQPipelineSumVectorExprBound(bound, value)
 }
 
@@ -3020,14 +3006,7 @@ func (s *EvalState) evalQPipelineCountVectorExpr(plan *qPipelinePlan) (any, bool
 	if bound, ok := qGlobalPipelineBindingCacheProbe(bindingKey); ok {
 		return evalQPipelineCountVectorExprBound(bound, array)
 	}
-	bound := qPipelineBoundPlan{
-		key:         bindingKey,
-		resultClass: qPipelineBoundResultArrayCount,
-		resultKind:  array.Kind(),
-		kernel:      "ArrayCountExpr",
-		kernelShape: "vector-count/expr/" + string(array.Kind()),
-	}
-	qGlobalPipelineBindingCacheStore(bound)
+	bound := qPipelineStoreBound(bindingKey, qPipelineBoundResultArrayCount, array.Kind(), "ArrayCountExpr", "vector-count/expr/"+string(array.Kind()), "")
 	return evalQPipelineCountVectorExprBound(bound, array)
 }
 

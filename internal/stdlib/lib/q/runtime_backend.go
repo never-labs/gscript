@@ -50,6 +50,16 @@ func evalQTypedRuntimeKernel[T any](kernel qTypedRuntimeKernel[T]) (T, bool, err
 	return out, handled, err
 }
 
+func evalQTypedRuntimeArrayInt64(kernel, shapePrefix string, array data.Array, call func(data.Array) (int64, bool, error)) (int64, bool, error) {
+	return evalQTypedRuntimeKernel(qTypedRuntimeKernel[int64]{
+		kernel: kernel,
+		shape:  shapePrefix + "/" + string(array.Kind()),
+		call: func() (int64, bool, error) {
+			return call(array)
+		},
+	})
+}
+
 type qTypedRuntimeKernel2[A, B any] struct {
 	kernel         string
 	shape          string

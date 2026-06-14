@@ -642,9 +642,7 @@ func (s *EvalState) evalFusedCountWhereNull(x FusedCountWhere) (any, error) {
 		}
 		return int64(0), nil
 	}
-	shape := "null-count/" + string(array.Kind())
-	out, handled, err := data.TryTypedNullCount(array)
-	out, handled, err = qTypedRuntimeResult("ArrayNullCount", shape, out, handled, err)
+	out, handled, err := evalQTypedRuntimeArrayInt64("ArrayNullCount", "null-count", array, data.TryTypedNullCount)
 	if err != nil {
 		return nil, err
 	}
@@ -671,8 +669,7 @@ func (s *EvalState) evalFusedCountWhereMask(x FusedCountWhere) (any, error) {
 	if !ok || array.Kind() != data.KindBool {
 		return nil, unsupportedEvalValueExpr{expr: x}
 	}
-	out, handled, err := data.TryTypedTrueCount(array)
-	out, handled, err = qTypedRuntimeResult("ArrayTrueCount", "true-count/"+string(array.Kind()), out, handled, err)
+	out, handled, err := evalQTypedRuntimeArrayInt64("ArrayTrueCount", "true-count", array, data.TryTypedTrueCount)
 	if err != nil {
 		return nil, err
 	}
