@@ -50,7 +50,8 @@ Use `leia.SecuritySandbox()` and explicit budgets for untrusted scripts.
 
 - [Documentation](docs/index.md)
 - [Language specification](docs/spec/index.md)
-- [CLI and playground](docs/reference/cli/index.md)
+- [Playground](docs/playground.md)
+- [CLI reference](docs/reference/cli/index.md)
 - [Embedding](docs/guides/embedding.md)
 - [Modules](docs/reference/modules/index.md)
 - [Packages and modules](docs/guides/packages.md)

@@ -27,8 +27,9 @@ print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 ## Start Here
 
 - [Language specification](spec/index.md)
+- [Playground](playground.md)
 - [Getting started](tutorial/getting-started.md)
-- [CLI and playground](reference/cli/index.md)
+- [CLI reference](reference/cli/index.md)
 - [Go embedding API](reference/embedding/index.md)
 - [Embedding guide](guides/embedding.md)
 - [Examples](examples/index.md)
