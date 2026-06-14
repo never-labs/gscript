@@ -69,7 +69,7 @@ func statsNormalize(args []Value) ([]Value, error) {
 			out[i] = (v - mean) / stddev
 		}
 	}
-	return []Value{TableValue(linalgVectorTable(out))}, nil
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
 func statsWeightedMean(args []Value) ([]Value, error) {
@@ -110,7 +110,7 @@ func statsCumsum(args []Value) ([]Value, error) {
 		sum += v
 		out[i] = sum
 	}
-	return []Value{TableValue(linalgVectorTable(out))}, nil
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
 func statsSystematicResample(args []Value) ([]Value, error) {

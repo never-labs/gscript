@@ -36,7 +36,7 @@ func linalgVector(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []Value{TableValue(linalgVectorTable(values))}, nil
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(values))}, nil
 }
 
 func linalgMatrix(args []Value) ([]Value, error) {
@@ -54,7 +54,7 @@ func linalgMatrix(args []Value) ([]Value, error) {
 	if len(values) != rows*cols {
 		return nil, fmt.Errorf("linalg.matrix: values length %d does not match %dx%d", len(values), rows, cols)
 	}
-	return []Value{TableValue(linalgMatrixTable(rows, cols, values))}, nil
+	return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
 }
 
 func linalgZeros(args []Value) ([]Value, error) {
@@ -64,7 +64,7 @@ func linalgZeros(args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{TableValue(linalgVectorTable(make([]float64, n)))}, nil
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(make([]float64, n)))}, nil
 	default:
 		if len(args) < 2 {
 			return nil, fmt.Errorf("linalg.zeros: need size or rows, cols")
@@ -73,7 +73,7 @@ func linalgZeros(args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{TableValue(linalgMatrixTable(rows, cols, make([]float64, rows*cols)))}, nil
+		return []Value{linalgMatrixDenseValue(rows, cols, make([]float64, rows*cols))}, nil
 	}
 }
 
@@ -89,7 +89,7 @@ func linalgEye(args []Value) ([]Value, error) {
 	for i := 0; i < n; i++ {
 		values[i*n+i] = 1
 	}
-	return []Value{TableValue(linalgMatrixTable(n, n, values))}, nil
+	return []Value{linalgMatrixDenseValue(n, n, values)}, nil
 }
 
 func linalgDiag(args []Value) ([]Value, error) {
@@ -105,7 +105,7 @@ func linalgDiag(args []Value) ([]Value, error) {
 	for i, v := range values {
 		out[i*n+i] = v
 	}
-	return []Value{TableValue(linalgMatrixTable(n, n, out))}, nil
+	return []Value{linalgMatrixDenseValue(n, n, out)}, nil
 }
 
 func linalgGet(args []Value) ([]Value, error) {
@@ -153,7 +153,9 @@ func linalgSet(args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		args[0].Table().RawGetString("values").Table().RawSetInt(int64(r*cols+c+1), FloatValue(value))
+		if err := linalgSetMatrixValue(args[0], r, c, rows, cols, value); err != nil {
+			return nil, err
+		}
 		return []Value{args[0]}, nil
 	}
 	values, err := linalgVectorValue("linalg.set", args[0])
@@ -168,7 +170,13 @@ func linalgSet(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	args[0].Table().RawSetInt(int64(i+1), FloatValue(value))
+	if args[0].IsDenseArray() {
+		if err := args[0].DenseArray().Set(i, FloatValue(value)); err != nil {
+			return nil, err
+		}
+	} else {
+		args[0].Table().RawSetInt(int64(i+1), FloatValue(value))
+	}
 	return []Value{args[0]}, nil
 }
 
@@ -190,13 +198,13 @@ func linalgScale(args []Value) ([]Value, error) {
 	if rows, cols, values, ok, err := linalgMatrixValue("linalg.scale", args[0]); err != nil {
 		return nil, err
 	} else if ok {
-		return []Value{TableValue(linalgMatrixTable(rows, cols, linalgMap(values, func(v float64) float64 { return v * s })))}, nil
+		return []Value{linalgMatrixDenseValue(rows, cols, linalgMap(values, func(v float64) float64 { return v * s }))}, nil
 	}
 	values, err := linalgVectorValue("linalg.scale", args[0])
 	if err != nil {
 		return nil, err
 	}
-	return []Value{TableValue(linalgVectorTable(linalgMap(values, func(v float64) float64 { return v * s })))}, nil
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(linalgMap(values, func(v float64) float64 { return v * s })))}, nil
 }
 
 func linalgDot(args []Value) ([]Value, error) {
@@ -245,7 +253,7 @@ func linalgMatvec(args []Value) ([]Value, error) {
 			out[r] += m[r*cols+c] * v[c]
 		}
 	}
-	return []Value{TableValue(linalgVectorTable(out))}, nil
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
 func linalgMatmul(args []Value) ([]Value, error) {
@@ -277,7 +285,7 @@ func linalgMatmul(args []Value) ([]Value, error) {
 			}
 		}
 	}
-	return []Value{TableValue(linalgMatrixTable(ar, bc, out))}, nil
+	return []Value{linalgMatrixDenseValue(ar, bc, out)}, nil
 }
 
 func linalgTranspose(args []Value) ([]Value, error) {
@@ -297,7 +305,7 @@ func linalgTranspose(args []Value) ([]Value, error) {
 			out[c*rows+r] = values[r*cols+c]
 		}
 	}
-	return []Value{TableValue(linalgMatrixTable(cols, rows, out))}, nil
+	return []Value{linalgMatrixDenseValue(cols, rows, out)}, nil
 }
 
 func linalgNorm(args []Value) ([]Value, error) {
@@ -337,7 +345,7 @@ func linalgSolve2(args []Value) ([]Value, error) {
 	if det == 0 {
 		return nil, fmt.Errorf("linalg.solve2: singular matrix")
 	}
-	return []Value{TableValue(linalgVectorTable([]float64{
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned([]float64{
 		(b[0]*a[3] - a[1]*b[1]) / det,
 		(a[0]*b[1] - b[0]*a[2]) / det,
 	}))}, nil
@@ -361,7 +369,7 @@ func linalgBinary(args []Value, name string, op func(float64, float64) float64) 
 		for i := range a {
 			out[i] = op(a[i], b[i])
 		}
-		return []Value{TableValue(linalgMatrixTable(ar, ac, out))}, nil
+		return []Value{linalgMatrixDenseValue(ar, ac, out)}, nil
 	}
 	a, err := linalgVectorValue(name, args[0])
 	if err != nil {
@@ -378,11 +386,11 @@ func linalgBinary(args []Value, name string, op func(float64, float64) float64) 
 	for i := range a {
 		out[i] = op(a[i], b[i])
 	}
-	return []Value{TableValue(linalgVectorTable(out))}, nil
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
 func linalgVectorArgs(name string, args []Value) ([]float64, error) {
-	if len(args) == 1 && args[0].IsTable() {
+	if len(args) == 1 && (args[0].IsTable() || args[0].IsDenseArray()) {
 		return linalgVectorValue(name, args[0])
 	}
 	out := make([]float64, len(args))
@@ -479,6 +487,36 @@ func linalgMatrixTable(rows, cols int, values []float64) *Table {
 	t.RawSetString("cols", IntValue(int64(cols)))
 	t.RawSetString("values", TableValue(linalgVectorTable(values)))
 	return t
+}
+
+func linalgMatrixDenseValue(rows, cols int, values []float64) Value {
+	m := NewDenseMatrix(rows, cols)
+	backing, _, stride, ok := m.DenseMatrixBacking()
+	if ok {
+		for r := 0; r < rows; r++ {
+			copy(backing[r*stride:r*stride+cols], values[r*cols:r*cols+cols])
+		}
+	}
+	return TableValue(m)
+}
+
+func linalgSetMatrixValue(value Value, row, col, rows, cols int, x float64) error {
+	if value.IsTable() {
+		t := value.Table()
+		if backing, denseRows, stride, ok := t.DenseMatrixBacking(); ok {
+			if denseRows != rows || stride != cols {
+				return fmt.Errorf("linalg.set: dense matrix shape changed")
+			}
+			backing[row*stride+col] = x
+			return nil
+		}
+		values := t.RawGetString("values")
+		if values.IsTable() {
+			values.Table().RawSetInt(int64(row*cols+col+1), FloatValue(x))
+			return nil
+		}
+	}
+	return fmt.Errorf("linalg.set: argument 1 must be a mutable matrix")
 }
 
 func linalgShape(name string, rowsValue, colsValue Value) (int, int, error) {

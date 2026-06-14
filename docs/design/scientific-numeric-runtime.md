@@ -90,14 +90,15 @@ The compatibility rule for the first implementation is:
 - public constructors may accept ordinary Leia numeric lists and nested lists;
 - runtime operations must also accept existing `DenseArray` and `DenseMatrix`
   values;
-- any temporary table metadata shape is an adapter boundary, not the long-term
-  storage format;
-- new hot paths should return typed dense values where script compatibility
-  allows it, so MethodJIT, q, and `matrix` can share the same backing data.
+- legacy table metadata shapes are accepted as adapter inputs, not used as the
+  primary storage format;
+- vector hot paths return typed dense arrays and matrix hot paths return
+  DenseMatrix-compatible values, so MethodJIT, q, and `matrix` can share the
+  same backing data.
 
-The next cleanup step is to make `linalg`, `stats`, `ode`, and `control`
-interop symmetric: `linalg` accepts `matrix.dense`, `stats` accepts `ode.rk4`
-state vectors, and `control.lqr2` accepts `linalg.matrix` without conversion.
+The next cleanup step is to lower dense linalg operations through shared
+kernel descriptors so q, Leia, and future JIT routes can observe the same
+fallback and hit-rate diagnostics.
 
 ### 5. q Integration
 
