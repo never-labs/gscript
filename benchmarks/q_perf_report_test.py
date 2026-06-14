@@ -36,7 +36,7 @@ BenchmarkQEvalPipelineNativeExitCallpath/SlowRoute-16  100  6000 ns/op  256 B/op
 
 SAMPLE_BRIDGE_HEALTHY = """
 BenchmarkQSessionEvalVectorWarmExecution/BridgeHealthy-16  100  900 ns/op  64 B/op  4 allocs/op  100.0 typed_kernel_hit_pct  3 typed_kernel_attempts/op  3 typed_kernel_hits/op  0 typed_kernel_fallbacks/op  0 typed_kernel_errors/op  3 typed_pipeline_shapes  0 typed_pipeline_fallback_shapes  1 q_pipeline_category_where_project_reduce  1 runtime_primitive_hits/op  0 runtime_primitive_errors/op
-BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  3 methodjit_vector_runtime_success/op  0 methodjit_vector_runtime_errors/op
+BenchmarkQEvalPipelineNativeExitCallpath/BridgeHealthy-16  100  700 ns/op  64 B/op  4 allocs/op  1 jit_typed_direct_return/op  0 jit_typed_native_exit/op  0 jit_typed_op_exit/op  1 jit_typed_kernel_success/op  0 jit_typed_kernel_errors/op  1 jit_typed_pipeline_shapes  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  0 methodjit_frame_runtime_direct_helper/op  0 methodjit_frame_runtime_native_exit/op  2 methodjit_frame_runtime_op_exit/op  3 methodjit_vector_runtime_success/op  0 methodjit_vector_runtime_errors/op  0 methodjit_vector_runtime_direct_helper/op  0 methodjit_vector_runtime_native_exit/op  3 methodjit_vector_runtime_op_exit/op
 """
 
 SAMPLE_ARRAY_BRIDGE = """
@@ -52,7 +52,7 @@ BenchmarkQEvalPipelineArrayRuntimeBridge/BulkEncodedSymbol-16  100  1400 ns/op  
 
 SAMPLE_BACKEND_ROUTE = """
 BenchmarkRuntimePrimitiveRegistry/DenseArrayGather-16  100  800 ns/op  64 B/op  2 allocs/op  1 runtime_primitive_hits/op  0 runtime_primitive_errors/op
-BenchmarkQFrameVectorMethodJITRoute/FrameVector-16    100  900 ns/op  96 B/op  3 allocs/op  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  3 methodjit_vector_runtime_success/op  1 methodjit_vector_runtime_errors/op
+BenchmarkQFrameVectorMethodJITRoute/FrameVector-16    100  900 ns/op  96 B/op  3 allocs/op  2 methodjit_frame_runtime_success/op  0 methodjit_frame_runtime_errors/op  0 methodjit_frame_runtime_direct_helper/op  0 methodjit_frame_runtime_native_exit/op  2 methodjit_frame_runtime_op_exit/op  3 methodjit_vector_runtime_success/op  1 methodjit_vector_runtime_errors/op  0 methodjit_vector_runtime_direct_helper/op  1 methodjit_vector_runtime_native_exit/op  2 methodjit_vector_runtime_op_exit/op
 """
 
 SAMPLE_DATA_RUNTIME = """
@@ -213,7 +213,7 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(coverage["current Leia vs old Leia"]["qSQL"], "covered")
 
     def test_runtime_metrics_structures_allocs_kernel_and_fallback_values(self):
-        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT + SAMPLE_ARRAY_BRIDGE + SAMPLE_DATA_RUNTIME)
+        rows = report.parse_go_benchmarks(SAMPLE + SAMPLE_JIT_SCRIPT + SAMPLE_ARRAY_BRIDGE + SAMPLE_DATA_RUNTIME + SAMPLE_BACKEND_ROUTE)
         metrics = {row.benchmark: row for row in report.build_runtime_metric_rows(rows)}
 
         qsql = metrics["BenchmarkQSQLBindRunSQLWarmCacheSelectWhereProject"]
@@ -251,6 +251,10 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(data_runtime.linalg_matrix_hits_op, 2)
         self.assertEqual(bridge.q_array_bridge_errors_op, 0)
         self.assertEqual(bridge.q_array_bridge_rows_op, 8192)
+        frame_vector = metrics["BenchmarkQFrameVectorMethodJITRoute/FrameVector"]
+        self.assertEqual(frame_vector.methodjit_frame_runtime_op_exit_op, 2)
+        self.assertEqual(frame_vector.methodjit_vector_runtime_native_exit_op, 1)
+        self.assertEqual(frame_vector.methodjit_vector_runtime_op_exit_op, 2)
 
     def test_runtime_backend_route_summary_exposes_registry_and_frame_vector_routes(self):
         rows = report.parse_go_benchmarks(SAMPLE_BACKEND_ROUTE)
@@ -264,6 +268,9 @@ class QPerfReportTest(unittest.TestCase):
         self.assertEqual(routes.methodjit_frame_vector_benchmark_count, 1)
         self.assertEqual(routes.hits_op, 6)
         self.assertEqual(routes.errors_op, 1)
+        self.assertEqual(routes.direct_helper_op, 0)
+        self.assertEqual(routes.native_exit_op, 1)
+        self.assertEqual(routes.op_exit_op, 4)
         self.assertAlmostEqual(routes.hit_pct, 100 * 6 / 7)
 
     def test_jit_route_summary_aggregates_route_metrics(self):

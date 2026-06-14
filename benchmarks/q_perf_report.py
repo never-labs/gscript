@@ -215,8 +215,14 @@ class RuntimeMetricRow:
     vector_runtime_primitive_errors_op: float | None
     methodjit_frame_runtime_success_op: float | None
     methodjit_frame_runtime_errors_op: float | None
+    methodjit_frame_runtime_direct_helper_op: float | None
+    methodjit_frame_runtime_native_exit_op: float | None
+    methodjit_frame_runtime_op_exit_op: float | None
     methodjit_vector_runtime_success_op: float | None
     methodjit_vector_runtime_errors_op: float | None
+    methodjit_vector_runtime_direct_helper_op: float | None
+    methodjit_vector_runtime_native_exit_op: float | None
+    methodjit_vector_runtime_op_exit_op: float | None
 
 
 @dataclass
@@ -296,6 +302,9 @@ class RuntimeBackendRouteRow:
     methodjit_frame_vector_benchmark_count: int
     hits_op: float
     errors_op: float
+    direct_helper_op: float
+    native_exit_op: float
+    op_exit_op: float
     hit_pct: float | None
     note: str = ""
 
@@ -707,8 +716,14 @@ def build_runtime_metric_rows(rows: dict[str, BenchRow]) -> list[RuntimeMetricRo
                 vector_runtime_primitive_errors_op=metrics.get("vector_runtime_primitive_errors/op"),
                 methodjit_frame_runtime_success_op=metrics.get("methodjit_frame_runtime_success/op"),
                 methodjit_frame_runtime_errors_op=metrics.get("methodjit_frame_runtime_errors/op"),
+                methodjit_frame_runtime_direct_helper_op=metrics.get("methodjit_frame_runtime_direct_helper/op"),
+                methodjit_frame_runtime_native_exit_op=metrics.get("methodjit_frame_runtime_native_exit/op"),
+                methodjit_frame_runtime_op_exit_op=metrics.get("methodjit_frame_runtime_op_exit/op"),
                 methodjit_vector_runtime_success_op=metrics.get("methodjit_vector_runtime_success/op"),
                 methodjit_vector_runtime_errors_op=metrics.get("methodjit_vector_runtime_errors/op"),
+                methodjit_vector_runtime_direct_helper_op=metrics.get("methodjit_vector_runtime_direct_helper/op"),
+                methodjit_vector_runtime_native_exit_op=metrics.get("methodjit_vector_runtime_native_exit/op"),
+                methodjit_vector_runtime_op_exit_op=metrics.get("methodjit_vector_runtime_op_exit/op"),
             )
         )
     return out
@@ -1086,8 +1101,14 @@ def build_runtime_backend_route_summary(rows: dict[str, BenchRow]) -> list[Runti
         or row.vector_runtime_primitive_errors_op is not None
         or row.methodjit_frame_runtime_success_op is not None
         or row.methodjit_frame_runtime_errors_op is not None
+        or row.methodjit_frame_runtime_direct_helper_op is not None
+        or row.methodjit_frame_runtime_native_exit_op is not None
+        or row.methodjit_frame_runtime_op_exit_op is not None
         or row.methodjit_vector_runtime_success_op is not None
         or row.methodjit_vector_runtime_errors_op is not None
+        or row.methodjit_vector_runtime_direct_helper_op is not None
+        or row.methodjit_vector_runtime_native_exit_op is not None
+        or row.methodjit_vector_runtime_op_exit_op is not None
     ]
     if not route_rows:
         return []
@@ -1106,8 +1127,14 @@ def build_runtime_backend_route_summary(rows: dict[str, BenchRow]) -> list[Runti
         for row in route_rows
         if row.methodjit_frame_runtime_success_op is not None
         or row.methodjit_frame_runtime_errors_op is not None
+        or row.methodjit_frame_runtime_direct_helper_op is not None
+        or row.methodjit_frame_runtime_native_exit_op is not None
+        or row.methodjit_frame_runtime_op_exit_op is not None
         or row.methodjit_vector_runtime_success_op is not None
         or row.methodjit_vector_runtime_errors_op is not None
+        or row.methodjit_vector_runtime_direct_helper_op is not None
+        or row.methodjit_vector_runtime_native_exit_op is not None
+        or row.methodjit_vector_runtime_op_exit_op is not None
     ]
     hits = sum(row.runtime_primitive_hits_op or 0.0 for row in route_rows)
     hits += sum(row.frame_runtime_primitive_hits_op or 0.0 for row in route_rows)
@@ -1119,6 +1146,12 @@ def build_runtime_backend_route_summary(rows: dict[str, BenchRow]) -> list[Runti
     errors += sum(row.vector_runtime_primitive_errors_op or 0.0 for row in route_rows)
     errors += sum(row.methodjit_frame_runtime_errors_op or 0.0 for row in route_rows)
     errors += sum(row.methodjit_vector_runtime_errors_op or 0.0 for row in route_rows)
+    direct_helper = sum(row.methodjit_frame_runtime_direct_helper_op or 0.0 for row in route_rows)
+    direct_helper += sum(row.methodjit_vector_runtime_direct_helper_op or 0.0 for row in route_rows)
+    native_exit = sum(row.methodjit_frame_runtime_native_exit_op or 0.0 for row in route_rows)
+    native_exit += sum(row.methodjit_vector_runtime_native_exit_op or 0.0 for row in route_rows)
+    op_exit = sum(row.methodjit_frame_runtime_op_exit_op or 0.0 for row in route_rows)
+    op_exit += sum(row.methodjit_vector_runtime_op_exit_op or 0.0 for row in route_rows)
     attempts = hits + errors
     return [
         RuntimeBackendRouteRow(
@@ -1128,6 +1161,9 @@ def build_runtime_backend_route_summary(rows: dict[str, BenchRow]) -> list[Runti
             methodjit_frame_vector_benchmark_count=len(frame_vector_rows),
             hits_op=hits,
             errors_op=errors,
+            direct_helper_op=direct_helper,
+            native_exit_op=native_exit,
+            op_exit_op=op_exit,
             hit_pct=(100 * hits / attempts) if attempts > 0 else None,
             note=(
                 "VM primitive registry plus MethodJIT frame/vector typed-runtime route counters; "
@@ -3069,8 +3105,8 @@ def markdown_report(
             "",
             "## Runtime Primitive Registry Routes",
             "",
-            "| Scope | Benchmarks | registry benchmarks | MethodJIT frame/vector benchmarks | hits/op | errors/op | hit pct | Note |",
-            "|---|---:|---:|---:|---:|---:|---:|---|",
+            "| Scope | Benchmarks | registry benchmarks | MethodJIT frame/vector benchmarks | hits/op | errors/op | direct helper/op | native exit/op | op-exit/op | hit pct | Note |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
         ]
     )
     if backend_routes:
@@ -3081,11 +3117,14 @@ def markdown_report(
                 f"{item.methodjit_frame_vector_benchmark_count} | "
                 f"{item.hits_op:.3f} | "
                 f"{item.errors_op:.3f} | "
+                f"{item.direct_helper_op:.3f} | "
+                f"{item.native_exit_op:.3f} | "
+                f"{item.op_exit_op:.3f} | "
                 f"{format_metric(item.hit_pct, 1)} | "
                 f"{item.note} |"
             )
     else:
-        lines.append("| missing | 0 | 0 | 0 | 0 | 0 | missing | no runtime primitive registry or MethodJIT frame/vector route metrics parsed |")
+        lines.append("| missing | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | missing | no runtime primitive registry or MethodJIT frame/vector route metrics parsed |")
     lines.extend(
         [
             "",

@@ -100,11 +100,21 @@ func reportMethodJITFrameVectorRouteBenchmarkStats(b *testing.B, iterations int,
 			Source:        "methodjit_q_frame_runtime",
 			SuccessMetric: "methodjit_frame_runtime_success/op",
 			ErrorMetric:   "methodjit_frame_runtime_errors/op",
+			RouteMetrics: map[string]string{
+				string(qTypedRuntimeExecutionRouteDirectHelper): "methodjit_frame_runtime_direct_helper/op",
+				string(qTypedRuntimeExecutionRouteNativeExit):   "methodjit_frame_runtime_native_exit/op",
+				string(qTypedRuntimeExecutionRouteOpExit):       "methodjit_frame_runtime_op_exit/op",
+			},
 		},
 		qBenchRouteMetricSpec{
 			Source:        "methodjit_q_vector_runtime",
 			SuccessMetric: "methodjit_vector_runtime_success/op",
 			ErrorMetric:   "methodjit_vector_runtime_errors/op",
+			RouteMetrics: map[string]string{
+				string(qTypedRuntimeExecutionRouteDirectHelper): "methodjit_vector_runtime_direct_helper/op",
+				string(qTypedRuntimeExecutionRouteNativeExit):   "methodjit_vector_runtime_native_exit/op",
+				string(qTypedRuntimeExecutionRouteOpExit):       "methodjit_vector_runtime_op_exit/op",
+			},
 		},
 	)
 }
@@ -140,5 +150,36 @@ func TestQBenchRouteMetricSummaryFiltersSourceKernelRouteAndShapes(t *testing.T)
 	}
 	if len(got.shapes) != 1 {
 		t.Fatalf("summary shapes = %+v, want one distinct matching shape", got.shapes)
+	}
+}
+
+func TestMethodJITFrameVectorRouteMetricsExposeRouteSplit(t *testing.T) {
+	stats := []QKernelExecutionStat{
+		{Source: "methodjit_q_frame_runtime", Kernel: "FrameColumn", Shape: "column", Route: string(qTypedRuntimeExecutionRouteOpExit), Outcome: "success", Count: 2},
+		{Source: "methodjit_q_vector_runtime", Kernel: "QVectorWhereReduce", Shape: "compare/vector-where/vector-reduce", Route: string(qTypedRuntimeExecutionRouteOpExit), Outcome: "success", Count: 3},
+		{Source: "methodjit_q_vector_runtime", Kernel: "QVectorWhereReduce", Shape: "compare/vector-where/vector-reduce", Route: string(qTypedRuntimeExecutionRouteNativeExit), Outcome: "success", Count: 5},
+	}
+
+	frame := summarizeQKernelRouteMetrics(stats, qBenchRouteMetricSpec{
+		Source: "methodjit_q_frame_runtime",
+		RouteMetrics: map[string]string{
+			string(qTypedRuntimeExecutionRouteOpExit): "methodjit_frame_runtime_op_exit/op",
+		},
+	})
+	vector := summarizeQKernelRouteMetrics(stats, qBenchRouteMetricSpec{
+		Source: "methodjit_q_vector_runtime",
+		RouteMetrics: map[string]string{
+			string(qTypedRuntimeExecutionRouteOpExit):     "methodjit_vector_runtime_op_exit/op",
+			string(qTypedRuntimeExecutionRouteNativeExit): "methodjit_vector_runtime_native_exit/op",
+		},
+	})
+
+	if frame.success != 2 || frame.routes[string(qTypedRuntimeExecutionRouteOpExit)] != 2 {
+		t.Fatalf("frame route summary = %+v, want op-exit success 2", frame)
+	}
+	if vector.success != 8 ||
+		vector.routes[string(qTypedRuntimeExecutionRouteOpExit)] != 3 ||
+		vector.routes[string(qTypedRuntimeExecutionRouteNativeExit)] != 5 {
+		t.Fatalf("vector route summary = %+v, want op-exit 3 native 5", vector)
 	}
 }

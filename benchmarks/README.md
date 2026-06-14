@@ -301,11 +301,13 @@ The `Runtime Primitive Registry Routes` section is the lower-level backend
 contract. It accepts either VM runtime primitive registry counters such as
 `runtime_primitive_hits/op` and `runtime_primitive_errors/op`, or MethodJIT
 Frame/Vector route counters such as `methodjit_frame_runtime_success/op` and
-`methodjit_vector_runtime_success/op`. The default `--check` policy requires at
-least one backend-route benchmark row, at least one hit/op, and zero errors/op.
-This catches partial benchmark output where typed-kernel or JIT summary rows are
-present but the underlying runtime primitive registry or Frame/Vector route
-statistics stopped being emitted.
+`methodjit_vector_runtime_success/op`, plus route split counters such as
+`methodjit_frame_runtime_op_exit/op`, `methodjit_vector_runtime_native_exit/op`,
+and `methodjit_vector_runtime_direct_helper/op`. The default `--check` policy
+requires at least one backend-route benchmark row, at least one hit/op, and zero
+errors/op. This catches partial benchmark output where typed-kernel or JIT
+summary rows are present but the underlying runtime primitive registry or
+Frame/Vector route statistics stopped being emitted.
 
 The `Ordinary q Family Coverage` section is the breadth contract for non-qSQL
 q work. The default `--check` policy requires actual benchmark output for

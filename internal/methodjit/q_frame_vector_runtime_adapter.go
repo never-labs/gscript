@@ -11,7 +11,9 @@ import (
 type qTypedRuntimeExecutionRoute string
 
 const (
-	qTypedRuntimeExecutionRouteOpExit qTypedRuntimeExecutionRoute = "typed_runtime_op_exit"
+	qTypedRuntimeExecutionRouteOpExit       qTypedRuntimeExecutionRoute = "typed_runtime_op_exit"
+	qTypedRuntimeExecutionRouteNativeExit   qTypedRuntimeExecutionRoute = "typed_runtime_native_exit"
+	qTypedRuntimeExecutionRouteDirectHelper qTypedRuntimeExecutionRoute = "typed_runtime_direct_helper"
 )
 
 const (
