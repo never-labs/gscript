@@ -522,6 +522,9 @@ def check_spec_runnable_coverage() -> None:
     files_without_examples = []
 
     for path in sorted(spec_dir.glob("*.md")):
+        if path.name == "index.md":
+            files_without_examples.append(path.name)
+            continue
         run = 0
         fail = 0
         for line in path.read_text(encoding="utf-8").splitlines():

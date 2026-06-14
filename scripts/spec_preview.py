@@ -58,6 +58,16 @@ LEIA_BUILTINS = frozenset(
     """.split()
 )
 
+Q_KEYWORDS = frozenset(
+    """
+    aj aj0 all any asc avg avgs bin binr by count desc dev differ distinct div
+    each enlist except exec fills first flip from group iasc idesc in inter last
+    like lj log max maxs mavg mcount med min mins mmax mmin mod msum next not
+    null or over prev prd prds rank ratios raze reverse select sum sums til
+    union update wavg where within xasc xbar xcol xdesc xgroup xkey xrank
+    """.split()
+)
+
 LEIA_OPERATOR_RE = re.compile(
     r"\+\+|--|\+=|-=|\*=|/=|%=|:=|==|!=|<=|>=|&&|\|\||&\^|<<|>>|<-|\.\.\.|\.\.|\*\*|[+\-*/%=<>!#&|^]"
 )
@@ -77,6 +87,8 @@ LEIA_NUMBER_RE = re.compile(
 )
 
 LEIA_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+LEIA_DIALECT_TAG_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*!?")
+Q_TOKEN_RE = re.compile(r"`(?:[A-Za-z_][A-Za-z0-9_]*)+|\"(?:\\.|[^\"\\])*\"|\b\d+(?:\.\d+)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b|[+\-*%#_!?:,;.<>=~&|]+")
 
 
 def is_leia_fence(info: str) -> bool:
@@ -87,11 +99,63 @@ def span(class_name: str, text: str) -> str:
     return f'<span class="{class_name}">{escape(text)}</span>'
 
 
+def highlight_q(source: str) -> str:
+    out: list[str] = []
+    last = 0
+    for match in Q_TOKEN_RE.finditer(source):
+        out.append(escape(source[last : match.start()]))
+        value = match.group(0)
+        if value.startswith("`"):
+            out.append(span("tok-q-symbol", value))
+        elif value.startswith('"'):
+            out.append(span("tok-string", value))
+        elif value[0].isdigit():
+            out.append(span("tok-number", value))
+        elif value in Q_KEYWORDS:
+            out.append(span("tok-q-keyword", value))
+        elif re.fullmatch(r"[+\-*%#_!?:,;.<>=~&|]+", value):
+            out.append(span("tok-operator", value))
+        else:
+            out.append(escape(value))
+        last = match.end()
+    out.append(escape(source[last:]))
+    return "".join(out)
+
+
+def highlight_dialect_body(tag: str, body: str) -> str:
+    if tag in {"q", "qsql"}:
+        return highlight_q(body)
+    return span("tok-string", body)
+
+
 def highlight_leia(source: str) -> str:
     out: list[str] = []
     i = 0
     while i < len(source):
         text = source[i:]
+        dialect = LEIA_DIALECT_TAG_RE.match(source, i)
+        if dialect:
+            tag_text = dialect.group(0)
+            tag = tag_text.rstrip("!")
+            after = dialect.end()
+            if source.startswith("```", after):
+                end = source.find("```", after + 3)
+                if end != -1:
+                    out.append(span("tok-dialect", tag_text))
+                    out.append(span("tok-string", "```"))
+                    out.append(highlight_dialect_body(tag, source[after + 3 : end]))
+                    out.append(span("tok-string", "```"))
+                    i = end + 3
+                    continue
+            if after < len(source) and source[after] == "`":
+                end = source.find("`", after + 1)
+                if end != -1:
+                    out.append(span("tok-dialect", tag_text))
+                    out.append(span("tok-string", "`"))
+                    out.append(highlight_dialect_body(tag, source[after + 1 : end]))
+                    out.append(span("tok-string", "`"))
+                    i = end + 1
+                    continue
         if text.startswith("/*"):
             end = source.find("*/", i + 2)
             if end == -1:
@@ -213,6 +277,24 @@ def shift_markdown_headings(text: str, levels: int = 1) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+def normalize_published_markdown_fences(text: str) -> str:
+    """Convert test-only spec fence info to Markdown that GitHub Pages renders.
+
+    The chapter files use info strings such as "leia run all" for the executable
+    spec gate. Kramdown treats those space-bearing fence infos as plain
+    paragraphs, so the published single-page spec must use ordinary language
+    names while the source chapters keep the test metadata.
+    """
+    out: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped in {"```leia run", "```leia run all", "```leia fail", "```leia fail all"}:
+            out.append(line[: len(line) - len(line.lstrip())] + "```leia")
+        else:
+            out.append(line)
+    return "\n".join(out).rstrip() + "\n"
+
+
 def build_spec_index_markdown(spec_dir: Path) -> str:
     index_path = spec_dir / "index.md"
     intro = strip_generated_spec_chapters(index_path.read_text(encoding="utf-8")).rstrip()
@@ -226,7 +308,8 @@ def build_spec_index_markdown(spec_dir: Path) -> str:
     for filename, _title in CHAPTERS:
         if filename == "index.md":
             continue
-        parts.append(shift_markdown_headings((spec_dir / filename).read_text(encoding="utf-8")))
+        chapter = shift_markdown_headings((spec_dir / filename).read_text(encoding="utf-8"))
+        parts.append(normalize_published_markdown_fences(chapter))
         parts.append("")
 
     grammar = (spec_dir / "grammar.ebnf").read_text(encoding="utf-8").rstrip()
@@ -545,6 +628,9 @@ pre.leia-code {{
 .tok-constant {{ color:#9a3412; font-weight:600; }}
 .tok-builtin {{ color:#0369a1; }}
 .tok-operator {{ color:#6b21a8; }}
+.tok-dialect {{ color:#7c3aed; font-weight:600; }}
+.tok-q-keyword {{ color:#005f73; font-weight:600; }}
+.tok-q-symbol {{ color:#9a3412; }}
 .table-wrap {{ max-width:920px; overflow-x:auto; margin:14px 0 18px; }}
 table {{ width:100%; border-collapse:collapse; border-top:1px solid var(--line); border-bottom:1px solid var(--line); font-size:14px; }}
 th, td {{ text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid #e5e7eb; }}

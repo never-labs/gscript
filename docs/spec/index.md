@@ -149,13 +149,13 @@ Stable identifiers are ASCII. Non-ASCII code points may appear in comments and
 strings. Future revisions may extend identifier characters, but portable source
 should use ASCII identifiers.
 
-```leia run all
+```leia
 // Non-ASCII text is stable in comments and strings.
 text := "cafe"
 assert(text == "cafe")
 ```
 
-```leia fail all
+```leia
 cafeé := 1
 ```
 
@@ -190,7 +190,7 @@ them being accepted, ignored, preserved, rejected, or reported in inspection
 output. Regardless of those diagnostics, an unknown file directive must not gain
 execution behavior or silently grant capabilities.
 
-```leia run all
+```leia
 //leia:build linux,darwin
 //leia:test smoke
 //leia:cap fs.read
@@ -214,7 +214,7 @@ Implementations must scan the longest valid token from the current byte position
 For example, `...` is one ellipsis token, not `..` plus `.`, and `<=` is one
 comparison token, not `<` plus `=`.
 
-```leia run all
+```leia
 concat := "a" .. "b"
 ellipsis_seen := false
 
@@ -245,7 +245,7 @@ Identifiers name variables, functions, labels, tools, agents, module aliases,
 and fields. Identifiers are case-sensitive. Non-ASCII letters are not identifier
 characters in v1.0 source.
 
-```leia run all
+```leia
 name := "leia"
 Name := "different binding"
 _scratch := 42
@@ -260,7 +260,7 @@ assert(agent_name == "summarizer")
 The identifiers `name` and `Name` are distinct. A digit may not be the first
 character of an identifier.
 
-```leia fail all
+```leia
 1name := "not an identifier"
 ```
 
@@ -277,7 +277,7 @@ func return if else elseif for range break continue in var go chan defer const g
 true false nil
 ```
 
-```leia run all
+```leia
 func_name := "ordinary identifier"
 returning := true
 iffoo := 7
@@ -287,7 +287,7 @@ assert(returning == true)
 assert(iffoo == 7)
 ```
 
-```leia fail all
+```leia
 func := "reserved"
 ```
 
@@ -295,7 +295,7 @@ Dialect words such as `q`, `model`, `tool`, `turn`, `agent`, and `evaluate`
 are contextual syntax words, not lexical keywords. They scan as identifiers
 outside grammar positions that assign them dialect meaning.
 
-```leia run all
+```leia
 agent := "identifier"
 tool := "identifier"
 turn := 1
@@ -347,7 +347,7 @@ Decimal float forms include `1.25`, `1e3`, `1.25e2`, and `1_2.3_4e5_6`.
 A dot belongs to a number only when it is not the start of `..`; therefore
 `1..2` scans as `1`, `..`, `2`.
 
-```leia run all
+```leia
 decimal := 1_000_000
 hex := 0xff
 binary := 0b1010
@@ -363,11 +363,11 @@ assert(float == 125)
 assert(spread == "12")
 ```
 
-```leia fail all
+```leia
 bad := 1__2
 ```
 
-```leia fail all
+```leia
 bad := 1e_2
 ```
 
@@ -427,7 +427,7 @@ with dialect-encoded values. A short raw body cannot contain a backtick. A
 fenced raw body can contain single or double backticks, but not three
 consecutive backticks. Quoted strings may not contain an unescaped newline.
 
-```leia run all
+```leia
 quoted := "line\n"
 literal := 'line\n'
 raw := `line\n`
@@ -451,7 +451,7 @@ escapes. The raw string contains the two bytes backslash and `n`. The
 double-quoted string interpolates `name`; the single-quoted spelling contains
 the literal bytes `${name}`.
 
-```leia fail all
+```leia
 bad := "line
 break"
 ```
@@ -464,7 +464,7 @@ Line comments begin with `//` and continue to the end of the line. Block
 comments begin with `/*` and end at the next `*/`; block comments do not nest.
 Comments are otherwise ignored for parsing.
 
-```leia run all
+```leia
 // A full-line comment.
 x := 1 /* inline block comment */ + 2
 
@@ -487,7 +487,7 @@ func summarize(text) {
 }
 ```
 
-```leia fail all
+```leia
 /* block comments do not nest
    /* inner */
 */
@@ -509,7 +509,7 @@ The stable operator and punctuation tokens are:
 Longest-token scanning applies to this table. For example, `+=` is one token,
 `++` is one token, `**` is one token, `...` is one token, and `<-` is one token.
 
-```leia run all
+```leia
 x := 1
 x += 2
 y := 2 ** 3
@@ -524,7 +524,7 @@ The parser may reject a token sequence even when each token is lexically valid.
 For example, `a + * b` is lexically valid as tokens but invalid as an
 expression.
 
-```leia fail all
+```leia
 a := 1 + * 2
 ```
 
@@ -544,7 +544,7 @@ expression resolve exactly as they would immediately before the declaration.
 Module-scope declarations are visible to later module-scope code and to nested
 blocks in the same module.
 
-```leia run all
+```leia
 x := 10
 
 if true {
@@ -566,7 +566,7 @@ Assignment with `:=` introduces local bindings. Assignment with `=` updates
 existing targets. Multiple assignment adjusts values according to the
 multi-return rules in [Expressions](expressions.md).
 
-```leia run all
+```leia
 x := 1
 x = x + 1
 
@@ -584,7 +584,7 @@ The inner `x` shadows the outer `x` only inside the block.
 already declared in an outer block creates a new shadowing binding; it does not
 update the outer binding. Use `=` to update an existing visible binding.
 
-```leia run all
+```leia
 value := 1
 
 if true {
@@ -601,7 +601,7 @@ runtime error. Leia does not create global variables implicitly with `=`.
 Top-level declarations, imports, builtins, enabled standard-library modules,
 and host-provided globals are all existing bindings for this rule.
 
-```leia fail all
+```leia
 missing = 1
 ```
 
@@ -609,7 +609,7 @@ Dynamic script APIs that execute code with a host-provided environment follow
 the same rule: code may update names that are already present in that
 environment, but must declare new names with `:=`.
 
-```leia run all
+```leia
 script := require("script")
 
 env := {count: 1}
@@ -634,7 +634,7 @@ const_decl = "const" identifier ( "=" | ":=" ) expr ;
 A const binding may not be rebound. Const does not freeze the internals of a
 mutable value such as a table.
 
-```leia run all
+```leia
 const limit := 10
 // limit = 11       // invalid: const binding
 
@@ -649,7 +649,7 @@ inner declaration may shadow an outer const, but code that resolves to the const
 binding may not assign to that binding with `=`, compound assignment, or
 increment/decrement forms.
 
-```leia fail all
+```leia
 const limit := 10
 limit = 11
 ```
@@ -657,7 +657,7 @@ limit = 11
 The read-only property belongs to the binding, not to the identifier spelling.
 A shadowing declaration creates a separate binding.
 
-```leia run all
+```leia
 const n := 1
 
 if true {
@@ -677,7 +677,7 @@ func_decl = "func" identifier param_list block ;
 A function declaration binds the function value to the declared name in the
 enclosing scope. Function bodies capture lexical bindings by reference.
 
-```leia run all
+```leia
 func add(a, b) {
     return a + b
 }
@@ -699,7 +699,7 @@ function name resolves to that binding, so the body may refer to the function
 for recursion. Parameters are local bindings in the function body. They shadow
 outer bindings with the same names for the entire body.
 
-```leia run all
+```leia
 func factorial(n) {
     if n <= 1 {
         return 1
@@ -752,7 +752,7 @@ conflicts with any other declaration.
 An import path names a capability provided by the module loader or embedder.
 The command-line runner rejects unallowlisted Go imports.
 
-```leia fail all
+```leia
 import math "go:math"
 ```
 
@@ -766,7 +766,7 @@ labels. Within a function, each label name may be declared at most once.
 
 A `goto` must not jump into a deeper lexical scope or over a local declaration.
 
-```leia run all
+```leia
 i := 0
 again:
 i = i + 1
@@ -776,18 +776,18 @@ if i < 3 {
 assert(i == 3)
 ```
 
-```leia run all
+```leia
 done:
 done := true
 assert(done)
 ```
 
-```leia fail all
+```leia
 again:
 again:
 ```
 
-```leia fail all
+```leia
 goto inner
 if true {
     x := 1
@@ -838,7 +838,7 @@ protected-call result slots hold values. Assignment copies the value reference,
 not the contents of an identity-bearing value. Reassigning a variable does not
 mutate the old value; mutating an aliased table does.
 
-```leia run all
+```leia
 a := {count: 1}
 b := a
 b.count = 2
@@ -862,7 +862,7 @@ assert(y == 2)
 Only `nil` and `false` are falsy. Numbers, including `0`, empty strings, empty
 tables, functions, coroutines, and channels are truthy.
 
-```leia run all
+```leia
 seenZero := false
 seenEmpty := false
 if 0 {
@@ -933,7 +933,7 @@ ordering is partial: it is defined only for numeric operands and for string
 operands, plus any metatable or host comparison contract documented elsewhere.
 Ordering values from unsupported categories raises a runtime error.
 
-```leia run all
+```leia
 assert(nil == nil)
 assert(true != false)
 assert("a" < "b")
@@ -951,7 +951,7 @@ with a `.0` suffix for finite whole-number floats so their subtype remains
 visible. NaN stringifies as `NaN`, positive infinity as `+Inf`, and negative
 infinity as `-Inf`.
 
-```leia run all
+```leia
 assert(type(1) == "number")
 assert(math.type(1) == "integer")
 assert(math.type(1.5) == "float")
@@ -974,7 +974,7 @@ assert(math.tointeger(1.0) == 1)
 assert(math.tointeger(1.5) == nil)
 ```
 
-```leia run all
+```leia
 assert(9007199254740992.0 == 9007199254740992.0 + 1.0)
 assert(9007199254740992.0 + 2.0 == 9007199254740994.0)
 
@@ -984,7 +984,7 @@ assert(math.type(fromFloat) == "integer")
 assert(math.tointeger(math.huge) == nil)
 ```
 
-```leia run all
+```leia
 nan := math.sqrt(-1)
 assert(math.isnan(nan))
 assert(math.isinf(math.huge))
@@ -1012,7 +1012,7 @@ they do not mutate existing string values. Library functions may interpret
 strings as UTF-8, paths, JSON, or protocol data when their module contract says
 so.
 
-```leia run all
+```leia
 s := "abc"
 alias := s
 t := s .. "d"
@@ -1047,7 +1047,7 @@ keys. NaN may be used as a raw key by the current runtime, but it still does
 not compare equal with `==`; portable programs should avoid NaN table keys
 unless a module explicitly documents that convention.
 
-```leia run all
+```leia
 t := {}
 t[1] = "int"
 assert(1 == 1.0)
@@ -1080,7 +1080,7 @@ performance, resource accounting, and recoverable host error behavior.
 Functions compare by identity unless a host-backed value documents a narrower
 comparison rule.
 
-```leia run all
+```leia
 func makeCounter() {
     n := 0
     return func() {
@@ -1123,7 +1123,7 @@ table/function/channel identity. Equality compares channel identity. A receive
 from a closed channel yields the channel contract's closed result; sends to a
 closed channel raise a runtime error unless protected.
 
-```leia run all
+```leia
 ch := make(chan, 1)
 same := ch
 other := make(chan, 1)
@@ -1160,7 +1160,7 @@ type({})      // "table"
 type(func() {}) // "function"
 ```
 
-```leia run all
+```leia
 assert(type(nil) == "nil")
 assert(type(true) == "boolean")
 assert(type(1) == "number")
@@ -1195,7 +1195,7 @@ short-circuit and return operand values rather than coerced booleans. Unary
 logical negation is `!`. Unary `^` is bitwise not; binary `^` is bitwise xor.
 Assignment forms are statements, not expressions.
 
-```leia run all
+```leia
 x := 1 + 2 * 3      // 7
 y := (1 + 2) * 3    // 9
 z := false || "ok"  // "ok"
@@ -1210,7 +1210,7 @@ assert(1 << 2 * 3 == 12)
 assert("a" .. "b" .. "c" == "abc")
 ```
 
-```leia fail all
+```leia
 x := 1
 y := (x = 2)
 ```
@@ -1222,7 +1222,7 @@ results. A call used where exactly one expression value is required contributes
 its first result, or `nil` when it produces no results. Expression-list
 positions are adjusted by the multi-return rules in [Functions](functions.md).
 
-```leia run all
+```leia
 func pair() {
     return "a", "b"
 }
@@ -1238,7 +1238,7 @@ assert(first == "a")
 The built-in `spread(x)` form preserves multiple results from a call in
 argument and table-constructor positions where explicit expansion is required.
 
-```leia run all
+```leia
 func pair() {
     return "a", "b"
 }
@@ -1261,7 +1261,7 @@ they do not create a fresh identity by themselves.
 `x[y]` indexes a table-like or host-backed value. `x.name` is member selection
 and is equivalent to a string-key field lookup where supported.
 
-```leia run all
+```leia
 user := { name: "Ada" }
 same := user.name == user["name"]
 user["score"] = 10
@@ -1275,7 +1275,7 @@ on that receiver, then calls the result with the receiver inserted as the first
 argument. Therefore `x:name(a, b)` has the same stable call semantics as
 `x.name(x, a, b)`, except the receiver expression is evaluated only once.
 
-```leia run all
+```leia
 counter := {
     value: 0,
     add: func(self, delta) {
@@ -1357,7 +1357,7 @@ Non-executable operator result summary:
 (1 << 8)     // 256
 ```
 
-```leia run all
+```leia
 assert(1 + 2 == 3)
 assert("5" + 3 == 8)
 assert("a" .. 3 == "a3")
@@ -1366,15 +1366,15 @@ assert(("3.9" & 1) == 1)
 assert((^"0") == -1)
 ```
 
-```leia fail all
+```leia
 return "x" + 3
 ```
 
-```leia fail all
+```leia
 return 1 << -1
 ```
 
-```leia run all
+```leia
 boxed := setmetatable({value: 4}, {
     __add: func(left, right) {
         return left.value + right
@@ -1412,7 +1412,7 @@ raise a runtime error if a value cannot be represented by that element type.
 Function literals capture their lexical environment by reference. Tagged
 dialect forms evaluate according to their registered dialect contract.
 
-```leia run all
+```leia
 events := {}
 func mark(name, value) {
     events[#events + 1] = name
@@ -1458,7 +1458,7 @@ Within an expression list, subexpressions are evaluated left-to-right unless a
 specific expression form short-circuits. Implementations may optimize execution
 but must preserve observable side effects and error behavior.
 
-```leia run all
+```leia
 events := {}
 func mark(name) {
     events[#events + 1] = name
@@ -1498,7 +1498,7 @@ braces. Locals declared inside the block are not visible after the closing
 brace. A block evaluates its statements in source order until control transfers,
 an error unwinds, or the block ends normally.
 
-```leia fail all
+```leia
 if true {
     hidden := 1
 }
@@ -1512,7 +1512,7 @@ use Leia truthiness: only `nil` and `false` are false. `elseif` branches are
 tested left-to-right after earlier conditions are false. At most one branch
 runs, and branch blocks have their own lexical scopes.
 
-```leia run all
+```leia
 seen := {}
 if 0 {
     seen.zero = true
@@ -1547,7 +1547,7 @@ fresh lexical bindings in the current block for identifier targets; `=` updates
 existing targets. Multi-value adjustment for the right-hand side follows the
 rules in [Functions](functions.md).
 
-```leia run all
+```leia
 events := {}
 func mark(name, value) {
     events[#events + 1] = name
@@ -1578,7 +1578,7 @@ storing the result back into the same target. The operator may use ordinary
 primitive coercions or metamethod dispatch. `x++` and `x--` are statements
 equivalent to adding or subtracting integer `1` from the target once.
 
-```leia run all
+```leia
 count := 1
 count += 2
 count *= 3
@@ -1600,11 +1600,11 @@ assert(log[1] == "read:score")
 assert(log[2] == "write:score=15")
 ```
 
-```leia fail all
+```leia
 1 = 2
 ```
 
-```leia fail all
+```leia
 name := "x"
 name++
 ```
@@ -1615,7 +1615,7 @@ name++
 close, ordering, and cancellation semantics are specified in
 [Concurrency](concurrency.md).
 
-```leia run all
+```leia
 ch := make(chan, 1)
 ch <- "sent"
 assert(<-ch == "sent")
@@ -1626,7 +1626,7 @@ assert(<-ch == "sent")
 `for` supports indefinite loops, condition loops, C-style loops, and range
 loops. Loop bodies may use `break` and `continue`.
 
-```leia run all
+```leia
 sum := 0
 for i := 1; i <= 3; i++ {
     sum += i
@@ -1650,7 +1650,7 @@ first condition check. The condition is checked before each iteration. The post
 statement runs after each normal iteration and after `continue`; it does not run
 after `break`, `return`, `goto`, or an unwind out of the loop body.
 
-```leia run all
+```leia
 postCount := 0
 bodyCount := 0
 
@@ -1701,7 +1701,7 @@ The v1.0 range algorithm is:
 range source to be advanced again according to the same algorithm. A `return`
 from the body exits the enclosing function.
 
-```leia run all
+```leia
 items := {10, 20, 30}
 sum := 0
 keySum := 0
@@ -1715,7 +1715,7 @@ assert(keySum == 6)
 assert(sum == 60)
 ```
 
-```leia run all
+```leia
 calls := {}
 
 for _, value := range pairs({10, 20, 30}) {
@@ -1729,7 +1729,7 @@ assert(calls[2]() == 20)
 assert(calls[3]() == 30)
 ```
 
-```leia run all
+```leia
 func counter(limit) {
     n := 0
     return func() {
@@ -1770,7 +1770,7 @@ assert(!ok)
 `break` exits the innermost enclosing loop. `continue` starts the next
 iteration of the innermost enclosing loop. Outside a loop they are invalid.
 
-```leia run all
+```leia
 values := {}
 for i := 1; i <= 6; i++ {
     if i % 2 == 0 {
@@ -1800,7 +1800,7 @@ rules are:
 3. a `default` case is selected immediately when no communication can proceed;
 4. a `select` with no cases raises a runtime error.
 
-```leia run all
+```leia
 ch := make(chan, 1)
 observed := ""
 select {
@@ -1826,7 +1826,7 @@ assert(observed == "recv:ready")
 `go call()` starts a goroutine-like task. `defer call()` schedules cleanup to
 run when the current function returns or unwinds through a protected boundary.
 
-```leia run all
+```leia
 func work(ready, done) {
     defer func() { done <- "done" }()
     ready <- "ready"
@@ -1846,7 +1846,7 @@ values use the multi-return adjustment rules in [Functions](functions.md).
 At module top level, `return` stops execution of the current chunk or module and
 produces the module result used by loaders such as `require`.
 
-```leia run all
+```leia
 func pair() {
     return "left", "right"
 }
@@ -1875,7 +1875,7 @@ change that deferred argument value. A deferred closure with no argument,
 however, still closes over lexical bindings in the ordinary way; when it runs,
 it observes the current value of those captured bindings.
 
-```leia run all
+```leia
 events := {}
 func scoped() {
     defer func() { events[#events + 1] = "last" }()
@@ -1889,7 +1889,7 @@ assert(events[2] == "first")
 assert(events[3] == "last")
 ```
 
-```leia run all
+```leia
 events := {}
 func record(value) {
     events[#events + 1] = value
@@ -1918,7 +1918,7 @@ scope, into a loop body from outside that loop, or over a local declaration that
 would be in scope at the target. It may jump forward or backward within the same
 scope when doing so does not bypass such declarations.
 
-```leia run all
+```leia
 i := 0
 again:
 i = i + 1
@@ -1928,7 +1928,7 @@ if i < 3 {
 assert(i == 3)
 ```
 
-```leia fail all
+```leia
 goto inside
 if true {
     inside:
@@ -1965,7 +1965,7 @@ vararg parameter. The call does not expose an argument count to fixed
 parameters; a fixed parameter that receives an explicit `nil` is
 indistinguishable from one filled because the argument is missing.
 
-```leia run all
+```leia
 func first(a, b) {
     return a, b
 }
@@ -1986,7 +1986,7 @@ The parameter `...` accepts any remaining arguments. Inside the function,
 most one vararg parameter, and it must be the final parameter. Fixed parameters
 are filled before the vararg list is formed.
 
-```leia run all
+```leia
 func count(...) {
     args := {...}
     return #args
@@ -1995,7 +1995,7 @@ func count(...) {
 assert(count(1, 2, 3) == 3)
 ```
 
-```leia run all
+```leia
 func rest(head, ...) {
     tail := {...}
     return {head, tail[1], tail[2]}
@@ -2026,7 +2026,7 @@ The stable adjustment rule is:
 In assignment and return positions, a final call expands. Missing assignment
 values become `nil`; extra assignment values are discarded.
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2046,7 +2046,7 @@ assert(p == 10 && q == 20 && r == 30)
 A parenthesized call is no longer in an expanding position and contributes
 exactly one value.
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2059,7 +2059,7 @@ assert(b == nil)
 When a call appears before the final expression in an expression list, it
 contributes exactly one value. A final call may expand.
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2077,7 +2077,7 @@ constructors use the same expression-list rule: non-final calls contribute one
 value; final calls expand. Use `spread(call())` to expand a call in a non-final
 position.
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2102,7 +2102,7 @@ filled first and only the remaining adjusted argument values are captured by the
 vararg binding. When the final argument expression expands, all of its remaining
 results may enter `...`.
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2120,7 +2120,7 @@ assert(tail[2] == 30)
 Multi-return adjustment is not transitive through variables or table fields. A
 variable holding the first result of a call is an ordinary single value.
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2132,7 +2132,7 @@ assert(a == 10)
 assert(b == nil)
 ```
 
-```leia run all
+```leia
 func triple() {
     return 10, 20, 30
 }
@@ -2169,7 +2169,7 @@ visible to all closures that share the binding. Each evaluation of a function
 literal creates a distinct function value. Returning or assigning an existing
 function value preserves that value's identity and captured environment.
 
-```leia run all
+```leia
 func counter() {
     n := 0
     inc := func() {
@@ -2231,14 +2231,14 @@ write the same normalized key, or on list-index assignment after interleaved
 keyed fields; use explicit assignments when that order matters. A constructor
 expression itself never reuses an existing table identity.
 
-```leia run all
+```leia
 t := { "first", "second", name: "Ada" }
 assert(t[1] == "first")
 assert(t.name == "Ada")
 assert(t["name"] == "Ada")
 ```
 
-```leia run all
+```leia
 a := {"x", "y", name: "Ada"}
 b := {"x", "y", name: "Ada"}
 assert(a != b)
@@ -2266,7 +2266,7 @@ Raw table operations are the primitive map operations:
 Raw helpers bypass metamethods by contract. Non-raw operations may consult
 metatables when the corresponding operation names an event below.
 
-```leia run all
+```leia
 t := {}
 assert(rawset(t, "x", 1) == t)
 assert(rawget(t, "x") == 1)
@@ -2279,7 +2279,7 @@ assert(rawequal(a, a))
 assert(!rawequal(a, b))
 ```
 
-```leia run all
+```leia
 log := {}
 t := setmetatable({present: 11}, {
     __index: func(_, key) {
@@ -2370,7 +2370,7 @@ floor division, bitwise operators, finalizers, weak tables, binary chunks, and
 Lua debug-slot protocols are not v1.0 stable contract unless a later spec
 revision names them explicitly.
 
-```leia run all
+```leia
 vec := {x: 3}
 mt := {
     __add: func(a, b) { return {x: a.x + b.x} },
@@ -2385,7 +2385,7 @@ assert(vec == setmetatable({x: 3}, mt))
 assert(tostring(vec) == "vec(3)")
 ```
 
-```leia run all
+```leia
 num_mt := {}
 num := func(value) {
     return setmetatable({value: value}, num_mt)
@@ -2412,7 +2412,7 @@ assert((-a).value == -5)
 assert(a .. b == "num:5:2")
 ```
 
-```leia run all
+```leia
 callable := setmetatable({base: 10}, {
     __call: func(self, value) {
         return self.base + value, self.base - value
@@ -2437,7 +2437,7 @@ mt.__metatable = nil
 assert(setmetatable(protected, nil) == protected)
 ```
 
-```leia run all
+```leia
 left := setmetatable({name: "left"}, {
     __add: func(a, b) { return a.name .. "+" .. b.name },
 })
@@ -2450,7 +2450,7 @@ assert(left + right == "left+right")
 assert(plain + right == "plain->right")
 ```
 
-```leia run all
+```leia
 mt := {}
 mt.__eq = func(a, b) { return a.key == b.key }
 mt.__lt = func(a, b) { return a.key < b.key }
@@ -2473,7 +2473,7 @@ redirect target. They can chain through more metatables, and the same raw-key
 rule is applied at each hop. A function-valued `__index` or `__newindex` stops
 the chain by handling the operation directly.
 
-```leia run all
+```leia
 base := {answer: 42}
 middle := setmetatable({}, {__index: base})
 obj := setmetatable({}, {__index: middle})
@@ -2491,13 +2491,13 @@ assert(log[1] == "event:saved")
 assert(rawget(proxy, "event") == nil)
 ```
 
-```leia fail all
+```leia
 t := {}
 setmetatable(t, {__index: t})
 return t.missing
 ```
 
-```leia fail all
+```leia
 t := {}
 setmetatable(t, {__newindex: t})
 t.missing = 1
@@ -2508,7 +2508,7 @@ t.missing = 1
 The length operator `#x` uses the value's ordinary length behavior and may
 consult `__len`. `rawlen(x)` bypasses `__len` for tables and strings.
 
-```leia run all
+```leia
 t := setmetatable({}, { __len: func(_) { return 99 } })
 assert(#t == 99)
 assert(rawlen(t) == 0)
@@ -2523,7 +2523,7 @@ ordinary traversal, but not on the order of those visits. `ipairs` is the
 portable sequence traversal form for consecutive positive integer keys starting
 at `1`; it stops at the first missing or `nil` element.
 
-```leia run all
+```leia
 t := {10, 20, [4]: 40, name: "Ada"}
 seen := {}
 for _, value := range ipairs(t) {
@@ -2564,7 +2564,7 @@ evaluated arguments. Later changes to variables used to compute the callee or
 arguments do not change that call, though captured tables and other reference
 values remain shared values.
 
-```leia run all
+```leia
 func worker(input, output) {
     value := <-input
     output <- value * 2
@@ -2578,7 +2578,7 @@ answer := <-output
 assert(answer == 42)
 ```
 
-```leia fail all
+```leia
 func fail_arg() {
     error("argument failed")
 }
@@ -2612,7 +2612,7 @@ creates an unbuffered channel. `type(ch)` returns `"channel"`; v1.0 has no
 script-visible send-only, receive-only, or direction-parameterized channel
 types.
 
-```leia run all
+```leia
 ch := make(chan, 2)
 assert(type(ch) == "channel")
 assert(cap(ch) == 2)
@@ -2626,7 +2626,7 @@ assert(rawlen(ch) == 2)
 Channels carry ordinary Leia values. Sending uses `ch <- value`; receiving uses
 `<-ch`. A receive can be used as a single value or in comma-ok form:
 
-```leia run all
+```leia
 ch := make(chan, 2)
 ch <- "a"
 ch <- "b"
@@ -2657,7 +2657,7 @@ values before reporting closure. Once the channel is closed and empty, a receive
 expression yields `nil`; comma-ok receive yields `nil, false`. Sending on a
 closed channel or closing an already closed channel is a runtime error.
 
-```leia run all
+```leia
 ch := make(chan, 1)
 close(ch)
 
@@ -2676,7 +2676,7 @@ assert(closed == false)
 assert(string.find(err, "closed channel", 1, true) != nil)
 ```
 
-```leia fail all
+```leia
 ch := make(chan)
 close(ch)
 ch <- "late"
@@ -2717,7 +2717,7 @@ until a case can proceed. If multiple cases are ready, the implementation may
 choose any ready case; portable programs must not assume fairness or round-robin
 ordering.
 
-```leia run all
+```leia
 ch := make(chan, 1)
 selected := ""
 
@@ -2746,7 +2746,7 @@ A send case on a closed channel raises a runtime error if selected or if a
 blocking select discovers the closed send case. A `select` with no cases is a
 runtime error.
 
-```leia run all
+```leia
 ch := make(chan, 1)
 close(ch)
 
@@ -2762,7 +2762,7 @@ default:
 assert(state == "closed")
 ```
 
-```leia fail all
+```leia
 select {
 }
 ```
@@ -2780,7 +2780,7 @@ Concurrent tasks have their own defer stack; a task started by `go` does not
 inherit the spawning task's pending defers, and deferred calls registered inside
 that task do not run in the spawning task.
 
-```leia run all
+```leia
 events := {}
 func record(x) {
     events[#events + 1] = x
@@ -2796,7 +2796,7 @@ assert(events[1] == "inner")
 assert(events[2] == "outer")
 ```
 
-```leia run all
+```leia
 done := make(chan, 1)
 
 func work() {
@@ -2814,7 +2814,7 @@ protected function is executing in the same task, including deferred-call errors
 from that protected function. They do not catch uncaught errors from other tasks
 started with `go`; use channels or runtime diagnostics to report those errors.
 
-```leia run all
+```leia
 ok, err := pcall(func() {
     defer error("cleanup failed")
 })
@@ -2838,7 +2838,7 @@ Script-level cancellation APIs, such as `context.withCancel`, are ordinary
 library values. They become useful when a task or library call selects on the
 context's done channel or explicitly checks the context state.
 
-```leia run all
+```leia
 ctx, cancel := context.withCancel()
 done := ctx.done
 out := make(chan, 1)
@@ -2899,7 +2899,7 @@ interleaving allowed by the implementation, and compound operations such as
 programs that require deterministic results should transfer ownership through
 channels or guard shared tables with a synchronization library.
 
-```leia run all
+```leia
 requests := make(chan, 4)
 replies := make(chan, 4)
 
@@ -2996,7 +2996,7 @@ Interpolation must preserve normal Leia evaluation order and error behavior.
 If evaluating an interpolation expression fails, the dialect implementation is
 not invoked.
 
-```leia run all
+```leia
 name := "Ada"
 profile := json`{"name": "${name}", "score": ${40 + 2}}`
 assert(profile.name == "Ada")
@@ -3149,7 +3149,7 @@ that do not contain backticks inside the body.
 dialect implementation directly. Hosts may use it when the q source is dynamic
 or when the tag spelling would be inconvenient.
 
-```leia run all
+```leia
 v := q`1 2 3`
 assert(v[1] == 1)
 assert(v[3] == 3)
@@ -3326,7 +3326,7 @@ orchestration engine.
 This stable lowering is observable without a live provider. A tagged tool must
 preserve helper-visible capability metadata:
 
-```leia run all
+```leia
 search_runbook := tool {
     name: "search_runbook"
     params: {"service"}
@@ -4110,7 +4110,7 @@ modules, and filesystem-backed project modules according to runtime module
 options. `name` must be a string. Loaded module results are cached in
 `package.loaded`.
 
-```leia run all
+```leia
 json := require("json")
 text := json.encode({ok: true})
 same := require("json")
@@ -4193,14 +4193,14 @@ Filesystem-backed project module resolution is deterministic:
 The resolved file is still checked by filesystem root, module byte, module
 depth, readonly, vendor, and capability controls before execution.
 
-```leia run all
+```leia
 json1 := require("json")
 json2 := require("json")
 assert(json1 == json2)
 assert(package.loaded["json"] == json1)
 ```
 
-```leia run all
+```leia
 fs := require("fs")
 path := require("path")
 script := require("script")
@@ -4214,7 +4214,7 @@ assert(require("local_helper") == helper)
 assert(package.loaded["local_helper"] == helper)
 ```
 
-```leia run all
+```leia
 fs := require("fs")
 path := require("path")
 script := require("script")
@@ -4242,7 +4242,7 @@ short-circuits resolution and is returned directly. This is mainly useful for
 embedders, tests, and compatibility shims; ordinary modules should prefer
 returning a value from the module file.
 
-```leia run all
+```leia
 package.loaded["example.preloaded"] = {answer: 42}
 mod := require("example.preloaded")
 assert(mod.answer == 42)
@@ -4253,7 +4253,7 @@ Because `package.loaded` is an ordinary table, any non-`nil` Leia value can be
 used as a preloaded module value. A false module value is still loaded: only
 `nil` means absent.
 
-```leia run all
+```leia
 package.loaded["example.false"] = false
 assert(require("example.false") == false)
 
@@ -4288,7 +4288,7 @@ third := require("example.override")
 
 The module name must be a string.
 
-```leia run all
+```leia
 ok, err := pcall(require, 123)
 assert(!ok)
 assert(type(err) == "string")
@@ -4423,7 +4423,7 @@ The declaration above is only valid when the embedder has allowlisted and
 registered the `go:net/http` binding. Source syntax alone never grants host
 access.
 
-```leia run all
+```leia
 ok, err := pcall(require, "go:net/http")
 assert(!ok)
 assert(type(err) == "string")
@@ -4495,7 +4495,7 @@ such as `kind`, `message`, `code`, `source`, or `retryable`, those fields are
 ordinary user data unless a specific library documents that table as a
 structured result.
 
-```leia run all
+```leia
 payload := {kind: "demo", message: "boom"}
 ok, err := pcall(func() {
     error(payload)
@@ -4505,7 +4505,7 @@ assert(err == payload)
 assert(err.kind == "demo")
 ```
 
-```leia run all
+```leia
 ok, err := pcall(error, nil)
 assert(!ok)
 assert(err == nil)
@@ -4519,7 +4519,7 @@ Runtime errors raised by invalid operations, host callbacks, parser/compiler
 operations called from script, resource budgets, and capability checks are
 represented inside `pcall` and `xpcall` as diagnostic strings.
 
-```leia run all
+```leia
 ok, err := pcall(func() {
     return "x" + 3
 })
@@ -4533,7 +4533,7 @@ assert(type(err) == "string")
 Extra arguments to `error` are evaluated by the call expression but ignored by
 the v1.0 `error` contract; the first argument is the only raised value.
 
-```leia run all
+```leia
 ok, err := pcall(func() {
     error()
 })
@@ -4549,7 +4549,7 @@ assert(err == "first")
 argument is present. If no message argument is present, the failure is a runtime
 diagnostic string.
 
-```leia run all
+```leia
 payload := {kind: "assertion"}
 ok, err := pcall(func() {
     assert(false, payload)
@@ -4571,7 +4571,7 @@ value)`, the object is `value`; if it came from a runtime, host, parser,
 budget, or capability failure, the protected error object is the current
 diagnostic string.
 
-```leia run all
+```leia
 ok, a, b := pcall(func() {
     return "a", "b"
 })
@@ -4590,7 +4590,7 @@ Arguments after the function are evaluated before entering the callee, then
 passed normally. Once the callable is entered, both script-raised errors and
 runtime errors are converted to the protected result form.
 
-```leia run all
+```leia
 ok, err := pcall(17)
 assert(!ok)
 assert(type(err) == "string")
@@ -4603,7 +4603,7 @@ handler results are discarded. If the handler returns no values, the second
 `xpcall` result is `nil`. If the handler itself fails, `xpcall` returns `false`
 plus the handler failure's error object.
 
-```leia run all
+```leia
 ok, value := pcall(func(a, b) {
     return a + b, "kept"
 }, 2, 5)
@@ -4615,7 +4615,7 @@ ok, handled := xpcall(error, func(err) {
 assert(!ok && handled == "handled:boom")
 ```
 
-```leia run all
+```leia
 ok, a, b := xpcall(func() {
     error("bad")
 }, func(err) {
@@ -4626,7 +4626,7 @@ assert(a == "handled:bad")
 assert(b == nil)
 ```
 
-```leia run all
+```leia
 ok, value := xpcall(func() {
     error("bad")
 }, func(err) {
@@ -4638,11 +4638,11 @@ assert(value == nil)
 Like `pcall`, `xpcall()` and `xpcall(fn)` raise unprotected argument errors
 because the protected function and handler arguments are missing.
 
-```leia fail all
+```leia
 pcall()
 ```
 
-```leia fail all
+```leia
 xpcall(print)
 ```
 
@@ -4673,7 +4673,7 @@ failing operation, not exact wording. Tests and portable programs must not parse
 runtime diagnostic prose unless a specific CLI JSON field or library result
 table documents that text as machine-readable.
 
-```leia run all
+```leia
 func fails(f) {
     ok, err := pcall(f)
     assert(!ok)

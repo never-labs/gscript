@@ -108,6 +108,9 @@ pre.leia-code {
 .tok-constant { color:#9a3412; font-weight:600; }
 .tok-builtin { color:#0369a1; }
 .tok-operator { color:#6b21a8; }
+.tok-dialect { color:#7c3aed; font-weight:600; }
+.tok-q-keyword { color:#005f73; font-weight:600; }
+.tok-q-symbol { color:#9a3412; }
 .table-wrap { max-width:920px; overflow-x:auto; margin:14px 0 18px; }
 table { width:100%; border-collapse:collapse; border-top:1px solid var(--line); border-bottom:1px solid var(--line); font-size:14px; }
 th, td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid #e5e7eb; }
@@ -1863,7 +1866,7 @@ tag! { fields }</code></pre>
 <p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a q value, or rejected.</p>
 <p>Interpolation must preserve normal Leia evaluation order and error behavior. If evaluating an interpolation expression fails, the dialect implementation is not invoked.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code">name <span class="tok-operator">:=</span> <span class="tok-string">&quot;Ada&quot;</span>
-profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&quot;name&quot;: &quot;${name}&quot;, &quot;score&quot;: ${40 + 2}}`</span>
+profile <span class="tok-operator">:=</span> <span class="tok-dialect">json</span><span class="tok-string">`</span><span class="tok-string">{&quot;name&quot;: &quot;${name}&quot;, &quot;score&quot;: ${40 + 2}}</span><span class="tok-string">`</span>
 <span class="tok-builtin">assert</span>(profile.name <span class="tok-operator">==</span> <span class="tok-string">&quot;Ada&quot;</span>)
 <span class="tok-builtin">assert</span>(profile.score <span class="tok-operator">==</span> <span class="tok-number">42</span>)</code></pre>
 <h3 id="tagged-dialects-bang-form">Bang Form</h3>
@@ -1948,7 +1951,7 @@ profile <span class="tok-operator">:=</span> json<span class="tok-string">`{&quo
 q```flip `sym`px!(`AAPL`MSFT;100 101.5)```</code></pre>
 <p>The fenced form is preferred for q source that contains symbol backticks, queries, or multiline tables. The short form is useful for simple expressions that do not contain backticks inside the body.</p>
 <p><code>dialect.eval(&quot;q&quot;, body, opts)</code> is equivalent to invoking the registered q dialect implementation directly. Hosts may use it when the q source is dynamic or when the tag spelling would be inconvenient.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">v <span class="tok-operator">:=</span> q<span class="tok-string">`1 2 3`</span>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">v <span class="tok-operator">:=</span> <span class="tok-dialect">q</span><span class="tok-string">`</span><span class="tok-number">1</span> <span class="tok-number">2</span> <span class="tok-number">3</span><span class="tok-string">`</span>
 <span class="tok-builtin">assert</span>(v[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">1</span>)
 <span class="tok-builtin">assert</span>(v[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-number">3</span>)
 

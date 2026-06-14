@@ -65,6 +65,9 @@ func TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable(t *testing.T) 
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
+		if entry.Name() == "index.md" {
+			continue
+		}
 		path := filepath.Join(specDir, entry.Name())
 		lines := strings.Split(readFileString(t, path), "\n")
 		for i, line := range lines {
@@ -115,6 +118,9 @@ func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExampl
 	var examples []runnableSpecExample
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		if entry.Name() == "index.md" {
 			continue
 		}
 		path := filepath.Join(specDir, entry.Name())

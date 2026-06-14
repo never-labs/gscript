@@ -174,6 +174,9 @@
     .highlight .kc, .tok-constant { color:#9a3412; font-weight:600; }
     .highlight .nf, .highlight .nb, .tok-builtin { color:#0369a1; }
     .highlight .o, .highlight .ow, .tok-operator { color:#6b21a8; }
+    .tok-dialect { color:#7c3aed; font-weight:600; }
+    .tok-q-keyword { color:#005f73; font-weight:600; }
+    .tok-q-symbol { color:#9a3412; }
     footer {
       color:var(--muted);
       border-top:1px solid var(--line);
@@ -236,7 +239,9 @@
       var keywords = new Set("break case continue defer default else elseif fallthrough for go goto if import in range return select switch chan const func var".split(" "));
       var constants = new Set("false nil true".split(" "));
       var builtins = new Set("assert close delete error getmetatable ipairs len make next pairs pcall print rawequal rawget rawlen rawset require select setmetatable spread tonumber tostring type xpcall".split(" "));
+      var qKeywords = new Set("aj aj0 all any asc avg avgs bin binr by count desc dev differ distinct div each enlist except exec fills first flip from group iasc idesc in inter last like lj log max maxs mavg mcount med min mins mmax mmin mod msum next not null or over prev prd prds rank ratios raze reverse select sum sums til union update wavg where within xasc xbar xcol xdesc xgroup xkey xrank".split(" "));
       var token = /("(?:\\.|[^"\\])*"|`[^`]*`|\/\/[^\n]*|\/\*[\s\S]*?\*\/|\b0[xX][0-9A-Fa-f_]+\b|\b0[bB][01_]+\b|\b0[oO][0-7_]+\b|\b\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?(?:[eE][+-]?\d+(?:_\d+)*)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b|==|!=|<=|>=|:=|\+\+|--|\+=|-=|\*=|\/=|%=|&&|\|\||<-|\.\.\.|\.\.|[+\-*\/%=<>!#&|^])/g;
+      var qToken = /(`(?:[A-Za-z_][A-Za-z0-9_]*)+|"(?:\\.|[^"\\])*"|\b\d+(?:\.\d+)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b|[+\-*%#_!?:,;.<>=~&|]+)/g;
 
       function escapeHTML(text) {
         return text.replace(/[&<>]/g, function (ch) {
@@ -255,19 +260,82 @@
         return "";
       }
 
-      article.querySelectorAll("pre code.language-leia").forEach(function (code) {
-        var text = code.textContent;
+      function highlightQ(text) {
         var html = "";
         var last = 0;
-        text.replace(token, function (part, _match, offset) {
+        text.replace(qToken, function (part, offset) {
           html += escapeHTML(text.slice(last, offset));
-          var cls = classify(part);
-          html += cls ? '<span class="' + cls + '">' + escapeHTML(part) + "</span>" : escapeHTML(part);
+          if (part[0] === "`") {
+            html += '<span class="tok-q-symbol">' + escapeHTML(part) + "</span>";
+          } else if (part[0] === '"' || /^\d/.test(part)) {
+            html += '<span class="' + (part[0] === '"' ? "tok-string" : "tok-number") + '">' + escapeHTML(part) + "</span>";
+          } else if (qKeywords.has(part)) {
+            html += '<span class="tok-q-keyword">' + escapeHTML(part) + "</span>";
+          } else if (/^[+\-*%#_!?:,;.<>=~&|]+$/.test(part)) {
+            html += '<span class="tok-operator">' + escapeHTML(part) + "</span>";
+          } else {
+            html += escapeHTML(part);
+          }
           last = offset + part.length;
           return part;
         });
-        html += escapeHTML(text.slice(last));
-        code.innerHTML = html;
+        return html + escapeHTML(text.slice(last));
+      }
+
+      function highlightDialect(tag, body) {
+        if (tag === "q" || tag === "qsql") return highlightQ(body);
+        return '<span class="tok-string">' + escapeHTML(body) + "</span>";
+      }
+
+      function highlightLeia(text) {
+        var html = "";
+        var i = 0;
+        var tagPattern = /[A-Za-z_][A-Za-z0-9_]*!?/y;
+        while (i < text.length) {
+          tagPattern.lastIndex = i;
+          var tagMatch = tagPattern.exec(text);
+          if (tagMatch) {
+            var tag = tagMatch[0];
+            var bareTag = tag.replace(/!$/, "");
+            var after = tagPattern.lastIndex;
+            if (text.slice(after, after + 3) === "```") {
+              var end = text.indexOf("```", after + 3);
+              if (end !== -1) {
+                html += '<span class="tok-dialect">' + escapeHTML(tag) + "</span><span class=\"tok-string\">```</span>";
+                html += highlightDialect(bareTag, text.slice(after + 3, end));
+                html += '<span class="tok-string">```</span>';
+                i = end + 3;
+                continue;
+              }
+            }
+            if (text[after] === "`") {
+              var close = text.indexOf("`", after + 1);
+              if (close !== -1) {
+                html += '<span class="tok-dialect">' + escapeHTML(tag) + "</span><span class=\"tok-string\">`</span>";
+                html += highlightDialect(bareTag, text.slice(after + 1, close));
+                html += '<span class="tok-string">`</span>';
+                i = close + 1;
+                continue;
+              }
+            }
+          }
+          token.lastIndex = i;
+          var match = token.exec(text);
+          if (!match || match.index !== i) {
+            html += escapeHTML(text[i]);
+            i++;
+            continue;
+          }
+          var part = match[0];
+          var cls = classify(part);
+          html += cls ? '<span class="' + cls + '">' + escapeHTML(part) + "</span>" : escapeHTML(part);
+          i = token.lastIndex;
+        }
+        return html;
+      }
+
+      article.querySelectorAll("pre code.language-leia, .language-leia.highlighter-rouge code").forEach(function (code) {
+        code.innerHTML = highlightLeia(code.textContent);
       });
     })();
   </script>

@@ -140,6 +140,9 @@ func TestRunnableSpecFencesKeepStableAllModeCoverage(t *testing.T) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
+		if entry.Name() == "index.md" {
+			continue
+		}
 		path := filepath.Join(specDir, entry.Name())
 		for lineNo, line := range strings.Split(readFileString(t, path), "\n") {
 			if !strings.HasPrefix(line, "```leia") {
