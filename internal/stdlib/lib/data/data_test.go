@@ -2694,6 +2694,41 @@ func TestRuntimeKernelPipelineShapeRecognizesLinalgFamilies(t *testing.T) {
 	}
 }
 
+func TestLinalgF64RuntimeFacadeRecordsKernelStats(t *testing.T) {
+	ClearRuntimeKernelExecutionStats()
+	t.Cleanup(ClearRuntimeKernelExecutionStats)
+
+	scaled := LinalgF64VectorScale([]float64{1, 2, 3}, 2)
+	if !reflect.DeepEqual(scaled, []float64{2, 4, 6}) {
+		t.Fatalf("LinalgF64VectorScale = %#v", scaled)
+	}
+	if got := LinalgF64VectorDot([]float64{1, 2, 3}, []float64{4, 5, 6}); got != 32 {
+		t.Fatalf("LinalgF64VectorDot = %v, want 32", got)
+	}
+	matvec := LinalgF64Matvec(2, 2, []float64{1, 2, 3, 4}, []float64{10, 20})
+	if !reflect.DeepEqual(matvec, []float64{50, 110}) {
+		t.Fatalf("LinalgF64Matvec = %#v", matvec)
+	}
+	matmul := LinalgF64Matmul(2, 2, 2, []float64{1, 2, 3, 4}, []float64{1, 0, 0, 1})
+	if !reflect.DeepEqual(matmul, []float64{1, 2, 3, 4}) {
+		t.Fatalf("LinalgF64Matmul = %#v", matmul)
+	}
+
+	stats := RuntimeKernelExecutionStats()
+	for _, tc := range []struct {
+		kernel string
+		shape  string
+	}{
+		{"LinalgVectorScale", "linalg/vector/scale/f64/3"},
+		{"LinalgVectorDot", "linalg/vector/dot/f64/3"},
+		{"LinalgMatrixVector", "linalg/vector/matvec/2x2/f64/2"},
+		{"LinalgMatrixMatmul", "linalg/matrix/matmul/2x2/f64/2x2"},
+	} {
+		assertDataRuntimeKernelStat(t, stats, tc.kernel, tc.shape, "attempt", 1)
+		assertDataRuntimeKernelStat(t, stats, tc.kernel, tc.shape, "hit", 1)
+	}
+}
+
 func TestQueryVectorTransformProjectionUsesFilteredAndOrderedRows(t *testing.T) {
 	frame := mustFrame(t,
 		NewColumn("sym", []any{Symbol("a"), Symbol("b"), Symbol("a"), Symbol("a")}),
