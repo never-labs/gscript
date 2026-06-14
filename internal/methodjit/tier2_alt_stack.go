@@ -266,6 +266,59 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		}
 		regs[slot] = out
 		ctx.HelperErrFlag = 0
+	case OpQFrameSelectColumn:
+		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
+		if cf == nil {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs, base, ok := helperRegsWindow(ctx)
+		if !ok {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		slot := base + int(ctx.OpExitSlot)
+		arg1 := base + int(ctx.OpExitArg1)
+		aux := int(ctx.OpExitAux)
+		if slot < 0 || slot >= len(regs) || arg1 < 0 || arg1 >= len(regs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: QFrameSelectColumn register range out of bounds")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		if cf.Proto == nil || aux < 0 || aux >= len(cf.QFrameSelectColumnSpecs) {
+			ctx.HelperErr = fmt.Errorf("tier2: direct helper: QFrameSelectColumn spec index is out of range")
+			ctx.HelperErrFlag = 1
+			return
+		}
+		argVal := runtime.NilValue()
+		hasArg := false
+		if ctx.OpExitArg2 >= 0 {
+			arg2 := base + int(ctx.OpExitArg2)
+			if arg2 < 0 || arg2 >= len(regs) {
+				ctx.HelperErr = fmt.Errorf("tier2: direct helper: QFrameSelectColumn dynamic arg out of bounds")
+				ctx.HelperErrFlag = 1
+				return
+			}
+			argVal = regs[arg2]
+			hasArg = true
+		}
+		out, err := cf.qFrameVectorRuntimeExecutionAdapter().executeQFrameSelectColumn(
+			cf.Proto.Constants,
+			aux,
+			regs[arg1],
+			argVal,
+			hasArg,
+			qTypedRuntimeExecutionRouteDirectHelper,
+		)
+		if err != nil {
+			ctx.HelperErr = err
+			ctx.HelperErrFlag = 1
+			return
+		}
+		regs[slot] = out
+		ctx.HelperErrFlag = 0
 	default:
 		ctx.HelperErr = fmt.Errorf("tier2: direct helper: unsupported op %v", Op(ctx.OpExitOp))
 		ctx.HelperErrFlag = 1

@@ -68,6 +68,9 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 			arg2Slot = int64(a2Slot)
 		}
 	}
+	if instr.Op == OpQFrameSelectColumn && len(instr.Args) < 2 {
+		arg2Slot = -1
+	}
 
 	// Store all active register-resident values to memory so the Go
 	// handler can read correct values from the register file.
@@ -102,7 +105,7 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 
 	continueLabel := ec.passLabel(fmt.Sprintf("op_continue_%d", instr.ID))
 
-	if (instr.Op == OpQVectorGatherReduce || instr.Op == OpFrameGroupAggregate) && tier2AltStackEnabled() && ec.selfCFCell != nil {
+	if (instr.Op == OpQVectorGatherReduce || instr.Op == OpFrameGroupAggregate || instr.Op == OpQFrameSelectColumn) && tier2AltStackEnabled() && ec.selfCFCell != nil {
 		helperErrLabel := ec.uniqueLabel(fmt.Sprintf("q_op_helper_err_%d", instr.ID))
 		genericExitLabel := ec.uniqueLabel(fmt.Sprintf("q_op_helper_exit_%d", instr.ID))
 		asm.LDR(jit.X0, mRegCtx, execCtxOffJITStackHdr)

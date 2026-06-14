@@ -466,6 +466,44 @@ func BenchmarkQFrameVectorMethodJITRouteTier2FrameGroupAggregate(b *testing.B) {
 	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
 }
 
+func BenchmarkQFrameVectorMethodJITRouteTier2QFrameSelectColumn(b *testing.B) {
+	proto := qFrameSelectColumnRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameSelectColumnRouteArgs(b)
+	if _, err := v.CallValue(fn, args); err != nil {
+		b.Fatalf("warm QFrameSelectColumn closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		b.Fatalf("CompileTier2(QFrameSelectColumn): %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatalf("settle QFrameSelectColumn closure: %v", err)
+		}
+	}
+
+	before := tm.QKernelExecutionStatsFor(proto)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatalf("Tier2 QFrameSelectColumn: %v", err)
+		}
+		if len(results) != 1 {
+			b.Fatalf("Tier2 QFrameSelectColumn results = %v, want one result", results)
+		}
+		assertQFrameSelectColumnRouteResult(b, results[0])
+	}
+	b.StopTimer()
+	reportMethodJITFrameVectorRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, tm.QKernelExecutionStatsFor(proto)))
+}
+
 func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -564,6 +602,44 @@ func TestTier2DirectHelperBridgeFrameGroupAggregateRecordsDirectRoute(t *testing
 	stats := cf.QKernelExecutionStats()
 	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "FrameGroupAggregate", "group/aggregate", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "FrameGroupAggregate", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+}
+
+func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.T) {
+	proto := qFrameSelectColumnRouteProto()
+	cf := &CompiledFunction{
+		Proto:                   proto,
+		QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{qFrameSelectColumnRouteSpec()},
+	}
+	regs := make([]runtime.Value, 3)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQFrameSelectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: -1,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QFrameSelectColumn error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QFrameSelectColumn direct helper calls = %d, want 1", got)
+	}
+	assertQFrameSelectColumnRouteResult(t, regs[base])
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
+		t.Fatalf("QFrameSelectColumn op-exit route count = %d, want 0", got)
+	}
 }
 
 func TestTier2QVectorWhereReduceUsesExpectedRuntimeRoute(t *testing.T) {
@@ -714,6 +790,56 @@ func TestTier2FrameGroupAggregateUsesExpectedRuntimeRoute(t *testing.T) {
 	}
 }
 
+func TestTier2QFrameSelectColumnUsesExpectedRuntimeRoute(t *testing.T) {
+	proto := qFrameSelectColumnRouteProto()
+	cl := vm.NewClosure(proto)
+	fn := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)
+	v := vm.New(map[string]runtime.Value{})
+	defer v.Close()
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	args := qFrameSelectColumnRouteArgs(t)
+	if _, err := v.CallValue(fn, args); err != nil {
+		t.Fatalf("warm QFrameSelectColumn closure: %v", err)
+	}
+	if err := tm.CompileTier2(proto); err != nil {
+		t.Fatalf("CompileTier2(QFrameSelectColumn): %v", err)
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	const calls = 8
+	for i := 0; i < calls; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			t.Fatalf("Tier2 QFrameSelectColumn call %d: %v", i, err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("Tier2 QFrameSelectColumn results = %v, want one result", results)
+		}
+		assertQFrameSelectColumnRouteResult(t, results[0])
+	}
+	if proto.EnteredTier2 == 0 {
+		t.Fatalf("QFrameSelectColumn closure never entered Tier2")
+	}
+
+	stats := tm.QKernelExecutionStatsFor(proto)
+	directCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "success")
+	opExitCount := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success")
+	if tier2AltStackEnabled() {
+		if direct := Tier2DirectHelperCallCount() - beforeDirect; direct == 0 {
+			t.Fatalf("QFrameSelectColumn direct helper calls did not increase under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+		if directCount == 0 {
+			t.Fatalf("QFrameSelectColumn direct helper route missing under LEIA_JIT_ALT_STACK=1; stats=%+v", stats)
+		}
+	} else if directCount != 0 {
+		t.Fatalf("QFrameSelectColumn direct helper route recorded with alt-stack disabled; stats=%+v", stats)
+	}
+	if directCount+opExitCount == 0 {
+		t.Fatalf("QFrameSelectColumn runtime route stats missing; stats=%+v", stats)
+	}
+}
+
 func qKernelExecutionCount(rows []QKernelExecutionStat, source, kernel, route, outcome string) uint64 {
 	var count uint64
 	for _, row := range rows {
@@ -805,6 +931,62 @@ func qFrameGroupAggregateRouteProto() *vm.FuncProto {
 			vm.EncodeABC(vm.OP_FRAME_GROUP_AGGREGATE, 1, 0, 0),
 			vm.EncodeABC(vm.OP_RETURN, 1, 2, 0),
 		},
+	}
+}
+
+func qFrameSelectColumnRouteProto() *vm.FuncProto {
+	return &vm.FuncProto{
+		Name:      "q_frame_select_column_tier2_route",
+		NumParams: 1,
+		MaxStack:  3,
+		Constants: []runtime.Value{
+			runtime.StringValue("price"),
+			runtime.FloatValue(100),
+			qHotPathNamesValue("size"),
+			runtime.StringValue("size"),
+		},
+		Code: []uint32{
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 1, 0, 0),
+			vm.EncodeABx(vm.OP_LOADK, 2, 1),
+			vm.EncodeABC(vm.OP_VECTOR_COMPARE, 1, 2, int(runtime.DenseArrayGE)),
+			vm.EncodeABC(vm.OP_FRAME_FILTER, 0, 0, 1),
+			vm.EncodeABC(vm.OP_FRAME_PROJECT, 0, 0, 2),
+			vm.EncodeABC(vm.OP_FRAME_COLUMN, 0, 0, 3),
+			vm.EncodeABC(vm.OP_RETURN, 0, 2, 0),
+		},
+	}
+}
+
+func qFrameSelectColumnRouteSpec() QFrameSelectColumnSpec {
+	return QFrameSelectColumnSpec{
+		Shape:              "compare/filter/project/column",
+		SourceColumnConst:  0,
+		MaskSpecConst:      -1,
+		ProjectConst:       2,
+		ResultColumnConst:  3,
+		CompareOp:          runtime.DenseArrayGE,
+		CompareRHSConst:    runtime.FloatValue(100),
+		HasCompareRHSConst: true,
+		RowMode:            QFrameSelectColumnRowsNone,
+		RowOrderConst:      -1,
+		DynamicArgRole:     QFrameSelectColumnArgNone,
+		MaskRoot:           -1,
+	}
+}
+
+func qFrameSelectColumnRouteArgs(tb testing.TB) []runtime.Value {
+	tb.Helper()
+	return []runtime.Value{runtime.TableValue(qVectorGatherReduceRouteFrame(tb))}
+}
+
+func assertQFrameSelectColumnRouteResult(tb testing.TB, value runtime.Value) {
+	tb.Helper()
+	if !value.IsDenseArray() {
+		tb.Fatalf("QFrameSelectColumn result = %v, want dense array", value)
+	}
+	got, ok := value.DenseArray().I64()
+	if !ok || len(got) != 2 || got[0] != 10 || got[1] != 20 {
+		tb.Fatalf("QFrameSelectColumn values = %#v, want [10 20]", got)
 	}
 }
 
