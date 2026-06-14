@@ -199,16 +199,8 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		// the session-eval executors, the q pipeline backends are host Go
 		// functions over q runtime state that never call back into the Leia
 		// VM, so the register file cannot be reallocated while they run.
-		cf := (*CompiledFunction)(unsafe.Pointer(ctx.HelperCF))
-		if cf == nil {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: nil CompiledFunction")
-			ctx.HelperErrFlag = 1
-			return
-		}
-		regs, base, ok := helperRegsWindow(ctx)
+		frame, ok := tier2DirectHelperFrameFor(ctx)
 		if !ok {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: invalid register window")
-			ctx.HelperErrFlag = 1
 			return
 		}
 		// Diagnostic exit-stat parity: the generic executeTier2 path records
@@ -217,10 +209,10 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		if tm := ctx.HelperTM; tm != nil {
 			savedExit := ctx.ExitCode
 			ctx.ExitCode = ExitQEvalPipelinePlan
-			tm.recordTier2Exit(cf.Proto, cf, ctx)
+			tm.recordTier2Exit(frame.cf.Proto, frame.cf, ctx)
 			ctx.ExitCode = savedExit
 		}
-		if err := cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteNativeExit); err != nil {
+		if err := frame.cf.executeQEvalPipelinePlanExit(ctx, frame.regs, frame.base, qEvalPipelineExecutionRouteNativeExit); err != nil {
 			ctx.HelperErr = err
 			ctx.HelperErrFlag = 1
 			return

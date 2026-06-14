@@ -4,7 +4,9 @@ package methodjit
 
 import (
 	"testing"
+	"unsafe"
 
+	"github.com/never-labs/leia/internal/jit"
 	"github.com/never-labs/leia/internal/runtime"
 	"github.com/never-labs/leia/internal/vm"
 )
@@ -50,6 +52,89 @@ func TestQEvalPipelinePlanNativeExitExecutesTypedPlanRef(t *testing.T) {
 		t.Fatalf("executeQEvalPipelinePlanExit = %v, want int 16", regs[0])
 	}
 	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_native_exit", "success", 1)
+}
+
+func TestQEvalPipelinePlanOpExitRecordsErrorRoute(t *testing.T) {
+	cf := &CompiledFunction{}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{
+		ExitCode:   ExitOpExit,
+		OpExitSlot: 0,
+		OpExitAux:  7,
+		OpExitID:   17,
+	}
+
+	err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteOpExit)
+	const want = "QEvalPipelinePlan exit plan 7 was not handled"
+	if err == nil || err.Error() != want {
+		t.Fatalf("executeQEvalPipelinePlanExit op-exit error = %v, want %q", err, want)
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_op_exit", "error", 1)
+	if got := qEvalPipelineExecutionCount(cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_native_exit", "error"); got != 0 {
+		t.Fatalf("native-exit error count = %d, want 0", got)
+	}
+}
+
+func TestQEvalPipelinePlanNativeExitRecordsErrorRoute(t *testing.T) {
+	cf := &CompiledFunction{}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{
+		ExitCode:   ExitQEvalPipelinePlan,
+		OpExitSlot: 0,
+		OpExitAux:  7,
+		OpExitID:   17,
+	}
+
+	err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteNativeExit)
+	const want = "QEvalPipelinePlan exit plan 7 was not handled"
+	if err == nil || err.Error() != want {
+		t.Fatalf("executeQEvalPipelinePlanExit native-exit error = %v, want %q", err, want)
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_native_exit", "error", 1)
+	if got := qEvalPipelineExecutionCount(cf.QKernelExecutionStats(), "q-eval/pipeline-plan", "typed_runtime_op_exit", "error"); got != 0 {
+		t.Fatalf("op-exit error count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeQEvalPipelinePlanRecordsNativeExitStats(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
+	proto := &vm.FuncProto{Name: "q_eval_pipeline_plan_direct_helper", MaxStack: 1}
+	cf := &CompiledFunction{
+		Proto:                  proto,
+		QEvalPipelinePlans:     []QEvalPipelinePlanRef{ref},
+		QEvalPipelineBackend:   newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
+		QEvalPipelinePlanStats: newQEvalPipelinePlanExecutionCounters([]QEvalPipelinePlanRef{ref}),
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	tm := NewTieringManager()
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		HelperTM:   tm,
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[0])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQEvalPipelinePlan),
+		OpExitSlot: 0,
+		OpExitAux:  int64(ref.ID),
+		OpExitID:   17,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QEvalPipelinePlan error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QEvalPipelinePlan direct helper calls = %d, want 1", got)
+	}
+	if !regs[0].IsInt() || regs[0].Int() != 16 {
+		t.Fatalf("QEvalPipelinePlan direct helper result = %v, want int 16", regs[0])
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_native_exit", "success", 1)
+	snap := tm.ExitStats()
+	if got := snap.ByExitCode["ExitQEvalPipelinePlan"]; got != 1 {
+		t.Fatalf("ExitQEvalPipelinePlan stats = %d, want 1; snap=%+v", got, snap)
+	}
 }
 
 func TestQEvalPipelinePlanCodegenUsesDedicatedExitKind(t *testing.T) {
@@ -338,4 +423,17 @@ func assertQEvalPipelineExecutionStat(t *testing.T, stats []QKernelExecutionStat
 		}
 	}
 	t.Fatalf("missing QEvalPipelinePlan execution stat shape=%s route=%s outcome=%s; stats=%+v", shape, route, outcome, stats)
+}
+
+func qEvalPipelineExecutionCount(stats []QKernelExecutionStat, shape, route, outcome string) uint64 {
+	for _, stat := range stats {
+		if stat.Source == "methodjit_q_eval_runtime" &&
+			stat.Kernel == "QEvalPipelinePlan" &&
+			stat.Shape == shape &&
+			stat.Route == route &&
+			stat.Outcome == outcome {
+			return stat.Count
+		}
+	}
+	return 0
 }
