@@ -40,12 +40,9 @@ go run ./cmd/leia playground --help
 - [q conformance matrix](design/q-conformance.md)
 - [Performance and benchmarks](reference/performance/index.md)
 - [Concurrency](reference/concurrency/index.md)
-
-## AI Dialect
-
-- [AI dialect reference](reference/ai/index.md)
-- [AI dialect guide](guides/ai-dialect.md)
 - [Evaluate reference](reference/evaluate/index.md)
+- [Optional LLM dialect reference](reference/ai/index.md)
+- [Optional LLM dialect guide](guides/ai-dialect.md)
 
 ## Examples And Release
 

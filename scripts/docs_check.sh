@@ -96,6 +96,54 @@ if ! grep -Fq "spec/index.html" docs/_config.yml; then
     echo "error: docs/spec/index.html is a checked-in local preview; docs/_config.yml must exclude it from GitHub Pages" >&2
     exit 1
 fi
+python3 - <<'PY'
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urldefrag, urlparse
+
+root = Path.cwd()
+html_path = root / "docs" / "spec" / "index.html"
+
+class LinkParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.ids = set()
+        self.hrefs = []
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if "id" in values:
+            self.ids.add(values["id"])
+        if tag == "a" and "href" in values:
+            self.hrefs.append(values["href"])
+
+parser = LinkParser()
+parser.feed(html_path.read_text(encoding="utf-8"))
+
+errors = []
+for href in parser.hrefs:
+    parsed = urlparse(href)
+    if parsed.scheme or parsed.netloc:
+        continue
+    path, fragment = urldefrag(href)
+    if fragment and not path and fragment not in parser.ids:
+        errors.append(f"{html_path.relative_to(root)}: missing local anchor #{fragment}")
+    if not path:
+        continue
+    target = (html_path.parent / path).resolve()
+    try:
+        target.relative_to(root.resolve())
+    except ValueError:
+        errors.append(f"{html_path.relative_to(root)}: link escapes repository: {href}")
+        continue
+    if not target.exists():
+        errors.append(f"{html_path.relative_to(root)}: missing linked file: {href}")
+
+if errors:
+    for error in errors:
+        print(f"error: {error}")
+    raise SystemExit(1)
+PY
 
 if ! go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1; then
     echo "error: docs/spec runnable Leia example gate failed" >&2
@@ -604,7 +652,7 @@ def check_readme_user_facing_gates() -> None:
                 "LuaJIT-class workloads",
                 "Analytics-native:",
                 "q-style vector syntax",
-                "AI support lives in dialects and libraries, not in the core language runtime.",
+                "Optional LLM support lives in dialects and libraries, not in",
                 "## Example",
                 "## Tooling",
                 "## References",

@@ -234,12 +234,14 @@ if [[ -f .github/workflows/release.yml ]]; then
   require_contains .github/workflows/release.yml "release tags must match vMAJOR.MINOR.PATCH"
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" --version'
   require_contains .github/workflows/release.yml '"$(go env GOPATH)/bin/goreleaser" release --clean'
+  require_contains .github/workflows/release.yml '--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'
 fi
 if [[ -f .github/workflows/distribution-check.yml ]]; then
   require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
   require_contains .github/workflows/distribution-check.yml "scripts/production_check.sh"
   require_contains .github/workflows/distribution-check.yml "scripts/public_release_blockers_check.sh"
   require_contains .github/workflows/distribution-check.yml "scripts/release_notes_check.sh"
+  require_contains .github/workflows/distribution-check.yml "bash scripts/release_notes_check.sh"
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" --version'
   require_contains .github/workflows/distribution-check.yml '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
 fi

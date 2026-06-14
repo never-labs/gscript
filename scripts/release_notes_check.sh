@@ -95,6 +95,12 @@ check_version() {
   done
   require_contains "$notes" "$version"
   require_contains "$notes" "bash scripts/release_artifacts_check.sh --build --require-clean --require-tag --version $version"
+  require_contains "$notes" "leia_${version}_"
+  require_contains "$notes" "leia-lsp"
+
+  if ! grep -Eq '[[:xdigit:]]{64}' "$notes"; then
+    add_failure "$notes must include at least one 64-hex SHA256 checksum"
+  fi
 
   for placeholder in \
     "vX.Y.Z" \

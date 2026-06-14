@@ -2,7 +2,7 @@
 
 The registry table is generated from the current `leia` binary dialect registry; explanatory sections below are maintained with the generated reference.
 
-Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and AI workflows. A dialect is an explicit tagged expression that returns an ordinary Leia value.
+Leia supports DSL-native tagged dialects for compact host automation, data format handling, web routing, q-style analytics, spreadsheets, and optional LLM integrations. A dialect is an explicit tagged expression that returns an ordinary Leia value.
 
 ## Forms
 
@@ -13,8 +13,8 @@ argv_checked := cmd!`printf checked`
 out := $`printf hello`
 files := glob`examples/**/*.leia`
 data := json`{"name": ${name}}`
-reviewer := agent {
-    name: "release_reviewer"
+summarizer := agent {
+    name: "summary_agent"
     config: func(summary) {
         return {model: "mock-fast", user: summary}, nil
     }
@@ -109,7 +109,7 @@ reviewer := agent {
 
 - Host automation tags such as `sh`, `cmd`, `glob`, and `env` use host filesystem, process, or environment capabilities.
 - Web and network-facing tags such as `serve` must be denied when the embedding host has not granted the relevant network capability.
-- AI tags such as `model`, `turn`, `tool`, and `agent` use the same `llm.turn` policy as the `llm` standard library.
+- Optional LLM tags such as `model`, `turn`, `tool`, and `agent` use the same `llm.turn` policy as the `llm` standard library.
 - Pure text, protocol, and data tags return ordinary values and should be covered by examples before being promoted in README-facing claims.
 
 ## Important Result Shapes

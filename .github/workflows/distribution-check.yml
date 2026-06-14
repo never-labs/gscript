@@ -43,5 +43,6 @@ jobs:
           cache: true
       - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
       - run: '"$(go env GOPATH)/bin/goreleaser" --version'
+      - run: bash scripts/release_notes_check.sh
       - run: bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
       - run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'

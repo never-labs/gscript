@@ -785,6 +785,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"scripts/release_notes_check.sh",
 				"go install github.com/goreleaser/goreleaser/v2@v2.16.0",
 				`"$(go env GOPATH)/bin/goreleaser" --version`,
+				"bash scripts/release_notes_check.sh",
 				"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
 			},
@@ -801,6 +802,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 				"LEIA_RELEASE_ARTIFACT_VERSION=\"${GITHUB_REF_NAME}\"",
 				`"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish`,
 				`"$(go env GOPATH)/bin/goreleaser" release --clean`,
+				`--release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"`,
 				"secrets.GITHUB_TOKEN",
 			},
 		},
@@ -1831,8 +1833,8 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"Analytics-native:",
 		"q-style vector syntax",
 		"Dialect-native:",
-		"AI tags such",
-		"AI support lives in dialects and libraries, not in the core language runtime.",
+		"shell/data tags",
+		"Optional LLM support lives in dialects and libraries, not in",
 		"## Example",
 		"## Tooling",
 		"## References",
@@ -2078,7 +2080,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		"high-throughput in-memory columnar computation",
 		"q.sql(",
 		"prompt`",
-		"AI support lives in dialects and libraries, not in the core language runtime.",
+		"Optional LLM support lives in dialects and libraries, not in",
 		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 	} {
 		if !strings.Contains(readme, promise) {
@@ -2312,7 +2314,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 	}{
 		{
 			capability:   "AI dialect",
-			promise:      "AI support lives in dialects and libraries, not in the core language runtime.",
+			promise:      "Optional LLM support lives in dialects and libraries, not in",
 			featureID:    "ai_dialect_integration",
 			specSections: []string{"AI Dialect Syntax"},
 			refs: []string{
@@ -2335,7 +2337,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "DSL-native dialects",
-			promise:      "Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, AI tags",
+			promise:      "Dialect-native: `q`, `sql`, `json`, `yaml`, shell/data tags",
 			featureID:    "tagged_dialect_syntax",
 			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
 			refs: []string{

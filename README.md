@@ -8,9 +8,8 @@ Leia is a Go-native scripting language built for DSLs, dialects, and embedded au
   release gates tracking LuaJIT-class workloads and VM equivalence.
 - Analytics-native: q-style vector syntax, qSQL, typed runtime kernels, and
   high-throughput in-memory columnar computation.
-- Dialect-native: `q`, `sql`, `json`, `yaml`, `prompt`, `quote`, AI tags such
-  as `model` and `turn`, and host-defined dialects extend the language without
-  expanding the core.
+- Dialect-native: `q`, `sql`, `json`, `yaml`, shell/data tags, and
+  host-defined dialects extend the language without expanding the core.
 
 The goal is a small language core with specialized runtime backends. Supported
 columnar and numeric hot paths are benchmarked against handwritten Go baselines
@@ -28,7 +27,8 @@ print(note.text)
 ````
 
 Tagged forms such as `q`, `json`, `sql`, `prompt`, and `quote` are ordinary
-extension points. AI support lives in dialects and libraries, not in the core language runtime.
+extension points. Optional LLM support lives in dialects and libraries, not in
+the core language runtime.
 
 ## Embedding
 
@@ -68,7 +68,7 @@ go run ./cmd/leia doc check
 - [Data-oriented programming](docs/reference/data-oriented/index.md)
 - [q analytics](docs/design/q-conformance.md)
 - [Performance](docs/reference/performance/index.md)
-- [AI dialect](docs/reference/ai/index.md)
+- [Optional LLM dialect](docs/reference/ai/index.md)
 - [Security](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)

@@ -53,4 +53,4 @@ jobs:
       - if: github.event_name == 'workflow_dispatch'
         run: '"$(go env GOPATH)/bin/goreleaser" release --snapshot --clean --skip=publish'
       - if: github.event_name == 'push'
-        run: '"$(go env GOPATH)/bin/goreleaser" release --clean'
+        run: '"$(go env GOPATH)/bin/goreleaser" release --clean --release-notes "docs/release/notes/${GITHUB_REF_NAME}.md"'

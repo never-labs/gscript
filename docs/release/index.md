@@ -65,8 +65,9 @@ Release archives must include both executables:
 - `leia-lsp`, the shared language server used by editor integrations.
 
 Use [`notes-template.md`](notes-template.md) for release candidates and public
-tags so compatibility, security, performance, validation, and artifact evidence
-are recorded consistently.
+tags. Candidate notes live under [`notes/`](notes/) as `vX.Y.Z.md` so
+compatibility, security, performance, validation, and artifact evidence are
+recorded consistently and can be passed to GoReleaser.
 
 ## Release Compatibility Checklist
 

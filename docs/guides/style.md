@@ -35,12 +35,12 @@ Tool and agent names should read like capabilities or actions:
 lookup_order := tool {
     name: "lookup_order"
     params: ["id"]
-    fn: fn(id) { ... }
+    fn: func(id) { ... }
 }
 
 support_triage := agent {
     name: "support_triage"
-    config: fn(message) {
+    config: func(message) {
         return { user: message }
     }
 }
@@ -108,7 +108,7 @@ lookup_order := tool {
     params: ["id"]
     requires: ["orders.read"]
     description: "Look up an order by id."
-    fn: fn(id) {
+    fn: func(id) {
         return orders[id], nil
     }
 }
@@ -119,7 +119,7 @@ lookup_order := tool {
 Use the simplest AI construct that fits the job:
 
 - `turn { user: ... }` for one request.
-- `agent { name: ..., config: fn(...) { ... } }` for reusable prompt capsules.
+- `agent { name: ..., config: func(...) { ... } }` for reusable prompt capsules.
 - `llm.agent(name, config_fn, flow_fn, opts)` only when you need custom multi-step control.
 - `evaluate` blocks for regression checks.
 

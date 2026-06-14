@@ -427,7 +427,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"high-throughput in-memory columnar computation",
 		"q.sql(",
 		"prompt`",
-		"AI support lives in dialects and libraries, not in the core language runtime.",
+		"Optional LLM support lives in dialects and libraries, not in",
 		"leia.New(leia.WithLibs(leia.LibSafe))",
 		"## Example",
 		"## Tooling",
@@ -1185,8 +1185,8 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"AI support lives in dialects and libraries, not in the core language runtime.",
-		"[AI dialect](docs/reference/ai/index.md)",
+		"Optional LLM support lives in dialects and libraries, not in",
+		"[Optional LLM dialect](docs/reference/ai/index.md)",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README AI dialect contract missing %q", snippet)

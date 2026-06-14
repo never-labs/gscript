@@ -23,18 +23,21 @@ Use this template for release candidates and public tags.
 
 ## Highlights
 
-- AI dialect:
 - Go embedding:
-- Hot reload:
-- Concurrency:
 - Data-oriented programming:
+- q analytics:
+- DSL/dialect changes:
+- Performance:
+- Concurrency:
+- Hot reload:
 - Package/module tooling:
+- LLM/AI integrations, if changed:
 
 ## Security
 
 - Sandbox/capability changes:
 - Host API changes:
-- AI provider/secret-handling changes:
+- LLM provider/secret-handling changes, if any:
 - Known risks:
 
 ## Performance
@@ -68,7 +71,9 @@ List known issues, or write `None known` after release validation.
 
 | Artifact | SHA256 |
 |---|---|
-| | |
+| `leia_vX.Y.Z_darwin_arm64.tar.gz` | |
+| `leia-lsp` included in each archive | |
+| `SHA256SUMS` | |
 
 ## Release Decisions
 
