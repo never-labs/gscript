@@ -1819,10 +1819,10 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
 	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
 	for _, snippet := range []string{
-		"trades := q```flip `sym`price`size`notional!",
-		"total := q`+/10000 12180 8060 15337.5`",
-		"leaders := q.sql(",
-		"note := prompt`Top symbol ${leaders[1].sym}",
+		"trades := q```flip `sym`px`qty!",
+		"leader := q.sql(",
+		"card := json`{\"symbol\": \"${leader[1].sym}\"",
+		"note := prompt`Review ${card.symbol}",
 		"print(note.text)",
 	} {
 		if !strings.Contains(surfaceSnippet, snippet) {
@@ -1868,7 +1868,7 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"README Leia example failed",
 		"README Leia example stdout",
 		`exec.Command("go", "run", "./cmd/leia", "run", file)`,
-		"Top symbol",
+		"Review AAPL",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
 			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate snippet %q", snippet)

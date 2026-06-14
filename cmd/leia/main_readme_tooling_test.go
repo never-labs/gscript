@@ -91,7 +91,7 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("README must contain a Leia example")
 	}
-	for _, want := range []string{"q```", "q`", "q.sql(", "prompt`", "print(note.text)"} {
+	for _, want := range []string{"q```", "q.sql(", "json`", "prompt`", "print(note.text)"} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}
@@ -108,8 +108,8 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("README Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Top symbol") || !strings.Contains(stdout.String(), "total") {
-		t.Fatalf("README Leia example stdout = %q, want q analytics summary", stdout.String())
+	if !strings.Contains(stdout.String(), "Review AAPL") || !strings.Contains(stdout.String(), "avg 100.375") {
+		t.Fatalf("README Leia example stdout = %q, want q/json/prompt analytics summary", stdout.String())
 	}
 }
 

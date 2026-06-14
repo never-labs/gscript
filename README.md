@@ -18,11 +18,11 @@ and external runtimes. Performance claims are benchmark-bound. JIT paths must pr
 ## Example
 
 ````leia
-trades := q```flip `sym`price`size`notional!(`AAPL`MSFT`AAPL`NVDA;100 101.5 100.75 102.25;100 120 80 150;10000 12180 8060 15337.5)```
-total := q`+/10000 12180 8060 15337.5`
-leaders := q.sql(trades, "select notional:sum notional, fills:count i by sym from trades order by notional desc")
+trades := q```flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)```
+leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades order by qty desc")
 
-note := prompt`Top symbol ${leaders[1].sym}; notional ${leaders[1].notional}; total ${total}.`
+card := json`{"symbol": "${leader[1].sym}", "qty": ${leader[1].qty}, "avg_px": ${leader[1].avg_px}}`
+note := prompt`Review ${card.symbol}: ${card.qty} shares at avg ${card.avg_px}.`
 print(note.text)
 ````
 
