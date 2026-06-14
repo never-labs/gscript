@@ -24,16 +24,15 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 		"Analytics-native:",
 		"q-style vector syntax",
 		"Dialect-native:",
-		"shell/data tags",
-		"Optional LLM support lives in dialects and libraries, not in",
-		"## Example",
+		"native DSL extension lets domain syntax live beside Leia code",
 		"## References",
 		"[Documentation](docs/index.md)",
-		"[CLI and playground](docs/reference/cli/index.md)",
+		"[Playground](docs/playground.md)",
+		"[CLI reference](docs/reference/cli/index.md)",
 		"[Optional LLM dialect](docs/reference/ai/index.md)",
-		"q```",
-		"q.sql(",
-		"prompt`",
+		"q`sum ${a}`",
+		"turn {",
+		"prompt {",
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("README missing focused positioning snippet %q", want)
@@ -90,7 +89,7 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("README must contain a Leia example")
 	}
-	for _, want := range []string{"q```", "q.sql(", "json`", "prompt`", "print(note.text)"} {
+	for _, want := range []string{"a := [1,2,3,4,5,6,7,8,6]", "x := q`sum ${a}`", "turn {", "prompt {", "print(x)"} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}
@@ -107,8 +106,8 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("README Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Review AAPL") || !strings.Contains(stdout.String(), "avg 100.375") {
-		t.Fatalf("README Leia example stdout = %q, want q/json/prompt analytics summary", stdout.String())
+	if strings.TrimSpace(stdout.String()) != "42" {
+		t.Fatalf("README Leia example stdout = %q, want 42 fallback without host LLM provider", stdout.String())
 	}
 }
 
@@ -156,12 +155,7 @@ func TestReadmeEmbeddingSnippetStaysRunnable(t *testing.T) {
 }
 
 func readmeEmbeddingGoSnippet(readme string) string {
-	const marker = "## Example"
-	start := strings.Index(readme, marker)
-	if start < 0 {
-		return ""
-	}
-	rest := readme[start+len(marker):]
+	rest := readme
 	blockStart := strings.Index(rest, "```go")
 	if blockStart < 0 {
 		return ""

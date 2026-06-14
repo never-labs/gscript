@@ -17,8 +17,8 @@ print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 ## What It Is
 
 - A Go-embedded scripting runtime with Go-shaped syntax and a small host API.
-- A dialect system where domain syntax lives in reusable tagged dialects
-  instead of the core grammar.
+- Native DSL extension through tagged dialects, so domain syntax can live
+  beside Leia code without expanding the core grammar.
 - A q-style in-memory analytics layer with vectors, qSQL, typed kernels, and
   columnar runtime/JIT work.
 - A practical automation language for services, tools, data pipelines, and

@@ -426,10 +426,9 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"q-style vector syntax",
 		"high-throughput in-memory columnar computation",
 		"q.sql(",
-		"prompt`",
-		"Optional LLM support lives in dialects and libraries, not in",
+		"turn {",
+		"prompt {",
 		"leia.New(leia.WithLibs(leia.LibSafe))",
-		"## Example",
 		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {

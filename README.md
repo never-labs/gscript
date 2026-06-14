@@ -8,23 +8,26 @@ Leia is a Go-native embedded scripting language with JIT execution, q-style in-m
   reproducible checks tracking LuaJIT-class workloads and typed runtime paths.
 - Analytics-native: q-style vector syntax, qSQL, typed runtime kernels, and
   high-throughput in-memory columnar computation.
-- Dialect-native: domain syntax lives in reusable tagged dialects, so embedders
-  can add specialized languages without expanding the core.
-
-## Example
+- Dialect-native: native DSL extension lets domain syntax live beside Leia code,
+  maximizing expression power without expanding the core.
 
 ````leia
-trades := q```flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)```
-leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades order by qty desc")
+a := [1,2,3,4,5,6,7,8,6]
+x := q`sum ${a}`
 
-card := json`{"symbol": "${leader[1].sym}", "qty": ${leader[1].qty}, "avg_px": ${leader[1].avg_px}}`
-note := prompt`Review ${card.symbol}: ${card.qty} shares at avg ${card.avg_px}.`
-print(note.text)
+answer, err := turn {
+    model: "mock-fast"
+    messages: {
+        prompt { role: "user", text: "Explain why ${x} matters." }
+    }
+}
+
+if err == nil {
+    print(answer.text)
+} else {
+    print(x)
+}
 ````
-
-Tagged forms such as `q`, `json`, `sql`, `prompt`, and `quote` are ordinary
-extension points. Optional LLM support lives in dialects and libraries, not in
-the core language runtime.
 
 The same language embeds directly in Go:
 

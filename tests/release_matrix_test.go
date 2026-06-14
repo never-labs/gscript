@@ -470,7 +470,6 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	for _, snippet := range []string{
 		"[Language specification](docs/spec/index.md)",
 		"Leia is a Go-native embedded scripting language with JIT execution, q-style in-memory analytics, and first-class extensible dialects.",
-		"## Example",
 		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {
@@ -482,7 +481,6 @@ func TestReleaseMatrixReadmeLanguageContractFailsThroughReleaseGates(t *testing.
 	for _, snippet := range []string{
 		"TestReadmeAndSpecStableContractStayAligned",
 		"[Language specification](docs/spec/index.md)",
-		"## Example",
 		"`tests/feature_matrix.json`",
 		"at least one semantic or conformance gate",
 	} {
@@ -1818,11 +1816,11 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
 	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
 	for _, snippet := range []string{
-		"trades := q```flip `sym`px`qty!",
-		"leader := q.sql(",
-		"card := json`{\"symbol\": \"${leader[1].sym}\"",
-		"note := prompt`Review ${card.symbol}",
-		"print(note.text)",
+		"a := [1,2,3,4,5,6,7,8,6]",
+		"x := q`sum ${a}`",
+		"answer, err := turn {",
+		"prompt { role:",
+		"print(x)",
 	} {
 		if !strings.Contains(surfaceSnippet, snippet) {
 			t.Fatalf("README.md Example snippet changed or lost product surface %q:\n%s", snippet, surfaceSnippet)
@@ -1851,9 +1849,7 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"Analytics-native:",
 		"q-style vector syntax",
 		"Dialect-native:",
-		"shell/data tags",
-		"Optional LLM support lives in dialects and libraries, not in",
-		"## Example",
+		"native DSL extension lets domain syntax live beside Leia code",
 		"## References",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
@@ -1866,7 +1862,7 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"README Leia example failed",
 		"README Leia example stdout",
 		`exec.Command("go", "run", "./cmd/leia", "run", file)`,
-		"Review AAPL",
+		"want 42 fallback without host LLM provider",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
 			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate snippet %q", snippet)
@@ -2096,8 +2092,7 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		"q-style vector syntax",
 		"high-throughput in-memory columnar computation",
 		"q.sql(",
-		"prompt`",
-		"Optional LLM support lives in dialects and libraries, not in",
+		"prompt {",
 	} {
 		if !strings.Contains(readme, promise) {
 			t.Fatalf("README.md concise surface must keep documented capability entry %q", promise)
@@ -2330,7 +2325,6 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 	}{
 		{
 			capability:   "AI dialect",
-			promise:      "Optional LLM support lives in dialects and libraries, not in",
 			featureID:    "ai_dialect_integration",
 			specSections: []string{"AI Dialect Syntax"},
 			refs: []string{
@@ -2353,7 +2347,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 		},
 		{
 			capability:   "DSL-native dialects",
-			promise:      "Dialect-native: domain syntax lives in reusable tagged dialects",
+			promise:      "Dialect-native: native DSL extension lets domain syntax live beside Leia code",
 			featureID:    "tagged_dialect_syntax",
 			specSections: []string{"Grammar Appendix", "Expressions", "Statements"},
 			refs: []string{
@@ -2553,15 +2547,10 @@ func releaseToolingAuditCommands() []string {
 func readReleaseReadmeSurfaceLeiaSnippet(t *testing.T, root string) string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Example"
-	start := strings.Index(readme, marker)
-	if start == -1 {
-		t.Fatal("README.md must contain an Example section")
-	}
-	rest := readme[start+len(marker):]
+	rest := readme
 	blockStart := strings.Index(rest, "````leia")
 	if blockStart == -1 {
-		t.Fatal("README.md Example section must contain a Leia code block")
+		t.Fatal("README.md must contain a Leia code block")
 	}
 	rest = rest[blockStart+len("````leia"):]
 	blockEnd := strings.Index(rest, "````")
@@ -2574,12 +2563,7 @@ func readReleaseReadmeSurfaceLeiaSnippet(t *testing.T, root string) string {
 func readReleaseReadmeEmbeddingGoSnippet(t *testing.T, root string) string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Example"
-	start := strings.Index(readme, marker)
-	if start == -1 {
-		t.Fatal("README.md must contain an Example section")
-	}
-	rest := readme[start+len(marker):]
+	rest := readme
 	blockStart := strings.Index(rest, "```go")
 	if blockStart == -1 {
 		t.Fatal("README.md Embedding section must contain a Go code block")
