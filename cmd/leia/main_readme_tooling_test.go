@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/leia/internal/support/dialect"
 )
 
 func TestReadmeIntroStaysFocused(t *testing.T) {
@@ -17,24 +19,26 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 	}
 	readme := string(data)
 	for _, want := range []string{
-		"Leia is an embeddable scripting language for Go systems.",
-		"Go-style syntax",
-		"typed hot-path optimization",
-		"native q-style columnar analytics",
-		"high-performance in-memory data",
-		"tagged dialects",
-		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
-		"## Surface",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"Go-native:",
+		"Performance-oriented:",
+		"LuaJIT-class workloads",
+		"Analytics-native:",
+		"q-style vector syntax",
+		"Dialect-native:",
+		"AI support lives in dialects and libraries, not in the core language runtime.",
+		"## Example",
 		"## Tooling",
 		"## References",
-		"model: \"claude\"",
-		"q```",
+		"q.eval(",
+		"q.sql(",
+		"prompt`",
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("README missing focused positioning snippet %q", want)
 		}
 	}
-	for _, forbidden := range []string{"## Quick Start", "## Install", "## Project Status", "AI-native syntax", "Go-native runtime"} {
+	for _, forbidden := range []string{"## Quick Start", "## Install", "## Project Status", "AI-native syntax", "AI-native runtime"} {
 		if strings.Contains(readme, forbidden) {
 			t.Fatalf("README must not contain template section %q", forbidden)
 		}
@@ -60,7 +64,7 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	if snippet == "" {
 		t.Fatal("README must contain a Leia example")
 	}
-	for _, want := range []string{"q```", "model {", "agent {", "prompt {", "model: \"claude\""} {
+	for _, want := range []string{"q`", "q.eval(", "q.sql(", "prompt`", "print(note.text)"} {
 		if !strings.Contains(snippet, want) {
 			t.Fatalf("README Leia example missing %q:\n%s", want, snippet)
 		}
@@ -75,10 +79,10 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("README Leia example failed before provider boundary: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		t.Fatalf("README Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "llm provider not configured") {
-		t.Fatalf("README Leia example stdout = %q, want provider boundary message", stdout.String())
+	if !strings.Contains(stdout.String(), "Top symbol") || !strings.Contains(stdout.String(), "total") {
+		t.Fatalf("README Leia example stdout = %q, want q analytics summary", stdout.String())
 	}
 }
 
@@ -120,8 +124,8 @@ func TestReadmeEmbeddingSnippetStaysRunnable(t *testing.T) {
 		t.Fatalf("README embedding snippet failed: %v\nstdout:\n%s\nstderr:\n%s",
 			err, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "hello from embedded leia") {
-		t.Fatalf("README embedding snippet stdout = %q, want embedded hello", stdout.String())
+	if strings.TrimSpace(stdout.String()) != "6" {
+		t.Fatalf("README embedding snippet stdout = %q, want q reduce result", stdout.String())
 	}
 }
 
@@ -184,7 +188,14 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 	}
 
 	for _, command := range commands {
-		args := strings.Fields(strings.TrimPrefix(command, "go run ./cmd/leia "))
+		argv, err := dialect.Shellwords(command)
+		if err != nil {
+			t.Fatalf("README command is not valid shellwords %q: %v", command, err)
+		}
+		if len(argv) < 4 || argv[0] != "go" || argv[1] != "run" || argv[2] != "./cmd/leia" {
+			t.Fatalf("README command must use `go run ./cmd/leia ...`: %q", command)
+		}
+		args := argv[3:]
 		if len(args) == 0 {
 			t.Fatalf("empty README command args for %q", command)
 		}
@@ -193,6 +204,11 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			t.Fatalf("README command %q is not registered", args[0])
 		}
 		switch args[0] {
+		case "eval":
+			var stdout, stderr bytes.Buffer
+			if code := runEvalCommand(args[1:], &stdout, &stderr); code != 0 {
+				t.Fatalf("README eval command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
 		case "fmt", "lint", "test":
 			var stdout, stderr bytes.Buffer
 			if code := spec.Run(args[1:], &stdout, &stderr); code != 0 {
@@ -213,7 +229,7 @@ func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
 			if code := runExamplesCommand(args[1:], &stdout, &stderr); code != 0 {
 				t.Fatalf("README examples command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 			}
-			for _, selector := range []string{"repo-hello-fib", "repo-hello-types_demo", "repo-hello-dialects"} {
+			for _, selector := range []string{"repo-hello-dialects"} {
 				if !strings.Contains(stdout.String(), selector) {
 					t.Fatalf("README examples stdout = %q, want %q", stdout.String(), selector)
 				}

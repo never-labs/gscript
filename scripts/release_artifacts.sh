@@ -150,6 +150,7 @@ lsp_binary_path="$out_dir/$lsp_binary_name"
 metadata_path="$out_dir/$metadata_name"
 checksums_path="$out_dir/SHA256SUMS"
 build_time_utc="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+ldflags="-s -w -X main.cliVersion=$version"
 
 write_metadata() {
   echo "artifact=$binary_name"
@@ -184,9 +185,9 @@ if [[ "$dry_run" == "true" ]]; then
 fi
 
 echo "building $binary_name"
-go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/leia
+go build -trimpath -ldflags="$ldflags" -o "$binary_path" ./cmd/leia
 echo "building $lsp_binary_name"
-go build -trimpath -ldflags="-s -w" -o "$lsp_binary_path" ./cmd/leia-lsp
+go build -trimpath -ldflags="$ldflags" -o "$lsp_binary_path" ./cmd/leia-lsp
 
 write_metadata >"$metadata_path"
 

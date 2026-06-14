@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/never-labs/leia/internal/support/dialect"
 )
 
 type releaseFeatureMatrix struct {
@@ -645,7 +647,8 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			path: "scripts/release_artifacts.sh",
 			snippets: []string{
 				"leia-lsp_${version}_${goos}_${goarch}",
-				"go build -trimpath -ldflags=\"-s -w\" -o \"$lsp_binary_path\" ./cmd/leia-lsp",
+				"ldflags=\"-s -w -X main.cliVersion=$version\"",
+				"go build -trimpath -ldflags=\"$ldflags\" -o \"$lsp_binary_path\" ./cmd/leia-lsp",
 				"lsp_artifact=$lsp_binary_name",
 			},
 		},
@@ -653,6 +656,7 @@ func TestReleaseMatrixReleaseArtifactsInstallSharedLSP(t *testing.T) {
 			path: "scripts/release_artifacts_check.sh",
 			snippets: []string{
 				"expected 3 checksum entries",
+				"built CLI still reports dev version",
 				"\"$lsp_binary_path\" --help >/dev/null",
 				"lsp_artifact=$lsp_binary_name",
 			},
@@ -787,22 +791,22 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 		evidenceSnippet string
 	}{
 		{
-			category:        "format",
-			readmeCommand:   "go run ./cmd/leia fmt --check tests/smoke/01_basic.leia",
-			evidencePath:    "cmd/leia/main_fmt_test.go",
-			evidenceSnippet: "TestFmtCheckReportsUnformattedFile",
+			category:        "eval",
+			readmeCommand:   "go run ./cmd/leia eval 'print(1 + 2 + 3)'",
+			evidencePath:    "cmd/leia/eval.go",
+			evidenceSnippet: "func runEvalCommand",
 		},
 		{
-			category:        "lint",
-			readmeCommand:   "go run ./cmd/leia lint tests/smoke/01_basic.leia",
-			evidencePath:    "cmd/leia/main_lint_test.go",
-			evidenceSnippet: "TestLintReportsSyntaxErrors",
+			category:        "examples",
+			readmeCommand:   "go run ./cmd/leia examples check examples/hello/dialects.leia",
+			evidencePath:    "cmd/leia/main_examples_command_test.go",
+			evidenceSnippet: "TestExamplesCommandChecksSelectedExamples",
 		},
 		{
-			category:        "test",
-			readmeCommand:   "go run ./cmd/leia test tests/smoke/01_basic.leia",
-			evidencePath:    "cmd/leia/main_test_run_test.go",
-			evidenceSnippet: "TestRunTestCommandJSONReportsResults",
+			category:        "docs",
+			readmeCommand:   "go run ./cmd/leia doc check",
+			evidencePath:    "cmd/leia/doc.go",
+			evidenceSnippet: "func runDocCommand",
 		},
 		{
 			category:        "benchmarks",
@@ -1608,15 +1612,15 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	root := findRepoRoot(t)
 	surfaceSnippet := readReleaseReadmeSurfaceLeiaSnippet(t, root)
 	for _, snippet := range []string{
-		"go_raw := `hello ${name}`",
-		"vector := q`1 2 3`",
-		"trades := q```",
-		"rollup := q.sql(",
-		`model: "claude"`,
-		"result, err := summarize(rollup)",
+		"prices := q`100 101.5 100.75 102.25`",
+		"notional := q`100 101.5 100.75 102.25 * 100 120 80 150`",
+		"trades := q.eval(",
+		"leaders := q.sql(",
+		"note := prompt`Top symbol ${leaders[1].sym}",
+		"print(note.text)",
 	} {
 		if !strings.Contains(surfaceSnippet, snippet) {
-			t.Fatalf("README.md Surface snippet changed or lost product surface %q:\n%s", snippet, surfaceSnippet)
+			t.Fatalf("README.md Example snippet changed or lost product surface %q:\n%s", snippet, surfaceSnippet)
 		}
 	}
 
@@ -1625,7 +1629,8 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		`import leia "github.com/never-labs/leia"`,
 		"leia.New(leia.WithLibs(leia.LibSafe))",
 		`vm.Exec(`,
-		`print("hello from embedded leia")`,
+		"print(q",
+		"`+/1 2 3`",
 	} {
 		if !strings.Contains(embeddingSnippet, snippet) {
 			t.Fatalf("README.md Embedding snippet changed or lost executable public SDK surface %q:\n%s", snippet, embeddingSnippet)
@@ -1635,14 +1640,14 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	focusedGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
 	for _, snippet := range []string{
 		"TestReadmeIntroStaysFocused",
-		"Leia is an embeddable scripting language for Go systems.",
-		"Go-style syntax",
-		"typed hot-path optimization",
-		"native q-style columnar analytics",
-		"high-performance in-memory data",
-		"tagged dialects",
-		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
-		"## Surface",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"Performance-oriented:",
+		"LuaJIT-class workloads",
+		"Analytics-native:",
+		"q-style vector syntax",
+		"Dialect-native:",
+		"AI support lives in dialects and libraries, not in the core language runtime.",
+		"## Example",
 		"## Tooling",
 		"## References",
 	} {
@@ -1653,10 +1658,10 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	for _, snippet := range []string{
 		"TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
 		"readmeFirstLeiaSnippet",
-		"README Leia example failed before provider boundary",
+		"README Leia example failed",
 		"README Leia example stdout",
 		`exec.Command("go", "run", "./cmd/leia", "run", file)`,
-		"llm provider not configured",
+		"Top symbol",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
 			t.Fatalf("cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate snippet %q", snippet)
@@ -1690,7 +1695,10 @@ func TestReleaseMatrixReadmeToolingCommandsStayRunnable(t *testing.T) {
 	})
 
 	for _, command := range commands {
-		fields := strings.Fields(command)
+		fields, err := dialect.Shellwords(command)
+		if err != nil {
+			t.Fatalf("README Tooling command is not valid shellwords %q: %v", command, err)
+		}
 		if len(fields) < 4 || fields[0] != "go" || fields[1] != "run" || fields[2] != "./cmd/leia" {
 			t.Fatalf("README Tooling command must use `go run ./cmd/leia ...`: %q", command)
 		}
@@ -1877,15 +1885,14 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 	features := loadFeatureMatrixFeatureMap(t, root)
 
 	for _, promise := range []string{
-		"Leia is an embeddable scripting language for Go systems.",
-		"Go-style syntax",
-		"typed hot-path optimization",
-		"q-style columnar analytics",
-		"high-performance in-memory data",
-		"rollup := q.sql(",
-		"cmd := $`git status --short`",
-		"answer, err := turn {",
-		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"Go-native:",
+		"LuaJIT-class workloads",
+		"q-style vector syntax",
+		"high-throughput in-memory columnar computation",
+		"q.sql(",
+		"prompt`",
+		"AI support lives in dialects and libraries, not in the core language runtime.",
 		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 	} {
 		if !strings.Contains(readme, promise) {
@@ -2362,20 +2369,20 @@ func readReleaseReadmeToolingCommands(t *testing.T, root string) []string {
 func readReleaseReadmeSurfaceLeiaSnippet(t *testing.T, root string) string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Surface"
+	const marker = "## Example"
 	start := strings.Index(readme, marker)
 	if start == -1 {
-		t.Fatal("README.md must contain a Surface section")
+		t.Fatal("README.md must contain an Example section")
 	}
 	rest := readme[start+len(marker):]
 	blockStart := strings.Index(rest, "````leia")
 	if blockStart == -1 {
-		t.Fatal("README.md Surface section must contain a Leia code block")
+		t.Fatal("README.md Example section must contain a Leia code block")
 	}
 	rest = rest[blockStart+len("````leia"):]
 	blockEnd := strings.Index(rest, "````")
 	if blockEnd == -1 {
-		t.Fatal("README.md Surface Leia code block is unterminated")
+		t.Fatal("README.md Example Leia code block is unterminated")
 	}
 	return strings.TrimSpace(rest[:blockEnd])
 }

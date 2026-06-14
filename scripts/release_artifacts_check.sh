@@ -251,6 +251,17 @@ require_contains "$metadata_path" "goos=$goos"
 require_contains "$metadata_path" "goarch=$goarch"
 
 verify_checksums "$out_dir"
+version_json="$("$binary_path" version --json)"
+if ! grep -Fq "\"version\": \"$version\"" <<<"$version_json"; then
+  echo "error: built CLI version metadata did not include version $version" >&2
+  echo "$version_json" >&2
+  exit 1
+fi
+if grep -Fq '"version": "dev"' <<<"$version_json"; then
+  echo "error: built CLI still reports dev version" >&2
+  echo "$version_json" >&2
+  exit 1
+fi
 "$binary_path" "$smoke_script" >/dev/null
 "$lsp_binary_path" --help >/dev/null
 

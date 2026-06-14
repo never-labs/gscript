@@ -31,8 +31,7 @@ print(note.text)
 ````
 
 Tagged forms such as `q`, `json`, `sql`, `prompt`, and `quote` are ordinary
-extension points. AI support lives in dialects and libraries, not in the core
-language runtime.
+extension points. AI support lives in dialects and libraries, not in the core language runtime.
 
 ## Embedding
 
@@ -54,7 +53,7 @@ Use `leia.SecuritySandbox()` and explicit budgets for untrusted scripts.
 ## Tooling
 
 ```bash
-go run ./cmd/leia eval 'print(q`+/1 2 3`)'
+go run ./cmd/leia eval 'print(1 + 2 + 3)'
 go run ./cmd/leia examples check examples/hello/dialects.leia
 go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3
 go run ./cmd/leia doc check

@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 )
 
-const cliVersion = "dev"
+var cliVersion = "dev"
 
 type cliVersionReport struct {
 	SchemaVersion int    `json:"schema_version"`

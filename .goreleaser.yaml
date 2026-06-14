@@ -23,6 +23,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -X main.cliVersion={{ .Tag }}
   - id: leia-lsp
     main: ./cmd/leia-lsp
     binary: leia-lsp
@@ -39,6 +40,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -X main.cliVersion={{ .Tag }}
 
 archives:
   - id: leia

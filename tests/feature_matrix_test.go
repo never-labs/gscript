@@ -419,18 +419,17 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Leia is an embeddable scripting language for Go systems.",
-		"Go-style syntax",
+		"Leia is a Go-native scripting language built for DSLs, dialects, and embedded automation.",
+		"Go-native:",
 		"ARM64 JIT",
-		"typed hot-path optimization",
-		"q-style columnar analytics",
-		"high-performance in-memory data",
-		"rollup := q.sql(",
-		"cmd := $`git status --short`",
-		"answer, err := turn {",
-		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+		"LuaJIT-class workloads",
+		"q-style vector syntax",
+		"high-throughput in-memory columnar computation",
+		"q.sql(",
+		"prompt`",
+		"AI support lives in dialects and libraries, not in the core language runtime.",
 		"leia.New(leia.WithLibs(leia.LibSafe))",
-		"## Surface",
+		"## Example",
 		"## Tooling",
 		"## References",
 	} {
@@ -1182,9 +1181,7 @@ func TestReadmeAINativeContractHasExplicitGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"answer, err := turn {",
-		"model: \"claude\"",
-		"AI is a dialect/stdlib layer, not an AI-native runtime or the language core.",
+		"AI support lives in dialects and libraries, not in the core language runtime.",
 		"[AI dialect](docs/reference/ai/index.md)",
 	} {
 		if !strings.Contains(readme, snippet) {
