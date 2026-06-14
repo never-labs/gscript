@@ -351,11 +351,11 @@ def render(spec_dir: Path) -> str:
         path = spec_dir / filename
         text = path.read_text(encoding="utf-8")
         ident = slug(title)
-        nav.append(f'<li><a href="#{ident}">{escape(title)}</a></li>')
+        nav.append(f'  <li><a href="#{ident}">{escape(title)}</a></li>')
         sections.append(f"<section>{markdown_to_html(text, ident)}</section>")
 
     grammar = (spec_dir / "grammar.ebnf").read_text(encoding="utf-8")
-    nav.append('<li><a href="#grammar-appendix">Grammar appendix</a></li>')
+    nav.append('  <li><a href="#grammar-appendix">Grammar appendix</a></li>')
     sections.append(
         '<section><h2 id="grammar-appendix">Grammar appendix</h2><pre class="language-ebnf"><code class="language-ebnf">'
         + escape(grammar)
@@ -363,7 +363,7 @@ def render(spec_dir: Path) -> str:
     )
 
     return HTML_TEMPLATE.format(
-        nav="".join(nav),
+        nav="\n".join(nav),
         sections="".join(sections),
         spec_dir=escape(str(spec_dir)),
     )
@@ -417,7 +417,7 @@ a:hover {{ text-decoration:underline; }}
   margin:0 auto;
   padding:28px 32px 72px;
 }}
-nav {{
+.toc {{
   position:sticky;
   top:76px;
   align-self:start;
@@ -426,15 +426,23 @@ nav {{
   border-right:1px solid var(--line);
   padding-right:20px;
 }}
-nav h2 {{
+.toc h2 {{
   font-size:13px;
   text-transform:uppercase;
   letter-spacing:.08em;
   color:var(--muted);
   margin:0 0 10px;
 }}
-nav ol {{ list-style:none; margin:0; padding:0; }}
-nav a {{ display:block; padding:5px 0; font-size:14px; color:#394247; }}
+.toc ol {{ list-style:none; margin:0; padding:0; }}
+.toc li {{ margin:0; }}
+.toc a {{
+  display:block;
+  padding:5px 0;
+  font-size:14px;
+  line-height:1.35;
+  color:#394247;
+  white-space:normal;
+}}
 main {{ min-width:0; }}
 main > header {{ margin-bottom:28px; border-bottom:1px solid var(--line); padding-bottom:22px; }}
 h1 {{ font-size:34px; line-height:1.16; margin:0 0 10px; font-weight:500; }}
@@ -481,17 +489,22 @@ tr:last-child td {{ border-bottom:0; }}
 footer {{ color:var(--muted); border-top:1px solid var(--line); margin-top:42px; padding-top:18px; font-size:14px; }}
 @media (max-width:900px) {{
   .shell {{ display:block; padding:20px; }}
-  nav {{ position:static; max-height:none; border-right:0; border-bottom:1px solid var(--line); padding:0 0 18px; margin-bottom:24px; }}
-  nav ol {{ columns:2; }}
+  .toc {{ position:static; max-height:none; border-right:0; border-bottom:1px solid var(--line); padding:0 0 18px; margin-bottom:24px; }}
+  .toc ol {{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); column-gap:24px; }}
   .topbar {{ padding:0 18px; }}
 }}
-@media (max-width:560px) {{ nav ol {{ columns:1; }} h1 {{ font-size:28px; }} h2 {{ font-size:24px; }} }}
+@media (max-width:560px) {{ .toc ol {{ grid-template-columns:1fr; }} h1 {{ font-size:28px; }} h2 {{ font-size:24px; }} }}
 </style>
 </head>
 <body>
 <div class="topbar"><span class="brand">Leia</span><span>Language Specification</span></div>
 <div class="shell">
-<nav aria-label="Table of contents"><h2>Contents</h2><ol>{nav}</ol></nav>
+<nav class="toc" aria-label="Table of contents">
+<h2>Contents</h2>
+<ol>
+{nav}
+</ol>
+</nav>
 <main>
 <header>
 <h1>The Leia Programming Language Specification</h1>
