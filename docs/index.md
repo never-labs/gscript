@@ -1,56 +1,72 @@
+---
+layout: home
+title: Leia
+---
+
 # Leia
 
 Leia is a Go-native scripting language built for DSLs, dialects, and embedded
-automation. It keeps the core language small, puts domain syntax behind tagged
-dialects, and backs q-style analytics and numeric hot paths with measured
-runtime and JIT validation.
+automation.
 
-```bash
-go run ./cmd/leia eval 'print("hello from leia")'
-go run ./cmd/leia playground --help
+```leia
+trades := q```flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)```
+leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades order by qty desc")
+print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 ```
+
+## What It Is
+
+- A Go-embedded scripting runtime with Go-shaped syntax and a small host API.
+- A dialect system for domain syntax such as `q`, `json`, `yaml`, shell/data
+  tags, and host-defined DSLs.
+- A q-style in-memory analytics layer with vectors, qSQL, typed kernels, and
+  columnar runtime/JIT work.
+- A practical automation language for services, tools, data pipelines, and
+  embedded application logic.
+
+## Start Here
+
+- [Language specification](spec/index.md)
+- [Getting started](tutorial/getting-started.md)
+- [CLI and playground](reference/cli/index.md)
+- [Go embedding API](reference/embedding/index.md)
+- [Embedding guide](guides/embedding.md)
+- [Examples](examples/index.md)
 
 ## Language
 
-- [Language specification](spec/index.md)
 - [Language overview](spec/language.md)
 - [Grammar appendix](spec/grammar.ebnf)
-- [Getting started](tutorial/getting-started.md)
-- [Style guide](guides/style.md)
-- [Editors and LSP](guides/editors.md)
-
-## Core Runtime
-
 - [Standard library](reference/stdlib/index.md)
-- [CLI reference](reference/cli/index.md)
-- [Go embedding API](reference/embedding/index.md)
-- [Embedding guide](guides/embedding.md)
 - [Modules](reference/modules/index.md)
 - [Packages and modules](guides/packages.md)
-- [File directives](reference/directives/index.md)
-- [Security and sandboxing](reference/security/index.md)
-- [Hot reload](reference/hot-reload/index.md)
-- [Platforms and execution modes](reference/platforms/index.md)
+- [Concurrency](reference/concurrency/index.md)
 - [Errors and diagnostics](reference/diagnostics/index.md)
 
-## DSLs And Data
+## Dialects And Data
 
 - [Tagged dialects](reference/dialects/index.md)
 - [Data-oriented programming](reference/data-oriented/index.md)
 - [q conformance](design/q-conformance.md)
 - [Performance and benchmarks](reference/performance/index.md)
-- [Concurrency](reference/concurrency/index.md)
 - [Evaluate reference](reference/evaluate/index.md)
 - [Optional LLM dialect reference](reference/ai/index.md)
 - [Optional LLM dialect guide](guides/ai-dialect.md)
 
-## Examples And Release
+## Runtime And Tooling
 
-- [Examples](examples/index.md)
-- [Example tree README](https://github.com/never-labs/leia/blob/main/examples/README.md)
-- [Cookbook](cookbook/index.md)
+- [File directives](reference/directives/index.md)
+- [Security and sandboxing](reference/security/index.md)
+- [Hot reload](reference/hot-reload/index.md)
+- [Platforms and execution modes](reference/platforms/index.md)
 - [Tooling guide](guides/tooling.md)
+- [Editors and LSP](guides/editors.md)
 - [Testing and release validation](testing.md)
+
+## Project
+
+- [Cookbook](cookbook/index.md)
+- [Example tree README](https://github.com/never-labs/leia/blob/main/examples/README.md)
 - [Release process](release/index.md)
 - [Release decisions](release/decisions.md)
 - [Governance](governance.md)

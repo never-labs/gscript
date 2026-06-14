@@ -930,51 +930,50 @@ func TestReleaseMatrixReadmeCLIExperienceCommandsHaveEvidence(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
+func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 	root := findRepoRoot(t)
-	readme := readFileString(t, filepath.Join(root, "README.md"))
+	toolingGuide := readFileString(t, filepath.Join(root, "docs", "guides", "tooling.md"))
 
 	for _, item := range []struct {
 		category        string
-		readmeCommand   string
+		command         string
 		evidencePath    string
 		evidenceSnippet string
 	}{
 		{
 			category:        "eval",
-			readmeCommand:   "go run ./cmd/leia eval 'print(1 + 2 + 3)'",
+			command:         "go run ./cmd/leia eval 'print(1 + 2 + 3)'",
 			evidencePath:    "cmd/leia/eval.go",
 			evidenceSnippet: "func runEvalCommand",
 		},
 		{
 			category:        "examples",
-			readmeCommand:   "go run ./cmd/leia examples check examples/hello/dialects.leia",
+			command:         "go run ./cmd/leia examples check examples/hello/dialects.leia",
 			evidencePath:    "cmd/leia/main_examples_command_test.go",
 			evidenceSnippet: "TestExamplesCommandChecksSelectedExamples",
 		},
 		{
 			category:        "docs",
-			readmeCommand:   "go run ./cmd/leia doc check",
+			command:         "go run ./cmd/leia doc check",
 			evidencePath:    "cmd/leia/doc.go",
 			evidenceSnippet: "func runDocCommand",
 		},
 		{
 			category:        "benchmarks",
-			readmeCommand:   "go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
+			command:         "go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 			evidencePath:    "cmd/leia/main_bench_test.go",
 			evidenceSnippet: "TestBenchCommandDispatchesCompareHarness",
 		},
 	} {
-		if !strings.Contains(readme, item.readmeCommand) {
-			t.Fatalf("README.md Tooling commands must cover %s via %q", item.category, item.readmeCommand)
+		if !strings.Contains(toolingGuide, item.command) {
+			t.Fatalf("docs/guides/tooling.md commands must cover %s via %q", item.category, item.command)
 		}
 		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.evidencePath)))
 		if !strings.Contains(text, item.evidenceSnippet) {
-			t.Fatalf("%s must keep focused test evidence for README %s tooling via %q", item.evidencePath, item.category, item.evidenceSnippet)
+			t.Fatalf("%s must keep focused test evidence for %s tooling via %q", item.evidencePath, item.category, item.evidenceSnippet)
 		}
 	}
 
-	toolingGuide := readFileString(t, filepath.Join(root, "docs", "guides", "tooling.md"))
 	for _, snippet := range []string{
 		"## Modules",
 		"## Documentation",
@@ -1011,17 +1010,17 @@ func TestReleaseMatrixReadmeToolingPromiseHasEvidence(t *testing.T) {
 	} {
 		text := readFileString(t, filepath.Join(root, filepath.FromSlash(item.path)))
 		if !strings.Contains(text, item.snippet) {
-			t.Fatalf("%s must keep README tooling script evidence snippet %q", item.path, item.snippet)
+			t.Fatalf("%s must keep tooling script evidence snippet %q", item.path, item.snippet)
 		}
 	}
 }
 
-func TestReleaseMatrixReadmeToolingCommandsStayInToolingGuide(t *testing.T) {
+func TestReleaseMatrixToolingAuditCommandsStayInToolingGuide(t *testing.T) {
 	root := findRepoRoot(t)
 	toolingGuide := readFileString(t, filepath.Join(root, "docs", "guides", "tooling.md"))
-	for _, command := range readReleaseReadmeToolingCommands(t, root) {
+	for _, command := range releaseToolingAuditCommands() {
 		if !strings.Contains(toolingGuide, command) {
-			t.Fatalf("docs/guides/tooling.md must document README Tooling command %q", command)
+			t.Fatalf("docs/guides/tooling.md must document tooling audit command %q", command)
 		}
 	}
 }
@@ -1835,8 +1834,8 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		`import leia "github.com/never-labs/leia"`,
 		"leia.New(leia.WithLibs(leia.LibSafe))",
 		`vm.Exec(`,
-		"print(q",
-		"`+/1 2 3`",
+		"q.sql(",
+		"print(leader[1].sym",
 	} {
 		if !strings.Contains(embeddingSnippet, snippet) {
 			t.Fatalf("README.md Embedding snippet changed or lost executable public SDK surface %q:\n%s", snippet, embeddingSnippet)
@@ -1855,7 +1854,6 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 		"shell/data tags",
 		"Optional LLM support lives in dialects and libraries, not in",
 		"## Example",
-		"## Tooling",
 		"## References",
 	} {
 		if !strings.Contains(focusedGate, snippet) {
@@ -1888,11 +1886,11 @@ func TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixReadmeToolingCommandsStayRunnable(t *testing.T) {
+func TestReleaseMatrixToolingAuditCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
-	commands := readReleaseReadmeToolingCommands(t, root)
+	commands := releaseToolingAuditCommands()
 	if len(commands) == 0 {
-		t.Fatal("README.md must contain runnable Tooling commands")
+		t.Fatal("tooling audit commands must not be empty")
 	}
 
 	diagDir := filepath.Join(os.TempDir(), "leia-diag")
@@ -1904,10 +1902,10 @@ func TestReleaseMatrixReadmeToolingCommandsStayRunnable(t *testing.T) {
 	for _, command := range commands {
 		fields, err := dialect.Shellwords(command)
 		if err != nil {
-			t.Fatalf("README Tooling command is not valid shellwords %q: %v", command, err)
+			t.Fatalf("tooling audit command is not valid shellwords %q: %v", command, err)
 		}
 		if len(fields) < 4 || fields[0] != "go" || fields[1] != "run" || fields[2] != "./cmd/leia" {
-			t.Fatalf("README Tooling command must use `go run ./cmd/leia ...`: %q", command)
+			t.Fatalf("tooling audit command must use `go run ./cmd/leia ...`: %q", command)
 		}
 		timeout := 60 * time.Second
 		if len(fields) > 3 {
@@ -2100,7 +2098,6 @@ func TestReleaseMatrixReadmeCapabilitiesStayCoveredByExamples(t *testing.T) {
 		"q.sql(",
 		"prompt`",
 		"Optional LLM support lives in dialects and libraries, not in",
-		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
 	} {
 		if !strings.Contains(readme, promise) {
 			t.Fatalf("README.md concise surface must keep documented capability entry %q", promise)
@@ -2544,33 +2541,13 @@ func documentedExamplesReadmeRunCommands(t *testing.T, doc string) [][]string {
 	return commands
 }
 
-func readReleaseReadmeToolingCommands(t *testing.T, root string) []string {
-	t.Helper()
-	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Tooling"
-	start := strings.Index(readme, marker)
-	if start < 0 {
-		t.Fatal("README.md must contain a Tooling section")
+func releaseToolingAuditCommands() []string {
+	return []string{
+		"go run ./cmd/leia eval 'print(1 + 2 + 3)'",
+		"go run ./cmd/leia examples check examples/hello/dialects.leia",
+		"go run ./cmd/leia bench compare --bench data/q_operator_pipeline --runs 3",
+		"go run ./cmd/leia doc check",
 	}
-	rest := readme[start+len(marker):]
-	blockStart := strings.Index(rest, "```bash")
-	if blockStart < 0 {
-		t.Fatal("README.md Tooling section must contain a bash command block")
-	}
-	rest = rest[blockStart+len("```bash"):]
-	blockEnd := strings.Index(rest, "```")
-	if blockEnd < 0 {
-		t.Fatal("README.md Tooling bash command block is unterminated")
-	}
-	var commands []string
-	for _, line := range strings.Split(rest[:blockEnd], "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		commands = append(commands, line)
-	}
-	return commands
 }
 
 func readReleaseReadmeSurfaceLeiaSnippet(t *testing.T, root string) string {
@@ -2597,10 +2574,10 @@ func readReleaseReadmeSurfaceLeiaSnippet(t *testing.T, root string) string {
 func readReleaseReadmeEmbeddingGoSnippet(t *testing.T, root string) string {
 	t.Helper()
 	readme := readFileString(t, filepath.Join(root, "README.md"))
-	const marker = "## Embedding"
+	const marker = "## Example"
 	start := strings.Index(readme, marker)
 	if start == -1 {
-		t.Fatal("README.md must contain an Embedding section")
+		t.Fatal("README.md must contain an Example section")
 	}
 	rest := readme[start+len(marker):]
 	blockStart := strings.Index(rest, "```go")

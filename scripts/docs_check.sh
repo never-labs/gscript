@@ -20,7 +20,7 @@ Checks README/docs Markdown for:
   - docs examples index lists each registered top-level example directory and
     keeps documented examples CLI selectors registered.
   - README concise examples stay tied to detailed docs, manifests, and focused gates.
-  - README Surface, Tooling, References, and Embedding snippets keep focused execution gates.
+  - README Surface, References, and Embedding snippets keep focused execution gates.
   - reference entrypoints stay linked from the docs home.
   - generated reference docs and the checked-in language spec HTML are fresh.
 
@@ -97,6 +97,14 @@ if [ ! -f "docs/_layouts/spec.html" ]; then
 fi
 if ! grep -Fq "layout: spec" docs/spec/index.md; then
     echo "error: docs/spec/index.md must use layout: spec so GitHub Pages renders the long-form spec page" >&2
+    exit 1
+fi
+if [ ! -f "docs/_layouts/home.html" ]; then
+    echo "error: docs/index.md uses the home layout, but docs/_layouts/home.html is missing" >&2
+    exit 1
+fi
+if ! grep -Fq "layout: home" docs/index.md; then
+    echo "error: docs/index.md must use layout: home so GitHub Pages does not render the default Minima page header" >&2
     exit 1
 fi
 if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
@@ -669,7 +677,6 @@ def check_readme_user_facing_gates() -> None:
                 "q-style vector syntax",
                 "Optional LLM support lives in dialects and libraries, not in",
                 "## Example",
-                "## Tooling",
                 "## References",
                 "TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary",
                 "readmeFirstLeiaSnippet",
@@ -677,9 +684,6 @@ def check_readme_user_facing_gates() -> None:
                 "Review AAPL",
                 "avg 100.375",
                 'exec.Command("go", "run", "./cmd/leia", "run", file)',
-                "TestReadmeToolingCommandsMapToCLI",
-                "readmeToolingCommands",
-                "README Tooling commands are empty",
                 "TestReadmeEmbeddingSnippetStaysRunnable",
                 "readmeEmbeddingGoSnippet",
                 "README embedding snippet failed",
@@ -693,10 +697,10 @@ def check_readme_user_facing_gates() -> None:
             [
                 "TestReleaseMatrixReadmeUserFacingSnippetsHaveFocusedGate",
                 "readReleaseReadmeSurfaceLeiaSnippet",
-                "readReleaseReadmeToolingCommands",
+                "releaseToolingAuditCommands",
                 "readReleaseReadmeEmbeddingGoSnippet",
                 "README.md Example snippet changed or lost product surface",
-                "README Tooling command must use `go run ./cmd/leia ...`",
+                "tooling audit command must use `go run ./cmd/leia ...`",
                 "cmd/leia/main_readme_tooling_test.go must keep README focused positioning gate",
                 "cmd/leia/main_readme_tooling_test.go must keep README Surface focused gate",
                 "cmd/leia/main_readme_tooling_test.go must keep README Embedding focused gate",

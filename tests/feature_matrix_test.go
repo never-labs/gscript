@@ -430,7 +430,6 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"Optional LLM support lives in dialects and libraries, not in",
 		"leia.New(leia.WithLibs(leia.LibSafe))",
 		"## Example",
-		"## Tooling",
 		"## References",
 	} {
 		if !strings.Contains(readme, snippet) {
@@ -863,16 +862,15 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"docs/guides/tooling.md",
 		"docs/reference/cli/index.md",
 	)
-	readmeToolingGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_readme_tooling_test.go"))
+	toolingGate := readFileString(t, filepath.Join(root, "tests", "release_matrix_test.go"))
 	for _, snippet := range []string{
-		"TestReadmeToolingCommandsMapToCLI",
-		"readmeToolingCommands",
+		"TestReleaseMatrixToolingAuditCommandsStayRunnable",
+		"releaseToolingAuditCommands",
 		"data/q_operator_pipeline",
 		"--runs",
-		"want doc check via scripts/docs_check.sh",
 	} {
-		if !strings.Contains(readmeToolingGate, snippet) {
-			t.Fatalf("README tooling guard must keep CLI command evidence snippet %q", snippet)
+		if !strings.Contains(toolingGate, snippet) {
+			t.Fatalf("tooling command guard must keep CLI command evidence snippet %q", snippet)
 		}
 	}
 	examplesCommandGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_examples_command_test.go"))
@@ -1085,7 +1083,6 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 
 func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	root := findRepoRoot(t)
-	readme := readFileString(t, filepath.Join(root, "README.md"))
 	performance := readFileString(t, filepath.Join(root, "docs", "reference", "performance", "index.md"))
 	platforms := readFileString(t, filepath.Join(root, "docs", "reference", "platforms", "index.md"))
 	release := readFileString(t, filepath.Join(root, "docs", "release", "index.md"))
@@ -1093,14 +1090,6 @@ func TestReadmeExecutionPerformanceContractHasReleaseGates(t *testing.T) {
 	productionCheck := readFileString(t, filepath.Join(root, "scripts", "production_check.sh"))
 	benchmarkGateTest := readFileString(t, filepath.Join(root, "benchmarks", "performance_gate_test.py"))
 
-	for _, snippet := range []string{
-		"Performance claims are benchmark-bound.",
-		"JIT paths must preserve VM/runtime semantics.",
-	} {
-		if !strings.Contains(readme, snippet) {
-			t.Fatalf("README execution/performance contract missing %q", snippet)
-		}
-	}
 	for _, snippet := range []string{
 		"supported hot paths may run natively, but unsupported",
 		"operations must fall back to the VM/runtime without changing visible results",

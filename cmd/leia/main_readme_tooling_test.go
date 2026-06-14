@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/never-labs/leia/internal/support/dialect"
 )
 
 func TestReadmeIntroStaysFocused(t *testing.T) {
@@ -29,7 +27,6 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 		"shell/data tags",
 		"Optional LLM support lives in dialects and libraries, not in",
 		"## Example",
-		"## Tooling",
 		"## References",
 		"[Documentation](docs/index.md)",
 		"[CLI and playground](docs/reference/cli/index.md)",
@@ -46,6 +43,8 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 		"## Quick Start",
 		"## Install",
 		"## Project Status",
+		"## Tooling",
+		"Performance claims are benchmark-bound",
 		"AI" + "-native syntax",
 		"AI" + "-native runtime",
 	} {
@@ -151,178 +150,13 @@ func TestReadmeEmbeddingSnippetStaysRunnable(t *testing.T) {
 		t.Fatalf("README embedding snippet failed: %v\nstdout:\n%s\nstderr:\n%s",
 			err, stdout.String(), stderr.String())
 	}
-	if strings.TrimSpace(stdout.String()) != "6" {
-		t.Fatalf("README embedding snippet stdout = %q, want q reduce result", stdout.String())
-	}
-}
-
-func TestReadmeToolingCommandsMapToCLI(t *testing.T) {
-	root := repoRootForBoundaryTest(t)
-	oldWD, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(root); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(oldWD); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
-	data, err := os.ReadFile(filepath.Join(root, "README.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	commands := readmeToolingCommands(string(data))
-	if len(commands) == 0 {
-		t.Fatal("README Tooling commands are empty")
-	}
-
-	oldBenchExecCommand := benchExecCommand
-	oldCheckExecCommand := checkExecCommand
-	oldDiagExecCommand := diagExecCommand
-	oldDocExecCommand := docExecCommand
-	t.Cleanup(func() {
-		benchExecCommand = oldBenchExecCommand
-		checkExecCommand = oldCheckExecCommand
-		diagExecCommand = oldDiagExecCommand
-		docExecCommand = oldDocExecCommand
-	})
-	var benchArgs []string
-	benchExecCommand = func(name string, args ...string) *exec.Cmd {
-		benchArgs = append([]string{name}, args...)
-		helper, helperArgs := testHelperCommand(t, "bench")
-		return exec.Command(helper, helperArgs...)
-	}
-	var checkArgs []string
-	checkExecCommand = func(name string, args ...string) *exec.Cmd {
-		checkArgs = append([]string{name}, args...)
-		helper, helperArgs := testHelperCommand(t, "manifest")
-		return exec.Command(helper, helperArgs...)
-	}
-	var diagArgs []string
-	diagExecCommand = func(name string, args ...string) *exec.Cmd {
-		diagArgs = append([]string{name}, args...)
-		helper, helperArgs := testHelperCommand(t, "diag")
-		return exec.Command(helper, helperArgs...)
-	}
-	var docArgs []string
-	docExecCommand = func(name string, args ...string) *exec.Cmd {
-		docArgs = append([]string{name}, args...)
-		helper, helperArgs := testHelperCommand(t, "doc")
-		return exec.Command(helper, helperArgs...)
-	}
-
-	for _, command := range commands {
-		argv, err := dialect.Shellwords(command)
-		if err != nil {
-			t.Fatalf("README command is not valid shellwords %q: %v", command, err)
-		}
-		if len(argv) < 4 || argv[0] != "go" || argv[1] != "run" || argv[2] != "./cmd/leia" {
-			t.Fatalf("README command must use `go run ./cmd/leia ...`: %q", command)
-		}
-		args := argv[3:]
-		if len(args) == 0 {
-			t.Fatalf("empty README command args for %q", command)
-		}
-		spec, ok := lookupCLICommand(args[0])
-		if !ok {
-			t.Fatalf("README command %q is not registered", args[0])
-		}
-		switch args[0] {
-		case "eval":
-			var stdout, stderr bytes.Buffer
-			if code := runEvalCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README eval command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-			}
-		case "fmt", "lint", "test":
-			var stdout, stderr bytes.Buffer
-			if code := spec.Run(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README %s command failed: code=%d stdout=%q stderr=%q", args[0], code, stdout.String(), stderr.String())
-			}
-		case "check":
-			var stdout, stderr bytes.Buffer
-			if code := runCheckCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README check command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-			}
-			for _, want := range []string{"fmt: ok", "lint: ok", "test: ok", "manifest: skipped", "docs: skipped", "editor: skipped", "examples: skipped"} {
-				if !strings.Contains(stdout.String(), want) {
-					t.Fatalf("README check stdout = %q, want %q", stdout.String(), want)
-				}
-			}
-		case "examples":
-			var stdout, stderr bytes.Buffer
-			if code := runExamplesCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README examples command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-			}
-			for _, selector := range []string{"repo-hello-dialects"} {
-				if !strings.Contains(stdout.String(), selector) {
-					t.Fatalf("README examples stdout = %q, want %q", stdout.String(), selector)
-				}
-			}
-		case "bench":
-			var stdout, stderr bytes.Buffer
-			if code := runBenchCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README bench command failed dispatch: code=%d stderr=%q", code, stderr.String())
-			}
-		case "diag":
-			var stdout, stderr bytes.Buffer
-			if code := runDiagCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README diag command failed dispatch: code=%d stderr=%q", code, stderr.String())
-			}
-		case "playground":
-			if len(args) != 2 || args[1] != "--help" {
-				t.Fatalf("README playground command args = %#v, want --help", args)
-			}
-			playgroundGate := readFileString(t, filepath.Join(root, "cmd", "leia", "main_playground_test.go"))
-			for _, want := range []string{
-				"TestReadmePlaygroundTabsMatchAPISurface",
-				"go run ./cmd/leia playground --help",
-				`data-tab="evaluate"`,
-				`url: "/api/examples"`,
-				`url: "/api/ai"`,
-			} {
-				if !strings.Contains(playgroundGate, want) {
-					t.Fatalf("playground README guard missing %q", want)
-				}
-			}
-		case "doc":
-			var stdout, stderr bytes.Buffer
-			if code := runDocCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README doc command failed dispatch: code=%d stderr=%q", code, stderr.String())
-			}
-		case "mod":
-			var stdout, stderr bytes.Buffer
-			if code := runModCommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README mod command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-			}
-		case "ci":
-			var stdout, stderr bytes.Buffer
-			if code := runCICommand(args[1:], &stdout, &stderr); code != 0 {
-				t.Fatalf("README ci command failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-			}
-			if !strings.Contains(stdout.String(), "bash scripts/production_check.sh --full --release-profile") {
-				t.Fatalf("README ci stdout = %q, want production release profile", stdout.String())
-			}
-		default:
-			t.Fatalf("README command %q is not part of the tooling audit", args[0])
-		}
-	}
-	_ = checkArgs
-	if len(docArgs) > 0 && (len(docArgs) < 2 || !strings.HasSuffix(docArgs[1], filepath.Join("scripts", "docs_check.sh"))) {
-		t.Fatalf("README doc dispatch args = %#v, want doc check via scripts/docs_check.sh", docArgs)
-	}
-	if len(benchArgs) == 0 || !containsString(benchArgs, "data/q_operator_pipeline") || !containsString(benchArgs, "--runs") {
-		t.Fatalf("README bench dispatch args = %#v, want q operator pipeline compare", benchArgs)
-	}
-	if len(diagArgs) > 0 && !containsString(diagArgs, "--skip-benchmarks") {
-		t.Fatalf("README diag dispatch args = %#v, want bundle --skip-benchmarks", diagArgs)
+	if !strings.Contains(stdout.String(), "AAPL") || !strings.Contains(stdout.String(), "18") || !strings.Contains(stdout.String(), "100.375") {
+		t.Fatalf("README embedding snippet stdout = %q, want q analytics result", stdout.String())
 	}
 }
 
 func readmeEmbeddingGoSnippet(readme string) string {
-	const marker = "## Embedding"
+	const marker = "## Example"
 	start := strings.Index(readme, marker)
 	if start < 0 {
 		return ""
@@ -355,40 +189,4 @@ func readmeFirstLeiaSnippet(readme string) string {
 		return strings.TrimSpace(rest[:blockEnd]) + "\n"
 	}
 	return ""
-}
-
-func readmeToolingCommands(readme string) []string {
-	const marker = "## Tooling"
-	start := strings.Index(readme, marker)
-	if start < 0 {
-		return nil
-	}
-	rest := readme[start+len(marker):]
-	blockStart := strings.Index(rest, "```bash")
-	if blockStart < 0 {
-		return nil
-	}
-	rest = rest[blockStart+len("```bash"):]
-	blockEnd := strings.Index(rest, "```")
-	if blockEnd < 0 {
-		return nil
-	}
-	lines := strings.Split(rest[:blockEnd], "\n")
-	var commands []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			commands = append(commands, line)
-		}
-	}
-	return commands
-}
-
-func knownLeiaCommand(name string) bool {
-	for _, command := range cliCommands() {
-		if command.Name == name {
-			return true
-		}
-	}
-	return false
 }
