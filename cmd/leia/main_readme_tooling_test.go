@@ -30,6 +30,8 @@ func TestReadmeIntroStaysFocused(t *testing.T) {
 		"## Example",
 		"## Tooling",
 		"## References",
+		"[Documentation](docs/index.md)",
+		"[CLI and playground](docs/reference/cli/index.md)",
 		"q.eval(",
 		"q.sql(",
 		"prompt`",

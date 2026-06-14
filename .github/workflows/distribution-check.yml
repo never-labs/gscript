@@ -31,6 +31,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go install github.com/goreleaser/goreleaser/v2@latest
+      - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
       - run: bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
       - run: goreleaser release --snapshot --clean --skip=publish

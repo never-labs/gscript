@@ -152,6 +152,53 @@ fetch_url() {
   esac
 }
 
+archive_entries() {
+  local archive="$1"
+  if [[ "$archive_ext" == "tar.gz" ]]; then
+    tar -tzf "$archive"
+  else
+    unzip -Z1 "$archive"
+  fi
+}
+
+validate_archive_entry() {
+  local entry="$1"
+  while [[ "$entry" == ./* ]]; do
+    entry="${entry#./}"
+  done
+  if [[ -z "$entry" || "$entry" == */ || "$entry" == /* || "$entry" == *".."* || "$entry" == *"/"* ]]; then
+    echo "error: unsafe archive entry: $1" >&2
+    exit 1
+  fi
+  case "$entry" in
+    "$binary_name"|"$lsp_binary_name"|README.md|SECURITY.md)
+      printf '%s\n' "$entry"
+      ;;
+    *)
+      echo "error: unexpected archive entry: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+validate_archive_entries() {
+  local archive="$1"
+  local found_cli=0
+  local found_lsp=0
+  local entry
+  while IFS= read -r entry; do
+    entry="$(validate_archive_entry "$entry")"
+    case "$entry" in
+      "$binary_name") found_cli=$((found_cli + 1)) ;;
+      "$lsp_binary_name") found_lsp=$((found_lsp + 1)) ;;
+    esac
+  done < <(archive_entries "$archive")
+  if [[ "$found_cli" -ne 1 || "$found_lsp" -ne 1 ]]; then
+    echo "error: archive must contain exactly one $binary_name and one $lsp_binary_name" >&2
+    exit 1
+  fi
+}
+
 goos="${goos:-$(detect_os)}"
 goarch="${goarch:-$(detect_arch)}"
 
@@ -246,6 +293,7 @@ fi
 
 extract_dir="$tmp_dir/extract"
 mkdir -p "$extract_dir"
+validate_archive_entries "$archive_path"
 if [[ "$archive_ext" == "tar.gz" ]]; then
   tar -xzf "$archive_path" -C "$extract_dir"
 else

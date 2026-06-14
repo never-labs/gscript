@@ -117,6 +117,25 @@ check_local_install_fixture() {
     exit 1
   fi
 
+  local bad_release_dir="$tmp_dir/bad-release"
+  local bad_bin_dir="$tmp_dir/bad-bin"
+  mkdir -p "$bad_release_dir" "$bad_bin_dir"
+  printf 'unexpected\n' >"$archive_dir/unexpected.txt"
+  tar -C "$archive_dir" -czf "$bad_release_dir/$asset" leia leia-lsp unexpected.txt
+  (
+    cd "$bad_release_dir"
+    printf '%s  %s\n' "$(sha256_file "$asset")" "$asset" >SHA256SUMS
+  )
+  if bash scripts/install.sh \
+    --version "$version" \
+    --os linux \
+    --arch amd64 \
+    --bin-dir "$bad_bin_dir" \
+    --base-url "file://$bad_release_dir" >/dev/null 2>&1; then
+    echo "error: install accepted archive with unexpected entry" >&2
+    exit 1
+  fi
+
   if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
     rm -rf "$release_dir" "$bin_dir"
     mkdir -p "$release_dir" "$bin_dir" "$archive_dir/windows"
@@ -165,6 +184,7 @@ optional_workflow() {
 
 optional_workflow .github/workflows/release.yml
 optional_workflow .github/workflows/distribution-check.yml
+optional_workflow .github/workflows/pages.yml
 
 require_contains .goreleaser.yaml "version: 2"
 require_contains .goreleaser.yaml "id: leia"
@@ -179,6 +199,8 @@ require_contains .goreleaser.yaml "- amd64"
 require_contains .goreleaser.yaml "- arm64"
 require_contains .goreleaser.yaml "name_template: \"{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}\""
 require_contains .goreleaser.yaml "- leia-lsp"
+require_contains .github/workflows/release.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
+require_contains .github/workflows/distribution-check.yml "go install github.com/goreleaser/goreleaser/v2@v2.16.0"
 
 bash -n scripts/install.sh
 

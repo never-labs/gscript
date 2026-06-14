@@ -61,7 +61,9 @@ go run ./cmd/leia doc check
 
 ## References
 
+- [Documentation](docs/index.md)
 - [Language specification](docs/spec/index.md)
+- [CLI and playground](docs/reference/cli/index.md)
 - [Embedding](docs/guides/embedding.md)
 - [Modules](docs/reference/modules/index.md)
 - [Packages and modules](docs/guides/packages.md)

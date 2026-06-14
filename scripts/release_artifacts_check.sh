@@ -5,7 +5,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/release_artifacts_check.sh [--build] [--output-dir DIR] [--version VERSION] [--keep-output]
+Usage: scripts/release_artifacts_check.sh [--build] [--output-dir DIR] [--version VERSION] [--keep-output] [--require-clean] [--require-tag]
 
 Checks scripts/release_artifacts.sh without changing its implementation.
 
@@ -20,6 +20,8 @@ Options:
   -o, --output-dir DIR  Output directory for --build mode; defaults to mktemp
       --version VERSION Version to pass to release_artifacts.sh
       --keep-output     Do not remove an auto-created temp output directory
+      --require-clean   Fail unless the git worktree has no tracked or untracked changes
+      --require-tag     Fail unless HEAD is exactly tagged with VERSION
   -h, --help            Show this help
 USAGE
 }
@@ -35,6 +37,8 @@ build="false"
 out_dir=""
 version="smoke-check"
 keep_output="false"
+require_clean="false"
+require_tag="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +64,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --keep-output)
       keep_output="true"
+      shift
+      ;;
+    --require-clean)
+      require_clean="true"
+      shift
+      ;;
+    --require-tag)
+      require_tag="true"
       shift
       ;;
     -h|--help)
@@ -193,6 +205,22 @@ require_cmd awk
 require_file "$release_script"
 require_file "$install_script"
 require_file "$repo_root/$smoke_script"
+
+if [[ "$require_clean" == "true" && -n "$(git status --porcelain)" ]]; then
+  echo "error: release artifact check requires a clean git worktree" >&2
+  exit 1
+fi
+if [[ "$require_tag" == "true" ]]; then
+  exact_tag="$(git describe --tags --exact-match 2>/dev/null || true)"
+  if [[ -z "$exact_tag" ]]; then
+    echo "error: release artifact check requires HEAD to be exactly tagged" >&2
+    exit 1
+  fi
+  if [[ "$version" != "$exact_tag" ]]; then
+    echo "error: release artifact version $version does not match exact git tag $exact_tag" >&2
+    exit 1
+  fi
+fi
 
 goos="$(go env GOOS)"
 goarch="$(go env GOARCH)"

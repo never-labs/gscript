@@ -36,7 +36,7 @@ jobs:
           cache-dependency-path: tools/tree-sitter-leia/package-lock.json
       - run: sudo apt-get update && sudo apt-get install -y luajit
       - run: npm ci --prefix tools/tree-sitter-leia
-      - run: go install github.com/goreleaser/goreleaser/v2@latest
+      - run: go install github.com/goreleaser/goreleaser/v2@v2.16.0
       - run: go run ./cmd/leia ci release
       - if: github.event_name == 'workflow_dispatch'
         run: goreleaser release --snapshot --clean --skip=publish

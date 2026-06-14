@@ -310,7 +310,7 @@ add_release_artifacts_gate() {
         return
     fi
     if [ "$RELEASE_PROFILE" -eq 1 ]; then
-        add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh --build"
+        add_run "Release Artifacts" "bash scripts/release_artifacts_check.sh --build --require-clean"
         return
     fi
     if ! have_cmd go; then

@@ -4,10 +4,12 @@ gscript/gscript
 game_engine
 /tmp/
 /dist/
+/_site/
 
 # Profiling
 *.prof
 __pycache__/
+node_modules/
 *.py[cod]
 *$py.class
 .pytest_cache/
