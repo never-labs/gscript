@@ -168,6 +168,45 @@ func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRoute(t *testing.T) {
 	}
 }
 
+func BenchmarkQSQLKernelPlanRouteMetrics(b *testing.B) {
+	for _, tc := range []struct {
+		name  string
+		route string
+	}{
+		{name: "op_exit", route: string(qTypedRuntimeExecutionRouteOpExit)},
+		{name: "direct_helper", route: string(qTypedRuntimeExecutionRouteDirectHelper)},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			plan := QSQLKernelRuntimeBackendPlan(QSQLKernelPipelineRef{
+				Shape:         "select/where/project",
+				PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column:1",
+				SchemaHash:    "bench-qsql-route",
+			})
+			cf := &CompiledFunction{
+				QSQLKernelPlans:   []QSQLKernelBackendPlan{plan},
+				QSQLKernelBackend: &testQSQLKernelBackendExecutor{out: int64(42), handled: true},
+			}
+			regs := []runtime.Value{runtime.NilValue()}
+			if err := cf.executeQSQLKernelPlanSlotWithRoute(0, 0, regs, tc.route); err != nil {
+				b.Fatalf("warm QSQLKernelPlan: %v", err)
+			}
+			before := cf.QKernelExecutionStats()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := cf.executeQSQLKernelPlanSlotWithRoute(0, 0, regs, tc.route); err != nil {
+					b.Fatalf("QSQLKernelPlan: %v", err)
+				}
+				if !regs[0].IsInt() || regs[0].Int() != 42 {
+					b.Fatalf("QSQLKernelPlan result = %v, want int 42", regs[0])
+				}
+			}
+			b.StopTimer()
+			reportMethodJITQSQLRouteBenchmarkStats(b, b.N, qKernelExecutionStatsDelta(before, cf.QKernelExecutionStats()))
+		})
+	}
+}
+
 func assertQSQLKernelExecutionStat(t *testing.T, rows []QKernelExecutionStat, ref QSQLKernelPipelineRef, outcome string, count uint64) {
 	t.Helper()
 	assertQSQLKernelExecutionStatWithRoute(t, rows, ref, "typed_runtime_op_exit", outcome, count)

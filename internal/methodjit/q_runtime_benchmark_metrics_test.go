@@ -119,6 +119,22 @@ func reportMethodJITFrameVectorRouteBenchmarkStats(b *testing.B, iterations int,
 	)
 }
 
+func reportMethodJITQSQLRouteBenchmarkStats(b *testing.B, iterations int, stats []QKernelExecutionStat) {
+	b.Helper()
+	reportQKernelRouteMetrics(b, iterations, stats, qBenchRouteMetricSpec{
+		Source:        QSQLKernelRuntimeSource,
+		SuccessMetric: "methodjit_qsql_runtime_success/op",
+		ErrorMetric:   "methodjit_qsql_runtime_errors/op",
+		RouteMetrics: map[string]string{
+			string(qTypedRuntimeExecutionRouteDirectHelper): "methodjit_qsql_runtime_direct_helper/op",
+			string(qTypedRuntimeExecutionRouteNativeExit):   "methodjit_qsql_runtime_native_exit/op",
+			string(qTypedRuntimeExecutionRouteOpExit):       "methodjit_qsql_runtime_op_exit/op",
+			QSQLKernelRuntimeRoute:                          "methodjit_qsql_runtime_backend/op",
+		},
+		ShapeMetric: "methodjit_qsql_runtime_shapes",
+	})
+}
+
 func reportQEvalArrayBridgeBenchmarkStats(b *testing.B, iterations, bulkHits, fallbacks, errors, rows int) {
 	b.Helper()
 	if iterations <= 0 {
@@ -181,5 +197,31 @@ func TestMethodJITFrameVectorRouteMetricsExposeRouteSplit(t *testing.T) {
 		vector.routes[string(qTypedRuntimeExecutionRouteOpExit)] != 3 ||
 		vector.routes[string(qTypedRuntimeExecutionRouteNativeExit)] != 5 {
 		t.Fatalf("vector route summary = %+v, want op-exit 3 native 5", vector)
+	}
+}
+
+func TestMethodJITQSQLRouteMetricsExposeRouteSplitAndShapes(t *testing.T) {
+	stats := []QKernelExecutionStat{
+		{Source: QSQLKernelRuntimeSource, Kernel: QSQLKernelName, Shape: "select/where/project", PipelineShape: "pipeline-a", Route: string(qTypedRuntimeExecutionRouteDirectHelper), Outcome: "success", Count: 4},
+		{Source: QSQLKernelRuntimeSource, Kernel: QSQLKernelName, Shape: "select/by/aggregate", PipelineShape: "pipeline-b", Route: string(qTypedRuntimeExecutionRouteOpExit), Outcome: "success", Count: 2},
+		{Source: QSQLKernelRuntimeSource, Kernel: QSQLKernelName, Shape: "select/by/aggregate", PipelineShape: "pipeline-b", Route: string(qTypedRuntimeExecutionRouteOpExit), Outcome: "error", Count: 1},
+		{Source: "methodjit_q_frame_runtime", Kernel: "QFrameSelectColumn", Shape: "compare/filter/project/column", Route: string(qTypedRuntimeExecutionRouteDirectHelper), Outcome: "success", Count: 9},
+	}
+	got := summarizeQKernelRouteMetrics(stats, qBenchRouteMetricSpec{
+		Source: QSQLKernelRuntimeSource,
+		RouteMetrics: map[string]string{
+			string(qTypedRuntimeExecutionRouteDirectHelper): "methodjit_qsql_runtime_direct_helper/op",
+			string(qTypedRuntimeExecutionRouteOpExit):       "methodjit_qsql_runtime_op_exit/op",
+		},
+		ShapeMetric: "methodjit_qsql_runtime_shapes",
+	})
+	if got.success != 6 || got.errors != 1 {
+		t.Fatalf("qSQL route summary success/errors = %d/%d, want 6/1", got.success, got.errors)
+	}
+	if got.routes[string(qTypedRuntimeExecutionRouteDirectHelper)] != 4 || got.routes[string(qTypedRuntimeExecutionRouteOpExit)] != 3 {
+		t.Fatalf("qSQL route summary routes = %+v, want direct/op 4/3", got.routes)
+	}
+	if len(got.shapes) != 2 {
+		t.Fatalf("qSQL route summary shapes = %+v, want two distinct shapes", got.shapes)
 	}
 }

@@ -195,6 +195,7 @@ type DiagReport struct {
 	QKernelDescriptors          []QKernelDescriptor      // normalized q kernel runtime/fallback observations
 	QKernelExecutionStats       []QKernelExecutionStat   // observed q typed-runtime kernel execution outcomes
 	QKernelDescriptorCacheStats []QKernelDescriptorCacheStat
+	QKernelPlanCacheStats       []QKernelDescriptorCacheStat
 	QKernelExecutionRoutes      []QKernelExecutionRouteSummary
 	QKernelShapeSummary         []QKernelShapeSummary // source-stable q kernel shape/fallback summary
 	ValidateErrors              []error               // structural invariant violations
@@ -349,6 +350,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.NativeError = nativeErr
 	r.QKernelExecutionStats = cf.QKernelExecutionStats()
 	r.QKernelDescriptorCacheStats = cf.QKernelDescriptorCacheStats()
+	r.QKernelPlanCacheStats = cf.QFrameSelectColumnPlanCacheStats()
 	r.QKernelExecutionRoutes = BuildQKernelExecutionRouteSummary(r.QKernelExecutionStats)
 	r.QKernelShapeSummary = BuildQKernelShapeSummaryFromDescriptorsAndExecutionStats(r.QKernelDescriptors, r.QKernelExecutionStats)
 	r.compareResults()
@@ -569,6 +571,7 @@ func (r *DiagReport) String() string {
 	w("\n--- Q kernel descriptors ---\n%s", formatQKernelDescriptors(r.QKernelDescriptors))
 	w("\n--- Q kernel execution stats ---\n%s", formatQKernelExecutionStats(r.QKernelExecutionStats))
 	w("\n--- Q kernel descriptor cache stats ---\n%s", formatQKernelDescriptorCacheStats(r.QKernelDescriptorCacheStats))
+	w("\n--- Q kernel plan cache stats ---\n%s", formatQKernelDescriptorCacheStats(r.QKernelPlanCacheStats))
 	w("\n--- Q kernel execution route summary ---\n%s", formatQKernelExecutionRouteSummary(r.QKernelExecutionRoutes))
 	w("\n--- Q kernel shape summary ---\n%s", formatQKernelShapeSummary(r.QKernelShapeSummary))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)

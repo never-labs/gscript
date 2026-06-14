@@ -3733,6 +3733,7 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 	assertQKernelShapeSummaryExecution(t, report.QKernelShapeSummary, "methodjit_q_frame_runtime", "runtime_kernel", "compare/filter/project/column", "supported", 1, 1, 0)
 	assertQKernelExecutionStat(t, report.QKernelExecutionStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "success", 1)
 	assertQKernelDescriptorCacheStat(t, report.QKernelDescriptorCacheStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", "typed_runtime_op_exit", "q-hot-path-test", 1, 0, 1, 0)
+	assertQKernelDescriptorCacheStat(t, report.QKernelPlanCacheStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", qFrameSelectColumnPlanCacheRoute, "q-hot-path-test", 1, 0, 1, 0)
 	assertQKernelExecutionRouteSummary(t, report.QKernelExecutionRoutes, "methodjit_q_frame_runtime", "QFrameSelectColumn", "typed_runtime_op_exit", "success", 1)
 	if !strings.Contains(report.String(), "Q query hot paths") {
 		t.Fatalf("diagnostic report missing q hot path section:\n%s", report.String())
@@ -3751,6 +3752,11 @@ func TestDiagnoseReportsQQueryHotPath(t *testing.T) {
 		!strings.Contains(report.String(), "schema_hash=q-hot-path-test") ||
 		!strings.Contains(report.String(), "misses=1") {
 		t.Fatalf("diagnostic report missing q descriptor cache stats:\n%s", report.String())
+	}
+	if !strings.Contains(report.String(), "Q kernel plan cache stats") ||
+		!strings.Contains(report.String(), "route="+qFrameSelectColumnPlanCacheRoute) ||
+		!strings.Contains(report.String(), "schema_hash=q-hot-path-test") {
+		t.Fatalf("diagnostic report missing q plan cache stats:\n%s", report.String())
 	}
 	if !strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "QQueryHotPath") ||
 		!strings.Contains(formatOptimizationRemarks(report.OptimizationRemarks), "first shape compare/filter/project/column") ||
@@ -4940,6 +4946,9 @@ func TestQFrameSelectColumnRuntimePlanCachesBySchema(t *testing.T) {
 	if second.misses != 1 || second.hits != 0 {
 		t.Fatalf("second schema plan stats = %+v, want 1 miss/0 hits", second)
 	}
+	publicStats := cf.QFrameSelectColumnPlanCacheStats()
+	assertQKernelDescriptorCacheStat(t, publicStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", qFrameSelectColumnPlanCacheRoute, "q-hot-path-test", 1, 1, 1, 0)
+	assertQKernelDescriptorCacheStat(t, publicStats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", qFrameSelectColumnPlanCacheRoute, "q-hot-path-string-test", 1, 0, 1, 0)
 }
 
 func TestQFrameSelectColumnPlannedRuntimeExecutesBoolColumnCombine(t *testing.T) {
