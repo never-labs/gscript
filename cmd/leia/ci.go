@@ -41,6 +41,10 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "usage: leia ci [smoke|pr|perf|release] [--list] [--no-luajit]")
 		return 2
 	}
+	if profile == "release" && *noLuaJIT {
+		fmt.Fprintln(errw, "leia ci: release profile requires LuaJIT evidence; use pr or perf --no-luajit for non-release checks")
+		return 2
+	}
 	commands, err := ciProfileCommands(profile, *noLuaJIT)
 	if err != nil {
 		fmt.Fprintf(errw, "leia ci: %v\n", err)
@@ -92,12 +96,7 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 		}, nil
 	case "release":
 		return []ciCommand{
-			{Name: "Module path gate", Args: modulePathGateCommand()},
-			{Name: "Performance gate", Args: []string{"bash", "scripts/performance_gate.sh", "--full"}},
 			{Name: "Production check", Args: []string{"bash", "scripts/production_check.sh", "--full", "--release-profile"}},
-			{Name: "Public release blockers check", Args: []string{"bash", "scripts/public_release_blockers_check.sh", "--require-resolved"}},
-			{Name: "Release distribution check", Args: []string{"bash", "scripts/release_distribution_check.sh", "--require-goreleaser", "--require-workflows"}},
-			{Name: "Release artifacts check", Args: []string{"bash", "scripts/release_artifacts_check.sh", "--build"}},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown ci profile %q (want smoke, pr, perf, or release)", profile)

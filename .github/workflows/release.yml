@@ -19,6 +19,8 @@ jobs:
     env:
       CGO_ENABLED: "0"
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LUA_BIN: luajit
+      LEIA_CONFORMANCE_CHECK_JIT: "1"
     steps:
       - uses: actions/checkout@v4
         with:

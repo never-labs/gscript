@@ -46,7 +46,7 @@ Then try examples for concurrency, data-oriented code, and q-style analytics:
 ```bash
 go run ./cmd/leia examples run examples/concurrency/goroutines_channels.leia
 go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernels.leia
-go run ./cmd/leia examples run examples/data/q_trade_analytics_project.leia
+go run ./cmd/leia examples run repo-data-q_trade_analytics_project-main
 ```
 
 Leia's larger examples emphasize DSLs: q-style analytics, shell/data/web
@@ -59,7 +59,7 @@ files.
 Use the local quality gate while editing:
 
 ```bash
-go run ./cmd/leia check --no-docs .
+go run ./cmd/leia check --quick .
 go test ./...
 ```
 

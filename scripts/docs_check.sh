@@ -56,6 +56,10 @@ if ! command -v python3 >/dev/null 2>&1; then
     echo "error: python3 is required for docs_check.sh" >&2
     exit 1
 fi
+if ! command -v go >/dev/null 2>&1; then
+    echo "error: go is required for docs_check.sh" >&2
+    exit 1
+fi
 
 TMP_DOCS="$(mktemp -d)"
 trap 'rm -rf "$TMP_DOCS"' EXIT
@@ -350,7 +354,6 @@ def require_snippets(path: Path, snippets: list[str]) -> None:
 def check_release_gate_docs() -> None:
     release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1"
     release_profile_cmd = "bash scripts/production_check.sh --full --release-profile"
-    public_release_blockers_cmd = "bash scripts/public_release_blockers_check.sh --require-resolved"
     release_distribution_cmd = "bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows"
     spec_examples_cmd = "go test ./tests -run 'TestSpecRunnableExamples|TestSpecLeiaCodeFencesAreExecutableOrExplicitlyNonExecutable' -count=1"
     require_snippets(
@@ -359,11 +362,9 @@ def check_release_gate_docs() -> None:
             "## Machine-Checkable Release Evidence",
             "go run ./cmd/leia ci release --list",
             release_profile_cmd,
-            release_matrix_cmd,
-            "bash scripts/performance_gate.sh --full",
-            public_release_blockers_cmd,
-            release_distribution_cmd,
-            "bash scripts/release_artifacts_check.sh --build",
+            "profile is the release gate source of truth",
+            "q conformance",
+            "local artifact installation evidence",
             "tests/feature_matrix.json",
             "docs/spec/index.md",
             "tests/language/MISSING_CAPABILITIES.md",
@@ -382,12 +383,8 @@ def check_release_gate_docs() -> None:
             "## Machine-Checkable Release Evidence",
             "go run ./cmd/leia ci release --list",
             release_profile_cmd,
-            release_matrix_cmd,
             "scripts/docs_check.sh",
-            "bash scripts/performance_gate.sh --full",
-            public_release_blockers_cmd,
             release_distribution_cmd,
-            "bash scripts/release_artifacts_check.sh --build",
             "tests/language/MANIFEST.md",
             "tests/language/KNOWN_FAILURES.md",
             "docs/reference/hot-reload/index.md",

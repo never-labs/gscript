@@ -46,15 +46,32 @@ func TestCICommandReleaseProfileIncludesDistributionCheck(t *testing.T) {
 	}
 	out := stdout.String()
 	for _, want := range []string{
-		"bash scripts/performance_gate.sh --full",
 		"bash scripts/production_check.sh --full --release-profile",
-		"bash scripts/public_release_blockers_check.sh --require-resolved",
-		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
-		"bash scripts/release_artifacts_check.sh --build",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}
+	}
+	for _, duplicate := range []string{
+		"bash scripts/performance_gate.sh --full",
+		"bash scripts/public_release_blockers_check.sh --require-resolved",
+		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
+		"bash scripts/release_artifacts_check.sh --build",
+	} {
+		if strings.Contains(out, duplicate) {
+			t.Fatalf("stdout = %q, release profile should delegate %q to production_check.sh", out, duplicate)
+		}
+	}
+}
+
+func TestCICommandReleaseRejectsNoLuaJIT(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"release", "--no-luajit"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCICommand code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "release profile requires LuaJIT evidence") {
+		t.Fatalf("stderr = %q, want LuaJIT release requirement", stderr.String())
 	}
 }
 
@@ -110,16 +127,8 @@ func TestCICommandRunsReleaseDistributionCheck(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
-	for _, want := range []string{
-		"bash scripts/performance_gate.sh --full",
-		"bash scripts/production_check.sh --full --release-profile",
-		"bash scripts/public_release_blockers_check.sh --require-resolved",
-		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
-		"bash scripts/release_artifacts_check.sh --build",
-	} {
-		if !containsCommand(commands, want) {
-			t.Fatalf("commands = %#v, want %q", commands, want)
-		}
+	if len(commands) != 1 || !containsCommand(commands, "bash scripts/production_check.sh --full --release-profile") {
+		t.Fatalf("commands = %#v, want only production release profile", commands)
 	}
 }
 

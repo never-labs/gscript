@@ -232,11 +232,44 @@ add_documentation_references() {
         add_skip "Documentation References" "missing scripts/docs_check.sh"
         return
     fi
+    if ! have_cmd go; then
+        add_skip "Documentation References" "missing go"
+        return
+    fi
     if ! have_cmd python3; then
         add_skip "Documentation References" "missing python3"
         return
     fi
     add_run "Documentation References" "bash scripts/docs_check.sh"
+}
+
+add_language_conformance_gate() {
+    if ! have_cmd go; then
+        add_skip "Language Conformance Surface" "missing go"
+        return
+    fi
+    if ! have_cmd luajit; then
+        add_skip "Language Conformance Surface" "missing luajit"
+        return
+    fi
+    add_run "Language Conformance Surface" \
+        "LUA_BIN=\"\${LUA_BIN:-luajit}\" LEIA_CONFORMANCE_CHECK_JIT=1 go test ./tests -run TestLanguageConformanceTranslatedCases -count=1"
+}
+
+add_q_conformance_gate() {
+    if ! have_cmd go; then
+        add_skip "Q Conformance Gate" "missing go"
+        return
+    fi
+    if ! have_cmd python3; then
+        add_skip "Q Conformance Gate" "missing python3"
+        return
+    fi
+    if [ ! -f scripts/q_conformance_gate.sh ]; then
+        add_skip "Q Conformance Gate" "missing scripts/q_conformance_gate.sh"
+        return
+    fi
+    add_run "Q Conformance Gate" "RUN_BENCH=smoke Q_GATE_SCOPE=core bash scripts/q_conformance_gate.sh"
 }
 
 add_editor_assets() {
@@ -431,11 +464,9 @@ build_full_plan() {
     add_race_smoke_gate
     if have_cmd go; then
         add_skip "Feature Matrix" "covered by Correctness (go test ./... -count=1)"
-        add_skip "Language Conformance Surface" "covered by Correctness (go test ./... -count=1)"
         add_skip "Release Matrix Metadata" "covered by Correctness (go test ./... -count=1)"
     else
         add_skip "Feature Matrix" "missing go"
-        add_skip "Language Conformance Surface" "missing go"
         add_skip "Release Matrix Metadata" "missing go"
     fi
     add_manifest_coverage
@@ -444,6 +475,10 @@ build_full_plan() {
     add_editor_assets
     add_performance_gate
     add_q_performance_gate
+    if [ "$RELEASE_PROFILE" -eq 1 ]; then
+        add_language_conformance_gate
+        add_q_conformance_gate
+    fi
     add_release_smoke
     add_cli_experience_gate
     if [ "$RELEASE_PROFILE" -eq 1 ]; then

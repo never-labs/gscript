@@ -11,6 +11,9 @@ func init() {
 
 func main() {
 	if len(os.Args) > 1 {
+		if os.Args[1] == "-h" || os.Args[1] == "--help" {
+			os.Exit(runHelpCommand(nil, os.Stdout, os.Stderr))
+		}
 		if os.Args[1] == "__playground_exec" {
 			os.Exit(runPlaygroundExecCommand(os.Args[2:], os.Stdout, os.Stderr))
 		}

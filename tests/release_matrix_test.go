@@ -329,12 +329,10 @@ func TestReleaseMatrixSpecGateCommandsStaySynchronized(t *testing.T) {
 				"## Machine-Checkable Release Evidence",
 				ciReleaseListCmd,
 				productionFullCmd,
-				releaseMatrixCmd,
-				docsCheckCmd,
-				fullPerfGateCmd,
-				publicReleaseBlockersCmd,
+				"profile is the release gate source of truth",
+				"q conformance",
+				"local artifact installation evidence",
 				releaseDistributionCmd,
-				releaseArtifactsCmd,
 				"tests/feature_matrix.json",
 				"docs/spec/index.md",
 			},
@@ -624,11 +622,15 @@ func TestReleaseMatrixDocumentedCIProfilesAreInspectable(t *testing.T) {
 		}
 	}
 
-	for _, profile := range []string{"smoke", "pr", "release"} {
+	for _, profile := range []string{"smoke", "pr"} {
 		out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", profile, "--list")
 		if !strings.Contains(out, "github.com/never-labs/leia") {
 			t.Fatalf("ci %s --list must include module path gate output; got:\n%s", profile, out)
 		}
+	}
+	releaseOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--release-profile", "--list")
+	if !strings.Contains(releaseOut, `test "$(go list -m)" = "github.com/never-labs/leia"`) {
+		t.Fatalf("production release profile must include module path gate output; got:\n%s", releaseOut)
 	}
 }
 
@@ -766,16 +768,8 @@ func TestReleaseMatrixCIProfilesKeepExampleImportGuards(t *testing.T) {
 	}
 
 	releaseOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--list")
-	for _, want := range []string{
-		"bash scripts/performance_gate.sh --full",
-		"bash scripts/production_check.sh --full --release-profile",
-		"bash scripts/public_release_blockers_check.sh --require-resolved",
-		"bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows",
-		"bash scripts/release_artifacts_check.sh --build",
-	} {
-		if !strings.Contains(releaseOut, want) {
-			t.Fatalf("ci release --list must include %q; got:\n%s", want, releaseOut)
-		}
+	if strings.TrimSpace(releaseOut) != "bash scripts/production_check.sh --full --release-profile" {
+		t.Fatalf("ci release --list must delegate to production release profile only; got:\n%s", releaseOut)
 	}
 
 	productionOut := runCommand(t, root, 30*time.Second, "bash", "scripts/production_check.sh", "--full", "--list")

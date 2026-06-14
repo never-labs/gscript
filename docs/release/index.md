@@ -7,15 +7,16 @@ Leia releases need machine-checkable evidence, not hand-written claims.
 Run at least:
 
 ```bash
-go run ./cmd/leia ci release --list
 bash scripts/production_check.sh --full --release-profile
-go test ./tests -run 'TestFeatureMatrix|TestReleaseMatrix' -count=1
-bash scripts/docs_check.sh
-bash scripts/performance_gate.sh --full
-bash scripts/public_release_blockers_check.sh --require-resolved
-bash scripts/release_distribution_check.sh --require-goreleaser --require-workflows
-bash scripts/release_artifacts_check.sh --build
+go run ./cmd/leia ci release --list
 ```
+
+`leia ci release` delegates to the same production release profile. That
+profile is the release gate source of truth: correctness, documentation,
+performance, q conformance, language conformance, public blockers,
+distribution configuration, and local artifact installation evidence are all
+listed there. Documentation evidence is produced by `scripts/docs_check.sh`
+inside that profile.
 
 The release evidence should cite:
 

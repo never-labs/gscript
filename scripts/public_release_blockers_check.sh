@@ -74,10 +74,13 @@ fi
 require_file docs/release/decisions.md || true
 if [[ -f docs/release/decisions.md ]]; then
   while IFS= read -r line; do
-    if [[ "$line" == \|* ]] && grep -Eq '\|[[:space:]]*Open\.[[:space:]]*\|' <<<"$line"; then
-      area="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2 }' <<<"$line")"
-      [[ -n "$area" ]] || area="release decision"
-      add_blocker "open release decision: $area"
+    [[ "$line" == \|* ]] || continue
+    area="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2 }' <<<"$line")"
+    status="$(awk -F'|' '{ gsub(/^[ \t]+|[ \t]+$/, "", $4); print $4 }' <<<"$line")"
+    [[ -n "$area" && -n "$status" ]] || continue
+    [[ "$area" != "Area" && "$area" != "---" ]] || continue
+    if ! grep -Eq '^(Resolved|Accepted|N/A)([:.]|$)' <<<"$status"; then
+      add_blocker "unresolved release decision: $area ($status)"
     fi
   done < docs/release/decisions.md
 fi
