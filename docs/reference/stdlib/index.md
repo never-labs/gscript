@@ -46,10 +46,14 @@ This inventory is generated from the standard-library metadata used by the curre
 | `llm` | `msg` | Normalized LLM message constructors for system, user, assistant, and tool roles. | false | none |
 | `data` | `array` | Dense typed arrays and conversion helpers for hot data loops. | true | none |
 | `data` | `binary` | Binary pack/unpack over Leia strings using declarative field formats. | true | none |
+| `data` | `control` | Control-system helpers for saturation, angle wrapping, and compact state-space gains. | true | none |
 | `data` | `csv` | CSV parse and encode helpers backed by Go's CSV behavior. | true | none |
 | `data` | `data` | Column arrays, frames, query plans, and qSQL lowering substrate. | true | none |
+| `data` | `linalg` | Dense vector and matrix construction, algebra, solves, and norms. | true | none |
 | `data` | `matrix` | Dense matrix values and numeric matrix helpers. | true | none |
+| `data` | `ode` | Reusable numeric ODE integration helpers over typed state vectors. | true | none |
 | `data` | `q` | Table-driven column queries over SoA values for high-level data analysis. | true | none |
 | `data` | `soa` | Structure-of-arrays records and column-oriented data processing. | true | none |
+| `data` | `stats` | Numeric reductions, normalization, scans, and resampling helpers. | true | none |
 | `data` | `vec` | Vector construction, arithmetic, geometry, and numeric helpers. | true | none |
 | `compat` | `bit32` | Lua-compatible 32-bit bit operations. | true | none |

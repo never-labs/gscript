@@ -1167,8 +1167,8 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 	root := findRepoRoot(t)
 	readme := readFileString(t, filepath.Join(root, "README.md"))
 	for _, snippet := range []string{
-		"Optional LLM support lives in dialects and libraries, not in",
-		"[Optional LLM dialect](docs/reference/ai/index.md)",
+		"turn {",
+		"prompt { role: \"user\"",
 	} {
 		if !strings.Contains(readme, snippet) {
 			t.Fatalf("README AI dialect contract missing %q", snippet)

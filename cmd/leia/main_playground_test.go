@@ -388,8 +388,8 @@ func TestPlaygroundAIExamplesCoverReadmeAIDialectSurface(t *testing.T) {
 	}
 	readmeText := string(readme)
 	for _, claim := range []string{
-		"Optional LLM support lives in dialects and libraries, not in",
-		"[Optional LLM dialect](docs/reference/ai/index.md)",
+		"turn {",
+		"prompt { role: \"user\"",
 	} {
 		if !strings.Contains(readmeText, claim) {
 			t.Fatalf("README missing AI playground claim %q", claim)
@@ -811,6 +811,7 @@ func TestPlaygroundRepositoryCoversDocumentedExampleDirectories(t *testing.T) {
 		"operations",
 		"performance",
 		"security",
+		"scientific",
 		"site",
 		"testing",
 		"tooling",
@@ -963,11 +964,11 @@ func TestReadmeFacingFeatureMatrixClaimsKeepRunnableExamples(t *testing.T) {
 		featureID     string
 		exampleRef    string
 	}{
-		{"leia.New(leia.WithLibs(leia.LibSafe))", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
-		{"[Optional LLM dialect](docs/reference/ai/index.md)", "ai_dialect_integration", "examples/llm/agent.leia"},
-		{"Dialect-native:", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
-		{"Analytics-native:", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
-		{"ARM64 JIT", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
+		{"embeddable scripting language for Go", "embedding_host_bindings", "examples/embedding/embedding_test.go"},
+		{"turn {", "ai_dialect_integration", "examples/llm/agent.leia"},
+		{"first-class extensible domain dialects", "tagged_dialect_syntax", "examples/hello/dialects.leia"},
+		{"q-style high-throughput in-memory columnar analytics", "matrix_dense_arrays", "examples/data_processing/data_oriented/dense_matrix_vec_kernels.leia"},
+		{"LuaJIT-class execution model", "arm64_jit_runtime_fallback", "examples/performance/execution_modes_matrix.leia"},
 	}
 
 	for _, claim := range claims {

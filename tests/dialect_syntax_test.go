@@ -939,7 +939,7 @@ func TestStringInterpolationFormsExecuteThroughInterpreterAndBytecode(t *testing
 	}
 }
 
-func TestQTaggedInterpolationEncodesLeiaLists(t *testing.T) {
+func TestQTaggedInterpolationEncodesNumericRuntimeLists(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []leia.Option
@@ -952,16 +952,34 @@ func TestQTaggedInterpolationEncodesLeiaLists(t *testing.T) {
 			if err := vm.Exec(`
 a := [1,2,3,4,5,6,7,8,6]
 x := q` + "`sum ${a}`" + `
+dense := array.f64(1.5, 2.5, 3.0)
+dense_sum := q` + "`sum ${dense}`" + `
+vec := linalg.vector(2, 4, 6)
+vec_sum := q` + "`sum ${vec}`" + `
 name := "abc"
 n := q` + "`count ${name}`" + `
 flag := true
 choice := q` + "`$[${flag};10;20]`" + `
+matrix_value := matrix.dense(2, 2)
+matrix_ok, matrix_err := pcall(func() { return q` + "`sum ${matrix_value}`" + ` })
+linalg_matrix := linalg.matrix(2, 2, {1, 2, 3, 4})
+linalg_matrix_ok, linalg_matrix_err := pcall(func() { return q` + "`sum ${linalg_matrix}`" + ` })
+frame_value := data.frame({x: data.i64({1, 2})})
+frame_ok, frame_err := pcall(func() { return q` + "`sum ${frame_value}`" + ` })
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
 			assertGet(t, vm, "x", int64(42))
+			assertGet(t, vm, "dense_sum", float64(7))
+			assertGet(t, vm, "vec_sum", int64(12))
 			assertGet(t, vm, "n", int64(3))
 			assertGet(t, vm, "choice", int64(10))
+			assertGet(t, vm, "matrix_ok", false)
+			assertStringContains(t, vm, "matrix_err", "q interpolation does not support matrix.dense values")
+			assertGet(t, vm, "linalg_matrix_ok", false)
+			assertStringContains(t, vm, "linalg_matrix_err", "q interpolation does not support linalg.matrix values")
+			assertGet(t, vm, "frame_ok", false)
+			assertStringContains(t, vm, "frame_err", "q interpolation does not support frame values")
 		})
 	}
 }

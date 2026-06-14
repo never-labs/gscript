@@ -182,6 +182,8 @@ func dialectQInterpolationValue(v Value) (string, error) {
 		return strconv.FormatFloat(v.Float(), 'g', -1, 64), nil
 	case v.IsString():
 		return dialectQString(v.Str()), nil
+	case v.IsDenseArray():
+		return dialectQInterpolationDenseArray(v.DenseArray())
 	case v.IsTable():
 		return dialectQInterpolationTable(v.Table())
 	default:
@@ -189,10 +191,47 @@ func dialectQInterpolationValue(v Value) (string, error) {
 	}
 }
 
+func dialectQInterpolationDenseArray(a *DenseArray) (string, error) {
+	if a == nil || a.Len() == 0 {
+		return "()", nil
+	}
+	parts := make([]string, 0, a.Len())
+	for i := 0; i < a.Len(); i++ {
+		v, err := a.At(i)
+		if err != nil {
+			return "", err
+		}
+		text, err := dialectQInterpolationValue(v)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, " "), nil
+}
+
 func dialectQInterpolationTable(t *Table) (string, error) {
 	if t == nil {
 		return "()", nil
 	}
+	if backing, _, _, ok := t.DenseMatrixBacking(); ok && backing != nil {
+		return "", fmt.Errorf("q interpolation does not support matrix.dense values")
+	}
+	if kind := t.RawGetString("_type"); kind.IsString() {
+		switch kind.Str() {
+		case "linalg.vector":
+			return dialectQInterpolationSequenceTable(t)
+		case "linalg.matrix":
+			return "", fmt.Errorf("q interpolation does not support linalg.matrix values")
+		}
+	}
+	if isDataFrameTable(t) || !t.RawGetString(qKeyedFrameMarker).IsNil() {
+		return "", fmt.Errorf("q interpolation does not support frame values")
+	}
+	return dialectQInterpolationSequenceTable(t)
+}
+
+func dialectQInterpolationSequenceTable(t *Table) (string, error) {
 	n := t.Len()
 	if n == 0 {
 		return "()", nil

@@ -21,6 +21,7 @@ go run ../cmd/leia examples check database/package_managed
 go run ../cmd/leia examples check web/serve_dialect_app.leia
 go run ../cmd/leia examples check web/tiny_fullstack_app.leia
 go run ../cmd/leia examples check site/static_docs_generator.leia site/release_dashboard.leia
+go run ../cmd/leia examples check scientific/kalman_filter.leia scientific/particle_filter.leia scientific/inverted_pendulum.leia
 go run ../cmd/leia examples run data_processing/data_oriented/soa_kernels.leia
 go run ../cmd/leia examples run concurrency/select_timeout.leia
 go run ../cmd/leia examples check concurrency/pipeline_project
@@ -47,6 +48,7 @@ Directories:
 | `llm/` | LLM models, tools, agents, direct turns, streaming, and provider smoke scripts. |
 | `macos/` | Package-managed macOS automation capability examples. |
 | `security/` | Supply-chain and vendor security workflow examples. |
+| `scientific/` | Scientific numeric examples using linalg, stats, ODE, control, q, math, and rand APIs. |
 | `site/` | Static site and release dashboard generation examples. |
 | `testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
 | `ui/` | Package-managed UI capability examples. |

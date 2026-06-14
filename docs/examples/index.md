@@ -51,6 +51,7 @@ set.
 | `examples/operations/` | Local operations and release-risk reporting workflows. |
 | `examples/performance/` | Execution mode and benchmark policy examples. |
 | `examples/security/` | Supply-chain and vendor security workflow examples. |
+| `examples/scientific/` | Scientific numeric examples using linalg, stats, ODE, control, q, math, and rand APIs. |
 | `examples/site/` | Static site and release dashboard generation examples. |
 | `examples/testing/` | `leia test` workflow and JSONL golden-evaluation examples. |
 | `examples/tooling/` | Release evidence, diagnostics, and cross-domain release-gate project examples. |
@@ -66,6 +67,7 @@ go run ./cmd/leia examples run examples/data_processing/data_oriented/soa_kernel
 go run ./cmd/leia examples check examples/data/q_vector_basics.leia
 go run ./cmd/leia examples check examples/data/q_trade_analytics_project
 go run ./cmd/leia examples check examples/data/db_q_frame_project
+go run ./cmd/leia examples check examples/scientific/kalman_filter.leia examples/scientific/particle_filter.leia examples/scientific/inverted_pendulum.leia
 go run ./cmd/leia examples run repo-tooling-release_gate_project-main
 go run ./cmd/leia examples check examples/web/fullstack_project
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia

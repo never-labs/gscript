@@ -1,0 +1,158 @@
+---
+layout: page
+title: Scientific Numeric Runtime
+---
+
+# Scientific Numeric Runtime
+
+Leia's scientific stack is built as a small set of reusable runtime layers. The
+goal is not to add one-off helpers for Kalman filters, particle filters, or
+control demos. Those programs should fall out of the same typed numeric,
+columnar, and dialect infrastructure used by ordinary Leia, q analytics, and
+host embeddings.
+
+## Goals
+
+- Keep Leia's core language small and Go-shaped.
+- Treat dense numeric data as runtime values, not ad hoc tables.
+- Route Leia, q, and domain libraries through the same typed kernels.
+- Make fallback paths observable and removable.
+- Keep domain power in reusable stdlib modules and dialects.
+- Let examples double as conformance and performance regression tests.
+
+## Runtime Layers
+
+### 1. Typed Values
+
+The existing `DenseArray`, `DenseMatrix`, and SoA frame runtime values are the
+base representation for scientific data:
+
+- `DenseArray[f64|i64|bool|string]` for vectors, masks, and typed columns.
+- `DenseMatrix[f64]` for dense numeric matrices with contiguous backing.
+- SoA frames for qSQL and columnar analytics.
+- Views are preferred over copies when a future operation can preserve aliasing
+  safely.
+
+New library code must reuse these values before introducing new containers.
+
+### 2. Kernel Backend
+
+Numeric operations lower to a small kernel vocabulary:
+
+- elementwise: add, sub, mul, div, pow, abs, sqrt, sin, cos, exp, log;
+- reductions: sum, min, max, mean, norm, dot;
+- scans: cumulative sum, deltas, running windows;
+- masks: compare, where, filter, gather;
+- matrix: transpose, matvec, matmul, solve, small-matrix fast paths;
+- frame: column load, typed compare mask, filter, projection, group aggregate.
+
+Kernels may be implemented in Go, lowered to MethodJIT native loops, or routed
+to a future native/BLAS backend. All routes must preserve VM/runtime semantics.
+
+### 3. Pipeline IR
+
+Leia expressions, q expressions, and domain helpers should lower to a shared
+pipeline shape before execution:
+
+- `VectorPipeline`
+- `MatrixPipeline`
+- `FramePipeline`
+- `LoopKernel`
+- `Reduction`
+- `Scan`
+- `Solver`
+
+The lowering stage records why a shape cannot use a typed kernel:
+
+- dynamic dtype;
+- unknown shape;
+- unsupported op;
+- aliasing risk;
+- closure escape;
+- null policy not supported.
+
+### 4. Standard Library Facades
+
+The public API is layered by domain:
+
+- `linalg`: typed vector/matrix construction, algebra, solve, norm;
+- `stats`: reductions, normalization, cumulative sums, resampling helpers;
+- `ode`: reusable integrators such as RK4;
+- `control`: control-system helpers such as saturation, angle wrapping, LQR;
+- `q`: q-style vector and columnar analytics, backed by the same kernels;
+- `plot`: future artifact-producing visualization module.
+
+Domain modules are facades over typed runtime values and kernels. They must not
+encode behavior specific to a single example.
+
+The compatibility rule for the first implementation is:
+
+- public constructors may accept ordinary Leia numeric lists and nested lists;
+- runtime operations must also accept existing `DenseArray` and `DenseMatrix`
+  values;
+- any temporary table metadata shape is an adapter boundary, not the long-term
+  storage format;
+- new hot paths should return typed dense values where script compatibility
+  allows it, so MethodJIT, q, and `matrix` can share the same backing data.
+
+The next cleanup step is to make `linalg`, `stats`, `ode`, and `control`
+interop symmetric: `linalg` accepts `matrix.dense`, `stats` accepts `ode.rk4`
+state vectors, and `control.lqr2` accepts `linalg.matrix` without conversion.
+
+### 5. q Integration
+
+q keeps its parser and semantics, but q runtime execution should call the same
+typed backend:
+
+- q vector verbs map to vector kernels;
+- q matrix verbs map to linalg kernels;
+- qSQL maps to frame pipelines;
+- tagged q interpolation converts Leia values to typed q values without string
+  re-parsing when possible.
+
+Leia-to-q bridges must support dense arrays, dense matrices, frames, ordinary
+lists, scalars, strings, booleans, and nil values.
+
+### 6. JIT Integration
+
+MethodJIT should recognize the shared pipeline IR rather than many q-specific
+special cases. The first supported routes are:
+
+- scalar numeric loops;
+- vector elementwise pipelines;
+- reductions and scans;
+- dense matrix get/set, matvec, and small matrix operations;
+- frame column load, typed compare mask, filter, project, group aggregate;
+- inlinable small closures used by `ode.rk4` and simulation loops.
+
+Every JIT miss or runtime fallback must produce stable diagnostic metadata.
+
+## Test Strategy
+
+The scientific examples are acceptance tests:
+
+- Kalman filter: matrix algebra, deterministic simulation, state estimation;
+- particle filter: vector math, random/replayable sampling, resampling;
+- inverted pendulum: ODE integration, closures, LQR/control switching.
+
+Each example must:
+
+- execute as ordinary Leia source;
+- use generic `linalg`, `stats`, `ode`, `control`, `q`, and `math` APIs;
+- print deterministic summary values;
+- avoid example-specific native helpers;
+- remain small enough to demonstrate the product direction.
+
+Implementation tests live next to the owning modules. End-to-end example tests
+live under `tests/scientific_numeric_examples_test.go` and run the translated
+Leia programs through the CLI.
+
+## Initial Milestones
+
+1. Register `linalg`, `stats`, `ode`, and `control` modules using existing
+   DenseArray and DenseMatrix values.
+2. Add reusable vector/matrix constructors and small-matrix algebra.
+3. Add generic statistics and resampling helpers.
+4. Add RK4 and control helpers that accept ordinary Leia functions.
+5. Convert the three MATLAB-style examples into Leia acceptance tests.
+6. Route hot vector/matrix operations into the shared kernel/JIT diagnostics.

@@ -48,6 +48,10 @@ const (
 	LibLog                            // log.*
 	LibArray                          // array.* dense arrays
 	LibSoA                            // soa.* structure-of-arrays
+	LibLinalg                         // linalg.* scientific dense vector/matrix helpers
+	LibStats                          // stats.* scientific reductions and resampling helpers
+	LibODE                            // ode.* numeric integration helpers
+	LibControl                        // control.* control-system helpers
 	LibLLM                            // llm.* native model/tool integration
 	LibDialect                        // dialect.* built-in language dialects
 	LibDB                             // db.* built-in SQLite runtime
@@ -60,7 +64,8 @@ const (
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
 		LibProcess | LibScript | LibDebug | LibTestkit | LibMatrix |
 		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibLog | LibArray | LibSoA | LibLLM | LibDialect | LibDB
+		LibContainer | LibLog | LibArray | LibSoA | LibLinalg |
+		LibStats | LibODE | LibControl | LibLLM | LibDialect | LibDB
 
 	// LibSafe is a sandboxed subset with no I/O, network, or system access.
 	LibSafe = LibString | LibTable | LibMath | LibCoroutine |
@@ -68,7 +73,7 @@ const (
 		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
 		LibBytes | LibCSV | LibURL | LibUUID | LibMatrix |
 		LibPath | LibTime | LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibArray | LibSoA | LibDialect
+		LibContainer | LibArray | LibSoA | LibLinalg | LibStats | LibODE | LibControl | LibDialect
 
 	// LibApp is a convenient preset for application development (no GL).
 	LibApp = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
@@ -77,12 +82,13 @@ const (
 		LibBytes | LibCSV | LibURL | LibUUID | LibProcess | LibScript |
 		LibDebug | LibMatrix | LibRand | LibSort | LibEncoding |
 		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA |
+		LibLinalg | LibStats | LibODE | LibControl |
 		LibLLM | LibDialect | LibDB
 
 	// LibGame is a preset for game development (no I/O, includes vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |
 		LibVec | LibColor | LibJSON | LibBit32 | LibBits |
-		LibTime | LibRand | LibArray | LibSoA
+		LibTime | LibRand | LibArray | LibSoA | LibLinalg | LibStats | LibODE | LibControl
 )
 
 // CapabilityFlags controls host capabilities that are separate from selecting

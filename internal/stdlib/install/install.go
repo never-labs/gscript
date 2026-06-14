@@ -97,6 +97,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("compress", stdbind.BuildCompress(maxHostResult))
 	installer.RegisterTable("container", stdbind.BuildContainer())
 	installer.RegisterTable("context", stdbind.BuildContext())
+	installer.RegisterTable("control", stdbind.BuildControl())
 	installer.RegisterTable("crypto", stdbind.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", stdbind.BuildCSV(maxHostResult))
 	installer.RegisterTable("data", buildDataModule())
@@ -114,15 +115,18 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	}
 	installer.RegisterTable("hash", stdbind.BuildHash())
 	installer.RegisterTable("json", stdbind.BuildJSON())
+	installer.RegisterTable("linalg", stdbind.BuildLinalg())
 	installer.RegisterTable("log", stdbind.BuildLog())
 	installer.RegisterTable("matrix", stdbind.BuildMatrix())
 	installer.RegisterTable("math", stdbind.BuildMath())
+	installer.RegisterTable("ode", stdbind.BuildODE(opts.ScriptCaller))
 	installer.RegisterTable("path", stdbind.BuildPath())
 	installer.RegisterTable("q", stdbind.BuildQ())
 	installer.RegisterTable("rand", stdbind.BuildRand())
 	installer.RegisterTable("regexp", stdbind.BuildRegexp())
 	installer.RegisterTable("sort", stdbind.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("soa", stdbind.BuildSOA())
+	installer.RegisterTable("stats", stdbind.BuildStats())
 	installer.RegisterTable("sync", stdbind.BuildSync(stdbind.ConcurrencyOptions{
 		Call:   opts.ScriptCaller,
 		Launch: opts.TaskLauncher,
