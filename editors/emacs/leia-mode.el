@@ -64,9 +64,9 @@
 
 (defconst leia--modules
   '("array" "base64" "binary" "bit32" "bits" "bytes" "chat" "color"
-    "compress" "container" "context" "crypto" "csv" "db" "debug" "encoding"
-    "fs" "hash" "history" "http" "io" "json" "llm" "log" "loop" "math"
-    "matrix" "msg" "net" "os" "path" "process" "q" "rand" "regexp"
+    "compress" "container" "context" "crypto" "csv" "data" "db" "debug"
+    "encoding" "fs" "hash" "history" "http" "io" "json" "llm" "log" "loop"
+    "math" "matrix" "msg" "net" "os" "path" "process" "q" "rand" "regexp"
     "script" "serve" "soa" "sort" "string" "sync" "table" "testkit" "time"
     "url" "utf8" "uuid" "vec"))
 

@@ -199,6 +199,33 @@
     "dialects": {
       "patterns": [
         {
+          "name": "meta.dialect.q.tagged-string.leia",
+          "contentName": "source.q.embedded.leia",
+          "begin": "\\b(q|qsql)(!)?\\s*(`)",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.dialect.q.leia"
+            },
+            "2": {
+              "name": "keyword.operator.raw.dialect.leia"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.leia"
+            }
+          },
+          "end": "`",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.leia"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#q"
+            }
+          ]
+        },
+        {
           "name": "meta.dialect.tagged-string.leia",
           "contentName": "string.quoted.raw.dialect.leia",
           "begin": "\\b([A-Za-z_][A-Za-z0-9_]*)(!)?\\s*(`)",
@@ -263,6 +290,45 @@
               "name": "punctuation.section.block.end.leia"
             }
           }
+        }
+      ]
+    },
+    "q": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.q.leia",
+          "match": "/.*$"
+        },
+        {
+          "name": "string.quoted.double.q.leia",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.q.leia",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "constant.other.symbol.q.leia",
+          "match": "`[A-Za-z_][A-Za-z0-9_./-]*"
+        },
+        {
+          "name": "keyword.control.qsql.q.leia",
+          "match": "\\b(?:select|exec|update|delete|from|where|by|fby|within|like|in|and|or|not)\\b"
+        },
+        {
+          "name": "support.function.q.leia",
+          "match": "\\b(?:abs|acos|all|any|asc|asin|atan|avg|bin|binr|ceiling|cor|cos|count|cov|cut|deltas|desc|dev|differ|distinct|div|ema|enlist|except|exp|fills|first|floor|flip|get|getenv|group|iasc|idesc|inter|inv|last|like|log|lower|max|maxs|mavg|mcount|mdev|med|min|mins|mmu|mod|msum|neg|next|null|parse|prd|prds|prev|raze|reciprocal|reverse|ratios|rank|rotate|save|sdev|set|signum|sin|sqrt|ss|ssr|string|sublist|sum|sums|sv|svar|system|tan|til|trim|type|union|upper|value|var|vs|where|within|wsum|xasc|xbar|xcol|xdesc|xexp|xgroup|xkey|xlog|xrank)\\b"
+        },
+        {
+          "name": "constant.numeric.q.leia",
+          "match": "\\b[0-9][0-9_]*(?:\\.[0-9_]+)?(?:[eE][+-]?[0-9_]+)?[a-z]?\\b"
+        },
+        {
+          "name": "keyword.operator.q.leia",
+          "match": "\\+|-|\\*|%|!|\\?|\\$|#|_|~|=|<>|<=|>=|<|>|\\||&|@|\\.|:|,|;|'|/"
         }
       ]
     },
