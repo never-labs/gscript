@@ -54,15 +54,52 @@ func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionWithRoute(id int, ro
 		return
 	}
 	if cf.recordQEvalPipelinePlanExecutionCounter(id, route, outcome) {
+		cf.recordQEvalPipelinePlanDescriptorCacheLookup(id, route)
 		return
 	}
-	cf.recordQKernelExecution(
+	shape := qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id)
+	cf.recordQKernelExecutionWithPipelineShape(
 		"methodjit_q_eval_runtime",
 		"QEvalPipelinePlan",
-		qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id),
+		shape,
+		cf.qEvalPipelinePlanDescriptorCachePipelineShape(id, shape),
 		route,
 		outcome,
+		"unknown",
 	)
+}
+
+func (cf *CompiledFunction) recordQEvalPipelinePlanDescriptorCacheLookup(id int, route string) {
+	if cf == nil {
+		return
+	}
+	shape := qEvalPipelinePlanExecutionShape(cf.QEvalPipelinePlans, id)
+	pipelineShape := cf.qEvalPipelinePlanDescriptorCachePipelineShape(id, shape)
+	if route == "" {
+		route = "unknown"
+	}
+	cf.recordQKernelDescriptorCacheLookup(qKernelDescriptorCacheKey{
+		source:        "methodjit_q_eval_runtime",
+		kernel:        "QEvalPipelinePlan",
+		shape:         shape,
+		pipelineShape: pipelineShape,
+		route:         route,
+		schemaHash:    "unknown",
+	})
+}
+
+func (cf *CompiledFunction) qEvalPipelinePlanDescriptorCachePipelineShape(id int, shape string) string {
+	pipelineShape := "unknown"
+	if ref, ok := qEvalPipelinePlanRefByID(cf.QEvalPipelinePlans, id); ok {
+		pipelineShape = qEvalPipelinePlanRefPipelineShape(ref)
+	}
+	if pipelineShape == "" || pipelineShape == "unknown" {
+		pipelineShape = qKernelExecutionPipelineShape("QPipelinePlan", shape)
+	}
+	if pipelineShape == "" {
+		pipelineShape = "unknown"
+	}
+	return pipelineShape
 }
 
 func (cf *CompiledFunction) recordQEvalPipelinePlanExecutionCounter(id int, route, outcome string) bool {

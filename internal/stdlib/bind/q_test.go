@@ -3761,6 +3761,16 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T)
 			},
 			{
 				Source:     "methodjit_q_frame_runtime",
+				Kernel:     "QFrameSelectColumn",
+				Shape:      "compare/filter/project/column",
+				Route:      "typed_runtime_direct_helper",
+				SchemaHash: "schema-a",
+				Entries:    1,
+				Hits:       7,
+				Misses:     1,
+			},
+			{
+				Source:     "methodjit_q_frame_runtime",
 				Kernel:     "FrameGroupAggregate",
 				Shape:      "filter/group/aggregate",
 				Route:      "typed_runtime_op_exit",
@@ -3779,14 +3789,14 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T)
 	if got := row.RawGetString("cache_backed"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("q_runtime_kernel_descriptor_cache cache_backed = %v, want true", got)
 	}
-	if got := row.RawGetString("entries"); !got.IsInt() || got.Int() != 2 {
-		t.Fatalf("q_runtime_kernel_descriptor_cache entries = %v, want 2", got)
+	if got := row.RawGetString("entries"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache entries = %v, want 3", got)
 	}
-	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
-		t.Fatalf("q_runtime_kernel_descriptor_cache hits = %v, want 5", got)
+	if got := row.RawGetString("hits"); !got.IsInt() || got.Int() != 12 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache hits = %v, want 12", got)
 	}
-	if got := row.RawGetString("misses"); !got.IsInt() || got.Int() != 2 {
-		t.Fatalf("q_runtime_kernel_descriptor_cache misses = %v, want 2", got)
+	if got := row.RawGetString("misses"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("q_runtime_kernel_descriptor_cache misses = %v, want 3", got)
 	}
 
 	stat := qTestNestedRowByFields(t, row, "stats", map[string]string{
@@ -3802,19 +3812,45 @@ func TestQRuntimeKernelDescriptorCacheStatsProviderFeedsCacheStats(t *testing.T)
 	if got := stat.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("descriptor cache stat misses = %v, want 1", got)
 	}
+	directStat := qTestNestedRowByFields(t, row, "stats", map[string]string{
+		"source":      "methodjit_q_frame_runtime",
+		"kernel":      "QFrameSelectColumn",
+		"shape":       "compare/filter/project/column",
+		"route":       "typed_runtime_direct_helper",
+		"schema_hash": "schema-a",
+	})
+	if got := directStat.RawGetString("hits"); !got.IsInt() || got.Int() != 7 {
+		t.Fatalf("descriptor cache direct-helper stat hits = %v, want 7", got)
+	}
+	route := qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+		"route":  "typed_runtime_direct_helper",
+	})
+	if got := route.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("descriptor cache direct-helper route misses = %v, want 1", got)
+	}
+	opRoute := qTestNestedRowByFields(t, row, "routes", map[string]string{
+		"source": "methodjit_q_frame_runtime",
+		"kernel": "QFrameSelectColumn",
+		"route":  "typed_runtime_op_exit",
+	})
+	if got := opRoute.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
+		t.Fatalf("descriptor cache op-exit route hits = %v, want 5", got)
+	}
 	shape := qTestNestedRowByFields(t, row, "shapes", map[string]string{
 		"source": "methodjit_q_frame_runtime",
 		"shape":  "compare/filter/project/column",
 	})
-	if got := shape.RawGetString("hits"); !got.IsInt() || got.Int() != 5 {
-		t.Fatalf("descriptor cache shape hits = %v, want 5", got)
+	if got := shape.RawGetString("hits"); !got.IsInt() || got.Int() != 12 {
+		t.Fatalf("descriptor cache shape hits = %v, want 12", got)
 	}
 	kernel := qTestNestedRowByFields(t, row, "kernels", map[string]string{
 		"source": "methodjit_q_frame_runtime",
 		"kernel": "QFrameSelectColumn",
 	})
-	if got := kernel.RawGetString("misses"); !got.IsInt() || got.Int() != 1 {
-		t.Fatalf("descriptor cache kernel misses = %v, want 1", got)
+	if got := kernel.RawGetString("misses"); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("descriptor cache kernel misses = %v, want 2", got)
 	}
 }
 

@@ -54,6 +54,50 @@ func TestQEvalPipelinePlanNativeExitExecutesTypedPlanRef(t *testing.T) {
 	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_native_exit", "success", 1)
 }
 
+func TestQEvalPipelinePlanDescriptorCacheTracksRouteWarmPath(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
+	cf := &CompiledFunction{
+		QEvalPipelinePlans:   []QEvalPipelinePlanRef{ref},
+		QEvalPipelineBackend: newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{OpExitSlot: 0, OpExitAux: int64(ref.ID)}
+
+	if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteOpExit); err != nil {
+		t.Fatalf("executeQEvalPipelinePlanExit first run: %v", err)
+	}
+	assertQEvalPipelineDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), ref, string(qEvalPipelineExecutionRouteOpExit), 1, 0, 1, 0)
+	if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteOpExit); err != nil {
+		t.Fatalf("executeQEvalPipelinePlanExit second run: %v", err)
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_op_exit", "success", 2)
+	assertQEvalPipelineDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), ref, string(qEvalPipelineExecutionRouteOpExit), 1, 1, 1, 0)
+}
+
+func TestQEvalPipelinePlanCounterStatsRecordDescriptorCache(t *testing.T) {
+	ref := qEvalPipelineDescriptorBackendTestRef(t, "count where (til 64 mod 4)=1")
+	cf := &CompiledFunction{
+		QEvalPipelinePlans:     []QEvalPipelinePlanRef{ref},
+		QEvalPipelineBackend:   newQRuntimeEvalPipelineBackend([]QEvalPipelinePlanRef{ref}),
+		QEvalPipelinePlanStats: newQEvalPipelinePlanExecutionCounters([]QEvalPipelinePlanRef{ref}),
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{OpExitSlot: 0, OpExitAux: int64(ref.ID)}
+
+	if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteNativeExit); err != nil {
+		t.Fatalf("executeQEvalPipelinePlanExit first run: %v", err)
+	}
+	assertQEvalPipelineDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), ref, string(qEvalPipelineExecutionRouteNativeExit), 1, 0, 1, 0)
+	if err := cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteNativeExit); err != nil {
+		t.Fatalf("executeQEvalPipelinePlanExit second run: %v", err)
+	}
+	assertQEvalPipelineExecutionStat(t, cf.QKernelExecutionStats(), qEvalPipelinePlanRefShape(ref), "typed_runtime_native_exit", "success", 2)
+	assertQEvalPipelineDescriptorCacheStat(t, cf.QKernelDescriptorCacheStats(), ref, string(qEvalPipelineExecutionRouteNativeExit), 1, 1, 1, 0)
+	if got := qEvalPipelineDescriptorCacheCount(cf.QKernelDescriptorCacheStats(), ref, string(qEvalPipelineExecutionRouteOpExit)); got != 0 {
+		t.Fatalf("op-exit descriptor cache rows = %d, want 0", got)
+	}
+}
+
 func TestQEvalPipelinePlanOpExitRecordsErrorRoute(t *testing.T) {
 	cf := &CompiledFunction{}
 	regs := []runtime.Value{runtime.NilValue()}
@@ -476,4 +520,54 @@ func qEvalPipelineExecutionCount(stats []QKernelExecutionStat, shape, route, out
 		}
 	}
 	return 0
+}
+
+func assertQEvalPipelineDescriptorCacheStat(t *testing.T, stats []QKernelDescriptorCacheStat, ref QEvalPipelinePlanRef, route string, entries, hits, misses, evictions uint64) {
+	t.Helper()
+	shape := qEvalPipelinePlanRefShape(ref)
+	pipelineShape := qEvalPipelinePlanRefPipelineShape(ref)
+	if pipelineShape == "" || pipelineShape == "unknown" {
+		pipelineShape = qKernelExecutionPipelineShape("QPipelinePlan", shape)
+	}
+	if pipelineShape == "" {
+		pipelineShape = "unknown"
+	}
+	for _, stat := range stats {
+		if stat.Source == "methodjit_q_eval_runtime" &&
+			stat.Kernel == "QEvalPipelinePlan" &&
+			stat.Shape == shape &&
+			stat.PipelineShape == pipelineShape &&
+			stat.Route == route &&
+			stat.SchemaHash == "unknown" &&
+			stat.Entries == entries &&
+			stat.Hits == hits &&
+			stat.Misses == misses &&
+			stat.Evictions == evictions {
+			return
+		}
+	}
+	t.Fatalf("missing QEvalPipelinePlan descriptor cache stat shape=%s pipeline=%s route=%s; stats=%+v", shape, pipelineShape, route, stats)
+}
+
+func qEvalPipelineDescriptorCacheCount(stats []QKernelDescriptorCacheStat, ref QEvalPipelinePlanRef, route string) uint64 {
+	shape := qEvalPipelinePlanRefShape(ref)
+	pipelineShape := qEvalPipelinePlanRefPipelineShape(ref)
+	if pipelineShape == "" || pipelineShape == "unknown" {
+		pipelineShape = qKernelExecutionPipelineShape("QPipelinePlan", shape)
+	}
+	if pipelineShape == "" {
+		pipelineShape = "unknown"
+	}
+	var count uint64
+	for _, stat := range stats {
+		if stat.Source == "methodjit_q_eval_runtime" &&
+			stat.Kernel == "QEvalPipelinePlan" &&
+			stat.Shape == shape &&
+			stat.PipelineShape == pipelineShape &&
+			stat.Route == route &&
+			stat.SchemaHash == "unknown" {
+			count++
+		}
+	}
+	return count
 }

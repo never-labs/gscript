@@ -163,8 +163,18 @@ func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRoute(t *testing.T) {
 		t.Fatalf("QSQLKernelPlan direct helper result = %v, want int 64", regs[0])
 	}
 	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+	assertQSQLKernelDescriptorCacheStatWithRoute(t, cf.QKernelDescriptorCacheStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), 1, 0, 1, 0)
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QSQLKernelPlan second run error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "success", 2)
+	assertQSQLKernelDescriptorCacheStatWithRoute(t, cf.QKernelDescriptorCacheStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), 1, 1, 1, 0)
 	if got := qKernelExecutionCount(cf.QKernelExecutionStats(), QSQLKernelRuntimeSource, plan.Ref.Kernel, "typed_runtime_op_exit", "success"); got != 0 {
 		t.Fatalf("QSQLKernelPlan op-exit route count = %d, want 0", got)
+	}
+	if got := qSQLKernelDescriptorCacheCount(cf.QKernelDescriptorCacheStats(), plan.Ref, "typed_runtime_op_exit"); got != 0 {
+		t.Fatalf("QSQLKernelPlan op-exit cache rows = %d, want 0", got)
 	}
 }
 
@@ -330,13 +340,18 @@ func assertQSQLKernelExecutionStatWithRoute(t *testing.T, rows []QKernelExecutio
 
 func assertQSQLKernelDescriptorCacheStat(t *testing.T, rows []QKernelDescriptorCacheStat, ref QSQLKernelPipelineRef, entries, hits, misses, evictions uint64) {
 	t.Helper()
+	assertQSQLKernelDescriptorCacheStatWithRoute(t, rows, ref, "typed_runtime_op_exit", entries, hits, misses, evictions)
+}
+
+func assertQSQLKernelDescriptorCacheStatWithRoute(t *testing.T, rows []QKernelDescriptorCacheStat, ref QSQLKernelPipelineRef, route string, entries, hits, misses, evictions uint64) {
+	t.Helper()
 	ref = ref.normalized(QSQLKernelRuntimeSource)
 	for _, row := range rows {
 		if row.Source == QSQLKernelRuntimeSource &&
 			row.Kernel == ref.Kernel &&
 			row.Shape == ref.Shape &&
 			row.PipelineShape == ref.PipelineShape &&
-			row.Route == "typed_runtime_op_exit" &&
+			row.Route == route &&
 			row.SchemaHash == ref.SchemaHash &&
 			row.Entries == entries &&
 			row.Hits == hits &&
@@ -346,4 +361,20 @@ func assertQSQLKernelDescriptorCacheStat(t *testing.T, rows []QKernelDescriptorC
 		}
 	}
 	t.Fatalf("missing qSQL descriptor cache stat ref=%+v rows=%+v", ref, rows)
+}
+
+func qSQLKernelDescriptorCacheCount(rows []QKernelDescriptorCacheStat, ref QSQLKernelPipelineRef, route string) uint64 {
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	var count uint64
+	for _, row := range rows {
+		if row.Source == QSQLKernelRuntimeSource &&
+			row.Kernel == ref.Kernel &&
+			row.Shape == ref.Shape &&
+			row.PipelineShape == ref.PipelineShape &&
+			row.Route == route &&
+			row.SchemaHash == ref.SchemaHash {
+			count++
+		}
+	}
+	return count
 }
