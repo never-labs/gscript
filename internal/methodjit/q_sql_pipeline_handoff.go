@@ -2,11 +2,7 @@
 
 package methodjit
 
-import (
-	"fmt"
-
-	"github.com/never-labs/leia/internal/runtime"
-)
+import "github.com/never-labs/leia/internal/runtime"
 
 const (
 	QSQLKernelRuntimeSource  = "methodjit_qsql_kernel_runtime"
@@ -241,16 +237,14 @@ func (cf *CompiledFunction) executeQSQLKernelPlanSlot(planID, absSlot int, regs 
 }
 
 func (cf *CompiledFunction) executeQSQLKernelPlanSlotWithRoute(planID, absSlot int, regs []runtime.Value, route string) error {
-	if absSlot < 0 || absSlot >= len(regs) {
-		return fmt.Errorf("QSQLKernelPlan op-exit out of register range")
-	}
-	out, handled, err := cf.ExecuteQSQLKernelPlanValueWithRoute(planID, route)
-	if err != nil {
-		return err
-	}
-	if !handled {
-		return fmt.Errorf("QSQLKernelPlan op-exit plan %d was not handled", planID)
-	}
-	regs[absSlot] = out
-	return nil
+	return executeQTypedRuntimeValueIntoSlot(
+		regs,
+		absSlot,
+		planID,
+		func() (runtime.Value, bool, error) {
+			return cf.ExecuteQSQLKernelPlanValueWithRoute(planID, route)
+		},
+		"QSQLKernelPlan op-exit out of register range",
+		"QSQLKernelPlan op-exit plan %d was not handled",
+	)
 }

@@ -234,18 +234,16 @@ func (a qEvalPipelineExecutionAdapter) executeValue(planID int, route qEvalPipel
 }
 
 func (a qEvalPipelineExecutionAdapter) executeIntoSlot(planID, absSlot int, regs []runtime.Value, route qEvalPipelineExecutionRoute) error {
-	if absSlot < 0 || absSlot >= len(regs) {
-		return fmt.Errorf("QEvalPipelinePlan exit out of register range")
-	}
-	out, handled, err := a.executeValue(planID, route)
-	if err != nil || !handled {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("QEvalPipelinePlan exit plan %d was not handled", planID)
-	}
-	regs[absSlot] = out
-	return nil
+	return executeQTypedRuntimeValueIntoSlot(
+		regs,
+		absSlot,
+		planID,
+		func() (runtime.Value, bool, error) {
+			return a.executeValue(planID, route)
+		},
+		"QEvalPipelinePlan exit out of register range",
+		"QEvalPipelinePlan exit plan %d was not handled",
+	)
 }
 
 func (cf *CompiledFunction) tryExecuteQEvalPipelineDirectReturn(args []runtime.Value) ([]runtime.Value, bool, error) {
