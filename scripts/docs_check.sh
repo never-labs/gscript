@@ -103,8 +103,16 @@ if [ ! -f "docs/_layouts/home.html" ]; then
     echo "error: docs/index.md uses the home layout, but docs/_layouts/home.html is missing" >&2
     exit 1
 fi
+if [ ! -f "docs/_layouts/default.html" ] || [ ! -f "docs/_layouts/page.html" ]; then
+    echo "error: docs must override Jekyll default/page layouts so reference pages do not use the Minima auto-navigation header" >&2
+    exit 1
+fi
 if ! grep -Fq "layout: home" docs/index.md; then
     echo "error: docs/index.md must use layout: home so GitHub Pages does not render the default Minima page header" >&2
+    exit 1
+fi
+if grep -R "guides/embedding/" docs/_layouts >/dev/null; then
+    echo "error: docs top navigation must link guides/embedding.html; guides/embedding/ is not a generated Pages path" >&2
     exit 1
 fi
 if [ ! -s "$TMP_DOCS/spec-preview.html" ]; then
