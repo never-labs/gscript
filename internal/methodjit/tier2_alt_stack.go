@@ -292,12 +292,8 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		if !ok {
 			return
 		}
-		slot, okSlot := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitSlot)
-		arg1, okArg1 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg1)
-		arg2, okArg2 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg2)
-		if !okSlot || !okArg1 || !okArg2 {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorGather register range out of bounds")
-			ctx.HelperErrFlag = 1
+		slot, arg1, arg2, ok := tier2DirectHelperBinary(ctx, frame, "VectorGather")
+		if !ok {
 			return
 		}
 		out, err := frame.cf.qFrameVectorRuntimeExecutionAdapter().executeVectorGather(
@@ -312,12 +308,8 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		if !ok {
 			return
 		}
-		slot, okSlot := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitSlot)
-		arg1, okArg1 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg1)
-		arg2, okArg2 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg2)
-		if !okSlot || !okArg1 || !okArg2 {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorCompare register range out of bounds")
-			ctx.HelperErrFlag = 1
+		slot, arg1, arg2, ok := tier2DirectHelperBinary(ctx, frame, "VectorCompare")
+		if !ok {
 			return
 		}
 		out, err := frame.cf.qFrameVectorRuntimeExecutionAdapter().executeVectorCompare(
@@ -333,12 +325,8 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		if !ok {
 			return
 		}
-		slot, okSlot := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitSlot)
-		arg1, okArg1 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg1)
-		arg2, okArg2 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg2)
-		if !okSlot || !okArg1 || !okArg2 {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorMask register range out of bounds")
-			ctx.HelperErrFlag = 1
+		slot, arg1, arg2, ok := tier2DirectHelperBinary(ctx, frame, "VectorMask")
+		if !ok {
 			return
 		}
 		out, err := frame.cf.qFrameVectorRuntimeExecutionAdapter().executeVectorMask(
@@ -375,11 +363,8 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		if !ok {
 			return
 		}
-		slot, okSlot := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitSlot)
-		arg1, okArg1 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg1)
-		if !okSlot || !okArg1 {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorReduce register range out of bounds")
-			ctx.HelperErrFlag = 1
+		slot, arg1, ok := tier2DirectHelperUnary(ctx, frame, "VectorReduce")
+		if !ok {
 			return
 		}
 		out, err := frame.cf.qFrameVectorRuntimeExecutionAdapter().executeVectorReduce(
@@ -394,11 +379,8 @@ func tier2JITHelperBridge(ctxPtr uintptr) {
 		if !ok {
 			return
 		}
-		slot, okSlot := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitSlot)
-		arg1, okArg1 := tier2DirectHelperAbs(frame.regs, frame.base, ctx.OpExitArg1)
-		if !okSlot || !okArg1 {
-			ctx.HelperErr = fmt.Errorf("tier2: direct helper: VectorScan register range out of bounds")
-			ctx.HelperErrFlag = 1
+		slot, arg1, ok := tier2DirectHelperUnary(ctx, frame, "VectorScan")
+		if !ok {
 			return
 		}
 		out, err := frame.cf.qFrameVectorRuntimeExecutionAdapter().executeVectorScan(

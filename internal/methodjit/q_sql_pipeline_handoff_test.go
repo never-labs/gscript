@@ -168,6 +168,105 @@ func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRoute(t *testing.T) {
 	}
 }
 
+func TestTier2DirectHelperBridgeQSQLKernelPlanReportsSlotRangeError(t *testing.T) {
+	cf := &CompiledFunction{}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[0])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQSQLKernelPlan),
+		OpExitSlot: 1,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QSQLKernelPlan direct helper calls = %d, want 1", got)
+	}
+	const want = "tier2: direct helper: QSQLKernelPlan register range out of bounds"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QSQLKernelPlan range error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+	if len(cf.QKernelExecutionStats()) != 0 {
+		t.Fatalf("QSQLKernelPlan range error stats = %+v, want none before backend execution", cf.QKernelExecutionStats())
+	}
+}
+
+func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRouteBackendUnhandled(t *testing.T) {
+	plan := QSQLKernelRuntimeBackendPlan(QSQLKernelPipelineRef{
+		Shape:         "select/where/project",
+		PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column:1",
+		SchemaHash:    "schema-direct-unhandled",
+	})
+	executor := &testQSQLKernelBackendExecutor{handled: false}
+	cf := &CompiledFunction{
+		QSQLKernelPlans:   []QSQLKernelBackendPlan{plan},
+		QSQLKernelBackend: executor,
+	}
+	regs := []runtime.Value{runtime.NilValue()}
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[0])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQSQLKernelPlan),
+		OpExitSlot: 0,
+		OpExitAux:  0,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	const want = "QSQLKernelPlan op-exit plan 0 was not handled"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QSQLKernelPlan unhandled error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+	if len(executor.seen) != 1 {
+		t.Fatalf("QSQLKernelPlan backend executions = %d, want 1", len(executor.seen))
+	}
+	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+	if got := qKernelExecutionCount(cf.QKernelExecutionStats(), QSQLKernelRuntimeSource, plan.Ref.Kernel, "typed_runtime_op_exit", "error"); got != 0 {
+		t.Fatalf("QSQLKernelPlan op-exit error route count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeQSQLKernelPlanRecordsDirectRouteConversionError(t *testing.T) {
+	plan := QSQLKernelRuntimeBackendPlan(QSQLKernelPipelineRef{
+		Shape:         "select/where/project",
+		PipelineShape: "scan=frame|where=compare_mask:column_literal|filter=index|project=column:1",
+		SchemaHash:    "schema-direct-conversion",
+	})
+	executor := &testQSQLKernelBackendExecutor{out: struct{}{}, handled: true}
+	cf := &CompiledFunction{
+		QSQLKernelPlans:   []QSQLKernelBackendPlan{plan},
+		QSQLKernelBackend: executor,
+	}
+	regs := []runtime.Value{runtime.IntValue(7)}
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[0])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQSQLKernelPlan),
+		OpExitSlot: 0,
+		OpExitAux:  0,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	const want = "methodjit: q eval pipeline result type struct {} is not runtime-value supported"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QSQLKernelPlan conversion error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+	if !regs[0].IsInt() || regs[0].Int() != 7 {
+		t.Fatalf("QSQLKernelPlan conversion error register = %v, want original int 7", regs[0])
+	}
+	assertQSQLKernelExecutionStatWithRoute(t, cf.QKernelExecutionStats(), plan.Ref, string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+	if got := qKernelExecutionCount(cf.QKernelExecutionStats(), QSQLKernelRuntimeSource, plan.Ref.Kernel, "typed_runtime_op_exit", "error"); got != 0 {
+		t.Fatalf("QSQLKernelPlan op-exit error route count = %d, want 0", got)
+	}
+}
+
 func BenchmarkQSQLKernelPlanRouteMetrics(b *testing.B) {
 	for _, tc := range []struct {
 		name  string

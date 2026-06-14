@@ -742,6 +742,54 @@ func TestTier2DirectHelperBridgeQVectorWhereReduceRecordsDirectRoute(t *testing.
 	assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_vector_runtime", "QVectorWhereReduce", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
 }
 
+func TestTier2DirectHelperBridgeQVectorWhereReduceReportsTempSlotRangeError(t *testing.T) {
+	cf := &CompiledFunction{}
+	regs := make([]runtime.Value, 4)
+	const base = 1
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQVectorWhereReduce),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 3,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QVectorWhereReduce direct helper calls = %d, want 1", got)
+	}
+	const want = "tier2: direct helper: QVectorWhereReduce register range out of bounds"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QVectorWhereReduce error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+}
+
+func TestTier2DirectHelperBridgeQVectorWhereReduceReportsInvalidTempArgCount(t *testing.T) {
+	cf := &CompiledFunction{}
+	regs := make([]runtime.Value, 5)
+	const base = 1
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQVectorWhereReduce),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	const want = "tier2: direct helper: QVectorWhereReduce register range out of bounds"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QVectorWhereReduce nArgs error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+}
+
 func TestTier2DirectHelperBridgeQVectorGatherReduceRecordsDirectRoute(t *testing.T) {
 	cf := &CompiledFunction{
 		QVectorRuntimeKernelShapesByID: map[int]string{
@@ -845,6 +893,146 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.
 	assertNoQKernelExecutionStat(t, stats, "methodjit_q_vector_runtime", "VectorCompare")
 	if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "success"); got != 0 {
 		t.Fatalf("QFrameSelectColumn op-exit route count = %d, want 0", got)
+	}
+}
+
+func TestTier2DirectHelperBridgeQFrameSelectColumnUsesDynamicCompareRHS(t *testing.T) {
+	proto := qFrameSelectColumnRouteProto()
+	spec := qFrameSelectColumnRouteSpec()
+	spec.HasCompareRHSConst = false
+	spec.CompareRHSConst = runtime.NilValue()
+	spec.DynamicArgRole = QFrameSelectColumnArgCompareRHS
+	cf := &CompiledFunction{
+		Proto:                   proto,
+		QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec},
+	}
+	regs := make([]runtime.Value, 4)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	regs[base+2] = runtime.FloatValue(100)
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQFrameSelectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QFrameSelectColumn dynamic RHS error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QFrameSelectColumn dynamic RHS direct helper calls = %d, want 1", got)
+	}
+	assertQFrameSelectColumnRouteResult(t, regs[base])
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+}
+
+func TestTier2DirectHelperBridgeQFrameSelectColumnUsesDynamicRowValue(t *testing.T) {
+	proto := qFrameSelectColumnRouteProto()
+	spec := qFrameSelectColumnRouteSpec()
+	spec.Shape = "gather/project/column"
+	spec.SourceColumnConst = -1
+	spec.CompareRHSConst = runtime.NilValue()
+	spec.HasCompareRHSConst = false
+	spec.RowMode = QFrameSelectColumnRowsGather
+	spec.DynamicArgRole = QFrameSelectColumnArgRowValue
+	cf := &CompiledFunction{
+		Proto:                   proto,
+		QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{spec},
+	}
+	regs := make([]runtime.Value, 4)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	regs[base+2] = runtime.DenseArrayValue(runtime.NewDenseArrayI64([]int64{3, 1}))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQFrameSelectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+		OpExitAux:  0,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if ctx.HelperErrFlag != 0 || ctx.HelperErr != nil {
+		t.Fatalf("tier2JITHelperBridge QFrameSelectColumn dynamic row error flag=%d err=%v", ctx.HelperErrFlag, ctx.HelperErr)
+	}
+	assertDenseI64Values(t, "QFrameSelectColumn dynamic row", regs[base], []int64{20, 5})
+	stats := cf.QKernelExecutionStats()
+	assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "gather/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "success", 1)
+}
+
+func TestTier2DirectHelperBridgeQFrameSelectColumnReportsDynamicArgRangeError(t *testing.T) {
+	proto := qFrameSelectColumnRouteProto()
+	cf := &CompiledFunction{
+		Proto:                   proto,
+		QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{qFrameSelectColumnRouteSpec()},
+	}
+	regs := make([]runtime.Value, 3)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQFrameSelectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: 2,
+		OpExitAux:  0,
+	}
+
+	beforeDirect := Tier2DirectHelperCallCount()
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	if got := Tier2DirectHelperCallCount() - beforeDirect; got != 1 {
+		t.Fatalf("QFrameSelectColumn dynamic arg range direct helper calls = %d, want 1", got)
+	}
+	const want = "tier2: direct helper: QFrameSelectColumn dynamic arg out of bounds"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QFrameSelectColumn dynamic arg error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+}
+
+func TestTier2DirectHelperBridgeQFrameSelectColumnReportsSpecIndexRangeError(t *testing.T) {
+	proto := qFrameSelectColumnRouteProto()
+	cf := &CompiledFunction{
+		Proto:                   proto,
+		QFrameSelectColumnSpecs: []QFrameSelectColumnSpec{qFrameSelectColumnRouteSpec()},
+	}
+	regs := make([]runtime.Value, 3)
+	const base = 1
+	regs[base+1] = runtime.TableValue(qVectorGatherReduceRouteFrame(t))
+	ctx := &ExecContext{
+		HelperCF:   uintptr(unsafe.Pointer(cf)),
+		RegsBase:   uintptr(unsafe.Pointer(&regs[0])),
+		Regs:       uintptr(unsafe.Pointer(&regs[base])),
+		RegsEnd:    uintptr(unsafe.Pointer(&regs[0])) + uintptr(len(regs))*uintptr(jit.ValueSize),
+		OpExitOp:   int64(OpQFrameSelectColumn),
+		OpExitSlot: 0,
+		OpExitArg1: 1,
+		OpExitArg2: -1,
+		OpExitAux:  1,
+	}
+
+	tier2JITHelperBridge(uintptr(unsafe.Pointer(ctx)))
+	const want = "tier2: direct helper: QFrameSelectColumn spec index is out of range"
+	if ctx.HelperErrFlag != 1 || ctx.HelperErr == nil || ctx.HelperErr.Error() != want {
+		t.Fatalf("QFrameSelectColumn spec index error flag=%d err=%v, want %q", ctx.HelperErrFlag, ctx.HelperErr, want)
+	}
+	if len(cf.QKernelExecutionStats()) != 0 {
+		t.Fatalf("QFrameSelectColumn spec index stats = %+v, want none before runtime execution", cf.QKernelExecutionStats())
 	}
 }
 
