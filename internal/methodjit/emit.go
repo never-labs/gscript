@@ -672,6 +672,13 @@ type CompiledFunction struct {
 	// typed pipeline op-exit/native lowering.
 	QEvalPipelinePlans []QEvalPipelinePlanRef
 
+	// QSQLKernelPlans keeps qSQL typed runtime backend handles alive for
+	// OpQSQLKernelPlan op-exit execution.
+	QSQLKernelPlans []QSQLKernelBackendPlan
+
+	// QSQLKernelBackend executes QSQLKernelPlans through the data/qSQL runtime.
+	QSQLKernelBackend QSQLKernelBackendExecutor
+
 	// QEvalPipelineBackend keeps predecoded descriptor handoff metadata for
 	// q.eval typed pipeline op-exit execution.
 	QEvalPipelineBackend qRuntimeEvalPipelineBackend

@@ -246,6 +246,10 @@ const (
 	// Function.QEvalPipelinePlans index. Interpreter/runtime paths execute the
 	// referenced plan through the q pipeline backend.
 	OpQEvalPipelinePlan
+	// qSQL typed runtime kernel primitive. Args = [], Aux =
+	// Function.QSQLKernelPlans index. Interpreter/runtime paths execute the
+	// referenced schema-stable plan through the qSQL runtime backend executor.
+	OpQSQLKernelPlan
 	// q session constant-source eval primitive. Args = [session table], Aux =
 	// constant pool index of the q source string. Execution invokes the
 	// receiver session's own eval host function (q.session.eval), so session

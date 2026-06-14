@@ -43,6 +43,8 @@ func qRuntimePrimitiveExecutionMetadata(op Op) (source, kernel, shape, route str
 		return "methodjit_q_vector_runtime", "QVectorGatherReduce", "gather/vector-reduce", route, true
 	case OpQEvalPipelinePlan:
 		return "methodjit_q_eval_runtime", "QEvalPipelinePlan", "q-eval/pipeline-plan", route, true
+	case OpQSQLKernelPlan:
+		return QSQLKernelRuntimeSource, "QSQLKernelPlan", "qsql/kernel-plan", route, true
 	case OpQEvalSessionEval:
 		return "methodjit_q_eval_runtime", "QEvalSessionEval", "q-eval/session-eval", route, true
 	case OpVectorScan:

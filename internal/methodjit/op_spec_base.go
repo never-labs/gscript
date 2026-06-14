@@ -106,6 +106,7 @@ var opSpecs = [...]OpSpec{
 	OpQVectorWhereReduce:            opSpecArgCount(opSpec("QVectorWhereReduce", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(3)),
 	OpQVectorGatherReduce:           opSpecArgCount(opSpec("QVectorGatherReduce", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(2)),
 	OpQEvalPipelinePlan:             opSpecArgCount(opSpec("QEvalPipelinePlan", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(0)),
+	OpQSQLKernelPlan:                opSpecArgCount(opSpec("QSQLKernelPlan", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(0)),
 	OpQEvalSessionEval:              opSpecArgCount(opSpec("QEvalSessionEval", OpEmitterTable, OpArgFixedAux, OpSideEffectCall, true), OpFixedCount(1)),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpGetFieldNumToFloat:            opSpec("GetFieldNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),

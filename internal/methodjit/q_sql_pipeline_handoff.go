@@ -2,6 +2,12 @@
 
 package methodjit
 
+import (
+	"fmt"
+
+	"github.com/never-labs/leia/internal/runtime"
+)
+
 const (
 	QSQLKernelRuntimeSource  = "methodjit_qsql_kernel_runtime"
 	QSQLKernelLoweringSource = "methodjit_qsql_kernel_lowering"
@@ -46,6 +52,14 @@ func (plan QSQLKernelBackendPlan) Valid() bool {
 // owns any frame/query-kernel lookup needed to run it.
 type QSQLKernelBackendExecutor interface {
 	ExecuteQSQLKernelBackendPlan(QSQLKernelBackendPlan) (any, bool, error)
+}
+
+func qSQLKernelBackendPlanByID(plans []QSQLKernelBackendPlan, id int) (QSQLKernelBackendPlan, bool) {
+	if id < 0 || id >= len(plans) {
+		return QSQLKernelBackendPlan{}, false
+	}
+	plan := plans[id]
+	return plan, plan.Valid()
 }
 
 func (ref QSQLKernelPipelineRef) normalized(source string) QSQLKernelPipelineRef {
@@ -171,4 +185,64 @@ func (cf *CompiledFunction) RecordQSQLKernelDescriptorCacheLookup(ref QSQLKernel
 		route:         ref.Route,
 		schemaHash:    ref.SchemaHash,
 	})
+}
+
+func (cf *CompiledFunction) RecordQSQLKernelPlanExecution(ref QSQLKernelPipelineRef, outcome string) {
+	cf.RecordQSQLKernelPlanExecutionWithRoute(ref, "typed_runtime_op_exit", outcome)
+}
+
+func (cf *CompiledFunction) RecordQSQLKernelPlanExecutionWithRoute(ref QSQLKernelPipelineRef, route, outcome string) {
+	if cf == nil {
+		return
+	}
+	ref = ref.normalized(QSQLKernelRuntimeSource)
+	if route == "" {
+		route = "typed_runtime_op_exit"
+	}
+	cf.recordQKernelExecutionWithPipelineShape(
+		QSQLKernelRuntimeSource,
+		ref.Kernel,
+		ref.Shape,
+		ref.PipelineShape,
+		route,
+		outcome,
+		ref.SchemaHash,
+	)
+}
+
+func (cf *CompiledFunction) ExecuteQSQLKernelPlanValue(id int) (runtime.Value, bool, error) {
+	if cf == nil || cf.QSQLKernelBackend == nil {
+		return runtime.NilValue(), false, nil
+	}
+	plan, ok := qSQLKernelBackendPlanByID(cf.QSQLKernelPlans, id)
+	if !ok {
+		return runtime.NilValue(), false, nil
+	}
+	out, handled, err := cf.QSQLKernelBackend.ExecuteQSQLKernelBackendPlan(plan)
+	if err != nil || !handled {
+		cf.RecordQSQLKernelPlanExecution(plan.Ref, "error")
+		return runtime.NilValue(), handled, err
+	}
+	value, err := qEvalPipelineRuntimeValue(out)
+	if err != nil {
+		cf.RecordQSQLKernelPlanExecution(plan.Ref, "error")
+		return runtime.NilValue(), false, err
+	}
+	cf.RecordQSQLKernelPlanExecution(plan.Ref, "success")
+	return value, true, nil
+}
+
+func (cf *CompiledFunction) executeQSQLKernelPlanSlot(planID, absSlot int, regs []runtime.Value) error {
+	if absSlot < 0 || absSlot >= len(regs) {
+		return fmt.Errorf("QSQLKernelPlan op-exit out of register range")
+	}
+	out, handled, err := cf.ExecuteQSQLKernelPlanValue(planID)
+	if err != nil {
+		return err
+	}
+	if !handled {
+		return fmt.Errorf("QSQLKernelPlan op-exit plan %d was not handled", planID)
+	}
+	regs[absSlot] = out
+	return nil
 }

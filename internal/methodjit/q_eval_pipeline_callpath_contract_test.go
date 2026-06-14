@@ -39,6 +39,40 @@ func TestQEvalPipelinePlanCallpathContracts(t *testing.T) {
 	}
 }
 
+func TestQSQLKernelPlanCallpathContracts(t *testing.T) {
+	spec, ok := OpQSQLKernelPlan.Spec()
+	if !ok {
+		t.Fatalf("OpQSQLKernelPlan has no OpSpec")
+	}
+	if spec.Name != "QSQLKernelPlan" ||
+		spec.EmitterFamily != OpEmitterTable ||
+		spec.ArgPolicy != OpArgFixedAux ||
+		!spec.ArgCount.Set ||
+		spec.ArgCount.Min != 0 ||
+		spec.ArgCount.Max != 0 ||
+		spec.SideEffect != OpSideEffectRead {
+		t.Fatalf("OpQSQLKernelPlan spec = %+v, want zero-arg read-side typed runtime op", spec)
+	}
+	if !spec.NativeReplayMayExit || !tier2OpMayExitForNativeReplay(&Instr{Op: OpQSQLKernelPlan}) {
+		t.Fatalf("OpQSQLKernelPlan should be native-replay may-exit through OpSpec")
+	}
+
+	source, kernel, shape, route, ok := qRuntimePrimitiveExecutionMetadata(OpQSQLKernelPlan)
+	if !ok ||
+		source != QSQLKernelRuntimeSource ||
+		kernel != "QSQLKernelPlan" ||
+		shape != "qsql/kernel-plan" ||
+		route != "typed_runtime_op_exit" {
+		t.Fatalf("qRuntimePrimitiveExecutionMetadata(OpQSQLKernelPlan) = %q/%q/%q/%q/%v, want qSQL typed runtime op-exit metadata",
+			source, kernel, shape, route, ok)
+	}
+
+	fn := &Function{Blocks: []*Block{{Instrs: []*Instr{{ID: 1, Op: OpQSQLKernelPlan, Aux: 0}}}}}
+	if !fnHasResultProducingOpExit(fn) {
+		t.Fatalf("OpQSQLKernelPlan should be treated as a result-producing op-exit by native codegen")
+	}
+}
+
 func TestQEvalPipelinePlanExecutionShapeUsesPlanRefShape(t *testing.T) {
 	refs := []QEvalPipelinePlanRef{{
 		ID:      0,

@@ -74,6 +74,7 @@ var opNativeReplayMayExitPolicies = [...]bool{
 	OpMatrixFlat:                 true,
 	OpMatrixStride:               true,
 	OpQEvalPipelinePlan:          true,
+	OpQSQLKernelPlan:             true,
 	OpQEvalSessionEval:           true,
 	OpAddInt:                     true,
 	OpSubInt:                     true,

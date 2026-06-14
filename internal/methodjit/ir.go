@@ -215,6 +215,15 @@ type Function struct {
 	// q.eval calls without depending on q AST/runtime implementation details.
 	QEvalPipelinePlans []QEvalPipelinePlanRef
 
+	// QSQLKernelPlans records schema-stable qSQL typed runtime backend handles.
+	// The qSQL frontend/data layer owns parsing and execution; MethodJIT keeps
+	// only the executable boundary needed for op-exit/JIT backend handoff.
+	QSQLKernelPlans []QSQLKernelBackendPlan
+
+	// QSQLKernelBackend executes QSQLKernelPlans when the IR interpreter or
+	// compiled op-exit path reaches OpQSQLKernelPlan.
+	QSQLKernelBackend QSQLKernelBackendExecutor
+
 	// Unpromotable, when true, signals that this function cannot be safely
 	// compiled at Tier 2 because BuildGraph encountered bytecode patterns
 	// it does not model. Set by the graph builder and checked by

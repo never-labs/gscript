@@ -649,6 +649,13 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		ctx.OpExitAux = int64(aux)
 		return cf.executeQEvalPipelinePlanExit(ctx, regs, base, qEvalPipelineExecutionRouteOpExit)
 
+	case OpQSQLKernelPlan:
+		cf, _ := tm.tier2CompiledFor(proto)
+		if cf == nil {
+			return fmt.Errorf("QSQLKernelPlan op-exit missing compiled function")
+		}
+		return cf.executeQSQLKernelPlanSlot(aux, absSlot, regs)
+
 	case OpQEvalSessionEval:
 		if absArg1 >= len(regs) || absSlot >= len(regs) {
 			return fmt.Errorf("QEvalSessionEval op-exit out of register range")

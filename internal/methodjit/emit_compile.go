@@ -521,6 +521,8 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		StringSplitSubSpecs:               fn.StringSplitSubSpecs,
 		QFrameSelectColumnSpecs:           fn.QFrameSelectColumnSpecs,
 		QEvalPipelinePlans:                fn.QEvalPipelinePlans,
+		QSQLKernelPlans:                   fn.QSQLKernelPlans,
+		QSQLKernelBackend:                 fn.QSQLKernelBackend,
 		QEvalPipelineBackend:              qEvalPipelineBackend,
 		QEvalPipelinePlanHelpers:          newQEvalPipelinePlanHelpers(fn.QEvalPipelinePlans, qEvalPipelineBackend),
 		QEvalPipelineDirectReturn:         qEvalPipelineDirectReturnID >= 0,
@@ -665,7 +667,7 @@ func fnHasResultProducingOpExit(fn *Function) bool {
 				continue
 			}
 			switch instr.Op {
-			case OpMatrixDense, OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameFilterProject, OpFrameGather, OpFrameSlice, OpFrameOrder, OpFrameOrderGather, OpFrameProjectColumn, OpFrameFilterProjectColumn, OpFrameGroupAggregate, OpVectorGather, OpVectorCompare, OpVectorMask, OpVectorWhere, OpVectorReduce, OpVectorScan, OpQFrameSelectColumn, OpQVectorWhereReduce, OpQVectorGatherReduce, OpQEvalPipelinePlan, OpQEvalSessionEval:
+			case OpMatrixDense, OpFrameLen, OpFrameColumn, OpFrameMask, OpFrameProject, OpFrameFilter, OpFrameFilterProject, OpFrameGather, OpFrameSlice, OpFrameOrder, OpFrameOrderGather, OpFrameProjectColumn, OpFrameFilterProjectColumn, OpFrameGroupAggregate, OpVectorGather, OpVectorCompare, OpVectorMask, OpVectorWhere, OpVectorReduce, OpVectorScan, OpQFrameSelectColumn, OpQVectorWhereReduce, OpQVectorGatherReduce, OpQEvalPipelinePlan, OpQSQLKernelPlan, OpQEvalSessionEval:
 				return true
 			}
 		}

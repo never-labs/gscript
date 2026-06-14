@@ -1324,6 +1324,9 @@ func (cf *CompiledFunction) executeOpExit(ctx *ExecContext, regs []runtime.Value
 		ctx.OpExitAux = int64(aux)
 		return cf.executeQEvalPipelinePlanExit(ctx, regs, 0, qEvalPipelineExecutionRouteOpExit)
 
+	case OpQSQLKernelPlan:
+		return cf.executeQSQLKernelPlanSlot(aux, slot, regs)
+
 	case OpQEvalSessionEval:
 		if arg1 >= len(regs) || slot >= len(regs) {
 			return fmt.Errorf("QEvalSessionEval op-exit out of register range")

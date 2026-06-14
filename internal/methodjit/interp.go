@@ -1266,6 +1266,17 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		s.values[instr.ID] = out
 
+	case OpQSQLKernelPlan:
+		cf := &CompiledFunction{QSQLKernelPlans: s.fn.QSQLKernelPlans, QSQLKernelBackend: s.fn.QSQLKernelBackend}
+		out, handled, err := cf.ExecuteQSQLKernelPlanValue(int(instr.Aux))
+		if err != nil {
+			return nil, false, err
+		}
+		if !handled {
+			return nil, false, fmt.Errorf("IR interpreter: qSQL kernel plan %d was not handled", instr.Aux)
+		}
+		s.values[instr.ID] = out
+
 	case OpQEvalSessionEval:
 		var constants []runtime.Value
 		if s.fn.Proto != nil {
