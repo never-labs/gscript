@@ -20,11 +20,11 @@ assert(x == nil && y == nil && z == nil)
 x, y, z = table.unpack(a, 11, 10)
 assert(x == nil && y == nil && z == nil)
 
-one := {1}
+one := [1]
 x, y = table.unpack(one, 1, 1)
 assert(x == 1 && y == nil)
 
-two := {1, 2}
+two := [1, 2]
 x, y = table.unpack(two, 1, 1)
 assert(x == 1 && y == nil)
 

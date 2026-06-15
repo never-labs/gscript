@@ -3,17 +3,17 @@ print("case:events_compare_metamethods")
 cap := {}
 
 func lt(a, b) {
-  cap[#cap + 1] = {"lt", a, b}
+  cap[#cap + 1] = ["lt", a, b]
   return true
 }
 
 func le(a, b) {
-  cap[#cap + 1] = {"le", a, b}
+  cap[#cap + 1] = ["le", a, b]
   return true
 }
 
 func eq(a, b) {
-  cap[#cap + 1] = {"eq", a, b}
+  cap[#cap + 1] = ["eq", a, b]
   return true
 }
 
