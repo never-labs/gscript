@@ -40,6 +40,9 @@ func TestMathModuleRuntimeMigratedCoverage(t *testing.T) {
 		e := math.exp(1)
 		l := math.log(math.exp(1))
 		l10 := math.log(100, 10)
+		near0 := math.near(1.0, 1.0000001, 0.000001)
+		near1 := math.near(1.0, 1.1, 0.000001)
+		near2 := math.near(1.0, 1.1, -0.2)
 		i, frac := math.modf(3.75)
 		math.randomseed(42)
 		r0 := math.random()
@@ -81,6 +84,15 @@ func TestMathModuleRuntimeMigratedCoverage(t *testing.T) {
 	}
 	if stdmath.Abs(interp.GetGlobal("l10").Number()-2) > 1e-10 {
 		t.Fatalf("math.log(100, 10) = %v", interp.GetGlobal("l10"))
+	}
+	if !interp.GetGlobal("near0").Truthy() {
+		t.Fatalf("math.near close value = %v, want true", interp.GetGlobal("near0"))
+	}
+	if interp.GetGlobal("near1").Truthy() {
+		t.Fatalf("math.near far value = %v, want false", interp.GetGlobal("near1"))
+	}
+	if !interp.GetGlobal("near2").Truthy() {
+		t.Fatalf("math.near negative tolerance = %v, want true", interp.GetGlobal("near2"))
 	}
 	if got := interp.GetGlobal("i").Number(); got != 3 {
 		t.Fatalf("math.modf integer part = %v", got)
@@ -176,6 +188,28 @@ func TestMathModuleBinaryFastPaths(t *testing.T) {
 		if !mathFastPathValueEqual(gotSlice, tc.want) {
 			t.Fatalf("math.%s.Fast1 = %v, want %v", name, gotSlice, tc.want)
 		}
+	}
+}
+
+func TestMathModuleTernaryFastPaths(t *testing.T) {
+	mathLib := BuildMath()
+	gf := requireMathGoFunction(t, mathLib, "near")
+	if gf.FastArg3 == nil || gf.Fast1 == nil {
+		t.Fatalf("math.near missing ternary fast paths: %#v", gf)
+	}
+	gotArg, err := gf.FastArg3(FloatValue(1), FloatValue(1.01), FloatValue(0.02))
+	if err != nil {
+		t.Fatalf("math.near.FastArg3 error: %v", err)
+	}
+	gotSlice, err := gf.Fast1([]Value{FloatValue(1), FloatValue(1.01), FloatValue(0.001)})
+	if err != nil {
+		t.Fatalf("math.near.Fast1 error: %v", err)
+	}
+	if !gotArg.Truthy() {
+		t.Fatalf("math.near.FastArg3 = %v, want true", gotArg)
+	}
+	if gotSlice.Truthy() {
+		t.Fatalf("math.near.Fast1 = %v, want false", gotSlice)
 	}
 }
 

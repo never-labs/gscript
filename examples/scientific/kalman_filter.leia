@@ -2,10 +2,6 @@
 // Run:
 //   go run ./cmd/leia run examples/scientific/kalman_filter.leia
 
-func near(a, b, tol) {
-    return math.abs(a - b) <= tol
-}
-
 dt := 1.0
 F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
 H := linalg.row(1.0, 0.0)
@@ -37,8 +33,8 @@ velocity := linalg.get(x, 2, 1)
 uncertainty_trace := linalg.trace(P)
 q_checksum := q.eval("+/1 2 3")
 
-assert(near(position, 5.0, 0.15))
-assert(near(velocity, 1.0, 0.15))
+assert(math.near(position, 5.0, 0.15))
+assert(math.near(velocity, 1.0, 0.15))
 assert(innovation_rmse < 0.20)
 assert(q_checksum == 6)
 

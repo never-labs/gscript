@@ -18,17 +18,17 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.col", "linalg.sandwich", "linalg.chainmul", "linalg.solve_right", "linalg.scalar", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.col", "linalg.sandwich", "linalg.chainmul", "linalg.solve_right", "linalg.scalar", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "math.near", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "rand.normal_vec", "linalg.add", "stats.uniform_weights", "stats.log_normal_pdf", "stats.normalize_log_weights", "stats.effective_sample_size", "stats.resample", "stats.mean", "stats[\"var\"]", "stats.std", "q.eval"},
+			wantAPI: []string{"rand.seed", "rand.normal_vec", "linalg.add", "stats.uniform_weights", "stats.log_normal_pdf", "stats.normalize_log_weights", "stats.effective_sample_size", "stats.resample", "stats.mean", "stats[\"var\"]", "stats.std", "math.near", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "control.lqr", "control.feedback", "ode.integrate", "stats.mean", "stats.max", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "control.lqr", "control.feedback", "ode.integrate", "stats.mean", "stats.max", "math.near", "q.eval"},
 		},
 	}
 	for _, tc := range cases {

@@ -70,6 +70,28 @@ func BuildMath() *Table {
 		}
 	}
 
+	// math.near(a, b, tol) reports whether two numeric values are within an
+	// absolute tolerance. It keeps scientific examples from carrying local
+	// tolerance helpers without adding an assertion-specific module.
+	set("near", func(args []Value) ([]Value, error) {
+		if len(args) < 3 {
+			return nil, fmt.Errorf("bad argument #3 to 'math.near'")
+		}
+		return []Value{mathNearValue(args[0], args[1], args[2])}, nil
+	})
+	if v := t.RawGetString("near"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg3 = func(a, b, tol Value) (Value, error) {
+			return mathNearValue(a, b, tol), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 3 {
+				return NilValue(), fmt.Errorf("bad argument #3 to 'math.near'")
+			}
+			return mathNearValue(args[0], args[1], args[2]), nil
+		}
+	}
+
 	// math.ceil(x) -> int
 	set("ceil", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -627,4 +649,12 @@ func mathToFloat(v Value) float64 {
 	default:
 		return 0
 	}
+}
+
+func mathNearValue(a, b, tol Value) Value {
+	tolerance := mathToFloat(tol)
+	if tolerance < 0 {
+		tolerance = -tolerance
+	}
+	return BoolValue(math.Abs(mathToFloat(a)-mathToFloat(b)) <= tolerance)
 }

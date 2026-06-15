@@ -2,10 +2,6 @@
 // Run:
 //   go run ./cmd/leia run examples/scientific/inverted_pendulum.leia
 
-func near(a, b, tol) {
-    return math.abs(a - b) <= tol
-}
-
 g := 9.81
 l := 1.0
 m := 1.0
@@ -45,8 +41,8 @@ mean_energy := stats.mean(energy)
 peak_energy := stats.max(energy)
 q_checksum := q.eval("+/1 2 3")
 
-assert(near(final_theta, 0.0, 0.04))
-assert(near(final_omega, 0.0, 0.08))
+assert(math.near(final_theta, 0.0, 0.04))
+assert(math.near(final_omega, 0.0, 0.08))
 assert(#trajectory == 240)
 assert(peak_energy < 0.25)
 assert(linalg.get(linalg_probe, 2, 1) == g / l)
