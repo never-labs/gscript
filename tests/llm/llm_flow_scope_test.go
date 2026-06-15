@@ -19,7 +19,7 @@ func TestLLMAgentFlowExplicitConfigLocalsAreShadowable(t *testing.T) {
 probe_config := {
     model: "cfg-model"
     system: "cfg-system"
-    capabilities: {"cfg.cap"}
+    capabilities: ["cfg.cap"]
     response_format: {type: "json_object"}
 }
 

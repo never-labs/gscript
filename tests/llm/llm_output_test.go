@@ -117,7 +117,7 @@ extract_contact := llm.agent("extract_contact", func(text) {
         }
     }, nil
 }, nil, {
-    params: {"text"}
+    params: ["text"]
     description: "Extract contact information."
     output: {
         name: "Ada Lovelace"
@@ -178,7 +178,7 @@ extract := llm.agent("extract", func(text) {
         response_format: {type: "json_schema", name: "explicit"}
     }, nil
 }, nil, {
-    params: {"text"}
+    params: ["text"]
     output: {ok: true}
 })
 
@@ -231,7 +231,7 @@ extract := llm.agent("extract", extract_config, func(text) {
     result, err := llm.turn({})
     return result, err
 }, {
-    params: {"text"}
+    params: ["text"]
     output: {name: "Ada"}
 })
 

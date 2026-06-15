@@ -44,8 +44,8 @@ gate_ok := nil
 gate_status := nil
 
 llm.with_budget({turns: 1}, func() {
-    first, first_err := llm.turn({messages: {llm.user("first")}})
-    second, second_err := llm.turn({messages: {llm.user("second")}})
+    first, first_err := llm.turn({messages: [llm.user("first")]})
+    second, second_err := llm.turn({messages: [llm.user("second")]})
     err_kind = second_err.kind
     err_dimension = second_err.dimension
     err_message = second_err.message
@@ -143,8 +143,8 @@ err_dimension := nil
 
 llm.with_budget({tokens: 5}, func() {
     llm.with_budget({tokens: 100}, func() {
-        first, first_err := llm.turn({messages: {llm.user("first")}})
-        second, second_err := llm.turn({messages: {llm.user("second")}})
+        first, first_err := llm.turn({messages: [llm.user("first")]})
+        second, second_err := llm.turn({messages: [llm.user("second")]})
         err_kind = second_err.kind
         err_dimension = second_err.dimension
     })
@@ -192,7 +192,7 @@ func TestLLMStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 			if err := vm.Exec(`
 lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
-}, {params: {"query"}, requires: {"none"}})
+}, {params: ["query"], requires: ["none"]})
 
 call_kind := nil
 call_dimension := nil
@@ -209,7 +209,7 @@ call_outcome_status := nil
 llm.with_budget({calls: 0}, func() {
     result, err := llm.run_agent({
         model: "mock"
-        tools: {lookup}
+        tools: [lookup]
         user: "find leia"
     })
     call_kind = err.kind
@@ -220,7 +220,7 @@ llm.with_budget({calls: 0}, func() {
 })
 
 llm.with_budget({time: 0}, func() {
-    result, err := llm.turn({messages: {llm.user("deadline")}})
+    result, err := llm.turn({messages: [llm.user("deadline")]})
     time_kind = err.kind
     time_message = err.message
     outcome := llm.budget_outcome(err)

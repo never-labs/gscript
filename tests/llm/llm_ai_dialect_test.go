@@ -57,28 +57,28 @@ model {
 read_file := tool {
     name: "read_file"
     fn: func(path) { return "file:" .. path, nil }
-    params: {"path"}
+    params: ["path"]
     description: "Read a workspace file."
 }
 
 search_text := tool {
     name: "search_text"
     fn: func(query) { return "matches:" .. query, nil }
-    params: {"query"}
+    params: ["query"]
     description: "Search workspace text."
 }
 
 apply_patch := tool {
     name: "apply_patch"
     fn: func(patch) { return "patched", nil }
-    params: {"patch"}
+    params: ["patch"]
     description: "Apply a patch."
 }
 
 run_shell := tool {
     name: "run_shell"
     fn: func(command) { return "ran:" .. command, nil }
-    params: {"command"}
+    params: ["command"]
     description: "Run a shell command."
 }
 
@@ -89,17 +89,17 @@ coding_agent := agent {
             model: "mock-fast"
             system: "Use the repository tools."
             user: task
-            tools: {read_file, search_text, apply_patch, run_shell}
+            tools: [read_file, search_text, apply_patch, run_shell]
         }, nil
     }
-    params: {"task"}
+    params: ["task"]
     description: "Repository coding agent."
 }
 
 agent_result, agent_err := coding_agent("inspect the README")
 turn_result, turn_err := turn {
     model: "mock-fast"
-    messages: {llm.user("single turn")}
+    messages: [llm.user("single turn")]
 }
 agent_err_kind := nil
 agent_err_message := nil
@@ -176,19 +176,19 @@ model {
 read_file := tool {
     name: "read_file"
     fn: func(path) { return "file:" .. path, nil }
-    params: {"path"}
+    params: ["path"]
 }
 
 search_text := tool {
     name: "search_text"
     fn: func(query) { return "matches:" .. query, nil }
-    params: {"query"}
+    params: ["query"]
 }
 
 result, err := turn {
     model: "mock-fast"
-    messages: {llm.user("single turn")}
-    tools: {read_file, search_text}
+    messages: [llm.user("single turn")]
+    tools: [read_file, search_text]
 }
 text := result.text
 `); err != nil {
@@ -231,7 +231,7 @@ model {
 lookup := tool {
     name: "lookup"
     fn: func(query) { return "found:" .. query, nil }
-    params: {"query"}
+    params: ["query"]
     description: "Lookup docs."
 }
 
@@ -240,11 +240,11 @@ assistant := agent {
     config: func(q) {
         return {
             model: "mock-fast"
-            messages: {llm.user(prompt` + "`" + `research ${q}` + "`" + `.text)}
-            tools: {lookup}
+            messages: [llm.user(prompt` + "`" + `research ${q}` + "`" + `.text)]
+            tools: [lookup]
         }, nil
     }
-    params: {"q"}
+    params: ["q"]
     description: "Prompt-backed research agent."
 }
 
@@ -257,8 +257,8 @@ agent_result, agent_err := assistant(subject)
 streamed := ""
 turn_result, turn_err := turn {
     model: "mock-fast"
-    messages: {llm.user(prompt` + "`" + `stream ${subject}` + "`" + `.text)}
-    tools: {lookup}
+    messages: [llm.user(prompt` + "`" + `stream ${subject}` + "`" + `.text)]
+    tools: [lookup]
     force_tool: lookup
     on_stream: func(event) {
         streamed = streamed .. event.token
@@ -334,7 +334,7 @@ model {
 lookup := tool {
     name: "lookup"
     fn: func(topic) { return "found:" .. topic, nil }
-    params: {"topic"}
+    params: ["topic"]
     description: "Lookup evidence."
 }
 
@@ -350,8 +350,8 @@ writer := agent {
     name: "writer"
     model: "mock-fast"
     instructions: prompt { role: "system", text: "Use evidence and be brief." }
-    tools: {lookup}
-    params: {"question"}
+    tools: [lookup]
+    params: ["question"]
     output: {summary: "short"}
     max_steps: 1
 }

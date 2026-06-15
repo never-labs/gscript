@@ -43,15 +43,15 @@ func TestLLMTraceSinkReceivesTurnAndReactEvents(t *testing.T) {
 			if err := vm.Exec(`
 turn_result, turn_err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
 })
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 react_result, react_err := llm.react({
     model: "mock-fast",
-    messages: {llm.user("find docs")},
-    tools: {lookup},
+    messages: [llm.user("find docs")],
+    tools: [lookup],
     max_steps: 3,
 })
 `); err != nil {
@@ -125,7 +125,7 @@ func TestLLMTraceSinkReceivesStreamingTokens(t *testing.T) {
 			if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
     stream: true,
 })
 text := result.text
@@ -175,7 +175,7 @@ streamed := ""
 last_event := ""
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
     on_stream: func(event) {
         streamed = streamed .. event.token
         last_event = event.type
@@ -203,7 +203,7 @@ func TestLLMTurnRejectsNonFunctionStreamCallback(t *testing.T) {
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
     on_stream: "not a function",
 })
 kind := err.kind
@@ -233,7 +233,7 @@ func TestLLMTraceRecorderHelper(t *testing.T) {
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
 })
 `); err != nil {
 		t.Fatalf("Exec: %v", err)

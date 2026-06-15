@@ -27,10 +27,10 @@ func TestLLMWorkflowRunsStepsWithPriorTextAsInput(t *testing.T) {
 			if err := vm.Exec(`
 flow := llm.workflow({
     llm.step("draft", func(ctx) {
-        return llm.turn({model: "mock-fast", messages: {llm.user(ctx.input)}})
+        return llm.turn({model: "mock-fast", messages: [llm.user(ctx.input)]})
     }),
     llm.step("revise", func(ctx) {
-        return llm.turn({model: "mock-fast", messages: {llm.user(ctx.input)}})
+        return llm.turn({model: "mock-fast", messages: [llm.user(ctx.input)]})
     }),
 })
 result, err := flow.run("leia")
@@ -86,10 +86,10 @@ func TestLLMWorkflowSupportsProviderReplay(t *testing.T) {
 	if err := vm.Exec(`
 flow := llm.workflow({
     llm.step("draft", func(ctx) {
-        return llm.turn({model: "mock-fast", messages: {llm.user(ctx.input)}})
+        return llm.turn({model: "mock-fast", messages: [llm.user(ctx.input)]})
     }),
     llm.step("final", func(ctx) {
-        return llm.turn({model: "mock-fast", messages: {llm.user(ctx.input)}})
+        return llm.turn({model: "mock-fast", messages: [llm.user(ctx.input)]})
     }),
 })
 result, err := flow.run("topic")
@@ -120,7 +120,7 @@ func TestLLMWorkflowMockSkipsProviderAndFeedsNextStep(t *testing.T) {
 			if err := vm.Exec(`
 flow := llm.workflow({
     llm.step("draft", func(ctx) {
-        return llm.turn({messages: {llm.user("should not run")}})
+        return llm.turn({messages: [llm.user("should not run")]})
     }),
     llm.step("review", func(ctx) {
         return {value: "reviewed " .. ctx.input, text: "reviewed " .. ctx.input}, nil
@@ -165,7 +165,7 @@ func TestLLMWorkflowCanCallAgentSteps(t *testing.T) {
 	)
 	if err := vm.Exec(`
 writer := llm.agent("writer", func(topic) {
-    return {model: "mock-fast", messages: {llm.user(topic)}}
+    return {model: "mock-fast", messages: [llm.user(topic)]}
 })
 flow := llm.workflow({
     llm.step("draft", func(ctx) {
@@ -285,7 +285,7 @@ plan_record, plan_record_err := llm.replay_record({
     replay_key: "turn:plan"
     request: {
         model: "fixture-model"
-        messages: {llm.user("topic")}
+        messages: [llm.user("topic")]
     }
     response: {status: "final_answer" text: "plan text" calls: {} usage: {}}
 })
@@ -294,7 +294,7 @@ final_record, final_record_err := llm.replay_record({
     replay_key: "turn:final"
     request: {
         model: "fixture-model"
-        messages: {llm.user("plan text")}
+        messages: [llm.user("plan text")]
     }
     response: {status: "final_answer" text: "final text" calls: {} usage: {}}
 })
@@ -339,12 +339,12 @@ graph := llm.workflow_graph({
     entrypoint: "ai.workflow.replay"
     stages: {
         llm.stage("plan", func(ctx) {
-            req := {model: "fixture-model" messages: {llm.user(ctx.input)}}
+            req := {model: "fixture-model" messages: [llm.user(ctx.input)]}
             replay, replay_err := plan_fixture.replay(req, "turn:plan")
             if replay_err != nil {
                 return nil, replay_err
             }
-            return llm.turn({model: "fixture-model" messages: {llm.user(ctx.input)} replay: replay})
+            return llm.turn({model: "fixture-model" messages: [llm.user(ctx.input)] replay: replay})
         }, {
             capability: "generic.ai.workflow.stage.plan"
             fixture_key: "turn:plan"
@@ -354,12 +354,12 @@ graph := llm.workflow_graph({
             output_schema: "plan.v1"
         }),
         llm.stage("finalize", func(ctx) {
-            req := {model: "fixture-model" messages: {llm.user(ctx.input)}}
+            req := {model: "fixture-model" messages: [llm.user(ctx.input)]}
             replay, replay_err := final_fixture.replay(req, "turn:final")
             if replay_err != nil {
                 return nil, replay_err
             }
-            return llm.turn({model: "fixture-model" messages: {llm.user(ctx.input)} replay: replay})
+            return llm.turn({model: "fixture-model" messages: [llm.user(ctx.input)] replay: replay})
         }, {
             depends_on: {"plan"}
             capability: "generic.ai.workflow.stage.finalize"
@@ -373,15 +373,15 @@ graph := llm.workflow_graph({
     edges: {{from: "plan", to: "finalize"}}
 })
 result, err := graph.run("topic")
-envelope := llm.trace_envelope({plan_event, final_event}, {
+envelope := llm.trace_envelope([plan_event, final_event], {
     trace_id: "trace-workflow-replay"
 })
 trace_summary := llm.trace_summary(envelope)
 trace_gate := llm.trace_assert(envelope, {
     require_provider_free: true
     deny_live_network: true
-    required_event_types: {"replay_record_matched"}
-    require_correlation_fields: {"replay_session_id", "workflow_run_id", "workflow_step_id"}
+    required_event_types: ["replay_record_matched"]
+    require_correlation_fields: ["replay_session_id", "workflow_run_id", "workflow_step_id"]
 })
 
 setup_ok := plan_record_err == nil && final_record_err == nil && plan_fixture_err == nil && final_fixture_err == nil
@@ -512,7 +512,7 @@ graph := llm.workflow_graph({
     workflow_id: "fixture-key-flow"
     stages: {
         llm.stage("plan", func(ctx) {
-            return llm.turn({messages: {llm.user("should not run")}})
+            return llm.turn({messages: [llm.user("should not run")]})
         }, {
             fixture_key: "turn:plan"
             capability: "generic.ai.workflow.stage.plan"

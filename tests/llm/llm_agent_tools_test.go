@@ -47,7 +47,7 @@ func extract_research_config(topic) {
 }
 
 extract_research := llm.agent("extract_research", extract_research_config, nil, {
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
         confidence: 1
@@ -66,13 +66,13 @@ func delegate_research_fn(topic) {
     }, nil
 }
 
-delegate_research := llm.tool("delegate_research", delegate_research_fn, {params: {"topic"}, requires: {"none"}})
+delegate_research := llm.tool("delegate_research", delegate_research_fn, {params: ["topic"], requires: ["none"]})
 
 result, err := llm.run_agent({
     model: "mock-supervisor"
     system: "Use delegated specialist agents as tools before answering."
     user: "Should this workflow delegate research?"
-    tools: {delegate_research}
+    tools: [delegate_research]
 })
 err_kind := nil
 err_message := nil
@@ -208,7 +208,7 @@ func extract_research_config(topic) {
 }
 
 extract_research := llm.agent("extract_research", extract_research_config, nil, {
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
         confidence: 1
@@ -218,7 +218,7 @@ extract_research := llm.agent("extract_research", extract_research_config, nil, 
 delegate_research := llm.toolof(extract_research, {
     name: "delegate_research"
     description: "Delegate research to a specialist agent."
-    requires: {"none"}
+    requires: ["none"]
 })
 delegate_research.output = {
     summary: "short finding"
@@ -354,7 +354,7 @@ func extract_research_config(topic) {
 }
 
 extract_research := llm.agent("extract_research", extract_research_config, nil, {
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
         confidence: 1
@@ -365,7 +365,7 @@ result, err := llm.run_agent({
     model: "mock-supervisor"
     system: "Use the specialist."
     user: "Check direct delegation."
-    tools: {extract_research}
+    tools: [extract_research]
 })
 err_kind := nil
 err_message := nil

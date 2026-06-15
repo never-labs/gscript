@@ -34,14 +34,14 @@ llm.register_models({
 echo_tool := llm.tool("echo_tool", func(query) {
     return query, nil
 }, {
-    params: {"query"}
-    requires: {"none"}
+    params: ["query"]
+    requires: ["none"]
 })
 
 func support_config(q) {
     return {
         model: "alias"
-        tools: {echo_tool}
+        tools: [echo_tool]
         system: "Use tools when useful."
         user: q
     }
@@ -59,13 +59,13 @@ support := llm.agent("support", support_config, func(q) {
     })
     return r, err
 }, {
-    params: {"q"}
+    params: ["q"]
     description: "Use tools when useful."
 })
 
 flow_result, flow_err := support("hello")
 turn_result, turn_err := llm.turn({
-    messages: {llm.user("direct user shorthand")}
+    messages: [llm.user("direct user shorthand")]
 })
 flow_text := flow_result.text
 turn_text := turn_result.text
@@ -257,8 +257,8 @@ echo_tool := llm.tool("echo_tool", func(query) {
     return query, nil
 }, {
     description: "Echoes a query."
-    params: {"query"}
-    requires: {"none"}
+    params: ["query"]
+    requires: ["none"]
 })
 
 llm.agent_defaults({
@@ -269,7 +269,7 @@ llm.agent_defaults({
 func flow_support_config(q) {
     return {
         model: "flow_alias"
-        tools: {echo_tool}
+        tools: [echo_tool]
         user: q
         budget: {tokens: 5}
     }
@@ -278,7 +278,7 @@ func flow_support_config(q) {
 func flow_support_flow(q) {
     first, first_err := llm.turn({})
     second, second_err := llm.turn({
-        messages: {llm.user("second " .. q)}
+        messages: [llm.user("second " .. q)]
     })
     return {
         first_text: first.text
@@ -287,7 +287,7 @@ func flow_support_flow(q) {
     }, nil
 }
 
-flow_support := llm.agent("flow_support", flow_support_config, flow_support_flow, {params: {"q"}})
+flow_support := llm.agent("flow_support", flow_support_config, flow_support_flow, {params: ["q"]})
 
 out, err := flow_support("hello")
 first_text := out.first_text

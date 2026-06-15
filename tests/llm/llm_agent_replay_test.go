@@ -51,7 +51,7 @@ reviewer := llm.agent("reviewer", reviewer_config, func(topic) {
     })
     return {draft: draft.text, final: final.text}, final_err
 }, {
-    params: {"topic"}
+    params: ["topic"]
     description: "Review with two passes."
 })
 

@@ -27,7 +27,7 @@ func TestLLMRecorderAndReplay(t *testing.T) {
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.system("short"), llm.user("hello")},
+    messages: [llm.system("short"), llm.user("hello")],
     max_tokens: 16,
 })
 text := result.text
@@ -44,7 +44,7 @@ text := result.text
 	if err := replay.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.system("short"), llm.user("hello")},
+    messages: [llm.system("short"), llm.user("hello")],
     max_tokens: 16,
 })
 text := result.text
@@ -80,7 +80,7 @@ func TestLLMRecorderAndReplayStreamingEvents(t *testing.T) {
 streamed := ""
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
     on_stream: func(event) {
         streamed = streamed .. event.token
     },
@@ -106,7 +106,7 @@ streamed := ""
 count := 0
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
     on_stream: func(event) {
         streamed = streamed .. event.token
         count = count + 1
@@ -165,7 +165,7 @@ func TestLLMReplayTraceEmitsRecordMatchedForTurn(t *testing.T) {
 			if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello replay trace")},
+    messages: [llm.user("hello replay trace")],
 })
 text := result.text
 `); err != nil {
@@ -237,7 +237,7 @@ func TestLLMReplayTraceEmitsRecordMatchedForStream(t *testing.T) {
 streamed := ""
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello stream replay trace")},
+    messages: [llm.user("hello stream replay trace")],
     stream: true,
     on_stream: func(event) {
         streamed = streamed .. event.token
@@ -292,7 +292,7 @@ func TestLLMReplayTraceDoesNotEmitRecordMatchedForMismatch(t *testing.T) {
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("actual")},
+    messages: [llm.user("actual")],
 })
 kind := err.kind
 `); err != nil {
@@ -334,7 +334,7 @@ record, record_err := llm.replay_record({
     replay_key: "turn:script:1"
     request: {
         model: "mock-fast"
-        messages: {llm.system("short"), llm.user("hello script replay")}
+        messages: [llm.system("short"), llm.user("hello script replay")]
         max_tokens: 16
     }
     response: {
@@ -355,7 +355,7 @@ match := fixture.match({
 })
 result, err := llm.turn({
     model: "mock-fast"
-    messages: {llm.system("short"), llm.user("hello script replay")}
+    messages: [llm.system("short"), llm.user("hello script replay")]
     max_tokens: 16
     replay: record.replay
 })
@@ -427,7 +427,7 @@ record, record_err := llm.replay_record({
     replay_key: "turn:direct"
     request: {
         model: "mock-fast"
-        messages: {llm.user("direct replay")}
+        messages: [llm.user("direct replay")]
         max_tokens: 8
     }
     response: {
@@ -442,23 +442,23 @@ fixture, fixture_err := llm.replay_fixture({record}, {
 })
 bad_replay, bad_err := fixture.replay({
     model: "mock-fast"
-    messages: {llm.user("drifted replay")}
+    messages: [llm.user("drifted replay")]
     max_tokens: 8
 }, "turn:direct")
 replay, replay_err := fixture.replay({
     model: "mock-fast"
-    messages: {llm.user("direct replay")}
+    messages: [llm.user("direct replay")]
     max_tokens: 8
 }, "turn:direct")
 result, turn_err := llm.turn({
     model: "mock-fast"
-    messages: {llm.user("direct replay")}
+    messages: [llm.user("direct replay")]
     max_tokens: 8
     replay: replay
 })
 exhausted_replay, exhausted_err := fixture.replay({
     model: "mock-fast"
-    messages: {llm.user("direct replay")}
+    messages: [llm.user("direct replay")]
     max_tokens: 8
 }, "turn:direct")
 summary := fixture.summary()
@@ -576,7 +576,7 @@ func TestLLMRecorderHelper(t *testing.T) {
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
 })
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -620,7 +620,7 @@ func TestLLMReplayRejectsMismatchedRequest(t *testing.T) {
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("actual")},
+    messages: [llm.user("actual")],
 })
 kind := err.kind
 `); err != nil {

@@ -47,7 +47,7 @@ func research_config(topic) {
 }
 
 research_agent := llm.agent("research_agent", research_config, nil, {
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
         confidence: 1
@@ -57,14 +57,14 @@ research_agent := llm.agent("research_agent", research_config, nil, {
 handoff_research := llm.handoff(research_agent, {
     name: "handoff_research"
     description: "Delegate research to another agent."
-    requires: {"none"}
+    requires: ["none"]
 })
 
 result, err := llm.run_agent({
     model: "mock-supervisor"
     system: "Use handoff tools before answering."
     user: "Check the composition path."
-    tools: {handoff_research}
+    tools: [handoff_research]
 })
 
 err_kind := nil
@@ -153,7 +153,7 @@ func review_flow(topic) {
     }, nil
 }
 
-review_agent := llm.agent("review_agent", review_config, review_flow, {params: {"topic"}})
+review_agent := llm.agent("review_agent", review_config, review_flow, {params: ["topic"]})
 delegate_review := llm.delegate(review_agent, {
     name: "delegate_review"
     description: "Delegate review to another agent."

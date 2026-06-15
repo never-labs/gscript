@@ -26,7 +26,7 @@ func TestLLMSectionsGenerateStructuredResults(t *testing.T) {
 lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
 }, {
-    params: {"query"}
+    params: ["query"]
     description: "Lookup shared evidence."
 })
 
@@ -37,7 +37,7 @@ generated, err := llm.sections({
         llm.user("Project: reusable generation helpers.")
     }
     evidence: "Evidence: launch checklist is complete."
-    tools: {lookup}
+    tools: [lookup]
     sections: {
         {
             name: "summary"

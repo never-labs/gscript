@@ -93,7 +93,7 @@ specialist := agent {
     name: "specialist"
     model: "specialist"
     instructions: prompt { role: "system", text: "Return structured delegated review." }
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
         owner: "team"
@@ -105,15 +105,15 @@ specialist := agent {
 handoff_review := llm.handoff(specialist, {
     name: "handoff_review"
     description: "Delegate the research brief to a specialist."
-    requires: {"none"}
+    requires: ["none"]
 })
 
 supervisor := agent {
     name: "supervisor"
     model: "supervisor"
     instructions: prompt { role: "system", text: "Use handoff_review before producing the final answer." }
-    tools: {handoff_review}
-    params: {"question"}
+    tools: [handoff_review]
+    params: ["question"]
     max_steps: 2
 }
 

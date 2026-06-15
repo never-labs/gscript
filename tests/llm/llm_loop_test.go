@@ -38,10 +38,10 @@ func TestLoopHelpers(t *testing.T) {
 simple, simple_err := loop.simple({system: "short", user: "hello"})
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 react, react_err := loop.react({
     user: "find docs",
-    tools: {lookup},
+    tools: [lookup],
     max_steps: 3,
 })
 simple_text := simple.text
@@ -77,7 +77,7 @@ func TestLoopSnapshotResume(t *testing.T) {
 			if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 pending := {id: "call_1", tool: "lookup", args: {name: "old"}}
 token := loop.snapshot({msg.user("find docs")}, pending)
 approved, approved_err := loop.resume(token, {ok: true, args: {name: "leia"}}, {lookup})
@@ -142,7 +142,7 @@ store := {
 }
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
 stored_name := saved.pending.args.name
 loaded, loaded_err := loop.resume("external-token", {ok: true}, {lookup}, store)
@@ -205,7 +205,7 @@ store := {
 }
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
 loaded, loaded_err := loop.resume(token, {ok: true}, {lookup}, store)
 `); err != nil {
@@ -261,10 +261,10 @@ func TestLoopReactApproveWhenPauses(t *testing.T) {
 			if err := vm.Exec(`
 refund := llm.tool("refund", func(amount) {
     return "refund:" .. amount, nil
-}, {params: {"amount"}})
+}, {params: ["amount"]})
 result, err := loop.react({
     user: "refund order",
-    tools: {refund},
+    tools: [refund],
     approve_when: func(call) {
         return call.tool == "refund" && call.args.amount > 100
     },
@@ -322,10 +322,10 @@ func TestLoopPlanExecute(t *testing.T) {
 			if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := loop.plan_execute({
     user: "find docs",
-    tools: {lookup},
+    tools: [lookup],
     plan_model: "planner",
     exec_model: "executor",
     max_steps: 3,

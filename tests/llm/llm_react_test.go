@@ -23,10 +23,10 @@ func TestLLMReactDispatchLoop(t *testing.T) {
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := llm.react({
-    messages: {llm.user("find docs")},
-    tools: {lookup},
+    messages: [llm.user("find docs")],
+    tools: [lookup],
     max_steps: 3,
 })
 status := result.status
@@ -65,10 +65,10 @@ func TestLLMReactCanWindowHistory(t *testing.T) {
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := llm.react({
     messages: {msg.system("drop this long system prompt"), msg.user("drop this long user prompt")},
-    tools: {lookup},
+    tools: [lookup],
     max_steps: 3,
     max_history_tokens: 10,
 })
@@ -110,10 +110,10 @@ lookup := llm.tool("lookup", func(name) {
         return nil, {kind: "network", message: "retry me"}
     }
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := llm.react({
-    messages: {llm.user("find docs")},
-    tools: {lookup},
+    messages: [llm.user("find docs")],
+    tools: [lookup],
     max_steps: 3,
     max_tool_retries: 1,
 })
@@ -144,10 +144,10 @@ func TestLLMReactFatalToolErrorPropagates(t *testing.T) {
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return nil, {kind: "fatal", message: "stop"}
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := llm.react({
-    messages: {llm.user("find docs")},
-    tools: {lookup},
+    messages: [llm.user("find docs")],
+    tools: [lookup],
     max_steps: 1,
 })
 err_kind := err.kind

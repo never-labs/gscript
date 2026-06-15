@@ -20,40 +20,40 @@ func TestLLMApprovalPolicyDefaultDenyAndReplayTrace(t *testing.T) {
 			if err := vm.Exec(`
 local_read := llm.tool("local_read", func(name) {
     return "doc:" .. name, nil
-}, {params: {"name"}, requires: {"local.read"}})
+}, {params: ["name"], requires: ["local.read"]})
 send_order := llm.tool("send_order", func(id) {
     return "sent:" .. id, nil
-}, {params: {"id"}, requires: {"trading.order.submit"}})
+}, {params: ["id"], requires: ["trading.order.submit"]})
 publish_artifact := llm.tool("publish_artifact", func(id) {
     return "published:" .. id, nil
-}, {params: {"id"}, requires: {"publish.web"}})
+}, {params: ["id"], requires: ["publish.web"]})
 call_network := llm.tool("call_network", func(url) {
     return url, nil
-}, {params: {"url"}, requires: {"network.http"}})
+}, {params: ["url"], requires: ["network.http"]})
 load_secret := llm.tool("load_secret", func(name) {
     return name, nil
-}, {params: {"name"}, requires: {"credential.read"}})
+}, {params: ["name"], requires: ["credential.read"]})
 run_generated := llm.tool("run_generated", func(name) {
     return name, nil
-}, {params: {"name"}, requires: {"generated-code.execute"}})
+}, {params: ["name"], requires: ["generated-code.execute"]})
 rebalance := llm.tool("rebalance", func(name) {
     return name, nil
-}, {params: {"name"}, requires: {"portfolio.rebalance"}})
+}, {params: ["name"], requires: ["portfolio.rebalance"]})
 
 policy := llm.policy()
-ok, ok_err := llm.check_policy({local_read}, policy)
-_, trading_err := llm.check_policy({send_order}, policy)
-_, publish_err := llm.check_policy({publish_artifact}, policy)
-_, network_err := llm.check_policy({call_network}, policy)
-_, credential_err := llm.check_policy({load_secret}, policy)
-_, generated_err := llm.check_policy({run_generated}, policy)
-_, portfolio_err := llm.check_policy({rebalance}, policy)
+ok, ok_err := llm.check_policy([local_read], policy)
+_, trading_err := llm.check_policy([send_order], policy)
+_, publish_err := llm.check_policy([publish_artifact], policy)
+_, network_err := llm.check_policy([call_network], policy)
+_, credential_err := llm.check_policy([load_secret], policy)
+_, generated_err := llm.check_policy([run_generated], policy)
+_, portfolio_err := llm.check_policy([rebalance], policy)
 allow_network := llm.policy({allow: {"network.http"}})
-network_ok, network_allow_err := llm.check_policy({call_network}, allow_network)
-local_outcome := llm.policy_outcome({local_read}, policy)
-network_outcome := llm.policy_outcome({call_network}, policy, {approval_required: true})
-allowed_network_outcome := llm.policy_outcome({call_network}, allow_network)
-clean_skip_outcome := llm.policy_outcome({call_network}, policy, {
+network_ok, network_allow_err := llm.check_policy([call_network], allow_network)
+local_outcome := llm.policy_outcome([local_read], policy)
+network_outcome := llm.policy_outcome([call_network], policy, {approval_required: true})
+allowed_network_outcome := llm.policy_outcome([call_network], allow_network)
+clean_skip_outcome := llm.policy_outcome([call_network], policy, {
     clean_skip: true
     reason: "network disabled by host"
     dependency: "live_network"
@@ -76,14 +76,14 @@ clean_skip_policy_event := llm.policy_outcome_trace_event(clean_skip_outcome, {
     workflow_run_id: "wf-policy"
     workflow_step_id: "step-skip"
 })
-policy_envelope := llm.trace_envelope({local_policy_event, network_policy_event, clean_skip_policy_event}, {
+policy_envelope := llm.trace_envelope([local_policy_event, network_policy_event, clean_skip_policy_event], {
     trace_id: "trace-policy"
 })
 policy_gate := llm.trace_assert(policy_envelope, {
     require_provider_free: true
     deny_live_network: true
-    required_event_types: {"policy_outcome"}
-    require_correlation_fields: {"workflow_run_id", "workflow_step_id", "correlation_id"}
+    required_event_types: ["policy_outcome"]
+    require_correlation_fields: ["workflow_run_id", "workflow_step_id", "correlation_id"]
 })
 
 pending := {id: "call_approval_1", tool: "send_order", args: {id: "order-1"}}
@@ -107,14 +107,14 @@ approval_event := llm.approval_trace_event(replay_trace, {
     workflow_run_id: "wf-approval"
     workflow_step_id: "step-approval"
 })
-approval_envelope := llm.trace_envelope({approval_event}, {
+approval_envelope := llm.trace_envelope([approval_event], {
     trace_id: "trace-approval"
 })
 approval_gate := llm.trace_assert(approval_envelope, {
     require_provider_free: true
     deny_live_network: true
-    required_event_types: {"approval_replay_trace"}
-    require_correlation_fields: {"approval_id", "tool_call_id", "workflow_run_id", "workflow_step_id"}
+    required_event_types: ["approval_replay_trace"]
+    require_correlation_fields: ["approval_id", "tool_call_id", "workflow_run_id", "workflow_step_id"]
 })
 approved_trace := llm.approval_trace({
     pending: {id: "call_approval_2", tool: "send_order"}

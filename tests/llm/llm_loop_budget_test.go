@@ -24,10 +24,10 @@ func TestLoopBudgets(t *testing.T) {
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := loop.react({
     user: "find docs",
-    tools: {lookup},
+    tools: [lookup],
     max_steps: 3,
     budget: {tokens: 5, turns: 3, calls: 2},
 })
@@ -65,10 +65,10 @@ func TestLoopToolCallBudget(t *testing.T) {
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := loop.react({
     user: "find docs",
-    tools: {lookup},
+    tools: [lookup],
     max_steps: 2,
     budget: {calls: 0},
 })

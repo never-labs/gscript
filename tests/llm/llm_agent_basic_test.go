@@ -84,7 +84,7 @@ llm.agent_defaults({
 
 answer := llm.agent("answer", func(question) {
     return {user: question}, nil
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 result, err := answer("What is the capital of France?")
 answer_text := result.text
@@ -144,20 +144,20 @@ func TestLLMAgentScenarioReactToolAutoDispatch(t *testing.T) {
 lookup := llm.tool("lookup", func(topic) {
     return "doc:" .. topic, nil
 }, {
-    params: {"topic"}
-    requires: {"none"}
+    params: ["topic"]
+    requires: ["none"]
 })
 
 func researcher_config(topic) {
     return {
         model: "mock-react"
         system: "Use tools before answering."
-        tools: {lookup}
+        tools: [lookup]
         user: "Find docs for " .. topic
     }
 }
 
-researcher := llm.agent("researcher", researcher_config, nil, {params: {"topic"}})
+researcher := llm.agent("researcher", researcher_config, nil, {params: ["topic"]})
 
 result, err := researcher("leia")
 status := result.status
@@ -224,15 +224,15 @@ func TestLLMAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 lookup := llm.tool("lookup", func(topic) {
     return "note:" .. topic, nil
 }, {
-    params: {"topic"}
-    requires: {"none"}
+    params: ["topic"]
+    requires: ["none"]
 })
 
 func analyst_config(topic) {
     return {
         model: "mock-flow"
         system: "Build the answer from tool evidence."
-        tools: {lookup}
+        tools: [lookup]
     }
 }
 
@@ -273,7 +273,7 @@ analyst := llm.agent("analyst", analyst_config, func(topic) {
         history_len: #history
     }, final_err
 }, {
-    params: {"topic"}
+    params: ["topic"]
     description: "Build the answer from tool evidence."
 })
 

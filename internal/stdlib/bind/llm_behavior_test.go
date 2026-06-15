@@ -100,7 +100,7 @@ func TestLLMRunAgentOutputValidationMissingField(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
-    messages: {llm.user("Extract the contact.")}
+    messages: [llm.user("Extract the contact.")]
     output: {
         name: "Ada"
         email: "ada@example.com"
@@ -130,7 +130,7 @@ func TestLLMTurnProviderErrorKindReachesScript(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("hello")}
+    messages: [llm.user("hello")]
 })
 err_kind := err.kind
 err_message := err.message
@@ -149,7 +149,7 @@ func TestLLMReactProviderErrorKindReachesScript(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.react({
     model: "mock"
-    messages: {llm.user("hello")}
+    messages: [llm.user("hello")]
     max_steps: 1
 })
 err_kind := err.kind
@@ -177,7 +177,7 @@ func TestLLMRunAgentOutputValidationTypeMismatch(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
-    messages: {llm.user("Classify the contact.")}
+    messages: [llm.user("Classify the contact.")]
     output: {
         name: "Ada"
         score: 1
@@ -202,7 +202,7 @@ func TestLLMRunAgentOutputValidationNestedMissingField(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
-    messages: {llm.user("Extract the contact.")}
+    messages: [llm.user("Extract the contact.")]
     output: {
         name: "Ada"
         profile: {
@@ -228,7 +228,7 @@ func TestLLMRunAgentOutputValidationArrayElementShape(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
-    messages: {llm.user("Rank the contacts.")}
+    messages: [llm.user("Rank the contacts.")]
     output: {
         items: {
             {
@@ -258,7 +258,7 @@ func TestLLMRunAgentOutputRepairRetrySucceeds(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
-    messages: {llm.user("Extract the contact.")}
+    messages: [llm.user("Extract the contact.")]
     output: {
         name: "Ada"
         email: "ada@example.com"
@@ -295,7 +295,7 @@ func TestLLMRunAgentOutputRepairConsumesTurnBudget(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
-    messages: {llm.user("Extract the contact.")}
+    messages: [llm.user("Extract the contact.")]
     output: {
         name: "Ada"
         email: "ada@example.com"

@@ -107,7 +107,7 @@ func specialist_flow(topic) {
     }, nil
 }
 
-specialist := llm.agent("specialist", specialist_config, specialist_flow, {params: {"topic"}})
+specialist := llm.agent("specialist", specialist_config, specialist_flow, {params: ["topic"]})
 handoff := llm.handoff(specialist, {name: "handoff_specialist"})
 value, err := llm.dispatch({
     id: "call_handoff"
@@ -180,7 +180,7 @@ event := llm.trace_event({
         args_schema: "redacted"
     }
 })
-envelope := llm.trace_envelope({event}, {
+envelope := llm.trace_envelope([event], {
     trace_id: "trace-1"
     kind: "generic_ai_trace_envelope"
 })
@@ -273,7 +273,7 @@ done := llm.trace_event({
     replay_key: "turn:1"
     payload: {phase: "done", result: "error"}
 })
-envelope := llm.trace_envelope({start, done}, {
+envelope := llm.trace_envelope([start, done], {
     trace_id: "trace-summary"
     provider_free: true
     live_network: false
@@ -284,25 +284,25 @@ check := llm.trace_assert(envelope, {
     require_provider_free: true
     deny_live_network: true
     deny_live_model: true
-    required_event_types: {"turn_start", "turn_end"}
+    required_event_types: ["turn_start", "turn_end"]
     require_status_counts: {ok: 1}
     limit_status_counts: {error: 1}
-    require_correlation_fields: {"turn_id", "replay_session_id"}
-    require_payload_fields: {"phase"}
+    require_correlation_fields: ["turn_id", "replay_session_id"]
+    require_payload_fields: ["phase"]
     deny_secret_values_present: true
     deny_raw_prompt_stored: true
     deny_raw_completion_stored: true
     require_event_payload_fields: {
-        turn_end: {"result"}
+        turn_end: ["result"]
     }
 })
 bad := llm.trace_assert(envelope, {
-    required_event_types: {"tool_call"}
-    require_correlation_fields: {"tool_call_id"}
+    required_event_types: ["tool_call"]
+    require_correlation_fields: ["tool_call_id"]
 })
 payload_bad := llm.trace_assert(envelope, {
     required_payload_fields_by_event_type: {
-        turn_start: {"result"}
+        turn_start: ["result"]
     }
 })
 status_bad := llm.trace_assert(envelope, {
@@ -459,19 +459,19 @@ exhausted_event := llm.replay_trace_event(exhausted, {
     sequence: 3
     replay_session_id: "session-1"
 })
-envelope := llm.trace_envelope({matched_event, mismatch_event, exhausted_event}, {
+envelope := llm.trace_envelope([matched_event, mismatch_event, exhausted_event], {
     trace_id: "trace-replay"
 })
 summary := llm.trace_summary(envelope)
 gate := llm.trace_assert(envelope, {
     require_provider_free: true
     deny_live_network: true
-    required_event_types: {
+    required_event_types: [
         "replay_record_matched",
         "replay_record_mismatch",
         "replay_record_exhausted",
-    }
-    require_correlation_fields: {"replay_session_id"}
+    ]
+    require_correlation_fields: ["replay_session_id"]
 })
 
 setup_ok := record_err == nil && fixture_err == nil && mismatch_record_err == nil && mismatch_fixture_err == nil

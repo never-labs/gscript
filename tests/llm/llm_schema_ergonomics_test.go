@@ -79,7 +79,7 @@ func TestLLMToolSchemaNormalizesLightweightSchema(t *testing.T) {
 lookup := llm.tool("lookup", func(query, limit) {
     return query, nil
 	}, {
-	    params: {"query", "limit"}
+	    params: ["query", "limit"]
 	    schema: llm.schema({
 	        query: {type: "string", description: "Search query"}
 	        limit: "integer?"
@@ -94,8 +94,8 @@ required_1 := info.schema.required[1]
 required_2_is_nil := info.schema.required[2] == nil
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("hello")}
-    tools: {lookup}
+    messages: [llm.user("hello")]
+    tools: [lookup]
 })
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -157,7 +157,7 @@ format_name := format.json_schema.name
 format_strict := format.json_schema.strict
 result, err := llm.turn({
     model: "mock-json"
-    messages: {llm.user("Extract Ada.")}
+    messages: [llm.user("Extract Ada.")]
     response_format: format
 })
 value_ok, value_msg := llm.validate_output(result.text, schema)

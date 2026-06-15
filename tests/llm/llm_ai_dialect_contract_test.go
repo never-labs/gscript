@@ -42,7 +42,7 @@ extractor := agent {
     name: "extractor"
     model: "json"
     instructions: prompt { role: "system", text: "Extract a structured delegation result." }
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
         confidence: 1
@@ -53,15 +53,15 @@ extractor := agent {
 delegate_extract := llm.agent_as_tool(extractor, {
     name: "delegate_extract"
     description: "Delegate extraction to the structured agent."
-    requires: {"none"}
+    requires: ["none"]
 })
 
 supervisor := agent {
     name: "supervisor"
     model: "mock-supervisor"
     instructions: prompt { role: "system", text: "Use delegate_extract before answering." }
-    tools: {delegate_extract}
-    params: {"question"}
+    tools: [delegate_extract]
+    params: ["question"]
     max_steps: 2
 }
 

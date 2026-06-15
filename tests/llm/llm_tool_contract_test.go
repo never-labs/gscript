@@ -22,8 +22,8 @@ lookup := llm.tool("lookup", func(query) {
     return {answer: "docs:" .. query}, nil
 }, {
     description: "Lookup local documents."
-    params: {"query"}
-    capabilities: {"docs.read", "replay.local"}
+    params: ["query"]
+    capabilities: ["docs.read", "replay.local"]
     result: {
         answer: "string"
     }
@@ -41,11 +41,11 @@ lookup := llm.tool("lookup", func(query) {
     secret_parameters_allowed: false
 })
 
-inventory := llm.tool_info({lookup})
+inventory := llm.tool_info([lookup])
 single := llm.tool_info(lookup)
 descriptor := llm.tool_descriptor(lookup)
 schema_info := llm.tool_schema(lookup)
-ok, validate_err := llm.validate_tools({lookup})
+ok, validate_err := llm.validate_tools([lookup])
 
 inventory_kind := inventory.kind
 inventory_cap_1 := inventory.capabilities[1]
@@ -126,12 +126,12 @@ func TestLLMValidateToolsReportsMissingContractFields(t *testing.T) {
 incomplete := llm.tool("incomplete", func(query) {
     return query, nil
 }, {
-    params: {"query"}
+    params: ["query"]
     result: "string"
     error: "tool_error"
     replay_key: "incomplete:{query}"
 })
-ok, err := llm.validate_tools({incomplete})
+ok, err := llm.validate_tools([incomplete])
 err_kind := err.kind
 err_field := err.field
 err_tool := err.tool
@@ -161,8 +161,8 @@ unsafe_tool := llm.tool("unsafe_tool", func(query) {
     return {answer: query}, nil
 }, {
     description: "Unsafe external tool."
-    params: {"query"}
-    capabilities: {"generic.tool.registry.declare"}
+    params: ["query"]
+    capabilities: ["generic.tool.registry.declare"]
     result: {answer: "string"}
     error: {kind: "validation" message: "string"}
     replay_key: "unsafe:{query}"
@@ -170,7 +170,7 @@ unsafe_tool := llm.tool("unsafe_tool", func(query) {
     live_network: true
     secret_parameters_allowed: true
 })
-ok, err := llm.validate_tools({unsafe_tool})
+ok, err := llm.validate_tools([unsafe_tool])
 err_kind := err.kind
 err_field := err.field
 err_tool := err.tool
@@ -216,7 +216,7 @@ func extract_config(topic) {
 }
 
 extract := llm.agent("extract", extract_config, nil, {
-    params: {"topic"}
+    params: ["topic"]
     output: {
         summary: "short finding"
     }
@@ -225,7 +225,7 @@ extract := llm.agent("extract", extract_config, nil, {
 delegate := llm.agent_as_tool(extract, {
     name: "delegate"
     description: "Delegate to extractor."
-    capabilities: {"agent.delegate"}
+    capabilities: ["agent.delegate"]
     error: {
         kind: "tool"
         message: "string"
@@ -234,11 +234,11 @@ delegate := llm.agent_as_tool(extract, {
 })
 
 info := llm.tool_info(delegate)
-ok, validate_err := llm.validate_tools({delegate})
+ok, validate_err := llm.validate_tools([delegate])
 result, turn_err := llm.turn({
     model: "mock-supervisor"
-    messages: {llm.user("hello")}
-    tools: {delegate}
+    messages: [llm.user("hello")]
+    tools: [delegate]
 })
 
 info_type := info.type

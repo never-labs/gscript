@@ -30,8 +30,8 @@ lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
 }, {
     description: "Lookup docs."
-    requires: {"docs.read", "net.client"}
-    params: {"query"}
+    requires: ["docs.read", "net.client"]
+    params: ["query"]
 })
 
 llm.register_models({
@@ -42,7 +42,7 @@ llm.register_models({
 llm.agent_defaults({
     model: "mock-alias"
     system: "Be concise."
-    tools: {lookup}
+    tools: [lookup]
 })
 
 answer := llm.agent("answer", func(q) {
@@ -52,7 +52,7 @@ answer := llm.agent("answer", func(q) {
 result, err := answer("search leia")
 direct, direct_err := llm.turn({
     model: "direct-model"
-    messages: {llm.user("single turn")}
+    messages: [llm.user("single turn")]
 })
 agent_text := result.text
 turn_text := direct.text

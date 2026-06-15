@@ -158,7 +158,7 @@ func pending_flow(topic) {
     }, nil
 }
 
-pending_agent := llm.agent("pending_agent", pending_config, pending_flow, {params: {"topic"}})
+pending_agent := llm.agent("pending_agent", pending_config, pending_flow, {params: ["topic"]})
 pending_tool := llm.agent_as_tool(pending_agent, {name: "pending_delegate"})
 pending_value, pending_err := llm.dispatch({
     id: "call_pending"
@@ -178,7 +178,7 @@ func error_flow(topic) {
     }
 }
 
-error_agent := llm.agent("error_agent", error_config, error_flow, {params: {"topic"}})
+error_agent := llm.agent("error_agent", error_config, error_flow, {params: ["topic"]})
 error_tool := llm.toolof(error_agent, {name: "error_delegate"})
 error_value, error_err := llm.dispatch({
     id: "call_error"

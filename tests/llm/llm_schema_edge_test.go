@@ -80,7 +80,7 @@ func TestLLMUnknownEvidenceShapeFallsBackToUserMessage(t *testing.T) {
 			if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("base question")}
+    messages: [llm.user("base question")]
     evidence: {unknown_shape: {nested: "value"}}
 })
 err_is_nil := err == nil

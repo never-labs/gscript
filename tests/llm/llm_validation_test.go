@@ -18,7 +18,7 @@ func TestLLMStdlibRuntimeValidation(t *testing.T) {
 			src: `
 refund := llm.tool("refund", func(id) {
     return id, nil
-}, {params: {"id"}, requires: {"payments.refund"}})
+}, {params: ["id"], requires: ["payments.refund"]})
 ok, err := llm.check_tools({refund}, {})
 got := err.kind .. "|" .. err.capability .. "|" .. err.tool
 `,

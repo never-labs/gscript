@@ -62,7 +62,7 @@ ok, register_err := llm.register_models({
 })
 turn, turn_err := llm.turn({
     provider: "request-scoped-live-provider",
-    messages: {llm.user("route by replay/default")},
+    messages: [llm.user("route by replay/default")],
 })
 turn_ok := register_err == nil && turn_err == nil
 turn_text := turn.text
