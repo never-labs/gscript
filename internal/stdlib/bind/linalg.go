@@ -109,7 +109,7 @@ func linalgMatrix(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	values, err := linalgNumericTable("linalg.matrix", args[2])
+	values, err := linalgVectorValue("linalg.matrix", args[2])
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func linalgDiag(args []Value) ([]Value, error) {
 	var values []float64
 	var err error
 	if len(args) == 1 && !args[0].IsNumber() {
-		values, err = linalgVectorValue("linalg.diag", args[0])
+		values, err = linalgVectorLikeValue("linalg.diag", args[0])
 		if err != nil {
 			return nil, err
 		}
@@ -452,11 +452,11 @@ func linalgDot(args []Value) ([]Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("linalg.dot: need two vectors")
 	}
-	a, err := linalgVectorValue("linalg.dot", args[0])
+	a, err := linalgVectorLikeValue("linalg.dot", args[0])
 	if err != nil {
 		return nil, err
 	}
-	b, err := linalgVectorValue("linalg.dot", args[1])
+	b, err := linalgVectorLikeValue("linalg.dot", args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +477,7 @@ func linalgMatvec(args []Value) ([]Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("linalg.matvec: argument 1 must be a matrix")
 	}
-	v, err := linalgVectorValue("linalg.matvec", args[1])
+	v, err := linalgVectorLikeValue("linalg.matvec", args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +506,7 @@ func linalgMatmul(args []Value) ([]Value, error) {
 			return nil, err
 		}
 		if !ok && i == len(args)-1 {
-			v, err := linalgVectorValue("linalg.matmul", args[i])
+			v, err := linalgVectorLikeValue("linalg.matmul", args[i])
 			if err != nil {
 				return nil, err
 			}
@@ -698,7 +698,7 @@ func linalgNorm(args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("linalg.norm: need vector")
 	}
-	values, err := linalgVectorValue("linalg.norm", args[0])
+	values, err := linalgVectorLikeValue("linalg.norm", args[0])
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +716,7 @@ func linalgSolve2(args []Value) ([]Value, error) {
 	if !ok || rows != 2 || cols != 2 {
 		return nil, fmt.Errorf("linalg.solve2: argument 1 must be a 2x2 matrix")
 	}
-	b, err := linalgVectorValue("linalg.solve2", args[1])
+	b, err := linalgVectorLikeValue("linalg.solve2", args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -743,7 +743,7 @@ func linalgSolve(args []Value) ([]Value, error) {
 	}
 	if br, bc, b, ok, err := linalgMatrixValue("linalg.solve", args[1]); err != nil {
 		return nil, err
-	} else if ok {
+	} else if ok && br != 1 && bc != 1 {
 		if br != n {
 			return nil, fmt.Errorf("linalg.solve: right-hand side row mismatch")
 		}
@@ -754,7 +754,7 @@ func linalgSolve(args []Value) ([]Value, error) {
 		stddata.RecordLinalgMatrixKernel("LinalgMatrixSolve", "solve", n, bc)
 		return []Value{linalgMatrixDenseValue(n, bc, out)}, nil
 	}
-	b, err := linalgVectorValue("linalg.solve", args[1])
+	b, err := linalgVectorLikeValue("linalg.solve", args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -901,7 +901,7 @@ func (operand linalgPointwiseOperand) valueAt(index int) float64 {
 
 func linalgVectorArgs(name string, args []Value) ([]float64, error) {
 	if len(args) == 1 && (args[0].IsTable() || args[0].IsDenseArray()) {
-		return linalgVectorValue(name, args[0])
+		return linalgVectorLikeValue(name, args[0])
 	}
 	out := make([]float64, len(args))
 	for i, arg := range args {
@@ -978,7 +978,7 @@ func linalgMatrixValue(name string, value Value) (int, int, []float64, bool, err
 	if err != nil {
 		return 0, 0, nil, true, err
 	}
-	values, err := linalgNumericTable(name, valuesValue)
+	values, err := linalgVectorValue(name, valuesValue)
 	if err != nil {
 		return 0, 0, nil, true, err
 	}

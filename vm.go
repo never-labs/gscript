@@ -581,6 +581,9 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"uuid":      libs&LibUUID != 0,
 		"vec":       libs&LibVec != 0,
 	}
+	for _, alias := range stdlibinstall.DefaultAliases() {
+		allowed[alias.Name] = allowed[alias.Module]
+	}
 	return allowed
 }
 

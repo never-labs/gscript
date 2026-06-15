@@ -9,7 +9,7 @@ dt := 0.01
 
 A := {{0.0, 1.0}, {g / l, 0.0}}
 B := {{0.0}, {1.0 / (m * l * l)}}
-Q := linalg.diag(12.0, 1.5)
+Q := diag(12.0, 1.5)
 linalg_probe := linalg.matrix(2, 2, {0.0, 1.0, g / l, 0.0})
 R := 0.18
 K := control.lqr(A, B, Q, R, {iterations: 16000, step: 0.001})
@@ -22,13 +22,13 @@ func dynamics(x) {
     u := control.apply(stabilizer, x)
     return {
         theta: x.omega,
-        omega: (g / l) * math.sin(x.theta) + u / (m * l * l),
+        omega: (g / l) * sin(x.theta) + u / (m * l * l),
     }
 }
 
 func observe_energy(x, step, t) {
     return {
-        energy: 0.5 * x.omega * x.omega + (g / l) * (1.0 - math.cos(x.theta)),
+        energy: 0.5 * x.omega * x.omega + (g / l) * (1.0 - cos(x.theta)),
     }
 }
 
@@ -45,13 +45,13 @@ q_checksum := q {
 avg ${observed}.energy
 }
 
-assert(math.near(final_theta, 0.0, 0.04))
-assert(math.near(final_omega, 0.0, 0.08))
+assert(near(final_theta, 0.0, 0.04))
+assert(near(final_omega, 0.0, 0.08))
 assert(#trajectory == 240)
 assert(#observed.theta == 240)
 assert(#observed.omega == 240)
 assert(peak_energy < 0.25)
 assert(linalg.get(linalg_probe, 2, 1) == g / l)
-assert(math.near(q_checksum, mean_energy, 0.000000001))
+assert(near(q_checksum, mean_energy, 0.000000001))
 
 print(string.format("ok pendulum steps=%d theta=%.4f omega=%.4f mean_energy=%.4f peak_energy=%.4f", 240, final_theta, final_omega, mean_energy, peak_energy))

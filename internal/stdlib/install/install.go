@@ -115,10 +115,14 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	}
 	installer.RegisterTable("hash", stdbind.BuildHash())
 	installer.RegisterTable("json", stdbind.BuildJSON())
-	installer.RegisterTable("linalg", stdbind.BuildLinalg())
+	linalg := stdbind.BuildLinalg()
+	installer.RegisterTable("linalg", linalg)
+	registerDefaultAliases(installer, "linalg", linalg)
 	installer.RegisterTable("log", stdbind.BuildLog())
 	installer.RegisterTable("matrix", stdbind.BuildMatrix())
-	installer.RegisterTable("math", stdbind.BuildMath())
+	math := stdbind.BuildMath()
+	installer.RegisterTable("math", math)
+	registerDefaultAliases(installer, "math", math)
 	installer.RegisterTable("ode", stdbind.BuildODE(opts.ScriptCaller))
 	installer.RegisterTable("path", stdbind.BuildPath())
 	installer.RegisterTable("q", stdbind.BuildQ())
@@ -126,7 +130,9 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("regexp", stdbind.BuildRegexp())
 	installer.RegisterTable("sort", stdbind.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("soa", stdbind.BuildSOA())
-	installer.RegisterTable("stats", stdbind.BuildStats())
+	stats := stdbind.BuildStats()
+	installer.RegisterTable("stats", stats)
+	registerDefaultAliases(installer, "stats", stats)
 	installer.RegisterTable("sync", stdbind.BuildSync(stdbind.ConcurrencyOptions{
 		Call:   opts.ScriptCaller,
 		Launch: opts.TaskLauncher,
@@ -211,4 +217,5 @@ func (installer interpreterInstaller) RegisterAlias(name string, value runtime.V
 		return
 	}
 	installer.interp.SetGlobal(name, value)
+	installer.interp.MarkStdlibModule(name)
 }

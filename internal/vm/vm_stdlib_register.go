@@ -26,6 +26,12 @@ func (vm *VM) RestrictStdlib(allowed map[string]bool) {
 			vm.stringMeta = nil
 		}
 	}
+	for _, alias := range stdlibinstall.DefaultAliases() {
+		if allowed[alias.Name] {
+			continue
+		}
+		vm.DeleteGlobal(alias.Name)
+	}
 	if !allowed["llm"] {
 		vm.DeleteGlobal("toolof")
 	}

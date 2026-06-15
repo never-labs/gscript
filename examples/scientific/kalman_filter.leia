@@ -5,10 +5,10 @@
 dt := 1.0
 F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
 H := linalg.row(1.0, 0.0)
-Q := linalg.eye(2, 0.01)
+Q := eye(2, 0.01)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
-state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
+state := stats.gaussian_state(vector(0.0, 1.0), eye(2))
 innovations := {}
 
 for i := 1; i <= #measurements; i++ {
@@ -25,10 +25,10 @@ q_state_sum := q {
 +/${state.x}
 }
 
-assert(math.near(position, 5.0, 0.15))
-assert(math.near(velocity, 1.0, 0.15))
+assert(near(position, 5.0, 0.15))
+assert(near(velocity, 1.0, 0.15))
 assert(innovation_rmse < 0.20)
 assert(#innovations == #measurements)
-assert(math.near(q_state_sum, position + velocity, 0.000000001))
+assert(near(q_state_sum, position + velocity, 0.000000001))
 
 print(string.format("ok kalman n=%d position=%.3f velocity=%.3f rmse=%.3f trace=%.4f", #measurements, position, velocity, innovation_rmse, uncertainty_trace))
