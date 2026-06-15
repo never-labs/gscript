@@ -21,6 +21,48 @@ a filesystem-backed module returns at least one value, the first value is the
 module value and additional return values are discarded. If it returns no
 values, the module value is `true`.
 
+## Standard Library Default Imports
+
+Installing an enabled standard-library module may also install selected
+default-import aliases as ordinary global bindings. These aliases are
+conveniences for stable, frequently used operations; `require(name)` still
+loads real modules only. A host or SDK `WithLibs` policy disables an alias when
+the module that owns it is disabled. `append` is available with the core table
+surface because it is the stable sequence-growth helper.
+
+Default-import aliases may be shadowed by lexical declarations exactly like
+other globals.
+
+```leia run all
+xs := ones(4)
+noise := randn(3, 0, 1)
+m := mat([[1, 2], [3, 4]])
+summary := describe(xs)
+
+assert(sum(xs) == 4)
+assert(summary.mean == 1)
+assert(trace(m) == 5)
+assert(describe(noise).count == 3)
+
+sqrt := func(x) { return x }
+assert(sqrt(9) == 9)
+```
+
+Stable numeric and data aliases include:
+
+- table: `append`;
+- math: `abs`, `sqrt`, `exp`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`,
+  `floor`, `ceil`, `round`, `min`, `max`, `clamp`, `near`, `pow`;
+- linalg: `vector`, `vec`, `mat`, `row`, `col`, `eye`, `diag`, `zeros`,
+  `ones`, `at`, `norm`, `dot`, `matvec`, `matmul`, `axpy`, `solve`, `trace`,
+  `transpose`;
+- stats: `sum`, `mean`, `avg`, `variance`, `std`, `describe`, `rms`, `rmse`,
+  `cumsum`, `diff`, `normalize`;
+- rand: `randn`, `sample`.
+
+`matrix` remains the standard-library module name. The short matrix-constructor
+alias is `mat` so default imports do not replace the module binding.
+
 The observable `require(name)` algorithm is:
 
 1. If `package.loaded[name]` is non-`nil`, return it.

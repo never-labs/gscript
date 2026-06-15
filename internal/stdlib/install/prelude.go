@@ -34,11 +34,13 @@ var defaultAliases = []DefaultAlias{
 
 	{Name: "vector", Module: "linalg", Member: "vector"},
 	{Name: "vec", Module: "linalg", Member: "vec"},
+	{Name: "mat", Module: "linalg", Member: "matrix"},
 	{Name: "row", Module: "linalg", Member: "row"},
 	{Name: "col", Module: "linalg", Member: "col"},
 	{Name: "eye", Module: "linalg", Member: "eye"},
 	{Name: "diag", Module: "linalg", Member: "diag"},
 	{Name: "zeros", Module: "linalg", Member: "zeros"},
+	{Name: "ones", Module: "linalg", Member: "ones"},
 	{Name: "at", Module: "linalg", Member: "at"},
 	{Name: "norm", Module: "linalg", Member: "norm"},
 	{Name: "dot", Module: "linalg", Member: "dot"},
@@ -54,7 +56,15 @@ var defaultAliases = []DefaultAlias{
 	{Name: "avg", Module: "stats", Member: "mean"},
 	{Name: "variance", Module: "stats", Member: "variance"},
 	{Name: "std", Module: "stats", Member: "std"},
+	{Name: "describe", Module: "stats", Member: "describe"},
+	{Name: "rms", Module: "stats", Member: "rms"},
+	{Name: "rmse", Module: "stats", Member: "rmse"},
+	{Name: "cumsum", Module: "stats", Member: "cumsum"},
+	{Name: "diff", Module: "stats", Member: "diff"},
 	{Name: "normalize", Module: "stats", Member: "normalize"},
+
+	{Name: "randn", Module: "rand", Member: "normal_vec"},
+	{Name: "sample", Module: "rand", Member: "sample"},
 }
 
 // DefaultAliases returns the default-import alias table. The returned slice is

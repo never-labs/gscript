@@ -23,12 +23,20 @@ func TestDefaultImportsExposeNumericPrelude(t *testing.T) {
 				appended := append([], 4, 5, 6)
 				energy := dot(v, v)
 				score := mean([1, 2, 3]) + avg([2, 4, 6])
-				q := linalg.matrix([[1, 0], [0, 1]])
+				q := mat([[1, 0], [0, 1]])
 				unit_trace := trace(q)
 				projected := matvec(q, col(5, 7))
 				projected_first := at(projected, 1)
 				chain_trace := trace(matmul(row(1, 0), col(9, 4)))
 				shifted := axpy([1, 1], 2, [10, 20])
+				ones_total := sum(ones(4))
+				stats := describe([2, 4, 6])
+				spread_ok := near(rms([3, 4]), sqrt(12.5), 0.000000001) && near(rmse([1, 2], [1, 4]), sqrt(2), 0.000000001)
+				steps := cumsum([1, 2, 3])
+				gaps := diff([2, 5, 9])
+				noisy := randn(3, 0, 1)
+				noisy_summary := describe(noisy)
+				pick := sample([7, 8, 9], 2)
 				nested := [[1, 2], [3, 4]]
 				nested_value := nested[2][1]
 				shadow := func() {
@@ -37,7 +45,8 @@ func TestDefaultImportsExposeNumericPrelude(t *testing.T) {
 				}()
 				result := root == 3 && wave == 1 && energy == 14 && score == 6 && unit_trace == 2 &&
 					projected_first == 5 && chain_trace == 9 && at(shifted, 2) == 41 &&
-					nested_value == 3 && appended[3] == 6 && shadow == 99
+					ones_total == 4 && stats.mean == 4 && spread_ok && steps[3] == 6 && gaps[2] == 4 &&
+					noisy_summary.count == 3 && #pick == 2 && nested_value == 3 && appended[3] == 6 && shadow == 99
 			`); err != nil {
 				t.Fatal(err)
 			}
@@ -73,8 +82,19 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "append", true)
 			assertSDKGlobalPresence(t, vm, "sqrt", false)
 			assertSDKGlobalPresence(t, vm, "eye", true)
+			assertSDKGlobalPresence(t, vm, "mat", true)
+			assertSDKGlobalPresence(t, vm, "ones", true)
 			assertSDKGlobalPresence(t, vm, "matmul", true)
 			assertSDKGlobalPresence(t, vm, "mean", true)
+			assertSDKGlobalPresence(t, vm, "describe", true)
+			assertSDKGlobalPresence(t, vm, "randn", false)
+
+			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibRand))...)
+			assertSDKGlobalPresence(t, vm, "append", true)
+			assertSDKGlobalPresence(t, vm, "randn", true)
+			assertSDKGlobalPresence(t, vm, "sample", true)
+			assertSDKGlobalPresence(t, vm, "sqrt", false)
+			assertSDKGlobalPresence(t, vm, "eye", false)
 
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibTable))...)
 			assertSDKGlobalPresence(t, vm, "append", true)

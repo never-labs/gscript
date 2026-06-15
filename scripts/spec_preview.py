@@ -52,9 +52,12 @@ LEIA_CONSTANTS = frozenset("false nil true".split())
 
 LEIA_BUILTINS = frozenset(
     """
-    assert close delete error getmetatable ipairs len make next pairs pcall print
-    rawequal rawget rawlen rawset require select setmetatable spread tonumber
-    tostring type xpcall
+    abs acos append asin atan avg axpy ceil clamp close cos cumsum delete
+    describe diag diff dot error exp eye floor getmetatable ipairs len make mat
+    matmul matvec max mean min near next norm ones pairs pcall pow print randn
+    rawequal rawget rawlen rawset require rmse rms round sample select
+    setmetatable sin solve sqrt spread std sum tan tonumber tostring trace
+    transpose type variance vec vector xpcall zeros
     """.split()
 )
 

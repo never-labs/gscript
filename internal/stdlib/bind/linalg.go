@@ -19,6 +19,7 @@ func BuildLinalg() *Table {
 	set("col", linalgCol)
 	set("matrix", linalgMatrix)
 	set("zeros", linalgZeros)
+	set("ones", linalgOnes)
 	set("eye", linalgEye)
 	set("diag", linalgDiag)
 	set("at", linalgAt)
@@ -139,6 +140,37 @@ func linalgZeros(args []Value) ([]Value, error) {
 		}
 		stddata.RecordLinalgMatrixKernel("LinalgMatrixZeros", "zeros", rows, cols)
 		return []Value{linalgMatrixDenseValue(rows, cols, make([]float64, rows*cols))}, nil
+	}
+}
+
+func linalgOnes(args []Value) ([]Value, error) {
+	fill := func(values []float64) {
+		for i := range values {
+			values[i] = 1
+		}
+	}
+	switch len(args) {
+	case 1:
+		n, err := linalgPositiveInt("linalg.ones", args[0], "size")
+		if err != nil {
+			return nil, err
+		}
+		values := make([]float64, n)
+		fill(values)
+		stddata.RecordLinalgVectorKernel("LinalgVectorOnes", "ones", n)
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(values))}, nil
+	default:
+		if len(args) < 2 {
+			return nil, fmt.Errorf("linalg.ones: need size or rows, cols")
+		}
+		rows, cols, err := linalgShape("linalg.ones", args[0], args[1])
+		if err != nil {
+			return nil, err
+		}
+		values := make([]float64, rows*cols)
+		fill(values)
+		stddata.RecordLinalgMatrixKernel("LinalgMatrixOnes", "ones", rows, cols)
+		return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
 	}
 }
 
