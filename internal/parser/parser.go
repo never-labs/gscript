@@ -1620,7 +1620,10 @@ func (p *Parser) parsePostfix() (ast.Expr, error) {
 			}
 
 		case lexer.TOKEN_COLON:
-			if p.peekAt(1).Type != lexer.TOKEN_IDENT || p.peekAt(2).Type != lexer.TOKEN_LPAREN {
+			colonTok := p.peek()
+			if p.peekAt(1).Type != lexer.TOKEN_IDENT ||
+				p.peekAt(2).Type != lexer.TOKEN_LPAREN ||
+				p.peekAt(1).Line != colonTok.Line {
 				return expr, nil
 			}
 			// Method call: obj:method(args)

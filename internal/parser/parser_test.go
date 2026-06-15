@@ -126,6 +126,42 @@ default:
 	}
 }
 
+func TestSelectCaseBodyAllowsCallStatements(t *testing.T) {
+	prog := mustParse(t, `
+left := make(chan, 1)
+right := make(chan, 1)
+select {
+case v := <-left:
+	print(v)
+case right <- 20:
+	print("sent")
+default:
+	print("idle")
+}
+`)
+	sel, ok := prog.Stmts[2].(*ast.SelectStmt)
+	if !ok {
+		t.Fatalf("third statement should be SelectStmt, got %T", prog.Stmts[2])
+	}
+	if len(sel.Cases) != 2 || sel.Default == nil {
+		t.Fatalf("unexpected select AST: %#v", sel)
+	}
+	for i, cls := range sel.Cases {
+		if len(cls.Body.Stmts) != 1 {
+			t.Fatalf("case %d body statements = %d, want 1", i, len(cls.Body.Stmts))
+		}
+		if _, ok := cls.Body.Stmts[0].(*ast.CallStmt); !ok {
+			t.Fatalf("case %d body statement should be CallStmt, got %T", i, cls.Body.Stmts[0])
+		}
+	}
+	if len(sel.Default.Stmts) != 1 {
+		t.Fatalf("default body statements = %d, want 1", len(sel.Default.Stmts))
+	}
+	if _, ok := sel.Default.Stmts[0].(*ast.CallStmt); !ok {
+		t.Fatalf("default body statement should be CallStmt, got %T", sel.Default.Stmts[0])
+	}
+}
+
 func TestStringLiteral(t *testing.T) {
 	prog := mustParse(t, `s := "hello"`)
 	decl := prog.Stmts[0].(*ast.DeclareStmt)

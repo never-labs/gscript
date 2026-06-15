@@ -193,6 +193,66 @@ assert(soa.len(window) == 3)
 	}
 }
 
+func TestReferenceConcurrencyExamplesStayRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "concurrency", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := markdownLeiaSnippets(string(data))
+	if len(blocks) < 8 {
+		t.Fatalf("docs/reference/concurrency/index.md Leia examples = %d, want concurrency walkthrough", len(blocks))
+	}
+	cases := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "goroutine",
+			source: blocks[0] + `
+assert(sum == 500500)
+`,
+		},
+		{
+			name: "channel",
+			source: blocks[1] + `
+assert(value == "ready")
+` + blocks[2] + `
+assert(ok == false)
+`,
+		},
+		{
+			name: "select",
+			source: `left := make(chan, 1)
+right := make(chan, 1)
+left <- 10
+` + blocks[3],
+		},
+		{
+			name: "timeout",
+			source: `done := make(chan)
+` + blocks[5],
+		},
+		{
+			name:   "waitgroup",
+			source: blocks[6],
+		},
+		{
+			name:   "group",
+			source: blocks[7],
+		},
+		{
+			name:   "shared-state",
+			source: blocks[8] + "\nassert(msg.count == 1)\n",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runLeiaDocSnippet(t, root, "concurrency-"+tc.name+".leia", tc.source)
+		})
+	}
+}
+
 func readmeFirstLeiaSnippet(readme string) string {
 	for _, marker := range []string{"```go", "````leia", "```leia"} {
 		start := strings.Index(readme, marker)
@@ -234,4 +294,20 @@ func markdownLeiaSnippets(markdown string) []string {
 		snippets = append(snippets, strings.TrimSpace(strings.Join(block, "\n")))
 	}
 	return snippets
+}
+
+func runLeiaDocSnippet(t *testing.T, root, name, source string) {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(file, []byte(strings.TrimSpace(source)+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", "./cmd/leia", "run", file)
+	cmd.Dir = root
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("%s failed: %v\nsource:\n%s\nstdout:\n%s\nstderr:\n%s", name, err, source, stdout.String(), stderr.String())
+	}
 }
