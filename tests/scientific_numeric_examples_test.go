@@ -18,12 +18,12 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.col", "linalg.solve", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.col", "linalg.sandwich", "linalg.chainmul", "linalg.solve_right", "linalg.scalar", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "rand.normal_vec", "stats.normal_pdf", "stats.normalize_weights", "stats.effective_sample_size", "stats.resample", "stats.mean", "stats[\"var\"]", "stats.rmse", "q.eval"},
+			wantAPI: []string{"rand.seed", "rand.normal_vec", "linalg.add", "stats.normal_pdf", "stats.normalize_weights", "stats.effective_sample_size", "stats.resample", "stats.mean", "stats[\"var\"]", "stats.std", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),

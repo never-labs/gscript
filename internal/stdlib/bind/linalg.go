@@ -24,14 +24,21 @@ func BuildLinalg() *Table {
 	set("set", linalgSet)
 	set("add", linalgAdd)
 	set("sub", linalgSub)
+	set("mul", linalgMul)
+	set("div", linalgDiv)
 	set("scale", linalgScale)
 	set("dot", linalgDot)
 	set("matvec", linalgMatvec)
 	set("matmul", linalgMatmul)
+	set("chainmul", linalgChainmul)
+	set("sandwich", linalgSandwich)
 	set("transpose", linalgTranspose)
 	set("trace", linalgTrace)
+	set("scalar", linalgScalar)
 	set("norm", linalgNorm)
 	set("solve", linalgSolve)
+	set("solve_right", linalgSolveRight)
+	set("rsolve", linalgSolveRight)
 	set("solve2", linalgSolve2)
 	return t
 }
@@ -218,10 +225,16 @@ func linalgSet(args []Value) ([]Value, error) {
 }
 
 func linalgAdd(args []Value) ([]Value, error) {
-	return linalgBinary(args, "linalg.add", func(a, b float64) float64 { return a + b })
+	return linalgPointwise(args, "linalg.add", "add", func(a, b float64) float64 { return a + b })
 }
 func linalgSub(args []Value) ([]Value, error) {
-	return linalgBinary(args, "linalg.sub", func(a, b float64) float64 { return a - b })
+	return linalgPointwise(args, "linalg.sub", "sub", func(a, b float64) float64 { return a - b })
+}
+func linalgMul(args []Value) ([]Value, error) {
+	return linalgPointwise(args, "linalg.mul", "mul", func(a, b float64) float64 { return a * b })
+}
+func linalgDiv(args []Value) ([]Value, error) {
+	return linalgPointwise(args, "linalg.div", "div", func(a, b float64) float64 { return a / b })
 }
 
 func linalgScale(args []Value) ([]Value, error) {
@@ -309,6 +322,61 @@ func linalgMatmul(args []Value) ([]Value, error) {
 	return []Value{linalgMatrixDenseValue(ar, bc, out)}, nil
 }
 
+func linalgChainmul(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("linalg.chainmul: need at least two matrices")
+	}
+	rows, cols, values, ok, err := linalgMatrixValue("linalg.chainmul", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.chainmul: argument 1 must be a matrix")
+	}
+	for i := 1; i < len(args); i++ {
+		br, bc, b, ok, err := linalgMatrixValue("linalg.chainmul", args[i])
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("linalg.chainmul: argument %d must be a matrix", i+1)
+		}
+		if cols != br {
+			return nil, fmt.Errorf("linalg.chainmul: dimension mismatch at argument %d", i+1)
+		}
+		values = stddata.LinalgF64Matmul(rows, cols, bc, values, b)
+		cols = bc
+	}
+	return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
+}
+
+func linalgSandwich(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("linalg.sandwich: need transform and matrix")
+	}
+	ar, ac, a, ok, err := linalgMatrixValue("linalg.sandwich", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.sandwich: argument 1 must be a matrix")
+	}
+	pr, pc, p, ok, err := linalgMatrixValue("linalg.sandwich", args[1])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.sandwich: argument 2 must be a matrix")
+	}
+	if ac != pr || pc != ac {
+		return nil, fmt.Errorf("linalg.sandwich: dimension mismatch")
+	}
+	ap := stddata.LinalgF64Matmul(ar, ac, pc, a, p)
+	at := stddata.LinalgF64Transpose(ar, ac, a)
+	out := stddata.LinalgF64Matmul(ar, pc, ar, ap, at)
+	return []Value{linalgMatrixDenseValue(ar, ar, out)}, nil
+}
+
 func linalgTranspose(args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("linalg.transpose: need matrix")
@@ -345,6 +413,31 @@ func linalgTrace(args []Value) ([]Value, error) {
 	}
 	stddata.RecordLinalgMatrixKernel("LinalgMatrixTrace", "trace", rows, cols)
 	return []Value{FloatValue(sum)}, nil
+}
+
+func linalgScalar(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("linalg.scalar: need value")
+	}
+	if args[0].IsNumber() {
+		return []Value{FloatValue(args[0].Number())}, nil
+	}
+	if rows, cols, values, ok, err := linalgMatrixValue("linalg.scalar", args[0]); err != nil {
+		return nil, err
+	} else if ok {
+		if rows != 1 || cols != 1 {
+			return nil, fmt.Errorf("linalg.scalar: matrix must be 1x1")
+		}
+		return []Value{FloatValue(values[0])}, nil
+	}
+	values, err := linalgVectorValue("linalg.scalar", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if len(values) != 1 {
+		return nil, fmt.Errorf("linalg.scalar: vector length must be 1")
+	}
+	return []Value{FloatValue(values[0])}, nil
 }
 
 func linalgNorm(args []Value) ([]Value, error) {
@@ -422,36 +515,134 @@ func linalgSolve(args []Value) ([]Value, error) {
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
-func linalgBinary(args []Value, name string, op func(float64, float64) float64) ([]Value, error) {
+func linalgSolveRight(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("linalg.solve_right: need right-hand side and matrix")
+	}
+	br, bc, b, ok, err := linalgMatrixValue("linalg.solve_right", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.solve_right: argument 1 must be a matrix")
+	}
+	ar, ac, a, ok, err := linalgMatrixValue("linalg.solve_right", args[1])
+	if err != nil {
+		return nil, err
+	}
+	if !ok || ar != ac {
+		return nil, fmt.Errorf("linalg.solve_right: argument 2 must be a square matrix")
+	}
+	if bc != ar {
+		return nil, fmt.Errorf("linalg.solve_right: dimension mismatch")
+	}
+	at := stddata.LinalgF64Transpose(ar, ac, a)
+	bt := stddata.LinalgF64Transpose(br, bc, b)
+	xt, err := linalgSolveDense(ar, br, at, bt)
+	if err != nil {
+		return nil, err
+	}
+	out := stddata.LinalgF64Transpose(ar, br, xt)
+	stddata.RecordLinalgMatrixKernel("LinalgMatrixSolveRight", "solve_right", br, bc)
+	return []Value{linalgMatrixDenseValue(br, bc, out)}, nil
+}
+
+type linalgPointwiseOperand struct {
+	kind       string
+	rows, cols int
+	data       []float64
+	scalar     float64
+}
+
+func linalgPointwise(args []Value, name, opName string, op func(float64, float64) float64) ([]Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("%s: need two values", name)
 	}
-	if ar, ac, a, ok, err := linalgMatrixValue(name, args[0]); err != nil {
-		return nil, err
-	} else if ok {
-		br, bc, b, ok, err := linalgMatrixValue(name, args[1])
+	operands := make([]linalgPointwiseOperand, len(args))
+	resultKind := "scalar"
+	rows, cols, length := 0, 0, 0
+	for i, arg := range args {
+		operand, err := linalgPointwiseDecode(name, arg)
 		if err != nil {
 			return nil, err
 		}
-		if !ok || ar != br || ac != bc {
-			return nil, fmt.Errorf("%s: matrix shape mismatch", name)
+		operands[i] = operand
+		switch operand.kind {
+		case "matrix":
+			if resultKind == "vector" {
+				return nil, fmt.Errorf("%s: cannot mix matrix and vector operands", name)
+			}
+			if resultKind == "matrix" && (operand.rows != rows || operand.cols != cols) {
+				return nil, fmt.Errorf("%s: matrix shape mismatch", name)
+			}
+			resultKind = "matrix"
+			rows, cols = operand.rows, operand.cols
+		case "vector":
+			if resultKind == "matrix" {
+				return nil, fmt.Errorf("%s: cannot mix matrix and vector operands", name)
+			}
+			if resultKind == "vector" && len(operand.data) != length {
+				return nil, fmt.Errorf("%s: vector length mismatch", name)
+			}
+			resultKind = "vector"
+			length = len(operand.data)
 		}
-		out := stddata.LinalgF64BinaryMatrix("LinalgMatrixBinary", name, ar, ac, a, b, op)
-		return []Value{linalgMatrixDenseValue(ar, ac, out)}, nil
 	}
-	a, err := linalgVectorValue(name, args[0])
+	switch resultKind {
+	case "matrix":
+		out := make([]float64, rows*cols)
+		for i := range out {
+			out[i] = operands[0].valueAt(i)
+		}
+		for _, operand := range operands[1:] {
+			for i := range out {
+				out[i] = op(out[i], operand.valueAt(i))
+			}
+		}
+		stddata.RecordLinalgMatrixKernel("LinalgMatrixPointwise", opName, rows, cols)
+		return []Value{linalgMatrixDenseValue(rows, cols, out)}, nil
+	case "vector":
+		out := make([]float64, length)
+		for i := range out {
+			out[i] = operands[0].valueAt(i)
+		}
+		for _, operand := range operands[1:] {
+			for i := range out {
+				out[i] = op(out[i], operand.valueAt(i))
+			}
+		}
+		stddata.RecordLinalgVectorKernel("LinalgVectorPointwise", opName, length)
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	default:
+		out := operands[0].scalar
+		for _, operand := range operands[1:] {
+			out = op(out, operand.scalar)
+		}
+		return []Value{FloatValue(out)}, nil
+	}
+}
+
+func linalgPointwiseDecode(name string, value Value) (linalgPointwiseOperand, error) {
+	if value.IsNumber() {
+		return linalgPointwiseOperand{kind: "scalar", scalar: value.Number()}, nil
+	}
+	if rows, cols, values, ok, err := linalgMatrixValue(name, value); err != nil {
+		return linalgPointwiseOperand{}, err
+	} else if ok {
+		return linalgPointwiseOperand{kind: "matrix", rows: rows, cols: cols, data: values}, nil
+	}
+	values, err := linalgVectorValue(name, value)
 	if err != nil {
-		return nil, err
+		return linalgPointwiseOperand{}, err
 	}
-	b, err := linalgVectorValue(name, args[1])
-	if err != nil {
-		return nil, err
+	return linalgPointwiseOperand{kind: "vector", data: values}, nil
+}
+
+func (operand linalgPointwiseOperand) valueAt(index int) float64 {
+	if operand.kind == "scalar" {
+		return operand.scalar
 	}
-	if len(a) != len(b) {
-		return nil, fmt.Errorf("%s: vector length mismatch", name)
-	}
-	out := stddata.LinalgF64BinaryVector("LinalgVectorBinary", name, a, b, op)
-	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	return operand.data[index]
 }
 
 func linalgVectorArgs(name string, args []Value) ([]float64, error) {

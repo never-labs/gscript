@@ -19,16 +19,16 @@ innovations := {}
 
 for i := 1; i <= #measurements; i++ {
     x_pred := linalg.matmul(F, x)
-    P_pred := linalg.add(linalg.matmul(linalg.matmul(F, P), linalg.transpose(F)), Q)
+    P_pred := linalg.add(linalg.sandwich(F, P), Q)
 
-    z := linalg.matrix(1, 1, {measurements[i]})
+    z := linalg.matrix({{measurements[i]}})
     y := linalg.sub(z, linalg.matmul(H, x_pred))
-    S := linalg.add(linalg.matmul(linalg.matmul(H, P_pred), linalg.transpose(H)), linalg.matrix({{0.04}}))
-    K := linalg.transpose(linalg.solve(S, linalg.transpose(linalg.matmul(P_pred, linalg.transpose(H)))))
+    S := linalg.add(linalg.chainmul(H, P_pred, linalg.transpose(H)), 0.04)
+    K := linalg.solve_right(linalg.matmul(P_pred, linalg.transpose(H)), S)
 
     x = linalg.add(x_pred, linalg.matmul(K, y))
     P = linalg.matmul(linalg.sub(I, linalg.matmul(K, H)), P_pred)
-    innovations[i] = linalg.get(y, 1, 1)
+    innovations[i] = linalg.scalar(y)
 }
 
 innovation_rmse := stats.rms(innovations)
