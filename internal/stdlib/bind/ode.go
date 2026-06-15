@@ -35,7 +35,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		return []Value{DenseArrayValue(NewDenseArrayF64Owned(next))}, nil
 	})
 
-	set("integrate", func(args []Value) ([]Value, error) {
+	integrate := func(args []Value) ([]Value, error) {
 		if len(args) < 4 {
 			return nil, fmt.Errorf("ode.integrate: need function, state, dt, steps")
 		}
@@ -134,6 +134,68 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			return []Value{final, TableValue(observations)}, nil
 		}
 		return []Value{final}, nil
+	}
+	set("integrate", integrate)
+
+	set("solve", func(args []Value) ([]Value, error) {
+		if len(args) < 3 {
+			return nil, fmt.Errorf("ode.solve: need function, state, options")
+		}
+		fn := args[0]
+		state := args[1]
+		var dt, steps Value
+		var opts Value
+		hasOpts := false
+		if args[2].IsTable() {
+			opts = args[2]
+			options := opts.Table()
+			dt = options.RawGetString("dt")
+			steps = options.RawGetString("steps")
+			hasOpts = true
+		} else {
+			if len(args) < 4 {
+				return nil, fmt.Errorf("ode.solve: need function, state, options")
+			}
+			dt = args[2]
+			steps = args[3]
+			if len(args) >= 5 {
+				if !args[4].IsTable() {
+					return nil, fmt.Errorf("ode.solve: options must be a table")
+				}
+				opts = args[4]
+				hasOpts = true
+			}
+		}
+		if !dt.IsNumber() {
+			return nil, fmt.Errorf("ode.solve: dt must be numeric")
+		}
+		if _, err := linalgPositiveInt("ode.solve", steps, "steps"); err != nil {
+			return nil, err
+		}
+		integrateArgs := []Value{fn, state, dt, steps}
+		trajectory := false
+		hasObserve := false
+		if hasOpts {
+			options := opts.Table()
+			trajectory = options.RawGetString("trajectory").Truthy()
+			hasObserve = options.RawGetString("observe").IsFunction()
+			integrateArgs = append(integrateArgs, opts)
+		}
+		values, err := integrate(integrateArgs)
+		if err != nil {
+			return nil, err
+		}
+		out := NewTable()
+		out.RawSetString("final", values[0])
+		next := 1
+		if trajectory {
+			out.RawSetString("trajectory", values[next])
+			next++
+		}
+		if hasObserve {
+			out.RawSetString("observed", values[next])
+		}
+		return []Value{TableValue(out)}, nil
 	})
 
 	return t

@@ -110,6 +110,11 @@ typed backend:
 - qSQL maps to frame pipelines;
 - tagged q interpolation converts Leia values to typed q values without string
   re-parsing when possible.
+- q raw source blocks support top-level newline statement separators, so
+  multi-line q algorithms can be written as `q { ... }` instead of quoted
+  source strings.
+- q raw source blocks and q tagged strings share `${...}` interpolation and
+  Leia-to-q literal encoding for scalars, lists, and dense arrays.
 
 Leia-to-q bridges must support dense arrays, dense matrices, frames, ordinary
 lists, scalars, strings, booleans, and nil values.
@@ -145,8 +150,9 @@ Each example must:
 - remain small enough to demonstrate the product direction.
 
 Implementation tests live next to the owning modules. End-to-end example tests
-live under `tests/scientific_numeric_examples_test.go` and run the translated
-Leia programs through the CLI.
+live under `tests/scientific_numeric_examples_test.go`, run the translated Leia
+programs through the CLI, parse deterministic summary fields, and execute the
+same acceptance checks in the default and bytecode VM modes.
 
 ## Initial Milestones
 
@@ -157,3 +163,19 @@ Leia programs through the CLI.
 4. Add RK4 and control helpers that accept ordinary Leia functions.
 5. Convert the three MATLAB-style examples into Leia acceptance tests.
 6. Route hot vector/matrix operations into the shared kernel/JIT diagnostics.
+
+## Current Surface
+
+The current standard-library surface intentionally favors reusable pieces over
+example-specific shortcuts:
+
+- `math.near` for tolerance checks.
+- `linalg.affine` for scaled vector/matrix updates.
+- `linalg.at` for shape-friendly vector, row, column, and matrix access.
+- `stats.variance`, `stats.log_normal_pdf`, `stats.normalize_log_weights`, and
+  `stats.resample_if` for sequential Monte Carlo code.
+- `control.lqr`, `control.feedback`, `control.saturate`, and
+  `control.wrap_angle` for small control systems.
+- `ode.integrate` and `ode.solve` for RK4-style simulation with projection,
+  observation hooks, and result-object access.
+- `q { ... }` raw blocks for compact q snippets without quoted source strings.

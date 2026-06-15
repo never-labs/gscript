@@ -372,6 +372,124 @@ func TestODEIntegrateProjectAndObserveHooks(t *testing.T) {
 	}
 }
 
+func TestODESolveWrapsTrajectoryAndObservedResult(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1}))}, nil
+		case "test.project":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{2 * state[0]}))}, nil
+		case "test.observe":
+			step := args[1].Number()
+			tm := args[2].Number()
+			return []Value{FloatValue(state[0] + step + tm)}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":         FloatValue(1),
+			"steps":      IntValue(3),
+			"trajectory": BoolValue(true),
+			"project":    FunctionValue(&GoFunction{Name: "test.project"}),
+			"observe":    FunctionValue(&GoFunction{Name: "test.observe"}),
+			"method":     StringValue("rk4"),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !got[0].IsTable() {
+		t.Fatalf("ode.solve returns %#v, want result table", got)
+	}
+	result := got[0].Table()
+	assertTableFloat(t, result.RawGetString("final"), 1, 14)
+	assertTableFloat(t, result.RawGetString("trajectory").Table().RawGetInt(1), 1, 2)
+	assertTableFloat(t, result.RawGetString("trajectory").Table().RawGetInt(2), 1, 6)
+	assertTableFloat(t, result.RawGetString("trajectory").Table().RawGetInt(3), 1, 14)
+	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(1), 4)
+	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(2), 10)
+	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(3), 20)
+}
+
+func TestODESolveWrapsObservedWithoutTrajectory(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0]}))}, nil
+		case "test.observe":
+			return []Value{FloatValue(state[0])}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":      FloatValue(0.25),
+			"steps":   IntValue(3),
+			"observe": FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := got[0].Table()
+	assertTableFloat(t, result.RawGetString("final"), 1, 0.75)
+	if !result.RawGetString("trajectory").IsNil() {
+		t.Fatalf("trajectory = %v, want nil", result.RawGetString("trajectory"))
+	}
+	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(1), 0.25)
+	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(2), 0.5)
+	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(3), 0.75)
+}
+
+func TestODESolveAcceptsIntegrateStyleArguments(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		return []Value{DenseArrayValue(NewDenseArrayF64([]float64{state[0]}))}, nil
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{1})),
+		FloatValue(0.1),
+		IntValue(2),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := got[0].Table()
+	final, ok := result.RawGetString("final").DenseArray().F64()
+	if !ok || len(final) != 1 {
+		t.Fatalf("ode.solve final = %v, want f64[1]", result.RawGetString("final"))
+	}
+	if math.Abs(final[0]-math.Exp(0.2)) > 2e-5 {
+		t.Fatalf("ode.solve final = %.12f, want %.12f", final[0], math.Exp(0.2))
+	}
+}
+
 func controlTestOptions(values map[string]Value) *Table {
 	t := NewTable()
 	for key, value := range values {

@@ -74,6 +74,8 @@ scalarFirst := linalg.sub(10, a)
 product := linalg.mul(a, b, 2)
 quot := linalg.div(product, 2)
 scaled := linalg.scale(a, 2)
+affine := linalg.affine(a, b, 2, -1)
+affineShift := linalg.affine(a, 10, 0.5, 1)
 dot := linalg.dot(a, b)
 norm := linalg.norm(linalg.vector(3, 4))
 m := linalg.matrix(2, 2, {1, 2, 3, 4})
@@ -84,6 +86,10 @@ mm := linalg.matmul(m, linalg.eye(2))
 cm := linalg.chainmul(m, linalg.eye(2), linalg.eye(2))
 sw := linalg.sandwich(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2))
 mshift := linalg.add(m, 10)
+maffine := linalg.affine(m, linalg.eye(2), 2, -10)
+rowAffine := linalg.affine(linalg.row(1, 2), 10, 2, -1)
+colAffine := linalg.affine(100, linalg.col(1, 2), 1, -3)
+scalarAffine := linalg.affine(2, 3, 4, 5)
 sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
 solg := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), {1, 2})
 solm := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), linalg.matrix({{1, 2}, {2, 1}}))
@@ -97,6 +103,9 @@ single := linalg.scalar(linalg.matrix({{42}}))
 	assertTableFloat(t, interp.GetGlobal("product"), 2, 20)
 	assertTableFloat(t, interp.GetGlobal("quot"), 3, 18)
 	assertTableFloat(t, interp.GetGlobal("scaled"), 2, 4)
+	assertTableFloat(t, interp.GetGlobal("affine"), 1, -2)
+	assertTableFloat(t, interp.GetGlobal("affine"), 3, 0)
+	assertTableFloat(t, interp.GetGlobal("affineShift"), 2, 11)
 	assertFloat(t, interp.GetGlobal("dot"), 32)
 	assertFloat(t, interp.GetGlobal("norm"), 5)
 	assertTableFloat(t, interp.GetGlobal("mv"), 1, 50)
@@ -107,6 +116,11 @@ single := linalg.scalar(linalg.matrix({{42}}))
 	assertMatrixFloat(t, interp.GetGlobal("sw"), 2, 2, 1, 5)
 	assertMatrixFloat(t, interp.GetGlobal("sw"), 2, 2, 2, 2)
 	assertMatrixFloat(t, interp.GetGlobal("mshift"), 2, 2, 3, 13)
+	assertMatrixFloat(t, interp.GetGlobal("maffine"), 2, 2, 1, -8)
+	assertMatrixFloat(t, interp.GetGlobal("maffine"), 2, 2, 4, -2)
+	assertMatrixFloat(t, interp.GetGlobal("rowAffine"), 1, 2, 2, -6)
+	assertMatrixFloat(t, interp.GetGlobal("colAffine"), 2, 1, 2, 94)
+	assertFloat(t, interp.GetGlobal("scalarAffine"), 23)
 	assertTableFloat(t, interp.GetGlobal("sol"), 1, 0.2)
 	assertTableFloat(t, interp.GetGlobal("sol"), 2, 0.6)
 	assertTableFloat(t, interp.GetGlobal("solg"), 1, 0.2)
@@ -217,6 +231,13 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 			col:  0,
 			want: 3,
 		},
+		{
+			name: "affine matrix",
+			src:  `m := linalg.affine(linalg.matrix(2, 2, {1, 2, 3, 4}), 10, 2, -1)`,
+			row:  1,
+			col:  0,
+			want: -4,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setRow, setCol := tc.setRow, tc.setCol
@@ -273,6 +294,13 @@ func TestLinalgVectorResultsAreDenseArrayInteroperable(t *testing.T) {
 			wantLen:  3,
 			wantMean: 4,
 			wantNorm: math.Sqrt(56),
+		},
+		{
+			name:     "affine vector",
+			src:      `v := linalg.affine(linalg.vector(1, 2, 3), 10, 2, -1)`,
+			wantLen:  3,
+			wantMean: -6,
+			wantNorm: math.Sqrt(116),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

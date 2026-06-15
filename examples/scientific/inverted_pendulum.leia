@@ -34,7 +34,10 @@ func observe_energy(x, step, t) {
     return 0.5 * x[2] * x[2] + (g / l) * (1.0 - math.cos(x[1]))
 }
 
-state, trajectory, energy := ode.integrate(dynamics, state, dt, 240, {trajectory: true, project: project_state, observe: observe_energy})
+solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, project: project_state, observe: observe_energy})
+state = solution.final
+trajectory := solution.trajectory
+energy := solution.observed
 final_theta := state[1]
 final_omega := state[2]
 mean_energy := stats.mean(energy)

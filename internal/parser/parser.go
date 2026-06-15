@@ -1829,7 +1829,11 @@ func (p *Parser) parseTaggedDialectExpr() (ast.Expr, error) {
 	}
 	if p.check(lexer.TOKEN_RAW_BLOCK) {
 		bodyTok := p.advance()
-		return &ast.TaggedBlockExpr{P: pos, Tag: tagTok.Value, RawSource: bodyTok.Value, HasRawSource: true, FailFast: failFast}, nil
+		body, err := p.interpolatedStringExpr(p.tokenPos(bodyTok), bodyTok.Value)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.TaggedBlockExpr{P: pos, Tag: tagTok.Value, RawSource: bodyTok.Value, RawSourceExpr: body, HasRawSource: true, FailFast: failFast}, nil
 	}
 	return nil, p.errorf("expected tagged dialect literal or block")
 }

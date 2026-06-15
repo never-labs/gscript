@@ -28,6 +28,7 @@ func BuildLinalg() *Table {
 	set("mul", linalgMul)
 	set("div", linalgDiv)
 	set("scale", linalgScale)
+	set("affine", linalgAffine)
 	set("dot", linalgDot)
 	set("matvec", linalgMatvec)
 	set("matmul", linalgMatmul)
@@ -297,6 +298,67 @@ func linalgScale(args []Value) ([]Value, error) {
 		return nil, err
 	}
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(stddata.LinalgF64VectorScale(values, s)))}, nil
+}
+
+func linalgAffine(args []Value) ([]Value, error) {
+	if len(args) < 4 {
+		return nil, fmt.Errorf("linalg.affine: need base, delta, baseScale, deltaScale")
+	}
+	base, err := linalgPointwiseDecode("linalg.affine", args[0])
+	if err != nil {
+		return nil, err
+	}
+	delta, err := linalgPointwiseDecode("linalg.affine", args[1])
+	if err != nil {
+		return nil, err
+	}
+	baseScale, err := linalgNumber("linalg.affine", args[2])
+	if err != nil {
+		return nil, err
+	}
+	deltaScale, err := linalgNumber("linalg.affine", args[3])
+	if err != nil {
+		return nil, err
+	}
+	return linalgAffineOperands(base, delta, baseScale, deltaScale)
+}
+
+func linalgAffineOperands(base, delta linalgPointwiseOperand, baseScale, deltaScale float64) ([]Value, error) {
+	switch {
+	case base.kind == "matrix" || delta.kind == "matrix":
+		if base.kind == "vector" || delta.kind == "vector" {
+			return nil, fmt.Errorf("linalg.affine: cannot mix matrix and vector operands")
+		}
+		rows, cols := base.rows, base.cols
+		if delta.kind == "matrix" {
+			if base.kind == "matrix" && (base.rows != delta.rows || base.cols != delta.cols) {
+				return nil, fmt.Errorf("linalg.affine: matrix shape mismatch")
+			}
+			rows, cols = delta.rows, delta.cols
+		}
+		out := make([]float64, rows*cols)
+		for i := range out {
+			out[i] = baseScale*base.valueAt(i) + deltaScale*delta.valueAt(i)
+		}
+		stddata.RecordLinalgMatrixKernel("LinalgMatrixAffine", "affine", rows, cols)
+		return []Value{linalgMatrixDenseValue(rows, cols, out)}, nil
+	case base.kind == "vector" || delta.kind == "vector":
+		length := len(base.data)
+		if delta.kind == "vector" {
+			if base.kind == "vector" && len(base.data) != len(delta.data) {
+				return nil, fmt.Errorf("linalg.affine: vector length mismatch")
+			}
+			length = len(delta.data)
+		}
+		out := make([]float64, length)
+		for i := range out {
+			out[i] = baseScale*base.valueAt(i) + deltaScale*delta.valueAt(i)
+		}
+		stddata.RecordLinalgVectorKernel("LinalgVectorAffine", "affine", length)
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	default:
+		return []Value{FloatValue(baseScale*base.scalar + deltaScale*delta.scalar)}, nil
+	}
 }
 
 func linalgDot(args []Value) ([]Value, error) {

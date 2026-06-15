@@ -995,10 +995,14 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibAll)}, tc.opts...)...)
 			if err := vm.Exec("info := dialect.info(\"q\")\n" +
+				"a := [1,2,3,4]\n" +
 				"has_block := info.block\n" +
 				"sum_inline := q {+/1 2 3}\n" +
 				"sum_multi := q {\n" +
 				"sum 4 5 6\n" +
+				"}\n" +
+				"sum_interp := q {\n" +
+				"sum ${a}\n" +
 				"}\n" +
 				"squares := q {\n" +
 				"x:til 10\n" +
@@ -1015,6 +1019,7 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 			assertGet(t, vm, "has_block", true)
 			assertGet(t, vm, "sum_inline", int64(6))
 			assertGet(t, vm, "sum_multi", int64(15))
+			assertGet(t, vm, "sum_interp", int64(10))
 			assertGet(t, vm, "squares", int64(285))
 			assertGet(t, vm, "symbol_count", int64(3))
 			assertGet(t, vm, "choice", int64(10))

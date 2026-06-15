@@ -185,6 +185,22 @@ func TestQTaggedRawSourceBlockParses(t *testing.T) {
 	if tagged.RawSource != "+/1 2 3\ncount `AAPL`MSFT" {
 		t.Fatalf("q raw source = %q", tagged.RawSource)
 	}
+	if _, ok := tagged.RawSourceExpr.(*ast.StringLit); !ok {
+		t.Fatalf("q raw source expr = %T, want StringLit", tagged.RawSourceExpr)
+	}
+}
+
+func TestQTaggedRawSourceBlockInterpolationParses(t *testing.T) {
+	prog := mustParse(t, "result := q {\nsum ${a}\n}\n")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedBlockExpr)
+	interp, ok := tagged.RawSourceExpr.(*ast.InterpolatedStringExpr)
+	if !ok {
+		t.Fatalf("q raw source expr = %T, want InterpolatedStringExpr", tagged.RawSourceExpr)
+	}
+	if len(interp.Parts) != 2 || interp.Parts[0].Text != "sum " || interp.Parts[1].Expr == nil {
+		t.Fatalf("q raw interpolation parts = %#v", interp.Parts)
+	}
 }
 
 func TestQTaggedFailFastRawSourceBlockParses(t *testing.T) {

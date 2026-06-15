@@ -128,7 +128,11 @@ func desugarExpr(expr Expr) Expr {
 			opts := &TableLitExpr{P: e.P, Fields: []TableField{
 				{Key: &StringLit{P: e.P, Value: "raw_source"}, Value: &BoolLit{P: e.P, Value: true}},
 			}}
-			return dialectCall(e.P, "eval", e.Tag, &StringLit{P: e.P, Value: e.RawSource}, opts, e.FailFast)
+			body := Expr(&StringLit{P: e.P, Value: e.RawSource})
+			if e.RawSourceExpr != nil {
+				body = taggedStringBody(e.P, e.Tag, e.RawSourceExpr)
+			}
+			return dialectCall(e.P, "eval", e.Tag, body, opts, e.FailFast)
 		}
 		if e.Body != nil {
 			return dialectCall(e.P, "eval_raw", e.Tag, &FuncLitExpr{P: e.P, Body: desugarBlock(e.Body)}, nil, e.FailFast)
