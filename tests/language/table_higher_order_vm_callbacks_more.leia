@@ -1,27 +1,27 @@
 print("case:table_higher_order_vm_callbacks_more")
 
-mapped := table.map({1, 2, 3}, func(v, k) {
+mapped := table.map([1, 2, 3], func(v, k) {
   return v * k
 })
 assert(mapped[1] == 1 && mapped[2] == 4 && mapped[3] == 9)
 
-filtered := table.filter({1, 2, 3, 4, 5}, func(v) {
+filtered := table.filter([1, 2, 3, 4, 5], func(v) {
   return v % 2 == 1
 })
 assert(#filtered == 3 && filtered[1] == 1 && filtered[2] == 3 && filtered[3] == 5)
 
-sum := table.reduce({1, 2, 3, 4}, func(acc, v) {
+sum := table.reduce([1, 2, 3, 4], func(acc, v) {
   return acc + v
 }, 0)
 assert(sum == 10)
 
-byKey := table.fromArray({"go", "lua"}, func(v) {
+byKey := table.fromArray(["go", "lua"], func(v) {
   return v
 })
 assert(byKey["go"] == "go" && byKey.lua == "lua")
 
-nested := {2, 3}
-flat := table.flatten({1, nested, 4})
+nested := [2, 3]
+flat := table.flatten([1, nested, 4])
 assert(#flat == 4 && flat[1] == 1 && flat[2] == 2 && flat[3] == 3 && flat[4] == 4)
 
 print("ok")

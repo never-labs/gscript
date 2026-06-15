@@ -18,13 +18,13 @@ func pack(...) {
   return table.pack(...)
 }
 
-a, b, c, d := unlpack({1, 2, 3})
+a, b, c, d := unlpack([1, 2, 3])
 assert(a == 1 && b == 2 && c == 3 && d == nil)
 
-t := {unlpack({1, 2, 3, 4})}
-equaltab(t, {1, 2, 3, 4})
+t := [unlpack([1, 2, 3, 4])]
+equaltab(t, [1, 2, 3, 4])
 
-p := pack(unlpack({1, 2, 3, 4}))
+p := pack(unlpack([1, 2, 3, 4]))
 assert(p.n >= 1 && p[1] == 1)
 
 print("ok")
