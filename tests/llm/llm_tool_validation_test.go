@@ -20,47 +20,47 @@ func TestLLMSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
 			err := vm.Exec(`
 lookup := llm.tool("lookup", func(query) {
     return query, nil
-}, {params: {"query"}, requires: {"docs.read", "net.client"}})
+}, {params: ["query"], requires: ["docs.read", "net.client"]})
 
 local_only := llm.tool("local_only", func(query) {
     return query, nil
-}, {params: {"query"}, requires: {"none"}})
+}, {params: ["query"], requires: ["none"]})
 
-llm.agent_defaults({tools: {lookup}})
+llm.agent_defaults({tools: [lookup]})
 
 inherited := llm.agent("inherited", func(q) {
     return {
-        capabilities: {"docs.read", "net.client"}
+        capabilities: ["docs.read", "net.client"]
         user: q
     }, nil
 })
 
 override := llm.agent("override", func(q) {
     return {
-        tools: {local_only}
-        capabilities: {}
+        tools: [local_only]
+        capabilities: []
         user: q
     }, nil
 })
 
 answer := llm.agent("answer", func(q) {
     return {
-        tools: {lookup}
-        capabilities: {"docs.read", "net.client"}
+        tools: [lookup]
+        capabilities: ["docs.read", "net.client"]
         user: q
     }, nil
 })
 
 func f(caps) {
     _ := {
-        tools: {lookup}
+        tools: [lookup]
         caps: caps
-        messages: {llm.user("hello")}
+        messages: [llm.user("hello")]
     }
 }
 
-ok, err := llm.check_tools({lookup}, {"docs.read", "net.client"})
-override_ok, override_err := llm.check_tools({local_only}, {})
+ok, err := llm.check_tools([lookup], ["docs.read", "net.client"])
+override_ok, override_err := llm.check_tools([local_only], [])
 `)
 			if err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -83,9 +83,9 @@ func TestLLMSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T) {
 			err := vm.Exec(`
 lookup := llm.tool("lookup", func(query) {
     return query, nil
-}, {params: {"query"}, requires: {"net.client"}})
+}, {params: ["query"], requires: ["net.client"]})
 
-default_tools := {lookup}
+default_tools := [lookup]
 default_caps := {}
 
 llm.agent_defaults({
@@ -118,8 +118,8 @@ func TestLLMSyntaxValidationAllowsDynamicToolRefs(t *testing.T) {
 			err := vm.Exec(`
 func f(tools) {
     _ := {
-        tools: {tools[1]}
-        messages: {llm.user("hello")}
+        tools: [tools[1]]
+        messages: [llm.user("hello")]
     }
 }
 `)
@@ -145,10 +145,10 @@ func TestLLMSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
 func make_agent(prefix) {
     local_lookup := llm.tool("local_lookup", func(query) {
         return prefix .. query, nil
-    }, {params: {"query"}, requires: {"none"}})
+    }, {params: ["query"], requires: ["none"]})
     return llm.agent("local_agent", func(q) {
         return {
-            tools: {local_lookup}
+            tools: [local_lookup]
             user: q
         }, nil
     })

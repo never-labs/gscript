@@ -192,7 +192,7 @@ func TestUserRegisteredDialectSyntaxExecutesThroughStdlib(t *testing.T) {
 					if opts != nil && opts.prefix != nil { prefix = opts.prefix }
 					if opts != nil && opts.suffix != nil { suffix = opts.suffix }
 					return prefix .. body .. suffix
-				}, {aliases: {"bracket"}})
+				}, {aliases: ["bracket"]})
 				dialect.register({
 					name: "record",
 					eval: func(body, opts) {
@@ -410,7 +410,7 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 				"http_headers.host = \"example.test\"\n" +
 				"http_encoded := dialect.eval(\"httpmsg\", {method: \"GET\", target: \"/health\", headers: http_headers}, {mode: \"encode\"})\n" +
 				"cookie_rows := cookie`session=abc123; tag=a; tag=b`\n" +
-				"cookie_encoded := dialect.eval(\"cookies\", {session: \"abc123\", tag: {\"a\", \"b\"}}, {mode: \"encode\"})\n" +
+				"cookie_encoded := dialect.eval(\"cookies\", {session: \"abc123\", tag: [\"a\", \"b\"]}, {mode: \"encode\"})\n" +
 				"template_text := template`Hello static`\n" +
 				"template_cfg := template { text: \"Score {{.score}}\", data: {score: \"42\"} }\n" +
 				"template_eval := dialect.eval(\"template\", \"Hi {{.name}}\", {data: {name: name}})\n" +
@@ -804,7 +804,7 @@ func TestStdlibSemVerDialectExecutesThroughStdlib(t *testing.T) {
 			}, tc.opts...)...)
 			err := vm.Exec(
 				"release := semver`1.2.3-rc.1+build.7`\n" +
-					"encoded := dialect.eval(\"semver\", {major: 2, minor: 0, patch: 1, prerelease: {\"beta\", \"2\"}, build: {\"ci\", \"0042\"}}, {mode: \"encode\"})\n" +
+					"encoded := dialect.eval(\"semver\", {major: 2, minor: 0, patch: 1, prerelease: [\"beta\", \"2\"], build: [\"ci\", \"0042\"]}, {mode: \"encode\"})\n" +
 					"formatted := dialect.eval(\"semver\", {major: 3, minor: 4, patch: 5, pre: \"alpha.1\", build_metadata: \"sha.abcdef\"}, {mode: \"format\"})\n" +
 					"roundtrip := dialect.eval(\"semver\", encoded)\n" +
 					"bad, bad_err := dialect.eval(\"semver\", \"1.02.3\")\n" +

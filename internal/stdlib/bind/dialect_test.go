@@ -283,7 +283,7 @@ func TestDialectRegisterScriptHandler(t *testing.T) {
 			if opts != nil && opts.prefix != nil { prefix = opts.prefix }
 			if opts != nil && opts.suffix != nil { suffix = opts.suffix }
 			return prefix .. body .. suffix
-		}, {aliases: {"bracket"}, category: "text", capabilities: {"text.wrap"}})
+		}, {aliases: ["bracket"], category: "text", capabilities: ["text.wrap"]})
 
 		literal := wrap`+"`"+`ok`+"`"+`
 		via_alias := bracket`+"`"+`ok`+"`"+`
@@ -330,7 +330,7 @@ func TestDialectRegisterScriptBlockHandler(t *testing.T) {
 	execOnInterp(t, interp, `
 		dialect.register({
 			name: "box",
-			aliases: {"boxcfg"},
+			aliases: ["boxcfg"],
 			eval: func(body, opts) {
 				return {kind: "eval", body: body}
 			},
@@ -416,18 +416,18 @@ func TestDialectCommandStructuredOptions(t *testing.T) {
 	interp := runWithLib(t, `
 		stdin_env := dialect.eval("cmd", {
 			cmd: "sh",
-			args: {"-c", "cat; printf :$LEIA_DIALECT_TEST"},
+			args: ["-c", "cat; printf :$LEIA_DIALECT_TEST"],
 			stdin: "payload",
 			env: {LEIA_DIALECT_TEST: "env-ok"},
 		})
-		argv := dialect.eval("cmd", {"printf", "argv-%s", "ok"})
+		argv := dialect.eval("cmd", ["printf", "argv-%s", "ok"])
 		string_opts := dialect.eval("cmd", "sh -c 'cat; printf :$LEIA_DIALECT_TEST'", {
 			stdin: "body",
 			env: {LEIA_DIALECT_TEST: "from-options"},
 		})
 		option_override := dialect.eval("cmd", {
 			cmd: "sh",
-			args: {"-c", "cat; printf :$LEIA_DIALECT_TEST"},
+			args: ["-c", "cat; printf :$LEIA_DIALECT_TEST"],
 			stdin: "body-a",
 			env: {LEIA_DIALECT_TEST: "env-a"},
 		}, {
@@ -436,12 +436,12 @@ func TestDialectCommandStructuredOptions(t *testing.T) {
 		})
 		cwd_alias := dialect.eval("cmd", {
 			cmd: "sh",
-			args: {"-c", "basename \"$PWD\""},
+			args: ["-c", "basename \"$PWD\""],
 			cwd: ".",
 		})
 		option_cwd := dialect.eval("cmd", {
 			cmd: "sh",
-			args: {"-c", "basename \"$PWD\""},
+			args: ["-c", "basename \"$PWD\""],
 			cwd: "/",
 		}, {cwd: "."})
 		missing := dialect.eval("cmd", "definitely-not-a-leia-command")
@@ -544,7 +544,7 @@ func TestDialectHostAutomationResultShapesAndCapabilityGates(t *testing.T) {
 		sh_fast_ok, sh_fast_err := pcall(func() {
 			return sh!`+"`"+`printf bad 1>&2; exit 7`+"`"+`
 		})
-		cmd_ok := dialect.eval("cmd", {"printf", "cmd-out"})
+		cmd_ok := dialect.eval("cmd", ["printf", "cmd-out"])
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	shOK := interp.GetGlobal("sh_ok").Table()
@@ -861,7 +861,7 @@ func TestDialectJSONPointerLookupAndEncode(t *testing.T) {
 		doc := json`+"`"+`{"events":[{"type":"token","data":"hello"},{"type":"done","data":{}}],"meta":{"trace/id":"agent-42"}}`+"`"+`
 		first := dialect.eval("jsonptr", doc, {path: "/events/0/data"})
 		trace := dialect.eval("jsonptr", doc, {path: "/meta/trace~1id"})
-		encoded := dialect.eval("jsonptr", {"meta", "trace/id"}, {mode: "encode"})
+		encoded := dialect.eval("jsonptr", ["meta", "trace/id"], {mode: "encode"})
 		missing, missing_err := dialect.eval("jsonptr", doc, {path: "/events/2"})
 		bad, bad_err := dialect.eval("jsonptr", doc, {path: "events/0"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
@@ -998,11 +998,11 @@ func TestDialectBase64HashUnknownOptionsReturnErrors(t *testing.T) {
 
 func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 	interp := runWithLib(t, `
-		packed := dialect.eval("binary", {258, "go"}, {mode: "pack", format: "be:u16 bytes:2"})
+		packed := dialect.eval("binary", [258, "go"], {mode: "pack", format: "be:u16 bytes:2"})
 		hexed := dialect.eval("hex", packed)
 		unpacked := dialect.eval("binary", packed, {mode: "unpack", format: "be:u16 bytes:2"})
 		sized := dialect.eval("binary", "", {mode: "size", format: "be:u16 bytes:2"})
-		mixed := dialect.eval("binary", {-1234, 16909060, 1.5, "OK"}, {mode: "pack", format: "le:i16 u32 f32 bytes:2"})
+		mixed := dialect.eval("binary", [-1234, 16909060, 1.5, "OK"], {mode: "pack", format: "le:i16 u32 f32 bytes:2"})
 		mixed_hex := dialect.eval("hex", mixed)
 		mixed_unpacked := dialect.eval("binary", mixed, {mode: "unpack", format: "le:i16 u32 f32 bytes:2"})
 		mixed_size := dialect.eval("binary", "", {mode: "size", format: "le:i16 u32 f32 bytes:2"})
@@ -1068,7 +1068,7 @@ func TestDialectBinaryPackUnpackAndSize(t *testing.T) {
 			want:   `binary: invalid field size "nope"`,
 		},
 		"bad size": {
-			source: `dialect.eval("binary", {"abc"}, {mode: "pack", format: "bytes:2"})`,
+			source: `dialect.eval("binary", ["abc"], {mode: "pack", format: "bytes:2"})`,
 			want:   "binary dialect: bytes:2 got 3 bytes",
 		},
 	} {
@@ -1132,11 +1132,11 @@ port = 5432
 func TestDialectSemVerDecodeAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
 		parsed := semver`+"`"+`1.2.3-rc.1+build.7`+"`"+`
-		encoded := dialect.eval("semver", {major: 2, minor: 0, patch: 1, prerelease: {"beta", "2"}, build: {"ci", "0042"}}, {mode: "encode"})
+		encoded := dialect.eval("semver", {major: 2, minor: 0, patch: 1, prerelease: ["beta", "2"], build: ["ci", "0042"]}, {mode: "encode"})
 		formatted := dialect.eval("semver", {major: 3, minor: 4, patch: 5, pre: "alpha.1", build_metadata: "sha.abcdef"}, {mode: "format"})
 		roundtrip := dialect.eval("semver", encoded)
 		bad, bad_err := dialect.eval("semver", "1.02.3")
-		bad_table, bad_table_err := dialect.eval("semver", {major: 1, minor: 2, patch: 3, prerelease: {"01"}}, {mode: "encode"})
+		bad_table, bad_table_err := dialect.eval("semver", {major: 1, minor: 2, patch: 3, prerelease: ["01"]}, {mode: "encode"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	parsed := interp.GetGlobal("parsed").Table()
@@ -1193,7 +1193,7 @@ func TestDialectMarkdownTableDecodeAndEncode(t *testing.T) {
 | Bob | 7 |
 `+"`"+`
 		encoded := dialect.eval("mdtable", rows, {mode: "encode"})
-		custom := dialect.eval("mdtable", {{name: "Ada", score: 42}}, {mode: "encode", headers: {"name", "score"}})
+		custom := dialect.eval("mdtable", [{name: "Ada", score: 42}], {mode: "encode", headers: ["name", "score"]})
 		bad, bad_err := dialect.eval("mdtable", "| a | b |\n| -- | --- |\n")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 

@@ -13,14 +13,14 @@ func TestLLMTurnRequestProviderOptions(t *testing.T) {
 	if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
     force_tool: "lookup",
     max_tokens: 16,
     temperature: 0.25,
     top_p: 0.9,
     response_format: {type: "json_object"},
     stream: true,
-    stop: {"END", "\n\n"},
+    stop: ["END", "\n\n"],
     metadata: {trace_id: "abc", route: "test"},
 })
 `); err != nil {
@@ -58,17 +58,17 @@ lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {
     description: "lookup docs",
-    params: {"name"},
-    requires: {"docs.read", "net.client"},
+    params: ["name"],
+    requires: ["docs.read", "net.client"],
     schema: {
         type: "object",
         properties: {name: {type: "string"}},
-        required: {"name"},
+        required: ["name"],
     },
 })
 result, err := llm.turn({
-    messages: {llm.user("hello")},
-    tools: {lookup},
+    messages: [llm.user("hello")],
+    tools: [lookup],
 })
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -105,8 +105,8 @@ lookup := llm.tool("lookup", func(query, source) {
     return query .. ":" .. source, nil
 }, {
     description: "lookup docs",
-    params: {"query", "source"},
-    requires: {"docs.read"},
+    params: ["query", "source"],
+    requires: ["docs.read"],
     output: {answer: "string"},
 })
 info := llm.tool_schema(lookup)
@@ -116,8 +116,8 @@ info_required_2 := info.schema.required[2]
 info_prop_query_type := info.schema.properties.query.type
 info_output_answer := info.output.answer
 result, err := llm.turn({
-    messages: {llm.user("hello")},
-    tools: {lookup},
+    messages: [llm.user("hello")],
+    tools: [lookup],
 })
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -162,19 +162,19 @@ func TestLLMToolExplicitSchemaWinsOverGeneratedParamsSchema(t *testing.T) {
 lookup := llm.tool("lookup", func(query) {
     return query, nil
 }, {
-    params: {"query"},
+    params: ["query"],
     schema: {
         type: "object",
         properties: {query: {type: "string", description: "search terms"}},
-        required: {"query"},
+        required: ["query"],
         additionalProperties: false,
     },
 })
-info := llm.toolSchema({lookup})
+info := llm.toolSchema([lookup])
 info_additional := info[1].schema.additionalProperties
 result, err := llm.turn({
-    messages: {llm.user("hello")},
-    tools: {lookup},
+    messages: [llm.user("hello")],
+    tools: [lookup],
 })
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -194,14 +194,14 @@ func TestDialectToolUsesLLMToolSchemaHelper(t *testing.T) {
 	if err := vm.Exec(`
 search_runbook := tool {
     name: "search_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Search local runbooks."
-    requires: {"docs.read", "runbooks.read"}
+    requires: ["docs.read", "runbooks.read"]
     fn: func(service) {
         return "runbook:" .. service, nil
     }
 }
-info := llm.tool_schema({search_runbook})
+info := llm.tool_schema([search_runbook])
 tool_name := info[1].name
 schema_type := info[1].schema.type
 required_1 := info[1].schema.required[1]
@@ -229,15 +229,15 @@ func TestLLMToolCapabilities(t *testing.T) {
 	if err := vm.Exec(`
 read_docs := llm.tool("read_docs", func(name) {
     return "docs:" .. name, nil
-}, {requires: {"docs.read", "net.client"}})
+}, {requires: ["docs.read", "net.client"]})
 refund := llm.tool("refund", func(id) {
     return id, nil
-}, {requires: {"payments.refund"}})
-tools := {read_docs, refund}
+}, {requires: ["payments.refund"]})
+tools := [read_docs, refund]
 caps := llm.tool_caps(tools)
-ok, ok_err := llm.check_tools(tools, {"docs.read", "net.client", "payments.refund"})
-missing, missing_err := llm.check_tools(tools, {"docs.read", "net.client"})
-all_ok, all_err := llm.check_tools(tools, {"cap.all"})
+ok, ok_err := llm.check_tools(tools, ["docs.read", "net.client", "payments.refund"])
+missing, missing_err := llm.check_tools(tools, ["docs.read", "net.client"])
+all_ok, all_err := llm.check_tools(tools, ["cap.all"])
 cap1 := caps[1]
 cap2 := caps[2]
 cap3 := caps[3]
@@ -273,15 +273,15 @@ func TestLoopRequestProviderOptions(t *testing.T) {
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := loop.react({
     user: "hello",
     model: "mock-fast",
-    tools: {lookup},
+    tools: [lookup],
     force_tool: lookup,
     max_tokens: 32,
     stream: true,
-    stop: {"DONE"},
+    stop: ["DONE"],
     metadata: {trace_id: "loop-1"},
 })
 `); err != nil {

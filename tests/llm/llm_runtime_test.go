@@ -61,17 +61,17 @@ func TestLLMTurnWithMockProvider(t *testing.T) {
 			err := vm.Exec(`
 lookup := llm.tool("lookup", func(query) {
     return query, nil
-}, {description: "lookup docs", params: {"query"}})
+}, {description: "lookup docs", params: ["query"]})
 fail := llm.tool("fail", func(query) {
     return nil, {kind: "validation", message: "raw failure for " .. query}
-}, {description: "fail docs", params: {"query"}})
-tools := {lookup}
-fail_tools := {fail}
+}, {description: "fail docs", params: ["query"]})
+tools := [lookup]
+fail_tools := [fail]
 value := nil
 dispatch_err := nil
 result, err := llm.turn({
     model: "mock-fast",
-    messages: {llm.system("Be concise."), llm.user("search leia")},
+    messages: [llm.system("Be concise."), llm.user("search leia")],
     tools: tools,
     max_tokens: 64,
 })
@@ -197,7 +197,7 @@ tool_gate_status := tool_gate.status
 func TestLLMTurnWithoutProviderReturnsError(t *testing.T) {
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM))
 	if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("hi")}})
+result, err := llm.turn({messages: [llm.user("hi")]})
 kind := err.kind
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -231,14 +231,14 @@ func TestLLMMessageHelpers(t *testing.T) {
 			vm := leia.New(opts...)
 			if err := vm.Exec(`
 call := {id: "call_1", tool: "lookup", args: {name: "leia"}}
-messages := {
+messages := [
     msg.system("system text"),
     msg.user("user text"),
     msg.assistant("assistant text"),
     msg.assistant_call(call),
     msg.tool_result("call_1", "docs"),
     msg.tool_error("call_2", "missing"),
-}
+]
 result, err := llm.turn({messages: messages})
 roles := messages[1].role .. "," .. messages[4].role .. "," .. messages[6].role
 tool_id := messages[5].tool_use_id
@@ -274,12 +274,12 @@ func TestChatHelpers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, tc.opts...)...)
 			if err := vm.Exec(`
-history := {
+history := [
     msg.system("You are concise."),
     msg.user("one two three four"),
     msg.assistant("five six"),
-}
-more := {msg.user("seven eight")}
+]
+more := [msg.user("seven eight")]
 merged := chat.merge(history, more)
 windowed := chat.window(merged, 4)
 tokens := chat.token_count(merged)
