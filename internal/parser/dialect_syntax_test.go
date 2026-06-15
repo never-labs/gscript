@@ -175,6 +175,27 @@ quoted := quote {
 	}
 }
 
+func TestQTaggedRawSourceBlockParses(t *testing.T) {
+	prog := mustParse(t, "result := q {\n+/1 2 3\ncount `AAPL`MSFT\n}\n")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedBlockExpr)
+	if tagged.Tag != "q" || !tagged.HasRawSource || tagged.Body != nil || len(tagged.Config) != 0 {
+		t.Fatalf("q block = %#v, want raw source block", tagged)
+	}
+	if tagged.RawSource != "+/1 2 3\ncount `AAPL`MSFT" {
+		t.Fatalf("q raw source = %q", tagged.RawSource)
+	}
+}
+
+func TestQTaggedFailFastRawSourceBlockParses(t *testing.T) {
+	prog := mustParse(t, "result := q! {+/1 2 3}\n")
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tagged := decl.Values[0].(*ast.TaggedBlockExpr)
+	if tagged.Tag != "q" || !tagged.FailFast || !tagged.HasRawSource || tagged.RawSource != "+/1 2 3" {
+		t.Fatalf("q fail-fast raw block = %#v", tagged)
+	}
+}
+
 func TestTaggedDialectFailFastRawBlockParses(t *testing.T) {
 	prog := mustParse(t, "quoted := quote! {\n    x := 1\n    x += 2\n}\n")
 	decl := prog.Stmts[0].(*ast.DeclareStmt)

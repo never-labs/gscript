@@ -23,7 +23,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "rand.normal", "stats.mean", "stats[\"var\"]", "math.exp", "q.eval"},
+			wantAPI: []string{"rand.seed", "rand.normal", "stats.fill", "stats.normalize_weights", "stats.effective_sample_size", "stats.gather", "stats.mean", "stats[\"var\"]", "stats.rmse", "math.exp", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),

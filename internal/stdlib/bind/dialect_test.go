@@ -62,6 +62,7 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 		glob_info := dialect.info("glob")
 		env_info := dialect.info("env")
 		json_info := dialect.info("json")
+		q_info := dialect.info("q")
 		jsonptr_info := dialect.info("jsonptr")
 			logfmt_info := dialect.info("logfmt")
 			junit_info := dialect.info("junit")
@@ -97,6 +98,13 @@ func TestDialectInfoAndListExposeMetadata(t *testing.T) {
 	}
 	if got := interp.GetGlobal("json_info").Table().RawGetString("category").Str(); got != "text" {
 		t.Fatalf("json category = %q, want text", got)
+	}
+	qInfo := interp.GetGlobal("q_info").Table()
+	if got := qInfo.RawGetString("category").Str(); got != "data" {
+		t.Fatalf("q category = %q, want data", got)
+	}
+	if !qInfo.RawGetString("builtin").Bool() || !qInfo.RawGetString("eval").Bool() || !qInfo.RawGetString("block").Bool() {
+		t.Fatalf("q info flags = builtin:%v eval:%v block:%v, want builtin eval+block", qInfo.RawGetString("builtin"), qInfo.RawGetString("eval"), qInfo.RawGetString("block"))
 	}
 	for name, global := range map[string]string{
 		"jsonptr":   "jsonptr_info",

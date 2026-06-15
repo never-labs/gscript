@@ -506,6 +506,30 @@ func TestTripleBacktickRawStringAllowsNewlines(t *testing.T) {
 	})
 }
 
+func TestQRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
+	input := "x := q {\n+/1 2 3\ncount `AAPL`MSFT\n}\ny := 1"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IDENT, Value: "x"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_RAW_BLOCK, Value: "+/1 2 3\ncount `AAPL`MSFT"},
+		{Type: TOKEN_IDENT, Value: "y"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_NUMBER, Value: "1"},
+	})
+}
+
+func TestQFailFastRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
+	input := "x := q! {+/1 2 3}"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IDENT, Value: "x"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_NOT, Value: "!"},
+		{Type: TOKEN_RAW_BLOCK, Value: "+/1 2 3"},
+	})
+}
+
 func TestUnterminatedTripleBacktickRawString(t *testing.T) {
 	lex := New("q```unterminated ` raw")
 	_, err := lex.Tokenize()

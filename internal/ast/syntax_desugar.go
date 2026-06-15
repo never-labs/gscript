@@ -124,6 +124,9 @@ func desugarExpr(expr Expr) Expr {
 	case *TaggedStringExpr:
 		return dialectCall(e.P, "eval", e.Tag, taggedStringBody(e.P, e.Tag, e.Body), nil, e.FailFast)
 	case *TaggedBlockExpr:
+		if e.HasRawSource {
+			return dialectCall(e.P, "eval", e.Tag, &StringLit{P: e.P, Value: e.RawSource}, nil, e.FailFast)
+		}
 		if e.Body != nil {
 			return dialectCall(e.P, "eval_raw", e.Tag, &FuncLitExpr{P: e.P, Body: desugarBlock(e.Body)}, nil, e.FailFast)
 		}

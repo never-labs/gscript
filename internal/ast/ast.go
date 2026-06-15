@@ -406,13 +406,16 @@ func (e *TaggedStringExpr) exprNode()        {}
 
 // TaggedBlockExpr represents tag { ... } dialect blocks. Field blocks lower to
 // dialect.eval_block(tag, table, opts); raw statement blocks lower to
-// dialect.eval_raw(tag, func(){...}, opts).
+// dialect.eval_raw(tag, func(){...}, opts). RawSource blocks lower to
+// dialect.eval(tag, source, opts).
 type TaggedBlockExpr struct {
-	P        Pos
-	Tag      string
-	Config   []ConfigField
-	Body     *BlockStmt
-	FailFast bool
+	P            Pos
+	Tag          string
+	Config       []ConfigField
+	Body         *BlockStmt
+	RawSource    string
+	HasRawSource bool
+	FailFast     bool
 }
 
 func (e *TaggedBlockExpr) nodeType() string { return "TaggedBlockExpr" }

@@ -1173,6 +1173,9 @@ func (p *Parser) taggedExprStmtCall(expr ast.Expr) *ast.CallExpr {
 	case *ast.TaggedStringExpr:
 		return parserDialectCall(e.P, "eval", e.Tag, e.Body, e.FailFast)
 	case *ast.TaggedBlockExpr:
+		if e.HasRawSource {
+			return parserDialectCall(e.P, "eval", e.Tag, &ast.StringLit{P: e.P, Value: e.RawSource}, e.FailFast)
+		}
 		if e.Body != nil {
 			return parserDialectCall(e.P, "eval_raw", e.Tag, &ast.FuncLitExpr{P: e.P, Body: e.Body}, e.FailFast)
 		}
@@ -1788,10 +1791,10 @@ func (p *Parser) isTaggedBlockStart() bool {
 	if p.peek().Type != lexer.TOKEN_IDENT {
 		return false
 	}
-	if p.peekAt(1).Type == lexer.TOKEN_LBRACE {
+	if p.peekAt(1).Type == lexer.TOKEN_LBRACE || p.peekAt(1).Type == lexer.TOKEN_RAW_BLOCK {
 		return true
 	}
-	return p.peekAt(1).Type == lexer.TOKEN_NOT && p.peekAt(2).Type == lexer.TOKEN_LBRACE
+	return p.peekAt(1).Type == lexer.TOKEN_NOT && (p.peekAt(2).Type == lexer.TOKEN_LBRACE || p.peekAt(2).Type == lexer.TOKEN_RAW_BLOCK)
 }
 
 func (p *Parser) parseTaggedDialectExpr() (ast.Expr, error) {
@@ -1823,6 +1826,10 @@ func (p *Parser) parseTaggedDialectExpr() (ast.Expr, error) {
 			return nil, err
 		}
 		return &ast.TaggedBlockExpr{P: pos, Tag: tagTok.Value, Body: body, FailFast: failFast}, nil
+	}
+	if p.check(lexer.TOKEN_RAW_BLOCK) {
+		bodyTok := p.advance()
+		return &ast.TaggedBlockExpr{P: pos, Tag: tagTok.Value, RawSource: bodyTok.Value, HasRawSource: true, FailFast: failFast}, nil
 	}
 	return nil, p.errorf("expected tagged dialect literal or block")
 }

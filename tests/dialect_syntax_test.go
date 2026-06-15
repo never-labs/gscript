@@ -984,6 +984,40 @@ frame_ok, frame_err := pcall(func() { return q` + "`sum ${frame_value}`" + ` })
 	}
 }
 
+func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibAll)}, tc.opts...)...)
+			if err := vm.Exec("info := dialect.info(\"q\")\n" +
+				"has_block := info.block\n" +
+				"sum_inline := q {+/1 2 3}\n" +
+				"sum_multi := q {\n" +
+				"sum 4 5 6\n" +
+				"}\n" +
+				"symbol_count := q {\n" +
+				"count `AAPL`MSFT`NVDA\n" +
+				"}\n" +
+				"choice := q {$[1b;10;20]}\n" +
+				"bad_ok, bad_err := pcall(func() { return q {not-a-q-token} })\n"); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "has_block", true)
+			assertGet(t, vm, "sum_inline", int64(6))
+			assertGet(t, vm, "sum_multi", int64(15))
+			assertGet(t, vm, "symbol_count", int64(3))
+			assertGet(t, vm, "choice", int64(10))
+			assertGet(t, vm, "bad_ok", false)
+			assertStringContains(t, vm, "bad_err", "q dialect:")
+		})
+	}
+}
+
 func assertGet(t *testing.T, vm *leia.VM, name string, want any) {
 	t.Helper()
 	got, err := vm.Get(name)

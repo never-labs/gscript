@@ -13,9 +13,10 @@ const (
 	// Literals
 	TOKEN_NUMBER // 123, 1.5, 1e10
 	TOKEN_STRING // "hello", 'hello', or `hello`
-	TOKEN_TRUE   // true
-	TOKEN_FALSE  // false
-	TOKEN_NIL    // nil
+	TOKEN_RAW_BLOCK
+	TOKEN_TRUE  // true
+	TOKEN_FALSE // false
+	TOKEN_NIL   // nil
 
 	// Identifier
 	TOKEN_IDENT
@@ -105,11 +106,12 @@ var tokenNames = map[TokenType]string{
 	TOKEN_EOF:     "EOF",
 	TOKEN_ILLEGAL: "ILLEGAL",
 
-	TOKEN_NUMBER: "NUMBER",
-	TOKEN_STRING: "STRING",
-	TOKEN_TRUE:   "TRUE",
-	TOKEN_FALSE:  "FALSE",
-	TOKEN_NIL:    "NIL",
+	TOKEN_NUMBER:    "NUMBER",
+	TOKEN_STRING:    "STRING",
+	TOKEN_RAW_BLOCK: "RAW_BLOCK",
+	TOKEN_TRUE:      "TRUE",
+	TOKEN_FALSE:     "FALSE",
+	TOKEN_NIL:       "NIL",
 
 	TOKEN_IDENT: "IDENT",
 

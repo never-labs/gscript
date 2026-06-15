@@ -15,17 +15,35 @@ func TestStatsAggregatesAndTransforms(t *testing.T) {
 	interp := statsInterp(t, `
 mean := stats.mean({1, 2, 3, 4})
 variance := stats["var"]({1, 2, 3, 4})
+stddev := stats.std({1, 2, 3, 4})
 normalized := stats.normalize({1, 2, 3})
+zscore := stats.zscore({1, 2, 3})
 flat := stats.normalize({5, 5})
 weighted := stats.weighted_mean({10, 20, 30}, {1, 2, 1})
+normalized_weights := stats.normalize_weights({2, 3, 5})
+ess_uniform := stats.effective_sample_size({0.25, 0.25, 0.25, 0.25})
+ess_raw := stats.effective_sample_size({2, 2, 2, 2})
 cumsum := stats.cumsum({2, 3, 5})
+diff := stats.diff({2, 5, 11})
+filled := stats.fill(4, 0.25)
+gathered := stats.gather({10, 20, 30}, {3, 1, 3})
+rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 `)
 	assertFloat(t, interp.GetGlobal("mean"), 2.5)
 	assertFloat(t, interp.GetGlobal("variance"), 1.25)
+	assertFloat(t, interp.GetGlobal("stddev"), 1.118033988749895)
 	assertTableFloat(t, interp.GetGlobal("normalized"), 2, 0)
+	assertTableFloat(t, interp.GetGlobal("zscore"), 3, 1.224744871391589)
 	assertTableFloat(t, interp.GetGlobal("flat"), 1, 0)
 	assertFloat(t, interp.GetGlobal("weighted"), 20)
+	assertTableFloat(t, interp.GetGlobal("normalized_weights"), 2, 0.3)
+	assertFloat(t, interp.GetGlobal("ess_uniform"), 4)
+	assertFloat(t, interp.GetGlobal("ess_raw"), 4)
 	assertTableFloat(t, interp.GetGlobal("cumsum"), 3, 10)
+	assertTableFloat(t, interp.GetGlobal("diff"), 2, 6)
+	assertTableFloat(t, interp.GetGlobal("filled"), 4, 0.25)
+	assertTableFloat(t, interp.GetGlobal("gathered"), 2, 10)
+	assertFloat(t, interp.GetGlobal("rmse"), 1.1547005383792515)
 }
 
 func TestStatsSystematicResample(t *testing.T) {
@@ -51,5 +69,13 @@ func TestStatsErrors(t *testing.T) {
 	err := execSourceOnInterp(interp, `stats.mean({})`)
 	if err == nil {
 		t.Fatal("stats.mean({}) succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.normalize_weights({0, 0})`)
+	if err == nil {
+		t.Fatal("stats.normalize_weights({0, 0}) succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.effective_sample_size({1, -1})`)
+	if err == nil {
+		t.Fatal("stats.effective_sample_size({1, -1}) succeeded, want error")
 	}
 }

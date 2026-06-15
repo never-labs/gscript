@@ -1047,6 +1047,28 @@ func dialectQ(body Value, opts *Table) ([]Value, error) {
 	return qEvalSymbolic(body.String())
 }
 
+func dialectQBlock(body Value, opts *Table) ([]Value, error) {
+	mode := dialectMode(opts)
+	if mode != "" && mode != "eval" && mode != "parse" {
+		return dialectUnknownMode("q", mode)
+	}
+	if !body.IsTable() {
+		return nil, fmt.Errorf("q block expects a table with source, body, or text")
+	}
+	t := body.Table()
+	for _, key := range []string{"source", "body", "text"} {
+		value := t.RawGetString(key)
+		if value.IsNil() {
+			continue
+		}
+		if !value.IsString() {
+			return nil, fmt.Errorf("q block %s must be a string", key)
+		}
+		return qEvalSymbolic(value.Str())
+	}
+	return nil, fmt.Errorf("q block expects source, body, or text")
+}
+
 func qEvalSymbolic(src string) ([]Value, error) {
 	v, err := qEvalSymbolicSource(src)
 	if err != nil {

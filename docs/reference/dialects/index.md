@@ -75,7 +75,7 @@ summarizer := agent {
 | `path` | `text` | true | false | none | none |
 | `pem` | `data` | true | false | none | none |
 | `prompt` | `llm` | true | true | none | none |
-| `q` | `data` | true | false | none | none |
+| `q` | `data` | true | true | none | none |
 | `quote` | `llm` | true | true | none | none |
 | `re` | `text` | true | false | none | regexp |
 | `regexp` | `text` | true | false | none | re |
