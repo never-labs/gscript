@@ -2389,7 +2389,7 @@ func TestQSQLAcceptsSQLFirstNamedFrame(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"AAPL\"],\n"+
 			"    price: array.i64([100, 80, 120]),\n"+
 			"})\n"+
 			"trades.column_kinds = {sym: \"symbol\", price: \"i64\"}\n"+
@@ -2422,8 +2422,8 @@ func TestQSQLTypedFrameWhereAndOutputSemantics(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"frame := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\", \"IBM\"},\n"+
-			"    venue: {\"XNYS\", \"XNAS\", \"BATS\", \"XNYS\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"AAPL\", \"IBM\"],\n"+
+			"    venue: [\"XNYS\", \"XNAS\", \"BATS\", \"XNYS\"],\n"+
 			"    active: array.bool([true, false, true, true]),\n"+
 			"    price: array.f64([100.5, 80.25, 120.0, 90.0]),\n"+
 			"})\n"+
@@ -2466,9 +2466,9 @@ func TestQSQLPlanCacheKeepsSchemaLiteralAlignmentSeparate(t *testing.T) {
 	installTestModule(interp, "data", runtime.TableValue(BuildData()))
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
-		"symbol_frame := data.frame({name: {\"AAPL\", \"MSFT\"}})\n"+
+		"symbol_frame := data.frame({name: [\"AAPL\", \"MSFT\"]})\n"+
 			"symbol_frame.column_kinds = {name: \"symbol\"}\n"+
-			"string_frame := data.frame({name: {\"AAPL\", \"MSFT\"}})\n"+
+			"string_frame := data.frame({name: [\"AAPL\", \"MSFT\"]})\n"+
 			"string_frame.column_kinds = {name: \"string\"}\n"+
 			"src := \"select name from frame where name=`AAPL\"\n"+
 			"symbol_rows := q.sql(symbol_frame, src)\n"+
@@ -2497,12 +2497,12 @@ func TestQSQLReturnsDataFrameCompatibleRowsAndTemporalStrings(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"events := data.frame({\n"+
-			"    day: {\"2026-06-05\", \"2026-06-06\"},\n"+
-			"    ts: {\"2026-06-05T09:30:00Z\", \"2026-06-06T09:30:00Z\"},\n"+
+			"    day: [\"2026-06-05\", \"2026-06-06\"],\n"+
+			"    ts: [\"2026-06-05T09:30:00Z\", \"2026-06-06T09:30:00Z\"],\n"+
 			"    active: array.bool([true, false]),\n"+
 			"    qty: array.i64([10, 20]),\n"+
 			"    px: array.f64([1.5, 2.25]),\n"+
-			"    note: {nil, \"close\"},\n"+
+			"    note: [nil, \"close\"],\n"+
 			"})\n"+
 			"events.column_kinds = {day: \"date\", ts: \"timestamp\", active: \"bool\", qty: \"i64\", px: \"f64\", note: \"string\"}\n"+
 			"rows := q.sql(events, \"select day,ts,active,qty,px,note from events where active=true\")\n"+
@@ -2604,7 +2604,7 @@ func TestQSQLOrderByAndLimit(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"],\n"+
 			"    price: array.f64([100, 80, 120, 90]),\n"+
 			"    active: array.bool([true, false, true, true]),\n"+
 			"})\n"+
@@ -2638,7 +2638,7 @@ func TestQSQLOrderByComputedProjection(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"NVDA\"],\n"+
 			"    price: array.f64([100, 80, 120]),\n"+
 			"    size: array.i64([10, 30, 20]),\n"+
 			"})\n"+
@@ -2675,11 +2675,11 @@ func TestQSQLExposesLibQExecOrderLimitAndLiterals(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"events := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"},\n"+
-			"    venue: {\"XNYS\", \"XNAS\", \"XNYS\", \"XNYS\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"],\n"+
+			"    venue: [\"XNYS\", \"XNAS\", \"XNYS\", \"XNYS\"],\n"+
 			"    active: array.bool([true, true, true, false]),\n"+
 			"    price: array.f64([100, 80, 120, 90]),\n"+
-			"    note: {nil, \"open\", \"open\", \"halted\"},\n"+
+			"    note: [nil, \"open\", \"open\", \"halted\"],\n"+
 			"})\n"+
 			"events.column_kinds = {sym: \"symbol\", venue: \"string\", active: \"bool\", price: \"f64\", note: \"string\"}\n"+
 			"prices := q.sql(events, \"exec price,sym from events where venue=\\\"XNYS\\\" order by price desc limit 2\")\n"+
@@ -2795,7 +2795,7 @@ func TestQSQLUpdateDeleteExecution(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"AAPL\"],\n"+
 			"    price: array.f64([100, 80, 120]),\n"+
 			"    size: array.i64([10, 20, 30]),\n"+
 			"})\n"+
@@ -2893,7 +2893,7 @@ func TestQSQLUpdateDeleteBoundarySemantics(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"NVDA\"],\n"+
 			"    price: array.f64([100, 80, 120]),\n"+
 			"    size: array.i64([10, 20, 30]),\n"+
 			"})\n"+
@@ -2941,7 +2941,7 @@ func TestQSQLInsertUpsertExecution(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\"],\n"+
 			"    price: array.f64([100, 80]),\n"+
 			"    size: array.i64([10, 20]),\n"+
 			"})\n"+
@@ -3049,11 +3049,11 @@ func TestQSQLInnerJoinExecution(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"AAPL\"],\n"+
 			"    price: array.f64([100, 80, 120]),\n"+
 			"})\n"+
 			"trades.column_kinds = {sym: \"symbol\", price: \"f64\"}\n"+
-			"quotes := data.frame({sym: {\"AAPL\", \"MSFT\"}, bid: array.f64([99, 79])})\n"+
+			"quotes := data.frame({sym: [\"AAPL\", \"MSFT\"], bid: array.f64([99, 79])})\n"+
 			"quotes.column_kinds = {sym: \"symbol\", bid: \"f64\"}\n"+
 			"joined := q.sql(\"select sym,price,bid from trades join quotes on sym order by price asc\", {trades: trades, quotes: quotes})\n"+
 			"joined_ij := q.sql(\"select sym,price,bid from trades ij quotes on sym order by price asc\", {trades: trades, quotes: quotes})\n"+
@@ -3094,14 +3094,14 @@ func TestQSQLInnerJoinExecutionWithMultipleAliasedKeys(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"accounts := data.frame({\n"+
-			"    id: {\"a1\", \"a1\", \"a2\", \"a3\"},\n"+
-			"    venue: {\"XNYS\", \"XNAS\", \"XNYS\", \"XNAS\"},\n"+
+			"    id: [\"a1\", \"a1\", \"a2\", \"a3\"],\n"+
+			"    venue: [\"XNYS\", \"XNAS\", \"XNYS\", \"XNAS\"],\n"+
 			"    value: array.f64([10, 20, 30, 40]),\n"+
 			"})\n"+
 			"accounts.column_kinds = {id: \"symbol\", venue: \"symbol\", value: \"f64\"}\n"+
 			"fills := data.frame({\n"+
-			"    account_id: {\"a1\", \"a1\", \"a2\", \"a2\"},\n"+
-			"    exchange: {\"XNAS\", \"XNYS\", \"XNAS\", \"XNYS\"},\n"+
+			"    account_id: [\"a1\", \"a1\", \"a2\", \"a2\"],\n"+
+			"    exchange: [\"XNAS\", \"XNYS\", \"XNAS\", \"XNYS\"],\n"+
 			"    qty: array.f64([200, 100, 999, 300]),\n"+
 			"})\n"+
 			"fills.column_kinds = {account_id: \"symbol\", exchange: \"symbol\", qty: \"f64\"}\n"+
@@ -3136,12 +3136,12 @@ func TestQSQLJoinBindingCacheLiteralAndPathSources(t *testing.T) {
 	interp.SetGlobal("store_path", StringValue(dir))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\", \"TSLA\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"AAPL\", \"TSLA\"],\n"+
 			"    price: array.f64([100, 80, 120, 90]),\n"+
 			"})\n"+
 			"trades.column_kinds = {sym: \"symbol\", price: \"f64\"}\n"+
 			"quotes := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\"],\n"+
 			"    bid: array.f64([99, 79]),\n"+
 			"})\n"+
 			"quotes.column_kinds = {sym: \"symbol\", bid: \"f64\"}\n"+
@@ -3239,7 +3239,7 @@ func TestQCacheStatsAndClearPublicAPI(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\"],\n"+
 			"    price: array.f64([100, 80]),\n"+
 			"    size: array.f64([10, 20]),\n"+
 			"})\n"+
@@ -6295,13 +6295,13 @@ func TestQSQLAsofJoinExecution(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    sym: [\"AAPL\", \"AAPL\", \"MSFT\", \"AAPL\"],\n"+
 			"    ts: array.i64([10, 15, 12, 25]),\n"+
 			"    price: array.f64([100, 101, 80, 103]),\n"+
 			"})\n"+
 			"trades.column_kinds = {sym: \"symbol\", ts: \"i64\", price: \"f64\"}\n"+
 			"quotes := data.frame({\n"+
-			"    sym: {\"AAPL\", \"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    sym: [\"AAPL\", \"AAPL\", \"MSFT\", \"AAPL\"],\n"+
 			"    ts: array.i64([8, 20, 11, 14]),\n"+
 			"    bid: array.f64([99, 102, 79, 100.5]),\n"+
 			"})\n"+
@@ -6429,7 +6429,7 @@ func TestQSQLLeftJoinExecution(t *testing.T) {
 			"})\n"+
 			"ref := data.frame({\n"+
 			"    sym: data.symbols([\"AAPL\", \"MSFT\"]),\n"+
-			"    sector: {\"tech\", \"software\"},\n"+
+			"    sector: [\"tech\", \"software\"],\n"+
 			"})\n"+
 			"joined := q.sql(\"select sym,price,sector from trades left join ref on sym order by sym asc\", {trades: trades, ref: ref})\n"+
 			"joined_lj := q.sql(\"select sym,price,sector from trades lj ref on sym order by sym asc\", {trades: trades, ref: ref})\n")
@@ -6774,7 +6774,7 @@ func TestQSQLXbarBucketExecution(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"trades := data.frame({\n"+
-			"    sym: {\"AAPL\", \"AAPL\", \"MSFT\", \"AAPL\"},\n"+
+			"    sym: [\"AAPL\", \"AAPL\", \"MSFT\", \"AAPL\"],\n"+
 			"    ts: array.i64([3, 8, 12, 17]),\n"+
 			"    size: array.i64([10, 20, 30, 40]),\n"+
 			"})\n"+
@@ -6878,7 +6878,7 @@ func TestQKeyedLookupMultiKeyBoundaries(t *testing.T) {
 			"aapl_xnas_by_dict_extra := q.lookup(keyed, {venue: \"XNAS\", sym: \"AAPL\", ignored: 1})\n"+
 			"aapl_xnas_by_reversed_keys := q.lookup(reversed_keyed, {sym: \"AAPL\", venue: \"XNAS\"})\n"+
 			"aapl_xnas_by_reversed_positional := q.lookup(reversed_keyed, \"XNAS\", \"AAPL\")\n"+
-			"aapl_xnas_by_array := q.lookup(keyed, {\"AAPL\", \"XNAS\"})\n"+
+			"aapl_xnas_by_array := q.lookup(keyed, [\"AAPL\", \"XNAS\"])\n"+
 			"missing := q.lookup(keyed, \"IBM\", \"XNYS\")\n"+
 			"missing_reversed := q.lookup(reversed_keyed, \"XNYS\", \"IBM\")\n"+
 			"missing_key_ok, missing_key_err := pcall(func() {\n"+
@@ -8131,7 +8131,7 @@ func TestQSQLPlanCachesDoNotStoreFrameData(t *testing.T) {
 	installTestModule(interp, "q", runtime.TableValue(BuildQ()))
 	execOnInterp(t, interp,
 		"events := data.frame({\n"+
-			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\"},\n"+
+			"    sym: [\"AAPL\", \"MSFT\", \"NVDA\"],\n"+
 			"    price: array.f64([100, 80, 120]),\n"+
 			"})\n"+
 			"events.column_kinds = {sym: \"symbol\", price: \"f64\"}\n"+
@@ -8625,21 +8625,21 @@ func TestQKeyedAmendAndUpsertAPI(t *testing.T) {
 			"    sym: data.symbols([\"AAPL\", \"MSFT\"]),\n"+
 			"    venue: data.symbols([\"XNAS\", \"XNYS\"]),\n"+
 			"    qty: data.i64([10, 20]),\n"+
-			"    note: {\"old-a\", \"old-m\"},\n"+
+			"    note: [\"old-a\", \"old-m\"],\n"+
 			"})\n"+
 			"keyed := q.key_by(base, q.eval(\"`sym`venue\"))\n"+
 			"amend_delta := data.frame({\n"+
 			"    sym: data.symbols([\"AAPL\", \"TSLA\"]),\n"+
 			"    venue: data.symbols([\"XNAS\", \"XNAS\"]),\n"+
 			"    qty: data.i64([15, 30]),\n"+
-			"    note: {\"amend-a\", \"ignored-t\"},\n"+
+			"    note: [\"amend-a\", \"ignored-t\"],\n"+
 			"})\n"+
 			"amended := q.amend(keyed, amend_delta, q.eval(\"`qty\"))\n"+
 			"upsert_delta := data.frame({\n"+
 			"    sym: data.symbols([\"MSFT\", \"TSLA\"]),\n"+
 			"    venue: data.symbols([\"XNYS\", \"XNAS\"]),\n"+
 			"    qty: data.i64([25, 40]),\n"+
-			"    note: {\"new-m\", \"new-t\"},\n"+
+			"    note: [\"new-m\", \"new-t\"],\n"+
 			"})\n"+
 			"upserted := q.upsert(amended, upsert_delta, q.eval(\"`qty`note\"))\n"+
 			"aapl := q.lookup(upserted, \"AAPL\", \"XNAS\")\n"+

@@ -141,10 +141,10 @@ func TestWithMaxHostResultBytesLimitsCSVEncoding(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, src := range []string{
-				`value := csv.encode({{"12345"}})`,
-				`value := csv.encodeWithHeaders({{name: "12345"}}, {"name"})`,
-				`value := dialect.eval("csv", {{"12345"}}, {mode: "encode"})`,
-				`value := dialect.eval("tsv", {{"12345"}}, {mode: "encode"})`,
+				`value := csv.encode([["12345"]])`,
+				`value := csv.encodeWithHeaders([{name: "12345"}], ["name"])`,
+				`value := dialect.eval("csv", [["12345"]], {mode: "encode"})`,
+				`value := dialect.eval("tsv", [["12345"]], {mode: "encode"})`,
 			} {
 				opts := append([]leia.Option{
 					leia.WithLibs(leia.LibString | leia.LibCSV | leia.LibDialect),
@@ -330,7 +330,7 @@ func TestWithMaxHostResultBytesPreflightsStringOutput(t *testing.T) {
 				`value := string.rep("12", 3)`,
 				`value := string.rep("1", 3, "-")`,
 				`value := string.repeat("12", 3)`,
-				`value := string.join({"12", "345"}, "")`,
+				`value := string.join(["12", "345"], "")`,
 				`value := string.padLeft("1", 5, "0")`,
 				`value := string.padRight("1", 5, "0")`,
 				`value := string.pack("bytes:5", "12345")`,
