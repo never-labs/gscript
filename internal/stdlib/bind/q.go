@@ -1044,7 +1044,11 @@ func dialectQ(body Value, opts *Table) ([]Value, error) {
 	if mode != "" && mode != "eval" && mode != "parse" {
 		return dialectUnknownMode("q", mode)
 	}
-	return qEvalSymbolic(body.String())
+	src := body.String()
+	if opts != nil && opts.RawGetString("raw_source").Truthy() {
+		src = stdq.NormalizeRawSourceStatements(src)
+	}
+	return qEvalSymbolic(src)
 }
 
 func dialectQBlock(body Value, opts *Table) ([]Value, error) {

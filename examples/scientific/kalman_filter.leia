@@ -31,7 +31,9 @@ innovation_rmse := stats.rms(innovations)
 position := linalg.at(x, 1)
 velocity := linalg.at(x, 2)
 uncertainty_trace := linalg.trace(P)
-q_checksum := q.eval("+/1 2 3")
+q_checksum := q {
++/1 2 3
+}
 
 assert(math.near(position, 5.0, 0.15))
 assert(math.near(velocity, 1.0, 0.15))

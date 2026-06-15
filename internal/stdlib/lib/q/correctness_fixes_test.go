@@ -22,6 +22,21 @@ import (
 	"github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
+func TestNormalizeRawSourceStatements(t *testing.T) {
+	src := "x:til 10\n y:x*x\n+/y"
+	if got, want := NormalizeRawSourceStatements(src), "x:til 10; y:x*x;+/y"; got != want {
+		t.Fatalf("NormalizeRawSourceStatements = %q, want %q", got, want)
+	}
+	nested := "f:{[x]\n x+1}\nf[41]\n"
+	if got, want := NormalizeRawSourceStatements(nested), "f:{[x]\n x+1};f[41]"; got != want {
+		t.Fatalf("NormalizeRawSourceStatements nested = %q, want %q", got, want)
+	}
+	quoted := "s:\"a\nb\"\ncount s"
+	if got, want := NormalizeRawSourceStatements(quoted), "s:\"a\nb\";count s"; got != want {
+		t.Fatalf("NormalizeRawSourceStatements quoted = %q, want %q", got, want)
+	}
+}
+
 // assertBothRoutes evaluates every statement of src through the compiled
 // route and the string evaluator (where compiled) and requires agreement.
 func assertBothRoutes(t *testing.T, src string) {

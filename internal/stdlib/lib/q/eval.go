@@ -4637,6 +4637,86 @@ func splitQScriptStatements(src string) []string {
 	return parts
 }
 
+// NormalizeRawSourceStatements turns top-level newlines in q raw source blocks
+// into semicolon statement separators. It intentionally lives outside the
+// normal q.eval string path so historical string semantics remain unchanged.
+func NormalizeRawSourceStatements(src string) string {
+	var b strings.Builder
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	inString := false
+	var lastSignificant byte
+	for i := 0; i < len(src); i++ {
+		ch := src[i]
+		if inString {
+			b.WriteByte(ch)
+			if ch == '\\' && i+1 < len(src) {
+				i++
+				b.WriteByte(src[i])
+				continue
+			}
+			if ch == '"' {
+				inString = false
+				lastSignificant = ch
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case '`':
+			end := qSymbolLiteralEnd(src, i)
+			b.WriteString(src[i:end])
+			lastSignificant = '`'
+			i = end - 1
+		case '(':
+			parenDepth++
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case ')':
+			parenDepth--
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case '[':
+			bracketDepth++
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case ']':
+			bracketDepth--
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case '{':
+			braceDepth++
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case '}':
+			braceDepth--
+			b.WriteByte(ch)
+			lastSignificant = ch
+		case '\r':
+			continue
+		case '\n':
+			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 {
+				if lastSignificant != 0 && lastSignificant != ';' {
+					b.WriteByte(';')
+					lastSignificant = ';'
+				}
+				continue
+			}
+			b.WriteByte(ch)
+		default:
+			b.WriteByte(ch)
+			if ch != ' ' && ch != '\t' && ch != '\v' && ch != '\f' {
+				lastSignificant = ch
+			}
+		}
+	}
+	return strings.TrimRight(strings.TrimRight(b.String(), " \t\r\n"), ";")
+}
+
 func splitQBracketFormArgs(src string) []string {
 	parts := splitTopLevelDelim(src, ';')
 	if parts == nil {

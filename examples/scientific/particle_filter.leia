@@ -31,7 +31,9 @@ estimate := stats.mean(particles)
 variance := stats.variance(particles)
 spread := stats.std(particles)
 last_measurement := measurements[#measurements]
-q_checksum := q.eval("+/1 2 3")
+q_checksum := q {
++/1 2 3
+}
 
 assert(math.near(estimate, last_measurement, 0.15))
 assert(math.near(spread, math.sqrt(variance), 0.000000001))
