@@ -10,11 +10,11 @@ print()
 print("--- Stack ---")
 
 func newStack() {
-    items := {}
+    items := []
     stack := {}
 
     stack.push = func(val) {
-        table.insert(items, val)
+        append(items, val)
     }
 
     stack.pop = func() {
@@ -38,9 +38,9 @@ func newStack() {
     }
 
     stack.toString = func() {
-        parts := {}
+        parts := []
         for i := 1; i <= #items; i++ {
-            table.insert(parts, tostring(items[i]))
+            append(parts, tostring(items[i]))
         }
         return "[" .. table.concat(parts, ", ") .. "] <- top"
     }
@@ -66,12 +66,12 @@ print()
 print("--- Queue ---")
 
 func newQueue() {
-    items := {}
+    items := []
     head := 1
     q := {}
 
     q.enqueue = func(val) {
-        table.insert(items, val)
+        append(items, val)
     }
 
     q.dequeue = func() {
@@ -97,9 +97,9 @@ func newQueue() {
     }
 
     q.toString = func() {
-        parts := {}
+        parts := []
         for i := head; i <= #items; i++ {
-            table.insert(parts, tostring(items[i]))
+            append(parts, tostring(items[i]))
         }
         return "front -> [" .. table.concat(parts, ", ") .. "]"
     }
@@ -194,10 +194,10 @@ func newLinkedList() {
 
     // Convert to string
     list.toString = func() {
-        parts := {}
+        parts := []
         current := head
         for current != nil {
-            table.insert(parts, tostring(current.value))
+            append(parts, tostring(current.value))
             current = current.next
         }
         return table.concat(parts, " -> ") .. " -> nil"
@@ -270,7 +270,7 @@ func newBST() {
     func inorderCollect(node, result) {
         if node == nil { return nil }
         inorderCollect(node.left, result)
-        table.insert(result, node.value)
+        append(result, node.value)
         inorderCollect(node.right, result)
     }
 
@@ -312,16 +312,16 @@ func newBST() {
     }
 
     bst.inorder = func() {
-        result := {}
+        result := []
         inorderCollect(root, result)
         return result
     }
 
     bst.toString = func() {
         vals := bst.inorder()
-        parts := {}
+        parts := []
         for i := 1; i <= #vals; i++ {
-            table.insert(parts, tostring(vals[i]))
+            append(parts, tostring(vals[i]))
         }
         return "[" .. table.concat(parts, ", ") .. "]"
     }
@@ -382,10 +382,10 @@ func newHashSet() {
     }
 
     set.toTable = func() {
-        result := {}
+        result := []
         for k, v := range data {
             if v == true {
-                table.insert(result, k)
+                append(result, k)
             }
         }
         return result
@@ -456,11 +456,11 @@ print()
 print("--- Priority Queue ---")
 
 func newPriorityQueue() {
-    items := {}
+    items := []
     pq := {}
 
     pq.push = func(value, priority) {
-        table.insert(items, {value: value, priority: priority})
+        append(items, {value: value, priority: priority})
         // Sort by priority (lower = higher priority)
         table.sort(items, func(a, b) { return a.priority < b.priority })
     }
@@ -486,9 +486,9 @@ func newPriorityQueue() {
     }
 
     pq.toString = func() {
-        parts := {}
+        parts := []
         for i := 1; i <= #items; i++ {
-            table.insert(parts, tostring(items[i].value) .. "(p=" .. tostring(items[i].priority) .. ")")
+            append(parts, tostring(items[i].value) .. "(p=" .. tostring(items[i].priority) .. ")")
         }
         return "[" .. table.concat(parts, ", ") .. "]"
     }
