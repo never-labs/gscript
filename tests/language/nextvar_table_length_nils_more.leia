@@ -1,11 +1,11 @@
 print("case:nextvar_table_length_nils_more")
 
 assert(#{} == 0)
-assert(#{nil} == 0)
-assert(#{nil, nil} == 0)
-assert(#{nil, nil, nil} == 0)
-assert(#{nil, nil, nil, nil} == 0)
-assert(#{1, 2, 3, nil, nil} == 3)
+assert(#[nil] == 0)
+assert(#[nil, nil] == 0)
+assert(#[nil, nil, nil] == 0)
+assert(#[nil, nil, nil, nil] == 0)
+assert(#[1, 2, 3, nil, nil] == 3)
 
 a := {}
 for i := 1; i <= 100; i++ {

@@ -7,7 +7,8 @@ for i := 1; i <= 100; i++ {
 }
 
 x := 0
-tmp := {10, 20, 30, x: 12}
+tmp := [10, 20, 30]
+tmp.x = 12
 for k, v := range ipairs(tmp) {
     x = x + 1
     assert(k == x && v == x * 10)
@@ -20,7 +21,7 @@ for _ := range ipairs(tmp) {
 
 x = false
 i := 0
-tmp = {true, false, true, false}
+tmp = [true, false, true, false]
 for k, v := range ipairs(tmp) {
     _ := k
     i = i + 1
@@ -29,9 +30,9 @@ for k, v := range ipairs(tmp) {
 }
 assert(i == 4)
 
-assert(type(ipairs({})) == "function")
+assert(type(ipairs([])) == "function")
 
-k, v := next({10})
+k, v := next([10])
 assert(k == 1 && v == 10)
 assert(next({}) == nil)
 

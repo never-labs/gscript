@@ -12,9 +12,13 @@ call := func(f, args) {
   return f(table.spread(args))
 }
 
-a, b := call(c12, {1, 2, n: 2})
+args := [1, 2]
+args.n = 2
+a, b := call(c12, args)
 assert(a == 55 && b == 2)
-a = call(c12, {1, 2, n: 1})
+args = [1, 2]
+args.n = 1
+a = call(c12, args)
 assert(!a)
 
 lim := 20

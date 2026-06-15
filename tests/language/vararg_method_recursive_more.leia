@@ -1,6 +1,6 @@
 print("case:vararg_method_recursive_more")
 
-t := {1, 10}
+t := [1, 10]
 t.f = func(self, ...) {
   arg := table.pack(...)
   return self[(...)] + arg.n

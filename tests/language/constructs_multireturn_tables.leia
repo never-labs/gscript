@@ -9,10 +9,10 @@ func f(i) {
   }
 }
 
-x := {f("alo"), f("xixi"), nil}
+x := [f("alo"), f("xixi"), nil]
 assert(x[1] == "alo" && x[2] == "xixi" && x[3] == nil)
 
-x = {f("alo") .. "xixi"}
+x = [f("alo") .. "xixi"]
 assert(x[1] == "aloxixi")
 
 print("ok")

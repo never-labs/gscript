@@ -1,11 +1,11 @@
 print("case:nextvar_length_more")
 
 assert(#{} == 0)
-assert(#{nil} == 0)
-assert(#{nil, nil} == 0)
-assert(#{nil, nil, nil} == 0)
-assert(#{nil, nil, nil, nil} == 0)
-assert(#{1, 2, 3, nil, nil} == 3)
+assert(#[nil] == 0)
+assert(#[nil, nil] == 0)
+assert(#[nil, nil, nil] == 0)
+assert(#[nil, nil, nil, nil] == 0)
+assert(#[1, 2, 3, nil, nil] == 3)
 
 t := {}
 t[-1] = 2

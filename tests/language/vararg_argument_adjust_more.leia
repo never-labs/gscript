@@ -6,9 +6,9 @@ func f(a, ...) {
   return x.n, x[1], x[2], x[3], x[4]
 }
 
-n, a, b, c, d := f({1, 2, 3}, 1, 2, 3)
+n, a, b, c, d := f([1, 2, 3], 1, 2, 3)
 assert(n == 3 && a == 1 && b == 2 && c == 3 && d == nil)
-n, a, b, c, d = f({"alo", nil, 45, f, nil}, "alo", nil, 45, f, nil)
+n, a, b, c, d = f(["alo", nil, 45, f, nil], "alo", nil, 45, f, nil)
 assert(n == 5 && a == "alo" && b == nil && c == 45 && d == f)
 
 func c12(...) {

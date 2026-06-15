@@ -1,9 +1,9 @@
 print("case:nextvar_length_nil")
 
 assert(#{} == 0)
-assert(#{nil} == 0)
-assert(#{nil, nil} == 0)
-assert(#{1, 2, 3, nil, nil} == 3)
+assert(#[nil] == 0)
+assert(#[nil, nil] == 0)
+assert(#[1, 2, 3, nil, nil] == 3)
 
 a := {}
 for i := 1; i <= 100; i++ {
@@ -27,7 +27,7 @@ for i := 96; i <= 100; i++ {
 
 x := false
 n := 0
-for k, v := range ipairs({true, false, true, false}) {
+for k, v := range ipairs([true, false, true, false]) {
   n = n + 1
   x = !x
   assert(k == n && x == v)
