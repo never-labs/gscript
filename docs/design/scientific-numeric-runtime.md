@@ -178,10 +178,11 @@ example-specific shortcuts:
 - `linalg.matmul` as a variadic matrix-chain facade that also supports
   matrix-vector tails, plus `linalg.matmul_t`, `linalg.T`/`linalg.t`,
   `linalg.vec`, and `linalg.sandwich_add` for compact linear algebra.
-- `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.bayes_update`,
-  `stats.describe(values[, weights])`, `stats.describe_fields(table[,
-  weights])`, and `stats.importance_update` for distribution-aware sequential
-  Monte Carlo code and compact statistical summaries.
+- `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.loglik`,
+  `stats.bayes_update`, `stats.describe(values[, weights])`,
+  `stats.describe_fields(table[, weights])`, and `stats.importance_update` for
+  distribution-aware sequential Monte Carlo code and compact statistical
+  summaries.
 - `rand.sample(distribution[, n])` and `rand.add_noise(values,
   distribution[, drift])` for scalar draws, dense-vector draws, and noisy
   vector evolution from reusable distribution objects.

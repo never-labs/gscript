@@ -128,6 +128,9 @@ pdf0 := stats.pdf(dist, 0)
 pdfs := stats.pdf(dist, {0, 1})
 log_pdf0 := stats.logpdf(dist, 0)
 log_pdfs := stats.logpdf(dist, {0, 1})
+loglik_scalar := stats.loglik(dist, 2, 2)
+loglik_vector := stats.loglik(dist, 2, {1, 2})
+loglik_broadcast := stats.loglik(dist, {1, 2}, 2)
 `)
 	if got := interp.GetGlobal("dist_kind"); !got.IsString() || got.Str() != "distribution" {
 		t.Fatalf("dist.kind = %v, want distribution", got)
@@ -141,6 +144,9 @@ log_pdfs := stats.logpdf(dist, {0, 1})
 	assertTableFloat(t, interp.GetGlobal("pdfs"), 2, 0.24197072451914337)
 	assertFloat(t, interp.GetGlobal("log_pdf0"), -0.9189385332046727)
 	assertTableFloat(t, interp.GetGlobal("log_pdfs"), 2, -1.4189385332046727)
+	assertFloat(t, interp.GetGlobal("loglik_scalar"), -0.9189385332046727)
+	assertTableFloat(t, interp.GetGlobal("loglik_vector"), 1, -1.4189385332046727)
+	assertTableFloat(t, interp.GetGlobal("loglik_broadcast"), 1, -1.4189385332046727)
 }
 
 func TestStatsSystematicResample(t *testing.T) {

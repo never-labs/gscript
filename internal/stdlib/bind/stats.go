@@ -25,6 +25,7 @@ func BuildStats() *Table {
 	set("normal", statsNormal)
 	set("pdf", statsPDF)
 	set("logpdf", statsLogPDF)
+	set("loglik", statsLogLik)
 	set("normal_pdf", statsNormalPDF)
 	set("log_normal_pdf", statsLogNormalPDF)
 	set("normalize_weights", statsNormalizeWeights)
@@ -350,6 +351,22 @@ func statsLogPDF(args []Value) ([]Value, error) {
 	return statsDistributionPDF("stats.logpdf", args, true)
 }
 
+func statsLogLik(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.loglik: need distribution, observed, and predicted")
+	}
+	dist, err := statsDistributionFromValue("stats.loglik", args[0])
+	if err != nil {
+		return nil, err
+	}
+	switch dist.name {
+	case "normal":
+		return statsNormalLogLik(args[1], args[2], dist.mean, dist.stddev)
+	default:
+		return nil, fmt.Errorf("stats.loglik: unsupported distribution %q", dist.name)
+	}
+}
+
 func statsDistributionPDF(fn string, args []Value, logPDF bool) ([]Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("%s: need distribution and x", fn)
@@ -426,6 +443,35 @@ func statsNormalPDFValue(fn string, xValue Value, mean, stddev float64, logPDF b
 	out := make([]float64, len(values))
 	for i, v := range values {
 		out[i] = eval(v)
+	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
+func statsNormalLogLik(observedValue, predictedValue Value, mean, stddev float64) ([]Value, error) {
+	observed, err := linalgPointwiseDecode("stats.loglik", observedValue)
+	if err != nil {
+		return nil, err
+	}
+	predicted, err := linalgPointwiseDecode("stats.loglik", predictedValue)
+	if err != nil {
+		return nil, err
+	}
+	if observed.kind == "matrix" || predicted.kind == "matrix" {
+		return nil, fmt.Errorf("stats.loglik: matrix operands are not supported")
+	}
+	eval := statsNormalPDFEvaluator(mean, stddev, true)
+	if observed.kind == "scalar" && predicted.kind == "scalar" {
+		return []Value{FloatValue(eval(observed.scalar - predicted.scalar))}, nil
+	}
+	length := len(observed.data)
+	if observed.kind == "scalar" {
+		length = len(predicted.data)
+	} else if predicted.kind != "scalar" && len(predicted.data) != length {
+		return nil, fmt.Errorf("stats.loglik: vector length mismatch")
+	}
+	out := make([]float64, length)
+	for i := range out {
+		out[i] = eval(observed.valueAt(i) - predicted.valueAt(i))
 	}
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
