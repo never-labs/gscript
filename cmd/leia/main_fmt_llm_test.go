@@ -13,7 +13,7 @@ func TestFmtStdinLLMStdlibIndentation(t *testing.T) {
 return "found:" .. query, nil
 }, {
 description: "Lookup docs."
-params: {"query"}
+params: ["query"]
 })
 
 llm.register_models({
@@ -26,12 +26,12 @@ return {user: q}, nil
 }, {
 model: "fast"
 system: "Use the tool."
-tools: {lookup}
+tools: [lookup]
 })
 
 result, err := llm.turn({
-messages: {llm.user("one-shot")}
-tools: {lookup}
+messages: [llm.user("one-shot")]
+tools: [lookup]
 model: "fast"
 })
 _ = answer
@@ -42,7 +42,7 @@ _ = err
     return "found:" .. query, nil
 }, {
     description: "Lookup docs."
-    params: {"query"}
+    params: ["query"]
 })
 
 llm.register_models({
@@ -55,12 +55,12 @@ answer := llm.agent("answer", func(q) {
 }, {
     model: "fast"
     system: "Use the tool."
-    tools: {lookup}
+    tools: [lookup]
 })
 
 result, err := llm.turn({
-    messages: {llm.user("one-shot")}
-    tools: {lookup}
+    messages: [llm.user("one-shot")]
+    tools: [lookup]
     model: "fast"
 })
 _ = answer
@@ -128,7 +128,7 @@ func TestFmtPreservesIntraLineFormattingBoundary(t *testing.T) {
 	src := `// lookup searches project docs.
 lookup := llm.tool("lookup", func(query) {
 return "found:"..query,nil
-}, {params:{"query"}})
+}, {params:["query"]})
 llm.register_models({
 short: "x"
 longer_key : {provider_model:"mock-fast"}
@@ -139,7 +139,7 @@ total:=1+  2
 	want := `// lookup searches project docs.
 lookup := llm.tool("lookup", func(query) {
     return "found:"..query,nil
-}, {params:{"query"}})
+}, {params:["query"]})
 llm.register_models({
     short: "x"
     longer_key : {provider_model:"mock-fast"}

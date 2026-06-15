@@ -68,7 +68,7 @@ llm.register_models({
 
 evaluate "streamed record case" {
     result, err := llm.turn({
-        messages: {llm.user("stream one")}
+        messages: [llm.user("stream one")]
         stream: true
         max_tokens: 16
     })
@@ -79,7 +79,7 @@ evaluate "streamed record case" {
 
 evaluate "plain record case" {
     result, err := llm.turn({
-        messages: {llm.user("plain two")}
+        messages: [llm.user("plain two")]
         max_tokens: 16
     })
     assert(err == nil)
@@ -290,7 +290,7 @@ func TestEvaluateLLMReplayReportsDeterministicFixtureDrift(t *testing.T) {
 evaluate "replay mismatch case" {
     result, err := llm.turn({
         model: "mock-fast"
-        messages: {llm.user("actual prompt")}
+        messages: [llm.user("actual prompt")]
     })
     assert(err == nil)
     _ = result

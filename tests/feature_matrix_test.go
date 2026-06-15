@@ -1329,6 +1329,7 @@ func TestUserFacingLeiaSourcesPreferListLiteralsForSequences(t *testing.T) {
 	root := findRepoRoot(t)
 	scanRoots := []string{
 		"README.md",
+		"cmd/leia",
 		"docs",
 		"examples",
 		"tests/llm",
@@ -1340,6 +1341,7 @@ func TestUserFacingLeiaSourcesPreferListLiteralsForSequences(t *testing.T) {
 		`messages: {`,
 		`tools: {`,
 		`params: {"`,
+		`params:{"`,
 		`requires: {"`,
 		`capabilities: {"`,
 		`depends_on: {`,
@@ -1351,6 +1353,7 @@ func TestUserFacingLeiaSourcesPreferListLiteralsForSequences(t *testing.T) {
 		`testkit.value({`,
 	}
 	skipSubstrings := []string{
+		"cmd/leia/main_lint_test.go",
 		"docs/spec/index.html",
 		"internal/stdlib/bind/table_",
 		"internal/stdlib/bind/q_bench",
