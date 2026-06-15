@@ -10,9 +10,9 @@ func contains(haystack, needle) {
 }
 
 trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT", "AAPL"}),
-  price: data.f64({100.5, 90.0, 101.0}),
-  size: data.i64({10, 15, 20}),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL"]),
+  price: data.f64([100.5, 90.0, 101.0]),
+  size: data.i64([10, 15, 20]),
 })
 
 fills := q.sql("select notional:sum price*size, fills:count i by sym from trades where price>100", {
@@ -71,10 +71,10 @@ scalar_cached_high := q.sql("select sym,price from trades where price>threshold 
 check("qsql scalar cache stays per env", scalar_cached_low.len == 2 && scalar_cached_high.len == 1 && scalar_cached_high[1].price == 101.0)
 
 side_trades := data.frame({
-  side: data.symbols({"buy", "sell", "buy"}),
-  price: data.f64({100.5, 99.5, 101.0}),
-  size: data.i64({10, 15, 20}),
-  arrival_mid: data.f64({100.0, 100.0, 100.0}),
+  side: data.symbols(["buy", "sell", "buy"]),
+  price: data.f64([100.5, 99.5, 101.0]),
+  size: data.i64([10, 15, 20]),
+  arrival_mid: data.f64([100.0, 100.0, 100.0]),
 })
 conditional_select := q.sql("select side,signed_qty:?[side=`buy;size;0-size],slip:?[side=`buy;price-arrival_mid;arrival_mid-price] from trades order by side asc", {trades: side_trades})
 conditional_update := q.sql("update signed_qty:?[side=`buy;size;0-size] from trades", {trades: side_trades})
@@ -82,15 +82,15 @@ check("qsql conditional select columns", conditional_select.len == 3 && conditio
 check("qsql conditional update assignment", conditional_update.len == 3 && conditional_update[1].signed_qty == 10.0 && conditional_update[2].signed_qty == -15.0 && conditional_update[3].signed_qty == 20.0)
 
 signed_trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT", "NVDA", "TSLA"}),
-  signed_qty: data.i64({40, -25, 10, data.null}),
+  sym: data.symbols(["AAPL", "MSFT", "NVDA", "TSLA"]),
+  signed_qty: data.i64([40, -25, 10, data.null]),
 })
 abs_filtered := q.sql("select sym,abs_qty:abs signed_qty from trades where abs signed_qty>20 order by abs signed_qty desc", {trades: signed_trades})
 check("qsql abs prefix projection where order", abs_filtered.len == 2 && abs_filtered[1].sym == "AAPL" && abs_filtered[1].abs_qty == 40.0 && abs_filtered[2].sym == "MSFT" && abs_filtered[2].abs_qty == 25.0)
 
 numeric_trades := data.frame({
-  sym: data.symbols({"ZERO", "ONE", "TWO"}),
-  qty: data.f64({0.0, 1.0, 2.0}),
+  sym: data.symbols(["ZERO", "ONE", "TWO"]),
+  qty: data.f64([0.0, 1.0, 2.0]),
 })
 exp_zero := q.sql("select sym,e:exp qty from trades where qty=0", {trades: numeric_trades})
 recip_sorted := q.sql("select sym,inv:reciprocal qty from trades where qty>0 order by reciprocal qty asc", {trades: numeric_trades})
@@ -98,17 +98,17 @@ check("qsql exp prefix projection", exp_zero.len == 1 && exp_zero[1].sym == "ZER
 check("qsql reciprocal prefix where order", recip_sorted.len == 2 && recip_sorted[1].sym == "TWO" && recip_sorted[1].inv == 0.5 && recip_sorted[2].sym == "ONE" && recip_sorted[2].inv == 1.0)
 
 nullable_trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT", "NVDA", "TSLA"}),
-  price: data.f64({100.0, data.null, 250.0, data.null}),
+  sym: data.symbols(["AAPL", "MSFT", "NVDA", "TSLA"]),
+  price: data.f64([100.0, data.null, 250.0, data.null]),
 })
 null_filtered := q.sql("select sym,missing:null price from trades where null price order by sym desc", {trades: nullable_trades})
 check("qsql null prefix projection where order", null_filtered.len == 2 && null_filtered[1].sym == "TSLA" && null_filtered[1].missing == true && null_filtered[2].sym == "MSFT" && null_filtered[2].missing == true)
 
 multi_mask_trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "TSLA"}),
-  price: data.f64({100.5, 99.0, 101.0, 120.0, 130.0}),
-  size: data.i64({10, 50, 20, 5, 2}),
-  active: data.bool({true, true, false, true, true}),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "TSLA"]),
+  price: data.f64([100.5, 99.0, 101.0, 120.0, 130.0]),
+  size: data.i64([10, 50, 20, 5, 2]),
+  active: data.bool([true, true, false, true, true]),
 })
 multi_mask := q.sql("select sym,price,size from trades where (sym=`AAPL or sym=`NVDA) and active and price>=100 order by price asc", {
   trades: multi_mask_trades,
@@ -139,21 +139,21 @@ explain_update := q.explain(trades, "update notional:price*size from trades wher
 explain_join := q.explain("select sym,price,bid from trades left join quotes on sym", {
   trades: trades,
   quotes: data.frame({
-    sym: data.symbols({"AAPL"}),
-    bid: data.f64({100.0}),
+    sym: data.symbols(["AAPL"]),
+    bid: data.f64([100.0]),
   }),
 })
 explain_compound := q.explain("select notional:sum price*size by region,sym from trades left join venues on venue where (sym=`AAPL or sym=`NVDA) and active order by region asc,sym asc", {
   trades: data.frame({
-    sym: data.symbols({"AAPL", "MSFT", "NVDA"}),
-    venue: data.symbols({"XNAS", "XNYS", "XNAS"}),
-    price: data.f64({100.5, 90.0, 120.0}),
-    size: data.i64({10, 20, 5}),
-    active: data.bool({true, true, false}),
+    sym: data.symbols(["AAPL", "MSFT", "NVDA"]),
+    venue: data.symbols(["XNAS", "XNYS", "XNAS"]),
+    price: data.f64([100.5, 90.0, 120.0]),
+    size: data.i64([10, 20, 5]),
+    active: data.bool([true, true, false]),
   }),
   venues: data.frame({
-    venue: data.symbols({"XNAS", "XNYS"}),
-    region: data.symbols({"US", "US"}),
+    venue: data.symbols(["XNAS", "XNYS"]),
+    region: data.symbols(["US", "US"]),
   }),
 })
 check("q explain select plan", explain_select.op == "select" && explain_select.source == "trades" && explain_select.where == "(price > 100)" && #explain_select.aggregates == 1 && explain_select.aggregates[1].name == "notional" && explain_select.aggregates[1].fn == "sum" && explain_select.by_exprs[1].name == "sym" && explain_select.order_by[1].column == "sym")

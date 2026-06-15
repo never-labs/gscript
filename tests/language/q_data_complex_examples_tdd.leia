@@ -36,18 +36,18 @@ func distinct_column(rows, name) {
 prices := q.eval("100 101.5 100.75 102.25 103 99.5")
 top_prices := q.eval("3#103 102.25 101.5 100.75")
 rich_indexes := q.eval("where 100 101.5 100.75 102.25 103 99.5>100")
-unique_symbols := distinct_values({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"})
+unique_symbols := distinct_values(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"])
 
 check("q vector take", q.count(top_prices) == 3 && top_prices[1] == 103 && top_prices[3] == 101.5)
 check("q vector filter indexes", q.count(rich_indexes) == 4 && rich_indexes[1] == 1 && rich_indexes[4] == 4)
 check("stable distinct helper", #unique_symbols == 3 && unique_symbols[1] == "AAPL" && unique_symbols[3] == "NVDA")
 
 trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"}),
-  side: data.symbols({"buy", "sell", "buy", "buy", "sell", "sell"}),
-  venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"}),
-  price: data.f64({100.0, 101.5, 100.75, 102.25, 103.0, 99.5}),
-  size: data.i64({100, 120, 80, 150, 90, 50}),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"]),
+  side: data.symbols(["buy", "sell", "buy", "buy", "sell", "sell"]),
+  venue: data.strings(["XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"]),
+  price: data.f64([100.0, 101.5, 100.75, 102.25, 103.0, 99.5]),
+  size: data.i64([100, 120, 80, 150, 90, 50]),
 })
 
 projected := q.sql(trades, "select sym,side,venue,notional:price*size from trades where price>100 order by notional desc,sym asc limit 3")
@@ -104,24 +104,24 @@ check("db frame feeds qsql", db_trades.len == 6 && db_trades.schema.kinds.price 
 check("db qsql roundtrip back to sqlite", #roundtrip == 3 && roundtrip[1].sym == "MSFT" && roundtrip[1].fills == 2 && roundtrip[3].notional == 8060.0)
 
 typed_trades := data.frame({
-  trade_id: data.i64({1, 2, 3, 4}),
-  sym: data.symbols({"AAPL", "AAPL", "MSFT", "TSLA"}),
-  venue: data.strings({"XNAS", "XNYS", "XNYS", "XNAS"}),
-  trade_date: data.date({"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"}),
-  event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T09:30:30Z", "2026-06-02T09:31:00Z"}),
-  price: data.f64({100.0, 101.0, 80.0, 200.0}),
-  size: data.i64({10, 20, 30, 5}),
+  trade_id: data.i64([1, 2, 3, 4]),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT", "TSLA"]),
+  venue: data.strings(["XNAS", "XNYS", "XNYS", "XNAS"]),
+  trade_date: data.date(["2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"]),
+  event_ts: data.timestamp(["2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T09:30:30Z", "2026-06-02T09:31:00Z"]),
+  price: data.f64([100.0, 101.0, 80.0, 200.0]),
+  size: data.i64([10, 20, 30, 5]),
 })
 typed_updated := q.sql(typed_trades, "update price:price+1.0,size:size+1 from trades where sym=`AAPL")
 typed_trimmed := q.sql(typed_updated, "delete from trades where sym=`TSLA")
 typed_venues := data.frame({
-  venue: data.strings({"XNAS", "XNYS"}),
-  region: data.symbols({"US", "US"}),
+  venue: data.strings(["XNAS", "XNYS"]),
+  region: data.symbols(["US", "US"]),
 })
 typed_quotes := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
-  event_ts: data.timestamp({"2026-06-01T09:29:30Z", "2026-06-01T09:30:30Z", "2026-06-02T09:30:00Z"}),
-  bid: data.f64({99.0, 100.5, 79.5}),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
+  event_ts: data.timestamp(["2026-06-01T09:29:30Z", "2026-06-01T09:30:30Z", "2026-06-02T09:30:00Z"]),
+  bid: data.f64([99.0, 100.5, 79.5]),
 })
 typed_enriched := q.sql(
   "select trade_id,sym,venue,trade_date,event_ts,price,size,region from trades left join venues on venue order by trade_id asc",
@@ -141,21 +141,21 @@ check("typed mutation join asof rollup", #typed_rollup == 2 && typed_rollup[1].s
 check("typed temporal schema survives q chain", typed_asofed.schema.kinds.event_ts == "timestamp" && typed_rollup[1].trade_date == "2026-06-01" && typed_rollup.schema.kinds.trade_date == "date" && #typed_empty_delete == 3)
 
 edge_trades := data.frame({
-  trade_id: data.i64({1, 2}),
-  sym: data.symbols({"AAPL", "MSFT"}),
-  venue: data.strings({"XNAS", "XASE"}),
-  event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z"}),
-  price: data.f64({100.0, 80.0}),
+  trade_id: data.i64([1, 2]),
+  sym: data.symbols(["AAPL", "MSFT"]),
+  venue: data.strings(["XNAS", "XASE"]),
+  event_ts: data.timestamp(["2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z"]),
+  price: data.f64([100.0, 80.0]),
 })
 edge_updated := q.sql(edge_trades, "update price:price+1.0 from trades where sym=`IBM")
 edge_venues := data.frame({
-  venue: data.strings({"XNAS"}),
-  region: data.symbols({"US"}),
+  venue: data.strings(["XNAS"]),
+  region: data.symbols(["US"]),
 })
 edge_quotes := data.frame({
-  sym: data.symbols({"AAPL"}),
-  event_ts: data.timestamp({"2026-06-01T09:30:30Z"}),
-  bid: data.f64({99.0}),
+  sym: data.symbols(["AAPL"]),
+  event_ts: data.timestamp(["2026-06-01T09:30:30Z"]),
+  bid: data.f64([99.0]),
 })
 edge_enriched := q.sql(
   "select trade_id,sym,venue,event_ts,price,region from trades left join venues on venue order by trade_id asc",

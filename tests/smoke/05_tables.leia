@@ -1,5 +1,5 @@
-// Array-style tables
-arr := {10, 20, 30, 40, 50}
+// List literals
+arr := [10, 20, 30, 40, 50]
 print(#arr)
 print(arr[1])
 print(arr[3])
@@ -16,5 +16,5 @@ print(person.name)
 print(person["age"])
 
 // Nested tables
-matrix := {{1,2,3},{4,5,6},{7,8,9}}
+matrix := [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 print(matrix[2][2])

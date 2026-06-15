@@ -43,9 +43,9 @@ temporal_nulls := q.sql(
   {}
 )
 temporal_keyed := q.key_by(data.frame({
-  sym: data.symbols({"AAPL", "MSFT"}),
-  bucket: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z"}),
-  notional: data.f64({10012.0, 8050.0}),
+  sym: data.symbols(["AAPL", "MSFT"]),
+  bucket: data.timestamp(["2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z"]),
+  notional: data.f64([10012.0, 8050.0]),
 }), "sym", "bucket")
 temporal_keyed_hit := q.lookup(temporal_keyed, {sym: "AAPL", bucket: "2026-06-06T09:30:00Z"})
 temporal_keyed_miss := q.lookup(temporal_keyed, {sym: "AAPL", bucket: "2026-06-06T09:31:00Z"})
@@ -82,27 +82,27 @@ expr_mins := q.eval("mins 30 20 25 10")
 expr_maxs := q.eval("maxs 30 20 35 10")
 expr_avgs := q.eval("avgs 10 0N 30 50")
 
-expect_vec("golden expression scalar-vector arithmetic", expr_add, {11, 21, 31})
-expect_vec("golden expression type promotion", expr_promote, {2.5, 4.5, 6.5})
-expect_vec("golden expression null scan", expr_null_scan, {1, 1, 3})
+expect_vec("golden expression scalar-vector arithmetic", expr_add, [11, 21, 31])
+expect_vec("golden expression type promotion", expr_promote, [2.5, 4.5, 6.5])
+expect_vec("golden expression null scan", expr_null_scan, [1, 1, 3])
 check("golden expression null deltas", expr_null_deltas[1] == 1 && missing(expr_null_deltas[2]) && missing(expr_null_deltas[3]))
-expect_vec("golden expression where/bin/within", expr_where, {1, 3})
-expect_vec("golden expression bin", expr_bin, {-1, 0, 1, 2, -1})
-expect_vec("golden expression within", expr_within, {false, true, true})
+expect_vec("golden expression where/bin/within", expr_where, [1, 3])
+expect_vec("golden expression bin", expr_bin, [-1, 0, 1, 2, -1])
+expect_vec("golden expression within", expr_within, [false, true, true])
 check("golden expression cut", q.count(expr_cut) == 2 && expr_cut[1][1] == 10 && expr_cut[1][2] == 20 && expr_cut[2][1] == 30 && expr_cut[2][2] == 40)
-expect_vec("golden expression rank", expr_rank, {4, 1, 2, 0, 3})
+expect_vec("golden expression rank", expr_rank, [4, 1, 2, 0, 3])
 check("golden expression xprev", missing(expr_xprev[1]) && missing(expr_xprev[2]) && expr_xprev[3] == 10 && expr_xprev[4] == 20)
-expect_vec("golden expression rotate", expr_rotate, {30, 40, 10, 20})
+expect_vec("golden expression rotate", expr_rotate, [30, 40, 10, 20])
 check("golden expression prior alias and each", missing(expr_prior[1]) && expr_prior[2] == 100 && expr_prior[3] == 105 && missing(expr_prior_each[1][1]) && expr_prior_each[1][2] == 10 && expr_prior_each[2][2] == 100)
 check("golden expression prev next differ", missing(expr_prev[1]) && expr_prev[2] == 100 && expr_prev[3] == 105 && expr_next[1] == 105 && expr_next[2] == 103 && missing(expr_next[3]) && expr_differ[1] == true && expr_differ[2] == false && expr_differ[3] == true && expr_differ[4] == false)
-expect_vec("golden expression moving sum", expr_msum, {10, 30, 60, 90})
-expect_vec("golden expression moving avg", expr_mavg, {10.0, 15.0, 20.0, 30.0})
-expect_vec("golden expression moving count", expr_mcount, {1, 1, 2, 2})
-expect_vec("golden expression moving min max", expr_mmin, {30, 30, 10, 10})
-expect_vec("golden expression moving max", expr_mmax, {30, 30, 30, 20})
-expect_vec("golden expression running mins maxs", expr_mins, {30, 20, 20, 10})
-expect_vec("golden expression running maxs", expr_maxs, {30, 30, 35, 35})
-expect_vec("golden expression running avgs nulls", expr_avgs, {10.0, 10.0, 20.0, 30.0})
+expect_vec("golden expression moving sum", expr_msum, [10, 30, 60, 90])
+expect_vec("golden expression moving avg", expr_mavg, [10.0, 15.0, 20.0, 30.0])
+expect_vec("golden expression moving count", expr_mcount, [1, 1, 2, 2])
+expect_vec("golden expression moving min max", expr_mmin, [30, 30, 10, 10])
+expect_vec("golden expression moving max", expr_mmax, [30, 30, 30, 20])
+expect_vec("golden expression running mins maxs", expr_mins, [30, 20, 20, 10])
+expect_vec("golden expression running maxs", expr_maxs, [30, 30, 35, 35])
+expect_vec("golden expression running avgs nulls", expr_avgs, [10.0, 10.0, 20.0, 30.0])
 
 symbols := q.eval("`AAPL`MSFT`AAPL`NVDA")
 symbol_group := q.eval("group `AAPL`MSFT`AAPL`NVDA")
@@ -136,10 +136,10 @@ flipped_cols := q.cols(flipped)
 flipped_meta := q.meta(flipped)
 
 bars := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "MSFT", "AAPL"}),
-  bucket: data.strings({"09:30", "09:30", "09:30", "09:31"}),
-  seq: data.i64({1, 2, 3, 4}),
-  px: data.f64({100.0, 100.5, 80.0, 101.0}),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT", "AAPL"]),
+  bucket: data.strings(["09:30", "09:30", "09:30", "09:31"]),
+  seq: data.i64([1, 2, 3, 4]),
+  px: data.f64([100.0, 100.5, 80.0, 101.0]),
 })
 keyed := q.key_by(bars, "sym", "bucket")
 keyed_keys := q.keys(keyed)

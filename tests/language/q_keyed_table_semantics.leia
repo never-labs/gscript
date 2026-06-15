@@ -8,10 +8,10 @@ func check(name, ok) {
 }
 
 bars := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
-  bucket: data.strings({"09:30", "09:30", "09:31"}),
-  seq: data.i64({1, 2, 3}),
-  px: data.f64({100.0, 100.5, 80.0}),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
+  bucket: data.strings(["09:30", "09:30", "09:31"]),
+  seq: data.i64([1, 2, 3]),
+  px: data.f64([100.0, 100.5, 80.0]),
 })
 
 keyed := q.key_by(bars, "sym", "bucket")
@@ -46,10 +46,10 @@ keyed_functional_upserted := q.eval("@[(`sym xkey flip `sym`price`size!(`AAPL`MS
 keyed_functional_hit := q.lookup(keyed_functional_amended, "AAPL")
 keyed_functional_insert := q.lookup(keyed_functional_upserted, "TSLA")
 typed_events := data.frame({
-  sym: data.symbols({"AAPL", "MSFT"}),
-  trade_date: data.date({"2026-06-06", data.null}),
-  event_ts: data.timestamp({"2026-06-06T09:30:00Z", data.null}),
-  session_time: data.time({"09:30:00", data.null}),
+  sym: data.symbols(["AAPL", "MSFT"]),
+  trade_date: data.date(["2026-06-06", data.null]),
+  event_ts: data.timestamp(["2026-06-06T09:30:00Z", data.null]),
+  session_time: data.time(["09:30:00", data.null]),
 })
 native_keyed := q.eval("([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)")
 native_keyed_keys := q.eval("keys ([venue:`XNYS`XNAS; sym:`AAPL`MSFT] price:100 101; size:10 20)")
@@ -157,10 +157,10 @@ check("q metadata error boundaries", keys_scalar_ok == false && string_find(tost
 check("q encode decode error boundaries", encode_noarg_ok == false && string_find(tostring(encode_noarg_err), "argument 1 required", 1, true) != nil && encode_function_ok == false && string_find(tostring(encode_function_err), "unsupported value type", 1, true) != nil && decode_type_ok == false && string_find(tostring(decode_type_err), "encoded string", 1, true) != nil && decode_payload_ok == false && string_find(tostring(decode_payload_err), "invalid character", 1, true) != nil)
 
 amend_delta := data.frame({
-  sym: data.symbols({"AAPL", "TSLA"}),
-  bucket: data.strings({"09:30", "09:32"}),
-  seq: data.i64({9, 10}),
-  px: data.f64({101.0, 120.0}),
+  sym: data.symbols(["AAPL", "TSLA"]),
+  bucket: data.strings(["09:30", "09:32"]),
+  seq: data.i64([9, 10]),
+  px: data.f64([101.0, 120.0]),
 })
 amended := q.amend(keyed_by_symbol_vector, amend_delta, q.eval("`seq`px"))
 upserted := q.upsert(amended, amend_delta, q.eval("`seq`px"))
