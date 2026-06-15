@@ -117,6 +117,8 @@ indices := stats.systematic_resample({0.1, 0.2, 0.7}, 0.5)
 resampled, uniform, resample_idx := stats.resample({10, 20, 30}, {0.1, 0.2, 0.7}, 0.5)
 kept, kept_weights, kept_resampled, kept_ess, kept_idx := stats.resample_if({10, 20, 30}, {1, 1, 1}, 0.5, 0.5)
 next, next_weights, did_resample, next_ess, next_idx := stats.resample_if({10, 20, 30}, {0.01, 0.01, 0.98}, 0.8, 0.5)
+iw_keep, iw_keep_weights, iw_keep_resampled, iw_keep_ess, iw_keep_idx := stats.importance_update({10, 20, 30}, {1, 1, 1}, {0, 0, 0}, {min_ess_ratio: 0.5, offset: 0.5})
+iw_next, iw_next_weights, iw_did_resample, iw_next_ess, iw_next_idx := stats.importance_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
 `)
 	indices := interp.GetGlobal("indices")
 	if !indices.IsTable() {
@@ -157,6 +159,26 @@ next, next_weights, did_resample, next_ess, next_idx := stats.resample_if({10, 2
 	if got := nextIdx.RawGetInt(1); !got.IsInt() || got.Int() != 3 {
 		t.Fatalf("next_idx[1] = %v, want 3", got)
 	}
+	if interp.GetGlobal("iw_keep_resampled").Truthy() {
+		t.Fatalf("iw_keep_resampled = %v, want false", interp.GetGlobal("iw_keep_resampled"))
+	}
+	assertTableFloat(t, interp.GetGlobal("iw_keep"), 2, 20)
+	assertTableFloat(t, interp.GetGlobal("iw_keep_weights"), 2, 1.0/3.0)
+	assertFloat(t, interp.GetGlobal("iw_keep_ess"), 3)
+	if got := interp.GetGlobal("iw_keep_idx").Table().Len(); got != 0 {
+		t.Fatalf("iw_keep_idx length = %d, want 0", got)
+	}
+	if !interp.GetGlobal("iw_did_resample").Truthy() {
+		t.Fatalf("iw_did_resample = %v, want true", interp.GetGlobal("iw_did_resample"))
+	}
+	assertTableFloat(t, interp.GetGlobal("iw_next"), 1, 30)
+	assertTableFloat(t, interp.GetGlobal("iw_next_weights"), 3, 1.0/3.0)
+	if got := interp.GetGlobal("iw_next_ess").Number(); got >= 2 {
+		t.Fatalf("iw_next_ess = %v, want below 2", got)
+	}
+	if got := interp.GetGlobal("iw_next_idx").Table().RawGetInt(1); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("iw_next_idx[1] = %v, want 3", got)
+	}
 }
 
 func TestStatsErrors(t *testing.T) {
@@ -181,5 +203,9 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.describe({})`)
 	if err == nil {
 		t.Fatal("stats.describe({}) succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.importance_update({1}, {1}, {0}, {})`)
+	if err == nil {
+		t.Fatal("stats.importance_update missing min_ess_ratio succeeded, want error")
 	}
 }

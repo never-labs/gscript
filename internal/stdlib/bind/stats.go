@@ -42,6 +42,7 @@ func BuildStats() *Table {
 	set("rmse", statsRMSE)
 	set("resample", statsResample)
 	set("resample_if", statsResampleIf)
+	set("importance_update", statsImportanceUpdate)
 	set("systematic_resample", statsSystematicResample)
 	return t
 }
@@ -538,6 +539,73 @@ func statsResampleIf(args []Value) ([]Value, error) {
 		FloatValue(ess),
 		TableValue(indexes),
 	}, nil
+}
+
+func statsImportanceUpdate(args []Value) ([]Value, error) {
+	if len(args) < 4 {
+		return nil, fmt.Errorf("stats.importance_update: need values, weights, log_likelihoods, and options")
+	}
+	values, err := linalgVectorValue("stats.importance_update", args[0])
+	if err != nil {
+		return nil, err
+	}
+	weights, total, err := statsWeights("stats.importance_update", []Value{args[1]})
+	if err != nil {
+		return nil, err
+	}
+	logLikelihoods, err := linalgVectorValue("stats.importance_update", args[2])
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 || len(values) != len(weights) || len(values) != len(logLikelihoods) {
+		return nil, fmt.Errorf("stats.importance_update: values, weights, and log_likelihoods length mismatch")
+	}
+	if !args[3].IsTable() {
+		return nil, fmt.Errorf("stats.importance_update: options must be a table")
+	}
+	opts := args[3].Table()
+	minRatioValue := opts.RawGetString("min_ess_ratio")
+	if minRatioValue.IsNil() {
+		minRatioValue = opts.RawGetString("min_ratio")
+	}
+	if minRatioValue.IsNil() {
+		minRatioValue = opts.RawGetString("minEssRatio")
+	}
+	if minRatioValue.IsNil() {
+		return nil, fmt.Errorf("stats.importance_update: options.min_ess_ratio is required")
+	}
+	minRatio, err := linalgNumber("stats.importance_update", minRatioValue)
+	if err != nil {
+		return nil, err
+	}
+	if minRatio < 0 || minRatio > 1 {
+		return nil, fmt.Errorf("stats.importance_update: minimum ESS ratio must be in [0, 1]")
+	}
+	offset := 0.5
+	if offsetValue := opts.RawGetString("offset"); !offsetValue.IsNil() {
+		offset, err = linalgNumber("stats.importance_update", offsetValue)
+		if err != nil {
+			return nil, err
+		}
+		if offset < 0 || offset >= 1 {
+			return nil, fmt.Errorf("stats.importance_update: offset must be in [0, 1)")
+		}
+	}
+	logWeights := make([]float64, len(weights))
+	logTotalWeight := math.Log(total)
+	for i, w := range weights {
+		if w == 0 {
+			logWeights[i] = math.Inf(-1)
+		} else {
+			logWeights[i] = math.Log(w) - logTotalWeight
+		}
+		logWeights[i] += logLikelihoods[i]
+	}
+	normalized, err := statsNormalizeLogWeights([]Value{DenseArrayValue(NewDenseArrayF64Owned(logWeights))})
+	if err != nil {
+		return nil, err
+	}
+	return statsResampleIf([]Value{args[0], normalized[0], FloatValue(minRatio), FloatValue(offset)})
 }
 
 func statsSystematicResampleValues(values, weights []float64, total, offset float64) ([]float64, []float64, *Table) {
