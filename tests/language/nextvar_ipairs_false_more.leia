@@ -1,7 +1,8 @@
 print("case:nextvar_ipairs_false_more")
 
 x := 0
-t := {10, 20, 30, x: 12}
+t := [10, 20, 30]
+t.x = 12
 f, s, c := ipairs(t)
 for guard := 1; guard <= 10; guard++ {
   k, v := f(s, c)
@@ -21,7 +22,7 @@ assert(!seen)
 
 x = false
 i := 0
-t = {true, false, true, false}
+t = [true, false, true, false]
 f, s, c = ipairs(t)
 for guard := 1; guard <= 10; guard++ {
   k, v = f(s, c)
@@ -32,6 +33,6 @@ for guard := 1; guard <= 10; guard++ {
   assert(k == i && x == v)
 }
 assert(i == 4)
-assert(type(ipairs({})) == "function" && ipairs({}) == ipairs({}))
+assert(type(ipairs([])) == "function" && ipairs([]) == ipairs([]))
 
 print("ok")

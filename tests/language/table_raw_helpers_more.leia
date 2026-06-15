@@ -34,7 +34,7 @@ expect_error(func() { table.toArray("not a table") })
 
 shared := {tag: "same"}
 other := {tag: "same"}
-uniq := table.unique({1, 1.0, "1", true, true, shared, shared, other, 2, 2})
+uniq := table.unique([1, 1.0, "1", true, true, shared, shared, other, 2, 2])
 assert(#uniq == 6)
 assert(uniq[1] == 1)
 assert(type(uniq[1]) == "number")

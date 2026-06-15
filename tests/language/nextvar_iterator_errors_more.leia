@@ -6,7 +6,7 @@ func checkerror(msg, f, ...) {
 }
 
 assert(next({}) == next({}))
-checkerror("invalid key", next, {10, 20}, 3)
+checkerror("invalid key", next, [10, 20], 3)
 checkerror("bad argument", pairs)
 checkerror("bad argument", ipairs)
 assert(next({}) == nil)

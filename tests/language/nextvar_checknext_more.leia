@@ -11,10 +11,19 @@ func checknext(a) {
   for k, v := range pairs(a) { assert(b[k] == v) }
 }
 
-checknext({1, x: 1, y: 2, z: 3})
-checknext({1, 2, x: 1, y: 2, z: 3})
-checknext({1, 2, 3, x: 1, y: 2, z: 3})
-checknext({1, 2, 3, 4, x: 1, y: 2, z: 3})
-checknext({1, 2, 3, 4, 5, x: 1, y: 2, z: 3})
+func mixed(n) {
+  t := []
+  for i := 1; i <= n; i++ { t[i] = i }
+  t.x = 1
+  t.y = 2
+  t.z = 3
+  return t
+}
+
+checknext(mixed(1))
+checknext(mixed(2))
+checknext(mixed(3))
+checknext(mixed(4))
+checknext(mixed(5))
 
 print("ok")

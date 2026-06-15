@@ -5,6 +5,6 @@ func checkerror(msg, f, ...) {
   assert(!s && string.find(err, msg))
 }
 checkerror("table expected", table.concat, 3)
-assert(!pcall(table.concat, {"a", "b", {}}))
+assert(!pcall(table.concat, ["a", "b", {}]))
 
 print("ok")

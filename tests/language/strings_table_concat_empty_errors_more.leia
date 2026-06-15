@@ -10,6 +10,6 @@ assert(table.concat({}) == "")
 assert(table.concat({}, "x") == "")
 assert(table.concat({}, "x", 10, 9) == "")
 assert(table.concat({}, "x", -9, -10) == "")
-assert(!pcall(table.concat, {"a", "b", {}}))
+assert(!pcall(table.concat, ["a", "b", {}]))
 
 print("ok")

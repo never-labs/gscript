@@ -1,7 +1,7 @@
 print("case:nextvar_pairs_delete")
 
-k1 := {1}
-k2 := {2}
+k1 := [1]
+k2 := [2]
 t := {}
 t[k1] = 1
 t[k2] = 2

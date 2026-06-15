@@ -15,11 +15,20 @@ func checknext(a) {
   }
 }
 
-a := {1, x: 1, y: 2, z: 3}
-b := {1, 2, x: 1, y: 2, z: 3}
-c := {1, 2, 3, x: 1, y: 2, z: 3}
-d := {1, 2, 3, 4, x: 1, y: 2, z: 3}
-e := {1, 2, 3, 4, 5, x: 1, y: 2, z: 3}
+func mixed(n) {
+  t := []
+  for i := 1; i <= n; i++ { t[i] = i }
+  t.x = 1
+  t.y = 2
+  t.z = 3
+  return t
+}
+
+a := mixed(1)
+b := mixed(2)
+c := mixed(3)
+d := mixed(4)
+e := mixed(5)
 
 checknext(a)
 checknext(b)

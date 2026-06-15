@@ -8,7 +8,7 @@ assert(table.remove(a) == 20)
 assert(table.remove(a) == -1)
 assert(table.remove(a) == nil)
 
-a = {10, 20, 30, 40}
+a = [10, 20, 30, 40]
 assert(table.remove(a, #a + 1) == nil)
 assert(!pcall(table.remove, a, 0))
 assert(table.remove(a, #a) == 40)

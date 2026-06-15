@@ -1,7 +1,9 @@
 print("case:vararg_forwarding")
 
 func vararg(...) {
-  return {n: select("#", ...), ...}
+  out := [...]
+  out.n = select("#", ...)
+  return out
 }
 
 func first_and_more(a, ...) {

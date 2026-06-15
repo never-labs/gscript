@@ -42,7 +42,7 @@ assert(type(report.rootLog) == "number")
 
 numInfo := testkit.value(42)
 floatInfo := testkit.value(1.5)
-tableInfo := testkit.value({10, 20, 30})
+tableInfo := testkit.value([10, 20, 30])
 fnInfoValue := nil
 assert(numInfo.type == "number")
 assert(type(numInfo.text) == "string")
