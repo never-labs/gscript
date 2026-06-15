@@ -202,7 +202,7 @@ func TestLLMStageAndWorkflowGraphRunSequentiallyWithMetadata(t *testing.T) {
 graph := llm.workflow_graph({
     workflow_id: "research-flow"
     entrypoint: "ai.workflow.orchestrate"
-    stages: {
+    stages: [
         llm.stage("plan", func(ctx) {
             return {value: "plan:" .. ctx.input, text: "plan:" .. ctx.input}, nil
         }, {
@@ -213,15 +213,15 @@ graph := llm.workflow_graph({
         llm.stage("finalize", func(ctx) {
             return {value: "final:" .. ctx.input, text: "final:" .. ctx.input}, nil
         }, {
-            depends_on: {"plan"}
+            depends_on: ["plan"]
             capability: "generic.ai.workflow.orchestration.stage.finalize"
             input_ref: "plan_result"
             output_ref: "final_result"
         }),
-    }
-    edges: {
+    ]
+    edges: [
         {from: "plan", to: "finalize"}
-    }
+    ]
 })
 result, err := graph.run("topic")
 text := result.text
@@ -298,11 +298,11 @@ final_record, final_record_err := llm.replay_record({
     }
     response: {status: "final_answer" text: "final text" calls: {} usage: {}}
 })
-plan_fixture, plan_fixture_err := llm.replay_fixture({plan_record}, {
+plan_fixture, plan_fixture_err := llm.replay_fixture([plan_record], {
     fixture_id: "fixture:plan"
     consume_on_match: false
 })
-final_fixture, final_fixture_err := llm.replay_fixture({final_record}, {
+final_fixture, final_fixture_err := llm.replay_fixture([final_record], {
     fixture_id: "fixture:final"
     consume_on_match: false
 })
@@ -337,7 +337,7 @@ final_event := llm.replay_trace_event(final_match, {
 graph := llm.workflow_graph({
     workflow_id: "wf-replay"
     entrypoint: "ai.workflow.replay"
-    stages: {
+    stages: [
         llm.stage("plan", func(ctx) {
             req := {model: "fixture-model" messages: [llm.user(ctx.input)]}
             replay, replay_err := plan_fixture.replay(req, "turn:plan")
@@ -361,7 +361,7 @@ graph := llm.workflow_graph({
             }
             return llm.turn({model: "fixture-model" messages: [llm.user(ctx.input)] replay: replay})
         }, {
-            depends_on: {"plan"}
+            depends_on: ["plan"]
             capability: "generic.ai.workflow.stage.finalize"
             fixture_key: "turn:final"
             input_ref: "plan.text"
@@ -369,7 +369,7 @@ graph := llm.workflow_graph({
             input_schema: "plan.v1"
             output_schema: "final.v1"
         }),
-    }
+    ]
     edges: [{from: "plan", to: "finalize"}]
 })
 result, err := graph.run("topic")
@@ -455,14 +455,14 @@ func TestLLMWorkflowGraphMockPreservesGraphMetadata(t *testing.T) {
 			if err := vm.Exec(`
 graph := llm.workflow_graph({
     workflow_id: "mockable-flow"
-    stages: {
+    stages: [
         llm.stage("plan", func(ctx) {
             return {text: "should not run"}, nil
         }),
         llm.stage("finalize", func(ctx) {
             return {text: "final " .. ctx.input}, nil
-        }, {depends_on: {"plan"}}),
-    }
+        }, {depends_on: ["plan"]}),
+    ]
 })
 mocked := graph.mock({plan: {text: "mock plan"}})
 result, err := mocked.run("topic")
@@ -510,7 +510,7 @@ func TestLLMWorkflowMockCanResolveStageFixtureKey(t *testing.T) {
 			if err := vm.Exec(`
 graph := llm.workflow_graph({
     workflow_id: "fixture-key-flow"
-    stages: {
+    stages: [
         llm.stage("plan", func(ctx) {
             return llm.turn({messages: [llm.user("should not run")]})
         }, {
@@ -520,11 +520,11 @@ graph := llm.workflow_graph({
         llm.stage("finalize", func(ctx) {
             return {text: "final " .. ctx.input}, nil
         }, {
-            depends_on: {"plan"}
+            depends_on: ["plan"]
             fixture_key: "turn:final"
             capability: "generic.ai.workflow.stage.finalize"
         }),
-    }
+    ]
 })
 fixtures := {}
 fixtures["turn:plan"] = {text: "fixture plan"}

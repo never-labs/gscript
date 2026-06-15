@@ -35,7 +35,7 @@ probe := llm.agent("probe", func(q) {
     observed := probe_config.model .. "|" .. probe_config.system .. "|" .. probe_config.capabilities[1]
     model := "local-model"
     system := "local-system"
-    capabilities := {"local.cap"}
+    capabilities := ["local.cap"]
     return {
         observed: observed,
         shadowed: model .. "|" .. system .. "|" .. capabilities[1]

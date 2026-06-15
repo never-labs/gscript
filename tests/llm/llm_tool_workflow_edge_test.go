@@ -90,10 +90,10 @@ func TestLLMWorkflowGraphEdgeRejectsDuplicateAndInvalidOrder(t *testing.T) {
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)...)
 			err := vm.Exec(`
 graph := llm.workflow_graph({
-    stages: {
+    stages: [
         llm.stage("plan", func(ctx) { return ctx.input, nil }),
         llm.stage("plan", func(ctx) { return ctx.input, nil }),
-    }
+    ]
 })
 `)
 			if err == nil || !strings.Contains(err.Error(), `duplicate stage "plan"`) {
@@ -105,10 +105,10 @@ graph := llm.workflow_graph({
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)...)
 			err := vm.Exec(`
 graph := llm.workflow_graph({
-    stages: {
-        llm.stage("finalize", func(ctx) { return ctx.input, nil }, {depends_on: {"plan"}}),
+    stages: [
+        llm.stage("finalize", func(ctx) { return ctx.input, nil }, {depends_on: ["plan"]}),
         llm.stage("plan", func(ctx) { return ctx.input, nil }),
-    }
+    ]
 })
 `)
 			if err == nil || !strings.Contains(err.Error(), `depends on unknown or later stage "plan"`) {
@@ -120,12 +120,12 @@ graph := llm.workflow_graph({
 			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibString | leia.LibLLM)}, mode.opts...)...)
 			err := vm.Exec(`
 graph := llm.workflow_graph({
-    stages: {
+    stages: [
         llm.stage("plan", func(ctx) { return ctx.input, nil }),
-    }
-    edges: {
+    ]
+    edges: [
         {from: "plan", to: "missing"}
-    }
+    ]
 })
 `)
 			if err == nil || !strings.Contains(err.Error(), `edge references unknown stage "plan" -> "missing"`) {

@@ -1291,9 +1291,9 @@ trades := soa.zip({
 
 rows := q.query(trades, {
     where: {column: "size", op: ">=", value: 100},
-    by: {"sym"},
+    by: ["sym"],
     select: {
-        notional: {"*", "price", "size"},
+        notional: ["*", "price", "size"],
         size: "size",
         fills: 1,
     },
@@ -1311,7 +1311,7 @@ flat := q.query(trades, {
 
 calc := q.query(trades, {
     where: soa.mask(trades, "sym", "==", 1),
-    select: {notional: {"*", "price", "size"}, adjusted: {"+", "price", 1.5}, large: {">=", "size", 75}, flagged: {"==", "flag", true}, marker: 1, active: true},
+    select: {notional: ["*", "price", "size"], adjusted: ["+", "price", 1.5], large: [">=", "size", 75], flagged: ["==", "flag", true], marker: 1, active: true},
 })
 
 limited := q.query(trades, {
@@ -1596,7 +1596,7 @@ trades := soa.zip({
 
 supported_spec := {
     where: {column: "size", op: ">=", value: 50},
-    select: {notional: {"*", "price", "size"}},
+    select: {notional: ["*", "price", "size"]},
     order_by: {column: "notional", desc: true},
     limit: 2,
 }
@@ -1606,7 +1606,7 @@ primed := q.query(trades, supported_spec)
 supported := q.explain_query(trades, supported_spec)
 
 unsupported := q.explain_query(trades, {
-    select: {price: "price", marker: {"negate", "price"}},
+    select: {price: "price", marker: ["negate", "price"]},
 })
 `)
 
@@ -1882,8 +1882,8 @@ by_size := q.query(trades, {
 })
 
 notional_by_sym := q.query(trades, {
-    by: {"sym"},
-    select: {notional: {"*", "price", "size"}},
+    by: ["sym"],
+    select: {notional: ["*", "price", "size"]},
     aggregate: {notional: "sum"},
     order_by: {column: "notional", desc: true},
     limit: 2,
@@ -4366,7 +4366,7 @@ func TestQFallbackStatsTrackQueryKernelHits(t *testing.T) {
 
 	interp := runWithQAndSOA(t, `
 trades := soa.zip({price: []f64{100, 101}, size: []f64{10, 20}})
-rows := q.query(trades, {select: {notional: {"*", "price", "size"}}})
+rows := q.query(trades, {select: {notional: ["*", "price", "size"]}})
 `)
 	rows := interp.GetGlobal("rows").Table()
 	if rows == nil || rows.Length() != 2 {
@@ -4449,9 +4449,9 @@ func TestQQueryKernelSupportCacheStats(t *testing.T) {
 
 	interp := runWithQAndSOA(t, `
 trades := soa.zip({price: []f64{100, 101}, size: []f64{10, 20}})
-first := q.query(trades, {select: {notional: {"*", "price", "size"}, large: {">=", "size", 15}}})
-second := q.query(trades, {select: {large: {">=", "size", 15}, notional: {"*", "price", "size"}}})
-explained := q.explain_query(trades, {select: {large: {">=", "size", 15}, notional: {"*", "price", "size"}}})
+first := q.query(trades, {select: {notional: ["*", "price", "size"], large: [">=", "size", 15]}})
+second := q.query(trades, {select: {large: [">=", "size", 15], notional: ["*", "price", "size"]}})
+explained := q.explain_query(trades, {select: {large: [">=", "size", 15], notional: ["*", "price", "size"]}})
 `)
 	first := interp.GetGlobal("first").Table()
 	second := interp.GetGlobal("second").Table()

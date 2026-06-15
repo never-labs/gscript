@@ -344,7 +344,7 @@ record, record_err := llm.replay_record({
         usage: {input_tokens: 2 output_tokens: 4 cost: 0.0 latency_ms: 0}
     }
 })
-fixture, fixture_err := llm.replay_fixture({record}, {
+fixture, fixture_err := llm.replay_fixture([record], {
     fixture_id: "script-fixture"
 })
 match := fixture.match({
@@ -437,7 +437,7 @@ record, record_err := llm.replay_record({
         usage: {input_tokens: 1 output_tokens: 3 cost: 0.0 latency_ms: 0}
     }
 })
-fixture, fixture_err := llm.replay_fixture({record}, {
+fixture, fixture_err := llm.replay_fixture([record], {
     fixture_id: "script-direct-fixture"
 })
 bad_replay, bad_err := fixture.replay({

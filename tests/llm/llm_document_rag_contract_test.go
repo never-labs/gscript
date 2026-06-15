@@ -23,7 +23,7 @@ filing := llm.document({
     title: "Apple 2025 Form 10-K"
     source: "fixtures/sec/aapl-2025-10k.md"
     artifact_id: "artifact://sec/aapl-2025-10k.md"
-    tags: {"sec", "10-k", "aapl"}
+    tags: ["sec", "10-k", "aapl"]
     sections: {
         item1: "Business section discusses products and services."
         item1a: "Risk factors include supply concentration and regulatory pressure."

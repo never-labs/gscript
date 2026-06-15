@@ -423,9 +423,9 @@ record, record_err := llm.replay_record({
     response_hash: "sha256:res1"
     response: {status: "final_answer" text: "secret answer" calls: {} usage: {}}
 })
-fixture, fixture_err := llm.replay_fixture({record}, {
+fixture, fixture_err := llm.replay_fixture([record], {
     fixture_id: "fixture:trace"
-    identity_fields: {"replay_key", "request_hash"}
+    identity_fields: ["replay_key", "request_hash"]
 })
 matched := fixture.match({replay_key: "turn:1" request_hash: "sha256:req1"})
 matched_event := llm.replay_trace_event(matched, {
@@ -442,9 +442,9 @@ mismatch_record, mismatch_record_err := llm.replay_record({
     response_hash: "sha256:res2"
     response: {status: "final_answer" text: "mismatch answer" calls: {} usage: {}}
 })
-mismatch_fixture, mismatch_fixture_err := llm.replay_fixture({mismatch_record}, {
+mismatch_fixture, mismatch_fixture_err := llm.replay_fixture([mismatch_record], {
     fixture_id: "fixture:mismatch"
-    identity_fields: {"replay_key", "request_hash"}
+    identity_fields: ["replay_key", "request_hash"]
 })
 mismatch := mismatch_fixture.match({replay_key: "turn:2" request_hash: "sha256:wrong"})
 mismatch_event := llm.replay_trace_event(mismatch, {

@@ -22,10 +22,10 @@ schema := llm.schema({
     name: {type: "string", description: "Display name"}
     score: "number"
     nickname: "string?"
-    tags: {"string"}
+    tags: ["string"]
 })
 kind := llm.schema_info(schema).kind
-ok, msg := llm.validate_output({name: "Ada", score: 0.98, tags: {"math"}}, schema)
+ok, msg := llm.validate_output({name: "Ada", score: 0.98, tags: ["math"]}, schema)
 schema_type := schema.type
 schema_additional := schema.additionalProperties
 name_desc := schema.properties.name.description

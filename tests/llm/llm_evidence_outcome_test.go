@@ -50,7 +50,7 @@ gate := llm.trace_assert(trace, {
     require_event_payload_fields: {evidence_outcome: ["status", "result_status", "evidence_count", "evidence_refs", "citation_count"]}
     require_correlation_fields: ["workflow_run_id", "workflow_step_id", "correlation_id"]
     max_status_counts: {cited: 1}
-    deny_payload_fields: {"text", "snippet", "raw_prompt", "raw_completion", "secret"}
+    deny_payload_fields: ["text", "snippet", "raw_prompt", "raw_completion", "secret"]
 })
 
 outcome_kind := outcome.kind

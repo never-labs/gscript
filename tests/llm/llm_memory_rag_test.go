@@ -30,7 +30,7 @@ docs := llm.collection({
         id: "runbook"
         title: "Checkout runbook"
         source: "local/runbook"
-        tags: {"checkout", "payments"}
+        tags: ["checkout", "payments"]
     })
     llm.document({
         id: "notes"

@@ -166,7 +166,7 @@ func TestDBFrameFeedsColumnarQQuery(t *testing.T) {
 			(2, 2, 70.0, 210.0, 4, 'email')`+"`"+`)
 		frame := conn.frame(sql`+"`"+`select day, channel_id, spend, revenue, conversions, label from campaigns order by day, channel_id`+"`"+`)
 		rollup := q.query(frame.soa, {
-			by: {"channel_id"},
+			by: ["channel_id"],
 			select: {
 				spend: "spend",
 				revenue: "revenue",
