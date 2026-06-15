@@ -9,23 +9,20 @@ prior := stats.normal(0.0, 0.8)
 process_noise := stats.normal(0.0, 0.04)
 sensor_noise := stats.normal(0.0, 0.18)
 
-particles := rand.sample(prior, N)
-weights := stats.uniform_weights(N)
+ensemble := stats.samples(rand.sample(prior, N))
 
 measurements := {0.58, 1.05, 1.53, 1.95}
 for t := 1; t <= #measurements; t++ {
-    particles = rand.add_noise(particles, process_noise, 0.50)
-    log_weights := stats.loglik(sensor_noise, measurements[t], particles)
-    posterior := stats.bayes_update(particles, weights, log_weights, {min_ess_ratio: 0.6, offset: 0.5})
-    particles = posterior.values
-    weights = posterior.weights
-    assert(posterior.ess > 0)
-    if posterior.resampled {
-        assert(#posterior.indexes == N)
+    predicted := rand.add_noise(ensemble.values, process_noise, 0.50)
+    log_weights := stats.loglik(sensor_noise, measurements[t], predicted)
+    ensemble = stats.update(stats.samples(predicted, ensemble.weights), log_weights, {min_ess_ratio: 0.6, offset: 0.5})
+    assert(ensemble.ess > 0)
+    if ensemble.resampled {
+        assert(#ensemble.indexes == N)
     }
 }
 
-summary := stats.describe(particles, weights)
+summary := stats.describe(ensemble)
 estimate := summary.mean
 variance := summary.variance
 spread := summary.std

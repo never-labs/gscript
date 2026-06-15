@@ -20,6 +20,8 @@ func BuildStats() *Table {
 	set("std", statsStd)
 	set("describe", statsDescribe)
 	set("describe_fields", statsDescribeFields)
+	set("samples", statsSamples)
+	set("update", statsUpdate)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
 	set("normal", statsNormal)
@@ -136,6 +138,10 @@ func statsStd(args []Value) ([]Value, error) {
 }
 
 func statsDescribe(args []Value) ([]Value, error) {
+	if len(args) == 1 && statsIsSampleSetValue(args[0]) {
+		samples := args[0].Table()
+		return statsDescribe([]Value{samples.RawGetString("values"), samples.RawGetString("weights")})
+	}
 	values, err := statsVectorArg("stats.describe", args)
 	if err != nil {
 		return nil, err
@@ -173,6 +179,52 @@ func statsDescribe(args []Value) ([]Value, error) {
 	out.RawSetString("max", FloatValue(max))
 	out.RawSetString("rms", FloatValue(math.Sqrt(sumSquares/float64(len(values)))))
 	return []Value{TableValue(out)}, nil
+}
+
+func statsSamples(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("stats.samples: need values")
+	}
+	values, err := linalgVectorValue("stats.samples", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.samples: empty input")
+	}
+	var weightsValue Value
+	if len(args) >= 2 {
+		weights, total, err := statsWeights("stats.samples", []Value{args[1]})
+		if err != nil {
+			return nil, err
+		}
+		if len(values) != len(weights) {
+			return nil, fmt.Errorf("stats.samples: values and weights length mismatch")
+		}
+		weightsValue = DenseArrayValue(NewDenseArrayF64Owned(statsNormalizeWeightsOf(weights, total)))
+	} else {
+		weights, err := statsUniformWeights([]Value{IntValue(int64(len(values)))})
+		if err != nil {
+			return nil, err
+		}
+		weightsValue = weights[0]
+	}
+	return statsMakeSampleSet("stats.samples", args[0], weightsValue, nil)
+}
+
+func statsUpdate(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("stats.update: need samples and log_likelihoods")
+	}
+	samples, err := statsSampleSetFromValue("stats.update", args[0])
+	if err != nil {
+		return nil, err
+	}
+	updateArgs := []Value{samples.values, samples.weights, args[1]}
+	if len(args) >= 3 {
+		updateArgs = append(updateArgs, args[2])
+	}
+	return statsBayesUpdate(updateArgs)
 }
 
 func statsDescribeWeighted(values []float64, weightsValue Value) ([]Value, error) {
@@ -764,6 +816,7 @@ func statsBayesUpdate(args []Value) ([]Value, error) {
 		return nil, err
 	}
 	out := NewTable()
+	out.RawSetString("kind", StringValue("weighted_samples"))
 	out.RawSetString("values", updated[0])
 	out.RawSetString("weights", updated[1])
 	out.RawSetString("resampled", updated[2])
@@ -771,6 +824,48 @@ func statsBayesUpdate(args []Value) ([]Value, error) {
 	out.RawSetString("indexes", updated[4])
 	out.RawSetString("summary", summary[0])
 	return []Value{TableValue(out)}, nil
+}
+
+type statsSampleSet struct {
+	values  Value
+	weights Value
+}
+
+func statsMakeSampleSet(fn string, valuesValue, weightsValue Value, extra *Table) ([]Value, error) {
+	summary, err := statsDescribe([]Value{valuesValue, weightsValue})
+	if err != nil {
+		return nil, err
+	}
+	out := NewTable()
+	out.RawSetString("kind", StringValue("weighted_samples"))
+	out.RawSetString("values", valuesValue)
+	out.RawSetString("weights", weightsValue)
+	out.RawSetString("summary", summary[0])
+	if extra != nil {
+		for _, key := range extra.PairsKeysSnapshot() {
+			out.RawSet(key, extra.RawGet(key))
+		}
+	}
+	return []Value{TableValue(out)}, nil
+}
+
+func statsSampleSetFromValue(fn string, value Value) (statsSampleSet, error) {
+	if !statsIsSampleSetValue(value) {
+		return statsSampleSet{}, fmt.Errorf("%s: weighted sample set expected", fn)
+	}
+	tbl := value.Table()
+	values := tbl.RawGetString("values")
+	weights := tbl.RawGetString("weights")
+	if values.IsNil() || weights.IsNil() {
+		return statsSampleSet{}, fmt.Errorf("%s: weighted sample set missing values or weights", fn)
+	}
+	return statsSampleSet{values: values, weights: weights}, nil
+}
+
+func statsIsSampleSetValue(value Value) bool {
+	return value.IsTable() &&
+		value.Table().RawGetString("kind").IsString() &&
+		value.Table().RawGetString("kind").Str() == "weighted_samples"
 }
 
 func statsBayesUpdateOptions(args []Value) (*Table, error) {

@@ -159,6 +159,9 @@ iw_keep, iw_keep_weights, iw_keep_resampled, iw_keep_ess, iw_keep_idx := stats.i
 iw_next, iw_next_weights, iw_did_resample, iw_next_ess, iw_next_idx := stats.importance_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
 bayes_keep := stats.bayes_update({10, 20, 30}, {1, 1, 1}, {0, 0, 0})
 bayes_next := stats.bayes_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
+samples := stats.samples({10, 20, 30}, {1, 2, 1})
+sample_desc := stats.describe(samples)
+sample_next := stats.update(samples, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
 `)
 	indices := interp.GetGlobal("indices")
 	if !indices.IsTable() {
@@ -192,6 +195,9 @@ bayes_next := stats.bayes_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, 
 		t.Fatalf("iw_next_idx length = %d, want 3", got)
 	}
 	bayesKeep := interp.GetGlobal("bayes_keep").Table()
+	if got := bayesKeep.RawGetString("kind"); !got.IsString() || got.Str() != "weighted_samples" {
+		t.Fatalf("bayes_keep.kind = %v, want weighted_samples", got)
+	}
 	assertTableFloat(t, bayesKeep.RawGetString("values"), 2, 20)
 	assertTableFloat(t, bayesKeep.RawGetString("weights"), 1, 1.0/3.0)
 	if got := bayesKeep.RawGetString("resampled"); !got.IsBool() || got.Bool() {
@@ -208,6 +214,18 @@ bayes_next := stats.bayes_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, 
 		t.Fatalf("bayes_next.indexes length = %d, want 3", got)
 	}
 	assertFloat(t, bayesNext.RawGetString("summary").Table().RawGetString("mean"), 30)
+	samples := interp.GetGlobal("samples").Table()
+	if got := samples.RawGetString("kind"); !got.IsString() || got.Str() != "weighted_samples" {
+		t.Fatalf("samples.kind = %v, want weighted_samples", got)
+	}
+	assertTableFloat(t, samples.RawGetString("weights"), 2, 0.5)
+	assertFloat(t, interp.GetGlobal("sample_desc").Table().RawGetString("mean"), 20)
+	sampleNext := interp.GetGlobal("sample_next").Table()
+	if got := sampleNext.RawGetString("kind"); !got.IsString() || got.Str() != "weighted_samples" {
+		t.Fatalf("sample_next.kind = %v, want weighted_samples", got)
+	}
+	assertTableFloat(t, sampleNext.RawGetString("values"), 1, 30)
+	assertFloat(t, sampleNext.RawGetString("summary").Table().RawGetString("mean"), 30)
 	if got := idx.RawGetInt(1); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("resample_idx[1] = %v, want 2", got)
 	}
