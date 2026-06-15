@@ -30,10 +30,10 @@ func TestLinalgVectorMatrixAndAccess(t *testing.T) {
 	interp := linalgInterp(t, `
 v := linalg.vector(1, 2, 3)
 row := linalg.row(1, 2, 3)
-col := linalg.col({4, 5})
-fromTable := linalg.vector({4, 5, 6})
-nested := linalg.matrix({{1, 2}, {3, 4}})
-m := linalg.matrix(2, 3, {1, 2, 3, 4, 5, 6})
+col := linalg.col([4, 5])
+fromTable := linalg.vector([4, 5, 6])
+nested := linalg.matrix([[1, 2], [3, 4]])
+m := linalg.matrix(2, 3, [1, 2, 3, 4, 5, 6])
 dense_values_matrix := linalg.matrix(2, 2, linalg.vector(1, 2, 3, 4))
 before := linalg.get(m, 2, 3)
 linalg.set(m, 1, 2, 9)
@@ -44,13 +44,13 @@ ov := linalg.ones(3)
 om := linalg.ones(2, 2)
 eye := linalg.eye(3)
 scaled_eye := linalg.eye(2, 0.25)
-diag := linalg.diag({7, 8})
+diag := linalg.diag([7, 8])
 diag_args := linalg.diag(7, 8)
 diag_one := linalg.diag(9)
 row_at := linalg.at(row, 3)
 col_at := linalg.at(col, 2)
 matrix_at := linalg.at(m, 2, 1)
-vec_at := linalg.at({9, 8, 7}, 2)
+vec_at := linalg.at([9, 8, 7], 2)
 `)
 	assertTableFloat(t, interp.GetGlobal("v"), 3, 3)
 	assertMatrixFloat(t, interp.GetGlobal("row"), 1, 3, 3, 3)
@@ -79,7 +79,7 @@ vec_at := linalg.at({9, 8, 7}, 2)
 func TestLinalgOps(t *testing.T) {
 	interp := linalgInterp(t, `
 a := linalg.vector(1, 2, 3)
-b := linalg.vector({4, 5, 6})
+b := linalg.vector([4, 5, 6])
 sum := linalg.add(a, b)
 diff := linalg.sub(b, a)
 shifted := linalg.add(a, b, 10)
@@ -95,36 +95,36 @@ dot := linalg.dot(a, b)
 dot_row_col := linalg.dot(linalg.row(1, 2), linalg.col(3, 4))
 norm := linalg.norm(linalg.vector(3, 4))
 norm_row := linalg.norm(linalg.row(3, 4))
-m := linalg.matrix(2, 2, {1, 2, 3, 4})
-mv := linalg.matvec(m, {10, 20})
+m := linalg.matrix(2, 2, [1, 2, 3, 4])
+mv := linalg.matvec(m, [10, 20])
 mv_col := linalg.matvec(m, linalg.col(10, 20))
 mt := linalg.transpose(m)
 mt_short := linalg.T(m)
 mt_lower := linalg.t(m)
 trace := linalg.trace(m)
 mm := linalg.matmul(m, linalg.eye(2))
-mm3 := linalg.matmul(m, linalg.eye(2), linalg.matrix({{1, 0}, {0, 2}}))
-mm_t := linalg.matmul_t(m, linalg.matrix({{10, 20}, {30, 40}, {50, 60}}))
-mmv := linalg.matmul(m, {10, 20})
+mm3 := linalg.matmul(m, linalg.eye(2), linalg.matrix([[1, 0], [0, 2]]))
+mm_t := linalg.matmul_t(m, linalg.matrix([[10, 20], [30, 40], [50, 60]]))
+mmv := linalg.matmul(m, [10, 20])
 cm := linalg.chainmul(m, linalg.eye(2), linalg.eye(2))
-sw := linalg.sandwich(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2))
-swadd := linalg.sandwich_add(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2), linalg.eye(2))
-swshift := linalg.sandwich_add(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2), 10)
+sw := linalg.sandwich(linalg.matrix([[1, 2], [0, 1]]), linalg.eye(2))
+swadd := linalg.sandwich_add(linalg.matrix([[1, 2], [0, 1]]), linalg.eye(2), linalg.eye(2))
+swshift := linalg.sandwich_add(linalg.matrix([[1, 2], [0, 1]]), linalg.eye(2), 10)
 mshift := linalg.add(m, 10)
 maffine := linalg.affine(m, linalg.eye(2), 2, -10)
-im := linalg.identity_minus(linalg.matrix({{0.2, 0.1}, {0.3, 0.4}}))
+im := linalg.identity_minus(linalg.matrix([[0.2, 0.1], [0.3, 0.4]]))
 rowAffine := linalg.affine(linalg.row(1, 2), 10, 2, -1)
 colAffine := linalg.affine(100, linalg.col(1, 2), 1, -3)
 vec_from_row := linalg.vec(linalg.row(7, 8))
 vec_from_col := linalg.vec(linalg.col(9, 10))
 scalarAffine := linalg.affine(2, 3, 4, 5)
-sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
-sol_col := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), linalg.col(1, 2))
-solg := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), {1, 2})
-solg_row := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), linalg.row(1, 2))
-solm := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), linalg.matrix({{1, 2}, {2, 1}}))
-solr := linalg.solve_right(linalg.matrix({{4, 7}}), linalg.matrix({{2, 1}, {1, 3}}))
-single := linalg.scalar(linalg.matrix({{42}}))
+sol := linalg.solve2(linalg.matrix(2, 2, [2, 1, 1, 3]), [1, 2])
+sol_col := linalg.solve2(linalg.matrix(2, 2, [2, 1, 1, 3]), linalg.col(1, 2))
+solg := linalg.solve(linalg.matrix([[2, 1], [1, 3]]), [1, 2])
+solg_row := linalg.solve(linalg.matrix([[2, 1], [1, 3]]), linalg.row(1, 2))
+solm := linalg.solve(linalg.matrix([[2, 1], [1, 3]]), linalg.matrix([[1, 2], [2, 1]]))
+solr := linalg.solve_right(linalg.matrix([[4, 7]]), linalg.matrix([[2, 1], [1, 3]]))
+single := linalg.scalar(linalg.matrix([[42]]))
 `)
 	assertTableFloat(t, interp.GetGlobal("sum"), 3, 9)
 	assertTableFloat(t, interp.GetGlobal("diff"), 1, 3)
@@ -197,7 +197,7 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 	}{
 		{
 			name:   "row",
-			src:    `m := linalg.row({1, 2})`,
+			src:    `m := linalg.row([1, 2])`,
 			row:    0,
 			col:    1,
 			want:   2,
@@ -215,14 +215,14 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 		},
 		{
 			name: "nested",
-			src:  `m := linalg.matrix({{1, 2}, {3, 4}})`,
+			src:  `m := linalg.matrix([[1, 2], [3, 4]])`,
 			row:  1,
 			col:  0,
 			want: 3,
 		},
 		{
 			name: "matrix",
-			src:  `m := linalg.matrix(2, 2, {1, 2, 3, 4})`,
+			src:  `m := linalg.matrix(2, 2, [1, 2, 3, 4])`,
 			row:  1,
 			col:  0,
 			want: 3,
@@ -236,7 +236,7 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 		},
 		{
 			name: "diag",
-			src:  `m := linalg.diag({5, 6})`,
+			src:  `m := linalg.diag([5, 6])`,
 			row:  1,
 			col:  1,
 			want: 6,
@@ -257,56 +257,56 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 		},
 		{
 			name: "matmul",
-			src:  `m := linalg.matmul(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.eye(2))`,
+			src:  `m := linalg.matmul(linalg.matrix(2, 2, [1, 2, 3, 4]), linalg.eye(2))`,
 			row:  1,
 			col:  0,
 			want: 3,
 		},
 		{
 			name: "matmul transpose right",
-			src:  `m := linalg.matmul_t(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.matrix(3, 2, {10, 20, 30, 40, 50, 60}))`,
+			src:  `m := linalg.matmul_t(linalg.matrix(2, 2, [1, 2, 3, 4]), linalg.matrix(3, 2, [10, 20, 30, 40, 50, 60]))`,
 			row:  1,
 			col:  2,
 			want: 390,
 		},
 		{
 			name: "transpose",
-			src:  `m := linalg.transpose(linalg.matrix(2, 2, {1, 2, 3, 4}))`,
+			src:  `m := linalg.transpose(linalg.matrix(2, 2, [1, 2, 3, 4]))`,
 			row:  1,
 			col:  0,
 			want: 2,
 		},
 		{
 			name: "scale matrix",
-			src:  `m := linalg.scale(linalg.matrix(2, 2, {1, 2, 3, 4}), 2)`,
+			src:  `m := linalg.scale(linalg.matrix(2, 2, [1, 2, 3, 4]), 2)`,
 			row:  1,
 			col:  0,
 			want: 6,
 		},
 		{
 			name: "add matrix",
-			src:  `m := linalg.add(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.eye(2))`,
+			src:  `m := linalg.add(linalg.matrix(2, 2, [1, 2, 3, 4]), linalg.eye(2))`,
 			row:  1,
 			col:  0,
 			want: 3,
 		},
 		{
 			name: "sub matrix",
-			src:  `m := linalg.sub(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.eye(2))`,
+			src:  `m := linalg.sub(linalg.matrix(2, 2, [1, 2, 3, 4]), linalg.eye(2))`,
 			row:  1,
 			col:  0,
 			want: 3,
 		},
 		{
 			name: "affine matrix",
-			src:  `m := linalg.affine(linalg.matrix(2, 2, {1, 2, 3, 4}), 10, 2, -1)`,
+			src:  `m := linalg.affine(linalg.matrix(2, 2, [1, 2, 3, 4]), 10, 2, -1)`,
 			row:  1,
 			col:  0,
 			want: -4,
 		},
 		{
 			name: "identity minus",
-			src:  `m := linalg.identity_minus(linalg.matrix(2, 2, {0.2, 0.1, 0.3, 0.4}))`,
+			src:  `m := linalg.identity_minus(linalg.matrix(2, 2, [0.2, 0.1, 0.3, 0.4]))`,
 			row:  0,
 			col:  0,
 			want: 0.8,
@@ -335,7 +335,7 @@ after := matrix.getf(m, %d, %d)
 func TestLinalgIdentityMinusErrors(t *testing.T) {
 	interp := runtime.NewCore()
 	installTestModule(interp, "linalg", runtime.TableValue(BuildLinalg()))
-	err := execSourceOnInterp(interp, `linalg.identity_minus(linalg.matrix(1, 2, {1, 2}))`)
+	err := execSourceOnInterp(interp, `linalg.identity_minus(linalg.matrix(1, 2, [1, 2]))`)
 	if err == nil {
 		t.Fatal("linalg.identity_minus non-square matrix succeeded, want error")
 	}
@@ -369,7 +369,7 @@ func TestLinalgVectorResultsAreDenseArrayInteroperable(t *testing.T) {
 		},
 		{
 			name:     "matvec",
-			src:      `v := linalg.matvec(linalg.matrix(2, 2, {1, 2, 3, 4}), {10, 20})`,
+			src:      `v := linalg.matvec(linalg.matrix(2, 2, [1, 2, 3, 4]), [10, 20])`,
 			wantLen:  2,
 			wantMean: 80,
 			wantNorm: math.Sqrt(14600),
@@ -422,7 +422,7 @@ func TestLinalgDenseRuntimeStatsFeedQCacheStats(t *testing.T) {
 	interp := linalgMigrationInterp(t, `
 v := linalg.vector(1, 2, 3)
 scaled := linalg.scale(v, 2)
-m := linalg.matmul(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.eye(2))
+m := linalg.matmul(linalg.matrix(2, 2, [1, 2, 3, 4]), linalg.eye(2))
 stats := q.cache_stats()
 `)
 	assertTableFloat(t, interp.GetGlobal("scaled"), 3, 6)

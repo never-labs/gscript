@@ -34,46 +34,46 @@ func assertNear(t *testing.T, got Value, want, tol float64) {
 
 func TestStatsAggregatesAndTransforms(t *testing.T) {
 	interp := statsInterp(t, `
-total := stats.sum({1, 2, 3, 4})
-mean := stats.mean({1, 2, 3, 4})
-minimum := stats.min({4, 2, 8})
-maximum := stats.max({4, 2, 8})
-variance := stats["var"]({1, 2, 3, 4})
-variance_alias := stats.variance({1, 2, 3, 4})
-stddev := stats.std({1, 2, 3, 4})
-normalized := stats.normalize({1, 2, 3})
-zscore := stats.zscore({1, 2, 3})
-flat := stats.normalize({5, 5})
-weighted := stats.weighted_mean({10, 20, 30}, {1, 2, 1})
-weighted_var := stats.weighted_var({10, 20, 30}, {1, 2, 1})
-weighted_std := stats.weighted_std({10, 20, 30}, {1, 2, 1})
-normalized_weights := stats.normalize_weights({2, 3, 5})
+total := stats.sum([1, 2, 3, 4])
+mean := stats.mean([1, 2, 3, 4])
+minimum := stats.min([4, 2, 8])
+maximum := stats.max([4, 2, 8])
+variance := stats["var"]([1, 2, 3, 4])
+variance_alias := stats.variance([1, 2, 3, 4])
+stddev := stats.std([1, 2, 3, 4])
+normalized := stats.normalize([1, 2, 3])
+zscore := stats.zscore([1, 2, 3])
+flat := stats.normalize([5, 5])
+weighted := stats.weighted_mean([10, 20, 30], [1, 2, 1])
+weighted_var := stats.weighted_var([10, 20, 30], [1, 2, 1])
+weighted_std := stats.weighted_std([10, 20, 30], [1, 2, 1])
+normalized_weights := stats.normalize_weights([2, 3, 5])
 uniform_weights := stats.uniform_weights(4)
-logsum := stats.logsumexp({0, 0})
+logsum := stats.logsumexp([0, 0])
 log_pdf0 := stats.log_normal_pdf(0, 0, 1)
-log_pdfs := stats.log_normal_pdf({0, 1}, 0, 1)
-normalized_log_weights := stats.normalize_log_weights({-1000, -1000})
-ess_uniform := stats.effective_sample_size({0.25, 0.25, 0.25, 0.25})
-ess_raw := stats.effective_sample_size({2, 2, 2, 2})
-cumsum := stats.cumsum({2, 3, 5})
-diff := stats.diff({2, 5, 11})
+log_pdfs := stats.log_normal_pdf([0, 1], 0, 1)
+normalized_log_weights := stats.normalize_log_weights([-1000, -1000])
+ess_uniform := stats.effective_sample_size([0.25, 0.25, 0.25, 0.25])
+ess_raw := stats.effective_sample_size([2, 2, 2, 2])
+cumsum := stats.cumsum([2, 3, 5])
+diff := stats.diff([2, 5, 11])
 filled := stats.fill(4, 0.25)
-gathered := stats.gather({10, 20, 30}, {3, 1, 3})
+gathered := stats.gather([10, 20, 30], [3, 1, 3])
 pdf0 := stats.normal_pdf(0, 0, 1)
-pdfs := stats.normal_pdf({0, 1}, 0, 1)
-rms := stats.rms({3, 4})
-rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
-desc := stats.describe({1, 2, 3, 4})
-weighted_desc := stats.describe({10, 20, 30}, {1, 2, 1})
-weighted_sparse := stats.describe({-100, 1, 2, 100}, {0, 1, 1, 0})
+pdfs := stats.normal_pdf([0, 1], 0, 1)
+rms := stats.rms([3, 4])
+rmse := stats.rmse([1, 2, 3], [1, 4, 3])
+desc := stats.describe([1, 2, 3, 4])
+weighted_desc := stats.describe([10, 20, 30], [1, 2, 1])
+weighted_sparse := stats.describe([-100, 1, 2, 100], [0, 1, 1, 0])
 fields := {}
-fields.x = stats.cumsum({1, 1, 1})
-fields.y = stats.cumsum({10, 10, 10})
+fields.x = stats.cumsum([1, 1, 1])
+fields.y = stats.cumsum([10, 10, 10])
 field_desc := stats.describe_fields(fields)
 weighted_fields := {}
-weighted_fields.x = stats.cumsum({10, 10, 10})
-weighted_fields.y = stats.cumsum({1, 1, 1})
-weighted_field_desc := stats.describe_fields(weighted_fields, {1, 2, 1})
+weighted_fields.x = stats.cumsum([10, 10, 10])
+weighted_fields.y = stats.cumsum([1, 1, 1])
+weighted_field_desc := stats.describe_fields(weighted_fields, [1, 2, 1])
 `)
 	assertFloat(t, interp.GetGlobal("total"), 10)
 	assertFloat(t, interp.GetGlobal("mean"), 2.5)
@@ -146,17 +146,17 @@ dist_name := dist.name
 dist_mean := dist.mean
 dist_sigma := dist.sigma
 pdf0 := stats.pdf(dist, 0)
-pdfs := stats.pdf(dist, {0, 1})
+pdfs := stats.pdf(dist, [0, 1])
 log_pdf0 := stats.logpdf(dist, 0)
-log_pdfs := stats.logpdf(dist, {0, 1})
+log_pdfs := stats.logpdf(dist, [0, 1])
 loglik_scalar := stats.loglik(dist, 2, 2)
-loglik_vector := stats.loglik(dist, 2, {1, 2})
-loglik_broadcast := stats.loglik(dist, {1, 2}, 2)
-sample_loglik := stats.loglik(dist, 2, stats.samples({1, 2}))
-observed_samples := stats.observe(stats.samples({1, 2}, {1, 1}), dist, 2, {min_ess_ratio: 0.0})
-manual_samples := stats.update(stats.samples({1, 2}, {1, 1}), sample_loglik, {min_ess_ratio: 0.0})
-observed_resample := stats.observe(stats.samples({10, 20, 30}, {0.2, 0.3, 0.5}), dist, 30, {min_ess_ratio: 0.8, offset: 0.5})
-manual_resample := stats.update(stats.samples({10, 20, 30}, {0.2, 0.3, 0.5}), stats.loglik(dist, 30, stats.samples({10, 20, 30}, {0.2, 0.3, 0.5})), {min_ess_ratio: 0.8, offset: 0.5})
+loglik_vector := stats.loglik(dist, 2, [1, 2])
+loglik_broadcast := stats.loglik(dist, [1, 2], 2)
+sample_loglik := stats.loglik(dist, 2, stats.samples([1, 2]))
+observed_samples := stats.observe(stats.samples([1, 2], [1, 1]), dist, 2, {min_ess_ratio: 0.0})
+manual_samples := stats.update(stats.samples([1, 2], [1, 1]), sample_loglik, {min_ess_ratio: 0.0})
+observed_resample := stats.observe(stats.samples([10, 20, 30], [0.2, 0.3, 0.5]), dist, 30, {min_ess_ratio: 0.8, offset: 0.5})
+manual_resample := stats.update(stats.samples([10, 20, 30], [0.2, 0.3, 0.5]), stats.loglik(dist, 30, stats.samples([10, 20, 30], [0.2, 0.3, 0.5])), {min_ess_ratio: 0.8, offset: 0.5})
 `)
 	if got := interp.GetGlobal("dist_kind"); !got.IsString() || got.Str() != "distribution" {
 		t.Fatalf("dist.kind = %v, want distribution", got)
@@ -206,11 +206,11 @@ manual_resample := stats.update(stats.samples({10, 20, 30}, {0.2, 0.3, 0.5}), st
 func TestStatsLinearGaussianStateSpace(t *testing.T) {
 	interp := statsLinalgInterp(t, `
 dt := 1.0
-F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
+F := linalg.matrix([[1.0, dt], [0.0, 1.0]])
 H := linalg.row(1.0, 0.0)
 Q := linalg.eye(2, 0.01)
 state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
-measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
+measurements := [0.95, 2.05, 2.95, 4.10, 5.00]
 innovations := {}
 for i := 1; i <= #measurements; i++ {
     state = stats.linear_predict(state, F, Q)
@@ -222,7 +222,7 @@ velocity := linalg.at(state.x, 2)
 trace := linalg.trace(state.P)
 rmse := stats.rms(innovations)
 row_state := stats.gaussian_state(linalg.row(1.0, 2.0), linalg.eye(2))
-col_state := stats.gaussian_state(linalg.matrix({{1.0}, {2.0}}), linalg.eye(2))
+col_state := stats.gaussian_state(linalg.matrix([[1.0], [2.0]]), linalg.eye(2))
 named_state := stats.gaussian_state({position: 0.0, velocity: 1.0}, linalg.eye(2), {names: {"position", "velocity"}, named_state: true})
 named_next := stats.linear_predict(named_state, F, Q)
 named_updated := stats.linear_update(named_next, H, 0.95, 0.04)
@@ -252,11 +252,11 @@ handmade_velocity := linalg.at(handmade_next.x, 2)
 func TestStatsLinearGaussianRejectsShapeErrors(t *testing.T) {
 	interp := statsLinalgInterp(t, ``)
 	cases := []string{
-		`stats.gaussian_state({1, 2}, linalg.matrix(1, 2, {1, 2}))`,
-		`stats.linear_predict(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.matrix(1, 3, {1, 0, 0}), linalg.eye(1))`,
-		`stats.linear_update(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.eye(2), {1, 2}, 0.1)`,
-		`stats.linear_update(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.row(1, 0), {1, 2}, 0.1)`,
-		`stats.linear_predict(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.eye(2), 0.01)`,
+		`stats.gaussian_state([1, 2], linalg.matrix(1, 2, [1, 2]))`,
+		`stats.linear_predict(stats.gaussian_state([1, 2], linalg.eye(2)), linalg.matrix(1, 3, [1, 0, 0]), linalg.eye(1))`,
+		`stats.linear_update(stats.gaussian_state([1, 2], linalg.eye(2)), linalg.eye(2), [1, 2], 0.1)`,
+		`stats.linear_update(stats.gaussian_state([1, 2], linalg.eye(2)), linalg.row(1, 0), [1, 2], 0.1)`,
+		`stats.linear_predict(stats.gaussian_state([1, 2], linalg.eye(2)), linalg.eye(2), 0.01)`,
 	}
 	for _, src := range cases {
 		if err := execSourceOnInterp(interp, src); err == nil {
@@ -267,17 +267,17 @@ func TestStatsLinearGaussianRejectsShapeErrors(t *testing.T) {
 
 func TestStatsSystematicResample(t *testing.T) {
 	interp := statsInterp(t, `
-indices := stats.systematic_resample({0.1, 0.2, 0.7}, 0.5)
-resampled, uniform, resample_idx := stats.resample({10, 20, 30}, {0.1, 0.2, 0.7}, 0.5)
-kept, kept_weights, kept_resampled, kept_ess, kept_idx := stats.resample_if({10, 20, 30}, {1, 1, 1}, 0.5, 0.5)
-next, next_weights, did_resample, next_ess, next_idx := stats.resample_if({10, 20, 30}, {0.01, 0.01, 0.98}, 0.8, 0.5)
-iw_keep, iw_keep_weights, iw_keep_resampled, iw_keep_ess, iw_keep_idx := stats.importance_update({10, 20, 30}, {1, 1, 1}, {0, 0, 0}, {min_ess_ratio: 0.5, offset: 0.5})
-iw_next, iw_next_weights, iw_did_resample, iw_next_ess, iw_next_idx := stats.importance_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
-bayes_keep := stats.bayes_update({10, 20, 30}, {1, 1, 1}, {0, 0, 0})
-bayes_next := stats.bayes_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
-samples := stats.samples({10, 20, 30}, {1, 2, 1})
+indices := stats.systematic_resample([0.1, 0.2, 0.7], 0.5)
+resampled, uniform, resample_idx := stats.resample([10, 20, 30], [0.1, 0.2, 0.7], 0.5)
+kept, kept_weights, kept_resampled, kept_ess, kept_idx := stats.resample_if([10, 20, 30], [1, 1, 1], 0.5, 0.5)
+next, next_weights, did_resample, next_ess, next_idx := stats.resample_if([10, 20, 30], [0.01, 0.01, 0.98], 0.8, 0.5)
+iw_keep, iw_keep_weights, iw_keep_resampled, iw_keep_ess, iw_keep_idx := stats.importance_update([10, 20, 30], [1, 1, 1], [0, 0, 0], {min_ess_ratio: 0.5, offset: 0.5})
+iw_next, iw_next_weights, iw_did_resample, iw_next_ess, iw_next_idx := stats.importance_update([10, 20, 30], [0.2, 0.3, 0.5], [-10, -10, 10], {min_ess_ratio: 0.8, offset: 0.5})
+bayes_keep := stats.bayes_update([10, 20, 30], [1, 1, 1], [0, 0, 0])
+bayes_next := stats.bayes_update([10, 20, 30], [0.2, 0.3, 0.5], [-10, -10, 10], {min_ess_ratio: 0.8, offset: 0.5})
+samples := stats.samples([10, 20, 30], [1, 2, 1])
 sample_desc := stats.describe(samples)
-sample_next := stats.update(samples, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
+sample_next := stats.update(samples, [-10, -10, 10], {min_ess_ratio: 0.8, offset: 0.5})
 `)
 	indices := interp.GetGlobal("indices")
 	if !indices.IsTable() {
@@ -391,35 +391,35 @@ sample_next := stats.update(samples, {-10, -10, 10}, {min_ess_ratio: 0.8, offset
 func TestStatsErrors(t *testing.T) {
 	interp := runtime.NewCore()
 	installTestModule(interp, "stats", runtime.TableValue(BuildStats()))
-	err := execSourceOnInterp(interp, `stats.mean({})`)
+	err := execSourceOnInterp(interp, `stats.mean([])`)
 	if err == nil {
-		t.Fatal("stats.mean({}) succeeded, want error")
+		t.Fatal("stats.mean([]) succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.normalize_weights({0, 0})`)
+	err = execSourceOnInterp(interp, `stats.normalize_weights([0, 0])`)
 	if err == nil {
-		t.Fatal("stats.normalize_weights({0, 0}) succeeded, want error")
+		t.Fatal("stats.normalize_weights([0, 0]) succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.effective_sample_size({1, -1})`)
+	err = execSourceOnInterp(interp, `stats.effective_sample_size([1, -1])`)
 	if err == nil {
-		t.Fatal("stats.effective_sample_size({1, -1}) succeeded, want error")
+		t.Fatal("stats.effective_sample_size([1, -1]) succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.resample_if({1}, {1}, 1.5)`)
+	err = execSourceOnInterp(interp, `stats.resample_if([1], [1], 1.5)`)
 	if err == nil {
 		t.Fatal("stats.resample_if invalid threshold succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.describe({})`)
+	err = execSourceOnInterp(interp, `stats.describe([])`)
 	if err == nil {
-		t.Fatal("stats.describe({}) succeeded, want error")
+		t.Fatal("stats.describe([]) succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {1})`)
+	err = execSourceOnInterp(interp, `stats.describe([1, 2], [1])`)
 	if err == nil {
 		t.Fatal("stats.describe length mismatch succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {1, -1})`)
+	err = execSourceOnInterp(interp, `stats.describe([1, 2], [1, -1])`)
 	if err == nil {
 		t.Fatal("stats.describe negative weight succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {0, 0})`)
+	err = execSourceOnInterp(interp, `stats.describe([1, 2], [0, 0])`)
 	if err == nil {
 		t.Fatal("stats.describe zero total weight succeeded, want error")
 	}
@@ -431,15 +431,15 @@ func TestStatsErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("stats.describe_fields non-numeric field succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.importance_update({1}, {1}, {0}, {})`)
+	err = execSourceOnInterp(interp, `stats.importance_update([1], [1], [0], {})`)
 	if err == nil {
 		t.Fatal("stats.importance_update missing min_ess_ratio succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.bayes_update({1}, {1})`)
+	err = execSourceOnInterp(interp, `stats.bayes_update([1], [1])`)
 	if err == nil {
 		t.Fatal("stats.bayes_update missing log_likelihoods succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.bayes_update({1}, {1}, {0}, "bad")`)
+	err = execSourceOnInterp(interp, `stats.bayes_update([1], [1], [0], "bad")`)
 	if err == nil {
 		t.Fatal("stats.bayes_update bad options succeeded, want error")
 	}
@@ -447,15 +447,15 @@ func TestStatsErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("stats.observe missing args succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.observe(stats.samples({1}), stats.normal(0, 1), 1, "bad")`)
+	err = execSourceOnInterp(interp, `stats.observe(stats.samples([1]), stats.normal(0, 1), 1, "bad")`)
 	if err == nil {
 		t.Fatal("stats.observe bad options succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.observe(stats.samples({1, 2}), stats.normal(0, 1), {1, 2, 3})`)
+	err = execSourceOnInterp(interp, `stats.observe(stats.samples([1, 2]), stats.normal(0, 1), [1, 2, 3])`)
 	if err == nil {
 		t.Fatal("stats.observe length mismatch succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `stats.observe(stats.samples({1, 2}), stats.normal(0, 1), {rows: 1, cols: 2, values: {1, 2}})`)
+	err = execSourceOnInterp(interp, `stats.observe(stats.samples([1, 2]), stats.normal(0, 1), {rows: 1, cols: 2, values: [1, 2]})`)
 	if err == nil {
 		t.Fatal("stats.observe matrix observed succeeded, want error")
 	}
