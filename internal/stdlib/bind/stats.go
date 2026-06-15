@@ -250,7 +250,14 @@ func statsGaussianState(args []Value) ([]Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("stats.gaussian_state: need mean and covariance")
 	}
-	return statsMakeGaussianState("stats.gaussian_state", args[0], args[1], nil)
+	var opts *Table
+	if len(args) >= 3 {
+		if !args[2].IsTable() {
+			return nil, fmt.Errorf("stats.gaussian_state: options must be a table")
+		}
+		opts = args[2].Table()
+	}
+	return statsMakeGaussianStateWithOptions("stats.gaussian_state", args[0], args[1], nil, opts)
 }
 
 func statsLinearPredict(args []Value) ([]Value, error) {
@@ -273,7 +280,7 @@ func statsLinearPredict(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stats.linear_predict: %w", err)
 	}
-	return statsMakeGaussianState("stats.linear_predict", mean[0], cov[0], nil)
+	return statsMakeGaussianStateWithMeta("stats.linear_predict", mean[0], cov[0], nil, state.meta)
 }
 
 func statsLinearUpdate(args []Value) ([]Value, error) {
@@ -347,7 +354,7 @@ func statsLinearUpdate(args []Value) ([]Value, error) {
 	extra.RawSetString("innovation", innovation[0])
 	extra.RawSetString("S", s[0])
 	extra.RawSetString("gain", gain[0])
-	return statsMakeGaussianState("stats.linear_update", mean[0], cov[0], extra)
+	return statsMakeGaussianStateWithMeta("stats.linear_update", mean[0], cov[0], extra, state.meta)
 }
 
 func statsDescribeWeighted(values []float64, weightsValue Value) ([]Value, error) {
@@ -1008,13 +1015,29 @@ func statsIsSampleSetValue(value Value) bool {
 type statsGaussianStateValue struct {
 	mean       Value
 	covariance Value
+	meta       stateMeta
 }
 
 func statsMakeGaussianState(fn string, meanValue, covarianceValue Value, extra *Table) ([]Value, error) {
-	mean, err := linalgVectorLikeValue(fn, meanValue)
+	return statsMakeGaussianStateWithOptions(fn, meanValue, covarianceValue, extra, nil)
+}
+
+func statsMakeGaussianStateWithOptions(fn string, meanValue, covarianceValue Value, extra, opts *Table) ([]Value, error) {
+	rows, _, _, ok, err := linalgMatrixValue(fn, covarianceValue)
 	if err != nil {
 		return nil, err
 	}
+	if !ok {
+		return nil, fmt.Errorf("%s: covariance must be a matrix", fn)
+	}
+	meta, err := stateMetaFromOptions(fn, opts, rows, "state dimension")
+	if err != nil {
+		return nil, err
+	}
+	return statsMakeGaussianStateWithMeta(fn, meanValue, covarianceValue, extra, meta)
+}
+
+func statsMakeGaussianStateWithMeta(fn string, meanValue, covarianceValue Value, extra *Table, meta stateMeta) ([]Value, error) {
 	rows, cols, _, ok, err := linalgMatrixValue(fn, covarianceValue)
 	if err != nil {
 		return nil, err
@@ -1025,10 +1048,23 @@ func statsMakeGaussianState(fn string, meanValue, covarianceValue Value, extra *
 	if rows != cols {
 		return nil, fmt.Errorf("%s: covariance must be square", fn)
 	}
+	var mean []float64
+	if len(meta.names) > 0 {
+		mean, err = stateVectorFromValue(fn, meanValue, meta.names)
+	} else {
+		mean, err = linalgVectorLikeValue(fn, meanValue)
+	}
+	if err != nil {
+		return nil, err
+	}
 	if len(mean) != rows {
 		return nil, fmt.Errorf("%s: mean and covariance dimension mismatch", fn)
 	}
-	meanValue = DenseArrayValue(NewDenseArrayF64Owned(mean))
+	if len(meta.names) > 0 {
+		meanValue = TableValue(namedStateVectorTable(meta.names, mean))
+	} else {
+		meanValue = DenseArrayValue(NewDenseArrayF64Owned(mean))
+	}
 	out := NewTable()
 	out.RawSetString("kind", StringValue("gaussian_state"))
 	out.RawSetString("mean", meanValue)
@@ -1036,6 +1072,12 @@ func statsMakeGaussianState(fn string, meanValue, covarianceValue Value, extra *
 	out.RawSetString("covariance", covarianceValue)
 	out.RawSetString("cov", covarianceValue)
 	out.RawSetString("P", covarianceValue)
+	if len(meta.names) > 0 {
+		out.RawSetString("state_names", TableValue(stateNamesTable(meta.names)))
+	}
+	if meta.named {
+		out.RawSetString("named_state", BoolValue(true))
+	}
 	if extra != nil {
 		for _, key := range extra.PairsKeysSnapshot() {
 			out.RawSet(key, extra.RawGet(key))
@@ -1067,7 +1109,18 @@ func statsGaussianStateFromValue(fn string, value Value) (statsGaussianStateValu
 	if mean.IsNil() || covariance.IsNil() {
 		return statsGaussianStateValue{}, fmt.Errorf("%s: gaussian state missing mean or covariance", fn)
 	}
-	canonical, err := statsMakeGaussianState(fn, mean, covariance, nil)
+	rows, _, _, ok, err := linalgMatrixValue(fn, covariance)
+	if err != nil {
+		return statsGaussianStateValue{}, err
+	}
+	if !ok {
+		return statsGaussianStateValue{}, fmt.Errorf("%s: covariance must be a matrix", fn)
+	}
+	meta, err := stateMetaFromOptions(fn, t, rows, "state dimension")
+	if err != nil {
+		return statsGaussianStateValue{}, err
+	}
+	canonical, err := statsMakeGaussianStateWithOptions(fn, mean, covariance, nil, t)
 	if err != nil {
 		return statsGaussianStateValue{}, err
 	}
@@ -1075,6 +1128,7 @@ func statsGaussianStateFromValue(fn string, value Value) (statsGaussianStateValu
 	return statsGaussianStateValue{
 		mean:       canonicalTable.RawGetString("mean"),
 		covariance: canonicalTable.RawGetString("covariance"),
+		meta:       meta,
 	}, nil
 }
 

@@ -223,6 +223,12 @@ trace := linalg.trace(state.P)
 rmse := stats.rms(innovations)
 row_state := stats.gaussian_state(linalg.row(1.0, 2.0), linalg.eye(2))
 col_state := stats.gaussian_state(linalg.matrix({{1.0}, {2.0}}), linalg.eye(2))
+named_state := stats.gaussian_state({position: 0.0, velocity: 1.0}, linalg.eye(2), {names: {"position", "velocity"}, named_state: true})
+named_next := stats.linear_predict(named_state, F, Q)
+named_updated := stats.linear_update(named_next, H, 0.95, 0.04)
+named_position := named_updated.x.position
+named_velocity := named_updated.x.velocity
+named_index_position := named_updated.x[1]
 handmade := {kind: "gaussian_state", x: linalg.row(0.0, 1.0), P: linalg.eye(2)}
 handmade_next := stats.linear_predict(handmade, F, Q)
 handmade_velocity := linalg.at(handmade_next.x, 2)
@@ -238,6 +244,9 @@ handmade_velocity := linalg.at(handmade_next.x, 2)
 	}
 	assertTableFloat(t, interp.GetGlobal("row_state").Table().RawGetString("x"), 2, 2)
 	assertTableFloat(t, interp.GetGlobal("col_state").Table().RawGetString("x"), 2, 2)
+	assertNear(t, interp.GetGlobal("named_position"), 0.9509756097560976, 0.000000001)
+	assertNear(t, interp.GetGlobal("named_velocity"), 0.975609756097561, 0.000000001)
+	assertNear(t, interp.GetGlobal("named_index_position"), 0.9509756097560976, 0.000000001)
 }
 
 func TestStatsLinearGaussianRejectsShapeErrors(t *testing.T) {

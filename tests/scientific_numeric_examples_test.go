@@ -20,7 +20,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"mat([[1.0, dt], [0.0, 1.0]])", "row(1.0, 0.0)", "[0.0, 1.0]", "eye(2, 0.01)", "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "trace(state.P)", "at(state.x, 1)", "stats.rms", "near(", "q {", "+/${state.x}", "assert(near(q_state_sum, position + velocity, 0.000000001))"},
+			wantAPI: []string{"mat([[1.0, dt], [0.0, 1.0]])", "row(1.0, 0.0)", "[0.0, 1.0]", "eye(2, 0.01)", `names: ["position", "velocity"]`, "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "trace(state.P)", "state.x.position", "state.x.velocity", "stats.rms", "near(", "q {", "+/${state.x}", "assert(near(q_state_sum, position + velocity, 0.000000001))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
@@ -59,6 +59,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "stats.samples(rand.sample(") {
 				t.Fatalf("%s bridges rand.sample through stats.samples instead of using rand.samples", tc.rel)
+			}
+			if strings.Contains(text, "at(state.x, 1)") || strings.Contains(text, "at(state.x, 2)") {
+				t.Fatalf("%s indexes named Gaussian state instead of using state.x fields", tc.rel)
 			}
 			if strings.Contains(text, "log_weights :=") {
 				t.Fatalf("%s manually exposes log weights instead of using stats.observe", tc.rel)

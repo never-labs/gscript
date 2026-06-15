@@ -198,3 +198,23 @@ func namedStateTable(names []string, state []float64) *Table {
 	}
 	return t
 }
+
+func namedStateVectorTable(names []string, state []float64) *Table {
+	t := NewAppendArrayTable(len(state))
+	for i, value := range state {
+		v := FloatValue(value)
+		t.RawSetInt(int64(i+1), v)
+		if i < len(names) {
+			t.RawSetString(names[i], v)
+		}
+	}
+	return t
+}
+
+func stateNamesTable(names []string) *Table {
+	t := NewAppendArrayTable(len(names))
+	for i, name := range names {
+		t.RawSetInt(int64(i+1), StringValue(name))
+	}
+	return t
+}

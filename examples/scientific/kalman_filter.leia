@@ -8,7 +8,7 @@ H := row(1.0, 0.0)
 Q := eye(2, 0.01)
 
 measurements := [0.95, 2.05, 2.95, 4.10, 5.00]
-state := stats.gaussian_state([0.0, 1.0], eye(2))
+state := stats.gaussian_state([0.0, 1.0], eye(2), {names: ["position", "velocity"], named_state: true})
 innovations := []
 
 for i := 1; i <= #measurements; i++ {
@@ -18,8 +18,8 @@ for i := 1; i <= #measurements; i++ {
 }
 
 innovation_rmse := stats.rms(innovations)
-position := at(state.x, 1)
-velocity := at(state.x, 2)
+position := state.x.position
+velocity := state.x.velocity
 uncertainty_trace := trace(state.P)
 q_state_sum := q {
 +/${state.x}
