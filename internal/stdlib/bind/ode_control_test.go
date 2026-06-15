@@ -124,6 +124,50 @@ func TestControlModulePrimitives(t *testing.T) {
 	if got[0].Number() != -5 {
 		t.Fatalf("control.apply override = %v, want -5", got[0])
 	}
+
+	namedPolicy, err := policyFn.Fn([]Value{
+		DenseArrayValue(NewDenseArrayF64([]float64{2, 3})),
+		TableValue(controlTestOptions(map[string]Value{
+			"state_names": controlTestStringTable("theta", "omega"),
+			"wrap_angles": controlTestStringTable("theta"),
+			"limit":       FloatValue(10),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := NewTable()
+	state.RawSetString("theta", FloatValue(2*math.Pi))
+	state.RawSetString("omega", FloatValue(2))
+	got, err = apply.Fn([]Value{namedPolicy[0], TableValue(state)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(got[0].Number()+6) > 1e-12 {
+		t.Fatalf("named control.apply = %.17g, want -6", got[0].Number())
+	}
+	got, err = apply.Fn([]Value{
+		namedPolicy[0],
+		TableValue(state),
+		TableValue(controlTestOptions(map[string]Value{"limit": FloatValue(5)})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Number() != -5 {
+		t.Fatalf("named control.apply override = %v, want -5", got[0])
+	}
+	missing := NewTable()
+	missing.RawSetString("theta", FloatValue(1))
+	if _, err := apply.Fn([]Value{namedPolicy[0], TableValue(missing)}); err == nil || !strings.Contains(err.Error(), `state missing field "omega"`) {
+		t.Fatalf("named control.apply missing field error = %v, want omega missing field", err)
+	}
+	if _, err := policyFn.Fn([]Value{
+		DenseArrayValue(NewDenseArrayF64([]float64{2, 3})),
+		TableValue(controlTestOptions(map[string]Value{"wrap_angles": controlTestStringTable("theta")})),
+	}); err == nil || !strings.Contains(err.Error(), "without state_names") {
+		t.Fatalf("control.policy wrap name error = %v, want state_names requirement", err)
+	}
 }
 
 func TestControlLQR2ReturnsFiniteGain(t *testing.T) {

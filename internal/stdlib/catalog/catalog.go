@@ -33,7 +33,7 @@ var modules = []ModuleInfo{
 	{Name: "compress", Layer: LayerBase, Description: "Compression and decompression helpers over strings.", SafeDefault: true},
 	{Name: "container", Layer: LayerBase, Description: "Sets, queues, stacks, deques, and heaps implemented in process.", SafeDefault: true},
 	{Name: "context", Layer: LayerBase, Description: "Cancellation, timeout, and done-channel helpers.", SafeDefault: true},
-	{Name: "control", Layer: LayerData, Description: "Control-system helpers for saturation, angle wrapping, and compact state-space gains.", SafeDefault: true},
+	{Name: "control", Layer: LayerData, Description: "Control-system helpers for saturation, angle wrapping, compact state-space gains, and named-state feedback policies.", SafeDefault: true},
 	{Name: "crypto", Layer: LayerBase, Description: "Secure random data and high-level cryptographic primitives.", SafeDefault: true},
 	{Name: "csv", Layer: LayerData, Description: "CSV parse and encode helpers backed by Go's CSV behavior.", SafeDefault: true},
 	{Name: "data", Layer: LayerData, Description: "Column arrays, frames, query plans, and qSQL lowering substrate.", SafeDefault: true},

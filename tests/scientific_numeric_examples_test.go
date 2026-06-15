@@ -60,6 +60,12 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			if strings.Contains(text, "log_weights :=") {
 				t.Fatalf("%s manually exposes log weights instead of using stats.observe", tc.rel)
 			}
+			if strings.Contains(text, "control.apply(stabilizer, {theta, omega})") {
+				t.Fatalf("%s manually packs controller state instead of using named policy state", tc.rel)
+			}
+			if strings.Contains(text, "theta := control.wrap_angle") {
+				t.Fatalf("%s manually wraps controller angle instead of using policy wrap metadata", tc.rel)
+			}
 		})
 	}
 }
