@@ -15,10 +15,25 @@ func BuildControl() *Table {
 	}
 
 	set("saturate", func(args []Value) ([]Value, error) {
-		if len(args) < 2 || !args[0].IsNumber() || !args[1].IsNumber() {
-			return nil, fmt.Errorf("control.saturate: need numeric value and limit")
+		if len(args) < 2 || !args[1].IsNumber() {
+			return nil, fmt.Errorf("control.saturate: need value and numeric limit")
 		}
-		return []Value{FloatValue(controlSaturate(args[0].Number(), args[1].Number()))}, nil
+		out, err := controlSaturateValue("control.saturate", args[0], args[1].Number())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{out}, nil
+	})
+
+	set("clamp", func(args []Value) ([]Value, error) {
+		if len(args) < 3 || !args[1].IsNumber() || !args[2].IsNumber() {
+			return nil, fmt.Errorf("control.clamp: need value, lower, upper")
+		}
+		out, err := controlClampValue("control.clamp", args[0], args[1].Number(), args[2].Number())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{out}, nil
 	})
 
 	set("wrap_angle", func(args []Value) ([]Value, error) {
@@ -32,24 +47,55 @@ func BuildControl() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("control.feedback: need gain and state")
 		}
-		gain, err := linalgVectorValue("control.feedback", args[0])
+		state, err := linalgVectorValue("control.feedback", args[1])
 		if err != nil {
 			return nil, err
 		}
-		state, err := linalgVectorValue("control.feedback", args[1])
+		var opts *Table
+		if len(args) >= 3 && args[2].IsTable() {
+			opts = args[2].Table()
+		}
+		if opts != nil {
+			if ref := opts.RawGetString("reference"); !ref.IsNil() {
+				reference, err := linalgVectorValue("control.feedback reference", ref)
+				if err != nil {
+					return nil, err
+				}
+				if len(reference) != len(state) {
+					return nil, fmt.Errorf("control.feedback: reference and state length mismatch")
+				}
+				for i := range state {
+					state[i] -= reference[i]
+				}
+			}
+		}
+		if rows, cols, gain, ok, err := linalgMatrixValue("control.feedback", args[0]); err != nil {
+			return nil, err
+		} else if ok {
+			if cols != len(state) {
+				return nil, fmt.Errorf("control.feedback: gain and state dimension mismatch")
+			}
+			u := stddata.LinalgF64Matvec(rows, cols, gain, state)
+			for i := range u {
+				u[i] = -u[i]
+			}
+			if err := controlApplyFeedbackOptions(opts, u); err != nil {
+				return nil, err
+			}
+			return []Value{DenseArrayValue(NewDenseArrayF64Owned(u))}, nil
+		}
+		gain, err := linalgVectorValue("control.feedback", args[0])
 		if err != nil {
 			return nil, err
 		}
 		if len(gain) != len(state) {
 			return nil, fmt.Errorf("control.feedback: gain and state length mismatch")
 		}
-		u := -stddata.LinalgF64VectorDot(gain, state)
-		if len(args) >= 3 && args[2].IsTable() {
-			if limit := args[2].Table().RawGetString("limit"); limit.IsNumber() {
-				u = controlSaturate(u, limit.Number())
-			}
+		u := []float64{-stddata.LinalgF64VectorDot(gain, state)}
+		if err := controlApplyFeedbackOptions(opts, u); err != nil {
+			return nil, err
 		}
-		return []Value{FloatValue(u)}, nil
+		return []Value{FloatValue(u[0])}, nil
 	})
 
 	set("lqr2", func(args []Value) ([]Value, error) {
@@ -116,13 +162,92 @@ func controlSaturate(x, limit float64) float64 {
 	if limit < 0 {
 		limit = -limit
 	}
-	if x > limit {
-		return limit
+	return controlClamp(x, -limit, limit)
+}
+
+func controlClamp(x, lower, upper float64) float64 {
+	if lower > upper {
+		lower, upper = upper, lower
 	}
-	if x < -limit {
-		return -limit
+	if x < lower {
+		return lower
+	}
+	if x > upper {
+		return upper
 	}
 	return x
+}
+
+func controlSaturateValue(name string, value Value, limit float64) (Value, error) {
+	return controlMapValue(name, value, func(x float64) float64 { return controlSaturate(x, limit) })
+}
+
+func controlClampValue(name string, value Value, lower, upper float64) (Value, error) {
+	return controlMapValue(name, value, func(x float64) float64 { return controlClamp(x, lower, upper) })
+}
+
+func controlMapValue(name string, value Value, fn func(float64) float64) (Value, error) {
+	if value.IsNumber() {
+		return FloatValue(fn(value.Number())), nil
+	}
+	if rows, cols, values, ok, err := linalgMatrixValue(name, value); err != nil {
+		return NilValue(), err
+	} else if ok {
+		out := make([]float64, len(values))
+		for i, v := range values {
+			out[i] = fn(v)
+		}
+		return linalgMatrixDenseValue(rows, cols, out), nil
+	}
+	values, err := linalgVectorValue(name, value)
+	if err != nil {
+		return NilValue(), err
+	}
+	out := make([]float64, len(values))
+	for i, v := range values {
+		out[i] = fn(v)
+	}
+	return DenseArrayValue(NewDenseArrayF64Owned(out)), nil
+}
+
+func controlApplyFeedbackOptions(opts *Table, values []float64) error {
+	if opts == nil {
+		return nil
+	}
+	if ff := opts.RawGetString("feedforward"); !ff.IsNil() {
+		if ff.IsNumber() {
+			for i := range values {
+				values[i] += ff.Number()
+			}
+		} else {
+			feedforward, err := linalgVectorValue("control.feedback feedforward", ff)
+			if err != nil {
+				return err
+			}
+			if len(feedforward) != len(values) {
+				return fmt.Errorf("control.feedback: feedforward length mismatch")
+			}
+			for i := range values {
+				values[i] += feedforward[i]
+			}
+		}
+	}
+	if lower := opts.RawGetString("lower"); lower.IsNumber() {
+		upper := opts.RawGetString("upper")
+		if !upper.IsNumber() {
+			return fmt.Errorf("control.feedback: upper must be numeric when lower is set")
+		}
+		for i, v := range values {
+			values[i] = controlClamp(v, lower.Number(), upper.Number())
+		}
+		return nil
+	}
+	if limit := opts.RawGetString("limit"); limit.IsNumber() {
+		for i, v := range values {
+			values[i] = controlSaturate(v, limit.Number())
+		}
+	}
+	return nil
 }
 
 type controlDenseMatrix struct {

@@ -45,6 +45,40 @@ func TestControlModulePrimitives(t *testing.T) {
 	if got[0].Number() != -10 {
 		t.Fatalf("limited control.feedback = %v, want -10", got[0])
 	}
+	got, err = saturate.Fn([]Value{
+		DenseArrayValue(NewDenseArrayF64([]float64{5, -6})),
+		FloatValue(3),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertTableFloat(t, got[0], 1, 3)
+	assertTableFloat(t, got[0], 2, -3)
+	clamp := control.RawGetString("clamp").GoFunction()
+	got, err = clamp.Fn([]Value{
+		controlTestMatrix(1, 2, []float64{-2, 5}),
+		FloatValue(0),
+		FloatValue(3),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMatrixFloat(t, got[0], 1, 2, 1, 0)
+	assertMatrixFloat(t, got[0], 1, 2, 2, 3)
+	got, err = feedback.Fn([]Value{
+		controlTestMatrix(2, 2, []float64{1, 0, 0, 2}),
+		DenseArrayValue(NewDenseArrayF64([]float64{3, 4})),
+		TableValue(controlTestOptions(map[string]Value{
+			"reference":   DenseArrayValue(NewDenseArrayF64([]float64{1, 1})),
+			"feedforward": DenseArrayValue(NewDenseArrayF64([]float64{10, 20})),
+			"limit":       FloatValue(15),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertTableFloat(t, got[0], 1, 8)
+	assertTableFloat(t, got[0], 2, 14)
 }
 
 func TestControlLQR2ReturnsFiniteGain(t *testing.T) {
@@ -160,6 +194,63 @@ func TestODEIntegrateCanReturnTrajectory(t *testing.T) {
 	}
 	if got[1].Table().Length() != 3 {
 		t.Fatalf("trajectory length = %d, want 3", got[1].Table().Length())
+	}
+}
+
+func TestODEIntegrateProjectAndObserveHooks(t *testing.T) {
+	calls := map[string]int{}
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		calls[name]++
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1}))}, nil
+		case "test.project":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{2 * state[0]}))}, nil
+		case "test.observe":
+			step := args[1].Number()
+			tm := args[2].Number()
+			return []Value{FloatValue(state[0] + step + tm)}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	integrate := ode.RawGetString("integrate").GoFunction()
+	got, err := integrate.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		FloatValue(1),
+		IntValue(3),
+		TableValue(controlTestOptions(map[string]Value{
+			"trajectory": BoolValue(true),
+			"project":    FunctionValue(&GoFunction{Name: "test.project"}),
+			"observe":    FunctionValue(&GoFunction{Name: "test.observe"}),
+			"method":     StringValue("rk4"),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("ode.integrate returns %d values, want 3", len(got))
+	}
+	final, ok := got[0].DenseArray().F64()
+	if !ok || len(final) != 1 || final[0] != 14 {
+		t.Fatalf("final = %#v, want 14", got[0])
+	}
+	assertTableFloat(t, got[1].Table().RawGetInt(1), 1, 2)
+	assertTableFloat(t, got[1].Table().RawGetInt(2), 1, 6)
+	assertTableFloat(t, got[1].Table().RawGetInt(3), 1, 14)
+	assertFloat(t, got[2].Table().RawGetInt(1), 4)
+	assertFloat(t, got[2].Table().RawGetInt(2), 10)
+	assertFloat(t, got[2].Table().RawGetInt(3), 20)
+	if calls["test.dyn"] != 12 || calls["test.project"] != 3 || calls["test.observe"] != 3 {
+		t.Fatalf("calls = %#v, want dyn=12 project=3 observe=3", calls)
 	}
 }
 

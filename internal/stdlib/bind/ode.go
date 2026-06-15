@@ -55,8 +55,25 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			return nil, err
 		}
 		trajectory := false
+		var project, observe Value
+		hasProject := false
+		hasObserve := false
 		if len(args) >= 5 && args[4].IsTable() {
-			trajectory = args[4].Table().RawGetString("trajectory").Truthy()
+			opts := args[4].Table()
+			trajectory = opts.RawGetString("trajectory").Truthy()
+			if method := opts.RawGetString("method"); method.IsString() && method.Str() != "rk4" {
+				return nil, fmt.Errorf("ode.integrate: unsupported method %q", method.Str())
+			}
+			project = opts.RawGetString("project")
+			if !project.IsNil() && !project.IsFunction() {
+				return nil, fmt.Errorf("ode.integrate: project must be a function")
+			}
+			hasProject = project.IsFunction()
+			observe = opts.RawGetString("observe")
+			if !observe.IsNil() && !observe.IsFunction() {
+				return nil, fmt.Errorf("ode.integrate: observe must be a function")
+			}
+			hasObserve = observe.IsFunction()
 		}
 		if call == nil {
 			return nil, fmt.Errorf("ode.integrate: script caller unavailable")
@@ -66,6 +83,10 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		if trajectory {
 			states = NewAppendArrayTable(steps)
 		}
+		var observations *Table
+		if hasObserve {
+			observations = NewAppendArrayTable(steps)
+		}
 		current := append([]float64(nil), state...)
 		for i := 0; i < steps; i++ {
 			next, err := odeRK4Step(call, fn, current, dt, "ode.integrate")
@@ -73,13 +94,44 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 				return nil, err
 			}
 			current = next
+			step := IntValue(int64(i + 1))
+			t := FloatValue(float64(i+1) * dt)
+			if hasProject {
+				projected, err := call(project, []Value{odeStateValue(current), step, t})
+				if err != nil {
+					return nil, err
+				}
+				if len(projected) == 0 {
+					return nil, fmt.Errorf("ode.integrate: project returned no state")
+				}
+				current, err = odeVectorFromValue(projected[0], "ode.integrate projected state")
+				if err != nil {
+					return nil, err
+				}
+			}
 			if trajectory {
-				states.RawSetInt(int64(i+1), DenseArrayValue(NewDenseArrayF64Owned(append([]float64(nil), current...))))
+				states.RawSetInt(int64(i+1), odeStateValue(current))
+			}
+			if hasObserve {
+				observed, err := call(observe, []Value{odeStateValue(current), step, t})
+				if err != nil {
+					return nil, err
+				}
+				if len(observed) == 0 {
+					return nil, fmt.Errorf("ode.integrate: observe returned no value")
+				}
+				observations.RawSetInt(int64(i+1), observed[0])
 			}
 		}
-		final := DenseArrayValue(NewDenseArrayF64Owned(current))
+		final := odeStateValue(current)
+		if trajectory && hasObserve {
+			return []Value{final, TableValue(states), TableValue(observations)}, nil
+		}
 		if trajectory {
 			return []Value{final, TableValue(states)}, nil
+		}
+		if hasObserve {
+			return []Value{final, TableValue(observations)}, nil
 		}
 		return []Value{final}, nil
 	})
@@ -130,6 +182,10 @@ func odeRK4Step(call ScriptFunctionCaller, fn Value, state []float64, dt float64
 
 func odeVectorFromValue(v Value, name string) ([]float64, error) {
 	return linalgVectorValue(name, v)
+}
+
+func odeStateValue(state []float64) Value {
+	return DenseArrayValue(NewDenseArrayF64Owned(append([]float64(nil), state...)))
 }
 
 func odeAddScaled(a, b []float64, scale float64) []float64 {
