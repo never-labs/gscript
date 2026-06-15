@@ -35,9 +35,9 @@ assert(type(a8) == "number" && a8 >= 0)
 
 assert(rand.int(7, 7) == 7)
 assert(rand.choice({}) == nil)
-assert(rand.choice({"only"}) == "only")
+assert(rand.choice(["only"]) == "only")
 
-items := {1, 2, 3, 4}
+items := [1, 2, 3, 4]
 ret := rand.shuffle(items)
 assert(ret == items)
 sum := 0
@@ -49,7 +49,7 @@ for i := 1; i <= #items; i++ {
 assert(sum == 10)
 assert(seen[1] && seen[2] && seen[3] && seen[4])
 
-sample := rand.sample({"a", "b", "c"}, 10)
+sample := rand.sample(["a", "b", "c"], 10)
 assert(#sample == 3)
 mark := {}
 for i := 1; i <= #sample; i++ {
@@ -57,9 +57,9 @@ for i := 1; i <= #sample; i++ {
 	assert(!mark[sample[i]])
 	mark[sample[i]] = true
 }
-assert(#rand.sample({"x", "y"}, 0) == 0)
+assert(#rand.sample(["x", "y"], 0) == 0)
 
-assert(rand.weighted({"a", "b"}, {0, 5}) == "b")
+assert(rand.weighted(["a", "b"], [0, 5]) == "b")
 assert(rand.weighted({}, {}) == nil)
 
 u := rand.uuid()
@@ -84,7 +84,7 @@ assert(!pcall(rand.sample, {}, -1))
 assert(!pcall(rand.sample, {}, "bad"))
 assert(!pcall(rand.normal, 0, -1))
 assert(!pcall(rand.exp, 0))
-assert(!pcall(rand.weighted, {"a"}, {0}))
-assert(!pcall(rand.weighted, {"a"}, {-1}))
+assert(!pcall(rand.weighted, ["a"], [0]))
+assert(!pcall(rand.weighted, ["a"], [-1]))
 
 print("ok")

@@ -29,12 +29,12 @@ mt.__le = func(a, b) {
   return true
 }
 
-assert(Set({1, 2, 3}) < Set({1, 2, 3, 4}))
-assert(!(Set({1, 2, 3, 4}) < Set({1, 2, 3, 4})))
-assert(Set({1, 2, 3, 4}) <= Set({1, 2, 3, 4}))
-assert(Set({1, 2, 3, 4}) >= Set({1, 2, 3, 4}))
-assert(!(Set({1, 3}) <= Set({3, 5})))
-assert(!(Set({1, 3}) >= Set({3, 5})))
+assert(Set([1, 2, 3]) < Set([1, 2, 3, 4]))
+assert(!(Set([1, 2, 3, 4]) < Set([1, 2, 3, 4])))
+assert(Set([1, 2, 3, 4]) <= Set([1, 2, 3, 4]))
+assert(Set([1, 2, 3, 4]) >= Set([1, 2, 3, 4]))
+assert(!(Set([1, 3]) <= Set([3, 5])))
+assert(!(Set([1, 3]) >= Set([3, 5])))
 
 mt.__eq = func(a, b) {
   for k, _ := range pairs(a) {
@@ -44,15 +44,15 @@ mt.__eq = func(a, b) {
   return next(b) == nil
 }
 
-s := Set({1, 3, 5})
-assert(s == Set({3, 5, 1}))
-assert(!rawequal(s, Set({3, 5, 1})))
+s := Set([1, 3, 5])
+assert(s == Set([3, 5, 1]))
+assert(!rawequal(s, Set([3, 5, 1])))
 assert(rawequal(s, s))
-assert(Set({1, 3, 5, 1}) == rawSet({3, 5, 1}))
-assert(rawSet({1, 3, 5, 1}) == Set({3, 5, 1}))
-assert(Set({1, 3, 5}) != Set({3, 5, 1, 6}))
+assert(Set([1, 3, 5, 1]) == rawSet([3, 5, 1]))
+assert(rawSet([1, 3, 5, 1]) == Set([3, 5, 1]))
+assert(Set([1, 3, 5]) != Set([3, 5, 1, 6]))
 
-mt[Set({1, 3, 5})] = 1
-assert(mt[Set({1, 3, 5})] == nil)
+mt[Set([1, 3, 5])] = 1
+assert(mt[Set([1, 3, 5])] == nil)
 
 print("ok")
