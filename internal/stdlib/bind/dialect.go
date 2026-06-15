@@ -58,11 +58,11 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 		if len(args) < 3 || !args[0].IsString() || !args[1].IsTable() || !args[2].IsTable() {
 			return nil, fmt.Errorf("bad arguments to 'dialect.interpolate' (tag, raw parts, and values expected)")
 		}
-		text, err := dialectInterpolate(args[0].Str(), args[1].Table(), args[2].Table())
+		value, err := dialectInterpolateValue(args[0].Str(), args[1].Table(), args[2].Table())
 		if err != nil {
 			return nil, err
 		}
-		return []Value{StringValue(text)}, nil
+		return []Value{value}, nil
 	})
 
 	set("tags", func(args []Value) ([]Value, error) {
@@ -131,19 +131,33 @@ func BuildDialect(opts HostOptions, maxHostResult func() int64, specs ...Dialect
 }
 
 func dialectInterpolate(tag string, rawParts, values *Table) (string, error) {
+	value, err := dialectInterpolateValue(tag, rawParts, values)
+	if err != nil {
+		return "", err
+	}
+	if !value.IsString() {
+		return "", fmt.Errorf("dialect.interpolate: %s interpolation produced a structured body", tag)
+	}
+	return value.Str(), nil
+}
+
+func dialectInterpolateValue(tag string, rawParts, values *Table) (Value, error) {
 	if rawParts == nil || values == nil {
-		return "", fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts and values must be tables)")
+		return NilValue(), fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts and values must be tables)")
 	}
 	rawCount := rawParts.Len()
 	valueCount := values.Len()
 	if rawCount != valueCount+1 {
-		return "", fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts must contain exactly one more entry than values)")
+		return NilValue(), fmt.Errorf("bad arguments to 'dialect.interpolate' (raw parts must contain exactly one more entry than values)")
+	}
+	if tag == "q" || tag == "qsql" {
+		return dialectQInterpolate(rawParts, values)
 	}
 	var b strings.Builder
 	for i := 1; i <= rawCount; i++ {
 		raw := rawParts.RawGetInt(int64(i))
 		if !raw.IsString() {
-			return "", fmt.Errorf("bad arguments to 'dialect.interpolate' (raw part %d must be a string)", i)
+			return NilValue(), fmt.Errorf("bad arguments to 'dialect.interpolate' (raw part %d must be a string)", i)
 		}
 		b.WriteString(raw.Str())
 		if i > valueCount {
@@ -151,11 +165,69 @@ func dialectInterpolate(tag string, rawParts, values *Table) (string, error) {
 		}
 		text, err := dialectInterpolationPart(tag, values.RawGetInt(int64(i)))
 		if err != nil {
-			return "", err
+			return NilValue(), err
 		}
 		b.WriteString(text)
 	}
-	return b.String(), nil
+	return StringValue(b.String()), nil
+}
+
+func dialectQInterpolate(rawParts, values *Table) (Value, error) {
+	rawCount := rawParts.Len()
+	valueCount := values.Len()
+	var b strings.Builder
+	env := NewTable()
+	bindings := 0
+	rawOverrides := map[int]string{}
+	for i := 1; i <= rawCount; i++ {
+		raw := rawParts.RawGetInt(int64(i))
+		if !raw.IsString() {
+			return NilValue(), fmt.Errorf("bad arguments to 'dialect.interpolate' (raw part %d must be a string)", i)
+		}
+		rawText := raw.Str()
+		if override, ok := rawOverrides[i]; ok {
+			rawText = override
+		}
+		b.WriteString(rawText)
+		if i > valueCount {
+			continue
+		}
+		part := values.RawGetInt(int64(i))
+		if !dialectQInterpolationNeedsBinding(part) {
+			text, err := dialectQInterpolationValue(part)
+			if err == nil {
+				b.WriteString(text)
+				continue
+			}
+			if _, bindErr := dialectQInterpolationBoundValue(part); bindErr != nil {
+				return NilValue(), err
+			}
+		}
+		name := dialectQInterpolationEnvName(bindings)
+		env.RawSetString(name, part)
+		bindings++
+		if i+1 <= rawCount {
+			nextRaw := rawParts.RawGetInt(int64(i + 1))
+			if nextRaw.IsString() {
+				if field, rest, ok := dialectQConsumeDotField(nextRaw.Str()); ok {
+					b.WriteString(name)
+					b.WriteByte('`')
+					b.WriteString(field)
+					rawOverrides[i+1] = rest
+					continue
+				}
+			}
+		}
+		b.WriteString(name)
+	}
+	if bindings == 0 {
+		return StringValue(b.String()), nil
+	}
+	out := NewTable()
+	out.RawSetString("kind", StringValue("q_interpolated_source"))
+	out.RawSetString("source", StringValue(b.String()))
+	out.RawSetString("env", TableValue(env))
+	return TableValue(out), nil
 }
 
 func dialectInterpolationPart(tag string, part Value) (string, error) {
@@ -231,22 +303,78 @@ func dialectQInterpolationTable(t *Table) (string, error) {
 	return dialectQInterpolationSequenceTable(t)
 }
 
+func dialectQInterpolationBoundValue(v Value) (any, error) {
+	return qWireValueFromValue(v)
+}
+
+func dialectQConsumeDotField(raw string) (string, string, bool) {
+	if len(raw) < 2 || raw[0] != '.' || !dialectQIdentStart(raw[1]) {
+		return "", raw, false
+	}
+	end := 2
+	for end < len(raw) && dialectQIdentRest(raw[end]) {
+		end++
+	}
+	return raw[1:end], raw[end:], true
+}
+
+func dialectQIdentStart(ch byte) bool {
+	return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_'
+}
+
+func dialectQIdentRest(ch byte) bool {
+	return dialectQIdentStart(ch) || (ch >= '0' && ch <= '9')
+}
+
+func dialectQInterpolationNeedsBinding(v Value) bool {
+	if _, _, _, ok, err := linalgMatrixValue("q interpolation", v); err == nil && ok {
+		return true
+	}
+	if !v.IsTable() {
+		return false
+	}
+	t := v.Table()
+	return qLooksLikeFrame(t) || qIsKeyedFrameTable(t)
+}
+
+func dialectQInterpolationEnvName(index int) string {
+	var suffix [8]byte
+	n := index
+	pos := len(suffix)
+	for {
+		pos--
+		suffix[pos] = byte('a' + n%26)
+		n = n/26 - 1
+		if n < 0 {
+			break
+		}
+	}
+	return "leiaqv" + string(suffix[pos:])
+}
+
 func dialectQInterpolationSequenceTable(t *Table) (string, error) {
 	n := t.Len()
 	if n == 0 {
 		return "()", nil
 	}
 	parts := make([]string, 0, n)
+	nested := false
 	for i := 1; i <= n; i++ {
 		v := t.RawGetInt(int64(i))
 		if v.IsNil() {
 			return "", fmt.Errorf("q interpolation expects a dense sequential list; missing index %d", i)
+		}
+		if v.IsTable() || v.IsDenseArray() {
+			nested = true
 		}
 		text, err := dialectQInterpolationValue(v)
 		if err != nil {
 			return "", err
 		}
 		parts = append(parts, text)
+	}
+	if nested {
+		return "(" + strings.Join(parts, ";") + ")", nil
 	}
 	return strings.Join(parts, " "), nil
 }

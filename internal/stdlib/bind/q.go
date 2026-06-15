@@ -1044,9 +1044,15 @@ func dialectQ(body Value, opts *Table) ([]Value, error) {
 	if mode != "" && mode != "eval" && mode != "parse" {
 		return dialectUnknownMode("q", mode)
 	}
-	src := body.String()
+	src, env, err := qInterpolatedSourceAndEnv(body)
+	if err != nil {
+		return nil, err
+	}
 	if opts != nil && opts.RawGetString("raw_source").Truthy() {
 		src = stdq.NormalizeRawSourceStatements(src)
+	}
+	if env != nil {
+		return qEvalSymbolicEnv(src, env)
 	}
 	return qEvalSymbolic(src)
 }
@@ -1073,8 +1079,59 @@ func dialectQBlock(body Value, opts *Table) ([]Value, error) {
 	return nil, fmt.Errorf("q block expects source, body, or text")
 }
 
+func qInterpolatedSourceAndEnv(body Value) (string, map[string]any, error) {
+	if !body.IsTable() {
+		return body.String(), nil, nil
+	}
+	t := body.Table()
+	kind := t.RawGetString("kind")
+	if !kind.IsString() || kind.Str() != "q_interpolated_source" {
+		return body.String(), nil, nil
+	}
+	source := t.RawGetString("source")
+	if !source.IsString() {
+		return "", nil, fmt.Errorf("q dialect: interpolated source must contain source string")
+	}
+	envValue := t.RawGetString("env")
+	if envValue.IsNil() {
+		return source.Str(), nil, nil
+	}
+	if !envValue.IsTable() {
+		return "", nil, fmt.Errorf("q dialect: interpolated source env must be a table")
+	}
+	env, err := qWireEnvFromTable(envValue.Table())
+	if err != nil {
+		return "", nil, err
+	}
+	return source.Str(), env, nil
+}
+
+func qWireEnvFromTable(t *Table) (map[string]any, error) {
+	env := make(map[string]any, t.Length())
+	for _, key := range t.PairsKeysSnapshot() {
+		if !key.IsString() {
+			return nil, fmt.Errorf("q dialect: interpolated env key must be a string")
+		}
+		name := key.Str()
+		value, err := qWireValueFromValue(t.RawGetString(name))
+		if err != nil {
+			return nil, fmt.Errorf("q dialect: interpolated env %s: %w", name, err)
+		}
+		env[name] = value
+	}
+	return env, nil
+}
+
 func qEvalSymbolic(src string) ([]Value, error) {
 	v, err := qEvalSymbolicSource(src)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{v}, nil
+}
+
+func qEvalSymbolicEnv(src string, env map[string]any) ([]Value, error) {
+	v, err := qEvalSymbolicSourceEnv(src, env)
 	if err != nil {
 		return nil, err
 	}
@@ -1095,6 +1152,20 @@ func qEvalSymbolicSource(src string) (v Value, err error) {
 	scope := PushValueScope()
 	defer func() { scope.Release(v) }()
 	return qEvalSymbolicSourceScoped(src)
+}
+
+func qEvalSymbolicSourceEnv(src string, env map[string]any) (v Value, err error) {
+	scope := PushValueScope()
+	defer func() { scope.Release(v) }()
+	out, err := stdq.EvalWithEnv(src, env)
+	if err != nil {
+		return NilValue(), fmt.Errorf("q dialect: %w (source %q)", err, src)
+	}
+	v, err = qEvalValueToValue(out)
+	if err != nil {
+		return NilValue(), fmt.Errorf("q dialect: %w", err)
+	}
+	return v, nil
 }
 
 func qEvalSymbolicSourceScoped(src string) (Value, error) {
@@ -1119,7 +1190,7 @@ func qEvalSymbolicSourceScoped(src string) (Value, error) {
 	}
 	out, err := stdq.Eval(src)
 	if err != nil {
-		return NilValue(), fmt.Errorf("q dialect: %w", err)
+		return NilValue(), fmt.Errorf("q dialect: %w (source %q)", err, src)
 	}
 	if cacheable && stdq.EvalValueCacheable(out) {
 		qEvalCacheMu.Lock()
@@ -7804,6 +7875,17 @@ func qWireValueFromValue(v Value) (any, error) {
 	}
 	if frame, err := qDataFrameFromValue(v, ""); err == nil {
 		return frame, nil
+	}
+	if rows, cols, values, ok, err := linalgMatrixValue("q wire value", v); err != nil {
+		return nil, err
+	} else if ok {
+		out := make([]any, rows)
+		for r := 0; r < rows; r++ {
+			row := make([]float64, cols)
+			copy(row, values[r*cols:(r+1)*cols])
+			out[r] = data.NewF64(row)
+		}
+		return data.InferArray(out), nil
 	}
 	if scalar, ok := qWireScalarFromValue(v); ok {
 		return scalar, nil

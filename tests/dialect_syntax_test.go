@@ -961,11 +961,24 @@ n := q` + "`count ${name}`" + `
 flag := true
 choice := q` + "`$[${flag};10;20]`" + `
 matrix_value := matrix.dense(2, 2)
-matrix_ok, matrix_err := pcall(func() { return q` + "`sum ${matrix_value}`" + ` })
-linalg_matrix := linalg.matrix(2, 2, {1, 2, 3, 4})
-linalg_matrix_ok, linalg_matrix_err := pcall(func() { return q` + "`sum ${linalg_matrix}`" + ` })
+matrix.setf(matrix_value, 0, 0, 1)
+matrix.setf(matrix_value, 0, 1, 2)
+matrix.setf(matrix_value, 1, 0, 3)
+matrix.setf(matrix_value, 1, 1, 4)
+matrix_count := q` + "`count ${matrix_value}`" + `
+matrix_raze_count := q` + "`count raze ${matrix_value}`" + `
+matrix_sum := q` + "`+/raze ${matrix_value}`" + `
+linalg_matrix := linalg.matrix(2, 2, {1.0, 2.0, 3.0, 4.0})
+linalg_matrix_count := q` + "`count ${linalg_matrix}`" + `
+linalg_matrix_raze_count := q` + "`count raze ${linalg_matrix}`" + `
+linalg_matrix_sum := q` + "`+/raze ${linalg_matrix}`" + `
 frame_value := data.frame({x: data.i64({1, 2})})
-frame_ok, frame_err := pcall(func() { return q` + "`sum ${frame_value}`" + ` })
+frame_count := q {
+count ${frame_value}
+}
+frame_column_sum := q {
+sum ${frame_value}.x
+}
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -974,12 +987,14 @@ frame_ok, frame_err := pcall(func() { return q` + "`sum ${frame_value}`" + ` })
 			assertGet(t, vm, "vec_sum", int64(12))
 			assertGet(t, vm, "n", int64(3))
 			assertGet(t, vm, "choice", int64(10))
-			assertGet(t, vm, "matrix_ok", false)
-			assertStringContains(t, vm, "matrix_err", "q interpolation does not support matrix.dense values")
-			assertGet(t, vm, "linalg_matrix_ok", false)
-			assertStringContains(t, vm, "linalg_matrix_err", "q interpolation does not support matrix.dense values")
-			assertGet(t, vm, "frame_ok", false)
-			assertStringContains(t, vm, "frame_err", "q interpolation does not support frame values")
+			assertGet(t, vm, "matrix_count", int64(2))
+			assertGet(t, vm, "matrix_raze_count", int64(4))
+			assertGet(t, vm, "matrix_sum", float64(10))
+			assertGet(t, vm, "linalg_matrix_count", int64(2))
+			assertGet(t, vm, "linalg_matrix_raze_count", int64(4))
+			assertGet(t, vm, "linalg_matrix_sum", float64(10))
+			assertGet(t, vm, "frame_count", int64(2))
+			assertGet(t, vm, "frame_column_sum", int64(3))
 		})
 	}
 }
