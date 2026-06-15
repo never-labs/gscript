@@ -32,6 +32,7 @@ v := linalg.vector(1, 2, 3)
 row := linalg.row(1, 2, 3)
 col := linalg.col({4, 5})
 fromTable := linalg.vector({4, 5, 6})
+nested := linalg.matrix({{1, 2}, {3, 4}})
 m := linalg.matrix(2, 3, {1, 2, 3, 4, 5, 6})
 before := linalg.get(m, 2, 3)
 linalg.set(m, 1, 2, 9)
@@ -44,6 +45,7 @@ diag := linalg.diag({7, 8})
 	assertTableFloat(t, interp.GetGlobal("v"), 3, 3)
 	assertMatrixFloat(t, interp.GetGlobal("row"), 1, 3, 3, 3)
 	assertMatrixFloat(t, interp.GetGlobal("col"), 2, 1, 2, 5)
+	assertMatrixFloat(t, interp.GetGlobal("nested"), 2, 2, 4, 4)
 	assertTableFloat(t, interp.GetGlobal("fromTable"), 2, 5)
 	assertFloat(t, interp.GetGlobal("before"), 6)
 	assertFloat(t, interp.GetGlobal("after"), 9)
@@ -68,6 +70,8 @@ mt := linalg.transpose(m)
 trace := linalg.trace(m)
 mm := linalg.matmul(m, linalg.eye(2))
 sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
+solg := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), {1, 2})
+solm := linalg.solve(linalg.matrix({{2, 1}, {1, 3}}), linalg.matrix({{1, 2}, {2, 1}}))
 `)
 	assertTableFloat(t, interp.GetGlobal("sum"), 3, 9)
 	assertTableFloat(t, interp.GetGlobal("diff"), 1, 3)
@@ -80,6 +84,11 @@ sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
 	assertMatrixFloat(t, interp.GetGlobal("mm"), 2, 2, 3, 3)
 	assertTableFloat(t, interp.GetGlobal("sol"), 1, 0.2)
 	assertTableFloat(t, interp.GetGlobal("sol"), 2, 0.6)
+	assertTableFloat(t, interp.GetGlobal("solg"), 1, 0.2)
+	assertTableFloat(t, interp.GetGlobal("solg"), 2, 0.6)
+	assertMatrixFloat(t, interp.GetGlobal("solm"), 2, 2, 1, 0.2)
+	assertMatrixFloat(t, interp.GetGlobal("solm"), 2, 2, 2, 1)
+	assertMatrixFloat(t, interp.GetGlobal("solm"), 2, 2, 4, 0)
 }
 
 func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
@@ -109,6 +118,13 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 			want:   2,
 			setRow: 1,
 			setCol: 0,
+		},
+		{
+			name: "nested",
+			src:  `m := linalg.matrix({{1, 2}, {3, 4}})`,
+			row:  1,
+			col:  0,
+			want: 3,
 		},
 		{
 			name: "matrix",

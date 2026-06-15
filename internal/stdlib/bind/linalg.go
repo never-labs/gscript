@@ -31,6 +31,7 @@ func BuildLinalg() *Table {
 	set("transpose", linalgTranspose)
 	set("trace", linalgTrace)
 	set("norm", linalgNorm)
+	set("solve", linalgSolve)
 	set("solve2", linalgSolve2)
 	return t
 }
@@ -63,8 +64,16 @@ func linalgCol(args []Value) ([]Value, error) {
 }
 
 func linalgMatrix(args []Value) ([]Value, error) {
+	if len(args) == 1 {
+		rows, cols, values, err := linalgNestedMatrix("linalg.matrix", args[0])
+		if err != nil {
+			return nil, err
+		}
+		stddata.RecordLinalgMatrixKernel("LinalgMatrixConstruct", "construct", rows, cols)
+		return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
+	}
 	if len(args) < 3 {
-		return nil, fmt.Errorf("linalg.matrix: need rows, cols, values")
+		return nil, fmt.Errorf("linalg.matrix: need nested rows or rows, cols, values")
 	}
 	rows, cols, err := linalgShape("linalg.matrix", args[0], args[1])
 	if err != nil {
@@ -374,6 +383,45 @@ func linalgSolve2(args []Value) ([]Value, error) {
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(stddata.LinalgF64Solve2(a, b)))}, nil
 }
 
+func linalgSolve(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("linalg.solve: need matrix and right-hand side")
+	}
+	n, cols, a, ok, err := linalgMatrixValue("linalg.solve", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok || n != cols {
+		return nil, fmt.Errorf("linalg.solve: argument 1 must be a square matrix")
+	}
+	if br, bc, b, ok, err := linalgMatrixValue("linalg.solve", args[1]); err != nil {
+		return nil, err
+	} else if ok {
+		if br != n {
+			return nil, fmt.Errorf("linalg.solve: right-hand side row mismatch")
+		}
+		out, err := linalgSolveDense(n, bc, a, b)
+		if err != nil {
+			return nil, err
+		}
+		stddata.RecordLinalgMatrixKernel("LinalgMatrixSolve", "solve", n, bc)
+		return []Value{linalgMatrixDenseValue(n, bc, out)}, nil
+	}
+	b, err := linalgVectorValue("linalg.solve", args[1])
+	if err != nil {
+		return nil, err
+	}
+	if len(b) != n {
+		return nil, fmt.Errorf("linalg.solve: right-hand side length mismatch")
+	}
+	out, err := linalgSolveDense(n, 1, a, b)
+	if err != nil {
+		return nil, err
+	}
+	stddata.RecordLinalgVectorKernel("LinalgMatrixSolve", "solve", n)
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
 func linalgBinary(args []Value, name string, op func(float64, float64) float64) ([]Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("%s: need two values", name)
@@ -456,6 +504,9 @@ func linalgMatrixValue(name string, value Value) (int, int, []float64, bool, err
 	colsValue := t.RawGetString("cols")
 	valuesValue := t.RawGetString("values")
 	if rowsValue.IsNil() && colsValue.IsNil() && valuesValue.IsNil() {
+		if rows, cols, values, err := linalgNestedMatrix(name, value); err == nil {
+			return rows, cols, values, true, nil
+		}
 		return 0, 0, nil, false, nil
 	}
 	rows, cols, err := linalgShape(name, rowsValue, colsValue)
@@ -472,6 +523,40 @@ func linalgMatrixValue(name string, value Value) (int, int, []float64, bool, err
 	return rows, cols, values, true, nil
 }
 
+func linalgNestedMatrix(name string, value Value) (int, int, []float64, error) {
+	if !value.IsTable() {
+		return 0, 0, nil, fmt.Errorf("%s: expected nested numeric table", name)
+	}
+	t := value.Table()
+	rows := t.Length()
+	if rows == 0 {
+		return 0, 0, nil, fmt.Errorf("%s: nested matrix must have at least one row", name)
+	}
+	first := t.RawGetInt(1)
+	if !first.IsTable() {
+		return 0, 0, nil, fmt.Errorf("%s: expected nested numeric table", name)
+	}
+	cols := first.Table().Length()
+	if cols == 0 {
+		return 0, 0, nil, fmt.Errorf("%s: nested matrix rows must not be empty", name)
+	}
+	out := make([]float64, rows*cols)
+	for r := 0; r < rows; r++ {
+		row := t.RawGetInt(int64(r + 1))
+		if !row.IsTable() || row.Table().Length() != cols {
+			return 0, 0, nil, fmt.Errorf("%s: nested matrix rows must have consistent length", name)
+		}
+		for c := 0; c < cols; c++ {
+			x, err := linalgNumber(name, row.Table().RawGetInt(int64(c+1)))
+			if err != nil {
+				return 0, 0, nil, fmt.Errorf("%s[%d][%d]: %w", name, r+1, c+1, err)
+			}
+			out[r*cols+c] = x
+		}
+	}
+	return rows, cols, out, nil
+}
+
 func linalgNumericTable(name string, value Value) ([]float64, error) {
 	if !value.IsTable() {
 		return nil, fmt.Errorf("%s: expected table, got %s", name, value.TypeName())
@@ -486,6 +571,63 @@ func linalgNumericTable(name string, value Value) ([]float64, error) {
 		out[i] = v
 	}
 	return out, nil
+}
+
+func linalgSolveDense(n, rhsCols int, a, b []float64) ([]float64, error) {
+	m := append([]float64(nil), a...)
+	x := append([]float64(nil), b...)
+	for k := 0; k < n; k++ {
+		pivot := k
+		pivotAbs := absFloat(m[k*n+k])
+		for r := k + 1; r < n; r++ {
+			if v := absFloat(m[r*n+k]); v > pivotAbs {
+				pivot = r
+				pivotAbs = v
+			}
+		}
+		if pivotAbs == 0 {
+			return nil, fmt.Errorf("linalg.solve: singular matrix")
+		}
+		if pivot != k {
+			for c := k; c < n; c++ {
+				m[k*n+c], m[pivot*n+c] = m[pivot*n+c], m[k*n+c]
+			}
+			for c := 0; c < rhsCols; c++ {
+				x[k*rhsCols+c], x[pivot*rhsCols+c] = x[pivot*rhsCols+c], x[k*rhsCols+c]
+			}
+		}
+		for r := k + 1; r < n; r++ {
+			factor := m[r*n+k] / m[k*n+k]
+			m[r*n+k] = 0
+			for c := k + 1; c < n; c++ {
+				m[r*n+c] -= factor * m[k*n+c]
+			}
+			for c := 0; c < rhsCols; c++ {
+				x[r*rhsCols+c] -= factor * x[k*rhsCols+c]
+			}
+		}
+	}
+	for k := n - 1; k >= 0; k-- {
+		pivot := m[k*n+k]
+		if pivot == 0 {
+			return nil, fmt.Errorf("linalg.solve: singular matrix")
+		}
+		for c := 0; c < rhsCols; c++ {
+			sum := x[k*rhsCols+c]
+			for j := k + 1; j < n; j++ {
+				sum -= m[k*n+j] * x[j*rhsCols+c]
+			}
+			x[k*rhsCols+c] = sum / pivot
+		}
+	}
+	return x, nil
+}
+
+func absFloat(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func linalgVectorTable(values []float64) *Table {

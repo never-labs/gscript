@@ -25,8 +25,7 @@ energy := {}
 func dynamics(x) {
     theta := control.wrap_angle(x[1])
     omega := x[2]
-    u_raw := -(K[1] * theta + K[2] * omega)
-    u := control.saturate(u_raw, 8.0)
+    u := control.feedback(K, {theta, omega}, {limit: 8.0})
     theta_dot := omega
     omega_dot := (g / l) * math.sin(theta) + u / (m * l * l)
     return {theta_dot, omega_dot}

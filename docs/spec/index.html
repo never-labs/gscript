@@ -1861,6 +1861,15 @@ tag!```body```</code></pre>
 <pre class="language-text"><code class="language-text">tag { fields }
 tag! { fields }</code></pre>
 <p>Tagged blocks use normal Leia block/table syntax at the outer boundary. The dialect owns the meaning of the fields inside its registered block contract.</p>
+<p>The q dialect also accepts a raw source block:</p>
+<pre class="language-text"><code class="language-text">q {
+    select avg price by sym from trades
+}
+q! {
+    +/1 2 3
+}</code></pre>
+<p>In this form the text inside the braces is q source, not Leia fields. It may span lines. The outer lexer matches balanced braces and skips braces inside quoted strings and comments. Raw q blocks do not interpolate; use a tagged raw string when the q source needs Leia values bound into the dialect call:</p>
+<pre class="language-text"><code class="language-text">q`sum ${xs}`</code></pre>
 <h3 id="tagged-dialects-interpolation">Interpolation</h3>
 <p>Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged raw strings may contain <code>${expr}</code> interpolation segments.</p>
 <p>For each interpolation segment, Leia evaluates <code>expr</code> in the surrounding lexical scope before the dialect receives the body. The dialect receives the raw body plus the evaluated values. The dialect decides whether an interpolated value is escaped as text, encoded as JSON, bound as a parameter, converted to a q value, or rejected.</p>
@@ -2816,6 +2825,7 @@ primary        = identifier
                | func_lit
                | tagged_string
                | tagged_block
+               | q_raw_block
                | table_lit
                | list_lit
                | dense_lit ;
@@ -2823,6 +2833,9 @@ primary        = identifier
 func_lit       = &quot;func&quot; param_list block ;
 tagged_string  = ( identifier | &quot;$&quot; ) [ &quot;!&quot; ] tagged_raw_string_lit ;
 tagged_block   = identifier [ &quot;!&quot; ] config_block ;
+q_raw_block    = &quot;q&quot; [ &quot;!&quot; ] raw_source_block ;
+raw_source_block
+               = &quot;{&quot; raw_source_body &quot;}&quot; ;
 
 config_block   = &quot;{&quot; [ config_field { field_sep config_field } [ field_sep ] ] &quot;}&quot; ;
 config_field   = identifier &quot;:&quot; expr

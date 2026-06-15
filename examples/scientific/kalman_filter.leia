@@ -7,8 +7,8 @@ func near(a, b, tol) {
 }
 
 dt := 1.0
-F := linalg.matrix(2, 2, {1.0, dt, 0.0, 1.0})
-H := linalg.matrix(1, 2, {1.0, 0.0})
+F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
+H := linalg.row(1.0, 0.0)
 Q := linalg.scale(linalg.eye(2), 0.01)
 I := linalg.eye(2)
 
@@ -23,8 +23,8 @@ for i := 1; i <= #measurements; i++ {
 
     z := linalg.matrix(1, 1, {measurements[i]})
     y := linalg.sub(z, linalg.matmul(H, x_pred))
-    S := linalg.get(linalg.matmul(linalg.matmul(H, P_pred), linalg.transpose(H)), 1, 1) + 0.04
-    K := linalg.scale(linalg.matmul(P_pred, linalg.transpose(H)), 1.0 / S)
+    S := linalg.add(linalg.matmul(linalg.matmul(H, P_pred), linalg.transpose(H)), linalg.matrix({{0.04}}))
+    K := linalg.transpose(linalg.solve(S, linalg.transpose(linalg.matmul(P_pred, linalg.transpose(H)))))
 
     x = linalg.add(x_pred, linalg.matmul(K, y))
     P = linalg.matmul(linalg.sub(I, linalg.matmul(K, H)), P_pred)

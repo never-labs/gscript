@@ -3,6 +3,8 @@ package bind
 import (
 	"fmt"
 	"math"
+
+	stddata "github.com/never-labs/leia/internal/stdlib/lib/data"
 )
 
 // BuildControl creates the "control" standard library table.
@@ -24,6 +26,30 @@ func BuildControl() *Table {
 			return nil, fmt.Errorf("control.wrap_angle: need numeric angle")
 		}
 		return []Value{FloatValue(math.Atan2(math.Sin(args[0].Number()), math.Cos(args[0].Number())))}, nil
+	})
+
+	set("feedback", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("control.feedback: need gain and state")
+		}
+		gain, err := linalgVectorValue("control.feedback", args[0])
+		if err != nil {
+			return nil, err
+		}
+		state, err := linalgVectorValue("control.feedback", args[1])
+		if err != nil {
+			return nil, err
+		}
+		if len(gain) != len(state) {
+			return nil, fmt.Errorf("control.feedback: gain and state length mismatch")
+		}
+		u := -stddata.LinalgF64VectorDot(gain, state)
+		if len(args) >= 3 && args[2].IsTable() {
+			if limit := args[2].Table().RawGetString("limit"); limit.IsNumber() {
+				u = controlSaturate(u, limit.Number())
+			}
+		}
+		return []Value{FloatValue(u)}, nil
 	})
 
 	set("lqr2", func(args []Value) ([]Value, error) {
@@ -106,47 +132,12 @@ type controlDenseMatrix struct {
 }
 
 func controlMatrix(v Value, name string) (controlDenseMatrix, error) {
-	if v.IsTable() {
-		t := v.Table()
-		if backing, rows, stride, ok := t.DenseMatrixBacking(); ok {
-			data := make([]float64, rows*stride)
-			copy(data, backing[:rows*stride])
-			return controlDenseMatrix{rows: rows, cols: stride, data: data}, nil
-		}
-		rowsValue := t.RawGetString("rows")
-		colsValue := t.RawGetString("cols")
-		valuesValue := t.RawGetString("values")
-		if !rowsValue.IsNil() || !colsValue.IsNil() || !valuesValue.IsNil() {
-			rows, cols, values, ok, err := linalgMatrixValue(name, v)
-			if err != nil {
-				return controlDenseMatrix{}, err
-			}
-			if ok {
-				return controlDenseMatrix{rows: rows, cols: cols, data: values}, nil
-			}
-		}
-		if t.Length() > 0 {
-			rows := t.Length()
-			first := t.RawGetInt(1)
-			if first.IsTable() {
-				cols := first.Table().Length()
-				data := make([]float64, rows*cols)
-				for i := 0; i < rows; i++ {
-					row := t.RawGetInt(int64(i + 1))
-					if !row.IsTable() || row.Table().Length() != cols {
-						return controlDenseMatrix{}, fmt.Errorf("%s rows must have consistent length", name)
-					}
-					for j := 0; j < cols; j++ {
-						x := row.Table().RawGetInt(int64(j + 1))
-						if !x.IsNumber() {
-							return controlDenseMatrix{}, fmt.Errorf("%s[%d][%d] must be numeric", name, i+1, j+1)
-						}
-						data[i*cols+j] = x.Number()
-					}
-				}
-				return controlDenseMatrix{rows: rows, cols: cols, data: data}, nil
-			}
-		}
+	rows, cols, values, ok, err := linalgMatrixValue(name, v)
+	if err != nil {
+		return controlDenseMatrix{}, err
+	}
+	if ok {
+		return controlDenseMatrix{rows: rows, cols: cols, data: values}, nil
 	}
 	return controlDenseMatrix{}, fmt.Errorf("%s must be a dense matrix or nested numeric table", name)
 }

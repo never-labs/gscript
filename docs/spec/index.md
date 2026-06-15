@@ -2981,6 +2981,26 @@ tag! { fields }
 Tagged blocks use normal Leia block/table syntax at the outer boundary. The
 dialect owns the meaning of the fields inside its registered block contract.
 
+The q dialect also accepts a raw source block:
+
+```text
+q {
+    select avg price by sym from trades
+}
+q! {
+    +/1 2 3
+}
+```
+
+In this form the text inside the braces is q source, not Leia fields. It may
+span lines. The outer lexer matches balanced braces and skips braces inside
+quoted strings and comments. Raw q blocks do not interpolate; use a tagged raw
+string when the q source needs Leia values bound into the dialect call:
+
+```text
+q`sum ${xs}`
+```
+
 ### Interpolation
 
 Untagged raw strings do not interpolate. Tagged raw strings and fenced tagged
@@ -5041,6 +5061,7 @@ primary        = identifier
                | func_lit
                | tagged_string
                | tagged_block
+               | q_raw_block
                | table_lit
                | list_lit
                | dense_lit ;
@@ -5048,6 +5069,9 @@ primary        = identifier
 func_lit       = "func" param_list block ;
 tagged_string  = ( identifier | "$" ) [ "!" ] tagged_raw_string_lit ;
 tagged_block   = identifier [ "!" ] config_block ;
+q_raw_block    = "q" [ "!" ] raw_source_block ;
+raw_source_block
+               = "{" raw_source_body "}" ;
 
 config_block   = "{" [ config_field { field_sep config_field } [ field_sep ] ] "}" ;
 config_field   = identifier ":" expr

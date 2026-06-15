@@ -18,7 +18,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.col", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.col", "linalg.solve", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
@@ -28,7 +28,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "control.lqr2", "control.saturate", "ode.rk4", "stats.mean", "stats.max", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "control.lqr2", "control.feedback", "ode.rk4", "stats.mean", "stats.max", "q.eval"},
 		},
 	}
 	for _, tc := range cases {
