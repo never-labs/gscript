@@ -1354,6 +1354,10 @@ func TestUserFacingLeiaSourcesPreferListLiteralsForSequences(t *testing.T) {
 		`loop.snapshot({msg.`,
 		`, {lookup}`,
 		`, {refund}`,
+		`json.encode({1, 2, 3})`,
+		`items: {1, 2, 3}`,
+		`return {"README.md"}`,
+		`return {"src/main.leia"`,
 	}
 	skipSubstrings := []string{
 		"cmd/leia/main_lint_test.go",

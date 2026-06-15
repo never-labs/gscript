@@ -339,7 +339,7 @@ func TestLinalgIdentityMinusErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("linalg.identity_minus non-square matrix succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `linalg.identity_minus({1, 2})`)
+	err = execSourceOnInterp(interp, `linalg.identity_minus([1, 2])`)
 	if err == nil {
 		t.Fatal("linalg.identity_minus vector succeeded, want error")
 	}

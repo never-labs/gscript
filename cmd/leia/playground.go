@@ -1515,9 +1515,9 @@ print(checked.text)`,
 
 func search_repo_impl(query) {
     if string.find(query, "slug") != nil {
-        return {"src/main.leia", "tests/slugify_cases.txt"}, nil
+        return ["src/main.leia", "tests/slugify_cases.txt"], nil
     }
-    return {"README.md"}, nil
+    return ["README.md"], nil
 }
 
 func read_docs_impl(topic) {

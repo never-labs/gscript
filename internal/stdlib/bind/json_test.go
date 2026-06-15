@@ -40,9 +40,9 @@ func TestJSONEncodeScalars(t *testing.T) {
 
 func TestJSONEncodeArrayObjectAndNestedValues(t *testing.T) {
 	interp := jsonInterp(t, `
-		array := json.encode({1, 2, 3})
+		array := json.encode([1, 2, 3])
 		object := json.encode({name: "test", age: 30})
-		nested := json.encode({items: {1, 2, 3}, meta: {count: 3}})
+		nested := json.encode({items: [1, 2, 3], meta: {count: 3}})
 		mixed := json.encode({10, 20, name: "test"})
 	`)
 	if got := interp.GetGlobal("array").Str(); got != "[1,2,3]" {
