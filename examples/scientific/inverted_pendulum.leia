@@ -25,18 +25,13 @@ func dynamics(x) {
     return {theta_dot, omega_dot}
 }
 
-func project_state(x, step, t) {
-    x[1] = control.wrap_angle(x[1])
-    return x
-}
-
 func observe_energy(x, step, t) {
     return {
         energy: 0.5 * x[2] * x[2] + (g / l) * (1.0 - math.cos(x[1])),
     }
 }
 
-solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, project: project_state, observe: observe_energy})
+solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, wrap_angles: {"theta"}, observe: observe_energy})
 trajectory := solution.trajectory
 observed := solution.observed
 energy := observed.energy

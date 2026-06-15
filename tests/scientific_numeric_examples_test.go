@@ -30,7 +30,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.feedback", "ode.solve", "state_names", "final_state", "stats.describe", "math.near", "q {"},
+			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.feedback", "ode.solve", "state_names", "wrap_angles", "final_state", "stats.describe", "math.near", "q {"},
 		},
 	}
 	for _, tc := range cases {

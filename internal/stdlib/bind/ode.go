@@ -1,6 +1,9 @@
 package bind
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // BuildODE creates the "ode" standard library table.
 func BuildODE(call ScriptFunctionCaller) *Table {
@@ -59,6 +62,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		hasProject := false
 		hasObserve := false
 		var stateNames []string
+		var wrapAngles []int
 		if len(args) >= 5 && args[4].IsTable() {
 			opts := args[4].Table()
 			trajectory = opts.RawGetString("trajectory").Truthy()
@@ -76,6 +80,10 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			}
 			hasObserve = observe.IsFunction()
 			stateNames, err = odeStateNamesFromOptions("ode.integrate", opts, len(state))
+			if err != nil {
+				return nil, err
+			}
+			wrapAngles, err = odeWrapAnglesFromOptions("ode.integrate", opts, len(state), stateNames)
 			if err != nil {
 				return nil, err
 			}
@@ -116,6 +124,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 					return nil, err
 				}
 			}
+			odeWrapAngleIndexes(current, wrapAngles)
 			if trajectory {
 				states.RawSetInt(int64(i+1), odeStateValue(current))
 			}
@@ -341,6 +350,68 @@ func odeStateNamesFromOptions(name string, opts *Table, stateLen int) ([]string,
 		names[i] = field
 	}
 	return names, nil
+}
+
+func odeWrapAnglesFromOptions(name string, opts *Table, stateLen int, stateNames []string) ([]int, error) {
+	value := opts.RawGetString("wrap_angles")
+	if value.IsNil() {
+		value = opts.RawGetString("wrap")
+	}
+	if value.IsNil() {
+		return nil, nil
+	}
+	var items []Value
+	if value.IsTable() {
+		t := value.Table()
+		items = make([]Value, t.Length())
+		for i := range items {
+			items[i] = t.RawGetInt(int64(i + 1))
+		}
+	} else {
+		items = []Value{value}
+	}
+	nameToIndex := map[string]int{}
+	for i, stateName := range stateNames {
+		nameToIndex[stateName] = i
+	}
+	seen := make(map[int]bool, len(items))
+	out := make([]int, 0, len(items))
+	for i, item := range items {
+		var idx int
+		switch {
+		case item.IsString():
+			if len(nameToIndex) == 0 {
+				return nil, fmt.Errorf("%s: wrap_angles[%d] uses name %q without state_names", name, i+1, item.Str())
+			}
+			var ok bool
+			idx, ok = nameToIndex[item.Str()]
+			if !ok {
+				return nil, fmt.Errorf("%s: wrap_angles[%d] unknown state name %q", name, i+1, item.Str())
+			}
+		case item.IsNumber():
+			n, err := linalgPositiveInt(name, item, fmt.Sprintf("wrap_angles[%d]", i+1))
+			if err != nil {
+				return nil, err
+			}
+			if n > stateLen {
+				return nil, fmt.Errorf("%s: wrap_angles[%d] index %d out of range for state length %d", name, i+1, n, stateLen)
+			}
+			idx = n - 1
+		default:
+			return nil, fmt.Errorf("%s: wrap_angles[%d] must be a state name or 1-based index, got %s", name, i+1, item.TypeName())
+		}
+		if !seen[idx] {
+			seen[idx] = true
+			out = append(out, idx)
+		}
+	}
+	return out, nil
+}
+
+func odeWrapAngleIndexes(state []float64, indexes []int) {
+	for _, idx := range indexes {
+		state[idx] = math.Atan2(math.Sin(state[idx]), math.Cos(state[idx]))
+	}
 }
 
 func odeNamedStateTable(names []string, state []float64) *Table {

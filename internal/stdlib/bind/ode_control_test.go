@@ -373,6 +373,95 @@ func TestODEIntegrateProjectAndObserveHooks(t *testing.T) {
 	}
 }
 
+func TestODEIntegrateWrapAnglesAfterProject(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1, 0}))}, nil
+		case "test.project":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{4 * math.Pi, state[1] + 1}))}, nil
+		case "test.observe":
+			return []Value{FloatValue(state[0])}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	integrate := ode.RawGetString("integrate").GoFunction()
+	got, err := integrate.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0, 2})),
+		FloatValue(1),
+		IntValue(1),
+		TableValue(controlTestOptions(map[string]Value{
+			"trajectory":  BoolValue(true),
+			"project":     FunctionValue(&GoFunction{Name: "test.project"}),
+			"observe":     FunctionValue(&GoFunction{Name: "test.observe"}),
+			"wrap_angles": controlTestNumberTable(1),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	final, ok := got[0].DenseArray().F64()
+	if !ok || len(final) != 2 {
+		t.Fatalf("final = %#v, want f64[2]", got[0])
+	}
+	if math.Abs(final[0]) > 1e-12 || final[1] != 3 {
+		t.Fatalf("final = %.17g %.17g, want wrapped theta 0 and second state 3", final[0], final[1])
+	}
+	assertTableFloat(t, got[1].Table().RawGetInt(1), 2, 3)
+	assertFloat(t, got[2].Table().RawGetInt(1), 0)
+}
+
+func TestODESolveWrapAnglesByStateName(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{4 * math.Pi, 1 + 0*state[1]}))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0, 10})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(1),
+			"steps":       IntValue(1),
+			"trajectory":  BoolValue(true),
+			"state_names": controlTestStringTable("theta", "omega"),
+			"wrap_angles": controlTestStringTable("theta"),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := got[0].Table()
+	finalState := result.RawGetString("final_state").Table()
+	observed := result.RawGetString("observed").Table()
+	if math.Abs(finalState.RawGetString("theta").Number()) > 1e-12 {
+		t.Fatalf("final_state.theta = %.17g, want wrapped zero", finalState.RawGetString("theta").Number())
+	}
+	assertFloat(t, finalState.RawGetString("omega"), 11)
+	if math.Abs(observed.RawGetString("theta").Table().RawGetInt(1).Number()) > 1e-12 {
+		t.Fatalf("observed.theta[1] = %.17g, want wrapped zero", observed.RawGetString("theta").Table().RawGetInt(1).Number())
+	}
+	assertFloat(t, observed.RawGetString("omega").Table().RawGetInt(1), 11)
+}
+
 func TestODESolveWrapsTrajectoryAndObservedResult(t *testing.T) {
 	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
 		name := fn.GoFunction().Name
@@ -736,6 +825,14 @@ func controlTestStringTable(values ...string) Value {
 	t := NewTable()
 	for i, value := range values {
 		t.RawSetInt(int64(i+1), StringValue(value))
+	}
+	return TableValue(t)
+}
+
+func controlTestNumberTable(values ...int64) Value {
+	t := NewTable()
+	for i, value := range values {
+		t.RawSetInt(int64(i+1), IntValue(value))
 	}
 	return TableValue(t)
 }
