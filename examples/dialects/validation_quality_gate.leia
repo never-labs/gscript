@@ -21,7 +21,7 @@ cases := jsonl`{"name":"callback-url","parser":"url","input":"https://app.exampl
 `
 
 slug := regexp!`^[a-z][a-z0-9-]*$`
-results := {}
+results := []
 passed := 0
 failed := 0
 

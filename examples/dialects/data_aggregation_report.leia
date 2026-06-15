@@ -57,12 +57,12 @@ for i := 1; i <= #sales; i++ {
     add_cell(totals, row, 3, sales[i].revenue * meta.weight)
 }
 
-region_ids := {}
-revenue := {}
-cost := {}
-units := {}
-weighted_revenue := {}
-gross_margin := {}
+region_ids := []
+revenue := []
+cost := []
+units := []
+weighted_revenue := []
+gross_margin := []
 
 for i := 1; i <= #regions; i++ {
     row := i - 1
@@ -105,9 +105,9 @@ for i := 1; i <= #sales; i++ {
     }
 }
 
-ranked_segments := {}
+ranked_segments := []
 for _, group := range pairs(segment_groups) {
-    table.insert(ranked_segments, group)
+    append(ranked_segments, group)
 }
 table.sort(ranked_segments, func(a, b) {
     if a.revenue == b.revenue {
@@ -116,7 +116,7 @@ table.sort(ranked_segments, func(a, b) {
     return a.revenue > b.revenue
 })
 
-output_rows := {}
+output_rows := []
 for i := 1; i <= soa.len(report); i++ {
     row := report[i]
     output_rows[i] = {

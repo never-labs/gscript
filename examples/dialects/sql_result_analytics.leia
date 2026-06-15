@@ -16,10 +16,10 @@ assert(identifier.match("1bad") == false)
 
 rows := dialect.eval("csv", "id,region,status,amount\n1,north,paid,120\n2,north,late,35\n3,south,paid,80\n4,south,late,55\n5,south,paid,40\n", {headers: true})
 
-ids := {}
-amounts := {}
-paid_flags := {}
-late_flags := {}
+ids := []
+amounts := []
+paid_flags := []
+late_flags := []
 for i := 1; i <= #rows; i++ {
     ids[i] = tonumber(rows[i].id)
     amounts[i] = tonumber(rows[i].amount)
@@ -40,7 +40,7 @@ result_set := soa.zip({
 })
 
 regions := ["north", "south"]
-summary := {}
+summary := []
 for r := 1; r <= #regions; r++ {
     region := regions[r]
     total := 0
