@@ -2077,9 +2077,9 @@ func TestQSQLTemporalStringPredicatesAlignToColumnKind(t *testing.T) {
 	interp := runWithQAndSOA(t, `
 trades := data.frame({
     sym: data.symbols(["AAPL", "MSFT", "NVDA"]),
-    trade_date: data.date({"2026-06-01", "2026-06-02", data.null}),
-    session_time: data.time({"09:30:00", "15:59:00", "16:00:00"}),
-    event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-02T15:59:00Z", data.null}),
+    trade_date: data.date(["2026-06-01", "2026-06-02", data.null]),
+    session_time: data.time(["09:30:00", "15:59:00", "16:00:00"]),
+    event_ts: data.timestamp(["2026-06-01T09:30:00Z", "2026-06-02T15:59:00Z", data.null]),
     price: data.f64([100.5, 90.0, 120.0]),
 })
 by_date := q.sql(trades, "select sym,trade_date from trades where trade_date=\"2026-06-01\"")
@@ -2164,8 +2164,8 @@ trades := data.frame({
     trade_id: data.i64([1, 2, 3, 4]),
     sym: data.symbols(["AAPL", "AAPL", "MSFT", "TSLA"]),
     venue: data.strings(["XNAS", "XNYS", "XNYS", "XNAS"]),
-    trade_date: data.date({"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"}),
-    event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T09:30:30Z", "2026-06-02T09:31:00Z"}),
+    trade_date: data.date(["2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"]),
+    event_ts: data.timestamp(["2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T09:30:30Z", "2026-06-02T09:31:00Z"]),
     price: data.f64([100.0, 101.0, 80.0, 200.0]),
     size: data.i64([10, 20, 30, 5]),
 })
@@ -2181,7 +2181,7 @@ venues := data.frame({
 
 quotes := data.frame({
     sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
-    event_ts: data.timestamp({"2026-06-01T09:29:30Z", "2026-06-01T09:30:30Z", "2026-06-02T09:30:00Z"}),
+    event_ts: data.timestamp(["2026-06-01T09:29:30Z", "2026-06-01T09:30:30Z", "2026-06-02T09:30:00Z"]),
     bid: data.f64([99.0, 100.5, 79.5]),
 })
 
@@ -2271,7 +2271,7 @@ trades := data.frame({
     trade_id: data.i64([1, 2]),
     sym: data.symbols(["AAPL", "MSFT"]),
     venue: data.strings(["XNAS", "XASE"]),
-    event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z"}),
+    event_ts: data.timestamp(["2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z"]),
     price: data.f64([100.0, 80.0]),
 })
 updated := q.sql(trades, "update price:price+1.0 from trades where sym=\"IBM\"")
@@ -2281,7 +2281,7 @@ venues := data.frame({
 })
 quotes := data.frame({
     sym: data.symbols(["AAPL"]),
-    event_ts: data.timestamp({"2026-06-01T09:30:30Z"}),
+    event_ts: data.timestamp(["2026-06-01T09:30:30Z"]),
     bid: data.f64([99.0]),
 })
 enriched := q.sql(
@@ -2424,7 +2424,7 @@ func TestQSQLTypedFrameWhereAndOutputSemantics(t *testing.T) {
 		"frame := data.frame({\n"+
 			"    sym: {\"AAPL\", \"MSFT\", \"AAPL\", \"IBM\"},\n"+
 			"    venue: {\"XNYS\", \"XNAS\", \"BATS\", \"XNYS\"},\n"+
-			"    active: array.bool({true, false, true, true}),\n"+
+			"    active: array.bool([true, false, true, true]),\n"+
 			"    price: array.f64([100.5, 80.25, 120.0, 90.0]),\n"+
 			"})\n"+
 			"frame.column_kinds = {\n"+
@@ -2499,7 +2499,7 @@ func TestQSQLReturnsDataFrameCompatibleRowsAndTemporalStrings(t *testing.T) {
 		"events := data.frame({\n"+
 			"    day: {\"2026-06-05\", \"2026-06-06\"},\n"+
 			"    ts: {\"2026-06-05T09:30:00Z\", \"2026-06-06T09:30:00Z\"},\n"+
-			"    active: array.bool({true, false}),\n"+
+			"    active: array.bool([true, false]),\n"+
 			"    qty: array.i64([10, 20]),\n"+
 			"    px: array.f64([1.5, 2.25]),\n"+
 			"    note: {nil, \"close\"},\n"+
@@ -2606,7 +2606,7 @@ func TestQSQLOrderByAndLimit(t *testing.T) {
 		"trades := data.frame({\n"+
 			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"},\n"+
 			"    price: array.f64([100, 80, 120, 90]),\n"+
-			"    active: array.bool({true, false, true, true}),\n"+
+			"    active: array.bool([true, false, true, true]),\n"+
 			"})\n"+
 			"trades.column_kinds = {sym: \"symbol\", price: \"f64\", active: \"bool\"}\n"+
 			"top := q.sql(trades, \"select sym,price from trades where active=true order by price desc limit 2\")\n"+
@@ -2677,7 +2677,7 @@ func TestQSQLExposesLibQExecOrderLimitAndLiterals(t *testing.T) {
 		"events := data.frame({\n"+
 			"    sym: {\"AAPL\", \"MSFT\", \"NVDA\", \"IBM\"},\n"+
 			"    venue: {\"XNYS\", \"XNAS\", \"XNYS\", \"XNYS\"},\n"+
-			"    active: array.bool({true, true, true, false}),\n"+
+			"    active: array.bool([true, true, true, false]),\n"+
 			"    price: array.f64([100, 80, 120, 90]),\n"+
 			"    note: {nil, \"open\", \"open\", \"halted\"},\n"+
 			"})\n"+
@@ -6532,18 +6532,18 @@ plus_right := data.frame({
 plus_joined := q.sql("select sym,qty,venue from plus_left pj plus_right on sym order by sym asc", {plus_left: plus_left, plus_right: plus_right})
 window_left := data.frame({
     sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
-    ts: data.timestamp({"2026-06-02T09:30:10Z", "2026-06-02T09:30:20Z", "2026-06-02T09:30:20Z"}),
+    ts: data.timestamp(["2026-06-02T09:30:10Z", "2026-06-02T09:30:20Z", "2026-06-02T09:30:20Z"]),
 })
 window_right := data.frame({
     sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
-    ts: data.timestamp({"2026-06-02T09:30:05Z", "2026-06-02T09:30:15Z", "2026-06-02T09:30:21Z"}),
+    ts: data.timestamp(["2026-06-02T09:30:05Z", "2026-06-02T09:30:15Z", "2026-06-02T09:30:21Z"]),
     bid: data.f64([100.0, 101.0, 200.0]),
 })
 window_joined := q.sql("select sym,ts,bid from window_left wj window_right on sym,ts order by sym asc,ts asc", {window_left: window_left, window_right: window_right})
 window_bounded := q.sql("select sym,ts,bid from window_left wj[-10000000000 0] window_right on sym,ts order by sym asc,ts asc", {window_left: window_left, window_right: window_right})
 window_last := q.sql("select sym,ts,bid from window_left wj1[-10000000000 0] window_right on sym,ts order by sym asc,ts asc", {window_left: window_left, window_right: window_right})
 window_aggs := q.sql("select sym,ts,n:count bid,sum_bid:sum bid,avg_bid:avg bid,first_bid:first bid,last_bid:last bid from window_left wj window_right on sym,ts order by sym asc,ts asc", {window_left: window_left, window_right: window_right})
-window_partition_boundary := q.sql("select sym,ts,bid from window_left wj[-10000000000 0] window_right on sym,ts order by sym asc,ts asc", {window_left: data.frame({sym: data.symbols(["MSFT"]), ts: data.timestamp({"2026-06-02T09:30:20Z"})}), window_right: data.frame({sym: data.symbols(["AAPL"]), ts: data.timestamp({"2026-06-02T09:30:15Z"}), bid: data.f64([101.0])})})
+window_partition_boundary := q.sql("select sym,ts,bid from window_left wj[-10000000000 0] window_right on sym,ts order by sym asc,ts asc", {window_left: data.frame({sym: data.symbols(["MSFT"]), ts: data.timestamp(["2026-06-02T09:30:20Z"])}), window_right: data.frame({sym: data.symbols(["AAPL"]), ts: data.timestamp(["2026-06-02T09:30:15Z"]), bid: data.f64([101.0])})})
 global_window_left := data.frame({
     ts: data.i64([10, 20, 30]),
 })
@@ -6715,11 +6715,11 @@ func TestQSQLWindowJoinTimespanBoundsOnTimestampKeys(t *testing.T) {
 	execOnInterp(t, interp, `
 trades := data.frame({
     sym: data.symbols(["AAPL", "AAPL", "AAPL"]),
-    ts: data.timestamp({"2026-06-06T09:31:00Z", "2026-06-06T09:32:00Z", data.null}),
+    ts: data.timestamp(["2026-06-06T09:31:00Z", "2026-06-06T09:32:00Z", data.null]),
 })
 quotes := data.frame({
     sym: data.symbols(["AAPL", "AAPL", "AAPL", "AAPL"]),
-    ts: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z", "2026-06-06T09:31:30Z", "2026-06-06T09:32:00Z"}),
+    ts: data.timestamp(["2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z", "2026-06-06T09:31:30Z", "2026-06-06T09:32:00Z"]),
     bid: data.f64([100.0, 100.5, 100.75, 101.0]),
 })
 windowed := q.sql("select sym,ts,bid from trades wj[-0D00:01:00 0D00:00:00] quotes on sym,ts order by ts asc", {trades: trades, quotes: quotes})
@@ -8090,7 +8090,7 @@ func TestQSQLWherePredicates(t *testing.T) {
 			"    sym: data.symbols([\"AAPL\", \"MSFT\", \"NVDA\", \"TSLA\"]),\n"+
 			"    price: data.f64([100.5, 80.0, 210.0, 190.0]),\n"+
 			"    size: array.i64([10, 20, 30, 40]),\n"+
-			"    active: array.bool({true, false, true, true}),\n"+
+			"    active: array.bool([true, false, true, true]),\n"+
 			"})\n"+
 			"filtered := q.sql(trades, \"select sym,price,size from trades where (sym in `AAPL`NVDA) and (price within 100 220) and not active=false order by sym asc\")\n"+
 			"comma_filtered := q.sql(trades, \"select sym,price from trades where active=true,price>=190 order by sym asc\")\n"+
@@ -8943,9 +8943,9 @@ func TestQEncodeDecodeRoundTripAPI(t *testing.T) {
 		"base := data.frame({\n"+
 			"    sym: data.symbols([\"AAPL\", \"MSFT\"]),\n"+
 			"    qty: data.i64([10, 20]),\n"+
-			"    trade_date: data.date({\"2026-06-06\", data.null}),\n"+
-			"    event_ts: data.timestamp({\"2026-06-06T09:30:00Z\", data.null}),\n"+
-			"    session_time: data.time({\"09:30:00\", data.null}),\n"+
+			"    trade_date: data.date([\"2026-06-06\", data.null]),\n"+
+			"    event_ts: data.timestamp([\"2026-06-06T09:30:00Z\", data.null]),\n"+
+			"    session_time: data.time([\"09:30:00\", data.null]),\n"+
 			"})\n"+
 			"keyed := q.key_by(base, \"sym\")\n"+
 			"decoded_keyed := q.decode(q.encode(keyed))\n"+
