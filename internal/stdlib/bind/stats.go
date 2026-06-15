@@ -22,6 +22,9 @@ func BuildStats() *Table {
 	set("describe_fields", statsDescribeFields)
 	set("samples", statsSamples)
 	set("update", statsUpdate)
+	set("gaussian_state", statsGaussianState)
+	set("linear_predict", statsLinearPredict)
+	set("linear_update", statsLinearUpdate)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
 	set("normal", statsNormal)
@@ -225,6 +228,106 @@ func statsUpdate(args []Value) ([]Value, error) {
 		updateArgs = append(updateArgs, args[2])
 	}
 	return statsBayesUpdate(updateArgs)
+}
+
+func statsGaussianState(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("stats.gaussian_state: need mean and covariance")
+	}
+	return statsMakeGaussianState("stats.gaussian_state", args[0], args[1], nil)
+}
+
+func statsLinearPredict(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.linear_predict: need state, F, and Q")
+	}
+	state, err := statsGaussianStateFromValue("stats.linear_predict", args[0])
+	if err != nil {
+		return nil, err
+	}
+	mean, err := linalgMatmul([]Value{args[1], state.mean})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_predict: %w", err)
+	}
+	cov, err := linalgSandwichAdd([]Value{args[1], state.covariance, args[2]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_predict: %w", err)
+	}
+	return statsMakeGaussianState("stats.linear_predict", mean[0], cov[0], nil)
+}
+
+func statsLinearUpdate(args []Value) ([]Value, error) {
+	if len(args) < 4 {
+		return nil, fmt.Errorf("stats.linear_update: need state, H, observed, and R")
+	}
+	state, err := statsGaussianStateFromValue("stats.linear_update", args[0])
+	if err != nil {
+		return nil, err
+	}
+	hr, _, _, ok, err := linalgMatrixValue("stats.linear_update", args[1])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("stats.linear_update: H must be a matrix")
+	}
+	observed := args[2]
+	if args[2].IsNumber() {
+		observed = DenseArrayValue(NewDenseArrayF64Owned([]float64{args[2].Number()}))
+	}
+	predicted, err := linalgMatmul([]Value{args[1], state.mean})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	innovation, err := linalgSub([]Value{observed, predicted[0]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	sBase, err := linalgSandwich([]Value{args[1], state.covariance})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	noise, err := statsObservationNoiseValue("stats.linear_update", args[3], hr)
+	if err != nil {
+		return nil, err
+	}
+	s, err := linalgAdd([]Value{sBase[0], noise})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	phT, err := linalgMatmulTransposeRight([]Value{state.covariance, args[1]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	gain, err := linalgSolveRight([]Value{phT[0], s[0]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	delta, err := linalgMatmul([]Value{gain[0], innovation[0]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	mean, err := linalgAdd([]Value{state.mean, delta[0]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	kh, err := linalgMatmul([]Value{gain[0], args[1]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	identityMinus, err := linalgIdentityMinus([]Value{kh[0]})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	cov, err := linalgMatmul([]Value{identityMinus[0], state.covariance})
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_update: %w", err)
+	}
+	extra := NewTable()
+	extra.RawSetString("innovation", innovation[0])
+	extra.RawSetString("S", s[0])
+	extra.RawSetString("gain", gain[0])
+	return statsMakeGaussianState("stats.linear_update", mean[0], cov[0], extra)
 }
 
 func statsDescribeWeighted(values []float64, weightsValue Value) ([]Value, error) {
@@ -866,6 +969,98 @@ func statsIsSampleSetValue(value Value) bool {
 	return value.IsTable() &&
 		value.Table().RawGetString("kind").IsString() &&
 		value.Table().RawGetString("kind").Str() == "weighted_samples"
+}
+
+type statsGaussianStateValue struct {
+	mean       Value
+	covariance Value
+}
+
+func statsMakeGaussianState(fn string, meanValue, covarianceValue Value, extra *Table) ([]Value, error) {
+	mean, err := linalgVectorLikeValue(fn, meanValue)
+	if err != nil {
+		return nil, err
+	}
+	rows, cols, _, ok, err := linalgMatrixValue(fn, covarianceValue)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("%s: covariance must be a matrix", fn)
+	}
+	if rows != cols {
+		return nil, fmt.Errorf("%s: covariance must be square", fn)
+	}
+	if len(mean) != rows {
+		return nil, fmt.Errorf("%s: mean and covariance dimension mismatch", fn)
+	}
+	meanValue = DenseArrayValue(NewDenseArrayF64Owned(mean))
+	out := NewTable()
+	out.RawSetString("kind", StringValue("gaussian_state"))
+	out.RawSetString("mean", meanValue)
+	out.RawSetString("x", meanValue)
+	out.RawSetString("covariance", covarianceValue)
+	out.RawSetString("cov", covarianceValue)
+	out.RawSetString("P", covarianceValue)
+	if extra != nil {
+		for _, key := range extra.PairsKeysSnapshot() {
+			out.RawSet(key, extra.RawGet(key))
+		}
+	}
+	return []Value{TableValue(out)}, nil
+}
+
+func statsGaussianStateFromValue(fn string, value Value) (statsGaussianStateValue, error) {
+	if !value.IsTable() {
+		return statsGaussianStateValue{}, fmt.Errorf("%s: gaussian state expected, got %s", fn, value.TypeName())
+	}
+	t := value.Table()
+	kind := t.RawGetString("kind")
+	if !kind.IsString() || kind.Str() != "gaussian_state" {
+		return statsGaussianStateValue{}, fmt.Errorf("%s: gaussian state expected", fn)
+	}
+	mean := t.RawGetString("mean")
+	if mean.IsNil() {
+		mean = t.RawGetString("x")
+	}
+	covariance := t.RawGetString("covariance")
+	if covariance.IsNil() {
+		covariance = t.RawGetString("cov")
+	}
+	if covariance.IsNil() {
+		covariance = t.RawGetString("P")
+	}
+	if mean.IsNil() || covariance.IsNil() {
+		return statsGaussianStateValue{}, fmt.Errorf("%s: gaussian state missing mean or covariance", fn)
+	}
+	if _, err := statsMakeGaussianState(fn, mean, covariance, nil); err != nil {
+		return statsGaussianStateValue{}, err
+	}
+	return statsGaussianStateValue{mean: mean, covariance: covariance}, nil
+}
+
+func statsObservationNoiseValue(fn string, value Value, dim int) (Value, error) {
+	if value.IsNumber() {
+		if dim != 1 {
+			return NilValue(), fmt.Errorf("%s: scalar observation noise requires a single observation", fn)
+		}
+		diag := make([]float64, dim*dim)
+		for i := 0; i < dim; i++ {
+			diag[i*dim+i] = value.Number()
+		}
+		return linalgMatrixDenseValue(dim, dim, diag), nil
+	}
+	rows, cols, _, ok, err := linalgMatrixValue(fn, value)
+	if err != nil {
+		return NilValue(), err
+	}
+	if !ok {
+		return NilValue(), fmt.Errorf("%s: observation noise must be a number or matrix", fn)
+	}
+	if rows != dim || cols != dim {
+		return NilValue(), fmt.Errorf("%s: observation noise dimension mismatch", fn)
+	}
+	return value, nil
 }
 
 func statsBayesUpdateOptions(args []Value) (*Table, error) {

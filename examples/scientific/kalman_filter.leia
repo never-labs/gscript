@@ -8,28 +8,19 @@ H := linalg.row(1.0, 0.0)
 Q := linalg.eye(2, 0.01)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
-x := linalg.vector(0.0, 1.0)
-P := linalg.eye(2)
+state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
 innovations := {}
 
 for i := 1; i <= #measurements; i++ {
-    x_pred := linalg.matmul(F, x)
-    P_pred := linalg.sandwich_add(F, P, Q)
-
-    z := linalg.vector(measurements[i])
-    y := linalg.sub(z, linalg.matmul(H, x_pred))
-    S := linalg.add(linalg.sandwich(H, P_pred), 0.04)
-    K := linalg.rsolve(linalg.matmul_t(P_pred, H), S)
-
-    x = linalg.add(x_pred, linalg.matmul(K, y))
-    P = linalg.matmul(linalg.identity_minus(linalg.matmul(K, H)), P_pred)
-    innovations[i] = y[1]
+    state = stats.linear_predict(state, F, Q)
+    state = stats.linear_update(state, H, measurements[i], 0.04)
+    innovations[i] = state.innovation[1]
 }
 
 innovation_rmse := stats.rms(innovations)
-position := linalg.at(x, 1)
-velocity := linalg.at(x, 2)
-uncertainty_trace := linalg.trace(P)
+position := linalg.at(state.x, 1)
+velocity := linalg.at(state.x, 2)
+uncertainty_trace := linalg.trace(state.P)
 q_checksum := q {
 +/1 2 3
 }

@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"math"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -9,6 +10,25 @@ import (
 func statsInterp(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	return runWithLib(t, src, "stats", BuildStats())
+}
+
+func statsLinalgInterp(t *testing.T, src string) *runtime.Interpreter {
+	t.Helper()
+	interp := New()
+	installTestModule(interp, "stats", TableValue(BuildStats()))
+	installTestModule(interp, "linalg", TableValue(BuildLinalg()))
+	execOnInterp(t, interp, src)
+	return interp
+}
+
+func assertNear(t *testing.T, got Value, want, tol float64) {
+	t.Helper()
+	if !got.IsNumber() {
+		t.Fatalf("got %s, want number near %.12f", got.TypeName(), want)
+	}
+	if math.Abs(got.Number()-want) > tol {
+		t.Fatalf("got %.12f, want %.12f +/- %.12f", got.Number(), want, tol)
+	}
 }
 
 func TestStatsAggregatesAndTransforms(t *testing.T) {
@@ -147,6 +167,54 @@ loglik_broadcast := stats.loglik(dist, {1, 2}, 2)
 	assertFloat(t, interp.GetGlobal("loglik_scalar"), -0.9189385332046727)
 	assertTableFloat(t, interp.GetGlobal("loglik_vector"), 1, -1.4189385332046727)
 	assertTableFloat(t, interp.GetGlobal("loglik_broadcast"), 1, -1.4189385332046727)
+}
+
+func TestStatsLinearGaussianStateSpace(t *testing.T) {
+	interp := statsLinalgInterp(t, `
+dt := 1.0
+F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
+H := linalg.row(1.0, 0.0)
+Q := linalg.eye(2, 0.01)
+state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
+measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
+innovations := {}
+for i := 1; i <= #measurements; i++ {
+    state = stats.linear_predict(state, F, Q)
+    state = stats.linear_update(state, H, measurements[i], 0.04)
+    innovations[i] = state.innovation[1]
+}
+position := linalg.at(state.x, 1)
+velocity := linalg.at(state.x, 2)
+trace := linalg.trace(state.P)
+rmse := stats.rms(innovations)
+row_state := stats.gaussian_state(linalg.row(1.0, 2.0), linalg.eye(2))
+col_state := stats.gaussian_state(linalg.matrix({{1.0}, {2.0}}), linalg.eye(2))
+`)
+	assertNear(t, interp.GetGlobal("position"), 5.0, 0.05)
+	assertNear(t, interp.GetGlobal("velocity"), 1.0, 0.05)
+	if got := interp.GetGlobal("trace").Number(); got <= 0 || got >= 0.08 {
+		t.Fatalf("trace = %.12f, want in (0, 0.08)", got)
+	}
+	if got := interp.GetGlobal("rmse").Number(); got >= 0.20 {
+		t.Fatalf("rmse = %.12f, want below 0.20", got)
+	}
+	assertTableFloat(t, interp.GetGlobal("row_state").Table().RawGetString("x"), 2, 2)
+	assertTableFloat(t, interp.GetGlobal("col_state").Table().RawGetString("x"), 2, 2)
+}
+
+func TestStatsLinearGaussianRejectsShapeErrors(t *testing.T) {
+	interp := statsLinalgInterp(t, ``)
+	cases := []string{
+		`stats.gaussian_state({1, 2}, linalg.matrix(1, 2, {1, 2}))`,
+		`stats.linear_predict(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.matrix(1, 3, {1, 0, 0}), linalg.eye(1))`,
+		`stats.linear_update(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.eye(2), {1, 2}, 0.1)`,
+		`stats.linear_update(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.row(1, 0), {1, 2}, 0.1)`,
+	}
+	for _, src := range cases {
+		if err := execSourceOnInterp(interp, src); err == nil {
+			t.Fatalf("%s succeeded, want error", src)
+		}
+	}
 }
 
 func TestStatsSystematicResample(t *testing.T) {
