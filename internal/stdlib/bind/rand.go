@@ -30,6 +30,54 @@ func BuildRand() *Table {
 		}
 		return nil
 	}
+	addNoise := func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad arguments to 'rand.add_noise' (values and distribution expected)")
+		}
+		valuesValue := args[0]
+		weightsValue := NilValue()
+		if statsIsSampleSetValue(args[0]) {
+			samples, err := statsSampleSetFromValue("rand.add_noise", args[0])
+			if err != nil {
+				return nil, err
+			}
+			valuesValue = samples.values
+			weightsValue = samples.weights
+		}
+		values, err := linalgVectorValue("rand.add_noise", valuesValue)
+		if err != nil {
+			return nil, err
+		}
+		dist, err := statsDistributionFromValue("rand.add_noise", args[1])
+		if err != nil {
+			return nil, err
+		}
+		drift := 0.0
+		if len(args) >= 3 {
+			if err := requireNumber("rand.add_noise", 3, args[2]); err != nil {
+				return nil, err
+			}
+			drift = toFloat(args[2])
+		}
+		out := make([]float64, len(values))
+		switch dist.name {
+		case "normal":
+			for i, value := range values {
+				noise, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
+				if err != nil {
+					return nil, fmt.Errorf("rand.add_noise: %s", err)
+				}
+				out[i] = value + drift + noise
+			}
+		default:
+			return nil, fmt.Errorf("rand.add_noise: unsupported distribution %q", dist.name)
+		}
+		outValue := DenseArrayValue(NewDenseArrayF64Owned(out))
+		if !weightsValue.IsNil() {
+			return statsMakeSampleSet("rand.add_noise", outValue, weightsValue, nil)
+		}
+		return []Value{outValue}, nil
+	}
 
 	// rand.seed(n) - seed the random source
 	set("seed", func(args []Value) ([]Value, error) {
@@ -347,53 +395,90 @@ func BuildRand() *Table {
 	})
 
 	// rand.add_noise(values, distribution[, drift]) - add distribution noise and optional drift to a dense vector
-	set("add_noise", func(args []Value) ([]Value, error) {
-		if len(args) < 2 {
-			return nil, fmt.Errorf("bad arguments to 'rand.add_noise' (values and distribution expected)")
+	set("add_noise", addNoise)
+
+	// rand.particle_filter(samples, observations, opts) - run a compact sequential Monte Carlo loop
+	set("particle_filter", func(args []Value) ([]Value, error) {
+		if len(args) < 3 {
+			return nil, fmt.Errorf("bad arguments to 'rand.particle_filter' (samples, observations, and options expected)")
 		}
-		valuesValue := args[0]
-		weightsValue := NilValue()
-		if statsIsSampleSetValue(args[0]) {
-			samples, err := statsSampleSetFromValue("rand.add_noise", args[0])
+		if !args[2].IsTable() {
+			return nil, fmt.Errorf("rand.particle_filter: options must be a table")
+		}
+		observations, err := linalgVectorValue("rand.particle_filter observations", args[1])
+		if err != nil {
+			return nil, err
+		}
+		if len(observations) == 0 {
+			return nil, fmt.Errorf("rand.particle_filter: observations must not be empty")
+		}
+		opts := args[2].Table()
+		processNoise, err := randParticleFilterOption(opts, "process_noise", "process")
+		if err != nil {
+			return nil, err
+		}
+		sensorNoise, err := randParticleFilterOption(opts, "sensor_noise", "observation_noise", "sensor", "observation")
+		if err != nil {
+			return nil, err
+		}
+		drift := FloatValue(0)
+		if value := opts.RawGetString("drift"); !value.IsNil() {
+			if err := requireNumber("rand.particle_filter", 0, value); err != nil {
+				return nil, err
+			}
+			drift = value
+		}
+		ensemble := args[0]
+		if !statsIsSampleSetValue(ensemble) {
+			samples, err := statsSamples([]Value{ensemble})
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("rand.particle_filter: %w", err)
 			}
-			valuesValue = samples.values
-			weightsValue = samples.weights
+			ensemble = samples[0]
 		}
-		values, err := linalgVectorValue("rand.add_noise", valuesValue)
+		keepTrajectory := opts.RawGetString("trajectory").Truthy() || opts.RawGetString("states").Truthy()
+		estimates := make([]float64, 0, len(observations))
+		trajectory := NewAppendArrayTable(len(observations))
+		for i, observation := range observations {
+			noisy, err := addNoise([]Value{ensemble, processNoise, drift})
+			if err != nil {
+				return nil, fmt.Errorf("rand.particle_filter: %w", err)
+			}
+			observed, err := statsObserve([]Value{noisy[0], sensorNoise, FloatValue(observation), TableValue(opts)})
+			if err != nil {
+				return nil, fmt.Errorf("rand.particle_filter: %w", err)
+			}
+			ensemble = observed[0]
+			summary := ensemble.Table().RawGetString("summary")
+			mean := summary.Table().RawGetString("mean")
+			if !mean.IsNumber() {
+				return nil, fmt.Errorf("rand.particle_filter: summary mean must be numeric")
+			}
+			estimates = append(estimates, mean.Number())
+			if keepTrajectory {
+				trajectory.RawSetInt(int64(i+1), ensemble)
+			}
+		}
+		summary, err := statsDescribe([]Value{ensemble})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rand.particle_filter: %w", err)
 		}
-		dist, err := statsDistributionFromValue("rand.add_noise", args[1])
-		if err != nil {
-			return nil, err
+		out := NewTable()
+		out.RawSetString("kind", StringValue("particle_filter_result"))
+		out.RawSetString("ensemble", ensemble)
+		out.RawSetString("samples", ensemble)
+		out.RawSetString("final", ensemble)
+		out.RawSetString("summary", summary[0])
+		finalTable := ensemble.Table()
+		out.RawSetString("ess", finalTable.RawGetString("ess"))
+		out.RawSetString("resampled", finalTable.RawGetString("resampled"))
+		out.RawSetString("indexes", finalTable.RawGetString("indexes"))
+		out.RawSetString("estimates", DenseArrayValue(NewDenseArrayF64Owned(estimates)))
+		if keepTrajectory {
+			out.RawSetString("states", TableValue(trajectory))
+			out.RawSetString("trajectory", TableValue(trajectory))
 		}
-		drift := 0.0
-		if len(args) >= 3 {
-			if err := requireNumber("rand.add_noise", 3, args[2]); err != nil {
-				return nil, err
-			}
-			drift = toFloat(args[2])
-		}
-		out := make([]float64, len(values))
-		switch dist.name {
-		case "normal":
-			for i, value := range values {
-				noise, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
-				if err != nil {
-					return nil, fmt.Errorf("rand.add_noise: %s", err)
-				}
-				out[i] = value + drift + noise
-			}
-		default:
-			return nil, fmt.Errorf("rand.add_noise: unsupported distribution %q", dist.name)
-		}
-		outValue := DenseArrayValue(NewDenseArrayF64Owned(out))
-		if !weightsValue.IsNil() {
-			return statsMakeSampleSet("rand.add_noise", outValue, weightsValue, nil)
-		}
-		return []Value{outValue}, nil
+		return []Value{TableValue(out)}, nil
 	})
 
 	// rand.uuid() - generate a random UUID v4 string
@@ -465,4 +550,13 @@ func BuildRand() *Table {
 	})
 
 	return t
+}
+
+func randParticleFilterOption(opts *Table, names ...string) (Value, error) {
+	for _, name := range names {
+		if value := opts.RawGetString(name); !value.IsNil() {
+			return value, nil
+		}
+	}
+	return NilValue(), fmt.Errorf("rand.particle_filter: missing option %s", names[0])
 }

@@ -25,7 +25,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "stats.samples", "stats.observe", "stats.describe(ensemble)", "math.near", "q {", "avg ${ensemble.values}", "assert(math.near(q_value_mean, last_measurement, 0.25))"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "stats.samples", "rand.particle_filter", "filter.summary", "filter.samples", "filter.states", "math.near", "q {", "avg ${ensemble.values}", "assert(math.near(q_value_mean, last_measurement, 0.25))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
@@ -59,6 +59,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "log_weights :=") {
 				t.Fatalf("%s manually exposes log weights instead of using stats.observe", tc.rel)
+			}
+			if strings.Contains(text, "rand.add_noise(ensemble") || strings.Contains(text, "stats.observe(ensemble") {
+				t.Fatalf("%s manually spells out the particle loop instead of using rand.particle_filter", tc.rel)
 			}
 			if strings.Contains(text, "control.apply(stabilizer, {theta, omega})") {
 				t.Fatalf("%s manually packs controller state instead of using named policy state", tc.rel)

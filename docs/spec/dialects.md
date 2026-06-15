@@ -47,11 +47,14 @@ q! {
 
 In this form the text inside the braces is q source, not Leia fields. It may
 span lines. The outer lexer matches balanced braces and skips braces inside
-quoted strings and comments. Raw q blocks do not interpolate; use a tagged raw
-string when the q source needs Leia values bound into the dialect call:
+quoted strings and comments. Raw q blocks support `${expr}` interpolation with
+the same binding semantics as tagged raw strings:
 
 ```text
 q`sum ${xs}`
+q {
+    sum ${xs}
+}
 ```
 
 ## Interpolation

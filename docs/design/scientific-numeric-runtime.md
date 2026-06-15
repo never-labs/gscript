@@ -195,6 +195,10 @@ example-specific shortcuts:
   vector evolution from reusable distribution objects. `rand.add_noise` and
   `stats.loglik` also preserve or consume weighted sample-set objects so
   Monte Carlo code can stay object-shaped.
+- `rand.particle_filter(samples, observations, opts)` for compact sequential
+  Monte Carlo loops over weighted sample sets, using the same distribution,
+  observation, resampling, and trajectory contracts as the lower-level
+  primitives.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
 - `control.policy(gain[, opts])` and `control.apply(policy, state[, opts])`

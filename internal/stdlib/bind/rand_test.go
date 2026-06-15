@@ -424,6 +424,55 @@ func TestRandAddNoise(t *testing.T) {
 	assertTableFloat(t, noisySamples.RawGetString("weights"), 2, 0.5)
 }
 
+func TestRandParticleFilter(t *testing.T) {
+	interp := randStatsInterp(t, `
+		N := 16
+		prior := stats.normal(0.0, 0.8)
+		process_noise := stats.normal(0.0, 0.04)
+		sensor_noise := stats.normal(0.0, 0.18)
+		measurements := {0.58, 1.05, 1.53, 1.95}
+
+		rand.seed(314159)
+		manual := stats.samples(rand.sample(prior, N))
+		for t := 1; t <= #measurements; t++ {
+		    manual = rand.add_noise(manual, process_noise, 0.50)
+		    manual = stats.observe(manual, sensor_noise, measurements[t], {min_ess_ratio: 0.6, offset: 0.5})
+		}
+		manual_summary := stats.describe(manual)
+
+		rand.seed(314159)
+		filter := rand.particle_filter(stats.samples(rand.sample(prior, N)), measurements, {process_noise: process_noise, sensor_noise: sensor_noise, drift: 0.50, min_ess_ratio: 0.6, offset: 0.5, trajectory: true})
+		filter_summary := filter.summary
+		filter_estimates := filter.estimates
+	`)
+	assertNear(t, interp.GetGlobal("filter_summary").Table().RawGetString("mean"), interp.GetGlobal("manual_summary").Table().RawGetString("mean").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("filter_summary").Table().RawGetString("std"), interp.GetGlobal("manual_summary").Table().RawGetString("std").Number(), 1e-12)
+	if got := interp.GetGlobal("filter_estimates").DenseArray().Len(); got != 4 {
+		t.Fatalf("filter estimates length = %d, want 4", got)
+	}
+	if got := interp.GetGlobal("filter").Table().RawGetString("states").Table().Length(); got != 4 {
+		t.Fatalf("filter states length = %d, want 4", got)
+	}
+	if got := interp.GetGlobal("filter").Table().RawGetString("samples").Table().RawGetString("values").DenseArray().Len(); got != 16 {
+		t.Fatalf("filter sample count = %d, want 16", got)
+	}
+}
+
+func TestRandParticleFilterRejectsBadInputs(t *testing.T) {
+	interp := randStatsInterp(t, ``)
+	cases := []string{
+		`rand.particle_filter(stats.samples({1}), {1}, "bad")`,
+		`rand.particle_filter(stats.samples({1}), {}, {process_noise: stats.normal(0, 1), sensor_noise: stats.normal(0, 1)})`,
+		`rand.particle_filter(stats.samples({1}), {1}, {sensor_noise: stats.normal(0, 1)})`,
+		`rand.particle_filter(stats.samples({1}), {1}, {process_noise: stats.normal(0, 1)})`,
+	}
+	for _, src := range cases {
+		if err := execSourceOnInterp(interp, src); err == nil {
+			t.Fatalf("%s succeeded, want error", src)
+		}
+	}
+}
+
 // ==================================================================
 // rand.uuid tests
 // ==================================================================
