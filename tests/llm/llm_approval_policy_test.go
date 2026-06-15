@@ -87,7 +87,7 @@ policy_gate := llm.trace_assert(policy_envelope, {
 })
 
 pending := {id: "call_approval_1", tool: "send_order", args: {id: "order-1"}}
-token := loop.snapshot({msg.user("submit order")}, pending)
+token := loop.snapshot([msg.user("submit order")], pending)
 approval := {
     ok: false
     reason: "default high-risk action denied"

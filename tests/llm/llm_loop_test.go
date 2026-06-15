@@ -79,13 +79,13 @@ lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: ["name"]})
 pending := {id: "call_1", tool: "lookup", args: {name: "old"}}
-token := loop.snapshot({msg.user("find docs")}, pending)
-approved, approved_err := loop.resume(token, {ok: true, args: {name: "leia"}}, {lookup})
+token := loop.snapshot([msg.user("find docs")], pending)
+approved, approved_err := loop.resume(token, {ok: true, args: {name: "leia"}}, [lookup])
 approved_status := approved.status
 approved_history_len := #approved.history
 approved_value := approved.value
 
-denied_token := loop.snapshot({msg.user("refund")}, {id: "call_2", tool: "lookup", args: {name: "x"}})
+denied_token := loop.snapshot([msg.user("refund")], {id: "call_2", tool: "lookup", args: {name: "x"}})
 denied, denied_err := loop.resume(denied_token, {ok: false, reason: "needs approval"})
 denied_status := denied.status
 denied_history_len := #denied.history
@@ -143,9 +143,9 @@ store := {
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: ["name"]})
-token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
+token, snap_err := loop.snapshot([msg.user("find docs")], {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
 stored_name := saved.pending.args.name
-loaded, loaded_err := loop.resume("external-token", {ok: true}, {lookup}, store)
+loaded, loaded_err := loop.resume("external-token", {ok: true}, [lookup], store)
 loaded_status := loaded.status
 loaded_value := loaded.value
 `); err != nil {
@@ -206,8 +206,8 @@ store := {
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: ["name"]})
-token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
-loaded, loaded_err := loop.resume(token, {ok: true}, {lookup}, store)
+token, snap_err := loop.snapshot([msg.user("find docs")], {id: "call_1", tool: "lookup", args: {name: "leia"}}, store)
+loaded, loaded_err := loop.resume(token, {ok: true}, [lookup], store)
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
 			}
@@ -272,7 +272,7 @@ result, err := loop.react({
 pending_status := result.status
 pending_tool := result.payload.tool
 pending_amount := result.payload.args.amount
-resume, resume_err := loop.resume(result.token, {ok: true}, {refund})
+resume, resume_err := loop.resume(result.token, {ok: true}, [refund])
 resume_status := resume.status
 resume_value := resume.value
 `); err != nil {
