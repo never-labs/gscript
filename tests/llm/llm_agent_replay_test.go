@@ -33,10 +33,10 @@ reviewer := llm.agent("reviewer", reviewer_config, func(topic) {
     cfg := reviewer_config(topic)
     draft, draft_err := llm.turn({
         model: cfg.model
-        messages: {
+        messages: [
             llm.system(cfg.system),
             llm.user("Draft " .. topic),
-        }
+        ]
         max_tokens: 32
     })
     if draft_err != nil {
@@ -45,9 +45,9 @@ reviewer := llm.agent("reviewer", reviewer_config, func(topic) {
 
     final, final_err := llm.turn({
         model: cfg.model
-        messages: {
+        messages: [
             llm.user(draft.text .. " / final"),
-        }
+        ]
     })
     return {draft: draft.text, final: final.text}, final_err
 }, {

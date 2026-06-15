@@ -67,7 +67,7 @@ lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
 }, {params: ["name"]})
 result, err := llm.react({
-    messages: {msg.system("drop this long system prompt"), msg.user("drop this long user prompt")},
+    messages: [msg.system("drop this long system prompt"), msg.user("drop this long user prompt")],
     tools: [lookup],
     max_steps: 3,
     max_history_tokens: 10,

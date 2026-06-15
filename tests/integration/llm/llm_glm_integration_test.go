@@ -171,7 +171,7 @@ if stored_err != nil {
                 max_tokens: 96
                 temperature: 0
             }, nil
-        }, nil, {params: {"summary"}})
+        }, nil, {params: ["summary"]})
 
         extracted, extract_err := extractor(recalled.text)
         if extract_err != nil {
@@ -261,7 +261,7 @@ glm_stream_final_text := ""
 glm_stream_event_count := 0
 result, err := llm.turn({
     model: "glm-smoke",
-    messages: {llm.system("Return plain text only."), llm.user("Reply with exactly: leia glm stream ok")},
+    messages: [llm.system("Return plain text only."), llm.user("Reply with exactly: leia glm stream ok")],
     max_tokens: 32,
     temperature: 0,
     on_stream: func(event) {
@@ -364,19 +364,19 @@ func extract_memory_flow(note) {
     }, nil
 }
 
-extract_memory := llm.agent("extract_memory", extract_memory_config, extract_memory_flow, {params: {"note"}})
+extract_memory := llm.agent("extract_memory", extract_memory_config, extract_memory_flow, {params: ["note"]})
 
 supervisor := llm.agent("supervisor", func(question) {
     return {
         model: "glm-smoke"
         system: "You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."
         user: question
-        tools: {extract_memory}
+        tools: [extract_memory]
         max_steps: 4
         max_tokens: 128
         temperature: 0
     }, nil
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 result, err := supervisor("Use the extract_memory tool with this note: project codename is ORCHID and owner is ADA. Do not answer from memory; call the tool first.")
 if err != nil {

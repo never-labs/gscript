@@ -118,10 +118,10 @@ func TestDBDirectSQLTableAcceptsParamAliases(t *testing.T) {
 	execOnInterp(t, interp, `
 		conn := db.memory()
 		conn.exec("create table metrics (name text not null, value integer not null)")
-		conn.exec({query: "insert into metrics (name, value) values (?, ?)", params: {"alpha", 7}})
-		conn.exec({query: "insert into metrics (name, value) values (?, ?)", bindings: {"beta", 11}})
-		alpha := conn.one({query: "select value from metrics where name = ?", params: {"alpha"}})
-		beta := conn.one({query: "select value from metrics where name = ?", bindings: {"beta"}})
+		conn.exec({query: "insert into metrics (name, value) values (?, ?)", params: ["alpha", 7]})
+		conn.exec({query: "insert into metrics (name, value) values (?, ?)", bindings: ["beta", 11]})
+		alpha := conn.one({query: "select value from metrics where name = ?", params: ["alpha"]})
+		beta := conn.one({query: "select value from metrics where name = ?", bindings: ["beta"]})
 		bad, bad_err := pcall(func() {
 			return conn.query({query: "select value from metrics where name = ?", params: "alpha"})
 		})

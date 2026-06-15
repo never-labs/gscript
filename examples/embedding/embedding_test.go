@@ -142,7 +142,7 @@ func Example_llmProvider() {
 	vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(exampleLLMProvider{}))
 	if err := vm.Exec(`
 result, err := llm.turn({
-    messages: {llm.user("hello from Leia")},
+    messages: [llm.user("hello from Leia")],
 })
 answer := result.text
 `); err != nil {

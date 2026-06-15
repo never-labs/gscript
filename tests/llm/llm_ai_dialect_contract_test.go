@@ -17,10 +17,10 @@ model {
 
 preflight, preflight_err := turn {
     model: "json"
-    messages: {
+    messages: [
         prompt { role: "system", text: "Return a compact JSON contract verdict." },
         prompt { role: "user", text: "Check AI dialect prompt messages." },
-    }
+    ]
     response_format: {
         type: "json_schema"
         json_schema: {
@@ -252,10 +252,10 @@ model {
 
 preflight, preflight_err := turn {
     model: "json"
-    messages: {
+    messages: [
         prompt { role: "system", text: "Return a compact JSON contract verdict." },
         prompt { role: "user", text: "Check AI dialect prompt messages." },
-    }
+    ]
     response_format: {
         type: "json_schema"
         json_schema: {

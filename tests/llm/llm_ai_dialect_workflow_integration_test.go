@@ -55,11 +55,11 @@ research_flow := llm.workflow({
     llm.step("brief", func(ctx) {
         return turn {
             model: "json"
-            messages: {
-                prompt { role: "system", text: "Write a structured research brief from retrieved memory." }
-                prompt { role: "user", text: ctx.input }
-                llm.context(retrieved.matches, {label: "Research memory"})
-            }
+            messages: [
+                prompt { role: "system", text: "Write a structured research brief from retrieved memory." },
+                prompt { role: "user", text: ctx.input },
+                llm.context(retrieved.matches, {label: "Research memory"}),
+            ]
             response_format: llm.output_schema("research_brief", brief_schema)
         }
     })
@@ -70,10 +70,10 @@ brief_ok, brief_msg := llm.validate_output(flow_result.text, brief_schema)
 
 sections_result, sections_err := llm.sections({
     model: "json"
-    messages: {
-        prompt { role: "system", text: "Draft operational decision sections as JSON." }
-        prompt { role: "user", text: flow_result.text }
-    }
+    messages: [
+        prompt { role: "system", text: "Draft operational decision sections as JSON." },
+        prompt { role: "user", text: flow_result.text },
+    ]
     context: llm.context(retrieved.matches, {label: "Section memory"})
     sections: {
         {

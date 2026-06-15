@@ -32,10 +32,10 @@ lookup := llm.tool("lookup", func(query) {
 
 generated, err := llm.sections({
     model: "mock-json"
-    messages: {
-        llm.system("Use the provided evidence and return JSON.")
-        llm.user("Project: reusable generation helpers.")
-    }
+    messages: [
+        llm.system("Use the provided evidence and return JSON."),
+        llm.user("Project: reusable generation helpers."),
+    ]
     evidence: "Evidence: launch checklist is complete."
     tools: [lookup]
     sections: {

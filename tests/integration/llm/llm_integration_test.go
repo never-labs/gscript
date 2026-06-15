@@ -115,10 +115,10 @@ llm.register_models({
 })
 
 result, err := llm.turn({
-    messages: {
+    messages: [
         llm.system("You are a concise test assistant. Return plain text only."),
         llm.user("Reply with exactly: leia llm provider ok"),
-    }
+    ]
     max_tokens: 32
     temperature: 0
 })

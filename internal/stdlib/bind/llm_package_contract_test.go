@@ -17,7 +17,7 @@ contract := llm.provider_free_package_contract({
     fixtures: {
         index: "fixtures/provider_free_fixture_index.json"
     }
-    capabilities: {"generic.ai.contract"}
+    capabilities: ["generic.ai.contract"]
 }, {
     default_policy: {fixture_hook: "recorded_fixture"}
 })
@@ -46,7 +46,7 @@ bad := llm.provider_free_package_contract({
     }
     credentials: {
         provider_credentials_required: true
-        required_env: {"OPENAI_API_KEY"}
+        required_env: ["OPENAI_API_KEY"]
     }
     entrypoints: {
         fixture_index: "../secrets.json"

@@ -340,10 +340,10 @@ lookup := tool {
 
 turn_result, turn_err := turn {
     model: "mock-fast"
-    messages: {
+    messages: [
         prompt { role: "system", text: "Be concise." },
         prompt { role: "user", text: "Summarize Leia." },
-    }
+    ]
 }
 
 writer := agent {

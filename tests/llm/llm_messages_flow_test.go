@@ -51,10 +51,10 @@ support := llm.agent("support", support_config, func(q) {
     cfg := support_config(q)
     r, err := llm.turn({
         model: cfg.model
-        messages: {
+        messages: [
             llm.system(cfg.system),
             llm.user(q),
-        }
+        ]
         tools: cfg.tools
     })
     return r, err

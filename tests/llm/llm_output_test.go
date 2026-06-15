@@ -21,10 +21,10 @@ func TestLLMDirectTurnResponseFormatProviderRequest(t *testing.T) {
 			if err := vm.Exec(`
 result, err := llm.turn({
     model: "mock-json"
-    messages: {
+    messages: [
         llm.system("Return only valid JSON."),
         llm.user("Extract the contact."),
-    }
+    ]
     response_format: {
         type: "json_schema"
         json_schema: {

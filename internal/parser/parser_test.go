@@ -309,7 +309,7 @@ llm.register_models({
 })
 
 result, err := llm.turn({
-    messages: { llm.system("Be concise."), llm.user(question) }
+    messages: [llm.system("Be concise."), llm.user(question)]
 })
 	`)
 	if len(prog.Stmts) != 2 {
