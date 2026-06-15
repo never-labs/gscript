@@ -190,7 +190,9 @@ example-specific shortcuts:
   innovation, innovation covariance, and gain.
 - `rand.sample(distribution[, n])` and `rand.add_noise(values,
   distribution[, drift])` for scalar draws, dense-vector draws, and noisy
-  vector evolution from reusable distribution objects.
+  vector evolution from reusable distribution objects. `rand.add_noise` and
+  `stats.loglik` also preserve or consume weighted sample-set objects so
+  Monte Carlo code can stay object-shaped.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
 - `control.policy(gain[, opts])` and `control.apply(policy, state[, opts])`

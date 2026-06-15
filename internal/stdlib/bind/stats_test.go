@@ -151,6 +151,7 @@ log_pdfs := stats.logpdf(dist, {0, 1})
 loglik_scalar := stats.loglik(dist, 2, 2)
 loglik_vector := stats.loglik(dist, 2, {1, 2})
 loglik_broadcast := stats.loglik(dist, {1, 2}, 2)
+sample_loglik := stats.loglik(dist, 2, stats.samples({1, 2}))
 `)
 	if got := interp.GetGlobal("dist_kind"); !got.IsString() || got.Str() != "distribution" {
 		t.Fatalf("dist.kind = %v, want distribution", got)
@@ -167,6 +168,7 @@ loglik_broadcast := stats.loglik(dist, {1, 2}, 2)
 	assertFloat(t, interp.GetGlobal("loglik_scalar"), -0.9189385332046727)
 	assertTableFloat(t, interp.GetGlobal("loglik_vector"), 1, -1.4189385332046727)
 	assertTableFloat(t, interp.GetGlobal("loglik_broadcast"), 1, -1.4189385332046727)
+	assertTableFloat(t, interp.GetGlobal("sample_loglik"), 1, -1.4189385332046727)
 }
 
 func TestStatsLinearGaussianStateSpace(t *testing.T) {

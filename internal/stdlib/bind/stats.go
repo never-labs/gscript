@@ -603,6 +603,20 @@ func statsNormalPDFValue(fn string, xValue Value, mean, stddev float64, logPDF b
 }
 
 func statsNormalLogLik(observedValue, predictedValue Value, mean, stddev float64) ([]Value, error) {
+	if statsIsSampleSetValue(observedValue) {
+		samples, err := statsSampleSetFromValue("stats.loglik", observedValue)
+		if err != nil {
+			return nil, err
+		}
+		observedValue = samples.values
+	}
+	if statsIsSampleSetValue(predictedValue) {
+		samples, err := statsSampleSetFromValue("stats.loglik", predictedValue)
+		if err != nil {
+			return nil, err
+		}
+		predictedValue = samples.values
+	}
 	observed, err := linalgPointwiseDecode("stats.loglik", observedValue)
 	if err != nil {
 		return nil, err

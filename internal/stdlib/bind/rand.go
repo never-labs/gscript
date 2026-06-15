@@ -351,7 +351,17 @@ func BuildRand() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad arguments to 'rand.add_noise' (values and distribution expected)")
 		}
-		values, err := linalgVectorValue("rand.add_noise", args[0])
+		valuesValue := args[0]
+		weightsValue := NilValue()
+		if statsIsSampleSetValue(args[0]) {
+			samples, err := statsSampleSetFromValue("rand.add_noise", args[0])
+			if err != nil {
+				return nil, err
+			}
+			valuesValue = samples.values
+			weightsValue = samples.weights
+		}
+		values, err := linalgVectorValue("rand.add_noise", valuesValue)
 		if err != nil {
 			return nil, err
 		}
@@ -379,7 +389,11 @@ func BuildRand() *Table {
 		default:
 			return nil, fmt.Errorf("rand.add_noise: unsupported distribution %q", dist.name)
 		}
-		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+		outValue := DenseArrayValue(NewDenseArrayF64Owned(out))
+		if !weightsValue.IsNil() {
+			return statsMakeSampleSet("rand.add_noise", outValue, weightsValue, nil)
+		}
+		return []Value{outValue}, nil
 	})
 
 	// rand.uuid() - generate a random UUID v4 string

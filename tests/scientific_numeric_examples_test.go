@@ -54,6 +54,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 					t.Fatalf("%s uses forbidden example-specific native helper marker %q", tc.rel, forbidden)
 				}
 			}
+			if strings.Contains(text, "stats.samples(predicted, ensemble.weights)") {
+				t.Fatalf("%s manually rewraps weighted samples instead of preserving sample-set flow", tc.rel)
+			}
 		})
 	}
 }

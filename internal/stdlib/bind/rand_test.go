@@ -403,6 +403,9 @@ func TestRandAddNoise(t *testing.T) {
 		rand.seed(42)
 		values := rand.add_noise({1, 2, 3, 4}, dist, 0.25)
 		empty := rand.add_noise({}, dist)
+		rand.seed(42)
+		samples := stats.samples({1, 2, 3, 4}, {1, 2, 1, 0})
+		noisy_samples := rand.add_noise(samples, dist, 0.25)
 	`)
 	values := interp.GetGlobal("values")
 	if !values.IsDenseArray() || values.DenseArray().Len() != 4 {
@@ -413,6 +416,12 @@ func TestRandAddNoise(t *testing.T) {
 	if !empty.IsDenseArray() || empty.DenseArray().Len() != 0 {
 		t.Fatalf("empty = %v, want empty dense array", empty)
 	}
+	noisySamples := interp.GetGlobal("noisy_samples").Table()
+	if got := noisySamples.RawGetString("kind"); !got.IsString() || got.Str() != "weighted_samples" {
+		t.Fatalf("noisy_samples.kind = %v, want weighted_samples", got)
+	}
+	assertTableFloat(t, noisySamples.RawGetString("values"), 4, 4.872007507538102)
+	assertTableFloat(t, noisySamples.RawGetString("weights"), 2, 0.5)
 }
 
 // ==================================================================
