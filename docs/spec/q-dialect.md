@@ -76,19 +76,24 @@ assert(leader[1].avg_px == 100.375)
 
 ## Interpolation
 
-q tagged strings use the generic dialect interpolation boundary with a q-aware
-encoder for `${expr}` values. Literal q source remains raw q text; interpolated
-Leia values are rendered as q source fragments before the q parser runs.
+q tagged strings and raw q blocks use the generic dialect interpolation boundary
+with a q-aware encoder for `${expr}` values. Literal q source remains raw q
+text. Interpolated values are either encoded inline as q source fragments or
+bound into the q environment when preserving runtime shape is required.
 
 Stable q interpolation encodings are:
 
-| Leia value | q source fragment |
+| Leia value | q representation |
 |---|---|
 | Integer or float | Numeric literal. |
 | Boolean | `1b` or `0b`. |
 | String | q string literal with escapes. |
 | `nil` | `0N`. |
 | Dense sequential list/table | Space-separated q list, recursively encoded. |
+| Dense array | Space-separated q list. |
+| Dense matrix or linalg matrix | Bound q matrix value. |
+| Frame or keyed frame | Bound q table value. |
+| String-keyed dictionary | Bound q dictionary value. |
 
 Non-sequential tables are not implicitly stringified for q interpolation.
 Implementations must reject them with a diagnostic instead of emitting pointer
@@ -106,6 +111,16 @@ assert(n == 3)
 flag := true
 choice := q`$[${flag};10;20]`
 assert(choice == 10)
+
+m := mat([[1.0, 2.0], [3.0, 4.0]])
+matrix_sum := q`+/raze ${m}`
+assert(matrix_sum == 10)
+
+rows := data.frame({x: data.i64([1, 2, 3])})
+frame_sum := q {
+sum ${rows}.x
+}
+assert(frame_sum == 6)
 ```
 
 ## qSQL
