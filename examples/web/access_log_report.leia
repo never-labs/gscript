@@ -102,7 +102,7 @@ for i := 1; i <= #access_logs; i++ {
     }
 }
 
-report_rows := {}
+report_rows := []
 top_route := ""
 top_requests := -1
 for i := 1; i <= #routes; i++ {

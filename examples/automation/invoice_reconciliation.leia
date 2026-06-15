@@ -80,14 +80,14 @@ func severity_for(age, balance) {
 
 applied := {}
 pending := {}
-exceptions := {}
+exceptions := []
 
 for i := 1; i <= #payments; i++ {
     payment := payments[i]
     amount := number_or(payment.amount_cents, 0)
     invoice := invoice_by_id(payment.invoice)
     if invoice == nil {
-        table.insert(exceptions, {
+        append(exceptions, {
             kind: "unknown-invoice",
             payment: payment.payment,
             invoice: payment.invoice,
@@ -107,7 +107,7 @@ for i := 1; i <= #payments; i++ {
     }
 }
 
-rows := {}
+rows := []
 owner_balances := {}
 total_open := 0
 overdue_open := 0
@@ -132,7 +132,7 @@ for i := 1; i <= #invoices; i++ {
         covered_by_pending = covered_by_pending + pending_amount
     }
     if balance < 0 {
-        table.insert(exceptions, {
+        append(exceptions, {
             kind: "overpayment",
             payment: "",
             invoice: invoice.invoice,
@@ -145,7 +145,7 @@ for i := 1; i <= #invoices; i++ {
     }
     owner_balances[invoice.owner] = owner_balances[invoice.owner] + balance
 
-    table.insert(rows, {
+    append(rows, {
         Invoice: invoice.invoice,
         Customer: invoice.customer,
         Owner: invoice.owner,
@@ -167,9 +167,9 @@ table.sort(rows, func(a, b) {
     return score[a.Severity] > score[b.Severity]
 })
 
-owner_rows := {}
+owner_rows := []
 for owner, balance := range pairs(owner_balances) {
-    table.insert(owner_rows, {owner: owner, balance_cents: balance, balance: money(balance)})
+    append(owner_rows, {owner: owner, balance_cents: balance, balance: money(balance)})
 }
 table.sort(owner_rows, func(a, b) {
     if a.balance_cents == b.balance_cents {

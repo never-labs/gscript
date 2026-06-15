@@ -102,12 +102,12 @@ for i := 1; i <= #request_logs; i++ {
     }
 }
 
-service_id := {}
-request_count := {}
-error_count := {}
-latency_ms := {}
-budget_ms := {}
-deploy_failures := {}
+service_id := []
+request_count := []
+error_count := []
+latency_ms := []
+budget_ms := []
+deploy_failures := []
 
 for i := 1; i <= #services; i++ {
     metric := metrics[services[i].service]
@@ -132,7 +132,7 @@ latency_over_budget := soa.mask(service_facts, "latency_ms", ">", "budget_ms")
 erroring_services := soa.mask(service_facts, "errors", ">", 0)
 latency_stats := soa.stats(service_facts, "latency_ms")
 
-report_rows := {}
+report_rows := []
 breach_count := 0
 for i := 1; i <= soa.len(service_facts); i++ {
     fact := service_facts[i]

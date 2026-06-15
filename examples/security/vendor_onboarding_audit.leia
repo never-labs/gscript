@@ -167,7 +167,7 @@ func severity_for(score) {
     return "monitor", "continue-standard-review"
 }
 
-rows := {}
+rows := []
 owner_rollups := {}
 open_findings := 0
 missing_controls := 0
@@ -231,7 +231,7 @@ for i := 1; i <= #vendors; i++ {
         owner_rollups[vendor.owner].critical = owner_rollups[vendor.owner].critical + 1
     }
 
-    table.insert(rows, {
+    append(rows, {
         ID: vendor.id,
         Vendor: vendor.name,
         Owner: vendor.owner,
@@ -255,9 +255,9 @@ table.sort(rows, func(a, b) {
     return a.Score > b.Score
 })
 
-owner_rows := {}
+owner_rows := []
 for _, owner := range pairs(owner_rollups) {
-    table.insert(owner_rows, owner)
+    append(owner_rows, owner)
 }
 table.sort(owner_rows, func(a, b) {
     if a.risk == b.risk {

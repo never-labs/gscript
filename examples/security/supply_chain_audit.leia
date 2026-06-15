@@ -95,7 +95,7 @@ for i := 1; i <= #vulnerabilities; i++ {
     }
 }
 
-audit_rows := {}
+audit_rows := []
 direct_count := 0
 vuln_count := 0
 fixable_count := 0
