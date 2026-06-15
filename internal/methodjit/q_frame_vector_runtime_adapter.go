@@ -3,7 +3,9 @@
 package methodjit
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
 )
@@ -14,6 +16,12 @@ const (
 
 	qFrameSelectColumnReasonPlanBuildError = "plan_build_error"
 	qFrameSelectColumnReasonExecutionError = "plan_execution_error"
+
+	qVectorRuntimeReasonOperandError = "operand_error"
+	qVectorRuntimeReasonDTypeError   = "dtype_error"
+	qVectorRuntimeReasonLengthError  = "length_error"
+	qVectorRuntimeReasonEmptyError   = "empty_error"
+	qVectorRuntimeReasonOpError      = "unsupported_op"
 )
 
 type qFrameVectorRuntimeExecutionAdapter struct {
@@ -214,7 +222,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorWhereReduce(instrID, 
 	const shape = "compare/vector-where/vector-reduce"
 	out, err := executeQVectorWhereReduceValue(opCode, maskVal, trueVal, falseVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "QVectorWhereReduce", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "QVectorWhereReduce", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "QVectorWhereReduce", shape, route, "success")
@@ -225,7 +233,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeQVectorGatherReduce(instrID,
 	const shape = "gather/vector-reduce"
 	out, err := executeQVectorGatherReduceValue(opCode, vectorVal, indexVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "QVectorGatherReduce", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "QVectorGatherReduce", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "QVectorGatherReduce", shape, route, "success")
@@ -236,7 +244,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeVectorGather(instrID int, ve
 	const shape = "vector-gather"
 	out, err := executeVectorGatherValue(vectorVal, indexVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "VectorGather", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "VectorGather", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "VectorGather", shape, route, "success")
@@ -247,7 +255,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeVectorCompare(instrID, opCod
 	const shape = "vector-compare"
 	out, err := executeVectorCompareValue(opCode, leftVal, rightVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "VectorCompare", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "VectorCompare", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "VectorCompare", shape, route, "success")
@@ -258,7 +266,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeVectorMask(instrID, opCode i
 	const shape = "vector-mask"
 	out, err := executeVectorMaskValue(opCode, leftVal, rightVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "VectorMask", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "VectorMask", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "VectorMask", shape, route, "success")
@@ -269,7 +277,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeVectorWhere(instrID int, mas
 	const shape = "vector-where"
 	out, err := executeVectorWhereValue(maskVal, trueVal, falseVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "VectorWhere", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "VectorWhere", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "VectorWhere", shape, route, "success")
@@ -280,7 +288,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeVectorReduce(instrID, opCode
 	const shape = "vector/vector-reduce"
 	out, err := executeVectorReduceValue(opCode, vectorVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "VectorReduce", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "VectorReduce", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "VectorReduce", shape, route, "success")
@@ -291,7 +299,7 @@ func (a qFrameVectorRuntimeExecutionAdapter) executeVectorScan(instrID int, vect
 	const shape = "vector-scan"
 	out, err := executeVectorScanValue(vectorVal)
 	if err != nil {
-		a.recordVectorByInstrID(instrID, "VectorScan", shape, route, "error")
+		a.recordVectorByInstrIDWithReason(instrID, "VectorScan", shape, route, "error", qVectorRuntimeReasonForError(err))
 		return runtime.NilValue(), err
 	}
 	a.recordVectorByInstrID(instrID, "VectorScan", shape, route, "success")
@@ -324,4 +332,37 @@ func (a qFrameVectorRuntimeExecutionAdapter) recordVectorByInstrID(instrID int, 
 		return
 	}
 	a.cf.recordQVectorRuntimeKernelExecution(instrID, kernel, fallbackShape, route, outcome)
+}
+
+func (a qFrameVectorRuntimeExecutionAdapter) recordVectorByInstrIDWithReason(instrID int, kernel, fallbackShape string, route qTypedRuntimeExecutionRoute, outcome, reasonCode string) {
+	if a.cf == nil {
+		return
+	}
+	a.cf.recordQKernelExecutionWithPipelineShapeAndReason(qVectorRuntimeExecutionSource, kernel, a.cf.qVectorRuntimeKernelShape(instrID, fallbackShape), "", string(route), outcome, "", reasonCode)
+}
+
+func qVectorRuntimeReasonForError(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, runtime.ErrDenseArrayOperand):
+		return qVectorRuntimeReasonOperandError
+	case errors.Is(err, runtime.ErrDenseArrayDType):
+		return qVectorRuntimeReasonDTypeError
+	case errors.Is(err, runtime.ErrDenseArrayLength):
+		return qVectorRuntimeReasonLengthError
+	case errors.Is(err, runtime.ErrDenseArrayEmpty):
+		return qVectorRuntimeReasonEmptyError
+	case errors.Is(err, runtime.ErrDenseArrayReduceOp), errors.Is(err, runtime.ErrDenseArrayMaskOp):
+		return qVectorRuntimeReasonOpError
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "must be dense array"):
+		return qVectorRuntimeReasonOperandError
+	case strings.Contains(msg, " is not a comparison"):
+		return qVectorRuntimeReasonOpError
+	default:
+		return ""
+	}
 }

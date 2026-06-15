@@ -5120,6 +5120,7 @@ func TestQFrameVectorRuntimeAdapterRecordsQFrameSelectColumnAndVectorReduceError
 			t.Fatalf("VectorReduce non-dense error = %v, want operand error", err)
 		}
 		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", "typed_runtime_op_exit", "error", 1)
+		assertQKernelExecutionStatReason(t, cf.QKernelExecutionStats(), "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", "typed_runtime_op_exit", "error", qVectorRuntimeReasonOperandError, 1)
 	})
 
 	t.Run("VectorReduce bad op", func(t *testing.T) {
@@ -5134,6 +5135,7 @@ func TestQFrameVectorRuntimeAdapterRecordsQFrameSelectColumnAndVectorReduceError
 			t.Fatalf("VectorReduce bad op error = %v, want reduce op error", err)
 		}
 		assertQKernelExecutionStat(t, cf.QKernelExecutionStats(), "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", "typed_runtime_op_exit", "error", 1)
+		assertQKernelExecutionStatReason(t, cf.QKernelExecutionStats(), "methodjit_q_vector_runtime", "VectorReduce", "vector/vector-reduce", "typed_runtime_op_exit", "error", qVectorRuntimeReasonOpError, 1)
 	})
 }
 

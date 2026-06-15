@@ -1002,10 +1002,11 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsDirectRoute(t *testing.
 
 func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsRuntimeErrorRoute(t *testing.T) {
 	tests := []struct {
-		name    string
-		proto   func() *vm.FuncProto
-		spec    func() QFrameSelectColumnSpec
-		wantErr string
+		name       string
+		proto      func() *vm.FuncProto
+		spec       func() QFrameSelectColumnSpec
+		wantErr    string
+		wantReason string
 	}{
 		{
 			name: "plan error",
@@ -1022,7 +1023,8 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsRuntimeErrorRoute(t *te
 			spec: func() QFrameSelectColumnSpec {
 				return qFrameSelectColumnRouteSpec()
 			},
-			wantErr: "FrameProject column list must be a string or string array",
+			wantErr:    "FrameProject column list must be a string or string array",
+			wantReason: qFrameSelectColumnReasonPlanBuildError,
 		},
 		{
 			name: "planned execution error",
@@ -1043,7 +1045,8 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsRuntimeErrorRoute(t *te
 				spec.DynamicArgRole = QFrameSelectColumnArgCompareRHS
 				return spec
 			},
-			wantErr: "QFrameSelectColumn compare path requires rhs",
+			wantErr:    "QFrameSelectColumn compare path requires rhs",
+			wantReason: qFrameSelectColumnReasonExecutionError,
 		},
 	}
 	for _, tc := range tests {
@@ -1078,6 +1081,7 @@ func TestTier2DirectHelperBridgeQFrameSelectColumnRecordsRuntimeErrorRoute(t *te
 			}
 			stats := cf.QKernelExecutionStats()
 			assertQKernelExecutionStat(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
+			assertQKernelExecutionStatReason(t, stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", "compare/filter/project/column", string(qTypedRuntimeExecutionRouteDirectHelper), "error", tc.wantReason, 1)
 			assertQKernelExecutionRouteSummary(t, BuildQKernelExecutionRouteSummary(stats), "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteDirectHelper), "error", 1)
 			if got := qKernelExecutionCount(stats, "methodjit_q_frame_runtime", "QFrameSelectColumn", string(qTypedRuntimeExecutionRouteOpExit), "error"); got != 0 {
 				t.Fatalf("QFrameSelectColumn op-exit error route count = %d, want 0", got)
