@@ -19,14 +19,14 @@ for i := 1; i <= #parts; i++ {
 
 // Custom split that handles multiple characters and edge cases
 func splitStr(s, sep) {
-    result := {}
+    result := []
     if #s == 0 {
         return result
     }
     if #sep == 0 {
         // Split into individual characters
         for i := 1; i <= #s; i++ {
-            table.insert(result, string.sub(s, i, i))
+            append(result, string.sub(s, i, i))
         }
         return result
     }
@@ -35,10 +35,10 @@ func splitStr(s, sep) {
     for true {
         pos := string.find(s, sep, start, true)
         if pos == nil {
-            table.insert(result, string.sub(s, start))
+            append(result, string.sub(s, start))
             break
         }
-        table.insert(result, string.sub(s, start, pos - 1))
+        append(result, string.sub(s, start, pos - 1))
         start = pos + #sep
     }
     return result
@@ -108,7 +108,7 @@ print()
 print("--- CSV Parser ---")
 
 func parseCSVLine(line) {
-    fields := {}
+    fields := []
     current := ""
     inQuotes := false
     i := 1
@@ -130,7 +130,7 @@ func parseCSVLine(line) {
             if ch == "\"" {
                 inQuotes = true
             } elseif ch == "," {
-                table.insert(fields, current)
+                append(fields, current)
                 current = ""
             } else {
                 current = current .. ch
@@ -138,7 +138,7 @@ func parseCSVLine(line) {
         }
         i = i + 1
     }
-    table.insert(fields, current)
+    append(fields, current)
     return fields
 }
 
@@ -147,7 +147,7 @@ func parseCSV(text) {
     if #lines == 0 { return {} }
 
     headers := parseCSVLine(lines[1])
-    rows := {}
+    rows := []
 
     for i := 2; i <= #lines; i++ {
         if #lines[i] > 0 {
@@ -160,7 +160,7 @@ func parseCSV(text) {
                     row[headers[j]] = ""
                 }
             }
-            table.insert(rows, row)
+            append(rows, row)
         }
     }
     return rows
@@ -190,7 +190,7 @@ print()
 print("--- Arithmetic Lexer ---")
 
 func lexArithmetic(input) {
-    tokens := {}
+    tokens := []
     i := 1
     for i <= #input {
         ch := string.sub(input, i, i)
@@ -200,7 +200,7 @@ func lexArithmetic(input) {
             i = i + 1
         } elseif ch == "+" || ch == "-" || ch == "*" || ch == "/" || ch == "(" || ch == ")" || ch == "^" || ch == "%" {
             // Operator or paren
-            table.insert(tokens, {type: "op", value: ch})
+            append(tokens, {type: "op", value: ch})
             i = i + 1
         } elseif string.find(ch, "%d") != nil || ch == "." {
             // Number: collect digits and dots
@@ -214,7 +214,7 @@ func lexArithmetic(input) {
                     break
                 }
             }
-            table.insert(tokens, {type: "number", value: numStr})
+            append(tokens, {type: "number", value: numStr})
         } elseif string.find(ch, "%a") != nil {
             // Identifier: collect letters and digits
             ident := ""
@@ -227,9 +227,9 @@ func lexArithmetic(input) {
                     break
                 }
             }
-            table.insert(tokens, {type: "ident", value: ident})
+            append(tokens, {type: "ident", value: ident})
         } else {
-            table.insert(tokens, {type: "unknown", value: ch})
+            append(tokens, {type: "unknown", value: ch})
             i = i + 1
         }
     }
@@ -238,10 +238,10 @@ func lexArithmetic(input) {
 
 func showTokens(expr) {
     tokens := lexArithmetic(expr)
-    parts := {}
+    parts := []
     for i := 1; i <= #tokens; i++ {
         t := tokens[i]
-        table.insert(parts, t.type .. "(" .. t.value .. ")")
+        append(parts, t.type .. "(" .. t.value .. ")")
     }
     print("  \"" .. expr .. "\" -> " .. table.concat(parts, " "))
 }
@@ -309,7 +309,7 @@ print()
 // Table formatter
 func formatTable(headers, rows) {
     // Calculate column widths
-    widths := {}
+    widths := []
     for i := 1; i <= #headers; i++ {
         widths[i] = #headers[i]
     }
@@ -330,16 +330,16 @@ func formatTable(headers, rows) {
     }
 
     // Build separator
-    sepParts := {}
+    sepParts := []
     for i := 1; i <= #widths; i++ {
-        table.insert(sepParts, repeatStr("-", widths[i] + 2))
+        append(sepParts, repeatStr("-", widths[i] + 2))
     }
     separator := "+" .. table.concat(sepParts, "+") .. "+"
 
     // Build header
-    headerParts := {}
+    headerParts := []
     for i := 1; i <= #headers; i++ {
-        table.insert(headerParts, " " .. padRight(headers[i], widths[i]) .. " ")
+        append(headerParts, " " .. padRight(headers[i], widths[i]) .. " ")
     }
     headerLine := "|" .. table.concat(headerParts, "|") .. "|"
 
@@ -349,13 +349,13 @@ func formatTable(headers, rows) {
     print("  " .. separator)
     for i := 1; i <= #rows; i++ {
         row := rows[i]
-        rowParts := {}
+        rowParts := []
         for j := 1; j <= #headers; j++ {
             val := ""
             if row[j] != nil {
                 val = tostring(row[j])
             }
-            table.insert(rowParts, " " .. padRight(val, widths[j]) .. " ")
+            append(rowParts, " " .. padRight(val, widths[j]) .. " ")
         }
         print("  |" .. table.concat(rowParts, "|") .. "|")
     }
@@ -413,9 +413,9 @@ freq := wordFrequency(text)
 print("  Text: \"" .. text .. "\"")
 print("  Word frequencies:")
 // Collect and sort
-freqList := {}
+freqList := []
 for word, count := range freq {
-    table.insert(freqList, {word: word, count: count})
+    append(freqList, {word: word, count: count})
 }
 table.sort(freqList, func(a, b) { return a.count > b.count })
 for i := 1; i <= #freqList; i++ {
