@@ -35,6 +35,7 @@ The release evidence should cite:
 - `docs/reference/ai/index.md`
 - `docs/reference/concurrency/index.md`
 - `docs/reference/data-oriented/index.md`
+- `docs/reference/scientific/index.md`
 - `docs/reference/performance/index.md`
 - `docs/reference/platforms/index.md`
 - `docs/reference/diagnostics/index.md`

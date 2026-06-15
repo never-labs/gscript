@@ -73,8 +73,9 @@ go run ./cmd/leia examples check examples/web/fullstack_project
 go run ./cmd/leia examples check examples/data_processing/data_oriented/particle_integration.leia
 ```
 
-Use these with the [data-oriented reference](../reference/data-oriented/index.md)
-and `benchmarks/data/` when evaluating numeric or SoA-heavy code. The
+Use these with the [data-oriented reference](../reference/data-oriented/index.md),
+the [scientific numeric reference](../reference/scientific/index.md), and
+`benchmarks/data/` when evaluating numeric or SoA-heavy code. The
 `q_trade_analytics_project` example covers q/kdb+-style symbolic vectors,
 dictionaries, scans, filters, and table rollups. The `db_q_frame_project`
 example exercises SQLite `db.frame`, SoA-backed `q.query`, and `xlsx`/`excel`

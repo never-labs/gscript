@@ -94,6 +94,7 @@ go run ./cmd/leia examples check examples/data_processing/data_oriented/particle
 Related references:
 
 - [Data-oriented programming](../reference/data-oriented/index.md)
+- [Scientific numeric programming](../reference/scientific/index.md)
 - [Performance and benchmarks](../reference/performance/index.md)
 
 ## Inspect Tooling And Environment

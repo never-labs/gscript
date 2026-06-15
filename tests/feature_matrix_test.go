@@ -817,6 +817,7 @@ func TestFeatureMatrixCoversReadmeStableContract(t *testing.T) {
 		"examples/data/db_q_frame_project/main.leia",
 		"examples/tooling/release_gate_project/main.leia",
 		"docs/reference/data-oriented/index.md",
+		"docs/reference/scientific/index.md",
 	)
 	requireFeatureCellRefs(t, data, "matrix_dense_arrays", "bytecode",
 		"internal/vm/compiler_dense_test.go",

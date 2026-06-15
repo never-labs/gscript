@@ -133,7 +133,8 @@ Next steps:
   [security reference](../reference/security/index.md) for host integration.
 - Use [hot reload](../reference/hot-reload/index.md) for long-running hosts.
 - Use [concurrency](../reference/concurrency/index.md) and
-  [data-oriented programming](../reference/data-oriented/index.md) for the
+  [data-oriented programming](../reference/data-oriented/index.md) plus
+  [scientific numeric programming](../reference/scientific/index.md) for the
   main language extensions.
 - Use the [AI dialect guide](../guides/ai-dialect.md) when a project needs model
   providers, tools, agents, or replay.
