@@ -4,7 +4,7 @@ import "testing"
 
 func TestTableKeys(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30}
+		t := [10, 20, 30]
 		k := table.keys(t)
 	`)
 	keys := interp.GetGlobal("k").Table()
@@ -15,7 +15,7 @@ func TestTableKeys(t *testing.T) {
 
 func TestTableValues(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30}
+		t := [10, 20, 30]
 		v := table.values(t)
 	`)
 	vals := interp.GetGlobal("v").Table()
@@ -26,7 +26,7 @@ func TestTableValues(t *testing.T) {
 
 func TestTableContains(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30}
+		t := [10, 20, 30]
 		a := table.contains(t, 20)
 		b := table.contains(t, 99)
 	`)
@@ -40,7 +40,7 @@ func TestTableContains(t *testing.T) {
 
 func TestTableIndexOf(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30}
+		t := [10, 20, 30]
 		a := table.indexOf(t, 20)
 		b := table.indexOf(t, 99)
 	`)
@@ -54,7 +54,7 @@ func TestTableIndexOf(t *testing.T) {
 
 func TestTableCopy(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30}
+		t := [10, 20, 30]
 		c := table.copy(t)
 		c[1] = 99
 		a := t[1]
@@ -110,7 +110,7 @@ func TestTableCountMixed(t *testing.T) {
 
 func TestTableUnique(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3, 2, 1, 4}
+		t := [1, 2, 3, 2, 1, 4]
 		u := table.unique(t)
 	`)
 	u := interp.GetGlobal("u").Table()
@@ -121,7 +121,7 @@ func TestTableUnique(t *testing.T) {
 
 func TestTableFlatten(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, {2, 3}, {4, {5, 6}}}
+		t := [1, [2, 3], [4, [5, 6]]]
 		f := table.flatten(t)
 	`)
 	f := interp.GetGlobal("f").Table()
@@ -138,11 +138,11 @@ func TestTableFlatten(t *testing.T) {
 
 func TestTableFlattenDepth(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, {2, {3, 4}}}
+		t := [1, [2, [3, 4]]]
 		f := table.flatten(t, 1)
 	`)
 	f := interp.GetGlobal("f").Table()
-	// depth=1: flatten once, so {1, 2, {3, 4}}
+	// depth=1: flatten once, so [1, 2, [3, 4]]
 	if f.Length() != 3 {
 		t.Errorf("expected 3 elements at depth 1, got %d", f.Length())
 	}
@@ -150,8 +150,8 @@ func TestTableFlattenDepth(t *testing.T) {
 
 func TestTableZip(t *testing.T) {
 	interp := runProgram(t, `
-		a := {1, 2, 3}
-		b := {"a", "b", "c"}
+		a := [1, 2, 3]
+		b := ["a", "b", "c"]
 		z := table.zip(a, b)
 	`)
 	z := interp.GetGlobal("z").Table()
@@ -169,7 +169,7 @@ func TestTableZip(t *testing.T) {
 
 func TestTableReverse(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3, 4, 5}
+		t := [1, 2, 3, 4, 5]
 		table.reverse(t)
 	`)
 	tbl := interp.GetGlobal("t").Table()
@@ -184,7 +184,7 @@ func TestTableReverse(t *testing.T) {
 
 func TestTableSlice(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30, 40, 50}
+		t := [10, 20, 30, 40, 50]
 		s := table.slice(t, 2, 4)
 	`)
 	s := interp.GetGlobal("s").Table()
@@ -212,7 +212,7 @@ func TestTableToArray(t *testing.T) {
 
 func TestTableFilter(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3, 4, 5, 6}
+		t := [1, 2, 3, 4, 5, 6]
 		result := table.filter(t, func(v) { return v > 3 })
 	`)
 
@@ -227,7 +227,7 @@ func TestTableFilter(t *testing.T) {
 
 func TestTableMap(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3}
+		t := [1, 2, 3]
 		result := table.map(t, func(v) { return v * 2 })
 	`)
 
@@ -248,7 +248,7 @@ func TestTableMap(t *testing.T) {
 
 func TestTableReduce(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3, 4, 5}
+		t := [1, 2, 3, 4, 5]
 		result := table.reduce(t, func(acc, v) { return acc + v }, 0)
 	`)
 

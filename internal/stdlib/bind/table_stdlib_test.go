@@ -4,7 +4,7 @@ import "testing"
 
 func TestTableInsert(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3}
+		t := [1, 2, 3]
 		table.insert(t, 4)
 		table.insert(t, 2, 10)
 	`)
@@ -28,7 +28,7 @@ func TestTableInsert(t *testing.T) {
 
 func TestTableRemove(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30, 40}
+		t := [10, 20, 30, 40]
 		removed := table.remove(t, 2)
 	`)
 	tbl := interp.GetGlobal("t").Table()
@@ -46,7 +46,7 @@ func TestTableRemove(t *testing.T) {
 
 func TestTableRemoveLast(t *testing.T) {
 	interp := runProgram(t, `
-		t := {10, 20, 30}
+		t := [10, 20, 30]
 		removed := table.remove(t)
 	`)
 	removed := interp.GetGlobal("removed")
@@ -61,7 +61,7 @@ func TestTableRemoveLast(t *testing.T) {
 
 func TestTableConcat(t *testing.T) {
 	interp := runProgram(t, `
-		t := {"hello", "world", "foo"}
+		t := ["hello", "world", "foo"]
 		a := table.concat(t, ", ")
 		b := table.concat(t, "-", 1, 2)
 	`)
@@ -75,7 +75,7 @@ func TestTableConcat(t *testing.T) {
 
 func TestTableSort(t *testing.T) {
 	interp := runProgram(t, `
-		t := {3, 1, 4, 1, 5, 9}
+		t := [3, 1, 4, 1, 5, 9]
 		table.sort(t)
 	`)
 	tbl := interp.GetGlobal("t").Table()
@@ -90,7 +90,7 @@ func TestTableSort(t *testing.T) {
 
 func TestTableSortCustom(t *testing.T) {
 	interp := runProgram(t, `
-		t := {3, 1, 4, 1, 5}
+		t := [3, 1, 4, 1, 5]
 		table.sort(t, func(a, b) { return a > b })
 	`)
 	tbl := interp.GetGlobal("t").Table()
@@ -105,7 +105,7 @@ func TestTableSortCustom(t *testing.T) {
 
 func TestTableUnpack(t *testing.T) {
 	interp := runProgram(t, `
-		a, b, c := table.unpack({10, 20, 30})
+		a, b, c := table.unpack([10, 20, 30])
 	`)
 	if interp.GetGlobal("a").Int() != 10 {
 		t.Errorf("expected a=10")
@@ -134,7 +134,7 @@ func TestTablePack(t *testing.T) {
 
 func TestTableMove(t *testing.T) {
 	interp := runProgram(t, `
-		t := {1, 2, 3, 4, 5}
+		t := [1, 2, 3, 4, 5]
 		table.move(t, 3, 5, 1)
 	`)
 	tbl := interp.GetGlobal("t").Table()

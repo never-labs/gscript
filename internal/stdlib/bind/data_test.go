@@ -531,14 +531,14 @@ rows := data.rows(f)
 func TestDataTemporalColumnConstructors(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    m: data.month({"2026.06", data.null}),
-    d: data.date({"2026-06-06", data.null}),
-    dt: data.datetime({"2026.06.06T09:30:00", data.null}),
-    span: data.timespan({"1D09:30:00", data.null}),
-    minute: data.minute({"09:30", "16:00"}),
-    second: data.second({"09:30:00", "16:00:00"}),
-    tm: data.time({"09:30:00", "16:00:00"}),
-    ts: data.timestamp({"2026-06-06T09:30:00Z", data.null}),
+    m: data.month(["2026.06", data.null]),
+    d: data.date(["2026-06-06", data.null]),
+    dt: data.datetime(["2026.06.06T09:30:00", data.null]),
+    span: data.timespan(["1D09:30:00", data.null]),
+    minute: data.minute(["09:30", "16:00"]),
+    second: data.second(["09:30:00", "16:00:00"]),
+    tm: data.time(["09:30:00", "16:00:00"]),
+    ts: data.timestamp(["2026-06-06T09:30:00Z", data.null]),
 })
 kinds := data.kinds(f)
 rows := data.rows(f)
