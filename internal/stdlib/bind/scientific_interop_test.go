@@ -21,9 +21,9 @@ func scientificInteropInterp(t *testing.T, src string) *runtime.Interpreter {
 
 func TestScientificInteropControlLQR2AcceptsLinalgMatrix(t *testing.T) {
 	interp := scientificInteropInterp(t, `
-A := linalg.matrix(2, 2, {0, 1, 9.81, -0.1})
-B := linalg.matrix(2, 1, {0, 1})
-Q := linalg.matrix(2, 2, {10, 0, 0, 1})
+A := linalg.matrix(2, 2, [0, 1, 9.81, -0.1])
+B := linalg.matrix(2, 1, [0, 1])
+Q := linalg.matrix(2, 2, [10, 0, 0, 1])
 gain := control.lqr2(A, B, Q, 1)
 gainNorm := linalg.norm(gain)
 `)
@@ -48,9 +48,9 @@ gainNorm := linalg.norm(gain)
 func TestScientificInteropStatsAcceptODERK4StateVector(t *testing.T) {
 	interp := scientificInteropInterp(t, `
 func constantVelocity(state) {
-	return {2, 4, 6}
+	return [2, 4, 6]
 }
-next := ode.rk4(constantVelocity, {1, 2, 3}, 0.5)
+next := ode.rk4(constantVelocity, [1, 2, 3], 0.5)
 mean := stats.mean(next)
 variance := stats["var"](next)
 `)
@@ -64,9 +64,9 @@ variance := stats["var"](next)
 func TestScientificInteropLinalgAcceptODERK4DenseArrayState(t *testing.T) {
 	interp := scientificInteropInterp(t, `
 func constantVelocity(state) {
-	return {2, 4, 6}
+	return [2, 4, 6]
 }
-next := ode.rk4(constantVelocity, {1, 2, 3}, 0.5)
+next := ode.rk4(constantVelocity, [1, 2, 3], 0.5)
 norm := linalg.norm(next)
 dot := linalg.dot(next, next)
 `)
