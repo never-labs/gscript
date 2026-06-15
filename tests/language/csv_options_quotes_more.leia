@@ -20,16 +20,16 @@ strictOk, strictErr := pcall(csv.parse, "a,b\n1,bare \"quote\n", {lazyQuotes: fa
 assert(strictOk == false)
 assert(type(strictErr) == "string")
 
-encoded := csv.encode({
-	{"plain", "a,b", "a\"b", "line\nbreak"},
-	{" leading", "trail ", ""},
-})
+encoded := csv.encode([
+	["plain", "a,b", "a\"b", "line\nbreak"],
+	[" leading", "trail ", ""],
+])
 assert(encoded == "plain,\"a,b\",\"a\"\"b\",\"line\nbreak\"\n\" leading\",trail ,\n")
 
-withHeaders := csv.encodeWithHeaders({
+withHeaders := csv.encodeWithHeaders([
 	{name: "alpha,beta", quote: "x\"y", note: "two\nlines"},
 	{name: " plain", quote: "", note: "done"},
-}, {"name", "quote", "note"})
+], ["name", "quote", "note"])
 assert(withHeaders == "name,quote,note\n\"alpha,beta\",\"x\"\"y\",\"two\nlines\"\n\" plain\",,done\n")
 
 print("ok")

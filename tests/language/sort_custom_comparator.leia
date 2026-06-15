@@ -14,7 +14,7 @@ func check(a, f) {
   }
 }
 
-a := {5, 1, 4, 2, 3}
+a := [5, 1, 4, 2, 3]
 count := 0
 func desc(x, y) {
   count = count + 1
@@ -25,9 +25,9 @@ assert(count > 0)
 check(a, greater)
 assert(table.concat(a, ",") == "5,4,3,2,1")
 
-table.sort({})
+table.sort([])
 
-a = {false, false, false, false}
+a = [false, false, false, false]
 func equal_cmp(x, y) {
   return nil
 }
@@ -36,7 +36,7 @@ for i := 1; i <= #a; i = i + 1 {
   assert(a[i] == false)
 }
 
-words := {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+words := ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 table.sort(words)
 check(words, less)
 
