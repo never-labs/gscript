@@ -53,8 +53,8 @@ func score_worker(ctx, input, output) {
             return;
             default:
         }
-        signals := incident.signals
-        minutes := incident.minutes
+        signals := tonumber(incident.signals)
+        minutes := tonumber(incident.minutes)
         score := severity_weight(incident.severity) + signals * 3 + minutes
         if incident.region == "edge" {
             score = score + 7
