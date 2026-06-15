@@ -15,7 +15,7 @@ innovations := {}
 
 for i := 1; i <= #measurements; i++ {
     x_pred := linalg.matmul(F, x)
-    P_pred := linalg.add(linalg.sandwich(F, P), Q)
+    P_pred := linalg.sandwich_add(F, P, Q)
 
     z := linalg.vector(measurements[i])
     y := linalg.sub(z, linalg.matmul(H, x_pred))

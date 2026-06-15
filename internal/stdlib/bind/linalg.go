@@ -37,6 +37,7 @@ func BuildLinalg() *Table {
 	set("matmul", linalgMatmul)
 	set("chainmul", linalgChainmul)
 	set("sandwich", linalgSandwich)
+	set("sandwich_add", linalgSandwichAdd)
 	set("transpose", linalgTranspose)
 	set("T", linalgTranspose)
 	set("t", linalgTranspose)
@@ -530,6 +531,19 @@ func linalgSandwich(args []Value) ([]Value, error) {
 	at := stddata.LinalgF64Transpose(ar, ac, a)
 	out := stddata.LinalgF64Matmul(ar, pc, ar, ap, at)
 	return []Value{linalgMatrixDenseValue(ar, ar, out)}, nil
+}
+
+func linalgSandwichAdd(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("linalg.sandwich_add: need transform, matrix, and addend")
+	}
+	base, err := linalgSandwich(args[:2])
+	if err != nil {
+		return nil, err
+	}
+	return linalgPointwise([]Value{base[0], args[2]}, "linalg.sandwich_add", "sandwich_add", func(a, b float64) float64 {
+		return a + b
+	})
 }
 
 func linalgTranspose(args []Value) ([]Value, error) {
