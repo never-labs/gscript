@@ -166,10 +166,11 @@ same acceptance checks in the default and bytecode VM modes.
 
 ## Current Surface
 
-The current standard-library surface intentionally favors reusable pieces over
-example-specific shortcuts. Algorithm facades are allowed only when they sit on
-top of general syntax and computation primitives and expose a stable runtime
-shape that can later be specialized:
+The current standard-library surface intentionally favors computation
+primitives over whole-algorithm helpers. Scientific examples should stay close
+to a bare implementation: syntax, symbols, q blocks, and typed numeric
+primitives make the code concise, while the algorithm remains visible in Leia
+source.
 
 - `math.near` for tolerance checks.
 - `linalg.eye(n[, scale])`, `linalg.diag(values...)`,
@@ -188,19 +189,14 @@ shape that can later be specialized:
   `stats.describe_fields(table[, weights])`, and `stats.importance_update` for
   distribution-aware sequential Monte Carlo code and compact statistical
   summaries.
-- `stats.gaussian_state`, `stats.linear_predict`, `stats.linear_update`, and
-  `stats.linear_filter` for reusable linear Gaussian state-space updates and
-  compact filter loops with diagnostics such as innovation, innovation
-  covariance, gain, and optional state trajectories.
+- `stats.gaussian_state`, `stats.linear_predict`, and `stats.linear_update`
+  for reusable linear Gaussian state-space primitives with diagnostics such as
+  innovation, innovation covariance, and gain.
 - `rand.sample(distribution[, n])` and `rand.add_noise(values,
   distribution[, drift])` for scalar draws, dense-vector draws, and noisy
   vector evolution from reusable distribution objects. `rand.add_noise` and
   `stats.loglik` also preserve or consume weighted sample-set objects so
   Monte Carlo code can stay object-shaped.
-- `rand.particle_filter(samples, observations, opts)` for compact sequential
-  Monte Carlo loops over weighted sample sets, using the same distribution,
-  observation, resampling, and trajectory contracts as the lower-level
-  primitives.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
 - `control.policy(gain[, opts])` and `control.apply(policy, state[, opts])`
@@ -213,16 +209,13 @@ shape that can later be specialized:
 - `ode.solve(..., {state_names: {...}, named_state: true})` for optional
   named state tables in dynamics, projection, and observation hooks while the
   default dense-vector hot path remains unchanged.
-- `ode.closed_loop(plant, state, policy, opts)` for closed-loop simulations
-  that reuse `control.policy` metadata, `control.apply`, and `ode.solve`
-  semantics while keeping plant dynamics and observation hooks as ordinary
-  Leia functions.
 - `q { ... }` raw blocks for compact q snippets without quoted source strings.
 
 ## Redundancy Audit
 
 The remaining verbosity in the scientific examples should be treated as a
-runtime/stdlib hardening problem, not a reason to expand the language grammar.
+runtime/stdlib/DSL hardening problem, not a reason to hide the algorithm behind
+vertical library calls.
 The design target is:
 
 - keep Leia's existing function, table, field-access, closure, and dialect
@@ -231,8 +224,9 @@ The design target is:
   `state_names`, `named_state`, `wrap_angles`, shape, and trajectory plumbing;
 - strengthen vector, matrix, sample-set, state-space, ODE, control, and q
   primitives so examples read as model code rather than adapter code;
-- add facades only for stable algorithm shapes that are already expressible as
-  primitive composition and that give the runtime a clear specialization point.
+- avoid whole-algorithm facades such as Kalman-filter, particle-filter, or
+  closed-loop-control wrappers in the core examples; such programs should be
+  written from reusable primitives so language and DSL gaps stay visible.
 
 Current sources of avoidable code are:
 

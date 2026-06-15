@@ -8,11 +8,16 @@ H := linalg.row(1.0, 0.0)
 Q := linalg.eye(2, 0.01)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
-initial := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
-filter := stats.linear_filter(initial, measurements, {F: F, H: H, Q: Q, R: 0.04, trajectory: true})
-state := filter.state
+state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
+innovations := {}
 
-innovation_rmse := stats.rms(filter.innovations)
+for i := 1; i <= #measurements; i++ {
+    state = stats.linear_predict(state, F, Q)
+    state = stats.linear_update(state, H, measurements[i], 0.04)
+    innovations[i] = state.innovation[1]
+}
+
+innovation_rmse := stats.rms(innovations)
 position := linalg.at(state.x, 1)
 velocity := linalg.at(state.x, 2)
 uncertainty_trace := linalg.trace(state.P)
@@ -23,7 +28,7 @@ q_state_sum := q {
 assert(math.near(position, 5.0, 0.15))
 assert(math.near(velocity, 1.0, 0.15))
 assert(innovation_rmse < 0.20)
-assert(#filter.states == #measurements)
+assert(#innovations == #measurements)
 assert(math.near(q_state_sum, position + velocity, 0.000000001))
 
 print(string.format("ok kalman n=%d position=%.3f velocity=%.3f rmse=%.3f trace=%.4f", #measurements, position, velocity, innovation_rmse, uncertainty_trace))

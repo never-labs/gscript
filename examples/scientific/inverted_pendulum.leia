@@ -17,7 +17,8 @@ stabilizer := control.policy(K, {limit: 8.0, state_names: {"theta", "omega"}, wr
 
 state := {0.22, 0.0}
 
-func plant(x, u) {
+func dynamics(x) {
+    u := control.apply(stabilizer, x)
     return {
         theta: x.omega,
         omega: (g / l) * math.sin(x.theta) + u / (m * l * l),
@@ -30,7 +31,7 @@ func observe_energy(x, step, t) {
     }
 }
 
-solution := ode.closed_loop(plant, state, stabilizer, {dt: dt, steps: 240, trajectory: true, observe: observe_energy})
+solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, named_state: true, wrap_angles: {"theta"}, observe: observe_energy})
 trajectory := solution.trajectory
 observed := solution.observed
 final_theta := solution.final_state.theta
