@@ -18,6 +18,7 @@ func BuildStats() *Table {
 	set("var", statsVar)
 	set("variance", statsVar)
 	set("std", statsStd)
+	set("describe", statsDescribe)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
 	set("normal", statsNormal)
@@ -128,6 +129,43 @@ func statsStd(args []Value) ([]Value, error) {
 		return nil, fmt.Errorf("stats.std: empty input")
 	}
 	return []Value{FloatValue(math.Sqrt(statsVarianceOf(values)))}, nil
+}
+
+func statsDescribe(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.describe", args)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.describe: empty input")
+	}
+	min := values[0]
+	max := values[0]
+	sum := 0.0
+	sumSquares := 0.0
+	for _, v := range values {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+		sum += v
+		sumSquares += v * v
+	}
+	mean := sum / float64(len(values))
+	variance := statsVarianceWithMean(values, mean)
+	out := NewTable()
+	out.RawSetString("count", IntValue(int64(len(values))))
+	out.RawSetString("sum", FloatValue(sum))
+	out.RawSetString("mean", FloatValue(mean))
+	out.RawSetString("variance", FloatValue(variance))
+	out.RawSetString("var", FloatValue(variance))
+	out.RawSetString("std", FloatValue(math.Sqrt(variance)))
+	out.RawSetString("min", FloatValue(min))
+	out.RawSetString("max", FloatValue(max))
+	out.RawSetString("rms", FloatValue(math.Sqrt(sumSquares/float64(len(values)))))
+	return []Value{TableValue(out)}, nil
 }
 
 func statsNormalize(args []Value) ([]Value, error) {

@@ -25,12 +25,12 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "linalg.add", "linalg.sub", "stats.uniform_weights", "stats.logpdf", "stats.normalize_log_weights", "stats.resample_if", "stats.mean", "stats.variance", "stats.std", "math.near", "q {"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "linalg.add", "linalg.sub", "stats.uniform_weights", "stats.logpdf", "stats.normalize_log_weights", "stats.resample_if", "stats.mean", "stats.describe", "math.near", "q {"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "control.lqr", "control.feedback", "ode.solve", "state_names", "stats.mean", "stats.max", "math.near", "q {"},
+			wantAPI: []string{"linalg.matrix", "control.lqr", "control.feedback", "ode.solve", "state_names", "final_state", "stats.describe", "math.near", "q {"},
 		},
 	}
 	for _, tc := range cases {

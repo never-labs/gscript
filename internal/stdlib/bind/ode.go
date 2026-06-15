@@ -220,11 +220,12 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		trajectory := false
 		hasObserve := false
 		hasNamedState := false
+		var stateNames []string
 		if hasOpts {
 			options := opts.Table()
 			trajectory = options.RawGetString("trajectory").Truthy()
 			hasObserve = options.RawGetString("observe").IsFunction()
-			stateNames, err := odeStateNamesFromOptions("ode.solve", options, len(stateValues))
+			stateNames, err = odeStateNamesFromOptions("ode.solve", options, len(stateValues))
 			if err != nil {
 				return nil, err
 			}
@@ -237,6 +238,13 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		}
 		out := NewTable()
 		out.RawSetString("final", values[0])
+		if hasNamedState {
+			finalValues, err := odeVectorFromValue(values[0], "ode.solve final")
+			if err != nil {
+				return nil, err
+			}
+			out.RawSetString("final_state", TableValue(odeNamedStateTable(stateNames, finalValues)))
+		}
 		next := 1
 		if trajectory {
 			out.RawSetString("trajectory", values[next])

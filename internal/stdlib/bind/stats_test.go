@@ -42,6 +42,7 @@ pdf0 := stats.normal_pdf(0, 0, 1)
 pdfs := stats.normal_pdf({0, 1}, 0, 1)
 rms := stats.rms({3, 4})
 rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
+desc := stats.describe({1, 2, 3, 4})
 `)
 	assertFloat(t, interp.GetGlobal("total"), 10)
 	assertFloat(t, interp.GetGlobal("mean"), 2.5)
@@ -72,6 +73,16 @@ rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 	assertTableFloat(t, interp.GetGlobal("pdfs"), 2, 0.24197072451914337)
 	assertFloat(t, interp.GetGlobal("rms"), 3.5355339059327378)
 	assertFloat(t, interp.GetGlobal("rmse"), 1.1547005383792515)
+	desc := interp.GetGlobal("desc").Table()
+	assertFloat(t, desc.RawGetString("count"), 4)
+	assertFloat(t, desc.RawGetString("sum"), 10)
+	assertFloat(t, desc.RawGetString("mean"), 2.5)
+	assertFloat(t, desc.RawGetString("variance"), 1.25)
+	assertFloat(t, desc.RawGetString("var"), 1.25)
+	assertFloat(t, desc.RawGetString("std"), 1.118033988749895)
+	assertFloat(t, desc.RawGetString("min"), 1)
+	assertFloat(t, desc.RawGetString("max"), 4)
+	assertFloat(t, desc.RawGetString("rms"), 2.7386127875258306)
 }
 
 func TestStatsDistributionFacadeNormalPDF(t *testing.T) {
@@ -166,5 +177,9 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.resample_if({1}, {1}, 1.5)`)
 	if err == nil {
 		t.Fatal("stats.resample_if invalid threshold succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.describe({})`)
+	if err == nil {
+		t.Fatal("stats.describe({}) succeeded, want error")
 	}
 }

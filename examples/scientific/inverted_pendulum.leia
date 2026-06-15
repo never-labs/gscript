@@ -40,10 +40,11 @@ solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, st
 trajectory := solution.trajectory
 observed := solution.observed
 energy := observed.energy
-final_theta := observed.theta[#observed.theta]
-final_omega := observed.omega[#observed.omega]
-mean_energy := stats.mean(energy)
-peak_energy := stats.max(energy)
+final_theta := solution.final_state.theta
+final_omega := solution.final_state.omega
+energy_summary := stats.describe(energy)
+mean_energy := energy_summary.mean
+peak_energy := energy_summary.max
 q_checksum := q {
 +/1 2 3
 }

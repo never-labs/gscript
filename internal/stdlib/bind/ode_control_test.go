@@ -540,6 +540,9 @@ func TestODESolveAggregatesNamedStateFields(t *testing.T) {
 	}
 	result := got[0].Table()
 	observed := result.RawGetString("observed").Table()
+	finalState := result.RawGetString("final_state").Table()
+	assertFloat(t, finalState.RawGetString("x"), 0.5)
+	assertFloat(t, finalState.RawGetString("v"), 11)
 	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(1), 0.25)
 	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(2), 0.5)
 	assertFloat(t, observed.RawGetString("v").Table().RawGetInt(1), 10.5)

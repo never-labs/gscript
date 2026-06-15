@@ -176,15 +176,15 @@ example-specific shortcuts:
 - `linalg.matmul` as a variadic matrix-chain facade that also supports
   matrix-vector tails, plus `linalg.T`/`linalg.t` and `linalg.vec` for compact
   linear algebra.
-- `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.variance`,
+- `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.describe`,
   `stats.normalize_log_weights`, and `stats.resample_if` for distribution-aware
-  sequential Monte Carlo code.
+  sequential Monte Carlo code and compact statistical summaries.
 - `rand.sample(distribution[, n])` for scalar or dense-vector draws from
   reusable distribution objects.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
 - `ode.integrate` and `ode.solve` for RK4-style simulation with projection,
   scalar or table-shaped observation hooks, and result-object access.
-- `ode.solve(..., {state_names: {...}})` for named state trajectories merged
-  into `solution.observed` alongside custom observation fields.
+- `ode.solve(..., {state_names: {...}})` for named final state access through
+  `solution.final_state` and named trajectories merged into `solution.observed`.
 - `q { ... }` raw blocks for compact q snippets without quoted source strings.
