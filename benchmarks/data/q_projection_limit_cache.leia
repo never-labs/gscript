@@ -40,8 +40,8 @@ events := data.frame({
     price: make_f64(N, 251, 80.0),
     size: make_i64(N, 97, 1),
 })
-event_projection := data.project(events, {"id", "sym", "price", "size"})
-event_projection_head := data.project(data.take(events, 64), {"id", "sym", "price", "size"})
+event_projection := data.project(events, ["id", "sym", "price", "size"])
+event_projection_head := data.project(data.take(events, 64), ["id", "sym", "price", "size"])
 assert(data.same_schema(event_projection, event_projection_head))
 
 query := "select id,sym,notional:price*size,spread:price-80 from events where bucket within 10 45 take 24"

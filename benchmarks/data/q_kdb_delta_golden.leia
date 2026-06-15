@@ -13,10 +13,10 @@ quotes := q.sql(
   {}
 )
 bars := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT"}),
-  bucket: data.strings({"09:30", "09:30", "09:31", "09:30"}),
-  seq: data.i64({1, 2, 3, 4}),
-  px: data.f64({100.0, 100.5, 101.0, 80.0}),
+  sym: data.symbols(["AAPL", "AAPL", "AAPL", "MSFT"]),
+  bucket: data.strings(["09:30", "09:30", "09:31", "09:30"]),
+  seq: data.i64([1, 2, 3, 4]),
+  px: data.f64([100.0, 100.5, 101.0, 80.0]),
 })
 keyed := q.key_by(bars, "sym", "bucket")
 typed := q.sql(

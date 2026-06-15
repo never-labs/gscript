@@ -19,11 +19,11 @@ cols := soa.zip({
     vy: make_f64(N, 0.00002, -0.02),
     vz: make_f64(N, -0.00001, 0.015),
 })
-terms := {
+terms := [
     {dst: "x", src: "vx", scale: 0.016, bias: 0.0},
     {dst: "y", src: "vy", scale: 0.016, bias: 1.0},
     {dst: "z", src: "vz", scale: 0.016, bias: 2.0},
-}
+]
 
 func run_hot(cols, terms, steps) {
     for step := 1; step <= steps; step++ {

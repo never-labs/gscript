@@ -31,6 +31,9 @@ func Files(path string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
+			if p != path && skipToolSourceDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(p) == ".leia" {
@@ -43,6 +46,15 @@ func Files(path string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+func skipToolSourceDir(name string) bool {
+	switch name {
+	case ".git", ".hg", ".svn", ".worktrees", "node_modules", "vendor":
+		return true
+	default:
+		return false
+	}
 }
 
 func ParseFile(filename string) error {

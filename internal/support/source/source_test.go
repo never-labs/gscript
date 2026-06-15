@@ -23,6 +23,24 @@ func TestFilesDiscoversLeiaFilesSorted(t *testing.T) {
 	}
 }
 
+func TestFilesSkipsToolAndExternalDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeSourceTestFile(t, filepath.Join(dir, "main.leia"), "")
+	writeSourceTestFile(t, filepath.Join(dir, ".worktrees", "branch", "shadow.leia"), "")
+	writeSourceTestFile(t, filepath.Join(dir, ".git", "hook.leia"), "")
+	writeSourceTestFile(t, filepath.Join(dir, "node_modules", "pkg", "generated.leia"), "")
+	writeSourceTestFile(t, filepath.Join(dir, "vendor", "pkg", "vendored.leia"), "")
+
+	got, err := Files(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{filepath.Join(dir, "main.leia")}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Files = %#v, want %#v", got, want)
+	}
+}
+
 func TestParseReportsSyntaxErrors(t *testing.T) {
 	if err := Parse("bad.leia", []byte("x := ")); err == nil {
 		t.Fatal("Parse error = nil, want syntax error")

@@ -59,7 +59,7 @@ campaigns := soa.zip({
 active := soa.mask(campaigns, "revenue", ">=", 80.0)
 campaign_frame := data.frame(campaigns)
 frame_head := data.take(campaign_frame, 16)
-frame_pick := data.gather(campaign_frame, {1, 8, 16})
+frame_pick := data.gather(campaign_frame, [1, 8, 16])
 assert(data.same_schema(campaign_frame, frame_head))
 assert(data.same_schema(campaign_frame, frame_pick))
 
@@ -68,12 +68,12 @@ func run_hot(campaigns, active, reps) {
     for r := 1; r <= reps; r++ {
         rows := q.query(campaigns, {
             where: active,
-            by: {"channel_id", "region_id"},
+            by: ["channel_id", "region_id"],
             select: {
                 revenue: "revenue",
                 cost: "cost",
                 units: "units",
-                gross: {"-", "revenue", "cost"},
+                gross: ["-", "revenue", "cost"],
                 rows: 1,
             },
             aggregate: {
@@ -83,10 +83,10 @@ func run_hot(campaigns, active, reps) {
                 gross: "sum",
                 rows: "count",
             },
-            order_by: {
+            order_by: [
                 {column: "gross", desc: true},
                 {column: "channel_id"},
-            },
+            ],
             limit: 8,
         })
         top := rows[1]

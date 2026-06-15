@@ -19,8 +19,8 @@ func checksum_text(sum, s) {
 lookup := tool {
     name: "lookup"
     description: "Lookup local knowledge."
-    params: {"query"}
-    requires: {"docs.read"}
+    params: ["query"]
+    requires: ["docs.read"]
     fn: func(query) {
         return "hit:" .. query, nil
     }
@@ -29,8 +29,8 @@ lookup := tool {
 summarize := tool {
     name: "summarize"
     description: "Summarize local text."
-    params: {"text"}
-    requires: {"docs.read", "text.write"}
+    params: ["text"]
+    requires: ["docs.read", "text.write"]
     fn: func(text) {
         return string.sub(text, 1, 24), nil
     }
@@ -39,24 +39,24 @@ summarize := tool {
 reviewer := agent {
     name: "reviewer"
     description: "Review local findings."
-    params: {"task"}
+    params: ["task"]
     output: {summary: "", risk: "low"}
     config: func(task) {
         return {
             model: "mock-fast"
-            messages: {
-                llm.system("Review concise local findings.")
+            messages: [
+                llm.system("Review concise local findings."),
                 llm.user(task)
-            }
-            tools: {lookup, summarize}
+            ]
+            tools: [lookup, summarize]
         }, nil
     }
 }
 
 review_tool := llm.agent_as_tool(reviewer, {name: "reviewer_tool", description: "Delegate a local review."})
-tools := {lookup, summarize, review_tool}
+tools := [lookup, summarize, review_tool]
 caps := llm.tool_caps(tools)
-ok, checkErr := llm.check_tools(tools, {"docs.read", "text.write", "cap.all"})
+ok, checkErr := llm.check_tools(tools, ["docs.read", "text.write", "cap.all"])
 assert(ok == true)
 assert(checkErr == nil)
 
@@ -82,10 +82,10 @@ for i := 1; i <= N; i++ {
     checksum = mix(checksum, #caps + #tools + (i % 23))
 
     if i % 75 == 0 {
-        allowed, err := llm.check_tools({lookup, summarize}, caps)
+        allowed, err := llm.check_tools([lookup, summarize], caps)
         assert(allowed == true)
         assert(err == nil)
-        checksum = mix(checksum, #llm.tool_caps({lookup, summarize}))
+        checksum = mix(checksum, #llm.tool_caps([lookup, summarize]))
     }
 }
 

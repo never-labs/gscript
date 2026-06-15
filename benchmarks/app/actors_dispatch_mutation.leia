@@ -40,7 +40,7 @@ func new_actor(i) {
     } elseif mod == 1 {
         return {id: i, kind: "io", queue: i % 113, bytes: i * 17, state: "read", step: step_io}
     }
-    return {id: i, kind: "cache", lines: {1, 3, 5, 7, 11, 13, 17, 19}, hits: i % 31, step: step_cache}
+    return {id: i, kind: "cache", lines: [1, 3, 5, 7, 11, 13, 17, 19], hits: i % 31, step: step_cache}
 }
 
 func build_actors(n) {

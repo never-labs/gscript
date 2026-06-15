@@ -60,12 +60,12 @@ facts := soa.zip({
 
 plan := {
     where: {column: "risk", op: ">=", value: 0.25},
-    by: {"segment_id", "region_id"},
+    by: ["segment_id", "region_id"],
     select: {
         revenue: "revenue",
         cost: "cost",
         units: "units",
-        margin: {"-", "revenue", "cost"},
+        margin: ["-", "revenue", "cost"],
         max_risk: "risk",
         rows: 1,
     },
@@ -77,11 +77,11 @@ plan := {
         max_risk: "max",
         rows: "count",
     },
-    order_by: {
+    order_by: [
         {column: "margin", desc: true},
         {column: "segment_id"},
         {column: "region_id"},
-    },
+    ],
     limit: 12,
 }
 

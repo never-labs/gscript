@@ -29,7 +29,7 @@ set-cookie: b=2
         headerToEncode["x-trace"] = trace
         headerEncoded := dialect.eval("http_headers", headerToEncode, {mode: "encode"})
 
-        cookieEncoded := dialect.eval("cookies", {session: trace, tag: {"a", "b"}}, {mode: "encode"})
+        cookieEncoded := dialect.eval("cookies", {session: trace, tag: ["a", "b"]}, {mode: "encode"})
         durationEncoded := dialect.eval("duration", {milliseconds: timeout.milliseconds + i % 17}, {mode: "encode"})
 
         checksum = checksum_text(checksum, headerRows["Content-Type"])

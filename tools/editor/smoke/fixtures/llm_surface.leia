@@ -14,22 +14,22 @@ lookup := llm.tool("lookup", func(query) {
 answer := llm.agent("answer", func(question) {
     return {
         model: "demo"
-        messages: {
+        messages: [
             llm.system("Use local docs."),
             llm.user(question)
-        }
-        tools: {lookup}
-        budget: { turns: 4, calls: 4, time: 30s }
+        ]
+        tools: [lookup]
+        budget: {turns: 4, calls: 4, seconds: 30}
     }, nil
 })
 
 func run_answer(question) {
     ids := [3]i64{1, 2, 3}
-    _ = ids
+    assert(#ids == 3)
     return answer(question)
 }
 
 go func() {
-    ch := chan()
+    ch := make(chan)
     ch <- run_answer("What is Leia?")
 }()

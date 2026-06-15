@@ -10,9 +10,9 @@ func make_event(i, regions, products, channels) {
 }
 
 func aggregate(n, passes) {
-    regions := {"na", "eu", "apac", "latam", "mea"}
-    products := {"core", "pro", "team", "edge", "ai", "data", "ops"}
-    channels := {"web", "partner", "sales", "market"}
+    regions := ["na", "eu", "apac", "latam", "mea"]
+    products := ["core", "pro", "team", "edge", "ai", "data", "ops"]
+    channels := ["web", "partner", "sales", "market"]
     totals := {}
     checksum := 0
 

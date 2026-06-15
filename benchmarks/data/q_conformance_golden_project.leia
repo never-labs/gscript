@@ -6,16 +6,16 @@ REPS := 1200
 MOD := 1000000007
 
 bars := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "MSFT", "AAPL"}),
-  bucket: data.strings({"09:30", "09:30", "09:30", "09:31"}),
-  seq: data.i64({1, 2, 3, 4}),
-  px: data.f64({100.0, 100.5, 80.0, 101.0}),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT", "AAPL"]),
+  bucket: data.strings(["09:30", "09:30", "09:30", "09:31"]),
+  seq: data.i64([1, 2, 3, 4]),
+  px: data.f64([100.0, 100.5, 80.0, 101.0]),
 })
 keyed := q.key_by(bars, "sym", "bucket")
 temporal_keyed := q.key_by(data.frame({
-  sym: data.symbols({"AAPL", "MSFT"}),
-  bucket: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z"}),
-  notional: data.f64({10012.0, 8050.0}),
+  sym: data.symbols(["AAPL", "MSFT"]),
+  bucket: data.timestamp(["2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z"]),
+  notional: data.f64([10012.0, 8050.0]),
 }), "sym", "bucket")
 
 quotes := q.sql(

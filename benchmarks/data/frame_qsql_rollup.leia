@@ -61,7 +61,7 @@ orders := memory_frame({
     gross: make_gross(N),
     discount: make_discount(N),
     units: make_units(N),
-}, {"day", "region_id", "product_id", "channel_id", "gross", "discount", "units"})
+}, ["day", "region_id", "product_id", "channel_id", "gross", "discount", "units"])
 
 qsql_rollup := "select revenue:sum gross-discount, gross:sum gross, units:sum units, orders:count i by region_id, product_id from orders where gross>900"
 

@@ -188,7 +188,7 @@ def check_textmate() -> None:
     assert_match(leia, "support.type.primitive.leia", "ids := [3]i64{1, 2, 3}")
     for unsupported in ("i8", "i16", "u8", "u16", "u32", "u64"):
         assert_no_match(leia, "support.type.primitive.leia", f"ids := [3]{unsupported}{{1, 2, 3}}")
-    assert_match(leia, "constant.numeric.duration.leia", source)
+    assert_match(leia, "constant.numeric.duration.leia", "timeout := 30s")
     assert_match(leia, "keyword.operator.leia", source)
     operator_pattern = pattern_by_name(leia, "keyword.operator.leia")
     if "%=" in str(operator_pattern.get("match", "")):

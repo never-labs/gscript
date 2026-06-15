@@ -41,7 +41,7 @@ func run_hot(n) {
 
         csvText := string.format("name,score,kind\n\"%s\",%d,api\nworker-%d,%d,batch\n", name, score, id % 31, score % 89)
         rows := csv.parseWithHeaders(csvText)
-        outCsv := csv.encodeWithHeaders(rows, {"name", "score", "kind"})
+        outCsv := csv.encodeWithHeaders(rows, ["name", "score", "kind"])
         checksum = mix(checksum, #rows + #outCsv + tonumber(rows[2].score) + #rows[1].name)
 
         raw := string.format("%s|%d|%d|%s", name, id, score, payload)

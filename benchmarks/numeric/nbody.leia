@@ -7,7 +7,7 @@ SOLAR_MASS := 4 * PI * PI
 DAYS_PER_YEAR := 365.24
 N_BODIES := 5
 
-bodies := {
+bodies := [
     {name: "sun",     x: 0.0, y: 0.0, z: 0.0, vx: 0.0, vy: 0.0, vz: 0.0, mass: SOLAR_MASS},
     {name: "jupiter", x: 4.84143144246472090, y: -1.16032004402742839, z: -0.10362204447112311,
      vx: 0.00166007664274403694 * DAYS_PER_YEAR, vy: 0.00769901118419740425 * DAYS_PER_YEAR,
@@ -21,7 +21,7 @@ bodies := {
     {name: "neptune", x: 15.3796971148509165, y: -25.9193146099879641, z: 0.17925877295037118,
      vx: 0.00268067772490389322 * DAYS_PER_YEAR, vy: 0.00162824170038242295 * DAYS_PER_YEAR,
      vz: -0.00009515922545197159 * DAYS_PER_YEAR, mass: 0.0000515138902046611451 * SOLAR_MASS},
-}
+]
 
 // Offset momentum
 func offsetMomentum() {

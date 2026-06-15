@@ -17,7 +17,7 @@ func checksum_text(sum, s) {
 
 app := serve.app({
     listen: "127.0.0.1:0",
-    routes: {
+    routes: [
         {method: "GET", path: "/ping/:id", handler: func(req) {
             return "pong:" .. req.params.id .. ":" .. req.query.step
         }},
@@ -28,7 +28,7 @@ app := serve.app({
             }
             return {id: body.id, name: body.name, ok: true}
         }},
-    },
+    ],
 })
 
 t0 := time.now()

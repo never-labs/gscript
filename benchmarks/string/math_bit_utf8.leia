@@ -4,11 +4,11 @@ N := 180000
 MOD := 1000000007
 MASK32 := 4294967295
 
-inputs := {"101010", "755", "1f", "Z", "12345", "-1011", "+1Z", "777777"}
-bases := {2, 8, 16, 36, 10, 2, 36, 8}
+inputs := ["101010", "755", "1f", "Z", "12345", "-1011", "+1Z", "777777"]
+bases := [2, 8, 16, 36, 10, 2, 36, 8]
 text := "Az" .. utf8.char(0x4e2d) .. utf8.char(0x03bb) .. utf8.char(0x1f600)
 textLen := utf8.len(text)
-textOffsets := {1, 2, 3, 6, 8}
+textOffsets := [1, 2, 3, 6, 8]
 
 func toint(x) {
   n := tonumber(x)
