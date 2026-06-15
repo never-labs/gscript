@@ -162,6 +162,33 @@ func TestTier2CallableGateRejectsOPVarargWithoutDeclaration(t *testing.T) {
 	}
 }
 
+func TestTier2GateRejectsFieldBackedLoopTableMutationWithoutDisablingTier1(t *testing.T) {
+	top := compileTop(t, `
+func build(n) {
+	t := {}
+	t.rows = {}
+	for i := 1; i <= n; i++ {
+		t.rows[i] = {}
+	}
+	return t
+}
+`)
+	proto := findFirstProtoWithName(t, top, "build")
+	if proto == nil {
+		t.Fatal("build proto not found")
+	}
+	if !proto.MethodJITTier1Callable() || proto.JITDisabled {
+		t.Fatal("field-backed loop table mutation should remain eligible for Tier 1 fallback")
+	}
+	if canPromoteToTier2(proto) {
+		t.Fatal("field-backed loop table mutation should not promote to Tier 2")
+	}
+	gate := firstUnsupportedTier2BytecodeGate(proto)
+	if gate.Allowed || gate.Gate != "Tier2LoopAllocation" {
+		t.Fatalf("Tier2 gate = %+v, want Tier2LoopAllocation blocker", gate)
+	}
+}
+
 func findFirstProtoWithName(t *testing.T, root *vm.FuncProto, name string) *vm.FuncProto {
 	t.Helper()
 	if root.Name == name {

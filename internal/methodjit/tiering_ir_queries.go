@@ -123,6 +123,36 @@ func hasStaticOpInLoop(proto *vm.FuncProto, target vm.Opcode) bool {
 	return false
 }
 
+func firstFieldBackedTableAccessInLoop(proto *vm.FuncProto) (vm.Opcode, bool) {
+	if proto == nil || len(proto.Code) == 0 {
+		return 0, false
+	}
+	inLoop := staticLoopPCs(proto)
+	for pc, inst := range proto.Code {
+		if !inLoop[pc] || vm.DecodeOp(inst) != vm.OP_GETFIELD {
+			continue
+		}
+		fieldReg := vm.DecodeA(inst)
+		for next := pc + 1; next < len(proto.Code) && next <= pc+4; next++ {
+			if !inLoop[next] {
+				break
+			}
+			nextInst := proto.Code[next]
+			switch vm.DecodeOp(nextInst) {
+			case vm.OP_GETTABLE:
+				if vm.DecodeB(nextInst) == fieldReg {
+					return vm.OP_GETFIELD, true
+				}
+			case vm.OP_SETTABLE:
+				if vm.DecodeA(nextInst) == fieldReg {
+					return vm.OP_GETFIELD, true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
 func hasFieldDispatchCallInLoop(proto *vm.FuncProto) bool {
 	fn := BuildGraph(proto)
 	if fn == nil || fn.Entry == nil || fn.Unpromotable {

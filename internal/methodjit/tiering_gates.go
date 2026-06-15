@@ -38,6 +38,9 @@ func canPromoteToTier2(proto *vm.FuncProto) bool {
 	if !jitTier2CallableGate(proto).Allowed {
 		return false
 	}
+	if hasStaticLoopAllocationBlocker(proto) {
+		return false
+	}
 	if protoLoadsProtectedCallBuiltin(proto) {
 		return false
 	}
@@ -65,6 +68,9 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 	if gate := jitTier2CallableGate(proto); !gate.Allowed {
 		return gate
 	}
+	if op, ok := firstStaticLoopAllocationBlocker(proto); ok {
+		return blockGate("Tier2LoopAllocation", vm.OpName(op)+" in loop")
+	}
 	if name, ok := firstProtectedCallBuiltinLoad(proto); ok {
 		return blockGate("Tier2Bytecode", name+" protected-call ABI")
 	}
@@ -77,6 +83,18 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 		}
 	}
 	return allowGate("Tier2Bytecode", "all bytecodes supported")
+}
+
+func hasStaticLoopAllocationBlocker(proto *vm.FuncProto) bool {
+	_, ok := firstStaticLoopAllocationBlocker(proto)
+	return ok
+}
+
+func firstStaticLoopAllocationBlocker(proto *vm.FuncProto) (vm.Opcode, bool) {
+	if !hasStaticOpInLoop(proto, vm.OP_NEWTABLE) {
+		return 0, false
+	}
+	return firstFieldBackedTableAccessInLoop(proto)
 }
 
 func protoLoadsProtectedCallBuiltin(proto *vm.FuncProto) bool {
