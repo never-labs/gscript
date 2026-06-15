@@ -9,11 +9,11 @@ Leia is an efficient, embeddable scripting language for Go, combining a
 LuaJIT-class execution model, q-style high-throughput in-memory columnar
 analytics, and first-class extensible domain dialects.
 
-```leia
+````leia
 trades := q```flip `sym`px`qty!(`AAPL`MSFT`AAPL;100 101.5 100.75;10 12 8)```
 leader := q.sql(trades, "select qty:sum qty, avg_px:avg px by sym from trades order by qty desc")
 print(leader[1].sym, leader[1].qty, leader[1].avg_px)
-```
+````
 
 ## What It Is
 

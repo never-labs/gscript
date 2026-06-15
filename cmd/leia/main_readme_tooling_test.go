@@ -101,6 +101,38 @@ func TestReadmeMainLeiaExampleStaysRunnableToProviderBoundary(t *testing.T) {
 	}
 }
 
+func TestDocsHomeMainLeiaExampleStaysRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snippet := readmeFirstLeiaSnippet(string(data))
+	if snippet == "" {
+		t.Fatal("docs/index.md must contain a Leia example")
+	}
+	for _, want := range []string{"trades := q```", "q.sql(", "print(leader[1].sym"} {
+		if !strings.Contains(snippet, want) {
+			t.Fatalf("docs home Leia example missing %q:\n%s", want, snippet)
+		}
+	}
+	file := filepath.Join(t.TempDir(), "docs-home.leia")
+	if err := os.WriteFile(file, []byte(snippet), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", "./cmd/leia", "run", file)
+	cmd.Dir = root
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("docs home Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "AAPL\t18\t100.375" {
+		t.Fatalf("docs home Leia example stdout = %q, want qSQL rollup", stdout.String())
+	}
+}
+
 func readmeFirstLeiaSnippet(readme string) string {
 	for _, marker := range []string{"```go", "````leia", "```leia"} {
 		start := strings.Index(readme, marker)
