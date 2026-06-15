@@ -3,7 +3,7 @@ print("case:calls_multiline_adjust_more")
 t := nil
 func f(a, b, c) {
   d := "a"
-  t = {a, b, c, d}
+  t = [a, b, c, d]
 }
 
 f(

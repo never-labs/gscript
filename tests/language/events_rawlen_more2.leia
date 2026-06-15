@@ -1,6 +1,6 @@
 print("case:events_rawlen_more2")
 
-t := {1, 2, 3}
+t := [1, 2, 3]
 mt := {__len: func() { return 10 }}
 setmetatable(t, mt)
 assert(#t == 10 && rawlen(t) == 3)

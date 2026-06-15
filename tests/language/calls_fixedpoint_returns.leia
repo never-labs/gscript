@@ -37,7 +37,7 @@ func unlpack(t, i) {
     }
 }
 
-a, b, c, d := unlpack({1, 2, 3})
+a, b, c, d := unlpack([1, 2, 3])
 assert(a == 1 && b == 2 && c == 3 && d == nil)
 
 print("ok")

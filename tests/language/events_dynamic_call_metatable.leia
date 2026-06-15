@@ -2,7 +2,7 @@ print("case:events_dynamic_call_metatable")
 
 u := table.pack
 for i := 1; i <= 4; i++ {
-  u = setmetatable({i}, {__call: u})
+  u = setmetatable([i], {__call: u})
 }
 
 packed := u("x", "y")

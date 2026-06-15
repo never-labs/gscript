@@ -2,7 +2,7 @@ print("case:events_rawlen")
 
 mt := {}
 mt.__len = func() { return 10 }
-t := {1, 2, 3}
+t := [1, 2, 3]
 setmetatable(t, mt)
 assert(#t == 10 && rawlen(t) == 3)
 assert(rawlen("abc") == 3)

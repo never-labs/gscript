@@ -4,7 +4,7 @@ rawget({}, "x", 1)
 rawset({}, "x", 1, 2)
 assert(math.sin(1, 2) == math.sin(1))
 
-t := {10, 9, 8, 4, 19, 23, 0, 0}
+t := [10, 9, 8, 4, 19, 23, 0, 0]
 comp := func(a, b) {
   return a < b
 }

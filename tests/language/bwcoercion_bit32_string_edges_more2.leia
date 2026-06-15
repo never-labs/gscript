@@ -12,7 +12,7 @@ func toint(x) {
   return y
 }
 
-inputs := {" 15 ", "0xf0", "-1", "4294967296", "3.0"}
+inputs := [" 15 ", "0xf0", "-1", "4294967296", "3.0"]
 assert(toint(inputs[1]) == 15)
 assert(toint(inputs[2]) == 240)
 assert(toint(inputs[3]) == -1)

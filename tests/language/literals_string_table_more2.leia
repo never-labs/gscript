@@ -1,12 +1,12 @@
 print("case:literals_string_table_more2")
 
-words := {
+words := [
   "alo",
   "alo\n",
   "\nalo\n",
   "",
   "brackets [] and equals ==",
-}
+]
 
 assert(#words == 5)
 assert(words[1] .. words[4] == "alo")

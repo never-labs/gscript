@@ -1,7 +1,7 @@
 print("case:big_generated_eval_env_more")
 
 lim := 128 + 7
-prog := {"y := {0"}
+prog := ["y := {0"]
 for i := 1; i <= lim; i++ {
   prog[#prog + 1] = i
 }
