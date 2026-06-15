@@ -162,6 +162,37 @@ func TestReferenceDialectsIntroExampleStaysRunnable(t *testing.T) {
 	}
 }
 
+func TestReferenceDataOrientedExamplesStayRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "data-oriented", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := markdownLeiaSnippets(string(data))
+	if len(blocks) < 8 {
+		t.Fatalf("docs/reference/data-oriented/index.md Leia examples = %d, want data-oriented walkthrough", len(blocks))
+	}
+	source := strings.Join(blocks, "\n\n") + `
+assert(#roundtrip == 1)
+assert(total[1].channel_id == 1)
+assert(total[1].amount == 120.0)
+assert(sum == 90.0)
+assert(soa.len(window) == 3)
+`
+	file := filepath.Join(t.TempDir(), "data-oriented-reference.leia")
+	if err := os.WriteFile(file, []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", "./cmd/leia", "run", file)
+	cmd.Dir = root
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("data-oriented reference Leia examples failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+}
+
 func readmeFirstLeiaSnippet(readme string) string {
 	for _, marker := range []string{"```go", "````leia", "```leia"} {
 		start := strings.Index(readme, marker)
@@ -177,4 +208,30 @@ func readmeFirstLeiaSnippet(readme string) string {
 		return strings.TrimSpace(rest[:blockEnd]) + "\n"
 	}
 	return ""
+}
+
+func markdownLeiaSnippets(markdown string) []string {
+	var snippets []string
+	lines := strings.Split(markdown, "\n")
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		var fence string
+		switch {
+		case strings.HasPrefix(line, "````leia"):
+			fence = "````"
+		case strings.HasPrefix(line, "```leia"):
+			fence = "```"
+		default:
+			continue
+		}
+		var block []string
+		for i++; i < len(lines); i++ {
+			if strings.HasPrefix(lines[i], fence) {
+				break
+			}
+			block = append(block, lines[i])
+		}
+		snippets = append(snippets, strings.TrimSpace(strings.Join(block, "\n")))
+	}
+	return snippets
 }
