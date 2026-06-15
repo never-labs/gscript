@@ -1,7 +1,7 @@
 ctx, cancel := context.withTimeout(0.01)
 _ := cancel
 
-result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
+result := process.run(ctx, ["sh", "-c", "sleep 1; echo late"])
 
 print(string.format("ok=%s cancelled=%s err=%s late=%s",
     tostring(result.ok),

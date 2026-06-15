@@ -47,7 +47,7 @@ print("cmd ok:", cmd_result.ok, "code:", cmd_result.code)
 // cmd also accepts structured argv/options when shell quoting would be noisy.
 structured_cmd := dialect.eval("cmd", {
     cmd: "sh",
-    args: {"-c", "cat; printf :$LEIA_DIALECT_EXAMPLE"},
+    args: ["-c", "cat; printf :$LEIA_DIALECT_EXAMPLE"],
     stdin: "body",
     env: {LEIA_DIALECT_EXAMPLE: "env"},
 })
@@ -66,12 +66,12 @@ print("env PATH length:", #host_path)
 entry := process.entry()
 cwd_cmd := dialect.eval("cmd", {
     cmd: "sh",
-    args: {"-c", "basename \"$PWD\""},
+    args: ["-c", "basename \"$PWD\""],
     cwd: entry.dir,
 })
 override_cwd_cmd := dialect.eval("cmd", {
     cmd: "sh",
-    args: {"-c", "basename \"$PWD\""},
+    args: ["-c", "basename \"$PWD\""],
     cwd: "/",
 }, {cwd: entry.dir})
 assert(cwd_cmd.ok == true)
@@ -88,8 +88,8 @@ assert(argv[1] == "printf")
 assert(argv[2] == "quoted value")
 assert(argv[3] == "a b")
 assert(argv[4] == "")
-encoded_cmd := dialect.eval("shellwords", {"printf", "%s\n", "quoted value", "it's", ""}, {mode: "encode"})
-formatted_cmd := dialect.eval("shellwords", {"printf", "%s\n", "quoted value", "it's", ""}, {mode: "format"})
+encoded_cmd := dialect.eval("shellwords", ["printf", "%s\n", "quoted value", "it's", ""], {mode: "encode"})
+formatted_cmd := dialect.eval("shellwords", ["printf", "%s\n", "quoted value", "it's", ""], {mode: "format"})
 roundtrip_argv := dialect.eval("shellwords", encoded_cmd)
 assert(roundtrip_argv[3] == "quoted value")
 assert(roundtrip_argv[4] == "it's")

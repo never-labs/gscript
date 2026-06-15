@@ -13,7 +13,7 @@ sales := jsonl`{"segment":"retail","revenue":120,"cost":72,"units":3}
 `
 
 segment_weights := nums`1.00 1.20 0.90`
-regions := {"north", "south"}
+regions := ["north", "south"]
 totals := matrix.dense(#regions, 4)
 
 func region_index(name) {
@@ -84,7 +84,7 @@ report := soa.zip({
 })
 
 empty_sales := dialect.eval("jsonl", "")
-empty_report := soa.zip({revenue: array.f64({})})
+empty_report := soa.zip({revenue: array.f64([])})
 
 missing_sales := dialect.eval("csv", "segment,revenue,cost,units\nretail,40,,1\npartner,,9,3\n", {headers: true})
 missing_revenue := number_or(missing_sales[2].revenue, 0)

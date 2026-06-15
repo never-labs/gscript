@@ -38,11 +38,11 @@ wire_response := dialect.eval("httpmsg", {
     body: response_body,
 }, {mode: "format"})
 
-events := {
+events := [
     {phase: "request", method: "GET", host: request_url.host, path: request_url.path, trace: request_headers["X-Trace-Id"]},
     {phase: "cache", key: etag_payload, ttl: tonumber(cache_control["max-age"])},
     {phase: "response", status: 200, media: response_type.type, etag: string.sub(etag, 1, 12)},
-}
+]
 trace := dialect.eval("jsonl", events, {mode: "encode"})
 
 print("request:", request_url.scheme, request_url.host, request_url.path)

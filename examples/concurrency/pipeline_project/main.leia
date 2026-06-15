@@ -117,14 +117,14 @@ func run_cancel_probe() {
     }
 }
 
-records := {
-    {id: "INC-101", service: "checkout", owner: "payments", severity: "sev2", region: "core", minutes: 9, signals: {"latency", "error"}},
-    {id: "INC-102", service: "search", owner: "discovery", severity: "sev3", region: "edge", minutes: 5, signals: {"timeout"}},
-    {id: "INC-103", service: "checkout", owner: "payments", severity: "sev1", region: "edge", minutes: 11, signals: {"latency", "error", "queue"}},
-    {id: "INC-104", service: "billing", owner: "finance", severity: "sev2", region: "core", minutes: 4, signals: {"error"}},
-    {id: "INC-105", service: "checkout", owner: "payments", severity: "sev3", region: "edge", minutes: 3, signals: {"saturation", "retry"}},
-    {id: "INC-106", service: "profile", owner: "identity", severity: "sev2", region: "core", minutes: 6, signals: {"latency"}},
-}
+records := [
+    {id: "INC-101", service: "checkout", owner: "payments", severity: "sev2", region: "core", minutes: 9, signals: ["latency", "error"]},
+    {id: "INC-102", service: "search", owner: "discovery", severity: "sev3", region: "edge", minutes: 5, signals: ["timeout"]},
+    {id: "INC-103", service: "checkout", owner: "payments", severity: "sev1", region: "edge", minutes: 11, signals: ["latency", "error", "queue"]},
+    {id: "INC-104", service: "billing", owner: "finance", severity: "sev2", region: "core", minutes: 4, signals: ["error"]},
+    {id: "INC-105", service: "checkout", owner: "payments", severity: "sev3", region: "edge", minutes: 3, signals: ["saturation", "retry"]},
+    {id: "INC-106", service: "profile", owner: "identity", severity: "sev2", region: "core", minutes: 6, signals: ["latency"]},
+]
 
 raw := make(chan, 8)
 decoded := make(chan, 8)

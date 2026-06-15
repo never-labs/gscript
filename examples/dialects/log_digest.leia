@@ -25,13 +25,13 @@ for name, _ := range pairs(components) {
 }
 table.sort(component_names)
 
-summary_lines := {
+summary_lines := [
     "events=" .. #events,
     "errors=" .. counts.error,
     "warnings=" .. counts.warn,
     "components=" .. table.concat(component_names, ","),
     "message_words=" .. message_words,
-}
+]
 summary := table.concat(summary_lines, "\n")
 digest := dialect.eval("hash", summary)
 encoded_summary := dialect.eval("base64", summary)

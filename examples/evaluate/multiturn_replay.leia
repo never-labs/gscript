@@ -1,8 +1,8 @@
 func run_multiturn_replay() {
-    history := {
+    history := [
         llm.system("Plan and then summarize Leia replay work."),
         llm.user("Create a short implementation plan for replay checks."),
-    }
+    ]
 
     plan, err := llm.turn({
         model: "mock-fast",

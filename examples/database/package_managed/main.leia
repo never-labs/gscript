@@ -20,13 +20,13 @@ conn.exec(sql`create table ledger_entries (
     foreign key (account_id) references accounts(id)
 )`)
 
-accounts := {
+accounts := [
     {id: 1, code: "cash", name: "Operating Cash", kind: "asset"},
     {id: 2, code: "ar", name: "Accounts Receivable", kind: "asset"},
     {id: 3, code: "rev", name: "Product Revenue", kind: "income"},
     {id: 4, code: "ops", name: "Operations Expense", kind: "expense"},
     {id: 5, code: "refund", name: "Customer Refunds", kind: "contra_income"},
-}
+]
 
 for i := 1; i <= #accounts; i++ {
     conn.exec(sql {
@@ -35,7 +35,7 @@ for i := 1; i <= #accounts; i++ {
     })
 }
 
-entries := {
+entries := [
     {id: 1, account_id: 1, posted_on: "2026-06-01", project: "alpha", amount_cents: 125000, memo: "Acme payment", cleared: true},
     {id: 2, account_id: 3, posted_on: "2026-06-01", project: "alpha", amount_cents: 125000, memo: "Acme invoice", cleared: true},
     {id: 3, account_id: 4, posted_on: "2026-06-02", project: "platform", amount_cents: -18000, memo: "hosting", cleared: true},
@@ -46,7 +46,7 @@ entries := {
     {id: 8, account_id: 2, posted_on: "2026-06-04", project: "gamma", amount_cents: 44000, memo: "Gamma invoice", cleared: false},
     {id: 9, account_id: 3, posted_on: "2026-06-04", project: "gamma", amount_cents: 44000, memo: "Gamma revenue", cleared: false},
     {id: 10, account_id: 4, posted_on: "2026-06-05", project: "gamma", amount_cents: -9500, memo: "team tools", cleared: true},
-}
+]
 
 for i := 1; i <= #entries; i++ {
     conn.exec(sql {

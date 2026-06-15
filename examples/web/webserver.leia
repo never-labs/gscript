@@ -40,7 +40,7 @@ router.get("/json", func(req, res) {
     data := {
         language: "Leia",
         version: "0.1.0",
-        features: {"closures", "metatables", "coroutines"},
+        features: ["closures", "metatables", "coroutines"],
         counter: counter
     }
     res.json(data)

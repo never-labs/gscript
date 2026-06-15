@@ -1,7 +1,7 @@
 func summarize_with_replay() {
     return llm.turn({
         model: "mock-fast",
-        messages: {llm.user("Summarize Leia replay checks in five words.")},
+        messages: [llm.user("Summarize Leia replay checks in five words.")],
     })
 }
 

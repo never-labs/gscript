@@ -25,14 +25,14 @@ clipboard_probe := macos.applescript({
 workflow := macos.plan({
     name: "release-note-notification",
     dry_run: true,
-    steps: {
+    steps: [
         notification,
         clipboard_probe,
         macos.open_url({
             url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
             dry_run: true,
         }),
-    },
+    ],
 })
 
 return workflow

@@ -330,7 +330,7 @@ func newBST() {
 }
 
 tree := newBST()
-values := {5, 3, 7, 1, 4, 6, 8, 2}
+values := [5, 3, 7, 1, 4, 6, 8, 2]
 for i := 1; i <= #values; i++ {
     tree.insert(values[i])
 }
@@ -532,14 +532,14 @@ func isBalanced(str) {
     return stack.isEmpty()
 }
 
-tests := {
+tests := [
     {expr: "(())", expected: true},
     {expr: "({[]})", expected: true},
     {expr: "(()", expected: false},
     {expr: "({)}", expected: false},
     {expr: "", expected: true},
     {expr: "a + (b * [c - {d}])", expected: true}
-}
+]
 
 for i := 1; i <= #tests; i++ {
     t := tests[i]

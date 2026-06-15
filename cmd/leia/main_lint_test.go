@@ -204,7 +204,7 @@ func TestLintJSONReportsEmptyDiagnosticsOnSuccess(t *testing.T) {
 func TestLintWarnsForPositionalTableLiterals(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "compat.leia")
-	if err := os.WriteFile(path, []byte("xs := {1, 2}\nrec := {name: \"Ada\"}\nys := [1, 2]\n"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("xs := {1, 2}\nrec := {name: \"Ada\"}\nys := [1, 2]\nfunc f(...) { args := {...} }\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 

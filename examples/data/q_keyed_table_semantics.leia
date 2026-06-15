@@ -3,10 +3,10 @@
 //   go run ./cmd/leia run examples/data/q_keyed_table_semantics.leia
 
 bars := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
-  bucket: data.strings({"09:30", "09:30", "09:31"}),
-  seq: data.i64({1, 2, 3}),
-  px: data.f64({100.0, 100.5, 80.0}),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
+  bucket: data.strings(["09:30", "09:30", "09:31"]),
+  seq: data.i64([1, 2, 3]),
+  px: data.f64([100.0, 100.5, 80.0]),
 })
 
 keyed := q.key_by(bars, "sym", "bucket")

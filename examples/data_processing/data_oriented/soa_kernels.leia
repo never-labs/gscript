@@ -69,10 +69,10 @@ check("stats", fullStats.count == 4 && fullStats.mean == 51)
 check("affineWhere", soa.affineWhere(points, "x", "velocity", 0.1, []bool{true, false, true, false}, 1))
 check("affineWhere masked result", soa.column(points, "x")[1] == 2 && soa.column(points, "x")[2] == 41)
 
-check("affineMany", soa.affineMany(points, {
+check("affineMany", soa.affineMany(points, [
     {dst: "x", src: "velocity", scale: 0.25, bias: 0.5},
     {dst: "y", src: "vy", scale: 10, bias: 1},
-}))
+]))
 check("affineMany x", soa.column(points, "x")[4] == 10.5)
 check("affineMany y", soa.column(points, "y")[4] == 41)
 

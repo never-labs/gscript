@@ -8,13 +8,13 @@ func check(name, ok) {
 }
 
 columns := {
-    sym: {"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"},
-    venue: {"XNAS", "XNYS", "XNAS", "ARCX", "BATS"},
-    active: {true, false, true, nil, true},
-    note: {"open", nil, "close", "halt", "resume"},
-    trade_date: {"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02", data.null},
-    session_time: {"09:30:00", "09:31:00", "15:59:00", "10:05:00", "16:00:00"},
-    event_ts: {"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T15:59:00Z", "2026-06-02T10:05:00Z", data.null},
+    sym: ["AAPL", "MSFT", "AAPL", "NVDA", "MSFT"],
+    venue: ["XNAS", "XNYS", "XNAS", "ARCX", "BATS"],
+    active: [true, false, true, nil, true],
+    note: ["open", nil, "close", "halt", "resume"],
+    trade_date: ["2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02", data.null],
+    session_time: ["09:30:00", "09:31:00", "15:59:00", "10:05:00", "16:00:00"],
+    event_ts: ["2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", "2026-06-02T15:59:00Z", "2026-06-02T10:05:00Z", data.null],
     price: []f64{100.5, 90.0, 101.0, 200.0, 120.0},
     size: []i64{10, 15, 20, 5, 11},
 }

@@ -19,13 +19,13 @@ payments := jsonl`{"payment":"PAY-1","invoice":"INV-100","amount_cents":120000,"
 {"payment":"PAY-5","invoice":"INV-103","amount_cents":95000,"status":"settled"}
 `
 
-bank_events := {
+bank_events := [
     logfmt`ts=2026-06-05T09:00:00Z payment=PAY-1 source=bank status=posted trace=bnk-100`,
     logfmt`ts=2026-06-05T09:01:00Z payment=PAY-2 source=bank status=posted trace=bnk-102`,
     logfmt`ts=2026-06-05T09:02:00Z payment=PAY-3 source=bank status=posted trace=bnk-999`,
     logfmt`ts=2026-06-05T09:03:00Z payment=PAY-4 source=processor status=authorized trace=bnk-104`,
     logfmt`ts=2026-06-05T09:04:00Z payment=PAY-5 source=bank status=posted trace=bnk-103`,
-}
+]
 
 escalation_rules := mdtable`| Severity | Min Age | Action |
 | --- | ---: | --- |

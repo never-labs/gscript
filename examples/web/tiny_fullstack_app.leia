@@ -62,30 +62,30 @@ func render_home() {
     for _, post := range ipairs(posts) {
         items[#items + 1] = {
             tag: "li",
-            children: {
+            children: [
                 {tag: "a", attrs: {href: "/posts/" .. tostring(post.id)}, text: post.title},
                 {tag: "span", text: " [" .. post.status .. "]"},
-            },
+            ],
         }
     }
     return html {
         tag: "main",
         attrs: {class: "page"},
-        children: {
+        children: [
             {tag: "h1", text: "Leia Tiny Fullstack"},
             {tag: "ul", children: items},
-            {tag: "form", attrs: {method: "post", action: "/posts"}, children: {
+            {tag: "form", attrs: {method: "post", action: "/posts"}, children: [
                 {tag: "input", attrs: {name: "title", value: "New Post"}},
                 {tag: "input", attrs: {name: "body", value: "from form"}},
                 {tag: "button", text: "Create"},
-            }},
-        },
+            ]},
+        ],
     }
 }
 
 app := serve {
     listen: "127.0.0.1:0"
-    routes: {
+    routes: [
         {method: "GET", path: "/", handler: func(req) {
             return render_home()
         }},
@@ -123,7 +123,7 @@ app := serve {
             post := post_row(inserted.last_insert_id)
             return {created: true, id: post.id, title: post.title, status: post.status}
         }},
-    }
+    ]
 }
 
 home := http.get(app.url .. "/")

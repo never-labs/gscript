@@ -33,7 +33,7 @@ func item_or_error(id) {
 
 app := serve.app({
     listen: "127.0.0.1:0",
-    routes: {
+    routes: [
         {method: "GET", path: "/", handler: func(req) {
                 record_event(req.method, req.path, "home")
                 return "<!doctype html><html><body><h1>Leia Route Workbench</h1><p>items=" .. tostring(#events) .. "</p></body></html>"
@@ -80,7 +80,7 @@ app := serve.app({
                 record_event(req.method, req.path, id)
                 return {deleted: true, id: id}
             }},
-    },
+    ],
 })
 
 home := http.get(app.url .. "/")

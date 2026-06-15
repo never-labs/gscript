@@ -15,7 +15,7 @@ private_key := {
     text: "private key fixture",
 }
 
-pem_text := dialect.eval("pem", {certificate, private_key}, {mode: "encode"})
+pem_text := dialect.eval("pem", [certificate, private_key], {mode: "encode"})
 blocks := dialect.eval("pem", pem_text)
 single := dialect.eval("pem", blocks[1].raw, {single: true})
 roundtrip := dialect.eval("pem", blocks, {mode: "format"})

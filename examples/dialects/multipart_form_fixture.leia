@@ -1,15 +1,15 @@
 print("=== Dialects: multipart form fixture ===")
 
 boundary := "fixture-boundary"
-parts := {
+parts := [
     {name: "meta", content_type: "application/json", body: "{\"ok\":true,\"kind\":\"upload\"}"},
     {name: "file", filename: "hello.txt", content_type: "text/plain", body: "hello leia"},
-}
+]
 
 body := dialect.eval("multipart", parts, {mode: "format", boundary: boundary})
 parsed := dialect.eval("multipart", body, {mode: "decode", contentType: "multipart/form-data; boundary=" .. boundary})
 single_headers := {}
-single_headers["X-Tag"] = {"a", "b"}
+single_headers["X-Tag"] = ["a", "b"]
 single_body := dialect.eval("multipart", {name: "note", value: "hello", contentType: "text/plain", headers: single_headers}, {mode: "format", boundary: boundary})
 single := dialect.eval("multipart", single_body, {mode: "decode", boundary: boundary})
 meta := json`{"ok":true,"kind":"upload"}`

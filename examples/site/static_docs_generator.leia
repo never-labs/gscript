@@ -10,7 +10,7 @@ site := {
     release: "2026.06",
 }
 
-pages := {
+pages := [
     {
         title: "Overview",
         slug: "index",
@@ -35,7 +35,7 @@ pages := {
         status: "draft",
         body: "Summarize shipped features, known issues, and verification evidence.",
     },
-}
+]
 
 nav_rows := mdtable`| Label | Href | Section |
 | --- | --- | --- |

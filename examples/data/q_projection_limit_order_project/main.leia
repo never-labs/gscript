@@ -7,11 +7,11 @@ func check(name, ok) {
 }
 
 events := data.frame({
-    id: data.i64({1, 2, 3, 4, 5, 6, 7, 8}),
-    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL", "NVDA", "MSFT"}),
-    bucket: data.i64({10, 11, 10, 12, 12, 11, 10, 13}),
-    price: data.f64({100.0, 250.0, 101.5, 880.0, 251.0, 99.5, 881.0, 249.0}),
-    size: data.i64({10, 20, 30, 5, 25, 40, 6, 15}),
+    id: data.i64([1, 2, 3, 4, 5, 6, 7, 8]),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL", "NVDA", "MSFT"]),
+    bucket: data.i64([10, 11, 10, 12, 12, 11, 10, 13]),
+    price: data.f64([100.0, 250.0, 101.5, 880.0, 251.0, 99.5, 881.0, 249.0]),
+    size: data.i64([10, 20, 30, 5, 25, 40, 6, 15]),
 })
 
 query := "select id,sym,notional:price*size,spread:price-100 from events where bucket within 10 12 order by notional desc take 4"

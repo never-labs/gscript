@@ -6,10 +6,10 @@ team := dialect.eval("mailaddr", "Ada <ada@example.org>, Bob <bob@example.net>",
 auto_team := dialect.eval("emailaddr", "Ada <ada@example.org>, Bob <bob@example.net>")
 
 encoded := dialect.eval("mailaddr", {name: "Ada Lovelace", address: "ada@example.org"}, {mode: "format"})
-encoded_list := dialect.eval("emailaddr", {
+encoded_list := dialect.eval("emailaddr", [
     {name: "Ada Lovelace", address: "ada@example.org"},
     {address: "bob@example.net"},
-}, {mode: "encode"})
+], {mode: "encode"})
 roundtrip := dialect.eval("mailaddr", encoded_list, {mode: "parse"})
 
 print("mailaddr:", primary.address, "team", #team)

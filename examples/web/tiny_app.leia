@@ -1,13 +1,13 @@
 app := serve.app({
     listen: "127.0.0.1:0",
-    routes: {
+    routes: [
         {method: "GET", path: "/", handler: func(req) {
             return "hello from Leia"
         }},
         {method: "GET", path: "/users/:name", handler: func(req) {
             return {name: req.params.name, ok: true}
         }},
-    },
+    ],
 })
 
 root := http.get(app.url .. "/")

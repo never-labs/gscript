@@ -32,12 +32,12 @@ func rollup(run_id) {
 happy := rollup("wf-10")
 failed := rollup("wf-11")
 
-tap_text := dialect.eval("tap", {
+tap_text := dialect.eval("tap", [
     {kind: "version", version: 13},
     {kind: "plan", first: 1, last: 2},
     {kind: "test", ok: happy.status == "ok", number: 1, name: "wf-10"},
     {kind: "test", ok: failed.status == "fail", number: 2, name: "wf-11 expected failure"},
-}, {mode: "encode"})
+], {mode: "encode"})
 tap_rows := dialect.eval("tap", tap_text)
 
 assert(happy.steps == 3)

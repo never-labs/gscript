@@ -53,7 +53,7 @@ assert(contains(ci_probe.text, "evaluate=ok"))
 
 artifact_probe := dialect.eval("cmd", {
     cmd: "sh",
-    args: {"-c", "printf '%s:%s' \"$RELEASE_CHANNEL\" \"$1\"", "sh", "candidate"},
+    args: ["-c", "printf '%s:%s' \"$RELEASE_CHANNEL\" \"$1\"", "sh", "candidate"],
     env: {RELEASE_CHANNEL: "stable"},
     cwd: entry.dir,
 })

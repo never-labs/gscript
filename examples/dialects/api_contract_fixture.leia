@@ -37,11 +37,11 @@ wire_request := httpmsg {
 parsed_request := dialect.eval("httpmsg", wire_request)
 parsed_cookies := dialect.eval("cookie", parsed_request.headers.Cookie)
 
-fixture_lines := dialect.eval("jsonl", {
+fixture_lines := dialect.eval("jsonl", [
     {phase: "request", service: contract.service, method: parsed_request.method, path: parsed_request.target},
     {phase: "headers", request_id: parsed_request.headers["X-Request-Id"], content_type: parsed_request.headers["Content-Type"]},
     {phase: "expect", status: tonumber(contract.endpoint.status), version: contract.version},
-}, {mode: "encode"})
+], {mode: "encode"})
 
 fingerprint := string.sub(dialect.eval("hash", wire_request .. fixture_lines), 1, 12)
 summary := template {

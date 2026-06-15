@@ -65,12 +65,12 @@ func join(tbl, sep) {
     return result
 }
 
-words := {"Hello", "World", "from", "Leia"}
+words := ["Hello", "World", "from", "Leia"]
 print("  Join with ' ':", join(words, " "))
 print("  Join with '-':", join(words, "-"))
 print("  Join with ', ':", join(words, ", "))
 
-nums := {1, 2, 3, 4, 5}
+nums := [1, 2, 3, 4, 5]
 print("  Join nums:", join(nums, " + ") .. " = 15")
 print()
 
@@ -362,13 +362,13 @@ func formatTable(headers, rows) {
     print("  " .. separator)
 }
 
-table_headers := {"Name", "Age", "City"}
-table_rows := {
-    {"Alice", "30", "New York"},
-    {"Bob", "25", "San Francisco"},
-    {"Charlie", "35", "Chicago"},
-    {"Diana", "28", "Boston"}
-}
+table_headers := ["Name", "Age", "City"]
+table_rows := [
+    ["Alice", "30", "New York"],
+    ["Bob", "25", "San Francisco"],
+    ["Charlie", "35", "Chicago"],
+    ["Diana", "28", "Boston"]
+]
 formatTable(table_headers, table_rows)
 print()
 
@@ -381,7 +381,7 @@ func byteLength(s) {
     return #s
 }
 
-strings_to_measure := {"hello", "Leia", "", "a", "hello world"}
+strings_to_measure := ["hello", "Leia", "", "a", "hello world"]
 for i := 1; i <= #strings_to_measure; i++ {
     s := strings_to_measure[i]
     print(string.format("  \"%s\" -> byte length: %d", s, byteLength(s)))

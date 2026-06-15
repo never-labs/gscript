@@ -1,12 +1,12 @@
 classify_support := llm.agent("classify_support", func(message) {
     return {
         model: "mock-fast"
-        messages: {
+        messages: [
             llm.system("Classify support message. Return refund, shipping, or other."),
             llm.user(message),
-        },
+        ],
     }
-}, nil, {params: {"message"}})
+}, nil, {params: ["message"]})
 
 evaluate "agent consumes replay" {
     result, err := classify_support("Customer asks for a refund after a damaged delivery.")

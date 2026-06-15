@@ -26,7 +26,7 @@ campaigns := soa.zip({
 })
 
 channel_rollup := q.query(campaigns, {
-    by: {"channel_id"},
+    by: ["channel_id"],
     select: {
         spend: "spend",
         clicks: "clicks",
@@ -58,7 +58,7 @@ top_campaigns := q.query(campaigns, {
         segment_id: "segment_id",
         paid: "paid_conversions",
         revenue: "revenue",
-        roas: {"/", "revenue", "spend"},
+        roas: ["/", "revenue", "spend"],
     },
     order_by: {column: "roas", desc: true},
     limit: 3,
@@ -66,7 +66,7 @@ top_campaigns := q.query(campaigns, {
 
 risk_segments := q.query(campaigns, {
     where: soa.mask(campaigns, "churn_risk", ">=", 0.20),
-    by: {"channel_id", "segment_id"},
+    by: ["channel_id", "segment_id"],
     select: {
         revenue: "revenue",
         tickets: "support_tickets",
@@ -84,7 +84,7 @@ risk_segments := q.query(campaigns, {
 
 enterprise_cohort := q.query(campaigns, {
     where: {column: "segment_id", op: "==", value: 3},
-    by: {"segment_id"},
+    by: ["segment_id"],
     select: {
         revenue: "revenue",
         paid: "paid_conversions",

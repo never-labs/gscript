@@ -8,12 +8,12 @@ func check(name, ok) {
 }
 
 trades := data.frame({
-    id: data.i64({1, 2, 3, 4, 5, 6}),
-    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "TSLA"}),
-    side: data.symbols({"buy", "sell", "buy", "buy", "sell", "buy"}),
-    venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"}),
-    price: data.f64({100.0, 101.5, 100.75, 102.25, 103.0, 98.0}),
-    size: data.i64({100, 120, 80, 150, 90, 40}),
+    id: data.i64([1, 2, 3, 4, 5, 6]),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "TSLA"]),
+    side: data.symbols(["buy", "sell", "buy", "buy", "sell", "buy"]),
+    venue: data.strings(["XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"]),
+    price: data.f64([100.0, 101.5, 100.75, 102.25, 103.0, 98.0]),
+    size: data.i64([100, 120, 80, 150, 90, 40]),
 })
 
 distinct_syms := q.sql(trades, "select distinct sym from trades order by sym asc")
@@ -25,16 +25,16 @@ check("qsql take", #top_trades == 3 && top_trades[1].sym == "NVDA")
 check("qsql hash take", #hash_take == 2 && hash_take[1].price == 103.0)
 
 venues := data.frame({
-    venue: data.strings({"XNAS", "XNYS", "ARCX", "BATS"}),
-    mic_name: data.strings({"Nasdaq", "NYSE", "NYSE Arca", "Cboe BZX"}),
-    region: data.strings({"US", "US", "US", "US"}),
+    venue: data.strings(["XNAS", "XNYS", "ARCX", "BATS"]),
+    mic_name: data.strings(["Nasdaq", "NYSE", "NYSE Arca", "Cboe BZX"]),
+    region: data.strings(["US", "US", "US", "US"]),
 })
 
 routes := data.frame({
-    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}),
-    venue: data.strings({"XNAS", "XNYS", "BATS", "ARCX", "BATS"}),
-    route: data.strings({"lit-primary", "nyse-close", "dark-sweep", "arca-open", "bzx-close"}),
-    tier: data.i64({1, 1, 2, 1, 2}),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT"]),
+    venue: data.strings(["XNAS", "XNYS", "BATS", "ARCX", "BATS"]),
+    route: data.strings(["lit-primary", "nyse-close", "dark-sweep", "arca-open", "bzx-close"]),
+    tier: data.i64([1, 1, 2, 1, 2]),
 })
 
 q_updated := q.sql(trades, "update price:price+1.0 from trades where sym=`AAPL")

@@ -38,7 +38,7 @@ check("string columns preserved", frame.columns.label[4] == "partner")
 check("numeric soa available", soa.len(frame.soa) == 4)
 
 rollup := q.query(frame.soa, {
-    by: {"channel_id"},
+    by: ["channel_id"],
     select: {
         spend: "spend",
         revenue: "revenue",
@@ -59,7 +59,7 @@ check("q rollup", #rollup == 3 && best.channel_id == 1 && best.revenue == 550.0)
 
 workbook := dialect.eval("xlsx", rollup, {
     mode: "encode",
-    headers: {"channel_id", "spend", "revenue", "conversions", "days"},
+    headers: ["channel_id", "spend", "revenue", "conversions", "days"],
     sheet: "rollup",
 })
 roundtrip := dialect.eval("excel", workbook, {headers: true})

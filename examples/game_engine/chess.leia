@@ -159,7 +159,7 @@ func getRawMoves(piece) {
 
     if ptype == "K" {
         // General: 1 step orthogonally, must stay in palace
-        dirs := {{0, 1}, {0, -1}, {1, 0}, {-1, 0}}
+        dirs := [[0, 1], [0, -1], [1, 0], [-1, 0]]
         for i := 1; i <= #dirs; i++ {
             nc := c + dirs[i][1]
             nr := r + dirs[i][2]
@@ -206,7 +206,7 @@ func getRawMoves(piece) {
 
     if ptype == "A" {
         // Advisor: 1 step diagonally, must stay in palace
-        dirs := {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+        dirs := [[1, 1], [1, -1], [-1, 1], [-1, -1]]
         for i := 1; i <= #dirs; i++ {
             nc := c + dirs[i][1]
             nr := r + dirs[i][2]
@@ -228,8 +228,8 @@ func getRawMoves(piece) {
 
     if ptype == "E" {
         // Elephant: 2 steps diagonally, cannot cross river, blocked at midpoint
-        dirs := {{2, 2}, {2, -2}, {-2, 2}, {-2, -2}}
-        blocks := {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+        dirs := [[2, 2], [2, -2], [-2, 2], [-2, -2]]
+        blocks := [[1, 1], [1, -1], [-1, 1], [-1, -1]]
         for i := 1; i <= #dirs; i++ {
             nc := c + dirs[i][1]
             nr := r + dirs[i][2]
@@ -257,7 +257,7 @@ func getRawMoves(piece) {
     if ptype == "H" {
         // Horse: 1 orthogonal + 1 diagonal outward, blocked at orthogonal step
         // The 8 possible moves and their blocking squares
-        horseMoves := {
+        horseMoves := [
             {dc: 1, dr: 2, bc: 0, br: 1},
             {dc: 1, dr: -2, bc: 0, br: -1},
             {dc: -1, dr: 2, bc: 0, br: 1},
@@ -266,7 +266,7 @@ func getRawMoves(piece) {
             {dc: 2, dr: -1, bc: 1, br: 0},
             {dc: -2, dr: 1, bc: -1, br: 0},
             {dc: -2, dr: -1, bc: -1, br: 0}
-        }
+        ]
         for i := 1; i <= #horseMoves; i++ {
             hm := horseMoves[i]
             nc := c + hm.dc
@@ -286,7 +286,7 @@ func getRawMoves(piece) {
 
     if ptype == "R" {
         // Chariot: any number of steps orthogonally
-        dirs := {{0, 1}, {0, -1}, {1, 0}, {-1, 0}}
+        dirs := [[0, 1], [0, -1], [1, 0], [-1, 0]]
         for i := 1; i <= #dirs; i++ {
             dc := dirs[i][1]
             dr := dirs[i][2]
@@ -310,7 +310,7 @@ func getRawMoves(piece) {
 
     if ptype == "C" {
         // Cannon: moves like chariot without capturing; captures by jumping over exactly one piece
-        dirs := {{0, 1}, {0, -1}, {1, 0}, {-1, 0}}
+        dirs := [[0, 1], [0, -1], [1, 0], [-1, 0]]
         for i := 1; i <= #dirs; i++ {
             dc := dirs[i][1]
             dr := dirs[i][2]
@@ -1012,7 +1012,7 @@ rl.setTargetFPS(60)
 chessChars := "帅将仕士相象马车炮兵卒楚河汉界红黑方走军胜和棋！悔棋重新开始退出"
 
 // Prefer plain .ttf files — raylib handles .ttf more reliably than .ttc collections
-fontPaths := {
+fontPaths := [
     "/Library/Fonts/Arial Unicode.ttf",
     "/System/Library/Fonts/STHeiti Light.ttc",
     "/System/Library/Fonts/STHeiti Medium.ttc",
@@ -1020,7 +1020,7 @@ fontPaths := {
     "/System/Library/Fonts/Hiragino Sans GB.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-}
+]
 
 fontLoaded = false
 for i := 1; i <= #fontPaths; i++ {

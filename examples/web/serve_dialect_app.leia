@@ -19,16 +19,16 @@ func json_headers() {
 
 app := serve {
     listen: "127.0.0.1:0"
-    routes: {
+    routes: [
         {method: "GET", path: "/", handler: func(req) {
             remember("page", req.path)
             return html {
                 tag: "main",
                 attrs: {class: "app"},
-                children: {
+                children: [
                     {tag: "h1", text: "Leia Serve Dialect"},
                     {tag: "p", text: "orders=" .. tostring(#events)},
-                },
+                ],
             }
         }},
         {method: "GET", path: "/orders/:id", handler: func(req) {
@@ -60,7 +60,7 @@ app := serve {
             remember("status", id .. ":" .. body.status)
             return {updated: true, id: id, status: order.status}
         }},
-    }
+    ]
 }
 
 home := http.get(app.url .. "/")

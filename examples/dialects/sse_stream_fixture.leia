@@ -25,11 +25,11 @@ for _, event := range stream {
     }
 }
 
-encoded := dialect.eval("sse", {
+encoded := dialect.eval("sse", [
     {event: "token", id: "1", data: "Hel"},
     {event: "token", id: "2", data: "lo"},
     {event: "done", id: "3", data: "{}"},
-}, {mode: "format"})
+], {mode: "format"})
 roundtrip := dialect.eval("sse", encoded, {mode: "parse"})
 heartbeat := dialect.eval("sse", ": heartbeat\nevent: tick\nretry: 0\ndata:\ndata\n\n")
 

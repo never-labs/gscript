@@ -18,7 +18,7 @@ policy := quote {
     body: {
         route: "database",
         priority: "urgent",
-        notify: {"oncall", "support-lead"},
+        notify: ["oncall", "support-lead"],
     }
 }
 
@@ -48,11 +48,11 @@ func prompt_message(p, fallback_role, tag) {
     return {role: role, tag: tag, text: text}
 }
 
-messages := {
+messages := [
     prompt_message(system_prompt, "system", "policy"),
     prompt_message(user_prompt, "user", "ticket"),
     {role: "tool", tag: raw_plan.dialect, text: raw_plan.body.step},
-}
+]
 
 transcript := dialect.eval("jsonl", messages, {mode: "encode"})
 

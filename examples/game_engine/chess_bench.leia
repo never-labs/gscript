@@ -781,7 +781,7 @@ func orderMoves(moveList, depth) {
 func storeKiller(depth, fc, fr, tc, tr) {
     enc := encodeMove(fc, fr, tc, tr)
     km := killerMoves[depth]
-    if km == nil { killerMoves[depth] = {enc, 0} }
+    if km == nil { killerMoves[depth] = [enc, 0] }
     else { if km[1] != enc { km[2] = km[1]; km[1] = enc } }
 }
 

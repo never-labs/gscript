@@ -16,16 +16,16 @@ module_plan := metadata.workflow({
     require: "github.com/never-labs/leia-package-workflow/metadata",
     version: "v0.2.0",
     replace: "./local/metadata",
-    imports: {
+    imports: [
         "github.com/never-labs/leia-package-workflow/metadata/report",
-    },
-    commands: {
+    ],
+    commands: [
         "leia mod verify --json .",
         "leia mod graph --json .",
         "leia mod capability --json .",
         "leia run --mod=readonly main.leia",
         "leia run --mod=vendor main.leia",
-    },
+    ],
 })
 
 package_manager_workflow_summary := string.format(

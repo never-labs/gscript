@@ -39,7 +39,7 @@ result_set := soa.zip({
     late: array.f64(late_flags),
 })
 
-regions := {"north", "south"}
+regions := ["north", "south"]
 summary := {}
 for r := 1; r <= #regions; r++ {
     region := regions[r]

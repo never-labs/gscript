@@ -15,7 +15,7 @@ doc := json`{
 first := dialect.eval("jsonptr", doc, {path: "/trace/events/0/data"})
 second := dialect.eval("jsonptr", doc, {path: "/trace/events/1/data"})
 model := dialect.eval("jsonptr", doc, {path: "/meta/model~1name"})
-path := dialect.eval("jsonptr", {"trace", "events", "2", "type"}, {mode: "encode"})
+path := dialect.eval("jsonptr", ["trace", "events", "2", "type"], {mode: "encode"})
 done := dialect.eval("jsonptr", doc, {path: path})
 
 print("message:", first .. second, "model:", model, "done:", done)

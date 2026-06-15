@@ -14,14 +14,14 @@ This fixture models a static release dashboard generated from local data.
 - deploy
 `
 
-checks := {
+checks := [
     {Name: "unit", Status: "pass", Owner: "platform", DurationMs: "42"},
     {Name: "integration", Status: "pass", Owner: "qa", DurationMs: "88"},
     {Name: "load", Status: "pass", Owner: "performance", DurationMs: "236"},
-}
+]
 
-check_rows := {checks[1], checks[2], checks[3]}
-check_rows._headers = {"Name", "Status", "Owner", "DurationMs"}
+check_rows := [checks[1], checks[2], checks[3]]
+check_rows._headers = ["Name", "Status", "Owner", "DurationMs"]
 check_table := dialect.eval("mdtable", check_rows, {mode: "encode"})
 
 gate := {
@@ -47,15 +47,15 @@ headline := template {
 page := html {
     tag: "main",
     attrs: {class: "release-dashboard", data_release: gate.release},
-    children: {
+    children: [
         {tag: "h1", text: release_notes.title},
         {tag: "p", text: headline},
-        {tag: "section", attrs: {class: "checks"}, children: {
+        {tag: "section", attrs: {class: "checks"}, children: [
             {tag: "h2", text: "Checks"},
             {tag: "pre", text: check_table},
-        }},
+        ]},
         {tag: "script", attrs: {type: "application/json", id: "release-data"}, text: data_json},
-    },
+    ],
 }
 
 func contains(text, needle) {

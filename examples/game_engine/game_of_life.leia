@@ -139,9 +139,9 @@ func placePattern(grid, pattern, offsetX, offsetY) {
 // 1. Glider - moves diagonally
 print("--- Glider Pattern ---")
 
-glider := {
-    {2, 1}, {3, 2}, {1, 3}, {2, 3}, {3, 3}
-}
+glider := [
+    [2, 1], [3, 2], [1, 3], [2, 3], [3, 3]
+]
 
 grid := newGrid(15, 15)
 placePattern(grid, glider, 2, 2)
@@ -158,9 +158,9 @@ for gen := 0; gen <= 8; gen++ {
 // 2. Blinker - period 2 oscillator
 print("--- Blinker Pattern (period 2) ---")
 
-blinker := {
-    {2, 1}, {2, 2}, {2, 3}
-}
+blinker := [
+    [2, 1], [2, 2], [2, 3]
+]
 
 grid2 := newGrid(7, 7)
 placePattern(grid2, blinker, 2, 2)
@@ -174,9 +174,9 @@ for gen := 0; gen <= 3; gen++ {
 // 3. Block - still life
 print("--- Block Pattern (still life) ---")
 
-block := {
-    {1, 1}, {2, 1}, {1, 2}, {2, 2}
-}
+block := [
+    [1, 1], [2, 1], [1, 2], [2, 2]
+]
 
 grid3 := newGrid(6, 6)
 placePattern(grid3, block, 2, 2)
@@ -190,10 +190,10 @@ print()
 // 4. Toad - period 2 oscillator
 print("--- Toad Pattern (period 2) ---")
 
-toad := {
-    {2, 1}, {3, 1}, {4, 1},
-    {1, 2}, {2, 2}, {3, 2}
-}
+toad := [
+    [2, 1], [3, 1], [4, 1],
+    [1, 2], [2, 2], [3, 2]
+]
 
 grid4 := newGrid(8, 6)
 placePattern(grid4, toad, 2, 2)
@@ -207,11 +207,11 @@ for gen := 0; gen <= 3; gen++ {
 // 5. R-pentomino - a chaotic pattern
 print("--- R-pentomino (chaotic!) ---")
 
-rpentomino := {
-    {2, 1}, {3, 1},
-    {1, 2}, {2, 2},
-    {2, 3}
-}
+rpentomino := [
+    [2, 1], [3, 1],
+    [1, 2], [2, 2],
+    [2, 3]
+]
 
 grid5 := newGrid(20, 20)
 placePattern(grid5, rpentomino, 9, 9)
@@ -230,11 +230,11 @@ for gen := 0; gen <= 20; gen++ {
 // 6. Die Hard - a methuselah that dies after 130 generations
 print("--- Die Hard Pattern ---")
 
-diehard := {
-    {7, 1},
-    {1, 2}, {2, 2},
-    {2, 3}, {6, 3}, {7, 3}, {8, 3}
-}
+diehard := [
+    [7, 1],
+    [1, 2], [2, 2],
+    [2, 3], [6, 3], [7, 3], [8, 3]
+]
 
 grid6 := newGrid(20, 12)
 placePattern(grid6, diehard, 5, 4)

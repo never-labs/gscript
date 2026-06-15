@@ -25,18 +25,18 @@ func stable_distinct(values) {
 // modeled here with ordinary Leia tables to keep the example runnable.
 rich_indexes := q.eval("where 100 101.5 100.75 102.25 103 99.5>100")
 top_prices := q.eval("3#103 102.25 101.5 100.75")
-symbols := stable_distinct({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"})
+symbols := stable_distinct(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"])
 
 check("filter indexes", q.count(rich_indexes) == 4 && rich_indexes[1] == 1 && rich_indexes[4] == 4)
 check("take prices", q.count(top_prices) == 3 && top_prices[1] == 103 && top_prices[3] == 101.5)
 check("stable distinct", #symbols == 3 && symbols[1] == "AAPL" && symbols[3] == "NVDA")
 
 trades := data.frame({
-    sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"}),
-    side: data.symbols({"buy", "sell", "buy", "buy", "sell", "sell"}),
-    venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"}),
-    price: data.f64({100.0, 101.5, 100.75, 102.25, 103.0, 99.5}),
-    size: data.i64({100, 120, 80, 150, 90, 50}),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT", "AAPL"]),
+    side: data.symbols(["buy", "sell", "buy", "buy", "sell", "sell"]),
+    venue: data.strings(["XNAS", "XNYS", "XNAS", "ARCX", "BATS", "XNAS"]),
+    price: data.f64([100.0, 101.5, 100.75, 102.25, 103.0, 99.5]),
+    size: data.i64([100, 120, 80, 150, 90, 50]),
 })
 
 leaders := q.sql(trades, "select sym,side,venue,notional:price*size from trades where price>100 order by notional desc,sym asc limit 3")
@@ -87,30 +87,30 @@ roundtrip := conn.query(sql`select sym,notional,fills from q_rollup order by ran
 check("db frame qsql sqlite roundtrip", #roundtrip == 3 && roundtrip[1].sym == "MSFT" && roundtrip[1].fills == 2)
 
 market := {
-    ticks: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-    trades: {1, 2, 3, 4, 5, 6},
-    quotes: {1, 2, 3, 4, 5, 6, 7},
-    enriched: {1, 2, 3, 4, 5, 6},
-    bars: {
+    ticks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    trades: [1, 2, 3, 4, 5, 6],
+    quotes: [1, 2, 3, 4, 5, 6, 7],
+    enriched: [1, 2, 3, 4, 5, 6],
+    bars: [
         {bucket: "2026-06-06T09:30:00Z", vwap: 100.12},
         {bucket: "2026-06-06T09:31:00Z", vwap: 100.50},
         {bucket: "2026-06-06T09:30:00Z", vwap: 250.30},
         {bucket: "2026-06-06T09:31:00Z", vwap: 250.90},
         {bucket: "2026-06-06T09:32:00Z", vwap: 882.00},
         {bucket: "2026-06-06T09:31:00Z", vwap: 140.10},
-    },
-    desk_rollup: {
+    ],
+    desk_rollup: [
         {desk: "alpha"},
         {desk: "beta"},
         {desk: "gamma"},
         {desk: "omega"},
-    },
-    parent_rollup: {
+    ],
+    parent_rollup: [
         {filled: 150.0},
         {filled: 75.0},
         {filled: 12.0},
         {filled: 5.0},
-    },
+    ],
 }
 
 check("market ticks trades quotes", #market.ticks == 15 && #market.trades == 6 && #market.quotes == 7)

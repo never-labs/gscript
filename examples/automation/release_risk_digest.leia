@@ -102,7 +102,7 @@ for i := 1; i <= #changes; i++ {
         seen[change.id] = true
         text := change.title .. " " .. change.body
         build := build_rollup(change.id)
-        sensitive := contains_any(text, {"payment", "card", "admin", "password", "token"})
+        sensitive := contains_any(text, ["payment", "card", "admin", "password", "token"])
         score := rule.base_score + type_bonus(change.type)
         if sensitive {
             score = score + 15
@@ -184,7 +184,7 @@ report := template {
 
 markdown := dialect.eval("mdtable", top_rows, {
     mode: "encode",
-    headers: {"rank", "id", "owner", "area", "risk", "failed", "duration"},
+    headers: ["rank", "id", "owner", "area", "risk", "failed", "duration"],
 })
 
 jsonl_report := dialect.eval("jsonl", top_rows, {mode: "encode"})

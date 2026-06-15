@@ -38,20 +38,20 @@ evidence := jsonl`{"vendor":"V-100","control":"soc2","status":"pass","received":
 {"vendor":"V-103","control":"dpa","status":"pass","received":"2026-03-01T08:00:00Z"}
 `
 
-findings := {
+findings := [
     logfmt`ts=2026-06-05T07:00:00Z vendor=V-100 severity=high status=open item=key_rotation`,
     logfmt`ts=2026-06-05T07:10:00Z vendor=V-100 severity=medium status=closed item=saml_metadata`,
     logfmt`ts=2026-06-05T07:20:00Z vendor=V-101 severity=low status=open item=questionnaire_note`,
     logfmt`ts=2026-06-05T07:30:00Z vendor=V-103 severity=high status=open item=hipaa_baa_missing`,
     logfmt`ts=2026-06-05T07:40:00Z vendor=V-103 severity=medium status=open item=audit_logs`,
-}
+]
 
-certificate_pem := dialect.eval("pem", {
+certificate_pem := dialect.eval("pem", [
     {type: "CERTIFICATE", headers: {Vendor: "V-100", NotAfter: "2026-06-20T00:00:00Z"}, body: "acme payments fixture\n"},
     {type: "CERTIFICATE", headers: {Vendor: "V-101", NotAfter: "2026-08-15T00:00:00Z"}, body: "cloud tasks fixture\n"},
     {type: "CERTIFICATE", headers: {Vendor: "V-102", NotAfter: "2027-01-15T00:00:00Z"}, body: "docs cdn fixture\n"},
     {type: "CERTIFICATE", headers: {Vendor: "V-103", NotAfter: "2026-05-30T00:00:00Z"}, body: "health metrics fixture\n"},
-}, {mode: "encode"})
+], {mode: "encode"})
 certificates := dialect.eval("pem", certificate_pem)
 
 reviewers := dialect.eval("mailaddr", policy.reviewers.security .. ", " .. policy.reviewers.procurement, {list: true})

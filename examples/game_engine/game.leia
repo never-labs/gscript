@@ -3,7 +3,7 @@
 
 score := 0
 frame := 0
-enemies := {"enemy_1", "enemy_2", "enemy_3"}
+enemies := ["enemy_1", "enemy_2", "enemy_3"]
 
 func onStart() {
     engine.log("Game starting!")

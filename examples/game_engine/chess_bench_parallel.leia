@@ -846,7 +846,7 @@ func storeKiller(depth, fc, fr, tc, tr, ctx) {
     if ctx != nil { km_table = ctx.killerMoves }
     enc := encodeMove(fc, fr, tc, tr)
     km := km_table[depth]
-    if km == nil { km_table[depth] = {enc, 0} }
+    if km == nil { km_table[depth] = [enc, 0] }
     else { if km[1] != enc { km[2] = km[1]; km[1] = enc } }
 }
 

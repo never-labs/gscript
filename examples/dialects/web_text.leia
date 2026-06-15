@@ -19,10 +19,10 @@ unescaped_html := dialect.eval("html_escape", escaped_html, {mode: "decode"})
 html_card := html {
     tag: "article",
     attrs: {class: "note", data_id: "web-1"},
-    children: {
+    children: [
         {tag: "h2", text: "Web <safe>"},
         {tag: "p", text: "Ada & Bob"},
-    },
+    ],
 }
 print("html escaped:", escaped_html)
 assert(escaped_html == "&lt;b&gt;Ada &amp; Bob&lt;/b&gt;")
@@ -73,7 +73,7 @@ assert(encoded_content_type == "application/json; charset=utf-8; version=2")
 parsed_headers := dialect.eval("headers", "content-type: text/plain\r\nset-cookie: a=1\r\nset-cookie: b=2\r\nx-trace: abc\r\n", {mode: "decode"})
 headers_to_encode := {}
 headers_to_encode["content-type"] = "text/plain"
-headers_to_encode["set-cookie"] = {"a=1", "b=2"}
+headers_to_encode["set-cookie"] = ["a=1", "b=2"]
 headers_to_encode["x-trace"] = "abc"
 encoded_headers := dialect.eval("headers", headers_to_encode, {mode: "format"})
 print("headers content-type:", parsed_headers["Content-Type"])
@@ -83,7 +83,7 @@ assert(parsed_headers["Set-Cookie"][2] == "b=2")
 assert(encoded_headers == "Content-Type: text/plain\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nX-Trace: abc\r\n")
 
 parsed_cookies := cookie`session=abc123; theme=light; tag=a; tag=b`
-encoded_cookies := dialect.eval("cookie", {session: "abc123", theme: "light", tag: {"a", "b"}}, {mode: "format"})
+encoded_cookies := dialect.eval("cookie", {session: "abc123", theme: "light", tag: ["a", "b"]}, {mode: "format"})
 print("cookie session:", parsed_cookies.session)
 print("cookie second tag:", parsed_cookies.tag[2])
 assert(parsed_cookies.session == "abc123")

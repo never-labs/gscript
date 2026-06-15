@@ -3,17 +3,17 @@
 //   go run ./cmd/leia run examples/data/q_multi_key_join.leia
 
 positions := data.frame({
-  acct: data.symbols({"a1", "a1", "a2", "a3"}),
-  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA"}),
-  asof: data.strings({"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"}),
-  qty: data.i64({11, 21, 15, 5}),
+  acct: data.symbols(["a1", "a1", "a2", "a3"]),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA"]),
+  asof: data.strings(["2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"]),
+  qty: data.i64([11, 21, 15, 5]),
 })
 
 limits := data.frame({
-  account: data.symbols({"a1", "a1", "a2", "a3", "a3"}),
-  effective: data.strings({"2026-06-01", "2026-06-02", "2026-06-02", "2026-06-01", "2026-06-02"}),
-  region: data.strings({"US", "EU", "US", "APAC", "US"}),
-  max_qty: data.i64({100, 200, 150, 50, 75}),
+  account: data.symbols(["a1", "a1", "a2", "a3", "a3"]),
+  effective: data.strings(["2026-06-01", "2026-06-02", "2026-06-02", "2026-06-01", "2026-06-02"]),
+  region: data.strings(["US", "EU", "US", "APAC", "US"]),
+  max_qty: data.i64([100, 200, 150, 50, 75]),
 })
 
 joined := q.sql(

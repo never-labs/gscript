@@ -3,16 +3,16 @@
 
 print("case:execution_modes_matrix")
 
-modes := {
+modes := [
     {name: "interpreter", role: "semantic reference", fallback: false},
     {name: "bytecode-vm", role: "default execution engine", fallback: true},
     {name: "arm64-jit", role: "hot-path acceleration", fallback: true},
-}
+]
 
-benchmarks := {
+benchmarks := [
     {id: "table/table_array_access", current: 0.07375, luajit: 0.10575},
     {id: "control/sieve", current: 0.019125, luajit: 0.06625},
-}
+]
 
 fallback_modes := 0
 for _, mode := range modes {

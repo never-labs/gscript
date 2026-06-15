@@ -20,7 +20,7 @@ token := dialect.eval("base64", header_json, {mode: "url_encode"}) .. "." .. dia
 claims := dialect.eval("jwt", token, {mode: "decode"})
 
 request_body := dialect.eval("json", {
-    include: {"comments", "watchers"},
+    include: ["comments", "watchers"],
     client: {name: "leia-offline", retry: true},
 }, {mode: "encode"})
 request_headers := {
@@ -44,10 +44,10 @@ response_media := mime`application/json; charset=utf-8`
 response_body := dialect.eval("json", {
     ok: true,
     project: route.params.project,
-    tickets: {
+    tickets: [
         {id: "T-100", title: "Login callback fails", priority: 1},
         {id: "T-101", title: "Retry budget exceeded", priority: 2},
-    },
+    ],
     next: next_page,
 }, {mode: "encode"})
 response_headers := {
@@ -94,11 +94,11 @@ for _, event := range stream {
 }
 
 retry_window := duration`250ms`
-audit := dialect.eval("jsonl", {
+audit := dialect.eval("jsonl", [
     {phase: "request", method: parsed_request.method, target: parsed_request.target, subject: claims.payload.sub},
     {phase: "response", status: parsed_response.status, media: parsed_response.headers["Content-Type"], next_cursor: set_cookie.cursor},
     {phase: "stream", events: #stream, open: open_count, cursor: last_cursor},
-}, {mode: "encode"})
+], {mode: "encode"})
 fingerprint := string.sub(dialect.eval("hash", wire_request .. wire_response .. audit, {algo: "sha256"}), 1, 16)
 summary := template {
     text: "{{.project}} {{.tickets}} tickets cursor={{.cursor}} retry={{.retry}} fp={{.fingerprint}}",

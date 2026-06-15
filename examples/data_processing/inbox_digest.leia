@@ -57,13 +57,13 @@ func contains_any(text, words) {
 
 func classify_queue(row) {
     text := row.subject .. " " .. row.body
-    if contains_any(text, {"checkout", "payment", "invoice", "receipt", "tax"}) {
+    if contains_any(text, ["checkout", "payment", "invoice", "receipt", "tax"]) {
         return "revenue"
     }
-    if contains_any(text, {"login", "mfa", "password", "admin"}) {
+    if contains_any(text, ["login", "mfa", "password", "admin"]) {
         return "identity"
     }
-    if contains_any(text, {"latency", "search", "worker", "queue", "retry"}) {
+    if contains_any(text, ["latency", "search", "worker", "queue", "retry"]) {
         return "reliability"
     }
     return "general"

@@ -61,7 +61,7 @@ frame := conn.frame(sql`select domain, domain_id, status, duration_ms, required 
 check("db frame", frame.len == 6 && soa.len(frame.soa) == 6)
 
 rollup := q.query(frame.soa, {
-    by: {"domain_id"},
+    by: ["domain_id"],
     select: {
         duration_ms: "duration_ms",
         gates: 1,
@@ -81,7 +81,7 @@ check("q rollup", #rollup == 6 && top.domain_id == 4 && top_domain == "performan
 
 workbook := dialect.eval("xlsx", rollup, {
     mode: "encode",
-    headers: {"domain_id", "duration_ms", "gates", "required"},
+    headers: ["domain_id", "duration_ms", "gates", "required"],
     sheet: "release",
 })
 roundtrip := dialect.eval("excel", workbook, {headers: true})
@@ -96,7 +96,7 @@ reviewer := agent {
             user: summary,
         }, nil
     }
-    params: {"summary"}
+    params: ["summary"]
     description: "Review release gate evidence."
 }
 
@@ -105,7 +105,7 @@ check("agent mock", agent_err == nil && agent_result.text == "Direct llm.turn ke
 
 app := serve {
     listen: "127.0.0.1:0"
-    routes: {
+    routes: [
         {method: "GET", path: "/summary", handler: func(req) {
             return {
                 gates: #checks,
@@ -114,7 +114,7 @@ app := serve {
                 agent: agent_result.text,
             }
         }},
-    },
+    ],
 }
 
 summary_resp := http.get(app.url .. "/summary")

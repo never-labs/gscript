@@ -140,6 +140,9 @@ func lintProgram(filename string, prog *ast.Program) []lintDiagnostic {
 		if !ok || len(table.Fields) == 0 {
 			return true
 		}
+		if lintIsVarargPackTable(table) {
+			return true
+		}
 		for _, field := range table.Fields {
 			if field.Key == nil {
 				pos := table.GetPos()
@@ -157,6 +160,14 @@ func lintProgram(filename string, prog *ast.Program) []lintDiagnostic {
 		return true
 	})
 	return diagnostics
+}
+
+func lintIsVarargPackTable(table *ast.TableLitExpr) bool {
+	if len(table.Fields) != 1 || table.Fields[0].Key != nil {
+		return false
+	}
+	_, ok := table.Fields[0].Value.(*ast.VarArgExpr)
+	return ok
 }
 
 func lintHasErrors(diagnostics []lintDiagnostic) bool {

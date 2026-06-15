@@ -78,7 +78,7 @@ samples := soa.zip({
     error: zeroes(#feature_rows),
 })
 
-weights := {1.1, 0.3, 0.4}
+weights := [1.1, 0.3, 0.4]
 bias := 0.5
 for i := 1; i <= soa.len(samples); i++ {
     score := bias
@@ -97,8 +97,8 @@ mean_prediction := soa.mean(samples, "prediction")
 positive_count := soa.countWhere(samples, positive_error)
 score_energy := soa.dot(samples, "prediction", "prediction")
 
-empty_features := dense_matrix_from_rows({})
-empty_samples := soa.zip({id: array.i64({})})
+empty_features := dense_matrix_from_rows([])
+empty_samples := soa.zip({id: array.i64([])})
 missing_rows := dialect.eval("csv", "id,x1,x2\n1,2.5,\n2,,4.5\n", {headers: true})
 imputed_x1 := number_or(missing_rows[2].x1, 0)
 imputed_x2 := number_or(missing_rows[1].x2, -1)
@@ -122,8 +122,8 @@ jsonl_xy_dot := soa.dot(jsonl_columns, "x", "y")
 
 bad_matrix, bad_matrix_err := dialect.eval("nums", "1 2\n3\n", {matrix: true})
 bad_nums, bad_nums_err := dialect.eval("nums", "1 nope 3")
-ok, convert_err := pcall(array.f64, {1, "bad"})
-ok_rect, rect_err := pcall(dense_matrix_from_rows, {{1, 2}, {3}})
+ok, convert_err := pcall(array.f64, [1, "bad"])
+ok_rect, rect_err := pcall(dense_matrix_from_rows, [[1, 2], [3]])
 
 print(string.format("rows: %d columns: %d", soa.len(samples), #feature_rows[1]))
 print(string.format("prediction mean: %.3f", mean_prediction))

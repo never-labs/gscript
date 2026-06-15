@@ -12,7 +12,7 @@ func applescript(spec) {
         dry_run: spec.dry_run,
         command: {
             program: "osascript",
-            args: {"-e", spec.source},
+            args: ["-e", spec.source],
         },
     }
 }
@@ -24,7 +24,7 @@ func open_url(spec) {
         dry_run: spec.dry_run,
         command: {
             program: "open",
-            args: {spec.url},
+            args: [spec.url],
         },
     }
 }

@@ -1,11 +1,11 @@
 print("=== Dialects: binary protocol fixture ===")
 
-frame := dialect.eval("binary", {258, "OK"}, {mode: "pack", format: "be:u16 bytes:2"})
+frame := dialect.eval("binary", [258, "OK"], {mode: "pack", format: "be:u16 bytes:2"})
 frame_hex := dialect.eval("hex", frame)
 decoded := dialect.eval("binary", frame, {mode: "unpack", format: "be:u16 bytes:2"})
 frame_size := dialect.eval("binary", "", {mode: "size", format: "be:u16 bytes:2"})
 
-little_frame := dialect.eval("binary", {-1234, 16909060, 1.5, "OK"}, {mode: "pack", format: "le:i16 u32 f32 bytes:2"})
+little_frame := dialect.eval("binary", [-1234, 16909060, 1.5, "OK"], {mode: "pack", format: "le:i16 u32 f32 bytes:2"})
 little_hex := dialect.eval("hex", little_frame)
 little_decoded := dialect.eval("binary", little_frame, {mode: "unpack", format: "le:i16 u32 f32 bytes:2"})
 little_size := dialect.eval("binary", "", {mode: "size", format: "le:i16 u32 f32 bytes:2"})

@@ -8,27 +8,27 @@ func check(name, ok) {
 }
 
 quotes := data.frame({
-    sym: data.symbols({"AAPL", "AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA"}),
-    ts: data.i64({570, 600, 630, 690, 570, 615, 675, 600, 660}),
-    bid: data.f64({99.90, 100.00, 100.30, 100.10, 250.00, 250.50, 251.00, 880.00, 882.00}),
-    ask: data.f64({100.10, 100.20, 100.50, 100.40, 250.30, 250.90, 251.40, 881.00, 883.00}),
+    sym: data.symbols(["AAPL", "AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA"]),
+    ts: data.i64([570, 600, 630, 690, 570, 615, 675, 600, 660]),
+    bid: data.f64([99.90, 100.00, 100.30, 100.10, 250.00, 250.50, 251.00, 880.00, 882.00]),
+    ask: data.f64([100.10, 100.20, 100.50, 100.40, 250.30, 250.90, 251.40, 881.00, 883.00]),
 })
 
 trades := data.frame({
-    trade_id: data.i64({1, 2, 3, 4, 5, 6, 7, 8}),
-    sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA"}),
-    ts: data.i64({601, 642, 705, 620, 671, 681, 605, 665}),
-    price: data.f64({100.15, 100.42, 100.30, 250.70, 251.10, 251.35, 880.60, 882.50}),
-    size: data.i64({100, 80, 120, 50, 40, 70, 10, 15}),
+    trade_id: data.i64([1, 2, 3, 4, 5, 6, 7, 8]),
+    sym: data.symbols(["AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA"]),
+    ts: data.i64([601, 642, 705, 620, 671, 681, 605, 665]),
+    price: data.f64([100.15, 100.42, 100.30, 250.70, 251.10, 251.35, 880.60, 882.50]),
+    size: data.i64([100, 80, 120, 50, 40, 70, 10, 15]),
 })
 
 market_ticks := data.frame({
-    event_id: data.i64({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}),
-    event: data.symbols({"quote", "trade", "quote", "trade", "trade", "quote", "trade", "quote", "trade", "trade", "quote", "trade"}),
-    sym: data.symbols({"AAPL", "AAPL", "AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA", "NVDA"}),
-    ts: data.i64({600, 601, 630, 642, 705, 615, 620, 675, 681, 605, 660, 665}),
-    px: data.f64({100.10, 100.15, 100.40, 100.42, 100.30, 250.70, 250.70, 251.20, 251.35, 880.60, 882.50, 882.50}),
-    qty: data.i64({0, 100, 0, 80, 120, 0, 50, 0, 70, 10, 0, 15}),
+    event_id: data.i64([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+    event: data.symbols(["quote", "trade", "quote", "trade", "trade", "quote", "trade", "quote", "trade", "trade", "quote", "trade"]),
+    sym: data.symbols(["AAPL", "AAPL", "AAPL", "AAPL", "AAPL", "MSFT", "MSFT", "MSFT", "MSFT", "NVDA", "NVDA", "NVDA"]),
+    ts: data.i64([600, 601, 630, 642, 705, 615, 620, 675, 681, 605, 660, 665]),
+    px: data.f64([100.10, 100.15, 100.40, 100.42, 100.30, 250.70, 250.70, 251.20, 251.35, 880.60, 882.50, 882.50]),
+    qty: data.i64([0, 100, 0, 80, 120, 0, 50, 0, 70, 10, 0, 15]),
 })
 
 enriched := q.sql(

@@ -1232,7 +1232,7 @@ func storeKiller(depth, fc, fr, tc, tr, ctx) {
     if ctx != nil { km_table = ctx.killerMoves }
     enc := encodeMove(fc, fr, tc, tr)
     km := km_table[depth]
-    if km == nil { km_table[depth] = {enc, 0} }
+    if km == nil { km_table[depth] = [enc, 0] }
     else { if km[1] != enc { km[2] = km[1]; km[1] = enc } }
 }
 
@@ -1738,7 +1738,7 @@ func drawBoard() {
     drawMark(colToPixel(2), rowToPixel(8))
     drawMark(colToPixel(8), rowToPixel(8))
     // Pawn positions
-    pawnCols := {1, 3, 5, 7, 9}
+    pawnCols := [1, 3, 5, 7, 9]
     for pi := 1; pi <= 5; pi++ {
         drawMark(colToPixel(pawnCols[pi]), rowToPixel(4))
         drawMark(colToPixel(pawnCols[pi]), rowToPixel(7))
@@ -2336,7 +2336,7 @@ rl.setTargetFPS(60)
 // Load Chinese font
 chessChars := "帅将仕士相象马车炮兵卒楚河汉界红黑方走军胜和棋悔重新开始退出思考中深度电脑执先轮到步！战果暂无记录吃0123456789., "
 
-fontPaths := {
+fontPaths := [
     "/Library/Fonts/Arial Unicode.ttf",
     "/System/Library/Fonts/STHeiti Light.ttc",
     "/System/Library/Fonts/STHeiti Medium.ttc",
@@ -2344,7 +2344,7 @@ fontPaths := {
     "/System/Library/Fonts/Hiragino Sans GB.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-}
+]
 
 fontLoaded = false
 for i := 1; i <= #fontPaths; i++ {

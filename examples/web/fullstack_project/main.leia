@@ -52,30 +52,30 @@ func render_index() {
     for _, ticket := range ipairs(rows) {
         items[#items + 1] = {
             tag: "li",
-            children: {
+            children: [
                 {tag: "a", attrs: {href: "/tickets/" .. tostring(ticket.id)}, text: ticket.title},
                 {tag: "span", text: " " .. ticket.status},
-            },
+            ],
         }
     }
     return html {
         tag: "main",
         attrs: {class: "fullstack-project"},
-        children: {
+        children: [
             {tag: "h1", text: "Leia Fullstack Project"},
             {tag: "ul", children: items},
-            {tag: "form", attrs: {method: "post", action: "/tickets"}, children: {
+            {tag: "form", attrs: {method: "post", action: "/tickets"}, children: [
                 {tag: "input", attrs: {name: "title", value: "Form ticket"}},
                 {tag: "input", attrs: {name: "owner", value: "ops"}},
                 {tag: "button", text: "Create"},
-            }},
-        },
+            ]},
+        ],
     }
 }
 
 app := serve {
     listen: "127.0.0.1:0"
-    routes: {
+    routes: [
         {method: "GET", path: "/", handler: func(req) {
             return render_index()
         }},
@@ -86,10 +86,10 @@ app := serve {
             }
             return html {
                 tag: "article",
-                children: {
+                children: [
                     {tag: "h1", text: ticket.title},
                     {tag: "p", text: ticket.owner .. ":" .. ticket.status},
-                },
+                ],
             }
         }},
         {method: "GET", path: "/api/tickets/:id", handler: func(req) {
@@ -125,7 +125,7 @@ app := serve {
             })
             return {created: true, id: inserted.last_insert_id, status: "triage"}
         }},
-    }
+    ]
 }
 
 home := http.get(app.url .. "/")

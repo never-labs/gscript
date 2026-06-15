@@ -6,10 +6,10 @@
 memory := {
     last_owner: "ops",
     release: "2026.06",
-    incidents: {
+    incidents: [
         {id: "INC-17", service: "checkout", severity: "sev2", symptom: "p95 latency spike"},
         {id: "INC-18", service: "search", severity: "sev3", symptom: "cache misses"}
-    }
+    ]
 }
 
 func memory_summary(service) {
@@ -41,8 +41,8 @@ lookup_runbook := llm.tool("lookup_runbook", func(service, severity) {
     return "runbook:" .. service .. ":" .. severity .. ":restart-workers:false:notify:oncall", nil
 }, {
     description: "Lookup deterministic runbook evidence."
-    params: {"service", "severity"}
-    requires: {"runbooks.read"}
+    params: ["service", "severity"]
+    requires: ["runbooks.read"]
     param_docs: {
         service: "service name"
         severity: "incident severity"
@@ -52,12 +52,12 @@ lookup_runbook := llm.tool("lookup_runbook", func(service, severity) {
 func incident_config(service, severity) {
     return {
         model: "mock-project"
-        messages: {
+        messages: [
             llm.system("Use memory and runbook evidence. Return a concise incident regression note."),
             msg.assistant("Memory: owner=" .. memory.last_owner .. " release=" .. memory.release),
             llm.user("Investigate " .. service .. " " .. severity .. " with " .. memory_summary(service)),
-        }
-        tools: {lookup_runbook}
+        ]
+        tools: [lookup_runbook]
         budget: {turns: 2, calls: 1, tokens: 512}
     }
 }
@@ -113,7 +113,7 @@ incident_agent := llm.agent("incident_agent", incident_config, func(service, sev
         task: task_msg.text,
         task_idx: task_idx,
     }, nil
-}, {params: {"service", "severity"}})
+}, {params: ["service", "severity"]})
 
 evaluate "project agent regression consumes replay" {
     result, err := incident_agent("checkout", "sev2")

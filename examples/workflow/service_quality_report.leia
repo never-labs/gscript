@@ -15,7 +15,7 @@ deploy_events := jsonl`{"service":"api","kind":"deploy","status":"ok","version":
 {"service":"search","kind":"reindex","status":"ok","version":"idx-884","duration_ms":90}
 `
 
-request_logs := {
+request_logs := [
     logfmt`ts=2026-06-04T10:00:00Z service=api route=/checkout status=200 ms=120 bytes=2048`,
     logfmt`ts=2026-06-04T10:00:01Z service=api route=/checkout status=503 ms=520 bytes=512`,
     logfmt`ts=2026-06-04T10:00:02Z service=api route=/profile status=200 ms=90 bytes=1024`,
@@ -24,7 +24,7 @@ request_logs := {
     logfmt`ts=2026-06-04T10:00:05Z service=search route=/query status=200 ms=80 bytes=4096`,
     logfmt`ts=2026-06-04T10:00:06Z service=search route=/query status=200 ms=110 bytes=6144`,
     logfmt`ts=2026-06-04T10:00:07Z service=search route=/query status=504 ms=650 bytes=1024`,
-}
+]
 
 slo_rules := mdtable`| Tier | Max Error Rate | Review |
 | --- | ---: | --- |

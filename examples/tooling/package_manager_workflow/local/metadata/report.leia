@@ -1,12 +1,12 @@
 // Local replace-backed metadata helper for package_manager_workflow.
 
 func workflow(spec) {
-    capabilities := {
+    capabilities := [
         "module.metadata",
         "module.graph",
         "module.verify",
         "module.capability",
-    }
+    ]
     return {
         module: spec.module,
         require: spec.require,

@@ -60,19 +60,19 @@ report := {
     failed: #tests - passed,
     results: results,
 }
-tap_report := {
+tap_report := [
     {kind: "version", version: 13},
     {kind: "plan", first: 1, last: #results},
-}
+]
 for i := 1; i <= #results; i++ {
     tap_report[#tap_report + 1] = {
         kind: "test",
         ok: results[i].ok,
         number: i,
         name: results[i].name,
-        diagnostics: {
+        diagnostics: [
             string.format("%s got=%s want=%s elapsed=%s", results[i].run, results[i].got, results[i].want, results[i].elapsed_duration),
-        },
+        ],
     }
 }
 tap_text := dialect.eval("tap", tap_report, {mode: "encode"})

@@ -3,10 +3,10 @@
 evaluate "judge replay records scoring metrics" {
     result, err := eval.judge({
         model: "mock-fast",
-        messages: {
+        messages: [
             llm.system("Score whether the answer satisfies the rubric. Return pass or fail."),
             llm.user("Rubric: mentions deterministic replay. Answer: deterministic replay keeps checks stable."),
-        },
+        ],
     })
     assert(err == nil)
     assert(result.text == "pass")
