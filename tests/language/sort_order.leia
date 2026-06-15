@@ -28,10 +28,10 @@ perm = func(s, n) {
     }
 }
 
-perm({})
-perm({1})
-perm({1, 2})
-perm({1, 2, 3})
-perm({2, 2, 3, 4})
+perm([])
+perm([1])
+perm([1, 2])
+perm([1, 2, 3])
+perm([2, 2, 3, 4])
 
 print("ok")

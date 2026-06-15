@@ -11,7 +11,7 @@ perm := nil
 perm = func(s, n) {
   n = n || #s
   if n == 1 {
-    t := {table.unpack(s)}
+    t := [table.unpack(s)]
     table.sort(t)
     check(t)
     seen = seen + 1
@@ -24,10 +24,10 @@ perm = func(s, n) {
   }
 }
 
-perm({1, 2, 3, 4})
+perm([1, 2, 3, 4])
 assert(seen == 24)
 seen = 0
-perm({1, 2, 3, 3, 5})
+perm([1, 2, 3, 3, 5])
 assert(seen == 120)
 
 print("ok")
