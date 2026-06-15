@@ -10,12 +10,12 @@ workspace := {
     ["tests/checkout_refund_test.leia"]: "assert(refund_cents(1250, 25) == 1225)\nassert(refund_cents(800, 25) == 775)\n",
 }
 
-patches := {}
+patches := []
 test_runs := 0
-tool_events := {}
+tool_events := []
 
 func record_tool_event(kind, detail) {
-    tool_events[#tool_events + 1] = kind .. ":" .. detail
+    append(tool_events, kind .. ":" .. detail)
 }
 
 read_file := tool {
@@ -46,7 +46,7 @@ search_text := tool {
 apply_patch := tool {
     name: "apply_patch"
     fn: func(patch) {
-        patches[#patches + 1] = patch
+        append(patches, patch)
         record_tool_event("apply_patch", "patch-" .. #patches)
         if #patches == 1 {
             return {

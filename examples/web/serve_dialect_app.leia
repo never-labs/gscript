@@ -7,10 +7,10 @@ orders := {
     ["ord-200"]: {id: "ord-200", customer: "Lin", status: "shipped", total: 75},
 }
 
-events := {}
+events := []
 
 func remember(kind, detail) {
-    events[#events + 1] = {kind: kind, detail: detail}
+    append(events, {kind: kind, detail: detail})
 }
 
 func json_headers() {

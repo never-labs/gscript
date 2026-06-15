@@ -13,10 +13,10 @@ local_context := {
     policy: "ship only when owner, rollback, and measurement plan are explicit"
 }
 
-evidence_log := {}
+evidence_log := []
 
 func remember(kind, value) {
-    evidence_log[#evidence_log + 1] = kind .. ":" .. value
+    append(evidence_log, kind .. ":" .. value)
 }
 
 load_context := tool {

@@ -9,10 +9,10 @@ model {
 
 source_pattern := "Python/TS orchestrator: gather evidence, call analyze(), call translate(), assemble report."
 
-evidence_log := {}
+evidence_log := []
 
 func remember(kind, value) {
-    evidence_log[#evidence_log + 1] = kind .. ":" .. value
+    append(evidence_log, kind .. ":" .. value)
 }
 
 load_source := tool {

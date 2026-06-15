@@ -7,14 +7,14 @@ items := {
     ["bk-202"]: {id: "bk-202", name: "Routing Tables", stock: 7},
 }
 
-events := {}
+events := []
 
 func record_event(method, path, detail) {
-    events[#events + 1] = {
+    append(events, {
         method: method,
         path: path,
         detail: detail,
-    }
+    })
 }
 
 func json_headers() {

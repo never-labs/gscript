@@ -62,7 +62,7 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(append(tc.opts, leia.WithLibs(leia.LibMath))...)
-			assertSDKGlobalPresence(t, vm, "append", false)
+			assertSDKGlobalPresence(t, vm, "append", true)
 			assertSDKGlobalPresence(t, vm, "sqrt", true)
 			assertSDKGlobalPresence(t, vm, "asin", true)
 			assertSDKGlobalPresence(t, vm, "eye", false)
@@ -70,7 +70,7 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "mean", false)
 
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibLinalg|leia.LibStats))...)
-			assertSDKGlobalPresence(t, vm, "append", false)
+			assertSDKGlobalPresence(t, vm, "append", true)
 			assertSDKGlobalPresence(t, vm, "sqrt", false)
 			assertSDKGlobalPresence(t, vm, "eye", true)
 			assertSDKGlobalPresence(t, vm, "matmul", true)
@@ -79,6 +79,10 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibTable))...)
 			assertSDKGlobalPresence(t, vm, "append", true)
 			assertSDKGlobalPresence(t, vm, "sqrt", false)
+
+			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibLLM))...)
+			assertSDKGlobalPresence(t, vm, "append", true)
+			assertSDKGlobalPresence(t, vm, "table", false)
 		})
 	}
 }

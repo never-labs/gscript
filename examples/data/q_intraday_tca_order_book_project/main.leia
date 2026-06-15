@@ -134,11 +134,11 @@ daily_rollup := q.sql(
 )
 venue_rollup := q.sql(trades, "select notional:sum notional,shares:sum size,fills:count i by venue from trades order by venue asc")
 liquid_ticks := q.sql(ticks, "select tick_id,event,sym,ts,px,qty,venue from trades where event=`trade,sym in `AAPL`MSFT`NVDA order by px desc")
-high_cost := {}
+high_cost := []
 for i := 1; i <= #tca; i++ {
     row := tca[i]
     if row.slippage_bps != nil && row.slippage_bps > 5 {
-        high_cost[#high_cost + 1] = {trade_id: row.trade_id, sym: row.sym, slippage_bps: row.slippage_bps}
+        append(high_cost, {trade_id: row.trade_id, sym: row.sym, slippage_bps: row.slippage_bps})
     }
 }
 

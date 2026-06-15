@@ -64,8 +64,8 @@ if err != nil {
     return
 }
 
-history[#history + 1] = msg.assistant(stored.text)
-history[#history + 1] = msg.user("Using only the stored memory, reply exactly: project=ORCHID;owner=ADA")
+append(history, msg.assistant(stored.text))
+append(history, msg.user("Using only the stored memory, reply exactly: project=ORCHID;owner=ADA"))
 
 recalled, err := llm.turn({
     messages: history
@@ -77,7 +77,7 @@ if err != nil {
     return
 }
 
-history[#history + 1] = msg.assistant(recalled.text)
+append(history, msg.assistant(recalled.text))
 
 extractor := llm.agent("extractor", func(summary) {
     return {

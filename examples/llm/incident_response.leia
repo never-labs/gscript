@@ -90,8 +90,8 @@ incident_brief := llm.agent("incident_brief", incident_brief_config, func(servic
     if dispatch_err != nil {
         return nil, dispatch_err
     }
-    history[#history + 1] = msg.assistant_call(call)
-    history[#history + 1] = msg.tool_result(call.id, evidence)
+    append(history, msg.assistant_call(call))
+    append(history, msg.tool_result(call.id, evidence))
 
     final, final_err := llm.turn({
         model: cfg.model

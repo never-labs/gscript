@@ -582,6 +582,10 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"vec":       libs&LibVec != 0,
 	}
 	for _, alias := range stdlibinstall.DefaultAliases() {
+		if alias.Name == "append" {
+			allowed[alias.Name] = true
+			continue
+		}
 		allowed[alias.Name] = allowed[alias.Module]
 	}
 	return allowed

@@ -7,13 +7,13 @@ func check(name, ok) {
 
 func distinct_values(values) {
   seen := {}
-  out := {}
+  out := []
   for i := 1; i <= #values; i++ {
     value := values[i]
     key := tostring(value)
     if !seen[key] {
       seen[key] = true
-      out[#out + 1] = value
+      append(out, value)
     }
   }
   return out
@@ -21,13 +21,13 @@ func distinct_values(values) {
 
 func distinct_column(rows, name) {
   seen := {}
-  out := {}
+  out := []
   for i := 1; i <= #rows; i++ {
     value := rows[i][name]
     key := tostring(value)
     if !seen[key] {
       seen[key] = true
-      out[#out + 1] = value
+      append(out, value)
     }
   }
   return out

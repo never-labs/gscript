@@ -48,15 +48,15 @@ func ticket_count() {
 
 func render_index() {
     rows := conn.query(sql`select id, title, status from tickets order by id`)
-    items := {}
+    items := []
     for _, ticket := range ipairs(rows) {
-        items[#items + 1] = {
+        append(items, {
             tag: "li",
             children: [
                 {tag: "a", attrs: {href: "/tickets/" .. tostring(ticket.id)}, text: ticket.title},
                 {tag: "span", text: " " .. ticket.status},
             ],
-        }
+        })
     }
     return html {
         tag: "main",

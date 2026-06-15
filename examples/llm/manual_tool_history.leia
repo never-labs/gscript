@@ -45,11 +45,11 @@ manual_research := llm.agent("manual_research", manual_research_config, func(top
     call := first.calls[1]
     evidence, dispatch_err := llm.dispatch(call, cfg.tools)
     if dispatch_err != nil {
-        history[#history + 1] = msg.assistant_call(call)
-        history[#history + 1] = msg.tool_error(call.id, dispatch_err.message)
+        append(history, msg.assistant_call(call))
+        append(history, msg.tool_error(call.id, dispatch_err.message))
     } else {
-        history[#history + 1] = msg.assistant_call(call)
-        history[#history + 1] = msg.tool_result(call.id, evidence)
+        append(history, msg.assistant_call(call))
+        append(history, msg.tool_result(call.id, evidence))
     }
 
     final, final_err := llm.turn({

@@ -9,13 +9,13 @@ func check(name, ok) {
 
 func stable_distinct(values) {
     seen := {}
-    out := {}
+    out := []
     for i := 1; i <= #values; i++ {
         value := values[i]
         key := tostring(value)
         if !seen[key] {
             seen[key] = true
-            out[#out + 1] = value
+            append(out, value)
         }
     }
     return out

@@ -11,8 +11,8 @@ func run_multiturn_replay() {
     assert(err == nil)
     assert(plan.text == "1. Write ordinary checks. 2. Replay LLM turns.")
 
-    history[#history + 1] = msg.assistant(plan.text)
-    history[#history + 1] = msg.user("Condense the plan into a release note.")
+    append(history, msg.assistant(plan.text))
+    append(history, msg.user("Condense the plan into a release note."))
 
     note, err := llm.turn({
         model: "mock-fast",

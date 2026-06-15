@@ -89,11 +89,11 @@ triage_agent := llm.agent("triage_agent", triage_config, func(service, severity)
 
     call := first.calls[1]
     evidence, dispatch_err := llm.dispatch(call, cfg.tools)
-    conversation[#conversation + 1] = msg.assistant_call(call)
+    append(conversation, msg.assistant_call(call))
     if dispatch_err != nil {
-        conversation[#conversation + 1] = msg.tool_error(call.id, dispatch_err.message)
+        append(conversation, msg.tool_error(call.id, dispatch_err.message))
     } else {
-        conversation[#conversation + 1] = msg.tool_result(call.id, evidence)
+        append(conversation, msg.tool_result(call.id, evidence))
     }
 
     final, final_err := llm.turn({

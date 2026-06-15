@@ -58,15 +58,15 @@ func post_count() {
 
 func render_home() {
     posts := conn.query(sql`select id, title, status from posts order by id`)
-    items := {}
+    items := []
     for _, post := range ipairs(posts) {
-        items[#items + 1] = {
+        append(items, {
             tag: "li",
             children: [
                 {tag: "a", attrs: {href: "/posts/" .. tostring(post.id)}, text: post.title},
                 {tag: "span", text: " [" .. post.status .. "]"},
             ],
-        }
+        })
     }
     return html {
         tag: "main",
