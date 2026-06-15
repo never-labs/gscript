@@ -150,7 +150,7 @@ func lintProgram(filename string, prog *ast.Program) []lintDiagnostic {
 					filename,
 					"LEIA2001",
 					"warning",
-					"use [..] for list literals; reserve {..} for keyed records",
+					"use [...] for list literals; reserve {...} for keyed records",
 					pos.Line,
 					pos.Column,
 				))

@@ -231,7 +231,7 @@ func TestLintWarnsForPositionalTableLiterals(t *testing.T) {
 	if got.Line != 1 || got.Column != 7 {
 		t.Fatalf("diagnostic position = %d:%d, want 1:7", got.Line, got.Column)
 	}
-	if !strings.Contains(got.Message, "use [..] for list literals") {
+	if !strings.Contains(got.Message, "use [...] for list literals") {
 		t.Fatalf("diagnostic message = %q, want list literal guidance", got.Message)
 	}
 }
