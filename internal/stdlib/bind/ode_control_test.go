@@ -679,6 +679,106 @@ func TestODESolveMergesNamedStateWithScalarObserve(t *testing.T) {
 	assertFloat(t, observed.RawGetString("value").Table().RawGetInt(2), 5)
 }
 
+func TestODESolveNamedStateInputForDynamicsProjectAndObserve(t *testing.T) {
+	calls := map[string]int{}
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		calls[name]++
+		if !args[0].IsTable() {
+			t.Fatalf("%s state = %s, want named table", name, args[0].TypeName())
+		}
+		state := args[0].Table()
+		x := state.RawGetString("x").Number()
+		v := state.RawGetString("v").Number()
+		switch name {
+		case "test.dyn":
+			return []Value{TableValue(controlTestOptions(map[string]Value{
+				"x": FloatValue(v),
+				"v": FloatValue(1),
+			}))}, nil
+		case "test.project":
+			return []Value{TableValue(controlTestOptions(map[string]Value{
+				"x": FloatValue(x),
+				"v": FloatValue(v),
+			}))}, nil
+		case "test.observe":
+			return []Value{TableValue(controlTestOptions(map[string]Value{
+				"speed": FloatValue(v),
+			}))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0, 0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(0.1),
+			"steps":       IntValue(2),
+			"trajectory":  BoolValue(true),
+			"state_names": controlTestStringTable("x", "v"),
+			"named_state": BoolValue(true),
+			"project":     FunctionValue(&GoFunction{Name: "test.project"}),
+			"observe":     FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls["test.dyn"] != 8 || calls["test.project"] != 2 || calls["test.observe"] != 2 {
+		t.Fatalf("calls = %#v, want dyn=8 project=2 observe=2", calls)
+	}
+	result := got[0].Table()
+	finalState := result.RawGetString("final_state").Table()
+	assertFloat(t, finalState.RawGetString("x"), 0.02)
+	assertFloat(t, finalState.RawGetString("v"), 0.2)
+	observed := result.RawGetString("observed").Table()
+	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(2), 0.02)
+	assertFloat(t, observed.RawGetString("v").Table().RawGetInt(2), 0.2)
+	assertFloat(t, observed.RawGetString("speed").Table().RawGetInt(2), 0.2)
+}
+
+func TestODESolveNamedStateInputRequiresStateNames(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1}))}, nil
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	_, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(0.1),
+			"steps":       IntValue(1),
+			"named_state": BoolValue(true),
+		})),
+	})
+	if err == nil || !strings.Contains(err.Error(), "named_state requires state_names") {
+		t.Fatalf("ode.solve named_state error = %v, want state_names requirement", err)
+	}
+}
+
+func TestODESolveNamedStateDerivativeRequiresAllFields(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		return []Value{TableValue(controlTestOptions(map[string]Value{"x": FloatValue(1)}))}, nil
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	_, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0, 0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(0.1),
+			"steps":       IntValue(1),
+			"state_names": controlTestStringTable("x", "v"),
+			"named_state": BoolValue(true),
+		})),
+	})
+	if err == nil || !strings.Contains(err.Error(), `missing field "v"`) {
+		t.Fatalf("ode.solve missing derivative field error = %v, want missing v", err)
+	}
+}
+
 func TestODESolveRejectsNamedStateObserveFieldConflict(t *testing.T) {
 	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
 		name := fn.GoFunction().Name

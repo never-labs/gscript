@@ -194,4 +194,7 @@ example-specific shortcuts:
   scalar or table-shaped observation hooks, and result-object access.
 - `ode.solve(..., {state_names: {...}, wrap_angles: {...}})` for named final
   state access, named trajectories, and periodic coordinate normalization.
+- `ode.solve(..., {state_names: {...}, named_state: true})` for optional
+  named state tables in dynamics, projection, and observation hooks while the
+  default dense-vector hot path remains unchanged.
 - `q { ... }` raw blocks for compact q snippets without quoted source strings.

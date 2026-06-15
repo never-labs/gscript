@@ -31,7 +31,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			return nil, fmt.Errorf("ode.rk4: dt must be numeric")
 		}
 		dt := args[2].Number()
-		next, err := odeRK4Step(call, fn, state, dt, "ode.rk4")
+		next, err := odeRK4Step(call, fn, state, dt, "ode.rk4", nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -63,6 +63,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		hasObserve := false
 		var stateNames []string
 		var wrapAngles []int
+		namedStateInput := false
 		if len(args) >= 5 && args[4].IsTable() {
 			opts := args[4].Table()
 			trajectory = opts.RawGetString("trajectory").Truthy()
@@ -87,8 +88,21 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			if err != nil {
 				return nil, err
 			}
+			namedStateInput = opts.RawGetString("named_state").Truthy()
+			if !namedStateInput {
+				namedStateInput = opts.RawGetString("namedState").Truthy()
+			}
+			if namedStateInput && len(stateNames) == 0 {
+				return nil, fmt.Errorf("ode.integrate: named_state requires state_names")
+			}
 		}
 		hasNamedState := len(stateNames) > 0
+		stateArg := odeStateValue
+		if namedStateInput {
+			stateArg = func(s []float64) Value {
+				return TableValue(odeNamedStateTable(stateNames, s))
+			}
+		}
 		if call == nil {
 			return nil, fmt.Errorf("ode.integrate: script caller unavailable")
 		}
@@ -104,7 +118,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		}
 		current := append([]float64(nil), state...)
 		for i := 0; i < steps; i++ {
-			next, err := odeRK4Step(call, fn, current, dt, "ode.integrate")
+			next, err := odeRK4Step(call, fn, current, dt, "ode.integrate", stateArg, stateNames)
 			if err != nil {
 				return nil, err
 			}
@@ -112,14 +126,14 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			step := IntValue(int64(i + 1))
 			t := FloatValue(float64(i+1) * dt)
 			if hasProject {
-				projected, err := call(project, []Value{odeStateValue(current), step, t})
+				projected, err := call(project, []Value{stateArg(current), step, t})
 				if err != nil {
 					return nil, err
 				}
 				if len(projected) == 0 {
 					return nil, fmt.Errorf("ode.integrate: project returned no state")
 				}
-				current, err = odeVectorFromValue(projected[0], "ode.integrate projected state")
+				current, err = odeVectorFromValueNamed(projected[0], "ode.integrate projected state", stateNames)
 				if err != nil {
 					return nil, err
 				}
@@ -131,7 +145,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			if hasObserve || hasNamedState {
 				var observedValue Value
 				if hasObserve {
-					observed, err := call(observe, []Value{odeStateValue(current), step, t})
+					observed, err := call(observe, []Value{stateArg(current), step, t})
 					if err != nil {
 						return nil, err
 					}
@@ -268,16 +282,19 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 	return t
 }
 
-func odeRK4Step(call ScriptFunctionCaller, fn Value, state []float64, dt float64, name string) ([]float64, error) {
+func odeRK4Step(call ScriptFunctionCaller, fn Value, state []float64, dt float64, name string, stateArg func([]float64) Value, stateNames []string) ([]float64, error) {
+	if stateArg == nil {
+		stateArg = odeStateValue
+	}
 	eval := func(s []float64) ([]float64, error) {
-		ret, err := call(fn, []Value{DenseArrayValue(NewDenseArrayF64(s))})
+		ret, err := call(fn, []Value{stateArg(s)})
 		if err != nil {
 			return nil, err
 		}
 		if len(ret) == 0 {
 			return nil, fmt.Errorf("%s: dynamics returned no state derivative", name)
 		}
-		out, err := odeVectorFromValue(ret[0], name+" derivative")
+		out, err := odeVectorFromValueNamed(ret[0], name+" derivative", stateNames)
 		if err != nil {
 			return nil, err
 		}
@@ -311,6 +328,36 @@ func odeRK4Step(call ScriptFunctionCaller, fn Value, state []float64, dt float64
 
 func odeVectorFromValue(v Value, name string) ([]float64, error) {
 	return linalgVectorValue(name, v)
+}
+
+func odeVectorFromValueNamed(v Value, name string, stateNames []string) ([]float64, error) {
+	if len(stateNames) > 0 && v.IsTable() && !v.Table().RawGetString(stateNames[0]).IsNil() {
+		return odeNamedVectorFromTable(v.Table(), name, stateNames)
+	}
+	values, err := odeVectorFromValue(v, name)
+	if err == nil {
+		return values, nil
+	}
+	if len(stateNames) == 0 || !v.IsTable() {
+		return nil, err
+	}
+	return odeNamedVectorFromTable(v.Table(), name, stateNames)
+}
+
+func odeNamedVectorFromTable(t *Table, name string, stateNames []string) ([]float64, error) {
+	out := make([]float64, len(stateNames))
+	for i, stateName := range stateNames {
+		value := t.RawGetString(stateName)
+		if value.IsNil() {
+			return nil, fmt.Errorf("%s: missing field %q", name, stateName)
+		}
+		number, numberErr := linalgNumber(name, value)
+		if numberErr != nil {
+			return nil, fmt.Errorf("%s: field %q must be numeric", name, stateName)
+		}
+		out[i] = number
+	}
+	return out, nil
 }
 
 func odeStateValue(state []float64) Value {

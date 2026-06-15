@@ -17,21 +17,22 @@ K := control.lqr(A, B, Q, R, {iterations: 16000, step: 0.001})
 state := {0.22, 0.0}
 
 func dynamics(x) {
-    theta := control.wrap_angle(x[1])
-    omega := x[2]
+    theta := control.wrap_angle(x.theta)
+    omega := x.omega
     u := control.feedback(K, {theta, omega}, {limit: 8.0})
-    theta_dot := omega
-    omega_dot := (g / l) * math.sin(theta) + u / (m * l * l)
-    return {theta_dot, omega_dot}
+    return {
+        theta: omega,
+        omega: (g / l) * math.sin(theta) + u / (m * l * l),
+    }
 }
 
 func observe_energy(x, step, t) {
     return {
-        energy: 0.5 * x[2] * x[2] + (g / l) * (1.0 - math.cos(x[1])),
+        energy: 0.5 * x.omega * x.omega + (g / l) * (1.0 - math.cos(x.theta)),
     }
 }
 
-solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, wrap_angles: {"theta"}, observe: observe_energy})
+solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, named_state: true, wrap_angles: {"theta"}, observe: observe_energy})
 trajectory := solution.trajectory
 observed := solution.observed
 final_theta := solution.final_state.theta
