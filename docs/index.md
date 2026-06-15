@@ -49,6 +49,7 @@ print(leader[1].sym, leader[1].qty, leader[1].avg_px)
 
 - [Tagged dialects](reference/dialects/index.md)
 - [Data-oriented programming](reference/data-oriented/index.md)
+- [Scientific numeric programming](reference/scientific/index.md)
 - [q conformance](design/q-conformance.md)
 - [Performance and benchmarks](reference/performance/index.md)
 - [Evaluate reference](reference/evaluate/index.md)

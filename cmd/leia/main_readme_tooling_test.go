@@ -193,6 +193,35 @@ assert(soa.len(window) == 3)
 	}
 }
 
+func TestReferenceScientificNumericExampleStaysRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "scientific", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := markdownLeiaSnippets(string(data))
+	if len(blocks) != 1 {
+		t.Fatalf("docs/reference/scientific/index.md Leia examples = %d, want one primitive-composition example", len(blocks))
+	}
+	for _, want := range []string{
+		"F := mat([[1.0, 1.0], [0.0, 1.0]])",
+		"H := row(1.0, 0.0)",
+		"Q := eye(2, 0.01)",
+		"stats.gaussian_state",
+		"stats.linear_predict",
+		"stats.linear_update",
+		"dot([state.x.position, state.x.velocity]",
+		"q {",
+		"+/${state.x}",
+		"assert(near(checksum, state.x.position + state.x.velocity, 0.000000001))",
+	} {
+		if !strings.Contains(blocks[0], want) {
+			t.Fatalf("scientific numeric reference example missing %q:\n%s", want, blocks[0])
+		}
+	}
+	runLeiaDocSnippet(t, root, "scientific-reference.leia", blocks[0])
+}
+
 func TestReferenceConcurrencyExamplesStayRunnable(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "concurrency", "index.md"))
