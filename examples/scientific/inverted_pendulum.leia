@@ -34,10 +34,10 @@ func observe_energy(x, step, t) {
 solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, wrap_angles: {"theta"}, observe: observe_energy})
 trajectory := solution.trajectory
 observed := solution.observed
-energy := observed.energy
 final_theta := solution.final_state.theta
 final_omega := solution.final_state.omega
-energy_summary := stats.describe(energy)
+observed_summary := stats.describe_fields(observed)
+energy_summary := observed_summary.energy
 mean_energy := energy_summary.mean
 peak_energy := energy_summary.max
 q_checksum := q {

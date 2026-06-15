@@ -179,9 +179,9 @@ example-specific shortcuts:
   matrix-vector tails, plus `linalg.matmul_t`, `linalg.T`/`linalg.t`,
   `linalg.vec`, and `linalg.sandwich_add` for compact linear algebra.
 - `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.bayes_update`,
-  `stats.describe(values[, weights])`, and `stats.importance_update` for
-  distribution-aware sequential Monte Carlo code and compact statistical
-  summaries.
+  `stats.describe(values[, weights])`, `stats.describe_fields(table[,
+  weights])`, and `stats.importance_update` for distribution-aware sequential
+  Monte Carlo code and compact statistical summaries.
 - `rand.sample(distribution[, n])` for scalar or dense-vector draws from
   reusable distribution objects.
 - `control.lqr`, `control.feedback`, `control.saturate`, and

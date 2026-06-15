@@ -45,6 +45,14 @@ rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 desc := stats.describe({1, 2, 3, 4})
 weighted_desc := stats.describe({10, 20, 30}, {1, 2, 1})
 weighted_sparse := stats.describe({-100, 1, 2, 100}, {0, 1, 1, 0})
+fields := {}
+fields.x = stats.cumsum({1, 1, 1})
+fields.y = stats.cumsum({10, 10, 10})
+field_desc := stats.describe_fields(fields)
+weighted_fields := {}
+weighted_fields.x = stats.cumsum({10, 10, 10})
+weighted_fields.y = stats.cumsum({1, 1, 1})
+weighted_field_desc := stats.describe_fields(weighted_fields, {1, 2, 1})
 `)
 	assertFloat(t, interp.GetGlobal("total"), 10)
 	assertFloat(t, interp.GetGlobal("mean"), 2.5)
@@ -101,6 +109,12 @@ weighted_sparse := stats.describe({-100, 1, 2, 100}, {0, 1, 1, 0})
 	assertFloat(t, weightedSparse.RawGetString("mean"), 1.5)
 	assertFloat(t, weightedSparse.RawGetString("min"), 1)
 	assertFloat(t, weightedSparse.RawGetString("max"), 2)
+	fieldDesc := interp.GetGlobal("field_desc").Table()
+	assertFloat(t, fieldDesc.RawGetString("x").Table().RawGetString("mean"), 2)
+	assertFloat(t, fieldDesc.RawGetString("y").Table().RawGetString("max"), 30)
+	weightedFieldDesc := interp.GetGlobal("weighted_field_desc").Table()
+	assertFloat(t, weightedFieldDesc.RawGetString("x").Table().RawGetString("mean"), 20)
+	assertFloat(t, weightedFieldDesc.RawGetString("y").Table().RawGetString("variance"), 0.5)
 }
 
 func TestStatsDistributionFacadeNormalPDF(t *testing.T) {
@@ -268,6 +282,14 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {0, 0})`)
 	if err == nil {
 		t.Fatal("stats.describe zero total weight succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.describe_fields({})`)
+	if err == nil {
+		t.Fatal("stats.describe_fields empty table succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `fields := {}; fields.x = {"bad"}; stats.describe_fields(fields)`)
+	if err == nil {
+		t.Fatal("stats.describe_fields non-numeric field succeeded, want error")
 	}
 	err = execSourceOnInterp(interp, `stats.importance_update({1}, {1}, {0}, {})`)
 	if err == nil {

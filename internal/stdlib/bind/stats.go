@@ -19,6 +19,7 @@ func BuildStats() *Table {
 	set("variance", statsVar)
 	set("std", statsStd)
 	set("describe", statsDescribe)
+	set("describe_fields", statsDescribeFields)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
 	set("normal", statsNormal)
@@ -224,6 +225,40 @@ func statsDescribeWeighted(values []float64, weightsValue Value) ([]Value, error
 	out.RawSetString("min", FloatValue(min))
 	out.RawSetString("max", FloatValue(max))
 	out.RawSetString("rms", FloatValue(math.Sqrt(weightedSquares/total)))
+	return []Value{TableValue(out)}, nil
+}
+
+func statsDescribeFields(args []Value) ([]Value, error) {
+	if len(args) < 1 || !args[0].IsTable() {
+		return nil, fmt.Errorf("stats.describe_fields: need table")
+	}
+	weights := NilValue()
+	if len(args) >= 2 {
+		weights = args[1]
+	}
+	src := args[0].Table()
+	out := NewTable()
+	count := 0
+	for _, key := range src.PairsKeysSnapshot() {
+		if !key.IsString() {
+			return nil, fmt.Errorf("stats.describe_fields: field key must be string, got %s", key.TypeName())
+		}
+		name := key.Str()
+		value := src.RawGet(key)
+		describeArgs := []Value{value}
+		if !weights.IsNil() {
+			describeArgs = append(describeArgs, weights)
+		}
+		desc, err := statsDescribe(describeArgs)
+		if err != nil {
+			return nil, fmt.Errorf("stats.describe_fields field %q: %w", name, err)
+		}
+		out.RawSetString(name, desc[0])
+		count++
+	}
+	if count == 0 {
+		return nil, fmt.Errorf("stats.describe_fields: empty table")
+	}
 	return []Value{TableValue(out)}, nil
 }
 
