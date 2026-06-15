@@ -20,7 +20,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.eye(2, 0.01)", "linalg.sandwich_add", "linalg.identity_minus", "linalg.rsolve", "linalg.T", "linalg.matmul", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.eye(2, 0.01)", "linalg.sandwich_add", "linalg.sandwich", "linalg.matmul_t", "linalg.identity_minus", "linalg.rsolve", "linalg.matmul", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),

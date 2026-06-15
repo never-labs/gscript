@@ -18,8 +18,8 @@ for i := 1; i <= #measurements; i++ {
 
     z := linalg.vector(measurements[i])
     y := linalg.sub(z, linalg.matmul(H, x_pred))
-    S := linalg.add(linalg.matmul(H, P_pred, linalg.T(H)), 0.04)
-    K := linalg.rsolve(linalg.matmul(P_pred, linalg.T(H)), S)
+    S := linalg.add(linalg.sandwich(H, P_pred), 0.04)
+    K := linalg.rsolve(linalg.matmul_t(P_pred, H), S)
 
     x = linalg.add(x_pred, linalg.matmul(K, y))
     P = linalg.matmul(linalg.identity_minus(linalg.matmul(K, H)), P_pred)

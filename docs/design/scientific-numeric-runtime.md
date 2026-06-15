@@ -176,8 +176,8 @@ example-specific shortcuts:
   vector/matrix updates.
 - `linalg.at` for shape-friendly vector, row, column, and matrix access.
 - `linalg.matmul` as a variadic matrix-chain facade that also supports
-  matrix-vector tails, plus `linalg.T`/`linalg.t`, `linalg.vec`, and
-  `linalg.sandwich_add` for compact linear algebra.
+  matrix-vector tails, plus `linalg.matmul_t`, `linalg.T`/`linalg.t`,
+  `linalg.vec`, and `linalg.sandwich_add` for compact linear algebra.
 - `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.bayes_update`,
   `stats.describe(values[, weights])`, and `stats.importance_update` for
   distribution-aware sequential Monte Carlo code and compact statistical

@@ -95,6 +95,7 @@ mt_lower := linalg.t(m)
 trace := linalg.trace(m)
 mm := linalg.matmul(m, linalg.eye(2))
 mm3 := linalg.matmul(m, linalg.eye(2), linalg.matrix({{1, 0}, {0, 2}}))
+mm_t := linalg.matmul_t(m, linalg.matrix({{10, 20}, {30, 40}, {50, 60}}))
 mmv := linalg.matmul(m, {10, 20})
 cm := linalg.chainmul(m, linalg.eye(2), linalg.eye(2))
 sw := linalg.sandwich(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2))
@@ -135,6 +136,8 @@ single := linalg.scalar(linalg.matrix({{42}}))
 	assertFloat(t, interp.GetGlobal("trace"), 5)
 	assertMatrixFloat(t, interp.GetGlobal("mm"), 2, 2, 3, 3)
 	assertMatrixFloat(t, interp.GetGlobal("mm3"), 2, 2, 4, 8)
+	assertMatrixFloat(t, interp.GetGlobal("mm_t"), 2, 3, 1, 50)
+	assertMatrixFloat(t, interp.GetGlobal("mm_t"), 2, 3, 6, 390)
 	assertTableFloat(t, interp.GetGlobal("mmv"), 1, 50)
 	assertTableFloat(t, interp.GetGlobal("mmv"), 2, 110)
 	assertMatrixFloat(t, interp.GetGlobal("cm"), 2, 2, 4, 4)
@@ -242,6 +245,13 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 			row:  1,
 			col:  0,
 			want: 3,
+		},
+		{
+			name: "matmul transpose right",
+			src:  `m := linalg.matmul_t(linalg.matrix(2, 2, {1, 2, 3, 4}), linalg.matrix(3, 2, {10, 20, 30, 40, 50, 60}))`,
+			row:  1,
+			col:  2,
+			want: 390,
 		},
 		{
 			name: "transpose",

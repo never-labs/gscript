@@ -36,6 +36,8 @@ func BuildLinalg() *Table {
 	set("dot", linalgDot)
 	set("matvec", linalgMatvec)
 	set("matmul", linalgMatmul)
+	set("matmul_t", linalgMatmulTransposeRight)
+	set("matmul_transpose_right", linalgMatmulTransposeRight)
 	set("chainmul", linalgChainmul)
 	set("sandwich", linalgSandwich)
 	set("sandwich_add", linalgSandwichAdd)
@@ -524,6 +526,41 @@ func linalgMatmul(args []Value) ([]Value, error) {
 		cols = bc
 	}
 	return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
+}
+
+func linalgMatmulTransposeRight(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("linalg.matmul_t: need two matrices")
+	}
+	ar, ac, a, ok, err := linalgMatrixValue("linalg.matmul_t", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.matmul_t: argument 1 must be a matrix")
+	}
+	br, bc, b, ok, err := linalgMatrixValue("linalg.matmul_t", args[1])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.matmul_t: argument 2 must be a matrix")
+	}
+	if ac != bc {
+		return nil, fmt.Errorf("linalg.matmul_t: dimension mismatch")
+	}
+	out := make([]float64, ar*br)
+	for r := 0; r < ar; r++ {
+		for c := 0; c < br; c++ {
+			sum := 0.0
+			for k := 0; k < ac; k++ {
+				sum += a[r*ac+k] * b[c*bc+k]
+			}
+			out[r*br+c] = sum
+		}
+	}
+	stddata.RecordLinalgMatrixKernel("LinalgMatrixMatmulTransposeRight", "matmul_t", ar, br)
+	return []Value{linalgMatrixDenseValue(ar, br, out)}, nil
 }
 
 func linalgChainmul(args []Value) ([]Value, error) {
