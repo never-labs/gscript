@@ -510,6 +510,116 @@ func TestODESolveAggregatesTableObserveFields(t *testing.T) {
 	assertFloat(t, observed.RawGetString("energy").Table().RawGetInt(3), 4.3125)
 }
 
+func TestODESolveAggregatesNamedStateFields(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0], 2 + 0*state[1]}))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0, 10})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(0.25),
+			"steps":       IntValue(2),
+			"state_names": controlTestStringTable("x", "v"),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := got[0].Table()
+	observed := result.RawGetString("observed").Table()
+	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(1), 0.25)
+	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(2), 0.5)
+	assertFloat(t, observed.RawGetString("v").Table().RawGetInt(1), 10.5)
+	assertFloat(t, observed.RawGetString("v").Table().RawGetInt(2), 11)
+	if !observed.RawGetString("value").IsNil() {
+		t.Fatalf("observed.value = %v, want nil without observe", observed.RawGetString("value"))
+	}
+}
+
+func TestODESolveMergesNamedStateWithScalarObserve(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0]}))}, nil
+		case "test.observe":
+			return []Value{FloatValue(10 * state[0])}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(0.25),
+			"steps":       IntValue(2),
+			"state_names": controlTestStringTable("x"),
+			"observe":     FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed := got[0].Table().RawGetString("observed").Table()
+	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(1), 0.25)
+	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(2), 0.5)
+	assertFloat(t, observed.RawGetString("value").Table().RawGetInt(1), 2.5)
+	assertFloat(t, observed.RawGetString("value").Table().RawGetInt(2), 5)
+}
+
+func TestODESolveRejectsNamedStateObserveFieldConflict(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0]}))}, nil
+		case "test.observe":
+			return []Value{TableValue(controlTestOptions(map[string]Value{"x": FloatValue(99)}))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	_, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":          FloatValue(0.25),
+			"steps":       IntValue(1),
+			"state_names": controlTestStringTable("x"),
+			"observe":     FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err == nil || !strings.Contains(err.Error(), `field "x" conflicts with state_names`) {
+		t.Fatalf("ode.solve field conflict error = %v, want state_names conflict", err)
+	}
+}
+
 func TestODESolveRejectsInconsistentTableObserveFields(t *testing.T) {
 	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
 		name := fn.GoFunction().Name
@@ -617,6 +727,14 @@ func controlTestOptions(values map[string]Value) *Table {
 		t.RawSetString(key, value)
 	}
 	return t
+}
+
+func controlTestStringTable(values ...string) Value {
+	t := NewTable()
+	for i, value := range values {
+		t.RawSetInt(int64(i+1), StringValue(value))
+	}
+	return TableValue(t)
 }
 
 func controlTestMatrix(rows, cols int, values []float64) Value {

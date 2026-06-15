@@ -58,6 +58,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		var project, observe Value
 		hasProject := false
 		hasObserve := false
+		var stateNames []string
 		if len(args) >= 5 && args[4].IsTable() {
 			opts := args[4].Table()
 			trajectory = opts.RawGetString("trajectory").Truthy()
@@ -74,7 +75,12 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 				return nil, fmt.Errorf("ode.integrate: observe must be a function")
 			}
 			hasObserve = observe.IsFunction()
+			stateNames, err = odeStateNamesFromOptions("ode.integrate", opts, len(state))
+			if err != nil {
+				return nil, err
+			}
 		}
+		hasNamedState := len(stateNames) > 0
 		if call == nil {
 			return nil, fmt.Errorf("ode.integrate: script caller unavailable")
 		}
@@ -85,7 +91,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		}
 		var observations *Table
 		var observationVectors *odeObservationVectors
-		if hasObserve {
+		if hasObserve || hasNamedState {
 			observations = NewAppendArrayTable(steps)
 		}
 		current := append([]float64(nil), state...)
@@ -113,40 +119,58 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			if trajectory {
 				states.RawSetInt(int64(i+1), odeStateValue(current))
 			}
-			if hasObserve {
-				observed, err := call(observe, []Value{odeStateValue(current), step, t})
-				if err != nil {
-					return nil, err
+			if hasObserve || hasNamedState {
+				var observedValue Value
+				if hasObserve {
+					observed, err := call(observe, []Value{odeStateValue(current), step, t})
+					if err != nil {
+						return nil, err
+					}
+					if len(observed) == 0 {
+						return nil, fmt.Errorf("ode.integrate: observe returned no value")
+					}
+					observedValue = observed[0]
 				}
-				if len(observed) == 0 {
-					return nil, fmt.Errorf("ode.integrate: observe returned no value")
+				if hasNamedState {
+					row := odeNamedStateTable(stateNames, current)
+					if hasObserve {
+						if observedValue.IsTable() {
+							if err := odeMergeObservationTable(row, observedValue.Table(), i+1); err != nil {
+								return nil, err
+							}
+						} else {
+							row.RawSetString("value", observedValue)
+						}
+					}
+					observedValue = TableValue(row)
 				}
-				if observed[0].IsTable() {
+				if observedValue.IsTable() {
 					if observationVectors == nil {
 						if i != 0 {
 							return nil, fmt.Errorf("ode.integrate: observe returned table at step %d after scalar observations", i+1)
 						}
 						observationVectors = newODEObservationVectors(observations)
 					}
-					if err := observationVectors.append(observed[0].Table(), i+1); err != nil {
+					if err := observationVectors.append(observedValue.Table(), i+1); err != nil {
 						return nil, err
 					}
 				} else {
 					if observationVectors != nil {
 						return nil, fmt.Errorf("ode.integrate: observe returned scalar at step %d after table observations", i+1)
 					}
-					observations.RawSetInt(int64(i+1), observed[0])
+					observations.RawSetInt(int64(i+1), observedValue)
 				}
 			}
 		}
 		final := odeStateValue(current)
-		if trajectory && hasObserve {
+		hasObservations := hasObserve || hasNamedState
+		if trajectory && hasObservations {
 			return []Value{final, TableValue(states), TableValue(observations)}, nil
 		}
 		if trajectory {
 			return []Value{final, TableValue(states)}, nil
 		}
-		if hasObserve {
+		if hasObservations {
 			return []Value{final, TableValue(observations)}, nil
 		}
 		return []Value{final}, nil
@@ -185,16 +209,26 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		if !dt.IsNumber() {
 			return nil, fmt.Errorf("ode.solve: dt must be numeric")
 		}
+		stateValues, err := odeVectorFromValue(state, "ode.solve state")
+		if err != nil {
+			return nil, err
+		}
 		if _, err := linalgPositiveInt("ode.solve", steps, "steps"); err != nil {
 			return nil, err
 		}
 		integrateArgs := []Value{fn, state, dt, steps}
 		trajectory := false
 		hasObserve := false
+		hasNamedState := false
 		if hasOpts {
 			options := opts.Table()
 			trajectory = options.RawGetString("trajectory").Truthy()
 			hasObserve = options.RawGetString("observe").IsFunction()
+			stateNames, err := odeStateNamesFromOptions("ode.solve", options, len(stateValues))
+			if err != nil {
+				return nil, err
+			}
+			hasNamedState = len(stateNames) > 0
 			integrateArgs = append(integrateArgs, opts)
 		}
 		values, err := integrate(integrateArgs)
@@ -208,7 +242,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			out.RawSetString("trajectory", values[next])
 			next++
 		}
-		if hasObserve {
+		if hasObserve || hasNamedState {
 			out.RawSetString("observed", values[next])
 		}
 		return []Value{TableValue(out)}, nil
@@ -264,6 +298,63 @@ func odeVectorFromValue(v Value, name string) ([]float64, error) {
 
 func odeStateValue(state []float64) Value {
 	return DenseArrayValue(NewDenseArrayF64Owned(append([]float64(nil), state...)))
+}
+
+func odeStateNamesFromOptions(name string, opts *Table, stateLen int) ([]string, error) {
+	value := opts.RawGetString("state_names")
+	if value.IsNil() {
+		value = opts.RawGetString("names")
+	}
+	if value.IsNil() {
+		return nil, nil
+	}
+	if !value.IsTable() {
+		return nil, fmt.Errorf("%s: state_names must be a string table", name)
+	}
+	t := value.Table()
+	if t.Length() != stateLen {
+		return nil, fmt.Errorf("%s: state_names length %d does not match state length %d", name, t.Length(), stateLen)
+	}
+	seen := make(map[string]bool, t.Length())
+	names := make([]string, t.Length())
+	for i := range names {
+		item := t.RawGetInt(int64(i + 1))
+		if !item.IsString() {
+			return nil, fmt.Errorf("%s: state_names[%d] must be a string, got %s", name, i+1, item.TypeName())
+		}
+		field := item.Str()
+		if field == "" {
+			return nil, fmt.Errorf("%s: state_names[%d] must not be empty", name, i+1)
+		}
+		if seen[field] {
+			return nil, fmt.Errorf("%s: duplicate state name %q", name, field)
+		}
+		seen[field] = true
+		names[i] = field
+	}
+	return names, nil
+}
+
+func odeNamedStateTable(names []string, state []float64) *Table {
+	t := NewTable()
+	for i, name := range names {
+		t.RawSetString(name, FloatValue(state[i]))
+	}
+	return t
+}
+
+func odeMergeObservationTable(dst, src *Table, step int) error {
+	for _, key := range src.PairsKeysSnapshot() {
+		if !key.IsString() {
+			return fmt.Errorf("ode.integrate: observe table key at step %d must be a string, got %s", step, key.TypeName())
+		}
+		name := key.Str()
+		if !dst.RawGetString(name).IsNil() {
+			return fmt.Errorf("ode.integrate: observe table at step %d field %q conflicts with state_names", step, name)
+		}
+		dst.RawSetString(name, src.RawGetString(name))
+	}
+	return nil
 }
 
 type odeObservationVectors struct {

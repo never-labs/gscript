@@ -32,19 +32,16 @@ func project_state(x, step, t) {
 
 func observe_energy(x, step, t) {
     return {
-        theta: x[1],
-        omega: x[2],
         energy: 0.5 * x[2] * x[2] + (g / l) * (1.0 - math.cos(x[1])),
     }
 }
 
-solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, project: project_state, observe: observe_energy})
-state = solution.final
+solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, project: project_state, observe: observe_energy})
 trajectory := solution.trajectory
 observed := solution.observed
 energy := observed.energy
-final_theta := state[1]
-final_omega := state[2]
+final_theta := observed.theta[#observed.theta]
+final_omega := observed.omega[#observed.omega]
 mean_energy := stats.mean(energy)
 peak_energy := stats.max(energy)
 q_checksum := q {
@@ -55,6 +52,7 @@ assert(math.near(final_theta, 0.0, 0.04))
 assert(math.near(final_omega, 0.0, 0.08))
 assert(#trajectory == 240)
 assert(#observed.theta == 240)
+assert(#observed.omega == 240)
 assert(peak_energy < 0.25)
 assert(linalg.get(linalg_probe, 2, 1) == g / l)
 assert(q_checksum == 6)

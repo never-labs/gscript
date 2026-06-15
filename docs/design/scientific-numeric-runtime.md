@@ -185,4 +185,6 @@ example-specific shortcuts:
   `control.wrap_angle` for small control systems.
 - `ode.integrate` and `ode.solve` for RK4-style simulation with projection,
   scalar or table-shaped observation hooks, and result-object access.
+- `ode.solve(..., {state_names: {...}})` for named state trajectories merged
+  into `solution.observed` alongside custom observation fields.
 - `q { ... }` raw blocks for compact q snippets without quoted source strings.
