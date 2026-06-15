@@ -36,6 +36,7 @@ func BuildStats() *Table {
 	set("rms", statsRMS)
 	set("rmse", statsRMSE)
 	set("resample", statsResample)
+	set("resample_if", statsResampleIf)
 	set("systematic_resample", statsSystematicResample)
 	return t
 }
@@ -348,16 +349,62 @@ func statsResample(args []Value) ([]Value, error) {
 	if len(values) != len(weights) {
 		return nil, fmt.Errorf("stats.resample: values and weights length mismatch")
 	}
-	offset := 0.5
-	if len(args) >= 3 {
-		offset, err = linalgNumber("stats.resample", args[2])
-		if err != nil {
-			return nil, err
-		}
-		if offset < 0 || offset >= 1 {
-			return nil, fmt.Errorf("stats.resample: offset must be in [0, 1)")
-		}
+	offset, err := statsResampleOffset("stats.resample", args, 2)
+	if err != nil {
+		return nil, err
 	}
+	out, uniform, indexes := statsSystematicResampleValues(values, weights, total, offset)
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out)), DenseArrayValue(NewDenseArrayF64Owned(uniform)), TableValue(indexes)}, nil
+}
+
+func statsResampleIf(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.resample_if: need values, weights, and minimum ESS ratio")
+	}
+	values, err := linalgVectorValue("stats.resample_if", args[0])
+	if err != nil {
+		return nil, err
+	}
+	weights, total, err := statsWeights("stats.resample_if", []Value{args[1]})
+	if err != nil {
+		return nil, err
+	}
+	if len(values) != len(weights) {
+		return nil, fmt.Errorf("stats.resample_if: values and weights length mismatch")
+	}
+	minRatio, err := linalgNumber("stats.resample_if", args[2])
+	if err != nil {
+		return nil, err
+	}
+	if minRatio < 0 || minRatio > 1 {
+		return nil, fmt.Errorf("stats.resample_if: minimum ESS ratio must be in [0, 1]")
+	}
+	offset, err := statsResampleOffset("stats.resample_if", args, 3)
+	if err != nil {
+		return nil, err
+	}
+	n := len(weights)
+	ess := statsEffectiveSampleSizeOf(weights, total)
+	if ess >= float64(n)*minRatio {
+		return []Value{
+			args[0],
+			DenseArrayValue(NewDenseArrayF64Owned(statsNormalizeWeightsOf(weights, total))),
+			BoolValue(false),
+			FloatValue(ess),
+			TableValue(NewAppendArrayTable(0)),
+		}, nil
+	}
+	out, uniform, indexes := statsSystematicResampleValues(values, weights, total, offset)
+	return []Value{
+		DenseArrayValue(NewDenseArrayF64Owned(out)),
+		DenseArrayValue(NewDenseArrayF64Owned(uniform)),
+		BoolValue(true),
+		FloatValue(ess),
+		TableValue(indexes),
+	}, nil
+}
+
+func statsSystematicResampleValues(values, weights []float64, total, offset float64) ([]float64, []float64, *Table) {
 	n := len(weights)
 	indexes := NewAppendArrayTable(n)
 	out := make([]float64, n)
@@ -379,7 +426,7 @@ func statsResample(args []Value) ([]Value, error) {
 			uniform[i] = w
 		}
 	}
-	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out)), DenseArrayValue(NewDenseArrayF64Owned(uniform)), TableValue(indexes)}, nil
+	return out, uniform, indexes
 }
 
 func statsWeightedMean(args []Value) ([]Value, error) {
@@ -450,11 +497,15 @@ func statsNormalizeWeights(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(statsNormalizeWeightsOf(weights, total)))}, nil
+}
+
+func statsNormalizeWeightsOf(weights []float64, total float64) []float64 {
 	out := make([]float64, len(weights))
 	for i, w := range weights {
 		out[i] = w / total
 	}
-	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	return out
 }
 
 func statsNormalizeLogWeights(args []Value) ([]Value, error) {
@@ -478,15 +529,19 @@ func statsEffectiveSampleSize(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
+	return []Value{FloatValue(statsEffectiveSampleSizeOf(weights, total))}, nil
+}
+
+func statsEffectiveSampleSizeOf(weights []float64, total float64) float64 {
 	sumSq := 0.0
 	for _, w := range weights {
 		normalized := w / total
 		sumSq += normalized * normalized
 	}
 	if sumSq == 0 {
-		return nil, fmt.Errorf("stats.effective_sample_size: total weight is zero")
+		return 0
 	}
-	return []Value{FloatValue(1.0 / sumSq)}, nil
+	return 1.0 / sumSq
 }
 
 func statsLogSumExp(args []Value) ([]Value, error) {
@@ -586,6 +641,21 @@ func statsWeights(name string, args []Value) ([]float64, float64, error) {
 		return nil, 0, fmt.Errorf("%s: total weight is zero", name)
 	}
 	return weights, total, nil
+}
+
+func statsResampleOffset(name string, args []Value, index int) (float64, error) {
+	offset := 0.5
+	if len(args) <= index {
+		return offset, nil
+	}
+	value, err := linalgNumber(name, args[index])
+	if err != nil {
+		return 0, err
+	}
+	if value < 0 || value >= 1 {
+		return 0, fmt.Errorf("%s: offset must be in [0, 1)", name)
+	}
+	return value, nil
 }
 
 func statsMeanOf(values []float64) float64 {

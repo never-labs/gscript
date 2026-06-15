@@ -76,6 +76,8 @@ func TestStatsSystematicResample(t *testing.T) {
 	interp := statsInterp(t, `
 indices := stats.systematic_resample({0.1, 0.2, 0.7}, 0.5)
 resampled, uniform, resample_idx := stats.resample({10, 20, 30}, {0.1, 0.2, 0.7}, 0.5)
+kept, kept_weights, kept_resampled, kept_ess, kept_idx := stats.resample_if({10, 20, 30}, {1, 1, 1}, 0.5, 0.5)
+next, next_weights, did_resample, next_ess, next_idx := stats.resample_if({10, 20, 30}, {0.01, 0.01, 0.98}, 0.8, 0.5)
 `)
 	indices := interp.GetGlobal("indices")
 	if !indices.IsTable() {
@@ -95,6 +97,27 @@ resampled, uniform, resample_idx := stats.resample({10, 20, 30}, {0.1, 0.2, 0.7}
 	if got := idx.RawGetInt(1); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("resample_idx[1] = %v, want 2", got)
 	}
+	if interp.GetGlobal("kept_resampled").Truthy() {
+		t.Fatalf("kept_resampled = %v, want false", interp.GetGlobal("kept_resampled"))
+	}
+	assertTableFloat(t, interp.GetGlobal("kept"), 2, 20)
+	assertTableFloat(t, interp.GetGlobal("kept_weights"), 2, 1.0/3.0)
+	assertFloat(t, interp.GetGlobal("kept_ess"), 3)
+	if got := interp.GetGlobal("kept_idx").Table().Len(); got != 0 {
+		t.Fatalf("kept_idx length = %d, want 0", got)
+	}
+	if !interp.GetGlobal("did_resample").Truthy() {
+		t.Fatalf("did_resample = %v, want true", interp.GetGlobal("did_resample"))
+	}
+	assertTableFloat(t, interp.GetGlobal("next"), 1, 30)
+	assertTableFloat(t, interp.GetGlobal("next_weights"), 2, 1.0/3.0)
+	if got := interp.GetGlobal("next_ess").Number(); got >= 2 {
+		t.Fatalf("next_ess = %v, want below 2", got)
+	}
+	nextIdx := interp.GetGlobal("next_idx").Table()
+	if got := nextIdx.RawGetInt(1); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("next_idx[1] = %v, want 3", got)
+	}
 }
 
 func TestStatsErrors(t *testing.T) {
@@ -111,5 +134,9 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.effective_sample_size({1, -1})`)
 	if err == nil {
 		t.Fatal("stats.effective_sample_size({1, -1}) succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.resample_if({1}, {1}, 1.5)`)
+	if err == nil {
+		t.Fatal("stats.resample_if invalid threshold succeeded, want error")
 	}
 }
