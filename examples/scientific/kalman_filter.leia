@@ -6,7 +6,6 @@ dt := 1.0
 F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
 H := linalg.row(1.0, 0.0)
 Q := linalg.eye(2, 0.01)
-I := linalg.eye(2)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
 x := linalg.vector(0.0, 1.0)
@@ -23,7 +22,7 @@ for i := 1; i <= #measurements; i++ {
     K := linalg.rsolve(linalg.matmul(P_pred, linalg.T(H)), S)
 
     x = linalg.add(x_pred, linalg.matmul(K, y))
-    P = linalg.matmul(linalg.sub(I, linalg.matmul(K, H)), P_pred)
+    P = linalg.matmul(linalg.identity_minus(linalg.matmul(K, H)), P_pred)
     innovations[i] = y[1]
 }
 

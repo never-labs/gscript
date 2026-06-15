@@ -32,6 +32,7 @@ func BuildLinalg() *Table {
 	set("affine", linalgAffine)
 	set("axpy", linalgAXPY)
 	set("add_scaled", linalgAXPY)
+	set("identity_minus", linalgIdentityMinus)
 	set("dot", linalgDot)
 	set("matvec", linalgMatvec)
 	set("matmul", linalgMatmul)
@@ -377,6 +378,34 @@ func linalgAXPY(args []Value) ([]Value, error) {
 		return nil, err
 	}
 	return linalgAffineOperands(base, delta, 1, scale)
+}
+
+func linalgIdentityMinus(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("linalg.identity_minus: need matrix")
+	}
+	rows, cols, values, ok, err := linalgMatrixValue("linalg.identity_minus", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.identity_minus: argument 1 must be a matrix")
+	}
+	if rows != cols {
+		return nil, fmt.Errorf("linalg.identity_minus: matrix must be square")
+	}
+	out := make([]float64, rows*cols)
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			v := -values[r*cols+c]
+			if r == c {
+				v += 1
+			}
+			out[r*cols+c] = v
+		}
+	}
+	stddata.RecordLinalgMatrixKernel("LinalgMatrixIdentityMinus", "identity_minus", rows, cols)
+	return []Value{linalgMatrixDenseValue(rows, cols, out)}, nil
 }
 
 func linalgAffineOperands(base, delta linalgPointwiseOperand, baseScale, deltaScale float64) ([]Value, error) {

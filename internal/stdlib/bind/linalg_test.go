@@ -102,6 +102,7 @@ swadd := linalg.sandwich_add(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2), lin
 swshift := linalg.sandwich_add(linalg.matrix({{1, 2}, {0, 1}}), linalg.eye(2), 10)
 mshift := linalg.add(m, 10)
 maffine := linalg.affine(m, linalg.eye(2), 2, -10)
+im := linalg.identity_minus(linalg.matrix({{0.2, 0.1}, {0.3, 0.4}}))
 rowAffine := linalg.affine(linalg.row(1, 2), 10, 2, -1)
 colAffine := linalg.affine(100, linalg.col(1, 2), 1, -3)
 vec_from_row := linalg.vec(linalg.row(7, 8))
@@ -145,6 +146,9 @@ single := linalg.scalar(linalg.matrix({{42}}))
 	assertMatrixFloat(t, interp.GetGlobal("mshift"), 2, 2, 3, 13)
 	assertMatrixFloat(t, interp.GetGlobal("maffine"), 2, 2, 1, -8)
 	assertMatrixFloat(t, interp.GetGlobal("maffine"), 2, 2, 4, -2)
+	assertMatrixFloat(t, interp.GetGlobal("im"), 2, 2, 1, 0.8)
+	assertMatrixFloat(t, interp.GetGlobal("im"), 2, 2, 2, -0.1)
+	assertMatrixFloat(t, interp.GetGlobal("im"), 2, 2, 4, 0.6)
 	assertMatrixFloat(t, interp.GetGlobal("rowAffine"), 1, 2, 2, -6)
 	assertMatrixFloat(t, interp.GetGlobal("colAffine"), 2, 1, 2, 94)
 	assertTableFloat(t, interp.GetGlobal("vec_from_row"), 2, 8)
@@ -274,6 +278,13 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 			col:  0,
 			want: -4,
 		},
+		{
+			name: "identity minus",
+			src:  `m := linalg.identity_minus(linalg.matrix(2, 2, {0.2, 0.1, 0.3, 0.4}))`,
+			row:  0,
+			col:  0,
+			want: 0.8,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setRow, setCol := tc.setRow, tc.setCol
@@ -292,6 +303,19 @@ after := matrix.getf(m, %d, %d)
 				t.Fatalf("%s returned %s without DenseMatrix metadata", tc.name, m.TypeName())
 			}
 		})
+	}
+}
+
+func TestLinalgIdentityMinusErrors(t *testing.T) {
+	interp := runtime.NewCore()
+	installTestModule(interp, "linalg", runtime.TableValue(BuildLinalg()))
+	err := execSourceOnInterp(interp, `linalg.identity_minus(linalg.matrix(1, 2, {1, 2}))`)
+	if err == nil {
+		t.Fatal("linalg.identity_minus non-square matrix succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `linalg.identity_minus({1, 2})`)
+	if err == nil {
+		t.Fatal("linalg.identity_minus vector succeeded, want error")
 	}
 }
 
