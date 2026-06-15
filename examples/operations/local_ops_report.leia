@@ -160,7 +160,7 @@ for i := 1; i <= #events; i++ {
     }
 }
 
-rows := {}
+rows := []
 owner_rollups := {}
 backup_alerts := 0
 top_service := ""
@@ -216,7 +216,7 @@ for i := 1; i <= #services; i++ {
         top_service = metric.service
     }
 
-    table.insert(rows, {
+    append(rows, {
         Service: metric.service,
         Owner: metric.owner,
         Tier: metric.tier,
@@ -240,9 +240,9 @@ table.sort(rows, func(a, b) {
     return a.Score > b.Score
 })
 
-owner_rows := {}
+owner_rows := []
 for _, owner := range pairs(owner_rollups) {
-    table.insert(owner_rows, owner)
+    append(owner_rows, owner)
 }
 table.sort(owner_rows, func(a, b) {
     if a.risk == b.risk {

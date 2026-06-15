@@ -35,7 +35,7 @@ func dense_matrix_from_rows(rows) {
 }
 
 func numeric_column(rows, column) {
-    out := {}
+    out := []
     for i := 1; i <= #rows; i++ {
         out[i] = rows[i][column]
     }
@@ -51,7 +51,7 @@ func number_or(value, fallback) {
 }
 
 func ids(n) {
-    out := {}
+    out := []
     for i := 1; i <= n; i++ {
         out[i] = i
     }
@@ -59,7 +59,7 @@ func ids(n) {
 }
 
 func zeroes(n) {
-    out := {}
+    out := []
     for i := 1; i <= n; i++ {
         out[i] = 0.0
     }
@@ -106,8 +106,8 @@ jsonl_samples := jsonl`{"id":1,"x":1.5,"y":2.0}
 {"id":2,"x":2.5,"y":4.0}
 {"id":3,"x":3.5,"y":6.0}
 `
-jsonl_x_values := {}
-jsonl_y_values := {}
+jsonl_x_values := []
+jsonl_y_values := []
 for i := 1; i <= #jsonl_samples; i++ {
     jsonl_x_values[i] = jsonl_samples[i].x
     jsonl_y_values[i] = jsonl_samples[i].y

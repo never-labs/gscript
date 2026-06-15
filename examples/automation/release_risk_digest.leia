@@ -88,8 +88,8 @@ func type_bonus(kind) {
 }
 
 seen := {}
-duplicates := {}
-items := {}
+duplicates := []
+items := []
 owner_counts := {}
 failures := 0
 
@@ -97,7 +97,7 @@ for i := 1; i <= #changes; i++ {
     change := changes[i]
     rule := area_rule(change.area)
     if seen[change.id] != nil {
-        table.insert(duplicates, change.id)
+        append(duplicates, change.id)
     } else {
         seen[change.id] = true
         text := change.title .. " " .. change.body
@@ -123,7 +123,7 @@ for i := 1; i <= #changes; i++ {
             risk: score,
             title: change.title,
         }
-        table.insert(items, item)
+        append(items, item)
 
         if owner_counts[rule.owner] == nil {
             owner_counts[rule.owner] = 0
@@ -139,9 +139,9 @@ table.sort(items, func(a, b) {
     return a.risk > b.risk
 })
 
-owners := {}
+owners := []
 for owner, count := range pairs(owner_counts) {
-    table.insert(owners, {owner: owner, count: count})
+    append(owners, {owner: owner, count: count})
 }
 table.sort(owners, func(a, b) {
     if a.count == b.count {
@@ -150,7 +150,7 @@ table.sort(owners, func(a, b) {
     return a.count > b.count
 })
 
-top_rows := {}
+top_rows := []
 limit := 3
 if #items < limit {
     limit = #items

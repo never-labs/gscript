@@ -144,6 +144,28 @@ ok := s[1] == 2 && s[2] == 1 && s[3] == 3
 	assertVMEqualsJIT(t, src, "ok")
 }
 
+func TestJITLoopReturnTableLiteralFallsBackToVMSemantics(t *testing.T) {
+	src := `
+rules := dialect.eval("csv", "severity,base_score,sla_minutes\ncritical,100,15\nhigh,70,60\n", {headers: true})
+tickets := dialect.eval("csv", "id,severity\nINC-100,critical\nINC-101,high\n", {headers: true})
+
+func rule_for(severity) {
+  for i := 1; i <= #rules; i++ {
+    row := rules[i]
+    if row.severity == severity {
+      return {base_score: tonumber(row.base_score), sla_minutes: tonumber(row.sla_minutes)}
+    }
+  }
+  return {base_score: 0, sla_minutes: 999999}
+}
+
+first := rule_for(tickets[1].severity).base_score
+second := rule_for(tickets[2].severity).base_score
+ok := first == 100 && second == 70
+`
+	assertVMEqualsJIT(t, src, "ok")
+}
+
 // ============================================================================
 // Invariant 4: Accumulated correctness (enter-exit-reenter cycles)
 // ============================================================================

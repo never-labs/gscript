@@ -11,6 +11,14 @@ normal,35,240
 low,10,720
 `, {headers: true})
 
+rules_by_severity := {}
+for rule_idx := 1; rule_idx <= #rules; rule_idx++ {
+    row := rules[rule_idx]
+    if row != nil {
+        rules_by_severity[row.severity] = row
+    }
+}
+
 tickets := dialect.eval("csv", `id,owner,severity,age_minutes,subject,body
 INC-100,platform,critical,18,Checkout failing,"Payment timeout seen on checkout retry flow"
 INC-101,security,high,44,Suspicious login spike,"MFA prompts increased for admin users"
@@ -31,15 +39,11 @@ func number_or(value, fallback) {
 }
 
 func rule_for(severity) {
-    for i := 1; i <= #rules; i++ {
-        row := rules[i]
-        if row != nil {
-            if row.severity == severity {
-                return {
-                    base_score: number_or(row.base_score, 0),
-                    sla_minutes: number_or(row.sla_minutes, 0),
-                }
-            }
+    row := rules_by_severity[severity]
+    if row != nil {
+        return {
+            base_score: number_or(row.base_score, 0),
+            sla_minutes: number_or(row.sla_minutes, 0),
         }
     }
     return {base_score: 0, sla_minutes: 999999}
@@ -81,8 +85,8 @@ func new_owner_summary(owner) {
 }
 
 seen := {}
-deduped := {}
-duplicates := {}
+deduped := []
+duplicates := []
 owners := {}
 queue_counts := {}
 breaches := 0
@@ -98,7 +102,7 @@ for i := 1; i <= #tickets; i++ {
 
     if seen[row.id] != nil {
         owner_summary.duplicates = owner_summary.duplicates + 1
-        table.insert(duplicates, row.id)
+        append(duplicates, row.id)
     } else {
         seen[row.id] = true
         rule := rule_for(row.severity)
@@ -123,7 +127,7 @@ for i := 1; i <= #tickets; i++ {
             priority: priority,
             subject: row.subject,
         }
-        table.insert(deduped, item)
+        append(deduped, item)
 
         owner_summary.tickets = owner_summary.tickets + 1
         owner_summary.score = owner_summary.score + priority
@@ -146,9 +150,9 @@ table.sort(deduped, func(a, b) {
     return a.priority > b.priority
 })
 
-owner_rows := {}
+owner_rows := []
 for _, owner := range pairs(owners) {
-    table.insert(owner_rows, owner)
+    append(owner_rows, owner)
 }
 table.sort(owner_rows, func(a, b) {
     if a.score == b.score {
@@ -157,9 +161,9 @@ table.sort(owner_rows, func(a, b) {
     return a.score > b.score
 })
 
-queue_rows := {}
+queue_rows := []
 for queue, count := range pairs(queue_counts) {
-    table.insert(queue_rows, {queue: queue, count: count})
+    append(queue_rows, {queue: queue, count: count})
 }
 table.sort(queue_rows, func(a, b) {
     if a.count == b.count {
@@ -168,7 +172,7 @@ table.sort(queue_rows, func(a, b) {
     return a.count > b.count
 })
 
-digest_rows := {}
+digest_rows := []
 limit := 4
 if #deduped < limit {
     limit = #deduped

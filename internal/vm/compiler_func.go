@@ -49,6 +49,9 @@ func (c *compiler) compileFunction(name string, params []ast.FuncParam, body *as
 	if blockContainsReturn(body) && !blockAlwaysReturns(body) {
 		child.proto.JITDisabled = true
 	}
+	if blockHasLoopReturnTableLiteral(body) {
+		child.proto.JITDisabled = true
+	}
 	child.collectFunctionArities(body.Stmts)
 	child.collectFunctionResults(body.Stmts)
 	child.collectLabelDepths(body.Stmts, child.depth)
