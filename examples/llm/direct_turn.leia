@@ -7,10 +7,10 @@
 func answer_with_plain_turn(question) {
     return llm.turn({
         model: "mock-fast"
-        messages: {
+        messages: [
             llm.system("Answer using the provider response exactly."),
             llm.user(question),
-        }
+        ]
         max_tokens: 64
         temperature: 0
     })

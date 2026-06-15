@@ -10,10 +10,10 @@ last_stream_event := ""
 
 stream_result, stream_err := llm.turn({
     model: "mock-stream"
-    messages: {
+    messages: [
         llm.system("Return the provider stream exactly."),
         llm.user("Stream a short greeting."),
-    }
+    ]
     stream: true
     on_stream: func(event) {
         streamed_text = streamed_text .. event.token

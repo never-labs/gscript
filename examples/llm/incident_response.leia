@@ -18,8 +18,8 @@ llm.register_models({
 search_runbook := llm.tool("search_runbook", func(service, symptom) {
     return "runbook:" .. service .. ":" .. symptom, nil
 }, {
-    params: {"service", "symptom"}
-    requires: {"runbooks.read"}
+    params: ["service", "symptom"]
+    requires: ["runbooks.read"]
     param_docs: {
         service: "production service name"
         symptom: "current symptom or alert summary"
@@ -29,45 +29,45 @@ search_runbook := llm.tool("search_runbook", func(service, symptom) {
 get_metrics := llm.tool("get_metrics", func(service) {
     return "metrics:" .. service .. ":latency=high,error_rate=2%", nil
 }, {
-    params: {"service"}
-    requires: {"metrics.read"}
+    params: ["service"]
+    requires: ["metrics.read"]
     param_docs: {service: "production service name"}
 })
 
 llm.agent_defaults({
     model: "ops"
-    tools: {search_runbook, get_metrics}
+    tools: [search_runbook, get_metrics]
     budget: {turns: 5, calls: 4, tokens: 3000, time: 45}
 })
 
 answer_faq := llm.agent("answer_faq", func(question) {
     return {
-        messages: {
+        messages: [
             llm.system("Answer internal operations questions in one concise paragraph."),
             llm.user(question),
-        }
-        tools: {}
+        ]
+        tools: []
         budget: {turns: 1, calls: 0, tokens: 256}
     }
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 investigate_alert := llm.agent("investigate_alert", func(service, symptom) {
     return {
-        messages: {
+        messages: [
             llm.system("Use runbook and metrics evidence before giving incident guidance."),
             llm.user("Investigate " .. service .. " alert: " .. symptom),
-        }
+        ]
     }
-}, nil, {params: {"service", "symptom"}})
+}, nil, {params: ["service", "symptom"]})
 
 func incident_brief_config(service, symptom) {
     return {
         model: "planner"
-        messages: {
+        messages: [
             llm.system("Create a brief incident update from verified tool evidence."),
             llm.user("Prepare incident brief for " .. service .. ": " .. symptom),
-        }
-        tools: {search_runbook, get_metrics}
+        ]
+        tools: [search_runbook, get_metrics]
         budget: {turns: 2, calls: 2, tokens: 800}
     }
 }
@@ -105,7 +105,7 @@ incident_brief := llm.agent("incident_brief", incident_brief_config, func(servic
         evidence: evidence,
         history_len: #history
     }, final_err
-}, {params: {"service", "symptom"}})
+}, {params: ["service", "symptom"]})
 
 faq, faq_err := answer_faq("Who owns checkout incidents?")
 if faq_err != nil {

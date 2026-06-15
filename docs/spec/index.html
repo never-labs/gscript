@@ -2113,10 +2113,10 @@ ok, err <span class="tok-operator">:=</span> llm.check_tools([search_runbook], [
 <p>The normalized host provider configuration shape is <code>llm.ProviderConfig</code> with <code>Name</code>, <code>Protocol</code>, <code>BaseURL</code>, <code>APIKey</code>, <code>ProviderModel</code>, and <code>Provider</code> fields. Script model aliases are stable routing names. They must not be treated as secret scopes, authorization grants, or guarantees that a specific remote provider will be used. A host may ignore, rewrite, or reject script-declared provider configuration according to policy.</p>
 <h3 id="ai-dialect-syntax-messages-and-history">Messages And History</h3>
 <p>Provider requests carry an ordered array of normalized message tables. Leia does not require a special message block syntax. Scripts may build message arrays directly or through the <code>llm</code> and <code>msg</code> helper modules.</p>
-<pre class="language-text"><code class="language-text">history := {
+<pre class="language-text"><code class="language-text">history := [
     llm.system(&quot;Answer concisely.&quot;),
     llm.user(&quot;Summarize this incident.&quot;),
-}
+]
 
 history[#history + 1] = msg.assistant(&quot;draft&quot;)
 history[#history + 1] = msg.user(&quot;Now include the owner.&quot;)</code></pre>
@@ -2172,7 +2172,7 @@ history[#history + 1] = msg.user(&quot;Now include the owner.&quot;)</code></pre
 <p><code>turn { ... }</code> performs exactly one provider request and returns <code>(result, err)</code>. It does not dispatch tools by itself.</p>
 <pre class="language-text"><code class="language-text">result, err := turn {
     model: &quot;fast&quot;
-    messages: {llm.user(&quot;Reply exactly: ok&quot;)}
+    messages: [llm.user(&quot;Reply exactly: ok&quot;)]
     tools: [search_runbook]
     max_tokens: 32
     temperature: 0

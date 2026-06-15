@@ -62,10 +62,10 @@ not dispatch tools by itself.
 ```leia
 result, err := turn {
     model: "fast"
-    messages: {
+    messages: [
         prompt { role: "system", text: "Be concise." }
         prompt { role: "user", text: "Return exactly: ok" }
-    }
+    ]
     max_tokens: 16
     temperature: 0
 }
@@ -91,11 +91,11 @@ Tools are ordinary Leia functions wrapped with model-facing metadata.
 ```leia
 lookup_runbook := tool {
     name: "lookup_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Look up a local runbook."
-    requires: {"docs.read"}
+    requires: ["docs.read"]
     fn: func(service) {
-        return {service: service, steps: {"check metrics", "restart if needed"}}, nil
+        return {service: service, steps: ["check metrics", "restart if needed"]}, nil
     }
 }
 ```
@@ -109,18 +109,18 @@ fixtures can inspect the tool without executing it:
 
 ```leia
 lookup_runbook := llm.tool("lookup_runbook", func(service) {
-    return {service: service, steps: {"check metrics", "restart if needed"}}, nil
+    return {service: service, steps: ["check metrics", "restart if needed"]}, nil
 }, {
-    params: {"service"}
+    params: ["service"]
     description: "Look up a local runbook."
-    capabilities: {"docs.read", "replay.local"}
-    result: {service: "string", steps: {"string"}}
+    capabilities: ["docs.read", "replay.local"]
+    result: {service: "string", steps: ["string"]}
     error: {kind: "validation", message: "string"}
     replay_key: "lookup_runbook:{service}"
 })
 
-info := llm.tool_info({lookup_runbook})
-ok, err := llm.validate_tools({lookup_runbook})
+info := llm.tool_info([lookup_runbook])
+ok, err := llm.validate_tools([lookup_runbook])
 ```
 
 `llm.tool_schema` and `llm.tool_info` are inventory helpers. They do not call
@@ -150,14 +150,14 @@ request table for each call.
 ```leia
 support := agent {
     name: "support"
-    params: {"question"}
+    params: ["question"]
     description: "Answer operational questions."
     config: func(question) {
         return {
             model: "fast"
             system: "Use tool evidence when it helps."
             user: question
-            tools: {lookup_runbook}
+            tools: [lookup_runbook]
         }, nil
     }
 }
@@ -178,8 +178,8 @@ flow function. The flow owns history and dispatch.
 func incident_config(service) {
     return {
         model: "fast"
-        messages: {llm.system("Create a short incident update."), llm.user(service)}
-        tools: {lookup_runbook}
+        messages: [llm.system("Create a short incident update."), llm.user(service)]
+        tools: [lookup_runbook]
     }, nil
 }
 
@@ -200,7 +200,7 @@ incident := llm.agent("incident", incident_config, func(service) {
     cfg.messages[#cfg.messages + 1] = msg.assistant_call(call)
     cfg.messages[#cfg.messages + 1] = msg.tool_result(call.id, evidence)
     return llm.turn(cfg)
-}, {params: {"service"}})
+}, {params: ["service"]})
 ```
 
 No hidden turn or dispatch happens inside a custom flow; the script calls
@@ -213,7 +213,7 @@ but the dialect generates the config function for you:
 ```leia
 extract := agent {
     name: "extract"
-    params: {"note"}
+    params: ["note"]
     model: "fast"
     instructions: prompt { role: "system", text: "Extract project and owner." }
     output: {project: "ORCHID", owner: "ADA"}
@@ -250,7 +250,7 @@ contact_schema := llm.schema({
 format := llm.output_schema("contact", contact_schema)
 result, err := llm.turn({
     model: "fast"
-    messages: {llm.user("Extract Ada with score 0.99.")}
+    messages: [llm.user("Extract Ada with score 0.99.")]
     response_format: format
 })
 ok, message := llm.validate_output(result.text, contact_schema)
@@ -269,7 +269,7 @@ document agent-as-tool support.
 ```leia
 extract := agent {
     name: "extract"
-    params: {"note"}
+    params: ["note"]
     config: func(note) {
         return {
             model: "fast"
@@ -282,12 +282,12 @@ extract := agent {
 
 supervisor := agent {
     name: "supervisor"
-    params: {"question"}
+    params: ["question"]
     config: func(question) {
         return {
             model: "fast"
             user: question
-            tools: {llm.agent_as_tool(extract)}
+            tools: [llm.agent_as_tool(extract)]
         }, nil
     }
 }
@@ -304,7 +304,7 @@ reviewer := llm.agent("reviewer", func(topic) {
         user: topic
         output: {summary: "short finding", confidence: 1}
     }, nil
-}, nil, {params: {"topic"}})
+}, nil, {params: ["topic"]})
 
 delegate_review := llm.delegate(reviewer, {
     name: "delegate_review"
@@ -336,7 +336,7 @@ docs := llm.collection({
         id: "runbook"
         title: "Checkout runbook"
         source: "local/runbook"
-        tags: {"checkout", "payments"}
+        tags: ["checkout", "payments"]
     })
     llm.document({
         id: "notes"
@@ -371,7 +371,7 @@ policy_doc := llm.document({
         approval: "Production releases require owner approval."
         rollback: "Rollback plans must name the on-call."
     }
-    tags: {"release", "operations"}
+    tags: ["release", "operations"]
 })
 ```
 
@@ -387,7 +387,7 @@ labels, and input/output refs.
 
 ```leia
 writer := llm.agent("writer", func(topic) {
-    return {model: "fast", messages: {llm.user(topic)}}, nil
+    return {model: "fast", messages: [llm.user(topic)]}, nil
 })
 
 flow := llm.workflow({
@@ -463,10 +463,10 @@ shapes.
 ```leia
 generated, err := llm.sections({
     model: "fast"
-    messages: {
+    messages: [
         llm.system("Use the provided evidence and return JSON.")
         llm.user("Project: reusable generation helpers.")
-    }
+    ]
     evidence: "Evidence: launch checklist is complete."
     sections: {
         {
@@ -573,7 +573,7 @@ Model calls can be summarized with the same provider-free metadata discipline:
 ```leia
 envelope := llm.model_io_envelope({
     model: "fast"
-    request: {messages: {llm.user("Summarize ACME.")}}
+    request: {messages: [llm.user("Summarize ACME.")]}
     response: {
         finish_reason: "stop"
         usage: {prompt_tokens: 8 completion_tokens: 5}
@@ -605,8 +605,8 @@ checkpoint := llm.agent_state_checkpoint({
     agent_run_id: "agent-run-42"
     session_id: "session-7"
     state_version: 3
-    input_refs: {llm.doc("input", "memory://input/42", {kind: "ref"})}
-    output_refs: {llm.doc("draft", "memory://draft/42", {kind: "ref"})}
+    input_refs: [llm.doc("input", "memory://input/42", {kind: "ref"})]
+    output_refs: [llm.doc("draft", "memory://draft/42", {kind: "ref"})]
 }, {
     workflow_run_id: "run-42"
     workflow_step_id: "draft"
@@ -673,19 +673,19 @@ options that drive `llm.turn` without contacting the provider.
 ```leia
 record, err := llm.replay_record({
     replay_key: "turn:1"
-    request: {model: "fast", messages: {llm.user("hello")}}
+    request: {model: "fast", messages: [llm.user("hello")]}
     response: {status: "final_answer", text: "fixture answer"}
 })
-fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+fixture, err := llm.replay_fixture([record], {fixture_id: "unit-fixture"})
 index := llm.fixture_index({
     fixture_id: "unit-fixture-index"
-    fixtures: {
+    fixtures: [
         {
             fixture_key: "turn:1"
             path: "fixtures/turns.json#/records/0"
             schema: "schemas/turn_record.schema.json"
         }
-    }
+    ]
 })
 gate := llm.validate_fixture_index(index, {
     require_replay_ready: true
@@ -713,11 +713,11 @@ artifact_record, err := llm.replay_artifact_record({
 })
 replay, err := fixture.replay({
     model: "fast"
-    messages: {llm.user("hello")}
+    messages: [llm.user("hello")]
 }, "turn:1")
 result, err := llm.turn({
     model: "fast"
-    messages: {llm.user("hello")}
+    messages: [llm.user("hello")]
     replay: replay
 })
 ```

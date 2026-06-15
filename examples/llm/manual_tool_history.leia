@@ -8,19 +8,19 @@
 lookup_doc := llm.tool("lookup_doc", func(topic) {
     return "doc:" .. topic, nil
 }, {
-    params: {"topic"}
-    requires: {"docs.read"}
+    params: ["topic"]
+    requires: ["docs.read"]
     param_docs: {topic: "documentation topic"}
 })
 
 func manual_research_config(topic) {
     return {
         model: "mock-manual"
-        messages: {
+        messages: [
             llm.system("Use tool evidence before answering."),
             llm.user("Find docs for " .. topic),
-        }
-        tools: {lookup_doc}
+        ]
+        tools: [lookup_doc]
         budget: {turns: 2, calls: 1, tokens: 512}
     }
 }
@@ -64,7 +64,7 @@ manual_research := llm.agent("manual_research", manual_research_config, func(top
         evidence: evidence,
         history_len: #history
     }, final_err
-}, {params: {"topic"}})
+}, {params: ["topic"]})
 
 manual, manual_err := manual_research("agent history")
 if manual_err != nil {

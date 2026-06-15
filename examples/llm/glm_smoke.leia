@@ -49,10 +49,10 @@ if glm_api_key == nil || glm_api_key == "" {
     return
 }
 
-history := {
+history := [
     llm.system("You are a deterministic memory smoke-test assistant. Follow exact reply instructions. Keep answers short."),
     llm.user("Store this memory: project codename is ORCHID and owner is ADA. Reply exactly: MEMORY_STORED"),
-}
+]
 
 stored, err := llm.turn({
     messages: history
@@ -82,10 +82,10 @@ history[#history + 1] = msg.assistant(recalled.text)
 extractor := llm.agent("extractor", func(summary) {
     return {
         model: "glm-smoke"
-        messages: {
+        messages: [
             llm.system("Return only compact JSON with exactly these keys: project, owner, remembered, meta. meta must be an object with source. Do not include Markdown."),
             llm.user("Convert this memory recall into JSON. Use project=\"ORCHID\", owner=\"ADA\", remembered=true, meta.source=\"history\" when the recall says project=ORCHID;owner=ADA. Recall: " .. summary),
-        }
+        ]
         output: {
             project: "ORCHID"
             owner: "ADA"
@@ -98,7 +98,7 @@ extractor := llm.agent("extractor", func(summary) {
         temperature: 0
     }
 }, nil, {
-    params: {"summary"}
+    params: ["summary"]
     output: {project: "ORCHID", owner: "ADA", remembered: true, meta: {source: "history"}}
 })
 

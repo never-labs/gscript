@@ -10,7 +10,7 @@ lookup_signal := tool {
     fn: func(service) {
         return "service=" .. service .. "; severity=sev2; queue=payments", nil
     }
-    params: {"service"}
+    params: ["service"]
     description: "Look up the current incident signal for a service."
 }
 
@@ -23,7 +23,7 @@ responder := agent {
             user: issue
         }, nil
     }
-    params: {"issue"}
+    params: ["issue"]
     description: "Triage a production incident with local evidence."
 }
 

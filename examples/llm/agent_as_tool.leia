@@ -49,8 +49,8 @@ lookup_policy := llm.tool("lookup_policy", func(domain, control) {
     return "policy:" .. domain .. ":" .. control .. "=review-required", nil
 }, {
     description: "Read deterministic local policy evidence."
-    params: {"domain", "control"}
-    requires: {"policies.read"}
+    params: ["domain", "control"]
+    requires: ["policies.read"]
     param_docs: {
         domain: "policy domain"
         control: "control or requirement"
@@ -66,11 +66,11 @@ func extract_research_config(domain, control) {
 
     return {
         model: "extractor"
-        messages: {
+        messages: [
             prompt_message(system_prompt, "system", "extractor-policy"),
             prompt_message(task_prompt, "user", "extractor-task"),
-        }
-        tools: {lookup_policy}
+        ]
+        tools: [lookup_policy]
         output: {
             summary: "short finding"
             confidence: 1
@@ -81,7 +81,7 @@ func extract_research_config(domain, control) {
 }
 
 extract_research := llm.agent("extract_research", extract_research_config, nil, {
-    params: {"domain", "control"}
+    params: ["domain", "control"]
     output: {
         summary: "short finding"
         confidence: 1
@@ -99,18 +99,18 @@ func supervisor_config(question) {
 
     return {
         model: "supervisor"
-        messages: {
+        messages: [
             prompt_message(system_prompt, "system", "supervisor-policy"),
             msg.assistant("Previous review: refunds need explicit evidence."),
             prompt_message(task_prompt, "user", "supervisor-task"),
-        }
-        tools: {extract_research}
+        ]
+        tools: [extract_research]
         budget: {turns: 3, calls: 2, tokens: 1024}
     }
 }
 
 supervisor := llm.agent("supervisor", supervisor_config, nil, {
-    params: {"question"}
+    params: ["question"]
     description: "Delegate to policy research before deciding."
 })
 
@@ -124,10 +124,10 @@ tool_msg, tool_idx := history.find(result.history, {role: "tool"})
 task_msg, task_idx := history.find(result.history, {tag: "supervisor-task"})
 
 audit_prompt := prompt`Audit delegated answer: ${result.text}`
-audit_history := chat.merge(result.history, {
+audit_history := chat.merge(result.history, [
     msg.assistant(result.text),
     prompt_message(audit_prompt, "user", "audit-task"),
-})
+])
 
 audit, audit_err := llm.turn({
     model: "audit"

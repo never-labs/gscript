@@ -3455,10 +3455,10 @@ does not require a special message block syntax. Scripts may build message
 arrays directly or through the `llm` and `msg` helper modules.
 
 ```text
-history := {
+history := [
     llm.system("Answer concisely."),
     llm.user("Summarize this incident."),
-}
+]
 
 history[#history + 1] = msg.assistant("draft")
 history[#history + 1] = msg.user("Now include the owner.")
@@ -3575,7 +3575,7 @@ ordered `registered`, `schema_validated`, `approval_checked`, `invoked`, and
 ```text
 result, err := turn {
     model: "fast"
-    messages: {llm.user("Reply exactly: ok")}
+    messages: [llm.user("Reply exactly: ok")]
     tools: [search_runbook]
     max_tokens: 32
     temperature: 0

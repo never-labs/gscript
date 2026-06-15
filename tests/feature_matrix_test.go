@@ -1220,7 +1220,7 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 		"tools": {
 			"tests/llm/llm_runtime_test.go":     {"TestLLMTurnWithMockProvider", "llm.dispatch(result.calls[1], tools)"},
 			"tests/llm/llm_agent_tools_test.go": {"TestLLMAgentScenarioAgentAsToolStructuredHandoff", "llm.agent_as_tool"},
-			"examples/llm/agent_as_tool.leia":   {"tools: {extract_research}", "llm.turn({"},
+			"examples/llm/agent_as_tool.leia":   {"tools: [extract_research]", "llm.turn({"},
 			"docs/reference/ai/index.md":        {"## Tool Dialect", "`llm.agent_as_tool`"},
 		},
 		"messages": {
@@ -1245,7 +1245,7 @@ func TestReadmeAIDialectContractHasExplicitGates(t *testing.T) {
 		"agents": {
 			"tests/llm/llm_agent_examples_test.go":       {"TestLLMAgentExampleSmoke", "agent.leia"},
 			"tests/llm/llm_agent_tools_test.go":          {"TestLLMAgentScenarioDirectAgentInToolsList", "llm.run_agent"},
-			"examples/ai/coding_agent_replay.leia":       {"coding-agent tools", "tools: {read_file, search_text, apply_patch, run_shell}"},
+			"examples/ai/coding_agent_replay.leia":       {"coding-agent tools", "tools: [read_file, search_text, apply_patch, run_shell]"},
 			"examples/ai/coding_agent_project/main.leia": {"llm.run_agent({", "read_file := tool {", "run_shell := tool {", "test_runs == 2"},
 			"docs/reference/ai/index.md":                 {"## Agent Dialect", "## Agent As Tool"},
 		},

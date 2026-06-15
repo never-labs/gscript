@@ -69,23 +69,23 @@ extract_memory := llm.agent("extract_memory", extract_memory_config, func(note) 
         source: "direct-agent-tool"
     }, nil
 }, {
-    params: {"note"}
+    params: ["note"]
     output: {project: "ORCHID", owner: "ADA", remembered: true, source: "direct-agent-tool"}
 })
 
 supervisor := llm.agent("supervisor", func(question) {
     return {
         model: "glm-smoke"
-        messages: {
+        messages: [
             llm.system("You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."),
             llm.user(question),
-        }
-        tools: {extract_memory}
+        ]
+        tools: [extract_memory]
         max_steps: 4
         max_tokens: 128
         temperature: 0
     }
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 result, err := supervisor("Use the extract_memory tool with this note: project codename is ORCHID and owner is ADA. Do not answer from memory; call the tool first.")
 if err != nil {

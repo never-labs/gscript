@@ -16,33 +16,33 @@ llm.register_models({
 lookup := llm.tool("lookup", func(query) {
     return "doc:" .. query, nil
 }, {
-    params: {"query"}
-    requires: {"docs.read"}
+    params: ["query"]
+    requires: ["docs.read"]
     param_docs: {query: "natural-language search query"}
 })
 
 llm.agent_defaults({
     model: "demo"
-    tools: {lookup}
+    tools: [lookup]
     budget: {turns: 4, calls: 4, tokens: 2000, time: 30}
 })
 
 answer := llm.agent("answer", func(question) {
     return {
-        messages: {
+        messages: [
             llm.system("Use local documentation when useful."),
             llm.user(question),
-        }
-        tools: {lookup}
+        ]
+        tools: [lookup]
     }
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 func review_config(question) {
     return {
-        messages: {
+        messages: [
             llm.system("Return a short answer."),
             llm.user(question),
-        }
+        ]
     }
 }
 
@@ -50,7 +50,7 @@ review := llm.agent("review", review_config, func(question) {
     cfg := review_config(question)
     result, err := llm.turn(cfg)
     return result, err
-}, {params: {"question"}})
+}, {params: ["question"]})
 
 llm.with_budget({turns: 2}, func() {
     result, err := answer("What is Leia?")

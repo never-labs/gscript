@@ -8,9 +8,9 @@ x := q`sum ${a}`
 
 answer, err := turn {
     model: "mock-fast"
-    messages: {
+    messages: [
         prompt { role: "user", text: "Explain why ${x} matters." }
-    }
+    ]
 }
 
 if err == nil {

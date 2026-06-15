@@ -10,10 +10,10 @@ events := 0
 
 result, err := turn {
     model: "mock-stream"
-    messages: {
+    messages: [
         llm.system("Stream exactly the provider response."),
         llm.user("Say hello stream."),
-    }
+    ]
     stream: true
     on_stream: func(event) {
         streamed = streamed .. event.token

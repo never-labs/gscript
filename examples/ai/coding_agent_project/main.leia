@@ -27,8 +27,8 @@ read_file := tool {
         }
         return workspace[path], nil
     }
-    params: {"path"}
-    requires: {"workspace.read"}
+    params: ["path"]
+    requires: ["workspace.read"]
     description: "Read a file from the fixture workspace."
 }
 
@@ -38,8 +38,8 @@ search_text := tool {
         record_tool_event("search_text", query)
         return "tests/checkout_refund_test.leia:1:assert(refund_cents(1250, 25) == 1225)\ntests/checkout_refund_test.leia:2:assert(refund_cents(800, 25) == 775)", nil
     }
-    params: {"query"}
-    requires: {"workspace.search"}
+    params: ["query"]
+    requires: ["workspace.search"]
     description: "Search fixture workspace text."
 }
 
@@ -51,7 +51,7 @@ apply_patch := tool {
         if #patches == 1 {
             return {
                 patch_id: "patch-1",
-                files: {"src/checkout.leia"},
+                files: ["src/checkout.leia"],
                 changed_lines: 1,
                 note: "removed one-cent adjustment but left high-value branch"
             }, nil
@@ -59,13 +59,13 @@ apply_patch := tool {
         workspace["src/checkout.leia"] = "func refund_cents(total_cents, fee_cents) {\n    return total_cents - fee_cents\n}\n"
         return {
             patch_id: "patch-2",
-            files: {"src/checkout.leia"},
+            files: ["src/checkout.leia"],
             changed_lines: 4,
             note: "collapsed branch after failed test"
         }, nil
     }
-    params: {"patch"}
-    requires: {"workspace.write"}
+    params: ["patch"]
+    requires: ["workspace.write"]
     description: "Apply a bounded patch to the fixture workspace."
 }
 
@@ -87,18 +87,18 @@ run_shell := tool {
             output: "PASS checkout_refund_test (2 assertions)"
         }, nil
     }
-    params: {"command"}
-    requires: {"process.exec"}
+    params: ["command"]
+    requires: ["process.exec"]
     description: "Run a deterministic local command in the fixture workspace."
 }
 
 agent_result, agent_err := llm.run_agent({
     model: "mock-coder",
-    messages: {
+    messages: [
         llm.system("You are a coding agent. Use read_file, search_text, apply_patch, and run_shell. Iterate once if tests fail."),
         llm.user("Fix the checkout refund rounding bug and prove the focused tests pass."),
-    },
-    tools: {read_file, search_text, apply_patch, run_shell},
+    ],
+    tools: [read_file, search_text, apply_patch, run_shell],
     budget: {turns: 8, calls: 8, tokens: 4000, time: 30},
     max_steps: 8,
     max_tokens: 240,

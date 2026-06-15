@@ -41,10 +41,10 @@ func prompt_message(p, fallback_role, tag) {
     return m
 }
 
-messages := {
+messages := [
     prompt_message(system_prompt, "system", "policy"),
     prompt_message(user_prompt, "user", "task"),
-}
+]
 
 task_msg, task_idx := history.find(messages, {tag: "task"})
 result, err := llm.turn({

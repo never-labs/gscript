@@ -25,7 +25,7 @@ load_context := tool {
         remember("load_context", topic)
         return local_context.metrics, nil
     }
-    params: {"topic"}
+    params: ["topic"]
     description: "Load local metrics and qualitative context for the analysis."
 }
 
@@ -35,7 +35,7 @@ retrieve_policy := tool {
         remember("retrieve_policy", domain)
         return local_context.policy, nil
     }
-    params: {"domain"}
+    params: ["domain"]
     description: "Retrieve local decision policy for the requested domain."
 }
 
@@ -45,7 +45,7 @@ compare_scenarios := tool {
         remember("compare_scenarios", base .. "->" .. proposed)
         return "base=stable; proposed=higher activation with support risk", nil
     }
-    params: {"base", "proposed"}
+    params: ["base", "proposed"]
     description: "Compare baseline and proposed operating scenarios."
 }
 
@@ -53,14 +53,14 @@ analysis_assistant := agent {
     name: "general_analysis_assistant"
     model: "mock-analysis"
     instructions: prompt { role: "system", text: "Act as a generic AI analysis assistant. Use local evidence, separate findings from risks, and return a decision-ready brief." }
-    tools: {load_context, retrieve_policy, compare_scenarios}
-    params: {"question"}
+    tools: [load_context, retrieve_policy, compare_scenarios]
+    params: ["question"]
     output: {
         brief: "decision brief"
-        evidence: {"metrics", "policy", "scenario"}
-        findings: {"finding"}
-        risks: {"risk"}
-        actions: {"action"}
+        evidence: ["metrics", "policy", "scenario"]
+        findings: ["finding"]
+        risks: ["risk"]
+        actions: ["action"]
         owner: "team"
         recommendation: "decision"
         replay_ready: true
@@ -84,10 +84,10 @@ assert(analysis.value.replay_ready == true)
 
 review, review_err := turn {
     model: "mock-analysis-review"
-    messages: {
+    messages: [
         llm.system("Review the analysis assistant output for evidence grounding, actionability, and replay determinism."),
         llm.user(analysis.text),
-    }
+    ]
 }
 assert(review_err == nil)
 assert(review.text == "Analysis is replayable and decision-ready: evidence is local, risks are explicit, and actions name owner, rollback, and measurement.")

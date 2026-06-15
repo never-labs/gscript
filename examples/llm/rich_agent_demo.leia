@@ -46,8 +46,8 @@ lookup_signal := llm.tool("lookup_signal", func(service, severity) {
     return "signal:" .. service .. ":severity=" .. severity .. ":queue=payments", nil
 }, {
     description: "Lookup deterministic incident signal evidence."
-    params: {"service", "severity"}
-    requires: {"signals.read"}
+    params: ["service", "severity"]
+    requires: ["signals.read"]
     param_docs: {
         service: "service name"
         severity: "incident severity"
@@ -63,12 +63,12 @@ func triage_config(service, severity) {
 
     return {
         model: "triage"
-        messages: {
+        messages: [
             prompt_message(system_prompt, "system", "policy"),
             msg.assistant("Previous handoff: checkout has pending payment alerts."),
             prompt_message(task_prompt, "user", "task"),
-        }
-        tools: {lookup_signal}
+        ]
+        tools: [lookup_signal]
         budget: {turns: 2, calls: 1, tokens: 768}
     }
 }
@@ -112,7 +112,7 @@ triage_agent := llm.agent("triage_agent", triage_config, func(service, severity)
         evidence: tool_msg.value,
         history_len: #conversation
     }, final_err
-}, {params: {"service", "severity"}})
+}, {params: ["service", "severity"]})
 
 rich_result, rich_err := triage_agent("checkout", "sev2")
 if rich_err != nil {

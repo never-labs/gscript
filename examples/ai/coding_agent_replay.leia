@@ -5,35 +5,35 @@ model {
 read_file := tool {
     name: "read_file"
     fn: func(path) { return "file:" .. path, nil }
-    params: {"path"}
+    params: ["path"]
     description: "Read a workspace file."
 }
 
 search_text := tool {
     name: "search_text"
     fn: func(query) { return "matches:" .. query, nil }
-    params: {"query"}
+    params: ["query"]
     description: "Search workspace text."
 }
 
 apply_patch := tool {
     name: "apply_patch"
     fn: func(patch) { return "patched", nil }
-    params: {"patch"}
+    params: ["patch"]
     description: "Apply a patch."
 }
 
 run_shell := tool {
     name: "run_shell"
     fn: func(command) { return "ran:" .. command, nil }
-    params: {"command"}
+    params: ["command"]
     description: "Run a shell command."
 }
 
 result, err := turn {
     model: "mock-fast"
-    messages: {llm.user("Name the repository coding-agent tools.")}
-    tools: {read_file, search_text, apply_patch, run_shell}
+    messages: [llm.user("Name the repository coding-agent tools.")]
+    tools: [read_file, search_text, apply_patch, run_shell]
 }
 
 assert(err == nil)

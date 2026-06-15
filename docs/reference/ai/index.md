@@ -71,9 +71,9 @@ Rules:
 ```leia
 search_runbook := tool {
     name: "search_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Search local runbooks."
-    requires: {"docs.read", "metrics.read"}
+    requires: ["docs.read", "metrics.read"]
     fn: func(service) {
         return "runbook:" .. service, nil
     }
@@ -108,16 +108,16 @@ tool list is missing required contract metadata for a workflow:
 lookup := llm.tool("lookup", func(query) {
     return {answer: "docs:" .. query}, nil
 }, {
-    params: {"query"}
+    params: ["query"]
     description: "Lookup local documents."
-    capabilities: {"docs.read", "replay.local"}
+    capabilities: ["docs.read", "replay.local"]
     result: {answer: "string"}
     error: {kind: "validation", message: "string"}
     replay_key: "lookup:{query}"
 })
 
-info := llm.tool_info({lookup})
-ok, err := llm.validate_tools({lookup})
+info := llm.tool_info([lookup])
+ok, err := llm.validate_tools([lookup])
 ```
 
 `llm.tool_info(tool_or_tools)` returns a contract inventory with normalized
@@ -163,7 +163,7 @@ effects.
 `msg.tool_error` to build normalized messages.
 
 ```leia
-history := {llm.system("You are concise."), llm.user("Summarize this.")}
+history := [llm.system("You are concise."), llm.user("Summarize this.")]
 history[#history + 1] = msg.assistant("draft")
 ```
 
@@ -193,8 +193,8 @@ may redact prompt text according to host policy.
 ```leia
 result, err := turn {
     model: "fast"
-    messages: {llm.user("Reply with ok.")}
-    tools: {search_runbook}
+    messages: [llm.user("Reply with ok.")]
+    tools: [search_runbook]
     max_tokens: 32
     temperature: 0
 }
@@ -231,14 +231,14 @@ the request configuration for each call.
 ```leia
 answer := agent {
     name: "answer"
-    params: {"question"}
+    params: ["question"]
     description: "Answer with local documentation when useful."
     config: func(question) {
         return {
             model: "fast"
             system: "Use local documentation when useful."
             user: question
-            tools: {search_runbook}
+            tools: [search_runbook]
         }, nil
     }
 }
@@ -253,10 +253,10 @@ The shorthand synthesizes the same config function and still lowers through
 ```leia
 summarize := agent {
     name: "summarize"
-    params: {"topic"}
+    params: ["topic"]
     model: "fast"
     instructions: prompt { role: "system", text: "Use evidence and be concise." }
-    tools: {search_runbook}
+    tools: [search_runbook]
     output: {summary: "short"}
 }
 
@@ -302,12 +302,12 @@ agent as a tool.
 ```leia
 supervisor := agent {
     name: "supervisor"
-    params: {"question"}
+    params: ["question"]
     config: func(question) {
         return {
             model: "fast"
             user: question
-            tools: {llm.agent_as_tool(answer)}
+            tools: [llm.agent_as_tool(answer)]
         }, nil
     }
 }
@@ -348,7 +348,7 @@ provider-free record of a model request/response boundary:
 ```leia
 envelope := llm.model_io_envelope({
     model: "fast"
-    request: {messages: {llm.user("Summarize ACME.")}}
+    request: {messages: [llm.user("Summarize ACME.")]}
     response: {finish_reason: "stop" usage: {prompt_tokens: 8 completion_tokens: 5}}
 }, {capability: "generic.ai.turn"})
 ```
@@ -369,7 +369,7 @@ also pass provider-facing hints through `response_format`.
 ```leia
 extract := agent {
     name: "extract"
-    params: {"note"}
+    params: ["note"]
     model: "fast"
     instructions: prompt { role: "system", text: "Extract project and owner." }
     output: {project: "ORCHID", owner: "ADA"}
@@ -400,13 +400,13 @@ contact_schema := llm.schema({
     name: {type: "string", description: "Display name"}
     score: "number"
     nickname: "string?"
-    tags: {"string"}
+    tags: ["string"]
 })
 
 format := llm.output_schema("contact", contact_schema)
 result, err := llm.turn({
     model: "fast"
-    messages: {llm.user("Extract the contact.")}
+    messages: [llm.user("Extract the contact.")]
     response_format: format
 })
 ok, message := llm.validate_output(result.text, contact_schema)
@@ -450,7 +450,7 @@ docs := llm.collection({
         id: "runbook"
         title: "Checkout runbook"
         source: "local/runbook"
-        tags: {"checkout", "payments"}
+        tags: ["checkout", "payments"]
     })
 })
 
@@ -500,10 +500,10 @@ Each step is built with `llm.step(name, fn, opts)`, with the stage-shaped alias
 ```leia
 flow := llm.workflow({
     llm.step("draft", func(ctx) {
-        return llm.turn({model: "fast", messages: {llm.user(ctx.input)}})
+        return llm.turn({model: "fast", messages: [llm.user(ctx.input)]})
     })
     llm.step("revise", func(ctx) {
-        return llm.turn({model: "fast", messages: {llm.user(ctx.input)}})
+        return llm.turn({model: "fast", messages: [llm.user(ctx.input)]})
     })
 })
 
@@ -583,7 +583,7 @@ results.
 ```leia
 generated, err := llm.sections({
     model: "fast"
-    messages: {llm.system("Return JSON."), llm.user("Draft the report.")}
+    messages: [llm.system("Return JSON."), llm.user("Draft the report.")]
     evidence: "Evidence: launch checklist is complete."
     sections: {
         {
@@ -778,7 +778,7 @@ with `require_status_counts`, cap status counts with `limit_status_counts` or
 ```leia
 record, err := llm.replay_record({
     replay_key: "turn:1"
-    request: {model: "fast", messages: {llm.user("hello")}}
+    request: {model: "fast", messages: [llm.user("hello")]}
     response: {status: "final_answer", text: "fixture answer"}
 })
 fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
@@ -821,11 +821,11 @@ artifact_record, err := llm.replay_artifact_record({
         replay_uri: "mock://artifacts/report.html"
     }
 })
-request := {model: "fast", messages: {llm.user("hello")}}
+request := {model: "fast", messages: [llm.user("hello")]}
 replay, err := fixture.replay(request, "turn:1")
 result, err := llm.turn({
     model: "fast"
-    messages: {llm.user("hello")}
+    messages: [llm.user("hello")]
     replay: replay
 })
 event := llm.trace_event({

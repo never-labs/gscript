@@ -21,7 +21,7 @@ load_source := tool {
         remember("load_source", path)
         return source_pattern, nil
     }
-    params: {"path"}
+    params: ["path"]
     description: "Load a local Python or TypeScript assistant skeleton."
 }
 
@@ -31,7 +31,7 @@ search_corpus := tool {
         remember("search_corpus", query)
         return "research notes: keep evidence local, make prompts declarative, assert replay outputs", nil
     }
-    params: {"query"}
+    params: ["query"]
     description: "Search local research notes used by the assistant."
 }
 
@@ -46,7 +46,7 @@ build_report := tool {
             replay: true
         }, nil
     }
-    params: {"summary", "workflow"}
+    params: ["summary", "workflow"]
     description: "Assemble a deterministic analysis report from structured fields."
 }
 
@@ -54,12 +54,12 @@ translator := agent {
     name: "assistant_translator"
     model: "mock-translation"
     instructions: prompt { role: "system", text: "Translate an imperative LLM analysis assistant into Leia dialect composition." }
-    tools: {load_source, search_corpus, build_report}
-    params: {"request"}
+    tools: [load_source, search_corpus, build_report]
+    params: ["request"]
     output: {
         source_style: "python_ts"
-        leia_blocks: {"model", "tool", "agent", "turn"}
-        workflow: {"research", "analysis", "report"}
+        leia_blocks: ["model", "tool", "agent", "turn"]
+        workflow: ["research", "analysis", "report"]
         replay_ready: true
         summary: "translation summary"
     }
@@ -78,10 +78,10 @@ assert(translation.value.summary == "Compose the assistant as local research too
 
 review, review_err := turn {
     model: "mock-report"
-    messages: {
+    messages: [
         llm.system("Review the Leia translation for offline replay and generic research workflow coverage."),
         llm.user(translation.text),
-    }
+    ]
 }
 assert(review_err == nil)
 assert(review.text == "Translation is replayable: local research evidence, structured analysis output, and deterministic report review.")

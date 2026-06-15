@@ -8,14 +8,14 @@ model {
 search_docs := tool {
     name: "search_docs"
     fn: func(query) { return "docs:" .. query .. ":found onboarding checklist", nil }
-    params: {"query"}
+    params: ["query"]
     description: "Search local product documentation."
 }
 
 fetch_ticket := tool {
     name: "fetch_ticket"
     fn: func(id) { return "ticket:" .. id .. ":owner=platform", nil }
-    params: {"id"}
+    params: ["id"]
     description: "Fetch local ticket metadata."
 }
 
@@ -23,12 +23,12 @@ planner := agent {
     name: "workflow_planner"
     model: "mock-plan"
     instructions: prompt { role: "system", text: "Create a short implementation workflow from local evidence." }
-    tools: {search_docs, fetch_ticket}
-    params: {"request"}
+    tools: [search_docs, fetch_ticket]
+    params: ["request"]
     output: {
         summary: "short plan"
         owner: "team"
-        steps: {"discover", "build", "verify"}
+        steps: ["discover", "build", "verify"]
         replay_ready: true
     }
     max_steps: 1
@@ -44,10 +44,10 @@ assert(plan.value.replay_ready == true)
 
 review, review_err := turn {
     model: "mock-review"
-    messages: {
+    messages: [
         llm.system("Review the structured plan for replay readiness."),
         llm.user(plan.text),
-    }
+    ]
 }
 assert(review_err == nil)
 assert(review.text == "Plan is replay-friendly: deterministic inputs, local evidence, and explicit verification.")

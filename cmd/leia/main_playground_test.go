@@ -418,7 +418,7 @@ func TestPlaygroundAIExamplesCoverReadmeAIDialectSurface(t *testing.T) {
 			"msg.user",
 		},
 		"ai-agent-tool": {
-			"tools: {extract_memory}",
+			"tools: [extract_memory]",
 		},
 		"ai-replay-trace": {
 			"turn {",
@@ -1151,7 +1151,7 @@ func TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates(t *testing.T) {
 	}{
 		"repo-ai-coding_agent_replay": {
 			requires: "local AI playground profile or LLM replay fixture",
-			snippets: []string{"model {", "tool {", "turn {", "tools: {read_file, search_text, apply_patch, run_shell}"},
+			snippets: []string{"model {", "tool {", "turn {", "tools: [read_file, search_text, apply_patch, run_shell]"},
 		},
 		"repo-ai-coding_agent_project-main": {
 			requires: "local AI playground profile or LLM replay fixture",
@@ -1171,11 +1171,11 @@ func TestPlaygroundRepositoryAIDialectExamplesHaveExplicitGates(t *testing.T) {
 		},
 		"repo-llm-agent": {
 			requires: "LLM provider",
-			snippets: []string{"llm.register_models({", "llm.agent(\"answer\"", "messages: {"},
+			snippets: []string{"llm.register_models({", "llm.agent(\"answer\"", "messages: ["},
 		},
 		"repo-llm-agent_as_tool": {
 			requires: "LLM provider",
-			snippets: []string{"llm.agent(\"extract_research\"", "tools: {extract_research}", "llm.turn({"},
+			snippets: []string{"llm.agent(\"extract_research\"", "tools: [extract_research]", "llm.turn({"},
 		},
 		"repo-llm-direct_turn": {
 			requires: "LLM provider",
@@ -1479,7 +1479,7 @@ func TestPlaygroundExecAIProfileUsesGLMEnv(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/main.leia"
-	src := `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")}, max_tokens: 16, temperature: 0 })
+	src := `result, err := llm.turn({ messages: [llm.user("Reply exactly: LEIA_GLM_OK")], max_tokens: 16, temperature: 0 })
 if err != nil { print(err.message); return }
 print(result.text)`
 	if err := os.WriteFile(path, []byte(src), 0600); err != nil {
@@ -1507,7 +1507,7 @@ func TestPlaygroundExecGLMProfileAliasUsesAIProfile(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/main.leia"
-	src := `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")}, max_tokens: 16, temperature: 0 })
+	src := `result, err := llm.turn({ messages: [llm.user("Reply exactly: LEIA_GLM_OK")], max_tokens: 16, temperature: 0 })
 if err != nil { print(err.message); return }
 print(result.text)`
 	if err := os.WriteFile(path, []byte(src), 0600); err != nil {

@@ -1119,7 +1119,7 @@ models["playground-fast"] = profile
 llm.register_models(models)
 
 result, err := llm.turn({
-    messages: {llm.user("Reply exactly: LEIA_GLM_OK")}
+    messages: [llm.user("Reply exactly: LEIA_GLM_OK")]
     max_tokens: 16
     temperature: 0
 })
@@ -1138,7 +1138,7 @@ print("model alias", result.text)`,
 				"The result carries text, usage, history, and tool-call metadata.",
 				"This example is intentionally one line; configure a model provider before running.",
 			},
-			Source: `result, err := llm.turn({ messages: {llm.user("Reply exactly: LEIA_GLM_OK")} })
+			Source: `result, err := llm.turn({ messages: [llm.user("Reply exactly: LEIA_GLM_OK")] })
 if err != nil { print(err.message); return }
 print(result.text)`,
 		},
@@ -1160,7 +1160,7 @@ print(result.text)`,
 
 lookup_signal := tool {
     name: "lookup_signal"
-    params: {"service"}
+    params: ["service"]
     description: "Look up a local incident signal."
     fn: func(service) {
         return "service=" .. service .. "; severity=sev2", nil
@@ -1169,14 +1169,14 @@ lookup_signal := tool {
 
 responder := agent {
     name: "incident_responder"
-    params: {"issue"}
+    params: ["issue"]
     description: "Triage a production incident with local evidence."
     config: func(issue) {
         return {
             model: "mock-fast"
             system: "Write a concise incident response."
             user: issue
-            tools: {lookup_signal}
+            tools: [lookup_signal]
         }, nil
     }
 }
@@ -1200,12 +1200,12 @@ print(result.text)`,
 			},
 			Source: `summarize := llm.agent("summarize", func(topic) {
     return {
-        messages: {
+        messages: [
             llm.system("Summarize in one sentence for an engineer evaluating Leia. Return plain text only."),
             llm.user(topic),
-        }
+        ]
     }
-}, nil, {params: {"topic"}})
+}, nil, {params: ["topic"]})
 
 result, err := summarize("Leia is a Go-native, hot-reloadable scripting language with an AI dialect.")
 if err != nil { print(err.message); return }
@@ -1224,10 +1224,10 @@ print(result.text)`,
 				"Hosts can consume the value without reparsing ad-hoc prose.",
 			},
 			Source: `result, err := llm.turn({
-    messages: {
+    messages: [
         llm.system("Return raw JSON only. Do not use markdown, prose, or code fences."),
         llm.user("Return exactly this object with no extra keys: {\"product\":\"playground\",\"severity\":\"low\",\"action\":\"improve_demos\"}"),
-    }
+    ]
     response_format: {type: "json_object"}
     max_tokens: 64
     temperature: 0
@@ -1250,7 +1250,7 @@ print(json.encode(ticket))`,
 			},
 			Source: `streamed := ""
 result, err := llm.turn({
-    messages: {llm.user("Reply exactly: LEIA_GLM_OK")}
+    messages: [llm.user("Reply exactly: LEIA_GLM_OK")]
     on_stream: func(event) {
         streamed = streamed .. event.token
     }
@@ -1280,10 +1280,10 @@ events := 0
 
 result, err := turn {
     model: "mock-stream"
-    messages: {
+    messages: [
         llm.system("Stream exactly the provider response."),
         llm.user("Say hello stream."),
-    }
+    ]
     stream: true
     on_stream: func(event) {
         streamed = streamed .. event.token
@@ -1327,20 +1327,20 @@ print("replay_ready", usage.replay_ready)`,
     }
     return docs[query] || "No local doc for " .. query, nil
 }, {
-    params: {"query"}
-    requires: {"docs.read"}
+    params: ["query"]
+    requires: ["docs.read"]
     param_docs: {query: "search query"}
 })
 
 answer_with_lookup := llm.agent("answer_with_lookup", func(question) {
     return {
-        messages: {
+        messages: [
             llm.system("Use lookup with one of: memory, tools, dialect. Reply in two short bullets."),
             llm.user(question),
-        }
-        tools: {lookup}
+        ]
+        tools: [lookup]
     }
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 result, err := answer_with_lookup("How should I keep multi-turn memory in Leia?")
 if err != nil { print(err.message); return }
@@ -1358,10 +1358,10 @@ print(result.text)`,
 				"Append assistant and user messages between turns.",
 				"Record/replay can later turn this into deterministic regression data.",
 			},
-			Source: `history := {
+			Source: `history := [
     llm.system("Remember facts exactly."),
     llm.user("Store these facts: project=ORCHID, owner=ADA, risk=LOW. Reply MEMORY_STORED."),
-}
+]
 
 stored, err := llm.turn({messages: history, max_tokens: 32})
 if err != nil { return nil, err }
@@ -1400,19 +1400,19 @@ print(recalled.text)`,
     }
     return { project: "ORCHID", owner: "ADA", risk: risk }, nil
 }, {
-    params: {"note"}
+    params: ["note"]
     output: {project: "ORCHID", owner: "ADA", risk: "LOW"}
 })
 
 supervisor := llm.agent("supervisor", func(question) {
     return {
-        messages: {
+        messages: [
             llm.system("Call extract_memory before answering. Summarize the extracted fields."),
             llm.user(question),
-        }
-        tools: {extract_memory}
+        ]
+        tools: [extract_memory]
     }
-}, nil, {params: {"question"}})
+}, nil, {params: ["question"]})
 
 result, err := supervisor("project is ORCHID, owner is ADA, launch risk is LOW")
 if err != nil { print(err.message); return }
@@ -1433,20 +1433,20 @@ print(result.text)`,
 			Source: `lookup_order := llm.tool("lookup_order", func(id) {
     return { id: id, status: "delivered", total: 42, refundable: true }, nil
 }, {
-    params: {"id"}
-    requires: {"orders.read"}
+    params: ["id"]
+    requires: ["orders.read"]
     param_docs: {id: "order id"}
 })
 
 support_triage := llm.agent("support_triage", func(message) {
     return {
-        messages: {
+        messages: [
             llm.system("You are a concise support assistant. Use lookup_order for order status. Mention whether refund is possible."),
             llm.user(message),
-        }
-        tools: {lookup_order}
+        ]
+        tools: [lookup_order]
     }
-}, nil, {params: {"message"}})
+}, nil, {params: ["message"]})
 
 result, err := support_triage("Customer asks: order A100 arrived damaged. Can I get a refund?")
 if err != nil { print(err.message); return }
@@ -1466,12 +1466,12 @@ print(result.text)`,
 			},
 			Source: `draft_release_note := llm.agent("draft_release_note", func(change) {
     return {
-        messages: {
+        messages: [
             llm.system("Write a release note in two short bullets."),
             llm.user(change),
-        }
+        ]
     }
-}, nil, {params: {"change"}})
+}, nil, {params: ["change"]})
 
 draft, err := draft_release_note("Playground now has runnable Tour, Examples, and AI demos.")
 if err != nil { print(err.message); return }
@@ -1558,40 +1558,40 @@ func propose_file_impl(path, body) {
 read_file := llm.tool("read_file", func(path) {
     return read_file_impl(path)
 }, {
-    params: {"path"}
-    requires: {"fs.read"}
+    params: ["path"]
+    requires: ["fs.read"]
     param_docs: {path: "source file path"}
 })
 
 search_repo := llm.tool("search_repo", func(query) {
     return search_repo_impl(query)
 }, {
-    params: {"query"}
-    requires: {"repo.search"}
+    params: ["query"]
+    requires: ["repo.search"]
     param_docs: {query: "search query"}
 })
 
 read_docs := llm.tool("read_docs", func(topic) {
     return read_docs_impl(topic)
 }, {
-    params: {"topic"}
-    requires: {"docs.read"}
+    params: ["topic"]
+    requires: ["docs.read"]
     param_docs: {topic: "language topic"}
 })
 
 run_tests := llm.tool("run_tests", func(patch) {
     return run_tests_impl(patch)
 }, {
-    params: {"patch"}
-    requires: {"tests.run"}
+    params: ["patch"]
+    requires: ["tests.run"]
     param_docs: {patch: "proposed patch text"}
 })
 
 propose_file := llm.tool("propose_file", func(path, body) {
     return propose_file_impl(path, body)
 }, {
-    params: {"path", "body"}
-    requires: {"patch.write"}
+    params: ["path", "body"]
+    requires: ["patch.write"]
     param_docs: {
         path: "target path"
         body: "proposed file content"
@@ -1600,11 +1600,11 @@ propose_file := llm.tool("propose_file", func(path, body) {
 
 func coding_agent_config(task) {
     return {
-        messages: {
+        messages: [
             llm.system("You are a careful coding agent for Leia. Produce a complete Leia patch proposal. Include code, tests, and risk notes. Do not claim to have written files."),
             llm.user(task),
-        }
-        tools: {search_repo, read_file, read_docs, run_tests, propose_file}
+        ]
+        tools: [search_repo, read_file, read_docs, run_tests, propose_file]
         budget: {turns: 4, calls: 8, tokens: 3200}
     }
 }
@@ -1631,11 +1631,11 @@ coding_agent := llm.agent("coding_agent", coding_agent_config, func(task) {
     last := nil
     for attempt := 1; attempt <= 3; attempt++ {
         draft, err := llm.turn({
-            messages: {
+            messages: [
                 llm.system(system_message),
                 llm.user(prompt),
-            }
-            tools: {}
+            ]
+            tools: []
             response_format: {type: "json_object"}
             max_tokens: 700
         })
@@ -1668,7 +1668,7 @@ coding_agent := llm.agent("coding_agent", coding_agent_config, func(task) {
                 attempts: attempt,
                 tests: report.output,
                 risk: patch.risk,
-                tools: {"search_repo", "read_file", "read_docs", "run_tests", "propose_file"},
+                tools: ["search_repo", "read_file", "read_docs", "run_tests", "propose_file"],
                 proposal: proposal,
             }, nil
         }
@@ -1682,7 +1682,7 @@ coding_agent := llm.agent("coding_agent", coding_agent_config, func(task) {
         tests: "needs human review after three attempts",
         risk: last.risk,
     }, nil
-}, {params: {"task"}})
+}, {params: ["task"]})
 
 result, err := coding_agent("Implement slugify(title) for document URLs and include evaluate regression cases.")
 if err != nil { print(err.message); return }
