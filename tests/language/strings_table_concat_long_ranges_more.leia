@@ -11,7 +11,7 @@ assert(table.concat(a, "", 20, 21) == "xuxuxuxu")
 assert(table.concat(a, "x", 22, 21) == "")
 assert(table.concat(a, "3", 299) == "xuxu3xuxu")
 
-b := {"a", "b", "c"}
+b := ["a", "b", "c"]
 assert(table.concat(b, ",", 1, 0) == "")
 assert(table.concat(b, ",", 1, 1) == "a")
 assert(table.concat(b, ",", 1, 2) == "a,b")

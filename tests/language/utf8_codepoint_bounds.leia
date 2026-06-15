@@ -9,7 +9,7 @@ s := "áéí"
 a, b, c := utf8.codepoint(s, 1, #s)
 assert(a == 225 && b == 233 && c == 237)
 
-x := {utf8.codepoint(s, 4, 3)}
+x := [utf8.codepoint(s, 4, 3)]
 assert(#x == 0)
 
 checkerror("out of bounds", utf8.codepoint, s, #s + 1)

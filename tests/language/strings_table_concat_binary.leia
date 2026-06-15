@@ -3,7 +3,7 @@ print("case:strings_table_concat_binary")
 z := string.char(0)
 z1 := string.char(0, 1)
 z12 := string.char(0, 1, 2)
-parts := {z, z1, z12}
+parts := [z, z1, z12]
 assert(table.concat(parts, "." .. z .. ".") ==
        z .. "." .. z .. "." .. z1 .. "." .. z .. "." .. z12)
 

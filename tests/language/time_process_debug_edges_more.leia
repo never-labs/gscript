@@ -30,7 +30,7 @@ assert(fs.remove(baseFile))
 assert(fs.mkdirAll(baseFile))
 defer fs.removeAll(baseFile)
 
-pwdRun := process.run({"pwd"}, {dir: baseFile})
+pwdRun := process.run(["pwd"], {dir: baseFile})
 assert(pwdRun.ok == true)
 assert(pwdRun.code == 0)
 assert(pwdRun.stderr == "")

@@ -7,7 +7,7 @@ assert(doc.items[3] == 3)
 assert(doc.flag == true)
 assert(doc.nested.x == 4)
 
-encoded := json.encode({name: "leia", items: {1, 2, 3}})
+encoded := json.encode({name: "leia", items: [1, 2, 3]})
 round := json.decode(encoded)
 assert(round.name == "leia")
 assert(round.items[2] == 2)

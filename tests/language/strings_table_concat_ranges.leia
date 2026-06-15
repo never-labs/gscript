@@ -3,7 +3,7 @@ print("case:strings_table_concat_ranges")
 assert(table.concat({}) == "")
 assert(table.concat({}, "x") == "")
 
-a := {"a", "b", "c"}
+a := ["a", "b", "c"]
 assert(table.concat(a, ",", 1, 0) == "")
 assert(table.concat(a, ",", 1, 1) == "a")
 assert(table.concat(a, ",", 1, 2) == "a,b")
