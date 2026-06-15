@@ -101,15 +101,27 @@ func TestScientificNumericExamplesRun(t *testing.T) {
 			},
 		},
 	}
+	modes := []struct {
+		name  string
+		flags []string
+	}{
+		{name: "default"},
+		{name: "vm", flags: []string{"--vm"}},
+	}
 	for _, tc := range cases {
 		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			out := runCommand(t, root, 20*time.Second, "go", "run", "./cmd/leia", "run", tc.rel)
-			if !strings.Contains(out, tc.summary) {
-				t.Fatalf("%s output = %q, want containing %q", tc.rel, out, tc.summary)
-			}
-			tc.check(t, parseScientificSummary(t, out))
-		})
+		for _, mode := range modes {
+			mode := mode
+			t.Run(tc.name+"/"+mode.name, func(t *testing.T) {
+				args := append([]string{"run", "./cmd/leia", "run"}, mode.flags...)
+				args = append(args, tc.rel)
+				out := runCommand(t, root, 20*time.Second, "go", args...)
+				if !strings.Contains(out, tc.summary) {
+					t.Fatalf("%s output = %q, want containing %q", tc.rel, out, tc.summary)
+				}
+				tc.check(t, parseScientificSummary(t, out))
+			})
+		}
 	}
 }
 
