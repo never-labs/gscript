@@ -60,11 +60,11 @@ llm.with_budget({turns: 1}, func() {
         trace_id: "trace-budget"
         sequence: 1
     })
-    envelope := llm.trace_envelope({event}, {trace_id: "trace-budget"})
+    envelope := llm.trace_envelope([event], {trace_id: "trace-budget"})
     gate := llm.trace_assert(envelope, {
-        required_event_types: {"budget_outcome"}
-        require_event_payload_fields: {budget_outcome: {"status", "result_status", "dimension", "limit", "used"}}
-        require_correlation_fields: {"workflow_run_id", "workflow_step_id", "correlation_id"}
+        required_event_types: ["budget_outcome"]
+        require_event_payload_fields: {budget_outcome: ["status", "result_status", "dimension", "limit", "used"]}
+        require_correlation_fields: ["workflow_run_id", "workflow_step_id", "correlation_id"]
         max_status_counts: {exceeded: 1}
     })
     outcome_kind = outcome.kind

@@ -95,11 +95,11 @@ fail_event := llm.tool_outcome_trace_event(fail_outcome, {
     trace_id: "trace-tool"
     sequence: 2
 })
-tool_trace := llm.trace_envelope({ok_event, fail_event}, {trace_id: "trace-tool"})
+tool_trace := llm.trace_envelope([ok_event, fail_event], {trace_id: "trace-tool"})
 tool_gate := llm.trace_assert(tool_trace, {
-    required_event_types: {"tool_outcome"}
-    require_event_payload_fields: {tool_outcome: {"tool_call_id", "tool_name", "status", "result_status"}}
-    require_correlation_fields: {"workflow_run_id", "workflow_step_id", "tool_call_id", "correlation_id"}
+    required_event_types: ["tool_outcome"]
+    require_event_payload_fields: {tool_outcome: ["tool_call_id", "tool_name", "status", "result_status"]}
+    require_correlation_fields: ["workflow_run_id", "workflow_step_id", "tool_call_id", "correlation_id"]
     max_status_counts: {ok: 1, error: 1}
     deny_raw_prompt_stored: true
     deny_raw_completion_stored: true

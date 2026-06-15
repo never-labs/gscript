@@ -8,30 +8,30 @@ lookup := llm.tool("lookup", func(symbol) {
     return {symbol: symbol price: 42}, nil
 }, {
     description: "Lookup fixture-backed market data."
-    params: {"symbol"}
-    requires: {"generic.tool.registry.declare" "market.read"}
+    params: ["symbol"]
+    requires: ["generic.tool.registry.declare", "market.read"]
     result: {type: "object"}
     replay_key: "tool:lookup:fixture"
 })
 write := llm.tool("write_report", func(path) {
     return {path: path}, nil
 }, {
-    params: {"path"}
-    requires: {"generic.tool.approval.edge"}
+    params: ["path"]
+    requires: ["generic.tool.approval.edge"]
     result: {type: "object"}
     effect: "effectful"
     approval_policy: "deny_without_approval"
 })
 
-registry := llm.tool_registry({lookup, write}, {registry_id: "generic-tool-registry"})
+registry := llm.tool_registry([lookup, write], {registry_id: "generic-tool-registry"})
 gate := llm.validate_tool_registry(registry)
 trace := llm.tool_invocation_trace({
     tool_name: "lookup"
-    capability_ids: {"generic.tool.invocation.trace"}
+    capability_ids: ["generic.tool.invocation.trace"]
     fixture_key: "generic_tool:invocation:trace:v1"
 }, {price: 42}, {trace_id: "trace-tool-1"})
 
-bad_registry := llm.tool_registry({lookup}, {provider_free: false live_network: true})
+bad_registry := llm.tool_registry([lookup], {provider_free: false live_network: true})
 bad_gate := llm.validateToolRegistry(bad_registry)
 
 missing_registry_ok, missing_registry_err := pcall(llm.tool_registry)

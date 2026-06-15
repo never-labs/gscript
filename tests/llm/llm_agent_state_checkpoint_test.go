@@ -49,11 +49,11 @@ event := llm.agent_state_checkpoint_event(checkpoint, {
     trace_id: "trace-state"
     sequence: 1
 })
-envelope := llm.trace_envelope({event}, {trace_id: "trace-state"})
+envelope := llm.trace_envelope([event], {trace_id: "trace-state"})
 gate := llm.trace_assert(envelope, {
-    required_event_types: {"agent_state_checkpoint"}
-    require_event_payload_fields: {agent_state_checkpoint: {"agent_run_id", "session_id", "state_version", "checkpoint_key", "cache_key", "resume_token"}}
-    require_correlation_fields: {"agent_run_id", "turn_id", "workflow_run_id", "workflow_step_id", "correlation_id"}
+    required_event_types: ["agent_state_checkpoint"]
+    require_event_payload_fields: {agent_state_checkpoint: ["agent_run_id", "session_id", "state_version", "checkpoint_key", "cache_key", "resume_token"]}
+    require_correlation_fields: ["agent_run_id", "turn_id", "workflow_run_id", "workflow_step_id", "correlation_id"]
     max_status_counts: {paused: 1}
     deny_secret_values_present: true
     deny_raw_prompt_stored: true

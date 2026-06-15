@@ -20,7 +20,7 @@ func TestLLMTurnStrictFixtureReplayBypassesProvider(t *testing.T) {
 	interp := runLLMTestProgramWithTrace(t, `
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("hello replay")}
+    messages: [llm.user("hello replay")]
     replay: {
         mode: "fixture_replay"
         replay_key: "turn:hello:v1"
@@ -29,7 +29,7 @@ result, err := llm.turn({
             status: "final_answer"
             text: "fixture answer"
             reason: "stop"
-            calls: {}
+            calls: []
             usage: {input_tokens: 1 output_tokens: 2 cost: 0.0 latency_ms: 0}
         }
     }
@@ -71,12 +71,12 @@ func TestLLMTurnStrictFixtureReplayRejectsRequestHashMismatch(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("hello replay")}
+    messages: [llm.user("hello replay")]
     replay: {
         mode: "fixture_replay"
         replay_key: "turn:hello:v1"
         request_hash: "definitely-not-the-request-hash"
-        response: {status: "final_answer" text: "fixture answer" calls: {} usage: {}}
+        response: {status: "final_answer" text: "fixture answer" calls: [] usage: {}}
     }
 })
 err_kind := err.kind
@@ -100,18 +100,18 @@ record, record_err := llm.replay_record({
     replay_key: "turn:helper"
     request: {
         model: "mock"
-        messages: {llm.user("hello helper replay")}
+        messages: [llm.user("hello helper replay")]
     }
     response: {
         status: "final_answer"
         text: "fixture helper answer"
-        calls: {}
+        calls: []
         usage: {input_tokens: 1 output_tokens: 2 cost: 0.0 latency_ms: 0}
     }
 })
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("hello helper replay")}
+    messages: [llm.user("hello helper replay")]
     replay: record.replay
 })
 record_err_nil := record_err == nil
@@ -165,7 +165,7 @@ func TestLLMTurnEmitsReplayMatchTraceFromProvider(t *testing.T) {
 	runLLMTestProgramWithTrace(t, `
 result, err := llm.turn({
     model: "mock"
-    messages: {llm.user("hello replay provider")}
+    messages: [llm.user("hello replay provider")]
 })
 `, provider, func(event runtime.LLMTraceEvent) {
 		events = append(events, event)
@@ -241,11 +241,11 @@ func TestLLMReactEmitsReplayMatchTraceForEachTurn(t *testing.T) {
 	runLLMTestProgramWithTrace(t, `
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {params: {"name"}})
+}, {params: ["name"]})
 result, err := llm.react({
     model: "mock"
-    messages: {llm.user("find docs")}
-    tools: {lookup}
+    messages: [llm.user("find docs")]
+    tools: [lookup]
     max_steps: 3
 })
 `, provider, func(event runtime.LLMTraceEvent) {

@@ -40,7 +40,7 @@ func TestWithLLMProviderSDKSmoke(t *testing.T) {
 			if err := vm.Exec(`
 result, err := llm.turn({
     model: "sdk-smoke",
-    messages: {llm.user("hello")},
+    messages: [llm.user("hello")],
 })
 text := result.text
 `); err != nil {
@@ -88,7 +88,7 @@ func TestLLMProviderSubpackageSDKSmoke(t *testing.T) {
 			}, tc.opts...)
 			vm := leia.New(opts...)
 			if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("hello")}})
+result, err := llm.turn({messages: [llm.user("hello")]})
 text := result.text
 `); err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -113,7 +113,7 @@ func TestLLMCommandSubpackageSDKSmoke(t *testing.T) {
 		}),
 	)
 	if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("hello")}})
+result, err := llm.turn({messages: [llm.user("hello")]})
 text := result.text
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -130,7 +130,7 @@ text := result.text
 func TestLLMWithoutProviderSDKSmoke(t *testing.T) {
 	vm := leia.New(leia.WithLibs(leia.LibString | leia.LibLLM))
 	if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("hi")}})
+result, err := llm.turn({messages: [llm.user("hi")]})
 kind := err.kind
 `); err != nil {
 		t.Fatalf("Exec: %v", err)

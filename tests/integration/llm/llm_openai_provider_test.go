@@ -237,7 +237,7 @@ func TestOpenAIProviderThroughEmbeddingOption(t *testing.T) {
 		leia.WithLLMProvider(openai.Provider{Endpoint: server.URL, Model: "mock-fast", Client: server.Client()}),
 	)
 	if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("hello")}})
+result, err := llm.turn({messages: [llm.user("hello")]})
 text := result.text
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -286,7 +286,7 @@ llm.register_models({
     }
 })
 
-result, err := llm.turn({model: "chat", messages: {llm.user("hello")}})
+result, err := llm.turn({model: "chat", messages: [llm.user("hello")]})
 text := result.text
 `, server.URL))
 			if err != nil {

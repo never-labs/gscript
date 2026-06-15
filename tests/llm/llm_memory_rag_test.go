@@ -50,11 +50,11 @@ memory_event := llm.memory_outcome_event(memory_outcome, {
     trace_id: "trace-memory"
     sequence: 1
 })
-memory_trace := llm.trace_envelope({memory_event}, {trace_id: "trace-memory"})
+memory_trace := llm.trace_envelope([memory_event], {trace_id: "trace-memory"})
 memory_gate := llm.trace_assert(memory_trace, {
-    required_event_types: {"memory_outcome"}
-    require_event_payload_fields: {memory_outcome: {"status", "result_status", "match_count", "match_refs", "top_match"}}
-    require_correlation_fields: {"workflow_run_id", "workflow_step_id", "correlation_id"}
+    required_event_types: ["memory_outcome"]
+    require_event_payload_fields: {memory_outcome: ["status", "result_status", "match_count", "match_refs", "top_match"]}
+    require_correlation_fields: ["workflow_run_id", "workflow_step_id", "correlation_id"]
     max_status_counts: {matched: 1}
 })
 

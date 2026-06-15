@@ -24,7 +24,7 @@ func TestLLMCommandProvider(t *testing.T) {
 		leia.WithLLMProvider(command.Provider{Command: "sh", Args: []string{"-c", `printf 'mock:%s' "$0"`}}),
 	)
 	if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("hello")}})
+result, err := llm.turn({messages: [llm.user("hello")]})
 text := result.text
 `); err != nil {
 		t.Fatalf("Exec: %v", err)
@@ -258,7 +258,7 @@ llm.register_models({
     }
 })
 
-result, err := llm.turn({model: "chat", messages: {llm.user("hello")}})
+result, err := llm.turn({model: "chat", messages: [llm.user("hello")]})
 text := result.text
 `)
 			if err != nil {

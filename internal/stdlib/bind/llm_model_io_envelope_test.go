@@ -6,7 +6,7 @@ func TestLLMModelIOEnvelopeNormalizesMetadataOnly(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 lookup := llm.tool("lookup", func(symbol) {
     return {symbol: symbol price: 42}, nil
-}, {requires: {"market.read"}})
+}, {requires: ["market.read"]})
 
 envelope := llm.model_io_envelope({
     model: "fast"
@@ -15,8 +15,8 @@ envelope := llm.model_io_envelope({
     request: {
         headers: {Authorization: "Bearer secret" Accept: "application/json"}
         auth: {scheme: "bearer" secret_ref: "env:LOCAL_LLM_KEY"}
-        messages: {llm.system("do not store me"), llm.user("ACME?")}
-        tools: {lookup}
+        messages: [llm.system("do not store me"), llm.user("ACME?")]
+        tools: [lookup]
         temperature: 0
         max_tokens: 128
     }
@@ -24,15 +24,15 @@ envelope := llm.model_io_envelope({
         text: "raw answer should be summarized only"
         finish_reason: "stop"
         usage: {prompt_tokens: 11 completion_tokens: 7 latency_ms: 13}
-        tool_calls: {{name: "lookup" arguments: {symbol: "ACME"}}}
+        tool_calls: [{name: "lookup" arguments: {symbol: "ACME"}}]
     }
     output_schema: {type: "object"}
-    evidence_refs: {{id: "src-1" artifact_id: "filing-1"}}
+    evidence_refs: [{id: "src-1" artifact_id: "filing-1"}]
 }, {capability: "generic.ai.turn"})
 
 alias := llm.modelCallEnvelope({
     model_alias: "analyst"
-    messages: {llm.user("hello")}
+    messages: [llm.user("hello")]
     text: "ok"
 })
 
