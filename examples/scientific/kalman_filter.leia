@@ -4,7 +4,7 @@
 
 dt := 1.0
 F := linalg.matrix([[1.0, dt], [0.0, 1.0]])
-H := linalg.row(1.0, 0.0)
+H := row(1.0, 0.0)
 Q := eye(2, 0.01)
 
 measurements := [0.95, 2.05, 2.95, 4.10, 5.00]
@@ -18,9 +18,9 @@ for i := 1; i <= #measurements; i++ {
 }
 
 innovation_rmse := stats.rms(innovations)
-position := linalg.at(state.x, 1)
-velocity := linalg.at(state.x, 2)
-uncertainty_trace := linalg.trace(state.P)
+position := at(state.x, 1)
+velocity := at(state.x, 2)
+uncertainty_trace := trace(state.P)
 q_state_sum := q {
 +/${state.x}
 }

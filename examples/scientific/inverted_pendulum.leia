@@ -51,7 +51,7 @@ assert(#trajectory == 240)
 assert(#observed.theta == 240)
 assert(#observed.omega == 240)
 assert(peak_energy < 0.25)
-assert(linalg.get(linalg_probe, 2, 1) == g / l)
+assert(at(linalg_probe, 2, 1) == g / l)
 assert(near(q_checksum, mean_energy, 0.000000001))
 
 print(string.format("ok pendulum steps=%d theta=%.4f omega=%.4f mean_energy=%.4f peak_energy=%.4f", 240, final_theta, final_omega, mean_energy, peak_energy))
