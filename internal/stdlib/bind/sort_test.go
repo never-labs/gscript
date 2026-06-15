@@ -23,7 +23,7 @@ func sortInterp(t *testing.T, src string) *Interpreter {
 
 func TestSortAsc(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {5, 3, 1, 4, 2}
+		arr := [5, 3, 1, 4, 2]
 		sort.asc(arr)
 		a := arr[1]
 		b := arr[2]
@@ -50,7 +50,7 @@ func TestSortAsc(t *testing.T) {
 
 func TestSortAscStrings(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {"cherry", "apple", "banana"}
+		arr := ["cherry", "apple", "banana"]
 		sort.asc(arr)
 		a := arr[1]
 		b := arr[2]
@@ -69,7 +69,7 @@ func TestSortAscStrings(t *testing.T) {
 
 func TestSortAscReturnsTable(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {3, 1, 2}
+		arr := [3, 1, 2]
 		result := sort.asc(arr)
 		same := result == arr
 	`)
@@ -85,7 +85,7 @@ func TestSortAscReturnsTable(t *testing.T) {
 
 func TestSortDesc(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 5, 3, 2, 4}
+		arr := [1, 5, 3, 2, 4]
 		sort.desc(arr)
 		a := arr[1]
 		b := arr[2]
@@ -108,7 +108,7 @@ func TestSortDesc(t *testing.T) {
 
 func TestSortBy(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {5, 3, 1, 4, 2}
+		arr := [5, 3, 1, 4, 2]
 		sort.by(arr, func(a, b) { return a > b })
 		first := arr[1]
 		last := arr[5]
@@ -127,7 +127,7 @@ func TestSortBy(t *testing.T) {
 
 func TestSortByKey(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {"banana", "fig", "apple", "cherry"}
+		arr := ["banana", "fig", "apple", "cherry"]
 		sort.byKey(arr, func(s) { return #s })
 		first := arr[1]
 		last := arr[4]
@@ -144,7 +144,7 @@ func TestSortByKey(t *testing.T) {
 
 func TestSortIsSortedTrue(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 2, 3, 4, 5}
+		arr := [1, 2, 3, 4, 5]
 		result := sort.isSorted(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -155,7 +155,7 @@ func TestSortIsSortedTrue(t *testing.T) {
 
 func TestSortIsSortedFalse(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 3, 2, 4, 5}
+		arr := [1, 3, 2, 4, 5]
 		result := sort.isSorted(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -166,7 +166,7 @@ func TestSortIsSortedFalse(t *testing.T) {
 
 func TestSortIsSortedEmpty(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {}
+		arr := []
 		result := sort.isSorted(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -177,7 +177,7 @@ func TestSortIsSortedEmpty(t *testing.T) {
 
 func TestSortIsSortedSingle(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {42}
+		arr := [42]
 		result := sort.isSorted(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -192,7 +192,7 @@ func TestSortIsSortedSingle(t *testing.T) {
 
 func TestSortReverse(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 2, 3, 4, 5}
+		arr := [1, 2, 3, 4, 5]
 		sort.reverse(arr)
 		a := arr[1]
 		b := arr[5]
@@ -207,7 +207,7 @@ func TestSortReverse(t *testing.T) {
 
 func TestSortReverseOdd(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 2, 3}
+		arr := [1, 2, 3]
 		sort.reverse(arr)
 		a := arr[1]
 		b := arr[2]
@@ -230,7 +230,7 @@ func TestSortReverseOdd(t *testing.T) {
 
 func TestSortBsearchFound(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {10, 20, 30, 40, 50}
+		arr := [10, 20, 30, 40, 50]
 		result := sort.bsearch(arr, 30)
 	`)
 	v := interp.GetGlobal("result")
@@ -241,7 +241,7 @@ func TestSortBsearchFound(t *testing.T) {
 
 func TestSortBsearchNotFound(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {10, 20, 30, 40, 50}
+		arr := [10, 20, 30, 40, 50]
 		result := sort.bsearch(arr, 25)
 	`)
 	v := interp.GetGlobal("result")
@@ -252,7 +252,7 @@ func TestSortBsearchNotFound(t *testing.T) {
 
 func TestSortBsearchFirst(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {10, 20, 30}
+		arr := [10, 20, 30]
 		result := sort.bsearch(arr, 10)
 	`)
 	v := interp.GetGlobal("result")
@@ -263,7 +263,7 @@ func TestSortBsearchFirst(t *testing.T) {
 
 func TestSortBsearchLast(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {10, 20, 30}
+		arr := [10, 20, 30]
 		result := sort.bsearch(arr, 30)
 	`)
 	v := interp.GetGlobal("result")
@@ -278,7 +278,7 @@ func TestSortBsearchLast(t *testing.T) {
 
 func TestSortUnique(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 1, 2, 2, 3, 3, 3, 4}
+		arr := [1, 1, 2, 2, 3, 3, 3, 4]
 		result := sort.unique(arr)
 		count := #result
 		a := result[1]
@@ -297,7 +297,7 @@ func TestSortUnique(t *testing.T) {
 
 func TestSortUniqueEmpty(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {}
+		arr := []
 		result := sort.unique(arr)
 		count := #result
 	`)
@@ -308,7 +308,7 @@ func TestSortUniqueEmpty(t *testing.T) {
 
 func TestSortUniqueNoDuplicates(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 2, 3}
+		arr := [1, 2, 3]
 		result := sort.unique(arr)
 		count := #result
 	`)
@@ -323,7 +323,7 @@ func TestSortUniqueNoDuplicates(t *testing.T) {
 
 func TestSortPartition(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {1, 2, 3, 4, 5, 6}
+		arr := [1, 2, 3, 4, 5, 6]
 		evens, odds := sort.partition(arr, func(v) { return v % 2 == 0 })
 		evenCount := #evens
 		oddCount := #odds
@@ -342,7 +342,7 @@ func TestSortPartition(t *testing.T) {
 
 func TestSortMin(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {5, 3, 1, 4, 2}
+		arr := [5, 3, 1, 4, 2]
 		result := sort.min(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -353,7 +353,7 @@ func TestSortMin(t *testing.T) {
 
 func TestSortMax(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {5, 3, 1, 4, 2}
+		arr := [5, 3, 1, 4, 2]
 		result := sort.max(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -364,7 +364,7 @@ func TestSortMax(t *testing.T) {
 
 func TestSortMinByKey(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {"banana", "fig", "apple"}
+		arr := ["banana", "fig", "apple"]
 		result := sort.min(arr, func(s) { return #s })
 	`)
 	v := interp.GetGlobal("result")
@@ -375,7 +375,7 @@ func TestSortMinByKey(t *testing.T) {
 
 func TestSortMaxByKey(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {"banana", "fig", "apple"}
+		arr := ["banana", "fig", "apple"]
 		result := sort.max(arr, func(s) { return #s })
 	`)
 	v := interp.GetGlobal("result")
@@ -386,7 +386,7 @@ func TestSortMaxByKey(t *testing.T) {
 
 func TestSortMinEmpty(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {}
+		arr := []
 		result := sort.min(arr)
 	`)
 	v := interp.GetGlobal("result")
@@ -397,7 +397,7 @@ func TestSortMinEmpty(t *testing.T) {
 
 func TestSortMaxEmpty(t *testing.T) {
 	interp := sortInterp(t, `
-		arr := {}
+		arr := []
 		result := sort.max(arr)
 	`)
 	v := interp.GetGlobal("result")
