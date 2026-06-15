@@ -370,7 +370,7 @@ graph := llm.workflow_graph({
             output_schema: "final.v1"
         }),
     }
-    edges: {{from: "plan", to: "finalize"}}
+    edges: [{from: "plan", to: "finalize"}]
 })
 result, err := graph.run("topic")
 envelope := llm.trace_envelope([plan_event, final_event], {

@@ -92,11 +92,11 @@ func TestCSVEncode(t *testing.T) {
 func TestCSVEncodeWithHeaders(t *testing.T) {
 	interp := newCSVTestInterpreter()
 	execCSVTest(t, interp, `
-		rows := {
+		rows := [
 			{name: "Alice", age: "30"},
 			{name: "Bob", age: "25"}
-		}
-		headers := {"name", "age"}
+		]
+		headers := ["name", "age"]
 		result := csv.encodeWithHeaders(rows, headers)
 	`)
 

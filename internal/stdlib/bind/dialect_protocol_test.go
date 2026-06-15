@@ -63,7 +63,7 @@ func TestDialectURLParseBoundaries(t *testing.T) {
 func TestDialectURLQueryBoundaryModes(t *testing.T) {
 	interp := runWithLib(t, `
 		to_encode := {}
-		to_encode.tag = {"b", "a"}
+		to_encode.tag = ["b", "a"]
 		to_encode.empty = ""
 		to_encode.page = 2
 		encoded := dialect.eval("urlquery", to_encode)
@@ -271,13 +271,13 @@ func TestDialectMultipartParseAndEncode(t *testing.T) {
 		body := "--fixture\r\nContent-Disposition: form-data; name=\"meta\"\r\nContent-Type: application/json\r\n\r\n{\"ok\":true}\r\n--fixture\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--fixture--\r\n"
 		parts := dialect.eval("multipart", body, {boundary: "fixture"})
 		parts_by_content_type := dialect.eval("multipart", body, {content_type: "multipart/form-data; boundary=fixture"})
-		encoded := dialect.eval("multipart", {
+		encoded := dialect.eval("multipart", [
 			{name: "meta", content_type: "application/json", body: "{\"ok\":true}"},
 			{name: "file", filename: "a.txt", content_type: "text/plain", body: "hello"},
-		}, {mode: "encode", boundary: "fixture"})
+		], {mode: "encode", boundary: "fixture"})
 		roundtrip := dialect.eval("multipart", encoded, {boundary: "fixture"})
 		single_headers := {}
-		single_headers["X-Tag"] = {"a", "b"}
+		single_headers["X-Tag"] = ["a", "b"]
 		single_encoded, single_encode_err := dialect.eval("multipart", {name: "note", value: "hello", contentType: "text/plain", headers: single_headers}, {mode: "encode", boundary: "fixture"})
 		single_roundtrip := dialect.eval("multipart", single_encoded, {boundary: "fixture"})
 		missing_boundary, missing_boundary_err := dialect.eval("multipart", body)
@@ -609,7 +609,7 @@ func TestDialectHeadersParseAndEncode(t *testing.T) {
 		trace := parsed["X-Trace"]
 		to_encode := {}
 		to_encode["x-trace"] = "abc"
-		to_encode["set-cookie"] = {"a=1", "b=2"}
+		to_encode["set-cookie"] = ["a=1", "b=2"]
 		to_encode["content-type"] = "text/plain"
 		encoded := dialect.eval("headers", to_encode, {mode: "encode"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
@@ -702,7 +702,7 @@ func TestDialectCookieParseAndEncode(t *testing.T) {
 		to_encode := {}
 		to_encode.theme = "light"
 		to_encode.session = "abc123"
-		to_encode.tag = {"a", "b"}
+		to_encode.tag = ["a", "b"]
 		encoded := dialect.eval("cookies", to_encode, {mode: "encode"})
 		empty := dialect.eval("cookie", "  ")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
