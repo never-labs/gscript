@@ -11,8 +11,8 @@ import (
 func TestDataFrameFromLeiaTablesRowsRoundTrip(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: {"AAPL", "MSFT"},
-    qty: {10, 20},
+    sym: ["AAPL", "MSFT"],
+    qty: [10, 20],
 })
 n := data.len(f)
 cols := data.columns(f)
@@ -38,8 +38,8 @@ rows2 := data.rows(f2)
 func TestDataFrameValueExposesUnifiedRowsAndFields(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL", "MSFT"}),
-    qty: data.i64({10, 20}),
+    sym: data.symbols(["AAPL", "MSFT"]),
+    qty: data.i64([10, 20]),
 })
 n := #f
 first := f[1]
@@ -79,8 +79,8 @@ dataColumns := f.data
 func TestDataFrameKeepsNativeFramePayloadForRoundTrip(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL", "MSFT"}),
-    qty: data.i64({10, 20}),
+    sym: data.symbols(["AAPL", "MSFT"]),
+    qty: data.i64([10, 20]),
 })
 `)
 	frame := interp.GetGlobal("f").Table()
@@ -300,8 +300,8 @@ func TestDataNativeArrayFromValueUsesUntypedFallbackOnlyWithoutTypedKind(t *test
 func TestDataFrameNativePayloadInvalidatesOnUserMutation(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL", "MSFT"}),
-    qty: data.i64({10, 20}),
+    sym: data.symbols(["AAPL", "MSFT"]),
+    qty: data.i64([10, 20]),
 })
 f.extra = 42
 `)
@@ -385,11 +385,11 @@ func TestDataFrameFromSoA(t *testing.T) {
 func TestDataTypedColumnConstructorsAndKinds(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL", "MSFT", "AAPL"}),
-    venue: data.string({"XNAS", "XNYS", "XNAS"}),
-    qty: data.i64({10, 15, 20}),
-    price: data.f64({100.5, 90, 101.0}),
-    active: data.bool({true, nil, false}),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL"]),
+    venue: data.string(["XNAS", "XNYS", "XNAS"]),
+    qty: data.i64([10, 15, 20]),
+    price: data.f64([100.5, 90, 101.0]),
+    active: data.bool([true, nil, false]),
 })
 n := data.len(f)
 kinds := data.kinds(f)
@@ -439,18 +439,18 @@ rows := data.rows(f)
 func TestDataExtendedNumericColumnConstructorsKindsAndNulls(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    i8v: data.i8({1, data.null}),
-    i16v: data.i16({2, data.null}),
-    i32v: data.i32({3, data.null}),
-    u8v: data.u8({4, data.null}),
-    u16v: data.u16({5, data.null}),
-    u32v: data.u32({6, data.null}),
-    u64v: data.u64({7, data.null}),
-    f32v: data.f32({8, data.null}),
+    i8v: data.i8([1, data.null]),
+    i16v: data.i16([2, data.null]),
+    i32v: data.i32([3, data.null]),
+    u8v: data.u8([4, data.null]),
+    u16v: data.u16([5, data.null]),
+    u32v: data.u32([6, data.null]),
+    u64v: data.u64([7, data.null]),
+    f32v: data.f32([8, data.null]),
 })
 kinds := data.kinds(f)
 rows := data.rows(f)
-g := f.gather({2, 1})
+g := f.gather([2, 1])
 gkinds := data.kinds(g)
 grows := data.rows(g)
 `)
@@ -505,8 +505,8 @@ grows := data.rows(g)
 func TestDataSymbolsAndStringColumnsStayDistinct(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL"}),
-    text: data.string({"AAPL"}),
+    sym: data.symbols(["AAPL"]),
+    text: data.string(["AAPL"]),
 })
 kinds := data.kinds(f)
 rows := data.rows(f)
@@ -542,7 +542,7 @@ f := data.frame({
 })
 kinds := data.kinds(f)
 rows := data.rows(f)
-g := f.gather({2, 1})
+g := f.gather([2, 1])
 gkinds := data.kinds(g)
 grows := data.rows(g)
 `)
@@ -602,15 +602,15 @@ grows := data.rows(g)
 func TestDataFrameSchemaColumnsRowGatherStableDeclarationOrder(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    z: data.i64({1, 2, 3}),
-    a: data.string({"x", "y", "z"}),
-    m: data.bool({true, false, true}),
+    z: data.i64([1, 2, 3]),
+    a: data.string(["x", "y", "z"]),
+    m: data.bool([true, false, true]),
 })
 cols := data.columns(f)
 schemaNames := f.schema.names
 schemaKinds := f.schema.kinds
 row := f.row(2)
-g := f.gather({3, 1})
+g := f.gather([3, 1])
 gcols := data.columns(g)
 grows := data.rows(g)
 `)
@@ -658,13 +658,13 @@ grows := data.rows(g)
 func TestDataFrameTakeGatherProjectSchemaStableHelpers(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL", "MSFT", "NVDA"}),
-    qty: data.i32({10, 20, 30}),
-    price: data.f64({100.5, 80.25, 120.75}),
+    sym: data.symbols(["AAPL", "MSFT", "NVDA"]),
+    qty: data.i32([10, 20, 30]),
+    price: data.f64([100.5, 80.25, 120.75]),
 })
 taken := data.take(f, 2)
-gathered := data.gather(f, {3, 1})
-projected := data.project(f, {"qty", "sym"})
+gathered := data.gather(f, [3, 1])
+projected := data.project(f, ["qty", "sym"])
 sameTaken := data.same_schema(f, taken)
 sameGathered := data.same_schema(f, gathered)
 sameProjected := data.same_schema(f, projected)
@@ -731,8 +731,8 @@ func TestDataNullSentinelScriptBehavior(t *testing.T) {
 	interp := runWithDataAndArray(t, `
 sentinel := data.null
 f := data.frame({
-    qty: data.i64({10, data.null, 30}),
-    label: data.string({"live", data.null, "done"}),
+    qty: data.i64([10, data.null, 30]),
+    label: data.string(["live", data.null, "done"]),
 })
 rows := data.rows(f)
 f2 := data.frame(rows)
@@ -764,9 +764,9 @@ func TestDataColumnarStoreScriptRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    sym: data.symbols({"AAPL", "MSFT", "AAPL"}),
-    qty: data.i64({10, data.null, 30}),
-    price: data.f64({100.5, 101.25, 102.75}),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL"]),
+    qty: data.i64([10, data.null, 30]),
+    price: data.f64([100.5, 101.25, 102.75]),
 })
 `)
 	interp.SetGlobal("store_path", StringValue(dir))
@@ -802,9 +802,9 @@ func TestDataPartitionedStoreScriptFiltersPartitions(t *testing.T) {
 	dir := t.TempDir()
 	interp := runWithDataAndArray(t, `
 f := data.frame({
-    day: data.i64({1, 1, 2, 2}),
-    sym: data.symbols({"AAPL", "MSFT", "AAPL", "MSFT"}),
-    qty: data.i64({10, 20, 30, 40}),
+    day: data.i64([1, 1, 2, 2]),
+    sym: data.symbols(["AAPL", "MSFT", "AAPL", "MSFT"]),
+    qty: data.i64([10, 20, 30, 40]),
 })
 `)
 	interp.SetGlobal("store_path", StringValue(dir))

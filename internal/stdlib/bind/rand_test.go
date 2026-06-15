@@ -287,7 +287,7 @@ func TestRandBoolDistribution(t *testing.T) {
 func TestRandChoice(t *testing.T) {
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {10, 20, 30, 40, 50}
+		items := [10, 20, 30, 40, 50]
 		result := rand.choice(items)
 	`)
 	v := interp.GetGlobal("result")
@@ -302,7 +302,7 @@ func TestRandChoice(t *testing.T) {
 
 func TestRandChoiceEmpty(t *testing.T) {
 	interp := randInterp(t, `
-		items := {}
+		items := []
 		result := rand.choice(items)
 	`)
 	v := interp.GetGlobal("result")
@@ -318,7 +318,7 @@ func TestRandChoiceEmpty(t *testing.T) {
 func TestRandShuffle(t *testing.T) {
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+		items := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 		rand.shuffle(items)
 		first := items[1]
 		sum := 0
@@ -336,7 +336,7 @@ func TestRandShuffle(t *testing.T) {
 func TestRandShuffleReturnsTable(t *testing.T) {
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {1, 2, 3}
+		items := [1, 2, 3]
 		result := rand.shuffle(items)
 		same := result == items
 	`)
@@ -356,7 +356,7 @@ func TestRandShuffleReturnsTable(t *testing.T) {
 func TestRandSample(t *testing.T) {
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {10, 20, 30, 40, 50}
+		items := [10, 20, 30, 40, 50]
 		result := rand.sample(items, 3)
 		count := #result
 	`)
@@ -369,7 +369,7 @@ func TestRandSample(t *testing.T) {
 func TestRandSampleMoreThanLength(t *testing.T) {
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {1, 2, 3}
+		items := [1, 2, 3]
 		result := rand.sample(items, 10)
 		count := #result
 	`)
@@ -424,10 +424,10 @@ func TestRandAddNoise(t *testing.T) {
 	interp := randStatsInterp(t, `
 		dist := stats.normal(0, 0.5)
 		rand.seed(42)
-		values := rand.add_noise({1, 2, 3, 4}, dist, 0.25)
-		empty := rand.add_noise({}, dist)
+		values := rand.add_noise([1, 2, 3, 4], dist, 0.25)
+		empty := rand.add_noise([], dist)
 		rand.seed(42)
-		samples := stats.samples({1, 2, 3, 4}, {1, 2, 1, 0})
+		samples := stats.samples([1, 2, 3, 4], [1, 2, 1, 0])
 		noisy_samples := rand.add_noise(samples, dist, 0.25)
 	`)
 	values := interp.GetGlobal("values")
@@ -517,8 +517,8 @@ func TestRandBytesZero(t *testing.T) {
 func TestRandWeighted(t *testing.T) {
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {"rare", "common", "legendary"}
-		weights := {1, 98, 1}
+		items := ["rare", "common", "legendary"]
+		weights := [1, 98, 1]
 		result := rand.weighted(items, weights)
 	`)
 	v := interp.GetGlobal("result")
@@ -536,8 +536,8 @@ func TestRandWeightedHeavyBias(t *testing.T) {
 	// With extreme weights, the result should almost always be the heavy item
 	interp := randInterp(t, `
 		rand.seed(42)
-		items := {"a", "b"}
-		weights := {0, 100}
+		items := ["a", "b"]
+		weights := [0, 100]
 		count_b := 0
 		for i := 0; i < 50; i++ {
 			if rand.weighted(items, weights) == "b" {
@@ -547,7 +547,7 @@ func TestRandWeightedHeavyBias(t *testing.T) {
 	`)
 	countB := interp.GetGlobal("count_b")
 	if countB.Int() != 50 {
-		t.Errorf("with weight {0, 100}, all picks should be 'b', got %d", countB.Int())
+		t.Errorf("with weight [0, 100], all picks should be 'b', got %d", countB.Int())
 	}
 }
 
