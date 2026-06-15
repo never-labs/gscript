@@ -197,8 +197,8 @@ incident := llm.agent("incident", incident_config, func(service) {
     if dispatch_err != nil {
         return nil, dispatch_err
     }
-    cfg.messages[#cfg.messages + 1] = msg.assistant_call(call)
-    cfg.messages[#cfg.messages + 1] = msg.tool_result(call.id, evidence)
+    append(cfg.messages, msg.assistant_call(call))
+    append(cfg.messages, msg.tool_result(call.id, evidence))
     return llm.turn(cfg)
 }, {params: ["service"]})
 ```

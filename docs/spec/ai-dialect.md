@@ -140,8 +140,8 @@ history := [
     llm.user("Summarize this incident."),
 ]
 
-history[#history + 1] = msg.assistant("draft")
-history[#history + 1] = msg.user("Now include the owner.")
+append(history, msg.assistant("draft"))
+append(history, msg.user("Now include the owner."))
 ```
 
 Stable roles are `system`, `user`, `assistant`, and `tool`. Tool-call and

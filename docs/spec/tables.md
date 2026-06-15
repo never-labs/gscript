@@ -67,14 +67,14 @@ assert(!rawequal(a, b))
 ```
 
 ```leia run all
-log := {}
+log := []
 t := setmetatable({present: 11}, {
     __index: func(_, key) {
-        log[#log + 1] = "index:" .. key
+        append(log, "index:" .. key)
         return "fallback"
     },
     __newindex: func(_, key, value) {
-        log[#log + 1] = "new:" .. key
+        append(log, "new:" .. key)
     },
 })
 
@@ -266,10 +266,10 @@ middle := setmetatable({}, {__index: base})
 obj := setmetatable({}, {__index: middle})
 assert(obj.answer == 42)
 
-log := {}
+log := []
 sink := setmetatable({}, {
     __newindex: func(_, key, value) {
-        log[#log + 1] = key .. ":" .. value
+        append(log, key .. ":" .. value)
     },
 })
 proxy := setmetatable({}, {__newindex: sink})
@@ -314,9 +314,9 @@ at `1`; it stops at the first missing or `nil` element.
 t := [10, 20]
 t[4] = 40
 t.name = "Ada"
-seen := {}
+seen := []
 for _, value := range ipairs(t) {
-    seen[#seen + 1] = value
+    append(seen, value)
 }
 assert(#seen == 2)
 assert(seen[1] == 10)

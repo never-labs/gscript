@@ -285,9 +285,9 @@ specific expression form short-circuits. Implementations may optimize execution
 but must preserve observable side effects and error behavior.
 
 ```leia run all
-events := {}
+events := []
 func mark(name) {
-    events[#events + 1] = name
+    append(events, name)
     return name
 }
 
@@ -296,7 +296,7 @@ assert(result == "leftright")
 assert(events[1] == "left")
 assert(events[2] == "right")
 
-events = {}
+events = []
 holder := { [mark("key")]: mark("value") }
 assert(events[1] == "key")
 assert(events[2] == "value")

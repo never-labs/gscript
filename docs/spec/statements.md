@@ -59,9 +59,9 @@ existing targets. Multi-value adjustment for the right-hand side follows the
 rules in [Functions](functions.md).
 
 ```leia run all
-events := {}
+events := []
 func mark(name, value) {
-    events[#events + 1] = name
+    append(events, name)
     return value
 }
 
@@ -96,14 +96,14 @@ count *= 3
 count--
 assert(count == 8)
 
-log := {}
+log := []
 t := setmetatable({}, {
     __index: func(_, key) {
-        log[#log + 1] = "read:" .. key
+        append(log, "read:" .. key)
         return 10
     },
     __newindex: func(_, key, value) {
-        log[#log + 1] = "write:" .. key .. "=" .. value
+        append(log, "write:" .. key .. "=" .. value)
     },
 })
 t.score += 5
@@ -227,12 +227,12 @@ assert(sum == 60)
 ```
 
 ```leia run all
-calls := {}
+calls := []
 
 for _, value := range pairs([10, 20, 30]) {
-    calls[#calls + 1] = func() {
+    append(calls, func() {
         return value
-    }
+    })
 }
 
 assert(calls[1]() == 10)
@@ -282,7 +282,7 @@ assert(!ok)
 iteration of the innermost enclosing loop. Outside a loop they are invalid.
 
 ```leia run all
-values := {}
+values := []
 for i := 1; i <= 6; i++ {
     if i % 2 == 0 {
         continue
@@ -290,7 +290,7 @@ for i := 1; i <= 6; i++ {
     if i > 5 {
         break
     }
-    values[#values + 1] = i
+    append(values, i)
 }
 
 assert(#values == 3)
@@ -387,11 +387,11 @@ however, still closes over lexical bindings in the ordinary way; when it runs,
 it observes the current value of those captured bindings.
 
 ```leia run all
-events := {}
+events := []
 func scoped() {
-    defer func() { events[#events + 1] = "last" }()
-    defer func() { events[#events + 1] = "first" }()
-    events[#events + 1] = "body"
+    defer func() { append(events, "last") }()
+    defer func() { append(events, "first") }()
+    append(events, "body")
 }
 
 scoped()
@@ -401,9 +401,9 @@ assert(events[3] == "last")
 ```
 
 ```leia run all
-events := {}
+events := []
 func record(value) {
-    events[#events + 1] = value
+    append(events, value)
 }
 
 func scoped() {

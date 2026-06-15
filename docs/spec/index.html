@@ -914,9 +914,9 @@ holder <span class="tok-operator">:=</span> { child: child }
 <p>Tagged dialect forms are expressions. The generic syntax, interpolation rules, bang behavior, registration model, and runtime boundary are specified in <a href="dialects.md">Tagged Dialects</a>. The core q analytics dialect is specified in <a href="q-dialect.md">q Dialect</a>. The optional standard AI dialect family is specified in <a href="ai-dialect.md">AI Dialect Syntax</a>.</p>
 <h3 id="expressions-evaluation-order">Evaluation Order</h3>
 <p>Within an expression list, subexpressions are evaluated left-to-right unless a specific expression form short-circuits. Implementations may optimize execution but must preserve observable side effects and error behavior.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
 <span class="tok-keyword">func</span> mark(name) {
-    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> name
+    append(events, name)
     <span class="tok-keyword">return</span> name
 }
 
@@ -925,7 +925,7 @@ result <span class="tok-operator">:=</span> mark(<span class="tok-string">&quot;
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;left&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;right&quot;</span>)
 
-events <span class="tok-operator">=</span> {}
+events <span class="tok-operator">=</span> []
 holder <span class="tok-operator">:=</span> { [mark(<span class="tok-string">&quot;key&quot;</span>)]: mark(<span class="tok-string">&quot;value&quot;</span>) }
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;key&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;value&quot;</span>)
@@ -966,9 +966,9 @@ short_or <span class="tok-operator">:=</span> <span class="tok-constant">true</s
 <p>Simple statements are assignments, compound assignments, increment and decrement statements, send statements, calls, and expression statements. Expression statements evaluate their expression for side effects and discard all results.</p>
 <h3 id="statements-assignment">Assignment</h3>
 <p>An assignment evaluates the right-hand side expression list left-to-right, then evaluates any address subexpressions needed by non-variable targets, then stores adjusted values into the targets from left to right. A target may be a visible variable binding, a table or host-backed index expression, or a member selection. Assignment to an invalid target raises a runtime error. <code>:=</code> creates fresh lexical bindings in the current block for identifier targets; <code>=</code> updates existing targets. Multi-value adjustment for the right-hand side follows the rules in <a href="functions.md">Functions</a>.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
 <span class="tok-keyword">func</span> mark(name, value) {
-    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> name
+    append(events, name)
     <span class="tok-keyword">return</span> value
 }
 
@@ -993,14 +993,14 @@ count <span class="tok-operator">*=</span> <span class="tok-number">3</span>
 count<span class="tok-operator">--</span>
 <span class="tok-builtin">assert</span>(count <span class="tok-operator">==</span> <span class="tok-number">8</span>)
 
-log <span class="tok-operator">:=</span> {}
+log <span class="tok-operator">:=</span> []
 t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, {
     __index: <span class="tok-keyword">func</span>(_, key) {
-        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;read:&quot;</span> <span class="tok-operator">..</span> key
+        append(log, <span class="tok-string">&quot;read:&quot;</span> <span class="tok-operator">..</span> key)
         <span class="tok-keyword">return</span> <span class="tok-number">10</span>
     },
     __newindex: <span class="tok-keyword">func</span>(_, key, value) {
-        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;write:&quot;</span> <span class="tok-operator">..</span> key <span class="tok-operator">..</span> <span class="tok-string">&quot;=&quot;</span> <span class="tok-operator">..</span> value
+        append(log, <span class="tok-string">&quot;write:&quot;</span> <span class="tok-operator">..</span> key <span class="tok-operator">..</span> <span class="tok-string">&quot;=&quot;</span> <span class="tok-operator">..</span> value)
     },
 })
 t.score <span class="tok-operator">+=</span> <span class="tok-number">5</span>
@@ -1069,12 +1069,12 @@ keySum <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 
 <span class="tok-builtin">assert</span>(keySum <span class="tok-operator">==</span> <span class="tok-number">6</span>)
 <span class="tok-builtin">assert</span>(sum <span class="tok-operator">==</span> <span class="tok-number">60</span>)</code></pre>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">calls <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">calls <span class="tok-operator">:=</span> []
 
 <span class="tok-keyword">for</span> _, value <span class="tok-operator">:=</span> <span class="tok-keyword">range</span> <span class="tok-builtin">pairs</span>([<span class="tok-number">10</span>, <span class="tok-number">20</span>, <span class="tok-number">30</span>]) {
-    calls[<span class="tok-operator">#</span>calls <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-keyword">func</span>() {
+    append(calls, <span class="tok-keyword">func</span>() {
         <span class="tok-keyword">return</span> value
-    }
+    })
 }
 
 <span class="tok-builtin">assert</span>(calls[<span class="tok-number">1</span>]() <span class="tok-operator">==</span> <span class="tok-number">10</span>)
@@ -1115,7 +1115,7 @@ ok <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span>ok)</code></pre>
 <h3 id="statements-break-and-continue">Break And Continue</h3>
 <p><code>break</code> exits the innermost enclosing loop. <code>continue</code> starts the next iteration of the innermost enclosing loop. Outside a loop they are invalid.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">values <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">values <span class="tok-operator">:=</span> []
 <span class="tok-keyword">for</span> i <span class="tok-operator">:=</span> <span class="tok-number">1</span>; i <span class="tok-operator">&lt;=</span> <span class="tok-number">6</span>; i<span class="tok-operator">++</span> {
     <span class="tok-keyword">if</span> i <span class="tok-operator">%</span> <span class="tok-number">2</span> <span class="tok-operator">==</span> <span class="tok-number">0</span> {
         <span class="tok-keyword">continue</span>
@@ -1123,7 +1123,7 @@ ok <span class="tok-operator">:=</span> <span class="tok-builtin">pcall</span>(<
     <span class="tok-keyword">if</span> i <span class="tok-operator">&gt;</span> <span class="tok-number">5</span> {
         <span class="tok-keyword">break</span>
     }
-    values[<span class="tok-operator">#</span>values <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> i
+    append(values, i)
 }
 
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>values <span class="tok-operator">==</span> <span class="tok-number">3</span>)
@@ -1184,20 +1184,20 @@ a, b <span class="tok-operator">:=</span> forward()
 <h3 id="statements-deferred-calls">Deferred Calls</h3>
 <p><code>defer</code> evaluates the callee and arguments when the <code>defer</code> statement executes, then invokes the deferred call later. Deferred calls run in last-in, first-out order when the current function exits normally, returns explicitly, or unwinds through a protected boundary. A deferred call cannot change the already computed return values unless it mutates an identity-bearing value reachable from those return values.</p>
 <p>The evaluated deferred call is a call plus its already adjusted argument values. Later assignment to a variable that was used as an argument does not change that deferred argument value. A deferred closure with no argument, however, still closes over lexical bindings in the ordinary way; when it runs, it observes the current value of those captured bindings.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
 <span class="tok-keyword">func</span> scoped() {
-    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;last&quot;</span> }()
-    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;first&quot;</span> }()
-    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;body&quot;</span>
+    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { append(events, <span class="tok-string">&quot;last&quot;</span>) }()
+    <span class="tok-keyword">defer</span> <span class="tok-keyword">func</span>() { append(events, <span class="tok-string">&quot;first&quot;</span>) }()
+    append(events, <span class="tok-string">&quot;body&quot;</span>)
 }
 
 scoped()
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;body&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">2</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;first&quot;</span>)
 <span class="tok-builtin">assert</span>(events[<span class="tok-number">3</span>] <span class="tok-operator">==</span> <span class="tok-string">&quot;last&quot;</span>)</code></pre>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
 <span class="tok-keyword">func</span> record(value) {
-    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> value
+    append(events, value)
 }
 
 <span class="tok-keyword">func</span> scoped() {
@@ -1444,14 +1444,14 @@ a <span class="tok-operator">:=</span> {}
 b <span class="tok-operator">:=</span> {}
 <span class="tok-builtin">assert</span>(<span class="tok-builtin">rawequal</span>(a, a))
 <span class="tok-builtin">assert</span>(<span class="tok-operator">!</span><span class="tok-builtin">rawequal</span>(a, b))</code></pre>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">log <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">log <span class="tok-operator">:=</span> []
 t <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({present: <span class="tok-number">11</span>}, {
     __index: <span class="tok-keyword">func</span>(_, key) {
-        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;index:&quot;</span> <span class="tok-operator">..</span> key
+        append(log, <span class="tok-string">&quot;index:&quot;</span> <span class="tok-operator">..</span> key)
         <span class="tok-keyword">return</span> <span class="tok-string">&quot;fallback&quot;</span>
     },
     __newindex: <span class="tok-keyword">func</span>(_, key, value) {
-        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> <span class="tok-string">&quot;new:&quot;</span> <span class="tok-operator">..</span> key
+        append(log, <span class="tok-string">&quot;new:&quot;</span> <span class="tok-operator">..</span> key)
     },
 })
 
@@ -1596,10 +1596,10 @@ middle <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatab
 obj <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, {__index: middle})
 <span class="tok-builtin">assert</span>(obj.answer <span class="tok-operator">==</span> <span class="tok-number">42</span>)
 
-log <span class="tok-operator">:=</span> {}
+log <span class="tok-operator">:=</span> []
 sink <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, {
     __newindex: <span class="tok-keyword">func</span>(_, key, value) {
-        log[<span class="tok-operator">#</span>log <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> key <span class="tok-operator">..</span> <span class="tok-string">&quot;:&quot;</span> <span class="tok-operator">..</span> value
+        append(log, key <span class="tok-operator">..</span> <span class="tok-string">&quot;:&quot;</span> <span class="tok-operator">..</span> value)
     },
 })
 proxy <span class="tok-operator">:=</span> <span class="tok-builtin">setmetatable</span>({}, {__newindex: sink})
@@ -1622,9 +1622,9 @@ t.missing <span class="tok-operator">=</span> <span class="tok-number">1</span><
 <pre class="language-leia leia-code"><code class="language-leia leia-code">t <span class="tok-operator">:=</span> [<span class="tok-number">10</span>, <span class="tok-number">20</span>]
 t[<span class="tok-number">4</span>] <span class="tok-operator">=</span> <span class="tok-number">40</span>
 t.name <span class="tok-operator">=</span> <span class="tok-string">&quot;Ada&quot;</span>
-seen <span class="tok-operator">:=</span> {}
+seen <span class="tok-operator">:=</span> []
 <span class="tok-keyword">for</span> _, value <span class="tok-operator">:=</span> <span class="tok-keyword">range</span> <span class="tok-builtin">ipairs</span>(t) {
-    seen[<span class="tok-operator">#</span>seen <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> value
+    append(seen, value)
 }
 <span class="tok-builtin">assert</span>(<span class="tok-operator">#</span>seen <span class="tok-operator">==</span> <span class="tok-number">2</span>)
 <span class="tok-builtin">assert</span>(seen[<span class="tok-number">1</span>] <span class="tok-operator">==</span> <span class="tok-number">10</span>)
@@ -1755,9 +1755,9 @@ state <span class="tok-operator">:=</span> <span class="tok-string">&quot;unset&
 <p>Timeouts and cancellation are library protocols built on channels. For example, <code>time.after(duration)</code> returns a channel that becomes ready after the duration. The language-level <code>select</code> semantics do not require a special timeout case.</p>
 <h3 id="concurrency-defer-errors-and-task-boundaries">Defer, Errors, And Task Boundaries</h3>
 <p><code>defer call()</code> is function-scoped. It evaluates the callee and arguments when the <code>defer</code> statement executes, and runs deferred calls in last-in, first-out order when the current function returns or unwinds through a protected boundary. Concurrent tasks have their own defer stack; a task started by <code>go</code> does not inherit the spawning task&#x27;s pending defers, and deferred calls registered inside that task do not run in the spawning task.</p>
-<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> {}
+<pre class="language-leia leia-code"><code class="language-leia leia-code">events <span class="tok-operator">:=</span> []
 <span class="tok-keyword">func</span> record(x) {
-    events[<span class="tok-operator">#</span>events <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> x
+    append(events, x)
 }
 
 <span class="tok-keyword">func</span> work() {
@@ -2115,8 +2115,8 @@ ok, err <span class="tok-operator">:=</span> llm.check_tools([search_runbook], [
     llm.user(&quot;Summarize this incident.&quot;),
 ]
 
-history[#history + 1] = msg.assistant(&quot;draft&quot;)
-history[#history + 1] = msg.user(&quot;Now include the owner.&quot;)</code></pre>
+append(history, msg.assistant(&quot;draft&quot;))
+append(history, msg.user(&quot;Now include the owner.&quot;))</code></pre>
 <p>Stable roles are <code>system</code>, <code>user</code>, <code>assistant</code>, and <code>tool</code>. Tool-call and tool-result messages are paired by provider call id. A later turn observes prior work only through the <code>messages</code> value supplied to that turn.</p>
 <p>Prompt field blocks are message object shorthand. A table produced by <code>prompt { role: &quot;system&quot;, text: &quot;...&quot; }</code> is valid anywhere a normalized message table is valid:</p>
 <pre class="language-text"><code class="language-text">messages := [

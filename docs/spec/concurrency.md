@@ -238,9 +238,9 @@ inherit the spawning task's pending defers, and deferred calls registered inside
 that task do not run in the spawning task.
 
 ```leia run all
-events := {}
+events := []
 func record(x) {
-    events[#events + 1] = x
+    append(events, x)
 }
 
 func work() {

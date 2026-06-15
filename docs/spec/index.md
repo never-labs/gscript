@@ -1457,9 +1457,9 @@ specific expression form short-circuits. Implementations may optimize execution
 but must preserve observable side effects and error behavior.
 
 ```leia
-events := {}
+events := []
 func mark(name) {
-    events[#events + 1] = name
+    append(events, name)
     return name
 }
 
@@ -1468,7 +1468,7 @@ assert(result == "leftright")
 assert(events[1] == "left")
 assert(events[2] == "right")
 
-events = {}
+events = []
 holder := { [mark("key")]: mark("value") }
 assert(events[1] == "key")
 assert(events[2] == "value")
@@ -1546,9 +1546,9 @@ existing targets. Multi-value adjustment for the right-hand side follows the
 rules in [Functions](functions.md).
 
 ```leia
-events := {}
+events := []
 func mark(name, value) {
-    events[#events + 1] = name
+    append(events, name)
     return value
 }
 
@@ -1583,14 +1583,14 @@ count *= 3
 count--
 assert(count == 8)
 
-log := {}
+log := []
 t := setmetatable({}, {
     __index: func(_, key) {
-        log[#log + 1] = "read:" .. key
+        append(log, "read:" .. key)
         return 10
     },
     __newindex: func(_, key, value) {
-        log[#log + 1] = "write:" .. key .. "=" .. value
+        append(log, "write:" .. key .. "=" .. value)
     },
 })
 t.score += 5
@@ -1714,12 +1714,12 @@ assert(sum == 60)
 ```
 
 ```leia
-calls := {}
+calls := []
 
 for _, value := range pairs([10, 20, 30]) {
-    calls[#calls + 1] = func() {
+    append(calls, func() {
         return value
-    }
+    })
 }
 
 assert(calls[1]() == 10)
@@ -1769,7 +1769,7 @@ assert(!ok)
 iteration of the innermost enclosing loop. Outside a loop they are invalid.
 
 ```leia
-values := {}
+values := []
 for i := 1; i <= 6; i++ {
     if i % 2 == 0 {
         continue
@@ -1777,7 +1777,7 @@ for i := 1; i <= 6; i++ {
     if i > 5 {
         break
     }
-    values[#values + 1] = i
+    append(values, i)
 }
 
 assert(#values == 3)
@@ -1874,11 +1874,11 @@ however, still closes over lexical bindings in the ordinary way; when it runs,
 it observes the current value of those captured bindings.
 
 ```leia
-events := {}
+events := []
 func scoped() {
-    defer func() { events[#events + 1] = "last" }()
-    defer func() { events[#events + 1] = "first" }()
-    events[#events + 1] = "body"
+    defer func() { append(events, "last") }()
+    defer func() { append(events, "first") }()
+    append(events, "body")
 }
 
 scoped()
@@ -1888,9 +1888,9 @@ assert(events[3] == "last")
 ```
 
 ```leia
-events := {}
+events := []
 func record(value) {
-    events[#events + 1] = value
+    append(events, value)
 }
 
 func scoped() {
@@ -2281,14 +2281,14 @@ assert(!rawequal(a, b))
 ```
 
 ```leia
-log := {}
+log := []
 t := setmetatable({present: 11}, {
     __index: func(_, key) {
-        log[#log + 1] = "index:" .. key
+        append(log, "index:" .. key)
         return "fallback"
     },
     __newindex: func(_, key, value) {
-        log[#log + 1] = "new:" .. key
+        append(log, "new:" .. key)
     },
 })
 
@@ -2480,10 +2480,10 @@ middle := setmetatable({}, {__index: base})
 obj := setmetatable({}, {__index: middle})
 assert(obj.answer == 42)
 
-log := {}
+log := []
 sink := setmetatable({}, {
     __newindex: func(_, key, value) {
-        log[#log + 1] = key .. ":" .. value
+        append(log, key .. ":" .. value)
     },
 })
 proxy := setmetatable({}, {__newindex: sink})
@@ -2528,9 +2528,9 @@ at `1`; it stops at the first missing or `nil` element.
 t := [10, 20]
 t[4] = 40
 t.name = "Ada"
-seen := {}
+seen := []
 for _, value := range ipairs(t) {
-    seen[#seen + 1] = value
+    append(seen, value)
 }
 assert(#seen == 2)
 assert(seen[1] == 10)
@@ -2784,9 +2784,9 @@ inherit the spawning task's pending defers, and deferred calls registered inside
 that task do not run in the spawning task.
 
 ```leia
-events := {}
+events := []
 func record(x) {
-    events[#events + 1] = x
+    append(events, x)
 }
 
 func work() {
@@ -3457,8 +3457,8 @@ history := [
     llm.user("Summarize this incident."),
 ]
 
-history[#history + 1] = msg.assistant("draft")
-history[#history + 1] = msg.user("Now include the owner.")
+append(history, msg.assistant("draft"))
+append(history, msg.user("Now include the owner."))
 ```
 
 Stable roles are `system`, `user`, `assistant`, and `tool`. Tool-call and

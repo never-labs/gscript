@@ -164,7 +164,7 @@ effects.
 
 ```leia
 history := [llm.system("You are concise."), llm.user("Summarize this.")]
-history[#history + 1] = msg.assistant("draft")
+append(history, msg.assistant("draft"))
 ```
 
 Message tables use normalized roles: `system`, `user`, `assistant`, and

@@ -134,8 +134,8 @@ history := [
 first, err := turn { messages: history }
 if err != nil { return nil, err }
 
-history[#history + 1] = msg.assistant(first.text)
-history[#history + 1] = msg.user("Recall the project and owner.")
+append(history, msg.assistant(first.text))
+append(history, msg.user("Recall the project and owner."))
 ```
 
 For agent outputs consumed by code, ask for JSON and validate the returned
