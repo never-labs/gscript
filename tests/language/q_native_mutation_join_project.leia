@@ -6,12 +6,12 @@ func check(name, ok) {
 }
 
 trades := data.frame({
-  id: data.i64({1, 2, 3, 4, 5}),
-  acct: data.symbols({"a1", "a1", "a2", "a3", "a3"}),
-  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA", "MSFT"}),
-  venue: data.strings({"XNAS", "XNYS", "XNAS", "ARCX", "BATS"}),
-  price: data.f64({100.0, 101.0, 102.0, 99.0, 98.5}),
-  size: data.i64({10, 20, 15, 5, 25}),
+  id: data.i64([1, 2, 3, 4, 5]),
+  acct: data.symbols(["a1", "a1", "a2", "a3", "a3"]),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA", "MSFT"]),
+  venue: data.strings(["XNAS", "XNYS", "XNAS", "ARCX", "BATS"]),
+  price: data.f64([100.0, 101.0, 102.0, 99.0, 98.5]),
+  size: data.i64([10, 20, 15, 5, 25]),
 })
 
 updated := q.sql(trades, "update price:price+0.5,size:size+1 from trades where acct=`a1")
@@ -25,17 +25,17 @@ keyed_deleted := q.sql(keyed_updated, "delete from trades where acct=`a3")
 keyed_selected := q.sql(keyed_deleted, "select id,acct,sym,size from trades where acct=`a1 order by id asc")
 keyed_key_frame := q.key(keyed_updated)
 keyed_struct_hit := q.lookup(keyed_updated, {sym: "MSFT", acct: "a1", ignored: 1})
-keyed_array_hit := q.lookup(keyed_updated, {"a1", "MSFT"})
+keyed_array_hit := q.lookup(keyed_updated, ["a1", "MSFT"])
 amend_delta := data.frame({
-  acct: data.symbols({"a1", "a4"}),
-  sym: data.symbols({"AAPL", "TSLA"}),
-  size: data.i64({333, 444}),
+  acct: data.symbols(["a1", "a4"]),
+  sym: data.symbols(["AAPL", "TSLA"]),
+  size: data.i64([333, 444]),
 })
 keyed_amended := q.amend(keyed_trades, amend_delta)
 upsert_delta := data.frame({
-  acct: data.symbols({"a1", "a4"}),
-  sym: data.symbols({"MSFT", "TSLA"}),
-  size: data.i64({555, 666}),
+  acct: data.symbols(["a1", "a4"]),
+  sym: data.symbols(["MSFT", "TSLA"]),
+  size: data.i64([555, 666]),
 })
 keyed_upserted := q.upsert(keyed_amended, upsert_delta)
 keyed_sql_ordered := q.sql(keyed_trades, "upsert into trades (size,sym,acct) values (777,`MSFT,`a1)")
@@ -56,9 +56,9 @@ check("q keyed amend upsert api", q.keys(keyed_upserted)[1] == "acct" && #keyed_
 check("qsql keyed upsert accepts reordered columns", q.keys(keyed_sql_ordered)[1] == "acct" && #keyed_sql_ordered.frame == 5 && sql_ordered_hit[1].size == 777)
 
 venues := data.frame({
-  venue: data.strings({"XNAS", "XNYS", "ARCX"}),
-  mic_name: data.strings({"Nasdaq", "NYSE", "NYSE Arca"}),
-  tier: data.i64({1, 1, 2}),
+  venue: data.strings(["XNAS", "XNYS", "ARCX"]),
+  mic_name: data.strings(["Nasdaq", "NYSE", "NYSE Arca"]),
+  tier: data.i64([1, 1, 2]),
 })
 
 joined := q.sql(
@@ -75,17 +75,17 @@ check("single-key join after mutation", #joined == 4 && joined[1].mic_name == "N
 check("left join unmatched keeps typed right schema", #left_joined == 5 && left_joined[5].venue == "BATS" && left_joined[5].mic_name == nil && left_joined[5].tier == nil && left_joined.column_kinds.mic_name == "string" && left_joined.schema.kinds.tier == "i64")
 
 positions := data.frame({
-  acct: data.symbols({"a1", "a1", "a2", "a3"}),
-  sym: data.symbols({"AAPL", "MSFT", "AAPL", "NVDA"}),
-  asof: data.strings({"2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"}),
-  qty: data.i64({11, 21, 15, 5}),
+  acct: data.symbols(["a1", "a1", "a2", "a3"]),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL", "NVDA"]),
+  asof: data.strings(["2026-06-01", "2026-06-01", "2026-06-02", "2026-06-02"]),
+  qty: data.i64([11, 21, 15, 5]),
 })
 
 limits := data.frame({
-  account: data.symbols({"a1", "a1", "a2", "a3", "a3"}),
-  effective: data.strings({"2026-06-01", "2026-06-02", "2026-06-02", "2026-06-01", "2026-06-02"}),
-  region: data.strings({"US", "EU", "US", "APAC", "US"}),
-  max_qty: data.i64({100, 200, 150, 50, 75}),
+  account: data.symbols(["a1", "a1", "a2", "a3", "a3"]),
+  effective: data.strings(["2026-06-01", "2026-06-02", "2026-06-02", "2026-06-01", "2026-06-02"]),
+  region: data.strings(["US", "EU", "US", "APAC", "US"]),
+  max_qty: data.i64([100, 200, 150, 50, 75]),
 })
 
 multi_key := q.sql(

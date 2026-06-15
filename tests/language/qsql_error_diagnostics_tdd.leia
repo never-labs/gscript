@@ -10,13 +10,13 @@ func check(name, ok) {
 }
 
 trades := data.frame({
-  sym: data.symbols({"AAPL"}),
-  price: data.f64({100.5}),
-  size: data.i64({10}),
+  sym: data.symbols(["AAPL"]),
+  price: data.f64([100.5]),
+  size: data.i64([10]),
 })
 quotes := data.frame({
-  sym: data.symbols({"AAPL"}),
-  bid: data.f64({100.0}),
+  sym: data.symbols(["AAPL"]),
+  bid: data.f64([100.0]),
 })
 
 ok, err := pcall(q.sql, "select notional:sum price*size by sym from trades where price>", {

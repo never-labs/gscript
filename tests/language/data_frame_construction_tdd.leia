@@ -6,19 +6,19 @@ func check(name, ok) {
 }
 
 trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT", "AAPL"}),
-  price: data.f64({100.5, 90.0, 101.0}),
-  size: data.i64({10, 15, 20}),
-  venue: data.strings({"XNAS", "XNYS", "XNAS"}),
-  active: data.bool({true, false, true}),
-  month: data.month({"2026.06", "2026.07", data.null}),
-  trade_date: data.date({"2026-06-01", "2026-06-01", data.null}),
-  local_dt: data.datetime({"2026.06.01T09:30:00", "2026.06.01T09:31:00", data.null}),
-  hold: data.timespan({"1D09:30:00", "0D00:01:00", data.null}),
-  minute: data.minute({"09:30", "09:31", "15:59"}),
-  second: data.second({"09:30:00", "09:31:00", "15:59:00"}),
-  session_time: data.time({"09:30:00", "09:31:00", "15:59:00"}),
-  event_ts: data.timestamp({"2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", data.null}),
+  sym: data.symbols(["AAPL", "MSFT", "AAPL"]),
+  price: data.f64([100.5, 90.0, 101.0]),
+  size: data.i64([10, 15, 20]),
+  venue: data.strings(["XNAS", "XNYS", "XNAS"]),
+  active: data.bool([true, false, true]),
+  month: data.month(["2026.06", "2026.07", data.null]),
+  trade_date: data.date(["2026-06-01", "2026-06-01", data.null]),
+  local_dt: data.datetime(["2026.06.01T09:30:00", "2026.06.01T09:31:00", data.null]),
+  hold: data.timespan(["1D09:30:00", "0D00:01:00", data.null]),
+  minute: data.minute(["09:30", "09:31", "15:59"]),
+  second: data.second(["09:30:00", "09:31:00", "15:59:00"]),
+  session_time: data.time(["09:30:00", "09:31:00", "15:59:00"]),
+  event_ts: data.timestamp(["2026-06-01T09:30:00Z", "2026-06-01T09:31:00Z", data.null]),
 })
 
 check("frame length", trades.len == 3)
@@ -30,12 +30,12 @@ check("temporal null passthrough", trades.month[3] == data.null && trades.trade_
 row := trades:row(3)
 check("row materialization", row.sym == "AAPL" && row.size == 20 && row.active == true && row.trade_date == data.null && row.event_ts == data.null)
 
-subset := trades:gather({3, 1})
+subset := trades:gather([3, 1])
 check("gather preserves columns", subset.len == 2 && subset.sym[1] == "AAPL" && subset.price[2] == 100.5 && subset.event_ts[1] == data.null && subset.trade_date[2] == "2026-06-01")
 
 ok, err := pcall(data.frame, {
-  a: data.i64({1, 2}),
-  b: data.i64({1}),
+  a: data.i64([1, 2]),
+  b: data.i64([1]),
 })
 check("length diagnostics", ok == false && string.find(tostring(err), "column \"b\" length 1", 1, true) != nil)
 

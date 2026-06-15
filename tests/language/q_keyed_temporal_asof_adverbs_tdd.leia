@@ -86,28 +86,28 @@ trades := q.sql(
 )
 
 typed_events := data.frame({
-  id: data.i64({1, 2, 3}),
-  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
-  ts: data.timestamp({"2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z", "2026-06-06T09:30:00Z"}),
-  qty: data.f64({10.0, 20.0, 5.0}),
+  id: data.i64([1, 2, 3]),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
+  ts: data.timestamp(["2026-06-06T09:30:00Z", "2026-06-06T09:31:00Z", "2026-06-06T09:30:00Z"]),
+  qty: data.f64([10.0, 20.0, 5.0]),
 })
 typed_keyed := q.key_by(typed_events, "ts")
 typed_lookup_string := q.lookup(typed_keyed, "2026.06.06D09:31:00")
 typed_where_string := q.sql(typed_events, "select id,sym,ts from events where ts=\"2026-06-06T09:30:00Z\" order by id asc")
 typed_in_string := q.sql(typed_events, "select id,sym,ts from events where ts in (\"2026.06.06D09:30:00\" \"2026.06.06D09:31:00\") order by id asc")
 string_ts_events := data.frame({
-  id: data.i64({1, 2}),
-  ts: data.strings({"2026.06.06D09:30:00", "2026.06.06D09:32:00"}),
+  id: data.i64([1, 2]),
+  ts: data.strings(["2026.06.06D09:30:00", "2026.06.06D09:32:00"]),
 })
 typed_ts_ref := data.frame({
-  ts: data.timestamp({"2026-06-06T09:30:00Z"}),
-  bid: data.f64({100.0}),
+  ts: data.timestamp(["2026-06-06T09:30:00Z"]),
+  bid: data.f64([100.0]),
 })
 joined_temporal_key := q.sql("select id,ts,bid from events left join ref on ts order by id asc", {events: string_ts_events, ref: typed_ts_ref})
 string_sym_trades := data.frame({
-  trade_id: data.i64({1, 2}),
-  sym: data.strings({"AAPL", "MSFT"}),
-  ts: data.timestamp({"2026-06-06T09:30:30Z", "2026-06-06T09:30:30Z"}),
+  trade_id: data.i64([1, 2]),
+  sym: data.strings(["AAPL", "MSFT"]),
+  ts: data.timestamp(["2026-06-06T09:30:30Z", "2026-06-06T09:30:30Z"]),
 })
 asof_partition_coerced := q.sql(
   "select trade_id,sym,ts,bid from trades asof join quotes on sym,ts order by trade_id asc",
@@ -174,7 +174,7 @@ venue_keyed := q.key_by(venue_trades, "sym", "venue")
 venue_hit := q.lookup(venue_keyed, "AAPL", "XNYS")
 venue_hit_by_dict := q.lookup(venue_keyed, {sym: "AAPL", venue: "XNAS"})
 venue_hit_by_dict_extra := q.lookup(venue_keyed, {venue: "XNAS", ignored: 1, sym: "AAPL"})
-venue_hit_by_array := q.lookup(venue_keyed, {"AAPL", "XNAS"})
+venue_hit_by_array := q.lookup(venue_keyed, ["AAPL", "XNAS"])
 venue_miss := q.lookup(venue_keyed, "IBM", "XNYS")
 venue_missing_key_ok, venue_missing_key_err := pcall(func() {
   return q.lookup(venue_keyed, {sym: "AAPL"})

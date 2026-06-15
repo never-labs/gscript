@@ -10,29 +10,29 @@ func check(name, ok) {
 }
 
 left := data.frame({
-  sym: data.symbols({"AAPL", "MSFT"}),
-  qty: data.i64({10, 20}),
+  sym: data.symbols(["AAPL", "MSFT"]),
+  qty: data.i64([10, 20]),
 })
 
 right := data.frame({
-  sym: data.symbols({"AAPL", "NVDA"}),
-  qty: data.i64({1, 3}),
-  px: data.f64({100.0, 300.0}),
+  sym: data.symbols(["AAPL", "NVDA"]),
+  qty: data.i64([1, 3]),
+  px: data.f64([100.0, 300.0]),
 })
 
 dup_left := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "MSFT"}),
-  id: data.i64({1, 2, 3}),
+  sym: data.symbols(["AAPL", "AAPL", "MSFT"]),
+  id: data.i64([1, 2, 3]),
 })
 
 dup_right := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "NVDA"}),
-  venue: data.strings({"XNYS", "XNAS", "BATS"}),
+  sym: data.symbols(["AAPL", "AAPL", "NVDA"]),
+  venue: data.strings(["XNYS", "XNAS", "BATS"]),
 })
 
 venue_regions := data.frame({
-  venue: data.strings({"XNYS", "XNAS"}),
-  region: data.symbols({"east", "west"}),
+  venue: data.strings(["XNYS", "XNAS"]),
+  region: data.symbols(["east", "west"]),
 })
 
 inner_dups := q.sql(
@@ -56,15 +56,15 @@ inner_distinct_take := q.sql(
 )
 
 alias_left := data.frame({
-  id: data.i64({1, 2, 3}),
-  acct: data.symbols({"a1", "a1", "a2"}),
-  venue: data.strings({"XNYS", "XNAS", "BATS"}),
+  id: data.i64([1, 2, 3]),
+  acct: data.symbols(["a1", "a1", "a2"]),
+  venue: data.strings(["XNYS", "XNAS", "BATS"]),
 })
 
 alias_right := data.frame({
-  account: data.symbols({"a1", "a1", "a3"}),
-  exchange: data.strings({"XNYS", "XNAS", "ARCX"}),
-  label: data.strings({"nyse", "nasdaq", "arca"}),
+  account: data.symbols(["a1", "a1", "a3"]),
+  exchange: data.strings(["XNYS", "XNAS", "ARCX"]),
+  label: data.strings(["nyse", "nasdaq", "arca"]),
 })
 
 inner_alias_keys := q.sql(
@@ -210,15 +210,15 @@ window_aggs := q.sql(
   {trades: trades, quotes: quotes}
 )
 edge_trades := data.frame({
-  trade_id: data.i64({10, 11, 12}),
-  sym: data.symbols({"AAPL", "AAPL", "AAPL"}),
-  ts: data.i64({10, 11, 20}),
+  trade_id: data.i64([10, 11, 12]),
+  sym: data.symbols(["AAPL", "AAPL", "AAPL"]),
+  ts: data.i64([10, 11, 20]),
 })
 edge_quotes := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "AAPL", "AAPL"}),
-  ts: data.i64({10, 10, 11, 30}),
-  bid: data.f64({100.0, nil, 110.0, 300.0}),
-  seq: data.i64({1, 2, 3, 4}),
+  sym: data.symbols(["AAPL", "AAPL", "AAPL", "AAPL"]),
+  ts: data.i64([10, 10, 11, 30]),
+  bid: data.f64([100.0, nil, 110.0, 300.0]),
+  seq: data.i64([1, 2, 3, 4]),
 })
 edge_windowed := q.sql(
   "select trade_id,sym,ts,bid,seq from edge_trades wj[0 0] edge_quotes on sym,ts order by trade_id asc",
@@ -229,14 +229,14 @@ edge_lasted := q.sql(
   {edge_trades: edge_trades, edge_quotes: edge_quotes}
 )
 partition_boundary_trades := data.frame({
-  trade_id: data.i64({20}),
-  sym: data.symbols({"MSFT"}),
-  ts: data.i64({11}),
+  trade_id: data.i64([20]),
+  sym: data.symbols(["MSFT"]),
+  ts: data.i64([11]),
 })
 partition_boundary_quotes := data.frame({
-  sym: data.symbols({"AAPL"}),
-  ts: data.i64({10}),
-  bid: data.f64({100.0}),
+  sym: data.symbols(["AAPL"]),
+  ts: data.i64([10]),
+  bid: data.f64([100.0]),
 })
 partition_boundary_window := q.sql(
   "select trade_id,sym,ts,bid from partition_boundary_trades wj[-10 0] partition_boundary_quotes on sym,ts",
