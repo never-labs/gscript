@@ -1012,6 +1012,16 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 				"symbol_count := q {\n" +
 				"count `AAPL`MSFT`NVDA\n" +
 				"}\n" +
+				"nested_forms := q {\n" +
+				"syms:`AAPL`MSFT\n" +
+				"f:{\n" +
+				"x+y\n" +
+				"}\n" +
+				".[f;(\n" +
+				"count syms;\n" +
+				"sum 4 5 6\n" +
+				")]\n" +
+				"}\n" +
 				"choice := q {$[1b;10;20]}\n" +
 				"bad_ok, bad_err := pcall(func() { return q {not-a-q-token} })\n"); err != nil {
 				t.Fatalf("Exec: %v", err)
@@ -1022,6 +1032,7 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 			assertGet(t, vm, "sum_interp", int64(10))
 			assertGet(t, vm, "squares", int64(285))
 			assertGet(t, vm, "symbol_count", int64(3))
+			assertGet(t, vm, "nested_forms", int64(17))
 			assertGet(t, vm, "choice", int64(10))
 			assertGet(t, vm, "bad_ok", false)
 			assertStringContains(t, vm, "bad_err", "q dialect:")

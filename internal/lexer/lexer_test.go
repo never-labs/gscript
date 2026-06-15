@@ -519,6 +519,19 @@ func TestQRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
 	})
 }
 
+func TestQRawSourceBlockAllowsNestedQForms(t *testing.T) {
+	input := "x := q {\nf:{\n x+y\n}\n.[f;(\n 2;\n 3\n)]\ncount `AAPL`MSFT\n}\ny := 1"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IDENT, Value: "x"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_RAW_BLOCK, Value: "f:{\n x+y\n}\n.[f;(\n 2;\n 3\n)]\ncount `AAPL`MSFT"},
+		{Type: TOKEN_IDENT, Value: "y"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_NUMBER, Value: "1"},
+	})
+}
+
 func TestQFailFastRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
 	input := "x := q! {+/1 2 3}"
 	expectTokens(t, input, []Token{
@@ -557,12 +570,12 @@ func TestQIdentifierBeforeControlFlowBlockIsNotRawSourceBlock(t *testing.T) {
 }
 
 func TestQRawSourceBlockIgnoresQLineCommentBraces(t *testing.T) {
-	input := "x := q {\n/ comment with }\n+/1 2 3\n}"
+	input := "x := q {\n/ comment with }\n/* block comment with } */\n+/1 2 3\n}"
 	expectTokens(t, input, []Token{
 		{Type: TOKEN_IDENT, Value: "x"},
 		{Type: TOKEN_DECLARE, Value: ":="},
 		{Type: TOKEN_IDENT, Value: "q"},
-		{Type: TOKEN_RAW_BLOCK, Value: "/ comment with }\n+/1 2 3"},
+		{Type: TOKEN_RAW_BLOCK, Value: "/ comment with }\n/* block comment with } */\n+/1 2 3"},
 	})
 }
 
