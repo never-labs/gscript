@@ -16,6 +16,7 @@ func BuildStats() *Table {
 	set("min", statsMin)
 	set("max", statsMax)
 	set("var", statsVar)
+	set("variance", statsVar)
 	set("std", statsStd)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)

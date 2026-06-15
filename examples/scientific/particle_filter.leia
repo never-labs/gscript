@@ -28,7 +28,7 @@ for t := 1; t <= #measurements; t++ {
 }
 
 estimate := stats.mean(particles)
-variance := stats["var"](particles)
+variance := stats.variance(particles)
 spread := stats.std(particles)
 last_measurement := measurements[#measurements]
 q_checksum := q.eval("+/1 2 3")

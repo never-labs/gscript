@@ -20,6 +20,7 @@ func BuildLinalg() *Table {
 	set("zeros", linalgZeros)
 	set("eye", linalgEye)
 	set("diag", linalgDiag)
+	set("at", linalgAt)
 	set("get", linalgGet)
 	set("set", linalgSet)
 	set("add", linalgAdd)
@@ -173,6 +174,47 @@ func linalgGet(args []Value) ([]Value, error) {
 		return nil, err
 	}
 	i, err := linalgIndex("linalg.get", args[1], len(values))
+	if err != nil {
+		return nil, err
+	}
+	return []Value{FloatValue(values[i])}, nil
+}
+
+func linalgAt(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("linalg.at: need value and index")
+	}
+	if rows, cols, values, ok, err := linalgMatrixValue("linalg.at", args[0]); err != nil {
+		return nil, err
+	} else if ok {
+		if len(args) >= 3 {
+			r, c, err := linalgIndex2("linalg.at", args[1], args[2], rows, cols)
+			if err != nil {
+				return nil, err
+			}
+			return []Value{FloatValue(values[r*cols+c])}, nil
+		}
+		if cols == 1 {
+			i, err := linalgIndex("linalg.at", args[1], rows)
+			if err != nil {
+				return nil, err
+			}
+			return []Value{FloatValue(values[i*cols])}, nil
+		}
+		if rows == 1 {
+			i, err := linalgIndex("linalg.at", args[1], cols)
+			if err != nil {
+				return nil, err
+			}
+			return []Value{FloatValue(values[i])}, nil
+		}
+		return nil, fmt.Errorf("linalg.at: matrix access needs row and col unless matrix is a row or column vector")
+	}
+	values, err := linalgVectorValue("linalg.at", args[0])
+	if err != nil {
+		return nil, err
+	}
+	i, err := linalgIndex("linalg.at", args[1], len(values))
 	if err != nil {
 		return nil, err
 	}

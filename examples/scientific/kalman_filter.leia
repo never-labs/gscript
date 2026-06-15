@@ -17,7 +17,7 @@ for i := 1; i <= #measurements; i++ {
     x_pred := linalg.matmul(F, x)
     P_pred := linalg.add(linalg.sandwich(F, P), Q)
 
-    z := linalg.matrix({{measurements[i]}})
+    z := linalg.col(measurements[i])
     y := linalg.sub(z, linalg.matmul(H, x_pred))
     S := linalg.add(linalg.chainmul(H, P_pred, linalg.transpose(H)), 0.04)
     K := linalg.solve_right(linalg.matmul(P_pred, linalg.transpose(H)), S)
@@ -28,8 +28,8 @@ for i := 1; i <= #measurements; i++ {
 }
 
 innovation_rmse := stats.rms(innovations)
-position := linalg.get(x, 1, 1)
-velocity := linalg.get(x, 2, 1)
+position := linalg.at(x, 1)
+velocity := linalg.at(x, 2)
 uncertainty_trace := linalg.trace(P)
 q_checksum := q.eval("+/1 2 3")
 
