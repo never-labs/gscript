@@ -20,12 +20,12 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.col", "linalg.sandwich", "linalg.chainmul", "linalg.solve_right", "linalg.scalar", "linalg.matmul", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.sandwich", "linalg.rsolve", "linalg.T", "linalg.matmul", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "rand.normal_vec", "linalg.add", "stats.uniform_weights", "stats.log_normal_pdf", "stats.normalize_log_weights", "stats.resample_if", "stats.mean", "stats.variance", "stats.std", "math.near", "q {"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "linalg.add", "linalg.sub", "stats.uniform_weights", "stats.logpdf", "stats.normalize_log_weights", "stats.resample_if", "stats.mean", "stats.variance", "stats.std", "math.near", "q {"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),

@@ -5,20 +5,23 @@
 rand.seed(314159)
 
 N := 64
-particles := rand.normal_vec(N, 0.0, 0.8)
+prior := stats.normal(0.0, 0.8)
+process_noise := stats.normal(0.0, 0.04)
+sensor_noise := stats.normal(0.0, 0.18)
+
+particles := rand.sample(prior, N)
 weights := stats.uniform_weights(N)
 
 measurements := {0.58, 1.05, 1.53, 1.95}
-process_sigma := 0.04
-sensor_sigma := 0.18
 did_resample := false
 ess := 0.0
 resample_idx := {}
 
 for t := 1; t <= #measurements; t++ {
-    noise := rand.normal_vec(N, 0.0, process_sigma)
+    noise := rand.sample(process_noise, N)
     particles = linalg.add(particles, noise, 0.50)
-    log_weights := stats.log_normal_pdf(particles, measurements[t], sensor_sigma)
+    residual := linalg.sub(particles, measurements[t])
+    log_weights := stats.logpdf(sensor_noise, residual)
     weights = stats.normalize_log_weights(log_weights)
     particles, weights, did_resample, ess, resample_idx = stats.resample_if(particles, weights, 0.6, 0.5)
     assert(ess > 0)

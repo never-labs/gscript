@@ -9,7 +9,7 @@ Q := linalg.scale(linalg.eye(2), 0.01)
 I := linalg.eye(2)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
-x := linalg.col(0.0, 1.0)
+x := linalg.vector(0.0, 1.0)
 P := linalg.scale(linalg.eye(2), 1.0)
 innovations := {}
 
@@ -17,14 +17,14 @@ for i := 1; i <= #measurements; i++ {
     x_pred := linalg.matmul(F, x)
     P_pred := linalg.add(linalg.sandwich(F, P), Q)
 
-    z := linalg.col(measurements[i])
+    z := linalg.vector(measurements[i])
     y := linalg.sub(z, linalg.matmul(H, x_pred))
-    S := linalg.add(linalg.chainmul(H, P_pred, linalg.transpose(H)), 0.04)
-    K := linalg.solve_right(linalg.matmul(P_pred, linalg.transpose(H)), S)
+    S := linalg.add(linalg.matmul(H, P_pred, linalg.T(H)), 0.04)
+    K := linalg.rsolve(linalg.matmul(P_pred, linalg.T(H)), S)
 
     x = linalg.add(x_pred, linalg.matmul(K, y))
     P = linalg.matmul(linalg.sub(I, linalg.matmul(K, H)), P_pred)
-    innovations[i] = linalg.scalar(y)
+    innovations[i] = y[1]
 }
 
 innovation_rmse := stats.rms(innovations)

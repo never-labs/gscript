@@ -279,7 +279,42 @@ func BuildRand() *Table {
 	})
 
 	// rand.sample(table, n) - sample n unique elements from an array-like table
+	// rand.sample(distribution[, n]) - sample scalar or dense vector from a distribution
 	set("sample", func(args []Value) ([]Value, error) {
+		if len(args) >= 1 && statsIsDistributionValue(args[0]) {
+			dist, err := statsDistributionFromValue("rand.sample", args[0])
+			if err != nil {
+				return nil, err
+			}
+			switch dist.name {
+			case "normal":
+				if len(args) == 1 {
+					v, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
+					if err != nil {
+						return nil, fmt.Errorf("rand.sample: %s", err)
+					}
+					return []Value{FloatValue(v)}, nil
+				}
+				if err := requireNumber("rand.sample", 2, args[1]); err != nil {
+					return nil, err
+				}
+				n := int(toInt(args[1]))
+				if n < 0 {
+					return nil, fmt.Errorf("bad argument #2 to 'rand.sample' (non-negative count expected)")
+				}
+				out := make([]float64, n)
+				for i := range out {
+					v, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
+					if err != nil {
+						return nil, fmt.Errorf("rand.sample: %s", err)
+					}
+					out[i] = v
+				}
+				return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+			default:
+				return nil, fmt.Errorf("rand.sample: unsupported distribution %q", dist.name)
+			}
+		}
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad arguments to 'rand.sample' (table and count expected)")
 		}

@@ -10,6 +10,15 @@ func randInterp(t *testing.T, src string) *Interpreter {
 	return runWithLib(t, src, "rand", BuildRand())
 }
 
+func randStatsInterp(t *testing.T, src string) *Interpreter {
+	t.Helper()
+	interp := New()
+	installTestModule(interp, "rand", TableValue(BuildRand()))
+	installTestModule(interp, "stats", TableValue(BuildStats()))
+	execOnInterp(t, interp, src)
+	return interp
+}
+
 // ==================================================================
 // rand.seed tests
 // ==================================================================
@@ -368,6 +377,24 @@ func TestRandSampleMoreThanLength(t *testing.T) {
 	if countV.Int() != 3 {
 		t.Errorf("sample with n > length should clamp to length, got %d", countV.Int())
 	}
+}
+
+func TestRandSampleNormalDistribution(t *testing.T) {
+	interp := randStatsInterp(t, `
+		dist := stats.normal(10, 0.5)
+		rand.seed(42)
+		scalar := rand.sample(dist)
+		rand.seed(42)
+		scalar_again := rand.sample(dist)
+		rand.seed(42)
+		values := rand.sample(dist, 4)
+	`)
+	assertFloat(t, interp.GetGlobal("scalar"), toFloat(interp.GetGlobal("scalar_again")))
+	values := interp.GetGlobal("values")
+	if !values.IsDenseArray() || values.DenseArray().Len() != 4 {
+		t.Fatalf("values = %v, want dense array length 4", values)
+	}
+	assertTableFloat(t, values, 4, 10.622007507538102)
 }
 
 // ==================================================================

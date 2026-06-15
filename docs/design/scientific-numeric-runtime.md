@@ -170,12 +170,19 @@ The current standard-library surface intentionally favors reusable pieces over
 example-specific shortcuts:
 
 - `math.near` for tolerance checks.
-- `linalg.affine` for scaled vector/matrix updates.
+- `linalg.affine`, `linalg.axpy`, and `linalg.add_scaled` for scaled
+  vector/matrix updates.
 - `linalg.at` for shape-friendly vector, row, column, and matrix access.
-- `stats.variance`, `stats.log_normal_pdf`, `stats.normalize_log_weights`, and
-  `stats.resample_if` for sequential Monte Carlo code.
+- `linalg.matmul` as a variadic matrix-chain facade that also supports
+  matrix-vector tails, plus `linalg.T`/`linalg.t` and `linalg.vec` for compact
+  linear algebra.
+- `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.variance`,
+  `stats.normalize_log_weights`, and `stats.resample_if` for distribution-aware
+  sequential Monte Carlo code.
+- `rand.sample(distribution[, n])` for scalar or dense-vector draws from
+  reusable distribution objects.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
 - `ode.integrate` and `ode.solve` for RK4-style simulation with projection,
-  observation hooks, and result-object access.
+  scalar or table-shaped observation hooks, and result-object access.
 - `q { ... }` raw blocks for compact q snippets without quoted source strings.

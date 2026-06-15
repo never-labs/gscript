@@ -2,6 +2,7 @@ package bind
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -460,6 +461,126 @@ func TestODESolveWrapsObservedWithoutTrajectory(t *testing.T) {
 	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(1), 0.25)
 	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(2), 0.5)
 	assertFloat(t, result.RawGetString("observed").Table().RawGetInt(3), 0.75)
+}
+
+func TestODESolveAggregatesTableObserveFields(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0]}))}, nil
+		case "test.observe":
+			step := args[1].Number()
+			tm := args[2].Number()
+			return []Value{TableValue(controlTestOptions(map[string]Value{
+				"theta":  FloatValue(state[0]),
+				"energy": FloatValue(state[0]*state[0] + step + tm),
+			}))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":      FloatValue(0.25),
+			"steps":   IntValue(3),
+			"observe": FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed := got[0].Table().RawGetString("observed").Table()
+	if !observed.RawGetInt(1).IsNil() {
+		t.Fatalf("observed should be table-of-vectors, got sequence-like %v", observed.RawGetInt(1))
+	}
+	assertFloat(t, observed.RawGetString("theta").Table().RawGetInt(1), 0.25)
+	assertFloat(t, observed.RawGetString("theta").Table().RawGetInt(2), 0.5)
+	assertFloat(t, observed.RawGetString("theta").Table().RawGetInt(3), 0.75)
+	assertFloat(t, observed.RawGetString("energy").Table().RawGetInt(1), 1.3125)
+	assertFloat(t, observed.RawGetString("energy").Table().RawGetInt(2), 2.75)
+	assertFloat(t, observed.RawGetString("energy").Table().RawGetInt(3), 4.3125)
+}
+
+func TestODESolveRejectsInconsistentTableObserveFields(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0]}))}, nil
+		case "test.observe":
+			step := args[1].Int()
+			values := map[string]Value{"theta": FloatValue(state[0])}
+			if step == 2 {
+				values["energy"] = FloatValue(1)
+			}
+			return []Value{TableValue(controlTestOptions(values))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	_, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":      FloatValue(0.25),
+			"steps":   IntValue(2),
+			"observe": FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err == nil || !strings.Contains(err.Error(), `added field "energy"`) {
+		t.Fatalf("ode.solve inconsistent observe error = %v, want added field error", err)
+	}
+}
+
+func TestODESolveRejectsChangedTableObserveFieldType(t *testing.T) {
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		name := fn.GoFunction().Name
+		state, err := odeVectorFromValue(args[0], "test state")
+		if err != nil {
+			return nil, err
+		}
+		switch name {
+		case "test.dyn":
+			return []Value{DenseArrayValue(NewDenseArrayF64([]float64{1 + 0*state[0]}))}, nil
+		case "test.observe":
+			value := Value(FloatValue(state[0]))
+			if args[1].Int() == 2 {
+				value = StringValue("bad")
+			}
+			return []Value{TableValue(controlTestOptions(map[string]Value{"theta": value}))}, nil
+		default:
+			t.Fatalf("unexpected function %s", name)
+			return nil, nil
+		}
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	_, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{0})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":      FloatValue(0.25),
+			"steps":   IntValue(2),
+			"observe": FunctionValue(&GoFunction{Name: "test.observe"}),
+		})),
+	})
+	if err == nil || !strings.Contains(err.Error(), `field "theta" changed type at step 2`) {
+		t.Fatalf("ode.solve changed observe type error = %v, want changed type error", err)
+	}
 }
 
 func TestODESolveAcceptsIntegrateStyleArguments(t *testing.T) {

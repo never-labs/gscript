@@ -84,6 +84,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			states = NewAppendArrayTable(steps)
 		}
 		var observations *Table
+		var observationVectors *odeObservationVectors
 		if hasObserve {
 			observations = NewAppendArrayTable(steps)
 		}
@@ -120,7 +121,22 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 				if len(observed) == 0 {
 					return nil, fmt.Errorf("ode.integrate: observe returned no value")
 				}
-				observations.RawSetInt(int64(i+1), observed[0])
+				if observed[0].IsTable() {
+					if observationVectors == nil {
+						if i != 0 {
+							return nil, fmt.Errorf("ode.integrate: observe returned table at step %d after scalar observations", i+1)
+						}
+						observationVectors = newODEObservationVectors(observations)
+					}
+					if err := observationVectors.append(observed[0].Table(), i+1); err != nil {
+						return nil, err
+					}
+				} else {
+					if observationVectors != nil {
+						return nil, fmt.Errorf("ode.integrate: observe returned scalar at step %d after table observations", i+1)
+					}
+					observations.RawSetInt(int64(i+1), observed[0])
+				}
 			}
 		}
 		final := odeStateValue(current)
@@ -248,6 +264,80 @@ func odeVectorFromValue(v Value, name string) ([]float64, error) {
 
 func odeStateValue(state []float64) Value {
 	return DenseArrayValue(NewDenseArrayF64Owned(append([]float64(nil), state...)))
+}
+
+type odeObservationVectors struct {
+	out   *Table
+	keys  []string
+	cols  map[string]*Table
+	kinds map[string]string
+}
+
+func newODEObservationVectors(out *Table) *odeObservationVectors {
+	return &odeObservationVectors{
+		out:   out,
+		cols:  map[string]*Table{},
+		kinds: map[string]string{},
+	}
+}
+
+func (o *odeObservationVectors) append(observed *Table, step int) error {
+	if step == 1 {
+		for _, key := range observed.PairsKeysSnapshot() {
+			if !key.IsString() {
+				return fmt.Errorf("ode.integrate: observe table key at step %d must be a string, got %s", step, key.TypeName())
+			}
+			name := key.Str()
+			value := observed.RawGetString(name)
+			if value.IsNil() {
+				continue
+			}
+			col := NewAppendArrayTable(0)
+			col.RawSetInt(int64(step), value)
+			o.keys = append(o.keys, name)
+			o.cols[name] = col
+			o.kinds[name] = odeObservationValueKind(value)
+			o.out.RawSetString(name, TableValue(col))
+		}
+		if len(o.keys) == 0 {
+			return fmt.Errorf("ode.integrate: observe table at step %d has no string fields", step)
+		}
+		return nil
+	}
+	seen := make(map[string]bool, len(o.keys))
+	for _, key := range observed.PairsKeysSnapshot() {
+		if !key.IsString() {
+			return fmt.Errorf("ode.integrate: observe table key at step %d must be a string, got %s", step, key.TypeName())
+		}
+		name := key.Str()
+		value := observed.RawGetString(name)
+		if value.IsNil() {
+			continue
+		}
+		col := o.cols[name]
+		if col == nil {
+			return fmt.Errorf("ode.integrate: observe table at step %d added field %q not present at step 1", step, name)
+		}
+		kind := odeObservationValueKind(value)
+		if kind != o.kinds[name] {
+			return fmt.Errorf("ode.integrate: observe table field %q changed type at step %d: got %s, want %s", name, step, kind, o.kinds[name])
+		}
+		col.RawSetInt(int64(step), value)
+		seen[name] = true
+	}
+	for _, name := range o.keys {
+		if !seen[name] {
+			return fmt.Errorf("ode.integrate: observe table at step %d missing field %q from step 1", step, name)
+		}
+	}
+	return nil
+}
+
+func odeObservationValueKind(value Value) string {
+	if value.IsNumber() {
+		return "number"
+	}
+	return value.TypeName()
 }
 
 func odeAddScaled(a, b []float64, scale float64) []float64 {

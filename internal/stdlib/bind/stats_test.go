@@ -74,6 +74,32 @@ rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 	assertFloat(t, interp.GetGlobal("rmse"), 1.1547005383792515)
 }
 
+func TestStatsDistributionFacadeNormalPDF(t *testing.T) {
+	interp := statsInterp(t, `
+dist := stats.normal(0, 1)
+dist_kind := dist.kind
+dist_name := dist.name
+dist_mean := dist.mean
+dist_sigma := dist.sigma
+pdf0 := stats.pdf(dist, 0)
+pdfs := stats.pdf(dist, {0, 1})
+log_pdf0 := stats.logpdf(dist, 0)
+log_pdfs := stats.logpdf(dist, {0, 1})
+`)
+	if got := interp.GetGlobal("dist_kind"); !got.IsString() || got.Str() != "distribution" {
+		t.Fatalf("dist.kind = %v, want distribution", got)
+	}
+	if got := interp.GetGlobal("dist_name"); !got.IsString() || got.Str() != "normal" {
+		t.Fatalf("dist.name = %v, want normal", got)
+	}
+	assertFloat(t, interp.GetGlobal("dist_mean"), 0)
+	assertFloat(t, interp.GetGlobal("dist_sigma"), 1)
+	assertFloat(t, interp.GetGlobal("pdf0"), 0.3989422804014327)
+	assertTableFloat(t, interp.GetGlobal("pdfs"), 2, 0.24197072451914337)
+	assertFloat(t, interp.GetGlobal("log_pdf0"), -0.9189385332046727)
+	assertTableFloat(t, interp.GetGlobal("log_pdfs"), 2, -1.4189385332046727)
+}
+
 func TestStatsSystematicResample(t *testing.T) {
 	interp := statsInterp(t, `
 indices := stats.systematic_resample({0.1, 0.2, 0.7}, 0.5)

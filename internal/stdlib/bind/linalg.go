@@ -14,6 +14,7 @@ func BuildLinalg() *Table {
 	}
 
 	set("vector", linalgVector)
+	set("vec", linalgVec)
 	set("row", linalgRow)
 	set("col", linalgCol)
 	set("matrix", linalgMatrix)
@@ -29,12 +30,16 @@ func BuildLinalg() *Table {
 	set("div", linalgDiv)
 	set("scale", linalgScale)
 	set("affine", linalgAffine)
+	set("axpy", linalgAXPY)
+	set("add_scaled", linalgAXPY)
 	set("dot", linalgDot)
 	set("matvec", linalgMatvec)
 	set("matmul", linalgMatmul)
 	set("chainmul", linalgChainmul)
 	set("sandwich", linalgSandwich)
 	set("transpose", linalgTranspose)
+	set("T", linalgTranspose)
+	set("t", linalgTranspose)
 	set("trace", linalgTrace)
 	set("scalar", linalgScalar)
 	set("norm", linalgNorm)
@@ -51,6 +56,18 @@ func linalgVector(args []Value) ([]Value, error) {
 		return nil, err
 	}
 	stddata.RecordLinalgVectorKernel("LinalgVectorConstruct", "construct", len(values))
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(values))}, nil
+}
+
+func linalgVec(args []Value) ([]Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("linalg.vec: need one vector-like value")
+	}
+	values, err := linalgVectorLikeValue("linalg.vec", args[0])
+	if err != nil {
+		return nil, err
+	}
+	stddata.RecordLinalgVectorKernel("LinalgVectorConstruct", "vec", len(values))
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(values))}, nil
 }
 
@@ -323,6 +340,25 @@ func linalgAffine(args []Value) ([]Value, error) {
 	return linalgAffineOperands(base, delta, baseScale, deltaScale)
 }
 
+func linalgAXPY(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("linalg.axpy: need base, scale, delta")
+	}
+	base, err := linalgPointwiseDecode("linalg.axpy", args[0])
+	if err != nil {
+		return nil, err
+	}
+	scale, err := linalgNumber("linalg.axpy", args[1])
+	if err != nil {
+		return nil, err
+	}
+	delta, err := linalgPointwiseDecode("linalg.axpy", args[2])
+	if err != nil {
+		return nil, err
+	}
+	return linalgAffineOperands(base, delta, 1, scale)
+}
+
 func linalgAffineOperands(base, delta linalgPointwiseOperand, baseScale, deltaScale float64) ([]Value, error) {
 	switch {
 	case base.kind == "matrix" || delta.kind == "matrix":
@@ -403,7 +439,7 @@ func linalgMatvec(args []Value) ([]Value, error) {
 
 func linalgMatmul(args []Value) ([]Value, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("linalg.matmul: need two matrices")
+		return nil, fmt.Errorf("linalg.matmul: need at least two operands")
 	}
 	ar, ac, a, ok, err := linalgMatrixValue("linalg.matmul", args[0])
 	if err != nil {
@@ -412,18 +448,33 @@ func linalgMatmul(args []Value) ([]Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("linalg.matmul: argument 1 must be a matrix")
 	}
-	br, bc, b, ok, err := linalgMatrixValue("linalg.matmul", args[1])
-	if err != nil {
-		return nil, err
+	rows, cols, values := ar, ac, a
+	for i := 1; i < len(args); i++ {
+		br, bc, b, ok, err := linalgMatrixValue("linalg.matmul", args[i])
+		if err != nil {
+			return nil, err
+		}
+		if !ok && i == len(args)-1 {
+			v, err := linalgVectorValue("linalg.matmul", args[i])
+			if err != nil {
+				return nil, err
+			}
+			if len(v) != cols {
+				return nil, fmt.Errorf("linalg.matmul: dimension mismatch at argument %d", i+1)
+			}
+			out := stddata.LinalgF64Matvec(rows, cols, values, v)
+			return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+		}
+		if !ok {
+			return nil, fmt.Errorf("linalg.matmul: argument %d must be a matrix", i+1)
+		}
+		if cols != br {
+			return nil, fmt.Errorf("linalg.matmul: dimension mismatch at argument %d", i+1)
+		}
+		values = stddata.LinalgF64Matmul(rows, cols, bc, values, b)
+		cols = bc
 	}
-	if !ok {
-		return nil, fmt.Errorf("linalg.matmul: argument 2 must be a matrix")
-	}
-	if ac != br {
-		return nil, fmt.Errorf("linalg.matmul: dimension mismatch")
-	}
-	out := stddata.LinalgF64Matmul(ar, ac, bc, a, b)
-	return []Value{linalgMatrixDenseValue(ar, bc, out)}, nil
+	return []Value{linalgMatrixDenseValue(rows, cols, values)}, nil
 }
 
 func linalgChainmul(args []Value) ([]Value, error) {
@@ -783,6 +834,26 @@ func linalgVectorValue(name string, value Value) ([]float64, error) {
 		return nil, fmt.Errorf("%s: expected vector table or dense array, got %s", name, value.TypeName())
 	}
 	return linalgNumericTable(name, value)
+}
+
+func linalgVectorLikeValue(name string, value Value) ([]float64, error) {
+	if rows, cols, values, ok, err := linalgMatrixValue(name, value); err != nil {
+		return nil, err
+	} else if ok {
+		switch {
+		case rows == 1:
+			return values[:cols:cols], nil
+		case cols == 1:
+			out := make([]float64, rows)
+			for r := 0; r < rows; r++ {
+				out[r] = values[r*cols]
+			}
+			return out, nil
+		default:
+			return nil, fmt.Errorf("%s: expected vector or row/column matrix, got %dx%d matrix", name, rows, cols)
+		}
+	}
+	return linalgVectorValue(name, value)
 }
 
 func linalgMatrixValue(name string, value Value) (int, int, []float64, bool, error) {

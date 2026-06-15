@@ -20,6 +20,9 @@ func BuildStats() *Table {
 	set("std", statsStd)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
+	set("normal", statsNormal)
+	set("pdf", statsPDF)
+	set("logpdf", statsLogPDF)
 	set("normal_pdf", statsNormalPDF)
 	set("log_normal_pdf", statsLogNormalPDF)
 	set("normalize_weights", statsNormalizeWeights)
@@ -161,22 +164,7 @@ func statsNormalPDF(args []Value) ([]Value, error) {
 	if stddev <= 0 {
 		return nil, fmt.Errorf("stats.normal_pdf: stddev must be positive")
 	}
-	eval := func(x float64) float64 {
-		z := (x - mean) / stddev
-		return math.Exp(-0.5*z*z) / (stddev * math.Sqrt(2*math.Pi))
-	}
-	if args[0].IsNumber() {
-		return []Value{FloatValue(eval(toFloat(args[0])))}, nil
-	}
-	values, err := linalgVectorValue("stats.normal_pdf", args[0])
-	if err != nil {
-		return nil, err
-	}
-	out := make([]float64, len(values))
-	for i, v := range values {
-		out[i] = eval(v)
-	}
-	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	return statsNormalPDFValue("stats.normal_pdf", args[0], mean, stddev, false)
 }
 
 func statsLogNormalPDF(args []Value) ([]Value, error) {
@@ -194,15 +182,112 @@ func statsLogNormalPDF(args []Value) ([]Value, error) {
 	if stddev <= 0 {
 		return nil, fmt.Errorf("stats.log_normal_pdf: stddev must be positive")
 	}
-	logNorm := -math.Log(stddev) - 0.5*math.Log(2*math.Pi)
-	eval := func(x float64) float64 {
-		z := (x - mean) / stddev
-		return logNorm - 0.5*z*z
+	return statsNormalPDFValue("stats.log_normal_pdf", args[0], mean, stddev, true)
+}
+
+func statsNormal(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("stats.normal: need mean and sigma")
 	}
-	if args[0].IsNumber() {
-		return []Value{FloatValue(eval(toFloat(args[0])))}, nil
+	mean, err := linalgNumber("stats.normal", args[0])
+	if err != nil {
+		return nil, err
 	}
-	values, err := linalgVectorValue("stats.log_normal_pdf", args[0])
+	stddev, err := linalgNumber("stats.normal", args[1])
+	if err != nil {
+		return nil, err
+	}
+	if stddev <= 0 {
+		return nil, fmt.Errorf("stats.normal: sigma must be positive")
+	}
+	dist := NewTable()
+	dist.RawSetString("kind", StringValue("distribution"))
+	dist.RawSetString("name", StringValue("normal"))
+	dist.RawSetString("distribution", StringValue("normal"))
+	dist.RawSetString("mean", FloatValue(mean))
+	dist.RawSetString("sigma", FloatValue(stddev))
+	dist.RawSetString("stddev", FloatValue(stddev))
+	return []Value{TableValue(dist)}, nil
+}
+
+func statsPDF(args []Value) ([]Value, error) {
+	return statsDistributionPDF("stats.pdf", args, false)
+}
+
+func statsLogPDF(args []Value) ([]Value, error) {
+	return statsDistributionPDF("stats.logpdf", args, true)
+}
+
+func statsDistributionPDF(fn string, args []Value, logPDF bool) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("%s: need distribution and x", fn)
+	}
+	dist, err := statsDistributionFromValue(fn, args[0])
+	if err != nil {
+		return nil, err
+	}
+	switch dist.name {
+	case "normal":
+		return statsNormalPDFValue(fn, args[1], dist.mean, dist.stddev, logPDF)
+	default:
+		return nil, fmt.Errorf("%s: unsupported distribution %q", fn, dist.name)
+	}
+}
+
+type statsDistribution struct {
+	name   string
+	mean   float64
+	stddev float64
+}
+
+func statsDistributionFromValue(fn string, v Value) (statsDistribution, error) {
+	if !v.IsTable() {
+		return statsDistribution{}, fmt.Errorf("%s: distribution expected, got %s", fn, v.TypeName())
+	}
+	tbl := v.Table()
+	if kind := tbl.RawGetString("kind"); !kind.IsString() || kind.Str() != "distribution" {
+		return statsDistribution{}, fmt.Errorf("%s: distribution expected", fn)
+	}
+	nameValue := tbl.RawGetString("distribution")
+	if nameValue.IsNil() {
+		nameValue = tbl.RawGetString("name")
+	}
+	if !nameValue.IsString() {
+		return statsDistribution{}, fmt.Errorf("%s: distribution name expected", fn)
+	}
+	switch name := nameValue.Str(); name {
+	case "normal":
+		mean, err := linalgNumber(fn, tbl.RawGetString("mean"))
+		if err != nil {
+			return statsDistribution{}, err
+		}
+		stddevValue := tbl.RawGetString("sigma")
+		if stddevValue.IsNil() {
+			stddevValue = tbl.RawGetString("stddev")
+		}
+		stddev, err := linalgNumber(fn, stddevValue)
+		if err != nil {
+			return statsDistribution{}, err
+		}
+		if stddev <= 0 {
+			return statsDistribution{}, fmt.Errorf("%s: normal sigma must be positive", fn)
+		}
+		return statsDistribution{name: name, mean: mean, stddev: stddev}, nil
+	default:
+		return statsDistribution{}, fmt.Errorf("%s: unsupported distribution %q", fn, name)
+	}
+}
+
+func statsIsDistributionValue(v Value) bool {
+	return v.IsTable() && v.Table().RawGetString("kind").IsString() && v.Table().RawGetString("kind").Str() == "distribution"
+}
+
+func statsNormalPDFValue(fn string, xValue Value, mean, stddev float64, logPDF bool) ([]Value, error) {
+	eval := statsNormalPDFEvaluator(mean, stddev, logPDF)
+	if xValue.IsNumber() {
+		return []Value{FloatValue(eval(toFloat(xValue)))}, nil
+	}
+	values, err := linalgVectorValue(fn, xValue)
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +296,18 @@ func statsLogNormalPDF(args []Value) ([]Value, error) {
 		out[i] = eval(v)
 	}
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
+func statsNormalPDFEvaluator(mean, stddev float64, logPDF bool) func(float64) float64 {
+	logNorm := -math.Log(stddev) - 0.5*math.Log(2*math.Pi)
+	return func(x float64) float64 {
+		z := (x - mean) / stddev
+		logDensity := logNorm - 0.5*z*z
+		if logPDF {
+			return logDensity
+		}
+		return math.Exp(logDensity)
+	}
 }
 
 func statsDiff(args []Value) ([]Value, error) {
