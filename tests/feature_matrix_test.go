@@ -1325,6 +1325,101 @@ func TestActiveDocsUseLeiaNamingAndNoLegacyAskAgentDesign(t *testing.T) {
 	}
 }
 
+func TestUserFacingLeiaSourcesPreferListLiteralsForSequences(t *testing.T) {
+	root := findRepoRoot(t)
+	scanRoots := []string{
+		"README.md",
+		"docs",
+		"examples",
+		"tests/llm",
+		"tests/integration/llm",
+		"tests/sdk",
+		"internal/stdlib/bind",
+	}
+	forbidden := []string{
+		`messages: {`,
+		`tools: {`,
+		`params: {"`,
+		`requires: {"`,
+		`capabilities: {"`,
+		`depends_on: {`,
+		`stages: {`,
+		`edges: {`,
+		`by: {"`,
+		`process.run({`,
+		`string.join({`,
+		`testkit.value({`,
+	}
+	skipSubstrings := []string{
+		"docs/spec/index.html",
+		"internal/stdlib/bind/table_",
+		"internal/stdlib/bind/q_bench",
+		"internal/stdlib/bind/q_runtime_kernel_bridge_test.go",
+	}
+	var offenders []string
+	for _, base := range scanRoots {
+		start := filepath.Join(root, filepath.FromSlash(base))
+		info, err := os.Stat(start)
+		if err != nil {
+			t.Fatalf("stat %s: %v", base, err)
+		}
+		visit := func(path string, entry os.DirEntry) {
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				t.Fatalf("rel %s: %v", path, err)
+			}
+			rel = filepath.ToSlash(rel)
+			for _, skip := range skipSubstrings {
+				if strings.Contains(rel, skip) {
+					return
+				}
+			}
+			ext := filepath.Ext(path)
+			if ext != ".md" && ext != ".leia" && ext != ".go" {
+				return
+			}
+			if strings.HasSuffix(rel, ".lua") {
+				return
+			}
+			data := readFileString(t, path)
+			for _, marker := range forbidden {
+				if strings.Contains(data, marker) {
+					offenders = append(offenders, rel+": positional sequence marker "+marker)
+				}
+			}
+		}
+		if !info.IsDir() {
+			visit(start, nil)
+			continue
+		}
+		err = filepath.WalkDir(start, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				rel, relErr := filepath.Rel(root, path)
+				if relErr != nil {
+					return relErr
+				}
+				rel = filepath.ToSlash(rel)
+				if strings.Contains(rel, "docs/archive") || strings.Contains(rel, "tests/language") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			visit(path, entry)
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", base, err)
+		}
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Fatalf("user-facing Leia sources must use [...] for sequence inputs:\n%s", strings.Join(offenders, "\n"))
+	}
+}
+
 func decodeRequiredString(t *testing.T, feature map[string]json.RawMessage, index int, field string) string {
 	t.Helper()
 	raw, ok := feature[field]
