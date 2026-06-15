@@ -113,15 +113,16 @@ print()
 // -------------------------------------------------------
 print("--- Cooperative Multitasking ---")
 
-// Task scheduler that round-robins between coroutines
+// Task scheduler that round-robins between explicit task steps.
 func scheduler() {
     tasks := []
     sched := {}
 
-    sched.addTask = func(name, fn) {
+    sched.addTask = func(name, steps) {
         append(tasks, {
             name: name,
-            co: coroutine.create(fn)
+            steps: steps,
+            next: 1
         })
     }
 
@@ -133,15 +134,14 @@ func scheduler() {
             task := tasks[1]
             table.remove(tasks, 1)
 
-            ok, msg := coroutine.resume(task.co)
-            status := coroutine.status(task.co)
-
+            msg := task.steps[task.next]
             if msg != nil {
                 print(string.format("    [step %d] %s: %s", step, task.name, tostring(msg)))
             }
+            task.next = task.next + 1
 
-            // If coroutine is still alive, put it back
-            if status == "suspended" {
+            // If the task still has work, put it back.
+            if task.next <= #task.steps {
                 append(tasks, task)
             } else {
                 print(string.format("    [step %d] %s: finished", step, task.name))
@@ -154,23 +154,9 @@ func scheduler() {
 
 sched := scheduler()
 
-sched.addTask("TaskA", func() {
-    coroutine.yield("working on step 1")
-    coroutine.yield("working on step 2")
-    coroutine.yield("working on step 3")
-})
-
-sched.addTask("TaskB", func() {
-    coroutine.yield("processing data")
-    coroutine.yield("saving results")
-})
-
-sched.addTask("TaskC", func() {
-    coroutine.yield("downloading")
-    coroutine.yield("parsing")
-    coroutine.yield("indexing")
-    coroutine.yield("complete")
-})
+sched.addTask("TaskA", ["working on step 1", "working on step 2", "working on step 3"])
+sched.addTask("TaskB", ["processing data", "saving results"])
+sched.addTask("TaskC", ["downloading", "parsing", "indexing", "complete"])
 
 sched.run()
 print()

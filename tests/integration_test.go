@@ -265,6 +265,7 @@ func TestExamples(t *testing.T) {
 		filepath.Join("..", "examples", "hello", "fib.leia"),
 		filepath.Join("..", "examples", "hello", "counter.leia"),
 		filepath.Join("..", "examples", "hello", "class.leia"),
+		filepath.Join("..", "examples", "hello", "coroutines.leia"),
 	}
 	for _, ex := range examples {
 		t.Run(filepath.Base(ex), func(t *testing.T) {
