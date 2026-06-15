@@ -6,52 +6,52 @@ func TestLLMPlanningGraphNormalizesValidatesAndTraces(t *testing.T) {
 	interp := runLLMTestProgram(t, `
 input := llm.plan_node("input", {
     node_type: "input"
-    trace_evidence: {"evt-input-completed"}
+    trace_evidence: ["evt-input-completed"]
 })
 expand := llm.planNode("expand", {
     node_type: "transform"
-    depends_on: {"input"}
+    depends_on: ["input"]
     retry_policy: {max_attempts: 2 retryable: true backoff: "fixed_fixture_ms"}
-    trace_evidence: {"evt-expand-attempt-1" "evt-expand-attempt-2"}
+    trace_evidence: ["evt-expand-attempt-1", "evt-expand-attempt-2"]
 })
 branch := llm.plan_node("branch", {
     node_type: "branch"
-    depends_on: {"expand"}
-    branches: {"collect" "validate"}
-    trace_evidence: {"evt-branch-selected"}
+    depends_on: ["expand"]
+    branches: ["collect", "validate"]
+    trace_evidence: ["evt-branch-selected"]
 })
 merge := llm.plan_node("merge", {
     node_type: "merge"
-    depends_on: {"branch"}
-    merge_policy: {mode: "all" required_inputs: {"collect" "validate"}}
-    trace_evidence: {"evt-merge-completed"}
+    depends_on: ["branch"]
+    merge_policy: {mode: "all" required_inputs: ["collect", "validate"]}
+    trace_evidence: ["evt-merge-completed"]
 })
 
-graph := llm.planning_graph({input, expand, branch, merge}, {
-    {from: "input" to: "expand" edge_type: "control"}
-    {from: "expand" to: "branch" edge_type: "branch"}
-    {from: "branch" to: "merge" edge_type: "merge"}
-}, {
+graph := llm.planning_graph([input, expand, branch, merge], [
+    {from: "input" to: "expand" edge_type: "control"},
+    {from: "expand" to: "branch" edge_type: "branch"},
+    {from: "branch" to: "merge" edge_type: "merge"},
+], {
     id: "generic-planning"
-    capability_refs: {"generic.planning.graph.define" "generic.planning.trace.evidence"}
+    capability_refs: ["generic.planning.graph.define", "generic.planning.trace.evidence"]
 })
 gate := llm.validate_planning_graph(graph)
-trace := llm.planning_trace(graph, {
-    {event_id: "evt-input-completed" evidence_kind: "plan.node.completed" plan_node_id: "input" status: "completed"}
-    {event_id: "evt-expand-attempt-1" evidence_kind: "plan.retry.attempt" plan_node_id: "expand" status: "retrying" attempt: 1}
-    {event_id: "evt-branch-selected" evidence_kind: "plan.branch.selected" plan_node_id: "branch" status: "completed" branches: {"collect" "validate"}}
-    {event_id: "evt-merge-completed" evidence_kind: "plan.merge.completed" plan_node_id: "merge" status: "completed" merged_inputs: {"collect" "validate"}}
-}, {run_id: "run-1" fixture_key: "planning:fixture"})
+trace := llm.planning_trace(graph, [
+    {event_id: "evt-input-completed" evidence_kind: "plan.node.completed" plan_node_id: "input" status: "completed"},
+    {event_id: "evt-expand-attempt-1" evidence_kind: "plan.retry.attempt" plan_node_id: "expand" status: "retrying" attempt: 1},
+    {event_id: "evt-branch-selected" evidence_kind: "plan.branch.selected" plan_node_id: "branch" status: "completed" branches: ["collect", "validate"]},
+    {event_id: "evt-merge-completed" evidence_kind: "plan.merge.completed" plan_node_id: "merge" status: "completed" merged_inputs: ["collect", "validate"]},
+], {run_id: "run-1" fixture_key: "planning:fixture"})
 
-bad_graph := llm.planningGraph({input, input}, {
+bad_graph := llm.planningGraph([input, input], [
     {from: "missing" to: "input" edge_type: "control"}
-}, {provider_free: false live_model: true})
+], {provider_free: false live_model: true})
 bad_gate := llm.validatePlanningGraph(bad_graph)
 
 missing_node_ok, missing_node_err := pcall(llm.plan_node)
 bad_node_opts_ok, bad_node_opts_err := pcall(llm.plan_node, "x", "opts")
 missing_graph_ok, missing_graph_err := pcall(llm.planning_graph)
-bad_graph_edges_ok, bad_graph_edges_err := pcall(llm.planning_graph, {}, "edges")
+bad_graph_edges_ok, bad_graph_edges_err := pcall(llm.planning_graph, [], "edges")
 missing_validate_ok, missing_validate_err := pcall(llm.validate_planning_graph)
 missing_trace_ok, missing_trace_err := pcall(llm.planning_trace)
 
