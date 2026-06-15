@@ -7,6 +7,7 @@ Leia supports DSL-native tagged dialects for compact host automation, data forma
 ## Forms
 
 ```leia
+name := "Leia"
 status := sh`git status --short`
 checked := sh!`printf checked`
 argv_checked := cmd!`printf checked`

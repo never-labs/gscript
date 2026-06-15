@@ -249,6 +249,7 @@ func generateDialectReferenceMarkdown() []byte {
 	fmt.Fprintln(&b, "## Forms")
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "```leia")
+	fmt.Fprintln(&b, "name := \"Leia\"")
 	fmt.Fprintln(&b, "status := sh`git status --short`")
 	fmt.Fprintln(&b, "checked := sh!`printf checked`")
 	fmt.Fprintln(&b, "argv_checked := cmd!`printf checked`")

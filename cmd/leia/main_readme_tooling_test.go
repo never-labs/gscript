@@ -133,6 +133,35 @@ func TestDocsHomeMainLeiaExampleStaysRunnable(t *testing.T) {
 	}
 }
 
+func TestReferenceDialectsIntroExampleStaysRunnable(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "dialects", "index.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snippet := readmeFirstLeiaSnippet(string(data))
+	if snippet == "" {
+		t.Fatal("docs/reference/dialects/index.md must contain a Leia example")
+	}
+	for _, want := range []string{"name := \"Leia\"", "sh`git status --short`", "json`{\"name\": ${name}}`", "agent {"} {
+		if !strings.Contains(snippet, want) {
+			t.Fatalf("dialects reference Leia example missing %q:\n%s", want, snippet)
+		}
+	}
+	file := filepath.Join(t.TempDir(), "dialects-reference.leia")
+	if err := os.WriteFile(file, []byte(snippet), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", "./cmd/leia", "run", file)
+	cmd.Dir = root
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("dialects reference Leia example failed: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+}
+
 func readmeFirstLeiaSnippet(readme string) string {
 	for _, marker := range []string{"```go", "````leia", "```leia"} {
 		start := strings.Index(readme, marker)
