@@ -334,7 +334,11 @@ func dialectQInterpolationNeedsBinding(v Value) bool {
 		return false
 	}
 	t := v.Table()
-	return qLooksLikeFrame(t) || qIsKeyedFrameTable(t)
+	if qLooksLikeFrame(t) || qIsKeyedFrameTable(t) {
+		return true
+	}
+	_, ok := qPlainStringDictionaryKeyOrder(t)
+	return ok
 }
 
 func dialectQInterpolationEnvName(index int) string {

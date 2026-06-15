@@ -26,13 +26,13 @@ estimate := summary.mean
 variance := summary.variance
 spread := summary.std
 last_measurement := measurements[#measurements]
-q_checksum := q {
-+/1 2 3
+q_value_mean := q {
+avg ${ensemble.values}
 }
 
 assert(math.near(estimate, last_measurement, 0.15))
 assert(math.near(spread, math.sqrt(variance), 0.000000001))
 assert(spread < 0.35)
-assert(q_checksum == 6)
+assert(math.near(q_value_mean, last_measurement, 0.25))
 
 print(string.format("ok particle n=%d estimate=%.3f measurement=%.3f spread=%.3f", N, estimate, last_measurement, spread))

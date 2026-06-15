@@ -7887,10 +7887,36 @@ func qWireValueFromValue(v Value) (any, error) {
 		}
 		return data.InferArray(out), nil
 	}
+	if array, ok, err := qWireSequenceTableFromValue(v); ok || err != nil {
+		return array, err
+	}
 	if scalar, ok := qWireScalarFromValue(v); ok {
 		return scalar, nil
 	}
 	return nil, fmt.Errorf("unsupported value type %v", v.Type())
+}
+
+func qWireSequenceTableFromValue(v Value) (data.Array, bool, error) {
+	if !v.IsTable() {
+		return nil, false, nil
+	}
+	t := v.Table()
+	if t.Length() == 0 {
+		return nil, false, nil
+	}
+	values := make([]any, t.Length())
+	for i := range values {
+		item := t.RawGetInt(int64(i + 1))
+		if item.IsNil() {
+			return nil, true, fmt.Errorf("sequence table missing index %d", i+1)
+		}
+		wire, err := qWireValueFromValue(item)
+		if err != nil {
+			return nil, true, err
+		}
+		values[i] = wire
+	}
+	return data.InferArray(values), true, nil
 }
 
 func qDictFromValue(v Value) (stdq.Dict, bool, error) {
@@ -7902,6 +7928,9 @@ func qDictFromValue(v Value) (stdq.Dict, bool, error) {
 		return stdq.Dict{}, false, nil
 	}
 	keys, ok := qDictionaryKeyOrder(tbl)
+	if !ok {
+		keys, ok = qPlainStringDictionaryKeyOrder(tbl)
+	}
 	if !ok {
 		return stdq.Dict{}, false, nil
 	}
@@ -7918,6 +7947,24 @@ func qDictFromValue(v Value) (stdq.Dict, bool, error) {
 		out.Values[i] = value
 	}
 	return out, true, nil
+}
+
+func qPlainStringDictionaryKeyOrder(tbl *Table) ([]data.Symbol, bool) {
+	if tbl == nil || tbl.Length() != 0 {
+		return nil, false
+	}
+	keys := make([]data.Symbol, 0)
+	tbl.ForEachPlainRaw(func(key, _ Value) bool {
+		if key.IsString() {
+			keys = append(keys, data.Symbol(key.Str()))
+		}
+		return true
+	})
+	if len(keys) == 0 {
+		return nil, false
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys, true
 }
 
 func qDenseArrayToDataArray(array *DenseArray) (data.Array, error) {

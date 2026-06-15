@@ -20,17 +20,17 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.eye(2, 0.01)", "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.eye(2, 0.01)", "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {", "+/${state.x}", "assert(math.near(q_state_sum, position + velocity, 0.000000001))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "stats.samples", "stats.observe", "stats.describe(ensemble)", "math.near", "q {"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "stats.samples", "stats.observe", "stats.describe(ensemble)", "math.near", "q {", "avg ${ensemble.values}", "assert(math.near(q_value_mean, last_measurement, 0.25))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.policy", "control.apply", "ode.solve", "state_names", "named_state", "x.theta", "x.omega", "wrap_angles", "final_state", "stats.describe_fields", "math.near", "q {"},
+			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.policy", "control.apply", "ode.solve", "state_names", "named_state", "x.theta", "x.omega", "wrap_angles", "final_state", "stats.describe_fields", "math.near", "q {", "avg ${observed}.energy", "assert(math.near(q_checksum, mean_energy, 0.000000001))"},
 		},
 	}
 	for _, tc := range cases {
@@ -65,6 +65,11 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "theta := control.wrap_angle") {
 				t.Fatalf("%s manually wraps controller angle instead of using policy wrap metadata", tc.rel)
+			}
+			for _, forbidden := range []string{"assert(q_checksum ==", "+/1 2 3", "+/raze ${F}"} {
+				if strings.Contains(text, forbidden) {
+					t.Fatalf("%s uses placeholder q checksum marker %q", tc.rel, forbidden)
+				}
 			}
 		})
 	}
