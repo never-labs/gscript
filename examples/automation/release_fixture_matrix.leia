@@ -96,7 +96,7 @@ for i := 1; i <= #test_cases; i++ {
         slowest_id = row.id
     }
 
-    matrix[#matrix + 1] = {
+    append(matrix, {
         id: tc.id,
         suite: tc.suite,
         owner: tc.owner,
@@ -106,7 +106,7 @@ for i := 1; i <= #test_cases; i++ {
         status: row.status,
         duration_ms: row.duration_ms,
         gate_ok: gate_ok,
-    }
+    })
 }
 
 table.sort(matrix, func(a, b) {
@@ -132,11 +132,11 @@ gate := {
     ok: failed <= tonumber(deploy_cfg.limits.max_failed_tests) && slowest_ms <= tonumber(deploy_cfg.limits.max_p95_ms),
 }
 
-owner_rows := {}
-owner_rows[#owner_rows + 1] = {Owner: "platform", Enabled: "1", Passed: "1", SlowestMs: "42"}
-owner_rows[#owner_rows + 1] = {Owner: "qa", Enabled: "1", Passed: "1", SlowestMs: "18"}
-owner_rows[#owner_rows + 1] = {Owner: "performance", Enabled: "1", Passed: "1", SlowestMs: "236"}
-owner_rows[#owner_rows + 1] = {Owner: "sre", Enabled: "0", Passed: "0", SlowestMs: "0"}
+owner_rows := []
+append(owner_rows, {Owner: "platform", Enabled: "1", Passed: "1", SlowestMs: "42"})
+append(owner_rows, {Owner: "qa", Enabled: "1", Passed: "1", SlowestMs: "18"})
+append(owner_rows, {Owner: "performance", Enabled: "1", Passed: "1", SlowestMs: "236"})
+append(owner_rows, {Owner: "sre", Enabled: "0", Passed: "0", SlowestMs: "0"})
 owner_table := dialect.eval("mdtable", owner_rows, {mode: "encode"})
 
 manifest := template {

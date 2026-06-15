@@ -79,11 +79,11 @@ incident_agent := llm.agent("incident_agent", incident_config, func(service, sev
 
     call := first.calls[1]
     evidence, dispatch_err := llm.dispatch(call, cfg.tools)
-    transcript[#transcript + 1] = msg.assistant_call(call)
+    append(transcript, msg.assistant_call(call))
     if dispatch_err != nil {
-        transcript[#transcript + 1] = msg.tool_error(call.id, dispatch_err.message)
+        append(transcript, msg.tool_error(call.id, dispatch_err.message))
     } else {
-        transcript[#transcript + 1] = msg.tool_result(call.id, evidence)
+        append(transcript, msg.tool_result(call.id, evidence))
     }
 
     final, final_err := llm.turn({

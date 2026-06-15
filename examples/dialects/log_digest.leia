@@ -19,9 +19,9 @@ for i := 1; i <= #events; i++ {
     message_words = message_words + #dialect.eval("words", event.message)
 }
 
-component_names := {}
+component_names := []
 for name, _ := range pairs(components) {
-    component_names[#component_names + 1] = name
+    append(component_names, name)
 }
 table.sort(component_names)
 
