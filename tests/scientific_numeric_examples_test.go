@@ -20,7 +20,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.eye(2, 0.01)", "stats.gaussian_state", "stats.linear_predict", "stats.linear_update", "state.innovation", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {", "+/${state.x}", "assert(math.near(q_state_sum, position + velocity, 0.000000001))"},
+			wantAPI: []string{"linalg.matrix", "linalg.row", "linalg.vector", "linalg.eye(2, 0.01)", "stats.gaussian_state", "stats.linear_filter", "filter.innovations", "filter.states", "linalg.trace", "linalg.at", "stats.rms", "math.near", "q {", "+/${state.x}", "assert(math.near(q_state_sum, position + velocity, 0.000000001))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
@@ -65,6 +65,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "theta := control.wrap_angle") {
 				t.Fatalf("%s manually wraps controller angle instead of using policy wrap metadata", tc.rel)
+			}
+			if strings.Contains(text, "state = stats.linear_predict") || strings.Contains(text, "state = stats.linear_update") {
+				t.Fatalf("%s manually spells out the linear Gaussian loop instead of using stats.linear_filter", tc.rel)
 			}
 			for _, forbidden := range []string{"assert(q_checksum ==", "+/1 2 3", "+/raze ${F}"} {
 				if strings.Contains(text, forbidden) {

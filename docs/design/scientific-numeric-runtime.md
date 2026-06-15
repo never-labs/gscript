@@ -186,9 +186,10 @@ example-specific shortcuts:
   `stats.describe_fields(table[, weights])`, and `stats.importance_update` for
   distribution-aware sequential Monte Carlo code and compact statistical
   summaries.
-- `stats.gaussian_state`, `stats.linear_predict`, and `stats.linear_update`
-  for reusable linear Gaussian state-space updates with diagnostics such as
-  innovation, innovation covariance, and gain.
+- `stats.gaussian_state`, `stats.linear_predict`, `stats.linear_update`, and
+  `stats.linear_filter` for reusable linear Gaussian state-space updates and
+  compact filter loops with diagnostics such as innovation, innovation
+  covariance, gain, and optional state trajectories.
 - `rand.sample(distribution[, n])` and `rand.add_noise(values,
   distribution[, drift])` for scalar draws, dense-vector draws, and noisy
   vector evolution from reusable distribution objects. `rand.add_noise` and

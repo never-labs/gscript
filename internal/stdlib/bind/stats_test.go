@@ -210,6 +210,7 @@ F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
 H := linalg.row(1.0, 0.0)
 Q := linalg.eye(2, 0.01)
 state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
+initial := state
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
 innovations := {}
 for i := 1; i <= #measurements; i++ {
@@ -217,15 +218,49 @@ for i := 1; i <= #measurements; i++ {
     state = stats.linear_update(state, H, measurements[i], 0.04)
     innovations[i] = state.innovation[1]
 }
+filtered := stats.linear_filter(initial, measurements, {F: F, H: H, Q: Q, R: 0.04, trajectory: true})
+facade_state := filtered.state
+facade_position := linalg.at(facade_state.x, 1)
+facade_velocity := linalg.at(facade_state.x, 2)
+facade_trace := linalg.trace(facade_state.P)
+facade_rmse := stats.rms(filtered.innovations)
+trajectory_len := #filtered.states
 position := linalg.at(state.x, 1)
 velocity := linalg.at(state.x, 2)
 trace := linalg.trace(state.P)
 rmse := stats.rms(innovations)
 row_state := stats.gaussian_state(linalg.row(1.0, 2.0), linalg.eye(2))
 col_state := stats.gaussian_state(linalg.matrix({{1.0}, {2.0}}), linalg.eye(2))
+aliased := stats.linear_filter(initial, measurements, {transition: F, observation: H, process_noise: Q, observation_noise: 0.04})
+aliased_position := linalg.at(aliased.state.x, 1)
+handmade := {kind: "gaussian_state", x: linalg.row(0.0, 1.0), P: linalg.eye(2)}
+handmade_next := stats.linear_filter(handmade, {1.0}, {F: F, H: H, Q: Q, R: 0.04})
+handmade_velocity := linalg.at(handmade_next.state.x, 2)
+H2 := linalg.eye(2)
+multi := stats.linear_filter(initial, {linalg.vector(1.0, 1.0), linalg.vector(2.0, 1.0)}, {F: F, H: H2, Q: Q, R: linalg.eye(2, 0.04)})
+multi_innovations := multi.innovations
 `)
 	assertNear(t, interp.GetGlobal("position"), 5.0, 0.05)
 	assertNear(t, interp.GetGlobal("velocity"), 1.0, 0.05)
+	assertNear(t, interp.GetGlobal("facade_position"), interp.GetGlobal("position").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("facade_velocity"), interp.GetGlobal("velocity").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("facade_trace"), interp.GetGlobal("trace").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("facade_rmse"), interp.GetGlobal("rmse").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("aliased_position"), interp.GetGlobal("position").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("handmade_velocity"), 1.0, 0.10)
+	if got := interp.GetGlobal("trajectory_len").Int(); got != 5 {
+		t.Fatalf("trajectory_len = %d, want 5", got)
+	}
+	if got := interp.GetGlobal("multi_innovations").Table().Length(); got != 2 {
+		t.Fatalf("multi innovations length = %d, want 2", got)
+	}
+	firstInnovation := interp.GetGlobal("multi_innovations").Table().RawGetInt(1)
+	if !firstInnovation.IsDenseArray() {
+		t.Fatalf("multi first innovation = %s, want dense array", firstInnovation.TypeName())
+	}
+	if got := firstInnovation.DenseArray().Len(); got != 2 {
+		t.Fatalf("multi first innovation length = %d, want 2", got)
+	}
 	if got := interp.GetGlobal("trace").Number(); got <= 0 || got >= 0.08 {
 		t.Fatalf("trace = %.12f, want in (0, 0.08)", got)
 	}
@@ -243,6 +278,12 @@ func TestStatsLinearGaussianRejectsShapeErrors(t *testing.T) {
 		`stats.linear_predict(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.matrix(1, 3, {1, 0, 0}), linalg.eye(1))`,
 		`stats.linear_update(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.eye(2), {1, 2}, 0.1)`,
 		`stats.linear_update(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.row(1, 0), {1, 2}, 0.1)`,
+		`stats.linear_filter(stats.gaussian_state({1, 2}, linalg.eye(2)), {1}, {H: linalg.row(1, 0), Q: linalg.eye(2), R: 0.1})`,
+		`stats.linear_filter(stats.gaussian_state({1, 2}, linalg.eye(2)), {}, {F: linalg.eye(2), H: linalg.row(1, 0), Q: linalg.eye(2), R: 0.1})`,
+		`stats.linear_filter(stats.gaussian_state({1, 2}, linalg.eye(2)), {1}, "bad")`,
+		`stats.linear_predict(stats.gaussian_state({1, 2}, linalg.eye(2)), linalg.eye(2), 0.01)`,
+		`stats.linear_filter(stats.gaussian_state({1, 2}, linalg.eye(2)), {1}, {F: linalg.eye(2), H: {1, 0}, Q: linalg.eye(2), R: 0.1})`,
+		`stats.linear_filter(stats.gaussian_state({1, 2}, linalg.eye(2)), {linalg.vector(1, 2, 3)}, {F: linalg.eye(2), H: linalg.eye(2), Q: linalg.eye(2), R: linalg.eye(2)})`,
 	}
 	for _, src := range cases {
 		if err := execSourceOnInterp(interp, src); err == nil {

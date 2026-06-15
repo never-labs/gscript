@@ -26,6 +26,7 @@ func BuildStats() *Table {
 	set("gaussian_state", statsGaussianState)
 	set("linear_predict", statsLinearPredict)
 	set("linear_update", statsLinearUpdate)
+	set("linear_filter", statsLinearFilter)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
 	set("normal", statsNormal)
@@ -265,7 +266,11 @@ func statsLinearPredict(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stats.linear_predict: %w", err)
 	}
-	cov, err := linalgSandwichAdd([]Value{args[1], state.covariance, args[2]})
+	processNoise, err := statsProcessNoiseValue("stats.linear_predict", args[2], state.covariance)
+	if err != nil {
+		return nil, fmt.Errorf("stats.linear_predict: %w", err)
+	}
+	cov, err := linalgSandwichAdd([]Value{args[1], state.covariance, processNoise})
 	if err != nil {
 		return nil, fmt.Errorf("stats.linear_predict: %w", err)
 	}
@@ -344,6 +349,142 @@ func statsLinearUpdate(args []Value) ([]Value, error) {
 	extra.RawSetString("S", s[0])
 	extra.RawSetString("gain", gain[0])
 	return statsMakeGaussianState("stats.linear_update", mean[0], cov[0], extra)
+}
+
+func statsLinearFilter(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.linear_filter: need state, observations, and options")
+	}
+	if !args[2].IsTable() {
+		return nil, fmt.Errorf("stats.linear_filter: options must be a table")
+	}
+	stateValue := args[0]
+	if _, err := statsGaussianStateFromValue("stats.linear_filter", stateValue); err != nil {
+		return nil, err
+	}
+	opts := args[2].Table()
+	F, err := statsLinearFilterOption(opts, "F", "transition")
+	if err != nil {
+		return nil, err
+	}
+	H, err := statsLinearFilterOption(opts, "H", "observation")
+	if err != nil {
+		return nil, err
+	}
+	Q, err := statsLinearFilterOption(opts, "Q", "process_noise")
+	if err != nil {
+		return nil, err
+	}
+	R, err := statsLinearFilterOption(opts, "R", "observation_noise")
+	if err != nil {
+		return nil, err
+	}
+	hRows, _, _, ok, err := linalgMatrixValue("stats.linear_filter H", H)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("stats.linear_filter: H must be a matrix")
+	}
+	observations, err := statsLinearFilterObservations(args[1], hRows)
+	if err != nil {
+		return nil, err
+	}
+	innovationsScalar := make([]float64, 0, len(observations))
+	innovationsRows := NewAppendArrayTable(len(observations))
+	states := NewAppendArrayTable(len(observations))
+	keepTrajectory := opts.RawGetString("trajectory").Truthy() || opts.RawGetString("states").Truthy()
+	for i, observation := range observations {
+		predicted, err := statsLinearPredict([]Value{stateValue, F, Q})
+		if err != nil {
+			return nil, fmt.Errorf("stats.linear_filter: %w", err)
+		}
+		updated, err := statsLinearUpdate([]Value{predicted[0], H, observation, R})
+		if err != nil {
+			return nil, fmt.Errorf("stats.linear_filter: %w", err)
+		}
+		stateValue = updated[0]
+		state := stateValue.Table()
+		innovation := state.RawGetString("innovation")
+		if hRows == 1 {
+			values, err := linalgVectorLikeValue("stats.linear_filter innovation", innovation)
+			if err != nil {
+				return nil, err
+			}
+			if len(values) != 1 {
+				return nil, fmt.Errorf("stats.linear_filter: scalar observation produced innovation length %d", len(values))
+			}
+			innovationsScalar = append(innovationsScalar, values[0])
+		} else {
+			innovationsRows.RawSetInt(int64(i+1), innovation)
+		}
+		if keepTrajectory {
+			states.RawSetInt(int64(i+1), stateValue)
+		}
+	}
+	out := NewTable()
+	out.RawSetString("kind", StringValue("linear_filter_result"))
+	out.RawSetString("state", stateValue)
+	out.RawSetString("final", stateValue)
+	if hRows == 1 {
+		out.RawSetString("innovations", DenseArrayValue(NewDenseArrayF64Owned(innovationsScalar)))
+	} else {
+		out.RawSetString("innovations", TableValue(innovationsRows))
+	}
+	if keepTrajectory {
+		out.RawSetString("states", TableValue(states))
+		out.RawSetString("trajectory", TableValue(states))
+	}
+	return []Value{TableValue(out)}, nil
+}
+
+func statsLinearFilterOption(opts *Table, names ...string) (Value, error) {
+	for _, name := range names {
+		if value := opts.RawGetString(name); !value.IsNil() {
+			return value, nil
+		}
+	}
+	return NilValue(), fmt.Errorf("stats.linear_filter: missing option %s", names[0])
+}
+
+func statsLinearFilterObservations(value Value, dim int) ([]Value, error) {
+	if dim <= 0 {
+		return nil, fmt.Errorf("stats.linear_filter: observation dimension must be positive")
+	}
+	if dim == 1 {
+		values, err := linalgVectorValue("stats.linear_filter observations", value)
+		if err != nil {
+			return nil, err
+		}
+		if len(values) == 0 {
+			return nil, fmt.Errorf("stats.linear_filter: observations must not be empty")
+		}
+		out := make([]Value, len(values))
+		for i, x := range values {
+			out[i] = FloatValue(x)
+		}
+		return out, nil
+	}
+	if !value.IsTable() {
+		return nil, fmt.Errorf("stats.linear_filter: multivariate observations must be a table")
+	}
+	t := value.Table()
+	if t.Length() == 0 {
+		return nil, fmt.Errorf("stats.linear_filter: observations must not be empty")
+	}
+	out := make([]Value, t.Length())
+	for i := range out {
+		observation := t.RawGetInt(int64(i + 1))
+		values, err := linalgVectorLikeValue("stats.linear_filter observations", observation)
+		if err != nil {
+			return nil, err
+		}
+		if len(values) != dim {
+			return nil, fmt.Errorf("stats.linear_filter: observation %d length %d does not match H rows %d", i+1, len(values), dim)
+		}
+		out[i] = DenseArrayValue(NewDenseArrayF64Owned(values))
+	}
+	return out, nil
 }
 
 func statsDescribeWeighted(values []float64, weightsValue Value) ([]Value, error) {
@@ -1063,10 +1204,36 @@ func statsGaussianStateFromValue(fn string, value Value) (statsGaussianStateValu
 	if mean.IsNil() || covariance.IsNil() {
 		return statsGaussianStateValue{}, fmt.Errorf("%s: gaussian state missing mean or covariance", fn)
 	}
-	if _, err := statsMakeGaussianState(fn, mean, covariance, nil); err != nil {
+	canonical, err := statsMakeGaussianState(fn, mean, covariance, nil)
+	if err != nil {
 		return statsGaussianStateValue{}, err
 	}
-	return statsGaussianStateValue{mean: mean, covariance: covariance}, nil
+	canonicalTable := canonical[0].Table()
+	return statsGaussianStateValue{
+		mean:       canonicalTable.RawGetString("mean"),
+		covariance: canonicalTable.RawGetString("covariance"),
+	}, nil
+}
+
+func statsProcessNoiseValue(fn string, value Value, covariance Value) (Value, error) {
+	rows, cols, _, ok, err := linalgMatrixValue(fn, covariance)
+	if err != nil {
+		return NilValue(), err
+	}
+	if !ok || rows != cols {
+		return NilValue(), fmt.Errorf("%s: covariance must be a square matrix", fn)
+	}
+	qRows, qCols, _, qOK, err := linalgMatrixValue(fn, value)
+	if err != nil {
+		return NilValue(), err
+	}
+	if !qOK {
+		return NilValue(), fmt.Errorf("%s: process noise must be a matrix", fn)
+	}
+	if qRows != rows || qCols != cols {
+		return NilValue(), fmt.Errorf("%s: process noise dimension mismatch", fn)
+	}
+	return value, nil
 }
 
 func statsObservationNoiseValue(fn string, value Value, dim int) (Value, error) {
