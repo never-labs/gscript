@@ -346,6 +346,42 @@ func BuildRand() *Table {
 		return []Value{TableValue(result)}, nil
 	})
 
+	// rand.add_noise(values, distribution[, drift]) - add distribution noise and optional drift to a dense vector
+	set("add_noise", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad arguments to 'rand.add_noise' (values and distribution expected)")
+		}
+		values, err := linalgVectorValue("rand.add_noise", args[0])
+		if err != nil {
+			return nil, err
+		}
+		dist, err := statsDistributionFromValue("rand.add_noise", args[1])
+		if err != nil {
+			return nil, err
+		}
+		drift := 0.0
+		if len(args) >= 3 {
+			if err := requireNumber("rand.add_noise", 3, args[2]); err != nil {
+				return nil, err
+			}
+			drift = toFloat(args[2])
+		}
+		out := make([]float64, len(values))
+		switch dist.name {
+		case "normal":
+			for i, value := range values {
+				noise, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
+				if err != nil {
+					return nil, fmt.Errorf("rand.add_noise: %s", err)
+				}
+				out[i] = value + drift + noise
+			}
+		default:
+			return nil, fmt.Errorf("rand.add_noise: unsupported distribution %q", dist.name)
+		}
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	})
+
 	// rand.uuid() - generate a random UUID v4 string
 	set("uuid", func(args []Value) ([]Value, error) {
 		return []Value{StringValue(stdrand.UUIDV4(func() byte { return byte(rng.Intn(256)) }))}, nil

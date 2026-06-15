@@ -397,6 +397,24 @@ func TestRandSampleNormalDistribution(t *testing.T) {
 	assertTableFloat(t, values, 4, 10.622007507538102)
 }
 
+func TestRandAddNoise(t *testing.T) {
+	interp := randStatsInterp(t, `
+		dist := stats.normal(0, 0.5)
+		rand.seed(42)
+		values := rand.add_noise({1, 2, 3, 4}, dist, 0.25)
+		empty := rand.add_noise({}, dist)
+	`)
+	values := interp.GetGlobal("values")
+	if !values.IsDenseArray() || values.DenseArray().Len() != 4 {
+		t.Fatalf("values = %v, want dense array length 4", values)
+	}
+	assertTableFloat(t, values, 4, 4.872007507538102)
+	empty := interp.GetGlobal("empty")
+	if !empty.IsDenseArray() || empty.DenseArray().Len() != 0 {
+		t.Fatalf("empty = %v, want empty dense array", empty)
+	}
+}
+
 // ==================================================================
 // rand.uuid tests
 // ==================================================================

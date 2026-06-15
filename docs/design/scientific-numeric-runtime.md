@@ -182,8 +182,9 @@ example-specific shortcuts:
   `stats.describe(values[, weights])`, `stats.describe_fields(table[,
   weights])`, and `stats.importance_update` for distribution-aware sequential
   Monte Carlo code and compact statistical summaries.
-- `rand.sample(distribution[, n])` for scalar or dense-vector draws from
-  reusable distribution objects.
+- `rand.sample(distribution[, n])` and `rand.add_noise(values,
+  distribution[, drift])` for scalar draws, dense-vector draws, and noisy
+  vector evolution from reusable distribution objects.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
 - `ode.integrate` and `ode.solve` for RK4-style simulation with projection,

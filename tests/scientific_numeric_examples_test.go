@@ -25,7 +25,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "linalg.add", "linalg.sub", "stats.uniform_weights", "stats.logpdf", "stats.bayes_update", "stats.describe(particles, weights)", "math.near", "q {"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "linalg.sub", "stats.uniform_weights", "stats.logpdf", "stats.bayes_update", "stats.describe(particles, weights)", "math.near", "q {"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
