@@ -155,6 +155,34 @@ again := rand.normal_vec(2)
 	}
 }
 
+func TestRandUniformVec(t *testing.T) {
+	interp := randInterp(t, `
+rand.seed(42)
+unit := rand.uniform_vec(4)
+scaled := rand.uniform_vec(3, -2, 2)
+`)
+	unit := interp.GetGlobal("unit")
+	if !unit.IsDenseArray() || unit.DenseArray().Len() != 4 {
+		t.Fatalf("unit = %v, want dense array length 4", unit)
+	}
+	for i := 1; i <= 4; i++ {
+		v, _ := unit.DenseArray().At(i - 1)
+		if v.Number() < 0 || v.Number() >= 1 {
+			t.Fatalf("unit[%d] = %v, want [0,1)", i, v)
+		}
+	}
+	scaled := interp.GetGlobal("scaled")
+	if !scaled.IsDenseArray() || scaled.DenseArray().Len() != 3 {
+		t.Fatalf("scaled = %v, want dense array length 3", scaled)
+	}
+	for i := 1; i <= 3; i++ {
+		v, _ := scaled.DenseArray().At(i - 1)
+		if v.Number() < -2 || v.Number() >= 2 {
+			t.Fatalf("scaled[%d] = %v, want [-2,2)", i, v)
+		}
+	}
+}
+
 // ==================================================================
 // rand.exp tests
 // ==================================================================
@@ -184,6 +212,23 @@ func TestRandExpWithRate(t *testing.T) {
 	}
 	if v.Float() < 0 {
 		t.Error("exponential distribution should return non-negative values")
+	}
+}
+
+func TestRandExpVec(t *testing.T) {
+	interp := randInterp(t, `
+rand.seed(42)
+values := rand.exp_vec(4, 2)
+`)
+	values := interp.GetGlobal("values")
+	if !values.IsDenseArray() || values.DenseArray().Len() != 4 {
+		t.Fatalf("values = %v, want dense array length 4", values)
+	}
+	for i := 1; i <= 4; i++ {
+		v, _ := values.DenseArray().At(i - 1)
+		if v.Number() < 0 {
+			t.Fatalf("values[%d] = %v, want non-negative", i, v)
+		}
 	}
 }
 

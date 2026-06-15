@@ -20,12 +20,18 @@ func BuildStats() *Table {
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
 	set("normal_pdf", statsNormalPDF)
+	set("log_normal_pdf", statsLogNormalPDF)
 	set("normalize_weights", statsNormalizeWeights)
+	set("normalize_log_weights", statsNormalizeLogWeights)
 	set("effective_sample_size", statsEffectiveSampleSize)
+	set("logsumexp", statsLogSumExp)
 	set("weighted_mean", statsWeightedMean)
+	set("weighted_var", statsWeightedVar)
+	set("weighted_std", statsWeightedStd)
 	set("cumsum", statsCumsum)
 	set("diff", statsDiff)
 	set("fill", statsFill)
+	set("uniform_weights", statsUniformWeights)
 	set("gather", statsGather)
 	set("rms", statsRMS)
 	set("rmse", statsRMSE)
@@ -171,6 +177,40 @@ func statsNormalPDF(args []Value) ([]Value, error) {
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
+func statsLogNormalPDF(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.log_normal_pdf: need x, mean, stddev")
+	}
+	mean, err := linalgNumber("stats.log_normal_pdf", args[1])
+	if err != nil {
+		return nil, err
+	}
+	stddev, err := linalgNumber("stats.log_normal_pdf", args[2])
+	if err != nil {
+		return nil, err
+	}
+	if stddev <= 0 {
+		return nil, fmt.Errorf("stats.log_normal_pdf: stddev must be positive")
+	}
+	logNorm := -math.Log(stddev) - 0.5*math.Log(2*math.Pi)
+	eval := func(x float64) float64 {
+		z := (x - mean) / stddev
+		return logNorm - 0.5*z*z
+	}
+	if args[0].IsNumber() {
+		return []Value{FloatValue(eval(toFloat(args[0])))}, nil
+	}
+	values, err := linalgVectorValue("stats.log_normal_pdf", args[0])
+	if err != nil {
+		return nil, err
+	}
+	out := make([]float64, len(values))
+	for i, v := range values {
+		out[i] = eval(v)
+	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
 func statsDiff(args []Value) ([]Value, error) {
 	values, err := statsVectorArg("stats.diff", args)
 	if err != nil {
@@ -201,6 +241,24 @@ func statsFill(args []Value) ([]Value, error) {
 	out := make([]float64, n)
 	for i := range out {
 		out[i] = value
+	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
+func statsUniformWeights(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("stats.uniform_weights: need size")
+	}
+	n, err := linalgPositiveInt("stats.uniform_weights", args[0], "size")
+	if err != nil {
+		return nil, err
+	}
+	out := make([]float64, n)
+	if n > 0 {
+		w := 1.0 / float64(n)
+		for i := range out {
+			out[i] = w
+		}
 	}
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
@@ -351,6 +409,42 @@ func statsWeightedMean(args []Value) ([]Value, error) {
 	return []Value{FloatValue(weighted / total)}, nil
 }
 
+func statsWeightedVar(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("stats.weighted_var: need values and weights")
+	}
+	values, err := linalgVectorValue("stats.weighted_var", args[0])
+	if err != nil {
+		return nil, err
+	}
+	weights, total, err := statsWeights("stats.weighted_var", []Value{args[1]})
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 || len(values) != len(weights) {
+		return nil, fmt.Errorf("stats.weighted_var: length mismatch")
+	}
+	mean := 0.0
+	for i, v := range values {
+		mean += v * weights[i]
+	}
+	mean /= total
+	variance := 0.0
+	for i, v := range values {
+		d := v - mean
+		variance += weights[i] * d * d
+	}
+	return []Value{FloatValue(variance / total)}, nil
+}
+
+func statsWeightedStd(args []Value) ([]Value, error) {
+	variance, err := statsWeightedVar(args)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{FloatValue(math.Sqrt(variance[0].Number()))}, nil
+}
+
 func statsNormalizeWeights(args []Value) ([]Value, error) {
 	weights, total, err := statsWeights("stats.normalize_weights", args)
 	if err != nil {
@@ -359,6 +453,22 @@ func statsNormalizeWeights(args []Value) ([]Value, error) {
 	out := make([]float64, len(weights))
 	for i, w := range weights {
 		out[i] = w / total
+	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
+func statsNormalizeLogWeights(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.normalize_log_weights", args)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.normalize_log_weights: empty weights")
+	}
+	logTotal := statsLogSumExpOf(values)
+	out := make([]float64, len(values))
+	for i, v := range values {
+		out[i] = math.Exp(v - logTotal)
 	}
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
@@ -377,6 +487,17 @@ func statsEffectiveSampleSize(args []Value) ([]Value, error) {
 		return nil, fmt.Errorf("stats.effective_sample_size: total weight is zero")
 	}
 	return []Value{FloatValue(1.0 / sumSq)}, nil
+}
+
+func statsLogSumExp(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.logsumexp", args)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.logsumexp: empty input")
+	}
+	return []Value{FloatValue(statsLogSumExpOf(values))}, nil
 }
 
 func statsCumsum(args []Value) ([]Value, error) {
@@ -486,4 +607,21 @@ func statsVarianceWithMean(values []float64, mean float64) float64 {
 		sum += d * d
 	}
 	return sum / float64(len(values))
+}
+
+func statsLogSumExpOf(values []float64) float64 {
+	maxValue := values[0]
+	for _, v := range values[1:] {
+		if v > maxValue {
+			maxValue = v
+		}
+	}
+	if math.IsInf(maxValue, -1) {
+		return maxValue
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += math.Exp(v - maxValue)
+	}
+	return maxValue + math.Log(sum)
 }

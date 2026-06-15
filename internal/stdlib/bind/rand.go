@@ -147,6 +147,44 @@ func BuildRand() *Table {
 		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 	})
 
+	// rand.uniform_vec(n[, max] | n, min, max) - sample a dense uniform vector
+	set("uniform_vec", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'rand.uniform_vec' (size expected)")
+		}
+		n, err := linalgPositiveInt("rand.uniform_vec", args[0], "size")
+		if err != nil {
+			return nil, err
+		}
+		min := 0.0
+		max := 1.0
+		if len(args) == 2 {
+			if err := requireNumber("rand.uniform_vec", 2, args[1]); err != nil {
+				return nil, err
+			}
+			max = toFloat(args[1])
+		}
+		if len(args) >= 3 {
+			if err := requireNumber("rand.uniform_vec", 2, args[1]); err != nil {
+				return nil, err
+			}
+			if err := requireNumber("rand.uniform_vec", 3, args[2]); err != nil {
+				return nil, err
+			}
+			min = toFloat(args[1])
+			max = toFloat(args[2])
+		}
+		if max < min {
+			return nil, fmt.Errorf("bad arguments to 'rand.uniform_vec' (min must be <= max)")
+		}
+		out := make([]float64, n)
+		width := max - min
+		for i := range out {
+			out[i] = min + width*rng.Float64()
+		}
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	})
+
 	// rand.exp([rate]) - sample from exponential distribution
 	// Default rate=1
 	set("exp", func(args []Value) ([]Value, error) {
@@ -165,6 +203,36 @@ func BuildRand() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'rand.exp' (positive rate expected)")
 		}
 		return []Value{FloatValue(n)}, nil
+	})
+
+	// rand.exp_vec(n[, rate]) - sample a dense exponential vector
+	set("exp_vec", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'rand.exp_vec' (size expected)")
+		}
+		n, err := linalgPositiveInt("rand.exp_vec", args[0], "size")
+		if err != nil {
+			return nil, err
+		}
+		rate := 1.0
+		if len(args) >= 2 {
+			if err := requireNumber("rand.exp_vec", 2, args[1]); err != nil {
+				return nil, err
+			}
+			rate = toFloat(args[1])
+			if rate <= 0 {
+				return nil, fmt.Errorf("bad argument #2 to 'rand.exp_vec' (positive rate expected)")
+			}
+		}
+		out := make([]float64, n)
+		for i := range out {
+			v, err := stdrand.Exponential(rng.ExpFloat64, rate)
+			if err != nil {
+				return nil, fmt.Errorf("bad argument #2 to 'rand.exp_vec' (positive rate expected)")
+			}
+			out[i] = v
+		}
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 	})
 
 	// rand.bool() - random boolean (50/50)
