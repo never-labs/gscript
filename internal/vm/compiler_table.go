@@ -241,6 +241,14 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 	return nil
 }
 
+func (c *compiler) compileListLitExpr(e *ast.ListLitExpr, dest int) error {
+	fields := make([]ast.TableField, 0, len(e.Values))
+	for _, value := range e.Values {
+		fields = append(fields, ast.TableField{Value: value})
+	}
+	return c.compileTableLitExpr(&ast.TableLitExpr{P: e.P, Fields: fields}, dest)
+}
+
 func hasExplicitSpreadTableField(e *ast.TableLitExpr) bool {
 	for _, f := range e.Fields {
 		if f.Key == nil {

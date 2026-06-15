@@ -19,16 +19,18 @@ func TestDefaultImportsExposeNumericPrelude(t *testing.T) {
 			if err := vm.Exec(`
 				root := sqrt(9)
 				wave := sin(0) + cos(0)
-				v := vector(1, 2, 3)
+				v := [1, 2, 3]
 				energy := dot(v, v)
-				scale := mean({1, 2, 3}) + avg({2, 4, 6})
-				q := eye(2)
+				scale := mean([1, 2, 3]) + avg([2, 4, 6])
+				q := linalg.matrix([[1, 0], [0, 1]])
 				unit_trace := trace(q)
+				nested := [[1, 2], [3, 4]]
+				nested_value := nested[2][1]
 				shadow := func() {
 					sqrt := func(x) { return 99 }
 					return sqrt(4)
 				}()
-				result := root == 3 && wave == 1 && energy == 14 && scale == 6 && unit_trace == 2 && shadow == 99
+				result := root == 3 && wave == 1 && energy == 14 && scale == 6 && unit_trace == 2 && nested_value == 3 && shadow == 99
 			`); err != nil {
 				t.Fatal(err)
 			}

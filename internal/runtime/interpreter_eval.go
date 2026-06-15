@@ -137,6 +137,13 @@ func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value
 		}
 		return []Value{v}, nil
 
+	case *ast.ListLitExpr:
+		v, err := interp.evalListLit(e, env)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+
 	case *ast.DenseLitExpr:
 		v, err := interp.evalDenseLit(e, env)
 		if err != nil {
@@ -1038,6 +1045,14 @@ func (interp *Interpreter) evalTableLit(e *ast.TableLitExpr, env *Environment) (
 	}
 
 	return TableValue(tbl), nil
+}
+
+func (interp *Interpreter) evalListLit(e *ast.ListLitExpr, env *Environment) (Value, error) {
+	fields := make([]ast.TableField, 0, len(e.Values))
+	for _, value := range e.Values {
+		fields = append(fields, ast.TableField{Value: value})
+	}
+	return interp.evalTableLit(&ast.TableLitExpr{P: e.P, Fields: fields}, env)
 }
 
 func (interp *Interpreter) evalDenseLit(e *ast.DenseLitExpr, env *Environment) (Value, error) {

@@ -49,6 +49,8 @@ func (c *compiler) compileExprTo(expr ast.Expr, dest int) error {
 		return c.compileFieldExpr(e, dest)
 	case *ast.TableLitExpr:
 		return c.compileTableLitExpr(e, dest)
+	case *ast.ListLitExpr:
+		return c.compileListLitExpr(e, dest)
 	case *ast.DenseLitExpr:
 		return c.compileDenseLitExpr(e, dest)
 	case *ast.FuncLitExpr:
