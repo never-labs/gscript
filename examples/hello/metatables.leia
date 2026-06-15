@@ -94,29 +94,30 @@ MatMeta.__mul = func(a, b) {
     if a.ncols != b.nrows {
         error("matrix dimension mismatch")
     }
-    result := {}
+    result := []
     for i := 1; i <= a.nrows; i++ {
-        result[i] = {}
+        row := []
         for j := 1; j <= b.ncols; j++ {
             sum := 0
             for k := 1; k <= a.ncols; k++ {
                 sum = sum + a.rows[i][k] * b.rows[k][j]
             }
-            result[i][j] = sum
+            append(row, sum)
         }
+        append(result, row)
     }
     return Mat(result)
 }
 
 // Helper to display a matrix
 func matStr(m) {
-    lines := {}
+    lines := []
     for i := 1; i <= m.nrows; i++ {
-        parts := {}
+        parts := []
         for j := 1; j <= m.ncols; j++ {
-            table.insert(parts, string.format("%6.1f", m.rows[i][j]))
+            append(parts, string.format("%6.1f", m.rows[i][j]))
         }
-        table.insert(lines, "    [" .. table.concat(parts, ", ") .. "]")
+        append(lines, "    [" .. table.concat(parts, ", ") .. "]")
     }
     return table.concat(lines, "\n")
 }
@@ -182,9 +183,9 @@ func observable(initial) {
     // Attach a watcher
     proxy._watch = func(key, callback) {
         if listeners[key] == nil {
-            listeners[key] = {}
+            listeners[key] = []
         }
-        table.insert(listeners[key], callback)
+        append(listeners[key], callback)
     }
 
     return proxy
@@ -218,15 +219,15 @@ print("--- Proxy Table ---")
 // A proxy that logs all reads and writes
 func loggedProxy(name, target) {
     proxy := {}
-    log := {}
+    log := []
 
     meta := {
         __index: func(t, key) {
-            table.insert(log, "GET " .. name .. "." .. tostring(key))
+            append(log, "GET " .. name .. "." .. tostring(key))
             return target[key]
         },
         __newindex: func(t, key, value) {
-            table.insert(log, "SET " .. name .. "." .. tostring(key) .. " = " .. tostring(value))
+            append(log, "SET " .. name .. "." .. tostring(key) .. " = " .. tostring(value))
             target[key] = value
         }
     }
