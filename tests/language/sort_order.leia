@@ -7,8 +7,8 @@ func check(a, f) {
     }
 }
 
-a := {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-      "Oct", "Nov", "Dec"}
+a := ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+      "Oct", "Nov", "Dec"]
 table.sort(a)
 check(a)
 
@@ -16,7 +16,7 @@ perm := nil
 perm = func(s, n) {
     n = n || #s
     if n == 1 {
-        t := {table.unpack(s)}
+        t := [table.unpack(s)]
         table.sort(t)
         check(t)
     } else {
