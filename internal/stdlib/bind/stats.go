@@ -140,6 +140,9 @@ func statsDescribe(args []Value) ([]Value, error) {
 	if len(values) == 0 {
 		return nil, fmt.Errorf("stats.describe: empty input")
 	}
+	if len(args) >= 2 {
+		return statsDescribeWeighted(values, args[1])
+	}
 	min := values[0]
 	max := values[0]
 	sum := 0.0
@@ -166,6 +169,60 @@ func statsDescribe(args []Value) ([]Value, error) {
 	out.RawSetString("min", FloatValue(min))
 	out.RawSetString("max", FloatValue(max))
 	out.RawSetString("rms", FloatValue(math.Sqrt(sumSquares/float64(len(values)))))
+	return []Value{TableValue(out)}, nil
+}
+
+func statsDescribeWeighted(values []float64, weightsValue Value) ([]Value, error) {
+	weights, total, err := statsWeights("stats.describe", []Value{weightsValue})
+	if err != nil {
+		return nil, err
+	}
+	if len(values) != len(weights) {
+		return nil, fmt.Errorf("stats.describe: length mismatch")
+	}
+	minSet := false
+	min := 0.0
+	max := 0.0
+	weightedSum := 0.0
+	weightedSquares := 0.0
+	for i, v := range values {
+		w := weights[i]
+		if w > 0 {
+			if !minSet {
+				min = v
+				max = v
+				minSet = true
+			} else {
+				if v < min {
+					min = v
+				}
+				if v > max {
+					max = v
+				}
+			}
+		}
+		weightedSum += v * w
+		weightedSquares += v * v * w
+	}
+	mean := weightedSum / total
+	variance := 0.0
+	for i, v := range values {
+		d := v - mean
+		variance += weights[i] * d * d
+	}
+	variance /= total
+	out := NewTable()
+	out.RawSetString("count", IntValue(int64(len(values))))
+	out.RawSetString("weight_sum", FloatValue(total))
+	out.RawSetString("sum", FloatValue(weightedSum))
+	out.RawSetString("weighted_sum", FloatValue(weightedSum))
+	out.RawSetString("mean", FloatValue(mean))
+	out.RawSetString("variance", FloatValue(variance))
+	out.RawSetString("var", FloatValue(variance))
+	out.RawSetString("std", FloatValue(math.Sqrt(variance)))
+	out.RawSetString("min", FloatValue(min))
+	out.RawSetString("max", FloatValue(max))
+	out.RawSetString("rms", FloatValue(math.Sqrt(weightedSquares/total)))
 	return []Value{TableValue(out)}, nil
 }
 

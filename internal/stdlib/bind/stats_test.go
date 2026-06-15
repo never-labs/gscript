@@ -43,6 +43,8 @@ pdfs := stats.normal_pdf({0, 1}, 0, 1)
 rms := stats.rms({3, 4})
 rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 desc := stats.describe({1, 2, 3, 4})
+weighted_desc := stats.describe({10, 20, 30}, {1, 2, 1})
+weighted_sparse := stats.describe({-100, 1, 2, 100}, {0, 1, 1, 0})
 `)
 	assertFloat(t, interp.GetGlobal("total"), 10)
 	assertFloat(t, interp.GetGlobal("mean"), 2.5)
@@ -83,6 +85,22 @@ desc := stats.describe({1, 2, 3, 4})
 	assertFloat(t, desc.RawGetString("min"), 1)
 	assertFloat(t, desc.RawGetString("max"), 4)
 	assertFloat(t, desc.RawGetString("rms"), 2.7386127875258306)
+	weightedDesc := interp.GetGlobal("weighted_desc").Table()
+	assertFloat(t, weightedDesc.RawGetString("count"), 3)
+	assertFloat(t, weightedDesc.RawGetString("weight_sum"), 4)
+	assertFloat(t, weightedDesc.RawGetString("sum"), 80)
+	assertFloat(t, weightedDesc.RawGetString("weighted_sum"), 80)
+	assertFloat(t, weightedDesc.RawGetString("mean"), 20)
+	assertFloat(t, weightedDesc.RawGetString("variance"), 50)
+	assertFloat(t, weightedDesc.RawGetString("var"), 50)
+	assertFloat(t, weightedDesc.RawGetString("std"), 7.0710678118654755)
+	assertFloat(t, weightedDesc.RawGetString("min"), 10)
+	assertFloat(t, weightedDesc.RawGetString("max"), 30)
+	assertFloat(t, weightedDesc.RawGetString("rms"), 21.213203435596427)
+	weightedSparse := interp.GetGlobal("weighted_sparse").Table()
+	assertFloat(t, weightedSparse.RawGetString("mean"), 1.5)
+	assertFloat(t, weightedSparse.RawGetString("min"), 1)
+	assertFloat(t, weightedSparse.RawGetString("max"), 2)
 }
 
 func TestStatsDistributionFacadeNormalPDF(t *testing.T) {
@@ -203,6 +221,18 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.describe({})`)
 	if err == nil {
 		t.Fatal("stats.describe({}) succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {1})`)
+	if err == nil {
+		t.Fatal("stats.describe length mismatch succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {1, -1})`)
+	if err == nil {
+		t.Fatal("stats.describe negative weight succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.describe({1, 2}, {0, 0})`)
+	if err == nil {
+		t.Fatal("stats.describe zero total weight succeeded, want error")
 	}
 	err = execSourceOnInterp(interp, `stats.importance_update({1}, {1}, {0}, {})`)
 	if err == nil {
