@@ -9,12 +9,12 @@ Q := eye(2, 0.01)
 
 measurements := [0.95, 2.05, 2.95, 4.10, 5.00]
 state := stats.gaussian_state([0.0, 1.0], eye(2))
-innovations := {}
+innovations := []
 
 for i := 1; i <= #measurements; i++ {
     state = stats.linear_predict(state, F, Q)
     state = stats.linear_update(state, H, measurements[i], 0.04)
-    innovations[i] = state.innovation[1]
+    append(innovations, state.innovation[1])
 }
 
 innovation_rmse := stats.rms(innovations)

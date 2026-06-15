@@ -1414,27 +1414,24 @@ Function literals capture their lexical environment by reference. Tagged
 dialect forms evaluate according to their registered dialect contract.
 
 ```leia
-events := {}
+events := []
 func mark(name, value) {
-    events[#events + 1] = name
+    append(events, name)
     return value
 }
 
-t := {
+rec := {
     first: mark("field", 1),
-    mark("list", 2),
 }
 list := [mark("a", 10), mark("b", 20)]
 dense := []i64{mark("d1", 3), mark("d2", 4)}
 
 assert(events[1] == "field")
-assert(events[2] == "list")
-assert(events[3] == "a")
-assert(events[4] == "b")
-assert(events[5] == "d1")
-assert(events[6] == "d2")
-assert(t.first == 1)
-assert(t[1] == 2)
+assert(events[2] == "a")
+assert(events[3] == "b")
+assert(events[4] == "d1")
+assert(events[5] == "d2")
+assert(rec.first == 1)
 assert(list[1] == 10 && list[2] == 20)
 assert(dense[1] == 3 && dense[2] == 4)
 assert({} != {})

@@ -139,7 +139,9 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	}))
 	installer.RegisterTable("string", stdbind.BuildString(opts.ScriptCaller, maxHostResult))
 	if !opts.SkipTable {
-		installer.RegisterTable("table", stdbind.BuildTable(opts.Table))
+		table := stdbind.BuildTable(opts.Table)
+		installer.RegisterTable("table", table)
+		registerDefaultAliases(installer, "table", table)
 	}
 	installer.RegisterTable("time", stdbind.BuildTime())
 	installer.RegisterTable("url", stdbind.BuildURL(maxHostResult))

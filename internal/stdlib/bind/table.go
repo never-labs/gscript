@@ -40,6 +40,7 @@ func BuildTable(options ...TableOptions) *Table {
 	lib := BuildTableLib()
 	lib.RawSet(StringValue("concat"), FunctionValue(BuildTableConcatFunction(TableUnpackLen(opts.Len), TableUnpackGet(opts.Get))))
 	lib.RawSet(StringValue("insert"), FunctionValue(BuildTableInsertFunction(TableInsertLen(opts.Len), TableInsertGet(opts.Get), TableInsertSet(opts.Set), opts.TryPlainInsert)))
+	lib.RawSet(StringValue("append"), FunctionValue(BuildTableAppendFunction(TableInsertLen(opts.Len), TableInsertSet(opts.Set), opts.TryPlainInsert)))
 	lib.RawSet(StringValue("remove"), FunctionValue(BuildTableRemoveFunction(TableRemoveLen(opts.Len), TableRemoveGet(opts.Get), TableRemoveSet(opts.Set), opts.TryPlainRemove)))
 	lib.RawSet(StringValue("unpack"), FunctionValue(BuildTableUnpackFunction("unpack", TableUnpackLen(opts.Len), TableUnpackGet(opts.Get))))
 	lib.RawSet(StringValue("spread"), FunctionValue(BuildTableUnpackFunction("spread", TableUnpackLen(opts.Len), TableUnpackGet(opts.Get))))
@@ -320,6 +321,50 @@ func rawTableInsertFunction() *GoFunction {
 	)
 }
 
+// BuildTableAppendFunction builds table.append/list append around caller-provided
+// table access hooks. It appends all values to the array part and returns the
+// same table so scripts can write xs = append(xs, a, b) or append(xs, a).
+func BuildTableAppendFunction(tableLen TableInsertLen, tableSet TableInsertSet, tryPlain TableInsertTryPlainArrayInsert) *GoFunction {
+	return &GoFunction{
+		Name: "table.append",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.append' (table expected)")
+			}
+			t := args[0]
+			length, err := tableLen(t)
+			if err != nil {
+				return nil, err
+			}
+			for i := 1; i < len(args); i++ {
+				pos := length + 1
+				if tryPlain == nil || !tryPlain(t, pos, args[i], length) {
+					if err := tableSet(t, IntValue(pos), args[i]); err != nil {
+						return nil, err
+					}
+				}
+				length++
+			}
+			return []Value{t}, nil
+		},
+	}
+}
+
+func rawTableAppendFunction() *GoFunction {
+	return BuildTableAppendFunction(
+		func(t Value) (int64, error) {
+			return int64(t.Table().Length()), nil
+		},
+		func(t Value, key Value, val Value) error {
+			t.Table().RawSet(key, val)
+			return nil
+		},
+		func(t Value, pos int64, val Value, length int64) bool {
+			return t.Table().TryPlainArrayInsertKnownLength(pos, val, length)
+		},
+	)
+}
+
 // BuildTableRemoveFunction builds table.remove around caller-provided table
 // access hooks. Raw callers pass RawGet/RawSet; interpreter callers pass
 // metamethod-aware hooks.
@@ -522,6 +567,7 @@ func BuildTableLib() *Table {
 	}
 
 	t.RawSet(StringValue("insert"), FunctionValue(rawTableInsertFunction()))
+	t.RawSet(StringValue("append"), FunctionValue(rawTableAppendFunction()))
 	t.RawSet(StringValue("remove"), FunctionValue(rawTableRemoveFunction()))
 
 	t.RawSet(StringValue("concat"), FunctionValue(rawTableConcatFunction()))

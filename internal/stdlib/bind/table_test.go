@@ -52,3 +52,16 @@ func TestTableModuleProxyMoveAndUnpackUseHooks(t *testing.T) {
 		t.Fatalf("writes = %d, want 2", got)
 	}
 }
+
+func TestTableAppendReturnsSameTableAndAppendsValues(t *testing.T) {
+	interp := runProgram(t, `
+		xs := []
+		same := table.append(xs, 1, 2, 3)
+		table.append(xs, 4)
+		ok := same == xs && #xs == 4 && xs[1] == 1 && xs[4] == 4
+	`)
+
+	if got := interp.GetGlobal("ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("ok = %v, want true", got)
+	}
+}

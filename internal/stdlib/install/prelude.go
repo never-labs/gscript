@@ -12,6 +12,8 @@ type DefaultAlias struct {
 }
 
 var defaultAliases = []DefaultAlias{
+	{Name: "append", Module: "table", Member: "append"},
+
 	{Name: "abs", Module: "math", Member: "abs"},
 	{Name: "sqrt", Module: "math", Member: "sqrt"},
 	{Name: "exp", Module: "math", Member: "exp"},

@@ -20,6 +20,7 @@ func TestDefaultImportsExposeNumericPrelude(t *testing.T) {
 				root := sqrt(9)
 				wave := sin(0) + cos(0) + asin(0) + acos(1)
 				v := [1, 2, 3]
+				appended := append([], 4, 5, 6)
 				energy := dot(v, v)
 				score := mean([1, 2, 3]) + avg([2, 4, 6])
 				q := linalg.matrix([[1, 0], [0, 1]])
@@ -36,7 +37,7 @@ func TestDefaultImportsExposeNumericPrelude(t *testing.T) {
 				}()
 				result := root == 3 && wave == 1 && energy == 14 && score == 6 && unit_trace == 2 &&
 					projected_first == 5 && chain_trace == 9 && at(shifted, 2) == 41 &&
-					nested_value == 3 && shadow == 99
+					nested_value == 3 && appended[3] == 6 && shadow == 99
 			`); err != nil {
 				t.Fatal(err)
 			}
@@ -61,6 +62,7 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			vm := leia.New(append(tc.opts, leia.WithLibs(leia.LibMath))...)
+			assertSDKGlobalPresence(t, vm, "append", false)
 			assertSDKGlobalPresence(t, vm, "sqrt", true)
 			assertSDKGlobalPresence(t, vm, "asin", true)
 			assertSDKGlobalPresence(t, vm, "eye", false)
@@ -68,10 +70,15 @@ func TestDefaultImportsFollowWithLibs(t *testing.T) {
 			assertSDKGlobalPresence(t, vm, "mean", false)
 
 			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibLinalg|leia.LibStats))...)
+			assertSDKGlobalPresence(t, vm, "append", false)
 			assertSDKGlobalPresence(t, vm, "sqrt", false)
 			assertSDKGlobalPresence(t, vm, "eye", true)
 			assertSDKGlobalPresence(t, vm, "matmul", true)
 			assertSDKGlobalPresence(t, vm, "mean", true)
+
+			vm = leia.New(append(tc.opts, leia.WithLibs(leia.LibTable))...)
+			assertSDKGlobalPresence(t, vm, "append", true)
+			assertSDKGlobalPresence(t, vm, "sqrt", false)
 		})
 	}
 }
