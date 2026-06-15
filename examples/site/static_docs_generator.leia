@@ -116,8 +116,8 @@ func nav_html(rows) {
 
 docs_root := p.clean(site.base_path)
 navigation := nav_html(nav_rows)
-page_outputs := {}
-manifest_pages := {}
+page_outputs := []
+manifest_pages := []
 published := 0
 drafts := 0
 
@@ -147,7 +147,7 @@ for i := 1; i <= #pages; i++ {
     }
 }
 
-asset_manifest := {}
+asset_manifest := []
 for i := 1; i <= #assets; i++ {
     asset := assets[i]
     asset_manifest[i] = {
