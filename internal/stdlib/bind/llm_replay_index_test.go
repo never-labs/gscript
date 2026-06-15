@@ -151,13 +151,13 @@ record, err := llm.replay_record({
     replay_key: "turn:1"
     request: {
         model: "mock"
-        messages: {llm.user("hello replay")}
+        messages: [llm.user("hello replay")]
         max_tokens: 16
     }
     response: {
         status: "final_answer"
         text: "fixture answer"
-        calls: {}
+        calls: []
         usage: {}
     }
 })
@@ -211,9 +211,9 @@ record2, err2 := llm.replay_record({
     request_hash: "hash:2"
     response: {text: "two"}
 })
-fixture, err := llm.replay_fixture({record1, record2}, {
+fixture, err := llm.replay_fixture([record1, record2], {
     fixture_id: "fixture:test"
-    identity_fields: {"replay_key", "request_hash"}
+    identity_fields: ["replay_key", "request_hash"]
 })
 first := fixture.match({replay_key: "turn:1" request_hash: "hash:1"})
 bad := fixture.match({replay_key: "turn:2" request_hash: "wrong"})
@@ -254,21 +254,21 @@ record, record_err := llm.replay_record({
     replay_key: "turn:direct"
     request: {
         model: "mock"
-        messages: {llm.user("direct replay")}
+        messages: [llm.user("direct replay")]
     }
     response: {
         status: "final_answer"
         text: "direct fixture"
-        calls: {}
+        calls: []
         usage: {}
     }
 })
-fixture, fixture_err := llm.replay_fixture({record}, {
+fixture, fixture_err := llm.replay_fixture([record], {
     fixture_id: "fixture:direct"
 })
 replay, err := fixture.replay({
     model: "mock"
-    messages: {llm.user("direct replay")}
+    messages: [llm.user("direct replay")]
 }, "turn:direct")
 summary := fixture.summary()
 
@@ -305,24 +305,24 @@ record, record_err := llm.replay_record({
     replay_key: "turn:direct"
     request: {
         model: "mock"
-        messages: {llm.user("direct replay")}
+        messages: [llm.user("direct replay")]
     }
-    response: {status: "final_answer" text: "direct fixture" calls: {} usage: {}}
+    response: {status: "final_answer" text: "direct fixture" calls: [] usage: {}}
 })
-fixture, fixture_err := llm.replay_fixture({record}, {
+fixture, fixture_err := llm.replay_fixture([record], {
     fixture_id: "fixture:direct"
 })
 bad_replay, bad_err := fixture.replay({
     model: "mock"
-    messages: {llm.user("wrong replay")}
+    messages: [llm.user("wrong replay")]
 }, "turn:direct")
 ok_replay, ok_err := fixture.replay({
     model: "mock"
-    messages: {llm.user("direct replay")}
+    messages: [llm.user("direct replay")]
 }, "turn:direct")
 exhausted_replay, exhausted_err := fixture.replay({
     model: "mock"
-    messages: {llm.user("direct replay")}
+    messages: [llm.user("direct replay")]
 }, "turn:direct")
 summary := fixture.summary()
 
@@ -363,25 +363,25 @@ func TestLLMReplayFixtureReplayKeepsStrictOrder(t *testing.T) {
 first, err1 := llm.replay_record({
     record_id: "rec-1"
     replay_key: "turn:1"
-    request: {model: "mock" messages: {llm.user("first")}}
-    response: {status: "final_answer" text: "first" calls: {} usage: {}}
+    request: {model: "mock" messages: [llm.user("first")]}
+    response: {status: "final_answer" text: "first" calls: [] usage: {}}
 })
 second, err2 := llm.replay_record({
     record_id: "rec-2"
     replay_key: "turn:2"
-    request: {model: "mock" messages: {llm.user("second")}}
-    response: {status: "final_answer" text: "second" calls: {} usage: {}}
+    request: {model: "mock" messages: [llm.user("second")]}
+    response: {status: "final_answer" text: "second" calls: [] usage: {}}
 })
-fixture, fixture_err := llm.replay_fixture({first, second}, {
+fixture, fixture_err := llm.replay_fixture([first, second], {
     fixture_id: "fixture:strict"
 })
 replay, err := fixture.replay({
     model: "mock"
-    messages: {llm.user("second")}
+    messages: [llm.user("second")]
 }, "turn:2")
 first_replay, first_err := fixture.replay({
     model: "mock"
-    messages: {llm.user("first")}
+    messages: [llm.user("first")]
 }, "turn:1")
 summary := fixture.summary()
 
@@ -415,21 +415,21 @@ next_index := summary.next_index
 
 func TestLLMReplayFixtureReplaySynthesizesOldRecordAndReturnsClone(t *testing.T) {
 	interp := runLLMTestProgram(t, `
-fixture, fixture_err := llm.replay_fixture({
+fixture, fixture_err := llm.replay_fixture([
     {
         record_id: "legacy-rec"
         operation: "llm.turn"
         capability: "generic.ai.turn"
         replay_key: "turn:legacy"
-        request: {model: "mock" messages: {llm.user("legacy")}}
-        response: {status: "final_answer" text: "legacy fixture" calls: {} usage: {}}
+        request: {model: "mock" messages: [llm.user("legacy")]}
+        response: {status: "final_answer" text: "legacy fixture" calls: [] usage: {}}
     },
-}, {
+], {
     fixture_id: "fixture:legacy"
 })
 replay, err := fixture.replay({
     model: "mock"
-    messages: {llm.user("legacy")}
+    messages: [llm.user("legacy")]
 }, "turn:legacy")
 replay.response.text = "mutated"
 stored_text := fixture.records[1].replay.response.text
@@ -452,9 +452,9 @@ record, record_err := llm.replay_record({
     record_id: "rec"
     replay_key: "turn:missing"
     request_hash: "hash:missing"
-    response: {status: "final_answer" text: "ok" calls: {} usage: {}}
+    response: {status: "final_answer" text: "ok" calls: [] usage: {}}
 })
-fixture, fixture_err := llm.replay_fixture({record}, {
+fixture, fixture_err := llm.replay_fixture([record], {
     fixture_id: "fixture:missing"
 })
 replay, err := fixture.replay({model: "mock"}, "turn:missing")
@@ -478,12 +478,12 @@ func TestLLMReplayFixtureReplayCustomIdentityFields(t *testing.T) {
 record_key_only, err1 := llm.replay_record({
     record_id: "rec-key"
     replay_key: "turn:shared"
-    request: {model: "mock" messages: {llm.user("record request")}}
-    response: {status: "final_answer" text: "key only fixture" calls: {} usage: {}}
+    request: {model: "mock" messages: [llm.user("record request")]}
+    response: {status: "final_answer" text: "key only fixture" calls: [] usage: {}}
 })
-fixture_key_only, fixture_err1 := llm.replay_fixture({record_key_only}, {
+fixture_key_only, fixture_err1 := llm.replay_fixture([record_key_only], {
     fixture_id: "fixture:key-only"
-    identity_fields: {"replay_key"}
+    identity_fields: ["replay_key"]
 })
 key_replay, key_err := fixture_key_only.replay({
     replay_key: "turn:shared"
@@ -493,22 +493,22 @@ record_tenant, err2 := llm.replay_record({
     record_id: "rec-tenant"
     tenant_id: "alpha"
     replay_key: "turn:tenant"
-    request: {model: "mock" messages: {llm.user("tenant request")}}
-    response: {status: "final_answer" text: "tenant fixture" calls: {} usage: {}}
+    request: {model: "mock" messages: [llm.user("tenant request")]}
+    response: {status: "final_answer" text: "tenant fixture" calls: [] usage: {}}
 })
-fixture_tenant, fixture_err2 := llm.replay_fixture({record_tenant}, {
+fixture_tenant, fixture_err2 := llm.replay_fixture([record_tenant], {
     fixture_id: "fixture:tenant"
-    identity_fields: {"tenant_id", "replay_key"}
+    identity_fields: ["tenant_id", "replay_key"]
 })
 bad_replay, bad_err := fixture_tenant.replay({
     tenant_id: "beta"
     model: "mock"
-    messages: {llm.user("tenant request")}
+    messages: [llm.user("tenant request")]
 }, "turn:tenant")
 good_replay, good_err := fixture_tenant.replay({
     tenant_id: "alpha"
     model: "mock"
-    messages: {llm.user("tenant request")}
+    messages: [llm.user("tenant request")]
 }, "turn:tenant")
 
 setup_ok := err1 == nil && fixture_err1 == nil && err2 == nil && fixture_err2 == nil
@@ -548,11 +548,11 @@ record_key_only, err1 := llm.replay_record({
     record_id: "rec-key"
     replay_key: "turn:shared"
     request_hash: "hash:any"
-    response: {status: "final_answer" text: "key only fixture" calls: {} usage: {}}
+    response: {status: "final_answer" text: "key only fixture" calls: [] usage: {}}
 })
-fixture_key_only, fixture_err1 := llm.replay_fixture({record_key_only}, {
+fixture_key_only, fixture_err1 := llm.replay_fixture([record_key_only], {
     fixture_id: "fixture:key-only"
-    identity_fields: {"replay_key"}
+    identity_fields: ["replay_key"]
 })
 key_replay, key_err := fixture_key_only.replay({replay_key: "turn:shared"})
 
@@ -564,9 +564,9 @@ record_tool, err2 := llm.replay_record({
     request_hash: "hash:any"
     response: {status: "ok" text: "tool fixture"}
 })
-fixture_tool, fixture_err2 := llm.replay_fixture({record_tool}, {
+fixture_tool, fixture_err2 := llm.replay_fixture([record_tool], {
     fixture_id: "fixture:tool"
-    identity_fields: {"operation", "capability", "replay_key"}
+    identity_fields: ["operation", "capability", "replay_key"]
 })
 tool_replay, tool_err := fixture_tool.replay({
     operation: "tool.call"
@@ -603,9 +603,9 @@ record, record_err := llm.replay_record({
     record_id: "rec"
     replay_key: "turn:1"
     request_hash: "hash:1"
-    response: {status: "final_answer" text: "ok" calls: {} usage: {}}
+    response: {status: "final_answer" text: "ok" calls: [] usage: {}}
 })
-fixture, fixture_err := llm.replay_fixture({record}, {})
+fixture, fixture_err := llm.replay_fixture([record], {})
 bad_request_ok, bad_request_err := pcall(fixture.replay, "request", "turn:1")
 bad_key_ok, bad_key_err := pcall(fixture.replay, {request_hash: "hash:1"}, 1)
 
@@ -646,7 +646,7 @@ index := llm.fixture_index({
         }
     }
 }, {
-    identity_fields: {"operation", "replay_key"}
+    identity_fields: ["operation", "replay_key"]
 })
 gate := llm.validate_fixture_index(index, {
     require_replay_ready: true
@@ -781,7 +781,7 @@ records := {
 }
 index, err := llm.replay_index(records, {
     fixture_id: "fixture:trace"
-    identity_fields: {"operation", "capability", "replay_key", "request_hash"}
+    identity_fields: ["operation", "capability", "replay_key", "request_hash"]
 })
 match := index.match({
     operation: "llm.turn"
@@ -848,7 +848,7 @@ records := {
 }
 index, err := llm.replay_index(records, {
     fixture_id: "fixture:trace"
-    identity_fields: {"operation", "capability", "replay_key", "request_hash"}
+    identity_fields: ["operation", "capability", "replay_key", "request_hash"]
 })
 mismatch := index.match({
     operation: "llm.turn"
@@ -857,7 +857,7 @@ mismatch := index.match({
     request_hash: "sha256:wrong"
 })
 mismatch_event := llm.replay_trace_event(mismatch, {trace_id: "trace-1"})
-exhausted_index, exhausted_index_err := llm.replay_index({}, {})
+exhausted_index, exhausted_index_err := llm.replay_index([], {})
 exhausted := exhausted_index.match({replay_key: "turn:missing"})
 exhausted_event := llm.replay_trace_event(exhausted, {trace_id: "trace-1"})
 missing_ok, missing_err := pcall(llm.replay_trace_event)

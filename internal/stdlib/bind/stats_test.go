@@ -211,7 +211,7 @@ H := linalg.row(1.0, 0.0)
 Q := linalg.eye(2, 0.01)
 state := stats.gaussian_state(linalg.vector(0.0, 1.0), linalg.eye(2))
 measurements := [0.95, 2.05, 2.95, 4.10, 5.00]
-innovations := {}
+innovations := []
 for i := 1; i <= #measurements; i++ {
     state = stats.linear_predict(state, F, Q)
     state = stats.linear_update(state, H, measurements[i], 0.04)
@@ -427,7 +427,7 @@ func TestStatsErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("stats.describe_fields empty table succeeded, want error")
 	}
-	err = execSourceOnInterp(interp, `fields := {}; fields.x = {"bad"}; stats.describe_fields(fields)`)
+	err = execSourceOnInterp(interp, `fields := {}; fields.x = ["bad"]; stats.describe_fields(fields)`)
 	if err == nil {
 		t.Fatal("stats.describe_fields non-numeric field succeeded, want error")
 	}
