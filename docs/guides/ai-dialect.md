@@ -130,7 +130,7 @@ When a package needs a portable tool inventory, wrap the same tools in a
 provider-free registry:
 
 ```leia
-registry := llm.tool_registry({lookup_runbook}, {registry_id: "ops-tools"})
+registry := llm.tool_registry([lookup_runbook], {registry_id: "ops-tools"})
 gate := llm.validate_tool_registry(registry)
 trace := llm.tool_invocation_trace({
     tool_name: "lookup_runbook"
@@ -331,7 +331,7 @@ Use `llm.doc`, `llm.collection`, and `llm.retrieve` for small local evidence
 sets that should be packaged into a turn or agent request.
 
 ```leia
-docs := llm.collection({
+docs := llm.collection([
     llm.doc("Checkout runbook says payment queue owns sev2 incidents.", {
         id: "runbook"
         title: "Checkout runbook"
@@ -344,7 +344,7 @@ docs := llm.collection({
         text: "Search indexing work is unrelated to checkout incidents."
         source: "local/notes"
     })
-})
+])
 
 ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
 result, err := llm.turn({
@@ -390,14 +390,14 @@ writer := llm.agent("writer", func(topic) {
     return {model: "fast", messages: [llm.user(topic)]}, nil
 })
 
-flow := llm.workflow({
+flow := llm.workflow([
     llm.step("draft", func(ctx) {
         return writer(ctx.input)
     })
     llm.step("final", func(ctx) {
         return writer(ctx.input)
     })
-})
+])
 
 result, err := flow.run("release notes")
 ```
@@ -428,14 +428,14 @@ runs through the same sequential workflow engine.
 ```leia
 graph := llm.workflow_graph({
     workflow_id: "research-flow"
-    stages: {
+    stages: [
         llm.stage("plan", plan_fn, {output_ref: "plan_result"})
         llm.stage("final", final_fn, {
-            depends_on: {"plan"}
+            depends_on: ["plan"]
             input_ref: "plan_result"
         })
-    }
-    edges: {{from: "plan", to: "final"}}
+    ]
+    edges: [{from: "plan", to: "final"}]
 })
 result, err := graph.run("release notes")
 ```
@@ -445,7 +445,7 @@ metadata-only planning helpers:
 
 ```leia
 node := llm.plan_node("plan", {node_type: "transform"})
-graph := llm.planning_graph({node}, {}, {id: "research-plan"})
+graph := llm.planning_graph([node], {}, {id: "research-plan"})
 gate := llm.validate_planning_graph(graph)
 trace := llm.planning_trace(graph, {}, {run_id: "research-plan:1"})
 ```
@@ -468,7 +468,7 @@ generated, err := llm.sections({
         llm.user("Project: reusable generation helpers.")
     ]
     evidence: "Evidence: launch checklist is complete."
-    sections: {
+    sections: [
         {
             name: "summary"
             instructions: "Create the summary section."
@@ -479,7 +479,7 @@ generated, err := llm.sections({
             prompt: "Create the risk section."
             output: {risk: "Low", owner: "team"}
         }
-    }
+    ]
 })
 
 headline := generated.values.summary.headline
@@ -506,7 +506,7 @@ contract := llm.report_artifact_contract({
 section_schema := contract.schemas.report_section
 manifest := contract.manifest_template
 manifest.report_id = "release-2026-06"
-manifest.report_sections = {"summary", "risk"}
+manifest.report_sections = ["summary", "risk"]
 manifest.source_annotations = {}
 manifest.ai_disclosure = "AI-assisted draft reviewed by owner."
 ```
@@ -625,11 +625,11 @@ Use policy checks before exposing high-risk tools:
 
 ```leia
 policy := llm.policy()
-ok, err := llm.check_policy({lookup_runbook}, policy)
+ok, err := llm.check_policy([lookup_runbook], policy)
 if err != nil {
     return nil, err
 }
-outcome := llm.policy_outcome({lookup_runbook}, policy)
+outcome := llm.policy_outcome([lookup_runbook], policy)
 event := llm.policy_outcome_event(outcome, {
     trace_id: "policy-review"
     workflow_run_id: "run-42"

@@ -140,7 +140,7 @@ results, raw prompts, or provider completions into the trace payload.
 For package-level inventories, use `llm.tool_registry(tools, opts)`:
 
 ```leia
-registry := llm.tool_registry({lookup}, {registry_id: "research-tools"})
+registry := llm.tool_registry([lookup], {registry_id: "research-tools"})
 gate := llm.validate_tool_registry(registry)
 trace := llm.tool_invocation_trace({tool_name: "lookup"}, {answer: "ok"})
 ```
@@ -445,14 +445,14 @@ metadata, and correlation fields without copying raw evidence text, snippets,
 prompts, completions, or credentials.
 
 ```leia
-docs := llm.collection({
+docs := llm.collection([
     llm.doc("Checkout runbook says payment queue owns sev2 incidents.", {
         id: "runbook"
         title: "Checkout runbook"
         source: "local/runbook"
         tags: ["checkout", "payments"]
     })
-})
+])
 
 ctx := llm.retrieve(docs, "checkout payment sev2", {limit: 1})
 outcome := llm.memory_outcome(ctx, {workflow_run_id: "run-42"})
@@ -498,14 +498,14 @@ Each step is built with `llm.step(name, fn, opts)`, with the stage-shaped alias
 `run(input, opts)` and `mock(fixtures)`.
 
 ```leia
-flow := llm.workflow({
+flow := llm.workflow([
     llm.step("draft", func(ctx) {
         return llm.turn({model: "fast", messages: [llm.user(ctx.input)]})
     })
     llm.step("revise", func(ctx) {
         return llm.turn({model: "fast", messages: [llm.user(ctx.input)]})
     })
-})
+])
 
 result, err := flow.run("release notes")
 ```
@@ -534,15 +534,15 @@ fixtures without introducing a separate scheduler.
 graph := llm.workflow_graph({
     workflow_id: "research-flow"
     entrypoint: "ai.workflow.orchestrate"
-    stages: {
+    stages: [
         llm.stage("plan", plan_fn, {output_ref: "plan_result"})
         llm.stage("finalize", final_fn, {
-            depends_on: {"plan"}
+            depends_on: ["plan"]
             input_ref: "plan_result"
             output_ref: "final_result"
         })
-    }
-    edges: {{from: "plan", to: "finalize"}}
+    ]
+    edges: [{from: "plan", to: "finalize"}]
 })
 result, err := graph.run("topic")
 ```
@@ -564,7 +564,7 @@ plan := llm.plan_node("plan", {
     node_type: "transform"
     retry_policy: {max_attempts: 1 retryable: false backoff: "none"}
 })
-contract := llm.planning_graph({plan}, {}, {id: "research-plan"})
+contract := llm.planning_graph([plan], {}, {id: "research-plan"})
 gate := llm.validate_planning_graph(contract)
 trace := llm.planning_trace(contract, {}, {run_id: "research-plan:1"})
 ```
@@ -585,7 +585,7 @@ generated, err := llm.sections({
     model: "fast"
     messages: [llm.system("Return JSON."), llm.user("Draft the report.")]
     evidence: "Evidence: launch checklist is complete."
-    sections: {
+    sections: [
         {
             name: "summary"
             instructions: "Create the summary section."
@@ -596,7 +596,7 @@ generated, err := llm.sections({
             prompt: "Create the risk section."
             output: {risk: "Low", owner: "team"}
         }
-    }
+    ]
 })
 headline := generated.values.summary.headline
 ```
@@ -668,7 +668,7 @@ Policy helpers operate on tool capability labels:
 
 ```leia
 policy := llm.policy()
-ok, err := llm.check_policy({search_runbook}, policy)
+ok, err := llm.check_policy([search_runbook], policy)
 ```
 
 The default policy is `capability_policy.v1` with `default:
@@ -781,16 +781,16 @@ record, err := llm.replay_record({
     request: {model: "fast", messages: [llm.user("hello")]}
     response: {status: "final_answer", text: "fixture answer"}
 })
-fixture, err := llm.replay_fixture({record}, {fixture_id: "unit-fixture"})
+fixture, err := llm.replay_fixture([record], {fixture_id: "unit-fixture"})
 index := llm.fixture_index({
     fixture_id: "unit-fixtures"
-    fixtures: {
+    fixtures: [
         {
             fixture_key: "turn:1"
             path: "fixtures/turns.json#/records/0"
             schema: "schemas/turn_record.schema.json"
         }
-    }
+    ]
 })
 index_gate := llm.validate_fixture_index(index, {
     require_replay_ready: true
@@ -836,16 +836,16 @@ event := llm.trace_event({
     response_hash: replay.response_hash
     payload: {status: result.status}
 })
-trace := llm.trace_envelope({event}, {trace_id: "unit-trace"})
+trace := llm.trace_envelope([event], {trace_id: "unit-trace"})
 gate := llm.trace_assert(trace, {
     require_provider_free: true
     deny_live_network: true
     deny_secret_values_present: true
     deny_raw_prompt_stored: true
     max_status_counts: {error: 0}
-    required_event_types: {"turn_end"}
+    required_event_types: ["turn_end"]
     require_event_payload_fields: {
-        turn_end: {"status"}
+        turn_end: ["status"]
     }
 })
 match := fixture.match({

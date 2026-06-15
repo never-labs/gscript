@@ -126,7 +126,7 @@ These are scoped changes. They must not leak into the caller after the block.
 Long-running commands need streaming output:
 
 ```leia
-proc := cmd.start("leia", {"run", "main.leia"})
+proc := cmd.start("leia", ["run", "main.leia"])
 for line := range proc.stdout {
     print("[game]", line)
 }
