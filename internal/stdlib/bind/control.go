@@ -101,6 +101,47 @@ func BuildControl() *Table {
 		return []Value{FloatValue(u[0])}, nil
 	})
 
+	set("policy", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("control.policy: need gain")
+		}
+		if _, err := controlGainDimension(args[0], "control.policy"); err != nil {
+			return nil, err
+		}
+		policy := NewTable()
+		policy.RawSetString("kind", StringValue("control_policy"))
+		policy.RawSetString("gain", args[0])
+		if len(args) >= 2 {
+			if !args[1].IsTable() {
+				return nil, fmt.Errorf("control.policy: options must be a table")
+			}
+			policy.RawSetString("options", TableValue(controlCopyTable(args[1].Table())))
+		} else {
+			policy.RawSetString("options", TableValue(NewTable()))
+		}
+		return []Value{TableValue(policy)}, nil
+	})
+
+	set("apply", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("control.apply: need policy and state")
+		}
+		policy, err := controlPolicyFromValue(args[0], "control.apply")
+		if err != nil {
+			return nil, err
+		}
+		opts := controlCopyTable(policy.options)
+		if len(args) >= 3 {
+			if !args[2].IsTable() {
+				return nil, fmt.Errorf("control.apply: options must be a table")
+			}
+			for _, key := range args[2].Table().PairsKeysSnapshot() {
+				opts.RawSet(key, args[2].Table().RawGet(key))
+			}
+		}
+		return t.RawGetString("feedback").GoFunction().Fn([]Value{policy.gain, args[1], TableValue(opts)})
+	})
+
 	set("lqr", controlLQR)
 
 	set("lqr2", func(args []Value) ([]Value, error) {
@@ -273,6 +314,67 @@ func controlRMatrix(value Value, inputs int) (controlDenseMatrix, error) {
 		return controlDenseMatrix{}, fmt.Errorf("control.lqr: R must be %dx%d", inputs, inputs)
 	}
 	return R, nil
+}
+
+type controlPolicyValue struct {
+	gain    Value
+	options *Table
+}
+
+func controlPolicyFromValue(value Value, name string) (controlPolicyValue, error) {
+	if !value.IsTable() {
+		return controlPolicyValue{}, fmt.Errorf("%s: policy expected, got %s", name, value.TypeName())
+	}
+	t := value.Table()
+	kind := t.RawGetString("kind")
+	if !kind.IsString() || kind.Str() != "control_policy" {
+		return controlPolicyValue{}, fmt.Errorf("%s: policy expected", name)
+	}
+	gain := t.RawGetString("gain")
+	if gain.IsNil() {
+		return controlPolicyValue{}, fmt.Errorf("%s: policy missing gain", name)
+	}
+	if _, err := controlGainDimension(gain, name); err != nil {
+		return controlPolicyValue{}, err
+	}
+	options := t.RawGetString("options")
+	if options.IsNil() {
+		return controlPolicyValue{gain: gain, options: NewTable()}, nil
+	}
+	if !options.IsTable() {
+		return controlPolicyValue{}, fmt.Errorf("%s: policy options must be a table", name)
+	}
+	return controlPolicyValue{gain: gain, options: options.Table()}, nil
+}
+
+func controlGainDimension(value Value, name string) (int, error) {
+	if rows, cols, _, ok, err := linalgMatrixValue(name, value); err != nil {
+		return 0, err
+	} else if ok {
+		if rows <= 0 || cols <= 0 {
+			return 0, fmt.Errorf("%s: gain must not be empty", name)
+		}
+		return cols, nil
+	}
+	gain, err := linalgVectorValue(name, value)
+	if err != nil {
+		return 0, err
+	}
+	if len(gain) == 0 {
+		return 0, fmt.Errorf("%s: gain must not be empty", name)
+	}
+	return len(gain), nil
+}
+
+func controlCopyTable(src *Table) *Table {
+	dst := NewTable()
+	if src == nil {
+		return dst
+	}
+	for _, key := range src.PairsKeysSnapshot() {
+		dst.RawSet(key, src.RawGet(key))
+	}
+	return dst
 }
 
 func controlValidateSymmetric(name string, matrix controlDenseMatrix, tolerance float64) error {

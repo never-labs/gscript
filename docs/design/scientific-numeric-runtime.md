@@ -193,6 +193,8 @@ example-specific shortcuts:
   vector evolution from reusable distribution objects.
 - `control.lqr`, `control.feedback`, `control.saturate`, and
   `control.wrap_angle` for small control systems.
+- `control.policy(gain[, opts])` and `control.apply(policy, state[, opts])`
+  for reusable feedback policies with optional per-call overrides.
 - `ode.integrate` and `ode.solve` for RK4-style simulation with projection,
   scalar or table-shaped observation hooks, and result-object access.
 - `ode.solve(..., {state_names: {...}, wrap_angles: {...}})` for named final

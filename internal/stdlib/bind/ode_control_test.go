@@ -90,6 +90,40 @@ func TestControlModulePrimitives(t *testing.T) {
 	}
 	assertTableFloat(t, got[0], 1, 8)
 	assertTableFloat(t, got[0], 2, 14)
+
+	policyFn := control.RawGetString("policy").GoFunction()
+	apply := control.RawGetString("apply").GoFunction()
+	policy, err := policyFn.Fn([]Value{
+		DenseArrayValue(NewDenseArrayF64([]float64{2, 3})),
+		TableValue(controlTestOptions(map[string]Value{"limit": FloatValue(10)})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := policy[0].Table().RawGetString("kind"); !got.IsString() || got.Str() != "control_policy" {
+		t.Fatalf("control.policy kind = %v, want control_policy", got)
+	}
+	got, err = apply.Fn([]Value{
+		policy[0],
+		DenseArrayValue(NewDenseArrayF64([]float64{4, 5})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Number() != -10 {
+		t.Fatalf("control.apply = %v, want -10", got[0])
+	}
+	got, err = apply.Fn([]Value{
+		policy[0],
+		DenseArrayValue(NewDenseArrayF64([]float64{4, 5})),
+		TableValue(controlTestOptions(map[string]Value{"limit": FloatValue(5)})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Number() != -5 {
+		t.Fatalf("control.apply override = %v, want -5", got[0])
+	}
 }
 
 func TestControlLQR2ReturnsFiniteGain(t *testing.T) {
