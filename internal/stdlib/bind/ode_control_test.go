@@ -168,6 +168,29 @@ func TestControlModulePrimitives(t *testing.T) {
 	}); err == nil || !strings.Contains(err.Error(), "without state_names") {
 		t.Fatalf("control.policy wrap name error = %v, want state_names requirement", err)
 	}
+
+	stateDescriptor := controlTestOptions(map[string]Value{
+		"names":       controlTestStringTable("theta", "omega"),
+		"wrap":        controlTestStringTable("theta"),
+		"named_state": BoolValue(true),
+	})
+	descriptorPolicy, err := policyFn.Fn([]Value{
+		DenseArrayValue(NewDenseArrayF64([]float64{2, 3})),
+		TableValue(controlTestOptions(map[string]Value{
+			"state": TableValue(stateDescriptor),
+			"limit": FloatValue(10),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = apply.Fn([]Value{descriptorPolicy[0], TableValue(state)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(got[0].Number()+6) > 1e-12 {
+		t.Fatalf("descriptor control.apply = %.17g, want -6", got[0].Number())
+	}
 }
 
 func TestControlLQR2ReturnsFiniteGain(t *testing.T) {
@@ -816,6 +839,49 @@ func TestODESolveNamedStateInputForDynamicsProjectAndObserve(t *testing.T) {
 	assertFloat(t, observed.RawGetString("x").Table().RawGetInt(2), 0.02)
 	assertFloat(t, observed.RawGetString("v").Table().RawGetInt(2), 0.2)
 	assertFloat(t, observed.RawGetString("speed").Table().RawGetInt(2), 0.2)
+}
+
+func TestODESolveAcceptsSharedStateDescriptor(t *testing.T) {
+	calls := 0
+	ode := BuildODE(func(fn Value, args []Value) ([]Value, error) {
+		calls++
+		if !args[0].IsTable() {
+			t.Fatalf("state = %s, want named table", args[0].TypeName())
+		}
+		state := args[0].Table()
+		return []Value{TableValue(controlTestOptions(map[string]Value{
+			"theta": state.RawGetString("omega"),
+			"omega": FloatValue(0),
+		}))}, nil
+	})
+	stateDescriptor := controlTestOptions(map[string]Value{
+		"names":       controlTestStringTable("theta", "omega"),
+		"wrap":        controlTestStringTable("theta"),
+		"named_state": BoolValue(true),
+	})
+	solve := ode.RawGetString("solve").GoFunction()
+	got, err := solve.Fn([]Value{
+		FunctionValue(&GoFunction{Name: "test.dyn"}),
+		DenseArrayValue(NewDenseArrayF64([]float64{2 * math.Pi, 1})),
+		TableValue(controlTestOptions(map[string]Value{
+			"dt":    FloatValue(0.1),
+			"steps": IntValue(1),
+			"state": TableValue(stateDescriptor),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 4 {
+		t.Fatalf("calls = %d, want RK4 calls", calls)
+	}
+	result := got[0].Table()
+	finalState := result.RawGetString("final_state").Table()
+	assertFloat(t, finalState.RawGetString("theta"), 0.1)
+	assertFloat(t, finalState.RawGetString("omega"), 1)
+	observed := result.RawGetString("observed").Table()
+	assertFloat(t, observed.RawGetString("theta").Table().RawGetInt(1), 0.1)
+	assertFloat(t, observed.RawGetString("omega").Table().RawGetInt(1), 1)
 }
 
 func TestODESolveNamedStateInputRequiresStateNames(t *testing.T) {

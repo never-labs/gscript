@@ -30,7 +30,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.policy", "control.apply", "ode.solve", "state_names", "named_state", "x.theta", "x.omega", "wrap_angles", "final_state", "stats.describe_fields", "math.near", "q {", "avg ${observed}.energy", "assert(math.near(q_checksum, mean_energy, 0.000000001))"},
+			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.policy", "control.apply", "ode.solve", "pendulum_state := {names:", "state: pendulum_state", "named_state", "x.theta", "x.omega", "wrap:", "final_state", "stats.describe_fields", "math.near", "q {", "avg ${observed}.energy", "assert(math.near(q_checksum, mean_energy, 0.000000001))"},
 		},
 	}
 	for _, tc := range cases {
@@ -65,6 +65,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "theta := control.wrap_angle") {
 				t.Fatalf("%s manually wraps controller angle instead of using policy wrap metadata", tc.rel)
+			}
+			if strings.Contains(text, "state_names") || strings.Count(text, "wrap_angles") > 0 {
+				t.Fatalf("%s should use a shared state descriptor instead of repeated state_names/wrap_angles options", tc.rel)
 			}
 			for _, forbidden := range []string{"stats.linear_filter", "rand.particle_filter", "ode.closed_loop"} {
 				if strings.Contains(text, forbidden) {

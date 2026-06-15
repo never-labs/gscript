@@ -13,7 +13,8 @@ Q := linalg.diag(12.0, 1.5)
 linalg_probe := linalg.matrix(2, 2, {0.0, 1.0, g / l, 0.0})
 R := 0.18
 K := control.lqr(A, B, Q, R, {iterations: 16000, step: 0.001})
-stabilizer := control.policy(K, {limit: 8.0, state_names: {"theta", "omega"}, wrap_angles: {"theta"}})
+pendulum_state := {names: {"theta", "omega"}, wrap: {"theta"}, named_state: true}
+stabilizer := control.policy(K, {limit: 8.0, state: pendulum_state})
 
 state := {0.22, 0.0}
 
@@ -31,7 +32,7 @@ func observe_energy(x, step, t) {
     }
 }
 
-solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state_names: {"theta", "omega"}, named_state: true, wrap_angles: {"theta"}, observe: observe_energy})
+solution := ode.solve(dynamics, state, {dt: dt, steps: 240, trajectory: true, state: pendulum_state, observe: observe_energy})
 trajectory := solution.trajectory
 observed := solution.observed
 final_theta := solution.final_state.theta

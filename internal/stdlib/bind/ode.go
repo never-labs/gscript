@@ -1,9 +1,6 @@
 package bind
 
-import (
-	"fmt"
-	"math"
-)
+import "fmt"
 
 // BuildODE creates the "ode" standard library table.
 func BuildODE(call ScriptFunctionCaller) *Table {
@@ -61,9 +58,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		var project, observe Value
 		hasProject := false
 		hasObserve := false
-		var stateNames []string
-		var wrapAngles []int
-		namedStateInput := false
+		var meta stateMeta
 		if len(args) >= 5 && args[4].IsTable() {
 			opts := args[4].Table()
 			trajectory = opts.RawGetString("trajectory").Truthy()
@@ -80,27 +75,19 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 				return nil, fmt.Errorf("ode.integrate: observe must be a function")
 			}
 			hasObserve = observe.IsFunction()
-			stateNames, err = odeStateNamesFromOptions("ode.integrate", opts, len(state))
+			meta, err = stateMetaFromOptions("ode.integrate", opts, len(state), "state length")
 			if err != nil {
 				return nil, err
 			}
-			wrapAngles, err = odeWrapAnglesFromOptions("ode.integrate", opts, len(state), stateNames)
-			if err != nil {
-				return nil, err
-			}
-			namedStateInput = opts.RawGetString("named_state").Truthy()
-			if !namedStateInput {
-				namedStateInput = opts.RawGetString("namedState").Truthy()
-			}
-			if namedStateInput && len(stateNames) == 0 {
+			if meta.named && len(meta.names) == 0 {
 				return nil, fmt.Errorf("ode.integrate: named_state requires state_names")
 			}
 		}
-		hasNamedState := len(stateNames) > 0
+		hasNamedState := len(meta.names) > 0
 		stateArg := odeStateValue
-		if namedStateInput {
+		if meta.named {
 			stateArg = func(s []float64) Value {
-				return TableValue(odeNamedStateTable(stateNames, s))
+				return TableValue(namedStateTable(meta.names, s))
 			}
 		}
 		if call == nil {
@@ -118,7 +105,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		}
 		current := append([]float64(nil), state...)
 		for i := 0; i < steps; i++ {
-			next, err := odeRK4Step(call, fn, current, dt, "ode.integrate", stateArg, stateNames)
+			next, err := odeRK4Step(call, fn, current, dt, "ode.integrate", stateArg, meta.names)
 			if err != nil {
 				return nil, err
 			}
@@ -133,12 +120,12 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 				if len(projected) == 0 {
 					return nil, fmt.Errorf("ode.integrate: project returned no state")
 				}
-				current, err = odeVectorFromValueNamed(projected[0], "ode.integrate projected state", stateNames)
+				current, err = odeVectorFromValueNamed(projected[0], "ode.integrate projected state", meta.names)
 				if err != nil {
 					return nil, err
 				}
 			}
-			odeWrapAngleIndexes(current, wrapAngles)
+			wrapStateIndexes(current, meta.wrap)
 			if trajectory {
 				states.RawSetInt(int64(i+1), odeStateValue(current))
 			}
@@ -155,7 +142,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 					observedValue = observed[0]
 				}
 				if hasNamedState {
-					row := odeNamedStateTable(stateNames, current)
+					row := namedStateTable(meta.names, current)
 					if hasObserve {
 						if observedValue.IsTable() {
 							if err := odeMergeObservationTable(row, observedValue.Table(), i+1); err != nil {
@@ -243,16 +230,16 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 		trajectory := false
 		hasObserve := false
 		hasNamedState := false
-		var stateNames []string
+		var meta stateMeta
 		if hasOpts {
 			options := opts.Table()
 			trajectory = options.RawGetString("trajectory").Truthy()
 			hasObserve = options.RawGetString("observe").IsFunction()
-			stateNames, err = odeStateNamesFromOptions("ode.solve", options, len(stateValues))
+			meta, err = stateMetaFromOptions("ode.solve", options, len(stateValues), "state length")
 			if err != nil {
 				return nil, err
 			}
-			hasNamedState = len(stateNames) > 0
+			hasNamedState = len(meta.names) > 0
 			integrateArgs = append(integrateArgs, opts)
 		}
 		values, err := integrate(integrateArgs)
@@ -266,7 +253,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			if err != nil {
 				return nil, err
 			}
-			out.RawSetString("final_state", TableValue(odeNamedStateTable(stateNames, finalValues)))
+			out.RawSetString("final_state", TableValue(namedStateTable(meta.names, finalValues)))
 		}
 		next := 1
 		if trajectory {
@@ -343,7 +330,7 @@ func odeVectorFromValue(v Value, name string) ([]float64, error) {
 
 func odeVectorFromValueNamed(v Value, name string, stateNames []string) ([]float64, error) {
 	if len(stateNames) > 0 && v.IsTable() && !v.Table().RawGetString(stateNames[0]).IsNil() {
-		return odeNamedVectorFromTable(v.Table(), name, stateNames)
+		return namedStateVectorFromTable(name, v.Table(), stateNames)
 	}
 	values, err := odeVectorFromValue(v, name)
 	if err == nil {
@@ -352,132 +339,11 @@ func odeVectorFromValueNamed(v Value, name string, stateNames []string) ([]float
 	if len(stateNames) == 0 || !v.IsTable() {
 		return nil, err
 	}
-	return odeNamedVectorFromTable(v.Table(), name, stateNames)
-}
-
-func odeNamedVectorFromTable(t *Table, name string, stateNames []string) ([]float64, error) {
-	out := make([]float64, len(stateNames))
-	for i, stateName := range stateNames {
-		value := t.RawGetString(stateName)
-		if value.IsNil() {
-			return nil, fmt.Errorf("%s: missing field %q", name, stateName)
-		}
-		number, numberErr := linalgNumber(name, value)
-		if numberErr != nil {
-			return nil, fmt.Errorf("%s: field %q must be numeric", name, stateName)
-		}
-		out[i] = number
-	}
-	return out, nil
+	return namedStateVectorFromTable(name, v.Table(), stateNames)
 }
 
 func odeStateValue(state []float64) Value {
 	return DenseArrayValue(NewDenseArrayF64Owned(append([]float64(nil), state...)))
-}
-
-func odeStateNamesFromOptions(name string, opts *Table, stateLen int) ([]string, error) {
-	value := opts.RawGetString("state_names")
-	if value.IsNil() {
-		value = opts.RawGetString("names")
-	}
-	if value.IsNil() {
-		return nil, nil
-	}
-	if !value.IsTable() {
-		return nil, fmt.Errorf("%s: state_names must be a string table", name)
-	}
-	t := value.Table()
-	if t.Length() != stateLen {
-		return nil, fmt.Errorf("%s: state_names length %d does not match state length %d", name, t.Length(), stateLen)
-	}
-	seen := make(map[string]bool, t.Length())
-	names := make([]string, t.Length())
-	for i := range names {
-		item := t.RawGetInt(int64(i + 1))
-		if !item.IsString() {
-			return nil, fmt.Errorf("%s: state_names[%d] must be a string, got %s", name, i+1, item.TypeName())
-		}
-		field := item.Str()
-		if field == "" {
-			return nil, fmt.Errorf("%s: state_names[%d] must not be empty", name, i+1)
-		}
-		if seen[field] {
-			return nil, fmt.Errorf("%s: duplicate state name %q", name, field)
-		}
-		seen[field] = true
-		names[i] = field
-	}
-	return names, nil
-}
-
-func odeWrapAnglesFromOptions(name string, opts *Table, stateLen int, stateNames []string) ([]int, error) {
-	value := opts.RawGetString("wrap_angles")
-	if value.IsNil() {
-		value = opts.RawGetString("wrap")
-	}
-	if value.IsNil() {
-		return nil, nil
-	}
-	var items []Value
-	if value.IsTable() {
-		t := value.Table()
-		items = make([]Value, t.Length())
-		for i := range items {
-			items[i] = t.RawGetInt(int64(i + 1))
-		}
-	} else {
-		items = []Value{value}
-	}
-	nameToIndex := map[string]int{}
-	for i, stateName := range stateNames {
-		nameToIndex[stateName] = i
-	}
-	seen := make(map[int]bool, len(items))
-	out := make([]int, 0, len(items))
-	for i, item := range items {
-		var idx int
-		switch {
-		case item.IsString():
-			if len(nameToIndex) == 0 {
-				return nil, fmt.Errorf("%s: wrap_angles[%d] uses name %q without state_names", name, i+1, item.Str())
-			}
-			var ok bool
-			idx, ok = nameToIndex[item.Str()]
-			if !ok {
-				return nil, fmt.Errorf("%s: wrap_angles[%d] unknown state name %q", name, i+1, item.Str())
-			}
-		case item.IsNumber():
-			n, err := linalgPositiveInt(name, item, fmt.Sprintf("wrap_angles[%d]", i+1))
-			if err != nil {
-				return nil, err
-			}
-			if n > stateLen {
-				return nil, fmt.Errorf("%s: wrap_angles[%d] index %d out of range for state length %d", name, i+1, n, stateLen)
-			}
-			idx = n - 1
-		default:
-			return nil, fmt.Errorf("%s: wrap_angles[%d] must be a state name or 1-based index, got %s", name, i+1, item.TypeName())
-		}
-		if !seen[idx] {
-			seen[idx] = true
-			out = append(out, idx)
-		}
-	}
-	return out, nil
-}
-
-func odeWrapAngleIndexes(state []float64, indexes []int) {
-	for _, idx := range indexes {
-		state[idx] = math.Atan2(math.Sin(state[idx]), math.Cos(state[idx]))
-	}
-}
-
-func odeNamedStateTable(names []string, state []float64) *Table {
-	t := NewTable()
-	for i, name := range names {
-		t.RawSetString(name, FloatValue(state[i]))
-	}
-	return t
 }
 
 func odeMergeObservationTable(dst, src *Table, step int) error {

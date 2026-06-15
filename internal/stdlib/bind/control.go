@@ -409,152 +409,51 @@ func controlCopyTable(src *Table) *Table {
 }
 
 func controlValidatePolicyOptions(name string, opts *Table, stateDim int) error {
-	stateNames, err := controlStateNamesFromOptions(name, opts, stateDim)
+	meta, err := stateMetaFromOptions(name, opts, stateDim, "gain dimension")
 	if err != nil {
 		return err
 	}
-	_, err = controlWrapAnglesFromOptions(name, opts, stateDim, stateNames)
-	return err
+	return controlStorePolicyStateMeta(opts, meta)
 }
 
 func controlPolicyStateValue(name string, value Value, opts *Table, stateDim int) (Value, error) {
-	stateNames, err := controlStateNamesFromOptions(name, opts, stateDim)
+	meta, err := stateMetaFromOptions(name, opts, stateDim, "gain dimension")
 	if err != nil {
 		return NilValue(), err
 	}
-	if len(stateNames) == 0 {
+	if len(meta.names) == 0 {
 		return value, nil
 	}
-	state, err := controlStateVectorFromValue(name, value, stateNames)
+	state, err := stateVectorFromValue(name, value, meta.names)
 	if err != nil {
 		return NilValue(), err
 	}
-	wrapAngles, err := controlWrapAnglesFromOptions(name, opts, stateDim, stateNames)
-	if err != nil {
-		return NilValue(), err
-	}
-	for _, idx := range wrapAngles {
-		state[idx] = math.Atan2(math.Sin(state[idx]), math.Cos(state[idx]))
-	}
+	wrapStateIndexes(state, meta.wrap)
 	return DenseArrayValue(NewDenseArrayF64Owned(state)), nil
 }
 
-func controlStateVectorFromValue(name string, value Value, stateNames []string) ([]float64, error) {
-	if value.IsTable() && len(stateNames) > 0 && !value.Table().RawGetString(stateNames[0]).IsNil() {
-		return controlNamedStateVector(name, value.Table(), stateNames)
+func controlStorePolicyStateMeta(opts *Table, meta stateMeta) error {
+	if opts == nil || meta.sourceKey == "" {
+		return nil
 	}
-	values, err := linalgVectorValue(name, value)
-	if err != nil {
-		return nil, err
-	}
-	if len(values) != len(stateNames) {
-		return nil, fmt.Errorf("%s: state length %d does not match state_names length %d", name, len(values), len(stateNames))
-	}
-	return values, nil
-}
-
-func controlNamedStateVector(name string, state *Table, stateNames []string) ([]float64, error) {
-	out := make([]float64, len(stateNames))
-	for i, stateName := range stateNames {
-		value := state.RawGetString(stateName)
-		if value.IsNil() {
-			return nil, fmt.Errorf("%s: state missing field %q", name, stateName)
-		}
-		x, err := linalgNumber(name, value)
-		if err != nil {
-			return nil, fmt.Errorf("%s: state field %q must be numeric", name, stateName)
-		}
-		out[i] = x
-	}
-	return out, nil
-}
-
-func controlStateNamesFromOptions(name string, opts *Table, stateDim int) ([]string, error) {
-	value := opts.RawGetString("state_names")
-	if value.IsNil() {
-		value = opts.RawGetString("stateNames")
-	}
-	if value.IsNil() {
-		return nil, nil
-	}
-	if !value.IsTable() {
-		return nil, fmt.Errorf("%s: state_names must be a string table", name)
-	}
-	t := value.Table()
-	if t.Length() != stateDim {
-		return nil, fmt.Errorf("%s: state_names length %d does not match gain dimension %d", name, t.Length(), stateDim)
-	}
-	seen := make(map[string]bool, t.Length())
-	names := make([]string, t.Length())
-	for i := range names {
-		item := t.RawGetInt(int64(i + 1))
-		if !item.IsString() {
-			return nil, fmt.Errorf("%s: state_names[%d] must be a string, got %s", name, i+1, item.TypeName())
-		}
-		field := item.Str()
-		if field == "" {
-			return nil, fmt.Errorf("%s: state_names[%d] must not be empty", name, i+1)
-		}
-		if seen[field] {
-			return nil, fmt.Errorf("%s: duplicate state name %q", name, field)
-		}
-		seen[field] = true
-		names[i] = field
-	}
-	return names, nil
-}
-
-func controlWrapAnglesFromOptions(name string, opts *Table, stateDim int, stateNames []string) ([]int, error) {
-	value := opts.RawGetString("wrap_angles")
-	if value.IsNil() {
-		value = opts.RawGetString("wrap")
-	}
-	if value.IsNil() {
-		return nil, nil
-	}
-	var items []Value
-	if value.IsTable() {
-		t := value.Table()
-		items = make([]Value, t.Length())
-		for i := range items {
-			items[i] = t.RawGetInt(int64(i + 1))
-		}
-	} else {
-		items = []Value{value}
-	}
-	nameToIndex := map[string]int{}
-	for i, stateName := range stateNames {
-		nameToIndex[stateName] = i
-	}
-	seen := make(map[int]bool, len(items))
-	out := make([]int, 0, len(items))
-	for i, item := range items {
-		var idx int
-		switch {
-		case item.IsString():
-			if len(nameToIndex) == 0 {
-				return nil, fmt.Errorf("%s: wrap_angles[%d] uses name %q without state_names", name, i+1, item.Str())
+	source := opts.RawGetString(meta.sourceKey)
+	if source.IsTable() {
+		if opts.RawGetString("state_names").IsNil() && opts.RawGetString("stateNames").IsNil() {
+			if names := source.Table().RawGetString("state_names"); !names.IsNil() {
+				opts.RawSetString("state_names", names)
+			} else if names := source.Table().RawGetString("names"); !names.IsNil() {
+				opts.RawSetString("state_names", names)
 			}
-			var ok bool
-			idx, ok = nameToIndex[item.Str()]
-			if !ok {
-				return nil, fmt.Errorf("%s: wrap_angles[%d] unknown state name %q", name, i+1, item.Str())
-			}
-		case item.IsInt():
-			n := int(item.Int())
-			if n < 1 || n > stateDim {
-				return nil, fmt.Errorf("%s: wrap_angles[%d] index out of range", name, i+1)
-			}
-			idx = n - 1
-		default:
-			return nil, fmt.Errorf("%s: wrap_angles[%d] must be a state name or 1-based index, got %s", name, i+1, item.TypeName())
 		}
-		if !seen[idx] {
-			seen[idx] = true
-			out = append(out, idx)
+		if opts.RawGetString("wrap_angles").IsNil() && opts.RawGetString("wrap").IsNil() {
+			if wrap := source.Table().RawGetString("wrap_angles"); !wrap.IsNil() {
+				opts.RawSetString("wrap_angles", wrap)
+			} else if wrap := source.Table().RawGetString("wrap"); !wrap.IsNil() {
+				opts.RawSetString("wrap_angles", wrap)
+			}
 		}
 	}
-	return out, nil
+	return nil
 }
 
 func controlValidateSymmetric(name string, matrix controlDenseMatrix, tolerance float64) error {
