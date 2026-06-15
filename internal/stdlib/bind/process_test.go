@@ -79,7 +79,7 @@ func TestProcessRunContextCancelled(t *testing.T) {
 	})
 	interp.SetGlobal("ctx", runtime.TableValue(runtime.NewScriptContextTable(state)))
 	execOnInterp(t, interp, `
-result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
+result := process.run(ctx, ["sh", "-c", "sleep 1; echo late"])
 `)
 
 	v := interp.GetGlobal("result")

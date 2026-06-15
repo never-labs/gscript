@@ -7,13 +7,13 @@ import (
 
 func TestDialectDelimitedParseAndEncode(t *testing.T) {
 	interp := runWithLib(t, `
-		csv_text := dialect.eval("csv", {{"name", "score"}, {"Ada", 42}, {"Bob", 7}}, {mode: "encode"})
+		csv_text := dialect.eval("csv", [["name", "score"], ["Ada", 42], ["Bob", 7]], {mode: "encode"})
 		csv_roundtrip := dialect.eval("csv", csv_text)
-		csv_header_text := dialect.eval("csv", {{name: "Ada", score: 42}, {name: "Bob", score: 7}}, {mode: "encode", headers: {"name", "score"}})
+		csv_header_text := dialect.eval("csv", [{name: "Ada", score: 42}, {name: "Bob", score: 7}], {mode: "encode", headers: ["name", "score"]})
 		csv_header_roundtrip := dialect.eval("csv", csv_header_text, {headers: true})
-		tsv_text := dialect.eval("tsv", {{"name", "score"}, {"Ada", 42}}, {mode: "encode"})
+		tsv_text := dialect.eval("tsv", [["name", "score"], ["Ada", 42]], {mode: "encode"})
 		tsv_roundtrip := dialect.eval("tsv", tsv_text)
-		bad, bad_err := dialect.eval("csv", {"not a row"}, {mode: "encode"})
+		bad, bad_err := dialect.eval("csv", ["not a row"], {mode: "encode"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if got, want := interp.GetGlobal("csv_text").Str(), "name,score\nAda,42\nBob,7\n"; got != want {
@@ -349,11 +349,11 @@ func TestDialectTextModeAliasesKeepDirectionInference(t *testing.T) {
 		json_decoded := dialect.eval("json", "{\"name\":\"Ada\"}", {mode: "decode"})
 		json_encoded := dialect.eval("json", {name: "Ada"}, {mode: "format"})
 		jsonptr_lookup := dialect.eval("jsonptr", {data: {name: "Ada"}, path: "/name"}, {mode: "lookup"})
-		jsonptr_encoded := dialect.eval("jsonptr", {"a/b", "c~d"}, {mode: "format"})
+		jsonptr_encoded := dialect.eval("jsonptr", ["a/b", "c~d"], {mode: "format"})
 		jsonl_rows := dialect.eval("jsonl", "{\"x\":1}\n", {mode: "parse"})
-		jsonl_text := dialect.eval("jsonl", {{x: 1}}, {mode: "format"})
+		jsonl_text := dialect.eval("jsonl", [{x: 1}], {mode: "format"})
 		csv_rows := dialect.eval("csv", "a,b\n", {mode: "decode"})
-		csv_text := dialect.eval("csv", {{"a", "b"}}, {mode: "format"})
+		csv_text := dialect.eval("csv", [["a", "b"]], {mode: "format"})
 		kv_table := dialect.eval("kv", "a=1", {mode: "parse"})
 		kv_text := dialect.eval("kv", {a: 1}, {mode: "format"})
 		logfmt_table := dialect.eval("logfmt", "a=1", {mode: "decode"})
@@ -365,7 +365,7 @@ func TestDialectTextModeAliasesKeepDirectionInference(t *testing.T) {
 		duration_table := dialect.eval("duration", "1s", {mode: "decode"})
 		duration_text := dialect.eval("duration", {seconds: 1}, {mode: "format"})
 		tap_rows := dialect.eval("tap", "1..1\nok 1\n", {mode: "parse"})
-		tap_text := dialect.eval("tap", {{kind: "plan", first: 1, last: 1}, {kind: "test", ok: true, number: 1}}, {mode: "format"})
+		tap_text := dialect.eval("tap", [{kind: "plan", first: 1, last: 1}, {kind: "test", ok: true, number: 1}], {mode: "format"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if got := interp.GetGlobal("json_decoded").Table().RawGetString("name").Str(); got != "Ada" {

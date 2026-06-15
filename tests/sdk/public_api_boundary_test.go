@@ -177,7 +177,7 @@ func TestPublicValueBoundaryWorksWithoutRawRuntimeTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := vm.Exec(`
-		config := {label: "answer", values: {limit, 2}}
+		config := {label: "answer", values: [limit, 2]}
 		func add(a, b) { return a + b }
 		result := add(config.values[1], config.values[2])
 	`); err != nil {

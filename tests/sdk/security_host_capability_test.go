@@ -133,7 +133,7 @@ func TestWithFilesystemRootConfinesProcessRunDir(t *testing.T) {
 				leia.WithFilesystemRoot(root),
 			}, tc.opts...)
 			vm := leia.New(opts...)
-			src := fmt.Sprintf(`result := process.run({"pwd"}, {dir: %q})`, outside)
+			src := fmt.Sprintf(`result := process.run(["pwd"], {dir: %q})`, outside)
 			err := vm.Exec(src)
 			if err == nil || !strings.Contains(err.Error(), "filesystem access denied") {
 				t.Fatalf("process.run dir escape err = %v, want filesystem access denied", err)
@@ -156,7 +156,7 @@ func TestProcessRunEnvFollowsEnvironmentPolicy(t *testing.T) {
 				leia.WithEnvironmentWrite(false),
 			}, tc.opts...)
 			vm := leia.New(opts...)
-			err := vm.Exec(`result := process.run({"pwd"}, {env: {LEIA_PROCESS_ENV_POLICY_TEST: "blocked"}})`)
+			err := vm.Exec(`result := process.run(["pwd"], {env: {LEIA_PROCESS_ENV_POLICY_TEST: "blocked"}})`)
 			if err == nil || !strings.Contains(err.Error(), "environment write access disabled") {
 				t.Fatalf("process.run env err = %v, want environment write access disabled", err)
 			}
@@ -168,7 +168,7 @@ func TestProcessRunEnvFollowsEnvironmentPolicy(t *testing.T) {
 				leia.WithEnvironmentAllowlist("LEIA_PROCESS_ENV_ALLOWED"),
 			}, tc.opts...)
 			vm := leia.New(opts...)
-			err := vm.Exec(`result := process.run({"pwd"}, {env: {LEIA_PROCESS_ENV_BLOCKED: "blocked"}})`)
+			err := vm.Exec(`result := process.run(["pwd"], {env: {LEIA_PROCESS_ENV_BLOCKED: "blocked"}})`)
 			if err == nil || !strings.Contains(err.Error(), "environment variable not allowed: LEIA_PROCESS_ENV_BLOCKED") {
 				t.Fatalf("process.run env allowlist err = %v, want environment variable not allowed", err)
 			}

@@ -47,7 +47,7 @@ func sample(a, b, ...) {
 	return a + b, "done"
 }
 numberInfo := testkit.value(42)
-tableInfo := testkit.value({1, 2, 3})
+tableInfo := testkit.value([1, 2, 3])
 fnInfo := testkit.functionInfo(sample)
 valueInfo := testkit.value(sample)
 sameSample := testkit.sameFunction(sample, sample)

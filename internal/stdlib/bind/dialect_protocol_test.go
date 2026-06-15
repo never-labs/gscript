@@ -187,12 +187,12 @@ func TestDialectHTMLValueEncoder(t *testing.T) {
 		page := html {
 			tag: "main",
 			attrs: {class: "card", hidden: false, data_id: "x&1"},
-			children: {
+			children: [
 				{tag: "h1", text: "Release <ok>"},
-				{tag: "p", children: {"Status: ", {tag: "strong", text: "green"}}},
+				{tag: "p", children: ["Status: ", {tag: "strong", text: "green"}]},
 				{tag: "input", attrs: {disabled: true, value: "ship"}},
 				{raw: "<!-- generated -->"},
-			},
+			],
 		}
 		bad_tag, bad_tag_err := dialect.eval("html", {tag: "script src"})
 		bad_attr, bad_attr_err := dialect.eval("html", {tag: "div", attrs: bad_attrs})
@@ -223,10 +223,10 @@ data: world
 retry: 2500
 
 `+"`"+`
-		encoded := dialect.eval("sse", {{event: "done", id: "2", data: "ok"}}, {mode: "encode"})
+		encoded := dialect.eval("sse", [{event: "done", id: "2", data: "ok"}], {mode: "encode"})
 		roundtrip := dialect.eval("sse", encoded)
 		boundary_events := dialect.eval("sse", ": heartbeat\nevent: zero\nretry: 0\ndata:\ndata\n\n")
-		boundary_encoded := dialect.eval("sse", {{event: "zero", retry: 0, data: ""}}, {mode: "encode"})
+		boundary_encoded := dialect.eval("sse", [{event: "zero", retry: 0, data: ""}], {mode: "encode"})
 		bad, bad_err := dialect.eval("sse", "retry: soon\n\n")
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
@@ -436,9 +436,9 @@ func TestDialectProtocolModeAliasesKeepDirectionInference(t *testing.T) {
 		cookie_parsed := dialect.eval("cookie", "sid=abc", {mode: "parse"})
 		http_encoded := dialect.eval("httpmsg", {method: "GET", target: "/", version: "HTTP/1.1", headers: {Host: "example.com"}}, {mode: "format"})
 		http_parsed := dialect.eval("httpmsg", "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", {mode: "decode"})
-		sse_encoded := dialect.eval("sse", {{event: "token", data: "hi"}}, {mode: "format"})
+		sse_encoded := dialect.eval("sse", [{event: "token", data: "hi"}], {mode: "format"})
 		sse_parsed := dialect.eval("sse", "event: token\ndata: hi\n\n", {mode: "parse"})
-		mp_encoded := dialect.eval("multipart", {{name: "field", body: "value"}}, {mode: "format", boundary: "fixture"})
+		mp_encoded := dialect.eval("multipart", [{name: "field", body: "value"}], {mode: "format", boundary: "fixture"})
 		mp_parsed := dialect.eval("multipart", mp_encoded, {mode: "decode", boundary: "fixture"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
@@ -894,7 +894,7 @@ func TestDialectSSEInvalidInputReturnsError(t *testing.T) {
 	interp := runWithLib(t, `
 		bad_retry, bad_retry_err := dialect.eval("sse", "retry: soon\n\n")
 		ok_scalar_encode, scalar_encode_err := pcall(dialect.eval, "sse", "data: hi\n\n", {mode: "encode"})
-		ok_bad_retry_encode, bad_retry_encode_err := pcall(dialect.eval, "sse", {{data: "hi", retry: "soon"}}, {mode: "format"})
+		ok_bad_retry_encode, bad_retry_encode_err := pcall(dialect.eval, "sse", [{data: "hi", retry: "soon"}], {mode: "format"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 
 	if !interp.GetGlobal("bad_retry").IsNil() {
@@ -923,10 +923,10 @@ func TestDialectMultipartInvalidInputReturnsError(t *testing.T) {
 		bad_boundary, bad_boundary_err := dialect.eval("multipart", "--bad--\r\n", {boundary: "bad\r\nboundary"})
 		bad_parse, bad_parse_err := dialect.eval("multipart", "not multipart", {boundary: "fixture"})
 		bad_scalar_encode, bad_scalar_encode_err := dialect.eval("multipart", "not parts", {mode: "encode", boundary: "fixture"})
-		bad_item_encode, bad_item_encode_err := dialect.eval("multipart", {"not table"}, {mode: "format", boundary: "fixture"})
-		bad_header := {{name: "field", body: "value", headers: {["bad name"]: "x"}}}
+		bad_item_encode, bad_item_encode_err := dialect.eval("multipart", ["not table"], {mode: "format", boundary: "fixture"})
+		bad_header := [{name: "field", body: "value", headers: {["bad name"]: "x"}}]
 		bad_header_encode, bad_header_encode_err := dialect.eval("multipart", bad_header, {mode: "encode", boundary: "fixture"})
-		bad_header_value := {{name: "field", body: "value", headers: {["x-ok"]: "first\r\nsecond: no"}}}
+		bad_header_value := [{name: "field", body: "value", headers: {["x-ok"]: "first\r\nsecond: no"}}]
 		bad_header_value_encode, bad_header_value_encode_err := dialect.eval("multipart", bad_header_value, {mode: "encode", boundary: "fixture"})
 	`, "dialect", BuildDialect(HostOptions{}, nil))
 

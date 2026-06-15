@@ -159,7 +159,7 @@ func TestStringReplaceAll(t *testing.T) {
 
 func TestStringJoin(t *testing.T) {
 	interp := runProgram(t, `
-		result := string.join({"a", "b", "c"}, ", ")
+		result := string.join(["a", "b", "c"], ", ")
 	`)
 	if interp.GetGlobal("result").Str() != "a, b, c" {
 		t.Errorf("expected 'a, b, c', got '%s'", interp.GetGlobal("result").Str())
