@@ -1079,6 +1079,79 @@ func dialectQBlock(body Value, opts *Table) ([]Value, error) {
 	return nil, fmt.Errorf("q block expects source, body, or text")
 }
 
+func dialectQSQL(body Value, opts *Table) ([]Value, error) {
+	mode := dialectMode(opts)
+	if mode != "" && mode != "sql" && mode != "select" && mode != "explain" {
+		return dialectUnknownMode("qsql", mode)
+	}
+	source, envValue, err := qInterpolatedSourceAndEnvValue(body)
+	if err != nil {
+		return nil, err
+	}
+	if opts != nil && opts.RawGetString("raw_source").Truthy() {
+		source = stdq.NormalizeRawSourceStatements(source)
+	}
+	args := qSQLArgsResult{
+		frameValue:    envValue,
+		source:        source,
+		resolveSource: true,
+		envValue:      envValue,
+	}
+	if mode == "explain" {
+		out, err := qExplainSQL(args)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{out}, nil
+	}
+	out, err := qRunSQL("qsql", args)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{out}, nil
+}
+
+func dialectQSQLBlock(body Value, opts *Table) ([]Value, error) {
+	if !body.IsTable() {
+		return nil, fmt.Errorf("qsql block expects a table with source, body, or text")
+	}
+	t := body.Table()
+	for _, key := range []string{"source", "body", "text"} {
+		value := t.RawGetString(key)
+		if value.IsNil() {
+			continue
+		}
+		if !value.IsString() {
+			return nil, fmt.Errorf("qsql block %s must be a string", key)
+		}
+		return dialectQSQL(value, opts)
+	}
+	return nil, fmt.Errorf("qsql block expects source, body, or text")
+}
+
+func qInterpolatedSourceAndEnvValue(body Value) (string, Value, error) {
+	if !body.IsTable() {
+		return body.String(), TableValue(NewTable()), nil
+	}
+	t := body.Table()
+	kind := t.RawGetString("kind")
+	if !kind.IsString() || kind.Str() != "q_interpolated_source" {
+		return body.String(), TableValue(NewTable()), nil
+	}
+	source := t.RawGetString("source")
+	if !source.IsString() {
+		return "", NilValue(), fmt.Errorf("q dialect: interpolated source must contain source string")
+	}
+	envValue := t.RawGetString("env")
+	if envValue.IsNil() {
+		return source.Str(), TableValue(NewTable()), nil
+	}
+	if !envValue.IsTable() {
+		return "", NilValue(), fmt.Errorf("q dialect: interpolated source env must be a table")
+	}
+	return source.Str(), envValue, nil
+}
+
 func qInterpolatedSourceAndEnv(body Value) (string, map[string]any, error) {
 	if !body.IsTable() {
 		return body.String(), nil, nil

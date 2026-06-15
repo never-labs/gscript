@@ -608,7 +608,7 @@ func builtinDialectCategory(name string) string {
 		return "protocol"
 	case "serve":
 		return "web"
-	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "pem", "xlsx", "excel":
+	case "base64", "hash", "hex", "base32", "uuid", "gzip", "zlib", "deflate", "binary", "q", "qsql", "pem", "xlsx", "excel":
 		return "data"
 	case "sql":
 		return "database"

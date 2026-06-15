@@ -1055,6 +1055,47 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 	}
 }
 
+func TestQSQLTaggedDialectExecutesThroughStdlib(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibAll)}, tc.opts...)...)
+			if err := vm.Exec(`
+trades := q` + "```flip `sym`price`size!(`AAPL`MSFT`AAPL;100.5 99.0 101.0;10 20 30)```" + `
+threshold := 100.0
+selected := qsql` + "`select sym,price,size from ${trades} where price>${threshold} order by price asc`" + `
+rollup := qsql {
+select total:sum price*size by sym from ${trades} where price>=${threshold} order by sym asc
+}
+explained := dialect.eval("qsql", dialect.interpolate("qsql", ["select sym from ", ""], [trades]), {mode: "explain"})
+selected_len := selected.len
+selected_first_sym := selected[1].sym
+selected_second_size := selected[2].size
+rollup_len := rollup.len
+rollup_first_sym := rollup[1].sym
+rollup_first_total := rollup[1].total
+explained_op := explained.op
+explained_rows := explained.source_rows
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "selected_len", int64(2))
+			assertGet(t, vm, "selected_first_sym", "AAPL")
+			assertGet(t, vm, "selected_second_size", int64(30))
+			assertGet(t, vm, "rollup_len", int64(1))
+			assertGet(t, vm, "rollup_first_sym", "AAPL")
+			assertGet(t, vm, "rollup_first_total", float64(4035))
+			assertGet(t, vm, "explained_op", "select")
+			assertGet(t, vm, "explained_rows", int64(3))
+		})
+	}
+}
+
 func TestQIdentifierControlFlowDoesNotBecomeRawBlock(t *testing.T) {
 	for _, tc := range []struct {
 		name string
