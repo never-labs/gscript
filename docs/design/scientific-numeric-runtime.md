@@ -180,7 +180,8 @@ example-specific shortcuts:
   `linalg.vec`, and `linalg.sandwich_add` for compact linear algebra.
 - `stats.normal`, `stats.pdf`, `stats.logpdf`, `stats.loglik`,
   `stats.samples(values[, weights])`, `stats.update(samples,
-  log_likelihoods[, opts])`, `stats.bayes_update`,
+  log_likelihoods[, opts])`, `stats.observe(samples, distribution,
+  observed[, opts])`, `stats.bayes_update`,
   `stats.describe(values[, weights])`/`stats.describe(samples)`,
   `stats.describe_fields(table[, weights])`, and `stats.importance_update` for
   distribution-aware sequential Monte Carlo code and compact statistical

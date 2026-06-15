@@ -14,8 +14,7 @@ ensemble := stats.samples(rand.sample(prior, N))
 measurements := {0.58, 1.05, 1.53, 1.95}
 for t := 1; t <= #measurements; t++ {
     ensemble = rand.add_noise(ensemble, process_noise, 0.50)
-    log_weights := stats.loglik(sensor_noise, measurements[t], ensemble)
-    ensemble = stats.update(ensemble, log_weights, {min_ess_ratio: 0.6, offset: 0.5})
+    ensemble = stats.observe(ensemble, sensor_noise, measurements[t], {min_ess_ratio: 0.6, offset: 0.5})
     assert(ensemble.ess > 0)
     if ensemble.resampled {
         assert(#ensemble.indexes == N)

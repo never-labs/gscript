@@ -25,7 +25,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "stats.samples", "stats.loglik", "stats.update", "stats.describe(ensemble)", "math.near", "q {"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "stats.samples", "stats.observe", "stats.describe(ensemble)", "math.near", "q {"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
@@ -56,6 +56,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "stats.samples(predicted, ensemble.weights)") {
 				t.Fatalf("%s manually rewraps weighted samples instead of preserving sample-set flow", tc.rel)
+			}
+			if strings.Contains(text, "log_weights :=") {
+				t.Fatalf("%s manually exposes log weights instead of using stats.observe", tc.rel)
 			}
 		})
 	}

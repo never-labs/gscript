@@ -2,6 +2,7 @@ package bind
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/never-labs/leia/internal/runtime"
@@ -152,6 +153,10 @@ loglik_scalar := stats.loglik(dist, 2, 2)
 loglik_vector := stats.loglik(dist, 2, {1, 2})
 loglik_broadcast := stats.loglik(dist, {1, 2}, 2)
 sample_loglik := stats.loglik(dist, 2, stats.samples({1, 2}))
+observed_samples := stats.observe(stats.samples({1, 2}, {1, 1}), dist, 2, {min_ess_ratio: 0.0})
+manual_samples := stats.update(stats.samples({1, 2}, {1, 1}), sample_loglik, {min_ess_ratio: 0.0})
+observed_resample := stats.observe(stats.samples({10, 20, 30}, {0.2, 0.3, 0.5}), dist, 30, {min_ess_ratio: 0.8, offset: 0.5})
+manual_resample := stats.update(stats.samples({10, 20, 30}, {0.2, 0.3, 0.5}), stats.loglik(dist, 30, stats.samples({10, 20, 30}, {0.2, 0.3, 0.5})), {min_ess_ratio: 0.8, offset: 0.5})
 `)
 	if got := interp.GetGlobal("dist_kind"); !got.IsString() || got.Str() != "distribution" {
 		t.Fatalf("dist.kind = %v, want distribution", got)
@@ -169,6 +174,33 @@ sample_loglik := stats.loglik(dist, 2, stats.samples({1, 2}))
 	assertTableFloat(t, interp.GetGlobal("loglik_vector"), 1, -1.4189385332046727)
 	assertTableFloat(t, interp.GetGlobal("loglik_broadcast"), 1, -1.4189385332046727)
 	assertTableFloat(t, interp.GetGlobal("sample_loglik"), 1, -1.4189385332046727)
+	observedSamples := interp.GetGlobal("observed_samples").Table()
+	if got := observedSamples.RawGetString("kind"); !got.IsString() || got.Str() != "weighted_samples" {
+		t.Fatalf("observed_samples.kind = %v, want weighted_samples", got)
+	}
+	assertTableFloat(t, observedSamples.RawGetString("weights"), 2, 0.6224593312018546)
+	assertTableFloat(t, observedSamples.RawGetString("values"), 2, 2)
+	assertFloat(t, observedSamples.RawGetString("summary").Table().RawGetString("mean"), 1.6224593312018545)
+	assertTableFloat(t, interp.GetGlobal("manual_samples").Table().RawGetString("weights"), 2, 0.6224593312018546)
+	assertTableFloat(t, interp.GetGlobal("manual_samples").Table().RawGetString("values"), 2, 2)
+	assertFloat(t, interp.GetGlobal("manual_samples").Table().RawGetString("summary").Table().RawGetString("mean"), 1.6224593312018545)
+	observedResample := interp.GetGlobal("observed_resample").Table()
+	manualResample := interp.GetGlobal("manual_resample").Table()
+	if got := observedResample.RawGetString("resampled"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("observed_resample.resampled = %v, want true", got)
+	}
+	if got := manualResample.RawGetString("resampled"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("manual_resample.resampled = %v, want true", got)
+	}
+	assertTableFloat(t, observedResample.RawGetString("values"), 1, 30)
+	assertTableFloat(t, manualResample.RawGetString("values"), 1, 30)
+	assertTableFloat(t, observedResample.RawGetString("weights"), 3, 1.0/3.0)
+	assertTableFloat(t, manualResample.RawGetString("weights"), 3, 1.0/3.0)
+	assertFloat(t, observedResample.RawGetString("summary").Table().RawGetString("mean"), 30)
+	assertFloat(t, manualResample.RawGetString("summary").Table().RawGetString("mean"), 30)
+	if got := observedResample.RawGetString("indexes").Table().Length(); got != manualResample.RawGetString("indexes").Table().Length() {
+		t.Fatalf("resample index lengths differ: %d vs %d", got, manualResample.RawGetString("indexes").Table().Length())
+	}
 }
 
 func TestStatsLinearGaussianStateSpace(t *testing.T) {
@@ -396,5 +428,25 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.bayes_update({1}, {1}, {0}, "bad")`)
 	if err == nil {
 		t.Fatal("stats.bayes_update bad options succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.observe()`)
+	if err == nil {
+		t.Fatal("stats.observe missing args succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.observe(stats.samples({1}), stats.normal(0, 1), 1, "bad")`)
+	if err == nil {
+		t.Fatal("stats.observe bad options succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.observe(stats.samples({1, 2}), stats.normal(0, 1), {1, 2, 3})`)
+	if err == nil {
+		t.Fatal("stats.observe length mismatch succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.observe(stats.samples({1, 2}), stats.normal(0, 1), {rows: 1, cols: 2, values: {1, 2}})`)
+	if err == nil {
+		t.Fatal("stats.observe matrix observed succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.observe("bad-samples", "bad-dist", 1)`)
+	if err == nil || !strings.Contains(err.Error(), "stats.loglik") {
+		t.Fatalf("stats.observe invalid distribution/samples error = %v, want stats.loglik error", err)
 	}
 }

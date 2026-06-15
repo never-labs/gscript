@@ -22,6 +22,7 @@ func BuildStats() *Table {
 	set("describe_fields", statsDescribeFields)
 	set("samples", statsSamples)
 	set("update", statsUpdate)
+	set("observe", statsObserve)
 	set("gaussian_state", statsGaussianState)
 	set("linear_predict", statsLinearPredict)
 	set("linear_update", statsLinearUpdate)
@@ -228,6 +229,21 @@ func statsUpdate(args []Value) ([]Value, error) {
 		updateArgs = append(updateArgs, args[2])
 	}
 	return statsBayesUpdate(updateArgs)
+}
+
+func statsObserve(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.observe: need samples, distribution, and observed")
+	}
+	logLikelihoods, err := statsLogLik([]Value{args[1], args[2], args[0]})
+	if err != nil {
+		return nil, err
+	}
+	updateArgs := []Value{args[0], logLikelihoods[0]}
+	if len(args) >= 4 {
+		updateArgs = append(updateArgs, args[3])
+	}
+	return statsUpdate(updateArgs)
 }
 
 func statsGaussianState(args []Value) ([]Value, error) {
