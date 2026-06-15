@@ -23,22 +23,22 @@ func rangeGen(start, stop, step) {
 
 // Helper to collect all values from a generator
 func collect(gen) {
-    result := {}
+    result := []
     for true {
         ok, val := coroutine.resume(gen)
         if !ok || val == nil {
             break
         }
-        table.insert(result, val)
+        append(result, val)
     }
     return result
 }
 
 // Helper to join table values as string
 func joinValues(tbl) {
-    parts := {}
+    parts := []
     for i := 1; i <= #tbl; i++ {
-        table.insert(parts, tostring(tbl[i]))
+        append(parts, tostring(tbl[i]))
     }
     return table.concat(parts, ", ")
 }
@@ -63,11 +63,11 @@ func fibGen() {
 
 // Take N values from a generator
 func take(gen, n) {
-    result := {}
+    result := []
     for i := 1; i <= n; i++ {
         ok, val := coroutine.resume(gen)
         if !ok || val == nil { break }
-        table.insert(result, val)
+        append(result, val)
     }
     return result
 }
@@ -92,12 +92,12 @@ func producer(items) {
 }
 
 func consumer(prod) {
-    consumed := {}
+    consumed := []
     for true {
         ok, item := coroutine.resume(prod)
         if !ok || item == nil { break }
         print("    [consumer] received: " .. tostring(item))
-        table.insert(consumed, item)
+        append(consumed, item)
     }
     return consumed
 }
@@ -115,11 +115,11 @@ print("--- Cooperative Multitasking ---")
 
 // Task scheduler that round-robins between coroutines
 func scheduler() {
-    tasks := {}
+    tasks := []
     sched := {}
 
     sched.addTask = func(name, fn) {
-        table.insert(tasks, {
+        append(tasks, {
             name: name,
             co: coroutine.create(fn)
         })
@@ -142,7 +142,7 @@ func scheduler() {
 
             // If coroutine is still alive, put it back
             if status == "suspended" {
-                table.insert(tasks, task)
+                append(tasks, task)
             } else {
                 print(string.format("    [step %d] %s: finished", step, task.name))
             }
@@ -331,10 +331,10 @@ func permutations(arr) {
 
         for i := 1; i <= #arr; i++ {
             // Create rest without element i
-            rest := {}
+            rest := []
             for j := 1; j <= #arr; j++ {
                 if j != i {
-                    table.insert(rest, arr[j])
+                    append(rest, arr[j])
                 }
             }
 
@@ -346,7 +346,7 @@ func permutations(arr) {
                 // Prepend arr[i]
                 result := [arr[i]]
                 for k := 1; k <= #perm; k++ {
-                    table.insert(result, perm[k])
+                    append(result, perm[k])
                 }
                 coroutine.yield(result)
             }

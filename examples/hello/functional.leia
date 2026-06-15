@@ -10,9 +10,9 @@ print()
 print("--- Map ---")
 
 func map(tbl, f) {
-    result := {}
+    result := []
     for i := 1; i <= #tbl; i++ {
-        table.insert(result, f(tbl[i]))
+        append(result, f(tbl[i]))
     }
     return result
 }
@@ -32,10 +32,10 @@ print()
 print("--- Filter ---")
 
 func filter(tbl, pred) {
-    result := {}
+    result := []
     for i := 1; i <= #tbl; i++ {
         if pred(tbl[i]) {
-            table.insert(result, tbl[i])
+            append(result, tbl[i])
         }
     }
     return result

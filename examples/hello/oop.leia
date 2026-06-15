@@ -76,11 +76,11 @@ Dog := Class(Animal)
 
 Dog.init = func(self, name) {
     Animal.init(self, name, "Woof!")
-    self.tricks = {}
+    self.tricks = []
 }
 
 Dog.learn = func(self, trick) {
-    table.insert(self.tricks, trick)
+    append(self.tricks, trick)
 }
 
 Dog.showTricks = func(self) {
@@ -214,10 +214,10 @@ func Mixin(target, mixin) {
 // Serializable mixin
 Serializable := {
     serialize: func(self) {
-        parts := {}
+        parts := []
         for k, v := range self {
             if type(v) != "function" {
-                table.insert(parts, tostring(k) .. "=" .. tostring(v))
+                append(parts, tostring(k) .. "=" .. tostring(v))
             }
         }
         return "{" .. table.concat(parts, ", ") .. "}"

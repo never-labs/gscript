@@ -283,11 +283,11 @@ print()
 print("--- Error Accumulator ---")
 
 func newErrorCollector() {
-    errors := {}
+    errors := []
     ec := {}
 
     ec.add = func(err) {
-        table.insert(errors, err)
+        append(errors, err)
     }
 
     ec.hasErrors = func() {
@@ -304,9 +304,9 @@ func newErrorCollector() {
 
     ec.toString = func() {
         if #errors == 0 { return "no errors" }
-        parts := {}
+        parts := []
         for i := 1; i <= #errors; i++ {
-            table.insert(parts, tostring(i) .. ". " .. tostring(errors[i]))
+            append(parts, tostring(i) .. ". " .. tostring(errors[i]))
         }
         return #errors .. " error(s):\n    " .. table.concat(parts, "\n    ")
     }

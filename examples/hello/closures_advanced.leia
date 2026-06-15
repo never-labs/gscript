@@ -239,8 +239,8 @@ func rangeIter(start, stop, step) {
 }
 
 print("  Counting by 3 from 0 to 15:")
-items := {}
+items := []
 for v := range rangeIter(0, 15, 3) {
-    table.insert(items, tostring(v))
+    append(items, tostring(v))
 }
 print("  " .. table.concat(items, ", "))

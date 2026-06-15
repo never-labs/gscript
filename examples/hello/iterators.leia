@@ -6,18 +6,18 @@ print()
 
 // Helper: collect all values from an iterator function into a table
 func collect(iter) {
-    result := {}
+    result := []
     for val := range iter {
-        table.insert(result, val)
+        append(result, val)
     }
     return result
 }
 
 // Helper: join table values
 func joinValues(tbl) {
-    parts := {}
+    parts := []
     for i := 1; i <= #tbl; i++ {
-        table.insert(parts, tostring(tbl[i]))
+        append(parts, tostring(tbl[i]))
     }
     return table.concat(parts, ", ")
 }
@@ -259,10 +259,10 @@ func trackedIter(source) {
 tracked := trackedIter(rangeIter(1, 100, 1))
 
 // Read only 5 items
-results := {}
+results := []
 for i := 1; i <= 5; i++ {
     val := tracked.next()
-    if val != nil { table.insert(results, val) }
+    if val != nil { append(results, val) }
 }
 print("  Read 5 items:", joinValues(results))
 print("  Items consumed:", tracked.count())

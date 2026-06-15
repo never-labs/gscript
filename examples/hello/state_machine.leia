@@ -170,10 +170,10 @@ orderData := {
     shipped: false
 }
 
-orderLog := {}
+orderLog := []
 
 func logOrder(msg) {
-    table.insert(orderLog, msg)
+    append(orderLog, msg)
     print("    " .. msg)
 }
 

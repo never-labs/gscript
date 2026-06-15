@@ -29,13 +29,13 @@ Animal.speak = func(self) {
 Dog := Class(Animal)
 Dog.init = func(self, name) {
     Animal.init(self, name)
-    self.tricks = {}
+    self.tricks = []
 }
 Dog.speak = func(self) {
     return self.name .. " says woof!"
 }
 Dog.learn = func(self, trick) {
-    table.insert(self.tricks, trick)
+    append(self.tricks, trick)
 }
 Dog.showTricks = func(self) {
     print(self.name .. " knows:")
