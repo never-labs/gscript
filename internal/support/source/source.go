@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/never-labs/leia/internal/ast"
 	"github.com/never-labs/leia/internal/lexer"
 	"github.com/never-labs/leia/internal/parser"
 )
@@ -45,20 +46,31 @@ func Files(path string) ([]string, error) {
 }
 
 func ParseFile(filename string) error {
+	_, err := ParseFileProgram(filename)
+	return err
+}
+
+func ParseFileProgram(filename string) (*ast.Program, error) {
 	src, err := os.ReadFile(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return Parse(filename, src)
+	return ParseProgram(filename, src)
 }
 
 func Parse(filename string, src []byte) error {
+	_, err := ParseProgram(filename, src)
+	return err
+}
+
+func ParseProgram(filename string, src []byte) (*ast.Program, error) {
 	tokens, err := lexer.New(string(src)).Tokenize()
 	if err != nil {
-		return fmt.Errorf("lexer error: %w", err)
+		return nil, fmt.Errorf("lexer error: %w", err)
 	}
-	if _, err := parser.New(tokens).Parse(); err != nil {
-		return fmt.Errorf("parse error: %w", err)
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return nil, fmt.Errorf("parse error: %w", err)
 	}
-	return nil
+	return prog, nil
 }

@@ -201,6 +201,41 @@ func TestLintJSONReportsEmptyDiagnosticsOnSuccess(t *testing.T) {
 	}
 }
 
+func TestLintWarnsForPositionalTableLiterals(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "compat.leia")
+	if err := os.WriteFile(path, []byte("xs := {1, 2}\nrec := {name: \"Ada\"}\nys := [1, 2]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format=json", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runLintCommand code = %d, want 0 for warnings; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+
+	var diagnostics []lintDiagnostic
+	if err := json.Unmarshal(stdout.Bytes(), &diagnostics); err != nil {
+		t.Fatalf("stdout is not JSON diagnostics: %v; stdout = %q", err, stdout.String())
+	}
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics len = %d, want 1: %#v", len(diagnostics), diagnostics)
+	}
+	got := diagnostics[0]
+	if got.File != path || got.Code != "LEIA2001" || got.Severity != "warning" {
+		t.Fatalf("diagnostic = %+v, want LEIA2001 warning for %s", got, path)
+	}
+	if got.Line != 1 || got.Column != 7 {
+		t.Fatalf("diagnostic position = %d:%d, want 1:7", got.Line, got.Column)
+	}
+	if !strings.Contains(got.Message, "use [..] for list literals") {
+		t.Fatalf("diagnostic message = %q, want list literal guidance", got.Message)
+	}
+}
+
 func TestLintSARIFReportsSyntaxErrors(t *testing.T) {
 	dir := t.TempDir()
 	badPath := filepath.Join(dir, "bad.leia")

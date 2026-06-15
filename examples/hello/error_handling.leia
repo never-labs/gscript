@@ -59,7 +59,7 @@ print("--- Error Chaining ---")
 
 // Chain operations that can fail, stopping at first error
 func chainOps(value, ...) {
-    ops := {...}
+    ops := [...]
     current := value
     for i := 1; i <= #ops; i++ {
         result, err := ops[i](current)
@@ -180,10 +180,10 @@ func permissionError(action) {
 
 // Use custom errors
 func findUser(id) {
-    users := {
+    users := [
         {id: 1, name: "Alice", role: "admin"},
         {id: 2, name: "Bob", role: "user"}
-    }
+    ]
     for i := 1; i <= #users; i++ {
         if users[i].id == id {
             return users[i], nil
@@ -211,12 +211,12 @@ func updateUser(id, newName) {
 }
 
 // Test various error scenarios
-testCases := {
+testCases := [
     {id: 1, name: "NewAlice"},
     {id: 99, name: "Nobody"},
     {id: 2, name: "NewBob"},
     {id: 1, name: "X"}
-}
+]
 
 for i := 1; i <= #testCases; i++ {
     tc := testCases[i]
@@ -376,7 +376,7 @@ func safeParse(s) {
     return nil, tostring(result)
 }
 
-testStrings := {"42", "3.14", "hello", "", "0", "-17"}
+testStrings := ["42", "3.14", "hello", "", "0", "-17"]
 for i := 1; i <= #testStrings; i++ {
     s := testStrings[i]
     result, err = safeParse(s)

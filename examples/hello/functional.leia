@@ -17,7 +17,7 @@ func map(tbl, f) {
     return result
 }
 
-nums := {1, 2, 3, 4, 5}
+nums := [1, 2, 3, 4, 5]
 doubled := map(nums, func(x) { return x * 2 })
 print("  nums:", table.concat(map(nums, tostring), ", "))
 print("  doubled:", table.concat(map(doubled, tostring), ", "))
@@ -47,7 +47,7 @@ print("  evens:", table.concat(map(evens, tostring), ", "))
 print("  odds:", table.concat(map(odds, tostring), ", "))
 
 // Filter strings by length
-words := {"hi", "hello", "yo", "goodbye", "ok", "wonderful"}
+words := ["hi", "hello", "yo", "goodbye", "ok", "wonderful"]
 longWords := filter(words, func(w) { return #w > 3 })
 print("  long words:", table.concat(longWords, ", "))
 print()
@@ -78,7 +78,7 @@ maximum := reduce(nums, func(a, b) {
 print("  max of {1..5}:", maximum)
 
 // Concatenate strings with reduce
-joined := reduce({"Hello", " ", "World", "!"}, func(a, b) { return a .. b }, "")
+joined := reduce(["Hello", " ", "World", "!"], func(a, b) { return a .. b }, "")
 print("  joined:", joined)
 print()
 
@@ -96,7 +96,7 @@ func compose(f, g) {
 
 // Compose many functions: composeN(f1, f2, f3)(x) = f1(f2(f3(x)))
 func composeN(...) {
-    fns := {...}
+    fns := [...]
     return func(x) {
         result := x
         // Apply from right to left
@@ -220,7 +220,7 @@ print("--- Pipeline ---")
 
 // Pipeline: chain operations on data in a readable way
 func pipeline(value, ...) {
-    fns := {...}
+    fns := [...]
     result := value
     for i := 1; i <= #fns; i++ {
         result = fns[i](result)
@@ -229,7 +229,7 @@ func pipeline(value, ...) {
 }
 
 // Process a list of numbers through a pipeline
-data := {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+data := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 result := pipeline(data,
     func(t) { return filter(t, func(x) { return x % 2 == 0 }) },  // keep evens
@@ -303,13 +303,13 @@ print()
 // -------------------------------------------------------
 print("--- Functional Data Processing ---")
 
-people := {
+people := [
     {name: "Alice", age: 30},
     {name: "Bob", age: 25},
     {name: "Charlie", age: 35},
     {name: "Diana", age: 28},
     {name: "Eve", age: 22}
-}
+]
 
 // Find names of people over 25, uppercased
 result3 := pipeline(people,

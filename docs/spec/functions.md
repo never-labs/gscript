@@ -28,13 +28,13 @@ assert(explicit_nil == nil && after_nil == "x")
 ## Varargs
 
 The parameter `...` accepts any remaining arguments. Inside the function,
-`{...}` constructs a table containing those arguments. A function may have at
+`[...]` constructs a list containing those arguments. A function may have at
 most one vararg parameter, and it must be the final parameter. Fixed parameters
 are filled before the vararg list is formed.
 
 ```leia run all
 func count(...) {
-    args := {...}
+    args := [...]
     return #args
 }
 
@@ -43,8 +43,8 @@ assert(count(1, 2, 3) == 3)
 
 ```leia run all
 func rest(head, ...) {
-    tail := {...}
-    return {head, tail[1], tail[2]}
+    tail := [...]
+    return [head, tail[1], tail[2]]
 }
 
 values := rest("a", "b", "c")
@@ -133,8 +133,8 @@ func pack(...) { return table.pack(...) }
 plain := pack(triple(), "x")              // receives 10, "x"
 expanded := pack(spread(triple()), "x")   // receives 10, 20, 30, "x"
 host_expanded := table.pack(triple())     // host calls use the same rule
-list := {triple()}                        // {10, 20, 30}
-single := {(triple())}                    // {10}
+list := [triple()]                        // [10, 20, 30]
+single := [(triple())]                    // [10]
 
 assert(plain[1] == 10 && plain[2] == "x")
 assert(expanded[1] == 10 && expanded[2] == 20 && expanded[3] == 30 && expanded[4] == "x")
@@ -154,10 +154,10 @@ func triple() {
 }
 
 func rest(a, ...) {
-    return a, {...}
+    return a, [...]
 }
 
-first, tail := rest(triple()) // first == 10; tail == {20, 30}
+first, tail := rest(triple()) // first == 10; tail == [20, 30]
 assert(first == 10)
 assert(tail[1] == 20)
 assert(tail[2] == 30)
@@ -195,7 +195,7 @@ func sum3(x, y, z) {
 assert(sum3(triple()) == 60)
 assert(sum3(triple(), 1, 2) == 13)
 
-expanded := {1, spread(triple()), 40}
+expanded := [1, spread(triple()), 40]
 assert(expanded[1] == 1)
 assert(expanded[2] == 10)
 assert(expanded[3] == 20)

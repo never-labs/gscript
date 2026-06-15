@@ -524,7 +524,8 @@ func (e *ListLitExpr) nodeType() string { return "ListLitExpr" }
 func (e *ListLitExpr) GetPos() Pos      { return e.P }
 func (e *ListLitExpr) exprNode()        {}
 
-// TableLitExpr represents a table literal: {k: v, k2: v2, expr, ...}
+// TableLitExpr represents a record/map literal: {k: v, k2: v2}. Positional
+// fields are retained for compatibility; new list syntax should use ListLitExpr.
 type TableLitExpr struct {
 	P      Pos
 	Fields []TableField
@@ -536,7 +537,7 @@ func (e *TableLitExpr) exprNode()        {}
 
 // TableField represents a single field in a table literal.
 type TableField struct {
-	Key   Expr // nil means array-style (positional value only)
+	Key   Expr // nil means compatibility positional field
 	Value Expr
 }
 

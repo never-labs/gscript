@@ -120,8 +120,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("commands = %#v, want %q", caps.Commands, want)
 		}
 	}
-	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "LEIA1001") {
-		t.Fatalf("linter capabilities = %+v, want json and LEIA1001", caps.Tooling.Linter)
+	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "LEIA1001") || !containsString(caps.Tooling.Linter.Codes, "LEIA2001") {
+		t.Fatalf("linter capabilities = %+v, want json, LEIA1001, and LEIA2001", caps.Tooling.Linter)
 	}
 	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "LEIA_TEST_SEED" || !containsString(caps.Tooling.Test.GoldenModes, "update") {
 		t.Fatalf("test capabilities = %+v, want golden stdout modes, directory, list, and seed env", caps.Tooling.Test)

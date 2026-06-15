@@ -181,21 +181,21 @@ func pipeline(value, fns) {
 }
 
 // Transform a number through several steps
-result := pipeline(5, {
+result := pipeline(5, [
     func(x) { return x * 2 },       // 10
     func(x) { return x + 3 },       // 13
     func(x) { return x * x },       // 169
     func(x) { return tostring(x) .. "!" }  // "169!"
-})
+])
 print("  pipeline(5, [*2, +3, ^2, tostring..!]) =", result)
 
 // Pipeline with string transformations
-result = pipeline("  Hello, World!  ", {
+result = pipeline("  Hello, World!  ", [
     func(s) { return string.gsub(s, "^%s+", "") },    // trim leading
     func(s) { return string.gsub(s, "%s+$", "") },    // trim trailing
     func(s) { return string.upper(s) },
     func(s) { return "<<" .. s .. ">>" }
-})
+])
 print("  string pipeline =", result)
 print()
 

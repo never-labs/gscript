@@ -1243,7 +1243,7 @@ func pair() {
     return "a", "b"
 }
 
-values := {1, spread(pair()), 4}
+values := [1, spread(pair()), 4]
 
 assert(values[1] == 1)
 assert(values[2] == "a")
@@ -1391,13 +1391,14 @@ assert(rawlen(boxed) == 0)
 
 ### Literals
 
-Table literals, list literals, dense array literals, function literals, and
+List literals, record/map literals, dense array literals, function literals, and
 tagged dialect forms are expressions. Their specific syntax is listed in
 [grammar.ebnf](grammar.ebnf).
 
 Literal operands are evaluated left-to-right. A literal that constructs an
 identity-bearing value creates a fresh identity each time the literal is
-evaluated. This applies to table literals, function literals, and dense arrays.
+evaluated. This applies to list literals, record/map literals, function
+literals, and dense arrays.
 Calls, tagged dialect evaluations, index expressions, and member selections do
 not imply freshness by themselves: they return the callee or dialect result, and
 selection returns the stored member or indexed value.
@@ -1702,7 +1703,7 @@ range source to be advanced again according to the same algorithm. A `return`
 from the body exits the enclosing function.
 
 ```leia
-items := {10, 20, 30}
+items := [10, 20, 30]
 sum := 0
 keySum := 0
 
@@ -1718,7 +1719,7 @@ assert(sum == 60)
 ```leia
 calls := {}
 
-for _, value := range pairs({10, 20, 30}) {
+for _, value := range pairs([10, 20, 30]) {
     calls[#calls + 1] = func() {
         return value
     }
@@ -1982,13 +1983,13 @@ assert(explicit_nil == nil && after_nil == "x")
 ### Varargs
 
 The parameter `...` accepts any remaining arguments. Inside the function,
-`{...}` constructs a table containing those arguments. A function may have at
+`[...]` constructs a list containing those arguments. A function may have at
 most one vararg parameter, and it must be the final parameter. Fixed parameters
 are filled before the vararg list is formed.
 
 ```leia
 func count(...) {
-    args := {...}
+    args := [...]
     return #args
 }
 
@@ -1997,8 +1998,8 @@ assert(count(1, 2, 3) == 3)
 
 ```leia
 func rest(head, ...) {
-    tail := {...}
-    return {head, tail[1], tail[2]}
+    tail := [...]
+    return [head, tail[1], tail[2]]
 }
 
 values := rest("a", "b", "c")
@@ -2087,8 +2088,8 @@ func pack(...) { return table.pack(...) }
 plain := pack(triple(), "x")              // receives 10, "x"
 expanded := pack(spread(triple()), "x")   // receives 10, 20, 30, "x"
 host_expanded := table.pack(triple())     // host calls use the same rule
-list := {triple()}                        // {10, 20, 30}
-single := {(triple())}                    // {10}
+list := [triple()]                        // [10, 20, 30]
+single := [(triple())]                    // [10]
 
 assert(plain[1] == 10 && plain[2] == "x")
 assert(expanded[1] == 10 && expanded[2] == 20 && expanded[3] == 30 && expanded[4] == "x")
@@ -2108,10 +2109,10 @@ func triple() {
 }
 
 func rest(a, ...) {
-    return a, {...}
+    return a, [...]
 }
 
-first, tail := rest(triple()) // first == 10; tail == {20, 30}
+first, tail := rest(triple()) // first == 10; tail == [20, 30]
 assert(first == 10)
 assert(tail[1] == 20)
 assert(tail[2] == 30)
@@ -2149,7 +2150,7 @@ func sum3(x, y, z) {
 assert(sum3(triple()) == 60)
 assert(sum3(triple(), 1, 2) == 13)
 
-expanded := {1, spread(triple()), 40}
+expanded := [1, spread(triple()), 40]
 assert(expanded[1] == 1)
 assert(expanded[2] == 10)
 assert(expanded[3] == 20)
@@ -2222,29 +2223,32 @@ does not change observable behavior.
 
 ### Constructors
 
-Table constructors create fresh table identities. List-style fields are assigned
-using 1-based integer sequence keys. Keyed fields assign the specified key.
-The v1.0 stable constructor subset is simple list fields, named fields, and
-explicit keyed fields that do not depend on an interleaving order between those
-forms. Portable programs must not depend on duplicate constructor fields that
-write the same normalized key, or on list-index assignment after interleaved
-keyed fields; use explicit assignments when that order matters. A constructor
-expression itself never reuses an existing table identity.
+Record/map constructors create fresh table identities. Named fields and
+explicit keyed fields assign the specified key. Sequence values should use list
+literals, which construct the same table value shape with consecutive 1-based
+integer keys. Positional fields inside `{...}` are retained as compatibility
+syntax, but new source should use `[...]` for lists and reserve `{...}` for
+keyed records.
+
+Portable programs must not depend on duplicate constructor fields that write
+the same normalized key; use explicit assignments when that order matters. A
+constructor expression itself never reuses an existing table identity.
 
 ```leia
-t := { "first", "second", name: "Ada" }
-assert(t[1] == "first")
-assert(t.name == "Ada")
-assert(t["name"] == "Ada")
+values := ["first", "second"]
+user := {name: "Ada"}
+
+assert(values[1] == "first")
+assert(user.name == "Ada")
+assert(user["name"] == "Ada")
 ```
 
 ```leia
-a := {"x", "y", name: "Ada"}
-b := {"x", "y", name: "Ada"}
+a := ["x", "y"]
+b := ["x", "y"]
 assert(a != b)
 assert(a[1] == "x")
 assert(a[2] == "y")
-assert(a.name == "Ada")
 
 a[3] = "third"
 assert(a[3] == "third")
@@ -2524,7 +2528,9 @@ portable sequence traversal form for consecutive positive integer keys starting
 at `1`; it stops at the first missing or `nil` element.
 
 ```leia
-t := {10, 20, [4]: 40, name: "Ada"}
+t := [10, 20]
+t[4] = 40
+t.name = "Ada"
 seen := {}
 for _, value := range ipairs(t) {
     seen[#seen + 1] = value
@@ -3392,20 +3398,20 @@ preserve helper-visible capability metadata:
 ```leia
 search_runbook := tool {
     name: "search_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Search local runbooks."
-    requires: {"docs.read", "runbooks.read"}
+    requires: ["docs.read", "runbooks.read"]
     fn: func(service) {
         return "runbook:" .. service, nil
     }
 }
 
-caps := llm.tool_caps({search_runbook})
+caps := llm.tool_caps([search_runbook])
 assert(#caps == 2)
 assert(caps[1] == "docs.read")
 assert(caps[2] == "runbooks.read")
 
-ok, err := llm.check_tools({search_runbook}, {"docs.read", "runbooks.read"})
+ok, err := llm.check_tools([search_runbook], ["docs.read", "runbooks.read"])
 assert(ok == true)
 assert(err == nil)
 ```
@@ -3467,10 +3473,10 @@ Prompt field blocks are message object shorthand. A table produced by
 table is valid:
 
 ```text
-messages := {
+messages := [
     prompt { role: "system", text: "Answer from the runbook only." }
     prompt { role: "user", text: "How do I restart search?" }
-}
+]
 ```
 
 The shorthand has no separate prompt lifetime. It must preserve the same role,
@@ -3486,9 +3492,9 @@ their own policies; the source-level object remains ordinary data.
 ```text
 search_runbook := tool {
     name: "search_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Search local runbooks."
-    requires: {"docs.read"}
+    requires: ["docs.read"]
     fn: func(service) {
         return "runbook:" .. service, nil
     }
@@ -3570,7 +3576,7 @@ ordered `registered`, `schema_validated`, `approval_checked`, `invoked`, and
 result, err := turn {
     model: "fast"
     messages: {llm.user("Reply exactly: ok")}
-    tools: {search_runbook}
+    tools: [search_runbook]
     max_tokens: 32
     temperature: 0
 }
@@ -3611,14 +3617,14 @@ the request configuration for each call.
 ```text
 answer := agent {
     name: "answer"
-    params: {"question"}
+    params: ["question"]
     description: "Answer with local documentation when useful."
     config: func(question) {
         return {
             model: "fast"
             system: "Use tool evidence when it helps."
             user: question
-            tools: {search_runbook}
+            tools: [search_runbook]
         }, nil
     }
 }
@@ -3632,10 +3638,10 @@ and provide request fields directly:
 ```text
 answer := agent {
     name: "answer"
-    params: {"question"}
+    params: ["question"]
     model: "fast"
     instructions: prompt { role: "system", text: "Use tool evidence." }
-    tools: {search_runbook}
+    tools: [search_runbook]
     output: {answer: "short"}
 }
 ```
@@ -3704,7 +3710,7 @@ scripts may use the lower-level helper directly:
 
 ```text
 incident := llm.agent("incident", incident_config, incident_flow, {
-    params: {"service"}
+    params: ["service"]
 })
 ```
 
@@ -3762,12 +3768,12 @@ The wrapper preserves the agent's name and metadata where available.
 ```text
 supervisor := agent {
     name: "supervisor"
-    params: {"question"}
+    params: ["question"]
     config: func(question) {
         return {
             model: "fast"
             user: question
-            tools: {llm.agent_as_tool(answer)}
+            tools: [llm.agent_as_tool(answer)]
         }, nil
     }
 }

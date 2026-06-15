@@ -334,11 +334,11 @@ Triangle.area = func(self) {
     return 0.5 * self.base * self.height
 }
 
-shapes := {
+shapes := [
     Circle.new(5),
     Rectangle.new(4, 6),
     Triangle.new(3, 8)
-}
+]
 
 totalArea := 0
 for _, shape := range shapes {

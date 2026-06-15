@@ -205,7 +205,7 @@ func buildCapabilities() cliCapabilities {
 			},
 			Linter: cliLinterCapability{
 				Formats: []string{"text", "json", "sarif"},
-				Codes:   []string{"LEIA0001", "LEIA1001"},
+				Codes:   []string{"LEIA0001", "LEIA1001", "LEIA2001"},
 			},
 			Test: cliTestCapability{
 				GoldenStdout: true,

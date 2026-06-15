@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/never-labs/leia/internal/ast"
 	toolsource "github.com/never-labs/leia/internal/support/source"
 )
 
@@ -34,6 +35,17 @@ func newLintDiagnostic(file, code, severity string, err error) lintDiagnostic {
 	}
 	diagnostic.Line, diagnostic.Column = parseLintDiagnosticPosition(diagnostic.Message)
 	return diagnostic
+}
+
+func newLintDiagnosticAt(file, code, severity, message string, line, column int) lintDiagnostic {
+	return lintDiagnostic{
+		File:     file,
+		Code:     code,
+		Severity: severity,
+		Message:  message,
+		Line:     line,
+		Column:   column,
+	}
 }
 
 func parseLintDiagnosticPosition(message string) (int, int) {
@@ -86,9 +98,12 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 			continue
 		}
 		for _, filename := range files {
-			if err := toolsource.ParseFile(filename); err != nil {
+			prog, err := toolsource.ParseFileProgram(filename)
+			if err != nil {
 				diagnostics = append(diagnostics, newLintDiagnostic(filename, "LEIA1001", "error", err))
+				continue
 			}
+			diagnostics = append(diagnostics, lintProgram(filename, prog)...)
 		}
 	}
 
@@ -112,10 +127,45 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 		}
 	}
 
-	if len(diagnostics) > 0 {
+	if lintHasErrors(diagnostics) {
 		return 1
 	}
 	return 0
+}
+
+func lintProgram(filename string, prog *ast.Program) []lintDiagnostic {
+	var diagnostics []lintDiagnostic
+	ast.Inspect(prog, func(node ast.Node) bool {
+		table, ok := node.(*ast.TableLitExpr)
+		if !ok || len(table.Fields) == 0 {
+			return true
+		}
+		for _, field := range table.Fields {
+			if field.Key == nil {
+				pos := table.GetPos()
+				diagnostics = append(diagnostics, newLintDiagnosticAt(
+					filename,
+					"LEIA2001",
+					"warning",
+					"use [..] for list literals; reserve {..} for keyed records",
+					pos.Line,
+					pos.Column,
+				))
+				return true
+			}
+		}
+		return true
+	})
+	return diagnostics
+}
+
+func lintHasErrors(diagnostics []lintDiagnostic) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == "error" {
+			return true
+		}
+	}
+	return false
 }
 
 type sarifLog struct {
@@ -198,6 +248,12 @@ func writeLintSARIF(w io.Writer, diagnostics []lintDiagnostic) error {
 						Name:             "syntax",
 						ShortDescription: sarifText{Text: "Lexer or parser error"},
 						DefaultConfig:    sarifDefaultConfig{Level: "error"},
+					},
+					{
+						ID:               "LEIA2001",
+						Name:             "positional-table-literal",
+						ShortDescription: sarifText{Text: "Use list literals for positional values"},
+						DefaultConfig:    sarifDefaultConfig{Level: "warning"},
 					},
 				},
 			}},

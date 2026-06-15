@@ -71,7 +71,7 @@ func pair() {
     return "a", "b"
 }
 
-values := {1, spread(pair()), 4}
+values := [1, spread(pair()), 4]
 
 assert(values[1] == 1)
 assert(values[2] == "a")
@@ -219,13 +219,14 @@ assert(rawlen(boxed) == 0)
 
 ## Literals
 
-Table literals, list literals, dense array literals, function literals, and
+List literals, record/map literals, dense array literals, function literals, and
 tagged dialect forms are expressions. Their specific syntax is listed in
 [grammar.ebnf](grammar.ebnf).
 
 Literal operands are evaluated left-to-right. A literal that constructs an
 identity-bearing value creates a fresh identity each time the literal is
-evaluated. This applies to table literals, function literals, and dense arrays.
+evaluated. This applies to list literals, record/map literals, function
+literals, and dense arrays.
 Calls, tagged dialect evaluations, index expressions, and member selections do
 not imply freshness by themselves: they return the callee or dialect result, and
 selection returns the stored member or indexed value.

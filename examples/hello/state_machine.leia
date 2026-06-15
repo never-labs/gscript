@@ -38,7 +38,7 @@ func newStateMachine(config) {
 
     // Send an event to the state machine
     sm.send = func(event, ...) {
-        args := {...}
+        args := [...]
         stateConfig := states[currentState]
         if stateConfig == nil {
             return false, "unknown state: " .. currentState
@@ -149,7 +149,7 @@ print("  Initial state:", trafficLight.getState())
 print()
 
 // Cycle through the traffic light
-events := {"timer", "timer", "timer", "timer", "timer", "timer"}
+events := ["timer", "timer", "timer", "timer", "timer", "timer"]
 for i := 1; i <= #events; i++ {
     print(string.format("  --- Sending '%s' event ---", events[i]))
     trafficLight.send(events[i])
@@ -164,7 +164,7 @@ print("--- Order Processing State Machine ---")
 // Simulated order context
 orderData := {
     id: "ORD-001",
-    items: {"Widget", "Gadget"},
+    items: ["Widget", "Gadget"],
     total: 59.99,
     paid: false,
     shipped: false

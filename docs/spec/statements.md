@@ -213,7 +213,7 @@ range source to be advanced again according to the same algorithm. A `return`
 from the body exits the enclosing function.
 
 ```leia run all
-items := {10, 20, 30}
+items := [10, 20, 30]
 sum := 0
 keySum := 0
 
@@ -229,7 +229,7 @@ assert(sum == 60)
 ```leia run all
 calls := {}
 
-for _, value := range pairs({10, 20, 30}) {
+for _, value := range pairs([10, 20, 30]) {
     calls[#calls + 1] = func() {
         return value
     }

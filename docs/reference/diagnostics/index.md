@@ -57,6 +57,7 @@ Current lint codes:
 |---|---|
 | `LEIA0001` | File discovery failed. |
 | `LEIA1001` | Lexer or parser error. |
+| `LEIA2001` | Positional `{...}` table literal. Use `[...]` for list literals and reserve `{...}` for keyed records. |
 
 ## Diagnostic Bundles
 

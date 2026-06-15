@@ -41,9 +41,9 @@ print("string.len(s) =", string.len(s))
 print("string.upper(s) =", string.upper(s))
 print()
 
-// --- Tables (arrays and maps) ---
+// --- Lists and records ---
 print("--- table ---")
-arr := {10, 20, 30}
+arr := [10, 20, 30]
 print("arr =", arr, "  type:", type(arr))
 print("#arr =", #arr)
 
@@ -106,7 +106,7 @@ v = "now I'm a string"
 print("v =", v, "  type:", type(v))
 v = true
 print("v =", v, "  type:", type(v))
-v = {1, 2, 3}
+v = [1, 2, 3]
 print("v =", v, "  type:", type(v))
 v = func() { return "I'm a function" }
 print("v =", v, "  type:", type(v))
@@ -116,8 +116,8 @@ print()
 print("=== Truthiness Rules ===")
 print("In Leia, only nil and false are falsy. Everything else is truthy.")
 print()
-values := {nil, false, true, 0, 1, "", "hello", {}}
-names := {"nil", "false", "true", "0", "1", "\"\"", "\"hello\"", "{}"}
+values := [nil, false, true, 0, 1, "", "hello", {}]
+names := ["nil", "false", "true", "0", "1", "\"\"", "\"hello\"", "{}"]
 for i := 1; i <= #values; i++ {
     label := names[i]
     if values[i] {
@@ -153,6 +153,6 @@ print("describe(42) =", describe(42))
 print("describe(-5) =", describe(-5))
 print("describe(0) =", describe(0))
 print("describe(\"hi\") =", describe("hi"))
-print("describe({1,2,3}) =", describe({1, 2, 3}))
+print("describe([1,2,3]) =", describe([1, 2, 3]))
 print("describe(print) =", describe(print))
 print("describe(nil) =", describe(nil))

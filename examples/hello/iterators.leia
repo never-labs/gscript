@@ -156,7 +156,7 @@ func zipIter(iter1, iter2) {
         a := iter1()
         b := iter2()
         if a == nil || b == nil { return nil }
-        return {a, b}
+        return [a, b]
     }
 }
 
@@ -168,8 +168,8 @@ for pair := range iter {
 }
 
 // Zip names with scores
-names := {"Alice", "Bob", "Charlie", "Diana"}
-scores := {95, 87, 92, 78}
+names := ["Alice", "Bob", "Charlie", "Diana"]
+scores := [95, 87, 92, 78]
 
 func tableIter(tbl) {
     i := 0
@@ -194,7 +194,7 @@ print("--- Chained Iterators ---")
 
 // Chain: concatenate multiple iterators
 func chainIter(...) {
-    iters := {...}
+    iters := [...]
     idx := 1
     return func() {
         for idx <= #iters {
@@ -216,8 +216,8 @@ print("  chain(1..3, 10..13, 100..103):", joinValues(chained))
 
 // Chain with different types
 chained2 := collect(chainIter(
-    tableIter({"hello", "world"}),
-    tableIter({"foo", "bar", "baz"})
+    tableIter(["hello", "world"]),
+    tableIter(["foo", "bar", "baz"])
 ))
 print("  chain strings:", joinValues(chained2))
 print()
@@ -283,11 +283,11 @@ func enumerate(iter, start) {
         val := iter()
         if val == nil { return nil }
         idx = idx + 1
-        return {idx, val}
+        return [idx, val]
     }
 }
 
-fruits := {"apple", "banana", "cherry", "date"}
+fruits := ["apple", "banana", "cherry", "date"]
 print("  enumerate(fruits):")
 for pair := range enumerate(tableIter(fruits), 1) {
     print(string.format("    %d: %s", pair[1], pair[2]))

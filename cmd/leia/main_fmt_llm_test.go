@@ -169,8 +169,8 @@ lookup := llm.tool("lookup", func(query) {
     return "found:" .. query, nil
 }, {
     description: "Lookup docs."
-    requires: {"docs.read"}
-    params: {"query"}
+    requires: ["docs.read"]
+    params: ["query"]
 })
 
 llm.register_models({
@@ -194,12 +194,12 @@ delegate := llm.toolof(extractor, {
 
 supervisor := llm.agent("supervisor", func(topic) {
     call := {id: "call_1", tool: "lookup", args: {query: topic}}
-    msgs := {
+    msgs := [
         llm.system("Return concise JSON."),
         llm.user(topic),
         msg.assistant_call(call),
         msg.tool_result("call_1", {summary: "docs"}),
-    }
+    ]
     tool_msg, tool_idx := history.find(msgs, {role: "tool"})
     assistant_msg, assistant_idx := history.last(msgs, {role: "assistant"})
     all_users := history.find_all(msgs, {role: "user"})
@@ -214,14 +214,14 @@ supervisor := llm.agent("supervisor", func(topic) {
     _ = ok_msg
     return {
         messages: msgs
-        tools: {lookup, delegate}
+        tools: [lookup, delegate]
         model: "fast"
     }, nil
 })
 
 answer, answer_err := supervisor("leia")
 direct, direct_err := llm.turn({
-    messages: {llm.user("one-shot")}
+    messages: [llm.user("one-shot")]
     model: "fast"
 })
 shell := $` + "`printf leia`" + `
@@ -243,7 +243,7 @@ func TestFmtLLMSyntaxCoverage(t *testing.T) {
 		t.Fatalf("formatSource: %v", err)
 	}
 	for _, want := range []string{
-		"tools: {lookup, delegate}",
+		"tools: [lookup, delegate]",
 		"msg.assistant_call(call)",
 		"msg.tool_result(\"call_1\", {summary: \"docs\"})",
 		"history.find(msgs, {role: \"tool\"})",

@@ -48,7 +48,7 @@ func quicksort(arr, low, high) {
     quicksort(arr, i + 1, high)
 }
 
-data := {38, 27, 43, 3, 9, 82, 10, 15, 42, 1}
+data := [38, 27, 43, 3, 9, 82, 10, 15, 42, 1]
 print("  Before:", joinValues(data))
 quicksort(data, 1, #data)
 print("  After: ", joinValues(data))
@@ -101,7 +101,7 @@ func mergesort(arr) {
     return result
 }
 
-data2 := {64, 34, 25, 12, 22, 11, 90, 45}
+data2 := [64, 34, 25, 12, 22, 11, 90, 45]
 print("  Before:", joinValues(data2))
 sorted := mergesort(data2)
 print("  After: ", joinValues(sorted))
@@ -129,10 +129,10 @@ func binarySearch(arr, target) {
     return -1  // not found
 }
 
-sortedArr := {2, 5, 8, 12, 16, 23, 38, 56, 72, 91}
+sortedArr := [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
 print("  Array:", joinValues(sortedArr))
 
-targets := {23, 72, 1, 56, 100}
+targets := [23, 72, 1, 56, 100]
 for i := 1; i <= #targets; i++ {
     idx := binarySearch(sortedArr, targets[i])
     if idx > 0 {
@@ -172,7 +172,7 @@ func buildGraph() {
 func bfs(graph, start) {
     visited := {}
     order := {}
-    queue := {start}
+    queue := [start]
     visited[start] = true
 
     for #queue > 0 {
@@ -235,7 +235,7 @@ print("  DFS from A:", table.concat(dfsOrder, " -> "))
 func dfsIterative(graph, start) {
     visited := {}
     order := {}
-    stack := {start}
+    stack := [start]
 
     for #stack > 0 {
         // Pop from stack
@@ -325,10 +325,10 @@ func getPath(prev, start, target) {
 
 // Build weighted graph
 wgraph := {
-    A: {{to: "B", weight: 4}, {to: "C", weight: 2}},
-    B: {{to: "D", weight: 3}, {to: "C", weight: 1}},
-    C: {{to: "B", weight: 1}, {to: "D", weight: 5}, {to: "E", weight: 7}},
-    D: {{to: "E", weight: 2}},
+    A: [{to: "B", weight: 4}, {to: "C", weight: 2}],
+    B: [{to: "D", weight: 3}, {to: "C", weight: 1}],
+    C: [{to: "B", weight: 1}, {to: "D", weight: 5}, {to: "E", weight: 7}],
+    D: [{to: "E", weight: 2}],
     E: {}
 }
 

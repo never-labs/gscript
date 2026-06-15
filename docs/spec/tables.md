@@ -6,29 +6,32 @@ does not change observable behavior.
 
 ## Constructors
 
-Table constructors create fresh table identities. List-style fields are assigned
-using 1-based integer sequence keys. Keyed fields assign the specified key.
-The v1.0 stable constructor subset is simple list fields, named fields, and
-explicit keyed fields that do not depend on an interleaving order between those
-forms. Portable programs must not depend on duplicate constructor fields that
-write the same normalized key, or on list-index assignment after interleaved
-keyed fields; use explicit assignments when that order matters. A constructor
-expression itself never reuses an existing table identity.
+Record/map constructors create fresh table identities. Named fields and
+explicit keyed fields assign the specified key. Sequence values should use list
+literals, which construct the same table value shape with consecutive 1-based
+integer keys. Positional fields inside `{...}` are retained as compatibility
+syntax, but new source should use `[...]` for lists and reserve `{...}` for
+keyed records.
+
+Portable programs must not depend on duplicate constructor fields that write
+the same normalized key; use explicit assignments when that order matters. A
+constructor expression itself never reuses an existing table identity.
 
 ```leia run all
-t := { "first", "second", name: "Ada" }
-assert(t[1] == "first")
-assert(t.name == "Ada")
-assert(t["name"] == "Ada")
+values := ["first", "second"]
+user := {name: "Ada"}
+
+assert(values[1] == "first")
+assert(user.name == "Ada")
+assert(user["name"] == "Ada")
 ```
 
 ```leia run all
-a := {"x", "y", name: "Ada"}
-b := {"x", "y", name: "Ada"}
+a := ["x", "y"]
+b := ["x", "y"]
 assert(a != b)
 assert(a[1] == "x")
 assert(a[2] == "y")
-assert(a.name == "Ada")
 
 a[3] = "third"
 assert(a[3] == "third")
@@ -308,7 +311,9 @@ portable sequence traversal form for consecutive positive integer keys starting
 at `1`; it stops at the first missing or `nil` element.
 
 ```leia run all
-t := {10, 20, [4]: 40, name: "Ada"}
+t := [10, 20]
+t[4] = 40
+t.name = "Ada"
 seen := {}
 for _, value := range ipairs(t) {
     seen[#seen + 1] = value

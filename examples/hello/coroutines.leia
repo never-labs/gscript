@@ -102,7 +102,7 @@ func consumer(prod) {
     return consumed
 }
 
-items := {"apple", "banana", "cherry", "date"}
+items := ["apple", "banana", "cherry", "date"]
 prod := producer(items)
 result := consumer(prod)
 print("  Consumed " .. #result .. " items")
@@ -344,7 +344,7 @@ func permutations(arr) {
                 ok, perm := coroutine.resume(subPerms)
                 if !ok || perm == nil { break }
                 // Prepend arr[i]
-                result := {arr[i]}
+                result := [arr[i]]
                 for k := 1; k <= #perm; k++ {
                     table.insert(result, perm[k])
                 }
@@ -354,8 +354,8 @@ func permutations(arr) {
     })
 }
 
-print("  Permutations of {1, 2, 3}:")
-perms := permutations({1, 2, 3})
+print("  Permutations of [1, 2, 3]:")
+perms := permutations([1, 2, 3])
 iter := iterFromCoroutine(perms)
 for perm := range iter {
     print("    " .. joinValues(perm))

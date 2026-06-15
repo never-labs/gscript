@@ -78,20 +78,20 @@ preserve helper-visible capability metadata:
 ```leia run all
 search_runbook := tool {
     name: "search_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Search local runbooks."
-    requires: {"docs.read", "runbooks.read"}
+    requires: ["docs.read", "runbooks.read"]
     fn: func(service) {
         return "runbook:" .. service, nil
     }
 }
 
-caps := llm.tool_caps({search_runbook})
+caps := llm.tool_caps([search_runbook])
 assert(#caps == 2)
 assert(caps[1] == "docs.read")
 assert(caps[2] == "runbooks.read")
 
-ok, err := llm.check_tools({search_runbook}, {"docs.read", "runbooks.read"})
+ok, err := llm.check_tools([search_runbook], ["docs.read", "runbooks.read"])
 assert(ok == true)
 assert(err == nil)
 ```
@@ -153,10 +153,10 @@ Prompt field blocks are message object shorthand. A table produced by
 table is valid:
 
 ```text
-messages := {
+messages := [
     prompt { role: "system", text: "Answer from the runbook only." }
     prompt { role: "user", text: "How do I restart search?" }
-}
+]
 ```
 
 The shorthand has no separate prompt lifetime. It must preserve the same role,
@@ -172,9 +172,9 @@ their own policies; the source-level object remains ordinary data.
 ```text
 search_runbook := tool {
     name: "search_runbook"
-    params: {"service"}
+    params: ["service"]
     description: "Search local runbooks."
-    requires: {"docs.read"}
+    requires: ["docs.read"]
     fn: func(service) {
         return "runbook:" .. service, nil
     }
@@ -256,7 +256,7 @@ ordered `registered`, `schema_validated`, `approval_checked`, `invoked`, and
 result, err := turn {
     model: "fast"
     messages: {llm.user("Reply exactly: ok")}
-    tools: {search_runbook}
+    tools: [search_runbook]
     max_tokens: 32
     temperature: 0
 }
@@ -297,14 +297,14 @@ the request configuration for each call.
 ```text
 answer := agent {
     name: "answer"
-    params: {"question"}
+    params: ["question"]
     description: "Answer with local documentation when useful."
     config: func(question) {
         return {
             model: "fast"
             system: "Use tool evidence when it helps."
             user: question
-            tools: {search_runbook}
+            tools: [search_runbook]
         }, nil
     }
 }
@@ -318,10 +318,10 @@ and provide request fields directly:
 ```text
 answer := agent {
     name: "answer"
-    params: {"question"}
+    params: ["question"]
     model: "fast"
     instructions: prompt { role: "system", text: "Use tool evidence." }
-    tools: {search_runbook}
+    tools: [search_runbook]
     output: {answer: "short"}
 }
 ```
@@ -390,7 +390,7 @@ scripts may use the lower-level helper directly:
 
 ```text
 incident := llm.agent("incident", incident_config, incident_flow, {
-    params: {"service"}
+    params: ["service"]
 })
 ```
 
@@ -448,12 +448,12 @@ The wrapper preserves the agent's name and metadata where available.
 ```text
 supervisor := agent {
     name: "supervisor"
-    params: {"question"}
+    params: ["question"]
     config: func(question) {
         return {
             model: "fast"
             user: question
-            tools: {llm.agent_as_tool(answer)}
+            tools: [llm.agent_as_tool(answer)]
         }, nil
     }
 }
