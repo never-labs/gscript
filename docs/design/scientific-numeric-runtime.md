@@ -167,7 +167,9 @@ same acceptance checks in the default and bytecode VM modes.
 ## Current Surface
 
 The current standard-library surface intentionally favors reusable pieces over
-example-specific shortcuts:
+example-specific shortcuts. Algorithm facades are allowed only when they sit on
+top of general syntax and computation primitives and expose a stable runtime
+shape that can later be specialized:
 
 - `math.near` for tolerance checks.
 - `linalg.eye(n[, scale])`, `linalg.diag(values...)`,
@@ -211,4 +213,36 @@ example-specific shortcuts:
 - `ode.solve(..., {state_names: {...}, named_state: true})` for optional
   named state tables in dynamics, projection, and observation hooks while the
   default dense-vector hot path remains unchanged.
+- `ode.closed_loop(plant, state, policy, opts)` for closed-loop simulations
+  that reuse `control.policy` metadata, `control.apply`, and `ode.solve`
+  semantics while keeping plant dynamics and observation hooks as ordinary
+  Leia functions.
 - `q { ... }` raw blocks for compact q snippets without quoted source strings.
+
+## Redundancy Audit
+
+The remaining verbosity in the scientific examples should be treated as a
+runtime/stdlib hardening problem, not a reason to expand the language grammar.
+The design target is:
+
+- keep Leia's existing function, table, field-access, closure, and dialect
+  syntax as the user-facing surface;
+- make scientific values carry enough metadata that APIs do not repeat
+  `state_names`, `named_state`, `wrap_angles`, shape, and trajectory plumbing;
+- strengthen vector, matrix, sample-set, state-space, ODE, control, and q
+  primitives so examples read as model code rather than adapter code;
+- add facades only for stable algorithm shapes that are already expressible as
+  primitive composition and that give the runtime a clear specialization point.
+
+Current sources of avoidable code are:
+
+- repeated metadata transfer between `control.policy` and `ode.solve`;
+- manual extraction of common result fields such as final state, summaries, and
+  observed columns;
+- explicit dense/vector/matrix coercions when APIs should accept the same
+  numeric value shapes consistently;
+- q evaluator coverage gaps that force some vector/list operations back into
+  Leia code.
+
+The next work should harden those existing primitives and value contracts before
+adding new syntax or broadening the language boundary.

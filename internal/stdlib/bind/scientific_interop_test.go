@@ -88,3 +88,44 @@ productValue := linalg.get(product, 2, 2)
 	assertFloat(t, interp.GetGlobal("got"), 3)
 	assertFloat(t, interp.GetGlobal("productValue"), 4)
 }
+
+func TestScientificInteropODEClosedLoopUsesPolicyMetadata(t *testing.T) {
+	interp := scientificInteropInterp(t, `
+K := linalg.row(2.0, 0.5)
+policy := control.policy(K, {limit: 10.0, state_names: {"theta", "omega"}, wrap_angles: {"theta"}})
+state := {0.2, 0.0}
+
+func plant(x, u) {
+	return {
+		theta: x.omega,
+		omega: -0.1 * x.omega + u,
+	}
+}
+
+func observe_energy(x, step, t) {
+	return {
+		energy: x.theta * x.theta + x.omega * x.omega,
+	}
+}
+
+closed := ode.closed_loop(plant, state, policy, {dt: 0.05, steps: 8, trajectory: true, observe: observe_energy})
+
+func manual_dynamics(x) {
+	u := control.apply(policy, x)
+	return plant(x, u)
+}
+
+manual := ode.solve(manual_dynamics, state, {dt: 0.05, steps: 8, trajectory: true, state_names: {"theta", "omega"}, named_state: true, wrap_angles: {"theta"}, observe: observe_energy})
+
+closed_theta := closed.final_state.theta
+manual_theta := manual.final_state.theta
+closed_omega := closed.final_state.omega
+manual_omega := manual.final_state.omega
+closed_energy_summary := stats.describe_fields(closed.observed).energy
+`)
+	assertNear(t, interp.GetGlobal("closed_theta"), interp.GetGlobal("manual_theta").Number(), 1e-12)
+	assertNear(t, interp.GetGlobal("closed_omega"), interp.GetGlobal("manual_omega").Number(), 1e-12)
+	if got := interp.GetGlobal("closed_energy_summary").Table().RawGetString("max").Number(); got <= 0 {
+		t.Fatalf("closed loop energy max = %.12f, want positive", got)
+	}
+}

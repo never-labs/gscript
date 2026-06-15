@@ -44,61 +44,7 @@ func BuildControl() *Table {
 	})
 
 	set("feedback", func(args []Value) ([]Value, error) {
-		if len(args) < 2 {
-			return nil, fmt.Errorf("control.feedback: need gain and state")
-		}
-		state, err := linalgVectorValue("control.feedback", args[1])
-		if err != nil {
-			return nil, err
-		}
-		var opts *Table
-		if len(args) >= 3 && args[2].IsTable() {
-			opts = args[2].Table()
-		}
-		if opts != nil {
-			if ref := opts.RawGetString("reference"); !ref.IsNil() {
-				reference, err := linalgVectorValue("control.feedback reference", ref)
-				if err != nil {
-					return nil, err
-				}
-				if len(reference) != len(state) {
-					return nil, fmt.Errorf("control.feedback: reference and state length mismatch")
-				}
-				for i := range state {
-					state[i] -= reference[i]
-				}
-			}
-		}
-		if rows, cols, gain, ok, err := linalgMatrixValue("control.feedback", args[0]); err != nil {
-			return nil, err
-		} else if ok {
-			if cols != len(state) {
-				return nil, fmt.Errorf("control.feedback: gain and state dimension mismatch")
-			}
-			u := stddata.LinalgF64Matvec(rows, cols, gain, state)
-			for i := range u {
-				u[i] = -u[i]
-			}
-			if err := controlApplyFeedbackOptions(opts, u); err != nil {
-				return nil, err
-			}
-			if rows == 1 {
-				return []Value{FloatValue(u[0])}, nil
-			}
-			return []Value{DenseArrayValue(NewDenseArrayF64Owned(u))}, nil
-		}
-		gain, err := linalgVectorValue("control.feedback", args[0])
-		if err != nil {
-			return nil, err
-		}
-		if len(gain) != len(state) {
-			return nil, fmt.Errorf("control.feedback: gain and state length mismatch")
-		}
-		u := []float64{-stddata.LinalgF64VectorDot(gain, state)}
-		if err := controlApplyFeedbackOptions(opts, u); err != nil {
-			return nil, err
-		}
-		return []Value{FloatValue(u[0])}, nil
+		return controlFeedbackValue(args)
 	})
 
 	set("policy", func(args []Value) ([]Value, error) {
@@ -132,27 +78,14 @@ func BuildControl() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("control.apply: need policy and state")
 		}
-		policy, err := controlPolicyFromValue(args[0], "control.apply")
-		if err != nil {
-			return nil, err
-		}
-		opts := controlCopyTable(policy.options)
+		var opts *Table
 		if len(args) >= 3 {
 			if !args[2].IsTable() {
 				return nil, fmt.Errorf("control.apply: options must be a table")
 			}
-			for _, key := range args[2].Table().PairsKeysSnapshot() {
-				opts.RawSet(key, args[2].Table().RawGet(key))
-			}
+			opts = args[2].Table()
 		}
-		if err := controlValidatePolicyOptions("control.apply", opts, policy.stateDim); err != nil {
-			return nil, err
-		}
-		state, err := controlPolicyStateValue("control.apply", args[1], opts, policy.stateDim)
-		if err != nil {
-			return nil, err
-		}
-		return t.RawGetString("feedback").GoFunction().Fn([]Value{policy.gain, state, TableValue(opts)})
+		return controlApplyPolicyValue(args[0], args[1], opts)
 	})
 
 	set("lqr", controlLQR)
@@ -333,6 +266,85 @@ type controlPolicyValue struct {
 	gain     Value
 	options  *Table
 	stateDim int
+}
+
+func controlFeedbackValue(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("control.feedback: need gain and state")
+	}
+	state, err := linalgVectorValue("control.feedback", args[1])
+	if err != nil {
+		return nil, err
+	}
+	var opts *Table
+	if len(args) >= 3 && args[2].IsTable() {
+		opts = args[2].Table()
+	}
+	if opts != nil {
+		if ref := opts.RawGetString("reference"); !ref.IsNil() {
+			reference, err := linalgVectorValue("control.feedback reference", ref)
+			if err != nil {
+				return nil, err
+			}
+			if len(reference) != len(state) {
+				return nil, fmt.Errorf("control.feedback: reference and state length mismatch")
+			}
+			for i := range state {
+				state[i] -= reference[i]
+			}
+		}
+	}
+	if rows, cols, gain, ok, err := linalgMatrixValue("control.feedback", args[0]); err != nil {
+		return nil, err
+	} else if ok {
+		if cols != len(state) {
+			return nil, fmt.Errorf("control.feedback: gain and state dimension mismatch")
+		}
+		u := stddata.LinalgF64Matvec(rows, cols, gain, state)
+		for i := range u {
+			u[i] = -u[i]
+		}
+		if err := controlApplyFeedbackOptions(opts, u); err != nil {
+			return nil, err
+		}
+		if rows == 1 {
+			return []Value{FloatValue(u[0])}, nil
+		}
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(u))}, nil
+	}
+	gain, err := linalgVectorValue("control.feedback", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if len(gain) != len(state) {
+		return nil, fmt.Errorf("control.feedback: gain and state length mismatch")
+	}
+	u := []float64{-stddata.LinalgF64VectorDot(gain, state)}
+	if err := controlApplyFeedbackOptions(opts, u); err != nil {
+		return nil, err
+	}
+	return []Value{FloatValue(u[0])}, nil
+}
+
+func controlApplyPolicyValue(policyValue, stateValue Value, overrides *Table) ([]Value, error) {
+	policy, err := controlPolicyFromValue(policyValue, "control.apply")
+	if err != nil {
+		return nil, err
+	}
+	opts := controlCopyTable(policy.options)
+	if overrides != nil {
+		for _, key := range overrides.PairsKeysSnapshot() {
+			opts.RawSet(key, overrides.RawGet(key))
+		}
+	}
+	if err := controlValidatePolicyOptions("control.apply", opts, policy.stateDim); err != nil {
+		return nil, err
+	}
+	state, err := controlPolicyStateValue("control.apply", stateValue, opts, policy.stateDim)
+	if err != nil {
+		return nil, err
+	}
+	return controlFeedbackValue([]Value{policy.gain, state, TableValue(opts)})
 }
 
 func controlPolicyFromValue(value Value, name string) (controlPolicyValue, error) {

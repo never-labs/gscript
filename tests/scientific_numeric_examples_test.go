@@ -30,7 +30,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.policy", "control.apply", "ode.solve", "state_names", "named_state", "x.theta", "x.omega", "wrap_angles", "final_state", "stats.describe_fields", "math.near", "q {", "avg ${observed}.energy", "assert(math.near(q_checksum, mean_energy, 0.000000001))"},
+			wantAPI: []string{"linalg.matrix", "linalg.diag", "control.lqr", "control.policy", "ode.closed_loop", "plant(x, u)", "x.theta", "x.omega", "final_state", "stats.describe_fields", "math.near", "q {", "avg ${observed}.energy", "assert(math.near(q_checksum, mean_energy, 0.000000001))"},
 		},
 	}
 	for _, tc := range cases {
@@ -65,6 +65,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "control.apply(stabilizer, {theta, omega})") {
 				t.Fatalf("%s manually packs controller state instead of using named policy state", tc.rel)
+			}
+			if strings.Contains(text, "control.apply(stabilizer, x)") || strings.Contains(text, "ode.solve(dynamics") {
+				t.Fatalf("%s manually spells out the closed-loop ODE glue instead of using ode.closed_loop", tc.rel)
 			}
 			if strings.Contains(text, "theta := control.wrap_angle") {
 				t.Fatalf("%s manually wraps controller angle instead of using policy wrap metadata", tc.rel)

@@ -200,7 +200,7 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 	}
 	set("integrate", integrate)
 
-	set("solve", func(args []Value) ([]Value, error) {
+	solve := func(args []Value) ([]Value, error) {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("ode.solve: need function, state, options")
 		}
@@ -277,9 +277,89 @@ func BuildODE(call ScriptFunctionCaller) *Table {
 			out.RawSetString("observed", values[next])
 		}
 		return []Value{TableValue(out)}, nil
+	}
+	set("solve", solve)
+
+	set("closed_loop", func(args []Value) ([]Value, error) {
+		if len(args) < 4 {
+			return nil, fmt.Errorf("ode.closed_loop: need plant, state, policy, and options")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("ode.closed_loop: script caller unavailable")
+		}
+		plant := args[0]
+		if !plant.IsFunction() {
+			return nil, fmt.Errorf("ode.closed_loop: plant must be a function")
+		}
+		if _, err := controlPolicyFromValue(args[2], "ode.closed_loop"); err != nil {
+			return nil, err
+		}
+		if !args[3].IsTable() {
+			return nil, fmt.Errorf("ode.closed_loop: options must be a table")
+		}
+		opts := controlCopyTable(args[3].Table())
+		if err := odeClosedLoopFillPolicyOptions(args[2], opts); err != nil {
+			return nil, err
+		}
+		dynamics := FunctionValue(&GoFunction{
+			Name: "ode.closed_loop.dynamics",
+			Fn: func(callArgs []Value) ([]Value, error) {
+				if len(callArgs) < 1 {
+					return nil, fmt.Errorf("ode.closed_loop: dynamics state missing")
+				}
+				control, err := controlApplyPolicyValue(args[2], callArgs[0], nil)
+				if err != nil {
+					return nil, fmt.Errorf("ode.closed_loop: %w", err)
+				}
+				if len(control) == 0 {
+					return nil, fmt.Errorf("ode.closed_loop: policy returned no control")
+				}
+				return odeCallFunction(call, plant, []Value{callArgs[0], control[0]}, "ode.closed_loop plant")
+			},
+		})
+		return solve([]Value{dynamics, args[1], TableValue(opts)})
 	})
 
 	return t
+}
+
+func odeClosedLoopFillPolicyOptions(policyValue Value, opts *Table) error {
+	policy, err := controlPolicyFromValue(policyValue, "ode.closed_loop")
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"state_names", "stateNames"} {
+		if opts.RawGetString(name).IsNil() {
+			if value := policy.options.RawGetString(name); !value.IsNil() {
+				opts.RawSetString(name, value)
+			}
+		}
+	}
+	for _, name := range []string{"wrap_angles", "wrap"} {
+		if opts.RawGetString(name).IsNil() {
+			if value := policy.options.RawGetString(name); !value.IsNil() {
+				opts.RawSetString(name, value)
+			}
+		}
+	}
+	if opts.RawGetString("named_state").IsNil() && opts.RawGetString("namedState").IsNil() {
+		if names := opts.RawGetString("state_names"); !names.IsNil() {
+			opts.RawSetString("named_state", BoolValue(true))
+		} else if names := opts.RawGetString("stateNames"); !names.IsNil() {
+			opts.RawSetString("named_state", BoolValue(true))
+		}
+	}
+	return nil
+}
+
+func odeCallFunction(call ScriptFunctionCaller, fn Value, args []Value, name string) ([]Value, error) {
+	if gf := fn.GoFunction(); gf != nil && gf.Fn != nil {
+		return gf.Fn(args)
+	}
+	if call == nil {
+		return nil, fmt.Errorf("%s: script caller unavailable", name)
+	}
+	return call(fn, args)
 }
 
 func odeRK4Step(call ScriptFunctionCaller, fn Value, state []float64, dt float64, name string, stateArg func([]float64) Value, stateNames []string) ([]float64, error) {
@@ -287,7 +367,7 @@ func odeRK4Step(call ScriptFunctionCaller, fn Value, state []float64, dt float64
 		stateArg = odeStateValue
 	}
 	eval := func(s []float64) ([]float64, error) {
-		ret, err := call(fn, []Value{stateArg(s)})
+		ret, err := odeCallFunction(call, fn, []Value{stateArg(s)}, name)
 		if err != nil {
 			return nil, err
 		}
