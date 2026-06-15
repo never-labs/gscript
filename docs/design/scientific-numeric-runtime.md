@@ -170,8 +170,9 @@ The current standard-library surface intentionally favors reusable pieces over
 example-specific shortcuts:
 
 - `math.near` for tolerance checks.
-- `linalg.affine`, `linalg.axpy`, and `linalg.add_scaled` for scaled
-  vector/matrix updates.
+- `linalg.eye(n[, scale])`, `linalg.diag(values...)`, `linalg.affine`,
+  `linalg.axpy`, and `linalg.add_scaled` for compact matrix construction and
+  scaled vector/matrix updates.
 - `linalg.at` for shape-friendly vector, row, column, and matrix access.
 - `linalg.matmul` as a variadic matrix-chain facade that also supports
   matrix-vector tails, plus `linalg.T`/`linalg.t`, `linalg.vec`, and

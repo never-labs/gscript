@@ -40,7 +40,10 @@ after := linalg.get(m, 1, 2)
 zv := linalg.zeros(3)
 zm := linalg.zeros(2, 2)
 eye := linalg.eye(3)
+scaled_eye := linalg.eye(2, 0.25)
 diag := linalg.diag({7, 8})
+diag_args := linalg.diag(7, 8)
+diag_one := linalg.diag(9)
 row_at := linalg.at(row, 3)
 col_at := linalg.at(col, 2)
 matrix_at := linalg.at(m, 2, 1)
@@ -56,7 +59,11 @@ vec_at := linalg.at({9, 8, 7}, 2)
 	assertTableFloat(t, interp.GetGlobal("zv"), 3, 0)
 	assertMatrixFloat(t, interp.GetGlobal("zm"), 2, 2, 4, 0)
 	assertMatrixFloat(t, interp.GetGlobal("eye"), 3, 3, 5, 1)
+	assertMatrixFloat(t, interp.GetGlobal("scaled_eye"), 2, 2, 1, 0.25)
+	assertMatrixFloat(t, interp.GetGlobal("scaled_eye"), 2, 2, 4, 0.25)
 	assertMatrixFloat(t, interp.GetGlobal("diag"), 2, 2, 4, 8)
+	assertMatrixFloat(t, interp.GetGlobal("diag_args"), 2, 2, 4, 8)
+	assertMatrixFloat(t, interp.GetGlobal("diag_one"), 1, 1, 1, 9)
 	assertFloat(t, interp.GetGlobal("row_at"), 3)
 	assertFloat(t, interp.GetGlobal("col_at"), 5)
 	assertFloat(t, interp.GetGlobal("matrix_at"), 4)
@@ -207,6 +214,13 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 		{
 			name: "diag",
 			src:  `m := linalg.diag({5, 6})`,
+			row:  1,
+			col:  1,
+			want: 6,
+		},
+		{
+			name: "diag varargs",
+			src:  `m := linalg.diag(5, 6)`,
 			row:  1,
 			col:  1,
 			want: 6,

@@ -147,9 +147,16 @@ func linalgEye(args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
+	scale := 1.0
+	if len(args) >= 2 {
+		scale, err = linalgNumber("linalg.eye", args[1])
+		if err != nil {
+			return nil, err
+		}
+	}
 	values := make([]float64, n*n)
 	for i := 0; i < n; i++ {
-		values[i*n+i] = 1
+		values[i*n+i] = scale
 	}
 	stddata.RecordLinalgMatrixKernel("LinalgMatrixEye", "eye", n, n)
 	return []Value{linalgMatrixDenseValue(n, n, values)}, nil
@@ -157,11 +164,23 @@ func linalgEye(args []Value) ([]Value, error) {
 
 func linalgDiag(args []Value) ([]Value, error) {
 	if len(args) < 1 {
-		return nil, fmt.Errorf("linalg.diag: need vector")
+		return nil, fmt.Errorf("linalg.diag: need vector or values")
 	}
-	values, err := linalgVectorValue("linalg.diag", args[0])
-	if err != nil {
-		return nil, err
+	var values []float64
+	var err error
+	if len(args) == 1 && !args[0].IsNumber() {
+		values, err = linalgVectorValue("linalg.diag", args[0])
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		values = make([]float64, len(args))
+		for i, arg := range args {
+			values[i], err = linalgNumber("linalg.diag", arg)
+			if err != nil {
+				return nil, fmt.Errorf("linalg.diag argument %d: %w", i+1, err)
+			}
+		}
 	}
 	n := len(values)
 	out := make([]float64, n*n)

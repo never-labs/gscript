@@ -5,12 +5,12 @@
 dt := 1.0
 F := linalg.matrix({{1.0, dt}, {0.0, 1.0}})
 H := linalg.row(1.0, 0.0)
-Q := linalg.scale(linalg.eye(2), 0.01)
+Q := linalg.eye(2, 0.01)
 I := linalg.eye(2)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
 x := linalg.vector(0.0, 1.0)
-P := linalg.scale(linalg.eye(2), 1.0)
+P := linalg.eye(2)
 innovations := {}
 
 for i := 1; i <= #measurements; i++ {
