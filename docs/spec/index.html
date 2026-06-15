@@ -388,7 +388,7 @@ x <span class="tok-operator">:=</span> <span class="tok-number">1</span> <span c
 // leia:cap net.client
 func summarize(text) {
     return llm.turn({
-        messages: {llm.user(text)}
+        messages: [llm.user(text)]
     })
 }</code></pre>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-comment">/* block comments do not nest

@@ -66,11 +66,11 @@ row tables for compatibility and column-oriented fields for analysis:
 ```leia
 conn := db.open(":memory:")
 conn.exec("create table sales(channel text, amount real)")
-conn.exec("insert into sales values (?, ?)", {"web", 120})
+conn.exec("insert into sales values (?, ?)", ["web", 120])
 
 frame := conn.frame("select channel, amount from sales", {})
 total := q.query(frame.soa, {
-    by: {"channel"}
+    by: ["channel"]
     select: {amount: "amount"}
     aggregate: {amount: "sum"}
     order_by: {column: "amount", desc: true}
@@ -84,7 +84,7 @@ round trip:
 ```leia
 workbook := dialect.eval("xlsx", total, {
     mode: "encode"
-    headers: {"channel", "amount"}
+    headers: ["channel", "amount"]
     sheet: "summary"
 })
 roundtrip := dialect.eval("excel", workbook, {headers: true})

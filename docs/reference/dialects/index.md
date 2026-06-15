@@ -18,7 +18,7 @@ summarizer := agent {
     config: func(summary) {
         return {model: "example-model", user: summary}, nil
     }
-    params: {"summary"}
+    params: ["summary"]
 }
 ```
 

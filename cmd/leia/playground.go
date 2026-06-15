@@ -1074,13 +1074,13 @@ print(task.body.user)`,
 			},
 			Source: `spread := q` + "`100 101.5 103 - 99.5 100 101`" + `
 symbols := dialect.eval("q", "` + "`bid`ask!99.5 100.5" + `")
-rows := {
+rows := [
     {channel: "web", amount: 120},
     {channel: "partner", amount: 80},
-}
+]
 workbook := dialect.eval("xlsx", rows, {
     mode: "encode"
-    headers: {"channel", "amount"}
+    headers: ["channel", "amount"]
     sheet: "summary"
 })
 roundtrip := dialect.eval("excel", workbook, {headers: true})

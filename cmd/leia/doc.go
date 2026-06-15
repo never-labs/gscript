@@ -260,7 +260,7 @@ func generateDialectReferenceMarkdown() []byte {
 	fmt.Fprintln(&b, "    config: func(summary) {")
 	fmt.Fprintln(&b, "        return {model: \"example-model\", user: summary}, nil")
 	fmt.Fprintln(&b, "    }")
-	fmt.Fprintln(&b, "    params: {\"summary\"}")
+	fmt.Fprintln(&b, "    params: [\"summary\"]")
 	fmt.Fprintln(&b, "}")
 	fmt.Fprintln(&b, "```")
 	fmt.Fprintln(&b)

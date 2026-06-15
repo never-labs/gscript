@@ -353,11 +353,11 @@ func TestStdlibDataDialectsExecuteThroughStdlib(t *testing.T) {
 			src := "name := \"Leia\"\n" +
 				"csv_rows := csv`name,score\nAda,42\nBob,7\n`\n" +
 				"csv_header_rows := dialect.eval(\"csv\", \"name;score\\nAda;42\\n\", {headers: true, sep: \";\"})\n" +
-				"csv_text := dialect.eval(\"csv\", {{\"name\", \"score\"}, {\"Ada\", 42}, {\"Bob\", 7}}, {mode: \"encode\"})\n" +
-				"csv_header_text := dialect.eval(\"csv\", {{name: \"Ada\", score: 42}, {name: \"Bob\", score: 7}}, {mode: \"encode\", headers: {\"name\", \"score\"}})\n" +
+				"csv_text := dialect.eval(\"csv\", [[\"name\", \"score\"], [\"Ada\", 42], [\"Bob\", 7]], {mode: \"encode\"})\n" +
+				"csv_header_text := dialect.eval(\"csv\", [{name: \"Ada\", score: 42}, {name: \"Bob\", score: 7}], {mode: \"encode\", headers: [\"name\", \"score\"]})\n" +
 				"tsv_rows := tsv`name\tscore\nAda\t42\nBob\t7\n`\n" +
 				"tsv_header_rows := dialect.eval(\"tsv\", \"name\\tscore\\nAda\\t42\\n\", {headers: true})\n" +
-				"tsv_text := dialect.eval(\"tsv\", {{\"name\", \"score\"}, {\"Ada\", 42}}, {mode: \"encode\"})\n" +
+				"tsv_text := dialect.eval(\"tsv\", [[\"name\", \"score\"], [\"Ada\", 42]], {mode: \"encode\"})\n" +
 				"mdtable_rows := mdtable`| Name | Score | Note |\n| --- | ---: | --- |\n| Ada | 42 | uses \\| safely |\n| Bob | 7 |\n`\n" +
 				"mdtable_text := dialect.eval(\"mdtable\", mdtable_rows, {mode: \"encode\"})\n" +
 				"line_rows := lines`alpha\n\nbeta\n`\n" +
@@ -968,11 +968,11 @@ matrix.setf(matrix_value, 1, 1, 4)
 matrix_count := q` + "`count ${matrix_value}`" + `
 matrix_raze_count := q` + "`count raze ${matrix_value}`" + `
 matrix_sum := q` + "`+/raze ${matrix_value}`" + `
-linalg_matrix := linalg.matrix(2, 2, {1.0, 2.0, 3.0, 4.0})
+linalg_matrix := linalg.matrix(2, 2, [1.0, 2.0, 3.0, 4.0])
 linalg_matrix_count := q` + "`count ${linalg_matrix}`" + `
 linalg_matrix_raze_count := q` + "`count raze ${linalg_matrix}`" + `
 linalg_matrix_sum := q` + "`+/raze ${linalg_matrix}`" + `
-frame_value := data.frame({x: data.i64({1, 2})})
+frame_value := data.frame({x: data.i64([1, 2])})
 frame_count := q {
 count ${frame_value}
 }
