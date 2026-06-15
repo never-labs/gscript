@@ -43,6 +43,7 @@ func BuildStats() *Table {
 	set("resample", statsResample)
 	set("resample_if", statsResampleIf)
 	set("importance_update", statsImportanceUpdate)
+	set("bayes_update", statsBayesUpdate)
 	set("systematic_resample", statsSystematicResample)
 	return t
 }
@@ -663,6 +664,54 @@ func statsImportanceUpdate(args []Value) ([]Value, error) {
 		return nil, err
 	}
 	return statsResampleIf([]Value{args[0], normalized[0], FloatValue(minRatio), FloatValue(offset)})
+}
+
+func statsBayesUpdate(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.bayes_update: need values, weights, and log_likelihoods")
+	}
+	opts, err := statsBayesUpdateOptions(args)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := statsImportanceUpdate([]Value{args[0], args[1], args[2], TableValue(opts)})
+	if err != nil {
+		return nil, err
+	}
+	summary, err := statsDescribe([]Value{updated[0], updated[1]})
+	if err != nil {
+		return nil, err
+	}
+	out := NewTable()
+	out.RawSetString("values", updated[0])
+	out.RawSetString("weights", updated[1])
+	out.RawSetString("resampled", updated[2])
+	out.RawSetString("ess", updated[3])
+	out.RawSetString("indexes", updated[4])
+	out.RawSetString("summary", summary[0])
+	return []Value{TableValue(out)}, nil
+}
+
+func statsBayesUpdateOptions(args []Value) (*Table, error) {
+	opts := NewTable()
+	if len(args) >= 4 {
+		if !args[3].IsTable() {
+			return nil, fmt.Errorf("stats.bayes_update: options must be a table")
+		}
+		src := args[3].Table()
+		for _, key := range src.PairsKeysSnapshot() {
+			opts.RawSet(key, src.RawGet(key))
+		}
+	}
+	if opts.RawGetString("min_ess_ratio").IsNil() &&
+		opts.RawGetString("min_ratio").IsNil() &&
+		opts.RawGetString("minEssRatio").IsNil() {
+		opts.RawSetString("min_ess_ratio", FloatValue(0))
+	}
+	if opts.RawGetString("offset").IsNil() {
+		opts.RawSetString("offset", FloatValue(0.5))
+	}
+	return opts, nil
 }
 
 func statsSystematicResampleValues(values, weights []float64, total, offset float64) ([]float64, []float64, *Table) {

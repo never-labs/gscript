@@ -13,19 +13,17 @@ particles := rand.sample(prior, N)
 weights := stats.uniform_weights(N)
 
 measurements := {0.58, 1.05, 1.53, 1.95}
-did_resample := false
-ess := 0.0
-resample_idx := {}
-
 for t := 1; t <= #measurements; t++ {
     noise := rand.sample(process_noise, N)
     particles = linalg.add(particles, noise, 0.50)
     residual := linalg.sub(particles, measurements[t])
     log_weights := stats.logpdf(sensor_noise, residual)
-    particles, weights, did_resample, ess, resample_idx = stats.importance_update(particles, weights, log_weights, {min_ess_ratio: 0.6, offset: 0.5})
-    assert(ess > 0)
-    if did_resample {
-        assert(#resample_idx == N)
+    posterior := stats.bayes_update(particles, weights, log_weights, {min_ess_ratio: 0.6, offset: 0.5})
+    particles = posterior.values
+    weights = posterior.weights
+    assert(posterior.ess > 0)
+    if posterior.resampled {
+        assert(#posterior.indexes == N)
     }
 }
 

@@ -137,6 +137,8 @@ kept, kept_weights, kept_resampled, kept_ess, kept_idx := stats.resample_if({10,
 next, next_weights, did_resample, next_ess, next_idx := stats.resample_if({10, 20, 30}, {0.01, 0.01, 0.98}, 0.8, 0.5)
 iw_keep, iw_keep_weights, iw_keep_resampled, iw_keep_ess, iw_keep_idx := stats.importance_update({10, 20, 30}, {1, 1, 1}, {0, 0, 0}, {min_ess_ratio: 0.5, offset: 0.5})
 iw_next, iw_next_weights, iw_did_resample, iw_next_ess, iw_next_idx := stats.importance_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
+bayes_keep := stats.bayes_update({10, 20, 30}, {1, 1, 1}, {0, 0, 0})
+bayes_next := stats.bayes_update({10, 20, 30}, {0.2, 0.3, 0.5}, {-10, -10, 10}, {min_ess_ratio: 0.8, offset: 0.5})
 `)
 	indices := interp.GetGlobal("indices")
 	if !indices.IsTable() {
@@ -153,6 +155,39 @@ iw_next, iw_next_weights, iw_did_resample, iw_next_ess, iw_next_idx := stats.imp
 	assertTableFloat(t, interp.GetGlobal("resampled"), 3, 30)
 	assertTableFloat(t, interp.GetGlobal("uniform"), 2, 1.0/3.0)
 	idx := interp.GetGlobal("resample_idx").Table()
+	assertTableFloat(t, interp.GetGlobal("iw_keep"), 2, 20)
+	assertTableFloat(t, interp.GetGlobal("iw_keep_weights"), 1, 1.0/3.0)
+	if got := interp.GetGlobal("iw_keep_resampled"); !got.IsBool() || got.Bool() {
+		t.Fatalf("iw_keep_resampled = %v, want false", got)
+	}
+	if got := interp.GetGlobal("iw_keep_idx").Table().Length(); got != 0 {
+		t.Fatalf("iw_keep_idx length = %d, want 0", got)
+	}
+	assertTableFloat(t, interp.GetGlobal("iw_next"), 1, 30)
+	assertTableFloat(t, interp.GetGlobal("iw_next_weights"), 1, 1.0/3.0)
+	if got := interp.GetGlobal("iw_did_resample"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("iw_did_resample = %v, want true", got)
+	}
+	if got := interp.GetGlobal("iw_next_idx").Table().Length(); got != 3 {
+		t.Fatalf("iw_next_idx length = %d, want 3", got)
+	}
+	bayesKeep := interp.GetGlobal("bayes_keep").Table()
+	assertTableFloat(t, bayesKeep.RawGetString("values"), 2, 20)
+	assertTableFloat(t, bayesKeep.RawGetString("weights"), 1, 1.0/3.0)
+	if got := bayesKeep.RawGetString("resampled"); !got.IsBool() || got.Bool() {
+		t.Fatalf("bayes_keep.resampled = %v, want false", got)
+	}
+	assertFloat(t, bayesKeep.RawGetString("summary").Table().RawGetString("mean"), 20)
+	bayesNext := interp.GetGlobal("bayes_next").Table()
+	assertTableFloat(t, bayesNext.RawGetString("values"), 1, 30)
+	assertTableFloat(t, bayesNext.RawGetString("weights"), 1, 1.0/3.0)
+	if got := bayesNext.RawGetString("resampled"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("bayes_next.resampled = %v, want true", got)
+	}
+	if got := bayesNext.RawGetString("indexes").Table().Length(); got != 3 {
+		t.Fatalf("bayes_next.indexes length = %d, want 3", got)
+	}
+	assertFloat(t, bayesNext.RawGetString("summary").Table().RawGetString("mean"), 30)
 	if got := idx.RawGetInt(1); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("resample_idx[1] = %v, want 2", got)
 	}
@@ -237,5 +272,13 @@ func TestStatsErrors(t *testing.T) {
 	err = execSourceOnInterp(interp, `stats.importance_update({1}, {1}, {0}, {})`)
 	if err == nil {
 		t.Fatal("stats.importance_update missing min_ess_ratio succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.bayes_update({1}, {1})`)
+	if err == nil {
+		t.Fatal("stats.bayes_update missing log_likelihoods succeeded, want error")
+	}
+	err = execSourceOnInterp(interp, `stats.bayes_update({1}, {1}, {0}, "bad")`)
+	if err == nil {
+		t.Fatal("stats.bayes_update bad options succeeded, want error")
 	}
 }
