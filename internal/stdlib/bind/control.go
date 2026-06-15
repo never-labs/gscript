@@ -82,6 +82,9 @@ func BuildControl() *Table {
 			if err := controlApplyFeedbackOptions(opts, u); err != nil {
 				return nil, err
 			}
+			if rows == 1 {
+				return []Value{FloatValue(u[0])}, nil
+			}
 			return []Value{DenseArrayValue(NewDenseArrayF64Owned(u))}, nil
 		}
 		gain, err := linalgVectorValue("control.feedback", args[0])
@@ -97,6 +100,8 @@ func BuildControl() *Table {
 		}
 		return []Value{FloatValue(u[0])}, nil
 	})
+
+	set("lqr", controlLQR)
 
 	set("lqr2", func(args []Value) ([]Value, error) {
 		if len(args) < 4 {
@@ -156,6 +161,150 @@ func BuildControl() *Table {
 	})
 
 	return t
+}
+
+func controlLQR(args []Value) ([]Value, error) {
+	if len(args) < 4 {
+		return nil, fmt.Errorf("control.lqr: need A, B, Q, R")
+	}
+	A, err := controlMatrix(args[0], "control.lqr A")
+	if err != nil {
+		return nil, err
+	}
+	B, err := controlMatrix(args[1], "control.lqr B")
+	if err != nil {
+		return nil, err
+	}
+	Q, err := controlMatrix(args[2], "control.lqr Q")
+	if err != nil {
+		return nil, err
+	}
+	if A.rows != A.cols {
+		return nil, fmt.Errorf("control.lqr: A must be square")
+	}
+	if B.rows != A.rows {
+		return nil, fmt.Errorf("control.lqr: B row count must match A")
+	}
+	if Q.rows != A.rows || Q.cols != A.cols {
+		return nil, fmt.Errorf("control.lqr: Q shape must match A")
+	}
+	if err := controlValidateSymmetric("control.lqr Q", Q, 1e-9); err != nil {
+		return nil, err
+	}
+	if err := controlValidateNonNegativeDiagonal("control.lqr Q", Q); err != nil {
+		return nil, err
+	}
+	R, err := controlRMatrix(args[3], B.cols)
+	if err != nil {
+		return nil, err
+	}
+	if err := controlValidateSymmetric("control.lqr R", R, 1e-9); err != nil {
+		return nil, err
+	}
+	if err := controlValidatePositiveDiagonal("control.lqr R", R); err != nil {
+		return nil, err
+	}
+	iterations := 20000
+	step := 0.001
+	tolerance := 1e-12
+	if len(args) >= 5 && args[4].IsTable() {
+		opts := args[4].Table()
+		if v := opts.RawGetString("iterations"); v.IsNumber() {
+			iterations = int(v.Int())
+		}
+		if v := opts.RawGetString("step"); v.IsNumber() {
+			step = v.Number()
+		}
+		if v := opts.RawGetString("tolerance"); v.IsNumber() {
+			tolerance = v.Number()
+		}
+	}
+	if iterations <= 0 {
+		return nil, fmt.Errorf("control.lqr: iterations must be positive")
+	}
+	if step <= 0 {
+		return nil, fmt.Errorf("control.lqr: step must be positive")
+	}
+	if tolerance < 0 {
+		return nil, fmt.Errorf("control.lqr: tolerance must be non-negative")
+	}
+	P := append([]float64(nil), Q.data...)
+	for i := 0; i < iterations; i++ {
+		dP, _, err := controlRiccati(A, B, P, Q.data, R)
+		if err != nil {
+			return nil, err
+		}
+		maxDelta := 0.0
+		for j := range P {
+			delta := step * dP[j]
+			if math.IsNaN(delta) || math.IsInf(delta, 0) {
+				return nil, fmt.Errorf("control.lqr: Riccati iteration diverged")
+			}
+			P[j] += delta
+			if math.Abs(delta) > maxDelta {
+				maxDelta = math.Abs(delta)
+			}
+		}
+		if maxDelta < tolerance {
+			break
+		}
+	}
+	_, K, err := controlRiccati(A, B, P, Q.data, R)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{linalgMatrixDenseValue(B.cols, A.rows, K)}, nil
+}
+
+func controlRMatrix(value Value, inputs int) (controlDenseMatrix, error) {
+	if value.IsNumber() {
+		r := value.Number()
+		data := make([]float64, inputs*inputs)
+		for i := 0; i < inputs; i++ {
+			data[i*inputs+i] = r
+		}
+		return controlDenseMatrix{rows: inputs, cols: inputs, data: data}, nil
+	}
+	R, err := controlMatrix(value, "control.lqr R")
+	if err != nil {
+		return controlDenseMatrix{}, err
+	}
+	if R.rows != inputs || R.cols != inputs {
+		return controlDenseMatrix{}, fmt.Errorf("control.lqr: R must be %dx%d", inputs, inputs)
+	}
+	return R, nil
+}
+
+func controlValidateSymmetric(name string, matrix controlDenseMatrix, tolerance float64) error {
+	if matrix.rows != matrix.cols {
+		return fmt.Errorf("%s must be square", name)
+	}
+	for r := 0; r < matrix.rows; r++ {
+		for c := r + 1; c < matrix.cols; c++ {
+			if math.Abs(matrix.data[r*matrix.cols+c]-matrix.data[c*matrix.cols+r]) > tolerance {
+				return fmt.Errorf("%s must be symmetric", name)
+			}
+		}
+	}
+	return nil
+}
+
+func controlValidateNonNegativeDiagonal(name string, matrix controlDenseMatrix) error {
+	for i := 0; i < matrix.rows; i++ {
+		if matrix.data[i*matrix.cols+i] < 0 {
+			return fmt.Errorf("%s diagonal must be non-negative", name)
+		}
+	}
+	return nil
+}
+
+func controlValidatePositiveDiagonal(name string, matrix controlDenseMatrix) error {
+	for i := 0; i < matrix.rows; i++ {
+		if matrix.data[i*matrix.cols+i] <= 0 {
+			return fmt.Errorf("%s diagonal must be positive", name)
+		}
+	}
+	return nil
 }
 
 func controlSaturate(x, limit float64) float64 {
@@ -289,4 +438,25 @@ func controlRiccati2(A, B, P, Q []float64, R float64) []float64 {
 		atp[2] + pa[2] - pb1*pb0/R + Q[2],
 		atp[3] + pa[3] - pb1*pb1/R + Q[3],
 	}
+}
+
+func controlRiccati(A, B controlDenseMatrix, P, Q []float64, R controlDenseMatrix) ([]float64, []float64, error) {
+	n := A.rows
+	m := B.cols
+	at := stddata.LinalgF64Transpose(A.rows, A.cols, A.data)
+	atp := stddata.LinalgF64Matmul(n, n, n, at, P)
+	pa := stddata.LinalgF64Matmul(n, n, n, P, A.data)
+	bt := stddata.LinalgF64Transpose(B.rows, B.cols, B.data)
+	btp := stddata.LinalgF64Matmul(m, n, n, bt, P)
+	k, err := linalgSolveDense(m, n, R.data, btp)
+	if err != nil {
+		return nil, nil, err
+	}
+	pb := stddata.LinalgF64Matmul(n, n, m, P, B.data)
+	term := stddata.LinalgF64Matmul(n, m, n, pb, k)
+	dP := make([]float64, n*n)
+	for i := range dP {
+		dP[i] = atp[i] + pa[i] - term[i] + Q[i]
+	}
+	return dP, k, nil
 }

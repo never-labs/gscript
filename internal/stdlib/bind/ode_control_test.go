@@ -45,6 +45,16 @@ func TestControlModulePrimitives(t *testing.T) {
 	if got[0].Number() != -10 {
 		t.Fatalf("limited control.feedback = %v, want -10", got[0])
 	}
+	got, err = feedback.Fn([]Value{
+		controlTestMatrix(1, 2, []float64{2, 3}),
+		DenseArrayValue(NewDenseArrayF64([]float64{4, 5})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Number() != -23 {
+		t.Fatalf("matrix-row control.feedback = %v, want -23", got[0])
+	}
 	got, err = saturate.Fn([]Value{
 		DenseArrayValue(NewDenseArrayF64([]float64{5, -6})),
 		FloatValue(3),
@@ -84,10 +94,15 @@ func TestControlModulePrimitives(t *testing.T) {
 func TestControlLQR2ReturnsFiniteGain(t *testing.T) {
 	control := BuildControl()
 	lqr := control.RawGetString("lqr2").GoFunction()
+	generic := control.RawGetString("lqr").GoFunction()
 	A := controlTestMatrix(2, 2, []float64{0, 1, 9.81, -0.1})
 	B := controlTestMatrix(2, 1, []float64{0, 1})
 	Q := controlTestMatrix(2, 2, []float64{10, 0, 0, 1})
-	got, err := lqr.Fn([]Value{A, B, Q, FloatValue(1)})
+	opts := TableValue(controlTestOptions(map[string]Value{
+		"iterations": IntValue(20000),
+		"step":       FloatValue(0.001),
+	}))
+	got, err := lqr.Fn([]Value{A, B, Q, FloatValue(1), opts})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,6 +115,109 @@ func TestControlLQR2ReturnsFiniteGain(t *testing.T) {
 	}
 	if math.IsNaN(xs[0]) || math.IsNaN(xs[1]) || math.IsInf(xs[0], 0) || math.IsInf(xs[1], 0) {
 		t.Fatalf("control.lqr2 gain is not finite: %#v", xs)
+	}
+	genericGain, err := generic.Fn([]Value{A, B, Q, FloatValue(1), opts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backing, rows, stride, ok := genericGain[0].Table().DenseMatrixBacking()
+	if !ok || rows != 1 || stride != 2 {
+		t.Fatalf("control.lqr returned %v, want 1x2 matrix", genericGain[0])
+	}
+	for i, want := range xs {
+		if math.Abs(backing[i]-want) > 1e-9 {
+			t.Fatalf("control.lqr gain[%d] = %.12f, want lqr2 %.12f", i+1, backing[i], want)
+		}
+	}
+}
+
+func TestControlLQRReturnsFiniteSingleInputGain(t *testing.T) {
+	control := BuildControl()
+	lqr := control.RawGetString("lqr").GoFunction()
+	A := controlTestMatrix(2, 2, []float64{0, 1, 9.81, -0.1})
+	B := controlTestMatrix(2, 1, []float64{0, 1})
+	Q := controlTestMatrix(2, 2, []float64{10, 0, 0, 1})
+	got, err := lqr.Fn([]Value{A, B, Q, FloatValue(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[0].IsTable() {
+		t.Fatalf("control.lqr returned %v, want gain matrix", got[0])
+	}
+	if backing, _, _, ok := got[0].Table().DenseMatrixBacking(); ok {
+		for _, x := range backing[:2] {
+			if math.IsNaN(x) || math.IsInf(x, 0) {
+				t.Fatalf("control.lqr gain is not finite: %#v", backing[:2])
+			}
+		}
+	}
+}
+
+func TestControlLQRKnownScalarCARE(t *testing.T) {
+	control := BuildControl()
+	lqr := control.RawGetString("lqr").GoFunction()
+	got, err := lqr.Fn([]Value{
+		controlTestMatrix(1, 1, []float64{1}),
+		controlTestMatrix(1, 1, []float64{1}),
+		controlTestMatrix(1, 1, []float64{1}),
+		FloatValue(1),
+		TableValue(controlTestOptions(map[string]Value{
+			"iterations": IntValue(20000),
+			"step":       FloatValue(0.001),
+		})),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 1 + math.Sqrt2
+	backing, rows, stride, ok := got[0].Table().DenseMatrixBacking()
+	if !ok || rows != 1 || stride != 1 {
+		t.Fatalf("control.lqr scalar CARE returned %v, want 1x1 matrix", got[0])
+	}
+	if math.Abs(backing[0]-want) > 1e-3 {
+		t.Fatalf("control.lqr scalar CARE = %.12f, want %.12f", backing[0], want)
+	}
+}
+
+func TestControlLQRReturnsMatrixGainForMultiInput(t *testing.T) {
+	control := BuildControl()
+	lqr := control.RawGetString("lqr").GoFunction()
+	A := controlTestMatrix(2, 2, []float64{0, 1, -1, -0.2})
+	B := controlTestMatrix(2, 2, []float64{1, 0, 0, 1})
+	Q := controlTestMatrix(2, 2, []float64{2, 0, 0, 1})
+	R := controlTestMatrix(2, 2, []float64{1, 0, 0, 1})
+	got, err := lqr.Fn([]Value{A, B, Q, R, TableValue(controlTestOptions(map[string]Value{
+		"iterations": IntValue(1000),
+		"step":       FloatValue(0.001),
+	}))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[0].IsTable() {
+		t.Fatalf("control.lqr returned %s, want matrix", got[0].TypeName())
+	}
+	if backing, _, _, ok := got[0].Table().DenseMatrixBacking(); ok {
+		for _, x := range backing[:4] {
+			if math.IsNaN(x) || math.IsInf(x, 0) {
+				t.Fatalf("control.lqr matrix gain is not finite: %#v", backing[:4])
+			}
+		}
+	}
+}
+
+func TestControlLQRRejectsInvalidWeights(t *testing.T) {
+	control := BuildControl()
+	lqr := control.RawGetString("lqr").GoFunction()
+	A := controlTestMatrix(1, 1, []float64{1})
+	B := controlTestMatrix(1, 1, []float64{1})
+	if _, err := lqr.Fn([]Value{A, B, controlTestMatrix(1, 1, []float64{-1}), FloatValue(1)}); err == nil {
+		t.Fatal("control.lqr accepted negative Q diagonal")
+	}
+	if _, err := lqr.Fn([]Value{A, B, controlTestMatrix(1, 1, []float64{1}), FloatValue(-1)}); err == nil {
+		t.Fatal("control.lqr accepted negative R")
+	}
+	if _, err := lqr.Fn([]Value{A, B, controlTestMatrix(1, 1, []float64{1}), FloatValue(1), TableValue(controlTestOptions(map[string]Value{"iterations": IntValue(0)}))}); err == nil {
+		t.Fatal("control.lqr accepted zero iterations")
 	}
 }
 
