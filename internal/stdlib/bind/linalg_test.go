@@ -29,6 +29,8 @@ func linalgMigrationInterp(t *testing.T, src string) *runtime.Interpreter {
 func TestLinalgVectorMatrixAndAccess(t *testing.T) {
 	interp := linalgInterp(t, `
 v := linalg.vector(1, 2, 3)
+row := linalg.row(1, 2, 3)
+col := linalg.col({4, 5})
 fromTable := linalg.vector({4, 5, 6})
 m := linalg.matrix(2, 3, {1, 2, 3, 4, 5, 6})
 before := linalg.get(m, 2, 3)
@@ -40,6 +42,8 @@ eye := linalg.eye(3)
 diag := linalg.diag({7, 8})
 `)
 	assertTableFloat(t, interp.GetGlobal("v"), 3, 3)
+	assertMatrixFloat(t, interp.GetGlobal("row"), 1, 3, 3, 3)
+	assertMatrixFloat(t, interp.GetGlobal("col"), 2, 1, 2, 5)
 	assertTableFloat(t, interp.GetGlobal("fromTable"), 2, 5)
 	assertFloat(t, interp.GetGlobal("before"), 6)
 	assertFloat(t, interp.GetGlobal("after"), 9)
@@ -61,6 +65,7 @@ norm := linalg.norm(linalg.vector(3, 4))
 m := linalg.matrix(2, 2, {1, 2, 3, 4})
 mv := linalg.matvec(m, {10, 20})
 mt := linalg.transpose(m)
+trace := linalg.trace(m)
 mm := linalg.matmul(m, linalg.eye(2))
 sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
 `)
@@ -71,6 +76,7 @@ sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
 	assertFloat(t, interp.GetGlobal("norm"), 5)
 	assertTableFloat(t, interp.GetGlobal("mv"), 1, 50)
 	assertMatrixFloat(t, interp.GetGlobal("mt"), 2, 2, 2, 3)
+	assertFloat(t, interp.GetGlobal("trace"), 5)
 	assertMatrixFloat(t, interp.GetGlobal("mm"), 2, 2, 3, 3)
 	assertTableFloat(t, interp.GetGlobal("sol"), 1, 0.2)
 	assertTableFloat(t, interp.GetGlobal("sol"), 2, 0.6)
@@ -78,12 +84,32 @@ sol := linalg.solve2(linalg.matrix(2, 2, {2, 1, 1, 3}), {1, 2})
 
 func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		src  string
-		row  int
-		col  int
-		want float64
+		name   string
+		src    string
+		row    int
+		col    int
+		want   float64
+		setRow int
+		setCol int
 	}{
+		{
+			name:   "row",
+			src:    `m := linalg.row({1, 2})`,
+			row:    0,
+			col:    1,
+			want:   2,
+			setRow: 0,
+			setCol: 1,
+		},
+		{
+			name:   "col",
+			src:    `m := linalg.col(1, 2)`,
+			row:    1,
+			col:    0,
+			want:   2,
+			setRow: 1,
+			setCol: 0,
+		},
 		{
 			name: "matrix",
 			src:  `m := linalg.matrix(2, 2, {1, 2, 3, 4})`,
@@ -149,11 +175,15 @@ func TestLinalgMatrixResultsAreDenseMatrixCompatible(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			setRow, setCol := tc.setRow, tc.setCol
+			if setRow == 0 && setCol == 0 {
+				setCol = 1
+			}
 			interp := linalgMigrationInterp(t, tc.src+fmt.Sprintf(`
 before := matrix.getf(m, %d, %d)
-matrix.setf(m, 0, 1, 9)
-after := matrix.getf(m, 0, 1)
-`, tc.row, tc.col))
+matrix.setf(m, %d, %d, 9)
+after := matrix.getf(m, %d, %d)
+`, tc.row, tc.col, setRow, setCol, setRow, setCol))
 			assertFloat(t, interp.GetGlobal("before"), tc.want)
 			assertFloat(t, interp.GetGlobal("after"), 9)
 			m := interp.GetGlobal("m")

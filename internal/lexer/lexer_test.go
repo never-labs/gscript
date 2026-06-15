@@ -530,6 +530,42 @@ func TestQFailFastRawSourceBlockAllowsEmbeddedQSyntax(t *testing.T) {
 	})
 }
 
+func TestQIdentifierBeforeControlFlowBlockIsNotRawSourceBlock(t *testing.T) {
+	input := "if q { x := 1 }\nfor q { break }\nobj.q {a: 1}"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IF, Value: "if"},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_LBRACE, Value: "{"},
+		{Type: TOKEN_IDENT, Value: "x"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_NUMBER, Value: "1"},
+		{Type: TOKEN_RBRACE, Value: "}"},
+		{Type: TOKEN_FOR, Value: "for"},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_LBRACE, Value: "{"},
+		{Type: TOKEN_BREAK, Value: "break"},
+		{Type: TOKEN_RBRACE, Value: "}"},
+		{Type: TOKEN_IDENT, Value: "obj"},
+		{Type: TOKEN_DOT, Value: "."},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_LBRACE, Value: "{"},
+		{Type: TOKEN_IDENT, Value: "a"},
+		{Type: TOKEN_COLON, Value: ":"},
+		{Type: TOKEN_NUMBER, Value: "1"},
+		{Type: TOKEN_RBRACE, Value: "}"},
+	})
+}
+
+func TestQRawSourceBlockIgnoresQLineCommentBraces(t *testing.T) {
+	input := "x := q {\n/ comment with }\n+/1 2 3\n}"
+	expectTokens(t, input, []Token{
+		{Type: TOKEN_IDENT, Value: "x"},
+		{Type: TOKEN_DECLARE, Value: ":="},
+		{Type: TOKEN_IDENT, Value: "q"},
+		{Type: TOKEN_RAW_BLOCK, Value: "/ comment with }\n+/1 2 3"},
+	})
+}
+
 func TestUnterminatedTripleBacktickRawString(t *testing.T) {
 	lex := New("q```unterminated ` raw")
 	_, err := lex.Tokenize()

@@ -11,11 +11,15 @@ func BuildStats() *Table {
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "stats." + name, Fn: fn}))
 	}
+	set("sum", statsSum)
 	set("mean", statsMean)
+	set("min", statsMin)
+	set("max", statsMax)
 	set("var", statsVar)
 	set("std", statsStd)
 	set("normalize", statsNormalize)
 	set("zscore", statsNormalize)
+	set("normal_pdf", statsNormalPDF)
 	set("normalize_weights", statsNormalizeWeights)
 	set("effective_sample_size", statsEffectiveSampleSize)
 	set("weighted_mean", statsWeightedMean)
@@ -23,9 +27,23 @@ func BuildStats() *Table {
 	set("diff", statsDiff)
 	set("fill", statsFill)
 	set("gather", statsGather)
+	set("rms", statsRMS)
 	set("rmse", statsRMSE)
+	set("resample", statsResample)
 	set("systematic_resample", statsSystematicResample)
 	return t
+}
+
+func statsSum(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.sum", args)
+	if err != nil {
+		return nil, err
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	return []Value{FloatValue(sum)}, nil
 }
 
 func statsMean(args []Value) ([]Value, error) {
@@ -37,6 +55,40 @@ func statsMean(args []Value) ([]Value, error) {
 		return nil, fmt.Errorf("stats.mean: empty input")
 	}
 	return []Value{FloatValue(statsMeanOf(values))}, nil
+}
+
+func statsMin(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.min", args)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.min: empty input")
+	}
+	min := values[0]
+	for _, v := range values[1:] {
+		if v < min {
+			min = v
+		}
+	}
+	return []Value{FloatValue(min)}, nil
+}
+
+func statsMax(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.max", args)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.max: empty input")
+	}
+	max := values[0]
+	for _, v := range values[1:] {
+		if v > max {
+			max = v
+		}
+	}
+	return []Value{FloatValue(max)}, nil
 }
 
 func statsVar(args []Value) ([]Value, error) {
@@ -82,6 +134,39 @@ func statsNormalize(args []Value) ([]Value, error) {
 		for i, v := range values {
 			out[i] = (v - mean) / stddev
 		}
+	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+}
+
+func statsNormalPDF(args []Value) ([]Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("stats.normal_pdf: need x, mean, stddev")
+	}
+	mean, err := linalgNumber("stats.normal_pdf", args[1])
+	if err != nil {
+		return nil, err
+	}
+	stddev, err := linalgNumber("stats.normal_pdf", args[2])
+	if err != nil {
+		return nil, err
+	}
+	if stddev <= 0 {
+		return nil, fmt.Errorf("stats.normal_pdf: stddev must be positive")
+	}
+	eval := func(x float64) float64 {
+		z := (x - mean) / stddev
+		return math.Exp(-0.5*z*z) / (stddev * math.Sqrt(2*math.Pi))
+	}
+	if args[0].IsNumber() {
+		return []Value{FloatValue(eval(toFloat(args[0])))}, nil
+	}
+	values, err := linalgVectorValue("stats.normal_pdf", args[0])
+	if err != nil {
+		return nil, err
+	}
+	out := make([]float64, len(values))
+	for i, v := range values {
+		out[i] = eval(v)
 	}
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
@@ -152,6 +237,21 @@ func statsGather(args []Value) ([]Value, error) {
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
 }
 
+func statsRMS(args []Value) ([]Value, error) {
+	values, err := statsVectorArg("stats.rms", args)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("stats.rms: empty input")
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += v * v
+	}
+	return []Value{FloatValue(math.Sqrt(sum / float64(len(values))))}, nil
+}
+
 func statsRMSE(args []Value) ([]Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("stats.rmse: need actual and predicted values")
@@ -173,6 +273,55 @@ func statsRMSE(args []Value) ([]Value, error) {
 		sum += d * d
 	}
 	return []Value{FloatValue(math.Sqrt(sum / float64(len(actual))))}, nil
+}
+
+func statsResample(args []Value) ([]Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("stats.resample: need values and weights")
+	}
+	values, err := linalgVectorValue("stats.resample", args[0])
+	if err != nil {
+		return nil, err
+	}
+	weights, total, err := statsWeights("stats.resample", []Value{args[1]})
+	if err != nil {
+		return nil, err
+	}
+	if len(values) != len(weights) {
+		return nil, fmt.Errorf("stats.resample: values and weights length mismatch")
+	}
+	offset := 0.5
+	if len(args) >= 3 {
+		offset, err = linalgNumber("stats.resample", args[2])
+		if err != nil {
+			return nil, err
+		}
+		if offset < 0 || offset >= 1 {
+			return nil, fmt.Errorf("stats.resample: offset must be in [0, 1)")
+		}
+	}
+	n := len(weights)
+	indexes := NewAppendArrayTable(n)
+	out := make([]float64, n)
+	cumulative := 0.0
+	j := 0
+	for i := 0; i < n; i++ {
+		pos := (float64(i) + offset) / float64(n)
+		for j < n-1 && pos > (cumulative+weights[j])/total {
+			cumulative += weights[j]
+			j++
+		}
+		indexes.RawSetInt(int64(i+1), IntValue(int64(j+1)))
+		out[i] = values[j]
+	}
+	uniform := make([]float64, n)
+	if n > 0 {
+		w := 1.0 / float64(n)
+		for i := range uniform {
+			uniform[i] = w
+		}
+	}
+	return []Value{DenseArrayValue(NewDenseArrayF64Owned(out)), DenseArrayValue(NewDenseArrayF64Owned(uniform)), TableValue(indexes)}, nil
 }
 
 func statsWeightedMean(args []Value) ([]Value, error) {

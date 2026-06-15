@@ -14,6 +14,8 @@ func BuildLinalg() *Table {
 	}
 
 	set("vector", linalgVector)
+	set("row", linalgRow)
+	set("col", linalgCol)
 	set("matrix", linalgMatrix)
 	set("zeros", linalgZeros)
 	set("eye", linalgEye)
@@ -27,6 +29,7 @@ func BuildLinalg() *Table {
 	set("matvec", linalgMatvec)
 	set("matmul", linalgMatmul)
 	set("transpose", linalgTranspose)
+	set("trace", linalgTrace)
 	set("norm", linalgNorm)
 	set("solve2", linalgSolve2)
 	return t
@@ -39,6 +42,24 @@ func linalgVector(args []Value) ([]Value, error) {
 	}
 	stddata.RecordLinalgVectorKernel("LinalgVectorConstruct", "construct", len(values))
 	return []Value{DenseArrayValue(NewDenseArrayF64Owned(values))}, nil
+}
+
+func linalgRow(args []Value) ([]Value, error) {
+	values, err := linalgVectorArgs("linalg.row", args)
+	if err != nil {
+		return nil, err
+	}
+	stddata.RecordLinalgMatrixKernel("LinalgMatrixRow", "row", 1, len(values))
+	return []Value{linalgMatrixDenseValue(1, len(values), values)}, nil
+}
+
+func linalgCol(args []Value) ([]Value, error) {
+	values, err := linalgVectorArgs("linalg.col", args)
+	if err != nil {
+		return nil, err
+	}
+	stddata.RecordLinalgMatrixKernel("LinalgMatrixCol", "col", len(values), 1)
+	return []Value{linalgMatrixDenseValue(len(values), 1, values)}, nil
 }
 
 func linalgMatrix(args []Value) ([]Value, error) {
@@ -292,6 +313,29 @@ func linalgTranspose(args []Value) ([]Value, error) {
 	}
 	out := stddata.LinalgF64Transpose(rows, cols, values)
 	return []Value{linalgMatrixDenseValue(cols, rows, out)}, nil
+}
+
+func linalgTrace(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("linalg.trace: need matrix")
+	}
+	rows, cols, values, ok, err := linalgMatrixValue("linalg.trace", args[0])
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("linalg.trace: argument 1 must be a matrix")
+	}
+	n := rows
+	if cols < n {
+		n = cols
+	}
+	sum := 0.0
+	for i := 0; i < n; i++ {
+		sum += values[i*cols+i]
+	}
+	stddata.RecordLinalgMatrixKernel("LinalgMatrixTrace", "trace", rows, cols)
+	return []Value{FloatValue(sum)}, nil
 }
 
 func linalgNorm(args []Value) ([]Value, error) {

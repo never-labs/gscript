@@ -110,6 +110,43 @@ func BuildRand() *Table {
 		return []Value{FloatValue(n)}, nil
 	})
 
+	// rand.normal_vec(n[, mean, stddev]) - sample a dense normal vector
+	set("normal_vec", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'rand.normal_vec' (size expected)")
+		}
+		n, err := linalgPositiveInt("rand.normal_vec", args[0], "size")
+		if err != nil {
+			return nil, err
+		}
+		mean := 0.0
+		stddev := 1.0
+		if len(args) >= 2 {
+			if err := requireNumber("rand.normal_vec", 2, args[1]); err != nil {
+				return nil, err
+			}
+			mean = toFloat(args[1])
+		}
+		if len(args) >= 3 {
+			if err := requireNumber("rand.normal_vec", 3, args[2]); err != nil {
+				return nil, err
+			}
+			stddev = toFloat(args[2])
+		}
+		if stddev < 0 {
+			return nil, fmt.Errorf("bad argument #3 to 'rand.normal_vec' (non-negative stddev expected)")
+		}
+		out := make([]float64, n)
+		for i := range out {
+			v, err := stdrand.Normal(rng.NormFloat64, mean, stddev)
+			if err != nil {
+				return nil, fmt.Errorf("bad argument #3 to 'rand.normal_vec' (non-negative stddev expected)")
+			}
+			out[i] = v
+		}
+		return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+	})
+
 	// rand.exp([rate]) - sample from exponential distribution
 	// Default rate=1
 	set("exp", func(args []Value) ([]Value, error) {

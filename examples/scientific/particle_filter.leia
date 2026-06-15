@@ -9,10 +9,7 @@ func near(a, b, tol) {
 rand.seed(314159)
 
 N := 64
-particles := stats.fill(N, 0.0)
-for i := 1; i <= N; i++ {
-    particles[i] = rand.normal(0.0, 0.8)
-}
+particles := rand.normal_vec(N, 0.0, 0.8)
 weights := stats.fill(N, 1.0 / N)
 
 measurements := {0.58, 1.05, 1.53, 1.95}
@@ -20,19 +17,19 @@ process_sigma := 0.04
 sensor_sigma := 0.18
 
 for t := 1; t <= #measurements; t++ {
+    noise := rand.normal_vec(N, 0.0, process_sigma)
     for i := 1; i <= N; i++ {
-        particles[i] = particles[i] + 0.50 + rand.normal(0.0, process_sigma)
-        residual := measurements[t] - particles[i]
-        likelihood := math.exp(-0.5 * (residual / sensor_sigma) ** 2)
-        weights[i] = likelihood + 1e-300
+        particles[i] = particles[i] + 0.50 + noise[i]
     }
+    weights = stats.normal_pdf(particles, measurements[t], sensor_sigma)
     weights = stats.normalize_weights(weights)
 
     ess := stats.effective_sample_size(weights)
     if ess < N * 0.6 {
-        idx := stats.systematic_resample(weights, 0.5)
-        particles = stats.gather(particles, idx)
-        weights = stats.fill(N, 1.0 / N)
+        resampled, uniform_weights, resample_idx := stats.resample(particles, weights, 0.5)
+        particles = resampled
+        weights = uniform_weights
+        assert(#resample_idx == N)
     }
 }
 

@@ -15,6 +15,8 @@ type Lexer struct {
 	tokens          []Token
 	pendingComments []Comment
 	lastTokenLine   int
+	lastTokenType   TokenType
+	hasLastToken    bool
 	rawBlockTag     string
 	rawBlockBang    bool
 }
@@ -126,7 +128,7 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 		if ch == '!' && !l.rawBlockBang {
 			l.rawBlockBang = true
 			l.advance()
-			return Token{Type: TOKEN_NOT, Value: "!", Line: startLine, Column: startCol}, nil
+			return l.finishToken(Token{Type: TOKEN_NOT, Value: "!", Line: startLine, Column: startCol}), nil
 		}
 		if ch == '{' {
 			tag := l.rawBlockTag
@@ -136,7 +138,7 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 			if err != nil {
 				return Token{}, err
 			}
-			return tok, nil
+			return l.finishToken(tok), nil
 		}
 		l.rawBlockTag = ""
 		l.rawBlockBang = false
@@ -173,7 +175,7 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 		if err != nil {
 			return Token{}, err
 		}
-		if tok.Type == TOKEN_IDENT && isRawSourceBlockTag(tok.Value) {
+		if tok.Type == TOKEN_IDENT && isRawSourceBlockTag(tok.Value) && l.rawSourceBlockAllowedHere() {
 			l.rawBlockTag = tok.Value
 		}
 		return l.finishToken(tok), nil
@@ -191,6 +193,23 @@ func isRawSourceBlockTag(tag string) bool {
 	return tag == "q"
 }
 
+func (l *Lexer) rawSourceBlockAllowedHere() bool {
+	if !l.hasLastToken {
+		return true
+	}
+	switch l.lastTokenType {
+	case TOKEN_SEMICOLON,
+		TOKEN_ASSIGN, TOKEN_DECLARE, TOKEN_PLUS_ASSIGN, TOKEN_MINUS_ASSIGN, TOKEN_STAR_ASSIGN, TOKEN_SLASH_ASSIGN,
+		TOKEN_RETURN,
+		TOKEN_COMMA,
+		TOKEN_LPAREN, TOKEN_LBRACKET, TOKEN_LBRACE,
+		TOKEN_COLON:
+		return true
+	default:
+		return false
+	}
+}
+
 func (l *Lexer) readRawSourceBlock(tag string, startLine, startCol int) (Token, error) {
 	l.advance() // consume opening {
 	if l.peek() == '\n' {
@@ -206,7 +225,7 @@ func (l *Lexer) readRawSourceBlock(tag string, startLine, startCol int) (Token, 
 			}
 			continue
 		}
-		if ch == '/' && l.peekAt(1) == '/' {
+		if l.rawSourceLineCommentAtSlash() {
 			for l.pos < len(l.source) && l.peek() != '\n' {
 				l.advance()
 			}
@@ -237,6 +256,20 @@ func (l *Lexer) readRawSourceBlock(tag string, startLine, startCol int) (Token, 
 		l.advance()
 	}
 	return Token{}, fmt.Errorf("unterminated raw %s block at %d:%d", tag, startLine, startCol)
+}
+
+func (l *Lexer) rawSourceLineCommentAtSlash() bool {
+	if l.peek() != '/' {
+		return false
+	}
+	i := l.pos - 1
+	for i >= 0 && l.source[i] != '\n' {
+		if l.source[i] != ' ' && l.source[i] != '\t' && l.source[i] != '\r' {
+			return l.peekAt(1) == '/'
+		}
+		i--
+	}
+	return true
 }
 
 func (l *Lexer) skipQuotedRawBlockString(quote byte) error {
@@ -275,6 +308,8 @@ func (l *Lexer) finishToken(tok Token) Token {
 	l.pendingComments = nil
 	if tok.Type != TOKEN_EOF {
 		l.lastTokenLine = tok.Line
+		l.lastTokenType = tok.Type
+		l.hasLastToken = true
 	}
 	return tok
 }

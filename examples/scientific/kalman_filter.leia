@@ -6,10 +6,6 @@ func near(a, b, tol) {
     return math.abs(a - b) <= tol
 }
 
-func col(x, v) {
-    return linalg.matrix(2, 1, {x, v})
-}
-
 dt := 1.0
 F := linalg.matrix(2, 2, {1.0, dt, 0.0, 1.0})
 H := linalg.matrix(1, 2, {1.0, 0.0})
@@ -17,7 +13,7 @@ Q := linalg.scale(linalg.eye(2), 0.01)
 I := linalg.eye(2)
 
 measurements := {0.95, 2.05, 2.95, 4.10, 5.00}
-x := col(0.0, 1.0)
+x := linalg.col(0.0, 1.0)
 P := linalg.scale(linalg.eye(2), 1.0)
 innovations := {}
 
@@ -35,14 +31,10 @@ for i := 1; i <= #measurements; i++ {
     innovations[i] = linalg.get(y, 1, 1)
 }
 
-innovation_sq := {}
-for i := 1; i <= #innovations; i++ {
-    innovation_sq[i] = innovations[i] * innovations[i]
-}
-innovation_rmse := math.sqrt(stats.mean(innovation_sq))
+innovation_rmse := stats.rms(innovations)
 position := linalg.get(x, 1, 1)
 velocity := linalg.get(x, 2, 1)
-uncertainty_trace := linalg.get(P, 1, 1) + linalg.get(P, 2, 2)
+uncertainty_trace := linalg.trace(P)
 q_checksum := q.eval("+/1 2 3")
 
 assert(near(position, 5.0, 0.15))

@@ -142,6 +142,19 @@ func TestRandNormalWithParams(t *testing.T) {
 	}
 }
 
+func TestRandNormalVec(t *testing.T) {
+	interp := randInterp(t, `
+rand.seed(42)
+values := rand.normal_vec(4, 10, 0.5)
+again := rand.normal_vec(2)
+`)
+	assertTableFloat(t, interp.GetGlobal("values"), 4, 10.622007507538102)
+	got := interp.GetGlobal("again")
+	if !got.IsDenseArray() || got.DenseArray().Len() != 2 {
+		t.Fatalf("again = %v, want dense array length 2", got)
+	}
+}
+
 // ==================================================================
 // rand.exp tests
 // ==================================================================

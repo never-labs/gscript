@@ -42,10 +42,7 @@ for step := 1; step <= 240; step++ {
 final_theta := state[1]
 final_omega := state[2]
 mean_energy := stats.mean(energy)
-peak_energy := 0.0
-for i := 1; i <= #energy; i++ {
-    peak_energy = math.max(peak_energy, energy[i])
-}
+peak_energy := stats.max(energy)
 q_checksum := q.eval("+/1 2 3")
 
 assert(near(final_theta, 0.0, 0.04))

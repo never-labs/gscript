@@ -18,17 +18,17 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "kalman_filter.leia"),
 			summary: "ok kalman ",
-			wantAPI: []string{"linalg.matrix", "linalg.matmul", "linalg.get", "stats.mean", "math.sqrt", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "linalg.col", "linalg.matmul", "linalg.trace", "linalg.get", "stats.rms", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "rand.normal", "stats.fill", "stats.normalize_weights", "stats.effective_sample_size", "stats.gather", "stats.mean", "stats[\"var\"]", "stats.rmse", "math.exp", "q.eval"},
+			wantAPI: []string{"rand.seed", "rand.normal_vec", "stats.normal_pdf", "stats.normalize_weights", "stats.effective_sample_size", "stats.resample", "stats.mean", "stats[\"var\"]", "stats.rmse", "q.eval"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
 			summary: "ok pendulum ",
-			wantAPI: []string{"linalg.matrix", "control.lqr2", "control.saturate", "ode.rk4", "stats.mean", "q.eval"},
+			wantAPI: []string{"linalg.matrix", "control.lqr2", "control.saturate", "ode.rk4", "stats.mean", "stats.max", "q.eval"},
 		},
 	}
 	for _, tc := range cases {

@@ -1018,6 +1018,36 @@ func TestQRawSourceBlockExecutesThroughDialect(t *testing.T) {
 	}
 }
 
+func TestQIdentifierControlFlowDoesNotBecomeRawBlock(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := leia.New(append([]leia.Option{leia.WithLibs(leia.LibAll)}, tc.opts...)...)
+			if err := vm.Exec(`
+q := true
+x := 0
+if q {
+    x = 1
+}
+n := 0
+for q {
+    n++
+    q = false
+}
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			assertGet(t, vm, "x", int64(1))
+			assertGet(t, vm, "n", int64(1))
+		})
+	}
+}
+
 func assertGet(t *testing.T, vm *leia.VM, name string, want any) {
 	t.Helper()
 	got, err := vm.Get(name)

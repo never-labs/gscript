@@ -13,7 +13,10 @@ func statsInterp(t *testing.T, src string) *runtime.Interpreter {
 
 func TestStatsAggregatesAndTransforms(t *testing.T) {
 	interp := statsInterp(t, `
+total := stats.sum({1, 2, 3, 4})
 mean := stats.mean({1, 2, 3, 4})
+minimum := stats.min({4, 2, 8})
+maximum := stats.max({4, 2, 8})
 variance := stats["var"]({1, 2, 3, 4})
 stddev := stats.std({1, 2, 3, 4})
 normalized := stats.normalize({1, 2, 3})
@@ -27,9 +30,15 @@ cumsum := stats.cumsum({2, 3, 5})
 diff := stats.diff({2, 5, 11})
 filled := stats.fill(4, 0.25)
 gathered := stats.gather({10, 20, 30}, {3, 1, 3})
+pdf0 := stats.normal_pdf(0, 0, 1)
+pdfs := stats.normal_pdf({0, 1}, 0, 1)
+rms := stats.rms({3, 4})
 rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 `)
+	assertFloat(t, interp.GetGlobal("total"), 10)
 	assertFloat(t, interp.GetGlobal("mean"), 2.5)
+	assertFloat(t, interp.GetGlobal("minimum"), 2)
+	assertFloat(t, interp.GetGlobal("maximum"), 8)
 	assertFloat(t, interp.GetGlobal("variance"), 1.25)
 	assertFloat(t, interp.GetGlobal("stddev"), 1.118033988749895)
 	assertTableFloat(t, interp.GetGlobal("normalized"), 2, 0)
@@ -43,12 +52,16 @@ rmse := stats.rmse({1, 2, 3}, {1, 4, 3})
 	assertTableFloat(t, interp.GetGlobal("diff"), 2, 6)
 	assertTableFloat(t, interp.GetGlobal("filled"), 4, 0.25)
 	assertTableFloat(t, interp.GetGlobal("gathered"), 2, 10)
+	assertFloat(t, interp.GetGlobal("pdf0"), 0.3989422804014327)
+	assertTableFloat(t, interp.GetGlobal("pdfs"), 2, 0.24197072451914337)
+	assertFloat(t, interp.GetGlobal("rms"), 3.5355339059327378)
 	assertFloat(t, interp.GetGlobal("rmse"), 1.1547005383792515)
 }
 
 func TestStatsSystematicResample(t *testing.T) {
 	interp := statsInterp(t, `
 indices := stats.systematic_resample({0.1, 0.2, 0.7}, 0.5)
+resampled, uniform, resample_idx := stats.resample({10, 20, 30}, {0.1, 0.2, 0.7}, 0.5)
 `)
 	indices := interp.GetGlobal("indices")
 	if !indices.IsTable() {
@@ -60,6 +73,13 @@ indices := stats.systematic_resample({0.1, 0.2, 0.7}, 0.5)
 		if !got.IsInt() || got.Int() != w {
 			t.Fatalf("indices[%d] = %v, want %d", i+1, got, w)
 		}
+	}
+	assertTableFloat(t, interp.GetGlobal("resampled"), 1, 20)
+	assertTableFloat(t, interp.GetGlobal("resampled"), 3, 30)
+	assertTableFloat(t, interp.GetGlobal("uniform"), 2, 1.0/3.0)
+	idx := interp.GetGlobal("resample_idx").Table()
+	if got := idx.RawGetInt(1); !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("resample_idx[1] = %v, want 2", got)
 	}
 }
 
