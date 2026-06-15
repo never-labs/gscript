@@ -9,7 +9,7 @@ prior := stats.normal(0.0, 0.8)
 process_noise := stats.normal(0.0, 0.04)
 sensor_noise := stats.normal(0.0, 0.18)
 
-ensemble := stats.samples(rand.sample(prior, N))
+ensemble := rand.samples(prior, N)
 measurements := [0.58, 1.05, 1.53, 1.95]
 
 for t := 1; t <= #measurements; t++ {

@@ -25,7 +25,7 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 		{
 			rel:     filepath.Join("examples", "scientific", "particle_filter.leia"),
 			summary: "ok particle ",
-			wantAPI: []string{"rand.seed", "stats.normal", "rand.sample", "rand.add_noise", "stats.samples", "stats.observe", "measurements := [", "stats.describe(ensemble)", "near(", "sqrt(variance)", "q {", "avg ${ensemble.values}", "assert(near(q_value_mean, last_measurement, 0.25))"},
+			wantAPI: []string{"rand.seed", "stats.normal", "rand.samples", "rand.add_noise", "stats.observe", "measurements := [", "stats.describe(ensemble)", "near(", "sqrt(variance)", "q {", "avg ${ensemble.values}", "assert(near(q_value_mean, last_measurement, 0.25))"},
 		},
 		{
 			rel:     filepath.Join("examples", "scientific", "inverted_pendulum.leia"),
@@ -56,6 +56,9 @@ func TestScientificNumericExamplesSourceContract(t *testing.T) {
 			}
 			if strings.Contains(text, "stats.samples(predicted, ensemble.weights)") {
 				t.Fatalf("%s manually rewraps weighted samples instead of preserving sample-set flow", tc.rel)
+			}
+			if strings.Contains(text, "stats.samples(rand.sample(") {
+				t.Fatalf("%s bridges rand.sample through stats.samples instead of using rand.samples", tc.rel)
 			}
 			if strings.Contains(text, "log_weights :=") {
 				t.Fatalf("%s manually exposes log weights instead of using stats.observe", tc.rel)

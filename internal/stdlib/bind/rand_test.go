@@ -397,6 +397,29 @@ func TestRandSampleNormalDistribution(t *testing.T) {
 	assertTableFloat(t, values, 4, 10.622007507538102)
 }
 
+func TestRandSamplesBuildsWeightedSampleSet(t *testing.T) {
+	interp := randStatsInterp(t, `
+		dist := stats.normal(10, 0.5)
+		rand.seed(42)
+		samples := rand.samples(dist, 4)
+		rand.seed(42)
+		repeated := rand.samples(dist, 4)
+		wrapped := rand.samples([1, 2, 3], [1, 2, 1])
+	`)
+	samples := interp.GetGlobal("samples").Table()
+	if got := samples.RawGetString("kind"); !got.IsString() || got.Str() != "weighted_samples" {
+		t.Fatalf("samples.kind = %v, want weighted_samples", got)
+	}
+	assertTableFloat(t, samples.RawGetString("values"), 4, 10.622007507538102)
+	assertTableFloat(t, samples.RawGetString("weights"), 4, 0.25)
+	assertFloat(t, samples.RawGetString("summary").Table().RawGetString("count"), 4)
+	repeated := interp.GetGlobal("repeated").Table()
+	assertTableFloat(t, repeated.RawGetString("values"), 4, 10.622007507538102)
+	wrapped := interp.GetGlobal("wrapped").Table()
+	assertTableFloat(t, wrapped.RawGetString("values"), 3, 3)
+	assertTableFloat(t, wrapped.RawGetString("weights"), 2, 0.5)
+}
+
 func TestRandAddNoise(t *testing.T) {
 	interp := randStatsInterp(t, `
 		dist := stats.normal(0, 0.5)

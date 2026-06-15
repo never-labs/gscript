@@ -78,6 +78,40 @@ func BuildRand() *Table {
 		}
 		return []Value{outValue}, nil
 	}
+	sampleDistribution := func(fn string, args []Value) ([]Value, error) {
+		dist, err := statsDistributionFromValue(fn, args[0])
+		if err != nil {
+			return nil, err
+		}
+		switch dist.name {
+		case "normal":
+			if len(args) == 1 {
+				v, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %s", fn, err)
+				}
+				return []Value{FloatValue(v)}, nil
+			}
+			if err := requireNumber(fn, 2, args[1]); err != nil {
+				return nil, err
+			}
+			n := int(toInt(args[1]))
+			if n < 0 {
+				return nil, fmt.Errorf("bad argument #2 to '%s' (non-negative count expected)", fn)
+			}
+			out := make([]float64, n)
+			for i := range out {
+				v, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %s", fn, err)
+				}
+				out[i] = v
+			}
+			return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
+		default:
+			return nil, fmt.Errorf("%s: unsupported distribution %q", fn, dist.name)
+		}
+	}
 
 	// rand.seed(n) - seed the random source
 	set("seed", func(args []Value) ([]Value, error) {
@@ -330,38 +364,7 @@ func BuildRand() *Table {
 	// rand.sample(distribution[, n]) - sample scalar or dense vector from a distribution
 	set("sample", func(args []Value) ([]Value, error) {
 		if len(args) >= 1 && statsIsDistributionValue(args[0]) {
-			dist, err := statsDistributionFromValue("rand.sample", args[0])
-			if err != nil {
-				return nil, err
-			}
-			switch dist.name {
-			case "normal":
-				if len(args) == 1 {
-					v, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
-					if err != nil {
-						return nil, fmt.Errorf("rand.sample: %s", err)
-					}
-					return []Value{FloatValue(v)}, nil
-				}
-				if err := requireNumber("rand.sample", 2, args[1]); err != nil {
-					return nil, err
-				}
-				n := int(toInt(args[1]))
-				if n < 0 {
-					return nil, fmt.Errorf("bad argument #2 to 'rand.sample' (non-negative count expected)")
-				}
-				out := make([]float64, n)
-				for i := range out {
-					v, err := stdrand.Normal(rng.NormFloat64, dist.mean, dist.stddev)
-					if err != nil {
-						return nil, fmt.Errorf("rand.sample: %s", err)
-					}
-					out[i] = v
-				}
-				return []Value{DenseArrayValue(NewDenseArrayF64Owned(out))}, nil
-			default:
-				return nil, fmt.Errorf("rand.sample: unsupported distribution %q", dist.name)
-			}
+			return sampleDistribution("rand.sample", args)
 		}
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad arguments to 'rand.sample' (table and count expected)")
@@ -392,6 +395,33 @@ func BuildRand() *Table {
 			result.RawSet(IntValue(int64(i+1)), tbl.RawGet(IntValue(int64(indices[i]))))
 		}
 		return []Value{TableValue(result)}, nil
+	})
+
+	// rand.samples(distribution, n) samples a distribution into a weighted
+	// sample set. For non-distribution inputs, it delegates to stats.samples so
+	// callers can construct sample sets through one random-oriented namespace.
+	set("samples", func(args []Value) ([]Value, error) {
+		if len(args) >= 1 && statsIsDistributionValue(args[0]) {
+			if len(args) < 2 {
+				return nil, fmt.Errorf("bad arguments to 'rand.samples' (distribution and count expected)")
+			}
+			values, err := sampleDistribution("rand.samples", args[:2])
+			if err != nil {
+				return nil, err
+			}
+			if len(values) == 0 || !values[0].IsDenseArray() {
+				return nil, fmt.Errorf("rand.samples: distribution sample did not return a dense vector")
+			}
+			weights, err := statsUniformWeights([]Value{IntValue(int64(values[0].DenseArray().Len()))})
+			if err != nil {
+				return nil, err
+			}
+			return statsMakeSampleSet("rand.samples", values[0], weights[0], nil)
+		}
+		if len(args) == 0 {
+			return nil, fmt.Errorf("rand.samples: need values")
+		}
+		return statsSamples(args)
 	})
 
 	// rand.add_noise(values, distribution[, drift]) - add distribution noise and optional drift to a dense vector
