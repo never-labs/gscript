@@ -123,6 +123,27 @@ func toFloat(v interface{}) (float64, bool) {
 	return 0, false
 }
 
+func TestJITImplicitNilReturnFallsBackToVMSemantics(t *testing.T) {
+	src := `
+f := func(i) {
+  if i < 10 { return "a" }
+  if i < 20 { return "b" }
+  if i < 30 { return "c" }
+}
+ok := f(3) == "a" && f(12) == "b" && f(26) == "c" && f(100) == nil
+`
+	assertVMEqualsJIT(t, src, "ok")
+}
+
+func TestJITMultiIndexAssignmentFallsBackToVMSemantics(t *testing.T) {
+	src := `
+s := [3, 1, 2]
+s[1], s[3] = s[3], s[1]
+ok := s[1] == 2 && s[2] == 1 && s[3] == 3
+`
+	assertVMEqualsJIT(t, src, "ok")
+}
+
 // ============================================================================
 // Invariant 4: Accumulated correctness (enter-exit-reenter cycles)
 // ============================================================================

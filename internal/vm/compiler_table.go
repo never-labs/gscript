@@ -81,6 +81,12 @@ type staticStringField struct {
 
 func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 	line := e.P.Line
+	for _, f := range e.Fields {
+		if exprContainsShortCircuit(f.Value) {
+			c.proto.JITDisabled = true
+			break
+		}
+	}
 	if hasExplicitSpreadTableField(e) {
 		return c.compileTableLitExprWithExplicitSpread(e, dest, line)
 	}

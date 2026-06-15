@@ -221,6 +221,15 @@ func (c *compiler) compileAssignStmt(s *ast.AssignStmt) error {
 	nTargets := len(s.Targets)
 	nValues := len(s.Values)
 
+	if nTargets > 1 {
+		for _, target := range s.Targets {
+			if exprIsIndexTarget(target) {
+				c.proto.JITDisabled = true
+				break
+			}
+		}
+	}
+
 	if nValues == 1 && nTargets > 1 {
 		if recv, ok := s.Values[0].(*ast.RecvExpr); ok && nTargets == 2 {
 			return c.compileAssignRecvOK(s, recv)
