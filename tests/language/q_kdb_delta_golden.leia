@@ -42,10 +42,10 @@ projection_prior := q.eval("({x-y}[;1])':10 15 14")
 check("q golden adverb projection", projection_each[1] == 11 && projection_each[3] == 13 && projection_over == 4 && projection_scan[1] == 2 && projection_scan[3] == 4 && projection_prior[2] == 14 && projection_prior[3] == 13)
 
 bars := data.frame({
-  sym: data.symbols({"AAPL", "AAPL", "AAPL", "MSFT"}),
-  bucket: data.strings({"09:30", "09:30", "09:31", "09:30"}),
-  seq: data.i64({1, 2, 3, 4}),
-  px: data.f64({100.0, 100.5, 101.0, 80.0}),
+  sym: data.symbols(["AAPL", "AAPL", "AAPL", "MSFT"]),
+  bucket: data.strings(["09:30", "09:30", "09:31", "09:30"]),
+  seq: data.i64([1, 2, 3, 4]),
+  px: data.f64([100.0, 100.5, 101.0, 80.0]),
 })
 keyed := q.key_by(bars, "sym", "bucket")
 lookup_dup := q.lookup(keyed, "AAPL", "09:30")

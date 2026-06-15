@@ -71,7 +71,7 @@ assert(err == nil)
 assert(resp.status == 500)
 assert(string.find(resp.body, "router boom", 1, true) != nil)
 
-arrayJSON := json.encode({"a", "b", "c"})
+arrayJSON := json.encode(["a", "b", "c"])
 assert(arrayJSON == "[\"a\",\"b\",\"c\"]")
 arrayRound := json.decode(arrayJSON)
 assert(arrayRound[1] == "a")
@@ -84,7 +84,7 @@ assert(string.find(sparseJSON, "\"2\"", 1, true) != nil)
 sparseRound := json.decode(sparseJSON)
 assert(sparseRound["2"] == "two")
 
-mixed := {10, 20}
+mixed := [10, 20]
 mixed.name = "mixed"
 mixedJSON := json.encode(mixed)
 mixedRound := json.decode(mixedJSON)
@@ -92,7 +92,7 @@ assert(mixedRound["1"] == 10)
 assert(mixedRound["2"] == 20)
 assert(mixedRound.name == "mixed")
 
-numericJSON := json.encode({0 / 0, 1 / 0, -1 / 0, 1.5})
+numericJSON := json.encode([0 / 0, 1 / 0, -1 / 0, 1.5])
 assert(numericJSON == "[null,null,null,1.5]")
 numericRound := json.decode(numericJSON)
 assert(numericRound[1] == nil)
@@ -100,7 +100,7 @@ assert(numericRound[2] == nil)
 assert(numericRound[3] == nil)
 assert(numericRound[4] == 1.5)
 
-pretty := json.pretty({outer: {items: {"x", "y"}, flag: true}}, "    ")
+pretty := json.pretty({outer: {items: ["x", "y"], flag: true}}, "    ")
 assert(string.find(pretty, "\n", 1, true) != nil)
 assert(string.find(pretty, "    \"outer\"", 1, true) != nil)
 assert(string.find(pretty, "\"items\"", 1, true) != nil)

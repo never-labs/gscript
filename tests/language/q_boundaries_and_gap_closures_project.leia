@@ -10,9 +10,9 @@ func check(name, ok) {
 }
 
 trades := data.frame({
-  sym: data.symbols({"AAPL", "MSFT"}),
-  price: data.f64({100.0, 101.0}),
-  size: data.i64({10, 20}),
+  sym: data.symbols(["AAPL", "MSFT"]),
+  price: data.f64([100.0, 101.0]),
+  size: data.i64([10, 20]),
 })
 
 tail := q.eval("-2#10 20 30")

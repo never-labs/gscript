@@ -11,8 +11,8 @@ func floordiv(a, b) {
 
 assert(0e12 == 0 && 0.0 == 0 && 0.2e2 == 20 && 2.0E-1 == 0.2)
 
-vals := {-16, -15, -3, -2, -1, 0, 1, 2, 3, 15}
-divs := {-16, -15, -3, -2, -1, 1, 2, 3, 15}
+vals := [-16, -15, -3, -2, -1, 0, 1, 2, 3, 15]
+divs := [-16, -15, -3, -2, -1, 1, 2, 3, 15]
 for _, i := range pairs(vals) {
     for _, j := range pairs(divs) {
         assert(floordiv(i, j) == math.floor(i / j))
