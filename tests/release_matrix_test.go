@@ -1300,6 +1300,38 @@ func TestReleaseMatrixFmtCheckJSONIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixLintJSONReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "warn.leia")
+	if err := os.WriteFile(path, []byte("xs := {1, 2}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "lint", "--json", path)
+	var report struct {
+		SchemaVersion   int    `json:"schema_version"`
+		OK              bool   `json:"ok"`
+		Status          string `json:"status"`
+		DiagnosticCount int    `json:"diagnostic_count"`
+		ErrorCount      int    `json:"error_count"`
+		WarningCount    int    `json:"warning_count"`
+		Diagnostics     []struct {
+			File     string `json:"file"`
+			Code     string `json:"code"`
+			Severity string `json:"severity"`
+		} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("lint JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || !report.OK || report.Status != "pass" || report.DiagnosticCount != 1 || report.ErrorCount != 0 || report.WarningCount != 1 || len(report.Diagnostics) != 1 {
+		t.Fatalf("lint JSON = %+v, want passing schema v1 warning report", report)
+	}
+	if report.Diagnostics[0].File != path || report.Diagnostics[0].Code != "LEIA2001" || report.Diagnostics[0].Severity != "warning" {
+		t.Fatalf("lint diagnostic = %+v, want LEIA2001 warning for %s", report.Diagnostics[0], path)
+	}
+}
+
 func TestReleaseMatrixTestCommandJSONReportsAreMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	dir := t.TempDir()

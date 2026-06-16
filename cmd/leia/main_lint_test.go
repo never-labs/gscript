@@ -136,6 +136,41 @@ func TestLintJSONReportsSyntaxErrors(t *testing.T) {
 	}
 }
 
+func TestLintJSONReportWrapsDiagnostics(t *testing.T) {
+	dir := t.TempDir()
+	okPath := filepath.Join(dir, "ok.leia")
+	badPath := filepath.Join(dir, "bad.leia")
+	warnPath := filepath.Join(dir, "warn.leia")
+	if err := os.WriteFile(okPath, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(badPath, []byte("func {\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(warnPath, []byte("xs := {1, 2}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runLintCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var report lintReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON lint report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || report.OK || report.Status != "issues" || report.DiagnosticCount != 2 || report.ErrorCount != 1 || report.WarningCount != 1 {
+		t.Fatalf("report = %+v, want schema v1 issues report with one error and one warning", report)
+	}
+	if len(report.Diagnostics) != 2 {
+		t.Fatalf("diagnostics len = %d, want 2: %#v", len(report.Diagnostics), report.Diagnostics)
+	}
+}
+
 func TestLintJSONReportsLexerErrorPosition(t *testing.T) {
 	dir := t.TempDir()
 	badPath := filepath.Join(dir, "bad.leia")

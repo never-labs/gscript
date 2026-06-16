@@ -24,6 +24,16 @@ type lintDiagnostic struct {
 	text string
 }
 
+type lintReport struct {
+	SchemaVersion   int              `json:"schema_version"`
+	OK              bool             `json:"ok"`
+	Status          string           `json:"status"`
+	DiagnosticCount int              `json:"diagnostic_count"`
+	ErrorCount      int              `json:"error_count"`
+	WarningCount    int              `json:"warning_count"`
+	Diagnostics     []lintDiagnostic `json:"diagnostics"`
+}
+
 var lintDiagnosticPositionRE = regexp.MustCompile(`(?:^|[^0-9])([0-9]+):([0-9]+)(?:[^0-9]|$)`)
 
 func newLintDiagnostic(file, code, severity string, err error) lintDiagnostic {
@@ -65,12 +75,13 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	format := fs.String("format", "text", "output format: text, json, or sarif")
+	jsonReport := fs.Bool("json", false, "write a versioned JSON lint report")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {
-		fmt.Fprintln(errw, "usage: leia lint [--format=text|json|sarif] <path-or-dir> [...]")
+		fmt.Fprintln(errw, "usage: leia lint [--json|--format=text|json|sarif] <path-or-dir> [...]")
 		return 2
 	}
 	if !flagWasSet(fs, "format") {
@@ -85,6 +96,10 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 	}
 	if *format != "text" && *format != "json" && *format != "sarif" {
 		fmt.Fprintf(errw, "leia lint: unsupported --format %q (want text, json, or sarif)\n", *format)
+		return 2
+	}
+	if *jsonReport && flagWasSet(fs, "format") && *format != "json" {
+		fmt.Fprintln(errw, "leia lint: --json cannot be combined with --format other than json")
 		return 2
 	}
 
@@ -107,7 +122,12 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 		}
 	}
 
-	if *format == "json" {
+	if *jsonReport {
+		if err := json.NewEncoder(outw).Encode(newLintReport(diagnostics)); err != nil {
+			fmt.Fprintf(errw, "leia lint: write json: %v\n", err)
+			return 1
+		}
+	} else if *format == "json" {
 		if err := json.NewEncoder(outw).Encode(diagnostics); err != nil {
 			fmt.Fprintf(errw, "leia lint: write json: %v\n", err)
 			return 1
@@ -131,6 +151,29 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func newLintReport(diagnostics []lintDiagnostic) lintReport {
+	report := lintReport{
+		SchemaVersion:   1,
+		OK:              true,
+		Status:          "pass",
+		DiagnosticCount: len(diagnostics),
+		Diagnostics:     diagnostics,
+	}
+	for _, diagnostic := range diagnostics {
+		switch diagnostic.Severity {
+		case "error":
+			report.ErrorCount++
+		case "warning":
+			report.WarningCount++
+		}
+	}
+	if report.ErrorCount > 0 {
+		report.OK = false
+		report.Status = "issues"
+	}
+	return report
 }
 
 func lintProgram(filename string, prog *ast.Program) []lintDiagnostic {

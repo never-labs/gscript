@@ -9,6 +9,7 @@ go run ./cmd/leia eval 'print(1 + 2 + 3)'
 go run ./cmd/leia fmt --check tests/smoke/01_basic.leia
 go run ./cmd/leia fmt --check --json tests/smoke/01_basic.leia
 go run ./cmd/leia lint tests/smoke/01_basic.leia
+go run ./cmd/leia lint --json tests/smoke/01_basic.leia
 go run ./cmd/leia test tests/smoke/01_basic.leia
 go run ./cmd/leia examples check examples/hello/dialects.leia
 go run ./cmd/leia test --json --output test-report.json tests/smoke/01_basic.leia

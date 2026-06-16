@@ -20,7 +20,7 @@ Generated from the current `leia` binary capabilities.
 | `help` | `usage: leia help [command]` | Show command help. |
 | `inspect` | `usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>
        leia inspect directives [--json] <file.leia>` | Inspect compiled artifacts and file directives. |
-| `lint` | `usage: leia lint [--format=text|json|sarif] <path-or-dir> [...]` | Report source diagnostics. |
+| `lint` | `usage: leia lint [--json|--format=text|json|sarif] <path-or-dir> [...]` | Report source diagnostics. |
 | `lsp` | `usage: leia lsp` | Run the Leia Language Server Protocol endpoint over stdio. |
 | `mod` | `usage: leia mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|gomod|verify] [flags]` | Manage local module metadata and require graphs. |
 | `playground` | `usage: leia playground [--addr ADDR] [--timeout DURATION] [--max-source-bytes N] [--max-steps N]` | Serve the local backend-powered Leia playground. |
