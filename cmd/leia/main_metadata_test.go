@@ -242,6 +242,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia evaluate --json", "inputs"},
 		{"leia evaluate --json", "notes"},
 		{"leia fmt --json", "files"},
+		{"leia inspect bytecode --json", "proto.children"},
 		{"leia test --json", "files"},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
