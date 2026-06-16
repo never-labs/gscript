@@ -1169,6 +1169,35 @@ func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixGoreleaserTargetsMatchInstallDryRun(t *testing.T) {
+	root := findRepoRoot(t)
+	targets := readGoreleaserTargets(t, filepath.Join(root, ".goreleaser.yaml"))
+	for _, target := range targets {
+		parts := strings.Split(target, "/")
+		if len(parts) != 2 {
+			t.Fatalf("bad target %q", target)
+		}
+		out := runCommand(t, root, 30*time.Second, "bash", "scripts/install.sh", "--dry-run", "--version", "v0.0.0", "--os", parts[0], "--arch", parts[1], "--bin-dir", "/tmp/leia-bin")
+		ext := "tar.gz"
+		installPath := "/tmp/leia-bin/leia"
+		lspInstallPath := "/tmp/leia-bin/leia-lsp"
+		if parts[0] == "windows" {
+			ext = "zip"
+			installPath += ".exe"
+			lspInstallPath += ".exe"
+		}
+		for _, want := range []string{
+			"asset=leia_v0.0.0_" + parts[0] + "_" + parts[1] + "." + ext,
+			"install_path=" + installPath,
+			"lsp_install_path=" + lspInstallPath,
+		} {
+			if !strings.Contains(out, want) {
+				t.Fatalf("install dry-run for %s missing %q:\n%s", target, want, out)
+			}
+		}
+	}
+}
+
 func TestReleaseMatrixDocsIndexCoversReferenceEntrypoints(t *testing.T) {
 	root := findRepoRoot(t)
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
@@ -2599,6 +2628,59 @@ func readBacktickCaseNames(t *testing.T, path string) map[string]bool {
 		cases[match[1]] = true
 	}
 	return cases
+}
+
+func readGoreleaserTargets(t *testing.T, path string) []string {
+	t.Helper()
+	data := readFileString(t, path)
+	lines := strings.Split(data, "\n")
+	var goos, goarch []string
+	var section string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch trimmed {
+		case "goos:":
+			section = "goos"
+			continue
+		case "goarch:":
+			section = "goarch"
+			continue
+		}
+		if strings.HasSuffix(trimmed, ":") && trimmed != "goos:" && trimmed != "goarch:" {
+			section = ""
+			continue
+		}
+		if !strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+		switch section {
+		case "goos":
+			goos = appendUniqueString(goos, value)
+		case "goarch":
+			goarch = appendUniqueString(goarch, value)
+		}
+	}
+	if len(goos) == 0 || len(goarch) == 0 {
+		t.Fatalf("%s must declare goos and goarch matrices", path)
+	}
+	targets := make([]string, 0, len(goos)*len(goarch))
+	for _, osName := range goos {
+		for _, arch := range goarch {
+			targets = append(targets, osName+"/"+arch)
+		}
+	}
+	sort.Strings(targets)
+	return targets
+}
+
+func appendUniqueString(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 func readFileString(t *testing.T, path string) string {
