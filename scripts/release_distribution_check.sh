@@ -5,16 +5,22 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 require_goreleaser="false"
 require_workflows="false"
+json_out="false"
+workflow_files=()
+install_targets=()
+goreleaser_available="false"
+local_install_fixture="pending"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/release_distribution_check.sh [--require-goreleaser] [--require-workflows] [--help]
+Usage: scripts/release_distribution_check.sh [--require-goreleaser] [--require-workflows] [--json] [--help]
 
 Checks release distribution configuration and install-script planning.
 
 Options:
   --require-goreleaser  Fail if the goreleaser CLI is not available locally
   --require-workflows   Fail if hosted release/distribution workflows are absent
+  --json                Print a machine-readable distribution report
   -h, --help            Show this help
 USAGE
 }
@@ -27,6 +33,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-workflows)
       require_workflows="true"
+      shift
+      ;;
+    --json)
+      json_out="true"
       shift
       ;;
     -h|--help)
@@ -42,6 +52,57 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+
+log_info() {
+  if [[ "$json_out" != "true" ]]; then
+    echo "$1"
+  fi
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+print_json_string_array() {
+  local indent="$1"
+  shift
+  local values=("$@")
+  printf '[\n'
+  local i=0
+  while [[ "$i" -lt "${#values[@]}" ]]; do
+    local value="${values[$i]}"
+    printf '%s  "%s"' "$indent" "$(json_escape "$value")"
+    if [[ "$i" -lt $((${#values[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '%s]' "$indent"
+}
+
+print_json_report() {
+  printf '{\n'
+  printf '  "schema_version": 1,\n'
+  printf '  "status": "pass",\n'
+  printf '  "require_goreleaser": %s,\n' "$require_goreleaser"
+  printf '  "require_workflows": %s,\n' "$require_workflows"
+  printf '  "goreleaser_available": %s,\n' "$goreleaser_available"
+  printf '  "local_install_fixture": "%s",\n' "$local_install_fixture"
+  printf '  "workflow_files": '
+  print_json_string_array "  " "${workflow_files[@]}"
+  printf ',\n'
+  printf '  "install_targets": '
+  print_json_string_array "  " "${install_targets[@]}"
+  printf '\n'
+  printf '}\n'
+}
 
 require_file() {
   if [[ ! -f "$1" ]]; then
@@ -182,11 +243,12 @@ check_local_install_fixture() {
       exit 1
     fi
   else
-    echo "release_distribution_check.sh: zip or unzip not installed; skipping local zip install fixture"
+    log_info "release_distribution_check.sh: zip or unzip not installed; skipping local zip install fixture"
   fi
 
   trap - RETURN
   rm -rf "$tmp_dir"
+  local_install_fixture="verified"
 }
 
 require_file .goreleaser.yaml
@@ -195,7 +257,8 @@ require_file scripts/install.sh
 optional_workflow() {
   local file="$1"
   if [[ -f "$file" ]]; then
-    echo "release_distribution_check.sh: found $file"
+    workflow_files+=("$file")
+    log_info "release_distribution_check.sh: found $file"
   elif [[ "$require_workflows" == "true" ]]; then
     echo "error: required hosted workflow not found: $file" >&2
     exit 1
@@ -249,6 +312,7 @@ bash -n scripts/install.sh
 for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
   goos="${target%/*}"
   goarch="${target#*/}"
+  install_targets+=("$target")
   output="$(bash scripts/install.sh --dry-run --version v0.0.0 --os "$goos" --arch "$goarch" --bin-dir /tmp/leia-bin)"
   case "$goos" in
     windows)
@@ -279,18 +343,27 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 wi
   fi
 done
 
-echo "release_distribution_check.sh: install script dry-run matrix verified"
+log_info "release_distribution_check.sh: install script dry-run matrix verified"
 
 check_local_install_fixture
-echo "release_distribution_check.sh: local install fixture verified"
+log_info "release_distribution_check.sh: local install fixture verified"
 
 if command -v goreleaser >/dev/null 2>&1; then
-  goreleaser check
+  goreleaser_available="true"
+  if [[ "$json_out" == "true" ]]; then
+    goreleaser check >/dev/null
+  else
+    goreleaser check
+  fi
 elif [[ "$require_goreleaser" == "true" ]]; then
   echo "error: goreleaser CLI is required for release distribution profile" >&2
   exit 1
 else
-  echo "release_distribution_check.sh: goreleaser not installed; skipping local goreleaser check"
+  log_info "release_distribution_check.sh: goreleaser not installed; skipping local goreleaser check"
 fi
 
-echo "release_distribution_check.sh: pass"
+if [[ "$json_out" == "true" ]]; then
+  print_json_report
+else
+  echo "release_distribution_check.sh: pass"
+fi

@@ -1222,6 +1222,37 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixReleaseDistributionReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_distribution_check.sh", "--json")
+	var report struct {
+		SchemaVersion       int      `json:"schema_version"`
+		Status              string   `json:"status"`
+		RequireGoreleaser   bool     `json:"require_goreleaser"`
+		RequireWorkflows    bool     `json:"require_workflows"`
+		GoreleaserAvailable bool     `json:"goreleaser_available"`
+		LocalInstallFixture string   `json:"local_install_fixture"`
+		WorkflowFiles       []string `json:"workflow_files"`
+		InstallTargets      []string `json:"install_targets"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("release distribution JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.RequireGoreleaser || report.RequireWorkflows || report.LocalInstallFixture != "verified" {
+		t.Fatalf("release distribution JSON = %+v, want passing schema v1 report", report)
+	}
+	for _, target := range []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64"} {
+		if !stringSliceContains(report.InstallTargets, target) {
+			t.Fatalf("release distribution JSON missing install target %q: %+v", target, report.InstallTargets)
+		}
+	}
+	for _, workflow := range []string{".github/workflows/release.yml", ".github/workflows/distribution-check.yml", ".github/workflows/pages.yml"} {
+		if !stringSliceContains(report.WorkflowFiles, workflow) {
+			t.Fatalf("release distribution JSON missing workflow %q: %+v", workflow, report.WorkflowFiles)
+		}
+	}
+}
+
 func TestReleaseMatrixGoreleaserTargetsMatchInstallDryRun(t *testing.T) {
 	root := findRepoRoot(t)
 	targets := readGoreleaserTargets(t, filepath.Join(root, ".goreleaser.yaml"))
