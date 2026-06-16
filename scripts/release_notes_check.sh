@@ -64,9 +64,14 @@ if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)
 fi
 
 failures=()
+checked_files=()
 
 add_failure() {
   failures+=("$1")
+}
+
+add_checked_file() {
+  checked_files+=("$1")
 }
 
 json_escape() {
@@ -89,9 +94,21 @@ print_json_report() {
   printf '  "status": "%s",\n' "$status"
   printf '  "require_ready": %s,\n' "$require_ready"
   printf '  "version": "%s",\n' "$(json_escape "$version")"
+  printf '  "checked_file_count": %d,\n' "${#checked_files[@]}"
+  printf '  "checked_files": [\n'
+  local i=0
+  while [[ "$i" -lt ${#checked_files[@]} ]]; do
+    printf '    "%s"' "$(json_escape "${checked_files[$i]}")"
+    if [[ "$i" -lt $((${#checked_files[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '  ],\n'
   printf '  "failure_count": %d,\n' "${#failures[@]}"
   printf '  "failures": [\n'
-  local i=0
+  i=0
   while [[ "$i" -lt ${#failures[@]} ]]; do
     printf '    "%s"' "$(json_escape "${failures[$i]}")"
     if [[ "$i" -lt $((${#failures[@]} - 1)) ]]; then
@@ -123,6 +140,7 @@ require_not_matching() {
 
 check_template() {
   local template="docs/release/notes-template.md"
+  add_checked_file "$template"
   if [[ ! -f "$template" ]]; then
     add_failure "missing $template"
     return
@@ -135,6 +153,7 @@ check_template() {
 
 check_version() {
   local notes="docs/release/notes/$version.md"
+  add_checked_file "$notes"
   if [[ ! -f "$notes" ]]; then
     add_failure "missing release notes for $version: $notes"
     return

@@ -1450,34 +1450,41 @@ func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
 	var passReport struct {
-		SchemaVersion int      `json:"schema_version"`
-		Status        string   `json:"status"`
-		RequireReady  bool     `json:"require_ready"`
-		Version       string   `json:"version"`
-		FailureCount  int      `json:"failure_count"`
-		Failures      []string `json:"failures"`
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		RequireReady     bool     `json:"require_ready"`
+		Version          string   `json:"version"`
+		CheckedFileCount int      `json:"checked_file_count"`
+		CheckedFiles     []string `json:"checked_files"`
+		FailureCount     int      `json:"failure_count"`
+		Failures         []string `json:"failures"`
 	}
 	if err := json.Unmarshal([]byte(out), &passReport); err != nil {
 		t.Fatalf("release notes JSON failed to decode: %v\n%s", err, out)
 	}
-	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.RequireReady || passReport.Version != "" || passReport.FailureCount != 0 || len(passReport.Failures) != 0 {
+	if passReport.SchemaVersion != 1 || passReport.Status != "pass" || passReport.RequireReady || passReport.Version != "" || passReport.CheckedFileCount != 1 || len(passReport.CheckedFiles) != 1 || passReport.CheckedFiles[0] != "docs/release/notes-template.md" || passReport.FailureCount != 0 || len(passReport.Failures) != 0 {
 		t.Fatalf("release notes template JSON = %+v, want passing schema v1 report", passReport)
 	}
 
 	missingOut := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json", "--version", "v9.9.9")
 	var missingReport struct {
-		SchemaVersion int      `json:"schema_version"`
-		Status        string   `json:"status"`
-		RequireReady  bool     `json:"require_ready"`
-		Version       string   `json:"version"`
-		FailureCount  int      `json:"failure_count"`
-		Failures      []string `json:"failures"`
+		SchemaVersion    int      `json:"schema_version"`
+		Status           string   `json:"status"`
+		RequireReady     bool     `json:"require_ready"`
+		Version          string   `json:"version"`
+		CheckedFileCount int      `json:"checked_file_count"`
+		CheckedFiles     []string `json:"checked_files"`
+		FailureCount     int      `json:"failure_count"`
+		Failures         []string `json:"failures"`
 	}
 	if err := json.Unmarshal([]byte(missingOut), &missingReport); err != nil {
 		t.Fatalf("missing release notes JSON failed to decode: %v\n%s", err, missingOut)
 	}
-	if missingReport.SchemaVersion != 1 || missingReport.Status != "issues" || missingReport.RequireReady || missingReport.Version != "v9.9.9" || missingReport.FailureCount != len(missingReport.Failures) {
+	if missingReport.SchemaVersion != 1 || missingReport.Status != "issues" || missingReport.RequireReady || missingReport.Version != "v9.9.9" || missingReport.CheckedFileCount != len(missingReport.CheckedFiles) || missingReport.CheckedFileCount != 2 || missingReport.FailureCount != len(missingReport.Failures) {
 		t.Fatalf("missing release notes JSON = %+v, want issues schema v1 report", missingReport)
+	}
+	if !stringSliceContains(missingReport.CheckedFiles, "docs/release/notes-template.md") || !stringSliceContains(missingReport.CheckedFiles, "docs/release/notes/v9.9.9.md") {
+		t.Fatalf("missing release notes JSON checked files = %+v, want template and version notes", missingReport.CheckedFiles)
 	}
 	if !stringSliceContains(missingReport.Failures, "missing release notes for v9.9.9: docs/release/notes/v9.9.9.md") {
 		t.Fatalf("missing release notes JSON missing actionable failure: %+v", missingReport.Failures)
