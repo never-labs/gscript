@@ -208,6 +208,13 @@ print_json_report() {
   printf '  "lsp_artifact": "%s",\n' "$(json_escape "$lsp_binary_name")"
   printf '  "metadata": "%s",\n' "$(json_escape "$metadata_name")"
   printf '  "checksums": "SHA256SUMS",\n'
+  printf '  "artifact_count": 4,\n'
+  printf '  "artifact_files": [\n'
+  printf '    "%s",\n' "$(json_escape "$binary_name")"
+  printf '    "%s",\n' "$(json_escape "$lsp_binary_name")"
+  printf '    "%s",\n' "$(json_escape "$metadata_name")"
+  printf '    "SHA256SUMS"\n'
+  printf '  ],\n'
   printf '  "artifact_path": "%s",\n' "$(json_escape "$binary_path")"
   printf '  "lsp_artifact_path": "%s",\n' "$(json_escape "$lsp_binary_path")"
   printf '  "metadata_path": "%s",\n' "$(json_escape "$metadata_path")"

@@ -69,6 +69,10 @@ print_json_report() {
   printf '  "tree_sitter_command": "%s",\n' "$(json_escape "$TREE_SITTER_COMMAND")"
   printf '  "emacs_status": "%s",\n' "$(json_escape "$EMACS_STATUS")"
   printf '  "emacs_command": "%s",\n' "$(json_escape "$EMACS_COMMAND")"
+  printf '  "textmate_grammar_count": 2,\n'
+  printf '  "vscode_asset_count": 5,\n'
+  printf '  "tree_sitter_asset_count": 3,\n'
+  printf '  "smoke_test_count": 1,\n'
   printf '  "textmate_grammars": [\n'
   printf '    "tools/syntax/textmate/leia.tmLanguage.json",\n'
   printf '    "tools/syntax/textmate/leia-mod.tmLanguage.json"\n'

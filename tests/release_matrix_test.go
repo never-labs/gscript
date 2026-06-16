@@ -1705,28 +1705,30 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_artifacts.sh", "--dry-run", "--version", "v1.2.3-rc.1", "--json")
 	var report struct {
-		SchemaVersion   int    `json:"schema_version"`
-		Status          string `json:"status"`
-		DryRun          bool   `json:"dry_run"`
-		OutputDir       string `json:"output_dir"`
-		Version         string `json:"version"`
-		Module          string `json:"module"`
-		GOOS            string `json:"goos"`
-		GOARCH          string `json:"goarch"`
-		Artifact        string `json:"artifact"`
-		LSPArtifact     string `json:"lsp_artifact"`
-		Metadata        string `json:"metadata"`
-		Checksums       string `json:"checksums"`
-		ArtifactPath    string `json:"artifact_path"`
-		LSPArtifactPath string `json:"lsp_artifact_path"`
-		MetadataPath    string `json:"metadata_path"`
-		ChecksumsPath   string `json:"checksums_path"`
-		GitCommit       string `json:"git_commit"`
-		GitShortCommit  string `json:"git_short_commit"`
-		GitBranch       string `json:"git_branch"`
-		GitDirty        bool   `json:"git_dirty"`
-		GoVersion       string `json:"go_version"`
-		BuildTimeUTC    string `json:"build_time_utc"`
+		SchemaVersion   int      `json:"schema_version"`
+		Status          string   `json:"status"`
+		DryRun          bool     `json:"dry_run"`
+		OutputDir       string   `json:"output_dir"`
+		Version         string   `json:"version"`
+		Module          string   `json:"module"`
+		GOOS            string   `json:"goos"`
+		GOARCH          string   `json:"goarch"`
+		Artifact        string   `json:"artifact"`
+		LSPArtifact     string   `json:"lsp_artifact"`
+		Metadata        string   `json:"metadata"`
+		Checksums       string   `json:"checksums"`
+		ArtifactCount   int      `json:"artifact_count"`
+		ArtifactFiles   []string `json:"artifact_files"`
+		ArtifactPath    string   `json:"artifact_path"`
+		LSPArtifactPath string   `json:"lsp_artifact_path"`
+		MetadataPath    string   `json:"metadata_path"`
+		ChecksumsPath   string   `json:"checksums_path"`
+		GitCommit       string   `json:"git_commit"`
+		GitShortCommit  string   `json:"git_short_commit"`
+		GitBranch       string   `json:"git_branch"`
+		GitDirty        bool     `json:"git_dirty"`
+		GoVersion       string   `json:"go_version"`
+		BuildTimeUTC    string   `json:"build_time_utc"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("release artifact plan JSON failed to decode: %v\n%s", err, out)
@@ -1737,9 +1739,15 @@ func TestReleaseMatrixReleaseArtifactPlanIsMachineReadable(t *testing.T) {
 	if report.OutputDir == "" || report.GOOS == "" || report.GOARCH == "" || report.GitCommit == "" || report.GitShortCommit == "" || report.GoVersion == "" || report.BuildTimeUTC == "" {
 		t.Fatalf("release artifact plan JSON missing environment metadata: %+v", report)
 	}
+	if report.ArtifactCount != len(report.ArtifactFiles) || report.ArtifactCount != 4 {
+		t.Fatalf("release artifact plan JSON artifact counts = %d/%d, want 4: %+v", report.ArtifactCount, len(report.ArtifactFiles), report)
+	}
 	for _, want := range []string{"leia_v1.2.3-rc.1_", "leia-lsp_v1.2.3-rc.1_", "metadata.txt", "SHA256SUMS"} {
 		if !strings.Contains(report.Artifact+" "+report.LSPArtifact+" "+report.Metadata+" "+report.Checksums, want) {
 			t.Fatalf("release artifact plan JSON missing artifact fragment %q: %+v", want, report)
+		}
+		if !strings.Contains(strings.Join(report.ArtifactFiles, " "), want) {
+			t.Fatalf("release artifact plan JSON missing counted artifact fragment %q: %+v", want, report.ArtifactFiles)
 		}
 	}
 	for _, path := range []string{report.ArtifactPath, report.LSPArtifactPath, report.MetadataPath, report.ChecksumsPath} {
@@ -1898,6 +1906,10 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 		TreeSitterCommand string   `json:"tree_sitter_command"`
 		EmacsStatus       string   `json:"emacs_status"`
 		EmacsCommand      string   `json:"emacs_command"`
+		TextMateCount     int      `json:"textmate_grammar_count"`
+		VSCodeCount       int      `json:"vscode_asset_count"`
+		TreeSitterCount   int      `json:"tree_sitter_asset_count"`
+		SmokeTestCount    int      `json:"smoke_test_count"`
 		TextMateGrammars  []string `json:"textmate_grammars"`
 		VSCodeAssets      []string `json:"vscode_assets"`
 		TreeSitterAssets  []string `json:"tree_sitter_assets"`
@@ -1913,6 +1925,9 @@ func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
 		if status != "verified" && status != "skipped" {
 			t.Fatalf("editor asset JSON has unexpected optional tool status %q: %+v", status, report)
 		}
+	}
+	if report.TextMateCount != len(report.TextMateGrammars) || report.TextMateCount != 2 || report.VSCodeCount != len(report.VSCodeAssets) || report.VSCodeCount != 5 || report.TreeSitterCount != len(report.TreeSitterAssets) || report.TreeSitterCount != 3 || report.SmokeTestCount != len(report.SmokeTests) || report.SmokeTestCount != 1 {
+		t.Fatalf("editor asset JSON counts = %+v, want counted asset collections", report)
 	}
 	for _, want := range []string{"tools/syntax/textmate/leia.tmLanguage.json", "tools/syntax/textmate/leia-mod.tmLanguage.json"} {
 		if !stringSliceContains(report.TextMateGrammars, want) {

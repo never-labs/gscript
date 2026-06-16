@@ -246,6 +246,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 		{"leia mod lock --json", []string{"entry_count", "diagnostic_count"}},
 		{"leia mod tidy --json", []string{"removed_count", "missing_count", "diagnostic_count"}},
 		{"leia mod vendor --json", []string{"module_count", "diagnostic_count"}},
+		{"scripts/editor_check.sh --json", []string{"textmate_grammar_count", "vscode_asset_count", "tree_sitter_asset_count", "smoke_test_count"}},
+		{"scripts/release_artifacts.sh --dry-run --json", []string{"artifact_count"}},
 	} {
 		report := capabilitiesReport(caps.Tooling.Reports, tc.command)
 		for _, want := range tc.fields {
