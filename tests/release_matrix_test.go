@@ -1142,6 +1142,33 @@ func TestReleaseMatrixPublicReleaseBlockersExplainDecisionWork(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixPublicReleaseBlockersJSONIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/public_release_blockers_check.sh", "--json")
+	var report struct {
+		SchemaVersion   int      `json:"schema_version"`
+		Status          string   `json:"status"`
+		RequireResolved bool     `json:"require_resolved"`
+		BlockerCount    int      `json:"blocker_count"`
+		Blockers        []string `json:"blockers"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("public release blocker JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "blocked" || report.RequireResolved || report.BlockerCount != len(report.Blockers) {
+		t.Fatalf("public release blocker JSON = %+v, want blocked schema v1 report", report)
+	}
+	for _, snippet := range []string{
+		"missing root LICENSE file",
+		"unresolved release decision: License: Choose the repository license and whether a `NOTICE` file is required. (Open.)",
+		"unresolved release decision: Compatibility policy: Define the pre-1.0 compatibility promise and the intended v1.0 stable surface. (Open.)",
+	} {
+		if !stringSliceContains(report.Blockers, snippet) {
+			t.Fatalf("public release blocker JSON missing blocker %q: %+v", snippet, report.Blockers)
+		}
+	}
+}
+
 func TestReleaseMatrixDocsIndexCoversReferenceEntrypoints(t *testing.T) {
 	root := findRepoRoot(t)
 	docsIndex := readFileString(t, filepath.Join(root, "docs", "index.md"))
@@ -2277,7 +2304,7 @@ func TestReleaseMatrixReadmeAIDialectConcurrencyDataPromisesHaveGates(t *testing
 			},
 			docSnippets: map[string][]string{
 				"docs/reference/data-oriented/index.md": {"Leia includes data-oriented standard libraries", "## Structure Of Arrays"},
-				"docs/reference/scientific/index.md":   {"Leia keeps scientific code in ordinary Leia source", "## Default Numeric Imports", "## Primitive Composition"},
+				"docs/reference/scientific/index.md":    {"Leia keeps scientific code in ordinary Leia source", "## Default Numeric Imports", "## Primitive Composition"},
 			},
 		},
 	} {
@@ -2581,4 +2608,13 @@ func readFileString(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(data)
+}
+
+func stringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

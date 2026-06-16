@@ -4,10 +4,11 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 require_resolved="false"
+json_out="false"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/public_release_blockers_check.sh [--require-resolved] [--help]
+Usage: scripts/public_release_blockers_check.sh [--require-resolved] [--json] [--help]
 
 Audits repository-level public release blockers that require maintainer
 decisions. Default mode reports unresolved blockers and exits successfully.
@@ -15,6 +16,7 @@ With --require-resolved, unresolved blockers fail the command.
 
 Options:
   --require-resolved  Fail when public release decisions are still unresolved
+  --json              Print a machine-readable blocker report
   -h, --help          Show this help
 USAGE
 }
@@ -23,6 +25,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --require-resolved)
       require_resolved="true"
+      shift
+      ;;
+    --json)
+      json_out="true"
       shift
       ;;
     -h|--help)
@@ -43,6 +49,40 @@ blockers=()
 
 add_blocker() {
   blockers+=("$1")
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+print_json_report() {
+  local status="pass"
+  if [[ ${#blockers[@]} -gt 0 ]]; then
+    status="blocked"
+  fi
+  printf '{\n'
+  printf '  "schema_version": 1,\n'
+  printf '  "status": "%s",\n' "$status"
+  printf '  "require_resolved": %s,\n' "$require_resolved"
+  printf '  "blocker_count": %d,\n' "${#blockers[@]}"
+  printf '  "blockers": [\n'
+  local i=0
+  while [[ "$i" -lt ${#blockers[@]} ]]; do
+    printf '    "%s"' "$(json_escape "${blockers[$i]}")"
+    if [[ "$i" -lt $((${#blockers[@]} - 1)) ]]; then
+      printf ','
+    fi
+    printf '\n'
+    i=$((i + 1))
+  done
+  printf '  ]\n'
+  printf '}\n'
 }
 
 require_file() {
@@ -111,6 +151,14 @@ if [[ -f docs/reference/platforms/index.md ]]; then
       add_blocker "docs/reference/platforms/index.md missing support level: $level"
     fi
   done
+fi
+
+if [[ "$json_out" == "true" ]]; then
+  print_json_report
+  if [[ ${#blockers[@]} -gt 0 && "$require_resolved" == "true" ]]; then
+    exit 1
+  fi
+  exit 0
 fi
 
 if [[ ${#blockers[@]} -eq 0 ]]; then
