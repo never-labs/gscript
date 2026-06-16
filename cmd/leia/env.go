@@ -11,6 +11,7 @@ import (
 
 type cliEnvReport struct {
 	SchemaVersion int                 `json:"schema_version"`
+	Status        string              `json:"status"`
 	Version       cliVersionReport    `json:"version"`
 	Capabilities  cliCapabilities     `json:"capabilities"`
 	WorkingDir    string              `json:"working_dir"`
@@ -80,6 +81,7 @@ func buildEnvReport(start string) cliEnvReport {
 	configDir, _ := os.UserConfigDir()
 	report := cliEnvReport{
 		SchemaVersion: 1,
+		Status:        "pass",
 		Version:       buildVersionReport(),
 		Capabilities:  buildCapabilities(),
 		WorkingDir:    wd,

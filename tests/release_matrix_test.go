@@ -1690,6 +1690,7 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", "release", "--release-version", "vX.Y.Z", "--list", "--json")
 	var report struct {
 		SchemaVersion  int    `json:"schema_version"`
+		Status         string `json:"status"`
 		Profile        string `json:"profile"`
 		ListOnly       bool   `json:"list_only"`
 		NoLuaJIT       bool   `json:"no_luajit"`
@@ -1704,7 +1705,7 @@ func TestReleaseMatrixCIPlanReportIsMachineReadable(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("ci profile plan JSON failed to decode: %v\n%s", err, out)
 	}
-	if report.SchemaVersion != 1 || report.Profile != "release" || !report.ListOnly || report.NoLuaJIT || report.ReleaseVersion != "vX.Y.Z" || report.CommandCount != 1 || len(report.Commands) != 1 {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Profile != "release" || !report.ListOnly || report.NoLuaJIT || report.ReleaseVersion != "vX.Y.Z" || report.CommandCount != 1 || len(report.Commands) != 1 {
 		t.Fatalf("ci profile plan JSON = %+v, want release schema v1 plan", report)
 	}
 	command := report.Commands[0]

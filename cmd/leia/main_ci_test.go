@@ -100,7 +100,7 @@ func TestCICommandListJSONReportsProfilePlan(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout.String())
 	}
-	if report.SchemaVersion != 1 || report.Profile != "release" || !report.ListOnly || report.NoLuaJIT || report.ReleaseVersion != "vX.Y.Z" || report.CommandCount != 1 || len(report.Commands) != 1 {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Profile != "release" || !report.ListOnly || report.NoLuaJIT || report.ReleaseVersion != "vX.Y.Z" || report.CommandCount != 1 || len(report.Commands) != 1 {
 		t.Fatalf("report = %+v, want release schema v1 plan", report)
 	}
 	command := report.Commands[0]

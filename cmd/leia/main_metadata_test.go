@@ -305,7 +305,7 @@ func TestVersionCommandJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON version report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.SchemaVersion != 1 || report.Version == "" || report.GoVersion == "" || report.GOOS != goruntime.GOOS || report.GOARCH != goruntime.GOARCH {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Version == "" || report.GoVersion == "" || report.GOOS != goruntime.GOOS || report.GOARCH != goruntime.GOARCH {
 		t.Fatalf("report = %+v, want stable version metadata", report)
 	}
 }
@@ -342,7 +342,7 @@ func TestEnvCommandJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON env report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.SchemaVersion != 1 || report.Version.GoVersion == "" || report.WorkingDir == "" {
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.Version.Status != "pass" || report.Version.GoVersion == "" || report.WorkingDir == "" {
 		t.Fatalf("report = %+v, want stable environment metadata", report)
 	}
 	if !report.Project.Found || report.Project.Name != "demo" || report.Project.Root != dir {

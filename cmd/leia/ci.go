@@ -25,6 +25,7 @@ type ciCommand struct {
 
 type ciPlanReport struct {
 	SchemaVersion  int             `json:"schema_version"`
+	Status         string          `json:"status"`
 	Profile        string          `json:"profile"`
 	ListOnly       bool            `json:"list_only"`
 	NoLuaJIT       bool            `json:"no_luajit"`
@@ -124,6 +125,7 @@ func ciPlan(profile string, noLuaJIT bool, releaseVersion string, commands []ciC
 	}
 	return ciPlanReport{
 		SchemaVersion:  1,
+		Status:         "pass",
 		Profile:        profile,
 		ListOnly:       true,
 		NoLuaJIT:       noLuaJIT,

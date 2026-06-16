@@ -13,6 +13,7 @@ var cliVersion = "dev"
 
 type cliVersionReport struct {
 	SchemaVersion int    `json:"schema_version"`
+	Status        string `json:"status"`
 	Version       string `json:"version"`
 	GoVersion     string `json:"go_version"`
 	GOOS          string `json:"goos"`
@@ -58,6 +59,7 @@ func runVersionCommand(args []string, outw, errw io.Writer) int {
 func buildVersionReport() cliVersionReport {
 	report := cliVersionReport{
 		SchemaVersion: 1,
+		Status:        "pass",
 		Version:       cliVersion,
 		GoVersion:     goruntime.Version(),
 		GOOS:          goruntime.GOOS,
