@@ -228,6 +228,12 @@ func TestCapabilitiesJSON(t *testing.T) {
 			t.Fatalf("doc generate report capability = %+v, want count field %q", docGenerateReport, want)
 		}
 	}
+	modGraphReport := capabilitiesReport(caps.Tooling.Reports, "leia mod graph --json")
+	for _, want := range []string{"file_count", "diagnostic_count"} {
+		if modGraphReport == nil || !containsString(modGraphReport.CountFields, want) {
+			t.Fatalf("mod graph report capability = %+v, want count field %q", modGraphReport, want)
+		}
+	}
 }
 
 func TestCapabilitiesDefaultImportsStaySyncedWithPrelude(t *testing.T) {

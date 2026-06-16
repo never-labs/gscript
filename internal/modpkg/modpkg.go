@@ -23,10 +23,12 @@ import (
 const SumFileName = "leia.sum"
 
 type GraphReport struct {
-	SchemaVersion int          `json:"schema_version"`
-	Root          string       `json:"root"`
-	Files         []GraphFile  `json:"files"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	SchemaVersion   int          `json:"schema_version"`
+	Root            string       `json:"root"`
+	FileCount       int          `json:"file_count"`
+	DiagnosticCount int          `json:"diagnostic_count"`
+	Files           []GraphFile  `json:"files"`
+	Diagnostics     []Diagnostic `json:"diagnostics,omitempty"`
 }
 
 type GraphFile struct {
@@ -219,11 +221,13 @@ func Graph(path string) (GraphReport, error) {
 	report := GraphReport{SchemaVersion: 1, Root: abs}
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
+		setGraphReportCounts(&report)
 		return report, err
 	}
 	files, err := toolsource.Files(abs)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "LEIA9101", Message: err.Error()})
+		setGraphReportCounts(&report)
 		return report, err
 	}
 	excludes := graphExcludeRoots(abs)
@@ -242,10 +246,16 @@ func Graph(path string) (GraphReport, error) {
 		}
 		report.Files = append(report.Files, GraphFile{File: filepath.ToSlash(rel), Requires: requires})
 	}
+	setGraphReportCounts(&report)
 	if len(report.Diagnostics) > 0 {
 		return report, errors.New("module graph has diagnostics")
 	}
 	return report, nil
+}
+
+func setGraphReportCounts(report *GraphReport) {
+	report.FileCount = len(report.Files)
+	report.DiagnosticCount = len(report.Diagnostics)
 }
 
 func graphExcludeRoots(root string) []string {

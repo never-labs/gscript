@@ -2478,6 +2478,38 @@ func TestReleaseMatrixModuleDocsKeepFirstRunCommandsLocal(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixModuleGraphJSONReportsCounts(t *testing.T) {
+	root := findRepoRoot(t)
+	tmp := t.TempDir()
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "init", "--module", "github.com/example/project", "--dir", tmp)
+	source := filepath.Join(tmp, "main.leia")
+	if err := os.WriteFile(source, []byte("require(\"json\")\nprint(\"ok\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "graph", "--json", tmp)
+	var report struct {
+		SchemaVersion   int `json:"schema_version"`
+		FileCount       int `json:"file_count"`
+		DiagnosticCount int `json:"diagnostic_count"`
+		Files           []struct {
+			File     string   `json:"file"`
+			Requires []string `json:"requires"`
+		} `json:"files"`
+		Diagnostics []struct {
+			Code string `json:"code"`
+		} `json:"diagnostics"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("mod graph JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.FileCount != len(report.Files) || report.FileCount != 1 || report.DiagnosticCount != len(report.Diagnostics) || report.DiagnosticCount != 0 {
+		t.Fatalf("mod graph JSON = %+v, want counted schema v1 graph", report)
+	}
+	if report.Files[0].File != "main.leia" || !stringSliceContains(report.Files[0].Requires, "json") {
+		t.Fatalf("mod graph file = %+v, want main.leia requiring json", report.Files[0])
+	}
+}
+
 func TestReleaseMatrixSecurityDocsUseModuleScopedCapabilityCommand(t *testing.T) {
 	root := findRepoRoot(t)
 	security := readFileString(t, filepath.Join(root, "docs", "reference", "security", "index.md"))
