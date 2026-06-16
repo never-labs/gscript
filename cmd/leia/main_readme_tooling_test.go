@@ -135,6 +135,26 @@ func TestDocsHomeMainLeiaExampleStaysRunnable(t *testing.T) {
 	}
 }
 
+func TestDocsHomeLayoutPrimaryNavStaysProductFocused(t *testing.T) {
+	root := repoRootForBoundaryTest(t)
+	layout := readFileString(t, filepath.Join(root, "docs", "_layouts", "home.html"))
+	for _, want := range []string{
+		`href="{{ '/spec/' | relative_url }}"`,
+		`href="{{ '/playground.html' | relative_url }}"`,
+		`href="{{ '/reference/cli/' | relative_url }}"`,
+		`href="{{ '/guides/embedding.html' | relative_url }}"`,
+		`href="{{ '/reference/dialects/' | relative_url }}"`,
+		`href="{{ '/reference/performance/' | relative_url }}"`,
+	} {
+		if !strings.Contains(layout, want) {
+			t.Fatalf("home layout primary nav missing %q", want)
+		}
+	}
+	if strings.Contains(strings.ToLower(layout), "blog") {
+		t.Fatal("home layout must not restore blog navigation")
+	}
+}
+
 func TestReferenceDialectsIntroExampleStaysRunnable(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
 	data, err := os.ReadFile(filepath.Join(root, "docs", "reference", "dialects", "index.md"))
