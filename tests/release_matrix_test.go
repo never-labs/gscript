@@ -995,6 +995,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"go run ./cmd/leia playground --addr 127.0.0.1:8080",
 		"bash scripts/production_check.sh --quick --list --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench none --json",
+		"bash scripts/editor_check.sh --json",
 		"bash scripts/release_distribution_check.sh --json",
 		"bash scripts/release_artifacts_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_artifacts_check.sh",
@@ -1114,6 +1115,7 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 		"docs/reference/platforms/index.md",
 		"bash scripts/production_check.sh --full --release-profile --release-version vX.Y.Z --list --json",
 		"bash scripts/q_conformance_gate.sh --scope core --bench smoke --json",
+		"bash scripts/editor_check.sh --json",
 		"bash scripts/public_release_blockers_check.sh --json",
 		"bash scripts/release_notes_check.sh --json --version vX.Y.Z",
 		"bash scripts/release_distribution_check.sh --json",
@@ -1400,6 +1402,53 @@ func TestReleaseMatrixQConformanceReportIsMachineReadable(t *testing.T) {
 	}
 	if report.BenchmarkJSON != "" || report.BenchmarkMarkdown != "" {
 		t.Fatalf("q conformance no-bench JSON should not report benchmark artifacts: %+v", report)
+	}
+}
+
+func TestReleaseMatrixEditorAssetReportIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	out := runCommand(t, root, 30*time.Second, "bash", "scripts/editor_check.sh", "--json")
+	var report struct {
+		SchemaVersion     int      `json:"schema_version"`
+		Status            string   `json:"status"`
+		RequireTreeSitter bool     `json:"require_tree_sitter"`
+		TreeSitterStatus  string   `json:"tree_sitter_status"`
+		TreeSitterCommand string   `json:"tree_sitter_command"`
+		EmacsStatus       string   `json:"emacs_status"`
+		EmacsCommand      string   `json:"emacs_command"`
+		TextMateGrammars  []string `json:"textmate_grammars"`
+		VSCodeAssets      []string `json:"vscode_assets"`
+		TreeSitterAssets  []string `json:"tree_sitter_assets"`
+		SmokeTests        []string `json:"smoke_tests"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("editor asset JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || report.Status != "pass" || report.RequireTreeSitter {
+		t.Fatalf("editor asset JSON = %+v, want passing schema v1 non-strict report", report)
+	}
+	for _, status := range []string{report.TreeSitterStatus, report.EmacsStatus} {
+		if status != "verified" && status != "skipped" {
+			t.Fatalf("editor asset JSON has unexpected optional tool status %q: %+v", status, report)
+		}
+	}
+	for _, want := range []string{"tools/syntax/textmate/leia.tmLanguage.json", "tools/syntax/textmate/leia-mod.tmLanguage.json"} {
+		if !stringSliceContains(report.TextMateGrammars, want) {
+			t.Fatalf("editor asset JSON missing TextMate grammar %q: %+v", want, report.TextMateGrammars)
+		}
+	}
+	for _, want := range []string{"editors/vscode/package.json", "editors/vscode/syntaxes/leia.tmLanguage.json"} {
+		if !stringSliceContains(report.VSCodeAssets, want) {
+			t.Fatalf("editor asset JSON missing VS Code asset %q: %+v", want, report.VSCodeAssets)
+		}
+	}
+	for _, want := range []string{"tools/tree-sitter-leia/grammar.js", "tools/tree-sitter-leia/src/grammar.json"} {
+		if !stringSliceContains(report.TreeSitterAssets, want) {
+			t.Fatalf("editor asset JSON missing tree-sitter asset %q: %+v", want, report.TreeSitterAssets)
+		}
+	}
+	if !stringSliceContains(report.SmokeTests, "tools/editor/smoke/editor_smoke.py") {
+		t.Fatalf("editor asset JSON missing smoke test: %+v", report.SmokeTests)
 	}
 }
 

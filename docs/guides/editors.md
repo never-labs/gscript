@@ -50,6 +50,7 @@ Run the editor guard locally:
 
 ```bash
 bash scripts/editor_check.sh
+bash scripts/editor_check.sh --json
 ```
 
 If the tree-sitter CLI is available and you want the full corpus check:
