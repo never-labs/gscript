@@ -49,6 +49,8 @@ if errors.As(err, &budgetErr) {
 | `leia fmt --check --json` | Formatter check report with changed files and per-file errors. |
 | `leia check --json` | Aggregate check report with step status and exit codes. |
 | `leia config --json` | Resolved project configuration with `ok`, discovery status, and diagnostics. |
+| `leia test --json` | Test run report with schema version, pass/fail counts, seed, golden mode, and per-file results. |
+| `leia test --list --json` | Test discovery report with schema version, list mode, file count, and selected files. |
 | `leia inspect bytecode --json` | Compiled bytecode metadata, disassembly text, nested proto summary, and JIT callable decisions. |
 | `leia inspect directives --json` | Parsed `//leia:` file directives. |
 | `leia mod ... --json` | Module graph, list, verify, capability, and vendoring reports. |

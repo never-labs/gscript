@@ -65,7 +65,7 @@ func TestRunTestCommandDefaultsToCurrentDirectory(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
 	}
-	if !result.OK || result.Total != 1 || result.Passed != 1 {
+	if result.SchemaVersion != 1 || !result.OK || result.Total != 1 || result.Passed != 1 {
 		t.Fatalf("result = %+v, want one passing default-directory test", result)
 	}
 }
@@ -158,7 +158,7 @@ func TestRunTestCommandJSONReportsResults(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
 	}
-	if !result.OK || result.Total != 1 || result.Passed != 1 || result.Failed != 0 || result.GoldenMode != "auto" {
+	if result.SchemaVersion != 1 || !result.OK || result.Total != 1 || result.Passed != 1 || result.Failed != 0 || result.GoldenMode != "auto" {
 		t.Fatalf("result = %+v, want one passing test", result)
 	}
 	if len(result.Files) != 1 || result.Files[0].File != okPath || !result.Files[0].OK {
@@ -193,7 +193,7 @@ func TestRunTestCommandWritesJSONReportToOutputFile(t *testing.T) {
 	if err := json.Unmarshal(data, &result); err != nil {
 		t.Fatalf("report is not JSON: %v; data = %q", err, string(data))
 	}
-	if !result.OK || result.Total != 1 || result.Passed != 1 || result.GoldenMode != "auto" {
+	if result.SchemaVersion != 1 || !result.OK || result.Total != 1 || result.Passed != 1 || result.GoldenMode != "auto" {
 		t.Fatalf("result = %+v, want one passing test", result)
 	}
 }
@@ -250,7 +250,7 @@ func TestRunTestCommandWritesFailingJSONReportToOutputFile(t *testing.T) {
 	if err := json.Unmarshal(data, &result); err != nil {
 		t.Fatalf("report is not JSON: %v; data = %q", err, string(data))
 	}
-	if result.OK || result.Total != 1 || result.Failed != 1 || len(result.Files) != 1 {
+	if result.SchemaVersion != 1 || result.OK || result.Total != 1 || result.Failed != 1 || len(result.Files) != 1 {
 		t.Fatalf("result = %+v, want one failing test", result)
 	}
 }
@@ -349,6 +349,37 @@ func TestRunTestCommandListsFiles(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunTestCommandListJSONReportsSchemaAndCounts(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "a.leia")
+	second := filepath.Join(dir, "b.leia")
+	if err := os.WriteFile(first, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("x := 2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--list", "--json", "--golden=require", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var report testListReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON test list report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || !report.ListOnly || report.GoldenMode != "require" || report.FileCount != 2 || len(report.Files) != 2 {
+		t.Fatalf("report = %+v, want two-file schema v1 list report", report)
+	}
+	if report.Files[0] != first || report.Files[1] != second {
+		t.Fatalf("files = %#v, want sorted files %#v", report.Files, []string{first, second})
 	}
 }
 

@@ -75,10 +75,13 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		}
 		if *format == "json" {
 			var buf bytes.Buffer
-			if err := json.NewEncoder(&buf).Encode(struct {
-				GoldenMode string   `json:"golden_mode"`
-				Files      []string `json:"files"`
-			}{GoldenMode: *goldenMode, Files: files}); err != nil {
+			if err := json.NewEncoder(&buf).Encode(testListReport{
+				SchemaVersion: 1,
+				ListOnly:      true,
+				GoldenMode:    *goldenMode,
+				FileCount:     len(files),
+				Files:         files,
+			}); err != nil {
 				fmt.Fprintf(errw, "leia test: write json: %v\n", err)
 				return 1
 			}
@@ -144,13 +147,22 @@ func writeCLIOutput(outw io.Writer, outputPath string, data []byte) error {
 }
 
 type testRunResult struct {
-	OK         bool             `json:"ok"`
-	Total      int              `json:"total"`
-	Passed     int              `json:"passed"`
-	Failed     int              `json:"failed"`
-	Seed       string           `json:"seed,omitempty"`
-	GoldenMode string           `json:"golden_mode"`
-	Files      []testFileResult `json:"files"`
+	SchemaVersion int              `json:"schema_version"`
+	OK            bool             `json:"ok"`
+	Total         int              `json:"total"`
+	Passed        int              `json:"passed"`
+	Failed        int              `json:"failed"`
+	Seed          string           `json:"seed,omitempty"`
+	GoldenMode    string           `json:"golden_mode"`
+	Files         []testFileResult `json:"files"`
+}
+
+type testListReport struct {
+	SchemaVersion int      `json:"schema_version"`
+	ListOnly      bool     `json:"list_only"`
+	GoldenMode    string   `json:"golden_mode"`
+	FileCount     int      `json:"file_count"`
+	Files         []string `json:"files"`
 }
 
 type testFileResult struct {
@@ -174,20 +186,22 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 			fmt.Fprintf(errw, "%s: %v\n", path, err)
 		}
 		return testRunResult{
-			OK:         false,
-			Total:      1,
-			Failed:     1,
-			Files:      []testFileResult{{File: path, OK: false, Error: err.Error()}},
-			GoldenMode: goldenMode,
+			SchemaVersion: 1,
+			OK:            false,
+			Total:         1,
+			Failed:        1,
+			Files:         []testFileResult{{File: path, OK: false, Error: err.Error()}},
+			GoldenMode:    goldenMode,
 		}
 	}
 
 	result := testRunResult{
-		OK:         true,
-		Total:      len(files),
-		Seed:       seed,
-		GoldenMode: goldenMode,
-		Files:      make([]testFileResult, 0, len(files)),
+		SchemaVersion: 1,
+		OK:            true,
+		Total:         len(files),
+		Seed:          seed,
+		GoldenMode:    goldenMode,
+		Files:         make([]testFileResult, 0, len(files)),
 	}
 	if seed != "" {
 		oldSeed, hadSeed := os.LookupEnv("LEIA_TEST_SEED")

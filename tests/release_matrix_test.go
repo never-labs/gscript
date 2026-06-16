@@ -1298,6 +1298,53 @@ func TestReleaseMatrixFmtCheckJSONIsMachineReadable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixTestCommandJSONReportsAreMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.leia")
+	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".leia")+".out", []byte("ok\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	runOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "--json", dir)
+	var runReport struct {
+		SchemaVersion int    `json:"schema_version"`
+		OK            bool   `json:"ok"`
+		Total         int    `json:"total"`
+		Passed        int    `json:"passed"`
+		Failed        int    `json:"failed"`
+		GoldenMode    string `json:"golden_mode"`
+		Files         []struct {
+			File string `json:"file"`
+			OK   bool   `json:"ok"`
+		} `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(runOut), &runReport); err != nil {
+		t.Fatalf("test run JSON failed to decode: %v\n%s", err, runOut)
+	}
+	if runReport.SchemaVersion != 1 || !runReport.OK || runReport.Total != 1 || runReport.Passed != 1 || runReport.Failed != 0 || runReport.GoldenMode != "auto" || len(runReport.Files) != 1 || runReport.Files[0].File != path || !runReport.Files[0].OK {
+		t.Fatalf("test run JSON = %+v, want passing schema v1 report", runReport)
+	}
+
+	listOut := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "--list", "--json", dir)
+	var listReport struct {
+		SchemaVersion int      `json:"schema_version"`
+		ListOnly      bool     `json:"list_only"`
+		GoldenMode    string   `json:"golden_mode"`
+		FileCount     int      `json:"file_count"`
+		Files         []string `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(listOut), &listReport); err != nil {
+		t.Fatalf("test list JSON failed to decode: %v\n%s", err, listOut)
+	}
+	if listReport.SchemaVersion != 1 || !listReport.ListOnly || listReport.GoldenMode != "auto" || listReport.FileCount != 1 || len(listReport.Files) != 1 || listReport.Files[0] != path {
+		t.Fatalf("test list JSON = %+v, want one-file schema v1 list report", listReport)
+	}
+}
+
 func TestReleaseMatrixReleaseNotesReportIsMachineReadable(t *testing.T) {
 	root := findRepoRoot(t)
 	out := runCommand(t, root, 30*time.Second, "bash", "scripts/release_notes_check.sh", "--json")
