@@ -16,7 +16,7 @@ Generated from the current `leia` binary capabilities.
 | `eval` | `usage: leia eval [--vm] [--jit=true|false] <source> [args...]` | Execute source passed on the command line. |
 | `evaluate` | `usage: leia evaluate [--json|--format=text|json|html] [--report FILE] [--gate] [--parallel N] [--baseline FILE|--compare OLD NEW] [--list] [--filter TEXT] [--replay FILE|--record FILE|--update-golden FILE] [path-or-dir...]` | Run evaluation checks and emit an agent evaluation report. |
 | `examples` | `usage: leia examples [list|show|run|check] [--json] [ID-or-path]` | List, inspect, run, or check repository example projects. |
-| `fmt` | `usage: leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]` | Normalize source formatting. |
+| `fmt` | `usage: leia fmt [--check] [--write] [--json] [--stdin-file-name FILE] <path-or-dir> [...]` | Normalize source formatting. |
 | `help` | `usage: leia help [command]` | Show command help. |
 | `inspect` | `usage: leia inspect bytecode [--json] [--proto NAME] <file.leia>
        leia inspect directives [--json] <file.leia>` | Inspect compiled artifacts and file directives. |

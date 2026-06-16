@@ -988,6 +988,7 @@ func TestReleaseMatrixToolingGuideCommandsHaveEvidence(t *testing.T) {
 		"## Playground",
 		"## Release Evidence",
 		"go run ./cmd/leia mod verify --json examples/ui/package_managed",
+		"go run ./cmd/leia fmt --check --json tests/smoke/01_basic.leia",
 		"go run ./cmd/leia doc check",
 		"GitHub Pages publishes `docs/` through `.github/workflows/pages.yml`",
 		"bash scripts/worktree_audit.sh --json",
@@ -1260,6 +1261,40 @@ print(add(1, 2))
 	child := report.Proto.Children[0]
 	if child.DisplayName != "add" || child.NumParams != 2 || child.InstructionCount == 0 || !strings.Contains(child.Disassembly, "RETURN") {
 		t.Fatalf("inspect bytecode child proto = %+v, want add disassembly", child)
+	}
+}
+
+func TestReleaseMatrixFmtCheckJSONIsMachineReadable(t *testing.T) {
+	root := findRepoRoot(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "formatted.leia")
+	if err := os.WriteFile(path, []byte("x := 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "fmt", "--check", "--json", path)
+	var report struct {
+		SchemaVersion int `json:"schema_version"`
+		OK            bool
+		Mode          string `json:"mode"`
+		Stdin         bool   `json:"stdin"`
+		FileCount     int    `json:"file_count"`
+		ChangedCount  int    `json:"changed_count"`
+		ErrorCount    int    `json:"error_count"`
+		Files         []struct {
+			Path    string `json:"path"`
+			Changed bool   `json:"changed"`
+			Written bool   `json:"written"`
+			Error   string `json:"error"`
+		} `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("fmt check JSON failed to decode: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || !report.OK || report.Mode != "check" || report.Stdin || report.FileCount != 1 || report.ChangedCount != 0 || report.ErrorCount != 0 || len(report.Files) != 1 {
+		t.Fatalf("fmt check JSON = %+v, want passing schema v1 check report", report)
+	}
+	if got := report.Files[0]; got.Path != path || got.Changed || got.Written || got.Error != "" {
+		t.Fatalf("fmt check JSON file = %+v, want unchanged file %s", got, path)
 	}
 }
 

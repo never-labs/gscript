@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -16,13 +17,14 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	check := fs.Bool("check", false, "check whether files are formatted without writing")
 	write := fs.Bool("write", false, "write formatted files in place")
+	jsonOut := fs.Bool("json", false, "print a machine-readable formatter report")
 	stdinFileName := fs.String("stdin-file-name", "", "read source from stdin and use this filename for diagnostics")
 	if code, done := parseCLIFlags(fs, args); done {
 		return code
 	}
 	paths := fs.Args()
 	if len(paths) == 0 && *stdinFileName == "" {
-		fmt.Fprintln(errw, "usage: leia fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]")
+		fmt.Fprintln(errw, fmtUsage)
 		return 2
 	}
 	if *check && *write {
@@ -38,32 +40,63 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 			fmt.Fprintln(errw, "leia fmt: --stdin-file-name cannot be used with --write")
 			return 2
 		}
-		return runFmtStdin(*stdinFileName, *check, outw, errw)
+		if *jsonOut && !*check {
+			fmt.Fprintln(errw, "leia fmt: --json with --stdin-file-name requires --check")
+			return 2
+		}
+		return runFmtStdin(*stdinFileName, *check, *jsonOut, outw, errw)
 	}
 
 	writeFiles := *write || !*check
+	report := fmtReport{SchemaVersion: 1, OK: true, Mode: fmtMode(*check, writeFiles)}
 	ok := true
 	for _, path := range paths {
 		files, err := toolsource.Files(path)
 		if err != nil {
-			fmt.Fprintf(errw, "%s: %v\n", path, err)
+			if !*jsonOut {
+				fmt.Fprintf(errw, "%s: %v\n", path, err)
+			}
+			report.OK = false
+			report.ErrorCount++
+			report.Files = append(report.Files, fmtFileReport{Path: path, Error: err.Error()})
 			ok = false
 			continue
 		}
 		for _, filename := range files {
 			changed, err := formatFile(filename, writeFiles)
+			item := fmtFileReport{Path: filename, Changed: changed, Written: writeFiles && changed}
 			if err != nil {
-				fmt.Fprintf(errw, "%s: %v\n", filename, err)
+				if !*jsonOut {
+					fmt.Fprintf(errw, "%s: %v\n", filename, err)
+				}
+				report.OK = false
+				report.ErrorCount++
+				item.Error = err.Error()
+				report.Files = append(report.Files, item)
 				ok = false
 				continue
 			}
+			report.FileCount++
+			if changed {
+				report.ChangedCount++
+			}
+			report.Files = append(report.Files, item)
 			if *check && changed {
-				fmt.Fprintf(errw, "%s: not formatted\n", filename)
+				if !*jsonOut {
+					fmt.Fprintf(errw, "%s: not formatted\n", filename)
+				}
+				report.OK = false
 				ok = false
 			}
-			if writeFiles && changed {
+			if writeFiles && changed && !*jsonOut {
 				fmt.Fprintln(outw, filename)
 			}
+		}
+	}
+	if *jsonOut {
+		if err := writeFmtReport(outw, report); err != nil {
+			fmt.Fprintf(errw, "leia fmt: write json: %v\n", err)
+			return 1
 		}
 	}
 	if !ok {
@@ -72,20 +105,100 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 	return 0
 }
 
-func runFmtStdin(filename string, check bool, outw, errw io.Writer) int {
+const fmtUsage = "usage: leia fmt [--check] [--write] [--json] [--stdin-file-name FILE] <path-or-dir> [...]"
+
+type fmtReport struct {
+	SchemaVersion int             `json:"schema_version"`
+	OK            bool            `json:"ok"`
+	Mode          string          `json:"mode"`
+	Stdin         bool            `json:"stdin"`
+	FileCount     int             `json:"file_count"`
+	ChangedCount  int             `json:"changed_count"`
+	ErrorCount    int             `json:"error_count"`
+	Files         []fmtFileReport `json:"files"`
+}
+
+type fmtFileReport struct {
+	Path    string `json:"path"`
+	Changed bool   `json:"changed"`
+	Written bool   `json:"written"`
+	Error   string `json:"error,omitempty"`
+}
+
+func fmtMode(check, writeFiles bool) string {
+	if check {
+		return "check"
+	}
+	if writeFiles {
+		return "write"
+	}
+	return "format"
+}
+
+func writeFmtReport(w io.Writer, report fmtReport) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(report)
+}
+
+func runFmtStdin(filename string, check bool, jsonOut bool, outw, errw io.Writer) int {
 	src, err := io.ReadAll(cliStdin)
 	if err != nil {
-		fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		if !jsonOut {
+			fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		}
+		if jsonOut {
+			_ = writeFmtReport(outw, fmtReport{
+				SchemaVersion: 1,
+				OK:            false,
+				Mode:          "check",
+				Stdin:         true,
+				ErrorCount:    1,
+				Files:         []fmtFileReport{{Path: filename, Error: err.Error()}},
+			})
+		}
 		return 1
 	}
 	formatted, err := formatSource(filename, src)
 	if err != nil {
-		fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		if !jsonOut {
+			fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		}
+		if jsonOut {
+			_ = writeFmtReport(outw, fmtReport{
+				SchemaVersion: 1,
+				OK:            false,
+				Mode:          "check",
+				Stdin:         true,
+				ErrorCount:    1,
+				Files:         []fmtFileReport{{Path: filename, Error: err.Error()}},
+			})
+		}
 		return 1
 	}
 	if check {
-		if !bytes.Equal(src, formatted) {
-			fmt.Fprintf(errw, "%s: not formatted\n", filename)
+		changed := !bytes.Equal(src, formatted)
+		if jsonOut {
+			report := fmtReport{
+				SchemaVersion: 1,
+				OK:            !changed,
+				Mode:          "check",
+				Stdin:         true,
+				FileCount:     1,
+				Files:         []fmtFileReport{{Path: filename, Changed: changed}},
+			}
+			if changed {
+				report.ChangedCount = 1
+			}
+			if err := writeFmtReport(outw, report); err != nil {
+				fmt.Fprintf(errw, "leia fmt: write json: %v\n", err)
+				return 1
+			}
+		}
+		if changed {
+			if !jsonOut {
+				fmt.Fprintf(errw, "%s: not formatted\n", filename)
+			}
 			return 1
 		}
 		return 0
